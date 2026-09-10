@@ -287,7 +287,8 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
 - **Logo** (SVG con las letras en trazados, no dependen de la fuente), en `public/`:
   `logo-redestina.svg` (horizontal, por defecto, sobre crema o blanco),
   `logo-redestina-apilado.svg` (espacios cuadrados), `logo-redestina-negativo.svg` (**sobre verde o
-  fondos oscuros**: sidebar, cabecera y pie de la landing, pantallas de acceso),
+  fondos oscuros**: sidebar, pie de la landing, pantallas de acceso; la barra superior de la
+  landing es clara y lleva el logo en color),
   `logo-redestina-mono.svg` (un color, `currentColor`), `isotipo-redestina.svg` (solo la hoja:
   favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. `logo-email.png` es el negativo
   rasterizado a 410×120 para la cabecera verde de los correos. Nada de `brightness-0 invert` ni
@@ -1928,10 +1929,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
 
 41. ~~**El rebranding a Redestina es textual, no visual.**~~ — **resuelta (10-09-2026)**: sistema
     de diseño implantado (§2bis) con el logo nuevo, sus variantes, iconos PWA, favicon y
-    `logo-email.png`. Queda por hacer, no como deuda sino como decisión de diseño: la cabecera y el
-    pie de la landing siguen en verde con el logo negativo; `design/DESIGN.md §6` propone cabecera
-    clara con el logo en color. Y las Edge Functions con la plantilla de correo nueva hay que
-    **redesplegarlas** (`/publicar`, §11) para que los correos salgan con los colores nuevos.
+    `logo-email.png`; la barra superior de la landing es clara con el logo en color (como propone
+    `design/DESIGN.md §6`) y el hero, el pie y los accesos van en verde con el negativo. Las Edge
+    Functions con la plantilla de correo nueva hay que **redesplegarlas** (`/publicar`, §11) para
+    que los correos salgan con los colores nuevos.
 42. ~~**La infraestructura todavía responde al nombre viejo.**~~ — **resuelta (10-09-2026)**:
     proyecto de Vercel, dominio, `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM`, `site_url` y
     `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que

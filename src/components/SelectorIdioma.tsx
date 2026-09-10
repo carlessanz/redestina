@@ -13,7 +13,7 @@ import {
   DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu'
 
-/** `clar` = va sobre el fondo navy (barra de la landing, pie de los accesos). */
+/** `clar` = va sobre el fondo verde (hero de la landing, pie de los accesos). */
 export default function SelectorIdioma({ clar = false }: { clar?: boolean }) {
   const { t, lang, setLang } = useT()
 
@@ -24,7 +24,7 @@ export default function SelectorIdioma({ clar = false }: { clar?: boolean }) {
           variant="ghost"
           size="sm"
           aria-label={t('set.language')}
-          className={cn('gap-1.5', clar && 'text-secondary/80 hover:bg-white/10 hover:text-secondary')}
+          className={cn('gap-1.5', clar && 'text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground')}
         >
           <Languages className="size-4" />
           <span className="text-xs font-medium uppercase">{lang}</span>

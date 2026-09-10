@@ -17,13 +17,10 @@ import { ComprovantSessio } from '../../components/LayoutAcces'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-// Coral de la identidad Redestina para la acción principal. No hay variante de Button que lo
-// dé: `default` es navy y `accent` en shadcn está reservado a los hovers.
-const CORAL = 'bg-accent text-accent-foreground hover:bg-accent/90'
-
-// Ghost sobre navy: mismo tratamiento que SelectorIdioma con `clar`, porque el ghost de
-// shadcn hace hover en coral y sobre este fondo canta.
-const GHOST_CLAR = 'text-secondary/80 hover:bg-white/10 hover:text-secondary'
+// Botón principal cuando va SOBRE VERDE (el hero): crema con texto verde, porque el `default`
+// de Button es verde y desaparecería. En fondos claros se usa `default` sin más. El coral no es
+// variante de botón (design/DESIGN.md §6).
+const BOTO_SOBRE_VERD = 'bg-primary-foreground text-primary hover:bg-primary-foreground/90'
 
 // Los cuatro momentos del proceso, los mismos que el panel del equipo enseña en su
 // tablero; aquí contados para quien aún no es usuario.
@@ -43,51 +40,51 @@ export default function Landing() {
 
   return (
     <div className="min-h-dvh bg-background">
-      {/* Barra superior. Sticky sobre toda la página: es hija directa de la raíz, no del
-          bloque navy, o al salir el hero de pantalla se iría con él. */}
-      <header className="sticky top-0 z-40 border-b border-white/10 bg-primary text-primary-foreground">
+      {/* Barra superior clara con el logo en color (design/DESIGN.md §6, «Parte pública»).
+          Sticky sobre toda la página: es hija directa de la raíz, no del hero, o al salir el
+          hero de pantalla se iría con él. */}
+      <header className="sticky top-0 z-40 border-b border-border bg-card text-foreground">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
           <Link to="/" aria-label="Redestina" className="flex items-center">
-            {/* Sobre verde va la versión negativa del logo (design/DESIGN.md §4): sin filtros. */}
-            <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-8 w-auto" />
+            <img src="/logo-redestina.svg" alt="Redestina" className="h-8 w-auto" />
           </Link>
 
           <nav className="mx-auto hidden items-center gap-6 md:flex">
-            <a href="#com-funciona" className="text-sm text-secondary/80 transition-colors hover:text-secondary">
+            <a href="#com-funciona" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               {t('land.nav_how')}
             </a>
-            <a href="#per-a-qui" className="text-sm text-secondary/80 transition-colors hover:text-secondary">
+            <a href="#per-a-qui" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
               {t('land.nav_who')}
             </a>
           </nav>
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
-            <SelectorIdioma clar />
-            <Button asChild variant="ghost" size="sm" className={GHOST_CLAR}>
+            <SelectorIdioma />
+            <Button asChild variant="ghost" size="sm">
               <Link to="/login">{t('land.enter')}</Link>
             </Button>
-            <Button asChild size="sm" className={CORAL}>
+            <Button asChild size="sm">
               <Link to="/registre">{t('land.signup')}</Link>
             </Button>
           </div>
         </div>
       </header>
 
-      {/* Hero: sigue el navy de la barra, sin costura entre los dos */}
+      {/* Hero en verde, con los botones en crema (BOTO_SOBRE_VERD) */}
       <section className="bg-primary px-4 py-16 text-center text-primary-foreground md:py-24">
         <h1 className="text-3xl font-bold md:text-5xl">{t('land.hero_title')}</h1>
         <p className="mx-auto mt-4 max-w-2xl text-primary-foreground/80 md:text-lg">
           {t('land.hero_sub')}
         </p>
         <div className="mt-8 flex flex-col items-center justify-center gap-3 sm:flex-row">
-          <Button asChild size="lg" className={CORAL}>
+          <Button asChild size="lg" className={BOTO_SOBRE_VERD}>
             <Link to="/registre?rol=productor">{t('land.hero_prod')}</Link>
           </Button>
           <Button
             asChild
             size="lg"
             variant="outline"
-            className="border-secondary/40 bg-transparent text-secondary shadow-none hover:bg-white/10 hover:text-secondary"
+            className="border-primary-foreground/40 bg-transparent text-primary-foreground shadow-none hover:bg-primary-foreground/10 hover:text-primary-foreground"
           >
             <Link to="/registre?rol=entitat">{t('land.hero_rec')}</Link>
           </Button>
@@ -105,10 +102,10 @@ export default function Landing() {
             hamburguesa porque son dos: un menú desplegable para dos anclas es más
             maquinaria que la que resuelve. */}
         <nav className="mt-8 flex items-center justify-center gap-6 md:hidden" aria-label={t('land.nav_how')}>
-          <a href="#com-funciona" className="py-2 text-sm text-secondary underline underline-offset-4">
+          <a href="#com-funciona" className="py-2 text-sm text-primary-foreground underline underline-offset-4">
             {t('land.nav_how')}
           </a>
-          <a href="#per-a-qui" className="py-2 text-sm text-secondary underline underline-offset-4">
+          <a href="#per-a-qui" className="py-2 text-sm text-primary-foreground underline underline-offset-4">
             {t('land.nav_who')}
           </a>
         </nav>
@@ -143,7 +140,7 @@ export default function Landing() {
               <CardContent className="pt-6">
                 <h3 className="text-lg font-semibold">{t('land.prod_title')}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{t('land.prod_d')}</p>
-                <Button asChild className={`mt-5 ${CORAL}`}>
+                <Button asChild className="mt-5">
                   <Link to="/registre?rol=productor">{t('land.prod_cta')}</Link>
                 </Button>
               </CardContent>
@@ -169,11 +166,11 @@ export default function Landing() {
             href="https://espigoladors.cat"
             target="_blank"
             rel="noreferrer"
-            className="text-sm text-secondary underline underline-offset-4 transition-opacity hover:opacity-80"
+            className="text-sm text-primary-foreground underline underline-offset-4 transition-opacity hover:opacity-80"
           >
             {t('land.foot_web')}
           </a>
-          <p className="text-xs text-secondary/60">{t('login.foot')}</p>
+          <p className="text-xs text-primary-foreground/60">{t('login.foot')}</p>
         </div>
       </footer>
     </div>

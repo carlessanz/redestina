@@ -35,7 +35,7 @@ export default function LayoutAcces({
           <img src="/logo-redestina-negativo.svg" alt="Redestina" className="mx-auto mb-8 h-11 w-auto" />
         </Link>
         {children}
-        <p className="mt-4 text-center text-xs text-secondary/70">{t('login.foot')}</p>
+        <p className="mt-4 text-center text-xs text-primary-foreground/70">{t('login.foot')}</p>
         <div className="mt-1 flex justify-center">
           <SelectorIdioma clar />
         </div>
@@ -49,7 +49,7 @@ export function ComprovantSessio() {
   const { t } = useT()
   return (
     <div className="grid min-h-dvh place-items-center bg-primary">
-      <p className="text-secondary/80">{t('login.checking')}</p>
+      <p className="text-primary-foreground/80">{t('login.checking')}</p>
     </div>
   )
 }
