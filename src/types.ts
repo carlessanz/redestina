@@ -579,6 +579,8 @@ export interface CierreDonante {
   id: string
   cierre_id: string
   productor_id: string
+  /** `donacio` = certificado de donación (con importes y factura) · `transaccio` = de transacción */
+  tipo: 'donacio' | 'transaccio'
   datos_fiscales: Record<string, string | null> | null
   kg_total: number
   valor_total: number
@@ -667,4 +669,39 @@ export interface ConvenioExigido {
   valorizacion: 'donacio' | 'venda' | 'maquila'
   parte: 'entrega' | 'recibe'
   tipo_convenio: ConvenioTipo
+}
+
+// --- Plan de prevención (fase 5, migraciones 20270301*) ---
+
+export interface PlanPrevencion {
+  id: string
+  tipo_org: 'productor' | 'entidad'
+  productor_id: string | null
+  entidad_id: string | null
+  nivel: 'basic' | 'personalitzat'
+  /**
+   * ⚠️ El cuestionario real NO existe todavía (anexo B del funcional, material de la fase 0):
+   * la base solo impone la forma del sobre. `versio_questionari = 0` marca las filas hechas
+   * antes de que ese anexo exista.
+   */
+  respuestas: {
+    questionari?: string
+    versio_questionari?: number
+    respostes?: { id: string; pregunta?: string; valor?: unknown }[]
+    notes?: string
+  }
+  version: number
+  vigente: boolean
+  estado: 'esborrany' | 'emes' | 'substituit'
+  idioma: 'ca' | 'es'
+  serie: string | null
+  ejercicio: number | null
+  numero: number | null
+  numero_completo: string | null
+  creado_por: string | null
+  emitido_por: string | null
+  emitido_at: string | null
+  sustituido_por: string | null
+  created_at: string
+  updated_at: string
 }

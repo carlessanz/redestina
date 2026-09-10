@@ -33,6 +33,8 @@ import { renderRec } from "../_shared/pdf/render/rec.ts";
 import type { DatosCierre } from "../_shared/pdf/render/cierre.ts";
 import { renderRes } from "../_shared/pdf/render/res.ts";
 import { renderCd } from "../_shared/pdf/render/cd.ts";
+import { renderCt } from "../_shared/pdf/render/ct.ts";
+import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
 
@@ -350,9 +352,11 @@ async function renderizar(
     return await renderOpe(activos, op);
   }
 
-  // El cierre anual: resumen y certificado. Comparten snapshot y esqueleto (`cierre.ts`)
-  // y son los únicos, con el futuro CT, que imprimen euros.
-  if (doc.tipo === "RES" || doc.tipo === "CD") {
+  // El cierre anual: resumen, certificado de donación y certificado de transacción.
+  // Comparten snapshot y esqueleto (`cierre.ts`). ⚠️ De los tres, solo RES y CD imprimen
+  // euros: el CT no lleva ninguno, y no porque aquí se filtre nada, sino porque su
+  // snapshot no trae ni una cifra en euros (§ct.ts).
+  if (doc.tipo === "RES" || doc.tipo === "CD" || doc.tipo === "CT") {
     const base = {
       datos: datos as DatosCierre,
       sha256Datos: doc.sha256_datos,
@@ -367,14 +371,27 @@ async function renderizar(
         enlaceDias: 60,
       }, doc.idioma);
     }
+    // Los dos certificados los firma la misma apoderada, con el mismo PNG y el mismo DNI
+    // que `documentos.datos` no lleva: la descarga es la misma para CD y para CT.
     const firma = await activosFirma(supabase);
     if (firma.msDescarga > 1) {
       console.log(JSON.stringify({
         fn: "generar-documento",
+        tipo: doc.tipo,
         activos_firma_ms: Number(firma.msDescarga.toFixed(1)),
         firma: firma.firmaPng !== null,
         segell: firma.selloPng !== null,
       }));
+    }
+    if (doc.tipo === "CT") {
+      // Sin `rectificativo`: no existe el CT rectificativo (no hay `R-CT` ni
+      // `rectificar_certificado_transaccion`), así que no se finge que lo haya.
+      return await renderCt(activos, {
+        ...base,
+        apoderadaDni: firma.apoderadaDni,
+        firmaPng: firma.firmaPng,
+        selloPng: firma.selloPng,
+      }, doc.idioma);
     }
     return await renderCd(activos, {
       ...base,
@@ -417,6 +434,18 @@ async function renderizar(
       selloPng: extras.selloPng,
       identidades: extras.identidades,
       canal: extras.canal,
+    }, doc.idioma);
+  }
+
+  // El plan de prevención (fase 5). No lleva firma ni envío: `plan_emet_document()` deja
+  // `documentos.envio` a null a propósito, porque el plan se descarga —el panel lo espera
+  // por polling—, no se manda por correo.
+  if (doc.tipo === "PLA") {
+    return await renderPla(activos, {
+      datos: datos as DatosPlan,
+      sha256Datos: doc.sha256_datos,
+      plantilla: await plantillaDe(supabase, doc.plantilla_id),
+      modo: doc.modo === "prueba" ? "prueba" : "real",
     }, doc.idioma);
   }
 

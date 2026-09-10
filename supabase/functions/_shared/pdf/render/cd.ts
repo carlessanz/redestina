@@ -34,13 +34,13 @@ import {
   abrirCierre,
   cerrarCierre,
   codigoVerificacion,
-  type ContextoCierre,
   diccionarioCierre,
   domicilioCompleto,
   fechaLarga,
   fechaLargaConArticulo,
   type OpcionesCierre,
   paresLlenos,
+  pintarFirma,
   pintarLegal,
   pintarOrganizacion,
   type Renderizado,
@@ -279,77 +279,9 @@ export async function renderCd(
   }
 
   // --------------------------------------------------------- lugar, fecha, firma
-  await pintarFirma(ctx, op, lengua);
+  // El bloque de firma es el MISMO del CT: vive en `cierre.ts` desde la fase 5, porque
+  // los dos certificados los firma la misma apoderada con el mismo PNG.
+  await pintarFirma(ctx);
 
   return await cerrarCierre(ctx);
-}
-
-/**
- * Lugar y fecha de generación (D14), la firma y el sello estampados y, debajo, quién
- * firma. Sin PNG en el bucket `activos` se deja el espacio en blanco con su filete: un
- * certificado sin firma se imprime igual y se firma a mano, que es mejor que no poder
- * emitirlo.
- */
-async function pintarFirma(
-  ctx: ContextoCierre,
-  op: OpcionesCierre,
-  lengua: "ca" | "es",
-): Promise<void> {
-  const { m, t, datos } = ctx;
-  const lugar = (datos.lloc ?? "").trim();
-  const fecha = fechaLarga(datos.data_generacio, t, lengua);
-
-  m.espacio(14);
-  if (lugar || fecha) {
-    m.parrafo([lugar, fecha].filter(Boolean).join(", "), { tamano: 10, despues: 10 });
-  }
-
-  const ALTO_FIRMA = 64;
-  const ALTO_SELLO = 74;
-  const alto = Math.max(ALTO_FIRMA, ALTO_SELLO);
-
-  let firma = null;
-  let sello = null;
-  try {
-    if (op.firmaPng && op.firmaPng.length > 0) firma = await ctx.doc.embedPng(op.firmaPng);
-    if (op.selloPng && op.selloPng.length > 0) sello = await ctx.doc.embedPng(op.selloPng);
-  } catch (e) {
-    // Un PNG ilegible no puede impedir que salga el certificado: se avisa y se deja el
-    // hueco. Lo que no se hace nunca es sustituirlo por otra cosa.
-    console.warn("cd: firma/sello no embebibles:", e instanceof Error ? e.message : String(e));
-  }
-
-  m.titulo(t.signatura_titol, 3);
-  m.asegurar(alto + 46);
-  const y = m.y;
-  if (firma) {
-    const ancho = (firma.width / firma.height) * ALTO_FIRMA;
-    m.paginaActual.drawImage(firma, {
-      x: m.x,
-      y: y - ALTO_FIRMA,
-      width: Math.min(ancho, 200),
-      height: ALTO_FIRMA,
-    });
-  }
-  if (sello) {
-    const ancho = (sello.width / sello.height) * ALTO_SELLO;
-    m.paginaActual.drawImage(sello, {
-      x: m.x + 230,
-      y: y - ALTO_SELLO,
-      width: Math.min(ancho, 150),
-      height: ALTO_SELLO,
-    });
-  }
-  m.espacio(alto + 6);
-  m.filete();
-  m.espacio(4);
-  m.parrafo(
-    [datos.apoderada?.nom, datos.apoderada?.carrec].filter(Boolean).join(" · "),
-    { fuente: m.fuentes.cuerpoFuerte, tamano: 9.5 },
-  );
-  m.parrafo(datos.fundacio?.["raó_social"] ?? "", {
-    color: COLORES.verdeGris,
-    tamano: 9,
-    despues: 4,
-  });
 }

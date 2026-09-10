@@ -435,7 +435,10 @@ supabase/
   migrations/*.sql             Migraciones versionadas
   functions/
     _shared/cors.ts            originPermitido()/corsPara(): CORS de las funciones públicas (§10)
-    _shared/pdf/               Motor de PDF: maquetador A4, fuentes embebidas, plantillas, render/
+    _shared/pdf/               Motor de PDF: maquetador A4, fuentes embebidas, plantillas y
+                               render/ (rec, ent, ope, res, cd, conv, pla, ct + cierre.ts común).
+                               `pintarFirma()` la comparten CD y CT; el CT NO importa lletres.ts
+                               porque no lleva ningún importe
     _shared/whatsapp.ts        Graph API + interruptor de envío (texto/plantilla/interactivos)
     _shared/intake.ts          Motor conversacional (máquina de estados)
     _shared/oferta.ts          crearExcedente(): id_excedente + texto "OFERTA DISPONIBLE"
@@ -772,6 +775,26 @@ desactivada** hasta que la Fundación dé la lista de taras.
 Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
 todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
 
+**`planes_prevencion` (fase 5, `20270301*`)** — el plan de prevención de una organización. Clave
+excluyente `productor_id`/`entidad_id` como `convenios`, `respuestas jsonb`, `nivel`
+(`basic`/`personalitzat`), `version`, `vigente`, `estado` (`esborrany`→`emes`→`substituit`), y la
+numeración `PLA` pedida **al emitir**. Índices únicos parciales: **un vigente y un borrador** por
+organización. Sin GRANT de escritura: todo por RPC. ⚠️ **El cuestionario real no existe** —es el
+anexo B del funcional, material de la fase 0—, así que `respuestas` es un sobre
+`{questionari, versio_questionari, respostes[], notes}` del que la base solo impone la forma;
+`versio_questionari = 0` marca las filas hechas antes de que ese anexo exista. El plan se descarga
+**al momento**: `documentos.envio` va `null` y quien lo pide hace polling.
+
+**`cierres_donante.tipo`** — `donacio` (el CD, con importes y factura) · `transaccio` (el **CT**, de
+venta y maquila, **sin importes**). Default `donacio`, que es lo que mantiene válidas las filas
+anteriores. La clave pasa a `(cierre_id, productor_id, tipo)`: una organización puede donar **y**
+vender el mismo año. El certificado de transacción **reutiliza el motor del cierre** en vez de
+duplicarlo —hereda `cierre_emet_document()`, `cierre_destinatario()`, `ruta_documento()`, la RLS y
+los puentes sin una línea nueva—; lo único que se duplica a propósito es la consulta base, porque
+los kilos salen del **OPE** (1:1 con la canalización, sin el reparto proporcional que necesita el
+REC). Un trigger `cierres_donante_tipo` impide cruzar los dos circuitos, y salta en el `update` que
+pide el número, así que el rollback devuelve el número a la serie.
+
 **Convenios y firma (fase 2, `20270111*`)** — `convenios` es el convenio de colaboración de una
 organización con su ciclo de firma. `tipo` ∈ `don_gen`·`don_rec`·`com`; clave **excluyente**
 productor **o** entidad, como `membresias`; `estado` ∈ `esborrany`→`pendent_firma`→`firmat`→`vigent`,
@@ -1015,6 +1038,8 @@ funciones, no políticas:
 | `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
+| `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
+| `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
 
@@ -2569,11 +2594,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `20260928100700_jobs_documentales.sql` trae el trigger y los dos jobs (§4 «Sistema
     documental»). Sin el secreto en `app_config` son no-op con `notice`, que es lo que permite
     emitir documentos de prueba en local sin que nada salga a la red.
-50. **`ruta_documento()` solo resuelve `PROVA`.** Las demás ramas —el propietario por tipo—
-    levantan `0A000` porque las tablas de dominio no existen todavía. Cada fase rellena la suya
-    con `create or replace`; el `case` objetivo está escrito en comentario dentro de la propia
-    función. Es deliberado: un fichero mal archivado cuesta mucho más de arreglar que una
-    emisión que no ocurre.
+50. ~~**`ruta_documento()` solo resuelve `PROVA`.**~~ — **resuelta (fase 5)**: cubre los seis
+    `objeto_tipo` y ya no queda ninguna rama que levante `0A000`. Cada fase rellenó la suya, que era
+    el plan.
+
 51. **`reiniciar_documentos_prova()` borra las FILAS, no los objetos de `proves/` en Storage.**
     SQL no puede borrar del bucket. Hasta que la RPC de reinicio del cierre (fase 4) lo haga a
     través de una Edge Function, cada ciclo de prueba deja sus PDF huérfanos en
@@ -2719,6 +2743,21 @@ Redestina en producción real quedan pasos de configuración y negocio.
     cobertura de rutas y de claves** antes de cada commit, no solo el build. Es la tercera cara de
     la deuda 63: las herramientas locales asumen un único operador.
 
+83. **`cierre_donante_lineas.albaran_rec_id` guarda el OPE en las líneas de transacción.** El
+    nombre se queda corto desde que el CT reutiliza el motor del cierre; renombrarlo obligaría a
+    reescribir también el circuito de donaciones, así que se deja anotado.
+84. **No hay plantillas `CT` ni `PLA`** en `plantillas_documento`, como tampoco las hay de REC, ENT,
+    OPE, CONV, RES ni CD: los textos son material de la fase 0. `documentos.plantilla_id` queda
+    `null` y el renderizador imprime su texto de trabajo con el aviso.
+
+85. **El certificado de transacción no tiene prueba end-to-end.** `emitir_certificado_transaccion`
+    aborta con `42501` porque el fixture deja `datos_provisionales = true` —que es la barrera
+    funcionando, no un fallo—, así que no hay ninguna fila `documentos` de tipo `CT` que generar. El
+    renderizador se probó en directo y el despacho son ocho líneas. Se cierra el día que el fixture
+    pueda desmarcar el flag, o con los datos reales de la Fundación.
+86. **No hay rectificativo del CT.** El CD lo tiene porque el modelo 182 lo exige; el certificado de
+    transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
+
 ## 13. Al terminar cualquier cambio
 
 1. `npm run build` en verde.
@@ -2729,10 +2768,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
    Referencia en **remoto**: era 56/56 + 1 saltada antes del sistema documental; con los checks
    de la fase 1 la matriz sube a **81 comprobaciones**, y la cifra hay que fijarla ejecutándola
    tras el primer `db push` (previsión: 78/78 correctas y 3 saltadas).
-   Referencia en **local** con el fixture de `crear-usuarios-prueba.ts` y `roles_activos` en
-   `true`: **64 comprobaciones, todas correctas y 9 saltadas** por falta de datos (una base
-   local recién creada no tiene ofertas, ni mensajes, ni documentos), terminando en «Sin fallos
-   de permisos» con código de salida 0.
+   Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **312 comprobaciones, todas
+   correctas y 13 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
+   de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
    aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale
    SALTADA, con el mismo criterio.

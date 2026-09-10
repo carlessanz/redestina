@@ -129,6 +129,9 @@ async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T>
 //   3. **Un donante con conciliación retroactiva.** Es la fuente 2 del plan (las
 //      canalizaciones de 2026 que no tienen albarán). Sirve para comprobar lo único que
 //      distingue un cierre de prueba de uno real: en prueba entra, en real no.
+/** Id del cierre de prueba en curso; lo fija `prepararCierre()` y lo usa el CT (fase 5). */
+let cierrePrueba: string | null = null;
+
 async function prepararCierre() {
   paso("Preparación del cierre anual");
 
@@ -240,6 +243,7 @@ async function prepararCierre() {
     console.log(`  tancament de prova ${cierre}`);
     console.log(`  calculat: ${res.donants} donants, ${res.linies} línies, ` +
       `${res.kg_total} kg, ${res.valor_total} € (${res.bloquejats} bloquejats)`);
+    cierrePrueba = cierre;
   }
 
   const { data: base } = await db.rpc("cierre_base", { p_ejercicio: ejercicio, p_modo: "prueba" });
@@ -269,6 +273,178 @@ async function prepararCierre() {
 //    organización real entra por aquí.
 //
 // IDEMPOTENTE: si ya hay un convenio vigente (o en curso) de ese modelo, no se toca.
+// ---------------------------------------------------------------------------
+// Lo que el CERTIFICADO DE TRANSACCIÓN necesita (fase 5)
+// ---------------------------------------------------------------------------
+// Una venta conciliada **con su albarán de operación**, no una conciliación retroactiva:
+// es el camino real del CT (los kilos salen del `OPE`) y es el que conviene ejercitar.
+// Recorre el ciclo entero —emitir, entregar, confirmar por enlace, conciliar— igual que
+// los ENT de la espigolada, y termina calculando las transacciones del cierre de prueba,
+// que es lo que deja una fila `cierres_donante` con `tipo = 'transaccio'`.
+//
+// ⚠️ NO emite el certificado. `emitir_certificado_transaccion()` exige que
+//    `parametros_documentales.datos_provisionales` sea `false`, y el fixture no toca ese
+//    interruptor: ponerlo a `false` con el CIF de relleno sería justo lo que la
+//    comprobación existe para impedir. El certificado se emite a mano cuando la
+//    Configuración esté completa.
+//
+// IDEMPOTENTE: si la oferta de venta del fixture ya existe, no se rehace nada.
+async function prepararTransaccio(cierre: string) {
+  paso("Venta conciliada para el certificado de transacción (fase 5)");
+
+  const idCT = `E-TEST-CT-${ejercicio}`;
+  const { data: ya } = await db.from("excedentes")
+    .select("id").eq("id_excedente", idCT).maybeSingle();
+
+  if (ya) {
+    console.log("  la venda del fixture ja existeix; no es refà");
+  } else {
+    const entComercial = await idOrg("entidades", "TEST-ENT-COMERCIAL");
+    const { data: exc, error: errExc } = await db.from("excedentes").insert({
+      id_excedente: idCT,
+      productor_id: productor,
+      familia: "Horta Fruit",
+      producto: "Carbassó",
+      variedad: "Verd",
+      kg_total: 200,
+      num_caixes: 10,
+      tipo_caixa: TIPO_CAJA,
+      modalitat: "venda",
+      preu_minim: 0.4,
+      causa: "Calibre no comercial",
+      estado: "bloqueada",
+      origen: "asistido",
+      texto_oferta: "OFERTA DISPONIBLE (fixture de proves — venda per al CT)",
+    }).select("id").single();
+    if (errExc) throw new Error(`oferta de venda del CT: ${errExc.message}`);
+
+    // La canalización dispara el trigger que crea el OPE en borrador.
+    const { data: can, error: errCan } = await db.from("canalizaciones").insert({
+      excedente_id: exc.id,
+      entidad_id: entComercial,
+      kg_confirmados: 200,
+      valorizacion: "venda",
+      estado: "confirmada",
+      data_hora_recollida: new Date().toISOString(),
+    }).select("id").single();
+    if (errCan) throw new Error(`canalització de venda: ${errCan.message}`);
+
+    const { data: ope, error: errOpe } = await db.from("albaranes")
+      .select("id").eq("canalizacion_id", can.id).eq("tipo", "OPE").single();
+    if (errOpe) throw new Error(`albarà d'operació: ${errOpe.message}`);
+
+    const emitido = await rpc<{ numero_completo: string }>("emitir_albaran", {
+      p_id: ope.id,
+      p_recogida: { fecha_hora: new Date().toISOString(), quien_recoge: "TEST-ENT-COMERCIAL" },
+      p_lineas: [{
+        producto: "Carbassó",
+        variedad: "Verd",
+        familia: "Horta Fruit",
+        num_cajas: 10,
+        tipo_caja: TIPO_CAJA,
+        kg_bruto: 200 + 10 * TARA_CAJA,
+        kg_previstos: 200,
+      }],
+      p_idioma: "ca",
+    });
+
+    await rpc("marcar_entregado", { p_id: ope.id });
+
+    // En un OPE confirman las dos partes; con una basta para poder conciliar.
+    const { data: enlaces } = await db.from("enlaces_token")
+      .select("id").eq("objeto_tipo", "albaran").eq("objeto_id", ope.id)
+      .eq("proposito", "confirmacion_albaran").order("created_at");
+    const enlace = (enlaces ?? [])[0];
+
+    if (enlace) {
+      const { data: lineas } = await db.from("albaran_lineas")
+        .select("id, kg_neto").eq("albaran_id", ope.id);
+      await rpc("registrar_confirmacion", {
+        p_enlace: enlace.id,
+        p_payload: {
+          kg_confirmados: (lineas ?? []).map((l) => ({ linea_id: l.id, kg: 195 })),
+          rechazo: "cap",
+        },
+        p_evidencia: {
+          nombre: "Responsable de TEST-ENT-COMERCIAL (fixture)",
+          cargo: "Compres",
+          ip: "127.0.0.1",
+          user_agent: "crear-datos-documentales-prueba.ts",
+          sha256_texto: "0".repeat(64),
+        },
+      });
+      await rpc("conciliar_albaran", {
+        p_id: ope.id, p_kg_validados: null, p_motivo: null, p_destino_final: null,
+      });
+      console.log(`  ${emitido.numero_completo}  200 kg venuts → 195 kg conciliats`);
+    } else {
+      console.log(`  ${emitido.numero_completo} emès, sense enllaç (la fitxa no té correu)`);
+    }
+  }
+
+  const res = await rpc<Record<string, unknown>>("calcular_cierre_transacciones", { p_cierre: cierre });
+  console.log(`  transaccions calculades: ${res.generadors} generadors, ${res.linies} línies, ` +
+    `${res.kg_total} kg (valor intern ${res.valor_intern} €, ${res.bloquejats} bloquejats)`);
+  console.log("  el certificat NO s'emet: cal desmarcar datos_provisionales a Configuració");
+}
+
+// ---------------------------------------------------------------------------
+// Lo que el PLAN DE PREVENCIÓN necesita (fase 5)
+// ---------------------------------------------------------------------------
+// Un plan emitido por organización, para que «ve EL SEU pla» del arnés tenga con qué
+// probarse por los dos lados (un productor y una entidad).
+//
+// ⚠️ LAS RESPUESTAS SON UN RELLENO RECONOCIBLE. El cuestionario real es el anexo B del
+//    funcional y todavía no existe (ver la cabecera de 20270301100000): `versio_questionari`
+//    va a 0 y los identificadores son `pendent-1…3` a propósito, para que nadie los
+//    confunda nunca con preguntas de negocio.
+//
+// IDEMPOTENTE: si la organización ya tiene un plan vigente, no se hace otro (emitir un
+// segundo consumiría un número de la serie PLA, que es real: los planes no tienen modo
+// prueba).
+async function prepararPlans() {
+  paso("Planes de prevención (fase 5)");
+
+  const orgs: { tipo: "productor" | "entidad"; id: string; etiqueta: string }[] = [
+    { tipo: "productor", id: productor, etiqueta: "TEST-PROD-1" },
+    { tipo: "entidad", id: await idOrg("entidades", "TEST-ENT-SOCIAL"), etiqueta: "TEST-ENT-SOCIAL" },
+  ];
+
+  for (const org of orgs) {
+    const columna = org.tipo === "productor" ? "productor_id" : "entidad_id";
+    const { data: vigente } = await db.from("planes_prevencion")
+      .select("numero_completo").eq(columna, org.id).eq("vigente", true).maybeSingle();
+    if (vigente) {
+      console.log(`  ${org.etiqueta}: ja té el pla ${vigente.numero_completo}`);
+      continue;
+    }
+
+    await rpc("guardar_plan_basico", {
+      p_tipo_org: org.tipo,
+      p_org: org.id,
+      p_respuestas: {
+        questionari: "basic",
+        versio_questionari: 0,
+        respostes: [
+          { id: "pendent-1", pregunta: "(pendent de l'annex B del funcional)", valor: null },
+          { id: "pendent-2", pregunta: "(pendent de l'annex B del funcional)", valor: null },
+          { id: "pendent-3", pregunta: "(pendent de l'annex B del funcional)", valor: null },
+        ],
+        notes: "Fixture de proves — el qüestionari real encara no existeix",
+      },
+      p_idioma: "ca",
+      p_nivel: "basic",
+    });
+
+    const { data: esborrany } = await db.from("planes_prevencion")
+      .select("id").eq(columna, org.id).eq("estado", "esborrany").single();
+
+    const emitido = await rpc<{ numero: string; versio: number; document: string }>(
+      "emitir_plan_basico", { p_plan: esborrany!.id });
+    console.log(`  ${org.etiqueta}: ${emitido.numero} (v${emitido.versio}), document ${emitido.document}`);
+  }
+}
+
 async function prepararConvenis() {
   paso("Convenios (fase 2)");
 
@@ -522,6 +698,8 @@ if (yaExiste) {
   // Lo del cierre y los convenios sí se reaplica: es idempotente y es lo que se añade
   // sobre lo que ya hay.
   await prepararCierre();
+  if (cierrePrueba) await prepararTransaccio(cierrePrueba);
+  await prepararPlans();
   await prepararConvenis();
   console.log();
   Deno.exit(0);
@@ -753,6 +931,8 @@ console.log(`  diferència ${propuesta.diferencia} kg (${propuesta.diferencia_pc
   `tolerància ${propuesta.tolerancia_pct} % → ${propuesta.dins_tolerancia ? "dins" : "FORA"}`);
 
 await prepararCierre();
+if (cierrePrueba) await prepararTransaccio(cierrePrueba);
+await prepararPlans();
 await prepararConvenis();
 
 const { count: nDocs } = await db.from("documentos")

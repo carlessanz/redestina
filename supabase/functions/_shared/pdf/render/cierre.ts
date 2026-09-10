@@ -48,6 +48,8 @@ export interface LineaDetalle {
   kg?: number | string | null;
   cost_kg?: number | string | null;
   valor?: number | string | null;
+  /** Solo CT: cuántas operaciones de venta o maquila suman esos kilos. */
+  operacions?: number | string | null;
 }
 
 export interface Bloqueo {
@@ -92,6 +94,15 @@ export interface DatosCierre {
   excepcio_motiu?: string | null;
   rectificacions?: number | null;
   motiu_rectificacio?: string | null;
+
+  // --- certificado de transacción (CT)
+  // La contraparte del CT es el GENERADOR, no un donante: son la misma forma con otro
+  // nombre, y el nombre importa porque el papel dice quién es quien vende o encarga.
+  generador?: OrganizacionCierre | null;
+  /** `true` en el CT: el snapshot no trae ni un euro, y el papel lo dice. */
+  sense_imports?: boolean | null;
+  /** La frase que explica por qué no hay importes. La escribe SQL, no el renderizador. */
+  nota?: string | null;
 }
 
 export interface OpcionesCierre {
@@ -142,6 +153,15 @@ export interface DiccionarioCierre {
   res_provisional: string;
   cd: string;
   cd_sub: string;
+  ct: string;
+  ct_sub: string;
+  generador: string;
+  certifica_ct: string;
+  sense_imports_titol: string;
+  sense_imports_text: string;
+  detall_ct: string;
+  destinacions_ct: string;
+  quilos_ct: string;
   rectificatiu: string;
   motiu_rectificacio: string;
   numero: string;
@@ -208,6 +228,19 @@ const CA: DiccionarioCierre = {
   res_provisional: "Resum provisional",
   cd: "Certificat de donació",
   cd_sub: "Article 16 de la Llei 49/2002, de règim fiscal de les entitats sense fins lucratius",
+  ct: "Certificat de transacció",
+  ct_sub: "Operacions de venda i de maquila conciliades durant l'exercici",
+  generador: "Generador",
+  certifica_ct: "Certifica",
+  sense_imports_titol: "Aquest certificat no recull imports",
+  sense_imports_text:
+    "Aquest certificat acredita les operacions realitzades amb els quilos conciliats. No hi consta cap import: el pagament es tramita fora de la plataforma, entre les parts.",
+  detall_ct: "Detall per producte",
+  destinacions_ct: "Qui ha rebut el producte",
+  // ⚠️ NO se reutiliza `quilos` («Quilos donats»): en un CT no se ha donado nada, se ha
+  // vendido o se ha encargado una maquila. La misma palabra en los dos papeles borraría
+  // justo la diferencia que separa el CD del CT.
+  quilos_ct: "Quilos acreditats",
   rectificatiu: "Rectificatiu",
   motiu_rectificacio: "Motiu de la rectificació",
   numero: "Número",
@@ -280,6 +313,7 @@ const CA: DiccionarioCierre = {
     cost_kg: "Cost €/kg",
     valor: "Valor",
     entitat: "Entitat receptora",
+    operacions: "Operacions",
   },
 };
 
@@ -289,6 +323,16 @@ const ES: DiccionarioCierre = {
   res_provisional: "Resumen provisional",
   cd: "Certificado de donación",
   cd_sub: "Artículo 16 de la Ley 49/2002, de régimen fiscal de las entidades sin fines lucrativos",
+  ct: "Certificado de transacción",
+  ct_sub: "Operaciones de venta y de maquila conciliadas durante el ejercicio",
+  generador: "Generador",
+  certifica_ct: "Certifica",
+  sense_imports_titol: "Este certificado no recoge importes",
+  sense_imports_text:
+    "Este certificado acredita las operaciones realizadas con los kilos conciliados. No consta ningún importe: el pago se tramita fuera de la plataforma, entre las partes.",
+  detall_ct: "Detalle por producto",
+  destinacions_ct: "Quién ha recibido el producto",
+  quilos_ct: "Kilos acreditados",
   rectificatiu: "Rectificativo",
   motiu_rectificacio: "Motivo de la rectificación",
   numero: "Número",
@@ -361,6 +405,7 @@ const ES: DiccionarioCierre = {
     cost_kg: "Coste €/kg",
     valor: "Valor",
     entitat: "Entidad receptora",
+    operacions: "Operaciones",
   },
 };
 
@@ -383,10 +428,19 @@ export const MARCA_PRUEBA: Record<IdiomaCierre, string> = {
 // Formato
 // ---------------------------------------------------------------------------
 
+/**
+ * Lo único que las tres funciones de fecha necesitan del diccionario. Se pide así —y no
+ * el `DiccionarioCierre` entero— para que un renderizador con su propio vocabulario
+ * (`pla.ts`) pueda usarlas sin fingir que es un documento de cierre.
+ */
+export interface ConMeses {
+  mesos: string[];
+}
+
 /** `2026-09-10` → `10 de setembre de 2026` (con `d'` ante vocal en catalán). */
 export function fechaLarga(
   valor: unknown,
-  t: DiccionarioCierre,
+  t: ConMeses,
   idioma: IdiomaCierre,
 ): string {
   if (typeof valor !== "string" || !valor) return "";
@@ -409,7 +463,7 @@ export function fechaLarga(
  */
 export function fechaLargaConArticulo(
   valor: unknown,
-  t: DiccionarioCierre,
+  t: ConMeses,
   idioma: IdiomaCierre,
 ): string {
   const larga = fechaLarga(valor, t, idioma);
@@ -420,7 +474,7 @@ export function fechaLargaConArticulo(
 }
 
 /** El nombre del mes por su número (1–12). Vacío si no lo es. */
-export function nombreMes(valor: unknown, t: DiccionarioCierre): string {
+export function nombreMes(valor: unknown, t: ConMeses): string {
   const n = typeof valor === "number" ? valor : Number(valor);
   if (!isFinite(n) || n < 1 || n > 12) return "";
   return t.mesos[n - 1];
@@ -564,6 +618,76 @@ export function pintarBloqueos(ctx: ContextoCierre): void {
     lista.map((b) => `· ${b.detall}`).join("\n") + `\n${t.bloquejos_text}`,
     { titulo: t.bloquejos_titol, fondo: COLORES.crema100 },
   );
+}
+
+/**
+ * Lugar y fecha de generación (D14), la firma y el sello estampados y, debajo, quién
+ * firma. Lo comparten el CD y el CT: los dos los firma la misma apoderada, con el mismo
+ * PNG y el mismo pie. Sin PNG en el bucket `activos` se deja el espacio en blanco con su
+ * filete: un certificado sin firma se imprime igual y se firma a mano, que es mejor que
+ * no poder emitirlo.
+ */
+export async function pintarFirma(ctx: ContextoCierre): Promise<void> {
+  const { m, t, datos, op, idioma } = ctx;
+  const lugar = (datos.lloc ?? "").trim();
+  const fecha = fechaLarga(datos.data_generacio, t, idioma);
+
+  m.espacio(14);
+  if (lugar || fecha) {
+    m.parrafo([lugar, fecha].filter(Boolean).join(", "), { tamano: 10, despues: 10 });
+  }
+
+  const ALTO_FIRMA = 64;
+  const ALTO_SELLO = 74;
+  const alto = Math.max(ALTO_FIRMA, ALTO_SELLO);
+
+  let firma = null;
+  let sello = null;
+  try {
+    if (op.firmaPng && op.firmaPng.length > 0) firma = await ctx.doc.embedPng(op.firmaPng);
+    if (op.selloPng && op.selloPng.length > 0) sello = await ctx.doc.embedPng(op.selloPng);
+  } catch (e) {
+    // Un PNG ilegible no puede impedir que salga el certificado: se avisa y se deja el
+    // hueco. Lo que no se hace nunca es sustituirlo por otra cosa.
+    console.warn(
+      "cierre: firma/sello no embebibles:",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+
+  m.titulo(t.signatura_titol, 3);
+  m.asegurar(alto + 46);
+  const y = m.y;
+  if (firma) {
+    const ancho = (firma.width / firma.height) * ALTO_FIRMA;
+    m.paginaActual.drawImage(firma, {
+      x: m.x,
+      y: y - ALTO_FIRMA,
+      width: Math.min(ancho, 200),
+      height: ALTO_FIRMA,
+    });
+  }
+  if (sello) {
+    const ancho = (sello.width / sello.height) * ALTO_SELLO;
+    m.paginaActual.drawImage(sello, {
+      x: m.x + 230,
+      y: y - ALTO_SELLO,
+      width: Math.min(ancho, 150),
+      height: ALTO_SELLO,
+    });
+  }
+  m.espacio(alto + 6);
+  m.filete();
+  m.espacio(4);
+  m.parrafo(
+    [datos.apoderada?.nom, datos.apoderada?.carrec].filter(Boolean).join(" · "),
+    { fuente: m.fuentes.cuerpoFuerte, tamano: 9.5 },
+  );
+  m.parrafo(datos.fundacio?.["raó_social"] ?? "", {
+    color: COLORES.verdeGris,
+    tamano: 9,
+    despues: 4,
+  });
 }
 
 /** Cierra el documento (pie y filigrana en todas las páginas) y devuelve los bytes. */

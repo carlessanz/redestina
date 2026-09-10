@@ -341,6 +341,34 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "firmar_convenio_por_enlace", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO firma per enllaç (això és del servidor)" },
   { tabla: "validar_codi_firma", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_codi: "000000" }, descripcion: "NO valida el codi de firma (això és del servidor)" },
   { tabla: "aprovar_resposta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO aprova cap resposta a una oferta" },
+  // Plan de prevención (fase 5). Un externo LEE el suyo —eso va en su bloque, con su
+  // `requiereFixture`— y no escribe nada: ni la tabla ni el cuestionario de otra
+  // organización. `guardar_plan_basico` sobre un uuid ajeno corta en `puc_gestionar_pla()`,
+  // que es la comprobación que de verdad separa «el meu qüestionari» de «el d'algú altre».
+  //
+  // ⚠️ `plan_emet_document` NO se comprueba aquí, y no por olvido: tiene el EXECUTE
+  //    revocado a `authenticated`, así que PostgREST ni la ve y devolvería `PGRST202`
+  //    —indistinguible de «falta la migración»—. Que sea inalcanzable lo garantiza el
+  //    `revoke` de 20270301100200, no un check.
+  { tabla: "planes_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea plans a mà (van per RPC)" },
+  {
+    tabla: "guardar_plan_basico",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} },
+    descripcion: "NO contesta el qüestionari d'una altra organitzacio",
+  },
+  {
+    tabla: "planes_meus",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_user: "00000000-0000-0000-0000-0000000000ff" },
+    descripcion: "NO consulta els plans d'una altra persona",
+  },
+  // Certificado de transacción (fase 5): la misma regla que el de donación. Las dos son
+  // de `pot_aprovar()`, así que un externo no llega ni a la comprobación siguiente.
+  { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions d'un tancament" },
+  { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -538,6 +566,29 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
     // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
     { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
+    // Certificado de transacción (fase 5): calcular y emitir son de `pot_aprovar()`, igual
+    // que en el circuito de donación. El técnico ve las filas y no mueve ninguna.
+    { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions (és de pot_aprovar)" },
+    { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio (és de pot_aprovar)" },
+    // Plan de prevención (fase 5). El equipo lo ve todo y **sí** puede contestar el
+    // cuestionario de cualquier organización: el diagnóstico es un servicio asistido. Lo
+    // que se comprueba es la autorización (`puc_gestionar_pla`), no el guardado: guardar
+    // dejaría un borrador en la base y el arnés no puede añadir filas a lo que audita.
+    {
+      tabla: "planes_prevencion",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els plans de prevencio",
+      requiereFixture: "algún plan emitido (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    { tabla: "planes_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea plans a mà (van per RPC)" },
+    {
+      tabla: "puc_gestionar_pla",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot contestar el qüestionari de qualsevol organitzacio (model assistit)",
+    },
     // Convenios (fase 2). El equipo lo LEE todo, prepara y envía; **contrasignar, retornar
     // y resolver son de `pot_aprovar()`**, como aprobar una canalización: es el punto de
     // control humano del circuito de firma, no una tarea del día a día.
@@ -664,6 +715,30 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve el acumulado anual de todos los donantes",
       requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Certificado de transacción (fase 5): la contraparte de los dos «denegar» del
+    // técnico. Sobre un uuid inventado la autorización pasa y la función falla después con
+    // 22023, sin dejar rastro: emitir uno de verdad consumiría un número de la serie CT.
+    {
+      tabla: "calcular_cierre_transacciones",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot calcular les transaccions (autoritza; el tancament no existeix)",
+    },
+    {
+      tabla: "emitir_certificado_transaccion",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cd: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot emetre un certificat de transaccio (autoritza; l'acumulat no existeix)",
+    },
+    {
+      tabla: "planes_prevencion",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els plans de prevencio",
+      requiereFixture: "algún plan emitido (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // Convenios (fase 2): la contraparte de los tres «denegar» del técnico. Sobre un uuid
     // inventado la autorización pasa y la función falla después con 22023 («aquest conveni
     // no existeix»), sin dejar rastro: contrafirmar uno de verdad emitiría un documento con
@@ -766,6 +841,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve EL SEU conveni (només el seu)",
       requiereFixture: "el conveni vigent de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Plan de prevención (fase 5): ve EL SUYO. Mismo patrón que el convenio —el fixture lo
+    // crea para TEST-PROD-1, así que la comprobación de TEST-PROD-2 sale SALTADA, y eso es
+    // lo correcto: si viera el de TEST-PROD-1 sería un escape—.
+    {
+      tabla: "planes_prevencion",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU pla de prevencio (només el seu)",
+      requiereFixture: "el pla de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -828,6 +913,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "ve EL SEU conveni (només el seu)",
       requiereFixture: "el conveni pendent de firma de TEST-ENT-SOCIAL (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // Plan de prevención (fase 5): ve EL SUYO. El fixture lo crea para TEST-ENT-SOCIAL.
+    {
+      tabla: "planes_prevencion",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU pla de prevencio (només el seu)",
+      requiereFixture: "el pla de TEST-ENT-SOCIAL (scripts/crear-datos-documentales-prueba.ts)",
     },
     // Ni el cierre del donante del que ha recibido: el certificado es del donante.
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO ve l'acumulat anual de cap donant" },
@@ -932,6 +1025,13 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     productor_id: "00000000-0000-0000-0000-000000000000",
   },
   costes_producto: { producto: "Tomàquet", ejercicio: 1999, coste_kg: 1, motivo: "TEST-RLS" },
+  // `planes_prevencion` tampoco tiene GRANT de escritura para nadie. Mismo criterio que
+  // `convenios`: lo justo para que lo que corte sea el permiso y no el check excluyente.
+  planes_prevencion: {
+    tipo_org: "productor",
+    productor_id: "00000000-0000-0000-0000-000000000000",
+    respuestas: {},
+  },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
   plantillas_documento: {
