@@ -160,7 +160,7 @@ export default function ContactList({ contacts, loading, error, selectedPhone, o
             <button key={c.id} type="button" onClick={() => onSelect(c.phone)}
               className={cn('flex w-full items-center gap-2.5 border-b px-3 py-1.5 text-left hover:bg-muted/50',
                 c.phone === selectedPhone && 'bg-secondary/40')}>
-              <span className={cn('size-2 shrink-0 rounded-full', c.opt_in ? 'bg-green-500' : 'bg-gray-400')}
+              <span className={cn('size-2 shrink-0 rounded-full', c.opt_in ? 'bg-exito' : 'bg-muted-foreground')}
                 title={c.opt_in ? t('msg.optin') : t('msg.no_consent')} />
               <span className="truncate text-sm font-medium">{c.name ?? c.phone}</span>
               {pendientes > 0 ? (

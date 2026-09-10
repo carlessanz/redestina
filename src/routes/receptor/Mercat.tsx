@@ -112,7 +112,7 @@ export default function Mercat() {
                 </div>
               </div>
               {meva && meva.estado === 'acceptada' ? (
-                <span className="rounded-full bg-green-100 px-2 py-0.5 text-xs font-medium text-green-800">
+                <span className="rounded-full bg-exito-fondo px-2 py-0.5 text-xs font-medium text-exito">
                   {t('mk.already', { n: meva.kg_solicitados ?? 0 })}
                 </span>
               ) : (

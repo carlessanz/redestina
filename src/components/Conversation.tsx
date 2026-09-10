@@ -232,15 +232,15 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
 
       {notice && (
         <div className={cn('mx-5 rounded-md px-3 py-2 text-sm',
-          notice.kind === 'success' ? 'bg-green-50 text-green-700'
-            : notice.kind === 'warning' ? 'bg-yellow-50 text-yellow-800'
-            : 'bg-red-50 text-red-700')}>
+          notice.kind === 'success' ? 'bg-exito-fondo text-exito'
+            : notice.kind === 'warning' ? 'bg-aviso-fondo text-aviso'
+            : 'bg-error-fondo text-error')}>
           {notice.text}
         </div>
       )}
 
       {!ventanaAbierta && (
-        <div className="mx-5 mb-1 flex items-start gap-2 rounded-md border border-yellow-200 bg-yellow-50 px-3 py-2 text-sm text-yellow-800">
+        <div className="mx-5 mb-1 flex items-start gap-2 rounded-md border border-aviso/30 bg-aviso-fondo px-3 py-2 text-sm text-aviso">
           <Lock className="mt-0.5 size-4 shrink-0" />
           <span>{t('msg.banner', { name: contact.name ?? t('msg.this_contact') })}</span>
         </div>

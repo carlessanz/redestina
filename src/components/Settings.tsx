@@ -44,12 +44,12 @@ export default function Settings() {
           ) : (
             <>
               <div className={cn('flex items-start gap-3 rounded-lg border p-3',
-                testMode ? 'border-green-200 bg-green-50' : 'border-red-200 bg-red-50')}>
+                testMode ? 'border-exito/30 bg-exito-fondo' : 'border-error/30 bg-error-fondo')}>
                 {testMode
-                  ? <ShieldCheck className="mt-0.5 size-5 shrink-0 text-green-600" />
-                  : <ShieldAlert className="mt-0.5 size-5 shrink-0 text-red-600" />}
+                  ? <ShieldCheck className="mt-0.5 size-5 shrink-0 text-exito" />
+                  : <ShieldAlert className="mt-0.5 size-5 shrink-0 text-error" />}
                 <div className="text-sm">
-                  <div className={cn('font-semibold', testMode ? 'text-green-800' : 'text-red-800')}>
+                  <div className={cn('font-semibold', testMode ? 'text-exito' : 'text-error')}>
                     {testMode ? t('set.test_on') : t('set.test_off')}
                   </div>
                   <p className="mt-0.5 text-muted-foreground">
@@ -61,12 +61,12 @@ export default function Settings() {
               <div className="inline-flex rounded-md border p-0.5">
                 <button type="button" disabled={saving} onClick={() => void cambiarTestMode(true)}
                   className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    testMode ? 'bg-green-600 text-white' : 'text-muted-foreground hover:bg-muted')}>
+                    testMode ? 'bg-exito text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.on')}
                 </button>
                 <button type="button" disabled={saving} onClick={() => void cambiarTestMode(false)}
                   className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    !testMode ? 'bg-red-600 text-white' : 'text-muted-foreground hover:bg-muted')}>
+                    !testMode ? 'bg-error text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.off')}
                 </button>
               </div>

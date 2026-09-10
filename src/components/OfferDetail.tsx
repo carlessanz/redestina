@@ -45,7 +45,7 @@ function fechaCorta(iso: string): string {
 // Color del canal recomendado: verde WhatsApp, navy correo, gris si no hay ninguno.
 function canalClases(canal: string): string {
   switch (canal) {
-    case 'whatsapp': return 'text-green-700'
+    case 'whatsapp': return 'text-exito'
     case 'email': return 'text-primary'
     default: return 'text-muted-foreground'
   }
@@ -53,8 +53,8 @@ function canalClases(canal: string): string {
 
 function estadoRespuestaClases(estado: string): string {
   switch (estado) {
-    case 'acceptada': return 'bg-green-100 text-green-800'
-    case 'rebutjada': return 'bg-red-100 text-red-700'
+    case 'acceptada': return 'bg-exito-fondo text-exito'
+    case 'rebutjada': return 'bg-error-fondo text-error'
     default: return 'bg-muted text-muted-foreground'
   }
 }
@@ -62,8 +62,8 @@ function estadoRespuestaClases(estado: string): string {
 function aprovacioClases(a: string): string {
   switch (a) {
     case 'aprovada': return 'bg-primary/15 text-primary'
-    case 'rebutjada': return 'bg-red-100 text-red-700'
-    default: return 'bg-amber-100 text-amber-800'
+    case 'rebutjada': return 'bg-error-fondo text-error'
+    default: return 'bg-aviso-fondo text-aviso'
   }
 }
 
@@ -486,7 +486,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             const motivos = puedeTest ? ent.motivos : [...ent.motivos, t('od.not_test')]
             return (
               <div key={ent.id}
-                className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 ${ent.pendiente ? 'bg-yellow-50 opacity-80' : ''}`}>
+                className={`flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 ${ent.pendiente ? 'bg-aviso-fondo opacity-80' : ''}`}>
                 <div className="flex items-center gap-3">
                   <span className="w-6 text-center text-lg font-bold text-primary">{ent.puntuacion}</span>
                   <div>
@@ -571,7 +571,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   <span className="text-xs font-medium text-primary">{t('od.approved_kg', { n: r.kg_solicitados ?? 0 })}</span>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'rebutjada' && (
-                  <span className="text-xs text-red-700">
+                  <span className="text-xs text-error">
                     {t('od.rejected_appr')}{r.motiu_aprovacio ? `: ${r.motiu_aprovacio}` : ''}
                   </span>
                 )}

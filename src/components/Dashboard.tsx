@@ -48,7 +48,7 @@ function Kpi({ titulo, valor, sub, detalle }: {
         <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
         <ul className="mt-3 space-y-0.5 border-t pt-2 text-sm">
           {detalle.map((d, i) => (
-            <li key={i} className={d.destacado ? 'font-medium text-blue-700' : 'text-muted-foreground'}>{d.texto}</li>
+            <li key={i} className={d.destacado ? 'font-medium text-primary' : 'text-muted-foreground'}>{d.texto}</li>
           ))}
         </ul>
       </CardContent>

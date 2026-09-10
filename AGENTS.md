@@ -174,10 +174,11 @@ enlace profundo y gesto «atrás»; el `useState<View>` anterior no daba ninguna
 librería de estado. Desde el 31-07-2026 el router es además la **capa raíz**, con rutas públicas y
 privadas (§6quater): ya no hay un `AuthGate` envolviéndolo todo. `vercel.json` añade el *rewrite* de SPA: sin él, recargar cualquier ruta que no
 sea `/` devuelve 404 en producción. **UI con Tailwind v4 + shadcn/ui**: componentes en
-`src/components/ui/` (generados con el CLI de shadcn, `components.json`), tokens del **tema Redestina**
-en `src/index.css` (navy `#234C66` / crema `#E0EBC7` / coral `#EE7A5F`, fuente Space Grotesk),
-alias `@/` → `src/`. Iconos `lucide-react`, toasts `sonner`, `cn()` en `src/lib/utils.ts`. El
-logo (`public/logo-redestina.svg`) y el favicon están en `public/`.
+`src/components/ui/` (generados con el CLI de shadcn, `components.json`), tokens del **sistema de
+diseño REDESTINA** en `src/index.css` (verde `#4e6b45` / coral `#ef7d77` / crema `#f5f1ea`, Sora para
+títulos e Inter para el cuerpo; la fuente de verdad es `design/tokens.json`, §2bis), alias `@/` →
+`src/`. Iconos `lucide-react`, toasts `sonner`, `cn()` en `src/lib/utils.ts`. El logo en sus seis
+variantes, el favicon y los iconos están en `public/` (§2bis).
 
 **Layout** (desde 2026-07-30): **menú lateral vertical plegable** (`sidebar` de shadcn: 16rem ↔ 3rem
 en modo icono, estado en cookie, atajo Ctrl/Cmd+B) + barra superior de 14 con el título de la
@@ -194,7 +195,7 @@ su propio alto. **Ninguna pantalla vuelve a escribir `h-dvh`.** Hay un tercer fl
 `ofertes`), que necesitan más ancho.
 
 **PWA instalable** (`vite-plugin-pwa`, `generateSW`): manifest, iconos 192/512 + *maskable*
-(generados desde `public/logo-redestina.svg`), `apple-touch-icon` y los metas de iOS —que no lee el
+(generados desde `public/isotipo-redestina.svg`, la hoja sola; §2bis), `apple-touch-icon` y los metas de iOS —que no lee el
 manifest—, `viewport-fit=cover` para que `env(safe-area-inset-*)` valga algo en iPhone.
 `registerType: 'autoUpdate'` + `cleanupOutdatedCaches` + `Cache-Control: must-revalidate` en
 `/index.html` y `/sw.js` (`vercel.json`): un service worker mal desplegado se queda pegado en los
@@ -245,11 +246,64 @@ horizontal en todas**, que es la referencia a mantener):
    bajo el recorte. Se aplica con `max(padding, env(...))` en `AppShell` y `LayoutAcces`; la barra
    inferior ya cubría el `bottom`.
 
+## 2bis. Sistema de diseño (10-09-2026)
+
+La imagen de REDESTINA (branding de agosto de 2026: `BRANDING_REDESTINA_FINAL.ai`) está implantada
+como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
+
+| Fichero | Qué es | Manda en |
+|---|---|---|
+| `design/tokens.json` | **Fuente única** de colores (marca, neutros cálidos, estados, gráficos, mapa a shadcn, extensión), tipografías y jerarquía, espaciado, radios, sombras, puntos de corte y reglas del logo. Cada valor lleva `origen: branding` (del diseñador) o `derivado` (definido por la consultoría). | Los valores. |
+| `design/DESIGN.md` | Reglas que un token no captura: cuándo se usa cada variante del logo y su zona de respeto, jerarquía tipográfica, tono de los mensajes y patrones de componentes (botón, tarjeta, badge, tabla, formulario, vacío, alertas, sidebar, barra móvil, diálogo, portada). | El uso. |
+| `design/preview.html` | Página autónoma con todos los componentes pintados con los tokens. Se abre en el navegador; no forma parte del build. Sirve para validar antes de tocar la aplicación. | La muestra. |
+
+`design/PLAN.md` es el plan con el que se implantó; queda como histórico.
+
+**Reglas para el código:**
+
+- **Todo estilo sale de los tokens.** No se escribe ningún hex, ningún `text-[13px]`, ningún color
+  de la paleta genérica de Tailwind (`bg-green-100`, `text-red-700`, `bg-blue-*`…). Se usan las
+  clases que salen de `src/index.css`: las de shadcn (`bg-primary`, `text-muted-foreground`,
+  `border-input`, `bg-sidebar-accent`…) y las de la **extensión REDESTINA**: `coral`,
+  `coral-foreground`, `coral-oscuro`, `coral-suave`, `coral-texto`, `verde-claro`, `verde-oscuro`,
+  `exito` / `exito-fondo`, `aviso` / `aviso-fondo`, `error` / `error-fondo`, `chart-1…5`, y la fuente
+  `font-titulos` (Sora). Los estados se pintan con `bg-exito-fondo text-exito`,
+  `bg-aviso-fondo text-aviso`, `bg-error-fondo text-error`; lo neutro-informativo con
+  `bg-secondary text-secondary-foreground`.
+- **`accent` de shadcn NO es el coral.** Es la superficie de hover de menús, selects y botones
+  ghost (crema oscurecido). El coral es acento de marca y vive en `coral`; solo da 2.67:1 sobre
+  blanco: nunca texto pequeño en coral ni texto blanco sobre coral (encima va negro,
+  `coral-foreground`; para texto coral, `coral-texto`).
+- **El error es rojo (`error` / `destructive`), no coral.** El coral no significa fallo.
+- **Los títulos van en Sora solos**: `@layer base` pone `font-titulos` en `h1`–`h4`. No hace falta
+  pedirlo en cada pantalla; para un título que no es un `h*`, la clase `font-titulos`.
+- **Los nombres de shadcn no se renombran** (`primary`, `secondary`, `muted`, `accent`,
+  `destructive`, `sidebar-*`, `chart-*`): son el contrato con `src/components/ui/`.
+- **`src/index.css` se deriva de `tokens.json` a mano** (no hay generador). **Para cambiar un
+  color**: se cambia el valor en `design/tokens.json`, se replica en `:root` de `src/index.css`
+  (y en `@theme inline` si es un token nuevo), se comprueba `design/preview.html` y, si el color
+  también aparece en los correos, en las constantes de `supabase/functions/_shared/resend.ts`
+  (§9) y en `theme_color` / `background_color` de `vite.config.ts` e `index.html`. Nunca al revés.
+- **Logo** (SVG con las letras en trazados, no dependen de la fuente), en `public/`:
+  `logo-redestina.svg` (horizontal, por defecto, sobre crema o blanco),
+  `logo-redestina-apilado.svg` (espacios cuadrados), `logo-redestina-negativo.svg` (**sobre verde o
+  fondos oscuros**: sidebar, cabecera y pie de la landing, pantallas de acceso),
+  `logo-redestina-mono.svg` (un color, `currentColor`), `isotipo-redestina.svg` (solo la hoja:
+  favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. `logo-email.png` es el negativo
+  rasterizado a 410×120 para la cabecera verde de los correos. Nada de `brightness-0 invert` ni
+  filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
+  `design/DESIGN.md §4`.
+- **Fuentes**: Sora (500/600/700/800) e Inter (400/500/600/700), libres (OFL), desde Google Fonts
+  en `index.html`. No hay fuentes propias en el repo.
+- Modo oscuro: no existe en el branding y no se implementa (`@custom-variant dark` se queda sin valores).
+
 ## 3. Estructura
 
 ```text
-index.html
+index.html                     Carga Sora e Inter (Google Fonts), theme-color verde
 vercel.json                    Rewrite de SPA (sin él, recargar una ruta profunda da 404)
+design/                        Sistema de diseño (§2bis): tokens.json, DESIGN.md, preview.html, PLAN.md
+public/                        Logo en seis variantes SVG, favicon, iconos PWA y logo-email.png (§2bis)
 .env.local.example             Plantilla de variables del frontend (sí se versiona)
 .claude/skills/publicar/       Skill /publicar: el procedimiento de publicación (§11)
 src/
@@ -274,7 +328,7 @@ src/
   routes/productor/            Inicio, listado, alta de oferta y detalle
   routes/receptor/             Mercat, interessos i històric
   types.ts                     Tipos de todas las tablas
-  index.css                    Todos los estilos (global, ~825 líneas)
+  index.css                    Tokens del sistema de diseño (:root + @theme inline) y base (§2bis)
   lib/
     supabase.ts                Cliente Supabase (lanza si faltan las env vars)
     rols.ts                    Tipos del contexto de sesión y ruta por rol (§4bis)
@@ -297,7 +351,7 @@ src/
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
-    LayoutAcces.tsx            Marco navy de las pantallas de acceso (+ ComprovantSessio)
+    LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
@@ -1302,17 +1356,21 @@ apagado y en test). Detalle:
 ### Maquetado de los correos — una sola plantilla, en el servidor
 
 **`plantillaEmail()` en `_shared/resend.ts` es el único sitio donde se maqueta un correo**
-(2026-07-30). Devuelve el documento completo: cabecera navy con el logo, tarjeta blanca con título,
+(2026-07-30). Devuelve el documento completo: cabecera verde con el logo en negativo, tarjeta blanca con título,
 cuerpo, botón y nota, filete coral, pie crema y la línea de por qué recibes esto. Está hecho con
 **tablas y estilos en línea** —lo único que renderizan igual Gmail, Outlook y Apple Mail—, admite
 `preheader` (la línea que la bandeja enseña junto al asunto) y pinta el botón con la técnica de
 tabla + `bgcolor`, porque Outlook ignora el `padding` de un `<a>`.
 
-**El logo es `public/logo-email.png`**, el wordmark rasterizado a 378×96 desde `logo-redestina.svg`: los
-clientes de correo no pintan SVG, no resuelven rutas relativas y Gmail bloquea `data:`. Se sirve por
-URL absoluta desde `APP_URL`. El `alt` del `<img>` va **estilado** (crema, 26px, bold), así que con
-las imágenes bloqueadas —lo normal en Gmail con un remitente nuevo— se sigue leyendo «Redestina» sobre el
-navy en vez de un icono roto. Si se cambia de dominio, basta con `APP_URL`.
+**El logo es `public/logo-email.png`**, el logo negativo rasterizado a 410×120 desde
+`logo-redestina-negativo.svg` (se pinta a 150×44): los clientes de correo no pintan SVG, no resuelven
+rutas relativas y Gmail bloquea `data:`. Se sirve por URL absoluta desde `APP_URL`. El `alt` del
+`<img>` va **estilado** (crema, 26px, bold), así que con las imágenes bloqueadas —lo normal en Gmail
+con un remitente nuevo— se sigue leyendo «Redestina» sobre el verde en vez de un icono roto. Si se
+cambia de dominio, basta con `APP_URL`. **Los colores del correo son constantes al principio de
+`resend.ts`** (`VERDE`, `CREMA`, `CORAL`, `FONDO`, `BORDE`, `TEXTO`, `SUAVE`) copiadas de
+`design/tokens.json`: si cambia un token, se cambian ahí (y en `enviar-acceso/index.ts`, que lleva
+dos en línea) y se redespliegan las funciones.
 
 ⚠️ **`textoAHtml(titulo, cuerpo)` ESCAPA su contenido**: es para texto plano (el `texto_oferta`, el
 albarán). Pasarle HTML lo publica como markup literal — pasó con `enviar-acceso` el 30-07-2026 y el
@@ -1567,10 +1625,9 @@ Cuatro cosas que costaron descubrir y siguen valiendo:
    `20260721120100_modelo_poma.sql`. Editarlas está prohibido (§7): el nombre es parte de su
    identidad.
 
-⚠️ **El rebranding es textual, no visual: falta el logo.** `public/logo-redestina.svg` es un wordmark
-en **paths**, no texto, así que **lo que se ve sigue diciendo POMA** en la landing, el menú lateral,
-las pantallas de acceso, los iconos de la PWA (`icona-*.png`, `apple-touch-icon.png`, `favicon.svg`)
-y la cabecera de todos los correos (`logo-email.png`). Deuda 41. Los PDF de
+~~⚠️ El rebranding es textual, no visual: falta el logo.~~ — **resuelto (10-09-2026)** con el
+sistema de diseño (§2bis): logo nuevo en seis variantes, iconos de la PWA, favicon y `logo-email.png`
+regenerados. Deuda 41 cerrada. Los PDF de
 `docs/nuevas-funcionalidades/` cambiaron de nombre pero no de contenido: son binarios y por dentro
 siguen diciendo POMA.
 
@@ -1744,7 +1801,7 @@ Redestina en producción real quedan pasos de configuración y negocio.
 6. `Conversation` carga el hilo completo sin paginación.
 7. ~~`ContactList` conserva la prop `single` (modo conversación única)~~ — **resuelto**: esa prop ya
    no existe (props actuales: `contacts`, `loading`, `error`, `selectedPhone`, `onSelect`, `onReload`).
-8. `index.css` es un único fichero global (~825 líneas) con clases sin namespace.
+8. ~~`index.css` es un único fichero global (~825 líneas) con clases sin namespace.~~ — **resuelto**: desde el paso a Tailwind v4 + shadcn solo contiene tokens y base (§2bis).
 9. `types.ts` no modela `raw`; `MessageRow` en `ProducersList` duplica parte de `WaMessage`.
 10. Hay migraciones que **borran datos** (`truncate wa_messages`) mezcladas con DDL.
 11. Sin FK entre `productores`, `wa_contacts` y `wa_messages` (unidas por `phone`).
@@ -1869,11 +1926,12 @@ Redestina en producción real quedan pasos de configuración y negocio.
     nombre del productor aunque esté disponible. Va con el checkpoint del formato definitivo del
     albarán (§12 checkpoint 4).
 
-41. **El rebranding a Redestina es textual, no visual.** Todo lo escrito dice ya «Redestina», pero
-    **el logo sigue dibujando «POMA»**: `public/logo-redestina.svg` es un wordmark en paths, no
-    texto, y de él derivan los iconos de la PWA, el `apple-touch-icon`, el `favicon` y el
-    `logo-email.png` de la cabecera de todos los correos. Hasta que haya logo nuevo, la aplicación
-    se llama Redestina y se ve POMA (§10bis).
+41. ~~**El rebranding a Redestina es textual, no visual.**~~ — **resuelta (10-09-2026)**: sistema
+    de diseño implantado (§2bis) con el logo nuevo, sus variantes, iconos PWA, favicon y
+    `logo-email.png`. Queda por hacer, no como deuda sino como decisión de diseño: la cabecera y el
+    pie de la landing siguen en verde con el logo negativo; `design/DESIGN.md §6` propone cabecera
+    clara con el logo en color. Y las Edge Functions con la plantilla de correo nueva hay que
+    **redesplegarlas** (`/publicar`, §11) para que los correos salgan con los colores nuevos.
 42. ~~**La infraestructura todavía responde al nombre viejo.**~~ — **resuelta (10-09-2026)**:
     proyecto de Vercel, dominio, `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM`, `site_url` y
     `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
@@ -1903,7 +1961,9 @@ Redestina en producción real quedan pasos de configuración y negocio.
    publicada, que es el comportamiento correcto). Cualquier otro rojo es una regresión.
 3. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
    redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
-4. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
+4. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un
+   token, `design/tokens.json`, `src/index.css` y `design/preview.html` van en el mismo commit.
+5. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
    comandos o deuda técnica; y **§1bis + su tabla de correspondencia** si cambió el alcance
    funcional o el estado de implementación (✅/🟡/⬜).
-5. Commit en castellano, describiendo el *qué* y el *por qué*.
+6. Commit en castellano, describiendo el *qué* y el *por qué*.

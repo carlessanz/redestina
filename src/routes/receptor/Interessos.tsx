@@ -27,8 +27,8 @@ interface CanalAmbOferta {
 
 function classeEstat(estado: string): string {
   switch (estado) {
-    case 'acceptada': return 'bg-green-100 text-green-800'
-    case 'rebutjada': return 'bg-red-100 text-red-700'
+    case 'acceptada': return 'bg-exito-fondo text-exito'
+    case 'rebutjada': return 'bg-error-fondo text-error'
     default: return 'bg-muted text-muted-foreground'
   }
 }
@@ -36,8 +36,8 @@ function classeEstat(estado: string): string {
 function classeAprovacio(a: string): string {
   switch (a) {
     case 'aprovada': return 'bg-primary/15 text-primary'
-    case 'rebutjada': return 'bg-red-100 text-red-700'
-    default: return 'bg-amber-100 text-amber-800'
+    case 'rebutjada': return 'bg-error-fondo text-error'
+    default: return 'bg-aviso-fondo text-aviso'
   }
 }
 

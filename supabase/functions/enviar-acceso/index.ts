@@ -172,10 +172,10 @@ Deno.serve(async (req) => {
           `<p style="margin:0">Ja pots entrar al panell de Redestina. L'enllaç caduca en <strong>1 hora</strong> i només es pot fer servir una vegada.</p>`,
         boton: { texto: "Entra a Redestina", url: enlace },
         nota:
-          `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:#234C66">${
+          `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:#4e6b45">${
             redirectTo.replace(/^https?:\/\//, "")
           }</a>, escriu el teu correu i fes servir aquest codi:<br>` +
-          `<span style="display:inline-block;margin-top:10px;padding:8px 14px;background:#F1F4F0;border-radius:8px;font-size:20px;font-weight:700;letter-spacing:4px;color:#234C66">${codi}</span>`,
+          `<span style="display:inline-block;margin-top:10px;padding:8px 14px;background:#ebe6da;border-radius:8px;font-size:20px;font-weight:700;letter-spacing:4px;color:#1d1d1b">${codi}</span>`,
       });
       const r = await sendEmail({
         to: email,

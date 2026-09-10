@@ -32,7 +32,7 @@ export default function LayoutAcces({
     >
       <div className={cn('w-full', ample ? 'max-w-md' : 'max-w-sm')}>
         <Link to="/" className="block">
-          <img src="/logo-redestina.svg" alt="Redestina" className="mx-auto mb-8 h-11 w-auto" />
+          <img src="/logo-redestina-negativo.svg" alt="Redestina" className="mx-auto mb-8 h-11 w-auto" />
         </Link>
         {children}
         <p className="mt-4 text-center text-xs text-secondary/70">{t('login.foot')}</p>

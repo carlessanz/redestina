@@ -20,11 +20,11 @@ const ACTIVES = ['borrador', 'publicada', 'parcial', 'bloqueada']
 
 export function estatEtiqueta(estado: string): { key: string; clase: string } {
   switch (estado) {
-    case 'publicada': return { key: 'off.st_published', clase: 'bg-blue-100 text-blue-800' }
-    case 'parcial': return { key: 'off.st_partial', clase: 'bg-yellow-100 text-yellow-800' }
-    case 'bloqueada': return { key: 'off.st_blocked', clase: 'bg-green-100 text-green-800' }
+    case 'publicada': return { key: 'off.st_published', clase: 'bg-secondary text-secondary-foreground' }
+    case 'parcial': return { key: 'off.st_partial', clase: 'bg-aviso-fondo text-aviso' }
+    case 'bloqueada': return { key: 'off.st_blocked', clase: 'bg-exito-fondo text-exito' }
     case 'borrador': return { key: 'off.st_draft', clase: 'bg-muted text-muted-foreground' }
-    case 'cancelada': return { key: 'off.st_cancelled', clase: 'bg-red-100 text-red-700' }
+    case 'cancelada': return { key: 'off.st_cancelled', clase: 'bg-error-fondo text-error' }
     case 'no_colocada': return { key: 'off.st_uncoll', clase: 'bg-muted text-muted-foreground' }
     case 'cerrada': return { key: 'off.st_closed', clase: 'bg-muted text-muted-foreground' }
     default: return { key: estado, clase: 'bg-muted text-muted-foreground' }
@@ -87,7 +87,7 @@ function FilaOferta({ o, canalitzats }: { o: Excedente; canalitzats: number }) {
       <div className="flex items-center gap-3">
         <div>
           <div className="h-2 w-28 overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-green-600" style={{ width: `${pct}%` }} />
+            <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
           </div>
           <span className="mt-1 block text-xs text-muted-foreground">
             {canalitzats}/{total} kg · {falten > 0 ? t('off.falten', { n: falten }) : t('off.complet')}

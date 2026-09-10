@@ -48,8 +48,8 @@ export default function Landing() {
       <header className="sticky top-0 z-40 border-b border-white/10 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
           <Link to="/" aria-label="Redestina" className="flex items-center">
-            {/* Los rellenos del SVG ya son coral y crema, pensados para fondo navy: sin filtros. */}
-            <img src="/logo-redestina.svg" alt="Redestina" className="h-8 w-auto" />
+            {/* Sobre verde va la versión negativa del logo (design/DESIGN.md §4): sin filtros. */}
+            <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-8 w-auto" />
           </Link>
 
           <nav className="mx-auto hidden items-center gap-6 md:flex">
@@ -163,7 +163,7 @@ export default function Landing() {
 
       <footer className="bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-10 text-center">
-          <img src="/logo-redestina.svg" alt="Redestina" className="h-7 w-auto" />
+          <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-7 w-auto" />
           <p className="text-sm text-primary-foreground/80">{t('land.foot_by')}</p>
           <a
             href="https://espigoladors.cat"

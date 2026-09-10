@@ -17,7 +17,8 @@ const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "Redestina <onboarding@resend
 
 // El logo tiene que ser una URL absoluta y pública: los clientes de correo no
 // resuelven rutas relativas, no cargan `data:` (Gmail lo bloquea) y no saben
-// pintar SVG. `public/logo-email.png` es el wordmark rasterizado a 378×96.
+// pintar SVG. `public/logo-email.png` es el logo en negativo (para la cabecera verde)
+// rasterizado a 410×120; se regenera desde `public/logo-redestina-negativo.svg`.
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com")
   .replace(/\/+$/, "");
 const LOGO_URL = `${APP_URL}/logo-email.png`;
@@ -66,12 +67,14 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
 
 // --- Plantilla visual -------------------------------------------------------
 
-const NAVY = "#234C66";
-const CREMA = "#E0EBC7";
-const CORAL = "#EE7A5F";
-const FONDO = "#F1F4F0";
-const TEXTO = "#234C66";
-const SUAVE = "#5F7787";
+// Colores del sistema de diseño (design/tokens.json). Si cambian allí, cambian aquí.
+const VERDE = "#4e6b45"; // primary
+const CREMA = "#f5f1ea"; // background / primary-foreground
+const CORAL = "#ef7d77"; // acento de marca
+const FONDO = "#ebe6da"; // muted: fondo exterior del correo
+const BORDE = "#e0d9ca"; // border
+const TEXTO = "#1d1d1b"; // foreground
+const SUAVE = "#5f6b5a"; // muted-foreground
 const FUENTE = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
 
 export function escaparHtml(s: string): string {
@@ -111,7 +114,7 @@ export function plantillaEmail(o: PlantillaOpciones): string {
 
   const boton = o.boton
     ? `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:28px 0">
-            <tr><td align="center" bgcolor="${NAVY}" style="border-radius:10px">
+            <tr><td align="center" bgcolor="${VERDE}" style="border-radius:10px">
               <a href="${o.boton.url}" style="display:inline-block;padding:14px 28px;font-family:${FUENTE};font-size:16px;font-weight:700;color:${CREMA};text-decoration:none;border-radius:10px">${
       escaparHtml(o.boton.texto)
     }</a>
@@ -120,7 +123,7 @@ export function plantillaEmail(o: PlantillaOpciones): string {
     : "";
 
   const nota = o.nota
-    ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid #EAEFE6;font-family:${FUENTE};font-size:13px;line-height:1.55;color:${SUAVE}">${o.nota}</p>`
+    ? `<p style="margin:24px 0 0;padding-top:16px;border-top:1px solid ${BORDE};font-family:${FUENTE};font-size:13px;line-height:1.55;color:${SUAVE}">${o.nota}</p>`
     : "";
 
   return `<!doctype html>
@@ -141,9 +144,9 @@ ${preheader}
 
       <!-- Cabecera: el alt del logo va estilado, así que con las imágenes
            bloqueadas (Gmail lo hace por defecto) se sigue leyendo «Redestina». -->
-      <tr><td align="center" bgcolor="${NAVY}" style="background:${NAVY};border-radius:16px 16px 0 0;padding:28px 24px 22px">
-        <img src="${LOGO_URL}" width="150" height="38" alt="Redestina"
-             style="display:block;border:0;outline:none;width:150px;height:38px;font-family:${FUENTE};font-size:26px;font-weight:700;color:${CREMA};letter-spacing:1px">
+      <tr><td align="center" bgcolor="${VERDE}" style="background:${VERDE};border-radius:16px 16px 0 0;padding:28px 24px 22px">
+        <img src="${LOGO_URL}" width="150" height="44" alt="Redestina"
+             style="display:block;border:0;outline:none;width:150px;height:44px;font-family:${FUENTE};font-size:26px;font-weight:700;color:${CREMA};letter-spacing:1px">
         <div style="font-family:${FUENTE};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${CREMA};opacity:.85;padding-top:10px">Fundació Espigoladors</div>
       </td></tr>
 
@@ -196,7 +199,7 @@ export function textoAHtml(titulo: string, cuerpo: string): string {
 // Recuadro monoespaciado-pero-legible para textos que llegan ya compuestos (el
 // `texto_oferta`, el albarán): conserva los saltos y no se los come el cliente.
 export function bloquePreformateado(texto: string): string {
-  return `<div style="white-space:pre-wrap;font-family:${FUENTE};font-size:15px;line-height:1.6;color:${TEXTO};background:#FAFCF7;border:1px solid ${CREMA};border-radius:12px;padding:18px 20px">${
+  return `<div style="white-space:pre-wrap;font-family:${FUENTE};font-size:15px;line-height:1.6;color:${TEXTO};background:#ffffff;border:1px solid ${BORDE};border-radius:12px;padding:18px 20px">${
     escaparHtml(texto)
   }</div>`;
 }
