@@ -111,14 +111,13 @@ Luego comprueba que las nueve quedaron `ACTIVE` y con el `verify_jwt` que toca:
 supabase functions list
 ```
 
-Esperado: `true` en `whatsapp-send`*, `priorizar-entidades`, `enviar-email`, `crear-oferta` y
+Esperado: `true` en `whatsapp-send`, `priorizar-entidades`, `enviar-email`, `crear-oferta` y
 `enviar-acceso`; `false` en `whatsapp-webhook`, `intake-recordatorios`, `recuperar-password` y
 `registro`.
 
-\* **Discrepancia conocida**: `config.toml` declara `verify_jwt = false` para `whatsapp-send`
-mientras `AGENTS.md` §9 y §11 dicen que va con JWT. Hoy queda en `false`. No rompe nada —la
-función comprueba la sesión por su cuenta con `exigirEquipo()` y devuelve `401 unauthorized`—,
-pero si sigue sin resolverse, señálalo en el informe en vez de cambiarlo por tu cuenta.
+⚠️ El `verify_jwt` que acaba aplicándose sale de **`config.toml`**, no del flag de la línea de
+comandos: si una función discrepa de esa lista, se corrige ahí y se vuelve a desplegar. Pasó con
+`whatsapp-send`, que estuvo en `false` hasta el 10-09-2026 (deuda 43, ya cerrada).
 
 ## 6. Verificación funcional
 

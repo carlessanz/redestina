@@ -1879,14 +1879,15 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
     el dominio anterior se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
     pero es la segunda vez que se usa ese argumento (§10bis).
-43. **`whatsapp-send` está desplegada SIN `verify_jwt`, y la documentación decía que con él.**
-    `config.toml` (`[functions.whatsapp-send] verify_jwt = false`) manda sobre lo que hace el CLI,
-    así que cada `functions deploy` la deja en `false`, mientras §9 y §11 afirmaban lo contrario.
-    **No es una vía de entrada**: la función llama a `exigirEquipo()` y responde `401
-    unauthorized` sin sesión —verificado el 10-09-2026 contra producción—, así que lo que falta es
-    la barrera de la plataforma *delante* de la propia, no la única barrera. Queda por decidir
-    cuál de las dos fuentes se corrige: poner `verify_jwt = true` en `config.toml` y redesplegar,
-    o aceptar el `false` y dejarlo escrito. Las ocho funciones restantes sí coinciden con §11.
+43. ~~**`whatsapp-send` desplegada sin `verify_jwt`**~~ — **resuelta (10-09-2026)**: `config.toml`
+    declaraba `verify_jwt = false` y manda sobre el CLI, así que cada `functions deploy` la dejaba
+    en `false` mientras §9 y §11 decían lo contrario. No era una vía de entrada —`exigirEquipo()`
+    ya respondía `401` sin sesión— pero faltaba la barrera de la plataforma *delante* de la propia.
+    Puesto `verify_jwt = true` y redesplegada (v102). Verificado contra producción: sin cabecera
+    `Authorization` corta la plataforma (`UNAUTHORIZED_NO_AUTH_HEADER`) antes de entrar al código;
+    con el JWT de una sesión de equipo entra y actúan los gates internos (`403 no_test_user`); el
+    preflight sigue devolviendo el origen correcto, porque un `OPTIONS` no lleva JWT. Las nueve
+    funciones coinciden ya con §11.
 44. **Un `functions deploy` sin cambios de código no siempre dice `No change found`.** El
     10-09-2026, cinco funciones desplegadas hacía diez minutos volvieron a empaquetarse
     («Deploying… script size: 1.8 MB») sin que su código hubiera cambiado. Es inocuo —el
