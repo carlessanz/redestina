@@ -1,4 +1,11 @@
 // Textos que el panel compone para copiar y pegar en el grupo de WhatsApp.
+//
+// ⚠️ AQUÍ YA NO HAY ALBARÁN. `textoAlbaran()` vivía en este fichero desde el principio: una
+// plantilla con marcadores, sin número de serie, con la advertencia «pendent del format
+// oficial» impresa dentro y con el nombre del productor siempre en blanco (deuda 40). Desde
+// la fase 3 el albarán es una fila numerada de `albaranes` con su PDF generado por el
+// servidor, así que se ha retirado — con ella se cierran el checkpoint §12.4 y la deuda 40.
+// Lo que queda es el aviso de WhatsApp, que no es un documento y sigue siendo texto.
 // Reproducen el formato que el equipo usa hoy a mano, emojis incluidos.
 //
 // El de "OFERTA DISPONIBLE" no está aquí: lo genera el intake al crear el
@@ -20,34 +27,5 @@ export function textoRecollidaConfirmada(campos: {
     `⚖️ KG RECOLLITS: ${campos.kgRecollits}`,
     `🔴 KG FALTEN RECOLLIR: ${campos.kgFalten}`,
     `👥 Comentaris: ${campos.comentaris}`,
-  ].join('\n')
-}
-
-// Plantilla del albarán con marcadores. El formato legal definitivo se toma de
-// la hoja "ALBARANS" del Excel, que no está en el repo: no se inventan campos
-// legales, se dejan para revisar al integrar el PDF definitivo.
-export function textoAlbaran(campos: {
-  idExcedente: string
-  entitat: string
-  productor: string
-  producte: string
-  kgReals: string
-  dataRecollida: string
-}): string {
-  return [
-    "ALBARÀ D'ENTREGA — FUNDACIÓ ESPIGOLADORS",
-    '(plantilla provisional · pendent del format oficial del full ALBARANS)',
-    '',
-    `Referència: ${campos.idExcedente}`,
-    `Data de recollida: ${campos.dataRecollida}`,
-    `Entitat receptora: ${campos.entitat}`,
-    `Productor/a d'origen: ${campos.productor}`,
-    `Producte: ${campos.producte}`,
-    `Quantitat entregada: ${campos.kgReals} kg`,
-    '',
-    'Signatura entitat: __________________________',
-    'Signatura Espigoladors: _____________________',
-    '',
-    "[TODO: camps legals definitius del full ALBARANS de l'Excel]",
   ].join('\n')
 }

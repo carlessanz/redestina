@@ -357,10 +357,12 @@ src/
   hooks/useInstalacio.ts       ¿Se puede instalar la PWA, y cómo? (automática o manual iOS; §2)
   routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés»
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
-                               Registre (/registre) y RestablirClau (/restablir) — §6quater
+                               Registre (/registre), RestablirClau (/restablir) y
+                               Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia, escrita por RPC con lista blanca
   routes/equip/                Envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja del sistema documental)
+                               + Albarans/AlbaraDetall/Espigolades (fase 3)
   routes/productor/            Inicio, listado, alta de oferta y detalle
   routes/receptor/             Mercat, interessos i històric
   types.ts                     Tipos de todas las tablas
@@ -380,6 +382,8 @@ src/
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
     settings.ts                getTestMode()/setTestMode(): modo test global (app_settings, §8)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
+    albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
+    enllacPublic.ts            Cliente de enlace-publico, sin sesión (§9)
     email.ts                   enviarEmail(): llama a la Edge Function enviar-email
     i18n.tsx                   Sistema de traducciones (ca/es, per defecte ca; useT, §7)
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
@@ -725,6 +729,37 @@ no se arregla repitiendo. **Sin el secreto en `app_config`, los tres disparadore
 `documento_envios`, `series_documentales`, `enlaces_token`, `evidencias` ni `municipios`**: la
 superficie de escritura son las RPC `security definer` y `service_role`.
 
+**Albaranes (fase 3, `20261012*`)** — `albaranes` (**REC** entrada del generador · **ENT** entrega
+a la entidad · **OPE** venta o maquila) y `albaran_lineas`, donde viven **los kilos oficiales**
+(`kg_bruto` / `tara_kg` / `kg_neto`, y `kg_previstos` / `kg_confirmados` / `kg_validados`); solo
+`kg_validados` cuenta para indicadores y certificados (D13). **Sin ninguna columna de importe, a
+propósito** —en un albarán no hay dinero— y el arnés lo comprueba esperando `42703`. El número se
+pide al **emitir** (`siguiente_numero`), nunca en borrador: un borrador descartado no deja hueco en
+la serie. `partes` congela quién entrega y quién recibe, así que si luego cambia una ficha el
+albarán no cambia. Estados: `borrador → emitido → entregado → confirmado → conciliado`, con
+`anulado` y `rectificado` como salidas.
+
+⚠️ **Un albarán nace por TRIGGER** (`canalizaciones_crea_albaranes`), no por una llamada, porque
+`canalizaciones` se inserta desde más de un camino: la RPC `aprovar_resposta`, las tres llamadas
+sueltas de `OfferDetail` (deuda 19) y ahora el reparto de una espigolada. El trigger **no** crea REC
+para registros de espigolada —la jornada ya tiene el suyo—: sin esa excepción, el reparto duplicaba
+la entrada y la conciliación contaba dos veces.
+
+**`espigoladas`** agrupa una jornada de espigueo: sus registros son `excedentes` con
+`origen='espigolament'` y su REC cuelga de `espigolada_id`. `documentos_externos` (polimórfica,
+`albaran`/`cierre_donante`) guarda lo que aportan terceros: el albarán del productor, la factura del
+donante, fotos de incidencias.
+
+**`tipos_caja`** (con `tara_kg`) y **`costes_producto`** (+`costes_producto_hist`, con motivo
+obligatorio en cada cambio). `costes_producto` es el **único origen del valor fiscal**: al crear una
+canalización se copia su `coste_kg` y se congela al conciliar; **si no hay coste del ejercicio queda
+`null` y eso bloquea el cierre**, que es justo lo que se quiere —con el 1 €/kg plano de
+`productos.eur_kg` el bloqueo no saltaría nunca—. `tipos_caja` nace **sembrada provisional y
+desactivada** hasta que la Fundación dé la lista de taras.
+
+Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
+todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
+
 ⚠️ **Cuatro columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
 `enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad` y
 `parametros_documentales.apoderada_dni`. RLS no sabe restringir columnas; el GRANT sí (mismo
@@ -905,6 +940,16 @@ funciones, no políticas:
 | `emitir_documento_prova(fallar default false)` | Documento de humo, serie `PROVA`, `modo='prueba'`. Exige `es_super_admin()`. Con `fallar` levanta excepción **después** de pedir el número: es lo que prueba `scripts/prueba-numeracion.ts` |
 | `reiniciar_documentos_prova()` | Borra los documentos `modo='prueba'` y pone a 0 `PROVA`/`P-*` del ejercicio. Única excepción a la inmutabilidad |
 | `marcar_documento_generado(id, sha, bytes, paginas)` / `marcar_documento_error(id, err)` | Solo `service_role`. La `ruta` no se pasa: ya está fijada. `generado` es idempotente |
+| `emitir_albaran(id, recogida, lineas, idioma)` | Pide número, congela `partes`, emite el PDF. `es_intern()`; `22023` si no es borrador |
+| `marcar_entregado(id)` | Crea los enlaces de confirmación y **devuelve el token en claro**: es la única vez que existe (en la base solo está su hash). `es_intern()` |
+| `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`.** Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada |
+| `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
+| `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo |
+| `anular_albaran` / `rectificar_albaran` | `pot_aprovar()`. El rectificativo usa serie `R-<tipo>` y deja el original en `rectificado` |
+| `crear_espigolada` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()` |
+| `fijar_coste_producto` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto` (`es_super_admin()`) | El valor fiscal y las taras. Borrar existe porque un coste fijado en el ejercicio equivocado no tenía vuelta atrás |
+| `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
+| `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
 
 ⚠️ **`auth.uid() is null` significa `service_role`.** Las RPC documentales comprueban el rol solo
 cuando hay sesión de usuario (`if auth.uid() is not null and not es_super_admin() then raise`),
@@ -1126,7 +1171,7 @@ que corresponde al momento de cierre y todavía no está implementado.
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
+| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · perfil` | Sus ofertas, su progreso y el **alta con el mismo cuestionario del intake** |
 | **Receptor** | `/receptor/mercat · interessos · historic · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés y su histórico |
 
@@ -1333,6 +1378,7 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/admin` | Acceso del **equipo**, con el copy de siempre. **No se enlaza desde lo público** |
 | `/registre` | Alta self-service por rol (§9) |
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
+| `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
 | `/panell` | Lo que antes era `/`: manda a cada cual a su panel |
 
 ⚠️ **`/admin` no está enlazado, pero eso no es una protección.** Quien conozca la URL ve el mismo
@@ -1702,6 +1748,27 @@ contadores solo se suben si el correo salió**: si no, el hito sigue pendiente y
 mañana. Con `email_equipo` NULL (hoy lo es) no falla: lo registra, lo cuenta como
 `sense_email_equip` y sigue. Devuelve `{ok, revisados, avisados, saltados, motivos}`.
 
+### Confirmación por enlace (`enlace-publico`, fase 3)
+
+`GET ?t=<token>` y `POST {t, accion}` — **pública** (`--no-verify-jwt`): quien confirma una entrega
+no tiene cuenta. **El token es la única credencial**, y en la base solo vive su sha256. Anti-abuso
+como `registro`: honeypot, 10 intentos/10 min por IP en memoria y freno durable (≥50 evidencias/hora
+→ 429).
+
+**`evidencias.sha256_texto` es la huella del acta que compone el SERVIDOR**, no la que manda el
+cliente. El `GET` devuelve el acta entera en `text_confirmacio` —declaración, número, código de
+verificación y una línea por producto con sus kg— y la página está obligada a mostrarla tal cual; el
+`POST` la vuelve a componer y hashea la suya. Si la del cliente no cuadra, `409 document_canviat`.
+Aceptar la huella del cliente convertiría la evidencia en una declaración suya sobre lo que dice
+haber visto. Los kg tecleados **no** entran en la huella: eso es lo respondido, y va en `payload`.
+
+⚠️ **D3 también se aplica en la API, no solo en el PDF.** El albarán de entrega filtraba la
+identidad del generador por dos vías que no eran evidentes: `id_excedente` tiene el formato
+`E-AAMMDD-XXX-YYY-N`, donde **XXX son las tres primeras letras del nombre del productor**, y
+`recogida.lugar` (la finca) más `responsable_origen` (la persona en origen) salían tanto impresos
+como en el JSON público. Los tres se tapan en ENT y el lugar se sustituye por el municipio. Si se
+añade algún campo nuevo al snapshot, hay que preguntarse si nombra al donante.
+
 ### Registro self-service (`registro`, 31-07-2026)
 
 `POST /functions/v1/registro` — **pública** (`--no-verify-jwt`), porque la llama quien todavía no
@@ -2001,6 +2068,8 @@ supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico 
 supabase functions deploy generar-documento --no-verify-jwt      # la llama el trigger por pg_net
 supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 60 s)
 supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama pg_cron
+supabase functions deploy enlace-publico --no-verify-jwt        # confirmación pública (§9)
+supabase functions deploy subir-documento-externo               # con verify_jwt (multipart, 10 MB)
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -2272,11 +2341,12 @@ Redestina en producción real quedan pasos de configuración y negocio.
 38. **`vista_defecto` se calcula en el servidor y el frontend lo descarta** (§4bis). El panel inicial
     de `/panell` se decide por `localStorage` (`preferit`) + `ctx.rols[0]`; el campo no llega siquiera
     a `ContextSessio`. Inofensivo, pero es lógica servida y no usada.
-39. **`crearExcedente()` no reintenta ante colisión del correlativo.** El comentario de `oferta.ts`
-    dice que un segundo alta simultánea «reintenta con N+1», pero no hay retry: `id_excedente` se
-    calcula contando las filas del día y se hace un único `insert`; si dos altas del mismo
-    productor+producto coinciden en el día, la segunda choca con el `unique` y **falla** en vez de
-    reintentar. Raro a la escala de Redestina, pero real (afecta tanto al intake como al panel).
+39. ~~**`crearExcedente()` no reintenta ante colisión del correlativo.**~~ — **resuelta (fase 3)**:
+    `generarId()` pide el número a `siguiente_numero(prefijo, ejercicio)` en vez de contar filas con
+    un `like`, y ante `23505` reintenta hasta 3 veces. El formato `E-AAMMDD-XXX-YYY-N` no cambia.
+    Verificado con dos altas **en paralelo** del mismo productor y producto: `-2` y `-3`, las dos
+    correctas. El comentario del fichero afirmaba desde julio que reintentaba, y no era verdad.
+
 40. **El albarán se genera con el productor en blanco.** `OfferDetail` pasa `productor: ''` (y
     `dataHora`/`comentaris` vacíos) a `textoAlbaran`, así que el «RECOLLIDA CONFIRMADA» nunca lleva el
     nombre del productor aunque esté disponible. Va con el checkpoint del formato definitivo del
@@ -2412,6 +2482,37 @@ Redestina en producción real quedan pasos de configuración y negocio.
     local no hay `RESEND_API_KEY`, así que la única forma de ejercitarlo fue interceptar `fetch`.
     Lo que sí queda probado sin stub es la invariante que importa: **si el correo no sale, los
     contadores no se mueven**, y el hito se reintenta mañana.
+
+60. **El bloque de conformidad de los albaranes se imprime siempre en blanco**, aunque el albarán
+    ya esté confirmado por enlace. La evidencia (quién, cuándo, desde dónde) vive en `evidencias`, y
+    `albaran_datos()` no la mete en el snapshot; el renderizador no habla con la base a propósito.
+    Cuando el snapshot la incluya, son tres campos que rellenar.
+61. **El REC de una espigolada imprime el UUID de la jornada** como referencia, porque el snapshot
+    no trae `espigoladas.ref_externa`. Es correcto y es ilegible en papel.
+62. **`subir-documento-externo` compone a mano la hoja del nombre de fichero**: `ruta_documento()`
+    solo sabe de documentos emitidos (termina siempre en `-v<n>.pdf`) y un externo no tiene versión
+    ni es siempre un PDF. El arreglo limpio es una `ruta_documento_externo()` en una migración.
+63. **Las herramientas locales asumen un único operador, y con agentes en paralelo eso rompe.** Dos
+    casos vistos el mismo día: el arnés borrando los documentos de prueba que otro acababa de
+    generar (deuda 52), y **dos `supabase functions serve` a la vez**, que no caben porque el
+    runtime es un contenedor de Docker con nombre fijo por proyecto
+    (`supabase_edge_runtime_<proyecto>`) — el segundo muere con `Conflict … already in use` y puede
+    dejar el primero colgado en un estado que ni `docker rm -f` deshace. Regla: el serve lo levanta
+    quien va a probar, y no se mantiene uno de fondo. Alternativa cuando el contenedor está
+    inservible: probar las funciones con `deno run` directo contra la base local —mismo código y
+    HTTP real—, que es como se verificó la fase 3.
+
+64. **`/equip/espigolades` no tiene listado**, solo alta (`/nova`) y detalle: por eso la entrada
+    del menú apunta a `/nova`. En cuanto haya más de un puñado de jornadas hará falta la pantalla.
+65. **El panel no sube documentos externos.** `subir-documento-externo` existe y funciona, pero la
+    ficha del albarán solo **lista** lo que hay: falta el formulario de subida.
+66. **«Amb discrepància» es un filtro, no un veredicto.** `v_albaranes_bandeja` solo sabe si hubo
+    rechazo o si lo confirmado no cuadra con el neto de ese albarán; la diferencia real la calcula
+    `propuesta_conciliacion()` cruzando el REC con todos sus ENT, y eso sería una llamada por fila.
+67. **Rectificar solo permite corregir `kg_neto` por línea**, no el producto ni las cajas. Es lo que
+    se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
+68. **El OPE no tiene interfaz propia para sus dos confirmaciones.** `marcar_entregado` crea los dos
+    enlaces y la ficha los enseña, pero sin distinguir quién es cada parte.
 
 ## 13. Al terminar cualquier cambio
 

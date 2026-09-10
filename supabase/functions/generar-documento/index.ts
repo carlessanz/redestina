@@ -25,7 +25,17 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { type BytesActivos, cargarActivos } from "../_shared/pdf/fuentes.ts";
+import type { DatosAlbaran, PlantillaLegal } from "../_shared/pdf/render/comu.ts";
+import { renderEnt } from "../_shared/pdf/render/ent.ts";
+import { renderOpe } from "../_shared/pdf/render/ope.ts";
 import { type LineaProva, renderProva } from "../_shared/pdf/render/prova.ts";
+import { renderRec } from "../_shared/pdf/render/rec.ts";
+
+// Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
+// resuelve el esquema a `never` y las llamadas dejan de compilar (misma nota que en
+// `registro/index.ts` y `_shared/gate.ts`).
+// deno-lint-ignore no-explicit-any
+type Cliente = any;
 
 /** Los activos (TTF y logo) viven en la carpeta de ESTA función, no en `_shared/`. */
 const ACTIVOS = new URL("./activos/", import.meta.url);
@@ -44,6 +54,7 @@ interface FilaDocumento {
   ejercicio: number | null;
   datos: Record<string, unknown> | null;
   sha256_datos: string | null;
+  plantilla_id: string | null;
   ruta: string | null;
   estado: string;
   fichero_at: string | null;
@@ -101,7 +112,7 @@ Deno.serve(async (req) => {
   const { data, error } = await supabase
     .from("documentos")
     .select(
-      "id, tipo, subtipo, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, ruta, estado, fichero_at",
+      "id, tipo, subtipo, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, plantilla_id, ruta, estado, fichero_at",
     )
     .eq("id", documentoId)
     .maybeSingle();
@@ -129,7 +140,7 @@ Deno.serve(async (req) => {
     const msActivos = performance.now() - tActivos;
 
     const tRender = performance.now();
-    const { bytes, paginas } = await renderizar(doc, activos);
+    const { bytes, paginas } = await renderizar(supabase, doc, activos);
     const msRender = performance.now() - tRender;
 
     const huella = await sha256(bytes);
@@ -189,9 +200,62 @@ Deno.serve(async (req) => {
   }
 });
 
+/**
+ * La plantilla legal con la que se emitió ESTE documento, no la vigente de hoy.
+ *
+ * `documentos.plantilla_id` se congela al emitir (`albaran_emet_document`), así que
+ * regenerar el PDF de un albarán de hace dos años vuelve a imprimir el texto de
+ * entonces aunque desde entonces se hayan publicado tres versiones. Es la mitad de la
+ * copia congelada: `datos` guarda los valores, esto guarda el texto que los rodea.
+ *
+ * Sin plantilla (todavía no hay texto validado para ese tipo e idioma, §fase 0) devuelve
+ * `null` y el renderizador imprime su texto provisional, marcado como tal.
+ */
+async function plantillaDe(
+  supabase: Cliente,
+  plantillaId: string | null,
+): Promise<PlantillaLegal | null> {
+  if (!plantillaId) return null;
+  const { data, error } = await supabase
+    .from("plantillas_documento")
+    .select("id, tipo, idioma, version, titulo, cuerpo")
+    .eq("id", plantillaId)
+    .maybeSingle();
+  if (error) {
+    // No es motivo para no generar el documento: se imprime el provisional y se avisa.
+    console.warn("generar-documento: plantilla:", error.message);
+    return null;
+  }
+  const fila = data as { titulo?: string | null; cuerpo?: unknown } | null;
+  return fila ? { titulo: fila.titulo ?? null, cuerpo: fila.cuerpo } : null;
+}
+
 /** Elige el renderizador por `tipo`. Un tipo desconocido es un error, no un vacío. */
-async function renderizar(doc: FilaDocumento, activos: BytesActivos) {
+async function renderizar(
+  supabase: Cliente,
+  doc: FilaDocumento,
+  activos: BytesActivos,
+) {
   const datos = (doc.datos ?? {}) as Record<string, unknown>;
+
+  // Los tres albaranes y sus rectificativos: mismo snapshot, mismo camino, renderizador
+  // distinto. `R-REC` se pinta como un REC con el rótulo de rectificativo (y su ruta ya
+  // lo archiva en la carpeta del original, `ruta_documento`).
+  const tipoBase = doc.tipo.replace(/^R-/, "");
+  if (tipoBase === "REC" || tipoBase === "ENT" || tipoBase === "OPE") {
+    const op = {
+      datos: datos as DatosAlbaran,
+      sha256Datos: doc.sha256_datos,
+      plantilla: await plantillaDe(supabase, doc.plantilla_id),
+      modo: doc.modo === "prueba" ? ("prueba" as const) : ("real" as const),
+      rectificativo: doc.tipo.startsWith("R-"),
+      subtipo: doc.subtipo,
+    };
+    if (tipoBase === "REC") return await renderRec(activos, op);
+    if (tipoBase === "ENT") return await renderEnt(activos, op);
+    return await renderOpe(activos, op);
+  }
+
   switch (doc.tipo) {
     case "PROVA": {
       // El `datos` del documento de prueba lo compone `emitir_documento_prova()`:

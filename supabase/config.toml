@@ -528,3 +528,20 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/recordatorios-documentales/deno.json"
 entrypoint = "./functions/recordatorios-documentales/index.ts"
+
+# Confirmación de albaranes sin sesión (fase 3). Pública: quien confirma una entrega no
+# tiene cuenta. Lo que la protege es el token —32 bytes, y en la base solo su sha256—,
+# no la plataforma. Anti-abuso propio dentro: honeypot, límite por IP y freno durable.
+[functions.enlace-publico]
+enabled = true
+verify_jwt = false
+import_map = "./functions/enlace-publico/deno.json"
+entrypoint = "./functions/enlace-publico/index.ts"
+
+# Subida del albarán del productor, facturas y fotos de incidencias. Multipart, 10 MB,
+# equipo o titular del objeto.
+[functions.subir-documento-externo]
+enabled = true
+verify_jwt = true
+import_map = "./functions/subir-documento-externo/deno.json"
+entrypoint = "./functions/subir-documento-externo/index.ts"

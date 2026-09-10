@@ -5,11 +5,17 @@
 // genera la Edge Function) y el PDF solo se baja por `descargar-documento`. O sea que
 // esta pantalla lista y descarga, y no hace nada más a propósito.
 //
-// Las PESTAÑAS están puestas ya aunque dos de ellas salgan vacías hoy. No es adorno: la
-// bandeja va a crecer con cada fase (fase 3 añade «Per conciliar» y «Confirmacions
-// pendents», fase 4 los cierres), y el sitio donde eso aparece conviene que exista desde
-// el principio. Vacías, cada una explica de qué se llenará; una pestaña en blanco se lee
-// como algo roto.
+// Las PESTAÑAS crecen con cada fase. La fase 3 llena dos de las que estaban reservadas,
+// leyendo `v_albaranes_bandeja` —una vista con `security_invoker`, así que no es un agujero
+// en la RLS: evalúa las políticas de quien consulta—:
+//
+//   · «Per conciliar»: los albaranes entregados o confirmados, ordenados por días de espera.
+//   · «Amb discrepància»: los que no cuadran. Y aquí hay una decisión que conviene leer: la
+//     discrepancia REAL de un registro la calcula `propuesta_conciliacion()` cruzando el REC
+//     con todos sus ENT, y eso es una llamada por fila —inviable en un listado—. Lo que se
+//     usa aquí es lo que la vista sí sabe por sí sola: que hubo un rechazo, o que los kilos
+//     confirmados no coinciden con los entregados. Es un filtro de «mira esto», no un
+//     veredicto; el veredicto lo da la ficha del albarán al abrir la conciliación.
 //
 // «Enllaços caducats» todavía no consulta nada: `enlaces_token` llega con la fase 2
 // (firma de convenios). Preferimos una pestaña que diga honestamente que aún no hay
@@ -18,10 +24,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { descarregarDocument, esperarGeneracio } from '../../lib/documents'
+import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
+import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -66,6 +75,7 @@ function casa(d: Fila, q: string): boolean {
 export default function Documents() {
   const { t } = useT()
   const [documents, setDocuments] = useState<Fila[]>([])
+  const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cerca, setCerca] = useState('')
@@ -97,6 +107,21 @@ export default function Documents() {
     })()
     return () => { cancelled = true }
   }, [carrega])
+
+  // La bandeja de albaranes va aparte y su fallo no tumba la pantalla: si la migración de
+  // la fase 3 todavía no está aplicada, esas dos pestañas salen vacías y la lista de
+  // documentos —que es lo que esta pantalla es— sigue funcionando igual.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      const { data } = await supabase
+        .from('v_albaranes_bandeja')
+        .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+        .in('estado', ['emitido', 'entregado', 'confirmado'])
+      if (!cancelled) setAlbarans((data as AlbaranBandeja[] | null) ?? [])
+    })()
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => () => avortar.current?.abort(), [])
 
@@ -154,6 +179,23 @@ export default function Documents() {
     const tots = documents.filter((d) => casa(d, q))
     return { tots, ambError: tots.filter((d) => d.estado === 'error') }
   }, [documents, cerca])
+
+  const { perConciliar, ambDiscrepancia } = useMemo(() => {
+    const q = cerca.trim().toLowerCase()
+    const casaAlb = (a: AlbaranBandeja) => !q
+      || [a.numero_completo, a.tipo, a.id_excedente, a.producto].some((c) => (c ?? '').toLowerCase().includes(q))
+    const filtrats = albarans.filter(casaAlb)
+    return {
+      // Quien más lleva esperando, primero: es quien bloquea el cierre anual de su donante.
+      perConciliar: filtrats
+        .filter((a) => a.estado === 'entregado' || a.estado === 'confirmado')
+        .sort((x, y) => (y.dias_esperando ?? 0) - (x.dias_esperando ?? 0)),
+      ambDiscrepancia: filtrats.filter((a) =>
+        a.rechazo !== 'cap'
+        || (a.kg_confirmados != null && a.kg_neto != null
+            && Number(a.kg_confirmados) !== Number(a.kg_neto))),
+    }
+  }, [albarans, cerca])
 
   function taula(llista: Fila[], buitKey: string) {
     if (llista.length === 0) {
@@ -231,6 +273,58 @@ export default function Documents() {
     )
   }
 
+  /** Tabla mínima de albaranes: número, tipo, kilos, estado y el enlace a su ficha. */
+  function taulaAlbarans(llista: AlbaranBandeja[], buitKey: string) {
+    if (llista.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('alb.c_number')}</TableHead>
+              <TableHead>{t('alb.c_type')}</TableHead>
+              <TableHead>{t('alb.c_product')}</TableHead>
+              <TableHead className="text-right">{t('alb.c_kg')}</TableHead>
+              <TableHead>{t('alb.c_status')}</TableHead>
+              <TableHead>{t('alb.c_waiting')}</TableHead>
+              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {llista.map((a) => (
+              <TableRow key={a.id}>
+                <TableCell className="font-medium whitespace-nowrap tabular-nums">
+                  {a.numero_completo ?? t('alb.no_number')}
+                </TableCell>
+                <TableCell><Badge variant="outline">{a.tipo}</Badge></TableCell>
+                <TableCell className="text-muted-foreground">{a.producto ?? '—'}</TableCell>
+                <TableCell className="text-right tabular-nums whitespace-nowrap">
+                  {kg(a.kg_confirmados ?? a.kg_neto ?? a.kg_previstos)}
+                </TableCell>
+                <TableCell>
+                  <Badge className={estilEstatAlbara(a.estado)}>{t(`alb.st_${a.estado}`)}</Badge>
+                  {a.rechazo !== 'cap' && (
+                    <Badge className="ml-1 bg-error-fondo text-error">{t(`alb.rj_${a.rechazo}`)}</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                  {a.dias_esperando != null ? t('alb.days', { n: a.dias_esperando }) : dataCurta(a.emitido_at)}
+                </TableCell>
+                <TableCell>
+                  <div className="flex justify-end">
+                    <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
+                      <Link to={`/equip/albarans/${a.id}`}>{t('c.detail')}</Link>
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            ))}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
   const buitKey = documents.length === 0 ? 'doc.empty' : 'doc.no_match'
 
   return (
@@ -257,6 +351,8 @@ export default function Documents() {
               <TabsList>
                 <TabsTrigger value="tots">{t('doc.tab_all', { n: tots.length })}</TabsTrigger>
                 <TabsTrigger value="error">{t('doc.tab_error', { n: ambError.length })}</TabsTrigger>
+                <TabsTrigger value="conciliar">{t('doc.tab_toreconcile', { n: perConciliar.length })}</TabsTrigger>
+                <TabsTrigger value="discrepancia">{t('doc.tab_mismatch', { n: ambDiscrepancia.length })}</TabsTrigger>
                 <TabsTrigger value="enllacos">{t('doc.tab_links')}</TabsTrigger>
               </TabsList>
             </div>
@@ -268,6 +364,16 @@ export default function Documents() {
             <TabsContent value="error" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('doc.error_hint')}</p>
               {taula(ambError, 'doc.empty_error')}
+            </TabsContent>
+
+            <TabsContent value="conciliar" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('doc.hint_toreconcile')}</p>
+              {taulaAlbarans(perConciliar, 'doc.empty_toreconcile')}
+            </TabsContent>
+
+            <TabsContent value="discrepancia" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('doc.hint_mismatch')}</p>
+              {taulaAlbarans(ambDiscrepancia, 'doc.empty_mismatch')}
             </TabsContent>
 
             <TabsContent value="enllacos" className="space-y-2">

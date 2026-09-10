@@ -138,7 +138,12 @@ export interface Excedente {
   texto_oferta: string | null
   estado: EstadoExcedente
   motivo_no_colocada: string | null
-  created_at: string
+  created_at: string  // --- fase 3 ---
+  origen: 'intake' | 'panel' | 'asistido' | 'espigolament'
+  espigolada_id: string | null
+  /** Previsión para el futuro módulo de espigolament: evita duplicar kilos */
+  ref_externa: string | null
+
 }
 
 export interface Canalizacion {
@@ -156,7 +161,19 @@ export interface Canalizacion {
   firmado_productor: boolean | null
   comentarios: string | null
   estado: string | null
-  created_at: string
+  created_at: string  // --- fase 3: valorización, lote y conciliación ---
+  valorizacion: 'donacio' | 'venda' | 'maquila' | null
+  /** Coste por kilo del ejercicio, copiado al crear y congelado al conciliar. Null bloquea el cierre */
+  coste_kg: number | null
+  nota_lote: string | null
+  codigo_lote: string | null
+  /** Los únicos kilos que cuentan para indicadores y certificados (D13) */
+  kg_conciliados: number | null
+  conciliada_at: string | null
+  conciliada_por: string | null
+  motivo_conciliacion: string | null
+  conciliacion_retroactiva: boolean
+
 }
 
 export interface OfertaRespuesta {
@@ -407,4 +424,119 @@ export interface Municipio {
   nom: string
   comarca: string
   provincia: 'Barcelona' | 'Girona' | 'Lleida' | 'Tarragona'
+}
+
+// --- Albaranes y espigoladas (fase 3, migraciones 20261012*) ---
+
+export type TipoAlbaran = 'REC' | 'ENT' | 'OPE'
+export type EstadoAlbaran =
+  | 'borrador' | 'emitido' | 'entregado' | 'confirmado' | 'conciliado' | 'anulado' | 'rectificado'
+
+export interface Albaran {
+  id: string
+  tipo: TipoAlbaran
+  serie: string | null
+  ejercicio: number | null
+  numero: number | null
+  /** Se pide al EMITIR, nunca en borrador: un borrador descartado no deja hueco en la serie */
+  numero_completo: string | null
+  excedente_id: string | null
+  espigolada_id: string | null
+  canalizacion_id: string | null
+  estado: EstadoAlbaran
+  /** Quién entrega y quién recibe, congelado al emitir: si la ficha cambia, el albarán no */
+  partes: Record<string, unknown> | null
+  recogida: Record<string, unknown> | null
+  retorn_envasos: string | null
+  observaciones: string | null
+  incidencias: Record<string, unknown>[] | null
+  rechazo: 'cap' | 'parcial' | 'total'
+  motivo_rechazo: string | null
+  idioma: 'ca' | 'es'
+  emitido_at: string | null
+  emitido_por: string | null
+  entregado_at: string | null
+  confirmado_at: string | null
+  conciliado_at: string | null
+  conciliado_por: string | null
+  motivo_conciliacion: string | null
+  destino_final: string | null
+  anulado_at: string | null
+  motivo_anulacion: string | null
+  rectifica_a: string | null
+  rectificado_por: string | null
+  created_at: string
+}
+
+export interface AlbaranLinea {
+  id: string
+  albaran_id: string
+  orden: number
+  producto: string | null
+  variedad: string | null
+  familia: string | null
+  causa: string | null
+  num_cajas: number | null
+  tipo_caja: string | null
+  kg_bruto: number | null
+  /** Tara TOTAL de la línea, no por caja */
+  tara_kg: number | null
+  kg_neto: number | null
+  kg_previstos: number | null
+  kg_entregados: number | null
+  kg_confirmados: number | null
+  /** Los oficiales: solo estos cuentan para indicadores y certificados */
+  kg_validados: number | null
+  lote_origen: string | null
+  created_at: string
+  // Sin importes, a propósito: en un albarán no hay dinero.
+}
+
+export interface Espigolada {
+  id: string
+  productor_id: string
+  ubicacion_id: string | null
+  fecha: string
+  num_voluntarios: number | null
+  notas: string | null
+  ref_externa: string | null
+  estado: 'oberta' | 'tancada'
+  creada_por: string | null
+  created_at: string
+}
+
+export interface TipoCaja {
+  codigo: string
+  nombre: string
+  tara_kg: number
+  retornable: boolean
+  activo: boolean
+  /** true mientras la Fundación no dé la lista real de taras */
+  provisional: boolean
+  orden: number
+}
+
+export interface CosteProducto {
+  producto: string
+  ejercicio: number
+  coste_kg: number
+  motivo: string
+  fijado_por: string | null
+  updated_at: string
+}
+
+export interface DocumentoExterno {
+  id: string
+  objeto_tipo: 'albaran' | 'cierre_donante'
+  objeto_id: string
+  tipo: 'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+  numero: string | null
+  fecha: string | null
+  ruta: string
+  sha256: string | null
+  mime: string | null
+  bytes: number | null
+  origen: 'panel' | 'enlace' | 'whatsapp'
+  subido_por: string | null
+  created_at: string
 }

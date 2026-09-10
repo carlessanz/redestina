@@ -11,8 +11,8 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, ClipboardCheck, FileText, Handshake, History, Home, LayoutDashboard,
-  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, UserCircle, Users,
+  Building2, ClipboardCheck, FileText, Handshake, History, Home, LayoutDashboard, Leaf,
+  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, UserCircle, Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
@@ -45,6 +45,8 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges' },
       { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
+      { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck },
+      { to: '/equip/espigolades/nova', labelKey: 'nav.espigolades', icon: Leaf },
     ],
   },
   {

@@ -1,0 +1,297 @@
+// Subida de un documento que aporta otro (albarán del productor, factura, foto).
+//
+//   POST /subir-documento-externo   multipart/form-data   (JWT de la sesión)
+//     fitxer       (File)   pdf, jpg o png, hasta 10 MB
+//     objeto_tipo  'albaran' | 'cierre_donante'
+//     objeto_id    uuid
+//     tipo         'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+//     numero?      número del documento AJENO, tal como viene impreso
+//     fecha?       AAAA-MM-DD del documento ajeno
+//   -> { id, ruta, sha256, bytes, mime, nombre }
+//
+// POR QUÉ ESTA FUNCIÓN Y NO UNA POLÍTICA DE STORAGE. `20260928100600` deja los dos
+// buckets **sin una sola política sobre `storage.objects`**, y es deliberado: dejar que
+// el navegador escriba en el bucket obliga a expresar en una política de Storage tres
+// cosas que una política no sabe decir —qué MIME acepta, cuánto pesa como máximo y en
+// qué carpeta puede escribir cada organización—. Aquí sí se pueden decir las tres, y
+// además queda la fila de `documentos_externos`, que es lo que hace que el fichero
+// signifique algo. Un objeto en el bucket sin su fila no lo ve nadie.
+//
+// LA RUTA LA DECIDE SQL. `ruta_documento()` sabe de quién es la carpeta —la de la
+// organización que aporta el fichero (§B.3)— y esta función no compone ninguna: pide la
+// carpeta y le pega el nombre del fichero. Es la misma regla que en `generar-documento`
+// («se sube exactamente a `documentos.ruta`») y por el mismo motivo: quien decide en qué
+// carpeta acaba un dato personal es la base, no un `+` de TypeScript.
+//
+// ⚠️ Con un matiz que hay que dejar escrito: `ruta_documento()` está pensada para un
+//    documento EMITIDO y termina siempre en `<numero>-v<n>.pdf`. Un externo no tiene ni
+//    número de serie nuestro ni versión, y puede ser un JPG. Así que se le pide la ruta
+//    con `p_tipo = 'externs'` y se le cambia **solo la hoja** por
+//    `<uuid>-<tipo>.<ext>`: la carpeta —lo único que decide quién puede ver el fichero—
+//    sigue viniendo entera de SQL. El arreglo limpio es una `ruta_documento_externo()`
+//    en una migración de `dades`; queda anotado en el informe.
+//
+// QUIÉN PUEDE SUBIR: el equipo, o el titular del objeto. Lo segundo se pregunta a
+// `albarans_de_les_meves_orgs()`, el mismo puente que usa la RLS de `albaranes`, para que
+// la respuesta sea exactamente la misma que daría un `select` desde el navegador. No se
+// reimplementa la regla aquí: se consulta.
+
+import "@supabase/functions-js/edge-runtime.d.ts";
+import { createClient } from "@supabase/supabase-js";
+import { contextoUsuario } from "../_shared/autorizacion.ts";
+import { corsPara } from "../_shared/cors.ts";
+
+// deno-lint-ignore no-explicit-any
+type Cliente = any;
+
+const BUCKET = "documentos";
+const MAX_BYTES = 10 * 1024 * 1024;
+
+/** Los tres formatos del circuito (los mismos que acepta el bucket, 20260928100600). */
+const MIMES: Record<string, string> = {
+  "application/pdf": "pdf",
+  "image/jpeg": "jpg",
+  "image/png": "png",
+};
+
+const OBJETOS = ["albaran", "cierre_donante"];
+const TIPOS = ["albaran_productor", "factura", "foto_incidencia", "altre"];
+
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+function textNet(v: unknown): string {
+  return typeof v === "string" ? v.trim() : "";
+}
+
+async function sha256(bytes: Uint8Array): Promise<string> {
+  const copia = new Uint8Array(bytes.length);
+  copia.set(bytes);
+  const resumen = await crypto.subtle.digest("SHA-256", copia.buffer);
+  return Array.from(new Uint8Array(resumen))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+/**
+ * La carpeta que dice SQL, con la hoja sustituida (ver el aviso de la cabecera).
+ * Si `ruta_documento()` no puede resolver el propietario, levanta `0A000` y esta función
+ * lo convierte en un 409: no se sube nada a una carpeta inventada.
+ */
+async function rutaExterno(
+  supabase: Cliente,
+  objetoTipo: string,
+  objetoId: string,
+  tipo: string,
+  ejercicio: number,
+  extension: string,
+): Promise<string> {
+  const id = crypto.randomUUID();
+  const { data, error } = await supabase.rpc("ruta_documento", {
+    p_objeto_tipo: objetoTipo,
+    p_objeto_id: objetoId,
+    p_tipo: "externs",
+    p_numero_completo: id,
+    p_version: 1,
+    p_modo: "real",
+    p_ejercicio: ejercicio,
+  });
+  if (error) throw Object.assign(new Error(error.message), { code: error.code });
+  const ruta = String(data ?? "");
+  const carpeta = ruta.slice(0, ruta.lastIndexOf("/") + 1);
+  if (!carpeta) throw new Error("ruta_documento() no ha devuelto ninguna carpeta");
+  return `${carpeta}${id}-${tipo}.${extension}`;
+}
+
+Deno.serve(async (req) => {
+  const t0 = performance.now();
+  const cors = corsPara(req);
+  const responder = (body: unknown, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...cors, "Content-Type": "application/json" },
+    });
+
+  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
+
+  const supabase = createClient(
+    Deno.env.get("SUPABASE_URL")!,
+    Deno.env.get("SB_SECRET_KEY")!,
+  );
+
+  // `service_role` ignora RLS (§4bis): la autorización propia es obligatoria, no un extra.
+  const ctx = await contextoUsuario(supabase, req);
+  if (!ctx) {
+    return responder({ error: "Necessites iniciar sessió", code: "unauthorized" }, 401);
+  }
+
+  let form: FormData;
+  try {
+    form = await req.formData();
+  } catch {
+    return responder(
+      { error: "S'esperava multipart/form-data", code: "cos_invalid" },
+      400,
+    );
+  }
+
+  const objetoTipo = textNet(form.get("objeto_tipo"));
+  const objetoId = textNet(form.get("objeto_id"));
+  const tipo = textNet(form.get("tipo"));
+  const numero = textNet(form.get("numero")).slice(0, 80) || null;
+  const fecha = textNet(form.get("fecha")) || null;
+
+  if (!OBJETOS.includes(objetoTipo)) {
+    return responder({ error: "Objecte no vàlid", code: "dades_invalides", camp: "objeto_tipo" }, 400);
+  }
+  if (!UUID.test(objetoId)) {
+    return responder({ error: "Identificador no vàlid", code: "dades_invalides", camp: "objeto_id" }, 400);
+  }
+  if (!TIPOS.includes(tipo)) {
+    return responder({ error: "Tipus no vàlid", code: "dades_invalides", camp: "tipo" }, 400);
+  }
+  if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
+    return responder({ error: "La data no és vàlida", code: "dades_invalides", camp: "fecha" }, 400);
+  }
+
+  const fichero = form.get("fitxer") ?? form.get("fichero") ?? form.get("file");
+  if (!(fichero instanceof File)) {
+    return responder({ error: "Falta el fitxer", code: "falta_fitxer" }, 400);
+  }
+  // El tamaño se mira ANTES de leer los bytes: `arrayBuffer()` de un fichero de 200 MB
+  // se los trae a memoria antes de que nadie pueda decir que no.
+  if (fichero.size > MAX_BYTES) {
+    return responder(
+      { error: "El fitxer no pot passar de 10 MB", code: "massa_gran", bytes: fichero.size },
+      413,
+    );
+  }
+  if (fichero.size === 0) {
+    return responder({ error: "El fitxer és buit", code: "fitxer_buit" }, 400);
+  }
+  const mime = (fichero.type || "").toLowerCase();
+  const extension = MIMES[mime];
+  if (!extension) {
+    return responder(
+      { error: "Només s'accepten PDF, JPG i PNG", code: "mime_no_acceptat", mime },
+      415,
+    );
+  }
+
+  // ---------------------------------------------------------------- permiso
+  // Equipo, o titular del objeto. Se pregunta al mismo puente que usa la RLS para que la
+  // respuesta no pueda discrepar de lo que ve el navegador.
+  if (!ctx.esIntern) {
+    if (objetoTipo !== "albaran") {
+      // `cierres_donante` llega en la fase 4 con su propio puente; hasta entonces, solo
+      // el equipo. Negar es lo correcto: no hay regla escrita que consultar.
+      return responder({ error: "No pots pujar documents d'aquest objecte", code: "forbidden" }, 403);
+    }
+    const { data, error } = await supabase.rpc("albarans_de_les_meves_orgs", { p_user: ctx.userId });
+    if (error) {
+      console.error("subir-documento-externo: albarans_de_les_meves_orgs:", error.message);
+      return responder({ error: "Error comprovant permisos", code: "error_bd" }, 500);
+    }
+    const meus = new Set((data ?? []).map((f: unknown) =>
+      typeof f === "string" ? f : String((f as { albarans_de_les_meves_orgs?: string })?.albarans_de_les_meves_orgs ?? "")
+    ));
+    if (!meus.has(objetoId)) {
+      return responder({ error: "Aquest albarà no és teu", code: "forbidden" }, 403);
+    }
+  }
+
+  // El ejercicio decide la subcarpeta del año. Se toma del albarán —el del acto
+  // documentado, no el de hoy— y solo se cae al año actual si todavía no lo tiene.
+  let ejercicio = new Date().getFullYear();
+  if (objetoTipo === "albaran") {
+    const { data: alb, error: errAlb } = await supabase
+      .from("albaranes")
+      .select("id, ejercicio, numero_completo, estado")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errAlb) {
+      console.error("subir-documento-externo: albaranes:", errAlb.message);
+      return responder({ error: "Error consultant l'albarà", code: "error_bd" }, 500);
+    }
+    if (!alb) return responder({ error: "Aquest albarà no existeix", code: "no_existeix" }, 404);
+    if (alb.ejercicio) ejercicio = alb.ejercicio as number;
+  }
+
+  // ------------------------------------------------------------------ subida
+  const bytes = new Uint8Array(await fichero.arrayBuffer());
+  // Doble comprobación del tamaño: `File.size` es lo que dice el cliente; esto es lo que
+  // de verdad ha llegado.
+  if (bytes.length > MAX_BYTES) {
+    return responder(
+      { error: "El fitxer no pot passar de 10 MB", code: "massa_gran", bytes: bytes.length },
+      413,
+    );
+  }
+
+  let ruta: string;
+  try {
+    ruta = await rutaExterno(supabase, objetoTipo, objetoId, tipo, ejercicio, extension);
+  } catch (e) {
+    const texto = e instanceof Error ? e.message : String(e);
+    console.error("subir-documento-externo: ruta_documento:", texto);
+    return responder(
+      { error: "No s'ha pogut decidir on desar el fitxer", code: "sense_carpeta", detall: texto },
+      409,
+    );
+  }
+
+  const huella = await sha256(bytes);
+
+  const { error: errSubida } = await supabase.storage
+    .from(BUCKET)
+    .upload(ruta, bytes, { contentType: mime, upsert: false });
+  if (errSubida) {
+    console.error("subir-documento-externo: upload:", errSubida.message);
+    return responder({ error: "No s'ha pogut desar el fitxer", code: "error_storage" }, 500);
+  }
+
+  const { data: fila, error: errFila } = await supabase
+    .from("documentos_externos")
+    .insert({
+      objeto_tipo: objetoTipo,
+      objeto_id: objetoId,
+      tipo,
+      numero,
+      fecha,
+      ruta,
+      sha256: huella,
+      mime,
+      bytes: bytes.length,
+      origen: "panel",
+      subido_por: ctx.userId,
+    })
+    .select("id, ruta, sha256, mime, bytes, created_at")
+    .single();
+
+  if (errFila) {
+    // Compensar: un objeto en el bucket sin su fila es un fichero que no ve nadie y que
+    // nadie va a borrar nunca. Mismo criterio que la compensación de `registro`.
+    console.error("subir-documento-externo: insert:", errFila.message);
+    await supabase.storage.from(BUCKET).remove([ruta]);
+    return responder({ error: "No s'ha pogut registrar el document", code: "error_bd" }, 500);
+  }
+
+  console.log(JSON.stringify({
+    fn: "subir-documento-externo",
+    objeto: `${objetoTipo}:${objetoId}`,
+    tipo,
+    mime,
+    bytes: bytes.length,
+    intern: ctx.esIntern,
+    ms_total: Number((performance.now() - t0).toFixed(1)),
+  }));
+
+  return responder({
+    id: fila.id,
+    ruta: fila.ruta,
+    sha256: fila.sha256,
+    mime: fila.mime,
+    bytes: fila.bytes,
+    nombre: fichero.name,
+  }, 201);
+});

@@ -26,6 +26,10 @@ import OfertaDetall from '../routes/equip/OfertaDetall'
 import FitxaRegistre from '../routes/equip/FitxaRegistre'
 import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
+import Albarans from '../routes/equip/Albarans'
+import AlbaraDetall from '../routes/equip/AlbaraDetall'
+import { EspigoladaDetall, NovaEspigolada } from '../routes/equip/Espigolades'
+import Confirmar from '../routes/public/Confirmar'
 import Aprovacions from '../routes/equip/Aprovacions'
 import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
 import NovaOferta from '../routes/productor/NovaOferta'
@@ -43,6 +47,7 @@ export const router = createBrowserRouter([
       { path: '/login', element: <LoginUsuaris /> },
       { path: '/admin', element: <LoginEquip /> },
       { path: '/registre', element: <Registre /> },
+      { path: '/confirmar/:token', element: <Confirmar /> },
       { path: '/restablir', element: <RestablirClau /> },
 
       // ── Privada ──
@@ -71,6 +76,10 @@ export const router = createBrowserRouter([
                   { path: 'entitats/:id', element: <FitxaRegistre tabla="entidades" />, handle: { titleKey: 'nav.entities' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },
+                  { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans', ample: true } },
+                  { path: 'albarans/:id', element: <AlbaraDetall />, handle: { titleKey: 'nav.albarans' } },
+                  { path: 'espigolades/nova', element: <NovaEspigolada />, handle: { titleKey: 'nav.espigolades' } },
+                  { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],

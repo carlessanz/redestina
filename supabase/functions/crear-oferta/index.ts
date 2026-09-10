@@ -131,7 +131,15 @@ Deno.serve(async (req) => {
       .from("productores").select("id, name").eq("id", productorId).maybeSingle();
     if (!productor) return responder({ error: "Productor no trobat" }, 404);
 
-    const r = await crearExcedente(supabase, datos as Record<string, unknown>, productor);
+    // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
+    // equipo en su nombre, que es el modelo de operación del servicio (§1bis) y a la
+    // hora de leer los datos no es lo mismo que si la hubiera publicado él.
+    const r = await crearExcedente(
+      supabase,
+      datos as Record<string, unknown>,
+      productor,
+      ctx.esIntern ? "asistido" : "panel",
+    );
     if (!r.ok) return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
 
     return responder({ ok: true, id: r.excedenteId, id_excedente: r.idExcedente }, 200);

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
+import { Link } from 'react-router'
 import { ArrowLeft, Copy, Check } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
@@ -8,7 +9,7 @@ import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
 import { useT } from '../lib/i18n'
-import { textoRecollidaConfirmada, textoAlbaran } from '../lib/textos'
+import { textoRecollidaConfirmada } from '../lib/textos'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
 import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
@@ -28,6 +29,15 @@ interface Props {
 function textoAHtmlPortapapeles(texto: string): string {
   const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
   return texto.split('\n').map((l) => `<div>${l === '' ? '<br>' : esc(l)}</div>`).join('')
+}
+
+/** Lo justo para enlazar: número para enseñar, canalización para casar la fila. */
+interface AlbaraDelRegistre {
+  id: string
+  tipo: 'REC' | 'ENT' | 'OPE'
+  numero_completo: string | null
+  estado: string
+  canalizacion_id: string | null
 }
 
 // Fila de oferta_respuestas con el nombre de la entidad (embed de PostgREST).
@@ -71,6 +81,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const { t } = useT()
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
+  // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
+  // Los crea el TRIGGER `canalizaciones_crea_albaranes` al insertar la canalización, así
+  // que aquí nunca se insertan: solo se enlazan. Si una canalización no tiene el suyo, el
+  // botón lo dice en vez de fingir que existe.
+  const [albarans, setAlbarans] = useState<AlbaraDelRegistre[]>([])
   const [respuestas, setRespuestas] = useState<RespuestaConEntidad[]>([])
   const [ranking, setRanking] = useState<EntidadPuntuada[]>([])
   const [rankingError, setRankingError] = useState<string | null>(null)
@@ -118,15 +133,28 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }, [t])
 
   const recargar = useCallback(async () => {
-    const [e, c] = await Promise.all([
+    const [e, c, a] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', excedente.id).single(),
       supabase.from('canalizaciones').select('*').eq('excedente_id', excedente.id).order('created_at', { ascending: true }),
+      // ⚠️ La lista de columnas en UN literal (§7, deuda 46).
+      supabase.from('albaranes')
+        .select('id, tipo, numero_completo, estado, canalizacion_id')
+        .eq('excedente_id', excedente.id),
     ])
     if (e.data) setExc(e.data)
     setCanalizaciones(c.data ?? [])
+    setAlbarans((a.data as AlbaraDelRegistre[] | null) ?? [])
   }, [excedente.id])
 
   useEffect(() => { void recargar() }, [recargar])
+
+  /** El albarán de salida (ENT u OPE) de una canalización concreta. */
+  const albaraDe = useCallback(
+    (canalitzacioId: string) => albarans.find((a) => a.canalizacion_id === canalitzacioId) ?? null,
+    [albarans],
+  )
+  /** El de recepción del registro: es el que se concilia. */
+  const albaraRec = useMemo(() => albarans.find((a) => a.tipo === 'REC') ?? null, [albarans])
 
   const recargarRespuestas = useCallback(async () => {
     const { data } = await supabase
@@ -597,13 +625,18 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     onBlur={(ev) => ev.target.value && void guardarKgReales(c.id, Number(ev.target.value))} />
                 </label>
                 {difiere && <span className="text-xs text-accent">{t('od.differs')}</span>}
-                <Button variant="outline" size="sm"
-                  onClick={() => copiar(textoAlbaran({
-                    idExcedente: exc.id_excedente ?? '', entitat: nombrePorId(c.entidad_id),
-                    productor: '', producte: exc.producto ?? '',
-                    kgReals: String(c.kg_reales ?? c.kg_confirmados ?? ''),
-                    dataRecollida: c.data_hora_recollida?.slice(0, 10) ?? '',
-                  }), `alb-${c.id}`)}>{t('od.albara')}</Button>
+                {/* El albarán ya no es un texto que compone el panel con marcadores y sin
+                    número: es una fila numerada de `albaranes` con su PDF. Aquí solo se
+                    enlaza (checkpoint §12.4 y deuda 40, cerradas). */}
+                {albaraDe(c.id)
+                  ? (
+                    <Button asChild variant="outline" size="sm">
+                      <Link to={`/equip/albarans/${albaraDe(c.id)?.id}`}>
+                        {albaraDe(c.id)?.numero_completo ?? t('od.albara')}
+                      </Link>
+                    </Button>
+                  )
+                  : <span className="text-xs text-muted-foreground">{t('od.albara_pending')}</span>}
               </div>
             )
           })}
@@ -626,8 +659,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
       {exc.estado === 'bloqueada' && (
         <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
+          <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">{t('od.recollida')}</CardTitle>
+            {/* El albarán de recepción del registro: es el que se emite, se confirma y se
+                concilia. Desde aquí se llega a su ficha sin pasar por el listado. */}
+            {albaraRec && (
+              <Button asChild variant="outline" size="sm">
+                <Link to={`/equip/albarans/${albaraRec.id}`}>
+                  {albaraRec.numero_completo ?? t('od.albara_rec')}
+                </Link>
+              </Button>
+            )}
             <Button variant="outline" size="sm"
               onClick={() => copiar(textoRecollidaConfirmada({
                 entitat: canalizaciones.map((c) => nombrePorId(c.entidad_id)).join(', '),

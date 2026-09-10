@@ -59,9 +59,37 @@ export function parseDisponibleFins(texto: string): string | null {
 }
 
 /**
- * E-AAMMDD-XXX-YYY-N, donde N es el orden de la oferta ese día para ese
- * productor y producto. La unicidad la garantiza el `unique` de la columna:
- * si dos intakes terminan a la vez, el segundo reintenta con N+1.
+ * E-AAMMDD-XXX-YYY-N, donde N es el orden de la oferta ese día para ese productor y
+ * producto. **El formato no cambia**; lo que cambia es de dónde sale la N.
+ *
+ * ANTES (deuda 39): se contaban las filas que ya empezaban por ese prefijo y se sumaba
+ * uno. Con eso, dos altas simultáneas del mismo productor y producto contaban lo mismo,
+ * proponían el mismo N y la segunda chocaba con el `unique` de `id_excedente`. El
+ * comentario decía que «reintenta con N+1», pero no había ningún reintento: fallaba.
+ * Además, el conteo `like` crece con la tabla y se hace desde fuera de la transacción,
+ * así que la carrera no se podía cerrar sin un reintento explícito.
+ *
+ * AHORA: el mismo mecanismo que numera albaranes y certificados,
+ * `siguiente_numero(serie, ejercicio)` — un `insert … on conflict do update … returning`
+ * que **bloquea la fila del contador** y devuelve un número que nadie más va a recibir.
+ * La serie de cada oferta es su propio prefijo (`E-260910-CAR-TOM`) y el ejercicio, el
+ * año: así el contador se reinicia solo cada día y por producto, que es exactamente lo
+ * que el formato pide, sin ninguna lógica de fechas propia.
+ *
+ * ⚠️ **No se usa `formato_numero()`** aunque exista y sea el compañero natural de
+ *    `siguiente_numero()`: rellena con ceros a la izquierda (`00001`) y aquí la N va
+ *    desnuda. El formato de `id_excedente` es anterior al sistema documental y circula
+ *    por WhatsApp desde julio; cambiarlo ahora rompería referencias que ya están en
+ *    conversaciones reales.
+ *
+ * ⚠️ `siguiente_numero()` solo la puede ejecutar `service_role` (20260928100000). Da
+ *    igual: los dos caminos que crean un excedente —el intake por el webhook y el panel
+ *    por `crear-oferta`— son Edge Functions y ya lo son. Desde el navegador no se puede
+ *    crear un excedente (§4: `authenticated` no tiene INSERT sobre `excedentes`).
+ *
+ * Si la RPC fallara, se cae al conteo de antes en vez de no dar de alta la oferta: un
+ * identificador con riesgo de colisión es peor que uno bueno, pero mucho mejor que
+ * perder el excedente que el productor acaba de dictar.
  */
 async function generarId(
   supabase: Cliente,
@@ -76,9 +104,16 @@ async function generarId(
   ].join("");
   const prefijo = `E-${fecha}-${siglas(productor)}-${siglas(producto)}`;
 
-  const { data } = await supabase
+  const { data, error } = await supabase.rpc("siguiente_numero", {
+    p_serie: prefijo,
+    p_ejercicio: hoy.getFullYear(),
+  });
+  if (!error && typeof data === "number") return `${prefijo}-${data}`;
+
+  console.error("siguiente_numero:", error?.message ?? "respuesta inesperada", data);
+  const { data: previas } = await supabase
     .from("excedentes").select("id_excedente").like("id_excedente", `${prefijo}-%`);
-  return `${prefijo}-${(data?.length ?? 0) + 1}`;
+  return `${prefijo}-${(previas?.length ?? 0) + 1}`;
 }
 
 /**
@@ -126,6 +161,15 @@ export function componerTextoOferta(campos: {
   return lineas.join("\n");
 }
 
+/**
+ * De dónde sale la oferta (`excedentes.origen`, 20261012100100):
+ *   · `intake`        el productor la dicta por WhatsApp
+ *   · `panel`         la da de alta él mismo desde su panel
+ *   · `asistido`      la introduce el equipo en su nombre (modelo asistido, §1bis)
+ *   · `espigolament`  nace de una espigolada, no de una oferta (la crea SQL)
+ */
+export type OrigenExcedente = "intake" | "panel" | "asistido" | "espigolament";
+
 /** Resultado de crear un excedente, para que quien llame decida qué contar. */
 export interface ResultadoCreacion {
   ok: boolean;
@@ -146,6 +190,7 @@ export async function crearExcedente(
   supabase: Cliente,
   d: Record<string, unknown>,
   productor: { id: string; name: string },
+  origen: OrigenExcedente = "intake",
 ): Promise<ResultadoCreacion> {
   const producto = String(d.producte ?? "");
 
@@ -166,7 +211,7 @@ export async function crearExcedente(
   const kg = Number(d.kg ?? 0);
   const preuMinim = d.preu_minim != null ? Number(d.preu_minim) : null;
   const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
-  const idExcedente = await generarId(supabase, productor.name, producto);
+  let idExcedente = await generarId(supabase, productor.name, producto);
 
   const textoOferta = componerTextoOferta({
     producte: producto,
@@ -185,30 +230,59 @@ export async function crearExcedente(
     observacions: String(d.observacions ?? ""),
   });
 
-  const { data: fila, error } = await supabase.from("excedentes").insert({
-    id_excedente: idExcedente,
-    productor_id: productor.id,
-    ubicacion_id: d.ubicacio ?? null,
-    familia: prod?.familia ?? d.familia ?? null,
-    producto,
-    variedad: d.varietat ?? null,
-    kg_total: kg || null,
-    num_caixes: d.caixes ?? null,
-    tipo_caixa: d.tipus_caixa ?? null,
-    retorn_envasos: d.retorn ?? null,
-    modalitat: d.modalitat ?? null,
-    preu_minim: preuMinim,
-    causa: causa?.nombre ?? null,
-    causa_codigo: d.causa ?? null,
-    // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha
-    // reconocible queda null y el panel la normaliza a mano.
-    disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
-    horari_recollida: d.horari ?? null,
-    observacions: d.observacions ?? null,
-    valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
-    texto_oferta: textoOferta,
-    estado: "publicada",
-  }).select("id").single();
+  // El alta, con reintento ante colisión del correlativo.
+  //
+  // ⚠️ POR QUÉ HACE FALTA AUNQUE EL CONTADOR SEA ATÓMICO. `siguiente_numero()` garantiza
+  //    que dos altas simultáneas reciben N distintas, pero no sabe nada de los
+  //    `id_excedente` que ya existen: los de antes de este cambio se numeraron contando
+  //    filas, y la serie `E-AAMMDD-XXX-YYY` de ese día nace con el contador a cero. El
+  //    día del despliegue, una oferta creada por la mañana con el método viejo y otra por
+  //    la tarde con el nuevo pedirían las dos el N=1. La ventana es estrecha —el prefijo
+  //    lleva la fecha, así que solo afecta al mismo día— pero existe.
+  //
+  //    Con el reintento, ese caso se resuelve solo: el `unique` de `id_excedente` rechaza
+  //    el duplicado (23505), se pide el número siguiente y se vuelve a intentar. Es
+  //    exactamente lo que el comentario de esta función decía que pasaba desde julio y
+  //    no pasaba. Tres intentos: si tres números seguidos chocan, el problema no es una
+  //    carrera.
+  let fila: { id: string } | null = null;
+  let error: { message: string; code?: string } | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    const r = await supabase.from("excedentes").insert({
+      id_excedente: idExcedente,
+      productor_id: productor.id,
+      ubicacion_id: d.ubicacio ?? null,
+      familia: prod?.familia ?? d.familia ?? null,
+      producto,
+      variedad: d.varietat ?? null,
+      kg_total: kg || null,
+      num_caixes: d.caixes ?? null,
+      tipo_caixa: d.tipus_caixa ?? null,
+      retorn_envasos: d.retorn ?? null,
+      modalitat: d.modalitat ?? null,
+      preu_minim: preuMinim,
+      causa: causa?.nombre ?? null,
+      causa_codigo: d.causa ?? null,
+      // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha
+      // reconocible queda null y el panel la normaliza a mano.
+      disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
+      horari_recollida: d.horari ?? null,
+      observacions: d.observacions ?? null,
+      valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
+      texto_oferta: textoOferta,
+      // De dónde viene esta oferta. La columna la añadió `20261012100100` con un check de
+      // cuatro valores y default `'intake'`; escribirlo explícitamente es lo que hace que
+      // el default deje de ser una suposición sobre el caso mayoritario.
+      origen,
+      estado: "publicada",
+    }).select("id").single();
+    fila = r.data;
+    error = r.error;
+    if (!error) break;
+    if (error.code !== "23505") break;
+    console.warn("excedentes: id_excedente ocupado, reintentando:", idExcedente);
+    idExcedente = await generarId(supabase, productor.name, producto);
+  }
 
   if (error) {
     console.error("excedentes insert:", error.message);
@@ -227,7 +301,7 @@ export async function crearExcedenteDesdeSesion(
   productor: { id: string; name: string },
 ): Promise<void> {
   const producto = String(sesion.datos_parciales.producte ?? "");
-  const r = await crearExcedente(supabase, sesion.datos_parciales, productor);
+  const r = await crearExcedente(supabase, sesion.datos_parciales, productor, "intake");
 
   if (!r.ok) {
     await sendText(

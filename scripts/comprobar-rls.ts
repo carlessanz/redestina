@@ -77,6 +77,36 @@
 //    una regresión: es el fail-open deliberado. Contra remoto, donde el interruptor está
 //    encendido, pasa.
 
+// ALBARANES Y ESPIGOLADA (fase 3, migraciones 20261012*). Entran seis tablas más
+// —`albaranes`, `albaran_lineas`, `espigoladas`, `documentos_externos`, `tipos_caja` y
+// `costes_producto`— y con ellas la primera afirmación de pertenencia REAL del sistema
+// documental: hasta la fase 3, `documents_meus()` devolvía vacío y todos los «denegar» de
+// los externos salían verdes sin que nadie hubiera escrito una política. Ahora sí hay algo
+// que ver, y lo que se comprueba es que cada cual ve **lo suyo**:
+//
+//   · el productor ve su REC (el albarán de recepción de su espigolada)
+//   · la entidad ve sus ENT, y NO ve la espigolada de la que salieron —quién más recibió
+//     de la misma jornada no es asunto suyo—
+//   · nadie fuera del equipo ve `costes_producto`: el coste por kilo con el que se valora
+//     una donación es información interna, y el donante ve el valor de SU certificado, no
+//     la tabla
+//   · **nadie ve importes en un albarán, porque no existen**: `albaran_lineas` no tiene
+//     ninguna columna de dinero. Eso lo afirma un check con `columnaAusente`, que espera
+//     `42703 undefined_column`. Es la única forma de comprobar una ausencia: si alguien
+//     añadiera un `coste_kg` a la tabla «para tenerlo a mano», el arnés se pondría rojo
+//     antes de que ese importe llegara a imprimirse en ningún PDF.
+//
+// ⚠️ Estas comprobaciones necesitan el fixture de `scripts/crear-datos-documentales-prueba.ts`
+//    (la espigolada de 1.000 kg del plan). Sin él salen SALTADAS, no rojas: 0 filas no
+//    distingue «la política me bloquea» de «no hay nada» (§12.48).
+//
+// ⚠️ LO QUE ESTE ARNÉS NO PUEDE AFIRMAR, y conviene saberlo: mide «ve algo / no ve nada»,
+//    no «ve exactamente lo suyo». Que `productor-altre` (TEST-PROD-2, sin albaranes) salga
+//    SALTADA es correcto; que viera el REC de TEST-PROD-1 saldría verde igual. Es la misma
+//    limitación que ya tenían los checks de `productores` y `entidades`, y la cubre el
+//    fixture: TEST-PROD-2 no tiene ninguno, así que un escape se vería como una saltada
+//    que de pronto pasa a ok.
+
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const url = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("VITE_SUPABASE_URL");
@@ -170,6 +200,16 @@ interface Check {
    * con `reiniciar_documentos_prova` (que solo toca `modo = 'prueba'`, §documental).
    */
   limpiar?: string;
+  /** Argumentos de `limpiar`, cuando la función de limpieza los necesita. */
+  limpiarArgs?: Record<string, unknown>;
+  /**
+   * Solo para `leer`+`denegar`: la comprobación afirma que **la columna no existe** en la
+   * tabla (se espera `42703 undefined_column`), no que esté prohibida. Es como se verifica
+   * que `albaran_lineas` no tiene ninguna columna de importe: una ausencia no se puede
+   * comprobar de otra manera, y sin esto nadie se enteraría el día que alguien añada un
+   * `coste_kg` «para tenerlo a mano».
+   */
+  columnaAusente?: boolean;
 }
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
@@ -204,6 +244,17 @@ const DOCUMENTAL_EXTERN: Check[] = [
     columnas: "id, tipo",
     descripcion: "NO ve ninguna evidencia de firma",
   },
+  // El coste por kilo es interno: el donante ve el valor de SU certificado, no la tabla
+  // con la que se valora toda la base.
+  { tabla: "costes_producto", op: "leer", esperado: "denegar", descripcion: "NO ve los costes por kilo" },
+  { tabla: "costes_producto_hist", op: "leer", esperado: "denegar", descripcion: "NO ve el histórico de costes" },
+  { tabla: "fijar_coste_producto", op: "rpc", esperado: "denegar", args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "arnes" }, descripcion: "NO fija costes por kilo" },
+  // Los envases sí: son catálogo, como `productos` y `municipios`, y los necesita el alta
+  // de una oferta.
+  { tabla: "tipos_caja", op: "leer", esperado: "permitir", descripcion: "lee el catálogo de envases" },
+  { tabla: "emitir_albaran", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emite albaranes" },
+  { tabla: "conciliar_albaran", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO concilia albaranes" },
+  { tabla: "albaranes", op: "insertar", esperado: "denegar", descripcion: "NO crea albaranes a mano (van por RPC)" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -297,6 +348,74 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "NI el equipo lee el DNI de quien firma (GRANT por columnas)",
     },
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor" },
+    // Albaranes y espigolada (fase 3). El equipo lo LEE todo y no escribe nada a mano:
+    // emitir, conciliar, anular y rectificar mueven varias tablas a la vez y son RPC.
+    {
+      tabla: "albaranes",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los albaranes",
+      requiereFixture: "la espigolada de prueba (deno run -A scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "albaran_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve las líneas y sus kilos",
+      requiereFixture: "la espigolada de prueba (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // La ausencia que hay que vigilar: en un albarán no hay importes. Si algún día
+    // apareciera una columna de dinero aquí, esto se pondría rojo antes de que llegara a
+    // imprimirse en un PDF.
+    {
+      tabla: "albaran_lineas",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "id, coste_kg",
+      columnaAusente: true,
+      descripcion: "un albarán NO tiene importes (la columna no existe)",
+    },
+    {
+      tabla: "espigoladas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve las espigoladas",
+      requiereFixture: "la espigolada de prueba (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "costes_producto",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los costes por kilo",
+      requiereFixture: "algún coste fijado (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    { tabla: "tipos_caja", op: "leer", esperado: "permitir", descripcion: "ve el catálogo de envases" },
+    {
+      tabla: "documentos_externos",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los documentos aportados por terceros",
+      requiereFixture: "algún adjunto subido (Edge Function subir-documento-externo, fase 3)",
+    },
+    { tabla: "albaranes", op: "insertar", esperado: "denegar", descripcion: "NO crea albaranes a mano (van por RPC)" },
+    { tabla: "espigoladas", op: "insertar", esperado: "denegar", descripcion: "NO crea espigoladas a mano (van por RPC)" },
+    { tabla: "costes_producto", op: "insertar", esperado: "denegar", descripcion: "NO escribe costes a mano" },
+    // Fijar el coste por kilo es `pot_aprovar()`, no ser del equipo: es una decisión
+    // económica, como aprobar una canalización.
+    {
+      tabla: "fijar_coste_producto",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "arnes" },
+      descripcion: "NO fija el coste por kilo (es de pot_aprovar)",
+    },
+    {
+      tabla: "fijar_tipo_caja",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_codigo: "TEST-ARNES", p_tara: 1 },
+      descripcion: "NO fija la tara de un envase (es de pot_aprovar)",
+    },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -326,6 +445,19 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       columnas: "id, caducidad_enlace_dias",
       descripcion: "puede tocar los parámetros documentales",
     },
+    // La contraparte del «denegar» del técnico. Se fija un coste en el ejercicio **1999**
+    // —imposible, ningún cierre lo mirará— y se borra acto seguido con
+    // `borrar_coste_producto`, que existe también para eso: un coste fijado en el año
+    // equivocado no tenía hasta ahora ninguna vuelta atrás.
+    {
+      tabla: "fijar_coste_producto",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "Comprobación del arnés de RLS" },
+      limpiar: "borrar_coste_producto",
+      limpiarArgs: { p_producto: "Tomàquet", p_ejercicio: 1999 },
+      descripcion: "puede fijar el coste por kilo (y lo borra)",
+    },
   ],
   productor: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
@@ -342,10 +474,40 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Sistema documental: en la fase 1 `documents_meus()` devuelve vacío, así que un
     // externo no ve NINGÚN documento. Cuando la fase 3 la reescriba, este check pasará
     // a «permitir, solo los suyos» con su fixture.
-    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     ...DOCUMENTAL_EXTERN,
+    // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
+    // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
+    // estos «permitir» significan algo.
+    {
+      tabla: "albaranes",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve SUS albaranes de recepción",
+      requiereFixture: "un REC emitido de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "albaran_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve las líneas de SUS albaranes",
+      requiereFixture: "un REC emitido de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "espigoladas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve SUS espigoladas",
+      requiereFixture: "una espigolada de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "documentos",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los documentos de SUS albaranes",
+      requiereFixture: "un REC emitido de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -370,10 +532,35 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "oferta_respuestas", op: "insertar", esperado: "denegar", descripcion: "NO escribe respuestas a mano (van por RPC)" },
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
-    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     ...DOCUMENTAL_EXTERN,
+    // Albaranes (fase 3): la entidad ve SUS albaranes de entrega…
+    {
+      tabla: "albaranes",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve SUS albaranes de entrega",
+      requiereFixture: "un ENT emitido a su entidad (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "albaran_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve las líneas de SUS entregas",
+      requiereFixture: "un ENT emitido a su entidad (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "documentos",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los documentos de SUS entregas",
+      requiereFixture: "un ENT emitido a su entidad (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // …y NO la espigolada de la que salieron: quién más recibió de la misma jornada no es
+    // asunto suyo. Esto sí es una política, no falta de datos: el fixture crea una
+    // espigolada y el equipo la ve.
+    { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "NO ve la espigolada de origen" },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -384,6 +571,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
+    { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -400,6 +589,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO se aprueba a sí misma (lo corta pot_aprovar)" },
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
+    { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
@@ -414,9 +605,19 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca sus membresías" },
     { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros" },
-    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     ...DOCUMENTAL_EXTERN,
+    // Su ficha de productor y su ficha de entidad no le dan más albaranes que los de esas
+    // dos organizaciones. Hoy las cuentas de doble rol cuelgan de fichas reales, que no
+    // tienen ninguno: sale SALTADA, y eso es lo correcto —si apareciera alguno sin fixture,
+    // sería un escape—.
+    {
+      tabla: "albaranes",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los albaranes de SUS dos organizaciones",
+      requiereFixture: "un albarán de la ficha de productor o de entidad de esta cuenta",
+    },
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
 };
@@ -428,6 +629,12 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   canalizaciones: { kg_confirmados: 1 },
   oferta_respuestas: { telefono: "34600000000", canal: "panel" },
   usuario_roles: { rol: "super_admin" },
+  // Los tres del sistema documental de la fase 3. Se rellenan lo justo para que lo que
+  // corte sea el permiso y no un `not null`: si cortara un check, la comprobación no
+  // diría nada sobre RLS.
+  albaranes: { tipo: "REC", estado: "borrador" },
+  espigoladas: { fecha: "1999-01-01" },
+  costes_producto: { producto: "Tomàquet", ejercicio: 1999, coste_kg: 1, motivo: "TEST-RLS" },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
   plantillas_documento: {
@@ -517,11 +724,24 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
     const { data, error } = await cliente.from(check.tabla)
       .select(check.columnas ?? "*").limit(1);
     if (error) {
+      // Afirmación de AUSENCIA: la columna no debe existir (importes en un albarán). El
+      // 42703 es aquí el resultado correcto, y un éxito sería el fallo.
+      if (check.columnaAusente) {
+        const noExiste = error.code === "42703" ||
+          (error.message ?? "").toLowerCase().includes("does not exist");
+        return {
+          ok: noExiste,
+          detalle: noExiste ? "la columna no existe (correcto)" : `¡la columna existe! ${error.message}`,
+        };
+      }
       // Un error de permisos con "denegar" esperado es exactamente lo que queremos.
       if (esRechazo(error)) {
         return { ok: check.esperado === "denegar", detalle: `rechazado (${error.code ?? "42501"})` };
       }
       return { ok: false, detalle: `error inesperado: ${error.message}` };
+    }
+    if (check.columnaAusente) {
+      return { ok: false, detalle: "¡la columna EXISTE y se puede leer!" };
     }
     const filas = data?.length ?? 0;
     // Sin error, RLS simplemente filtra: 0 filas es la forma normal de "denegar".
@@ -639,7 +859,7 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
     // La RPC ha hecho su trabajo: si deja rastro, se limpia ahora mismo. El arnés no
     // puede añadir filas a la base que audita.
     if (check.limpiar) {
-      const { error: errLimpieza } = await cliente.rpc(check.limpiar);
+      const { error: errLimpieza } = await cliente.rpc(check.limpiar, check.limpiarArgs ?? {});
       if (errLimpieza) {
         return { ok: false, detalle: `ejecutada, pero no se pudo limpiar: ${errLimpieza.message.slice(0, 50)}` };
       }
@@ -816,8 +1036,16 @@ const ancho = {
 console.log();
 for (const r of resultados) {
   const marca = r.saltada ? " sense" : r.ok ? "  ok  " : " FALLA";
+  // Dos motivos distintos para una saltada, y confundirlos despista: o la tabla no tiene
+  // ni una fila, o la tiene pero ninguna es de esta cuenta (el fixture no cubre a esta
+  // organización). El segundo caso es el normal desde la fase 3, donde cada cuenta ve solo
+  // lo suyo, y decir «taula buida» ahí sería directamente falso.
   const detalle = r.saltada
-    ? (r.check.tabla === "—" ? r.detalle : "taula buida, no es pot comprovar")
+    ? (r.check.tabla === "—"
+        ? r.detalle
+        : vacias.has(r.check.tabla)
+          ? "taula buida, no es pot comprovar"
+          : "aquest compte no en té cap (falta fixture)")
     : r.detalle;
   console.log(
     `${marca}  ${r.cuenta.padEnd(ancho.cuenta)}  ${r.check.tabla.padEnd(ancho.tabla)}  ` +
