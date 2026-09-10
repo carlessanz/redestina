@@ -58,6 +58,9 @@ Actualiza `AGENTS.md` cuando cambie cualquiera de estas cosas:
    conocido y correcto: un receptor comercial sin ninguna oferta de `venda` publicada).
 3. `AGENTS.md` actualizado.
 4. Commit en castellano.
+5. Para **publicar en producción**, el skill `/publicar`: hace el commit, el push, el redespliegue
+   de las Edge Functions que lo necesiten y verifica dominio, CORS y permisos. Detalle en
+   `AGENTS.md` §11.
 
 ## Carpeta del proyecto de consultoría (fuera del repo)
 

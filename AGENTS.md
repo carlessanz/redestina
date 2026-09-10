@@ -251,6 +251,7 @@ horizontal en todas**, que es la referencia a mantener):
 index.html
 vercel.json                    Rewrite de SPA (sin él, recargar una ruta profunda da 404)
 .env.local.example             Plantilla de variables del frontend (sí se versiona)
+.claude/skills/publicar/       Skill /publicar: el procedimiento de publicación (§11)
 src/
   main.tsx                     Punto de entrada React
   App.tsx                      Dos capas: SessioProvider → RouterProvider (el contexto de rol
@@ -1645,6 +1646,11 @@ supabase functions deploy registro --no-verify-jwt               # registro púb
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
 supabase secrets set --env-file .secrets.env
 
+# Publicar en producción: el procedimiento completo (build, commit, push, redespliegue de las
+# funciones que lo necesiten y verificación de dominio, CORS y permisos) vive en el skill
+# `/publicar` (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos
+# a mano: recoge los flags de cada función y las trampas de verificación.
+
 deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
 deno run -A scripts/import-ara.ts             # importar los CSV maestros
 
@@ -1873,6 +1879,20 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
     el dominio anterior se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
     pero es la segunda vez que se usa ese argumento (§10bis).
+43. **`whatsapp-send` está desplegada SIN `verify_jwt`, y la documentación decía que con él.**
+    `config.toml` (`[functions.whatsapp-send] verify_jwt = false`) manda sobre lo que hace el CLI,
+    así que cada `functions deploy` la deja en `false`, mientras §9 y §11 afirmaban lo contrario.
+    **No es una vía de entrada**: la función llama a `exigirEquipo()` y responde `401
+    unauthorized` sin sesión —verificado el 10-09-2026 contra producción—, así que lo que falta es
+    la barrera de la plataforma *delante* de la propia, no la única barrera. Queda por decidir
+    cuál de las dos fuentes se corrige: poner `verify_jwt = true` en `config.toml` y redesplegar,
+    o aceptar el `false` y dejarlo escrito. Las ocho funciones restantes sí coinciden con §11.
+44. **Un `functions deploy` sin cambios de código no siempre dice `No change found`.** El
+    10-09-2026, cinco funciones desplegadas hacía diez minutos volvieron a empaquetarse
+    («Deploying… script size: 1.8 MB») sin que su código hubiera cambiado. Es inocuo —el
+    despliegue es idempotente— pero significa que **la salida del CLI no sirve para saber si el
+    bundle desplegado estaba al día**; solo `No change found` es concluyente en un sentido, y su
+    ausencia no prueba nada en el otro.
 
 ## 13. Al terminar cualquier cambio
 
@@ -1880,7 +1900,9 @@ Redestina en producción real quedan pasos de configuración y negocio.
 2. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles. Referencia
    actual: **56/57** (el rojo conocido es un receptor comercial sin ninguna oferta de `venda`
    publicada, que es el comportamiento correcto). Cualquier otro rojo es una regresión.
-3. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
+3. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
+   redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
+4. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
    comandos o deuda técnica; y **§1bis + su tabla de correspondencia** si cambió el alcance
    funcional o el estado de implementación (✅/🟡/⬜).
-4. Commit en castellano, describiendo el *qué* y el *por qué*.
+5. Commit en castellano, describiendo el *qué* y el *por qué*.
