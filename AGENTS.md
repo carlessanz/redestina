@@ -53,6 +53,11 @@ cómo reenviar un acceso, cortar uno y recrear las cuentas) y **`usuarios-test.m
 de esas 12 cuentas, para tenerla a mano al probar). Los dos últimos **llevan credenciales en claro**:
 que estén fuera de git no es un detalle, es el motivo de que existan ahí.
 
+La **documentación generada para la consultoría** (informes, análisis, propuestas) no va a `docs/`
+sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/`
+(acceso por `additionalDirectories` en `.claude/settings.local.json`; reglas en `CLAUDE.md`,
+sección «Carpeta del proyecto de consultoría»). Nada con credenciales ni datos personales sale de `docs/`.
+
 ## 1bis. Visión funcional Redestina 2026 (modelo objetivo ↔ lo construido)
 
 Resumen del **funcional de negocio** (el *to-be*, `docs/Documento funcional Redestina 2026.md`) y su
@@ -1284,8 +1289,8 @@ apagado y en test). Detalle:
   mismo) y el enlace se manda por **Resend** desde `recuperar-password`. La app detecta el evento
   `PASSWORD_RECOVERY` (en `useSessio`, §6quater) y desvía a `/restablir`. La `redirectTo` (APP_URL)
   debe estar en la allow-list de Auth (Management API, **no** config push; §10).
-- **Dominio `espigoladors.com` verificado en Resend** y `RESEND_FROM` configurado (hoy todavía
-  `POMA <no-reply@espigoladors.com>`, §10ter), así que **se envía a cualquier dirección** (verificado el envío a un correo externo).
+- **Dominio `espigoladors.com` verificado en Resend** y `RESEND_FROM="Redestina <no-reply@espigoladors.com>"`
+  configurado, así que **se envía a cualquier dirección** (verificado el envío a un correo externo).
   Si se cambia de dominio, verificarlo en `resend.com/domains` y ajustar `RESEND_FROM`. El gate
   `email_test_recipients` limita, mientras se está en pruebas, a los correos de esa whitelist.
 
@@ -1495,7 +1500,7 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
   otro valor = simula (`status='simulat'`)
 - `ALLOWED_ORIGIN` — admite **varios orígenes separados por comas** y `*` como comodín
   dentro de un origen, porque los despliegues de Vercel no tienen URL estable.
-  ⚠️ **Valor real hoy: todavía el de `p0ma` — pendiente del rename (§10ter).** Debe pasar a
+  Valor actual:
   `http://localhost:5173,https://redestina.carlessanz.com,https://redestina-*-carlessanz-projects.vercel.app`.
   **La app en producción se sirve desde el dominio propio**, que hay que añadir aquí (si no, el
   navegador bloquea por CORS todas las llamadas a las Edge Functions). Si se cambia/añade dominio,
@@ -1508,18 +1513,16 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
   en git.
 - `RESEND_API_KEY` — API key de Resend (ofertas por email y reset de contraseña). Nunca en git.
 - `RESEND_FROM` — remitente (`from`) de un dominio **verificado** en Resend.
-  ⚠️ **Valor real hoy: `POMA <no-reply@espigoladors.com>` — pendiente del rename (§10ter)**; debe
-  pasar a `Redestina <no-reply@espigoladors.com>`. Ausente = usa `onboarding@resend.dev`, que solo
+  Valor actual: `Redestina <no-reply@espigoladors.com>`. Ausente = usa `onboarding@resend.dev`, que solo
   entrega al correo owner de la cuenta.
-- `APP_URL` — URL de la app para el `redirectTo` del reset.
-  ⚠️ **Valor real hoy: `https://p0ma.carlessanz.com` — pendiente del rename (§10ter)**; debe pasar a
-  `https://redestina.carlessanz.com`. Tiene que estar en la allow-list de Auth (`uri_allow_list`).
+- `APP_URL` — URL de la app para el `redirectTo` del reset. Valor actual:
+  `https://redestina.carlessanz.com`; tiene que estar en la allow-list de Auth (`uri_allow_list`).
 - `SB_SECRET_KEY` (`sb_secret_...`)
 - `SUPABASE_URL` (la inyecta Supabase automáticamente)
 
 **Redirect URLs de Auth** (Management API, no config push): `site_url` = APP_URL y `uri_allow_list`
-incluye `localhost:5173`, el dominio de producción y el comodín de los despliegues de Vercel.
-⚠️ **Siguen apuntando a `p0ma` — pendiente del rename (§10ter).**
+incluye `localhost:5173`, el dominio de producción y el comodín de los despliegues de Vercel, todos
+sobre `redestina`.
 ⚠️ **Son dos matchers distintos**: el de las Edge Functions convierte `*` en `[A-Za-z0-9-]+` y compara
 orígenes completos (sin `/**`); el de GoTrue es glob y **sí** necesita el `/**` final. No copiar el
 mismo literal a los dos sitios.
@@ -1566,28 +1569,23 @@ interfaz, en los correos y en las plantillas de WhatsApp.
 | `src/lib/poma.ts` | — | `src/lib/redestina.ts` | ✅ |
 | Claves de `localStorage` y canal de Realtime | `poma-*` | `redestina-*` | ✅ |
 | Documentos de `docs/` (contenido y nombre) | `POMA` | `Redestina` | ✅ |
-| **Proyecto Vercel** | `p0ma` | `redestina` | ⬜ **pendiente** |
-| **Dominio** | `p0ma.carlessanz.com` | `redestina.carlessanz.com` | ⬜ **pendiente** |
-| **Secretos `ALLOWED_ORIGIN` y `APP_URL`** | `p0ma…` | `redestina…` | ⬜ **pendiente** |
-| **`uri_allow_list` de Auth** | `p0ma…` | `redestina…` | ⬜ **pendiente** |
-| **Secreto `RESEND_FROM`** | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ⬜ **pendiente** |
+| Proyecto Vercel | `p0ma` | `redestina` | ✅ |
+| Dominio | `p0ma.carlessanz.com` | `redestina.carlessanz.com` | ✅ |
+| Secretos `ALLOWED_ORIGIN` y `APP_URL` | `p0ma…` | `redestina…` | ✅ |
+| `uri_allow_list` y `site_url` de Auth | `p0ma…` | `redestina…` | ✅ |
+| Secreto `RESEND_FROM` | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ✅ |
 | **El logo** (wordmark) | dibuja «POMA» | dibuja «Redestina» | ⬜ **pendiente (diseño)** |
 
-⚠️ **El código ya nombra `redestina.carlessanz.com`, que todavía no existe** — pero la aplicación
-**sigue funcionando**, y conviene entender por qué para no «arreglar» lo que no está roto:
+**El rename se completó el 10-09-2026.** El dominio `redestina.carlessanz.com` resuelve y sirve la
+aplicación, y las tres capas que tenían que reconocerlo lo reconocen: Vercel, el `ALLOWED_ORIGIN` de
+las Edge Functions y la `uri_allow_list` de Auth. Verificado con preflight real: el dominio nuevo y
+`localhost:5173` obtienen su propio origen de vuelta; el dominio viejo y un origen arbitrario, no.
 
-- **CORS aguanta** porque el origen no ha cambiado: se sigue sirviendo desde `p0ma.carlessanz.com`,
-  que `ALLOWED_ORIGIN` todavía incluye. Lo que rompería CORS es mover el dominio **antes** de
-  actualizar el secreto, no al revés.
-- **Los correos aguantan** porque `APP_URL` sigue definido como secreto y manda sobre el fallback de
-  `_shared/resend.ts`. Ese fallback solo actuaría si el secreto faltara.
-
-Lo único que este rename **sí ha roto ya** es la **previsualización social**: `og:url` y `og:image`
-en `index.html` apuntan al dominio nuevo, así que la tarjeta de WhatsApp, Slack o LinkedIn no carga
-la imagen hasta que el dominio exista.
-
-El orden de §10ter está pensado justo para eso: **añadir antes de retirar**, para que no haya
-ventana de caída.
+⚠️ **`p0ma.carlessanz.com` se retiró sin redirección** y hoy devuelve **404**. Vale el mismo
+razonamiento del rename 1 —seguimos en modo test y no ha recibido correo ningún destinatario real,
+solo `hola+*@carlessanz.com` y las organizaciones `TEST-*`—, pero **ese razonamiento ya se ha gastado
+dos veces**: al primer correo a un productor o una entidad de verdad, apagar un dominio rompe su
+historial hacia atrás y sin remedio. El siguiente cambio de dominio exige redirección 308, no corte.
 
 ⚠️ **El logo no se pudo renombrar.** `public/logo-redestina.svg` es un wordmark en **paths**, no
 texto: las letras de «POMA» están dibujadas como vectores. El fichero cambió de nombre, pero **lo
@@ -1617,51 +1615,58 @@ ocupando los puertos 553xx. Para limpiarlos, **filtrar por nombre**
 (`docker ps -q --filter name=_Redestina`): en esta máquina conviven otros stacks de Supabase y un
 `docker stop $(docker ps -q)` se los llevaría por delante.
 
-## 10ter. Completar el rename: los pasos de infraestructura
+## 10ter. Cómo se completó el rename (10-09-2026)
 
-Pendientes del rename 2 (§10bis). **El código ya está desplegable pero la infraestructura no
-responde a ese nombre**, así que hasta cerrar esto la aplicación en producción está rota. Orden:
+Los pasos de infraestructura del rename 2, **ya ejecutados**. Se dejan escritos porque son el
+procedimiento a repetir el día que cambie el dominio, y porque dos de ellos tienen trampa.
 
-1. **Vercel — renombrar el proyecto.** Dashboard → proyecto `p0ma` → Settings → General → Project
-   Name → `redestina`. El `projectId` no cambia, así que conserva variables, dominios e historial;
-   `.vercel/project.json` no hace falta tocarlo.
+1. **Vercel — renombrar el proyecto** (`p0ma` → `redestina`): Settings → General → Project Name. El
+   `projectId` no cambia, así que conserva variables, dominios e historial; `.vercel/project.json`
+   no hace falta tocarlo.
    ⚠️ **Hace falta rol OWNER.** El CLI de esta máquina está autenticado como `upsocial`
    (csanz@upsocial.org), que en este equipo es **DEVELOPER**: despliega y lee, pero un
    `PATCH /v9/projects/{id}` responde `403 forbidden`. El OWNER es `carlessanz`
-   (hola@carlessanz.com). O se hace desde el Dashboard con esa cuenta, o se cambia la sesión del
-   CLI (`vercel login`) antes de intentarlo por API.
+   (hola@carlessanz.com). Se hizo desde el Dashboard con esa cuenta.
    ⚠️ **Renombrar el proyecto cambia las URLs de preview**: `p0ma-*-carlessanz-projects.vercel.app`
-   pasa a `redestina-*-…`. El dominio propio no se ve afectado, pero **las previews dejan de pasar
-   CORS y de valer como `redirectTo`** hasta que se actualicen `ALLOWED_ORIGIN` (paso 3) y
-   `uri_allow_list` (paso 4). Por eso este paso va junto con esos dos, no suelto.
-2. **Vercel — añadir el dominio** `redestina.carlessanz.com` (Settings → Domains) y crear el
-   registro DNS que indique. **Añadir, no sustituir**: hasta que el nuevo resuelva, `p0ma…` es lo
-   único que funciona.
-3. **Secretos de Supabase**, con los dos dominios a la vez mientras dure la transición:
-   ```bash
-   supabase secrets set ALLOWED_ORIGIN='http://localhost:5173,https://redestina.carlessanz.com,https://redestina-*-carlessanz-projects.vercel.app'
-   supabase secrets set APP_URL='https://redestina.carlessanz.com'
-   supabase secrets set RESEND_FROM='Redestina <no-reply@espigoladors.com>'
-   ```
-   ⚠️ **Redesplegar después todas las Edge Functions**: `ALLOWED_ORIGIN` es un `const` de módulo y
-   un isolate caliente no ve el secreto nuevo (§10).
-4. **Auth — `uri_allow_list`** por Management API (**nunca** `config push`, §9):
+   pasó a `redestina-*-…`, así que los pasos 3 y 4 son parte del mismo trabajo, no un extra.
+2. **Vercel — el dominio** `redestina.carlessanz.com`, con su registro DNS.
+3. **Secretos de Supabase** (`supabase secrets set`): `ALLOWED_ORIGIN`, `APP_URL` y `RESEND_FROM`.
+   ⚠️ **Redesplegar después TODAS las Edge Functions**: `ALLOWED_ORIGINS` es un `const` de módulo y
+   un isolate caliente no ve el secreto nuevo (§10). Se redesplegaron las nueve, con sus flags de
+   `verify_jwt` (§11) — que además es lo que llevó a producción los textos con el nombre nuevo.
+4. **Auth — `site_url` y `uri_allow_list`** por Management API (**nunca** `config push`, §9):
    ```bash
    TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
    curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/config/auth \
-     -d '{"site_url":"https://redestina.carlessanz.com","uri_allow_list":"http://localhost:5173/**,https://redestina.carlessanz.com/**,https://redestina-*-carlessanz-projects.vercel.app/**"}'
+     -d '{"site_url":"https://redestina.carlessanz.com","uri_allow_list":"…"}'
    ```
    ⚠️ Los dos matchers **no** llevan la misma sintaxis: el de las Edge Functions compara orígenes
-   sin `/**`; el de GoTrue es glob y sí lo necesita (§10).
-5. **El dominio viejo.** Seguimos en modo test y no ha recibido correo ningún destinatario real,
-   así que vale el mismo razonamiento del rename 1 y `p0ma.carlessanz.com` se puede apagar. Si para
-   entonces ya se ha salido del modo test, **redirección 308 permanente, no corte**.
-6. **El logo nuevo** en `public/logo-redestina.svg`, y regenerar desde él `logo-email.png` (378×96),
-   `icona-192/512`, `icona-maskable-512`, `apple-touch-icon` y `favicon.svg`.
-7. **Plantillas de Meta**: su texto ya dice «Redestina» (`_shared/plantillas-meta.md`) y **ninguna
-   está aprobada todavía**, así que el rename no obliga a rehacer nada — pero hay que registrarlas
-   ya con el nombre nuevo (§12.2).
+   sin `/**`; el de GoTrue es glob y sí lo necesita (§10). La lista incluye cada origen en las dos
+   formas para no depender de esa diferencia.
+
+**Cómo se verificó** (y cómo verificarlo la próxima vez): un preflight `OPTIONS` real contra una
+Edge Function pública con cuatro orígenes distintos. Lo que hay que ver es que la respuesta devuelve
+**el origen pedido**, no el primero de la lista:
+
+```bash
+curl -i -X OPTIONS "$SUPABASE_URL/functions/v1/registro" \
+  -H "Origin: https://redestina.carlessanz.com" \
+  -H "Access-Control-Request-Method: POST" | grep -i access-control-allow-origin
+```
+
+| Origen probado | Respuesta esperada |
+| --- | --- |
+| `https://redestina.carlessanz.com` | el mismo origen ✅ |
+| `http://localhost:5173` | el mismo origen ✅ (si no, se rompe `npm run dev`) |
+| `https://p0ma.carlessanz.com` | **no** el mismo (cae al primero de la lista) |
+| un origen arbitrario | **no** el mismo |
+
+⚠️ **La trampa de esta comprobación**: un origen no permitido **no da error**. La función responde
+`204` igual, pero con el `Access-Control-Allow-Origin` de otro origen, y es el **navegador** quien
+bloquea después. Mirar solo el código de estado da un falso verde: hay que leer la cabecera.
+
+Lo único que queda del rename es **el logo** (§10bis, deuda 41).
 
 ## 11. Comandos
 
@@ -1905,12 +1910,11 @@ Redestina en producción real quedan pasos de configuración y negocio.
     texto, y de él derivan los iconos de la PWA, el `apple-touch-icon`, el `favicon` y el
     `logo-email.png` de la cabecera de todos los correos. Hasta que haya logo nuevo, la aplicación
     se llama Redestina y se ve POMA (§10bis).
-42. **La infraestructura todavía responde al nombre viejo.** Proyecto de Vercel, dominio,
-    `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM` y `uri_allow_list` siguen en `p0ma`, mientras que el
-    código ya nombra `redestina.carlessanz.com`. **No está roto** —el origen servido no ha cambiado
-    y `APP_URL` sigue mandando sobre el fallback—, pero sí lo está la previsualización social
-    (`og:url`/`og:image`), y el nombre queda partido en dos: la interfaz dice Redestina y la URL
-    dice p0ma. Los pasos, en orden, en §10ter.
+42. ~~**La infraestructura todavía responde al nombre viejo.**~~ — **resuelta (10-09-2026)**:
+    proyecto de Vercel, dominio, `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM`, `site_url` y
+    `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
+    `p0ma.carlessanz.com` se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
+    pero es la segunda vez que se usa ese argumento (§10bis).
 
 ## 13. Al terminar cualquier cambio
 

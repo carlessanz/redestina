@@ -3,49 +3,84 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Tema Redestina (identidad de espigoladors.cat/simbiosi_poma) ───────────────
-   navy #234C66 · crema #E0EBC7 · coral #EE7A5F · fondo #F9FAFD · Space Grotesk */
+/* ─── Tema REDESTINA ──────────────────────────────────────────────────────────────
+   Generado a mano a partir de design/tokens.json (fuente única de verdad).
+   Reglas de uso: design/DESIGN.md. Muestra visual: design/preview.html.
+   Para cambiar un color: se cambia en tokens.json y se replica aquí; nunca al revés.
+
+   Branding (BRANDING_REDESTINA_FINAL.ai): verde #4e6b45 · coral #ef7d77 · crema #f5f1ea
+   · verde claro #7d9775 · negro tipográfico #1d1d1b · Sora (títulos) + Inter (cuerpo).
+   Los nombres de las variables son los que espera shadcn/ui: no se renombran. */
 :root {
   --radius: 0.75rem;
 
-  --background: #f9fafd;
-  --foreground: #234c66;
+  --background: #f5f1ea;
+  --foreground: #1d1d1b;
 
   --card: #ffffff;
-  --card-foreground: #234c66;
+  --card-foreground: #1d1d1b;
 
   --popover: #ffffff;
-  --popover-foreground: #234c66;
+  --popover-foreground: #1d1d1b;
 
-  --primary: #234c66;
-  --primary-foreground: #e0ebc7;
+  --primary: #4e6b45;
+  --primary-foreground: #f5f1ea;
 
-  --secondary: #e0ebc7;
-  --secondary-foreground: #234c66;
+  --secondary: #e4eadf;
+  --secondary-foreground: #4e6b45;
 
-  --muted: #edf1e4;
-  --muted-foreground: #5f7787;
+  --muted: #ebe6da;
+  --muted-foreground: #5f6b5a;
 
-  --accent: #ee7a5f;
-  --accent-foreground: #ffffff;
+  /* `accent` es la superficie de hover de menús, selects y botones ghost (shadcn).
+     Por eso NO es el coral: el coral es acento de marca y vive en --coral. */
+  --accent: #ebe6da;
+  --accent-foreground: #1d1d1b;
 
-  --destructive: #dc2626;
+  /* Error en rojo, no en coral: el coral no significa fallo. */
+  --destructive: #b3261e;
   --destructive-foreground: #ffffff;
 
-  --border: #dbe3ec;
-  --input: #cdd8e0;
-  --ring: #234c66;
+  --border: #e0d9ca;
+  --input: #cfc6b3;
+  --ring: #4e6b45;
 
-  /* Menú lateral en navy con la crema Redestina, para conservar la identidad que tenía
-     la barra superior: activo en crema sobre navy, hover en navy aclarado. */
-  --sidebar: #234c66;
-  --sidebar-foreground: #e0ebc7;
-  --sidebar-primary: #e0ebc7;
-  --sidebar-primary-foreground: #234c66;
-  --sidebar-accent: #2f5f7d;
+  --chart-1: #4e6b45;
+  --chart-2: #ef7d77;
+  --chart-3: #7d9775;
+  --chart-4: #c98a1b;
+  --chart-5: #3e5139;
+
+  /* Menú lateral en verde con texto crema: activo en crema sobre verde, hover en verde
+     aclarado, foco en coral. Lleva el logo en negativo (logo-redestina-negativo.svg). */
+  --sidebar: #4e6b45;
+  --sidebar-foreground: #f5f1ea;
+  --sidebar-primary: #f5f1ea;
+  --sidebar-primary-foreground: #4e6b45;
+  --sidebar-accent: #5c7a52;
   --sidebar-accent-foreground: #ffffff;
-  --sidebar-border: #35617c;
-  --sidebar-ring: #ee7a5f;
+  --sidebar-border: #5f7c56;
+  --sidebar-ring: #ef7d77;
+
+  /* Extensión REDESTINA (además de shadcn). Se exponen como colores de Tailwind:
+     bg-coral, text-coral-texto, bg-exito-fondo, text-aviso, border-error… */
+  --coral: #ef7d77;
+  --coral-foreground: #1d1d1b; /* el coral solo da 2.67:1 con blanco: texto negro encima */
+  --coral-oscuro: #e56a5c;
+  --coral-suave: #fde9e6;
+  --coral-texto: #c9503f;
+  --verde-claro: #7d9775;
+  --verde-oscuro: #3e5139;
+  --exito: #3d7238;
+  --exito-fondo: #e6f0e0;
+  --aviso: #8a5a00;
+  --aviso-fondo: #fbf0d5;
+  --error: #b3261e;
+  --error-fondo: #fbe4e0;
+
+  --sombra-sm: 0 1px 2px 0 rgb(62 81 57 / 0.06);
+  --sombra-md: 0 2px 8px -2px rgb(62 81 57 / 0.12), 0 1px 2px 0 rgb(62 81 57 / 0.06);
+  --sombra-lg: 0 12px 32px -8px rgb(62 81 57 / 0.18), 0 2px 6px 0 rgb(62 81 57 / 0.06);
 }
 
 @theme inline {
@@ -69,6 +104,12 @@
   --color-input: var(--input);
   --color-ring: var(--ring);
 
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -78,12 +119,34 @@
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-ring: var(--sidebar-ring);
 
+  --color-coral: var(--coral);
+  --color-coral-foreground: var(--coral-foreground);
+  --color-coral-oscuro: var(--coral-oscuro);
+  --color-coral-suave: var(--coral-suave);
+  --color-coral-texto: var(--coral-texto);
+  --color-verde-claro: var(--verde-claro);
+  --color-verde-oscuro: var(--verde-oscuro);
+  --color-exito: var(--exito);
+  --color-exito-fondo: var(--exito-fondo);
+  --color-aviso: var(--aviso);
+  --color-aviso-fondo: var(--aviso-fondo);
+  --color-error: var(--error);
+  --color-error-fondo: var(--error-fondo);
+
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 
-  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --shadow-sm: var(--sombra-sm);
+  --shadow-md: var(--sombra-md);
+  --shadow-lg: var(--sombra-lg);
+
+  /* Inter para el cuerpo (font-sans, la de todo por defecto); Sora para títulos
+     (font-titulos). Las dos se cargan desde Google Fonts en index.html. */
+  --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  --font-titulos: "Sora", ui-sans-serif, system-ui, -apple-system, sans-serif;
 }
 
 @layer base {
@@ -96,5 +159,12 @@
     color: var(--foreground);
     font-family: var(--font-sans);
     -webkit-font-smoothing: antialiased;
+  }
+  /* Jerarquía tipográfica del sistema: los títulos van en Sora sin que cada pantalla
+     tenga que pedirlo. Tamaño y peso siguen saliendo de las clases de cada componente. */
+  h1, h2, h3, h4 {
+    font-family: var(--font-titulos);
+    letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 }

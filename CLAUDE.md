@@ -58,3 +58,21 @@ Actualiza `AGENTS.md` cuando cambie cualquiera de estas cosas:
    conocido y correcto: un receptor comercial sin ninguna oferta de `venda` publicada).
 3. `AGENTS.md` actualizado.
 4. Commit en castellano.
+
+## Carpeta del proyecto de consultoría (fuera del repo)
+
+La documentación del proyecto vive en `/Users/carlessanz/Documents/Claude/Projects/Redestina/`,
+accesible desde Claude Code por `additionalDirectories` en `.claude/settings.local.json`.
+Está organizada así: raíz = documentos vigentes (funcional v3, automatización, guía técnica,
+manual, flujo), `1. Fuentes/` = memoria de subvención, feedback de la Fundación, datos ARA y
+diseño, `2. Contexto/` = histórico (no se toca), `Claude outputs/` = salidas de sesiones de
+Cowork, y **`3. Claude Code/`** = lo que genera este repo.
+
+- **Lee** de la raíz y de `1. Fuentes/` cuando haga falta el funcional vigente, la memoria de
+  subvención o el feedback de la Fundación. Las copias de `docs/` del repo pueden ir por detrás.
+- **Escribe únicamente en `3. Claude Code/`**: informes de estado, análisis, resúmenes de cambios,
+  propuestas. Markdown, un documento por tema, nombre `AAAA-MM-DD-tema.md`, y añade la fila
+  correspondiente al `README.md` de esa carpeta.
+- **Nunca copies allí** `Usuarios y accesos`, `usuarios-test.md`, `.env*`, `scripts/data/` ni nada
+  con credenciales o datos personales: esa carpeta puede subirse al Project de Claude.
+- No escribas en la raíz, `1. Fuentes/`, `2. Contexto/` ni `Claude outputs/`.

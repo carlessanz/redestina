@@ -23,7 +23,7 @@ export default defineConfig({
     //    shell estático, que el precache ya sirve igual para cualquier ruta.
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-redestina.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-redestina.svg', 'logo-redestina-negativo.svg', 'isotipo-redestina.svg'],
       manifest: {
         name: 'Redestina — Espigoladors',
         short_name: 'Redestina',
@@ -34,8 +34,8 @@ export default defineConfig({
         display: 'standalone',
         orientation: 'portrait',
         lang: 'ca',
-        background_color: '#f9fafd',
-        theme_color: '#234C66',
+        background_color: '#f5f1ea',
+        theme_color: '#4e6b45',
         icons: [
           { src: '/icona-192.png', sizes: '192x192', type: 'image/png' },
           { src: '/icona-512.png', sizes: '512x512', type: 'image/png' },
