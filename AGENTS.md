@@ -144,21 +144,21 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `organizacion` multirol única | `productores` + `entidades` (2 tablas, sin multirol; doble rol por teléfono + prioridad del webhook) | 🟡 |
 | `usuario` de organización | `perfiles` + `membresias` (vincula la cuenta con su ficha; §4bis) | ✅ |
 | `rol_organizacion` | `membresias.rol_org` (titular/operador) + `usuario_roles` de plataforma | 🟡 |
-| `convenio` de colaboración | — | ⬜ |
+| `convenio` de colaboración | `convenios` + `convenios_exigidos`, con firma por enlace, contrafirma y campaña (§4) | ✅ |
 | `excedente` | `excedentes` | ✅ |
 | `demanda` | — | ⬜ |
 | `interes` (solicitud de receptor) | `oferta_respuestas` (aceptación con kg/preu + aprobación del superadmin → canalización) | 🟡 |
 | `sugerencia_match` persistida | `priorizar-entidades` (Edge Function pura, no persiste) | 🟡 |
-| `operacion`/`entrega` (lotes; kg prev/recib/valid) | `canalizaciones` (por entidad; `kg_confirmados`/`kg_reales`) | 🟡 |
-| `albaran`/`albaran_linea` (serie, estados, QR) | texto *placeholder* (`src/lib/textos.ts`) | ⬜ |
-| `documento_externo` | — | ⬜ |
-| `documento` / **certificados** | — | ⬜ |
+| `operacion`/`entrega` (lotes; kg prev/recib/valid) | `canalizaciones` + `albaran_lineas` con previstos/entregados/confirmados/validados y conciliación con tolerancia | ✅ |
+| `albaran`/`albaran_linea` (serie, estados, QR) | `albaranes` + `albaran_lineas`: REC/ENT/OPE con series sin huecos, estados, conciliación y PDF (§4) | ✅ |
+| `documento_externo` | `documentos_externos` (albarán del productor, factura, fotos) | ✅ |
+| `documento` / **certificados** | `documentos` + `plantillas_documento` + `series_documentales`; certificados de donación y de transacción (§4) | ✅ |
 | `conversacion`/`mensaje`/`adjunto` | `wa_contacts`/`wa_messages` (sin adjuntos) | 🟡 |
 | `plantilla_mensaje` (tabla) | plantillas en código (`plantillas-meta.md`, `plantillas.ts`) | 🟡 |
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
-| `diagnostico`/`plan_prevencion`/`plan_revision` | — | ⬜ |
-| `derivacion_espigueo` | — | ⬜ |
+| `diagnostico`/`plan_prevencion`/`plan_revision` | `planes_prevencion` con su PDF. **Falta el cuestionario** (anexo B, fase 0) | 🟡 |
+| `derivacion_espigueo` | `espigoladas` con alta manual y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
 | catálogos (categorías/unidades/motivos/destinos) | `productos`/`causas`/`factores_conversion` | 🟡 |
@@ -170,16 +170,23 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | multiidioma `ca`/`es` | i18n propio (`src/lib/i18n.tsx`) | ✅ |
 | móvil primero / responsive | responsive `md`, mensajería lista↔conversación | ✅ |
 | módulo de comunicación WhatsApp | Fase 1 + intake/opt-in/gates/recordatorios | ✅/excede |
-| valor económico | `valor_eur = kg × eur_kg` (plano 1 €/kg) | 🟡 |
+| valor económico | `costes_producto` por producto y ejercicio, congelado en la canalización al conciliar; sin coste no hay cierre | ✅ |
 | vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
 
-**Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~ **resuelta**
-(§4bis) → (2) organización unificada multirol + `usuario` → (3) back office 🟡 (ya hay cola de
-aprobaciones y validación de altas; faltan convenios y verificación) → (4) onboarding 🟡 (ya hay alta
-self-service validada; falta el **convenio** y avisar por correo de la validación) → (5) demandas →
-(6) albaranes/conciliación real → **certificados** → (7) notificaciones + encuestas → (8) adjuntos de
-WhatsApp → (9) diagnóstico/planes → (10) espigueo, catálogo público, calendario y mapa → (11) vistas
-SQL + `historial_estado`. La más urgente ahora es la **organización unificada multirol**: mientras
+**Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
+**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** → ~~(3) back office~~ y
+~~(4) onboarding~~ **resueltas** (cola de aprobaciones con tres colas, alta self-service y convenio
+en el registro) → (5) demandas → ~~(6) albaranes/conciliación real y certificados~~ **resueltos**
+(fases 3, 4 y 5 del sistema documental: §4) → (7) notificaciones + encuestas → (8) adjuntos de
+WhatsApp → ~~(9) diagnóstico/planes~~ 🟡 (la estructura está; **falta el cuestionario**, anexo B) →
+(10) 🟡 espigueo con alta manual; faltan catálogo público, calendario y mapa → (11) vistas SQL +
+`historial_estado`.
+
+⚠️ **Lo que bloquea ahora no es código, es material de la fase 0**: los textos legales validados por
+la asesoría (los ocho tipos de documento y los tres convenios), los datos fiscales reales de
+Espigoladors con la firma y el sello de la apoderada, las taras por tipo de caja, los costes por kilo
+del ejercicio y el cuestionario de diagnóstico. Todo el circuito funciona con valores provisionales
+**marcados como tales**, y el certificado se niega a emitirse mientras lo sean. La más urgente ahora es la **organización unificada multirol**: mientras
 `productores` y `entidades` sean dos tablas sin clave común, el registro público no puede detectar
 que una organización ya existe (deuda §12.28).
 
