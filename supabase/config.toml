@@ -496,3 +496,26 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/enviar-acceso/deno.json"
 entrypoint = "./functions/enviar-acceso/index.ts"
+
+# Sistema documental (§4). Genera el PDF de un documento ya emitido y lo sube al bucket
+# privado. No verifica JWT porque la llaman el trigger de encolado y el job de reintento
+# por pg_net, que no tienen sesión; se protege con el secreto compartido
+# `x-documentos-secret` (mismo patrón que intake-recordatorios).
+# ⚠️ `static_files` no es opcional: dentro del runtime, `Deno.readFile` NO ve el sistema
+# de ficheros del contenedor, así que sin este bloque no hay fuentes ni logo. Comprobado
+# también que no se puede sortear copiando los ficheros al contenedor.
+[functions.generar-documento]
+enabled = true
+verify_jwt = false
+import_map = "./functions/generar-documento/deno.json"
+entrypoint = "./functions/generar-documento/index.ts"
+static_files = [ "./functions/generar-documento/activos/*" ]
+
+# Devuelve una URL firmada de 60 s del PDF, tras comprobar el permiso con
+# puede_ver_documento(). Nadie lee el bucket directamente: no hay ninguna política en
+# storage.objects.
+[functions.descargar-documento]
+enabled = true
+verify_jwt = true
+import_map = "./functions/descargar-documento/deno.json"
+entrypoint = "./functions/descargar-documento/index.ts"

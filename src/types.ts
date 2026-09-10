@@ -231,3 +231,70 @@ export interface FactorConversion {
   producto: string
   kg_por_unidad: number | null
 }
+
+// --- Sistema documental (fase 1, migraciones 20260928*) ---
+
+export type DocumentoTipo =
+  | 'REC' | 'ENT' | 'OPE'
+  | 'R-REC' | 'R-ENT' | 'R-OPE'
+  | 'CONV' | 'RES' | 'CD' | 'CT' | 'PLA' | 'PROVA'
+
+export type DocumentoObjetoTipo =
+  | 'albaran' | 'convenio' | 'cierre_donante' | 'espigolada' | 'plan' | 'prova'
+
+export type DocumentoEstado = 'pendiente_fichero' | 'emitido' | 'error'
+
+export interface Documento {
+  id: string
+  tipo: DocumentoTipo
+  subtipo: 'emes' | 'conciliat' | 'firmat' | 'contrafirmat' | 'provisional' | 'definitiu' | null
+  objeto_tipo: DocumentoObjetoTipo
+  objeto_id: string
+  numero_completo: string
+  version: number
+  serie: string
+  ejercicio: number
+  /** El modo vive en el dato: decide serie P-*, marca de agua y destinatarios */
+  modo: 'real' | 'prueba'
+  idioma: 'ca' | 'es'
+  plantilla_id: string | null
+  /** Snapshot congelado de lo que dice el documento; el PDF se regenera desde aquí */
+  datos: Record<string, unknown>
+  /** Huella del snapshot. Es la que se IMPRIME como código de verificación */
+  sha256_datos: string
+  /** Ruta dentro del bucket `documentos`, fijada por ruta_documento() al insertar */
+  ruta: string | null
+  /** Huella de los bytes del PDF; verifica la descarga */
+  sha256_fichero: string | null
+  bytes: number | null
+  paginas: number | null
+  estado: DocumentoEstado
+  intentos: number
+  ultimo_error: string | null
+  envio: Record<string, unknown> | null
+  vigente: boolean
+  sustituido_por: string | null
+  emitido_por: string | null
+  emitido_at: string
+  fichero_at: string | null
+}
+
+export interface DocumentoEnvio {
+  id: string
+  documento_id: string
+  destinatario: string
+  canal: 'email'
+  estado: 'pendent' | 'enviat' | 'error'
+  proveedor_id: string | null
+  error: string | null
+  enviado_at: string | null
+  created_at: string
+}
+
+export interface SerieDocumental {
+  serie: string
+  ejercicio: number
+  ultimo: number
+  /** Relleno con ceros: REC-2026-00042 son 5, RES-2026-0012 son 4 */
+  digitos: number
+}

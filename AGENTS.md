@@ -543,6 +543,96 @@ select/insert/update, y `service_role`. Hoy guarda **`test_mode`** (`'true'`/`'f
 `'true'`): el **modo test global** (§8). Lo leen las Edge Functions (`modoTestActivo`) y lo togglea
 `src/lib/settings.ts` desde la página Configuración.
 
+### Sistema documental (fase 1)
+
+**Regla que lo ordena todo: el número pertenece a la fila, no al fichero.**
+`siguiente_numero(serie, ejercicio)` se llama DENTRO de la transacción que crea la fila del
+dominio y su fila en `documentos`. Si la transacción cae, el número no se consume; si lo que
+falla es el PDF (después, en la Edge Function), la fila ya existe y no hay hueco legal. Por eso
+**no** es una `sequence`: `nextval()` no se deshace con el `rollback`.
+
+**`series_documentales`** — `serie`, `ejercicio` (PK compuesta), `ultimo`, `digitos`
+(`20260928100000_series_documentales.sql`). `siguiente_numero()` es un
+`insert … on conflict (serie, ejercicio) do update set ultimo = ultimo + 1 returning`: el
+`on conflict` toma el bloqueo de la fila y serializa; el valor solo se consolida con el `commit`
+de quien lo pidió. `formato_numero(serie, ejercicio, n)` → `REC-2026-00042`. Sembradas 16 series
+× ejercicios 2026-2030: REC/ENT/OPE y sus `R-` con 5 dígitos; CONV-DON-GEN/CONV-DON-REC/CONV-COM/
+RES/CD/CT/PLA y `P-RES`/`P-CD` con 4; `PROVA` con 4. RLS: select `es_intern()`.
+**`siguiente_numero` NO la puede ejecutar `authenticated`**, ni el super_admin: quemar un número
+de una serie legal solo puede pasar dentro de la transacción de una RPC de emisión.
+Verificado con `scripts/prueba-numeracion.ts` (§11): 50 emisiones concurrentes con un 20 % de
+rollback, cinco pasadas, `1..N` sin huecos; y en estrés, 200 × 30 % de fallos.
+
+**`documentos`** (`20260928100200_documentos.sql`) — una fila por documento emitido.
+Polimórfica (`objeto_tipo`/`objeto_id`, sin FK por tipo ni FK inversa desde el dominio); el
+dominio nunca apunta al PDF, se le pregunta con `documento_vigente()`. Columnas: `tipo` (12
+valores, de REC a PROVA) · `subtipo` · `objeto_tipo` (6) · `objeto_id` · `numero_completo` ·
+`version` · `serie` · `ejercicio` · **`modo`** (`real`/`prueba`) · `idioma` · `plantilla_id` ·
+`datos jsonb` · `sha256_datos` · `ruta` · `sha256_fichero` · `bytes` · `paginas` · `estado`
+(`pendiente_fichero`/`emitido`/`error`) · `intentos` · `ultimo_error` · `envio jsonb` ·
+`vigente` · `sustituido_por` · `emitido_por` · `emitido_at` · `fichero_at`. Índices:
+`unique (numero_completo, version)`; único parcial `(objeto_tipo, objeto_id, tipo) where vigente`;
+`(objeto_tipo, objeto_id)`; parcial `(estado) where estado <> 'emitido'`.
+
+⚠️ **`plantilla_id` no tiene FK todavía**: `plantillas_documento` la crea `20260928100100`, que
+no entró en el spike. Esa migración añadirá la FK con `alter table`.
+
+**Dos huellas, no una.** `sha256_datos` = huella del snapshot canónico (`datos::text`, que en
+`jsonb` es determinista), calculada en SQL al emitir, y **es la que se imprime** como código de
+verificación. `sha256_fichero` = huella de los bytes, calculada en Deno antes del `upload`. Un
+PDF no puede contener su propio hash.
+
+**El modo vive en el dato.** `documentos.modo` decide serie con prefijo `P-`, marca de agua y
+destinatarios. **No depende de `test_mode`** (§8): un cierre de prueba no llega nunca a un
+donante real aunque el modo test global esté apagado. Y los documentos `modo='prueba'` no los ve
+ningún externo, ni de su propia organización.
+
+**Inmutabilidad por trigger.** `documentos_inmutable` congela tipo, objeto, número, serie, modo,
+idioma, `datos`, `sha256_datos`, `ruta` y la autoría; solo deja las transiciones
+`pendiente_fichero→emitido|error`, `error→emitido|pendiente_fichero` (**`emitido` es terminal**)
+y `vigente` true→false. ⚠️ La transición `error→emitido` no estaba prevista y la encontró la
+prueba, no la lectura: sin ella, el job de reintento —que reencola sin devolver la fila a
+`pendiente_fichero`— dejaba un documento fallado imposible de recuperar.
+`documentos_no_esborrar` prohíbe el `delete` salvo con
+`current_setting('redestina.reinicio_prueba', true) = 'on'` **y** `modo='prueba'`; ese
+interruptor solo lo fija `reiniciar_documentos_prova()` con `set_config(..., is_local => true)`,
+así que no se puede dejar encendido. `documentos_objeto_existe` (before insert) sustituye a la FK
+que el modelo polimórfico no puede tener: resuelve la tabla con `to_regclass`, así que **no hay
+que editarlo en cada fase** —cuando la fase 3 cree `albaranes`, empieza a comprobarlos solo—.
+`objeto_tipo = 'prova'` está exento.
+
+**`documento_envios`** — `id`, `documento_id` (FK cascade), `destinatario`, `canal` (**solo
+`email`**), `estado` (`pendent`/`enviat`/`error`), `proveedor_id`, `error`, `enviado_at`,
+`created_at`. Cierra parcialmente la deuda §12.25. `canal` admite solo correo a propósito: un
+documento o un enlace de firma por WhatsApp quedaría publicado en la consola de Mensajería, que
+lee todo el equipo.
+
+**Buckets** (`20260928100600_storage_buckets.sql`) — `documentos` (privado, 20 MB,
+pdf/png/jpeg) y `activos` (privado, 5 MB, png/jpeg, para la firma y el sello de la apoderada).
+**Sin una sola política en `storage.objects`**: nadie toca Storage directo, ni para leer ni para
+listar. Se lee por la Edge Function `descargar-documento`, que autoriza con
+`puede_ver_documento()` y firma una URL de 60 s.
+
+**La carpeta ordena; la tabla autoriza.** `ruta_documento()` compone en SQL, al insertar:
+
+```text
+productors/<productor_id>/<ejercicio>/<CARPETA>/<numero>-v<n>.pdf
+entitats/<entidad_id>/<ejercicio>/<CARPETA>/<numero>-v<n>.pdf
+productors/<productor_id>/proves/<ejercicio>/<CARPETA>/…    (modo = 'prueba')
+proves/<ejercicio>/PROVA/<numero>-v<n>.pdf                  (tipo = 'PROVA')
+```
+
+`<CARPETA>` es el `tipo` sin el prefijo `R-`: el rectificativo se archiva junto al original. Un
+fichero se guarda **una sola vez**, bajo su organización propietaria; la otra parte de un
+documento a dos bandas lo ve por `documents_meus()`, nunca por la ruta. La Edge Function sube
+exactamente a `documentos.ruta` y no elige carpeta: si la eligiera ella, la estructura del bucket
+dependería del código desplegado en cada momento. ⚠️ La función es **`stable`, no `immutable`**:
+resolver el propietario exige leer tablas del dominio.
+
+**GRANT**: `authenticated` solo `SELECT` en `documentos`, `documento_envios` y
+`series_documentales`. **Ninguna escritura, en ninguna fase**: la superficie de escritura son las
+RPC `security definer` y `service_role`.
+
 ### Integridad
 
 Las tablas Redestina sí tienen foreign keys. Las de mensajería **no**: `productores`,
@@ -707,6 +797,20 @@ funciones, no políticas:
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
+| `siguiente_numero(serie, ejercicio)` | El correlativo, dentro de la transacción de emisión. **Sin `execute` para `authenticated`** |
+| `formato_numero(serie, ejercicio, n)` | `REC-2026-00042` |
+| `ruta_documento(objeto_tipo, objeto_id, tipo, numero, version, modo, ejercicio)` | La carpeta por organización (§4 «Sistema documental»). `stable`, no `immutable`: lee el dominio. Solo `service_role` |
+| `puede_ver_documento(documento, user default null)` | Autoriza la descarga. `service_role` puede preguntar por un usuario concreto; un `authenticated` que pase el uuid de otro se lleva `42501` |
+| `documento_vigente(objeto_tipo, objeto_id, tipo)` | Qué PDF vale hoy. **`security invoker` a propósito**: la RLS de `documentos` se aplica igual que en un `select` |
+| `documents_meus(user default null)` | Puente `security definer` (`setof uuid`) entre `documentos` y las organizaciones del usuario. **Fase 1: vacío**; cada fase la reescribe con `create or replace` sin tocar la tabla ni su política |
+| `emitir_documento_prova(fallar default false)` | Documento de humo, serie `PROVA`, `modo='prueba'`. Exige `es_super_admin()`. Con `fallar` levanta excepción **después** de pedir el número: es lo que prueba `scripts/prueba-numeracion.ts` |
+| `reiniciar_documentos_prova()` | Borra los documentos `modo='prueba'` y pone a 0 `PROVA`/`P-*` del ejercicio. Única excepción a la inmutabilidad |
+| `marcar_documento_generado(id, sha, bytes, paginas)` / `marcar_documento_error(id, err)` | Solo `service_role`. La `ruta` no se pasa: ya está fijada. `generado` es idempotente |
+
+⚠️ **`auth.uid() is null` significa `service_role`.** Las RPC documentales comprueban el rol solo
+cuando hay sesión de usuario (`if auth.uid() is not null and not es_super_admin() then raise`),
+igual que `trg_membresias_control_aprovacio`. Sin esa salida, con `roles_activos` encendido en
+producción `service_role` se quedaría fuera de sus propias funciones.
 
 Además, dos triggers imponen lo mismo aunque alguien relajara las políticas:
 `respuestas_control_aprovacio` impide mover `aprovacio`/`canalizacion_id` de `oferta_respuestas`
@@ -1768,6 +1872,16 @@ deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
 deno run -A scripts/import-ara.ts             # importar los CSV maestros
 
 deno run -A scripts/comprobar-rls.ts          # arnés de RLS: matriz de permisos por cuenta (§4bis)
+# ⚠️ Contra la base LOCAL el arnés NO inicia sesión: el CLI apaga el login por correo
+# (§9), así que firma el JWT con el secreto del stack. Necesita SB_SECRET_KEY para
+# resolver los uuid, y las cuentas creadas con crear-usuarios-prueba.ts.
+SUPABASE_URL=http://127.0.0.1:55321 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_… \
+  SB_SECRET_KEY=sb_secret_… deno run -A scripts/comprobar-rls.ts
+
+# Numeración documental sin huecos (§4 «Sistema documental»)
+SUPABASE_URL=http://127.0.0.1:55321 SB_SECRET_KEY=sb_secret_… \
+  deno run -A scripts/prueba-numeracion.ts                    # 5 pasadas × 50 emisiones
+  deno run -A scripts/prueba-numeracion.ts --pasadas 2 --emisiones 200 --fallos 0.3
 
 # Typecheck de lo que `tsc` NO mira. ⚠️ El --config es obligatorio: `deno check` toma la
 # configuración del cwd, no la de la carpeta del módulo, y sin ella no resuelve los imports.
@@ -2069,15 +2183,57 @@ Redestina en producción real quedan pasos de configuración y negocio.
     verdad importa. El agrupado es por bloque de la matriz y no por tabla: el check homónimo del
     equipo, que sí pasa, taparía el de los receptores.
 
+49. **El trigger de encolado de PDF no existe todavía.** `documentos_encola_generacion`
+    (`after insert` → `net.http_post` a `generar-documento` con `x-documentos-secret` de
+    `app_config`) y `20260928100700_jobs_documentales.sql` (reintento cada 5 min,
+    recordatorios diarios) quedaron **fuera del spike a propósito**, para poder medir el tiempo
+    de generación sin el cron de por medio. Hasta que entren, un `documentos` en
+    `pendiente_fichero` se queda ahí y hay que llamar a la función a mano.
+50. **`ruta_documento()` solo resuelve `PROVA`.** Las demás ramas —el propietario por tipo—
+    levantan `0A000` porque las tablas de dominio no existen todavía. Cada fase rellena la suya
+    con `create or replace`; el `case` objetivo está escrito en comentario dentro de la propia
+    función. Es deliberado: un fichero mal archivado cuesta mucho más de arreglar que una
+    emisión que no ocurre.
+51. **`reiniciar_documentos_prova()` borra las FILAS, no los objetos de `proves/` en Storage.**
+    SQL no puede borrar del bucket. Hasta que la RPC de reinicio del cierre (fase 4) lo haga a
+    través de una Edge Function, cada ciclo de prueba deja sus PDF huérfanos en
+    `proves/<ejercicio>/`. Son inalcanzables (bucket privado y sin políticas), pero ocupan.
+52. **El arnés, al pasar por el super_admin, borra todos los documentos `modo='prueba'`** de la
+    base contra la que corre (`emitir_documento_prova` + `limpiar: reiniciar_documentos_prova`).
+    Hoy es inocuo; a partir de la fase 4 no debe ejecutarse a la vez que un ciclo de cierre de
+    prueba en curso, o hay que acotar la limpieza a la serie `PROVA`.
+    ⚠️ **Ya ha mordido una vez**, el mismo día que se escribió: durante el spike, el arnés
+    ejecutándose en paralelo hizo desaparecer los documentos que la Edge Function acababa de
+    generar y devolvió el contador a `PROVA-2026-0001`. Desde fuera parecía que
+    `emitir_documento_prova()` pisaba la fila anterior; no era eso —dos emisiones seguidas dan
+    `0001` y `0002`, cada una con su `objeto_id`—, era el arnés limpiando. El síntoma
+    característico es «mi documento estaba y ya no está».
+53. **`documentos` y `documento_envios` no tienen fixture en el arnés.** Los dos checks de
+    lectura del equipo salen SALTADA (§12.48) hasta que exista algún documento persistente.
+    `crear-datos-documentales-prueba.ts` (fase 4) es quien los creará.
+54. **Dos checks nuevos dependen de `roles_activos`.** Con el interruptor apagado —como nace
+    cualquier entorno recreado desde las migraciones— `es_super_admin()` devuelve `true` para
+    cualquier autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. Es el
+    fail-open deliberado de §4bis, no una regresión: hay que encender el interruptor antes de
+    juzgar el resultado. Está escrito en la cabecera del script.
+
 ## 13. Al terminar cualquier cambio
 
 1. `npm run build` en verde.
 2. `deno check` si el cambio toca `scripts/` o `supabase/functions/`: `tsc` no mira ni lo uno ni lo
    otro (§11 trae la orden con su `--config`, que es obligatorio).
-3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles. Referencia
-   actual: **56/56 correctas y 1 saltada** —el receptor comercial, que no tiene ninguna oferta de
-   `venda` que ver—, y termina en «Sin fallos de permisos». **Cualquier FALLA es una regresión**:
-   ya no hay rojos «conocidos y correctos» que haya que aprender a ignorar (§12.48).
+3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
+   `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
+   Referencia en **remoto**: era 56/56 + 1 saltada antes del sistema documental; con los checks
+   de la fase 1 la matriz sube a **81 comprobaciones**, y la cifra hay que fijarla ejecutándola
+   tras el primer `db push` (previsión: 78/78 correctas y 3 saltadas).
+   Referencia en **local** con el fixture de `crear-usuarios-prueba.ts` y `roles_activos` en
+   `true`: **64 comprobaciones, todas correctas y 9 saltadas** por falta de datos (una base
+   local recién creada no tiene ofertas, ni mensajes, ni documentos), terminando en «Sin fallos
+   de permisos» con código de salida 0.
+   **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
+   aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale
+   SALTADA, con el mismo criterio.
 4. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
    redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
 5. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un

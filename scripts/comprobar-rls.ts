@@ -37,6 +37,22 @@
 // Las escrituras solo se prueban sobre filas de prueba (codigo like 'TEST-%') y
 // siempre se revierten; si una fila fixture no existe, la comprobación se salta y
 // se avisa, en vez de tocar datos reales.
+//
+// SISTEMA DOCUMENTAL (fase 1, migraciones 20260928*). Se añaden las comprobaciones ya
+// alcanzables: el equipo lee `documentos`, `documento_envios` y `series_documentales` y
+// no escribe ninguna de las tres; nadie salvo el super_admin emite un documento; y
+// `siguiente_numero()` no la puede llamar ni el super_admin desde el navegador —quemar
+// un número de una serie legal solo puede pasar dentro de la transacción de una RPC de
+// emisión—. Los externos no ven nada porque en la fase 1 `documents_meus()` devuelve
+// vacío; cuando la fase 3 la reescriba, esos «denegar» pasan a «permitir, solo los
+// suyos» con su `requiereFixture`.
+//
+// ⚠️ Dos de estas comprobaciones dependen del interruptor `roles_activos` (§4bis): con
+//    el interruptor APAGADO —que es como nace cualquier entorno recreado desde las
+//    migraciones, incluido el local— `es_super_admin()` devuelve true para cualquier
+//    autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. No es
+//    una regresión: es el fail-open deliberado. Contra remoto, donde el interruptor está
+//    encendido, pasa.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -50,6 +66,12 @@ if (!url || !publishable) {
   console.error("y por tanto la única con la que RLS se comporta como en la app real.");
   Deno.exit(1);
 }
+
+// Ya validadas. Hacen falta como `string` a secas porque TypeScript NO propaga a las
+// funciones de más abajo el estrechamiento que hace el `if` de aquí arriba: el narrowing
+// por flujo de control no cruza a una closure, aunque la variable sea `const`.
+const URL_BASE: string = url;
+const PUBLISHABLE: string = publishable;
 
 // ---------------------------------------------------------------------------
 // Cuentas
@@ -108,6 +130,13 @@ interface Check {
    * "esa fila no existe" que llegaría igual con permisos de sobra.
    */
   args?: Record<string, unknown>;
+  /**
+   * Solo para `rpc`+`permitir`: función que deshace lo que la comprobación acaba de
+   * crear. Una RPC que se espera que funcione **hace algo**, y el arnés no puede dejar
+   * rastro: `emitir_documento_prova` emite un documento de verdad, así que se limpia
+   * con `reiniciar_documentos_prova` (que solo toca `modo = 'prueba'`, §documental).
+   */
+  limpiar?: string;
 }
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -125,11 +154,38 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "productos", op: "leer", esperado: "permitir", descripcion: "lee el catálogo" },
     { tabla: "app_config", op: "leer", esperado: "denegar", descripcion: "NO lee los secretos" },
     { tabla: "usuario_roles", op: "insertar", esperado: "denegar", descripcion: "NO se puede dar roles a sí mismo" },
+    // Sistema documental (fase 1). El equipo lo LEE todo y no escribe nada: un documento
+    // nace dentro de la transacción de una RPC, nunca desde el navegador.
+    {
+      tabla: "documentos",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los documentos emitidos",
+      requiereFixture: "algún documento emitido (super_admin → emitir_documento_prova())",
+    },
+    { tabla: "series_documentales", op: "leer", esperado: "permitir", descripcion: "ve los contadores de serie" },
+    { tabla: "documento_envios", op: "leer", esperado: "permitir", descripcion: "ve los envíos de documentos", requiereFixture: "algún envío registrado (fase 1, al mandar un documento por correo)" },
+    { tabla: "documentos", op: "insertar", esperado: "denegar", descripcion: "NO crea documentos a mano (van por RPC)" },
+    { tabla: "documentos", op: "actualizar", esperado: "denegar", descripcion: "NO edita un documento emitido" },
+    { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO quema números de una serie legal" },
+    { tabla: "emitir_documento_prova", op: "rpc", esperado: "denegar", args: { p_fallar: false }, descripcion: "NO emite documentos de prueba (es del super_admin)" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
     { tabla: "app_settings", op: "actualizar", esperado: "permitir", descripcion: "puede tocar el modo test" },
     { tabla: "app_config", op: "leer", esperado: "denegar", descripcion: "NO lee los secretos" },
+    { tabla: "series_documentales", op: "leer", esperado: "permitir", descripcion: "ve los contadores de serie" },
+    // La emite de verdad y se limpia acto seguido: es la única comprobación del arnés
+    // que ejercita el circuito documental entero (número + snapshot + ruta).
+    {
+      tabla: "emitir_documento_prova",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_fallar: false },
+      limpiar: "reiniciar_documentos_prova",
+      descripcion: "emite un documento de prueba (y lo limpia)",
+    },
+    { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NI el super_admin quema números a mano" },
   ],
   productor: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
@@ -143,6 +199,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca su propia membresía (ningún externo se auto-activa)" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros (lo corta pot_aprovar)" },
+    // Sistema documental: en la fase 1 `documents_meus()` devuelve vacío, así que un
+    // externo no ve NINGÚN documento. Cuando la fase 3 la reescriba, este check pasará
+    // a «permitir, solo los suyos» con su fixture.
+    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
+    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
+    { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
   ],
   // OJO con el receptor: «ve las ofertas compatibles» solo se cumple si existe alguna
   // oferta viva de una modalitat que le encaje (`modalitat_receptor_compat`). Un
@@ -164,11 +226,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "oferta_respuestas", op: "insertar", esperado: "denegar", descripcion: "NO escribe respuestas a mano (van por RPC)" },
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
+    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
+    { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
   ],
   sense_rol: [
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "entidades", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
   // false`. No ve NADA —`mis_productores()`/`mis_entidades()` filtran por `activo`, así
@@ -182,6 +249,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "membresias", op: "leer", esperado: "permitir", descripcion: "ve SU membresía pendiente (pantalla de espera)" },
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO se activa a sí misma" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO se aprueba a sí misma (lo corta pot_aprovar)" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
   ],
   // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
   // interfaz enseña con los dos menús a la vez, y aquí lo que se comprueba es que ver dos
@@ -195,6 +264,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca sus membresías" },
     { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
+    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
   ],
 };
 
@@ -205,6 +276,30 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   canalizaciones: { kg_confirmados: 1 },
   oferta_respuestas: { telefono: "34600000000", canal: "panel" },
   usuario_roles: { rol: "super_admin" },
+  // `documentos` tiene checks y NOT NULL por todas partes: la fila se rellena entera
+  // para que lo que corte sea el permiso y no una restricción de datos (si cortara un
+  // check, la comprobación no diría nada sobre RLS). Ejercicio 1999 para que se
+  // distinga a simple vista si alguna vez llegara a entrar.
+  documentos: {
+    tipo: "PROVA",
+    objeto_tipo: "prova",
+    objeto_id: "00000000-0000-0000-0000-000000000000",
+    numero_completo: "TEST-RLS-1999-0001",
+    version: 1,
+    serie: "PROVA",
+    ejercicio: 1999,
+    modo: "prueba",
+    datos: {},
+    sha256_datos: "0".repeat(64),
+  },
+};
+
+/**
+ * Columna inocua con la que probar un UPDATE que debe fallar: se reescribe con su
+ * propio valor, así que si el permiso estuviera mal abierto tampoco se estropearía nada.
+ */
+const COLUMNA_INOCUA: Record<string, string> = {
+  documentos: "intentos",
 };
 
 // ---------------------------------------------------------------------------
@@ -308,6 +403,30 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       await cliente.from("membresias").update({ activo: fila.activo }).eq("id", fila.id);
       return { ok: check.esperado === "permitir", detalle: "¡actualizado! (y revertido)" };
     }
+    // Tablas con una columna inocua declarada: se reescribe con su propio valor. Si la
+    // cuenta no puede ni leerlas, el UPDATE se lanza igual contra un id inventado —lo
+    // que se mide es el GRANT/la política, no que exista la fila—.
+    const columna = COLUMNA_INOCUA[check.tabla];
+    if (columna) {
+      const { data: fila } = await cliente.from(check.tabla).select("*").limit(1).maybeSingle();
+      const id = (fila?.id as string) ?? UUID_NULO;
+      const valor = fila ? (fila as Record<string, unknown>)[columna] : 0;
+      const { error } = await cliente.from(check.tabla)
+        .update({ [columna]: valor }).eq("id", id);
+      if (error) {
+        return {
+          ok: check.esperado === "denegar",
+          detalle: esRechazo(error)
+            ? `rechazado (${error.code ?? "42501"})`
+            : `bloqueado por la base (${error.code ?? "?"})`,
+        };
+      }
+      return {
+        ok: check.esperado === "permitir",
+        detalle: fila ? "actualizado (mismo valor)" : "sin fila que tocar, pero el UPDATE pasó",
+      };
+    }
+
     // app_settings es idempotente: se reescribe su valor actual.
     const { data: actual } = await cliente.from(check.tabla).select("key, value").limit(1).maybeSingle();
     if (!actual) return { ok: true, detalle: "sin fila que probar (saltado)" };
@@ -333,6 +452,15 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       // posterior: para un "denegar" eso es exactamente lo que no debe ocurrir.
       return { ok: check.esperado === "permitir", detalle: `error: ${error.message.slice(0, 60)}` };
     }
+    // La RPC ha hecho su trabajo: si deja rastro, se limpia ahora mismo. El arnés no
+    // puede añadir filas a la base que audita.
+    if (check.limpiar) {
+      const { error: errLimpieza } = await cliente.rpc(check.limpiar);
+      if (errLimpieza) {
+        return { ok: false, detalle: `ejecutada, pero no se pudo limpiar: ${errLimpieza.message.slice(0, 50)}` };
+      }
+      return { ok: check.esperado === "permitir", detalle: "ejecutada (y limpiada)" };
+    }
     return { ok: check.esperado === "permitir", detalle: "ejecutada" };
   }
 
@@ -345,6 +473,101 @@ const resultados: Resultado[] = [];
 // Tablas que el equipo ve vacías: no tienen filas, punto. Una expectativa de "permitir"
 // sobre ellas no demuestra nada, así que se salta en vez de dar un falso negativo (es lo
 // que pasa contra una base local recién sembrada, donde no hay ofertas ni mensajes).
+// ── Cómo se abre la sesión: login real en remoto, JWT firmado en local ──────────
+//
+// En el CLI local `[auth.email] enable_signup = false` —que es obligatorio y debe seguir
+// así (§9)— arrastra `GOTRUE_EXTERNAL_EMAIL_ENABLED=false` en el contenedor, así que
+// `signInWithPassword` responde «Email logins are disabled» para TODAS las cuentas y el
+// arnés salía 0/7 contra local sin que hubiera nada roto. No se arregla tocando ese flag:
+// además de ser la postura correcta, un `config push` accidental dejaría al equipo fuera
+// de producción (§9, «No hacer supabase config push»).
+//
+// Contra local, entonces, se firma el JWT con el secreto del stack y se evita GoTrue por
+// completo. PostgREST valida la firma igual y **RLS se aplica exactamente igual**: lo que
+// decide es el `sub` del token, no cómo se obtuvo. Verificado con `get_my_session_context`,
+// que devuelve el rol real de cada cuenta.
+const esLocal = URL_BASE.includes("127.0.0.1") || URL_BASE.includes("localhost");
+const JWT_SECRET_LOCAL = Deno.env.get("SUPABASE_JWT_SECRET") ??
+  "super-secret-jwt-token-with-at-least-32-characters-long"; // el del CLI, público
+
+function base64url(entrada: Uint8Array | string): string {
+  const bytes = typeof entrada === "string" ? new TextEncoder().encode(entrada) : entrada;
+  let bin = "";
+  for (const b of bytes) bin += String.fromCharCode(b);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+async function firmarJwtLocal(userId: string, email: string): Promise<string> {
+  const cabecera = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
+  const ahora = Math.floor(Date.now() / 1000);
+  const cuerpo = base64url(JSON.stringify({
+    sub: userId,
+    email,
+    role: "authenticated",
+    aud: "authenticated",
+    iat: ahora,
+    exp: ahora + 3600,
+    app_metadata: { provider: "email" },
+    user_metadata: {},
+  }));
+  const clave = await crypto.subtle.importKey(
+    "raw",
+    new TextEncoder().encode(JWT_SECRET_LOCAL),
+    { name: "HMAC", hash: "SHA-256" },
+    false,
+    ["sign"],
+  );
+  const firma = new Uint8Array(
+    await crypto.subtle.sign("HMAC", clave, new TextEncoder().encode(`${cabecera}.${cuerpo}`)),
+  );
+  return `${cabecera}.${cuerpo}.${base64url(firma)}`;
+}
+
+/** email → uuid de auth.users. Solo en local, y solo para poder firmar el token. */
+async function idsLocales(): Promise<Map<string, string>> {
+  const secreto = Deno.env.get("SB_SECRET_KEY");
+  if (!secreto) {
+    console.error("Contra la base local hace falta SB_SECRET_KEY para resolver los uuid.");
+    console.error("El login por correo está apagado en el CLI local (§9), así que el arnés");
+    console.error("firma el JWT en vez de iniciar sesión. Con `supabase status` tienes la clave.");
+    Deno.exit(1);
+  }
+  const admin = createClient(URL_BASE, secreto, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
+  if (error) {
+    console.error("No se pudo listar los usuarios locales:", error.message);
+    Deno.exit(1);
+  }
+  return new Map(data.users.map((u) => [u.email ?? "", u.id]));
+}
+
+const idsPorEmail = esLocal ? await idsLocales() : new Map<string, string>();
+
+/** Cliente con la sesión de esa cuenta, o el motivo por el que no se pudo abrir. */
+async function abrirSesion(cuenta: Cuenta): Promise<{ cliente?: SupabaseClient; error?: string }> {
+  if (esLocal) {
+    const id = idsPorEmail.get(cuenta.email);
+    if (!id) return { error: `no existe en la base local: ${cuenta.email}` };
+    const jwt = await firmarJwtLocal(id, cuenta.email);
+    return {
+      cliente: createClient(URL_BASE, PUBLISHABLE, {
+        auth: { autoRefreshToken: false, persistSession: false },
+        global: { headers: { Authorization: `Bearer ${jwt}` } },
+      }),
+    };
+  }
+  const cliente = createClient(URL_BASE, PUBLISHABLE, {
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  const { error } = await cliente.auth.signInWithPassword({
+    email: cuenta.email,
+    password: cuenta.password,
+  });
+  return error ? { error: error.message } : { cliente };
+}
+
 const vacias = new Set<string>();
 
 // El equipo primero: es quien lo ve todo, así que sirve para saber qué tablas están
@@ -355,19 +578,26 @@ const ordenadas = [...cuentas].sort((a, b) => {
 });
 
 for (const cuenta of ordenadas) {
-  const cliente = createClient(url, publishable, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { error: authError } = await cliente.auth.signInWithPassword({
-    email: cuenta.email,
-    password: cuenta.password,
-  });
-  if (authError) {
+  const { cliente, error: authError } = await abrirSesion(cuenta);
+  if (authError || !cliente) {
+    // Una cuenta que no existe en ESTA base no es un fallo de permisos: es falta de
+    // datos, igual que una tabla vacía (§12.48). Pasa en local con las cuentas que
+    // cuelgan de fichas reales del equipo, que el fixture no crea. Sale SALTADA con el
+    // motivo, y el aviso de «no las cubre nadie» sigue vigilando la cobertura perdida.
+    const ausente = esLocal && (authError ?? "").startsWith("no existe en la base local");
     resultados.push({
       cuenta: cuenta.etiqueta,
-      check: { tabla: "—", op: "leer", esperado: "permitir", descripcion: "iniciar sesión" },
-      ok: false,
-      detalle: authError.message,
+      rol: cuenta.rol,
+      check: {
+        tabla: "—",
+        op: "leer",
+        esperado: "permitir",
+        descripcion: "iniciar sesión",
+        ...(ausente ? { requiereFixture: `la cuenta ${cuenta.email} en esta base` } : {}),
+      },
+      ok: ausente,
+      saltada: ausente,
+      detalle: authError ?? "sin cliente",
     });
     continue;
   }
@@ -402,7 +632,9 @@ const ancho = {
 console.log();
 for (const r of resultados) {
   const marca = r.saltada ? " sense" : r.ok ? "  ok  " : " FALLA";
-  const detalle = r.saltada ? "taula buida, no es pot comprovar" : r.detalle;
+  const detalle = r.saltada
+    ? (r.check.tabla === "—" ? r.detalle : "taula buida, no es pot comprovar")
+    : r.detalle;
   console.log(
     `${marca}  ${r.cuenta.padEnd(ancho.cuenta)}  ${r.check.tabla.padEnd(ancho.tabla)}  ` +
       `${r.check.op.padEnd(11)}  ${r.check.descripcion}  → ${detalle}`,
