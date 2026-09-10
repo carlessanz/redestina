@@ -1573,10 +1573,21 @@ interfaz, en los correos y en las plantillas de WhatsApp.
 | **Secreto `RESEND_FROM`** | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ⬜ **pendiente** |
 | **El logo** (wordmark) | dibuja «POMA» | dibuja «Redestina» | ⬜ **pendiente (diseño)** |
 
-⚠️ **El código ya apunta a `redestina.carlessanz.com`, que todavía no existe.** Hasta que se
-completen las cuatro filas de infraestructura, la aplicación desplegada **se rompe**: el navegador
-bloquea por CORS las llamadas a las Edge Functions (`ALLOWED_ORIGIN` no reconoce el origen nuevo) y
-los enlaces de los correos apuntan a una URL muerta. El orden correcto está en §10ter.
+⚠️ **El código ya nombra `redestina.carlessanz.com`, que todavía no existe** — pero la aplicación
+**sigue funcionando**, y conviene entender por qué para no «arreglar» lo que no está roto:
+
+- **CORS aguanta** porque el origen no ha cambiado: se sigue sirviendo desde `p0ma.carlessanz.com`,
+  que `ALLOWED_ORIGIN` todavía incluye. Lo que rompería CORS es mover el dominio **antes** de
+  actualizar el secreto, no al revés.
+- **Los correos aguantan** porque `APP_URL` sigue definido como secreto y manda sobre el fallback de
+  `_shared/resend.ts`. Ese fallback solo actuaría si el secreto faltara.
+
+Lo único que este rename **sí ha roto ya** es la **previsualización social**: `og:url` y `og:image`
+en `index.html` apuntan al dominio nuevo, así que la tarjeta de WhatsApp, Slack o LinkedIn no carga
+la imagen hasta que el dominio exista.
+
+El orden de §10ter está pensado justo para eso: **añadir antes de retirar**, para que no haya
+ventana de caída.
 
 ⚠️ **El logo no se pudo renombrar.** `public/logo-redestina.svg` es un wordmark en **paths**, no
 texto: las letras de «POMA» están dibujadas como vectores. El fichero cambió de nombre, pero **lo
@@ -1887,9 +1898,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     se llama Redestina y se ve POMA (§10bis).
 42. **La infraestructura todavía responde al nombre viejo.** Proyecto de Vercel, dominio,
     `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM` y `uri_allow_list` siguen en `p0ma`, mientras que el
-    código ya apunta a `redestina.carlessanz.com`. **Con el código desplegado y la infraestructura
-    sin migrar, la aplicación en producción se rompe** (CORS y enlaces de correo muertos). Los pasos,
-    en orden, en §10ter.
+    código ya nombra `redestina.carlessanz.com`. **No está roto** —el origen servido no ha cambiado
+    y `APP_URL` sigue mandando sobre el fallback—, pero sí lo está la previsualización social
+    (`og:url`/`og:image`), y el nombre queda partido en dos: la interfaz dice Redestina y la URL
+    dice p0ma. Los pasos, en orden, en §10ter.
 
 ## 13. Al terminar cualquier cambio
 
