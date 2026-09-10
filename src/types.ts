@@ -540,3 +540,78 @@ export interface DocumentoExterno {
   subido_por: string | null
   created_at: string
 }
+
+// --- Cierre anual y certificados (fase 4, migraciones 20261109*) ---
+
+export interface CierreEjercicio {
+  id: string
+  ejercicio: number
+  /** Vive en el dato: decide serie P-*, marca de agua y destinatarios. Varios ensayos por año, un solo cierre real */
+  modo: 'prueba' | 'real'
+  estado: 'obert' | 'provisional' | 'tancat' | 'declarat'
+  abierto_at: string
+  calculado_at: string | null
+  provisional_at: string | null
+  cerrado_at: string | null
+  declarado_at: string | null
+  creado_por: string | null
+  notas: string | null
+  created_at: string
+}
+
+export type EstatCierreDonante =
+  | 'calculat' | 'resum_enviat' | 'factura_pendent' | 'factura_rebuda'
+  | 'coincident' | 'discrepancia' | 'certificat_emes' | 'enviat' | 'declarat'
+
+/** Con algún `bloqueja` en true, el certificado no se puede emitir */
+export interface BloqueigCierre {
+  codigo: string
+  detall: string
+  bloqueja: boolean
+}
+
+export interface CierreDonante {
+  id: string
+  cierre_id: string
+  productor_id: string
+  datos_fiscales: Record<string, string | null> | null
+  kg_total: number
+  valor_total: number
+  estado: EstatCierreDonante
+  bloqueos: BloqueigCierre[]
+  resumen_numero: string | null
+  certificado_numero: string | null
+  certificado_at: string | null
+  factura_numero: string | null
+  factura_fecha: string | null
+  factura_importe: number | null
+  factura_doc_externo_id: string | null
+  /** D4: solo el super_admin, y con motivo registrado */
+  excepcion_sin_factura: boolean
+  excepcion_motivo: string | null
+  excepcion_por: string | null
+  recordatorios: number
+  ultimo_recordatorio_at: string | null
+  requiere_llamada: boolean
+  rectificaciones: number
+  calculado_at: string | null
+  enviado_at: string | null
+  declarado_at: string | null
+  created_at: string
+}
+
+export interface CierreDonanteLinea {
+  id: string
+  cierre_donante_id: string
+  canalizacion_id: string
+  albaran_rec_id: string | null
+  producto: string | null
+  mes: number | null
+  kg_neto: number
+  coste_kg: number | null
+  valor: number
+  entidad_id: string | null
+  /** Conciliada a mano para el ensayo: `cierre_base()` la excluye en modo real */
+  retroactiva: boolean
+  created_at: string
+}

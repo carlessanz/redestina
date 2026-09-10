@@ -107,6 +107,32 @@
 //    fixture: TEST-PROD-2 no tiene ninguno, así que un escape se vería como una saltada
 //    que de pronto pasa a ok.
 
+// CIERRE ANUAL Y CERTIFICADOS (fase 4, migraciones 20261109*). Tres tablas más
+// —`cierres_ejercicio`, `cierres_donante`, `cierre_donante_lineas`— y once RPC. Lo que
+// aquí se afirma y no se afirmaba en ninguna otra parte:
+//
+//   1. **Ninguna de las tres tablas tiene GRANT de escritura para nadie.** El importe de
+//      un certificado no cambia con un `update` desde el navegador, ni siendo super_admin:
+//      se recalcula o no cambia. Lo comprueba un `insertar` que espera 42501.
+//   2. **El donante ve SU acumulado anual, y solo el suyo.** Es la primera vez que un
+//      externo lee una cifra con efecto fiscal, y la regla tiene un matiz que ninguna otra
+//      tabla tiene: los cierres de **prueba** los ve únicamente si su ficha es `es_test`
+//      (`cierres_donante_meus()`), porque un donante real no debe encontrarse en su panel
+//      un acumulado que no vale nada. Que un receptor o una cuenta de doble rol vean 0 es
+//      una política, no falta de datos: el fixture crea el cierre y el equipo lo ve.
+//   3. **Abrir el cierre REAL es del super_admin, no del equipo.** Es el acto que consume
+//      las series legales de un año.
+//
+// ⚠️ `abrir_cierre` NO se prueba como «permitir» en ningún bloque: dejaría una cabecera de
+//    cierre en la base y no hay RPC que la borre (a propósito: un cierre tiene número, no
+//    es una fila desechable). Lo que se prueba del lado del super_admin son las RPC que
+//    **no dejan rastro cuando el objeto no existe** —`reiniciar_cierre_prueba`,
+//    `conciliacion_retroactiva` y `cerrar_cierre` sobre un uuid inventado—: la autorización
+//    pasa y la función falla después con 22023, que el arnés lee como «dejó pasar». Por eso
+//    tampoco se comprueba aquí que cerrar el cierre REAL exija `es_super_admin()`: haría
+//    falta una cabecera de verdad en la base. Eso lo verifican las pruebas SQL de
+//    20261109100300, dentro de una transacción con rollback.
+
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const url = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("VITE_SUPABASE_URL");
@@ -255,6 +281,43 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "emitir_albaran", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emite albaranes" },
   { tabla: "conciliar_albaran", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO concilia albaranes" },
   { tabla: "albaranes", op: "insertar", esperado: "denegar", descripcion: "NO crea albaranes a mano (van por RPC)" },
+  // Cierre anual (fase 4). Aquí solo lo que vale para CUALQUIER externo; que el donante
+  // vea SU fila de `cierres_donante` se comprueba en el bloque `productor`.
+  { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
+  { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
+  { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
+  { tabla: "calcular_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula un cierre" },
+  { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de donació" },
+  { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia res a posteriori" },
+  { tabla: "reiniciar_cierre_prueba", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO reinicia un cierre de prueba" },
+  { tabla: "datos_182", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta los datos del 182" },
+  { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca cap exercici" },
+  // El puente que usa `subir-documento-externo` para decidir si alguien puede adjuntar un
+  // fichero a un albarán o a un cierre. Dos afirmaciones distintas:
+  //   - preguntar por OTRA persona se corta con 42501, aunque la respuesta fuera «no».
+  //     Sin esto, cualquiera podría mapear a qué objetos tiene acceso quien sea.
+  //   - preguntar por uno mismo se puede siempre: la respuesta es un booleano, y sobre un
+  //     uuid inventado es `false`. Lo que se verifica aquí es que no da error, no el valor
+  //     (el valor lo comprueban las pruebas SQL de la migración, que sí pueden mirar el
+  //     objeto de cada cuenta).
+  {
+    tabla: "puc_pujar_document_extern",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_objeto_tipo: "cierre_donante",
+      p_objeto_id: "00000000-0000-0000-0000-000000000000",
+      p_user: "00000000-0000-0000-0000-0000000000ff",
+    },
+    descripcion: "NO pregunta els permisos d'una altra persona",
+  },
+  {
+    tabla: "puc_pujar_document_extern",
+    op: "rpc",
+    esperado: "permitir",
+    args: { p_objeto_tipo: "cierre_donante", p_objeto_id: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "pot preguntar pels SEUS permisos (respon false, sense error)",
+  },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -416,6 +479,42 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_codigo: "TEST-ARNES", p_tara: 1 },
       descripcion: "NO fija la tara de un envase (es de pot_aprovar)",
     },
+    // Cierre anual (fase 4). El equipo lo LEE todo y no escribe ninguna de las tres
+    // tablas: los kilos y el importe de un certificado nacen dentro de una RPC o no nacen.
+    {
+      tabla: "cierres_ejercicio",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve los cierres de ejercicio",
+      requiereFixture: "un cierre de prueba de 2026 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "cierres_donante",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el acumulado anual de todos los donantes",
+      requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "cierre_donante_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el detalle que sostiene la cifra",
+      requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    { tabla: "cierres_ejercicio", op: "insertar", esperado: "denegar", descripcion: "NO abre cierres a mano (van por RPC)" },
+    { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO toca el acumulado de un donante" },
+    // El técnico no puede aprobar, así que ninguna acción del cierre es suya. La de `real`
+    // además es del super_admin: es la que consume las series legales del año.
+    { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "real" }, descripcion: "NO obre el tancament REAL (és del super_admin)" },
+    { tabla: "calcular_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula un cierre (es de pot_aprovar)" },
+    // El botón «Tanca l'exercici» tampoco es del técnico: cerrar emite los resúmenes
+    // definitivos y congela el cálculo. Mismo `pot_aprovar()` que calcular.
+    { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca un exercici (és de pot_aprovar)" },
+    { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats (és de pot_aprovar)" },
+    { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
+    // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
+    { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -455,8 +554,47 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "Comprobación del arnés de RLS" },
       limpiar: "borrar_coste_producto",
-      limpiarArgs: { p_producto: "Tomàquet", p_ejercicio: 1999 },
+      // `p_motivo` es obligatorio desde 20261109100500: borrar un coste deja fila en
+      // `costes_producto_hist` con el motivo, igual que sobrescribirlo.
+      limpiarArgs: { p_producto: "Tomàquet", p_ejercicio: 1999, p_motivo: "Limpieza del arnés de RLS" },
       descripcion: "puede fijar el coste por kilo (y lo borra)",
+    },
+    // Cierre anual (fase 4). Sobre un uuid inventado: la autorización pasa y la función
+    // falla después con 22023 («aquest tancament no existeix»), que es lo que el arnés lee
+    // como «dejó pasar», sin dejar ni una fila detrás. Ver la advertencia de la cabecera
+    // sobre por qué `abrir_cierre` no se prueba nunca como «permitir».
+    {
+      tabla: "reiniciar_cierre_prueba",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "puede reiniciar un cierre de prueba (autoriza; el cierre no existe)",
+    },
+    {
+      tabla: "conciliacion_retroactiva",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "Comprobación del arnés de RLS" },
+      descripcion: "puede conciliar a posteriori (autoriza; la canalización no existe)",
+    },
+    // Cerrar un ejercicio, por el mismo camino y por el mismo motivo: sobre un uuid
+    // inventado la autorización pasa y la función falla con 22023 sin dejar rastro. Que un
+    // cierre REAL exija además `es_super_admin()` no se puede comprobar aquí —haría falta
+    // una cabecera real en la base, que es justo lo que ningún arnés debe crear—: lo
+    // verifican las pruebas SQL de 20261109100300, en una transacción con rollback.
+    {
+      tabla: "cerrar_cierre",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "puede cerrar un ejercicio (autoriza; el cierre no existe)",
+    },
+    {
+      tabla: "cierres_donante",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el acumulado anual de todos los donantes",
+      requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
     },
   ],
   productor: [
@@ -507,6 +645,23 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "ve los documentos de SUS albaranes",
       requiereFixture: "un REC emitido de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // Cierre anual (fase 4): el donante ve SU acumulado y SU detalle. Las dos fichas de
+    // prueba son `es_test`, que es lo que les da acceso al cierre de PRUEBA; una ficha
+    // real solo vería los cierres reales.
+    {
+      tabla: "cierres_donante",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve SU acumulat anual (només el seu)",
+      requiereFixture: "un cierre de prueba calculado con su ficha (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    {
+      tabla: "cierre_donante_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el detall del SEU acumulat",
+      requiereFixture: "un cierre de prueba calculado con su ficha (scripts/crear-datos-documentales-prueba.ts)",
     },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
@@ -561,6 +716,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // asunto suyo. Esto sí es una política, no falta de datos: el fixture crea una
     // espigolada y el equipo la ve.
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "NO ve la espigolada de origen" },
+    // Ni el cierre del donante del que ha recibido: el certificado es del donante.
+    { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO ve l'acumulat anual de cap donant" },
+    { tabla: "cierre_donante_lineas", op: "leer", esperado: "denegar", descripcion: "NO ve les línies de cap tancament" },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -573,6 +731,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
+    { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -591,6 +750,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
+    { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
@@ -618,6 +778,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve los albaranes de SUS dos organizaciones",
       requiereFixture: "un albarán de la ficha de productor o de entidad de esta cuenta",
     },
+    // Su ficha de productor es REAL y no es `es_test`, así que no ve ningún cierre de
+    // prueba —tampoco el suyo, si lo tuviera—. Es una política, no falta de datos: el
+    // fixture crea el cierre y el equipo lo ve.
+    { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO veu cap acumulat anual (fitxa real, cap tancament real)" },
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
 };
@@ -633,6 +797,10 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // corte sea el permiso y no un `not null`: si cortara un check, la comprobación no
   // diría nada sobre RLS.
   albaranes: { tipo: "REC", estado: "borrador" },
+  // Las dos del cierre: se rellenan lo justo para que lo que corte sea el GRANT —no hay
+  // ninguno de escritura sobre estas tablas— y no un `not null`.
+  cierres_ejercicio: { ejercicio: 2020, modo: "prueba" },
+  cierres_donante: { productor_id: "00000000-0000-0000-0000-000000000000" },
   espigoladas: { fecha: "1999-01-01" },
   costes_producto: { producto: "Tomàquet", ejercicio: 1999, coste_kg: 1, motivo: "TEST-RLS" },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial

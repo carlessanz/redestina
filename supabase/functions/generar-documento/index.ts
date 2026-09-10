@@ -30,6 +30,9 @@ import { renderEnt } from "../_shared/pdf/render/ent.ts";
 import { renderOpe } from "../_shared/pdf/render/ope.ts";
 import { type LineaProva, renderProva } from "../_shared/pdf/render/prova.ts";
 import { renderRec } from "../_shared/pdf/render/rec.ts";
+import type { DatosCierre } from "../_shared/pdf/render/cierre.ts";
+import { renderRes } from "../_shared/pdf/render/res.ts";
+import { renderCd } from "../_shared/pdf/render/cd.ts";
 
 // Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
 // resuelve el esquema a `never` y las llamadas dejan de compilar (misma nota que en
@@ -41,6 +44,9 @@ type Cliente = any;
 const ACTIVOS = new URL("./activos/", import.meta.url);
 
 const BUCKET = "documentos";
+/** Bucket privado con la firma y el sello de la apoderada (20260928100600). */
+const BUCKET_ACTIVOS = "activos";
+const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/$/, "");
 
 interface FilaDocumento {
   id: string;
@@ -58,6 +64,9 @@ interface FilaDocumento {
   ruta: string | null;
   estado: string;
   fichero_at: string | null;
+  /** Intención de envío que dejó la RPC de emisión: destinatario, asunto y —solo en el
+   *  resumen— el token del enlace de subida de factura. Nunca se registra en el log. */
+  envio: Record<string, unknown> | null;
 }
 
 function json(body: unknown, status = 200): Response {
@@ -112,7 +121,7 @@ Deno.serve(async (req) => {
   const { data, error } = await supabase
     .from("documentos")
     .select(
-      "id, tipo, subtipo, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, plantilla_id, ruta, estado, fichero_at",
+      "id, tipo, subtipo, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, plantilla_id, ruta, estado, fichero_at, envio",
     )
     .eq("id", documentoId)
     .maybeSingle();
@@ -200,6 +209,77 @@ Deno.serve(async (req) => {
   }
 });
 
+
+// ---------------------------------------------------------------------------
+// Lo que el certificado necesita y el snapshot NO lleva
+// ---------------------------------------------------------------------------
+// `cierre_datos_certificado()` deja fuera `apoderada_dni` a propósito: `documentos.datos`
+// lo lee el propio donante desde su panel, y el DNI de una persona del equipo no tiene por
+// qué llegarle. Está fuera incluso del GRANT de SELECT de `parametros_documentales`
+// (20260928100400), así que solo se puede leer desde aquí, con `service_role`, y solo para
+// estamparlo en el papel que lo exige.
+//
+// La firma y el sello son PNG del bucket privado `activos`. Los dos son opcionales: sin
+// ellos el certificado se imprime con el espacio en blanco para firmar a mano, que es
+// mejor que no poder emitirlo (§cd.ts).
+
+interface ActivosFirma {
+  apoderadaDni: string | null;
+  firmaPng: Uint8Array | null;
+  selloPng: Uint8Array | null;
+  msDescarga: number;
+}
+
+async function activosFirma(supabase: Cliente): Promise<ActivosFirma> {
+  const t0 = performance.now();
+  const vacio: ActivosFirma = { apoderadaDni: null, firmaPng: null, selloPng: null, msDescarga: 0 };
+
+  const { data, error } = await supabase
+    .from("parametros_documentales")
+    .select("id, apoderada_dni, firma_ruta, sello_ruta")
+    .eq("id", 1)
+    .maybeSingle();
+  if (error || !data) {
+    console.warn("generar-documento: parametros_documentales:", error?.message ?? "sin fila");
+    return vacio;
+  }
+
+  const bajar = async (ruta: string | null): Promise<Uint8Array | null> => {
+    if (!ruta) return null;
+    const { data: fichero, error: err } = await supabase.storage
+      .from(BUCKET_ACTIVOS)
+      .download(ruta);
+    if (err || !fichero) {
+      console.warn("generar-documento: activo no descargado:", ruta, err?.message);
+      return null;
+    }
+    return new Uint8Array(await fichero.arrayBuffer());
+  };
+
+  const [firmaPng, selloPng] = await Promise.all([
+    bajar(data.firma_ruta as string | null),
+    bajar(data.sello_ruta as string | null),
+  ]);
+
+  return {
+    apoderadaDni: ((data.apoderada_dni as string | null) ?? "").trim() || null,
+    firmaPng,
+    selloPng,
+    msDescarga: performance.now() - t0,
+  };
+}
+
+/**
+ * La URL con la que el donante sube su factura. El token vive en `documentos.envio`
+ * —lo dejó ahí `emitir_resumen()`— y **no se registra en ningún log**: es una credencial
+ * al portador con 60 días de vida. Sin token, el resumen se imprime sin enlace y lo dice.
+ */
+function enlaceFactura(envio: Record<string, unknown> | null): string | null {
+  const token = typeof envio?.token === "string" ? envio.token.trim() : "";
+  if (!token) return null;
+  return `${APP_URL}/factura/${encodeURIComponent(token)}`;
+}
+
 /**
  * La plantilla legal con la que se emitió ESTE documento, no la vigente de hoy.
  *
@@ -254,6 +334,45 @@ async function renderizar(
     if (tipoBase === "REC") return await renderRec(activos, op);
     if (tipoBase === "ENT") return await renderEnt(activos, op);
     return await renderOpe(activos, op);
+  }
+
+  // El cierre anual: resumen y certificado. Comparten snapshot y esqueleto (`cierre.ts`)
+  // y son los únicos, con el futuro CT, que imprimen euros.
+  if (doc.tipo === "RES" || doc.tipo === "CD") {
+    const base = {
+      datos: datos as DatosCierre,
+      sha256Datos: doc.sha256_datos,
+      plantilla: await plantillaDe(supabase, doc.plantilla_id),
+      modo: doc.modo === "prueba" ? ("prueba" as const) : ("real" as const),
+      subtipo: doc.subtipo,
+    };
+    if (doc.tipo === "RES") {
+      return await renderRes(activos, {
+        ...base,
+        enlaceFactura: enlaceFactura(doc.envio),
+        enlaceDias: 60,
+      }, doc.idioma);
+    }
+    const firma = await activosFirma(supabase);
+    if (firma.msDescarga > 1) {
+      console.log(JSON.stringify({
+        fn: "generar-documento",
+        activos_firma_ms: Number(firma.msDescarga.toFixed(1)),
+        firma: firma.firmaPng !== null,
+        segell: firma.selloPng !== null,
+      }));
+    }
+    return await renderCd(activos, {
+      ...base,
+      apoderadaDni: firma.apoderadaDni,
+      firmaPng: firma.firmaPng,
+      selloPng: firma.selloPng,
+      // ⚠️ Un certificado rectificado NO cambia de tipo (`documentos.tipo` no tiene
+      // `R-CD`): `rectificar_certificado()` emite otra versión del mismo CD con el mismo
+      // número y añade `motiu_rectificacio` al snapshot. Eso es lo que hay que mirar.
+      rectificativo: typeof (datos as DatosCierre).motiu_rectificacio === "string" &&
+        (datos as DatosCierre).motiu_rectificacio !== "",
+    }, doc.idioma);
   }
 
   switch (doc.tipo) {

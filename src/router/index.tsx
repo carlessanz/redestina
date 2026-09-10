@@ -30,6 +30,7 @@ import Albarans from '../routes/equip/Albarans'
 import AlbaraDetall from '../routes/equip/AlbaraDetall'
 import { EspigoladaDetall, NovaEspigolada } from '../routes/equip/Espigolades'
 import Confirmar from '../routes/public/Confirmar'
+import Factura from '../routes/public/Factura'
 import Aprovacions from '../routes/equip/Aprovacions'
 import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
 import NovaOferta from '../routes/productor/NovaOferta'
@@ -48,6 +49,7 @@ export const router = createBrowserRouter([
       { path: '/admin', element: <LoginEquip /> },
       { path: '/registre', element: <Registre /> },
       { path: '/confirmar/:token', element: <Confirmar /> },
+      { path: '/factura/:token', element: <Factura /> },
       { path: '/restablir', element: <RestablirClau /> },
 
       // ── Privada ──

@@ -45,7 +45,11 @@ export default function AppShell() {
   // /equip, /productor y /receptor—, así que nunca pasa de 4.
   const grups = navPerRol(rolActiu)
   const items = itemsPlans(grups)
-  const ambBarraInferior = rolActiu !== 'intern' && items.length > 0 && items.length <= 5
+  // La barra inferior reparte el ancho a partes iguales: a 360 px, cinco entradas
+  // desbordan hasta 94 px con las etiquetas en catalán (medido). Las marcadas
+  // `barra: false` se quedan solo en el menú lateral. Ver el comentario de `NavItem`.
+  const itemsBarra = items.filter((i) => i.barra !== false)
+  const ambBarraInferior = rolActiu !== 'intern' && itemsBarra.length > 0 && itemsBarra.length <= 4
 
   // Contadores del menú del equipo. Se calculan una vez aquí y se reparten, para no
   // repetir la consulta en cada sección.
@@ -142,7 +146,7 @@ export default function AppShell() {
             render (`useIsMobile()` devuelve false hasta que corre su efecto). */}
         {rolActiu !== 'intern' && <AvisInstallacio ambBarraInferior={ambBarraInferior} />}
 
-        {ambBarraInferior && <BottomNav items={items} />}
+        {ambBarraInferior && <BottomNav items={itemsBarra} />}
       </SidebarInset>
     </SidebarProvider>
   )

@@ -164,3 +164,104 @@ export async function esperarGeneracio(
   if (senyal?.aborted) return { resultat: 'cancellat', estado, motiuKey: null }
   return { resultat: 'espera_esgotada', estado, motiuKey: MOTIU_ESPERA.espera_esgotada }
 }
+
+// ---------------------------------------------------------------------------
+// Subida de un documento ajeno (la factura del donante, su albarán en papel)
+// ---------------------------------------------------------------------------
+// Va por la Edge Function `subir-documento-externo` y no por Storage por la misma razón
+// que la descarga: el bucket no tiene ninguna política para `authenticated`. Y aquí hay
+// además tres reglas que una política de Storage no sabría decir —qué MIME se acepta,
+// cuánto puede pesar y en qué carpeta va— y que la función sí dice.
+//
+// ⚠️ Hoy la función **solo deja subir a un albarán** si quien sube no es del equipo: la
+// rama de `cierre_donante` para el titular todavía no está abierta y responde `403`. Por
+// eso `forbidden` tiene su propia frase, que manda al enlace del correo del resumen en
+// vez de decir «no tienes permiso», que sería verdad pero no ayudaría a nadie.
+
+export type CodiPujada =
+  | 'unauthorized' | 'forbidden' | 'no_existeix' | 'cos_invalid' | 'dades_invalides'
+  | 'falta_fitxer' | 'fitxer_buit' | 'massa_gran' | 'mime_no_acceptat'
+  | 'sense_carpeta' | 'error_storage' | 'error_bd' | 'xarxa' | 'desconegut'
+
+const MOTIU_PUJADA: Record<CodiPujada, string> = {
+  unauthorized: 'doc.err_sessio',
+  forbidden: 'mydoc.err_pujada_permis',
+  no_existeix: 'doc.err_no_existeix',
+  cos_invalid: 'doc.err_peticio',
+  dades_invalides: 'doc.err_peticio',
+  falta_fitxer: 'mydoc.err_falta_fitxer',
+  fitxer_buit: 'mydoc.err_fitxer_buit',
+  massa_gran: 'mydoc.err_massa_gran',
+  mime_no_acceptat: 'mydoc.err_mime',
+  sense_carpeta: 'doc.err_servidor',
+  error_storage: 'doc.err_servidor',
+  error_bd: 'doc.err_servidor',
+  xarxa: 'doc.err_xarxa',
+  desconegut: 'doc.err_generic',
+}
+
+export interface Pujada {
+  id: string
+  ruta: string
+  sha256: string | null
+  bytes: number | null
+  nombre: string
+}
+
+export type ResultatPujada =
+  | { ok: true; data: Pujada }
+  | { ok: false; codi: CodiPujada; motiuKey: string }
+
+/** Sube un fichero (PDF, JPG o PNG, hasta 10 MB) y lo enlaza con un objeto del circuito. */
+export async function pujarDocumentExtern(camps: {
+  fitxer: File
+  objecteTipus: 'albaran' | 'cierre_donante'
+  objecteId: string
+  tipus: 'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+  numero?: string | null
+  data?: string | null
+}): Promise<ResultatPujada> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return { ok: false, codi: 'unauthorized', motiuKey: MOTIU_PUJADA.unauthorized }
+
+    const form = new FormData()
+    form.append('fitxer', camps.fitxer)
+    form.append('objeto_tipo', camps.objecteTipus)
+    form.append('objeto_id', camps.objecteId)
+    form.append('tipo', camps.tipus)
+    if (camps.numero) form.append('numero', camps.numero)
+    if (camps.data) form.append('fecha', camps.data)
+
+    // Sin `Content-Type` a mano: el navegador tiene que poner el `boundary` del multipart.
+    const res = await fetch(`${supabaseUrl}/functions/v1/subir-documento-externo`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    const cos = (await res.json().catch(() => null)) as
+      | (Partial<Pujada> & { code?: string })
+      | null
+
+    if (!res.ok || !cos?.id) {
+      const codi = typeof cos?.code === 'string' && cos.code in MOTIU_PUJADA
+        ? cos.code as CodiPujada
+        : res.status === 401 ? 'unauthorized' : res.status === 403 ? 'forbidden' : 'desconegut'
+      return { ok: false, codi, motiuKey: MOTIU_PUJADA[codi] }
+    }
+
+    return {
+      ok: true,
+      data: {
+        id: cos.id,
+        ruta: cos.ruta ?? '',
+        sha256: cos.sha256 ?? null,
+        bytes: cos.bytes ?? null,
+        nombre: cos.nombre ?? camps.fitxer.name,
+      },
+    }
+  } catch {
+    return { ok: false, codi: 'xarxa', motiuKey: MOTIU_PUJADA.xarxa }
+  }
+}

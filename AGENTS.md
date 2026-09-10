@@ -206,6 +206,18 @@ títulos e Inter para el cuerpo; la fuente de verdad es `design/tokens.json`, §
 `src/`. Iconos `lucide-react`, toasts `sonner`, `cn()` en `src/lib/utils.ts`. El logo en sus seis
 variantes, el favicon y los iconos están en `public/` (§2bis).
 
+⚠️ **La barra inferior de móvil admite CUATRO entradas, no cinco, y va al límite.** Reparte el
+ancho a partes iguales con `flex-1`, así que a 360 px cada celda da ~90 px y las etiquetas de este
+proyecto piden 66-112 px —son largas a propósito: `nav.ts` las elige únicas entre paneles para que
+los tooltips del menú plegado no se repitan (§2bis, `text-nav`)—. Medido: con cuatro entradas la
+barra pide **exactamente 360 px** en los dos paneles; con cinco pedía **393** y desbordaba. Y
+`truncate` **no** lo arregla: el `li` es `flex-1` y un flex item con `min-width: auto` no encoge por
+debajo de su contenido, así que el `nowrap` convierte el salto de línea en desbordamiento.
+Consecuencias: una entrada que no quepa se marca **`barra: false`** en `NavItem` y se queda solo en
+el menú lateral (hoy, «Nova oferta» en productor —ya es `primari` y cabe dentro de Inici— e
+«Històric» en receptor); y **cualquier etiqueta nueva o traducción más larga rompe la barra**, así
+que al añadir una hay que medirla, no estimarla.
+
 **Layout** (desde 2026-07-30): **menú lateral vertical plegable** (`sidebar` de shadcn: 16rem ↔ 3rem
 en modo icono, estado en cookie, atajo Ctrl/Cmd+B) + barra superior de 14 con el título de la
 sección y el menú de la persona (idioma y salir). En móvil el menú se abre como panel deslizante y,
@@ -760,6 +772,28 @@ desactivada** hasta que la Fundación dé la lista de taras.
 Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
 todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
 
+**Cierre anual (fase 4, `20261109*`)** — `cierres_ejercicio`, `cierres_donante` y
+`cierre_donante_lineas`. **`modo` (`prueba`/`real`) vive en el dato**, con un único parcial
+`(ejercicio) where modo = 'real'`: varios ensayos por año, **un solo cierre real**.
+`cierres_donante` guarda el acumulado del donante (kg, valor, `bloqueos jsonb`, `resumen_numero`,
+`certificado_numero`, la factura citada y la excepción de D4) y `cierre_donante_lineas` el detalle
+**congelado** por canalización, con `albaran_rec_id` y la marca `retroactiva`.
+
+`bloqueos` = `[{codigo, detall, bloqueja}]`. Bloquean de verdad `sense_conciliar`, `sense_cost` y
+`dades_fiscals`; `sense_rec` y `certificat_desactualitzat` solo avisan. ⚠️ `sense_rec` **no puede
+bloquear**: las canalizaciones de 2026 que ya existen no tienen albarán, y con un bloqueo el ensayo
+del plan sería inejecutable. Lo que las separa del cierre real es `retroactiva`, que `cierre_base()`
+excluye cuando `modo = 'real'`.
+
+**Ninguna de las tres tiene GRANT de escritura para nadie**: todo entra por RPC. RLS `es_intern()`, y
+el donante ve su fila por `cierres_donante_meus()` —los cierres de **prueba** solo si su ficha es
+`es_test`, para que un donante real no se encuentre en su panel un acumulado sin valor fiscal—.
+Series `P-RES`/`P-CD` en prueba; `reiniciar_cierre_prueba()` las devuelve a 0 **sin tocar
+canalizaciones ni albaranes**.
+
+Job `congelar-ejercicio` en `pg_cron` a `59 22 31 12 *` **UTC**, que son las 23:59 de Madrid en
+horario de invierno.
+
 ⚠️ **Cuatro columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
 `enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad` y
 `parametros_documentales.apoderada_dni`. RLS no sabe restringir columnas; el GRANT sí (mismo
@@ -950,6 +984,27 @@ funciones, no políticas:
 | `fijar_coste_producto` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto` (`es_super_admin()`) | El valor fiscal y las taras. Borrar existe porque un coste fijado en el ejercicio equivocado no tenía vuelta atrás |
 | `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
 | `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
+| `abrir_cierre` · `calcular_cierre` · `emitir_resumen` · `registrar_factura` · `simular_factura` · `emitir_certificado` · `marcar_enviado` · `marcar_declarado` · `rectificar_certificado` · `reiniciar_cierre_prueba` · `conciliacion_retroactiva` | El ciclo del cierre anual. `abrir_cierre` en modo real exige `es_super_admin()`; `simular_factura` solo existe en cierres de prueba |
+| `cierre_base` · `cierre_pendents` · `datos_182` · `comparar_cierre_prueba` · `provincia_por_cp` | Las consultas. La base de cálculo son donaciones **conciliadas** con la fecha de recogida dentro del año **en hora de Madrid**, con los kilos del REC conciliado repartidos entre las canalizaciones del registro (D13) |
+| `cerrar_cierre(cierre)` | Cierra **un** cierre por su uuid: recalcula, emite los resúmenes definitivos y pasa a `tancat`. `pot_aprovar()`, y **`es_super_admin()` si el cierre es real** |
+| `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
+| `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
+
+⚠️ **Cerrar el cierre real exige `es_super_admin()`; el de prueba, solo `pot_aprovar()`.** No es
+simetría con `abrir_cierre`: es que **cerrar es el acto irreversible**. Abrir consume la serie del
+año; cerrar emite los resúmenes definitivos con los que se le pide la factura al donante y congela
+el cálculo, y a partir de ahí toda corrección pasa por `rectificar_certificado()`, que numera una
+rectificativa — el error de un clic no se deshace, se documenta. Un cierre de prueba no tiene
+ninguna de esas consecuencias, y exigir el super_admin ahí solo conseguiría que el ensayo no se
+hiciera.
+
+⚠️ **`emitir_certificado()` se niega mientras `parametros_documentales.datos_provisionales` sea
+`true`**, citando el CIF sembrado. Un certificado con efecto fiscal no puede salir con un CIF
+inválido; cierra la deuda 56.
+
+⚠️ **Una guarda escrita como `es_intern()` a secas deja fuera a `service_role` en silencio.** Pasó
+con `datos_182`: devolvía **0 filas**, indistinguible de «este cierre no tiene certificados». La
+forma correcta en todo el circuito es `auth.uid() is not null and not es_intern()`.
 
 ⚠️ **`auth.uid() is null` significa `service_role`.** Las RPC documentales comprueban el rol solo
 cuando hay sesión de usuario (`if auth.uid() is not null and not es_super_admin() then raise`),
@@ -1549,6 +1604,15 @@ que administran, y para recibir algo hay que tener ya una cuenta con un rol conc
 un correo nuestro a cualquier dirección con cuenta; sigue respondiendo el 200 genérico de siempre, que no
 revela si el correo existe ni si pasó el gate.
 
+**Barrera del modo prueba de un documento** (`destinatariosPrueba` en `_shared/gate.ts`, fase 4) —
+con `documentos.modo = 'prueba'` solo pasan las direcciones de una organización `es_test` y el buzón
+`parametros_documentales.email_equipo`, **aunque `test_mode` esté apagado**. Y esa es toda la
+cuestión: el modo test global se apaga el día que Redestina sale a producción, pero los cierres de
+prueba se siguen ensayando **cada diciembre**, así que un resumen o un certificado de ensayo no
+puede llegar nunca a un donante real. Es la **segunda** barrera —`cierre_destinatario()` en SQL ya
+elige a quién se escribe—, y su fail-safe es el de siempre: si no se puede leer el buzón del equipo,
+esa dirección se bloquea.
+
 **Gate de la lista de test de Meta** (segunda barrera, requisito técnico del entorno de test): si
 `meta_test_recipients` tiene alguna fila y el destinatario **no** está en ella →
 `403 no_test_recipient`. Si la tabla está **vacía**, no restringe (§4). Es defensa en
@@ -1723,6 +1787,28 @@ Límite real del canal WhatsApp (§8): solo llega a números de `meta_test_recip
 la única que hay es `hello_world`, que no admite variables—. Para el resto de las cuentas, correo.
 Mandarlo por WhatsApp de forma general exigiría número de producción y una plantilla de categoría
 `AUTHENTICATION` (checkpoint §12.2).
+
+### Subida de la factura del donante (fase 4)
+
+`GET /enlace-publico?t=` con propósito `subida_factura` devuelve el resumen del donante (número,
+ejercicio, kg, **importe esperado**, bloqueos, modo y el PDF del resumen firmado 60 s).
+`POST { t, accion:'subir_factura', numero, fecha?, importe?, fitxer }` acepta **multipart** o JSON
+con `fitxer_base64` (PDF/JPG/PNG, ≤10 MB): sube a la ruta de `ruta_documento(… 'externs' …)` **con
+el modo del cierre**, deja la fila en `documentos_externos` (`tipo='factura'`, `origen='enlace'`) y
+llama a `registrar_factura()`, que decide `coincident`/`discrepancia`/`factura_rebuda`. Si el
+registro falla se borran fichero y fila. Deja evidencia `subida` y **el token se consume**
+(reintento → 409). El otro camino es el panel del donante, y los dos resuelven el permiso con
+`puc_pujar_document_extern()`.
+
+⚠️ **El DNI de la apoderada y los PNG de firma y sello no viajan en `documentos.datos`**: los lee
+`generar-documento` con `service_role` de `parametros_documentales` y del bucket `activos`, y solo
+para estamparlos. `documentos.datos` lo lee el donante por `documents_meus()`; meter ahí el DNI
+anularía el GRANT por columnas. Para emitir un certificado real hacen falta, además de
+`datos_provisionales = false`, el `apoderada_dni`, la `firma_ruta` y el `sello_ruta`.
+
+⚠️ **El resumen anual SÍ lleva importes; los albaranes no.** La regla «ningún importe» es de los
+documentos legales de entrega (REC/ENT/OPE), no del resumen: su función es justamente pedirle al
+donante una factura por una cifra concreta (anexo B.1).
 
 ### Recordatorios de enlaces (`recordatorios-documentales`)
 
@@ -2462,12 +2548,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     ninguna política cambie ni ningún test de RLS lo note**. Hoy lo vigila el arnés con cuatro
     checks dedicados; el arreglo de verdad es no volver a escribir nunca un GRANT masivo sobre
     `all tables`, y añadir el `revoke` correspondiente si alguna vez se hace.
-56. **`parametros_documentales` está sembrada con datos provisionales, y nada impide todavía
-    emitir con ellos.** La fila lleva `datos_provisionales = true`, textos que dicen
-    `PROVISIONAL — pendent de …` y un CIF inválido a propósito, pero **ninguna RPC comprueba ese
-    flag antes de emitir**: hoy solo protege que se vea a simple vista en el PDF. Cuando la fase 4
-    emita certificados con efecto fiscal, `emitir_certificado()` tiene que negarse mientras el
-    flag esté puesto.
+56. ~~**`parametros_documentales` está sembrada con datos provisionales, y nada impide emitir con
+    ellos.**~~ — **resuelta (fase 4)**: `emitir_certificado()` es quien lo comprueba, y levanta
+    `42501` citando el CIF sembrado. Un certificado con efecto fiscal no sale con un CIF inválido.
+    Sustituir los datos reales sigue siendo checkpoint de negocio (§12 checkpoint 10).
 
 57. **El recordatorio de un enlace no llega a quien tiene que responder.** Llega al equipo,
     porque el token no se puede reconstruir desde su hash (§9). Cierra el circuito, pero mete una
@@ -2513,6 +2597,38 @@ Redestina en producción real quedan pasos de configuración y negocio.
     se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
 68. **El OPE no tiene interfaz propia para sus dos confirmaciones.** `marcar_entregado` crea los dos
     enlaces y la ficha los enseña, pero sin distinguir quién es cada parte.
+
+69. **La fecha del cierre no es siempre la de recogida.** `cierre_base()` usa
+    `coalesce(data_hora_recollida, conciliada_at, created_at)` porque hoy `data_hora_recollida` está
+    **vacía en todas las canalizaciones** —ni `repartir_espigolada` ni `aprovar_resposta` la
+    escriben— y sin ese respaldo el cierre saldría vacío. En el filo del 31 de diciembre el año
+    podría salir mal; lo tapa el job, que congela esa misma noche. Se cierra de verdad escribiendo
+    la fecha al emitir el albarán.
+70. **Los kilos por línea del cierre son derivados, no medidos.** D13 manda certificar el neto del
+    albarán de recepción, pero las líneas tienen que ser por canalización para saber a qué entidades
+    llegó el producto: el neto se reparte proporcionalmente a `kg_conciliados`, con el residuo del
+    redondeo a la línea mayor. Con un rechazo grande en un solo lote, ese lote absorbe parte de la
+    merma. **El total del donante —lo único que sale en el certificado y en el 182— es exacto.**
+71. **No hay plantillas `RES` ni `CD` sembradas** (el texto es material de la fase 0), así que
+    `documentos.plantilla_id` sale `null` en los dos, igual que en REC/ENT/OPE.
+72. **`abrir_cierre` no se puede probar como «permitir» en el arnés**: dejaría una cabecera de
+    cierre y no hay RPC que la borre. Se cubre por el lado del «denegar», y con
+    `reiniciar_cierre_prueba`/`conciliacion_retroactiva` sobre un uuid inventado.
+
+73. **El camino feliz de los recordatorios de factura no se puede probar en local.** `sendEmail()`
+    exige `RESEND_API_KEY` y **no tiene modo simulado**, al revés que `WHATSAPP_ENVIO_REAL`, que sí
+    permite ensayar el envío sin salir a la red. Solo se ejercitan la selección y el fail-safe (si
+    el correo no sale, los contadores no se mueven). Un `RESEND_ENVIO_REAL` equivalente cerraría
+    este hueco y el de la deuda 59.
+74. **El recordatorio al donante no lleva enlace**, por lo mismo que el de los convenios (deuda 57):
+    de `enlaces_token` solo se guarda el hash. Le dice que use el del resumen o su panel.
+75. **`documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla**, así
+    que el donante puede leer su propio token. Es inocuo —es suyo— pero **`envio` no debe pintarse
+    tal cual en ninguna pantalla**, y el día que guarde algo de otra persona habrá que pasarlo a
+    GRANT por columnas.
+76. **La filigrana de los documentos de prueba no se puede comprobar con un `grep` literal**:
+    `pdftotext` la trocea porque va girada 45°. Cualquier verificación automática tiene que buscar
+    fragmentos (`PR`, `O`, `V`, `A`…), no la frase entera.
 
 ## 13. Al terminar cualquier cambio
 

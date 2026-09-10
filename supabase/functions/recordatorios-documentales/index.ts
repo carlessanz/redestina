@@ -46,15 +46,22 @@
 //    sin que nadie se haya enterado de nada, y ese enlace ya solo tendría una
 //    oportunidad más.
 //
-// FASE 4 (cierre anual): aquí se añadirá el segundo bloque, las **facturas
-// pendientes** de `cierres_donante` (mismos hitos de 7 y 14 días sobre sus propios
-// `recordatorios` / `ultimo_recordatorio_at`, y a los 14 días marcar
-// `requiere_llamada`). Está fuera a propósito: esa tabla todavía no existe. El sitio
-// donde va está marcado más abajo.
+// SEGUNDO BLOQUE (fase 4): las **facturas pendientes** del cierre anual. Mismos hitos
+// de 7 y 14 días, pero sobre `cierres_donante.recordatorios` y con **destinatario
+// distinto**: aquí sí se le escribe al donante, porque lo que se le pide no es que use
+// un enlace que no podemos reenviar, sino que nos haga llegar su factura —y eso lo
+// puede hacer desde su panel o pidiendo un enlace nuevo—. A los 14 días se marca
+// `requiere_llamada`, que es el filtro de la bandeja del equipo (decisión D del plan:
+// no hay módulo de tareas y no se crea uno).
+//
+// ⚠️ Los enlaces con propósito `subida_factura` quedan FUERA del primer bloque
+//    (`.neq('proposito', …)`): los lleva este segundo con su propio contador. Sin esa
+//    exclusión, el mismo enlace consumiría dos contadores distintos y el equipo
+//    recibiría dos avisos de lo mismo la misma mañana.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { esEmailTest, modoTestActivo } from "../_shared/gate.ts";
+import { destinatariosPrueba, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com")
@@ -111,7 +118,10 @@ type Motivo =
   | "no_test_user" // modo test activo y el destinatario no es es_test
   | "limit_execucio" // pasó del tope de esta ejecución
   | "sense_email_equip" // `parametros_documentales.email_equipo` está vacío
-  | "error_email"; // Resend no aceptó el resumen
+  | "error_email" // Resend no aceptó el resumen
+  | "sense_enllac_factura" // la factura no tiene enlace del que contar los días
+  | "sense_destinatari_donant" // `cierre_destinatario()` no puede decidir a quién escribir
+  | "mode_prova_bloqueja"; // cierre de prueba y el destinatario no es es_test ni el equipo
 
 type Resultado =
   | { toca: true; hito: number; dias: number }
@@ -211,6 +221,247 @@ function cuerpoResumen(vencidos: Vencido[], ahoraMs: number): string {
 </table>`;
 }
 
+// ---------------------------------------------------------------------------
+// Las facturas pendientes (fase 4)
+// ---------------------------------------------------------------------------
+
+// Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
+// resuelve el esquema a `never` (misma nota que en `generar-documento` y `_shared/gate.ts`).
+// deno-lint-ignore no-explicit-any
+type Cliente = any;
+
+interface FilaCierreDonante {
+  id: string;
+  cierre_id: string;
+  estado: string;
+  kg_total: number | null;
+  valor_total: number | null;
+  resumen_numero: string | null;
+  recordatorios: number;
+  ultimo_recordatorio_at: string | null;
+  requiere_llamada: boolean;
+}
+
+interface FacturaPendiente {
+  cd: FilaCierreDonante;
+  hito: number;
+  dias: number;
+  email: string;
+  nombre: string;
+  /** El destinatario NO es el donante: es el buzón del equipo (modo prueba). */
+  forzado: boolean;
+  motivoDestinatario: string;
+  numero: string | null;
+  importe: number | null;
+  kg: number | null;
+  ejercicio: number | null;
+  modo: string;
+  caducaAt: string | null;
+}
+
+/** `850` → `850,00 €`, sin `Intl` (misma razón que en `_shared/pdf/lletres.ts`). */
+function eur(valor: number | null | undefined): string {
+  if (valor === null || valor === undefined || !isFinite(valor)) return "—";
+  const [entera, decimal] = Math.abs(valor).toFixed(2).split(".");
+  const conMillares = entera.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+  return `${valor < 0 ? "-" : ""}${conMillares},${decimal} €`;
+}
+
+/**
+ * Los donantes a los que hoy les toca aviso porque su factura sigue sin llegar.
+ *
+ * Tres cosas que decide esta función y conviene tener juntas:
+ *
+ *   · **De dónde se cuentan los días.** No de `cierres_donante` —que no guarda cuándo se
+ *     mandó el resumen— sino del `enlaces_token` de propósito `subida_factura`, que crea
+ *     `emitir_resumen()` en la misma transacción. Sin enlace no hay reloj y se salta:
+ *     avisar de una factura que nunca se pidió sería avisar de nada.
+ *   · **A quién se escribe.** Lo dice `cierre_destinatario()`, la MISMA función que usó la
+ *     emisión, y no un `productores.email` leído aquí: en modo prueba nunca devuelve el
+ *     correo de un donante real. Si no puede decidir (donante sin correo en un cierre
+ *     real), se salta y el equipo lo verá en la bandeja.
+ *   · **Qué gates se aplican.** Los dos: el modo test global (§8) y, si el cierre es de
+ *     prueba, `destinatariosPrueba()` —que no mira `test_mode` a propósito—. Un ensayo del
+ *     cierre no puede escribirle a un donante de verdad ni el día que Redestina esté en
+ *     producción con el modo test apagado.
+ */
+async function facturasPendientes(
+  supabase: Cliente,
+  ahoraMs: number,
+  modoTest: boolean,
+  salta: (m: Motivo) => void,
+): Promise<{ pendientes: FacturaPendiente[]; revisadas: number }> {
+  // La lista de columnas, en UN literal (§7, deuda 46).
+  const { data, error } = await supabase
+    .from("cierres_donante")
+    .select(
+      "id, cierre_id, estado, kg_total, valor_total, resumen_numero, recordatorios, ultimo_recordatorio_at, requiere_llamada",
+    )
+    .eq("estado", "factura_pendent")
+    .lt("recordatorios", HITOS_DIAS.length)
+    .order("id", { ascending: true })
+    .limit(LIMITE_CONSULTA);
+
+  if (error) {
+    console.error("recordatorios-documentales: select cierres_donante:", error.message);
+    return { pendientes: [], revisadas: 0 };
+  }
+  const candidatas = (data ?? []) as FilaCierreDonante[];
+  if (candidatas.length === 0) return { pendientes: [], revisadas: 0 };
+
+  // El reloj: el enlace de subida vivo de cada donante.
+  const { data: enlaces } = await supabase
+    .from("enlaces_token")
+    .select("id, proposito, objeto_tipo, objeto_id, estado, created_at, caduca_at, usado_at")
+    .eq("proposito", "subida_factura")
+    .eq("objeto_tipo", "cierre_donante")
+    .eq("estado", "activo")
+    .in("objeto_id", candidatas.map((c) => c.id));
+  const reloj = new Map<string, { created_at: string; caduca_at: string }>();
+  for (const e of (enlaces ?? []) as { objeto_id: string; created_at: string; caduca_at: string }[]) {
+    reloj.set(e.objeto_id, { created_at: e.created_at, caduca_at: e.caduca_at });
+  }
+
+  // El ejercicio y el modo, por cierre.
+  const { data: cierres } = await supabase
+    .from("cierres_ejercicio")
+    .select("id, ejercicio, modo, estado")
+    .in("id", [...new Set(candidatas.map((c) => c.cierre_id))]);
+  const porCierre = new Map<string, { ejercicio: number | null; modo: string }>();
+  for (const c of (cierres ?? []) as { id: string; ejercicio: number | null; modo: string }[]) {
+    porCierre.set(c.id, { ejercicio: c.ejercicio, modo: c.modo });
+  }
+
+  const pendientes: FacturaPendiente[] = [];
+  for (const cd of candidatas) {
+    const enlace = reloj.get(cd.id);
+    if (!enlace) {
+      salta("sense_enllac_factura");
+      continue;
+    }
+    const r = tocaAviso(
+      {
+        recordatorios: cd.recordatorios,
+        created_at: enlace.created_at,
+        ultimo_recordatorio_at: cd.ultimo_recordatorio_at,
+      },
+      ahoraMs,
+    );
+    if (!r.toca) {
+      salta(r.motivo);
+      continue;
+    }
+    if (pendientes.length >= MAX_POR_EJECUCION) {
+      salta("limit_execucio");
+      continue;
+    }
+
+    const cierre = porCierre.get(cd.cierre_id) ?? { ejercicio: null, modo: "prueba" };
+
+    // A quién: lo decide SQL, como en la emisión.
+    const { data: dest, error: errDest } = await supabase
+      .rpc("cierre_destinatario", { p_cd: cd.id });
+    const destino = (dest ?? {}) as Record<string, unknown>;
+    const email = String(destino.email ?? "").trim();
+    if (errDest || !email) {
+      if (errDest) console.warn("recordatorios-documentales: cierre_destinatario:", errDest.message);
+      salta("sense_destinatari_donant");
+      continue;
+    }
+
+    // Barrera del cierre de prueba: independiente de `test_mode` (§8, `gate.ts`).
+    const barrera = await destinatariosPrueba(
+      supabase,
+      { modo: cierre.modo, tipo: "RES", numero_completo: cd.resumen_numero, envio: { destinatario: email } },
+      [email],
+    );
+    if (barrera.permitidos.length === 0) {
+      salta("mode_prova_bloqueja");
+      continue;
+    }
+
+    // Y el gate de test global, salvo que el destinatario sea el propio buzón del equipo
+    // (mismo criterio que en el resto del circuito: ese buzón recibe siempre).
+    if (modoTest && !destino.forcat && !(await esEmailTest(supabase, email))) {
+      salta("no_test_user");
+      continue;
+    }
+
+    pendientes.push({
+      cd,
+      hito: r.hito,
+      dias: r.dias,
+      email,
+      nombre: String(destino.nom ?? ""),
+      forzado: destino.forcat === true,
+      motivoDestinatario: String(destino.motiu ?? ""),
+      numero: cd.resumen_numero,
+      importe: cd.valor_total,
+      kg: cd.kg_total,
+      ejercicio: cierre.ejercicio,
+      modo: cierre.modo,
+      caducaAt: enlace.caduca_at,
+    });
+  }
+
+  return { pendientes, revisadas: candidatas.length };
+}
+
+/** El correo al donante. Todo lo que viene de la base va escapado. */
+function cuerpoFactura(f: FacturaPendiente): string {
+  const prova = f.modo === "prueba"
+    ? `<p style="margin:0 0 14px;color:#5f6b5a"><strong>Aquest és un tancament de prova</strong> (${
+      escaparHtml(f.motivoDestinatario)
+    }): no cal fer res.</p>`
+    : "";
+  return `${prova}<p style="margin:0 0 14px">Fa <strong>${f.dias} dies</strong> que et vam enviar el resum anual
+${escaparHtml(f.numero ?? "")} de l'exercici ${f.ejercicio ?? ""} i encara no ens ha arribat la teva factura.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px;margin:0 0 14px">
+  <tr><td style="padding:4px 0;color:#5f6b5a">Import</td><td style="padding:4px 0;text-align:right"><strong>${
+    eur(f.importe)
+  }</strong></td></tr>
+  <tr><td style="padding:4px 0;color:#5f6b5a">Quilos</td><td style="padding:4px 0;text-align:right">${
+    f.kg === null ? "—" : `${f.kg} kg`
+  }</td></tr>
+</table>
+<p style="margin:0 0 14px">Pots pujar-la des de l'enllaç que t'enviàvem amb el resum —encara és vàlid— o des del teu panell a Redestina.
+Si l'has perdut, respon a aquest correu i te'n fem arribar un de nou.</p>`;
+}
+
+/** La segunda tabla del resumen del equipo. */
+function cuerpoFacturas(facturas: FacturaPendiente[]): string {
+  const filas = facturas.map((f) =>
+    `<tr style="border-top:1px solid #e0d9ca">
+      <td style="padding:8px 10px;vertical-align:top">${escaparHtml(f.nombre || "—")}<br>
+        <span style="color:#5f6b5a">${escaparHtml(f.email)}</span></td>
+      <td style="padding:8px 10px;vertical-align:top">${escaparHtml(f.numero ?? "—")}<br>
+        <span style="color:#5f6b5a">exercici ${f.ejercicio ?? ""}${
+      f.modo === "prueba" ? " · prova" : ""
+    }</span></td>
+      <td style="padding:8px 10px;vertical-align:top;white-space:nowrap;text-align:right">${eur(f.importe)}</td>
+      <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${f.dias} dies</td>
+      <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${
+      f.hito >= HITOS_DIAS[HITOS_DIAS.length - 1] ? "Cal trucar" : "Avisat"
+    }</td>
+    </tr>`
+  ).join("\n");
+
+  const n = facturas.length;
+  return `<p style="margin:18px 0 14px">${
+    n === 1 ? "Hi ha <strong>1 factura</strong> pendent" : `Hi ha <strong>${n} factures</strong> pendents`
+  } del tancament anual. Al donant ja se li ha escrit.</p>
+<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px">
+  <tr style="text-align:left;color:#5f6b5a;font-size:12px;text-transform:uppercase;letter-spacing:.5px">
+    <th style="padding:0 10px 6px">Donant</th>
+    <th style="padding:0 10px 6px">Resum</th>
+    <th style="padding:0 10px 6px;text-align:right">Import</th>
+    <th style="padding:0 10px 6px">Enviat fa</th>
+    <th style="padding:0 10px 6px">Estat</th>
+  </tr>
+  ${filas}
+</table>`;
+}
+
 Deno.serve(async (req) => {
   const t0 = performance.now();
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
@@ -249,6 +500,8 @@ Deno.serve(async (req) => {
     )
     .eq("estado", "activo")
     .is("usado_at", null)
+    // Los de factura los lleva el segundo bloque, con su propio contador (ver cabecera).
+    .neq("proposito", "subida_factura")
     .gt("caduca_at", ahoraIso)
     .lt("recordatorios", HITOS_DIAS.length)
     .lt("created_at", hastaIso)
@@ -317,7 +570,14 @@ Deno.serve(async (req) => {
     vencidos.push({ fila, hito: r.hito, dias: r.dias });
   }
 
-  const resumen = (ok: boolean, avisados: number) => {
+  // ---------------------------------------------------------------------------
+  // SEGUNDO BLOQUE — facturas pendientes del cierre anual (fase 4)
+  // ---------------------------------------------------------------------------
+  // Se calcula ANTES de mandar nada: el correo del equipo tiene que ser uno solo, con
+  // las dos listas dentro, y para eso hay que tener las dos antes de escribirlo.
+  const facturas = await facturasPendientes(supabase, ahoraMs, modoTest, salta);
+
+  const resumen = (ok: boolean, avisados: number, avisadasFacturas = 0) => {
     const saltados = candidatos.length - avisados;
     console.log(JSON.stringify({
       fn: "recordatorios-documentales",
@@ -325,59 +585,130 @@ Deno.serve(async (req) => {
       revisados: candidatos.length,
       avisados,
       saltados,
+      factures_revisades: facturas.revisadas,
+      factures_avisades: avisadasFacturas,
       motivos,
       modo_test: modoTest,
       ms_total: Number((performance.now() - t0).toFixed(1)),
     }));
-    return json({ ok, revisados: candidatos.length, avisados, saltados, motivos }, 200);
+    return json({
+      ok,
+      revisados: candidatos.length,
+      avisados,
+      saltados,
+      factures: { revisades: facturas.revisadas, avisades: avisadasFacturas },
+      motivos,
+    }, 200);
   };
 
-  if (vencidos.length === 0) return resumen(true, 0);
+  if (vencidos.length === 0 && facturas.pendientes.length === 0) return resumen(true, 0);
 
+  // ------------------------------------------------- avisos a cada donante
+  // Van uno a uno y ANTES del resumen del equipo: cada uno es un correo distinto a una
+  // persona distinta, y su contador solo se mueve si el suyo salió.
+  let avisadasFacturas = 0;
+  for (const f of facturas.pendientes) {
+    const envioDonante = await sendEmail({
+      to: f.email,
+      subject: `Redestina · falta la teva factura del resum ${f.numero ?? ""}`.trim(),
+      html: plantillaEmail({
+        titulo: "Ens falta la teva factura",
+        preheader: `${f.numero ?? "El resum anual"} · ${eur(f.importe)} · fa ${f.dias} dies.`,
+        cuerpoHtml: cuerpoFactura(f),
+        boton: { texto: "Obre Redestina", url: APP_URL },
+        nota: f.hito >= HITOS_DIAS[HITOS_DIAS.length - 1]
+          ? "Aquest és el segon i darrer avís automàtic. A partir d'ara et trucarà algú de l'equip."
+          : "Si ja ens l'has enviada, no cal que facis res: aquest avís s'atura tot sol quan la registrem.",
+      }),
+    });
+    if (!envioDonante.ok) {
+      console.error(
+        "recordatorios-documentales: factura no avisada:",
+        f.numero,
+        envioDonante.status,
+        JSON.stringify(envioDonante.data),
+      );
+      salta("error_email");
+      continue;
+    }
+
+    // Contador y —al segundo aviso— la bandera de llamada. `.eq('recordatorios', previo)`
+    // por el mismo motivo que en los enlaces: si algo movió la fila por debajo, no se pisa.
+    const previo = f.cd.recordatorios;
+    const { data: tocada, error: errCd } = await supabase
+      .from("cierres_donante")
+      .update({
+        recordatorios: previo + 1,
+        ultimo_recordatorio_at: ahoraIso,
+        // A los 14 días deja de ser un correo y pasa a ser una llamada (decisión D).
+        requiere_llamada: previo + 1 >= HITOS_DIAS.length ? true : f.cd.requiere_llamada,
+      })
+      .eq("id", f.cd.id)
+      .eq("recordatorios", previo)
+      .select("id");
+    if (errCd) {
+      console.error("recordatorios-documentales: update cierres_donante:", errCd.message);
+      motivos["error_contador"] = (motivos["error_contador"] ?? 0) + 1;
+      continue;
+    }
+    avisadasFacturas += (tocada ?? []).length;
+  }
+
+  // ------------------------------------------------------- resumen al equipo
   if (!emailEquipo) {
-    // Sin buzón no hay a quién avisar. No se tocan los contadores: cuando el equipo
-    // rellene `email_equipo` desde Configuració, estos enlaces siguen pendientes y el
-    // aviso sale en la ejecución siguiente.
+    // Sin buzón no hay a quién avisar. No se tocan los contadores de los enlaces: cuando
+    // el equipo rellene `email_equipo` desde Configuració, siguen pendientes y el aviso
+    // sale en la ejecución siguiente.
     for (const _ of vencidos) salta("sense_email_equip");
     console.warn(
-      `recordatorios-documentales: ${vencidos.length} enllaç(os) per avisar i parametros_documentales.email_equipo és buit; no s'envia res.`,
+      `recordatorios-documentales: ${vencidos.length} enllaç(os) per avisar i parametros_documentales.email_equipo és buit; no s'envia el resum.`,
     );
-    return resumen(true, 0);
+    return resumen(true, 0, avisadasFacturas);
   }
 
   const n = vencidos.length;
+  const nf = facturas.pendientes.length;
+  const partes: string[] = [];
+  if (n > 0) partes.push(`${n} enllaç${n === 1 ? "" : "os"} sense resposta`);
+  if (nf > 0) partes.push(`${nf} factura${nf === 1 ? "" : "es"} pendent${nf === 1 ? "" : "s"}`);
+
   const envio = await sendEmail({
     to: emailEquipo,
-    subject: `Redestina · ${n} enllaç${n === 1 ? "" : "os"} sense resposta`,
+    subject: `Redestina · ${partes.join(" · ")}`,
     html: plantillaEmail({
-      titulo: "Enllaços pendents de resposta",
-      preheader: `${n} enllaç${n === 1 ? "" : "os"} sense fer servir a 7 o 14 dies.`,
-      cuerpoHtml: cuerpoResumen(vencidos, ahoraMs),
+      titulo: "Pendents de resposta",
+      preheader: `${partes.join(" i ")} a 7 o 14 dies.`,
+      cuerpoHtml: [
+        n > 0 ? cuerpoResumen(vencidos, ahoraMs) : "",
+        nf > 0 ? cuerpoFacturas(facturas.pendientes) : "",
+      ].filter(Boolean).join("\n"),
       boton: { texto: "Obre Redestina", url: APP_URL },
       // El porqué, dicho al equipo con las mismas palabras que la cabecera de este
       // fichero: quien recibe esto tiene que entender por qué le toca a él y no al bot.
       nota:
-        "Aquest avís va a l'equip i no a les persones destinatàries perquè el sistema <strong>no pot reenviar l'enllaç</strong>: " +
+        "Els <strong>enllaços</strong> els avisem a l'equip i no a les persones destinatàries perquè el sistema <strong>no pot reenviar-los</strong>: " +
         "de cada token només se'n desa l'empremta, i el text original només existeix al correu que es va enviar. " +
         "Per tornar a provar-ho cal revocar l'enllaç i emetre'n un de nou des del panell, o bé trucar. " +
-        "Un enllaç que ja porta dos avisos no en rebrà cap més.",
+        "Les <strong>factures</strong>, en canvi, sí que s'avisen al donant; a partir del segon avís queden marcades per trucar.",
     }),
   });
 
   if (!envio.ok) {
-    // No se suben los contadores: el hito sigue pendiente y se reintenta mañana.
+    // No se suben los contadores de los enlaces: el hito sigue pendiente y se reintenta
+    // mañana. Los de las facturas ya se movieron, y con razón: su correo sí salió.
     console.error(
       "recordatorios-documentales: Resend no acceptó el resumen:",
       envio.status,
       JSON.stringify(envio.data),
     );
     for (const _ of vencidos) salta("error_email");
-    return resumen(false, 0);
+    return resumen(false, 0, avisadasFacturas);
   }
 
-  // Contadores. Se agrupa por el valor previo (0→1, 1→2) para hacer dos UPDATE en vez
-  // de uno por fila; el `.eq('recordatorios', previo)` es el cinturón: si algo hubiera
-  // movido la fila entre el select y esto (un reenvío desde el panel), no se pisa.
+  // Contadores de los enlaces. Se agrupa por el valor previo (0→1, 1→2) para hacer dos
+  // UPDATE en vez de uno por fila; el `.eq('recordatorios', previo)` es el cinturón: si
+  // algo hubiera movido la fila entre el select y esto (un reenvío desde el panel), no se
+  // pisa.
   let avisados = 0;
   for (let previo = 0; previo < HITOS_DIAS.length; previo++) {
     const ids = vencidos
@@ -404,16 +735,5 @@ Deno.serve(async (req) => {
   // correcto por el que equivocarse.
   if (avisados < vencidos.length) motivos["error_contador"] = vencidos.length - avisados;
 
-  // ---------------------------------------------------------------------------
-  // FASE 4 — facturas pendientes de `cierres_donante`
-  // ---------------------------------------------------------------------------
-  // Mismo esquema que lo de arriba sobre `cierres_donante.recordatorios` /
-  // `ultimo_recordatorio_at`, con dos diferencias: el destinatario es el donante (que
-  // sí puede recibir su propio aviso, porque el enlace de subida de factura se puede
-  // reemitir sin romper nada que esté firmado) y, al segundo aviso, hay que marcar
-  // `requiere_llamada = true`. Va en esta misma función y en esta misma ejecución: el
-  // resumen del equipo debe ser uno, no dos correos a la misma hora.
-  // No se implementa aquí porque `cierres_donante` no existe todavía.
-
-  return resumen(true, avisados);
+  return resumen(true, avisados, avisadasFacturas);
 });

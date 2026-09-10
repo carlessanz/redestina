@@ -11,7 +11,8 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, ClipboardCheck, FileText, Handshake, History, Home, LayoutDashboard, Leaf,
+  Building2, Calculator, ClipboardCheck, Coins, FileText, FolderOpen, Handshake, History,
+  Home, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, UserCircle, Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -29,6 +30,18 @@ export interface NavItem {
   comptador?: Comptador
   /** Acción destacada del panel (se pinta como botón, no como enlace). */
   primari?: boolean
+  /**
+   * `false` = fuera de la barra inferior de móvil; sigue en el menú lateral.
+   *
+   * La barra reparte el ancho a partes iguales, así que a 360 px cada celda da ~62 px de
+   * texto y las etiquetas de este proyecto piden 62-113 px (son largas a propósito: §2,
+   * `nav.ts` las elige únicas entre paneles para que los tooltips del menú plegado no se
+   * repitan). Con cinco entradas la barra desborda hasta 94 px en catalán, y `truncate` no
+   * lo arregla: el `li` es `flex-1` y un flex item con `min-width:auto` no encoge por
+   * debajo de su contenido, así que el `nowrap` convierte el salto de línea en
+   * desbordamiento. Cuatro es el máximo real.
+   */
+  barra?: false
 }
 
 export interface NavGrup {
@@ -47,6 +60,8 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
       { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck },
       { to: '/equip/espigolades/nova', labelKey: 'nav.espigolades', icon: Leaf },
+      { to: '/equip/tancament', labelKey: 'nav.tancament', icon: Calculator },
+      { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins },
     ],
   },
   {
@@ -63,10 +78,11 @@ const PRODUCTOR: NavGrup[] = [
   {
     items: [
       { to: '/productor/inici', labelKey: 'nav.home', icon: Home, end: true },
-      { to: '/productor/ofertes/nova', labelKey: 'nav.new_offer', icon: PlusCircle, primari: true },
+      { to: '/productor/ofertes/nova', labelKey: 'nav.new_offer', icon: PlusCircle, primari: true, barra: false },
       // `Sprout` y no `Package`: el panel del equipo ya usa `Package` para «Ofertes», y
       // con los dos menús a la vez el mismo icono dos veces no distingue nada.
       { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true },
+      { to: '/productor/documents', labelKey: 'nav.my_documents', icon: FolderOpen },
       { to: '/productor/perfil', labelKey: 'nav.my_producer_org', icon: UserCircle },
     ],
   },
@@ -77,7 +93,8 @@ const RECEPTOR: NavGrup[] = [
     items: [
       { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true },
       { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake },
-      { to: '/receptor/historic', labelKey: 'nav.history', icon: History },
+      { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
+      { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt },
       { to: '/receptor/perfil', labelKey: 'nav.my_entity', icon: Building2 },
     ],
   },

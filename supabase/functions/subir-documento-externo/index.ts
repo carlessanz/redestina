@@ -31,10 +31,11 @@
 //    sigue viniendo entera de SQL. El arreglo limpio es una `ruta_documento_externo()`
 //    en una migración de `dades`; queda anotado en el informe.
 //
-// QUIÉN PUEDE SUBIR: el equipo, o el titular del objeto. Lo segundo se pregunta a
-// `albarans_de_les_meves_orgs()`, el mismo puente que usa la RLS de `albaranes`, para que
-// la respuesta sea exactamente la misma que daría un `select` desde el navegador. No se
-// reimplementa la regla aquí: se consulta.
+// QUIÉN PUEDE SUBIR: el equipo, o el titular del objeto. Se pregunta con **una sola
+// llamada**, `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` (20261109100400),
+// que responde sí/no y sabe de los dos tipos de objeto —y sabrá de `convenio` y `plan` sin
+// que esta función se entere—. No se reimplementa la regla aquí: se consulta, y se consulta
+// al mismo sitio del que sale lo que se puede leer, para que subir y ver no discrepen.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
@@ -84,6 +85,7 @@ async function rutaExterno(
   tipo: string,
   ejercicio: number,
   extension: string,
+  modo = "real",
 ): Promise<string> {
   const id = crypto.randomUUID();
   const { data, error } = await supabase.rpc("ruta_documento", {
@@ -92,7 +94,7 @@ async function rutaExterno(
     p_tipo: "externs",
     p_numero_completo: id,
     p_version: 1,
-    p_modo: "real",
+    p_modo: modo,
     p_ejercicio: ejercicio,
   });
   if (error) throw Object.assign(new Error(error.message), { code: error.code });
@@ -179,30 +181,61 @@ Deno.serve(async (req) => {
   }
 
   // ---------------------------------------------------------------- permiso
-  // Equipo, o titular del objeto. Se pregunta al mismo puente que usa la RLS para que la
-  // respuesta no pueda discrepar de lo que ve el navegador.
-  if (!ctx.esIntern) {
-    if (objetoTipo !== "albaran") {
-      // `cierres_donante` llega en la fase 4 con su propio puente; hasta entonces, solo
-      // el equipo. Negar es lo correcto: no hay regla escrita que consultar.
-      return responder({ error: "No pots pujar documents d'aquest objecte", code: "forbidden" }, 403);
-    }
-    const { data, error } = await supabase.rpc("albarans_de_les_meves_orgs", { p_user: ctx.userId });
+  // Una pregunta, con la misma respuesta que daría un `select` desde el navegador. Se
+  // hace también para el equipo: la función ya sabe que el equipo puede, y así no hay dos
+  // caminos que un día puedan decir cosas distintas.
+  {
+    const { data, error } = await supabase.rpc("puc_pujar_document_extern", {
+      p_objeto_tipo: objetoTipo,
+      p_objeto_id: objetoId,
+      p_user: ctx.userId,
+    });
     if (error) {
-      console.error("subir-documento-externo: albarans_de_les_meves_orgs:", error.message);
+      console.error("subir-documento-externo: puc_pujar_document_extern:", error.message);
       return responder({ error: "Error comprovant permisos", code: "error_bd" }, 500);
     }
-    const meus = new Set((data ?? []).map((f: unknown) =>
-      typeof f === "string" ? f : String((f as { albarans_de_les_meves_orgs?: string })?.albarans_de_les_meves_orgs ?? "")
-    ));
-    if (!meus.has(objetoId)) {
-      return responder({ error: "Aquest albarà no és teu", code: "forbidden" }, 403);
+    if (data !== true) {
+      return responder(
+        {
+          error: objetoTipo === "albaran"
+            ? "Aquest albarà no és teu"
+            : "Aquest tancament no és teu",
+          code: "forbidden",
+        },
+        403,
+      );
     }
   }
 
-  // El ejercicio decide la subcarpeta del año. Se toma del albarán —el del acto
-  // documentado, no el de hoy— y solo se cae al año actual si todavía no lo tiene.
+  // El ejercicio decide la subcarpeta del año, y el MODO decide si cuelga de `proves/`.
+  // Los dos se toman del acto documentado —no de hoy— y solo se cae al año actual si el
+  // objeto todavía no lo tiene.
+  //
+  // ⚠️ El modo importa en el cierre y no en el albarán: una factura de un cierre de prueba
+  //    tiene que archivarse bajo `proves/`, que es lo único que `reiniciar_cierre_prueba()`
+  //    borra. Guardarla en la carpeta real dejaría un fichero de un ensayo mezclado con los
+  //    documentos de verdad de esa organización, y ya no habría forma de distinguirlos.
   let ejercicio = new Date().getFullYear();
+  let modo = "real";
+  if (objetoTipo === "cierre_donante") {
+    const { data: cd, error: errCd } = await supabase
+      .from("cierres_donante")
+      .select("id, cierre_id, estado")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errCd) {
+      console.error("subir-documento-externo: cierres_donante:", errCd.message);
+      return responder({ error: "Error consultant el tancament", code: "error_bd" }, 500);
+    }
+    if (!cd) return responder({ error: "Aquest tancament no existeix", code: "no_existeix" }, 404);
+    const { data: ce } = await supabase
+      .from("cierres_ejercicio")
+      .select("id, ejercicio, modo, estado")
+      .eq("id", cd.cierre_id)
+      .maybeSingle();
+    if (ce?.ejercicio) ejercicio = ce.ejercicio as number;
+    if (ce?.modo === "prueba") modo = "prueba";
+  }
   if (objetoTipo === "albaran") {
     const { data: alb, error: errAlb } = await supabase
       .from("albaranes")
@@ -230,7 +263,7 @@ Deno.serve(async (req) => {
 
   let ruta: string;
   try {
-    ruta = await rutaExterno(supabase, objetoTipo, objetoId, tipo, ejercicio, extension);
+    ruta = await rutaExterno(supabase, objetoTipo, objetoId, tipo, ejercicio, extension, modo);
   } catch (e) {
     const texto = e instanceof Error ? e.message : String(e);
     console.error("subir-documento-externo: ruta_documento:", texto);

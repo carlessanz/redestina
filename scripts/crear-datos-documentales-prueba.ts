@@ -20,6 +20,9 @@
 //   · documentos, enlaces_token y evidencias reales   -> los tres «requiereFixture» del equipo
 //   · una oferta de `venda` publicada de TEST-PROD-2  -> el receptor comercial deja de ver
 //     un mercado vacío, que era la última saltada estructural del arnés (deuda §12.32)
+//   · un **cierre de prueba de 2026 ya calculado**     -> los dos productores ven su
+//     acumulado anual y sus líneas (fase 4), con TEST-PROD-1 certificable y TEST-PROD-2
+//     bloqueado por datos fiscales: los dos casos de la pantalla de cierre
 //
 // TODO LO QUE TOCA LLEVA PREFIJO `TEST-`. No crea ni modifica ninguna organización real, y
 // el tipo de caja que activa es uno inventado (`TEST-CAIXA`): las taras de verdad las
@@ -65,6 +68,23 @@ const LOTES = [
 // El lote que se confirma con rechazo parcial: 10 kg en mal estado.
 const KG_RECHAZADOS = 10;
 
+// El segundo donante del cierre: existe para que el ensayo tenga un caso BLOQUEADO y una
+// línea `retroactiva`. Ver `prepararCierre()`.
+const PRODUCTO_2 = "Carbassa";
+const COSTE_KG_2 = 0.6;
+const KG_DONACIO_2 = 120;
+const KG_RETRO_2 = 118;
+
+// Datos fiscales de la organización de prueba que SÍ tiene que poder certificar. Son
+// inventados a propósito y se leen como tales: el NIF no es válido (el dígito de control
+// no cuadra), igual que el CIF `G00000000` de `parametros_documentales`.
+const FISCAL_PROD_1 = {
+  nif: "B00000000",
+  direccion: "Carrer de Prova, 1",
+  codigo_postal: "08850",
+  poblacion: "Gavà",
+};
+
 const ejercicio = new Date().getFullYear();
 
 // ---------------------------------------------------------------------------
@@ -92,13 +112,153 @@ async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T>
 }
 
 // ---------------------------------------------------------------------------
+// Lo que el CIERRE ANUAL necesita (fase 4)
+// ---------------------------------------------------------------------------
+// Se ejecuta SIEMPRE, exista ya la espigolada o no: es idempotente y hace falta que se
+// reaplique al añadir cosas al fixture (mismo criterio que los catálogos y las ofertas).
+//
+// Tres cosas que el cierre no puede calcular sin ellas:
+//
+//   1. **Fecha de recogida.** `cierre_base()` filtra por `data_hora_recollida`, y ni el
+//      reparto de una espigolada ni `aprovar_resposta()` la escriben. La RPC cae a
+//      `conciliada_at`, así que el cierre saldría igual — pero entonces el camino
+//      principal no lo probaría nadie. Aquí se rellena.
+//   2. **Datos fiscales.** Sin NIF y domicilio, `calcular_cierre()` bloquea al donante y
+//      no se puede llegar al certificado. TEST-PROD-1 los recibe; **TEST-PROD-2 no**, a
+//      propósito: es el caso bloqueado que hay que ver en la pantalla.
+//   3. **Un donante con conciliación retroactiva.** Es la fuente 2 del plan (las
+//      canalizaciones de 2026 que no tienen albarán). Sirve para comprobar lo único que
+//      distingue un cierre de prueba de uno real: en prueba entra, en real no.
+async function prepararCierre() {
+  paso("Preparación del cierre anual");
+
+  // (0) Buzón del equipo: en modo prueba es el destinatario de TODO. La migración lo deja
+  //     null a propósito (§7: ninguna migración lleva un correo real), así que sin esto
+  //     `emitir_resumen` falla diciendo que no hay a dónde enviar. `.invalid` es un TLD
+  //     reservado: no se puede entregar en ningún sitio, que es lo que se quiere de un
+  //     valor de relleno.
+  const { data: par } = await db.from("parametros_documentales")
+    .select("id, email_equipo").eq("id", 1).maybeSingle();
+  if (par && !par.email_equipo) {
+    await db.from("parametros_documentales")
+      .update({ email_equipo: "equip-proves@example.invalid" }).eq("id", 1);
+    console.log("  email_equipo ← equip-proves@example.invalid (RELLENO: cámbialo en Configuració)");
+  }
+
+  // (1) Datos fiscales del donante que sí certifica.
+  await db.from("productores").update(FISCAL_PROD_1).eq("id", productor);
+  console.log(`  TEST-PROD-1: NIF ${FISCAL_PROD_1.nif}, ${FISCAL_PROD_1.codigo_postal} ${FISCAL_PROD_1.poblacion}`);
+  console.log("  TEST-PROD-2: SIN dades fiscals (cas bloquejat, a propòsit)");
+
+  // (2) Coste del segundo producto.
+  await rpc("fijar_coste_producto", {
+    p_producto: PRODUCTO_2,
+    p_ejercicio: ejercicio,
+    p_coste: COSTE_KG_2,
+    p_motivo: `Fixture de proves ${ejercicio} — NO es una referencia real de mercat`,
+  });
+
+  // (3) La donación de TEST-PROD-2, conciliada retroactivamente.
+  const idDon2 = `E-TEST-RETRO-${ejercicio}`;
+  let exc2: string | null = null;
+  const { data: ya2 } = await db.from("excedentes")
+    .select("id").eq("id_excedente", idDon2).maybeSingle();
+  if (ya2) {
+    exc2 = ya2.id as string;
+  } else {
+    const { data, error } = await db.from("excedentes").insert({
+      id_excedente: idDon2,
+      productor_id: productor2,
+      familia: "Horta Fruit",
+      producto: PRODUCTO_2,
+      variedad: "Violina",
+      kg_total: KG_DONACIO_2,
+      modalitat: "donacio",
+      causa: "Excedent de collita",
+      estado: "bloqueada",
+      origen: "asistido",
+      texto_oferta: "OFERTA DISPONIBLE (fixture de proves — conciliació retroactiva)",
+    }).select("id").single();
+    if (error) throw new Error(`donació retroactiva: ${error.message}`);
+    exc2 = data.id as string;
+  }
+
+  const entSocial = await idOrg("entidades", "TEST-ENT-SOCIAL");
+  const { data: can2ya } = await db.from("canalizaciones")
+    .select("id, estado").eq("excedente_id", exc2).maybeSingle();
+  let can2 = can2ya?.id as string | undefined;
+  if (!can2) {
+    const { data, error } = await db.from("canalizaciones").insert({
+      excedente_id: exc2,
+      entidad_id: entSocial,
+      kg_confirmados: KG_DONACIO_2,
+      valorizacion: "donacio",
+      estado: "confirmada",
+      data_hora_recollida: new Date().toISOString(),
+    }).select("id").single();
+    if (error) throw new Error(`canalització retroactiva: ${error.message}`);
+    can2 = data.id as string;
+  }
+  if (can2ya?.estado !== "conciliada") {
+    await rpc("conciliacion_retroactiva", {
+      p_canalizacion: can2,
+      p_kg: KG_RETRO_2,
+      p_coste: COSTE_KG_2,
+      p_motivo: "Fixture: canalització de 2026 sense albarans, conciliada a posteriori",
+    });
+  }
+  console.log(`  ${idDon2}: ${KG_RETRO_2} kg conciliats retroactivament (${COSTE_KG_2} €/kg)`);
+
+  // (4) Fecha de recogida en las canalizaciones de donación que no la tengan.
+  const { data: sinFecha } = await db.from("canalizaciones")
+    .select("id").eq("valorizacion", "donacio").is("data_hora_recollida", null);
+  for (const c of sinFecha ?? []) {
+    await db.from("canalizaciones")
+      .update({ data_hora_recollida: new Date().toISOString() }).eq("id", c.id);
+  }
+  if ((sinFecha ?? []).length) {
+    console.log(`  data_hora_recollida omplerta en ${(sinFecha ?? []).length} canalitzacions`);
+  }
+
+  // (5) Un cierre de prueba YA CALCULADO. Es lo que da sentido a las comprobaciones
+  //     `requiereFixture` del arnés: sin una fila en `cierres_donante`, «el productor ve
+  //     SU acumulat anual» sale SALTADA, porque 0 filas no distingue «la política me
+  //     bloquea» de «no hay nada que ver» (§12.48). Se reutiliza el que ya esté abierto.
+  {
+    let cierre: string;
+    const { data: abierto } = await db.from("cierres_ejercicio")
+      .select("id").eq("ejercicio", ejercicio).eq("modo", "prueba").eq("estado", "obert")
+      .order("created_at").limit(1).maybeSingle();
+    if (abierto) {
+      cierre = abierto.id as string;
+    } else {
+      const nuevo = await rpc<{ id: string }>("abrir_cierre",
+        { p_ejercicio: ejercicio, p_modo: "prueba" });
+      cierre = nuevo.id;
+    }
+    const res = await rpc<Record<string, unknown>>("calcular_cierre", { p_cierre: cierre });
+    console.log(`  tancament de prova ${cierre}`);
+    console.log(`  calculat: ${res.donants} donants, ${res.linies} línies, ` +
+      `${res.kg_total} kg, ${res.valor_total} € (${res.bloquejats} bloquejats)`);
+  }
+
+  const { data: base } = await db.rpc("cierre_base", { p_ejercicio: ejercicio, p_modo: "prueba" });
+  const kg = (base ?? []).reduce((a: number, l: { kg_neto: number }) => a + Number(l.kg_neto), 0);
+  const valor = (base ?? []).reduce((a: number, l: { valor: number }) => a + Number(l.valor), 0);
+  console.log(`  base del tancament de prova ${ejercicio}: ${(base ?? []).length} línies, ` +
+    `${kg.toFixed(2)} kg, ${valor.toFixed(2)} €`);
+}
+
+// ---------------------------------------------------------------------------
 // 0. Simulación
 // ---------------------------------------------------------------------------
 
 if (dryRun) {
   console.log("\n--dry-run: se crearía la espigolada de 1.000 kg de tomate en 29 cajas,");
   console.log(`lotes de ${LOTES.map((l) => l.kg).join("/")} kg, con REC + 3 ENT y una confirmación`);
-  console.log(`con ${KG_RECHAZADOS} kg rechazados. Nada escrito.\n`);
+  console.log(`con ${KG_RECHAZADOS} kg rechazados. Nada escrito.`);
+  console.log(`Y la preparación del cierre: dades fiscals de TEST-PROD-1, cost de ${PRODUCTO_2},`);
+  console.log(`una donació de ${KG_RETRO_2} kg conciliada retroactivament i les dates de recollida.\n`);
   Deno.exit(0);
 }
 
@@ -246,6 +406,8 @@ if (yaExiste) {
   for (const a of albs ?? []) {
     console.log(`  ${a.tipo.padEnd(4)} ${(a.numero_completo ?? "(esborrany)").padEnd(18)} ${a.estado}`);
   }
+  // Lo del cierre sí se reaplica: es idempotente y es lo que se añade sobre lo que ya hay.
+  await prepararCierre();
   console.log();
   Deno.exit(0);
 }
@@ -474,6 +636,8 @@ const propuesta = await rpc<Record<string, unknown>>("propuesta_conciliacion", {
 console.log(`  recepció ${propuesta.kg_recepcio} kg · entregues ${propuesta.kg_entregues} kg`);
 console.log(`  diferència ${propuesta.diferencia} kg (${propuesta.diferencia_pct} %), ` +
   `tolerància ${propuesta.tolerancia_pct} % → ${propuesta.dins_tolerancia ? "dins" : "FORA"}`);
+
+await prepararCierre();
 
 const { count: nDocs } = await db.from("documentos")
   .select("id", { count: "exact", head: true }).eq("objeto_tipo", "albaran");

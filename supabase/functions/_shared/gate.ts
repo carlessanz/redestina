@@ -80,3 +80,79 @@ export async function modoTestActivo(supabase: Cliente): Promise<boolean> {
     .from("app_settings").select("value").eq("key", "test_mode").maybeSingle();
   return data?.value !== "false";
 }
+
+/**
+ * Barrera del MODO PRUEBA de un documento: a quién se le puede mandar.
+ *
+ * ⚠️ ES INDEPENDIENTE DE `test_mode`, Y ESE ES TODO EL PUNTO. El modo test global (§8) es
+ *    un interruptor que el super_admin apaga el día que Redestina sale a producción; los
+ *    cierres de prueba, en cambio, se siguen ensayando **después** de ese día —cada
+ *    diciembre, sobre el ejercicio en curso— y un resumen o un certificado de ensayo no
+ *    puede llegar nunca a un donante real, con `test_mode` encendido o apagado. Por eso
+ *    esta comprobación no lo mira: solo mira `documentos.modo`.
+ *
+ * La regla, en una línea: con `modo = 'prueba'` solo pasan las direcciones de una
+ * organización `es_test` y el buzón del equipo (`parametros_documentales.email_equipo`).
+ *
+ * Es la SEGUNDA barrera, no la única: `cierre_destinatario()` (20261109100100) ya elige
+ * en SQL a quién se escribe y en prueba nunca devuelve el correo de un donante real. Esto
+ * está aquí porque quien envía es esta capa, y la capa que envía tiene que poder negarse
+ * sin depender de que la de arriba haya elegido bien —incluido el caso de un destinatario
+ * escrito a mano desde el panel—.
+ *
+ * Fail-safe como el resto del gate: si no se puede leer `parametros_documentales`, el
+ * buzón del equipo se trata como desconocido y esa dirección se bloquea. La duda corta.
+ */
+export interface DocumentoParaEnviar {
+  id?: string | null;
+  modo?: string | null;
+  tipo?: string | null;
+  numero_completo?: string | null;
+  /** `documentos.envio`: de aquí sale el destinatario por defecto. */
+  envio?: { destinatario?: string | null; [k: string]: unknown } | null;
+}
+
+export interface ResultadoDestinatarios {
+  /** Direcciones a las que SÍ se puede escribir. */
+  permitidos: string[];
+  /** Las que no, con el motivo (para el log y para el panel). */
+  bloqueados: { email: string; motivo: "no_test_user" | "sense_bustia_equip" }[];
+  /** `true` si el documento es de prueba y, por tanto, se ha aplicado la barrera. */
+  modoPrueba: boolean;
+}
+
+export async function destinatariosPrueba(
+  supabase: Cliente,
+  documento: DocumentoParaEnviar,
+  destinos?: string[],
+): Promise<ResultadoDestinatarios> {
+  const lista = (destinos && destinos.length > 0
+    ? destinos
+    : [documento.envio?.destinatario ?? ""])
+    .map((e) => (e ?? "").trim())
+    .filter((e) => e !== "");
+
+  // Un documento real no pasa por aquí: lo filtran los gates de siempre (§8).
+  if (documento.modo !== "prueba") {
+    return { permitidos: [...new Set(lista)], bloqueados: [], modoPrueba: false };
+  }
+
+  const { data: params } = await supabase
+    .from("parametros_documentales").select("id, email_equipo").eq("id", 1).maybeSingle();
+  const equipo = (params?.email_equipo ?? "").trim().toLowerCase();
+
+  const permitidos: string[] = [];
+  const bloqueados: { email: string; motivo: "no_test_user" | "sense_bustia_equip" }[] = [];
+  for (const email of [...new Set(lista)]) {
+    if (equipo && email.toLowerCase() === equipo) {
+      permitidos.push(email);
+      continue;
+    }
+    if (await esEmailTest(supabase, email)) {
+      permitidos.push(email);
+      continue;
+    }
+    bloqueados.push({ email, motivo: equipo ? "no_test_user" : "sense_bustia_equip" });
+  }
+  return { permitidos, bloqueados, modoPrueba: true };
+}
