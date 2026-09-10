@@ -74,7 +74,10 @@ cómo sobre este repo**.
 donación—, con quince decisiones abiertas (D1–D15) y una **fecha dura**: para certificar el ejercicio
 2026 desde Redestina tendría que estar en producción antes del **1 de diciembre de 2026** (D1, cuya
 recomendación es no hacerlo y estrenar con 2027). Es la obra grande que viene después de las brechas
-de §1bis, y hoy el repo no tiene nada de ella.
+de §1bis, y hoy el repo no tiene nada de ella. Su **plan de ejecución sobre este repo** —spike, fases con
+migraciones, funciones, pantallas, arnés y aceptación, y el modelo de trabajo con los tres agentes de
+`.claude/agents/`— está en `3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md` (aprobado
+el 10-09-2026; el código arranca con el spike del 21/09).
 
 La **documentación generada para la consultoría** (informes, análisis, propuestas) no va a `docs/`
 sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/`
@@ -336,6 +339,8 @@ design/                        Sistema de diseño (§2bis): tokens.json, DESIGN.
 public/                        Logo en seis variantes SVG, favicon, iconos PWA y logo-email.png (§2bis)
 .env.local.example             Plantilla de variables del frontend (sí se versiona)
 .claude/skills/publicar/       Skill /publicar: el procedimiento de publicación (§11)
+.claude/agents/                Tres agentes de proyecto (dades, servidor, interficie) con los que se
+                               ejecutan por fases el sistema documental (§1, §7); Opus a esfuerzo alto
 src/
   main.tsx                     Punto de entrada React
   App.tsx                      Dos capas: SessioProvider → RouterProvider (el contexto de rol
@@ -1176,6 +1181,18 @@ menú (`AppShell`) **suma las dos colas**.
   (no passen per i18n). Identificadors en inglés salvo los del dominio (`productores`, `entidades`,
   `excedentes`, `canalizaciones`).
 - **Secretos**: nunca en el código. Env vars, siempre.
+- **Sin servicios externos nuevos** (10-09-2026). Cualquier capacidad nueva —generación de PDF, firma
+  electrónica, almacenamiento de ficheros, colas, notificaciones— se resuelve con **librerías npm dentro
+  del stack** (Edge Functions de Deno con `npm:`, React) y con lo que ya da Supabase (Storage, `pg_cron`,
+  `pg_net`), nunca con un SaaS ni con un microservicio aparte. Los PDF se generan con `pdf-lib` en una
+  Edge Function y van a Supabase Storage, en **una carpeta por organización** ordenada por ejercicio y
+  tipo. Detalle en el plan de ejecución del sistema documental (§1).
+- **Ejecución por fases con agentes** (10-09-2026). Los bloques de desarrollo del sistema documental
+  se reparten entre los tres agentes de `.claude/agents/` —`dades` (migraciones, RPC, arnés),
+  `servidor` (Edge Functions) e `interficie` (pantallas)— sobre **ficheros disjuntos del mismo árbol de
+  trabajo**, sin worktrees ni ramas (se trabaja siempre en `main`). Los ficheros compartidos
+  (`config.toml`, `src/types.ts`, `nav.ts`, `router`, `i18n.tsx`, `_shared/*.ts` salvo `pdf/`, este
+  documento) los toca solo la sesión que orquesta. Todos en **Opus 5 a esfuerzo alto**.
 - **`docs/` y `scripts/data/` nunca entran en git.** El primero es material de trabajo —incluye el
   **funcional de negocio** (`Documento funcional Redestina 2026.md` y `Documento funcional Redestina 2026 —
   adaptado.md`, resumidos en §1bis), `nuevas-funcionalidades/` y los seis documentos operativos
