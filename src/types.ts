@@ -334,6 +334,11 @@ export interface PlantillaDocumento {
   cuerpo: BloquePlantilla[]
   /** Contrato declarado: qué claves espera el texto. Sirve para negarse a emitir con huecos */
   marcadores: string[]
+  /**
+   * Los tres modelos de convenio comparten el tipo `CONV`, y el índice único
+   * `(tipo, idioma) where vigente` solo dejaba uno: la variante es lo que los separa.
+   */
+  variante: ConvenioTipo | null
   vigente: boolean
   valida_desde: string
   created_by: string | null
@@ -614,4 +619,52 @@ export interface CierreDonanteLinea {
   /** Conciliada a mano para el ensayo: `cierre_base()` la excluye en modo real */
   retroactiva: boolean
   created_at: string
+}
+
+// --- Convenios y firma (fase 2, migraciones 20270111*) ---
+
+export type ConvenioTipo = 'don_gen' | 'don_rec' | 'com'
+export type ConvenioEstado =
+  | 'esborrany' | 'pendent_firma' | 'firmat' | 'vigent' | 'retornat' | 'resolt' | 'substituit'
+
+export interface Convenio {
+  id: string
+  tipo: ConvenioTipo
+  tipo_org: 'productor' | 'entidad'
+  productor_id: string | null
+  entidad_id: string | null
+  plantilla_id: string | null
+  idioma: 'ca' | 'es'
+  serie: string | null
+  ejercicio: number | null
+  numero: number | null
+  /** Se pide al FIRMAR, no al preparar: un borrador descartado no deja hueco en la serie */
+  numero_completo: string | null
+  estado: ConvenioEstado
+  roles_com: ('venedora' | 'compradora' | 'obrador')[]
+  /** Copia congelada de la ficha en el momento de firmar */
+  datos_org: Record<string, unknown>
+  /** Quién firmó. ⚠️ SIN documento de identidad: eso vive solo en `evidencias` */
+  firmante: { nombre?: string; cargo?: string; email?: string } | null
+  enlace_id: string | null
+  enviado_at: string | null
+  firmado_at: string | null
+  contrafirmado_at: string | null
+  contrafirmado_por: string | null
+  devuelto_at: string | null
+  motivo_devolucion: string | null
+  resuelto_at: string | null
+  fecha_efecto_resolucion: string | null
+  motivo_resolucion: string | null
+  sustituido_por: string | null
+  creado_por: string | null
+  created_at: string
+  updated_at: string
+}
+
+/** Matriz en tabla: qué convenio exige cada valorización a cada parte */
+export interface ConvenioExigido {
+  valorizacion: 'donacio' | 'venda' | 'maquila'
+  parte: 'entrega' | 'recibe'
+  tipo_convenio: ConvenioTipo
 }

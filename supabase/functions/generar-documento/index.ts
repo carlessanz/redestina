@@ -33,6 +33,8 @@ import { renderRec } from "../_shared/pdf/render/rec.ts";
 import type { DatosCierre } from "../_shared/pdf/render/cierre.ts";
 import { renderRes } from "../_shared/pdf/render/res.ts";
 import { renderCd } from "../_shared/pdf/render/cd.ts";
+import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
+import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
 
 // Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
 // resuelve el esquema a `never` y las llamadas dejan de compilar (misma nota que en
@@ -52,6 +54,8 @@ interface FilaDocumento {
   id: string;
   tipo: string;
   subtipo: string | null;
+  objeto_tipo: string;
+  objeto_id: string;
   modo: string;
   idioma: string | null;
   numero_completo: string | null;
@@ -121,7 +125,7 @@ Deno.serve(async (req) => {
   const { data, error } = await supabase
     .from("documentos")
     .select(
-      "id, tipo, subtipo, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, plantilla_id, ruta, estado, fichero_at, envio",
+      "id, tipo, subtipo, objeto_tipo, objeto_id, modo, idioma, numero_completo, version, serie, ejercicio, datos, sha256_datos, plantilla_id, ruta, estado, fichero_at, envio",
     )
     .eq("id", documentoId)
     .maybeSingle();
@@ -281,6 +285,14 @@ function enlaceFactura(envio: Record<string, unknown> | null): string | null {
 }
 
 /**
+ * La plantilla, con su **versión**. El convenio la imprime («con qué redacción se firmó»)
+ * y el resto de renderizadores la ignoran: `PlantillaLegal` sigue siendo lo que ven ellos.
+ */
+interface PlantillaEmitida extends PlantillaLegal {
+  version?: number | null;
+}
+
+/**
  * La plantilla legal con la que se emitió ESTE documento, no la vigente de hoy.
  *
  * `documentos.plantilla_id` se congela al emitir (`albaran_emet_document`), así que
@@ -294,7 +306,7 @@ function enlaceFactura(envio: Record<string, unknown> | null): string | null {
 async function plantillaDe(
   supabase: Cliente,
   plantillaId: string | null,
-): Promise<PlantillaLegal | null> {
+): Promise<PlantillaEmitida | null> {
   if (!plantillaId) return null;
   const { data, error } = await supabase
     .from("plantillas_documento")
@@ -306,8 +318,10 @@ async function plantillaDe(
     console.warn("generar-documento: plantilla:", error.message);
     return null;
   }
-  const fila = data as { titulo?: string | null; cuerpo?: unknown } | null;
-  return fila ? { titulo: fila.titulo ?? null, cuerpo: fila.cuerpo } : null;
+  const fila = data as { titulo?: string | null; cuerpo?: unknown; version?: number | null } | null;
+  return fila
+    ? { titulo: fila.titulo ?? null, cuerpo: fila.cuerpo, version: fila.version ?? null }
+    : null;
 }
 
 /** Elige el renderizador por `tipo`. Un tipo desconocido es un error, no un vacío. */
@@ -375,6 +389,37 @@ async function renderizar(
     }, doc.idioma);
   }
 
+  // El convenio (fase 2). Dos emisiones del mismo documento: `firmat`, que es lo que
+  // firma la organización, y `contrafirmat`, con la firma y el sello de la apoderada
+  // estampados. Lo que cambia entre las dos es qué PNG se le pasan al renderizador.
+  if (doc.tipo === "CONV") {
+    const datosConv = datos as DatosConvenio;
+    const plantilla = await plantillaDe(supabase, doc.plantilla_id);
+    const extras = await activosConvenio(supabase, doc, datosConv);
+    if (extras.ms > 1) {
+      console.log(JSON.stringify({
+        fn: "generar-documento",
+        activos_conveni_ms: Number(extras.ms.toFixed(1)),
+        trac: extras.trazoPng !== null,
+        firma: extras.firmaPng !== null,
+        segell: extras.selloPng !== null,
+        identitats: extras.identidades.length,
+      }));
+    }
+    return await renderConv(activos, {
+      datos: datosConv,
+      sha256Datos: doc.sha256_datos,
+      plantilla,
+      plantillaVersion: plantilla?.version ?? null,
+      subtipo: doc.subtipo,
+      trazoPng: extras.trazoPng,
+      firmaPng: extras.firmaPng,
+      selloPng: extras.selloPng,
+      identidades: extras.identidades,
+      canal: extras.canal,
+    }, doc.idioma);
+  }
+
   switch (doc.tipo) {
     case "PROVA": {
       // El `datos` del documento de prueba lo compone `emitir_documento_prova()`:
@@ -396,4 +441,114 @@ async function renderizar(
     default:
       throw new Error(`Tipo de documento sin renderizador: ${doc.tipo}`);
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Lo que el CONVENIO necesita y el snapshot no lleva (o no lleva descargado)
+// ---------------------------------------------------------------------------
+// Tres cosas, y cada una está fuera del snapshot por un motivo distinto:
+//
+//   · **El trazo de la firma** es un PNG en el bucket `documentos`, en la carpeta de la
+//     organización. El snapshot solo guarda su ruta (`evidencies[].traç_ruta`), porque un
+//     jsonb no es sitio para una imagen.
+//   · **La firma y el sello de la apoderada** son PNG del bucket privado `activos`. Sus
+//     rutas SÍ vienen en el snapshot, pero solo cuando el subtipo es `contrafirmat`: es
+//     `convenio_emet_document()` quien decide eso, y aquí se obedece sin volver a
+//     preguntarle a `parametros_documentales`. Así, regenerar el PDF de un convenio
+//     firmado hace dos años no le estampa la firma de la apoderada de hoy.
+//   · **El documento de identidad de quien firmó** no está —ni puede estar— en el
+//     snapshot: `documentos.datos` lo lee la propia organización y
+//     `evidencias.documento_identidad` está fuera del GRANT de SELECT (20260928100300).
+//     Se lee aquí con `service_role`, y solo para imprimirlo en la página de evidencias.
+//
+// Nada de esto puede impedir que el documento se genere: un PNG que no baja deja su
+// hueco, y un DNI que no está se queda sin línea. Un convenio que no se emite es peor.
+
+interface ActivosConvenio {
+  trazoPng: Uint8Array | null;
+  firmaPng: Uint8Array | null;
+  selloPng: Uint8Array | null;
+  identidades: IdentidadEvidencia[];
+  /** `enlaces_token.canal` del enlace con el que se firmó (`email` | `asistido`). */
+  canal: string | null;
+  ms: number;
+}
+
+async function activosConvenio(
+  supabase: Cliente,
+  doc: FilaDocumento,
+  datos: DatosConvenio,
+): Promise<ActivosConvenio> {
+  const t0 = performance.now();
+  const salida: ActivosConvenio = {
+    trazoPng: null,
+    firmaPng: null,
+    selloPng: null,
+    identidades: [],
+    canal: null,
+    ms: 0,
+  };
+
+  const bajar = async (bucket: string, ruta: string | null | undefined): Promise<Uint8Array | null> => {
+    if (!ruta) return null;
+    const { data, error } = await supabase.storage.from(bucket).download(ruta);
+    if (error || !data) {
+      console.warn("generar-documento: activo de conveni no descargado:", bucket, ruta, error?.message);
+      return null;
+    }
+    return new Uint8Array(await data.arrayBuffer());
+  };
+
+  // El trazo de la firma más reciente (un convenio devuelto y vuelto a firmar tiene dos).
+  const firmas = (datos.evidencies ?? []).filter((e) => e && e.tipus === "firma");
+  const rutaTrazo = firmas.map((e) => e["traç_ruta"]).filter(Boolean).pop() ?? null;
+  const fundacion = datos.fundacio ?? {};
+
+  const [trazoPng, firmaPng, selloPng] = await Promise.all([
+    bajar(BUCKET, rutaTrazo),
+    bajar(BUCKET_ACTIVOS, fundacion.firma_ruta),
+    bajar(BUCKET_ACTIVOS, fundacion.segell_ruta),
+  ]);
+  salida.trazoPng = trazoPng;
+  salida.firmaPng = firmaPng;
+  salida.selloPng = selloPng;
+
+  // Los DNI declarados. `evidencias` no tiene columna de convenio: cuelga del enlace, y
+  // el enlace del objeto. Son dos consultas y no un embed porque PostgREST no puede
+  // embeber `evidencias` desde `documentos` (no hay FK entre ellas, ni la habrá: el
+  // vínculo es el objeto, no el documento).
+  const { data: enlaces, error: errEnlaces } = await supabase
+    .from("enlaces_token")
+    .select("id, proposito, objeto_tipo, objeto_id, canal, usado_at, created_at")
+    .eq("objeto_tipo", "convenio")
+    .eq("objeto_id", doc.objeto_id)
+    .eq("proposito", "firma_convenio");
+  if (errEnlaces) {
+    console.warn("generar-documento: enlaces del conveni:", errEnlaces.message);
+  }
+  // El canal sale del enlace que SE USÓ para firmar; si ninguno consta usado (un convenio
+  // devuelto, con enlaces revocados por el camino), del más reciente.
+  const filas = (enlaces ?? []) as { id: string; canal: string | null; usado_at: string | null }[];
+  const usado = filas.find((e) => e.usado_at !== null) ?? filas[filas.length - 1];
+  salida.canal = usado?.canal ?? null;
+
+  const ids = filas.map((e) => e.id);
+  if (ids.length > 0) {
+    const { data: evs, error: errEvs } = await supabase
+      .from("evidencias")
+      .select("id, enlace_id, tipo, documento_identidad, created_at")
+      .in("enlace_id", ids)
+      .eq("tipo", "firma");
+    if (errEvs) {
+      console.warn("generar-documento: evidencias del conveni:", errEvs.message);
+    }
+    salida.identidades = (evs ?? []).map((e: { created_at: string | null; documento_identidad: string | null }) => ({
+      at: e.created_at,
+      documento: e.documento_identidad,
+    }));
+  }
+
+  salida.ms = performance.now() - t0;
+  return salida;
 }

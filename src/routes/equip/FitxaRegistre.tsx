@@ -10,6 +10,7 @@ import { useT } from '../../lib/i18n'
 import { assegurarContacte } from '../../lib/contactes'
 import { ENTIDAD_CAMPOS, PRODUCTOR_CAMPOS } from '../../lib/crudCampos'
 import RecordDetail from '../../components/RecordDetail'
+import BadgeConveni from '../../components/BadgeConveni'
 
 type Registre = Record<string, unknown> & { id: string }
 
@@ -54,6 +55,15 @@ export default function FitxaRegistre({ tabla }: Props) {
       telefonoKey={esProductor ? 'phone' : 'telefono'}
       onBack={() => navigate(llista)}
       onSaved={() => navigate(llista)}
+      avisos={(
+        // El estado del convenio y, si no hay ninguno vigente, la nota heredada del Excel
+        // marcada como lo que es: papel histórico que NO habilita a operar.
+        <BadgeConveni
+          tipusOrg={esProductor ? 'productor' : 'entidad'}
+          orgId={id ?? null}
+          conveniPaper={(registre?.[esProductor ? 'conveni' : 'estat'] as string | null) ?? null}
+        />
+      )}
       onSendMessage={(phone, name) => {
         void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))
       }}

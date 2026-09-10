@@ -250,6 +250,118 @@ async function prepararCierre() {
 }
 
 // ---------------------------------------------------------------------------
+// Lo que los CONVENIOS necesitan (fase 2)
+// ---------------------------------------------------------------------------
+// Dos convenios, y a propósito en estados distintos, porque las dos cosas que hay que
+// poder mirar en la pantalla y en el arnés son distintas:
+//
+//   · TEST-PROD-1 → conveni de donació del generador, firmat y **contrasignat**: es el
+//     único estado que desbloquea de verdad `exigir_convenio()`, así que es lo que hace
+//     que el bloqueo del corte se pueda probar por los dos lados (con y sin convenio).
+//   · TEST-ENT-SOCIAL → conveni d'entitat receptora, enviat y **pendent de firma**: deja
+//     un `enlaces_token` vivo de propósito `firma_convenio` y una fila en la bandeja de
+//     la campaña. Sin él, «l'equip veu l'estat dels enllaços» seguiría dependiendo de que
+//     hubiera pasado antes una espigolada.
+//
+// ⚠️ EL TOKEN EN CLARO SE IMPRIME. Es la única vez que existe (en la base solo queda su
+//    sha256), y aquí se imprime porque es lo que permite abrir `/signar/<token>` a mano
+//    para probar la página de firma. Solo pasa con fixtures `TEST-*`: ninguna
+//    organización real entra por aquí.
+//
+// IDEMPOTENTE: si ya hay un convenio vigente (o en curso) de ese modelo, no se toca.
+async function prepararConvenis() {
+  paso("Convenios (fase 2)");
+
+  async function ciclo(
+    tipoOrg: "productor" | "entidad",
+    orgId: string,
+    tipo: "don_gen" | "don_rec" | "com",
+    etiqueta: string,
+    hastaVigent: boolean,
+  ) {
+    const { data: ya } = await db.from("convenios")
+      .select("id, estado, numero_completo")
+      .eq("tipo", tipo)
+      .eq(tipoOrg === "productor" ? "productor_id" : "entidad_id", orgId)
+      .not("estado", "in", "(resolt,substituit)")
+      .maybeSingle();
+    if (ya) {
+      console.log(`  ${etiqueta}: ya existía (${ya.estado}${ya.numero_completo ? ` ${ya.numero_completo}` : ""})`);
+      return;
+    }
+
+    const conv = await rpc<{ id: string }>("preparar_convenio", {
+      p_tipo_org: tipoOrg,
+      p_org: orgId,
+      p_tipo: tipo,
+      p_idioma: "ca",
+    });
+
+    const env = await rpc<{ enllac: { id: string; token: string; destinatari: string } }>(
+      "enviar_convenio",
+      { p_id: conv.id },
+    );
+    if (!hastaVigent) {
+      console.log(`  ${etiqueta}: pendent de firma → /signar/${env.enllac.token}`);
+      return;
+    }
+
+    // La firma, con la evidencia completa: sin `sha256_texto` y sin la declaración de
+    // representación la RPC se niega, y con razón — son las dos cosas que convierten un
+    // «va firmar» en un «va firmar AIXÒ, i deia poder fer-ho».
+    const texto = `Text del conveni ${tipo} (fixture de proves)`;
+    const huella = Array.from(
+      new Uint8Array(await crypto.subtle.digest("SHA-256", new TextEncoder().encode(texto))),
+    ).map((b) => b.toString(16).padStart(2, "0")).join("");
+
+    const firmado = await rpc<{ id: string; numero_completo: string }>(
+      "firmar_convenio_por_enlace",
+      {
+        p_enlace: env.enllac.id,
+        p_datos: {
+          raso_social: etiqueta,
+          nif: FISCAL_PROD_1.nif,
+          domicili: FISCAL_PROD_1.direccion,
+          codi_postal: FISCAL_PROD_1.codigo_postal,
+          poblacio: FISCAL_PROD_1.poblacion,
+          representant: "Titular de prova",
+          carrec: "Administrador",
+          email: env.enllac.destinatari,
+        },
+        p_evidencia: {
+          nombre: "Titular de prova",
+          cargo: "Administrador",
+          // DNI inventado y NO válido (la letra no cuadra), como el CIF G00000000 de
+          // `parametros_documentales`. Va solo a `evidencias.documento_identidad`, que
+          // está fuera del GRANT de SELECT de `authenticated`.
+          documento_identidad: "00000000T",
+          declaracion_representacion: true,
+          ip: "127.0.0.1",
+          user_agent: "crear-datos-documentales-prueba.ts",
+          sha256_texto: huella,
+        },
+      },
+    );
+
+    const vigent = await rpc<{ numero_completo: string; estado: string }>(
+      "contrafirmar_convenio",
+      { p_id: firmado.id },
+    );
+    console.log(`  ${etiqueta}: ${vigent.numero_completo} ${vigent.estado}`);
+  }
+
+  await ciclo("productor", productor, "don_gen", "TEST-PROD-1 (donació generador)", true);
+  await ciclo("entidad", await idOrg("entidades", "TEST-ENT-SOCIAL"), "don_rec",
+              "TEST-ENT-SOCIAL (entitat receptora)", false);
+
+  const { data: camp } = await db.from("v_campanya_convenis")
+    .select("tipo_org, tipo, comarca, organitzacions, vigents, pendents_firma, sense_conveni");
+  const tot = (camp ?? []).reduce((a, c) => a + Number(c.organitzacions), 0);
+  const vig = (camp ?? []).reduce((a, c) => a + Number(c.vigents), 0);
+  console.log(`  campanya: ${vig}/${tot} organitzacions amb conveni vigent`);
+}
+
+// ---------------------------------------------------------------------------
 // 0. Simulación
 // ---------------------------------------------------------------------------
 
@@ -258,7 +370,8 @@ if (dryRun) {
   console.log(`lotes de ${LOTES.map((l) => l.kg).join("/")} kg, con REC + 3 ENT y una confirmación`);
   console.log(`con ${KG_RECHAZADOS} kg rechazados. Nada escrito.`);
   console.log(`Y la preparación del cierre: dades fiscals de TEST-PROD-1, cost de ${PRODUCTO_2},`);
-  console.log(`una donació de ${KG_RETRO_2} kg conciliada retroactivament i les dates de recollida.\n`);
+  console.log(`una donació de ${KG_RETRO_2} kg conciliada retroactivament i les dates de recollida.`);
+  console.log("I dos convenis: TEST-PROD-1 vigent (firmat i contrasignat) i TEST-ENT-SOCIAL pendent de firma.\n");
   Deno.exit(0);
 }
 
@@ -406,8 +519,10 @@ if (yaExiste) {
   for (const a of albs ?? []) {
     console.log(`  ${a.tipo.padEnd(4)} ${(a.numero_completo ?? "(esborrany)").padEnd(18)} ${a.estado}`);
   }
-  // Lo del cierre sí se reaplica: es idempotente y es lo que se añade sobre lo que ya hay.
+  // Lo del cierre y los convenios sí se reaplica: es idempotente y es lo que se añade
+  // sobre lo que ya hay.
   await prepararCierre();
+  await prepararConvenis();
   console.log();
   Deno.exit(0);
 }
@@ -638,6 +753,7 @@ console.log(`  diferència ${propuesta.diferencia} kg (${propuesta.diferencia_pc
   `tolerància ${propuesta.tolerancia_pct} % → ${propuesta.dins_tolerancia ? "dins" : "FORA"}`);
 
 await prepararCierre();
+await prepararConvenis();
 
 const { count: nDocs } = await db.from("documentos")
   .select("id", { count: "exact", head: true }).eq("objeto_tipo", "albaran");

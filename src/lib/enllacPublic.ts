@@ -28,6 +28,10 @@ export type CodiEnllac =
   // vocabulario es el de la función, y la función es una.
   | 'falta_fitxer' | 'massa_gran' | 'mime_no_acceptat'
   | 'sense_carpeta' | 'error_storage' | 'error_bd' | 'cos_invalid' | 'base64_invalid'
+  // Solo en la firma de un convenio (fase 2), por el mismo motivo: la función es una.
+  | 'codi_incorrecte' | 'codi_caducat' | 'sense_codi' | 'no_cal_codi' | 'sense_correu'
+  | 'no_test_user' | 'error_email'
+  | 'falta_declaracio' | 'falta_acceptacio' | 'falta_signatura'
   | 'xarxa' | 'desconegut_client'
 
 /** Cada código, su frase. Los tres finales del enlace —no existe, ya usado, caducado— se
@@ -56,6 +60,18 @@ const MOTIU: Record<CodiEnllac, string> = {
   error_bd: 'conf.err_servidor',
   cos_invalid: 'conf.err_peticio',
   base64_invalid: 'conf.err_peticio',
+  // Firma del convenio. Los del código se separan porque lo que hay que hacer después no
+  // es lo mismo en cada caso: volver a teclearlo, pedir otro o dejar de esperarlo.
+  codi_incorrecte: 'sig.err_codi_incorrecte',
+  codi_caducat: 'sig.err_codi_caducat',
+  sense_codi: 'sig.err_sense_codi',
+  no_cal_codi: 'sig.err_no_cal_codi',
+  sense_correu: 'sig.err_sense_correu',
+  no_test_user: 'sig.err_no_test_user',
+  error_email: 'sig.err_email',
+  falta_declaracio: 'sig.err_declaracio',
+  falta_acceptacio: 'sig.err_acceptacio',
+  falta_signatura: 'sig.err_signatura',
   xarxa: 'conf.err_xarxa',
   desconegut_client: 'conf.err_generic',
 }
@@ -432,6 +448,261 @@ export async function pujaFactura(
     const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
     if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code))
     return { ok: true, data: resultatDe(cos, dades) }
+  } catch {
+    return falla('xarxa')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// FASE 2 — el enlace de firma del convenio
+// ---------------------------------------------------------------------------
+// Quien abre esto es LA PERSONA QUE REPRESENTA a la organización. Puede estar en su
+// despacho o de pie en una finca con el dinamizador al lado (firma asistida, §3.2.5), y
+// en los dos casos la pantalla es la misma. Lo que cambia es el canal del enlace y si hay
+// segundo factor.
+//
+// TRES COSAS SIN LAS QUE NO SE FIRMA, y las impone `firmar_convenio_por_enlace()`, no
+// esta pantalla: la declaración de representación, la huella del texto exacto que se
+// mostró (`sha256_texto`) y —si el enlace lleva código— haberlo validado antes. Aquí se
+// piden porque sin ellas el servidor va a decir que no, no porque el cliente decida nada.
+
+/** Los datos de la organización. Nombres **literales** de `p_datos` de la RPC. */
+export interface DadesOrganitzacio {
+  raso_social: string
+  nom_comercial: string
+  nif: string
+  domicili: string
+  codi_postal: string
+  poblacio: string
+  representant: string
+  carrec: string
+  email: string
+}
+
+export interface DadesConveni {
+  proposito: string
+  estado: string
+  destinatari: string | null
+  /** Firma asistida: la conduce el equipo con la persona delante (§3.2.5). */
+  assistida: boolean
+  /** El enlace lleva código de 6 cifras pendiente de validar. */
+  calCodi: boolean
+  /** Hay una dirección a la que mandar el código. Sin ella no hay segundo factor. */
+  potDemanarCodi: boolean
+  conveni: {
+    id: string
+    tipus: string
+    estat: string
+    numero_completo: string | null
+    idioma: string
+    /** Nombre del modelo, ya traducido por el servidor al idioma del convenio. */
+    model: string | null
+    titol: string | null
+    rolesCom: string[]
+  }
+  organitzacio: DadesOrganitzacio & { tipus_org: string; nom: string | null }
+  /** Qué campos exige el servidor. La pantalla los marca; no se inventa la lista. */
+  obligatoris: string[]
+  /** Texto exacto de las dos declaraciones, tal como aparecen en el convenio. */
+  declaracioRepresentacio: string | null
+  declaracioAcceptacio: string | null
+  /**
+   * EL CONVENIO ENTERO, tal cual. Su huella es la evidencia de QUÉ se firmó, no solo de
+   * que alguien pulsó un botón: se pinta literal y `sha256_texto` viaja de vuelta.
+   */
+  textConveni: string | null
+  sha256Texto: string | null
+}
+
+function textCamp(o: Record<string, unknown>, ...claus: string[]): string {
+  for (const c of claus) {
+    const v = o[c]
+    if (typeof v === 'string' && v !== '') return v
+  }
+  return ''
+}
+
+function normalitzaConveni(cos: Record<string, unknown>): DadesConveni {
+  // El bloque bueno es `documento` (mismo nombre que en el albarán: para la función es
+  // «el documento de este enlace»), y los datos de la organización van dentro, en
+  // `organitzacio`. Se aceptan `conveni`/`convenio` como alias por si el contrato se
+  // mueve: prefiero un cliente que aguante la variante a una página en blanco delante de
+  // quien está a punto de firmar.
+  const conv = (cos.documento ?? cos.conveni ?? cos.convenio ?? {}) as Record<string, unknown>
+  const org = (conv.organitzacio ?? conv.datos_org ?? cos.organitzacio ?? {}) as Record<string, unknown>
+  const form = (cos.formulari ?? {}) as Record<string, unknown>
+  const decl = (cos.declaracions ?? {}) as Record<string, unknown>
+  const camp = (...claus: string[]) => textCamp(org, ...claus)
+  const roles = Array.isArray(conv.roles_com)
+    ? (conv.roles_com as unknown[]).filter((r): r is string => typeof r === 'string')
+    : []
+  const obligatoris = Array.isArray(form.obligatoris)
+    ? (form.obligatoris as unknown[]).filter((r): r is string => typeof r === 'string')
+    : []
+
+  return {
+    proposito: text(cos.proposito) ?? 'firma_convenio',
+    estado: text(cos.estado) ?? text(cos.estado_efectivo) ?? 'activo',
+    destinatari: text(cos.destinatari) ?? text(cos.destinatario_nombre),
+    assistida: form.assistida === true,
+    // Ante la duda, **sí hace falta código**: pedirlo de más solo cuesta un paso; darlo por
+    // no necesario cuando el enlace lo lleva acaba en un 403 después de rellenarlo todo,
+    // que es la peor manera de enterarse.
+    calCodi: form.cal_codi === true,
+    potDemanarCodi: form.pot_demanar_codi === true,
+    conveni: {
+      id: text(conv.id) ?? '',
+      tipus: text(conv.variant) ?? text(conv.tipo) ?? '',
+      estat: text(conv.estado) ?? text(conv.estat) ?? '',
+      numero_completo: text(conv.numero_completo) ?? text(conv.numero),
+      idioma: text(conv.idioma) ?? 'ca',
+      /** El nombre del modelo ya traducido por el servidor, en el idioma del convenio. */
+      model: text(conv.model),
+      titol: text(conv.titol),
+      rolesCom: roles,
+    },
+    organitzacio: {
+      tipus_org: text(conv.tipo_org) ?? text(org.tipo_org) ?? '',
+      nom: text(org.raso_social) ?? text(org.nom) ?? text(org.nombre),
+      raso_social: camp('raso_social', 'razon_social', 'nom', 'nombre'),
+      nom_comercial: camp('nom_comercial', 'nombre_comercial'),
+      nif: camp('nif'),
+      domicili: camp('domicili', 'domicilio', 'direccion'),
+      codi_postal: camp('codi_postal', 'codigo_postal'),
+      poblacio: camp('poblacio', 'poblacion'),
+      representant: camp('representant', 'representante'),
+      carrec: camp('carrec', 'cargo'),
+      email: camp('email'),
+    },
+    // Qué campos son obligatorios lo dice el SERVIDOR, que es quien va a rechazar el
+    // envío. Si esta lista se escribiera aquí, el día que cambie la regla el formulario
+    // dejaría firmar y el 400 llegaría después de todo el trabajo.
+    obligatoris,
+    // Las dos declaraciones vienen con el texto de la plantilla, en el idioma del
+    // convenio: son parte de lo que se firma, no una etiqueta de interfaz.
+    declaracioRepresentacio: text(decl.representacio),
+    declaracioAcceptacio: text(decl.acceptacio),
+    textConveni: text(cos.text_conveni) ?? text(cos.text_confirmacio) ?? null,
+    sha256Texto: text(cos.sha256_texto),
+  }
+}
+
+/** Carga el convenio que hay detrás del token. El servidor deja la evidencia de apertura. */
+export async function carregaConveni(token: string): Promise<ResultatEnllac<DadesConveni>> {
+  const res = await demanaEnllac(token)
+  if (!res.ok) return res
+  // Un token de albarán abierto en `/signar` responde 200 y trae otra cosa. Sin esto la
+  // pantalla pintaría un convenio vacío, que es la peor forma de fallar: parece que va.
+  const proposito = text(res.data.proposito)
+  if (proposito && proposito !== 'firma_convenio') return falla('proposit_incorrecte')
+  return { ok: true, data: normalitzaConveni(res.data) }
+}
+
+export interface Firma {
+  dades: DadesOrganitzacio
+  /** Quién firma y con qué cargo. Suele coincidir con representante/cargo, pero no siempre. */
+  nom: string
+  carrec: string
+  /**
+   * ⚠️ DNI/NIE de quien firma. Viaja al servidor y muere en `evidencias`, que está fuera
+   * del GRANT de SELECT de `authenticated`: **ninguna pantalla del equipo lo lee**.
+   */
+  documentIdentitat: string
+  declaracioRepresentacio: boolean
+  acceptacio: boolean
+  /** PNG del trazo en data URI. El servidor lo guarda en la carpeta de evidencias. */
+  firmaPng: string
+  /** Huella del texto que se ha enseñado. El servidor corta con 409 si ya no coincide. */
+  sha256Texto: string | null
+  /** Honeypot: siempre vacío en una persona. Si viene lleno, el servidor finge un 200. */
+  web: string
+}
+
+export interface ResultatFirma {
+  numero: string | null
+  estat: string
+  /** El PDF se genera después del commit: al firmar todavía no hay nada que descargar. */
+  pdfPendent: boolean
+}
+
+/**
+ * Firma el convenio.
+ *
+ * Los campos van **planos**, con los nombres que la función lee: es su vocabulario, no el
+ * nuestro (misma regla que los códigos de error). El servidor valida otra vez todo lo que
+ * se valida aquí, y su 400 dice qué campo falla; esta pantalla solo evita llegar hasta ahí.
+ */
+export async function signaConveni(
+  token: string,
+  firma: Firma,
+): Promise<ResultatEnllac<ResultatFirma>> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/enlace-publico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        t: token,
+        accion: 'firmar',
+        ...firma.dades,
+        nombre: firma.nom,
+        cargo: firma.carrec,
+        documento_identidad: firma.documentIdentitat,
+        declaracio_representacio: firma.declaracioRepresentacio,
+        acceptacio: firma.acceptacio,
+        signatura_base64: firma.firmaPng,
+        sha256_texto: firma.sha256Texto,
+        web: firma.web,
+      }),
+    })
+    const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code))
+    const conv = (cos.conveni ?? cos.convenio ?? {}) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        numero: text(conv.numero) ?? text(conv.numero_completo),
+        estat: text(conv.estat) ?? text(conv.estado) ?? 'firmat',
+        pdfPendent: cos.pdf_pendent === true,
+      },
+    }
+  } catch {
+    return falla('xarxa')
+  }
+}
+
+/** Pide el código de 6 cifras por correo (segundo factor de la firma asistida). */
+export async function enviaCodiFirma(token: string): Promise<ResultatEnllac<{ destinatari: string | null }>> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/enlace-publico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: token, accion: 'enviar_codi' }),
+    })
+    const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code))
+    return { ok: true, data: { destinatari: text(cos.destinatari) } }
+  } catch {
+    return falla('xarxa')
+  }
+}
+
+/** Valida el código. Un fallo también deja evidencia: un intento fallido es información. */
+export async function validaCodiFirma(
+  token: string,
+  codi: string,
+): Promise<ResultatEnllac<{ valid: boolean }>> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/enlace-publico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: token, accion: 'validar_codi', codi }),
+    })
+    const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code))
+    // Un código incorrecto puede llegar como 200 con `valid:false` o como 4xx con su
+    // código: los dos caminos tienen que acabar en el mismo mensaje.
+    if (cos.valid === false) return falla('codi_incorrecte')
+    return { ok: true, data: { valid: true } }
   } catch {
     return falla('xarxa')
   }

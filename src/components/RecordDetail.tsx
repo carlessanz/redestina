@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import type { ReactNode } from 'react'
 import { ArrowLeft, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
@@ -27,10 +28,18 @@ interface Props {
   onBack: () => void
   onSaved: () => void
   onSendMessage?: (phone: string, name: string | null) => void
+  /**
+   * Lo que hay que saber de esta ficha ANTES de tocarla y que no es un campo suyo: hoy,
+   * el estado del convenio (fase 2). Va bajo la cabecera y no en la rejilla de campos
+   * porque no se edita aquí —el convenio se firma, no se teclea— y porque `RecordDetail`
+   * es genérico: si supiera de convenios dejaría de servir para la siguiente tabla.
+   */
+  avisos?: ReactNode
 }
 
 export default function RecordDetail({
-  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, onBack, onSaved, onSendMessage,
+  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, onBack, onSaved,
+  onSendMessage, avisos,
 }: Props) {
   const { t } = useT()
   const esNuevo = registro == null
@@ -186,6 +195,7 @@ export default function RecordDetail({
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
+          {avisos}
           {error && <p className="text-sm text-destructive">{error}</p>}
           <div className="grid gap-4 sm:grid-cols-2">
             {campos.map((c) => (

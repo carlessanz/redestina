@@ -772,6 +772,31 @@ desactivada** hasta que la Fundación dé la lista de taras.
 Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
 todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
 
+**Convenios y firma (fase 2, `20270111*`)** — `convenios` es el convenio de colaboración de una
+organización con su ciclo de firma. `tipo` ∈ `don_gen`·`don_rec`·`com`; clave **excluyente**
+productor **o** entidad, como `membresias`; `estado` ∈ `esborrany`→`pendent_firma`→`firmat`→`vigent`,
+con salidas `retornat`, `resolt` y `substituit`. Índice único parcial
+`(coalesce(productor_id, entidad_id), tipo) where estado = 'vigent'`: **una organización tiene como
+mucho un convenio vigente de cada tipo**. El número se pide **al firmar**, no al preparar, así que un
+borrador descartado no deja hueco. `datos_org` es la copia congelada de la ficha y `firmante` quién
+firmó: ⚠️ **ninguno de los dos lleva DNI** —el documento de identidad vive solo en
+`evidencias.documento_identidad`, fuera del GRANT (§4)—. Sin GRANT de escritura para nadie. Triggers
+`convenios_control` (inmutabilidad desde `firmat` y transiciones válidas) y `convenios_no_esborrar`.
+
+**`convenios_exigidos`** — matriz oferta↔convenio **en tabla**, como `modalitat_receptor_compat`:
+`(valorizacion, parte, tipo_convenio)`. La donación exige `don_gen` a quien entrega y `don_rec` a
+quien recibe; venta y maquila exigen `com` a las dos partes. Cambiar la regla es un `insert`.
+
+**`plantillas_documento.variante`** (`don_gen`·`don_rec`·`com` o null) — los tres modelos comparten
+el tipo `CONV`, y el índice `(tipo, idioma) where vigente` solo dejaba uno vigente: ahora es
+`(tipo, coalesce(variante,''), idioma)`.
+
+⚠️ **El texto de los seis convenios NO está validado por la asesoría.** `20270111100200` siembra
+texto de trabajo completo, marcado como borrador en tres sitios (primer bloque, título y pie), para
+que el circuito de firma se pueda probar antes de que la fase 0 entregue los textos definitivos.
+Sustituirlo es publicar la **versión 2** desde la pantalla y retirar la 1: editar una plantilla que
+ya ha emitido algo está prohibido por trigger.
+
 **Cierre anual (fase 4, `20261109*`)** — `cierres_ejercicio`, `cierres_donante` y
 `cierre_donante_lineas`. **`modo` (`prueba`/`real`) vive en el dato**, con un único parcial
 `(ejercicio) where modo = 'real'`: varios ensayos por año, **un solo cierre real**.
@@ -989,6 +1014,12 @@ funciones, no políticas:
 | `cerrar_cierre(cierre)` | Cierra **un** cierre por su uuid: recalcula, emite los resúmenes definitivos y pasa a `tancat`. `pot_aprovar()`, y **`es_super_admin()` si el cierre es real** |
 | `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
+| `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
+| `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
+| `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
+
+⚠️ **`get_my_session_context()` devuelve además `conveni_pendent`.** Al recrearla hay que repetir
+`parallel restricted`, como siempre (se hizo en `20270111100100`).
 
 ⚠️ **Cerrar el cierre real exige `es_super_admin()`; el de prueba, solo `pot_aprovar()`.** No es
 simetría con `abrir_cierre`: es que **cerrar es el acto irreversible**. Abrir consume la serie del
@@ -1810,6 +1841,32 @@ anularía el GRANT por columnas. Para emitir un certificado real hacen falta, ad
 documentos legales de entrega (REC/ENT/OPE), no del resumen: su función es justamente pedirle al
 donante una factura por una cifra concreta (anexo B.1).
 
+### Firma de convenios por enlace (fase 2)
+
+`enlace-publico` gana el propósito `firma_convenio` con tres acciones: `firmar`, `enviar_codi` y
+`validar_codi`. Es **firma electrónica simple**: lo que la acredita no es el trazo, es la evidencia.
+
+**El texto que se firma lo compone el servidor** (`_shared/pdf/convenio.ts`, el mismo módulo que
+imprime el PDF, para que el texto hasheado y el impreso sean el mismo) y su sha256 se **recalcula**
+en el POST: nunca se acepta la huella del cliente, y si no coincide, `409 document_canviat`.
+⚠️ **La huella cubre el articulado y las dos declaraciones, no los datos que la persona teclea**: si
+los cubriera cambiaría con cada tecla y el guardia dejaría de distinguir un cambio real. Lo tecleado
+va a `evidencias.payload` y se congela en `convenios.datos_org`. **Precio conocido**: el NIF o el
+domicilio que se corrigen al firmar salen luego en el PDF sin estar en esa huella.
+
+El trazo es un PNG que se sube a `<org>/<ejercicio>/evidencies/<enlace>.png` **antes** de llamar a la
+RPC, y se retira si esta falla. **El DNI de quien firma vive solo en `evidencias.documento_identidad`**
+(§4): no está en `documentos.datos`, así que `sha256_datos` no lo cubre; lo lee `generar-documento`
+con `service_role` solo para la página de evidencias.
+
+El segundo factor (6 cifras, 10 min) es **solo** de la firma asistida. `enviar_codi` **manda el
+correo antes de escribir `codigo_hash`**: al revés, un fallo de correo dejaría el enlace exigiendo un
+código que nadie tiene. En un enlace por correo responde `409 no_cal_codi`.
+
+`registro` acepta los datos del convenio y crea el borrador con su enlace: devuelve el token **solo**
+si firma quien registra (misma sesión, misma persona); si firma otra, el enlace queda esperando y lo
+envía el equipo, porque `registro` sigue sin mandar ningún correo (§8).
+
 ### Recordatorios de enlaces (`recordatorios-documentales`)
 
 `POST /functions/v1/recordatorios-documentales {}` — **pública** (`--no-verify-jwt`) porque la
@@ -2629,6 +2686,38 @@ Redestina en producción real quedan pasos de configuración y negocio.
 76. **La filigrana de los documentos de prueba no se puede comprobar con un `grep` literal**:
     `pdftotext` la trocea porque va girada 45°. Cualquier verificación automática tiene que buscar
     fragmentos (`PR`, `O`, `V`, `A`…), no la frase entera.
+
+77. **El texto de los seis convenios no está validado por la asesoría** (§4). Se siembra texto de
+    trabajo marcado como borrador para poder probar el circuito antes de la fase 0. Sustituirlo es
+    publicar la versión 2 y retirar la 1, **no editar la existente**: en cuanto una plantilla ha
+    emitido algo, el trigger la congela.
+78. **`aprovar_resposta()` no puede devolver el aviso de convenio.** Su tipo de retorno es
+    `canalizaciones` y lo consume `OfferDetail`; antes de la fecha de corte el aviso sale por
+    `raise notice`, y quien lo tiene que enseñar es el panel llamando a `convenio_vigente()`
+    **antes** de aprobar. Desde el corte sí hay excepción y sí llega.
+79. **Una organización con doble rol necesita dos convenios**, uno por ficha, porque `productores` y
+    `entidades` siguen siendo dos tablas sin clave común. Es la deuda §12.16 asomando en el circuito
+    de firma; se cierra con la `organizacion` unificada (§1bis, brecha 2).
+80. **El DNI del firmante no entra en `documentos.datos` aunque el PDF lo imprima.** `documentos`
+    tiene `grant select` sobre la tabla entera, así que meterlo ahí deshacía el GRANT por columnas
+    de `evidencias`. El renderizador lo lee de `evidencias` con `service_role`. **Precio conocido:
+    `sha256_datos` no cubre ese dato**, así que la huella del snapshot no prueba qué documento de
+    identidad se declaró — eso lo prueba la fila de `evidencias`.
+
+81. **`sense_conveni` de `priorizar-entidades` replica la resta, no la regla.** Para no llamar a
+    `convenio_vigente()` 111 veces por oferta, lee `convenios_exigidos` y los convenios vigentes y
+    calcula la diferencia en TypeScript. La regla sigue en la tabla y la autoridad sigue siendo la
+    RPC (`exigir_convenio`): una divergencia solo produce un aviso de más o de menos en el panel.
+82. ⚠️ **Un agente NO debe hacer `git checkout` de un fichero compartido para restaurar su entorno
+    de pruebas.** Pasó el 10-09-2026 y costó trabajo: un agente montó rutas e i18n temporales para
+    poder medir, y al terminar restauró `src/router/index.tsx` y `src/lib/i18n.tsx` con
+    `git checkout` — llevándose por delante la integración de la fase 4 que estaba en el árbol sin
+    commitear. **El build no lo detecta**: unas rutas que no existen y unas claves que faltan
+    compilan igual, así que se commiteó una fase entera con sus pantallas inalcanzables. Lo cazó el
+    intento de integrar la fase siguiente. Regla: quien toque un fichero compartido guarda **copia
+    del contenido** y restaura esa copia, nunca la versión de git; y el orquestador **audita
+    cobertura de rutas y de claves** antes de cada commit, no solo el build. Es la tercera cara de
+    la deuda 63: las herramientas locales asumen un único operador.
 
 ## 13. Al terminar cualquier cambio
 

@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
 
     const { data: excedente, error: exError } = await supabase
       .from("excedentes")
-      .select("familia, producto, kg_total, ubicacion_id, productor_id")
+      .select("familia, producto, kg_total, ubicacion_id, productor_id, modalitat")
       .eq("id", excedente_id)
       .maybeSingle();
     if (exError) {
@@ -136,6 +136,13 @@ Deno.serve(async (req) => {
     // distintas y el panel necesita las dos para explicar por qué un botón está gris.
     const modoTest = await modoTestActivo(supabase);
 
+    // Y `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
+    const sinConvenio = await entidadesSinConvenio(
+      supabase,
+      excedente.modalitat,
+      (entidades ?? []).map((e: { id: string }) => e.id),
+    );
+
     const rankingConCanal = ranking.map((e) => {
       const ficha = porId.get(e.id);
       const contacto = ficha?.telefono ? porTelefono.get(ficha.telefono) : undefined;
@@ -153,12 +160,96 @@ Deno.serve(async (req) => {
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,
         email_possible: d.emailPosible,
+        // Aviso, no bloqueo: el bloqueo duro lo hace la base al aprobar (§fase 2).
+        sense_conveni: sinConvenio.has(e.id),
       };
     });
 
-    return json({ excedente_id, contexto, modo_test: modoTest, ranking: rankingConCanal });
+    return json({
+      excedente_id,
+      contexto,
+      modo_test: modoTest,
+      modalitat: excedente.modalitat ?? null,
+      ranking: rankingConCanal,
+    });
   } catch (err) {
     console.error("priorizar-entidades:", err instanceof Error ? err.message : String(err));
     return json({ error: "Error interno o JSON inválido" }, 500);
   }
 });
+
+// ---------------------------------------------------------------------------
+// `sense_conveni`: a quién le falta el papel para poder recibir esto (fase 2)
+// ---------------------------------------------------------------------------
+// Es un AVISO, no un bloqueo. El bloqueo lo hace la base, y solo desde la fecha de corte
+// (D7): `aprovar_resposta()` llama a `exigir_convenio()`, que antes del corte devuelve
+// texto y después levanta `42501 sense_conveni:`. Aquí lo único que se hace es que el
+// panel pueda pintarlo **antes** de aprobar, que es donde un aviso sirve de algo: uno
+// después de haber canalizado no evita nada.
+//
+// ⚠️ POR QUÉ NO SE LLAMA A `convenio_vigente()` UNA VEZ POR ENTIDAD, que sería lo obvio.
+//    Son 111 entidades: 111 llamadas RPC por cada vez que alguien abre una oferta. En su
+//    lugar se leen las **dos** tablas de las que esa función sale —la matriz y los
+//    convenios vigentes— y se hace la resta aquí. La regla de negocio sigue viviendo
+//    donde tiene que vivir (`convenios_exigidos`, que se cambia con un `insert`); lo que
+//    se replica es la resta, no la regla.
+//
+//    Y la autoridad sigue siendo `convenio_vigente()`: si esto y la base discreparan, el
+//    panel enseñaría un aviso de más o de menos y la aprobación seguiría decidiendo bien.
+//    Es la única duplicación aceptable, porque el peor caso es cosmético.
+//
+// Semántica copiada literalmente de la RPC: una valorización **sin ninguna fila** en la
+// matriz no exige nada. No es un descuido: bloquear por omisión pararía el servicio el día
+// que alguien añada una valorización nueva.
+
+// deno-lint-ignore no-explicit-any
+type ClienteSupabase = any;
+
+async function entidadesSinConvenio(
+  supabase: ClienteSupabase,
+  modalitat: string | null | undefined,
+  entidadIds: string[],
+): Promise<Set<string>> {
+  const sin = new Set<string>();
+  const valorizacion = (modalitat ?? "").trim();
+  if (!valorizacion || entidadIds.length === 0) return sin;
+
+  const { data: exigidos, error: errEx } = await supabase
+    .from("convenios_exigidos")
+    .select("valorizacion, parte, tipo_convenio")
+    .eq("valorizacion", valorizacion)
+    .eq("parte", "recibe");
+  if (errEx) {
+    // Sin la matriz no se puede afirmar que falte nada: se calla. Un aviso inventado en
+    // 111 filas es peor que no avisar.
+    console.error("convenios_exigidos select:", errEx.message);
+    return sin;
+  }
+  const tipos = (exigidos ?? []).map((f: { tipo_convenio: string }) => f.tipo_convenio);
+  if (tipos.length === 0) return sin;
+
+  const { data: vigentes, error: errConv } = await supabase
+    .from("convenios")
+    .select("id, tipo, estado, entidad_id")
+    .eq("estado", "vigent")
+    .in("tipo", tipos)
+    .in("entidad_id", entidadIds);
+  if (errConv) {
+    console.error("convenios select:", errConv.message);
+    return sin;
+  }
+
+  const porEntidad = new Map<string, Set<string>>();
+  for (const c of vigentes ?? []) {
+    const fila = c as { tipo: string; entidad_id: string | null };
+    if (!fila.entidad_id) continue;
+    const ya = porEntidad.get(fila.entidad_id) ?? new Set<string>();
+    ya.add(fila.tipo);
+    porEntidad.set(fila.entidad_id, ya);
+  }
+  for (const id of entidadIds) {
+    const tiene = porEntidad.get(id) ?? new Set<string>();
+    if (tipos.some((t: string) => !tiene.has(t))) sin.add(id);
+  }
+  return sin;
+}

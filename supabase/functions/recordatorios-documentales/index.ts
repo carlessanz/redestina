@@ -689,6 +689,9 @@ Deno.serve(async (req) => {
         "Els <strong>enllaços</strong> els avisem a l'equip i no a les persones destinatàries perquè el sistema <strong>no pot reenviar-los</strong>: " +
         "de cada token només se'n desa l'empremta, i el text original només existeix al correu que es va enviar. " +
         "Per tornar a provar-ho cal revocar l'enllaç i emetre'n un de nou des del panell, o bé trucar. " +
+        "Mira la columna <strong>Què espera</strong>: una <strong>signatura de conveni</strong> no es resol com una " +
+        "<strong>confirmació d'albarà</strong> —l'albarà el pot confirmar l'equip pel panell passat el termini, i el conveni no: " +
+        "o es torna a enviar, o es fa una <strong>signatura assistida</strong> a la propera visita—. " +
         "Les <strong>factures</strong>, en canvi, sí que s'avisen al donant; a partir del segon avís queden marcades per trucar.",
     }),
   });

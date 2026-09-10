@@ -318,6 +318,29 @@ const DOCUMENTAL_EXTERN: Check[] = [
     args: { p_objeto_tipo: "cierre_donante", p_objeto_id: "00000000-0000-0000-0000-000000000000" },
     descripcion: "pot preguntar pels SEUS permisos (respon false, sense error)",
   },
+  // Convenios (fase 2). Un externo LEE lo suyo y **no mueve ninguna pieza del ciclo de
+  // firma**: ni prepara, ni envía, ni contrafirma, ni resuelve. Las dos que solo puede
+  // llamar el servidor —firmar por enlace y validar el código— tampoco: quien firma no
+  // tiene sesión, así que si `authenticated` pudiera llamarlas, cualquier cuenta podría
+  // firmar un convenio ajeno conociendo el uuid de su enlace.
+  { tabla: "convenios_exigidos", op: "leer", esperado: "permitir", descripcion: "lee la matriz de convenios exigidos (catálogo)" },
+  { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
+  {
+    tabla: "convenio_vigente",
+    op: "rpc",
+    esperado: "permitir",
+    args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_valorizacion: "donacio", p_parte: "entrega" },
+    descripcion: "pot consultar si li cal conveni (respon false, sense error)",
+  },
+  { tabla: "preparar_convenio", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" }, descripcion: "NO prepara convenis" },
+  { tabla: "enviar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO envia convenis a firmar" },
+  { tabla: "contrafirmar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO contrasigna cap conveni" },
+  { tabla: "retornar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna cap conveni" },
+  { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol cap conveni" },
+  { tabla: "iniciar_firma_asistida", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO obre cap firma assistida" },
+  { tabla: "firmar_convenio_por_enlace", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO firma per enllaç (això és del servidor)" },
+  { tabla: "validar_codi_firma", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_codi: "000000" }, descripcion: "NO valida el codi de firma (això és del servidor)" },
+  { tabla: "aprovar_resposta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO aprova cap resposta a una oferta" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -515,6 +538,51 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
     // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
     { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
+    // Convenios (fase 2). El equipo lo LEE todo, prepara y envía; **contrasignar, retornar
+    // y resolver son de `pot_aprovar()`**, como aprobar una canalización: es el punto de
+    // control humano del circuito de firma, no una tarea del día a día.
+    {
+      tabla: "convenios",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els convenis",
+      requiereFixture: "algún convenio (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    { tabla: "convenios_exigidos", op: "leer", esperado: "permitir", descripcion: "ve la matriu de convenis exigits" },
+    { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenis a mà (van per RPC)" },
+    {
+      tabla: "v_campanya_convenis",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el seguiment de la campanya",
+      requiereFixture: "alguna organización activa (las fichas TEST-* del fixture)",
+    },
+    {
+      tabla: "v_fitxes_incompletes_conveni",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve què falta a cada fitxa per al conveni",
+      requiereFixture: "alguna organización activa (las fichas TEST-* del fixture)",
+    },
+    // Preparar sí: es el paso 2 de la campaña y lo hace el dinamizador. Sobre una
+    // organización que no existe, la autorización pasa y el insert falla con la FK, así
+    // que no deja ni una fila detrás (mismo truco que `reiniciar_cierre_prueba`).
+    {
+      tabla: "preparar_convenio",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" },
+      descripcion: "pot preparar un conveni (autoritza; l'organització no existeix)",
+    },
+    { tabla: "contrafirmar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO contrasigna (és de pot_aprovar)" },
+    { tabla: "retornar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna un conveni (és de pot_aprovar)" },
+    { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol un conveni (és de pot_aprovar)" },
+    // Y NI EL EQUIPO firma por nadie: `firmar_convenio_por_enlace` y `validar_codi_firma`
+    // son solo de `service_role`. Es lo que hace que una firma acredite algo: si el equipo
+    // pudiera invocarla, el registro de evidencias no distinguiría a quien firmó de quien
+    // tenía el panel abierto.
+    { tabla: "firmar_convenio_por_enlace", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000" }, descripcion: "NI l'equip firma per algú (només el servidor)" },
+    { tabla: "validar_codi_firma", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_codi: "000000" }, descripcion: "NI l'equip valida el codi (només el servidor)" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -596,6 +664,31 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve el acumulado anual de todos los donantes",
       requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Convenios (fase 2): la contraparte de los tres «denegar» del técnico. Sobre un uuid
+    // inventado la autorización pasa y la función falla después con 22023 («aquest conveni
+    // no existeix»), sin dejar rastro: contrafirmar uno de verdad emitiría un documento con
+    // número, que es exactamente lo que un arnés no debe crear.
+    {
+      tabla: "contrafirmar_convenio",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_id: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot contrasignar un conveni (autoritza; el conveni no existeix)",
+    },
+    {
+      tabla: "resolver_convenio",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "Comprobación del arnés de RLS" },
+      descripcion: "pot resoldre un conveni (autoritza; el conveni no existeix)",
+    },
+    {
+      tabla: "convenios",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve tots els convenis",
+      requiereFixture: "algún convenio (scripts/crear-datos-documentales-prueba.ts)",
+    },
   ],
   productor: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
@@ -663,6 +756,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve el detall del SEU acumulat",
       requiereFixture: "un cierre de prueba calculado con su ficha (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Convenios (fase 2): ve EL SUYO. TEST-PROD-1 lo tiene vigente (firmado y
+    // contrafirmado por el fixture); TEST-PROD-2 no tiene ninguno, así que su comprobación
+    // sale SALTADA — y eso es lo correcto: si viera el de TEST-PROD-1 sería un escape.
+    {
+      tabla: "convenios",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU conveni (només el seu)",
+      requiereFixture: "el conveni vigent de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -716,6 +819,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // asunto suyo. Esto sí es una política, no falta de datos: el fixture crea una
     // espigolada y el equipo la ve.
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "NO ve la espigolada de origen" },
+    // Convenios (fase 2): ve EL SUYO. TEST-ENT-SOCIAL tiene uno `pendent_firma` (el
+    // fixture lo prepara y lo envía, pero no lo firma: es el estado que hay que poder ver
+    // en la bandeja de la campaña).
+    {
+      tabla: "convenios",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU conveni (només el seu)",
+      requiereFixture: "el conveni pendent de firma de TEST-ENT-SOCIAL (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // Ni el cierre del donante del que ha recibido: el certificado es del donante.
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO ve l'acumulat anual de cap donant" },
     { tabla: "cierre_donante_lineas", op: "leer", esperado: "denegar", descripcion: "NO ve les línies de cap tancament" },
@@ -732,6 +845,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
+    { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -751,6 +865,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
+    { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
@@ -782,6 +897,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // prueba —tampoco el suyo, si lo tuviera—. Es una política, no falta de datos: el
     // fixture crea el cierre y el equipo lo ve.
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO veu cap acumulat anual (fitxa real, cap tancament real)" },
+    {
+      tabla: "convenios",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els convenis de les SEVES dues organitzacions",
+      requiereFixture: "un convenio de la ficha de productor o de entidad de esta cuenta",
+    },
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
 };
@@ -802,6 +924,13 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   cierres_ejercicio: { ejercicio: 2020, modo: "prueba" },
   cierres_donante: { productor_id: "00000000-0000-0000-0000-000000000000" },
   espigoladas: { fecha: "1999-01-01" },
+  // `convenios` no tiene GRANT de escritura para nadie: la fila se rellena lo justo para
+  // que lo que corte sea el permiso y no un `not null` ni el check excluyente.
+  convenios: {
+    tipo: "don_gen",
+    tipo_org: "productor",
+    productor_id: "00000000-0000-0000-0000-000000000000",
+  },
   costes_producto: { producto: "Tomàquet", ejercicio: 1999, coste_kg: 1, motivo: "TEST-RLS" },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.

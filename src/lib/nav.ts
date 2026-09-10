@@ -11,7 +11,7 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, Calculator, ClipboardCheck, Coins, FileText, FolderOpen, Handshake, History,
+  Building2, Calculator, ClipboardCheck, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, UserCircle, Users,
 } from 'lucide-react'
@@ -62,6 +62,7 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/espigolades/nova', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/tancament', labelKey: 'nav.tancament', icon: Calculator },
       { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins },
+      { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },
     ],
   },
   {

@@ -1,4 +1,4 @@
-// Cola global de aprobaciones. Son dos colas distintas en la misma pantalla:
+// Cola global de aprobaciones. Son tres colas distintas en la misma pantalla:
 //
 // 1. REGISTRES PENDENTS — altas hechas desde el registro público
 //    (`membresias.aprovacio = 'pendent'`). Hasta que alguien las valida la persona no
@@ -9,23 +9,33 @@
 //    `tipo_receptor` a null, y sin ellos queda fuera de la priorización y no ve ninguna
 //    oferta—, por eso cada fila enlaza con su ficha para revisarla ANTES de aprobar.
 //
-// 2. APROVACIONS D'OFERTES — aceptaciones de entidades pendientes de confirmar. Antes
+// 2. CONVENIS PER CONTRASIGNAR — convenios que la organización ya ha firmado
+//    (`convenios.estado = 'firmat'`) y esperan el punto de control humano: alguien con
+//    `pot_aprovar()` revisa el NIF y el cargo y valida, o los devuelve con motivo
+//    (§3.2.4, paso 6). Al validar se estampa la firma de la apoderada y el convenio pasa
+//    a `vigent`, que es lo que habilita a esa organización a operar. Aquí se contrafirma
+//    directamente —es un sí/no sobre dos datos— y se enlaza al detalle para revisar el
+//    resto antes de decidir.
+//
+// 3. APROVACIONS D'OFERTES — aceptaciones de entidades pendientes de confirmar. Antes
 //    solo se veían entrando en cada oferta; con receptores aceptando desde su panel
 //    (canal 'panel') la cola crece sin que nadie la mire. Aprobar sigue haciéndose en el
 //    detalle de la oferta, donde está el contexto (kg que faltan, preu, resto de
 //    respuestas).
 //
-// ⚠️ Las dos colas son independientes a propósito: si la migración del registro público
-//    todavía no está aplicada, la consulta de `membresias` falla por columna inexistente
-//    y esa sección se queda vacía, pero la de ofertas sigue funcionando igual.
+// ⚠️ Las tres colas son independientes a propósito: si una migración todavía no está
+//    aplicada, su consulta falla por tabla o columna inexistente y esa sección se queda
+//    vacía, pero las otras dos siguen funcionando igual.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
-import type { Membresia } from '../../types'
+import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
+import type { Convenio, Membresia } from '../../types'
+import DialegMotiu from '../../components/DialegMotiu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +85,15 @@ interface Perfil {
   telefono: string | null
 }
 
+/** Convenio firmado esperando contrafirma, con la ficha embebida por su FK. */
+type ConveniPendent = Pick<
+  Convenio,
+  'id' | 'tipo' | 'tipo_org' | 'numero_completo' | 'firmado_at' | 'datos_org' | 'firmante'
+> & {
+  productores: { id: string; name: string | null; empresa: string | null; poblacion: string | null } | null
+  entidades: { id: string; nombre: string | null; poblacion: string | null } | null
+}
+
 const TIPUS_RECEPTOR = ['social', 'animal', 'transformador', 'comercial']
 
 function quan(iso: string): string {
@@ -92,8 +111,14 @@ export default function Aprovacions() {
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
   const [carregantReg, setCarregantReg] = useState(true)
-  /** Id de la membresía que se está resolviendo, para no dejar pulsar dos veces. */
+  const [convenis, setConvenis] = useState<ConveniPendent[]>([])
+  const [carregantConv, setCarregantConv] = useState(true)
+  /** Id de la fila que se está resolviendo, para no dejar pulsar dos veces. */
   const [ocupat, setOcupat] = useState<string | null>(null)
+  /** El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35). */
+  const [motiuDe, setMotiuDe] = useState<
+    { tipus: 'registre'; registre: Registre } | { tipus: 'conveni'; conveni: ConveniPendent } | null
+  >(null)
 
   // Con el contexto degradado (RPC de sesión no desplegada) se asume que sí: es como se
   // ha comportado la app siempre. La RPC revalida de todas formas y devuelve 42501.
@@ -149,9 +174,31 @@ export default function Aprovacions() {
     setCarregantReg(false)
   }, [])
 
+  const carregaConvenis = useCallback(async () => {
+    // ⚠️ Lista de columnas en UN literal (§7, deuda 46). Las dos fichas SÍ se embeben:
+    // `convenios` tiene FK real a `productores` y a `entidades`, al revés que `perfiles`.
+    const { data, error } = await supabase
+      .from('convenios')
+      .select('id, tipo, tipo_org, numero_completo, firmado_at, datos_org, firmante, productores(id, name, empresa, poblacion), entidades(id, nombre, poblacion)')
+      .eq('estado', 'firmat')
+      .order('firmado_at', { ascending: true, nullsFirst: false })
+
+    if (error) {
+      // Migración de convenios sin aplicar: la sección se queda vacía y las otras dos
+      // siguen vivas.
+      console.warn('convenis per contrasignar:', error.message)
+      setConvenis([])
+      setCarregantConv(false)
+      return
+    }
+    setConvenis((data as unknown as ConveniPendent[]) ?? [])
+    setCarregantConv(false)
+  }, [])
+
   useEffect(() => {
     void carrega()
     void carregaRegistres()
+    void carregaConvenis()
     const canal = supabase
       .channel('aprovacions-pendents')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'oferta_respuestas' },
@@ -160,9 +207,12 @@ export default function Aprovacions() {
       // recargar. Si no está aplicada, simplemente no llega ningún evento.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'membresias' },
         () => void carregaRegistres())
+      // `convenios` NO está en la publicación de Realtime (decisión D del plan: en las
+      // tablas documentales se consulta, no se suscribe), así que esa cola se refresca al
+      // entrar y después de cada acción. Con un puñado de contrafirmas al día es de sobra.
       .subscribe()
     return () => { void supabase.removeChannel(canal) }
-  }, [carrega, carregaRegistres])
+  }, [carrega, carregaRegistres, carregaConvenis])
 
   /** Los dos errores que las RPC lanzan a propósito tienen texto propio. */
   function textError(err: { code?: string; message: string }): string {
@@ -180,16 +230,34 @@ export default function Aprovacions() {
     void carregaRegistres()
   }
 
-  async function rebutjarRegistre(r: Registre) {
-    const motiu = window.prompt(t('appr.reg_reject_reason'))
-    if (motiu === null) return
+  async function rebutjarRegistre(r: Registre, motiu: string) {
     setOcupat(r.id)
     const { error } = await supabase.rpc('rebutjar_registre',
       { p_membresia: r.id, p_motiu: motiu || null })
     setOcupat(null)
+    setMotiuDe(null)
     if (error) { toast.error(textError(error)); return }
     toast.success(t('appr.reg_rejected'))
     void carregaRegistres()
+  }
+
+  async function contrafirmar(c: ConveniPendent) {
+    setOcupat(c.id)
+    const res = await contrafirmarConveni(c.id)
+    setOcupat(null)
+    if (!res.ok) { toast.error(res.missatge); return }
+    toast.success(t('conv.countersigned'))
+    void carregaConvenis()
+  }
+
+  async function retornar(c: ConveniPendent, motiu: string) {
+    setOcupat(c.id)
+    const res = await retornarConveni(c.id, motiu)
+    setOcupat(null)
+    setMotiuDe(null)
+    if (!res.ok) { toast.error(res.missatge); return }
+    toast.success(t('conv.returned'))
+    void carregaConvenis()
   }
 
   return (
@@ -254,7 +322,7 @@ export default function Aprovacions() {
                       {t('appr.reg_approve')}
                     </Button>
                     <Button size="sm" variant="outline" disabled={!potAprovar || ocupat === r.id}
-                      onClick={() => void rebutjarRegistre(r)}>
+                      onClick={() => setMotiuDe({ tipus: 'registre', registre: r })}>
                       {t('appr.reg_reject')}
                     </Button>
                   </div>
@@ -265,6 +333,71 @@ export default function Aprovacions() {
         </CardContent>
       </Card>
 
+      {/* ── 2. Convenis per contrasignar ── */}
+      <Card>
+        <CardHeader>
+          <CardTitle>{t('appr.conv_title')}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{t('appr.conv_subtitle')}</p>
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {carregantConv && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+          {!carregantConv && convenis.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('appr.conv_empty')}</p>
+          )}
+          {convenis.map((c) => {
+            const fitxa = c.tipo_org === 'productor'
+              ? (c.productores?.empresa || c.productores?.name || null)
+              : (c.entidades?.nombre || null)
+            const nom = nomOrganitzacio(c.datos_org, fitxa)
+            const poblacio = c.tipo_org === 'productor' ? c.productores?.poblacion : c.entidades?.poblacion
+            const nif = typeof c.datos_org?.nif === 'string' ? c.datos_org.nif : null
+            const firmant = c.firmante ?? {}
+
+            return (
+              <div key={c.id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <Badge variant="secondary">{t(`sig.model_${c.tipo}`)}</Badge>
+                      <span className="font-medium">{nom}</span>
+                    </div>
+                    {/* NIF y cargo son EXACTAMENTE lo que hay que revisar antes de estampar
+                        (§3.2.4, paso 6): salen aquí para no tener que abrir el detalle
+                        cuando están bien, que es casi siempre. */}
+                    <div className="text-xs text-muted-foreground">
+                      {[c.numero_completo, nif ? `NIF ${nif}` : null, poblacio].filter(Boolean).join(' · ')}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t('appr.conv_signer', {
+                        nom: firmant.nombre ?? '—',
+                        carrec: firmant.cargo ?? '—',
+                        date: c.firmado_at ? quan(c.firmado_at) : '—',
+                      })}
+                    </div>
+                    {!nif && <div className="text-xs text-destructive">{t('appr.conv_no_nif')}</div>}
+                  </div>
+                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                    <Button asChild size="sm" variant="outline">
+                      <Link to={`/equip/convenis/${c.id}`}>{t('c.detail')}</Link>
+                    </Button>
+                    <Button size="sm" className="whitespace-normal"
+                      disabled={!potAprovar || ocupat === c.id}
+                      onClick={() => void contrafirmar(c)}>
+                      {t('appr.conv_countersign')}
+                    </Button>
+                    <Button size="sm" variant="outline" disabled={!potAprovar || ocupat === c.id}
+                      onClick={() => setMotiuDe({ tipus: 'conveni', conveni: c })}>
+                      {t('conv.return')}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      {/* ── 3. Aprovacions d'ofertes ── */}
       <Card>
         <CardHeader>
           <CardTitle>{t('appr.title')}</CardTitle>
@@ -296,6 +429,24 @@ export default function Aprovacions() {
           ))}
         </CardContent>
       </Card>
+
+      {/* El motivo de las dos acciones que lo exigen. Un único diálogo para las dos colas:
+          lo que cambia es a quién se lo cuenta, no lo que se pregunta. */}
+      <DialegMotiu
+        obert={motiuDe !== null}
+        onObert={(v) => { if (!v) setMotiuDe(null) }}
+        titol={t(motiuDe?.tipus === 'conveni' ? 'conv.return_title' : 'appr.reg_reject')}
+        descripcio={t(motiuDe?.tipus === 'conveni' ? 'conv.return_desc' : 'appr.reg_reject_desc')}
+        etiqueta={t(motiuDe?.tipus === 'conveni' ? 'conv.return_label' : 'appr.reg_reject_reason')}
+        confirmar={t(motiuDe?.tipus === 'conveni' ? 'conv.return' : 'appr.reg_reject')}
+        destructiu={motiuDe?.tipus === 'registre'}
+        ocupat={ocupat !== null}
+        onConfirma={(m) => {
+          if (!motiuDe) return
+          if (motiuDe.tipus === 'conveni') void retornar(motiuDe.conveni, m)
+          else void rebutjarRegistre(motiuDe.registre, m)
+        }}
+      />
     </div>
   )
 }

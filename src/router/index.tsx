@@ -30,6 +30,15 @@ import Albarans from '../routes/equip/Albarans'
 import AlbaraDetall from '../routes/equip/AlbaraDetall'
 import { EspigoladaDetall, NovaEspigolada } from '../routes/equip/Espigolades'
 import Confirmar from '../routes/public/Confirmar'
+import Signar from '../routes/public/Signar'
+import Tancament from '../routes/equip/Tancament'
+import TancamentDetall from '../routes/equip/TancamentDetall'
+import Costos from '../routes/equip/Costos'
+import Convenis from '../routes/equip/Convenis'
+import ConveniDetall from '../routes/equip/ConveniDetall'
+import CampanyaConvenis from '../routes/equip/CampanyaConvenis'
+import ProductorDocuments from '../routes/productor/Documents'
+import ReceptorDocuments from '../routes/receptor/Documents'
 import Factura from '../routes/public/Factura'
 import Aprovacions from '../routes/equip/Aprovacions'
 import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
@@ -50,6 +59,7 @@ export const router = createBrowserRouter([
       { path: '/registre', element: <Registre /> },
       { path: '/confirmar/:token', element: <Confirmar /> },
       { path: '/factura/:token', element: <Factura /> },
+      { path: '/signar/:token', element: <Signar /> },
       { path: '/restablir', element: <RestablirClau /> },
 
       // ── Privada ──
@@ -82,6 +92,12 @@ export const router = createBrowserRouter([
                   { path: 'albarans/:id', element: <AlbaraDetall />, handle: { titleKey: 'nav.albarans' } },
                   { path: 'espigolades/nova', element: <NovaEspigolada />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },
+                  { path: 'tancament', element: <Tancament />, handle: { titleKey: 'nav.tancament', ample: true } },
+                  { path: 'tancament/:id', element: <TancamentDetall />, handle: { titleKey: 'nav.tancament', ample: true } },
+                  { path: 'costos', element: <Costos />, handle: { titleKey: 'nav.costos', ample: true } },
+                  { path: 'convenis', element: <Convenis />, handle: { titleKey: 'nav.convenis', ample: true } },
+                  { path: 'convenis/campanya', element: <CampanyaConvenis />, handle: { titleKey: 'nav.convenis', ample: true } },
+                  { path: 'convenis/:id', element: <ConveniDetall />, handle: { titleKey: 'nav.convenis' } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],
@@ -98,6 +114,7 @@ export const router = createBrowserRouter([
                   // `key` explícita: los dos «perfil» tienen la misma forma de match y sin
                   // ella React reutiliza la instancia entre paneles, arrastrando el estado
                   // de la organización anterior.
+                  { path: 'documents', element: <ProductorDocuments />, handle: { titleKey: 'nav.my_documents' } },
                   { path: 'perfil', element: <PerfilOrganitzacio key="productor" tipus="productor" />, handle: { titleKey: 'nav.my_producer_org' } },
                 ],
               },
@@ -109,6 +126,7 @@ export const router = createBrowserRouter([
                   { path: 'mercat', element: <Mercat />, handle: { titleKey: 'nav.market' } },
                   { path: 'interessos', element: <Interessos />, handle: { titleKey: 'nav.my_interests' } },
                   { path: 'historic', element: <Historic />, handle: { titleKey: 'nav.history' } },
+                  { path: 'documents', element: <ReceptorDocuments />, handle: { titleKey: 'nav.entity_documents' } },
                   { path: 'perfil', element: <PerfilOrganitzacio key="entidad" tipus="entidad" />, handle: { titleKey: 'nav.my_entity' } },
                 ],
               },

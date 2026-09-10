@@ -13,6 +13,19 @@
 // residuo posible —una cuenta de Auth sin membresía— es inocuo: sin membresía activa
 // no ve absolutamente nada (mis_productores/mis_entidades filtran por `activo`).
 //
+// Y DESDE LA FASE 2, una cuarta cosa que **no se compensa a propósito**: el convenio en
+// `esborrany` y su enlace de firma (§3.2.4, «Dentro del registro»). Si ese paso falla, el
+// alta se da por buena igualmente y el equipo prepara el convenio desde la campaña: negar
+// un registro entero porque no se pudo preparar un contrato que todavía nadie ha leído
+// sería tirar a la basura lo único que la persona vino a hacer.
+//
+// ⚠️ EL TOKEN DE FIRMA SOLO SE DEVUELVE SI FIRMA AHORA MISMO. Cuando la persona dice ser
+//    la representante legal, la respuesta trae el token para que la propia pantalla siga
+//    a `/signar/<token>`: no viaja por ningún sitio, es la misma sesión y la misma
+//    persona. Cuando indica el correo de otra persona, el enlace se crea y se queda
+//    esperando: esta función NO envía correo (ver abajo) y quien lo manda es el equipo
+//    desde la bandeja de la campaña.
+//
 // NO ENVÍA NINGÚN CORREO, y es deliberado. Con el modo test activo (§8) la cuenta recién
 // creada no pasaría `esCuentaPermitida` —su organización nace con es_test = false—, así
 // que el correo se descartaría en silencio y el alta quedaría a medias: una persona
@@ -107,6 +120,16 @@ interface Dades {
   telefon: string | null;
   poblacio: string | null;
   tipoReceptor: string | null;
+  // --- fase 2: lo que el convenio necesita de la ficha, y quién lo firma
+  nif: string | null;
+  domicili: string | null;
+  codiPostal: string | null;
+  representant: string | null;
+  carrec: string | null;
+  /** `true` = la persona que registra dice ser la representante legal y firma ya. */
+  firmarAra: boolean;
+  /** Correo de quien firmará, si no es quien registra. */
+  emailSignant: string | null;
 }
 
 type Validacio = { ok: true; dades: Dades } | { ok: false; camp: string; error: string };
@@ -187,9 +210,43 @@ function validar(body: Record<string, unknown>): Validacio {
     return { ok: false, camp: "tipo_receptor", error: "Un productor no te tipus de receptor" };
   }
 
+  // -------------------------------------------------------------------------
+  // Fase 2: los datos del convenio. TODOS opcionales, y no es una laxitud.
+  // -------------------------------------------------------------------------
+  // `preparar_convenio()` no exige ficha completa a propósito (§3.2.6, paso 2): lo que
+  // falte se pide en la página de firma, y descubrir qué falta es justo lo que la campaña
+  // quiere. Exigir el NIF aquí convertiría un formulario de alta en una gestoría y dejaría
+  // fuera a quien no lo tenga a mano.
+  const corto = (v: unknown, max: number) => textNet(v).slice(0, max) || null;
+  const nif = corto(body.nif, 20);
+  const domicili = corto(body.domicili ?? body.domicilio, 200);
+  const codiPostal = corto(body.codi_postal ?? body.codigo_postal, 10);
+  const representant = corto(body.representant ?? body.representante, 120);
+  const carrec = corto(body.carrec ?? body.cargo, 120);
+
+  const firmarAra = body.firmar_ara === true;
+  let emailSignant: string | null = null;
+  const signantBrut = textNet(body.email_signant).toLowerCase();
+  if (signantBrut) {
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(signantBrut) || signantBrut.length > 200) {
+      return { ok: false, camp: "email_signant", error: "El correu de qui signa no es valid" };
+    }
+    emailSignant = signantBrut;
+  }
+  if (firmarAra && emailSignant && emailSignant !== email) {
+    return {
+      ok: false,
+      camp: "email_signant",
+      error: "O signes tu ara mateix o indiques el correu d'una altra persona, no les dues coses",
+    };
+  }
+
   return {
     ok: true,
-    dades: { rol, nomOrganitzacio, nomPersona, email, password, telefon, poblacio, tipoReceptor },
+    dades: {
+      rol, nomOrganitzacio, nomPersona, email, password, telefon, poblacio, tipoReceptor,
+      nif, domicili, codiPostal, representant, carrec, firmarAra, emailSignant,
+    },
   };
 }
 
@@ -326,6 +383,9 @@ Deno.serve(async (req) => {
         email: d.email,
         phone: d.telefon,
         poblacion: d.poblacio,
+        nif: d.nif,
+        direccion: d.domicili,
+        codigo_postal: d.codiPostal,
         // es_test = false: una organización que se registra sola NO recibe envíos
         // mientras el modo test esté activo (§8). Lo marca el equipo si toca.
         es_test: false,
@@ -336,6 +396,9 @@ Deno.serve(async (req) => {
         email: d.email,
         telefono: d.telefon,
         poblacion: d.poblacio,
+        nif: d.nif,
+        direccion: d.domicili,
+        codigo_postal: d.codiPostal,
         tipo_receptor: d.tipoReceptor,
         // opt_in = false: el consentimiento de WhatsApp se recoge aparte (§12.3).
         opt_in: false,
@@ -384,7 +447,13 @@ Deno.serve(async (req) => {
       return responder({ error: "No s'ha pogut completar el registre", code: "error_intern" }, 500);
     }
 
-    return responder({ ok: true }, 200);
+    // -----------------------------------------------------------------------
+    // 4. El convenio en borrador y su enlace de firma (§3.2.4). Fuera del camino
+    //    de compensación: si falla, el alta sigue siendo válida (ver cabecera).
+    // -----------------------------------------------------------------------
+    const conveni = await prepararConveni(supabase, d, fitxaId);
+
+    return responder({ ok: true, conveni }, 200);
   } catch (err) {
     // Cualquier cosa no prevista: se intenta dejar la base como estaba, en orden
     // inverso al de creación. Si la compensación también falla queda en el log con
@@ -404,5 +473,109 @@ async function esborrarUsuari(supabase: Cliente, userId: string): Promise<void> 
   const { error } = await supabase.auth.admin.deleteUser(userId);
   if (error) {
     console.error("[registro] NO se pudo compensar el alta de auth:", userId, error.message);
+  }
+}
+
+
+// ---------------------------------------------------------------------------
+// El convenio dentro del alta (fase 2, §3.2.4 «Dentro del registro»)
+// ---------------------------------------------------------------------------
+// Dos RPC y ninguna decisión propia:
+//   · `preparar_convenio()` compone el borrador con la plantilla vigente del modelo que
+//     le toca a la organización —un productor firma `don_gen`; una entidad, `don_rec`—.
+//     El de compraventa no se prepara aquí: se prepara cuando la organización opera en
+//     venta o maquila, y en el alta todavía no sabemos si lo hará.
+//   · `enviar_convenio()` crea el enlace de firma (token de 256 bits, del que en la base
+//     solo queda el sha256) y devuelve el token EN CLARO, que es la única vez que existe.
+//
+// NUNCA LANZA. Lo peor que puede pasar es que el registro responda sin convenio y el
+// equipo lo prepare desde la campaña, que es exactamente el camino de las 452 fichas que
+// ya existen. Un alta perdida, en cambio, no se recupera.
+//
+// ⚠️ Aquí NO se manda ningún correo, igual que en el resto de esta función y por el mismo
+//    motivo (§8): la organización nace con `es_test = false` y, con el modo test activo,
+//    el correo se descartaría en silencio. Si firma quien registra, el token vuelve en la
+//    respuesta y la pantalla sigue sola; si firma otra persona, el enlace queda creado y
+//    lo envía el equipo.
+
+interface ConveniPreparat {
+  id: string;
+  tipo: string;
+  estado: string;
+  /** Solo cuando firma quien registra, y en la misma respuesta HTTP. */
+  token: string | null;
+  /** A quién apunta el enlace, para poder decirlo en pantalla. */
+  destinatari: string | null;
+  /** `true` = el enlace existe pero todavía no se ha enviado a nadie. */
+  pendent_enviament: boolean;
+}
+
+async function prepararConveni(
+  supabase: Cliente,
+  d: Dades,
+  fitxaId: string,
+): Promise<ConveniPreparat | null> {
+  try {
+    const tipoOrg = d.rol === "productor" ? "productor" : "entidad";
+    const tipo = d.rol === "productor" ? "don_gen" : "don_rec";
+
+    const { data: conv, error: errPrep } = await supabase.rpc("preparar_convenio", {
+      p_tipo_org: tipoOrg,
+      p_org: fitxaId,
+      p_tipo: tipo,
+      p_idioma: null,
+      p_roles_com: null,
+    });
+    if (errPrep || !conv) {
+      // El caso esperable es `22023`: todavía no hay plantilla vigente de ese modelo.
+      console.warn("[registro] preparar_convenio:", errPrep?.code, errPrep?.message);
+      return null;
+    }
+    const fila = conv as { id: string; tipo: string; estado: string };
+
+    // Quién firma. Sin ninguno de los dos, el borrador se queda como está y el equipo
+    // decide a quién se lo manda: es una organización más de la campaña.
+    const destinatari = d.firmarAra ? d.email : d.emailSignant;
+    if (!destinatari) {
+      return {
+        id: fila.id,
+        tipo: fila.tipo,
+        estado: fila.estado,
+        token: null,
+        destinatari: null,
+        pendent_enviament: false,
+      };
+    }
+
+    const { data: env, error: errEnv } = await supabase.rpc("enviar_convenio", {
+      p_id: fila.id,
+      p_email: destinatari,
+    });
+    if (errEnv || !env) {
+      console.warn("[registro] enviar_convenio:", errEnv?.code, errEnv?.message);
+      return {
+        id: fila.id,
+        tipo: fila.tipo,
+        estado: fila.estado,
+        token: null,
+        destinatari: null,
+        pendent_enviament: false,
+      };
+    }
+    const salida = env as { enllac?: { token?: string; destinatari?: string } };
+
+    return {
+      id: fila.id,
+      tipo: fila.tipo,
+      estado: "pendent_firma",
+      // El token SOLO si firma quien está delante. Devolverlo cuando firma otra persona
+      // sería poner una credencial al portador en manos de quien no la tiene que usar.
+      token: d.firmarAra ? (salida.enllac?.token ?? null) : null,
+      destinatari: salida.enllac?.destinatari ?? destinatari,
+      pendent_enviament: !d.firmarAra,
+    };
+  } catch (e) {
+    console.warn("[registro] conveni no preparat:", e instanceof Error ? e.message : String(e));
+    return null;
   }
 }

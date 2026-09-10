@@ -49,7 +49,9 @@ export interface ContextSessio {
    * desplegada, o la RPC falla). Se trata como equipo interno: es el comportamiento
    * que la app ha tenido siempre, y con `roles_activos` apagado es además el correcto.
    */
-  degradat: boolean
+  degradat: boolean  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto */
+  conveni_pendent?: boolean
+
 }
 
 /** Forma cruda que devuelve la RPC (snake_case, como en la base). */
@@ -68,7 +70,9 @@ export interface ContextCru {
   organizaciones: Organitzacio[]
   /** Opcionales: los añade la migración del registro público; sin ella llegan `undefined`. */
   registre_pendent?: boolean
-  registre_rebutjat?: boolean
+  registre_rebutjat?: boolean  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto */
+  conveni_pendent?: boolean
+
 }
 
 export function mapejaContext(cru: ContextCru): ContextSessio {
