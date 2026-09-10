@@ -160,9 +160,11 @@ export SUPABASE_URL="${SUPABASE_URL:-$VITE_SUPABASE_URL}"   # el script pide SUP
 deno run -A scripts/comprobar-rls.ts
 ```
 
-Referencia: **56/57**. El único rojo aceptable es `receptor-comercial · excedentes · leer`
-(no hay ninguna oferta de `venda` publicada, así que ver 0 filas es correcto). **Cualquier otro
-rojo es una regresión**: no des la publicación por buena.
+Referencia: **56/56 correctas y 1 saltada**, terminando en «Sin fallos de permisos» y con código
+de salida 0. La saltada es `receptor-comercial · excedentes · leer`, y el propio arnés dice qué
+fixture le falta. **Cualquier FALLA es una regresión**: no des la publicación por buena. Hasta el
+10-09-2026 esto salía como `56/57` con un rojo y el mensaje «Revisa las políticas», que parecía una
+emergencia siendo el resultado normal.
 
 Si algo se torció con los permisos: `deno run -A scripts/roles-activos.ts off` (10 segundos), y
 si no basta, `scripts/sql/rls-emergencia.sql`.
@@ -173,7 +175,7 @@ Una línea por paso, con OK o FALLO y el detalle de lo que hiciste. Incluye siem
 
 - el SHA publicado y si hubo commit o el árbol ya estaba limpio;
 - qué funciones se redesplegaron de verdad y cuáles dijeron `No change found`;
-- el resultado del arnés (`56/57`) si lo ejecutaste;
+- el resultado del arnés (`56/56` + 1 saltada) si lo ejecutaste;
 - los interruptores de producción que siguen pendientes, para que no se olviden:
   **`VITE_ACCESSOS_TEST`** (si está en `true`, las contraseñas de las cuentas de prueba viajan en
   el bundle y cualquiera que abra `/login` entra como ellas; es **variable de build**, así que

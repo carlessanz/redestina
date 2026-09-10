@@ -1809,7 +1809,8 @@ Redestina en producción real quedan pasos de configuración y negocio.
    reales en `priorizar-entidades`. Un `deno check` en un hook o en Actions los habría cazado el
    día que se escribieron.
 2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
-   (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/57 —§13— y la
+   (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/56 + 1 saltada
+   —§13— y la
    diferencia está explicada en la deuda 32). El único rojo era, y sigue siendo, un receptor
    comercial sin ninguna oferta de `venda` publicada, que es el comportamiento correcto. Queda de deuda: `tipo_receptor`
    sigue en `null` en 111 entidades y sin él un receptor no ve ninguna oferta —es triaje manual—, y
@@ -1920,8 +1921,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `sense_rol` (3) y `pendent` (6) de `scripts/comprobar-rls.ts` siguen escritos —son la
     especificación de lo que esas cuentas deben *no* poder hacer— pero el arnés recorre las cuentas de
     `cuentas-prueba.json`, y desde el recorte del 31-07-2026 ninguna tiene esos roles: por eso la
-    referencia pasó de 65/66 a **56/57**. No es un fallo de comportamiento, es **cobertura perdida**,
-    y el arnés no lo avisa (salta el bloque en silencio). Se recupera dando de alta una organización
+    referencia pasó de 65/66 a **56/56 + 1 saltada**. No es un fallo de comportamiento, es
+    **cobertura perdida**; el arnés sigue saltando esos bloques en silencio por no tener cuenta que
+    los recorra, aunque desde el 10-09-2026 sí avisa de la cobertura que se queda huérfana **dentro**
+    de un bloque que sí se recorre (§12.48). Se recupera dando de alta una organización
     por `/registre` y añadiendo su credencial con `"rol": "pendent"` (§9). Con ello, la **cola de
     «Registres pendents» también vuelve a tener con qué probarse**, que hoy está vacía.
 33. **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK: la tabla
@@ -1999,6 +2002,24 @@ Redestina en producción real quedan pasos de configuración y negocio.
     se lanzan a mano, así que valen lo que valga la disciplina de quien commitea. Un hook de
     `pre-commit` con las dos primeras (la tercera necesita credenciales) es barato y cerraría la
     parte accionable de la deuda 1.
+48. ~~**El arnés daba por fallo lo que solo era falta de datos.**~~ — **resuelta (10-09-2026)**. El
+    check «el receptor ve las ofertas compatibles» salía en rojo para el receptor comercial porque
+    no hay ninguna oferta de `venda` publicada, y el arnés remataba con «Revisa las políticas antes
+    de seguir» + `exit 1`. O sea que **el resultado normal se presentaba como una emergencia**, y
+    solo se sabía que era inofensivo leyendo este documento. El 10-09-2026 costó una sesión: el
+    arnés se dio por roto cuando estaba dando el resultado correcto.
+    El fondo del asunto es que **con RLS activa un `select` que devuelve 0 filas no distingue «la
+    política me bloquea» de «no hay nada que ver»**: no hay error, la política simplemente filtra.
+    Marcarlo como fallo afirmaba más de lo que el arnés puede saber. Ahora esas lecturas llevan
+    `requiereFixture` y salen como **saltadas**, con una línea que dice qué crear para recuperar la
+    cobertura. Es la misma idea del mecanismo `vacias` que ya existía para las tablas sin filas,
+    extendida al **subconjunto** que una cuenta debería ver.
+    ⚠️ Lo que eso podía tapar, y por eso lleva red: el check lo comparten las dos cuentas
+    receptoras, así que si RLS se rompiera y **ninguna** viera ofertas, antes habrían sido dos rojos
+    y ahora serían dos saltadas silenciosas. El informe avisa aparte cuando una comprobación queda
+    saltada por **todas** las cuentas de su bloque —«no las cubre nadie»—, que es la señal que de
+    verdad importa. El agrupado es por bloque de la matriz y no por tabla: el check homónimo del
+    equipo, que sí pasa, taparía el de los receptores.
 
 ## 13. Al terminar cualquier cambio
 
@@ -2006,8 +2027,9 @@ Redestina en producción real quedan pasos de configuración y negocio.
 2. `deno check` si el cambio toca `scripts/` o `supabase/functions/`: `tsc` no mira ni lo uno ni lo
    otro (§11 trae la orden con su `--config`, que es obligatorio).
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles. Referencia
-   actual: **56/57** (el rojo conocido es un receptor comercial sin ninguna oferta de `venda`
-   publicada, que es el comportamiento correcto). Cualquier otro rojo es una regresión.
+   actual: **56/56 correctas y 1 saltada** —el receptor comercial, que no tiene ninguna oferta de
+   `venda` que ver—, y termina en «Sin fallos de permisos». **Cualquier FALLA es una regresión**:
+   ya no hay rojos «conocidos y correctos» que haya que aprender a ignorar (§12.48).
 4. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
    redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
 5. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un

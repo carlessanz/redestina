@@ -93,6 +93,15 @@ interface Check {
   /** Solo para `rpc`: nombre de la función si no coincide con `tabla`. */
   rpc?: string;
   /**
+   * Solo para `leer`+`permitir`: qué fixture hace falta para que esta comprobación
+   * signifique algo. Con RLS activa, **0 filas es indistinguible** de «la política me
+   * bloquea» y de «no hay nada que ver»: el `select` no da error, simplemente filtra.
+   * Así que cuando no hay datos esto se marca SALTADA, no FALLA — afirmar un fallo de
+   * permisos sería afirmar más de lo que se sabe. El texto dice qué crear para
+   * recuperar la cobertura, y sale en el informe.
+   */
+  requiereFixture?: string;
+  /**
    * Solo para `rpc`: argumentos. El valor literal "@meva_membresia" se sustituye en
    * tiempo de ejecución por el id de la propia membresía —y por el uuid nulo si la
    * cuenta no ve ninguna—, para que la comprobación mida la AUTORIZACIÓN y no un
@@ -137,12 +146,20 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   ],
   // OJO con el receptor: «ve las ofertas compatibles» solo se cumple si existe alguna
   // oferta viva de una modalitat que le encaje (`modalitat_receptor_compat`). Un
-  // receptor comercial sin ninguna oferta de venda publicada verá 0, y estará bien.
-  // Para que el arnés sea informativo, pon aquí una cuenta cuya modalitat tenga oferta.
+  // receptor comercial sin ninguna oferta de venda publicada verá 0, y estará bien: por
+  // eso ese check lleva `requiereFixture` y sale como SALTADA en vez de FALLA. La
+  // propiedad en sí no queda sin cubrir mientras haya otra cuenta receptora que sí
+  // tenga ofertas compatibles (hoy, la social).
   receptor: [
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "NO ve las fichas de productor" },
     { tabla: "entidades", op: "leer", esperado: "permitir", descripcion: "ve SU entidad (solo la suya)" },
-    { tabla: "excedentes", op: "leer", esperado: "permitir", descripcion: "ve las ofertas compatibles" },
+    {
+      tabla: "excedentes",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve las ofertas compatibles",
+      requiereFixture: "una oferta publicada de una modalitat compatible con su tipo_receptor",
+    },
     { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "oferta_respuestas", op: "insertar", esperado: "denegar", descripcion: "NO escribe respuestas a mano (van por RPC)" },
@@ -196,6 +213,8 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
 
 interface Resultado {
   cuenta: string;
+  /** Bloque de la matriz que se le aplicó: agrupa la cobertura por caso del modelo. */
+  rol?: Cuenta["rol"];
   check: Check;
   ok: boolean;
   /** true = la tabla no tiene datos, así que la comprobación no demuestra nada. */
@@ -358,8 +377,15 @@ for (const cuenta of ordenadas) {
     if (esEquipo && check.op === "leer" && check.esperado === "permitir" && detalle.startsWith("0 filas")) {
       vacias.add(check.tabla);
     }
-    const saltada = check.op === "leer" && check.esperado === "permitir" && vacias.has(check.tabla);
-    resultados.push({ cuenta: cuenta.etiqueta, check, ok: saltada ? true : ok, saltada, detalle });
+    // Dos motivos para saltar, y los dos son el mismo argumento: 0 filas no prueba nada.
+    // `vacias` cubre la tabla entera sin filas; `requiereFixture`, el subconjunto que esta
+    // cuenta debería ver y que hoy no existe (p. ej. un receptor comercial cuando no hay
+    // ninguna oferta de venda publicada: `excedentes` tiene filas, pero ninguna suya).
+    const sinDatos = check.op === "leer" && check.esperado === "permitir" &&
+      detalle.startsWith("0 filas");
+    const saltada = (check.op === "leer" && check.esperado === "permitir" &&
+      vacias.has(check.tabla)) || (sinDatos && check.requiereFixture !== undefined);
+    resultados.push({ cuenta: cuenta.etiqueta, rol: cuenta.rol, check, ok: saltada ? true : ok, saltada, detalle });
   }
   await cliente.auth.signOut();
 }
@@ -384,14 +410,43 @@ for (const r of resultados) {
 }
 
 const fallos = resultados.filter((r) => !r.ok);
-const saltadas = resultados.filter((r) => r.saltada).length;
+const saltadasLista = resultados.filter((r) => r.saltada);
+const saltadas = saltadasLista.length;
 console.log(
   `\n${resultados.length - fallos.length - saltadas}/${resultados.length - saltadas} ` +
     `comprobaciones correctas` + (saltadas > 0 ? ` (${saltadas} sin datos que comprobar).` : "."),
 );
+
+// Qué cobertura falta y cómo recuperarla. Sin esto, una saltada es una línea «sense» que
+// nadie sabe interpretar; el arnés debe decir qué crear para que vuelva a medir algo.
+if (saltadas > 0) {
+  console.log("\nSin datos que comprobar (no es un fallo de permisos: con RLS activa,");
+  console.log("0 filas es indistinguible de «no hay nada»). Para recuperar la cobertura:");
+  for (const r of saltadasLista) {
+    const falta = r.check.requiereFixture ?? `alguna fila en ${r.check.tabla}`;
+    console.log(`  · ${r.cuenta} · ${r.check.tabla}: falta ${falta}`);
+  }
+
+  // ⚠️ Saltar una comprobación porque UNA cuenta no tiene datos es normal; que la salten
+  // TODAS las que la llevan significa que esa propiedad ya no la verifica nadie, y eso
+  // se parece demasiado a un fallo de permisos como para pasarlo en una línea gris.
+  const clave = (r: { rol?: Cuenta["rol"]; check: Check }) =>
+    `${r.rol ?? "?"} · ${r.check.tabla}·${r.check.op}`;
+  const totales = new Map<string, number>();
+  for (const r of resultados) totales.set(clave(r), (totales.get(clave(r)) ?? 0) + 1);
+  const huerfanas = new Set<string>();
+  for (const k of new Set(saltadasLista.map(clave))) {
+    if (saltadasLista.filter((r) => clave(r) === k).length === totales.get(k)) huerfanas.add(k);
+  }
+  if (huerfanas.size > 0) {
+    console.log("\n⚠️  Y estas no las comprobó NINGUNA cuenta, así que hoy no las cubre nadie:");
+    for (const k of huerfanas) console.log(`  · ${k}`);
+  }
+}
+
 if (fallos.length > 0) {
   console.log("\nRevisa las políticas antes de seguir. Para volver al estado permisivo:");
   console.log("  psql … -f scripts/sql/rls-emergencia.sql   (o pégalo en el SQL Editor)\n");
   Deno.exit(1);
 }
-console.log();
+console.log("\nSin fallos de permisos.\n");
