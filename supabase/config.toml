@@ -519,3 +519,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/descargar-documento/deno.json"
 entrypoint = "./functions/descargar-documento/index.ts"
+
+# Recordatorios del circuito documental: enlaces sin usar a 7 y 14 días. La llama pg_cron
+# a las 7:00 (disparar_recordatorios_documentales), así que va sin JWT y con el mismo
+# secreto compartido que generar-documento. No sirve ficheros estáticos.
+[functions.recordatorios-documentales]
+enabled = true
+verify_jwt = false
+import_map = "./functions/recordatorios-documentales/deno.json"
+entrypoint = "./functions/recordatorios-documentales/index.ts"

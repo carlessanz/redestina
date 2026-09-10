@@ -360,6 +360,7 @@ src/
                                Registre (/registre) y RestablirClau (/restablir) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia, escrita por RPC con lista blanca
   routes/equip/                Envoltorios de las pantallas que ya existían + Aprovacions
+                               + Documents (bandeja del sistema documental)
   routes/productor/            Inicio, listado, alta de oferta y detalle
   routes/receptor/             Mercat, interessos i històric
   types.ts                     Tipos de todas las tablas
@@ -378,6 +379,7 @@ src/
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
     settings.ts                getTestMode()/setTestMode(): modo test global (app_settings, §8)
+    documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
     email.ts                   enviarEmail(): llama a la Edge Function enviar-email
     i18n.tsx                   Sistema de traducciones (ca/es, per defecte ca; useT, §7)
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
@@ -407,6 +409,7 @@ scripts/
   crear-usuarios-prueba.ts     5 organizaciones ficticias TEST-* y 7 cuentas, idempotente (§9)
   crear-usuarios-whatsapp.ts   5 cuentas de organización sobre las fichas REALES con móvil en
                                Meta; no crea ni toca ninguna ficha, solo enlaza (§9)
+  prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
   diagnostico-whatsapp.ts      Interroga la Graph API y distingue token caducado / número / permisos (§8ter)
   sql/rls-emergencia.sql       Paracaídas: restaura las políticas permisivas (NO es migración)
@@ -415,6 +418,8 @@ supabase/
   config.toml                  Config del CLI (puertos 553xx, ver §7)
   migrations/*.sql             Migraciones versionadas
   functions/
+    _shared/cors.ts            originPermitido()/corsPara(): CORS de las funciones públicas (§10)
+    _shared/pdf/               Motor de PDF: maquetador A4, fuentes embebidas, plantillas, render/
     _shared/whatsapp.ts        Graph API + interruptor de envío (texto/plantilla/interactivos)
     _shared/intake.ts          Motor conversacional (máquina de estados)
     _shared/oferta.ts          crearExcedente(): id_excedente + texto "OFERTA DISPONIBLE"
@@ -434,6 +439,11 @@ supabase/
     registro/index.ts          POST público: alta self-service (cuenta + ficha + membresía
                                PENDIENTE; el acceso lo concede el equipo al aprobar, §9)
     enviar-acceso/index.ts     POST: enlace mágico por correo y código de 6 cifras por WhatsApp (§9)
+    generar-documento/         POST (secreto): renderiza el PDF y lo sube al bucket. activos/ con
+                               las fuentes y el logo, declarados con static_files en config.toml
+    descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
+    recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
+                               (el token no se puede reenviar, §9)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo
 docs/                          Material de trabajo local — IGNORADO POR GIT (§7)
@@ -629,9 +639,98 @@ exactamente a `documentos.ruta` y no elige carpeta: si la eligiera ella, la estr
 dependería del código desplegado en cada momento. ⚠️ La función es **`stable`, no `immutable`**:
 resolver el propietario exige leer tablas del dominio.
 
-**GRANT**: `authenticated` solo `SELECT` en `documentos`, `documento_envios` y
-`series_documentales`. **Ninguna escritura, en ninguna fase**: la superficie de escritura son las
-RPC `security definer` y `service_role`.
+**`plantillas_documento`** — el TEXTO de los documentos, versionado y en la base
+(`20260928100100`): `tipo` (mismo vocabulario que `documentos.tipo`), `idioma` (`ca`/`es`),
+`version`, `titulo`, `cuerpo jsonb`, `marcadores text[]`, `vigente`, `valida_desde`.
+`unique (tipo, idioma, version)` e índice único parcial `(tipo, idioma) where vigente`. `cuerpo` =
+bloques `{tipo:'h1'|'h2'|'h3'|'p'|'lista'|'salt', text}` con `{{marcadores}}`: exactamente lo que
+consume `_shared/pdf/plantilla.ts`. **Está en la base y no en el código** porque el texto lo
+redacta la Fundación, cambia sin que cambie el software, y hay que poder responder con qué texto
+EXACTO se emitió un documento de hace cinco años. Un documento ya emitido **no cambia** si la
+plantilla cambia: lleva su snapshot en `documentos.datos`. Trigger `plantillas_inmutables`: en
+cuanto un `documentos` la referencia, tipo/idioma/versión/título/cuerpo/marcadores quedan
+congelados (42501); solo se puede mover `vigente` y `valida_desde`. **Sin GRANT de DELETE**: una
+plantilla se retira, no se borra. Se siembra solo la de `PROVA` (ca+es), que no es texto de
+negocio sino el ejemplo ejecutable del formato.
+
+⚠️ La FK `documentos.plantilla_id → plantillas_documento(id)` vive en
+**`20260928100250_fk_documentos_plantilla.sql`**, no en `…100100`, y no es una preferencia:
+`100100 < 100200`, así que en cualquier entorno recreado desde cero ese fichero se aplica **antes**
+de que exista `documentos` y el `alter table` fallaría. Que hoy funcione en local —donde `100200`
+ya estaba aplicada y `100100` llegó fuera de orden— habría escondido el problema hasta el primer
+`db reset`.
+
+**`enlaces_token`** — firmar y confirmar **sin tener cuenta** (`20260928100300`): `proposito`
+(`firma_convenio`·`confirmacion_albaran`·`subida_factura`), `objeto_tipo` + `objeto_id`,
+`destinatario_email`, `canal` (`email`·`asistido`), **`token_hash` UNIQUE**, `codigo_hash`,
+`caduca_at`, `abierto_at`, `usado_at`, `estado`, `recordatorios`, `ultimo_recordatorio_at`.
+Índice parcial `(caduca_at) where estado='activo' and usado_at is null` (el de los recordatorios
+de 7/14 días). **El token en claro solo existe en el correo**: en la base queda el sha256 de 32
+bytes aleatorios, como una contraseña. `canal='asistido'` es el enlace que abre el dinamizador
+delante de la persona (modelo asistido, §1bis), no un atajo.
+
+**`evidencias`** — lo que hace que una firma propia valga algo: `enlace_id` (FK cascade), `tipo`
+(`apertura`·`firma`·`confirmacion`·`subida`·`codigo`), `nombre`, `cargo`,
+**`documento_identidad`**, `declaracion_representacion`, `trazo_firma_ruta`, `ip inet`,
+`user_agent`, **`sha256_texto`** (huella del texto EXACTO que se aceptó: sin ella, «firmó» no dice
+qué firmó), `payload jsonb`, `asistido_por`. No se borran nunca.
+
+**`resolver_enlace(token_hash)`** — `security definer`, EXECUTE **solo `service_role`** (quien la
+llama no tiene sesión: lo que autoriza es tener el token). Devuelve la fila **sin las
+credenciales** —`tiene_codigo boolean` en vez de `codigo_hash`— más **`estado_efectivo`**
+calculado al vuelo. **La caducidad no se guarda, se calcula**: si hubiera que escribirla, entre el
+instante en que vence y el instante en que un job la marca el enlace seguiría funcionando. 0 filas
+si el hash no coincide, y quien llama decide si eso es 404 o 410.
+
+**`parametros_documentales`** — fila única (`id int pk check (id = 1)`, `20260928100400`) con los
+datos de Espigoladors que encabezan todos los documentos y los umbrales del circuito
+(`caducidad_enlace_dias` 30, `caducidad_confirmacion_dias` 15, `tolerancia_conciliacion_pct` 2,
+`plazo_conciliar_sin_confirmacion_dias` 7, `fecha_corte_convenios`, `cierre_apertura`,
+`cierre_provisional`). **No es `app_settings`** porque aquí hacen falta tipos: un `'2%'` mal
+escrito en clave/valor no lo detecta nadie hasta que una conciliación decide mal. RLS: select
+`es_intern()`, update `es_super_admin()`. `apoderada_dni` se **escribe pero no se lee** (GRANT de
+UPDATE sí, de SELECT no), que es la asimetría correcta para ese dato. **Hoy está sembrada con
+valores provisionales explícitos**: cada campo dice `PROVISIONAL — pendent de …` dentro del propio
+texto (así sale impreso si alguien emite antes de tiempo), `cif = 'G00000000'` **no es un CIF
+válido** a propósito, y `apoderada_dni`/`email_equipo` quedan NULL porque ninguna migración pone
+datos personales en git. La columna **`datos_provisionales`** lo hace comprobable por código.
+
+**`municipios`** — el nomenclátor oficial (`20260928100500`): `codi_ine` (5 dígitos, **texto y no
+int** porque los de Barcelona empiezan por 0), `nom` (forma oficial con artículo pospuesto:
+`Ametlla del Vallès, l'`), `comarca`, `provincia`. **947 municipios y 43 comarcas** (Moianès y
+Lluçanès incluidos), cruzados entre la API de IDESCAT y el dataset «Municipis Catalunya Geo» del
+portal de datos abiertos: los 947 códigos y los 947 nombres coinciden en las dos fuentes, así que
+no hay ninguna fila reconciliada a mano. Es dato público sin nada personal, así que **sí va en
+git**, al revés que `scripts/data/` (§7). `productor_ubicaciones.municipio_ine` (nullable) **nace
+nula en las 12 ubicaciones que hay**: casar el texto libre es un script aparte con ambigüedades
+reales. Existe para dos cosas que hoy no se pueden hacer: que el «mismo municipio +2» de la
+priorización deje de comparar cadenas, y que el albarán de entrega diga municipio y **comarca** de
+origen sin nombrar al donante (D3).
+
+**Jobs** (`20260928100700`, cierra la deuda 49) — trigger `documentos_encola_generacion`
+(`after insert on documentos` → `net.http_post` a `generar-documento` con `x-documentos-secret` de
+`app_config`) y dos de `pg_cron`: `documentos-pendientes` (`*/5 * * * *`, reencola
+`pendiente_fichero`/`error` con `fichero_at is null` e `intentos < 5`, `limit 50`) y
+`recordatorios-documentales` (`0 7 * * *`). **Hacen falta los dos, trigger y job**: solo el
+trigger, un `net.http_post` perdido deja un documento sin PDF para siempre y nadie se entera; solo
+el job, quien acaba de pulsar «Emet» mira cinco minutos una pantalla que dice «Generant…». El tope
+de 5 intentos es deliberado: lo que falla cinco veces (una plantilla rota, un parámetro que falta)
+no se arregla repitiendo. **Sin el secreto en `app_config`, los tres disparadores son no-op con
+`notice`**, que es lo que permite emitir documentos de prueba en local sin que nada salga a la red.
+
+**GRANT**: `authenticated` tiene `SELECT` completo en `documentos`, `documento_envios`,
+`series_documentales`, `plantillas_documento` y `municipios`; `INSERT`/`UPDATE` (sin DELETE) en
+`plantillas_documento`; y **`SELECT` y `UPDATE` por columnas** en `parametros_documentales`, más
+`SELECT` por columnas en `enlaces_token` y `evidencias`. **Ninguna escritura en `documentos`,
+`documento_envios`, `series_documentales`, `enlaces_token`, `evidencias` ni `municipios`**: la
+superficie de escritura son las RPC `security definer` y `service_role`.
+
+⚠️ **Cuatro columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
+`enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad` y
+`parametros_documentales.apoderada_dni`. RLS no sabe restringir columnas; el GRANT sí (mismo
+patrón que `perfiles`, §4bis). Consecuencia práctica: **un `select('*')` sobre esas tres tablas
+responde `42501 permission denied for column`** — hay que pedir columnas explícitas, y en un solo
+literal (§7).
 
 ### Integridad
 
@@ -831,9 +930,27 @@ sesión** → `401` (no `403`).
 
 ### Verificación
 
-`deno run -A scripts/comprobar-rls.ts` (§11): abre sesión real con cada cuenta —con la publishable
+`deno run -A scripts/comprobar-rls.ts` (§11): abre sesión con cada cuenta —con la publishable
 key, como el navegador— y comprueba una matriz declarativa de *(cuenta, tabla, operación) →
-permitir/denegar*. Es la primera comprobación automática del proyecto que no es `tsc`. Las
+permitir/denegar*. Referencia con el sistema documental: **95/95 correctas y 12 saltadas** (107
+comprobaciones). Contra local hay que darle también `SB_SECRET_KEY`: ahí no inicia sesión, firma el
+JWT, porque el CLI apaga el login por correo (§9).
+
+Del sistema documental comprueba que el técnico lee plantillas y parámetros pero **no los
+escribe**, que el super_admin sí, que ninguna cuenta externa ve plantillas, parámetros, enlaces ni
+evidencias, que **el nomenclátor sí lo ve todo el mundo** (es catálogo, como `productos`) y —lo que
+no afirmaba nada más— que **ni el equipo puede leer `enlaces_token.token_hash`,
+`evidencias.documento_identidad` ni `parametros_documentales.apoderada_dni`**.
+
+Dos mecanismos que conviene conocer antes de tocarlo:
+- **`Check.columnas`**. En las tablas con GRANT por columnas, un `select('*')` lo corta el GRANT
+  *antes* de evaluar ninguna política, así que un check «denegar» saldría verde **sin haber probado
+  la RLS**. Con la lista explícita, lo que devuelve 0 filas es la política; la columna sensible se
+  comprueba aparte, con su propio check que sí espera `permission denied for column`.
+- **Un `UPDATE` denegado por RLS no da error.** PostgREST no encuentra filas que cumplan el `using`
+  y devuelve éxito con cero afectadas, así que un rechazo era indistinguible de un acierto. La rama
+  de `actualizar` pide ahora las filas afectadas (`.select('id')`) y trata «cero filas sobre una
+  fila que sé que existe» como denegación. Es el argumento del §12.48 por el otro lado. Es la primera comprobación automática del proyecto que no es `tsc`. Las
 credenciales viven en `scripts/data/cuentas-prueba.json` (fuera de git).
 
 Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key='roles_activos';`
@@ -1009,7 +1126,7 @@ que corresponde al momento de cierre y todavía no está implementado.
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** |
+| **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · perfil` | Sus ofertas, su progreso y el **alta con el mismo cuestionario del intake** |
 | **Receptor** | `/receptor/mercat · interessos · historic · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés y su histórico |
 
@@ -1561,6 +1678,30 @@ la única que hay es `hello_world`, que no admite variables—. Para el resto de
 Mandarlo por WhatsApp de forma general exigiría número de producción y una plantilla de categoría
 `AUTHENTICATION` (checkpoint §12.2).
 
+### Recordatorios de enlaces (`recordatorios-documentales`)
+
+`POST /functions/v1/recordatorios-documentales {}` — **pública** (`--no-verify-jwt`) porque la
+llama `pg_cron` a las 7:00; se protege con el mismo secreto compartido que `generar-documento`
+(`x-documentos-secret` / `DOCUMENTOS_SECRET`, en `app_config.documentos_secret` para el job).
+Busca enlaces `activo`, sin `usado_at` y **con `caduca_at` en el futuro** —la caducidad se calcula,
+no se guarda— que lleven 7 días (`recordatorios = 0`) o 14 (`recordatorios = 1`); a partir del
+segundo aviso no manda nada más.
+
+⚠️ **El recordatorio no puede llevar el enlace, y por eso va al equipo y no al destinatario.** De
+`enlaces_token` solo existe `token_hash`: el token en claro vive únicamente en el correo original.
+Emitir uno nuevo rompería en silencio el que la persona quizá ya tiene abierto —y revocar+crear es
+una decisión del equipo, no de un cron—; mandar un correo sin enlace sería un aviso que no se puede
+accionar. Así que se manda **un solo resumen diario** a `parametros_documentales.email_equipo` con
+los enlaces vencidos, para que alguien reenvíe desde el panel o llame. Es el modelo asistido
+(§1bis) aplicado al recordatorio.
+
+Respeta los gates (§8): `modoTestActivo()` + `esEmailTest()` **sobre el destinatario**, aunque el
+correo vaya al equipo —lo que el aviso desencadena es reenviar un enlace a esa persona—; un enlace
+`asistido` (sin correo con que comprobarlo) también se salta con el modo test activo. **Los
+contadores solo se suben si el correo salió**: si no, el hito sigue pendiente y se reintenta
+mañana. Con `email_equipo` NULL (hoy lo es) no falla: lo registra, lo cuenta como
+`sense_email_equip` y sigue. Devuelve `{ok, revisados, avisados, saltados, motivos}`.
+
 ### Registro self-service (`registro`, 31-07-2026)
 
 `POST /functions/v1/registro` — **pública** (`--no-verify-jwt`), porque la llama quien todavía no
@@ -1857,6 +1998,9 @@ supabase functions deploy recuperar-password --no-verify-jwt     # login públic
 supabase functions deploy crear-oferta         # con verify_jwt (alta desde el panel del productor)
 supabase functions deploy registro --no-verify-jwt               # registro público self-service (§9)
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
+supabase functions deploy generar-documento --no-verify-jwt      # la llama el trigger por pg_net
+supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 60 s)
+supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama pg_cron
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -1895,6 +2039,18 @@ deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas
 deno run -A scripts/crear-usuarios-whatsapp.ts           # crearlas (no toca ninguna ficha)
 
 supabase migration up --local                 # aplicar migraciones pendientes SOLO en local (no borra datos)
+
+# ⚠️ La tanda documental necesita --include-all. El spike aplicó 20260928100600 y ...100800
+# dejando huecos por debajo, así que las seis migraciones de la segunda mitad de la fase 1
+# son «anteriores a la última aplicada» y el CLI las rechaza con
+# LegacyMigrationMissingRemoteError. No es un error: es el precio de haber adelantado dos
+# ficheros en el spike.
+supabase migration up --local --include-all
+supabase db push --include-all            # en remoto, la primera vez tras la fase 1
+
+# Secreto del sistema documental, en los DOS sitios (el job lo manda, la función lo valida):
+deno run -A scripts/set-config.ts documentos_secret '<valor>'   # app_config
+supabase secrets set DOCUMENTOS_SECRET='<el mismo valor>'       # secreto de la función
 ```
 
 Emergencia de RLS (§4bis), por orden: primero el interruptor,
@@ -1954,6 +2110,19 @@ Redestina en producción real quedan pasos de configuración y negocio.
    `service_role` y no hay procedimiento escrito.
 9. **Checklist de ficha antes de aprobar una entidad**: sin `estat` no entra en la priorización y
    sin `tipo_receptor` no ve ninguna oferta. Hoy es conocimiento tácito del equipo.
+10. **Datos reales de Espigoladors en `parametros_documentales`.** La fila está sembrada con
+    valores provisionales visibles (§4). Antes de emitir nada con efecto fiscal hay que sustituir
+    razón social, CIF, domicilio, inscripción, los datos de la apoderada, los PNG de firma y sello
+    (al bucket privado `activos`), `email_equipo` y `fecha_corte_convenios`, y poner
+    `datos_provisionales = false`. ⚠️ **`email_equipo` es NULL** y es el destinatario de TODO lo
+    que se emite en modo prueba: hasta que se rellene, un cierre de ensayo no tiene a dónde enviar.
+11. **Textos legales de las plantillas.** `plantillas_documento` solo trae sembrada la de `PROVA`
+    (el ejemplo del formato). Los textos ca/es de REC, ENT, OPE, CONV, RES, CD, CT y PLA los
+    entrega la fase 0 y los introduce el equipo desde la pantalla: una migración no inserta texto
+    legal sin validar.
+12. **Casar `productor_ubicaciones.municipio_ine`** con el texto libre que hay hoy (script aparte,
+    con ambigüedades reales: hay nombres de municipio repetidos entre provincias). Hasta entonces
+    la columna es nula en las 12 ubicaciones y la priorización sigue comparando cadenas.
 
 **Deuda técnica:**
 
@@ -2183,12 +2352,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     verdad importa. El agrupado es por bloque de la matriz y no por tabla: el check homónimo del
     equipo, que sí pasa, taparía el de los receptores.
 
-49. **El trigger de encolado de PDF no existe todavía.** `documentos_encola_generacion`
-    (`after insert` → `net.http_post` a `generar-documento` con `x-documentos-secret` de
-    `app_config`) y `20260928100700_jobs_documentales.sql` (reintento cada 5 min,
-    recordatorios diarios) quedaron **fuera del spike a propósito**, para poder medir el tiempo
-    de generación sin el cron de por medio. Hasta que entren, un `documentos` en
-    `pendiente_fichero` se queda ahí y hay que llamar a la función a mano.
+49. ~~**El trigger de encolado de PDF no existe todavía.**~~ — **resuelta**:
+    `20260928100700_jobs_documentales.sql` trae el trigger y los dos jobs (§4 «Sistema
+    documental»). Sin el secreto en `app_config` son no-op con `notice`, que es lo que permite
+    emitir documentos de prueba en local sin que nada salga a la red.
 50. **`ruta_documento()` solo resuelve `PROVA`.** Las demás ramas —el propietario por tipo—
     levantan `0A000` porque las tablas de dominio no existen todavía. Cada fase rellena la suya
     con `create or replace`; el `case` objetivo está escrito en comentario dentro de la propia
@@ -2216,6 +2383,35 @@ Redestina en producción real quedan pasos de configuración y negocio.
     cualquier autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. Es el
     fail-open deliberado de §4bis, no una regresión: hay que encender el interruptor antes de
     juzgar el resultado. Está escrito en la cabecera del script.
+
+55. **Los cuatro campos sensibles del sistema documental los protege un GRANT, no una política,
+    y eso se puede deshacer sin querer.** `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
+    `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están fuera del
+    GRANT de SELECT (§4). Un `grant select on all tables in schema public to authenticated`
+    —exactamente la línea que ya existe en `20260721160000`— los volvería a abrir **sin que
+    ninguna política cambie ni ningún test de RLS lo note**. Hoy lo vigila el arnés con cuatro
+    checks dedicados; el arreglo de verdad es no volver a escribir nunca un GRANT masivo sobre
+    `all tables`, y añadir el `revoke` correspondiente si alguna vez se hace.
+56. **`parametros_documentales` está sembrada con datos provisionales, y nada impide todavía
+    emitir con ellos.** La fila lleva `datos_provisionales = true`, textos que dicen
+    `PROVISIONAL — pendent de …` y un CIF inválido a propósito, pero **ninguna RPC comprueba ese
+    flag antes de emitir**: hoy solo protege que se vea a simple vista en el PDF. Cuando la fase 4
+    emita certificados con efecto fiscal, `emitir_certificado()` tiene que negarse mientras el
+    flag esté puesto.
+
+57. **El recordatorio de un enlace no llega a quien tiene que responder.** Llega al equipo,
+    porque el token no se puede reconstruir desde su hash (§9). Cierra el circuito, pero mete una
+    persona en medio de algo que debería ser automático. La salida no es guardar el token en claro
+    —eso es exactamente lo que la tabla evita— sino que la bandeja del panel ofrezca «revocar i
+    reenviar» en un clic y que el aviso enlace ahí; hoy el correo solo puede describir el enlace.
+58. **`MAX_POR_EJECUCION = 50` en `recordatorios-documentales`.** Si se acumulan más enlaces
+    vencidos, los que sobran se cuentan como `limit_execucio` y esperan al día siguiente. Es
+    intrascendente para un recordatorio y acota el coste del gate, pero es un tope silencioso:
+    solo se ve en `motivos`.
+59. **El camino de envío correcto de los recordatorios no tiene prueba automática sin stub.** En
+    local no hay `RESEND_API_KEY`, así que la única forma de ejercitarlo fue interceptar `fetch`.
+    Lo que sí queda probado sin stub es la invariante que importa: **si el correo no sale, los
+    contadores no se mueven**, y el hito se reintenta mañana.
 
 ## 13. Al terminar cualquier cambio
 

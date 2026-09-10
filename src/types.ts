@@ -56,6 +56,8 @@ export interface ProductorUbicacion {
   coord_lat: number | null
   coord_lng: number | null
   municipio: string | null
+  /** Municipio del catálogo. Nulo mientras no se case con el texto libre de `municipio` */
+  municipio_ine: string | null
   es_principal: boolean | null
 }
 
@@ -297,4 +299,112 @@ export interface SerieDocumental {
   ultimo: number
   /** Relleno con ceros: REC-2026-00042 son 5, RES-2026-0012 son 4 */
   digitos: number
+}
+
+export interface BloquePlantilla {
+  tipo: 'h1' | 'h2' | 'h3' | 'p' | 'lista' | 'salt'
+  /** En `lista`, una entrada por elemento. En `salt`, nada */
+  text?: string | string[]
+}
+
+export interface PlantillaDocumento {
+  id: string
+  tipo: DocumentoTipo
+  idioma: 'ca' | 'es'
+  version: number
+  titulo: string
+  /** Bloques {tipo, text} con {{marcadores}}: la forma que consume _shared/pdf/plantilla.ts */
+  cuerpo: BloquePlantilla[]
+  /** Contrato declarado: qué claves espera el texto. Sirve para negarse a emitir con huecos */
+  marcadores: string[]
+  vigente: boolean
+  valida_desde: string
+  created_by: string | null
+  created_at: string
+}
+
+/**
+ * ⚠️ `token_hash` y `codigo_hash` NO están aquí a propósito: quedan fuera del GRANT de
+ * SELECT (20260928100300), así que un `select('*')` responde 42501. Pide columnas.
+ */
+export interface EnlaceToken {
+  id: string
+  proposito: 'firma_convenio' | 'confirmacion_albaran' | 'subida_factura'
+  objeto_tipo: 'albaran' | 'convenio' | 'cierre_donante'
+  objeto_id: string
+  destinatario_email: string | null
+  destinatario_nombre: string | null
+  canal: 'email' | 'asistido'
+  codigo_caduca_at: string | null
+  caduca_at: string
+  abierto_at: string | null
+  usado_at: string | null
+  /** Estado escrito. La caducidad por reloj la calcula resolver_enlace() como estado_efectivo */
+  estado: 'activo' | 'usado' | 'caducado' | 'revocado'
+  recordatorios: number
+  ultimo_recordatorio_at: string | null
+  creado_por: string | null
+  created_at: string
+}
+
+/** Lo que devuelve resolver_enlace() (solo service_role, desde una Edge Function) */
+export interface EnlaceResuelto extends Omit<EnlaceToken, 'creado_por'> {
+  tiene_codigo: boolean
+  estado_efectivo: 'activo' | 'usado' | 'caducado' | 'revocado'
+}
+
+/** ⚠️ Sin `documento_identidad`: fuera del GRANT de SELECT (solo lo lee el renderizador) */
+export interface Evidencia {
+  id: string
+  enlace_id: string
+  tipo: 'apertura' | 'firma' | 'confirmacion' | 'subida' | 'codigo'
+  nombre: string | null
+  cargo: string | null
+  declaracion_representacion: boolean
+  trazo_firma_ruta: string | null
+  ip: string | null
+  user_agent: string | null
+  /** Huella del texto aceptado: es lo que convierte un «firmó» en un «firmó ESTO» */
+  sha256_texto: string | null
+  payload: Record<string, unknown> | null
+  asistido_por: string | null
+  created_at: string
+}
+
+/** Fila única (id = 1). ⚠️ Sin `apoderada_dni`: se escribe pero no se lee */
+export interface ParametrosDocumentales {
+  id: 1
+  razon_social: string | null
+  cif: string | null
+  domicilio: string | null
+  codigo_postal: string | null
+  poblacion: string | null
+  inscripcion: string | null
+  apoderada_nombre: string | null
+  apoderada_cargo: string | null
+  /** Ruta dentro del bucket privado `activos`, no una URL */
+  firma_ruta: string | null
+  sello_ruta: string | null
+  email_equipo: string | null
+  caducidad_enlace_dias: number
+  caducidad_confirmacion_dias: number
+  tolerancia_conciliacion_pct: number
+  plazo_conciliar_sin_confirmacion_dias: number
+  fecha_corte_convenios: string | null
+  /** 'MM-DD': el año lo pone el ejercicio que se cierra */
+  cierre_apertura: string
+  cierre_provisional: string
+  /** true mientras los datos sembrados no sean los reales de la Fundación */
+  datos_provisionales: boolean
+  actualizado_at: string
+  actualizado_por: string | null
+}
+
+export interface Municipio {
+  /** Código INE de 5 dígitos. Texto, no número: los de Barcelona empiezan por 0 */
+  codi_ine: string
+  /** Nombre oficial con artículo pospuesto: «Ametlla del Vallès, l'» */
+  nom: string
+  comarca: string
+  provincia: 'Barcelona' | 'Girona' | 'Lleida' | 'Tarragona'
 }

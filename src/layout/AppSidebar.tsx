@@ -18,6 +18,7 @@ import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import { navPerRol } from '../lib/nav'
+import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
 import {
   Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
@@ -27,7 +28,9 @@ import {
 
 interface Props {
   /** Badges en vivo: se calculan una sola vez en el shell y se reparten aquí. */
-  comptadors: Partial<Record<'aprovacions' | 'missatges', number>>
+  // Reutiliza el tipo en vez de repetir la unión: cuando se añade un contador nuevo,
+  // repetirla aquí hacía fallar el build con TS7053 desde el otro extremo del proyecto.
+  comptadors: Partial<Record<Comptador, number>>
 }
 
 /** Cabecera de cada panel cuando hay más de uno. */

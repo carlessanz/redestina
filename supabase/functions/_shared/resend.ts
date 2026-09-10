@@ -28,6 +28,21 @@ export interface EmailPayload {
   subject: string;
   html?: string;
   text?: string;
+  /**
+   * Ficheros adjuntos. `content` es el PDF ya en base64 (sin el prefijo `data:`).
+   *
+   * Los documentos legales viajan adjuntos y NO como enlace: un enlace al bucket
+   * caduca en 60 s y uno con token es una credencial al portador (§9). El adjunto es
+   * el mismo fichero cuya huella está en `documentos.sha256_fichero`, así que lo que
+   * recibe la persona se puede verificar contra la base.
+   *
+   * ⚠️ Resend limita el correo entero a 40 MB, y base64 infla un 33 %: un documento
+   * de más de ~28 MB no cabe. Hoy ninguno se acerca (el de prueba, 6 páginas, pesa
+   * 123 KB), pero un albarán con fotos de incidencias podría: por eso `generar-documento`
+   * comprueba el tamaño antes de adjuntar y, si no cabe, manda el correo sin adjunto
+   * diciendo dónde descargarlo.
+   */
+  attachments?: { filename: string; content: string }[];
 }
 
 export interface EmailResult {
@@ -54,6 +69,7 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
         subject: payload.subject,
         ...(payload.html ? { html: payload.html } : {}),
         ...(payload.text ? { text: payload.text } : {}),
+        ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
       }),
     });
     const data = await res.json().catch(() => null);

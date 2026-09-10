@@ -36,7 +36,7 @@ export default function AppShell() {
   const { t } = useT()
   const { ctx, rolActiu } = useAppContext()
   const matches = useMatches()
-  const [comptadors, setComptadors] = useState<{ aprovacions?: number; missatges?: number }>({})
+  const [comptadors, setComptadors] = useState<{ aprovacions?: number; missatges?: number; documents?: number }>({})
 
   const handle = (matches[matches.length - 1]?.handle ?? {}) as RouteHandle
   // La barra inferior enseña SOLO el panel en el que estás, aunque el menú lateral los
@@ -60,7 +60,7 @@ export default function AppShell() {
     if (!esIntern) { setComptadors({}); return }
     let viu = true
     void (async () => {
-      const [respostes, registres, missatges] = await Promise.all([
+      const [respostes, registres, missatges, documents] = await Promise.all([
         supabase.from('oferta_respuestas')
           .select('id', { count: 'exact', head: true })
           .eq('estado', 'acceptada').eq('aprovacio', 'pendent'),
@@ -71,12 +71,19 @@ export default function AppShell() {
           .select('id', { count: 'exact', head: true })
           .eq('aprovacio', 'pendent'),
         supabase.from('wa_messages').select('contact_phone, direction, created_at'),
+        // Documentos cuyo PDF no se ha podido generar. El job los reintenta solo cada
+        // 5 minutos hasta 5 veces, así que lo que sigue en `error` es lo que ya nadie
+        // va a arreglar sin mirarlo.
+        supabase.from('documentos')
+          .select('id', { count: 'exact', head: true })
+          .eq('estado', 'error'),
       ])
       if (!viu) return
       const pendents = countUnanswered((missatges.data as MessageRow[]) ?? [])
       setComptadors({
         aprovacions: (respostes.count ?? 0) + (registres.count ?? 0),
         missatges: Object.values(pendents).reduce((s, n) => s + n, 0),
+        documents: documents.count ?? 0,
       })
     })()
     return () => { viu = false }

@@ -25,6 +25,7 @@ import { Entitats, Ofertes, Productors } from '../routes/equip/Llistats'
 import OfertaDetall from '../routes/equip/OfertaDetall'
 import FitxaRegistre from '../routes/equip/FitxaRegistre'
 import Missatgeria from '../routes/equip/Missatgeria'
+import Documents from '../routes/equip/Documents'
 import Aprovacions from '../routes/equip/Aprovacions'
 import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
 import NovaOferta from '../routes/productor/NovaOferta'
@@ -69,6 +70,7 @@ export const router = createBrowserRouter([
                   { path: 'entitats/nova', element: <FitxaRegistre tabla="entidades" />, handle: { titleKey: 'nav.entities' } },
                   { path: 'entitats/:id', element: <FitxaRegistre tabla="entidades" />, handle: { titleKey: 'nav.entities' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
+                  { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],

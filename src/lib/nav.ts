@@ -11,14 +11,14 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, ClipboardCheck, Handshake, History, Home, LayoutDashboard,
+  Building2, ClipboardCheck, FileText, Handshake, History, Home, LayoutDashboard,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, UserCircle, Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
 
 /** Contadores que el sidebar pinta como badge; se resuelven en AppSidebar. */
-export type Comptador = 'aprovacions' | 'missatges'
+export type Comptador = 'aprovacions' | 'missatges' | 'documents'
 
 export interface NavItem {
   to: string
@@ -44,6 +44,7 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges' },
+      { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
     ],
   },
   {

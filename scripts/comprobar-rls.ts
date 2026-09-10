@@ -47,6 +47,29 @@
 // vacío; cuando la fase 3 la reescriba, esos «denegar» pasan a «permitir, solo los
 // suyos» con su `requiereFixture`.
 //
+// SEGUNDA MITAD DE LA FASE 1 (20260928100100–100700). Entran cinco tablas más:
+// `plantillas_documento`, `parametros_documentales`, `enlaces_token`, `evidencias` y
+// `municipios`. Tres cosas que aquí se afirman y no se afirmaban en ninguna otra parte:
+//
+//   1. **Las columnas sensibles no se leen desde el navegador, ni siendo del equipo.**
+//      `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
+//      `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están
+//      fuera del GRANT de SELECT, y eso lo comprueba un check `denegar` que pide esa
+//      columna y espera `permission denied for column`. Es fácil de romper sin querer:
+//      basta con que alguien vuelva a ejecutar un `grant select on all tables … to
+//      authenticated` como el de 20260721160000 y las cuatro quedarían legibles otra vez,
+//      **sin que ninguna política cambie**. Sin este check, nadie se enteraría.
+//   2. **Escribir el texto de un documento legal es `pot_aprovar()`, no ser del equipo.**
+//      El técnico lee las plantillas y no las toca; el super_admin sí.
+//   3. **El nomenclátor es catálogo, no dato.** `municipios` la lee cualquier cuenta con
+//      sesión, como `productos`: la necesita el formulario de ubicación de un productor.
+//
+// ⚠️ Los `denegar` de plantillas/parámetros/enlaces/evidencias para cuentas externas
+//    llevan `columnas` explícitas a propósito. Con `select *`, en las tablas con GRANT
+//    por columnas lo que corta es el GRANT —antes de evaluar ninguna política— y el check
+//    saldría verde sin haber probado la RLS. Con la lista explícita, lo que devuelve 0
+//    filas es la política, que es lo que se quería medir.
+//
 // ⚠️ Dos de estas comprobaciones dependen del interruptor `roles_activos` (§4bis): con
 //    el interruptor APAGADO —que es como nace cualquier entorno recreado desde las
 //    migraciones, incluido el local— `es_super_admin()` devuelve true para cualquier
@@ -131,6 +154,16 @@ interface Check {
    */
   args?: Record<string, unknown>;
   /**
+   * Columnas que se piden en un `leer` (o en la lectura previa de un `actualizar`).
+   * Por defecto `*`, que es lo que hace la app. Hace falta declararlas en las tablas con
+   * **GRANT por columnas** —`enlaces_token`, `evidencias`, `parametros_documentales`—,
+   * porque ahí `select *` lo corta el GRANT antes de que RLS diga nada: la comprobación
+   * mediría el permiso de columna y no la política. Con la lista explícita se mide lo que
+   * se quería medir, y la columna sensible se comprueba **aparte**, con su propio check
+   * `denegar` (que sí debe salir `permission denied for column`).
+   */
+  columnas?: string;
+  /**
    * Solo para `rpc`+`permitir`: función que deshace lo que la comprobación acaba de
    * crear. Una RPC que se espera que funcione **hace algo**, y el arnés no puede dejar
    * rastro: `emitir_documento_prova` emite un documento de verdad, así que se limpia
@@ -138,6 +171,40 @@ interface Check {
    */
   limpiar?: string;
 }
+
+// El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
+// Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
+// afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
+// repetirla cinco veces garantizaría que algún día se actualicen cuatro.
+//
+// `columnas` en `enlaces_token` y `evidencias` no es un detalle: sin ella, `select *` lo
+// cortaría el GRANT por columnas y la comprobación diría «rechazado» sin haber llegado a
+// evaluar la política. Con la lista explícita, lo que rechaza es la RLS, que es lo que se
+// quiere verificar.
+const DOCUMENTAL_EXTERN: Check[] = [
+  { tabla: "plantillas_documento", op: "leer", esperado: "denegar", descripcion: "NO ve las plantillas de documento" },
+  {
+    tabla: "parametros_documentales",
+    op: "leer",
+    esperado: "denegar",
+    columnas: "id, razon_social, cif",
+    descripcion: "NO ve los parámetros documentales",
+  },
+  {
+    tabla: "enlaces_token",
+    op: "leer",
+    esperado: "denegar",
+    columnas: "id, estado",
+    descripcion: "NO ve ningún enlace (los suyos los tiene en el correo)",
+  },
+  {
+    tabla: "evidencias",
+    op: "leer",
+    esperado: "denegar",
+    columnas: "id, tipo",
+    descripcion: "NO ve ninguna evidencia de firma",
+  },
+];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
 // si alguien relaja una política sin querer, aquí sale en rojo.
@@ -169,6 +236,67 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documentos", op: "actualizar", esperado: "denegar", descripcion: "NO edita un documento emitido" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO quema números de una serie legal" },
     { tabla: "emitir_documento_prova", op: "rpc", esperado: "denegar", args: { p_fallar: false }, descripcion: "NO emite documentos de prueba (es del super_admin)" },
+    // Plantillas: el técnico las LEE (necesita saber con qué texto se emite) pero no las
+    // escribe. Escribir el texto de un documento legal es `pot_aprovar()`, como aprobar
+    // una canalización.
+    { tabla: "plantillas_documento", op: "leer", esperado: "permitir", descripcion: "ve las plantillas de documento" },
+    { tabla: "plantillas_documento", op: "insertar", esperado: "denegar", descripcion: "NO publica plantillas (es de pot_aprovar)" },
+    { tabla: "plantillas_documento", op: "actualizar", esperado: "denegar", descripcion: "NO edita plantillas (es de pot_aprovar)" },
+    // Parámetros: se leen todos MENOS el DNI de la apoderada, y no los toca nadie que no
+    // sea super_admin (cambian lo que dirán todos los documentos futuros).
+    {
+      tabla: "parametros_documentales",
+      op: "leer",
+      esperado: "permitir",
+      columnas: "id, razon_social, cif, caducidad_enlace_dias, datos_provisionales",
+      descripcion: "ve los parámetros documentales",
+    },
+    {
+      tabla: "parametros_documentales",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "apoderada_dni",
+      descripcion: "NI el equipo lee el DNI de la apoderada (GRANT por columnas)",
+    },
+    {
+      tabla: "parametros_documentales",
+      op: "actualizar",
+      esperado: "denegar",
+      columnas: "id, caducidad_enlace_dias",
+      descripcion: "NO cambia los parámetros (es del super_admin)",
+    },
+    // Enlaces y evidencias: el equipo ve el estado, nunca las credenciales ni el DNI.
+    {
+      tabla: "enlaces_token",
+      op: "leer",
+      esperado: "permitir",
+      columnas: "id, proposito, estado, caduca_at",
+      descripcion: "ve el estado de los enlaces",
+      requiereFixture: "algún enlace emitido (fase 2/3: firma de convenio o confirmación de albarán)",
+    },
+    {
+      tabla: "enlaces_token",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "token_hash",
+      descripcion: "NI el equipo lee el hash del token (GRANT por columnas)",
+    },
+    {
+      tabla: "evidencias",
+      op: "leer",
+      esperado: "permitir",
+      columnas: "id, tipo, nombre, created_at",
+      descripcion: "ve las evidencias de firma",
+      requiereFixture: "alguna evidencia registrada (fase 2/3, al abrir o firmar un enlace)",
+    },
+    {
+      tabla: "evidencias",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "documento_identidad",
+      descripcion: "NI el equipo lee el DNI de quien firma (GRANT por columnas)",
+    },
+    { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -186,6 +314,18 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "emite un documento de prueba (y lo limpia)",
     },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NI el super_admin quema números a mano" },
+    { tabla: "plantillas_documento", op: "leer", esperado: "permitir", descripcion: "ve las plantillas de documento" },
+    // La contraparte del «denegar» del técnico: alguien tiene que poder tocarlas, y es
+    // quien puede aprobar. Se reescribe `vigente` con su propio valor, así que la
+    // plantilla queda exactamente igual.
+    { tabla: "plantillas_documento", op: "actualizar", esperado: "permitir", descripcion: "puede retirar o publicar plantillas" },
+    {
+      tabla: "parametros_documentales",
+      op: "actualizar",
+      esperado: "permitir",
+      columnas: "id, caducidad_enlace_dias",
+      descripcion: "puede tocar los parámetros documentales",
+    },
   ],
   productor: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
@@ -205,6 +345,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
+    ...DOCUMENTAL_EXTERN,
+    // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
+    // formulario de ubicación.
+    { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
   // OJO con el receptor: «ve las ofertas compatibles» solo se cumple si existe alguna
   // oferta viva de una modalitat que le encaje (`modalitat_receptor_compat`). Un
@@ -229,6 +373,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
+    ...DOCUMENTAL_EXTERN,
+    // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
+    // formulario de ubicación.
+    { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
   sense_rol: [
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
@@ -236,6 +384,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
   // false`. No ve NADA —`mis_productores()`/`mis_entidades()` filtran por `activo`, así
@@ -251,6 +400,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO se aprueba a sí misma (lo corta pot_aprovar)" },
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    ...DOCUMENTAL_EXTERN,
   ],
   // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
   // interfaz enseña con los dos menús a la vez, y aquí lo que se comprueba es que ver dos
@@ -266,6 +416,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros" },
     { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "NO ve documentos (fase 1: documents_meus() vacío)" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
+    ...DOCUMENTAL_EXTERN,
+    { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
 };
 
@@ -276,6 +428,16 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   canalizaciones: { kg_confirmados: 1 },
   oferta_respuestas: { telefono: "34600000000", canal: "panel" },
   usuario_roles: { rol: "super_admin" },
+  // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
+  // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
+  plantillas_documento: {
+    tipo: "PROVA",
+    idioma: "ca",
+    version: 99,
+    titulo: "TEST-RLS",
+    cuerpo: [],
+    vigente: false,
+  },
   // `documentos` tiene checks y NOT NULL por todas partes: la fila se rellena entera
   // para que lo que corte sea el permiso y no una restricción de datos (si cortara un
   // check, la comprobación no diría nada sobre RLS). Ejercicio 1999 para que se
@@ -300,6 +462,10 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
  */
 const COLUMNA_INOCUA: Record<string, string> = {
   documentos: "intentos",
+  // Retirar/publicar una plantilla es lo único que se puede hacer sobre una ya usada, así
+  // que `vigente` es también la columna con la que se mide el permiso de escritura.
+  plantillas_documento: "vigente",
+  parametros_documentales: "caducidad_enlace_dias",
 };
 
 // ---------------------------------------------------------------------------
@@ -348,7 +514,8 @@ async function resolverArgs(
 
 async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: boolean; detalle: string }> {
   if (check.op === "leer") {
-    const { data, error } = await cliente.from(check.tabla).select("*").limit(1);
+    const { data, error } = await cliente.from(check.tabla)
+      .select(check.columnas ?? "*").limit(1);
     if (error) {
       // Un error de permisos con "denegar" esperado es exactamente lo que queremos.
       if (esRechazo(error)) {
@@ -408,11 +575,24 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
     // que se mide es el GRANT/la política, no que exista la fila—.
     const columna = COLUMNA_INOCUA[check.tabla];
     if (columna) {
-      const { data: fila } = await cliente.from(check.tabla).select("*").limit(1).maybeSingle();
-      const id = (fila?.id as string) ?? UUID_NULO;
-      const valor = fila ? (fila as Record<string, unknown>)[columna] : 0;
-      const { error } = await cliente.from(check.tabla)
-        .update({ [columna]: valor }).eq("id", id);
+      // ⚠️ El `select` va con una EXPRESIÓN, no con un literal, así que supabase-js no
+      // puede deducir el tipo de la fila y devuelve `GenericStringError` (§7 y deuda
+      // §12.46). Aquí es inevitable —la lista de columnas es del check— y por eso se
+      // convierte a mano: es el único sitio del arnés donde esa convención no se cumple,
+      // y se cumple el motivo por el que existe (saber por qué el tipo se pierde).
+      const { data: filaCruda } = await cliente.from(check.tabla)
+        .select(check.columnas ?? "*").limit(1).maybeSingle();
+      const fila = filaCruda as Record<string, unknown> | null;
+      const id = (fila?.id as string | number | undefined) ?? UUID_NULO;
+      const valor = fila ? fila[columna] : 0;
+      // ⚠️ `.select()` DESPUÉS del update, y no por comodidad: cuando lo que deniega es la
+      // política (y no el GRANT), PostgREST **no da error** —el UPDATE simplemente no
+      // encuentra filas que cumplan el `using`— y sin pedir las filas afectadas un
+      // rechazo de RLS sería indistinguible de un éxito. Es el mismo argumento del
+      // §12.48 para las lecturas, del otro lado: aquí sí se puede distinguir, porque
+      // «cero filas actualizadas sobre una fila que sé que existe» solo significa una cosa.
+      const { data: tocadas, error } = await cliente.from(check.tabla)
+        .update({ [columna]: valor }).eq("id", id).select("id");
       if (error) {
         return {
           ok: check.esperado === "denegar",
@@ -421,10 +601,14 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
             : `bloqueado por la base (${error.code ?? "?"})`,
         };
       }
-      return {
-        ok: check.esperado === "permitir",
-        detalle: fila ? "actualizado (mismo valor)" : "sin fila que tocar, pero el UPDATE pasó",
-      };
+      if (!fila) {
+        return { ok: check.esperado === "denegar", detalle: "sin fila que tocar (no demuestra nada)" };
+      }
+      const n = tocadas?.length ?? 0;
+      if (n === 0) {
+        return { ok: check.esperado === "denegar", detalle: "0 filas afectadas (la política filtra)" };
+      }
+      return { ok: check.esperado === "permitir", detalle: "actualizado (mismo valor)" };
     }
 
     // app_settings es idempotente: se reescribe su valor actual.
@@ -662,8 +846,13 @@ if (saltadas > 0) {
   // ⚠️ Saltar una comprobación porque UNA cuenta no tiene datos es normal; que la salten
   // TODAS las que la llevan significa que esa propiedad ya no la verifica nadie, y eso
   // se parece demasiado a un fallo de permisos como para pasarlo en una línea gris.
+  // Las columnas entran en la clave porque dos checks sobre la misma tabla y operación
+  // pueden estar afirmando cosas distintas: «el equipo ve el estado de los enlaces» y
+  // «el equipo NO ve su token_hash» son `enlaces_token·leer` los dos, y si contaran como
+  // uno solo, el segundo taparía la cobertura perdida del primero.
   const clave = (r: { rol?: Cuenta["rol"]; check: Check }) =>
-    `${r.rol ?? "?"} · ${r.check.tabla}·${r.check.op}`;
+    `${r.rol ?? "?"} · ${r.check.tabla}·${r.check.op}` +
+    (r.check.columnas ? `·${r.check.columnas}` : "");
   const totales = new Map<string, number>();
   for (const r of resultados) totales.set(clave(r), (totales.get(clave(r)) ?? 0) + 1);
   const huerfanas = new Set<string>();
