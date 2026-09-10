@@ -1170,7 +1170,8 @@ menú (`AppShell`) **suma las dos colas**.
   **`.claude/settings.local.json` tampoco**: lleva rutas de esta máquina (el
   `additionalDirectories` de la carpeta de consultoría, §1). Lo ignoraba solo el `~/.config/git/ignore`
   del usuario, que no viaja con el repo; desde el 10-09-2026 la regla está también en el `.gitignore`
-  propio, para que un clon en otra máquina no lo suba sin querer.
+  propio, para que un clon en otra máquina no lo suba sin querer. **Ni `.claude/launch.json`**, que
+  lo genera el panel de navegador al arrancar `npm run dev` y fija el puerto de esta máquina.
 - **Claves de Supabase**: usar las **nuevas** — `sb_publishable_...` en el frontend,
   `sb_secret_...` en el servidor. **No** usar las obsoletas `anon`/`service_role` (claves JWT
   antiguas). Los *roles* de Postgres `anon`/`authenticated`/`service_role` sí se siguen usando
@@ -1991,6 +1992,13 @@ Redestina en producción real quedan pasos de configuración y negocio.
     despliegue es idempotente— pero significa que **la salida del CLI no sirve para saber si el
     bundle desplegado estaba al día**; solo `No change found` es concluyente en un sentido, y su
     ausencia no prueba nada en el otro.
+    ⚠️ Y al revés, antes de leer un redespliegue masivo como un caso de esto: **el `deno.json` de
+    cada función entra en su bundle**, así que tocar los nueve import maps —como hizo `6e157fe`—
+    cambia las nueve de verdad, aunque el único `index.ts` modificado sea el de
+    `priorizar-entidades`. Al publicarlo (10-09-2026) ninguna de las nueve dijo `No change found`, y
+    eso era lo correcto. `supabase functions list` publica un `ezbr_sha256` por función: es el
+    candidato a comparación fiable entre dos despliegues, pero **todavía no se ha usado así**
+    —haría falta guardar el valor de antes—, así que hoy sigue sin haber forma cómoda de saberlo.
 45. ~~**Las Edge Functions no se podían typecheckear.**~~ — **resuelta (10-09-2026)**: los nueve
     `deno.json` mapeaban `"@supabase/functions-js"` sin barra final, y un import map **no resuelve
     subpaths a partir de un mapping exacto**, así que `import "@supabase/functions-js/edge-runtime.d.ts"`
