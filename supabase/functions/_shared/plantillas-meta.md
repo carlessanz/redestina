@@ -28,7 +28,7 @@ en test se envía `hello_world`, y al aprobarlas en Meta y poner el flag a `true
 - **Body** (sin variables):
 
 ```
-Hola! Som l'equip de POMA d'Espigoladors 🌱. T'ajudem a canalitzar els teus excedents agrícoles. Respon OK per activar la conversa i poder oferir-nos excedents quan vulguis. Gràcies!
+Hola! Som l'equip de Redestina d'Espigoladors 🌱. T'ajudem a canalitzar els teus excedents agrícoles. Respon OK per activar la conversa i poder oferir-nos excedents quan vulguis. Gràcies!
 ```
 
 ### 0b. `salutacio_entitat` — primer contacto con una entidad receptora
@@ -39,7 +39,7 @@ Hola! Som l'equip de POMA d'Espigoladors 🌱. T'ajudem a canalitzar els teus ex
 - **Body** (sin variables):
 
 ```
-Hola! Som l'equip de POMA d'Espigoladors 🌱. Col·laborem amb entitats socials per aprofitar excedents agrícoles. Respon OK per activar la conversa i començar a rebre les nostres ofertes. Gràcies!
+Hola! Som l'equip de Redestina d'Espigoladors 🌱. Col·laborem amb entitats socials per aprofitar excedents agrícoles. Respon OK per activar la conversa i començar a rebre les nostres ofertes. Gràcies!
 ```
 
 Sin variables → aprobación más fácil. Si Meta las reclasifica a `MARKETING`, requerirán opt-in de
@@ -75,7 +75,7 @@ Responsable: {{7}}. Respon a aquest missatge si el voleu recollir.
   4. `kg_total` kg (+ `num_caixes` caixes)
   5. `disponible_hasta`
   6. `horari_recollida`
-  7. responsable (equipo POMA)
+  7. responsable (equipo Redestina)
 
 - **Ejemplo de `components` para `whatsapp-send`:**
 
@@ -91,7 +91,7 @@ Responsable: {{7}}. Respon a aquest missatge si el voleu recollir.
       { "type": "text", "text": "120 kg" },
       { "type": "text", "text": "fins 30/07" },
       { "type": "text", "text": "matins" },
-      { "type": "text", "text": "Equip POMA" }
+      { "type": "text", "text": "Equip Redestina" }
     ]}
   ]
 }

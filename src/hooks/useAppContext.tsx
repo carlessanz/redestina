@@ -23,7 +23,7 @@ import {
 } from '../lib/rols'
 import { organitzacioActiva } from '../lib/rols'
 
-const CLAU_ROL = 'poma-rol'
+const CLAU_ROL = 'redestina-rol'
 
 interface Valor {
   ctx: ContextSessio | null

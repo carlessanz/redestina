@@ -10,11 +10,11 @@ canónico, que se importa aquí:
 
 ## Visión funcional del producto
 
-**POMA** es un **servicio** de la Fundació Espigoladors apoyado por tecnología, que actúa como
+**Redestina** es un **servicio** de la Fundació Espigoladors apoyado por tecnología, que actúa como
 **ERP del servicio**: canaliza excedentes agrícolas por cinco líneas —donación social (core),
 salida comercial, transformación por maquila, espigueo y diagnóstico/prevención— con un equipo de
 dinamización que opera de forma **asistida** en nombre de las organizaciones. Lo construido hoy es
-un **subconjunto** de esa visión (Fase 1 WhatsApp + POMA núcleo: intake, priorización, canalización
+un **subconjunto** de esa visión (Fase 1 WhatsApp + Redestina núcleo: intake, priorización, canalización
 y cierre básico, más —desde el 31-07-2026— **parte pública, registro self-service validado por el
 equipo y accesos separados** para usuarios y equipo); falta el grueso del modelo objetivo
 (organización multirol, convenios, demandas, conciliación real, certificados, diagnóstico/planes).
@@ -22,18 +22,17 @@ equipo y accesos separados** para usuarios y equipo); falta el grueso del modelo
 - **Versión reducida + correspondencia objetivo↔construido:** `AGENTS.md §1bis` (se importa arriba;
   es la fuente mantenida de este resumen).
 - **Funcional completo adaptado** (con estado de implementación por sección): `docs/Documento
-  funcional POMA 2026 — adaptado.md`.
-- **Funcional original** (visión de negocio íntegra): `docs/Documento funcional POMA 2026.md`.
+  funcional Redestina 2026 — adaptado.md`.
+- **Funcional original** (visión de negocio íntegra): `docs/Documento funcional Redestina 2026.md`.
 
 Ambos documentos de `docs/` están **fuera de git** (§7). Para el detalle de negocio mandan esos
 funcionales; para el **estado real construido**, manda `AGENTS.md`.
 
 ## Rama de trabajo
 
-**Trabaja SIEMPRE sobre la rama `dev`, siempre la misma.** No crees ramas nuevas por
-tarea ni con nombres generados: todo el desarrollo va a `dev`. Si `dev` no existe en local,
-créala desde la default (`git checkout -B dev origin/main`). Commit y push van a `dev`
-(`git push -u origin dev`).
+**Trabaja sobre `main`,** que es la rama por defecto del repo. No crees ramas nuevas por
+tarea ni con nombres generados. (Hubo una convención anterior de trabajar en `dev`; se
+retiró el 10-09-2026 al reintegrar esa rama en `main`.)
 
 ## Regla permanente
 

@@ -1,4 +1,4 @@
-// Recordatorio de intake a medias (POMA).
+// Recordatorio de intake a medias (Redestina).
 //
 // La invoca pg_cron cada 2 min vía pg_net (ver 20260722130000_intake_recordatorios.sql).
 // Busca sesiones de intake inactivas entre 10 min y 12 h y, si aún no se ha avisado,

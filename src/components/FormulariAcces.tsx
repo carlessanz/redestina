@@ -4,7 +4,7 @@
 // monta (/login o /admin) observa la sesión y decide adónde ir, de modo que el mismo
 // componente sirve para «acabo de entrar» y para «ya venía con sesión».
 //
-// El copy es un parámetro a propósito: /admin conserva el de siempre («Consola POMA ·
+// El copy es un parámetro a propósito: /admin conserva el de siempre («Consola Redestina ·
 // accés restringit a l'equip») y /login estrena el suyo para productores y entidades.
 
 import { useState } from 'react'

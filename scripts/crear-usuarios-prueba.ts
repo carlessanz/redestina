@@ -93,8 +93,8 @@ interface Cuenta {
 // que crea el registro público—, así que dos cuentas por organización no probaban nada
 // que no probara una.
 const CUENTAS: Cuenta[] = [
-  { email: correo("superadmin"), nombre: "Super Admin POMA", rol: "super_admin", para: "Aprueba, canaliza y toca la configuración" },
-  { email: correo("equip"), nombre: "Tècnic POMA", rol: "tecnic", para: "Opera el día a día; NO aprueba ni cambia el modo test" },
+  { email: correo("superadmin"), nombre: "Super Admin Redestina", rol: "super_admin", para: "Aprueba, canaliza y toca la configuración" },
+  { email: correo("equip"), nombre: "Tècnic Redestina", rol: "tecnic", para: "Opera el día a día; NO aprueba ni cambia el modo test" },
   { email: correo("prodowner-masprova"), nombre: "Productor Mas de Prova", rol: null, org: { codigo: "TEST-PROD-1", rolOrg: "titular" }, para: "Publica ofertas y edita la ficha de su organización" },
   { email: correo("prodowner-hortaprova"), nombre: "Productor Horta de Prova", rol: null, org: { codigo: "TEST-PROD-2", rolOrg: "titular" }, para: "Control de fuga: no debe ver nada de TEST-PROD-1" },
   { email: correo("recowner-social"), nombre: "Receptor Menjador Social", rol: null, org: { codigo: "TEST-ENT-SOCIAL", rolOrg: "titular" }, para: "Entidad social: mercado de donaciones, interés e histórico" },

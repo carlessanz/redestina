@@ -12,7 +12,7 @@ trabajan en este repositorio. `CLAUDE.md` lo importa; **no dupliques contenido a
 
 ## 1. Proyecto
 
-**PDApp / POMA** — plataforma de canalización de excedentes agrícolas de Espigoladors, con
+**PDApp / Redestina** — plataforma de canalización de excedentes agrícolas de Espigoladors, con
 WhatsApp Cloud API como canal. Un productor ofrece un excedente por WhatsApp, el sistema lo
 convierte en una **oferta** con identificador propio, prioriza **entidades sociales**
 receptoras y registra las **canalizaciones** hasta el cierre con kg reales y albaranes.
@@ -22,7 +22,7 @@ Dos fases:
 | Fase | Qué es | Estado |
 | --- | --- | --- |
 | **1. Infraestructura WhatsApp** | Consola de mensajería: webhook con firma, envío texto/plantilla, opt-in, Realtime | ✅ construida y endurecida |
-| **2. POMA** | Intake conversacional, excedentes/canalizaciones, priorización, cierre | ✅ construida (prompts 0bis–8). Quedan checkpoints de negocio, no de código (§12) |
+| **2. Redestina** | Intake conversacional, excedentes/canalizaciones, priorización, cierre | ✅ construida (prompts 0bis–8). Quedan checkpoints de negocio, no de código (§12) |
 
 Actualmente en **entorno de pruebas** de Meta con **`WHATSAPP_ENVIO_REAL` activado**
 (2026-07-22): los envíos salen de verdad, pero Meta en test **solo entrega a los ≤5 números
@@ -34,33 +34,33 @@ más la whitelist `meta_test_recipients`. Ver §8.
 publicar en un grupo se ofrece "copiar texto" y se pega a mano.
 
 La especificación completa está en `docs/nuevas-funcionalidades/` (fuera de git):
-`poma-automatizacion-canalizacion-whatsapp-final.md` manda en el proceso de canalización y
+`redestina-automatizacion-canalizacion-whatsapp-final.md` manda en el proceso de canalización y
 trae los prompts 0–8; `manual-whatsapp-cloud-api-supabase-final.md` manda en la
 configuración de Meta y las decisiones D1–D7; `guia-tecnica-claude-code-whatsapp-final.md`
 es el mapa de ejecución. El **funcional de negocio** (visión objetivo del servicio, más amplia
-que lo construido) vive en `docs/Documento funcional POMA 2026.md` y su **versión adaptada al
-estado real** en `docs/Documento funcional POMA 2026 — adaptado.md` (ambos fuera de git); su
+que lo construido) vive en `docs/Documento funcional Redestina 2026.md` y su **versión adaptada al
+estado real** en `docs/Documento funcional Redestina 2026 — adaptado.md` (ambos fuera de git); su
 resumen y la correspondencia objetivo↔construido están en **§1bis**.
 
 `docs/` guarda además seis documentos operativos (también fuera de git): **`Guía producción
-WhatsApp — POMA.md`** (los pasos en Meta del checkpoint §12.2 —número de producción, verificación,
+WhatsApp — Redestina.md`** (los pasos en Meta del checkpoint §12.2 —número de producción, verificación,
 pago, plantillas— con el estado de preparación verificado el 24-07-2026, y su versión visual
-`WhatsApp producción (visual).html`), **`Costes de WhatsApp — POMA.md`** (modelo de costes: la
-ventana de 24 h es gratis, la plantilla se paga), **`Flujo de la aplicación POMA.md`** (el flujo
+`WhatsApp producción (visual).html`), **`Costes de WhatsApp — Redestina.md`** (modelo de costes: la
+ventana de 24 h es gratis, la plantilla se paga), **`Flujo de la aplicación Redestina.md`** (el flujo
 end-to-end con diagramas Mermaid y los textos literales que se envían), **`Usuarios y accesos —
-POMA.md`** (las 3 cuentas reales del equipo con su rol y las **12 de prueba con su contraseña**, más
+Redestina.md`** (las 3 cuentas reales del equipo con su rol y las **12 de prueba con su contraseña**, más
 cómo reenviar un acceso, cortar uno y recrear las cuentas) y **`usuarios-test.md`** (la tabla escueta
 de esas 12 cuentas, para tenerla a mano al probar). Los dos últimos **llevan credenciales en claro**:
 que estén fuera de git no es un detalle, es el motivo de que existan ahí.
 
-## 1bis. Visión funcional POMA 2026 (modelo objetivo ↔ lo construido)
+## 1bis. Visión funcional Redestina 2026 (modelo objetivo ↔ lo construido)
 
-Resumen del **funcional de negocio** (el *to-be*, `docs/Documento funcional POMA 2026.md`) y su
+Resumen del **funcional de negocio** (el *to-be*, `docs/Documento funcional Redestina 2026.md`) y su
 reconciliación con lo que hay en el repo (el *as-is*, que describe el **resto** de este documento). El
-detalle vive en `docs/Documento funcional POMA 2026 — adaptado.md` (fuera de git). **Regla:** cuando
+detalle vive en `docs/Documento funcional Redestina 2026 — adaptado.md` (fuera de git). **Regla:** cuando
 cambie el alcance funcional o el estado de implementación, mantener al día esta §1bis y su tabla.
 
-**Qué es POMA.** Un **servicio** de la Fundació Espigoladors apoyado por tecnología (un dinamizador de
+**Qué es Redestina.** Un **servicio** de la Fundació Espigoladors apoyado por tecnología (un dinamizador de
 referencia + red de actores + plataforma como **ERP del servicio**, fuente única sin duplicidades). En
 la fase inicial la operativa es **asistida**: el equipo opera en nombre de las organizaciones. Ocho
 principios: servicio apoyado por tecnología; modelo asistido; ERP fuente única; pagos fuera / valor
@@ -95,7 +95,7 @@ encuestas.
 **Diagnóstico y planes de prevención:** servicio técnico (plan básico/personalizado) con plan
 **activo** alimentado por el histórico. ⬜ No construido.
 
-**Modelo de datos objetivo:** base única compartida (POMA + back office + CRM); `organizacion`
+**Modelo de datos objetivo:** base única compartida (Redestina + back office + CRM); `organizacion`
 (multirol) y `usuario` como cosas distintas; Espigoladors dentro del modelo; `historial_estado` para
 trazabilidad total; JSON flexible y catálogos parametrizables. Entidades: organizacion, usuario,
 rol_organizacion, convenio, excedente, demanda, interes, sugerencia_match, operacion, entrega,
@@ -162,17 +162,17 @@ que una organización ya existe (deuda §12.28).
 | Email | **Resend** (API HTTP, vía Edge Function `enviar-email`) |
 | BD | Postgres (Supabase) con RLS |
 | Scripts | Deno 2.x (`scripts/import-ara.ts`) |
-| Hosting frontend | Vercel (proyecto `p0ma`) |
+| Hosting frontend | Vercel (proyecto `redestina`) |
 
 **Con router** (`react-router` v7, desde 2026-07-30: los paneles por rol necesitan URL propia,
 enlace profundo y gesto «atrás»; el `useState<View>` anterior no daba ninguna de las tres) y sin
 librería de estado. Desde el 31-07-2026 el router es además la **capa raíz**, con rutas públicas y
 privadas (§6quater): ya no hay un `AuthGate` envolviéndolo todo. `vercel.json` añade el *rewrite* de SPA: sin él, recargar cualquier ruta que no
 sea `/` devuelve 404 en producción. **UI con Tailwind v4 + shadcn/ui**: componentes en
-`src/components/ui/` (generados con el CLI de shadcn, `components.json`), tokens del **tema POMA**
+`src/components/ui/` (generados con el CLI de shadcn, `components.json`), tokens del **tema Redestina**
 en `src/index.css` (navy `#234C66` / crema `#E0EBC7` / coral `#EE7A5F`, fuente Space Grotesk),
 alias `@/` → `src/`. Iconos `lucide-react`, toasts `sonner`, `cn()` en `src/lib/utils.ts`. El
-logo (`public/logo-poma.svg`) y el favicon están en `public/`.
+logo (`public/logo-redestina.svg`) y el favicon están en `public/`.
 
 **Layout** (desde 2026-07-30): **menú lateral vertical plegable** (`sidebar` de shadcn: 16rem ↔ 3rem
 en modo icono, estado en cookie, atajo Ctrl/Cmd+B) + barra superior de 14 con el título de la
@@ -189,7 +189,7 @@ su propio alto. **Ninguna pantalla vuelve a escribir `h-dvh`.** Hay un tercer fl
 `ofertes`), que necesitan más ancho.
 
 **PWA instalable** (`vite-plugin-pwa`, `generateSW`): manifest, iconos 192/512 + *maskable*
-(generados desde `public/logo-poma.svg`), `apple-touch-icon` y los metas de iOS —que no lee el
+(generados desde `public/logo-redestina.svg`), `apple-touch-icon` y los metas de iOS —que no lee el
 manifest—, `viewport-fit=cover` para que `env(safe-area-inset-*)` valga algo en iPhone.
 `registerType: 'autoUpdate'` + `cleanupOutdatedCaches` + `Cache-Control: must-revalidate` en
 `/index.html` y `/sw.js` (`vercel.json`): un service worker mal desplegado se queda pegado en los
@@ -211,7 +211,7 @@ antes del primer render**, por eso lo captura `escoltaInstalacio()` desde `main.
 React** y lo guarda en estado de módulo; escucharlo dentro de un componente llega tarde y el aviso no
 saldría nunca. El banner es **hermano flex `shrink-0`, no `fixed`** —mismo contrato de alturas que la
 barra inferior—, así que resta alto al `main` y no tapa nada. Quien lo descarta no lo vuelve a ver en
-**30 días**: `poma-install-descartat` guarda la **fecha**, no un booleano, porque un booleano no sabe
+**30 días**: `redestina-install-descartat` guarda la **fecha**, no un booleano, porque un booleano no sabe
 expresar eso.
 
 **Responsive** (breakpoint `md`, 768px). Los **listados** van
@@ -278,7 +278,7 @@ src/
     whatsapp.ts                sendWhatsApp(): llama a la Edge Function; nunca lanza
     plantillas.ts              plantillaPrimerContacte(): tría plantilla de 1r contacte per rol (§6ter)
     ofertaTemplate.ts          construirComponentsOferta(): variables de la plantilla oferta_excedent (§6ter)
-    poma.ts                    priorizarEntidades(): llama a la Edge Function con el JWT
+    redestina.ts               priorizarEntidades(): llama a la Edge Function con el JWT
     mensajes.ts                countUnanswered(): mensajes «sin contestar» por teléfono (§5)
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
@@ -290,7 +290,7 @@ src/
     crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
-    AvisInstallacio.tsx        Banner de «instal·la POMA» en móvil, productor y receptor (§2)
+    AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
     LayoutAcces.tsx            Marco navy de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
@@ -342,7 +342,7 @@ supabase/
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo
 docs/                          Material de trabajo local — IGNORADO POR GIT (§7)
-  nuevas-funcionalidades/      Specs POMA, manuales y CSV de origen
+  nuevas-funcionalidades/      Specs Redestina, manuales y CSV de origen
 ```
 
 ## 4. Modelo de datos
@@ -358,7 +358,7 @@ de 24 h y decide si se puede enviar texto libre (§8).
 los reintentos de Meta), `contact_phone`, `direction` (`inbound`/`outbound`), `type`,
 `body`, `status`, `raw` (jsonb), `created_at`. Índice `(contact_phone, created_at)`.
 
-### POMA (fase 2)
+### Redestina (fase 2)
 
 **`productores`** — la tabla original (`id`, `name`, `email` UNIQUE, `phone` UNIQUE,
 `created_at`) **ampliada** con `empresa`, `codigo`, `comentario`, `visitado`, `conveni`,
@@ -450,7 +450,7 @@ select/insert/update, y `service_role`. Hoy guarda **`test_mode`** (`'true'`/`'f
 
 ### Integridad
 
-Las tablas POMA sí tienen foreign keys. Las de mensajería **no**: `productores`,
+Las tablas Redestina sí tienen foreign keys. Las de mensajería **no**: `productores`,
 `wa_contacts` y `wa_messages` siguen unidas solo por `phone`, sin FK.
 
 ### RLS y GRANTs — hacen falta LAS DOS capas
@@ -761,9 +761,9 @@ excedente. Si no reconoce una fecha, queda `null` (como antes) y el panel la nor
 texto de la oferta conserva siempre el original. Esto reduce la deuda §12.4.
 
 **Arranca preguntando, no con el cuestionario.** Ante un mensaje que no sea ALTA/BAJA de un
-productor sin sesión abierta, POMA responde con una **guía corta** (qué es, qué preguntará, y
+productor sin sesión abierta, Redestina responde con una **guía corta** (qué es, qué preguntará, y
 que puede escribir `Stop` cuando quiera) y los botones *Sí / Ara no*. Es una desviación
-deliberada del POMA §8, que hacía que *cualquier* mensaje lanzara el formulario: con 271
+deliberada del Redestina §8, que hacía que *cualquier* mensaje lanzara el formulario: con 271
 productores escribiendo por cualquier motivo, eso secuestra conversaciones normales.
 
 **La paginación es el caso normal.** Las listas de WhatsApp admiten 10 filas: se muestran 9
@@ -986,9 +986,9 @@ hasta que el panel la normalice.
 ## 6quater. Parte pública, accesos separados y registro (31-07-2026)
 
 Hasta hoy **no existía ninguna página pública**: `AuthGate` envolvía el router entero, así que
-cualquier URL enseñaba el login del equipo («Consola POMA · accés restringit a l'equip») y el router
+cualquier URL enseñaba el login del equipo («Consola Redestina · accés restringit a l'equip») y el router
 ni se montaba sin sesión. Eso servía cuando los únicos usuarios eran tres personas del equipo; con
-paneles de productor y de receptor deja de servir, porque no hay dónde explicar qué es POMA ni por
+paneles de productor y de receptor deja de servir, porque no hay dónde explicar qué es Redestina ni por
 dónde entra alguien que todavía no tiene cuenta.
 
 ### La composición se invierte
@@ -1087,7 +1087,7 @@ menú (`AppShell`) **suma las dos colas**.
   `excedentes`, `canalizaciones`).
 - **Secretos**: nunca en el código. Env vars, siempre.
 - **`docs/` y `scripts/data/` nunca entran en git.** El primero es material de trabajo —incluye el
-  **funcional de negocio** (`Documento funcional POMA 2026.md` y `Documento funcional POMA 2026 —
+  **funcional de negocio** (`Documento funcional Redestina 2026.md` y `Documento funcional Redestina 2026 —
   adaptado.md`, resumidos en §1bis), `nuevas-funcionalidades/` y los seis documentos operativos
   de §1 (guía de producción de WhatsApp + su HTML visual, costes, flujo de la aplicación y los dos
   de **usuarios, con contraseñas en claro**)—; el segundo son datos personales
@@ -1284,8 +1284,8 @@ apagado y en test). Detalle:
   mismo) y el enlace se manda por **Resend** desde `recuperar-password`. La app detecta el evento
   `PASSWORD_RECOVERY` (en `useSessio`, §6quater) y desvía a `/restablir`. La `redirectTo` (APP_URL)
   debe estar en la allow-list de Auth (Management API, **no** config push; §10).
-- **Dominio `espigoladors.com` verificado en Resend** y `RESEND_FROM="POMA <no-reply@espigoladors.com>"`
-  configurado, así que **se envía a cualquier dirección** (verificado el envío a un correo externo).
+- **Dominio `espigoladors.com` verificado en Resend** y `RESEND_FROM` configurado (hoy todavía
+  `POMA <no-reply@espigoladors.com>`, §10ter), así que **se envía a cualquier dirección** (verificado el envío a un correo externo).
   Si se cambia de dominio, verificarlo en `resend.com/domains` y ajustar `RESEND_FROM`. El gate
   `email_test_recipients` limita, mientras se está en pruebas, a los correos de esa whitelist.
 
@@ -1298,10 +1298,10 @@ cuerpo, botón y nota, filete coral, pie crema y la línea de por qué recibes e
 `preheader` (la línea que la bandeja enseña junto al asunto) y pinta el botón con la técnica de
 tabla + `bgcolor`, porque Outlook ignora el `padding` de un `<a>`.
 
-**El logo es `public/logo-email.png`**, el wordmark rasterizado a 378×96 desde `logo-poma.svg`: los
+**El logo es `public/logo-email.png`**, el wordmark rasterizado a 378×96 desde `logo-redestina.svg`: los
 clientes de correo no pintan SVG, no resuelven rutas relativas y Gmail bloquea `data:`. Se sirve por
 URL absoluta desde `APP_URL`. El `alt` del `<img>` va **estilado** (crema, 26px, bold), así que con
-las imágenes bloqueadas —lo normal en Gmail con un remitente nuevo— se sigue leyendo «POMA» sobre el
+las imágenes bloqueadas —lo normal en Gmail con un remitente nuevo— se sigue leyendo «Redestina» sobre el
 navy en vez de un icono roto. Si se cambia de dominio, basta con `APP_URL`.
 
 ⚠️ **`textoAHtml(titulo, cuerpo)` ESCAPA su contenido**: es para texto plano (el `texto_oferta`, el
@@ -1364,7 +1364,7 @@ esperando una validación que no llegaría nunca.
 **Anti-abuso proporcionado** (sin captcha, deuda §12.26): honeypot `web` —que responde 200 falso—,
 límite de 5 intentos/10 min por IP **en memoria** (best-effort: se pierde en cada arranque en frío y
 no se comparte entre instancias) y un freno global durable: ≥20 registros pendientes en la última
-hora → 429. A la escala de POMA, ese freno no molesta a nadie legítimo y corta un abuso masivo aunque
+hora → 429. A la escala de Redestina, ese freno no molesta a nadie legítimo y corta un abuso masivo aunque
 roten las IP.
 
 **Compensación**: si falla el insert de la ficha se borra la cuenta; si falla la membresía se borran
@@ -1494,11 +1494,12 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
 - `WHATSAPP_ENVIO_REAL` — `"true"` en remoto desde 2026-07-22 (envíos reales, §8); ausente u
   otro valor = simula (`status='simulat'`)
 - `ALLOWED_ORIGIN` — admite **varios orígenes separados por comas** y `*` como comodín
-  dentro de un origen, porque los despliegues de Vercel no tienen URL estable. Valor actual:
-  `http://localhost:5173,https://p0ma.carlessanz.com,https://p0ma-*-carlessanz-projects.vercel.app`.
-  **La app en producción se sirve desde el dominio propio `https://p0ma.carlessanz.com`**, que
-  hubo que añadir aquí (si no, el navegador bloquea por CORS todas las llamadas a las Edge
-  Functions). Si se cambia/añade dominio, actualizar este secret.
+  dentro de un origen, porque los despliegues de Vercel no tienen URL estable.
+  ⚠️ **Valor real hoy: todavía el de `p0ma` — pendiente del rename (§10ter).** Debe pasar a
+  `http://localhost:5173,https://redestina.carlessanz.com,https://redestina-*-carlessanz-projects.vercel.app`.
+  **La app en producción se sirve desde el dominio propio**, que hay que añadir aquí (si no, el
+  navegador bloquea por CORS todas las llamadas a las Edge Functions). Si se cambia/añade dominio,
+  actualizar este secret.
   ⚠️ Un cambio de este secret **no llega a un isolate caliente**: `ALLOWED_ORIGINS` es un `const` de
   módulo que se evalúa al cargar. Hay que **redesplegar** las funciones, y no dar por buena una
   prueba hecha diez segundos después.
@@ -1506,59 +1507,141 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
   valor va en `app_config.recordatorios_secret` para que el job lo pueda enviar (§4, §5). Nunca
   en git.
 - `RESEND_API_KEY` — API key de Resend (ofertas por email y reset de contraseña). Nunca en git.
-- `RESEND_FROM` — remitente (`from`) de un dominio **verificado** en Resend. Valor actual:
-  `POMA <no-reply@espigoladors.com>`. Ausente = usa `onboarding@resend.dev`, que solo entrega al
-  correo owner de la cuenta.
-- `APP_URL` — URL de la app para el `redirectTo` del reset (dominio propio
-  `https://p0ma.carlessanz.com`); debe estar en la allow-list de Auth (`uri_allow_list`).
+- `RESEND_FROM` — remitente (`from`) de un dominio **verificado** en Resend.
+  ⚠️ **Valor real hoy: `POMA <no-reply@espigoladors.com>` — pendiente del rename (§10ter)**; debe
+  pasar a `Redestina <no-reply@espigoladors.com>`. Ausente = usa `onboarding@resend.dev`, que solo
+  entrega al correo owner de la cuenta.
+- `APP_URL` — URL de la app para el `redirectTo` del reset.
+  ⚠️ **Valor real hoy: `https://p0ma.carlessanz.com` — pendiente del rename (§10ter)**; debe pasar a
+  `https://redestina.carlessanz.com`. Tiene que estar en la allow-list de Auth (`uri_allow_list`).
 - `SB_SECRET_KEY` (`sb_secret_...`)
 - `SUPABASE_URL` (la inyecta Supabase automáticamente)
 
 **Redirect URLs de Auth** (Management API, no config push): `site_url` = APP_URL y `uri_allow_list`
-incluye `localhost:5173`, el dominio de producción y el comodín `https://p0ma-*-carlessanz-projects.vercel.app/**`.
+incluye `localhost:5173`, el dominio de producción y el comodín de los despliegues de Vercel.
+⚠️ **Siguen apuntando a `p0ma` — pendiente del rename (§10ter).**
 ⚠️ **Son dos matchers distintos**: el de las Edge Functions convierte `*` en `[A-Za-z0-9-]+` y compara
 orígenes completos (sin `/**`); el de GoTrue es glob y **sí** necesita el `/**` final. No copiar el
 mismo literal a los dos sitios.
 
 **Scripts**: `SUPABASE_URL` y `SB_SECRET_KEY` en el entorno.
 
-## 10bis. El rename a P0MA (31-07-2026)
+## 10bis. Los dos renames: `pdApp-wp` → `P0MA` → `Redestina`
 
-El proyecto se llamaba `pdApp-wp` —el nombre del producto anterior— en la carpeta, el repo, Vercel y el
-dominio. Ahora:
+El proyecto ha cambiado de nombre **dos veces**. El histórico importa porque cada rename deja
+redirecciones vivas y nombres que no se pueden reutilizar.
 
-| Qué | Antes | Ahora |
-| --- | --- | --- |
-| Carpeta | `…/Espigoladors/pdApp-wp` | `…/Espigoladors/P0MA` |
-| Repo | `carlessanz/pdApp-wp` | `carlessanz/P0MA` (GitHub redirige el viejo con 301) |
-| Paquete | `pdapp-wp` | `p0ma` (npm exige minúsculas) |
-| `project_id` (Docker local) | `pdApp-wp` | `P0MA` |
-| Proyecto Vercel | `pdapp-wp` | `p0ma` (mismo `projectId`: conserva env vars, dominios e historial) |
-| **Dominio** | `pdapp-wp.carlessanz.com` | **`p0ma.carlessanz.com`** |
+### Rename 1 — `pdApp-wp` → `P0MA` (31-07-2026)
+
+`pdApp-wp` era el nombre del producto anterior. Se cambió en la carpeta, el repo, el paquete, el
+`project_id`, el proyecto de Vercel y el dominio (`pdapp-wp.carlessanz.com` → `p0ma.carlessanz.com`).
 
 **El dominio viejo se apagó del todo el mismo día.** Se llegó a poner una redirección 308 pensando
 en el logo (`/logo-email.png`) y el enlace del pie de los correos ya entregados, que quedan
 congelados en la bandeja del destinatario para siempre. **Pero en este proyecto no había ningún
 destinatario real**: todo lo enviado hasta el 31-07-2026 fue a `hola+*@carlessanz.com` y a las
 cuatro entidades `TEST-*`, en modo test (§8). Sin correos reales que proteger, la redirección solo
-era rastro, así que se retiró el DNS, los dos dominios de Vercel (`pdapp-wp.carlessanz.com` y
-`pdapp-wp.vercel.app`) y los patrones `pdapp-*` de `ALLOWED_ORIGIN` y `uri_allow_list`.
+era rastro, así que se retiró el DNS, los dos dominios de Vercel y los patrones `pdapp-*` de
+`ALLOWED_ORIGIN` y `uri_allow_list`.
 
 ⚠️ **Ese razonamiento caduca en cuanto se salga del modo test.** A partir del primer correo a un
 productor o una entidad de verdad, apagar un dominio sí rompe su historial hacia atrás y sin
 remedio: entonces la respuesta correcta vuelve a ser la redirección permanente, no el corte.
+**Es exactamente lo que hay que decidir en el rename 2 antes de tocar el dominio.**
 
-**No volver a crear un repo llamado `pdApp-wp`**: rompería la redirección 301 de GitHub, que sí
-sigue viva.
+### Rename 2 — `P0MA` → `Redestina` (10-09-2026)
 
-Lo que **no** dependía del nombre y por eso no se tocó: el `ref` de Supabase (`uxppvaldhptdomvdhsmn`),
-la base de datos, las migraciones, la URL del webhook en Meta y los secretos de WhatsApp.
+A diferencia del anterior, este **no es solo un cambio de slug: es un rebranding**. `POMA` era
+además el nombre del servicio de cara al usuario, así que cambia también lo que se lee en la
+interfaz, en los correos y en las plantillas de WhatsApp.
+
+| Qué | Antes | Ahora | Estado |
+| --- | --- | --- | --- |
+| Carpeta | `…/Espigoladors/P0MA` | `…/Espigoladors/Redestina` | ✅ |
+| Repo | `carlessanz/P0MA` | `carlessanz/Redestina` (GitHub redirige el viejo con 301) | ✅ |
+| `remote` de git local | `P0MA.git` | `Redestina.git` | ✅ |
+| Paquete | `p0ma` | `redestina` | ✅ |
+| `project_id` (Docker local) | `P0MA` | `Redestina` | ✅ |
+| Nombre del servicio en la UI, correos y plantillas | `POMA` | `Redestina` | ✅ |
+| `src/lib/poma.ts` | — | `src/lib/redestina.ts` | ✅ |
+| Claves de `localStorage` y canal de Realtime | `poma-*` | `redestina-*` | ✅ |
+| Documentos de `docs/` (contenido y nombre) | `POMA` | `Redestina` | ✅ |
+| **Proyecto Vercel** | `p0ma` | `redestina` | ⬜ **pendiente** |
+| **Dominio** | `p0ma.carlessanz.com` | `redestina.carlessanz.com` | ⬜ **pendiente** |
+| **Secretos `ALLOWED_ORIGIN` y `APP_URL`** | `p0ma…` | `redestina…` | ⬜ **pendiente** |
+| **`uri_allow_list` de Auth** | `p0ma…` | `redestina…` | ⬜ **pendiente** |
+| **Secreto `RESEND_FROM`** | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ⬜ **pendiente** |
+| **El logo** (wordmark) | dibuja «POMA» | dibuja «Redestina» | ⬜ **pendiente (diseño)** |
+
+⚠️ **El código ya apunta a `redestina.carlessanz.com`, que todavía no existe.** Hasta que se
+completen las cuatro filas de infraestructura, la aplicación desplegada **se rompe**: el navegador
+bloquea por CORS las llamadas a las Edge Functions (`ALLOWED_ORIGIN` no reconoce el origen nuevo) y
+los enlaces de los correos apuntan a una URL muerta. El orden correcto está en §10ter.
+
+⚠️ **El logo no se pudo renombrar.** `public/logo-redestina.svg` es un wordmark en **paths**, no
+texto: las letras de «POMA» están dibujadas como vectores. El fichero cambió de nombre, pero **lo
+que se ve sigue diciendo POMA** en la landing, el menú lateral, las pantallas de acceso, el icono de
+la PWA (`icona-*.png`, `apple-touch-icon.png`, `favicon.svg`) y la cabecera de todos los correos
+(`logo-email.png`). Hace falta el logo nuevo en SVG y regenerar los derivados.
+
+⚠️ **Los PDF de `docs/nuevas-funcionalidades/` cambiaron de nombre pero no de contenido**: son
+binarios y por dentro siguen diciendo POMA. Sus versiones `.md` sí están actualizadas.
+
+**No volver a crear un repo llamado `P0MA` ni `pdApp-wp`**: rompería las redirecciones 301 de
+GitHub, que siguen vivas las dos.
+
+Lo que **no** depende del nombre y por eso no se tocó: el `ref` de Supabase (`uxppvaldhptdomvdhsmn`),
+la base de datos, **las migraciones ya aplicadas** (llevan `POMA` en comentarios y el nombre
+`20260721120100_modelo_poma.sql`; editarlas está prohibido, §7), la URL del webhook en Meta y los
+secretos de WhatsApp.
+
+⚠️ **`Poma` es también un producto del catálogo** (manzana, en `productos.csv` y en el seed
+`20260721120300_seed_catalogos.sql`), y aparece en comentarios de fichas de productores. Cualquier
+sustitución masiva futura tiene que ser **sensible a mayúsculas**: `POMA` es el proyecto, `Poma` es
+fruta. Un `sed -i 's/poma/redestina/gi'` renombraría la manzana.
 
 ⚠️ **Orden que hay que respetar si se repite**: `supabase stop` **antes** de cambiar `project_id`. Al
 revés, el CLI filtra por el nombre nuevo, no encuentra los contenedores viejos y deja doce huérfanos
 ocupando los puertos 553xx. Para limpiarlos, **filtrar por nombre**
-(`docker ps -q --filter name=_pdApp-wp`): en esta máquina conviven otros stacks de Supabase y un
+(`docker ps -q --filter name=_Redestina`): en esta máquina conviven otros stacks de Supabase y un
 `docker stop $(docker ps -q)` se los llevaría por delante.
+
+## 10ter. Completar el rename: los pasos de infraestructura
+
+Pendientes del rename 2 (§10bis). **El código ya está desplegable pero la infraestructura no
+responde a ese nombre**, así que hasta cerrar esto la aplicación en producción está rota. Orden:
+
+1. **Vercel — renombrar el proyecto.** Dashboard → proyecto `p0ma` → Settings → General → Project
+   Name → `redestina`. El `projectId` no cambia, así que conserva variables, dominios e historial;
+   `.vercel/project.json` no hace falta tocarlo.
+2. **Vercel — añadir el dominio** `redestina.carlessanz.com` (Settings → Domains) y crear el
+   registro DNS que indique. **Añadir, no sustituir**: hasta que el nuevo resuelva, `p0ma…` es lo
+   único que funciona.
+3. **Secretos de Supabase**, con los dos dominios a la vez mientras dure la transición:
+   ```bash
+   supabase secrets set ALLOWED_ORIGIN='http://localhost:5173,https://redestina.carlessanz.com,https://redestina-*-carlessanz-projects.vercel.app'
+   supabase secrets set APP_URL='https://redestina.carlessanz.com'
+   supabase secrets set RESEND_FROM='Redestina <no-reply@espigoladors.com>'
+   ```
+   ⚠️ **Redesplegar después todas las Edge Functions**: `ALLOWED_ORIGIN` es un `const` de módulo y
+   un isolate caliente no ve el secreto nuevo (§10).
+4. **Auth — `uri_allow_list`** por Management API (**nunca** `config push`, §9):
+   ```bash
+   TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+   curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+     https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/config/auth \
+     -d '{"site_url":"https://redestina.carlessanz.com","uri_allow_list":"http://localhost:5173/**,https://redestina.carlessanz.com/**,https://redestina-*-carlessanz-projects.vercel.app/**"}'
+   ```
+   ⚠️ Los dos matchers **no** llevan la misma sintaxis: el de las Edge Functions compara orígenes
+   sin `/**`; el de GoTrue es glob y sí lo necesita (§10).
+5. **El dominio viejo.** Seguimos en modo test y no ha recibido correo ningún destinatario real,
+   así que vale el mismo razonamiento del rename 1 y `p0ma.carlessanz.com` se puede apagar. Si para
+   entonces ya se ha salido del modo test, **redirección 308 permanente, no corte**.
+6. **El logo nuevo** en `public/logo-redestina.svg`, y regenerar desde él `logo-email.png` (378×96),
+   `icona-192/512`, `icona-maskable-512`, `apple-touch-icon` y `favicon.svg`.
+7. **Plantillas de Meta**: su texto ya dice «Redestina» (`_shared/plantillas-meta.md`) y **ninguna
+   está aprobada todavía**, así que el rename no obliga a rehacer nada — pero hay que registrarlas
+   ya con el nombre nuevo (§12.2).
 
 ## 11. Comandos
 
@@ -1607,8 +1690,8 @@ tocas algo de `supabase/functions/_shared/`, **redespliega todas** las funciones
 
 ## 12. Checkpoints de negocio y deuda técnica
 
-**Checkpoints que NO son código** (POMA §10): la construcción está completa, pero para poner
-POMA en producción real quedan pasos de configuración y negocio.
+**Checkpoints que NO son código** (Redestina §10): la construcción está completa, pero para poner
+Redestina en producción real quedan pasos de configuración y negocio.
 
 1. ~~**Salir del modo PoC**~~ — **hecho (2026-07-22)**: `WHATSAPP_ENVIO_REAL=true` en remoto. Lo
    que contiene el riesgo ahora es el entorno de test de Meta (≤5 números) + `meta_test_recipients`.
@@ -1625,7 +1708,7 @@ POMA en producción real quedan pasos de configuración y negocio.
    (`_shared/whatsapp.ts`, si no la consola las registra como `[plantilla: nombre]`; §6ter),
    actualizar el secreto `WHATSAPP_PHONE_ID` con el número de producción, vaciar
    `meta_test_recipients` y (opcional) apagar el modo test. Un solo commit. Los pasos en Meta,
-   con rutas de clic y textos listos para pegar, están en `docs/Guía producción WhatsApp — POMA.md`.
+   con rutas de clic y textos listos para pegar, están en `docs/Guía producción WhatsApp — Redestina.md`.
 3. **Opt-in real de las entidades**: hoy `false` en las 111; el toggle deja la mecánica, pero
    recoger el consentimiento es trabajo de negocio.
 4. **Formato definitivo del albarán**: se genera con placeholders (`src/lib/textos.ts`); el
@@ -1791,11 +1874,22 @@ POMA en producción real quedan pasos de configuración y negocio.
     dice que un segundo alta simultánea «reintenta con N+1», pero no hay retry: `id_excedente` se
     calcula contando las filas del día y se hace un único `insert`; si dos altas del mismo
     productor+producto coinciden en el día, la segunda choca con el `unique` y **falla** en vez de
-    reintentar. Raro a la escala de POMA, pero real (afecta tanto al intake como al panel).
+    reintentar. Raro a la escala de Redestina, pero real (afecta tanto al intake como al panel).
 40. **El albarán se genera con el productor en blanco.** `OfferDetail` pasa `productor: ''` (y
     `dataHora`/`comentaris` vacíos) a `textoAlbaran`, así que el «RECOLLIDA CONFIRMADA» nunca lleva el
     nombre del productor aunque esté disponible. Va con el checkpoint del formato definitivo del
     albarán (§12 checkpoint 4).
+
+41. **El rebranding a Redestina es textual, no visual.** Todo lo escrito dice ya «Redestina», pero
+    **el logo sigue dibujando «POMA»**: `public/logo-redestina.svg` es un wordmark en paths, no
+    texto, y de él derivan los iconos de la PWA, el `apple-touch-icon`, el `favicon` y el
+    `logo-email.png` de la cabecera de todos los correos. Hasta que haya logo nuevo, la aplicación
+    se llama Redestina y se ve POMA (§10bis).
+42. **La infraestructura todavía responde al nombre viejo.** Proyecto de Vercel, dominio,
+    `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM` y `uri_allow_list` siguen en `p0ma`, mientras que el
+    código ya apunta a `redestina.carlessanz.com`. **Con el código desplegado y la infraestructura
+    sin migrar, la aplicación en producción se rompe** (CORS y enlaces de correo muertos). Los pasos,
+    en orden, en §10ter.
 
 ## 13. Al terminar cualquier cambio
 

@@ -3,7 +3,7 @@
 
 @custom-variant dark (&:is(.dark *));
 
-/* ─── Tema POMA (identidad de espigoladors.cat/simbiosi_poma) ───────────────
+/* ─── Tema Redestina (identidad de espigoladors.cat/simbiosi_poma) ───────────────
    navy #234C66 · crema #E0EBC7 · coral #EE7A5F · fondo #F9FAFD · Space Grotesk */
 :root {
   --radius: 0.75rem;
@@ -36,7 +36,7 @@
   --input: #cdd8e0;
   --ring: #234c66;
 
-  /* Menú lateral en navy con la crema POMA, para conservar la identidad que tenía
+  /* Menú lateral en navy con la crema Redestina, para conservar la identidad que tenía
      la barra superior: activo en crema sobre navy, hover en navy aclarado. */
   --sidebar: #234c66;
   --sidebar-foreground: #e0ebc7;

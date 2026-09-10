@@ -16,7 +16,7 @@ import { exigirEquipo } from "../_shared/autorizacion.ts";
 // CORS restringido a los orígenes del panel; ya no '*'.
 // ALLOWED_ORIGIN admite varios separados por comas y '*' como comodín dentro de
 // un origen, porque los despliegues de Vercel no tienen URL estable. Ejemplo:
-//   http://localhost:5173,https://p0ma-*-carlessanz-projects.vercel.app
+//   http://localhost:5173,https://redestina-*-carlessanz-projects.vercel.app
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
   .split(",")
   .map((o) => o.trim())

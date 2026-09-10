@@ -1,4 +1,4 @@
-// ¿Se puede ofrecer instalar POMA en este dispositivo, y de qué manera?
+// ¿Se puede ofrecer instalar Redestina en este dispositivo, y de qué manera?
 //
 // La aplicación ya es una PWA instalable (vite.config.ts). Lo que faltaba era que
 // alguien se enterara: el navegador esconde la opción en un menú que nadie abre.
@@ -30,7 +30,7 @@ interface BeforeInstallPromptEvent extends Event {
 /** Cómo se puede instalar: no se puede · hay diálogo del sistema · hay que explicarlo. */
 export type ModeInstalacio = 'no' | 'automatica' | 'manual-ios'
 
-const CLAU_DESCARTAT = 'poma-install-descartat'
+const CLAU_DESCARTAT = 'redestina-install-descartat'
 /** Quien lo descarta no lo vuelve a ver en 30 días. */
 const DIES_ESPERA = 30
 

@@ -80,17 +80,17 @@ Deno.serve(async (req) => {
       } else if (link) {
         await sendEmail({
           to: email,
-          subject: "Recuperació de contrasenya · POMA",
+          subject: "Recuperació de contrasenya · Redestina",
           html: plantillaEmail({
             titulo: "Recupera la teva contrasenya",
-            preheader: "Enllaç per triar una contrasenya nova del panell de POMA.",
+            preheader: "Enllaç per triar una contrasenya nova del panell de Redestina.",
             cuerpoHtml:
-              `<p style="margin:0">Has demanat restablir la contrasenya del panell de POMA. Fes clic al botó per triar-ne una de nova:</p>`,
+              `<p style="margin:0">Has demanat restablir la contrasenya del panell de Redestina. Fes clic al botó per triar-ne una de nova:</p>`,
             boton: { texto: "Restablir contrasenya", url: link },
             nota:
               "Si no has estat tu, pots ignorar aquest correu: la teva contrasenya no canviarà. L'enllaç caduca aviat i només es pot fer servir una vegada.",
           }),
-          text: `Restableix la teva contrasenya de POMA obrint aquest enllaç: ${link}`,
+          text: `Restableix la teva contrasenya de Redestina obrint aquest enllaç: ${link}`,
         });
       }
     }

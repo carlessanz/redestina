@@ -13,12 +13,12 @@
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
 // Por defecto, el remitente de pruebas de Resend (solo entrega al owner).
-const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "POMA <onboarding@resend.dev>";
+const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "Redestina <onboarding@resend.dev>";
 
 // El logo tiene que ser una URL absoluta y pública: los clientes de correo no
 // resuelven rutas relativas, no cargan `data:` (Gmail lo bloquea) y no saben
 // pintar SVG. `public/logo-email.png` es el wordmark rasterizado a 378×96.
-const APP_URL = (Deno.env.get("APP_URL") ?? "https://p0ma.carlessanz.com")
+const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com")
   .replace(/\/+$/, "");
 const LOGO_URL = `${APP_URL}/logo-email.png`;
 
@@ -140,9 +140,9 @@ ${preheader}
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:separate">
 
       <!-- Cabecera: el alt del logo va estilado, así que con las imágenes
-           bloqueadas (Gmail lo hace por defecto) se sigue leyendo «POMA». -->
+           bloqueadas (Gmail lo hace por defecto) se sigue leyendo «Redestina». -->
       <tr><td align="center" bgcolor="${NAVY}" style="background:${NAVY};border-radius:16px 16px 0 0;padding:28px 24px 22px">
-        <img src="${LOGO_URL}" width="150" height="38" alt="POMA"
+        <img src="${LOGO_URL}" width="150" height="38" alt="Redestina"
              style="display:block;border:0;outline:none;width:150px;height:38px;font-family:${FUENTE};font-size:26px;font-weight:700;color:${CREMA};letter-spacing:1px">
         <div style="font-family:${FUENTE};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${CREMA};opacity:.85;padding-top:10px">Fundació Espigoladors</div>
       </td></tr>
@@ -157,13 +157,13 @@ ${preheader}
         ${nota}
       </td></tr>
 
-      <!-- Filete coral: la identidad de POMA sin depender de imágenes -->
+      <!-- Filete coral: la identidad de Redestina sin depender de imágenes -->
       <tr><td bgcolor="${CORAL}" style="background:${CORAL};font-size:0;line-height:0;height:4px">&nbsp;</td></tr>
 
       <!-- Pie -->
       <tr><td bgcolor="${CREMA}" style="background:${CREMA};border-radius:0 0 16px 16px;padding:20px 32px">
         <p style="margin:0;font-family:${FUENTE};font-size:13px;line-height:1.6;color:${TEXTO}">
-          <strong>POMA</strong> · aprofitament d'excedents agrícoles<br>
+          <strong>Redestina</strong> · aprofitament d'excedents agrícoles<br>
           <a href="${APP_URL}" style="color:${TEXTO};text-decoration:underline">${
     APP_URL.replace(/^https?:\/\//, "")
   }</a>
@@ -173,7 +173,7 @@ ${preheader}
     </table>
 
     <p style="margin:16px 0 0;font-family:${FUENTE};font-size:11px;line-height:1.5;color:${SUAVE};max-width:600px">
-      Has rebut aquest correu perquè formes part de la xarxa de POMA, el servei de canalització d'excedents de la Fundació Espigoladors.
+      Has rebut aquest correu perquè formes part de la xarxa de Redestina, el servei de canalització d'excedents de la Fundació Espigoladors.
     </p>
 
   </td></tr>

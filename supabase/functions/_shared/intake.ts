@@ -1,6 +1,6 @@
-// Motor del intake conversacional de POMA.
+// Motor del intake conversacional de Redestina.
 //
-// Un productor escribe al número de POMA y, paso a paso, compone una oferta de
+// Un productor escribe al número de Redestina y, paso a paso, compone una oferta de
 // excedente. El estado vive en `intake_sessions` (una fila por teléfono), de modo
 // que cada mensaje entrante se interpreta según el paso en curso.
 //

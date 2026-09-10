@@ -23,10 +23,10 @@ export default defineConfig({
     //    shell estático, que el precache ya sirve igual para cualquier ruta.
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-poma.svg'],
+      includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-redestina.svg'],
       manifest: {
-        name: 'POMA — Espigoladors',
-        short_name: 'POMA',
+        name: 'Redestina — Espigoladors',
+        short_name: 'Redestina',
         description: 'Canalització d’excedents agrícoles de la Fundació Espigoladors.',
         // La raíz, no una ruta de rol: cada cuenta aterriza en su panel (§6ter).
         start_url: '/',

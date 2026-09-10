@@ -59,7 +59,7 @@ export default function OffersList({ onOpen }: Props) {
   useEffect(() => {
     void load()
     const channel = supabase
-      .channel('poma-ofertas')
+      .channel('redestina-ofertas')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'excedentes' }, () => void load())
       .on('postgres_changes', { event: '*', schema: 'public', table: 'canalizaciones' }, () => void load())
       .subscribe()

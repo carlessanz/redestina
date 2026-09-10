@@ -274,7 +274,7 @@ Deno.serve(async (req) => {
         .from("productores").select("id").ilike("email", patroLike(d.email)).limit(1);
       if ((xocEmail ?? []).length > 0) {
         return responder(
-          { error: "Aquest correu ja consta en una fitxa. Contacta amb l'equip de POMA.", code: "dades_en_us", camp: "email" },
+          { error: "Aquest correu ja consta en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "email" },
           409,
         );
       }
@@ -283,7 +283,7 @@ Deno.serve(async (req) => {
           .from("productores").select("id").eq("phone", d.telefon).limit(1);
         if ((xocTel ?? []).length > 0) {
           return responder(
-            { error: "Aquest telefon ja consta en una fitxa. Contacta amb l'equip de POMA.", code: "dades_en_us", camp: "telefon" },
+            { error: "Aquest telefon ja consta en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "telefon" },
             409,
           );
         }
@@ -353,7 +353,7 @@ Deno.serve(async (req) => {
       if (errFitxa?.code === "23505") {
         const camp = /phone/i.test(errFitxa.message ?? "") ? "telefon" : "email";
         return responder(
-          { error: "Aquestes dades ja consten en una fitxa. Contacta amb l'equip de POMA.", code: "dades_en_us", camp },
+          { error: "Aquestes dades ja consten en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp },
           409,
         );
       }

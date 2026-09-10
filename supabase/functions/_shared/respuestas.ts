@@ -91,7 +91,7 @@ async function finalizarAceptacion(
   if (error) console.error("oferta_respuestas finalizar:", error.message);
   await sendText(
     supabase, from,
-    `Perfecte, hem registrat que en vols ${kg} kg. L'equip de POMA ho confirmarà i ` +
+    `Perfecte, hem registrat que en vols ${kg} kg. L'equip de Redestina ho confirmarà i ` +
       "coordinarà la recollida. 🚚",
   );
 }

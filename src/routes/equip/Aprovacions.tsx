@@ -2,7 +2,7 @@
 //
 // 1. REGISTRES PENDENTS — altas hechas desde el registro público
 //    (`membresias.aprovacio = 'pendent'`). Hasta que alguien las valida la persona no
-//    ve absolutamente nada de POMA, así que esta cola es la puerta de entrada al
+//    ve absolutamente nada de Redestina, así que esta cola es la puerta de entrada al
 //    servicio y va primero. Aprobar y rechazar se hacen aquí mismo, con las RPC
 //    `aprovar_registre` / `rebutjar_registre` (exigen `pot_aprovar()`). Lo que NO se
 //    hace aquí es completar la ficha —una entidad nueva llega con `estat` y

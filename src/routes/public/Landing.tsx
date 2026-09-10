@@ -1,4 +1,4 @@
-// Página pública de POMA: la raíz de la aplicación.
+// Página pública de Redestina: la raíz de la aplicación.
 //
 // Es lo primero que ve alguien que llega sin cuenta, así que explica qué es el servicio
 // y encamina a registro o login. No anuncia el acceso del equipo interno: el panel de
@@ -17,7 +17,7 @@ import { ComprovantSessio } from '../../components/LayoutAcces'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-// Coral de la identidad POMA para la acción principal. No hay variante de Button que lo
+// Coral de la identidad Redestina para la acción principal. No hay variante de Button que lo
 // dé: `default` es navy y `accent` en shadcn está reservado a los hovers.
 const CORAL = 'bg-accent text-accent-foreground hover:bg-accent/90'
 
@@ -47,9 +47,9 @@ export default function Landing() {
           bloque navy, o al salir el hero de pantalla se iría con él. */}
       <header className="sticky top-0 z-40 border-b border-white/10 bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
-          <Link to="/" aria-label="POMA" className="flex items-center">
+          <Link to="/" aria-label="Redestina" className="flex items-center">
             {/* Los rellenos del SVG ya son coral y crema, pensados para fondo navy: sin filtros. */}
-            <img src="/logo-poma.svg" alt="POMA" className="h-8 w-auto" />
+            <img src="/logo-redestina.svg" alt="Redestina" className="h-8 w-auto" />
           </Link>
 
           <nav className="mx-auto hidden items-center gap-6 md:flex">
@@ -163,7 +163,7 @@ export default function Landing() {
 
       <footer className="bg-primary text-primary-foreground">
         <div className="mx-auto flex max-w-6xl flex-col items-center gap-3 px-4 py-10 text-center">
-          <img src="/logo-poma.svg" alt="POMA" className="h-7 w-auto" />
+          <img src="/logo-redestina.svg" alt="Redestina" className="h-7 w-auto" />
           <p className="text-sm text-primary-foreground/80">{t('land.foot_by')}</p>
           <a
             href="https://espigoladors.cat"

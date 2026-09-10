@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
         const r = await sendText(
           supabase,
           perfil.telefono,
-          `El teu codi d'accés a POMA és ${codi}. Caduca en 1 hora. ` +
+          `El teu codi d'accés a Redestina és ${codi}. Caduca en 1 hora. ` +
             `Entra a ${redirectTo}, escriu el teu correu i el codi.`,
           { bodyConsola: "[codi d'accés enviat · ocult]" },
         );
@@ -166,11 +166,11 @@ Deno.serve(async (req) => {
     if (canal === "email" || canal === "ambos") {
       const salutacio = perfil.nombre ? `Hola ${escaparHtml(perfil.nombre)},` : "Hola,";
       const html = plantillaEmail({
-        titulo: "El teu accés a POMA",
+        titulo: "El teu accés a Redestina",
         preheader: "Enllaç d'accés directe (caduca en 1 hora) i codi alternatiu.",
         cuerpoHtml: `<p style="margin:0 0 12px">${salutacio}</p>` +
-          `<p style="margin:0">Ja pots entrar al panell de POMA. L'enllaç caduca en <strong>1 hora</strong> i només es pot fer servir una vegada.</p>`,
-        boton: { texto: "Entra a POMA", url: enlace },
+          `<p style="margin:0">Ja pots entrar al panell de Redestina. L'enllaç caduca en <strong>1 hora</strong> i només es pot fer servir una vegada.</p>`,
+        boton: { texto: "Entra a Redestina", url: enlace },
         nota:
           `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:#234C66">${
             redirectTo.replace(/^https?:\/\//, "")
@@ -179,9 +179,9 @@ Deno.serve(async (req) => {
       });
       const r = await sendEmail({
         to: email,
-        subject: "El teu accés a POMA",
+        subject: "El teu accés a Redestina",
         html,
-        text: `Accés a POMA: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora).`,
+        text: `Accés a Redestina: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora).`,
       });
       resultado.email = r.ok ? "enviat" : `error: ${JSON.stringify(r.data)}`;
     }

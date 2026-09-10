@@ -47,11 +47,11 @@ export function plantillaPrimerContacte(rol: RolContacte): PlantillaRef {
 // apruebe la plantilla. Fuera de la ventana solo cabe la plantilla (plantillaPrimerContacte).
 export function textoSalutacio(rol: RolContacte): string {
   if (rol === 'entitat') {
-    return "Hola! Som l'equip de POMA d'Espigoladors 🌱. Col·laborem amb entitats socials " +
+    return "Hola! Som l'equip de Redestina d'Espigoladors 🌱. Col·laborem amb entitats socials " +
       'per aprofitar excedents agrícoles. Respon *OK* per activar la conversa i començar a ' +
       'rebre les nostres ofertes. Gràcies!'
   }
-  return "Hola! Som l'equip de POMA d'Espigoladors 🌱. T'ajudem a canalitzar els teus " +
+  return "Hola! Som l'equip de Redestina d'Espigoladors 🌱. T'ajudem a canalitzar els teus " +
     'excedents agrícoles. Respon *OK* per activar la conversa i poder oferir-nos excedents ' +
     'quan vulguis. Gràcies!'
 }

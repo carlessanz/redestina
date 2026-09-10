@@ -1,4 +1,4 @@
-// Aviso de «instal·la POMA al mòbil», para productores y receptores.
+// Aviso de «instal·la Redestina al mòbil», para productores y receptores.
 //
 // Es un banner descartable, no un diálogo modal: interrumpir a alguien a media tarea
 // para pedirle que instale una aplicación es justo lo que hace que se descarte sin

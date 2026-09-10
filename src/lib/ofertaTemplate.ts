@@ -34,7 +34,7 @@ export function construirComponentsOferta(d: DatosOfertaPlantilla): unknown[] {
     quantitat,
     orDefault(d.disponible, 'consultar'),
     orDefault(d.horari, 'a convenir'),
-    orDefault(d.responsable, 'Equip POMA'),
+    orDefault(d.responsable, 'Equip Redestina'),
   ]
   return [{ type: 'body', parameters: textos.map((text) => ({ type: 'text', text })) }]
 }

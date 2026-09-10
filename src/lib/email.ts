@@ -8,7 +8,7 @@ export interface EmailPayload {
   html?: string
   text?: string
   /**
-   * Si viene, el servidor maqueta el correo con la plantilla de POMA (cabecera con
+   * Si viene, el servidor maqueta el correo con la plantilla de Redestina (cabecera con
    * logo, tarjeta, pie) y `html`/`text` pasan a ser solo el contenido. Mantener la
    * plantilla en el servidor evita tenerla duplicada y desincronizada en el cliente.
    */

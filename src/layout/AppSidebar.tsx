@@ -46,7 +46,7 @@ export default function AppSidebar({ comptadors }: Props) {
   // `ctx` es null mientras se resuelve la sesión: sin el fallback esto reventaría.
   const rols = ctx?.rols ?? []
   const multi = rols.length > 1
-  const titol = multi ? 'POMA' : (organitzacio?.nombre ?? t('app.team'))
+  const titol = multi ? 'Redestina' : (organitzacio?.nombre ?? t('app.team'))
 
   // En móvil, elegir una sección cierra el panel; si no, se queda encima del contenido.
   const alNavegar = () => { if (isMobile) setOpenMobile(false) }
@@ -56,7 +56,7 @@ export default function AppSidebar({ comptadors }: Props) {
       <SidebarHeader className="gap-3 px-3 py-4">
         {/* A `/panell`, no a `/`: la raíz es la página pública y sacaría de la aplicación. */}
         <NavLink to="/panell" className="flex items-center gap-2.5 overflow-hidden" onClick={alNavegar}>
-          <img src="/logo-poma.svg" alt="POMA" className="h-7 w-auto shrink-0 brightness-0 invert" />
+          <img src="/logo-redestina.svg" alt="Redestina" className="h-7 w-auto shrink-0 brightness-0 invert" />
           <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
             {titol}
           </span>

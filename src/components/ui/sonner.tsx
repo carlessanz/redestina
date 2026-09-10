@@ -7,7 +7,7 @@ import {
 } from "lucide-react"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-// POMA usa modo claro fijo, así que no dependemos de next-themes.
+// Redestina usa modo claro fijo, así que no dependemos de next-themes.
 const Toaster = ({ ...props }: ToasterProps) => {
   return (
     <Sonner
