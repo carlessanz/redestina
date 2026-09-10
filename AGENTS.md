@@ -1625,6 +1625,15 @@ responde a ese nombre**, así que hasta cerrar esto la aplicación en producció
 1. **Vercel — renombrar el proyecto.** Dashboard → proyecto `p0ma` → Settings → General → Project
    Name → `redestina`. El `projectId` no cambia, así que conserva variables, dominios e historial;
    `.vercel/project.json` no hace falta tocarlo.
+   ⚠️ **Hace falta rol OWNER.** El CLI de esta máquina está autenticado como `upsocial`
+   (csanz@upsocial.org), que en este equipo es **DEVELOPER**: despliega y lee, pero un
+   `PATCH /v9/projects/{id}` responde `403 forbidden`. El OWNER es `carlessanz`
+   (hola@carlessanz.com). O se hace desde el Dashboard con esa cuenta, o se cambia la sesión del
+   CLI (`vercel login`) antes de intentarlo por API.
+   ⚠️ **Renombrar el proyecto cambia las URLs de preview**: `p0ma-*-carlessanz-projects.vercel.app`
+   pasa a `redestina-*-…`. El dominio propio no se ve afectado, pero **las previews dejan de pasar
+   CORS y de valer como `redirectTo`** hasta que se actualicen `ALLOWED_ORIGIN` (paso 3) y
+   `uri_allow_list` (paso 4). Por eso este paso va junto con esos dos, no suelto.
 2. **Vercel — añadir el dominio** `redestina.carlessanz.com` (Settings → Domains) y crear el
    registro DNS que indique. **Añadir, no sustituir**: hasta que el nuevo resuelva, `p0ma…` es lo
    único que funciona.
