@@ -21,6 +21,10 @@ supabase/functions/*/deno.lock
 # Datos maestros del Excel ARA: llevan teléfonos, emails y NIF de personas reales
 /scripts/data/
 
+# Configuración local de Claude Code (rutas de esta máquina; hoy solo la cubría
+# el ignore global del usuario, que no viaja con el repo)
+.claude/settings.local.json
+
 # Sistema / editor
 .DS_Store
 *.log

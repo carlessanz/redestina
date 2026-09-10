@@ -1098,6 +1098,10 @@ menú (`AppShell`) **suma las dos colas**.
   de **usuarios, con contraseñas en claro**)—; el segundo son datos personales
   (teléfonos, emails y NIF de ~450 personas y entidades). `.env.local.example` sí se versiona: es la
   plantilla, sin valores.
+  **`.claude/settings.local.json` tampoco**: lleva rutas de esta máquina (el
+  `additionalDirectories` de la carpeta de consultoría, §1). Lo ignoraba solo el `~/.config/git/ignore`
+  del usuario, que no viaja con el repo; desde el 10-09-2026 la regla está también en el `.gitignore`
+  propio, para que un clon en otra máquina no lo suba sin querer.
 - **Claves de Supabase**: usar las **nuevas** — `sb_publishable_...` en el frontend,
   `sb_secret_...` en el servidor. **No** usar las obsoletas `anon`/`service_role` (claves JWT
   antiguas). Los *roles* de Postgres `anon`/`authenticated`/`service_role` sí se siguen usando
@@ -1537,15 +1541,15 @@ redirecciones vivas y nombres que no se pueden reutilizar.
 ### Rename 1 — `pdApp-wp` → `P0MA` (31-07-2026)
 
 `pdApp-wp` era el nombre del producto anterior. Se cambió en la carpeta, el repo, el paquete, el
-`project_id`, el proyecto de Vercel y el dominio (`pdapp-wp.carlessanz.com` → `p0ma.carlessanz.com`).
+`project_id`, el proyecto de Vercel y el dominio. Ninguno de esos dos dominios existe ya.
 
 **El dominio viejo se apagó del todo el mismo día.** Se llegó a poner una redirección 308 pensando
 en el logo (`/logo-email.png`) y el enlace del pie de los correos ya entregados, que quedan
 congelados en la bandeja del destinatario para siempre. **Pero en este proyecto no había ningún
 destinatario real**: todo lo enviado hasta el 31-07-2026 fue a `hola+*@carlessanz.com` y a las
 cuatro entidades `TEST-*`, en modo test (§8). Sin correos reales que proteger, la redirección solo
-era rastro, así que se retiró el DNS, los dos dominios de Vercel y los patrones `pdapp-*` de
-`ALLOWED_ORIGIN` y `uri_allow_list`.
+era rastro, así que se retiró el DNS, los dominios de Vercel y sus patrones de `ALLOWED_ORIGIN` y
+`uri_allow_list`.
 
 ⚠️ **Ese razonamiento caduca en cuanto se salga del modo test.** A partir del primer correo a un
 productor o una entidad de verdad, apagar un dominio sí rompe su historial hacia atrás y sin
@@ -1570,7 +1574,7 @@ interfaz, en los correos y en las plantillas de WhatsApp.
 | Claves de `localStorage` y canal de Realtime | `poma-*` | `redestina-*` | ✅ |
 | Documentos de `docs/` (contenido y nombre) | `POMA` | `Redestina` | ✅ |
 | Proyecto Vercel | `p0ma` | `redestina` | ✅ |
-| Dominio | `p0ma.carlessanz.com` | `redestina.carlessanz.com` | ✅ |
+| Dominio | (retirado) | `redestina.carlessanz.com` | ✅ |
 | Secretos `ALLOWED_ORIGIN` y `APP_URL` | `p0ma…` | `redestina…` | ✅ |
 | `uri_allow_list` y `site_url` de Auth | `p0ma…` | `redestina…` | ✅ |
 | Secreto `RESEND_FROM` | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ✅ |
@@ -1581,11 +1585,12 @@ aplicación, y las tres capas que tenían que reconocerlo lo reconocen: Vercel, 
 las Edge Functions y la `uri_allow_list` de Auth. Verificado con preflight real: el dominio nuevo y
 `localhost:5173` obtienen su propio origen de vuelta; el dominio viejo y un origen arbitrario, no.
 
-⚠️ **`p0ma.carlessanz.com` se retiró sin redirección** y hoy devuelve **404**. Vale el mismo
-razonamiento del rename 1 —seguimos en modo test y no ha recibido correo ningún destinatario real,
-solo `hola+*@carlessanz.com` y las organizaciones `TEST-*`—, pero **ese razonamiento ya se ha gastado
-dos veces**: al primer correo a un productor o una entidad de verdad, apagar un dominio rompe su
-historial hacia atrás y sin remedio. El siguiente cambio de dominio exige redirección 308, no corte.
+⚠️ **El dominio anterior se retiró sin redirección**, igual que en el rename 1 y por el mismo
+motivo: seguimos en modo test y no ha recibido correo ningún destinatario real, solo
+`hola+*@carlessanz.com` y las organizaciones `TEST-*`. Pero **ese razonamiento ya se ha gastado dos
+veces**: al primer correo a un productor o una entidad de verdad, apagar un dominio rompe su
+historial hacia atrás y sin remedio, porque el logo y el enlace del pie viven para siempre en la
+bandeja de quien lo recibió. **El siguiente cambio de dominio exige redirección 308, no corte.**
 
 ⚠️ **El logo no se pudo renombrar.** `public/logo-redestina.svg` es un wordmark en **paths**, no
 texto: las letras de «POMA» están dibujadas como vectores. El fichero cambió de nombre, pero **lo
@@ -1627,8 +1632,9 @@ procedimiento a repetir el día que cambie el dominio, y porque dos de ellos tie
    (csanz@upsocial.org), que en este equipo es **DEVELOPER**: despliega y lee, pero un
    `PATCH /v9/projects/{id}` responde `403 forbidden`. El OWNER es `carlessanz`
    (hola@carlessanz.com). Se hizo desde el Dashboard con esa cuenta.
-   ⚠️ **Renombrar el proyecto cambia las URLs de preview**: `p0ma-*-carlessanz-projects.vercel.app`
-   pasó a `redestina-*-…`, así que los pasos 3 y 4 son parte del mismo trabajo, no un extra.
+   ⚠️ **Renombrar el proyecto cambia las URLs de preview**: pasaron a
+   `redestina-*-carlessanz-projects.vercel.app`, así que los pasos 3 y 4 son parte del mismo
+   trabajo, no un extra.
 2. **Vercel — el dominio** `redestina.carlessanz.com`, con su registro DNS.
 3. **Secretos de Supabase** (`supabase secrets set`): `ALLOWED_ORIGIN`, `APP_URL` y `RESEND_FROM`.
    ⚠️ **Redesplegar después TODAS las Edge Functions**: `ALLOWED_ORIGINS` es un `const` de módulo y
@@ -1659,8 +1665,7 @@ curl -i -X OPTIONS "$SUPABASE_URL/functions/v1/registro" \
 | --- | --- |
 | `https://redestina.carlessanz.com` | el mismo origen ✅ |
 | `http://localhost:5173` | el mismo origen ✅ (si no, se rompe `npm run dev`) |
-| `https://p0ma.carlessanz.com` | **no** el mismo (cae al primero de la lista) |
-| un origen arbitrario | **no** el mismo |
+| un dominio retirado o cualquier origen arbitrario | **no** el mismo (cae al primero de la lista) |
 
 ⚠️ **La trampa de esta comprobación**: un origen no permitido **no da error**. La función responde
 `204` igual, pero con el `Access-Control-Allow-Origin` de otro origen, y es el **navegador** quien
@@ -1913,7 +1918,7 @@ Redestina en producción real quedan pasos de configuración y negocio.
 42. ~~**La infraestructura todavía responde al nombre viejo.**~~ — **resuelta (10-09-2026)**:
     proyecto de Vercel, dominio, `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM`, `site_url` y
     `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
-    `p0ma.carlessanz.com` se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
+    el dominio anterior se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
     pero es la segunda vez que se usa ese argumento (§10bis).
 
 ## 13. Al terminar cualquier cambio

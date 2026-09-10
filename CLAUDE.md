@@ -65,8 +65,9 @@ La documentación del proyecto vive en `/Users/carlessanz/Documents/Claude/Proje
 accesible desde Claude Code por `additionalDirectories` en `.claude/settings.local.json`.
 Está organizada así: raíz = documentos vigentes (funcional v3, automatización, guía técnica,
 manual, flujo), `1. Fuentes/` = memoria de subvención, feedback de la Fundación, datos ARA y
-diseño, `2. Contexto/` = histórico (no se toca), `Claude outputs/` = salidas de sesiones de
-Cowork, y **`3. Claude Code/`** = lo que genera este repo.
+diseño, `2. Contexto/` = histórico (no se toca) y **`3. Claude Code/`** = todo lo que genera
+Claude: lo que escribe este repo y las salidas de Cowork (`3. Claude Code/diseño/` es el origen
+de `design/tokens.json` y `design/DESIGN.md`).
 
 - **Lee** de la raíz y de `1. Fuentes/` cuando haga falta el funcional vigente, la memoria de
   subvención o el feedback de la Fundación. Las copias de `docs/` del repo pueden ir por detrás.
@@ -75,4 +76,4 @@ Cowork, y **`3. Claude Code/`** = lo que genera este repo.
   correspondiente al `README.md` de esa carpeta.
 - **Nunca copies allí** `Usuarios y accesos`, `usuarios-test.md`, `.env*`, `scripts/data/` ni nada
   con credenciales o datos personales: esa carpeta puede subirse al Project de Claude.
-- No escribas en la raíz, `1. Fuentes/`, `2. Contexto/` ni `Claude outputs/`.
+- No escribas en la raíz, `1. Fuentes/` ni `2. Contexto/`.
