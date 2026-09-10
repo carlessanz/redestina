@@ -60,6 +60,22 @@ cómo reenviar un acceso, cortar uno y recrear las cuentas) y **`usuarios-test.m
 de esas 12 cuentas, para tenerla a mano al probar). Los dos últimos **llevan credenciales en claro**:
 que estén fuera de git no es un detalle, es el motivo de que existan ahí.
 
+**Dos documentos vigentes no tienen copia en `docs/` y viven solo en la raíz de la carpeta del
+proyecto de consultoría** (§ abajo), así que no se encuentran buscando en el repo: **`Definición de
+Producto REDESTINA 2026.md`**, la capa estratégica que enmarca al resto —principios, cinco líneas,
+propuesta de valor por actor, Lean Canvas, recorridos por rol, alcance del MVP y trazabilidad con la
+subvención ARC (expediente TER/4617/2024)—, y **`Flujo de usuarios REDESTINA.md`**, los recorridos
+objetivo por rol paso a paso. Jerarquía cuando se solapan: la Definición de Producto manda en **el
+porqué y el para quién**, el funcional en **el qué**, y la automatización y la guía técnica en **el
+cómo sobre este repo**.
+
+⚠️ Y en `3. Claude Code/2026-09-10-plan-sistema-documental.md` está el plan del **circuito documental**
+—cimientos, convenios con firma por enlace, albaranes desde la base, cierre anual y certificados de
+donación—, con quince decisiones abiertas (D1–D15) y una **fecha dura**: para certificar el ejercicio
+2026 desde Redestina tendría que estar en producción antes del **1 de diciembre de 2026** (D1, cuya
+recomendación es no hacerlo y estrenar con 2027). Es la obra grande que viene después de las brechas
+de §1bis, y hoy el repo no tiene nada de ella.
+
 La **documentación generada para la consultoría** (informes, análisis, propuestas) no va a `docs/`
 sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/`
 (acceso por `additionalDirectories` en `.claude/settings.local.json`; reglas en `CLAUDE.md`,
