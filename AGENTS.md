@@ -34,13 +34,20 @@ más la whitelist `meta_test_recipients`. Ver §8.
 publicar en un grupo se ofrece "copiar texto" y se pega a mano.
 
 La especificación completa está en `docs/nuevas-funcionalidades/` (fuera de git):
-`redestina-automatizacion-canalizacion-whatsapp-final.md` manda en el proceso de canalización y
-trae los prompts 0–8; `manual-whatsapp-cloud-api-supabase-final.md` manda en la
-configuración de Meta y las decisiones D1–D7; `guia-tecnica-claude-code-whatsapp-final.md`
-es el mapa de ejecución. El **funcional de negocio** (visión objetivo del servicio, más amplia
-que lo construido) vive en `docs/Documento funcional Redestina 2026.md` y su **versión adaptada al
-estado real** en `docs/Documento funcional Redestina 2026 — adaptado.md` (ambos fuera de git); su
-resumen y la correspondencia objetivo↔construido están en **§1bis**.
+`redestina-automatizacion-canalizacion-whatsapp-final.md` (**v4**, 10-09-2026) manda en el proceso de
+canalización y trae los prompts 0–8 (incluidos 6bis mapa y 7bis exportación a Excel);
+`manual-whatsapp-cloud-api-supabase-final.md` manda en la configuración de Meta y las decisiones
+D1–D7; `guia-tecnica-claude-code-whatsapp-final.md` es el mapa de ejecución. El **funcional de
+negocio** (visión objetivo del servicio, más amplia que lo construido) vive en `docs/Documento
+funcional Redestina 2026.md` (**v3**, septiembre 2026, con el feedback de la Fundación: vocabulario
+**AFCV** —alimentos fuera del circuito de venta habitual— en lugar de «excedente», necesidades de los
+receptores, un registro repartido en varias operaciones con valorización propia, formulario mínimo
+con campos dinámicos, coste por kilo en donaciones, mapa en el match, exportación a Excel y catálogos
+maestros) y su **versión adaptada al estado real** en `docs/Documento funcional Redestina 2026 —
+adaptado.md` (ambos fuera de git; copia vigente del funcional en la raíz de la carpeta del proyecto
+de consultoría); su resumen y la correspondencia objetivo↔construido están en **§1bis**. En el código
+la tabla sigue siendo `excedentes` y los textos dicen «excedent»: el rename de vocabulario es brecha
+pendiente (ver el adaptado, §0).
 
 `docs/` guarda además seis documentos operativos (también fuera de git): **`Guía producción
 WhatsApp — Redestina.md`** (los pasos en Meta del checkpoint §12.2 —número de producción, verificación,
