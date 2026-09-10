@@ -147,6 +147,12 @@
      (font-titulos). Las dos se cargan desde Google Fonts en index.html. */
   --font-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-titulos: "Sora", ui-sans-serif, system-ui, -apple-system, sans-serif;
+
+  /* Único tamaño por debajo de xs (0.75rem), para las etiquetas de la barra inferior
+     de móvil y solo para eso: a 0.75rem rompen a dos líneas y desalinean las pestañas.
+     Sale de design/tokens.json → tipografia.escala.nav. */
+  --text-nav: 0.6875rem;
+  --text-nav--line-height: 1rem;
 }
 
 @layer base {

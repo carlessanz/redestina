@@ -103,6 +103,8 @@
   .muted { color: var(--muted-foreground); }
   .sm { font-size: 0.875rem; line-height: 1.25rem; }
   .xs { font-size: 0.75rem; line-height: 1rem; }
+  /* Único tamaño por debajo de xs: etiquetas de la barra inferior de móvil y nada más. */
+  .nav-label { font-size: 0.6875rem; line-height: 1rem; font-weight: 500; }
 
   /* ── Tarjeta ──────────────────────────────────────────────────────────────── */
   .card { background: var(--card); color: var(--card-foreground); border: 1px solid var(--border); border-radius: var(--radius-xl); padding: 1.5rem; box-shadow: var(--shadow-sm); }
@@ -373,6 +375,7 @@
       <div class="type-row"><span class="k">etiqueta · Inter 500 · sm</span><span class="sm" style="font-weight:500">Quantitat estimada (kg)</span></div>
       <div class="type-row"><span class="k">meta · Inter 400 · xs</span><span class="xs muted">Actualitzat fa 3 minuts · 12 registres</span></div>
       <div class="type-row"><span class="k">sobrelinea · Sora 600 · xs</span><span class="sobrelinea">Donació social</span></div>
+      <div class="type-row"><span class="k">nav · Inter 500 · nav (0.6875rem)</span><span class="nav-label">Els meus interessos</span> <span class="xs muted">— només per a les etiquetes de la barra inferior de mòbil</span></div>
       <div class="type-row"><span class="k">enlace</span><a href="#">Veure el detall del lot</a></div>
     </div>
   </section>

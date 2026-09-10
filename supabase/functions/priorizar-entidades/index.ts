@@ -96,10 +96,11 @@ Deno.serve(async (req) => {
 
     const { data: entidades, error: entError } = await supabase
       .from("entidades")
-      .select(
-        "id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, " +
-          "productes_frescos, transport_plataforma, descarrega_toro",
-      );
+      // ⚠️ La lista de columnas va en UN literal, sin concatenar: supabase-js deduce el
+      // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
+      // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
+      // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro");
     if (entError) {
       console.error("entidades select:", entError.message);
       return json({ error: "Error consultando las entidades" }, 500);

@@ -270,6 +270,12 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   `font-titulos` (Sora). Los estados se pintan con `bg-exito-fondo text-exito`,
   `bg-aviso-fondo text-aviso`, `bg-error-fondo text-error`; lo neutro-informativo con
   `bg-secondary text-secondary-foreground`.
+- **`text-nav` (0.6875rem / 11 px) es el único tamaño por debajo de `xs`**, y existe para una sola
+  cosa: las etiquetas de la barra inferior de móvil. Son largas a propósito —`nav.ts` las eligió
+  únicas entre paneles para que los tooltips del menú plegado no se repitan—, así que a `xs`
+  (0.75rem) rompen a dos líneas en una celda de ~85 px y desalinean las pestañas. Antes era un
+  `text-[11px]` a pelo, que contradecía la regla de arriba; el valor es el mismo, pero ahora sale
+  de `tipografia.escala.nav` en `design/tokens.json`. No usarlo en texto que haya que leer.
 - **`accent` de shadcn NO es el coral.** Es la superficie de hover de menús, selects y botones
   ghost (crema oscurecido). El coral es acento de marca y vive en `coral`; solo da 2.67:1 sobre
   blanco: nunca texto pequeño en coral ni texto blanco sobre coral (encima va negro,
@@ -1165,6 +1171,10 @@ menú (`AppShell`) **suma las dos colas**.
 - **Errores**: `sendWhatsApp()` nunca lanza; devuelve `{ ok, status, data }`. El mapeo a texto
   legible vive en `noticeFromError()` (`Conversation.tsx`), que cubre los códigos propios
   (`window_closed`, `no_opt_in`, `unknown_contact`, `unauthorized`) y el `131047` de Meta.
+- **La lista de columnas de un `.select()` va en UN literal**, nunca concatenada ni interpolada.
+  supabase-js deduce el tipo de la fila analizando ese literal; ante una expresión devuelve
+  `GenericStringError` y la fila se queda sin columnas, con lo que todo uso posterior deja de
+  compilar. Si la lista es larga, que la línea sea larga (deuda §12.46).
 - **Migraciones**: `supabase/migrations/AAAAMMDDHHMMSS_descripcion.sql`. Nunca editar una ya
   aplicada; añadir una nueva.
 - **Puertos del Supabase local**: este proyecto usa el rango **553xx** (API 55321, BD 55322,
@@ -1689,7 +1699,7 @@ Lo único que queda del rename es **el logo** (§10bis, deuda 41).
 
 ```bash
 npm run dev                # Vite en local
-npm run build              # tsc && vite build  ← única verificación automática que existe
+npm run build              # tsc && vite build  (solo mira src/: ni scripts ni Edge Functions)
 npm run preview            # servir el build
 
 supabase db push                                          # aplicar migraciones
@@ -1703,6 +1713,10 @@ supabase functions deploy crear-oferta         # con verify_jwt (alta desde el p
 supabase functions deploy registro --no-verify-jwt               # registro público self-service (§9)
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
 supabase secrets set --env-file .secrets.env
+# ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
+# CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
+# el default del CLI, que es `true` — correcto, pero no escrito en ninguna parte, que es
+# exactamente la distancia de la que nació la deuda 43).
 
 # Publicar en producción: el procedimiento completo (build, commit, push, redespliegue de las
 # funciones que lo necesiten y verificación de dominio, CORS y permisos) vive en el skill
@@ -1713,6 +1727,13 @@ deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
 deno run -A scripts/import-ara.ts             # importar los CSV maestros
 
 deno run -A scripts/comprobar-rls.ts          # arnés de RLS: matriz de permisos por cuenta (§4bis)
+
+# Typecheck de lo que `tsc` NO mira. ⚠️ El --config es obligatorio: `deno check` toma la
+# configuración del cwd, no la de la carpeta del módulo, y sin ella no resuelve los imports.
+deno check scripts/*.ts
+for d in supabase/functions/*/; do [ "$(basename $d)" = "_shared" ] && continue; \
+  deno check --config "$d/deno.json" "$d/index.ts"; done
+
 deno run -A scripts/crear-usuarios-prueba.ts --dry-run   # simular el alta de los 12 usuarios de prueba
 deno run -A scripts/crear-usuarios-prueba.ts             # crearlos (idempotente)
 deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas de WhatsApp (§9)
@@ -1730,9 +1751,12 @@ deno run -A scripts/roles-activos.ts off     # o, en el SQL Editor:
 
 y si no basta, `scripts/sql/rls-emergencia.sql` en el SQL Editor.
 
-`npm run build` corre `tsc` con `strict`, `noUnusedLocals` y `noUnusedParameters`. **Ya no es la
-única comprobación automática**: `scripts/comprobar-rls.ts` verifica los permisos de verdad, contra
-la base y con sesiones reales. Ejecuta las dos tras cada cambio que toque datos o políticas. Si
+`npm run build` corre `tsc` con `strict`, `noUnusedLocals` y `noUnusedParameters`, **pero solo
+sobre `src/`**: ni los scripts de Deno ni las Edge Functions entran en ese `tsconfig`, así que
+durante meses no los comprobó nadie. Hoy hay **tres** comprobaciones automáticas: `tsc`,
+`deno check` (scripts y las nueve funciones) y `scripts/comprobar-rls.ts`, que verifica los
+permisos de verdad, contra la base y con sesiones reales. Ejecuta las tres tras cada cambio que
+toque datos o políticas. Si
 tocas algo de `supabase/functions/_shared/`, **redespliega todas** las funciones que lo importan.
 
 ## 12. Checkpoints de negocio y deuda técnica
@@ -1778,8 +1802,12 @@ Redestina en producción real quedan pasos de configuración y negocio.
 
 **Deuda técnica:**
 
-1. **Sin linter y sin CI.** Ya hay dos comprobaciones automáticas (`tsc` y `scripts/comprobar-rls.ts`),
-   pero ninguna se ejecuta sola ni hay tests de la interfaz.
+1. **Sin linter y sin CI.** Ya hay tres comprobaciones automáticas (`tsc`, `deno check` y
+   `scripts/comprobar-rls.ts`), pero **ninguna se ejecuta sola** ni hay tests de la interfaz. Lo que
+   costó no tener CI está medido: `deno check` no había pasado nunca sobre las Edge Functions
+   —el import map no resolvía el subpath de tipos (§12.45)— y escondía tres errores de tipos
+   reales en `priorizar-entidades`. Un `deno check` en un hook o en Actions los habría cazado el
+   día que se escribieron.
 2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
    (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/57 —§13— y la
    diferencia está explicada en la deuda 32). El único rojo era, y sigue siendo, un receptor
@@ -1953,18 +1981,38 @@ Redestina en producción real quedan pasos de configuración y negocio.
     despliegue es idempotente— pero significa que **la salida del CLI no sirve para saber si el
     bundle desplegado estaba al día**; solo `No change found` es concluyente en un sentido, y su
     ausencia no prueba nada en el otro.
+45. ~~**Las Edge Functions no se podían typecheckear.**~~ — **resuelta (10-09-2026)**: los nueve
+    `deno.json` mapeaban `"@supabase/functions-js"` sin barra final, y un import map **no resuelve
+    subpaths a partir de un mapping exacto**, así que `import "@supabase/functions-js/edge-runtime.d.ts"`
+    —la primera línea de las nueve funciones— fallaba con `TS2307` y `deno check` moría ahí, antes
+    de mirar una sola línea propia. Añadida la entrada `"@supabase/functions-js/":
+    "jsr:/@supabase/functions-js@^2/"` (⚠️ con la barra **después** de `jsr:`; sin ella no resuelve).
+    Las nueve pasan `deno check`. Lo que tapaba: los tres errores de la entrada 46.
+46. ~~**`priorizar-entidades` tenía tres errores de tipos.**~~ — **resuelta (10-09-2026)**, y la
+    causa merece recordarse porque se puede repetir en cualquier consulta: el `.select()` tenía la
+    lista de columnas partida en **dos cadenas concatenadas con `+`**. supabase-js deduce el tipo de
+    la fila **analizando ese literal**, y ante una expresión se rinde y devuelve `GenericStringError`
+    —o sea que `entidades` dejaba de tener columnas y todo uso posterior (`e.id`, `e.telefono`)
+    fallaba—. El `as unknown as EntidadPriorizable[]` de la llamada a `priorizar()` escondía la mitad
+    del problema. Ver la convención del `select` en §7.
+47. **Las tres comprobaciones siguen sin ejecutarse solas.** `tsc`, `deno check` y el arnés de RLS
+    se lanzan a mano, así que valen lo que valga la disciplina de quien commitea. Un hook de
+    `pre-commit` con las dos primeras (la tercera necesita credenciales) es barato y cerraría la
+    parte accionable de la deuda 1.
 
 ## 13. Al terminar cualquier cambio
 
 1. `npm run build` en verde.
-2. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles. Referencia
+2. `deno check` si el cambio toca `scripts/` o `supabase/functions/`: `tsc` no mira ni lo uno ni lo
+   otro (§11 trae la orden con su `--config`, que es obligatorio).
+3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles. Referencia
    actual: **56/57** (el rojo conocido es un receptor comercial sin ninguna oferta de `venda`
    publicada, que es el comportamiento correcto). Cualquier otro rojo es una regresión.
-3. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
+4. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
    redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
-4. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un
+5. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un
    token, `design/tokens.json`, `src/index.css` y `design/preview.html` van en el mismo commit.
-5. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
+6. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
    comandos o deuda técnica; y **§1bis + su tabla de correspondencia** si cambió el alcance
    funcional o el estado de implementación (✅/🟡/⬜).
-6. Commit en castellano, describiendo el *qué* y el *por qué*.
+7. Commit en castellano, describiendo el *qué* y el *por qué*.

@@ -467,3 +467,32 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/registro/deno.json"
 entrypoint = "./functions/registro/index.ts"
+
+# Las tres de abajo funcionaban ya con JWT, pero por el DEFAULT del CLI, no porque
+# nadie lo hubiera escrito. Se declaran para que el repo sea la fuente de verdad:
+# la deuda 43 (whatsapp-send desplegada sin JWT) nació justo de esa distancia entre
+# lo que decía la documentación y lo que declaraba este fichero.
+
+# Ranking de entidades para un excedente. Corre con service_role (ignora RLS), así que
+# exigirEquipo() decide dentro; el JWT es la barrera de la plataforma delante.
+[functions.priorizar-entidades]
+enabled = true
+verify_jwt = true
+import_map = "./functions/priorizar-entidades/deno.json"
+entrypoint = "./functions/priorizar-entidades/index.ts"
+
+# Alta de oferta desde el panel del productor. Es quien genera id_excedente y
+# texto_oferta (authenticated no tiene INSERT sobre excedentes), así que exige sesión.
+[functions.crear-oferta]
+enabled = true
+verify_jwt = true
+import_map = "./functions/crear-oferta/deno.json"
+entrypoint = "./functions/crear-oferta/index.ts"
+
+# Enlace mágico por correo / código por WhatsApp. Restringida al equipo (exigirEquipo)
+# y sujeta al gate de cuenta del modo test (§8).
+[functions.enviar-acceso]
+enabled = true
+verify_jwt = true
+import_map = "./functions/enviar-acceso/deno.json"
+entrypoint = "./functions/enviar-acceso/index.ts"

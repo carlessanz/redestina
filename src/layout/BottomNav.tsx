@@ -45,7 +45,7 @@ export default function BottomNav({ items }: { items: NavItem[] }) {
                     plegado no se repitan—, así que no se pueden acortar. Sin recortar,
                     «Els meus interessos» rompía a 2-3 líneas en una celda de ~85px y las
                     cuatro pestañas dejaban de estar alineadas. */}
-                <span className="w-full truncate px-0.5 text-center text-[11px] font-medium leading-none">
+                <span className="w-full truncate px-0.5 text-center text-nav font-medium leading-none">
                   {t(item.labelKey)}
                 </span>
               </NavLink>

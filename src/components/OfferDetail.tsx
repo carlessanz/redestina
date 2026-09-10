@@ -608,8 +608,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             )
           })}
           <form className="flex flex-wrap items-center gap-2 pt-2" onSubmit={altaCanalizacion}>
+            {/* `text-base md:text-sm`: iOS Safari amplía la página al enfocar un control
+                con menos de 16px y no deshace el zoom (§2, regla 1 de móvil). Los
+                `<select>` nativos no lo heredan de shadcn: hay que repetirlo a mano. */}
             <select name="entidad" required defaultValue=""
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-sm">
+              className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm">
               <option value="" disabled>{t('od.entity_ph')}</option>
               {ranking.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
             </select>
