@@ -1533,92 +1533,45 @@ mismo literal a los dos sitios.
 
 **Scripts**: `SUPABASE_URL` y `SB_SECRET_KEY` en el entorno.
 
-## 10bis. Los dos renames: `pdApp-wp` → `P0MA` → `Redestina`
+## 10bis. Nombres retirados y lo que dejaron aprendido
 
-El proyecto ha cambiado de nombre **dos veces**. El histórico importa porque cada rename deja
-redirecciones vivas y nombres que no se pueden reutilizar.
+El proyecto se llamó **`pdApp-wp`** hasta el 31-07-2026, **`P0MA`** hasta el 10-09-2026, y desde
+entonces **`Redestina`**. El segundo cambio no fue solo un slug: `POMA` era también el nombre del
+servicio de cara al usuario, así que cambió lo que se lee en la interfaz, en los correos y en las
+plantillas de WhatsApp.
 
-### Rename 1 — `pdApp-wp` → `P0MA` (31-07-2026)
+⚠️ **No crear nunca un repo llamado `P0MA` ni `pdApp-wp`.** GitHub mantiene una redirección 301
+desde los dos hacia `Redestina`, y funciona también para git (`git ls-remote` sobre la URL vieja
+devuelve el `main` actual), así que un clon con el remote antiguo sigue trabajando sin enterarse.
+Crear un repo con cualquiera de esos nombres **rompe la redirección** y desvía esos clones a otro
+repositorio en silencio.
 
-`pdApp-wp` era el nombre del producto anterior. Se cambió en la carpeta, el repo, el paquete, el
-`project_id`, el proyecto de Vercel y el dominio. Ninguno de esos dos dominios existe ya.
+Cuatro cosas que costaron descubrir y siguen valiendo:
 
-**El dominio viejo se apagó del todo el mismo día.** Se llegó a poner una redirección 308 pensando
-en el logo (`/logo-email.png`) y el enlace del pie de los correos ya entregados, que quedan
-congelados en la bandeja del destinatario para siempre. **Pero en este proyecto no había ningún
-destinatario real**: todo lo enviado hasta el 31-07-2026 fue a `hola+*@carlessanz.com` y a las
-cuatro entidades `TEST-*`, en modo test (§8). Sin correos reales que proteger, la redirección solo
-era rastro, así que se retiró el DNS, los dominios de Vercel y sus patrones de `ALLOWED_ORIGIN` y
-`uri_allow_list`.
+1. ⚠️ **`supabase stop` ANTES de cambiar `project_id`.** Al revés, el CLI filtra por el nombre nuevo,
+   no encuentra los contenedores viejos y deja doce huérfanos ocupando los puertos 553xx. Para
+   limpiarlos, **filtrar por nombre** (`docker ps -q --filter name=_Redestina`): en esta máquina
+   conviven otros stacks de Supabase y un `docker stop $(docker ps -q)` se los llevaría por delante.
+2. ⚠️ **El próximo cambio de dominio exige redirección 308, no corte.** Los dos dominios anteriores
+   se apagaron sin redirección, y las dos veces valió el mismo argumento: seguimos en modo test y no
+   ha recibido correo ningún destinatario real, solo `hola+*@carlessanz.com` y las organizaciones
+   `TEST-*`. **Ese argumento ya se ha gastado dos veces.** Al primer correo a un productor o una
+   entidad de verdad, apagar un dominio rompe su historial hacia atrás y sin remedio: el logo y el
+   enlace del pie viven para siempre en la bandeja de quien lo recibió.
+3. ⚠️ **`Poma` es un producto del catálogo, no el proyecto.** Es *manzana*: está en `productos.csv`,
+   en el seed `20260721120300_seed_catalogos.sql` y en comentarios de fichas de productores.
+   Cualquier sustitución masiva tiene que ser **sensible a mayúsculas** — un
+   `sed -i 's/poma/redestina/gi'` renombraría la fruta.
+4. **Las migraciones ya aplicadas conservan `POMA` en sus comentarios**, y una se llama
+   `20260721120100_modelo_poma.sql`. Editarlas está prohibido (§7): el nombre es parte de su
+   identidad.
 
-⚠️ **Ese razonamiento caduca en cuanto se salga del modo test.** A partir del primer correo a un
-productor o una entidad de verdad, apagar un dominio sí rompe su historial hacia atrás y sin
-remedio: entonces la respuesta correcta vuelve a ser la redirección permanente, no el corte.
-**Es exactamente lo que hay que decidir en el rename 2 antes de tocar el dominio.**
-
-### Rename 2 — `P0MA` → `Redestina` (10-09-2026)
-
-A diferencia del anterior, este **no es solo un cambio de slug: es un rebranding**. `POMA` era
-además el nombre del servicio de cara al usuario, así que cambia también lo que se lee en la
-interfaz, en los correos y en las plantillas de WhatsApp.
-
-| Qué | Antes | Ahora | Estado |
-| --- | --- | --- | --- |
-| Carpeta | `…/Espigoladors/P0MA` | `…/Espigoladors/Redestina` | ✅ |
-| Repo | `carlessanz/P0MA` | `carlessanz/Redestina` (GitHub redirige el viejo con 301) | ✅ |
-| `remote` de git local | `P0MA.git` | `Redestina.git` | ✅ |
-| Paquete | `p0ma` | `redestina` | ✅ |
-| `project_id` (Docker local) | `P0MA` | `Redestina` | ✅ |
-| Nombre del servicio en la UI, correos y plantillas | `POMA` | `Redestina` | ✅ |
-| `src/lib/poma.ts` | — | `src/lib/redestina.ts` | ✅ |
-| Claves de `localStorage` y canal de Realtime | `poma-*` | `redestina-*` | ✅ |
-| Documentos de `docs/` (contenido y nombre) | `POMA` | `Redestina` | ✅ |
-| Proyecto Vercel | `p0ma` | `redestina` | ✅ |
-| Dominio | (retirado) | `redestina.carlessanz.com` | ✅ |
-| Secretos `ALLOWED_ORIGIN` y `APP_URL` | `p0ma…` | `redestina…` | ✅ |
-| `uri_allow_list` y `site_url` de Auth | `p0ma…` | `redestina…` | ✅ |
-| Secreto `RESEND_FROM` | `POMA <no-reply@…>` | `Redestina <no-reply@…>` | ✅ |
-| **El logo** (wordmark) | dibuja «POMA» | dibuja «Redestina» | ⬜ **pendiente (diseño)** |
-
-**El rename se completó el 10-09-2026.** El dominio `redestina.carlessanz.com` resuelve y sirve la
-aplicación, y las tres capas que tenían que reconocerlo lo reconocen: Vercel, el `ALLOWED_ORIGIN` de
-las Edge Functions y la `uri_allow_list` de Auth. Verificado con preflight real: el dominio nuevo y
-`localhost:5173` obtienen su propio origen de vuelta; el dominio viejo y un origen arbitrario, no.
-
-⚠️ **El dominio anterior se retiró sin redirección**, igual que en el rename 1 y por el mismo
-motivo: seguimos en modo test y no ha recibido correo ningún destinatario real, solo
-`hola+*@carlessanz.com` y las organizaciones `TEST-*`. Pero **ese razonamiento ya se ha gastado dos
-veces**: al primer correo a un productor o una entidad de verdad, apagar un dominio rompe su
-historial hacia atrás y sin remedio, porque el logo y el enlace del pie viven para siempre en la
-bandeja de quien lo recibió. **El siguiente cambio de dominio exige redirección 308, no corte.**
-
-⚠️ **El logo no se pudo renombrar.** `public/logo-redestina.svg` es un wordmark en **paths**, no
-texto: las letras de «POMA» están dibujadas como vectores. El fichero cambió de nombre, pero **lo
-que se ve sigue diciendo POMA** en la landing, el menú lateral, las pantallas de acceso, el icono de
-la PWA (`icona-*.png`, `apple-touch-icon.png`, `favicon.svg`) y la cabecera de todos los correos
-(`logo-email.png`). Hace falta el logo nuevo en SVG y regenerar los derivados.
-
-⚠️ **Los PDF de `docs/nuevas-funcionalidades/` cambiaron de nombre pero no de contenido**: son
-binarios y por dentro siguen diciendo POMA. Sus versiones `.md` sí están actualizadas.
-
-**No volver a crear un repo llamado `P0MA` ni `pdApp-wp`**: rompería las redirecciones 301 de
-GitHub, que siguen vivas las dos.
-
-Lo que **no** depende del nombre y por eso no se tocó: el `ref` de Supabase (`uxppvaldhptdomvdhsmn`),
-la base de datos, **las migraciones ya aplicadas** (llevan `POMA` en comentarios y el nombre
-`20260721120100_modelo_poma.sql`; editarlas está prohibido, §7), la URL del webhook en Meta y los
-secretos de WhatsApp.
-
-⚠️ **`Poma` es también un producto del catálogo** (manzana, en `productos.csv` y en el seed
-`20260721120300_seed_catalogos.sql`), y aparece en comentarios de fichas de productores. Cualquier
-sustitución masiva futura tiene que ser **sensible a mayúsculas**: `POMA` es el proyecto, `Poma` es
-fruta. Un `sed -i 's/poma/redestina/gi'` renombraría la manzana.
-
-⚠️ **Orden que hay que respetar si se repite**: `supabase stop` **antes** de cambiar `project_id`. Al
-revés, el CLI filtra por el nombre nuevo, no encuentra los contenedores viejos y deja doce huérfanos
-ocupando los puertos 553xx. Para limpiarlos, **filtrar por nombre**
-(`docker ps -q --filter name=_Redestina`): en esta máquina conviven otros stacks de Supabase y un
-`docker stop $(docker ps -q)` se los llevaría por delante.
+⚠️ **El rebranding es textual, no visual: falta el logo.** `public/logo-redestina.svg` es un wordmark
+en **paths**, no texto, así que **lo que se ve sigue diciendo POMA** en la landing, el menú lateral,
+las pantallas de acceso, los iconos de la PWA (`icona-*.png`, `apple-touch-icon.png`, `favicon.svg`)
+y la cabecera de todos los correos (`logo-email.png`). Deuda 41. Los PDF de
+`docs/nuevas-funcionalidades/` cambiaron de nombre pero no de contenido: son binarios y por dentro
+siguen diciendo POMA.
 
 ## 10ter. Cómo se completó el rename (10-09-2026)
 
