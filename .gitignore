@@ -33,3 +33,6 @@ supabase/functions/*/deno.lock
 .env*
 # ...salvo la plantilla de variables, que sí se versiona
 !.env.local.example
+
+# Cobertura de Vitest
+coverage/

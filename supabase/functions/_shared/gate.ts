@@ -116,9 +116,20 @@ export interface ResultadoDestinatarios {
   /** Direcciones a las que SÍ se puede escribir. */
   permitidos: string[];
   /** Las que no, con el motivo (para el log y para el panel). */
-  bloqueados: { email: string; motivo: "no_test_user" | "sense_bustia_equip" }[];
+  bloqueados: { email: string; motivo: "no_test_user" }[];
   /** `true` si el documento es de prueba y, por tanto, se ha aplicado la barrera. */
   modoPrueba: boolean;
+  /**
+   * ¿Está configurado `parametros_documentales.email_equipo`?
+   *
+   * Va aparte y no como motivo de un bloqueo porque **no es una propiedad de ninguna
+   * dirección**, es del sistema. Mezclarlo hacía que un donante real bloqueado saliera
+   * etiquetado `sense_bustia_equip` —el buzón está hoy a NULL (§12 checkpoint 10)—, o sea
+   * que el diagnóstico mandaba a rellenar algo que no habría cambiado nada para esa
+   * dirección. Con esto, quien registre el resultado puede decir las dos cosas por separado:
+   * a quién no se ha escrito, y que además falta el buzón.
+   */
+  bustiaEquip: boolean;
 }
 
 export async function destinatariosPrueba(
@@ -134,7 +145,7 @@ export async function destinatariosPrueba(
 
   // Un documento real no pasa por aquí: lo filtran los gates de siempre (§8).
   if (documento.modo !== "prueba") {
-    return { permitidos: [...new Set(lista)], bloqueados: [], modoPrueba: false };
+    return { permitidos: [...new Set(lista)], bloqueados: [], modoPrueba: false, bustiaEquip: true };
   }
 
   const { data: params } = await supabase
@@ -142,7 +153,7 @@ export async function destinatariosPrueba(
   const equipo = (params?.email_equipo ?? "").trim().toLowerCase();
 
   const permitidos: string[] = [];
-  const bloqueados: { email: string; motivo: "no_test_user" | "sense_bustia_equip" }[] = [];
+  const bloqueados: { email: string; motivo: "no_test_user" }[] = [];
   for (const email of [...new Set(lista)]) {
     if (equipo && email.toLowerCase() === equipo) {
       permitidos.push(email);
@@ -152,7 +163,16 @@ export async function destinatariosPrueba(
       permitidos.push(email);
       continue;
     }
-    bloqueados.push({ email, motivo: equipo ? "no_test_user" : "sense_bustia_equip" });
+    // ⚠️ El motivo se decide por LO QUE HA FALLADO, no por si hay buzón del equipo.
+    //
+    // Antes era `equipo ? "no_test_user" : "sense_bustia_equip"`, que mira una condición
+    // ajena a esta dirección: con `email_equipo` sin rellenar —que es el estado de hoy, el
+    // campo es NULL (§12 checkpoint 10)— un donante REAL bloqueado salía etiquetado como
+    // `sense_bustia_equip`. El bloqueo era correcto; lo que engañaba era el diagnóstico,
+    // que mandaba a rellenar el buzón cuando rellenarlo no habría cambiado nada para esa
+    // dirección. `sense_bustia_equip` significa exactamente una cosa: esta dirección ES la
+    // del equipo y no se ha podido comprobar porque el buzón no está configurado.
+    bloqueados.push({ email, motivo: "no_test_user" });
   }
-  return { permitidos, bloqueados, modoPrueba: true };
+  return { permitidos, bloqueados, modoPrueba: true, bustiaEquip: equipo !== "" };
 }

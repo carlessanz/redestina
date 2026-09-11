@@ -2293,6 +2293,19 @@ deno check scripts/*.ts
 for d in supabase/functions/*/; do [ "$(basename $d)" = "_shared" ] && continue; \
   deno check --config "$d/deno.json" "$d/index.ts"; done
 
+# Pruebas unitarias (Vitest 4). Corren en Node sobre los módulos de negocio, que son
+# TypeScript puro: ni una referencia a `Deno.`, ni un import `npm:`/`jsr:`.
+npm test                      # vitest run
+npm run test:watch            # durante el desarrollo
+npm run test:cobertura        # con cobertura v8 sobre src/lib y _shared
+
+# Los tres controles de una vez (lo que conviene ejecutar antes de dar nada por terminado):
+npm run check                 # tipos (app + pruebas) + vitest + deno check
+npm run check:tipos           # solo tsc: tsconfig.json y tsconfig.tests.json
+
+# El hook de pre-commit se instala UNA VEZ por clon (git no ejecuta hooks versionados solo):
+git config core.hooksPath .githooks
+
 deno run -A scripts/crear-usuarios-prueba.ts --dry-run   # simular el alta de los 12 usuarios de prueba
 deno run -A scripts/crear-usuarios-prueba.ts             # crearlos (idempotente)
 deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas de WhatsApp (§9)
@@ -2425,12 +2438,13 @@ Redestina en producción real quedan pasos de configuración y negocio.
 
 **Deuda técnica:**
 
-1. **Sin linter y sin CI.** Ya hay tres comprobaciones automáticas (`tsc`, `deno check` y
-   `scripts/comprobar-rls.ts`), pero **ninguna se ejecuta sola** ni hay tests de la interfaz. Lo que
-   costó no tener CI está medido: `deno check` no había pasado nunca sobre las Edge Functions
-   —el import map no resolvía el subpath de tipos (§12.45)— y escondía tres errores de tipos
-   reales en `priorizar-entidades`. Un `deno check` en un hook o en Actions los habría cazado el
-   día que se escribieron.
+1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*. Ya hay **430 pruebas de
+   Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
+   `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
+   Lo que sigue faltando: **linter** (no hay ESLint) y **CI de verdad** — el hook se puede saltar
+   con `--no-verify` y no protege a quien no lo haya instalado, y el arnés de RLS sigue fuera
+   porque necesita credenciales. Lo que costó no tener nada de esto está medido: `deno check` no
+   había pasado nunca sobre las Edge Functions (§12.45) y escondía tres errores de tipos reales.
 2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
    (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/56 + 1 saltada
    —§13— y la
@@ -2464,8 +2478,15 @@ Redestina en producción real quedan pasos de configuración y negocio.
     no tienen captura automática (no hay inbound de correo): se marcan a mano.
 14. La clasificación sí/no de `procesarRespuestaOferta` es una **heurística por lista de palabras**:
     un texto corto que empiece por «sí/no» con una oferta pendiente podría clasificarse mal.
-15. La selección de plantilla de primer contacto por rol **no se ejercita en test** (siempre cae a
-    `hello_world`); solo actúa en producción con `PLANTILLES_CA_APROVADES=true`.
+15. ~~La selección de plantilla de primer contacto por rol no se ejercita en test.~~ —
+    **resuelta (11-09-2026)**: `tests/plantillas.test.ts` cubre las dos ramas del flag. La
+    encendida se ejercita recompilando el mismo fuente con `PLANTILLES_CA_APROVADES = true`, y la
+    prueba verifica que la sustitución ha ocurrido de verdad — si el flag se renombrara, la suite
+    falla en vez de probar dos veces el mismo caso. Sigue siendo cierto que **en producción** solo
+    actúa cuando Meta apruebe las plantillas (checkpoint §12.2).
+    ⚠️ Hay ahí un `expect(PLANTILLES_CA_APROVADES).toBe(false)` **puesto para fallar** el día que
+    se encienda: el checkpoint exige cuatro cosas más en ese mismo commit, y esa parada es el
+    recordatorio.
 16. **Doble rol** productor+entidad (Carles Sanz, Sebas Sale, Raquel Diaz, Laura Masdeu): tablas
     separadas sin FK, un teléfono puede estar en ambas. En el **panel** ya está resuelto —se ven los
     dos menús a la vez (§6ter)—, pero **en WhatsApp no**: el webhook lo desambigua por prioridad
@@ -2483,9 +2504,16 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `pot_aprovar()` y el trigger `respuestas_control_aprovacio` lo impone aunque se relajen las
     políticas (§4bis). Efectivo al encender `roles_activos`. El «acuerdo del productor» que exige el
     funcional sigue implícito en la coordinación asistida del equipo (mejora futura: señal explícita).
-19. **`OfferDetail` todavía aprueba a mano**, con tres llamadas sueltas (insert de canalización,
-    update de la respuesta, update del excedente) en vez de la RPC `aprovar_resposta()`, que hace lo
-    mismo en una transacción. Migrarlo cuando se toque el panel interno.
+19. ~~**`OfferDetail` aprueba a mano**, con llamadas sueltas en vez de `aprovar_resposta()`.~~ —
+    **resuelta (11-09-2026)**, y no era lo que esta entrada decía. Estaba escrita como un problema
+    de elegancia —cuatro escrituras sin transacción— y era **una regla de negocio sin aplicar**:
+    `aprovar_resposta()` comprueba el convenio vigente de las dos partes, y el panel **no llamaba a
+    la RPC**, así que pasada `fecha_corte_convenios` una canalización sin convenio entraba igual.
+    Como este es el **único sitio desde el que el equipo aprueba**, el bloqueo no existía en la
+    práctica. Ahora va por la RPC, con el aviso previo de §12.78.
+    Lo único que se pierde es `canalizaciones.comentarios = 'Preu acordat: …'`, que la RPC no
+    escribe: **no lo lee nadie** —ninguna pantalla pinta esa columna— y el precio vive en
+    `oferta_respuestas.preu_ofert`, que es su sitio.
 20. **Rol único por usuario**: `usuario_roles` admite varias filas pero la interfaz asumirá el más
     alto. El funcional (§1bis) pide multirol real por organización; las `membresias` ya lo permiten,
     la UI aún no.
@@ -2557,10 +2585,14 @@ Redestina en producción real quedan pasos de configuración y negocio.
     oferta. El resto de la interfaz sigue en `h-9` (36 px), por debajo de los 44 px que recomiendan
     Apple y Google: subirlos todos es rediseñar la aplicación entera para ganar 8 px en botones
     secundarios. Los ítems de los menús desplegables (idioma, `UserMenu`) siguen en 32 px.
-35. **`window.prompt()` en dos sitios** (`productor/OfertaDetall.tsx`, para cancelar una oferta; y
-    `equip/Aprovacions.tsx`, para el motivo al rechazar un registro). En los navegadores integrados de
-    WhatsApp o Instagram —muy probables en este público— puede estar bloqueado y devolver `null` **en
-    silencio**: la acción no haría nada y no lo diría. Necesitan un diálogo propio.
+35. ~~**`window.prompt()` en dos sitios.**~~ — **resuelta (11-09-2026)**. Y eran **tres**, no dos:
+    la entrada nombraba `productor/OfertaDetall.tsx` y `equip/Aprovacions.tsx` —este último ya se
+    había arreglado por el camino— pero no los **dos de `OfferDetail.tsx`** (rechazar una
+    aprobación y marcar no colocada), que nadie había anotado. Los tres usan ya el `DialegMotiu`
+    que existía. `grep -rn "window.prompt" src/` no devuelve ninguno.
+    ⚠️ Quedan **seis `window.confirm()`**. Ese sí devuelve un booleano y su bloqueo se comporta
+    como «cancelar», que es el lado seguro; aun así son seis sitios donde el navegador integrado
+    decide por la persona.
 36. **Las pestañas de `/registre` caben con 1 px de margen** a 320 px («Entitat receptora» ocupa 115 px
     en una pastilla de 116). No está roto y por eso no se tocó, pero cualquier traducción más larga o
     un cambio de fuente lo rompe.
@@ -2577,10 +2609,13 @@ Redestina en producción real quedan pasos de configuración y negocio.
     Verificado con dos altas **en paralelo** del mismo productor y producto: `-2` y `-3`, las dos
     correctas. El comentario del fichero afirmaba desde julio que reintentaba, y no era verdad.
 
-40. **El albarán se genera con el productor en blanco.** `OfferDetail` pasa `productor: ''` (y
-    `dataHora`/`comentaris` vacíos) a `textoAlbaran`, así que el «RECOLLIDA CONFIRMADA» nunca lleva el
-    nombre del productor aunque esté disponible. Va con el checkpoint del formato definitivo del
-    albarán (§12 checkpoint 4).
+40. ~~**El albarán se genera con el productor en blanco.**~~ — **ya lo estaba, y el documento no
+    se enteró.** `textoAlbaran()` **no existe** desde la fase 3, que lo retiró: `src/lib/textos.ts`
+    solo exporta `textoRecollidaConfirmada`, que es un aviso de WhatsApp para copiar y pegar, no un
+    documento. Queda el matiz de que ese aviso sigue pasando `dataHora` y `comentaris` vacíos —dos
+    líneas—, pero no tiene efecto legal. Sirve de precedente: **una lista de deuda envejece en las
+    dos direcciones**, y dar por buena una entrada vieja hace escribir código para un problema que
+    ya no está.
 
 41. ~~**El rebranding a Redestina es textual, no visual.**~~ — **resuelta (10-09-2026)**: sistema
     de diseño implantado (§2bis) con el logo nuevo, sus variantes, iconos PWA, favicon y
@@ -2629,10 +2664,13 @@ Redestina en producción real quedan pasos de configuración y negocio.
     —o sea que `entidades` dejaba de tener columnas y todo uso posterior (`e.id`, `e.telefono`)
     fallaba—. El `as unknown as EntidadPriorizable[]` de la llamada a `priorizar()` escondía la mitad
     del problema. Ver la convención del `select` en §7.
-47. **Las tres comprobaciones siguen sin ejecutarse solas.** `tsc`, `deno check` y el arnés de RLS
-    se lanzan a mano, así que valen lo que valga la disciplina de quien commitea. Un hook de
-    `pre-commit` con las dos primeras (la tercera necesita credenciales) es barato y cerraría la
-    parte accionable de la deuda 1.
+47. ~~**Las tres comprobaciones siguen sin ejecutarse solas.**~~ — **resuelta (11-09-2026)**:
+    `.githooks/pre-commit` corre tipos, `vitest` y —solo si el commit toca `scripts/` o
+    `supabase/functions/`— `deno check`. El arnés de RLS se queda fuera **a propósito**: necesita
+    credenciales y una base viva, y un hook que falla sin red se acaba desinstalando entero.
+    ⚠️ **Hay que instalarlo una vez por clon**: `git config core.hooksPath .githooks`. Git no
+    ejecuta hooks versionados por su cuenta, así que en una máquina nueva no protege nada hasta
+    que alguien lo haga.
 48. ~~**El arnés daba por fallo lo que solo era falta de datos.**~~ — **resuelta (10-09-2026)**. El
     check «el receptor ve las ofertas compatibles» salía en rojo para el receptor comercial porque
     no hay ninguna oferta de `venda` publicada, y el arnés remataba con «Revisa las políticas antes
@@ -2777,10 +2815,14 @@ Redestina en producción real quedan pasos de configuración y negocio.
     trabajo marcado como borrador para poder probar el circuito antes de la fase 0. Sustituirlo es
     publicar la versión 2 y retirar la 1, **no editar la existente**: en cuanto una plantilla ha
     emitido algo, el trigger la congela.
-78. **`aprovar_resposta()` no puede devolver el aviso de convenio.** Su tipo de retorno es
-    `canalizaciones` y lo consume `OfferDetail`; antes de la fecha de corte el aviso sale por
-    `raise notice`, y quien lo tiene que enseñar es el panel llamando a `convenio_vigente()`
-    **antes** de aprobar. Desde el corte sí hay excepción y sí llega.
+78. ~~**`aprovar_resposta()` no puede devolver el aviso de convenio.**~~ — **resuelta
+    (11-09-2026)**: `OfferDetail` llama a `convenio_vigente()` para las dos partes **antes** de
+    aprobar y enseña qué convenio falta, con confirmación. La limitación de la RPC sigue ahí —su
+    tipo de retorno es `canalizaciones` y el `raise notice` lo descarta PostgREST—, pero ya no tiene
+    consecuencia: el aviso llega por delante y el bloqueo duro (`42501 sense_conveni`, desde la
+    fecha de corte) se traduce a un mensaje propio en vez de soltar el error crudo.
+    De paso se estrenó `conveniVigent()` de `src/lib/convenis.ts`, que llevaba escrito desde la
+    fase 2 **sin que lo llamara nadie**.
 79. **Una organización con doble rol necesita dos convenios**, uno por ficha, porque `productores` y
     `entidades` siguen siendo dos tablas sin clave común. Es la deuda §12.16 asomando en el circuito
     de firma; se cierra con la `organizacion` unificada (§1bis, brecha 2).
@@ -2876,9 +2918,12 @@ Redestina en producción real quedan pasos de configuración y negocio.
 
 ## 13. Al terminar cualquier cambio
 
-1. `npm run build` en verde.
-2. `deno check` si el cambio toca `scripts/` o `supabase/functions/`: `tsc` no mira ni lo uno ni lo
-   otro (§11 trae la orden con su `--config`, que es obligatorio).
+1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
+   `deno check` de los scripts y las 14 funciones. Sustituye a lanzar los tres a mano.
+   Referencia: **430 pruebas en 15 ficheros**, todas correctas y ninguna pendiente.
+   El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
+   (`git config core.hooksPath .githooks`, una vez por clon).
+2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
    Referencia en **remoto**, fijada tras publicar el sistema documental (11-09-2026):

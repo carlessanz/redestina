@@ -26,7 +26,7 @@ import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
 import {
-  bloqueja, calcularTancament, compararTancamentProva, congelarExercici, csv182, dades182,
+  bloqueja, calcularTancament, compararTancamentProva, tancarTancament, csv182, dades182,
   dataTancament, descarregarText, emetreCertificat, emetreResum, estilEstatDonant,
   estilEstatTancament, euros, marcarDeclarat, marcarEnviat, rectificarCertificat,
   registrarFactura, reiniciarTancamentProva, simularFactura,
@@ -252,10 +252,16 @@ export default function TancamentDetall() {
       .maybeSingle()
     if (errCap) return { errCap }
 
+    // ⚠️ `.eq('tipo', 'donacio')` no es un adorno. Desde que existe el certificado de
+    // transacción, esta tabla guarda los dos acumulados; sin el filtro, las filas
+    // `transaccio` salían mezcladas con las de donación y sus botones llamaban a las RPC de
+    // donación, que responden `22023` por el trigger guardián. Esta pantalla es la del
+    // cierre de DONACIONES; el CT tiene la suya.
     const { data: donData } = await supabase
       .from('cierres_donante')
       .select('id, productor_id, datos_fiscales, kg_total, valor_total, estado, bloqueos, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, excepcion_sin_factura, excepcion_motivo, recordatorios, requiere_llamada, rectificaciones, enviado_at')
       .eq('cierre_id', id)
+      .eq('tipo', 'donacio')
 
     const llista = (donData as Donant[] | null) ?? []
 
@@ -366,7 +372,8 @@ export default function TancamentDetall() {
   async function tanca() {
     if (!cap) return
     setOcupat(true)
-    const res = await congelarExercici(cap.ejercicio)
+    // Por `id`, no por ejercicio: se cierra el que se tiene delante. Ver `tancament.ts`.
+    const res = await tancarTancament(id)
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.closed'))

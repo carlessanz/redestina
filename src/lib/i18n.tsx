@@ -190,6 +190,7 @@ const ca: Dict = {
   'od.mark_uncoll': 'Marcar com a no col·locada', 'od.cancel_offer': 'Cancel·lar oferta',
   'od.confirm_cancel': 'Segur que vols cancel·lar aquesta oferta? Quedarà marcada com a cancel·lada.',
   'od.prompt_uncoll': 'Motiu pel qual no s’ha col·locat:',
+      'od.uncoll_desc': 'L’oferta es tanca sense destí. El motiu queda registrat.',
   'od.no_text': 'L’oferta no té text generat.', 'od.sent_wa': 'Oferta enviada a {name} per WhatsApp.',
   'od.sent_email': 'Oferta enviada a {name} per correu.', 'od.no_test_meta': '{name} no és als números de prova de Meta.',
   'od.must_write': '{name} ha d’escriure «hola» al número primer.', 'od.window_closed': 'Finestra de 24h tancada amb {name}.',
@@ -230,6 +231,11 @@ const ca: Dict = {
   'od.approve': 'Aprovar i canalitzar', 'od.reject_appr': 'Rebutjar',
   'od.reject_reason': 'Motiu del rebuig? (opcional)',
   'od.approved': 'Oferta aprovada i convertida en canalització.',
+  // El convenio se consulta ANTES de aprobar: la RPC lo bloquea desde la fecha de corte
+  // con un 42501, y antes de esa fecha su aviso se pierde por el camino (deuda §12.78).
+  'od.conv_producer': 'el productor', 'od.conv_entity': "l'entitat",
+  'od.conv_missing': 'Falta el conveni vigent de: {parts}. Vols aprovar igualment?',
+  'od.conv_blocked': 'No es pot aprovar: falta el conveni vigent. Envia\u2019l des de la fitxa de l\u2019organització.',
   'od.approved_kg': 'Canalitzada · {n} kg', 'od.rejected_appr': 'Rebutjada per l’equip',
   'od.over_alloc': 'Estàs canalitzant més kg dels que falten ({n}). Continuar igualment?',
   // messaging
@@ -462,6 +468,7 @@ const ca: Dict = {
   'po.no_org': 'El teu compte no està vinculat a cap organització.',
   'po.no_locations': "No tens cap ubicació donada d'alta. L'equip te la pot afegir.",
   'po.cancel_reason': 'Per què la cancel·les?', 'po.cancelled': 'Oferta cancel·lada',
+  'po.cancel_desc': "L'oferta deixarà d'estar disponible. El text que ja va circular no es pot retirar.",
   'po.cancel_offer': 'Cancel·lar oferta', 'po.who_takes': 'Qui se la queda',
   'po.no_channelings': 'Encara no hi ha cap canalització.',
   'po.channeled_kg': '{n} kg canalitzats', 'po.real_kg': '{n} kg reals',
@@ -1029,6 +1036,7 @@ const es: Dict = {
   'od.mark_uncoll': 'Marcar como no colocada', 'od.cancel_offer': 'Cancelar oferta',
   'od.confirm_cancel': '¿Seguro que quieres cancelar esta oferta? Quedará marcada como cancelada.',
   'od.prompt_uncoll': 'Motivo por el que no se ha colocado:',
+      'od.uncoll_desc': 'La oferta se cierra sin destino. El motivo queda registrado.',
   'od.no_text': 'La oferta no tiene texto generado.', 'od.sent_wa': 'Oferta enviada a {name} por WhatsApp.',
   'od.sent_email': 'Oferta enviada a {name} por email.', 'od.no_test_meta': '{name} no está en los números de prueba de Meta.',
   'od.must_write': '{name} debe escribir «hola» al número primero.', 'od.window_closed': 'Ventana de 24h cerrada con {name}.',
@@ -1069,6 +1077,9 @@ const es: Dict = {
   'od.approve': 'Aprobar y canalizar', 'od.reject_appr': 'Rechazar',
   'od.reject_reason': '¿Motivo del rechazo? (opcional)',
   'od.approved': 'Oferta aprobada y convertida en canalización.',
+  'od.conv_producer': 'el productor', 'od.conv_entity': 'la entidad',
+  'od.conv_missing': 'Falta el convenio vigente de: {parts}. ¿Apruebas igualmente?',
+  'od.conv_blocked': 'No se puede aprobar: falta el convenio vigente. Envíalo desde la ficha de la organización.',
   'od.approved_kg': 'Canalizada · {n} kg', 'od.rejected_appr': 'Rechazada por el equipo',
   'od.over_alloc': 'Estás canalizando más kg de los que faltan ({n}). ¿Continuar igualmente?',
   'msg.contacts': 'Contactos', 'msg.no_contacts': 'No hay contactos todavía.',
@@ -1296,6 +1307,7 @@ const es: Dict = {
   'po.no_org': 'Tu cuenta no está vinculada a ninguna organización.',
   'po.no_locations': 'No tienes ninguna ubicación dada de alta. El equipo puede añadírtela.',
   'po.cancel_reason': '¿Por qué la cancelas?', 'po.cancelled': 'Oferta cancelada',
+  'po.cancel_desc': 'La oferta dejará de estar disponible. El texto que ya circuló no se puede retirar.',
   'po.cancel_offer': 'Cancelar oferta', 'po.who_takes': 'Quién se la queda',
   'po.no_channelings': 'Todavía no hay ninguna canalización.',
   'po.channeled_kg': '{n} kg canalizados', 'po.real_kg': '{n} kg reales',
@@ -1692,7 +1704,16 @@ const es: Dict = {
   'entdoc.empty': 'Todavía no has recibido ninguna entrega con albarán.',
 }
 
-const DICTS: Record<Lang, Dict> = { ca, es }
+/**
+ * Los dos diccionarios, expuestos para poder comprobarlos.
+ *
+ * Se exporta por una razón concreta: `t()` cae en silencio al catalán cuando una clave falta
+ * en castellano, así que una traducción olvidada no rompe nada y nadie se entera. Con esto,
+ * `tests/i18n.test.ts` compara los dos juegos de claves y falla si divergen — que es
+ * exactamente el fallo que en la fase 4 dejó cuatro entradas de menú enseñando su
+ * identificador, sin que el build dijera nada.
+ */
+export const DICTS: Record<Lang, Dict> = { ca, es }
 
 interface I18nCtx {
   lang: Lang

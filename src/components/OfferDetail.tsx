@@ -12,6 +12,8 @@ import { useT } from '../lib/i18n'
 import { textoRecollidaConfirmada } from '../lib/textos'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
+import { conveniVigent } from '../lib/convenis'
+import DialegMotiu from './DialegMotiu'
 import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -95,6 +97,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // (p. ej. si el intake dejó una fecha parseada o el usuario la edita).
   const [fecha, setFecha] = useState<string>(excedente.disponible_hasta ?? '')
   const [testMode, setTestMode] = useState(true)
+  // Los dos motivos que antes se pedían con `window.prompt` (deuda §12.35). Van con estado
+  // porque el de rechazo lo abre la fila de una respuesta concreta, no un botón suelto.
+  const [rebutjant, setRebutjant] = useState<RespuestaConEntidad | null>(null)
+  const [noColocada, setNoColocada] = useState(false)
   // Productor y municipi para las variables de la plantilla oferta_excedent.
   const [datosOferta, setDatosOferta] = useState<{ productor: string | null; municipi: string | null }>(
     { productor: null, municipi: null },
@@ -257,9 +263,43 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     await recargarRespuestas()
   }
 
-  // El superadmin aprueba una aceptación y la convierte en canalización: crea la
-  // fila en `canalizaciones` con los kg acordados, enlaza ambas (canalizacion_id) y
-  // hace avanzar el excedente (parcial/bloqueada), con la misma regla que el alta manual.
+  /**
+   * ¿Falta algún convenio? Se pregunta ANTES de aprobar, no después.
+   *
+   * `aprovar_resposta()` ya aplica la regla, pero desde la fecha de corte lo hace levantando
+   * `42501 sense_conveni` a mitad de operación, y antes de esa fecha el aviso sale por
+   * `raise notice`, que PostgREST descarta (deuda §12.78). O sea que sin esta consulta previa
+   * el equipo o no se entera de nada o se lleva un error opaco. La autoridad sigue siendo la
+   * RPC: esto solo decide si hay que avisar.
+   */
+  async function avisoConvenio(entidadId: string): Promise<string | null> {
+    const val = (exc.modalitat ?? 'donacio') as 'donacio' | 'venda' | 'maquila'
+    const falta: string[] = []
+    // `productor_id` es nullable: una oferta sin productor (no debería haberla, pero el tipo
+    // lo admite) no se puede comprobar, y callar es mejor que afirmar que falta el convenio.
+    if (exc.productor_id) {
+      const prod = await conveniVigent('productor', exc.productor_id, val, 'entrega')
+      if (prod.ok && prod.data === false) falta.push(t('od.conv_producer'))
+    }
+    const ent = await conveniVigent('entidad', entidadId, val, 'recibe')
+    if (ent.ok && ent.data === false) falta.push(t('od.conv_entity'))
+    return falta.length ? falta.join(' · ') : null
+  }
+
+  /**
+   * Aprobar una aceptación y convertirla en canalización, **en una sola transacción**.
+   *
+   * Antes esto eran cuatro escrituras sueltas (insert de canalización, update de la respuesta,
+   * update del excedente) sin transacción y **sin comprobar nada**. Como este es el único
+   * sitio desde el que el equipo aprueba, la comprobación de convenios que `aprovar_resposta()`
+   * sí hace no se estaba aplicando en la práctica: pasada `fecha_corte_convenios`, una
+   * canalización sin convenio entraba igual. No era deuda de elegancia (§12.19), era una regla
+   * de negocio sin aplicar.
+   *
+   * Lo único que se pierde por el camino es `canalizaciones.comentarios = 'Preu acordat: …'`,
+   * que la RPC no escribe. No lo lee nadie: el precio vive en `oferta_respuestas.preu_ofert`,
+   * que es su sitio, y ninguna pantalla pinta esa columna.
+   */
   async function aprovarRespuesta(e: FormEvent<HTMLFormElement>, r: RespuestaConEntidad) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
@@ -267,30 +307,27 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     if (!r.entidad_id || !kg) { toast.error(t('od.no_text')); return }
     // Aviso no bloqueante si se canaliza más de lo que falta por cubrir.
     if (kg > faltan && !window.confirm(t('od.over_alloc', { n: faltan }))) return
+
+    const falta = await avisoConvenio(r.entidad_id)
+    if (falta && !window.confirm(t('od.conv_missing', { parts: falta }))) return
+
     const preuRaw = String(fd.get('preu') ?? '')
     const preu = preuRaw !== '' ? Number(preuRaw) : null
-    const { data: canal, error } = await supabase.from('canalizaciones').insert({
-      excedente_id: excedente.id, entidad_id: r.entidad_id, kg_confirmados: kg,
-      comentarios: preu != null ? `Preu acordat: ${preu} €/kg` : null,
-    }).select('id').single()
-    if (error) { toast.error(error.message); return }
-    await supabase.from('oferta_respuestas').update({
-      aprovacio: 'aprovada', aprovat_at: new Date().toISOString(),
-      kg_solicitados: kg, preu_ofert: preu, canalizacion_id: canal.id,
-    }).eq('id', r.id)
-    const nuevoCanalizado = canalizados + kg
-    if (total > 0 && nuevoCanalizado >= total) {
-      await supabase.from('excedentes').update({ estado: 'bloqueada' }).eq('id', excedente.id)
-    } else if (exc.estado === 'publicada') {
-      await supabase.from('excedentes').update({ estado: 'parcial' }).eq('id', excedente.id)
+    const { error } = await supabase.rpc('aprovar_resposta', {
+      p_resposta: r.id, p_kg: kg, p_preu: preu, p_motiu: null,
+    })
+    if (error) {
+      // `42501` llega por dos motivos distintos y el mensaje tiene que distinguirlos: no
+      // poder aprobar, o no haber convenio desde la fecha de corte.
+      const esConveni = (error.message ?? '').includes('sense_conveni')
+      toast.error(esConveni ? t('od.conv_blocked') : error.message)
+      return
     }
     toast.success(t('od.approved'))
     await recargar(); await recargarRespuestas()
   }
 
-  async function rebutjarAprovacio(r: RespuestaConEntidad) {
-    const motiu = window.prompt(t('od.reject_reason'))
-    if (motiu === null) return
+  async function rebutjarAprovacio(r: RespuestaConEntidad, motiu: string) {
     await supabase.from('oferta_respuestas').update({
       aprovacio: 'rebutjada', motiu_aprovacio: motiu || null, aprovat_at: new Date().toISOString(),
     }).eq('id', r.id)
@@ -434,10 +471,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     await recargar()
   }
 
-  async function marcarNoColocada() {
-    const motivo = window.prompt(t('od.prompt_uncoll'))
-    if (!motivo) return
+  async function marcarNoColocada(motivo: string) {
     await supabase.from('excedentes').update({ estado: 'no_colocada', motivo_no_colocada: motivo }).eq('id', excedente.id)
+    setNoColocada(false)
     await recargar()
   }
 
@@ -592,7 +628,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     )}
                     <Button size="sm" type="submit">{t('od.approve')}</Button>
                     <Button size="sm" variant="outline" type="button"
-                      onClick={() => void rebutjarAprovacio(r)}>{t('od.reject_appr')}</Button>
+                      onClick={() => setRebutjant(r)}>{t('od.reject_appr')}</Button>
                   </form>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'aprovada' && (
@@ -684,10 +720,35 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
       {exc.estado !== 'no_colocada' && exc.estado !== 'cerrada' && exc.estado !== 'cancelada' && (
         <div className="flex flex-wrap gap-2">
-          <Button variant="destructive" onClick={() => void marcarNoColocada()}>{t('od.mark_uncoll')}</Button>
+          <Button variant="destructive" onClick={() => setNoColocada(true)}>{t('od.mark_uncoll')}</Button>
           <Button variant="destructive" onClick={() => void cancelarOferta()}>{t('od.cancel_offer')}</Button>
         </div>
       )}
+
+      <DialegMotiu
+        obert={rebutjant !== null}
+        onObert={(v) => { if (!v) setRebutjant(null) }}
+        titol={t('od.reject_appr')}
+        etiqueta={t('od.reject_reason')}
+        confirmar={t('od.reject_appr')}
+        destructiu
+        onConfirma={(m) => {
+          const r = rebutjant
+          setRebutjant(null)
+          if (r) void rebutjarAprovacio(r, m)
+        }}
+      />
+
+      <DialegMotiu
+        obert={noColocada}
+        onObert={setNoColocada}
+        titol={t('od.mark_uncoll')}
+        descripcio={t('od.uncoll_desc')}
+        etiqueta={t('od.prompt_uncoll')}
+        confirmar={t('od.mark_uncoll')}
+        destructiu
+        onConfirma={(m) => void marcarNoColocada(m)}
+      />
     </div>
   )
 }

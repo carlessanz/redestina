@@ -5,14 +5,30 @@
 // aplica antes, y el intake del webhook trabaja siempre dentro de la ventana
 // porque responde a un mensaje que acaba de llegar.
 
-const API_VERSION = Deno.env.get("WHATSAPP_API_VERSION") ?? "v23.0";
+// Los dos secretos se leen DENTRO de una funcion, no en el cuerpo del modulo.
+//
+// Escrito como `const API_VERSION = Deno.env.get(...)` a nivel de modulo, cualquier `import`
+// desde Node moria con `ReferenceError: Deno is not defined` **antes de ejecutar nada**. Y eso
+// no era teorico: arrastraba consigo a `oferta.ts`, `intake.ts` y `respuestas.ts`, que importan
+// este fichero, y con ellos a `parseDisponibleFins` (deuda 4) y a la heuristica si/no
+// (deuda 14) -- justo los dos sitios que el propio documento senala como fragiles y que no se
+// podian probar. Leyendolos dentro, el modulo se importa desde Vitest y esas funciones entran
+// en el arnes de pruebas.
+//
+// No cambia el comportamiento en Deno: el entorno del isolate no cambia durante su vida, asi
+// que da igual cuando se pregunte.
+function apiVersion(): string {
+  return Deno.env.get("WHATSAPP_API_VERSION") ?? "v23.0";
+}
 
 // Modo prueba de concepto: mientras esto no sea exactamente "true", NO se envía
 // nada por WhatsApp. Es seguro por omisión: si el secreto no está configurado,
 // no sale ningún mensaje. Los salientes se registran igualmente en wa_messages
 // con status='simulat' para verlos en la consola. Se activa el envío real
 // poniendo WHATSAPP_ENVIO_REAL=true en los secretos, sin tocar código.
-const ENVIO_REAL = Deno.env.get("WHATSAPP_ENVIO_REAL") === "true";
+function envioReal(): boolean {
+  return Deno.env.get("WHATSAPP_ENVIO_REAL") === "true";
+}
 
 // WhatsApp acepta como máximo 3 botones y 10 filas por lista interactiva.
 export const MAX_BOTONES = 3;
@@ -40,7 +56,7 @@ export interface RespuestaMeta {
 }
 
 async function enviar(payload: Record<string, unknown>): Promise<RespuestaMeta> {
-  if (!ENVIO_REAL) {
+  if (!envioReal()) {
     // Modo PoC: no se contacta con Meta. Se devuelve una respuesta simulada para
     // que el flujo (intake, panel) continúe con normalidad.
     // deno-lint-ignore no-explicit-any
@@ -56,7 +72,7 @@ async function enviar(payload: Record<string, unknown>): Promise<RespuestaMeta> 
   }
   const phoneId = Deno.env.get("WHATSAPP_PHONE_ID");
   const res = await fetch(
-    `https://graph.facebook.com/${API_VERSION}/${phoneId}/messages`,
+    `https://graph.facebook.com/${apiVersion()}/${phoneId}/messages`,
     {
       method: "POST",
       headers: {

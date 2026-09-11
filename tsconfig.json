@@ -12,6 +12,10 @@
     "noEmit": true,
     "skipLibCheck": true,
     "isolatedModules": true,
+    // Las pruebas importan los módulos de `supabase/functions/_shared/`, que se
+    // referencian entre sí con extensión `.ts` porque son Deno. Sin esto, `tsc` no
+    // los resuelve. Solo permite la forma; no obliga a nadie a usarla.
+    "allowImportingTsExtensions": true,
     "types": ["vite/client"],
     "paths": {
       "@/*": ["./src/*"]

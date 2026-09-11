@@ -21,7 +21,7 @@ import { leerRespuesta } from "./intake.ts";
 type Cliente = any;
 
 // Normaliza para comparar: quita acentos, signos y espacios de más.
-function normalizar(texto: string): string {
+export function normalizar(texto: string): string {
   return texto
     .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita diacríticos: í→i (ç se conserva)
     .toLowerCase()
@@ -41,7 +41,12 @@ const NEGATIVOS = [
   "descarto", "ara no", "no gracies", "no interessa",
 ];
 
-function clasificar(texto: string): "acceptada" | "rebutjada" | null {
+/**
+ * Exportada para poder probarla: es una heurística por lista de palabras (deuda 14), o sea
+ * el sitio con más probabilidad de clasificar mal un mensaje real. Sin test, esa fragilidad
+ * solo se descubre cuando una entidad acepta una oferta y el sistema entiende que la rechaza.
+ */
+export function clasificar(texto: string): "acceptada" | "rebutjada" | null {
   const t = normalizar(texto);
   if (!t) return null;
   // Solo mensajes cortos disparan por "empieza/termina por"; un párrafo largo
@@ -63,10 +68,34 @@ const BOTONS_PREU = [
   { id: "accept:preu_no", titulo: "No" },
 ];
 
-/** Primer número del texto (acepta "200", "150,5", "uns 300 kg"). */
-function parseNumero(texto: string | null): number | null {
-  const m = (texto ?? "").match(/\d+([.,]\d+)?/);
-  return m ? Number(m[0].replace(",", ".")) : null;
+/**
+ * Primer número del texto: "200", "150,5", "uns 300 kg", "1.500".
+ *
+ * ⚠️ EL PUNTO ES SEPARADOR DE MILLARES, no decimal, y esto es lo que se arregló aquí.
+ * Antes la expresión aceptaba `[.,]` indistintamente como coma decimal, así que **«1.500 kg»
+ * se leía como 1,5 kg**: una entidad que pedía tonelada y media quedaba registrada con kilo
+ * y medio, y el diálogo lo daba por bueno porque `kg > 0` y no repreguntaba. En catalán y en
+ * castellano el millar se escribe con punto y el decimal con coma, que es justo al revés de
+ * lo que hacía el código.
+ *
+ * La regla, en el orden en que se aplica:
+ *   · un punto seguido de EXACTAMENTE tres cifras y no seguido de más dígitos es millar y se
+ *     quita — `1.500` → 1500, `12.345.678` → 12345678;
+ *   · la coma siempre es decimal — `150,5` → 150.5;
+ *   · un punto que no cumple lo del millar se respeta como decimal, porque quien escribe
+ *     `1.5` casi seguro quiere uno y medio — no hay forma de distinguirlo, y ese caso pierde
+ *     mucho menos que el otro (1,5 kg en vez de 1.500 es un error de mil veces).
+ */
+export function parseNumero(texto: string | null): number | null {
+  const m = (texto ?? "").match(/\d{1,3}(?:\.\d{3})+(?:,\d+)?|\d+(?:[.,]\d+)?/);
+  if (!m) return null;
+  const bruto = m[0];
+  // Con separador de millares reconocido, los puntos se van y la coma pasa a punto.
+  const normalizado = /\d\.\d{3}(?!\d)/.test(bruto)
+    ? bruto.replace(/\./g, "").replace(",", ".")
+    : bruto.replace(",", ".");
+  const n = Number(normalizado);
+  return Number.isFinite(n) ? n : null;
 }
 
 /** Cierra la aceptación: la fila queda 'acceptada' y pendiente de aprobación. */

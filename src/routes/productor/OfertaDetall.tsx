@@ -8,6 +8,7 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
+import DialegMotiu from '../../components/DialegMotiu'
 import { useT } from '../../lib/i18n'
 import { cancelaOferta } from '../../lib/ofertes'
 import { estatEtiqueta } from './Ofertes'
@@ -37,12 +38,20 @@ export default function ProductorOfertaDetall() {
 
   useEffect(() => { void carrega() }, [carrega])
 
-  async function cancelar() {
+  // El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35): este es
+  // el panel del productor, o sea el público con más probabilidad de abrirlo desde el
+  // navegador integrado de WhatsApp, donde `prompt()` devuelve `null` sin decir nada y la
+  // cancelación no ocurriría.
+  const [cancelant, setCancelant] = useState(false)
+  const [ocupatCancel, setOcupatCancel] = useState(false)
+
+  async function cancelar(motiu: string) {
     if (!oferta) return
-    const motiu = window.prompt(t('po.cancel_reason'))
-    if (motiu === null) return
+    setOcupatCancel(true)
     const r = await cancelaOferta(oferta.id, motiu)
+    setOcupatCancel(false)
     if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+    setCancelant(false)
     toast.success(t('po.cancelled'))
     await carrega()
   }
@@ -113,8 +122,20 @@ export default function ProductorOfertaDetall() {
       </Card>
 
       {cancelable && (
-        <Button variant="destructive" onClick={() => void cancelar()}>{t('po.cancel_offer')}</Button>
+        <Button variant="destructive" onClick={() => setCancelant(true)}>{t('po.cancel_offer')}</Button>
       )}
+
+      <DialegMotiu
+        obert={cancelant}
+        onObert={setCancelant}
+        titol={t('po.cancel_offer')}
+        descripcio={t('po.cancel_desc')}
+        etiqueta={t('po.cancel_reason')}
+        confirmar={t('po.cancel_offer')}
+        destructiu
+        ocupat={ocupatCancel}
+        onConfirma={(m) => void cancelar(m)}
+      />
     </div>
   )
 }

@@ -1,0 +1,18 @@
+{
+  // Comprobación de tipos de las pruebas, aparte de la de la aplicación.
+  //
+  // POR QUÉ NO VAN EN `tsconfig.json`. Las pruebas importan dos mundos que la aplicación no
+  // conoce: los módulos de `supabase/functions/_shared/`, que son **Deno** —se referencian
+  // entre sí con extensión `.ts` y declaran el global `Deno`—, y las utilidades de **Node**
+  // (`node:fs`, `node:url`). Meter `"node"` en los `types` del tsconfig de la aplicación
+  // dejaría `process`, `Buffer` y `fs` visibles dentro de `src/`, que se empaqueta para el
+  // navegador: haría compilar código que luego revienta en producción. Separarlo cuesta un
+  // fichero y un comando más en `npm run check`, y evita esa clase entera de error.
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "types": ["node", "vite/client"],
+    "allowImportingTsExtensions": true,
+    "noEmit": true
+  },
+  "include": ["tests", "vitest.config.ts"]
+}

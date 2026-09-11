@@ -6,7 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:cobertura": "vitest run --coverage",
+    "check:deno": "deno check scripts/*.ts && for d in supabase/functions/*/; do [ \"$(basename $d)\" = \"_shared\" ] && continue; deno check --config \"$d/deno.json\" \"$d/index.ts\" || exit 1; done",
+    "check": "npm run check:tipos && vitest run && npm run check:deno",
+    "check:tipos": "tsc && tsc -p tsconfig.tests.json"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2",
@@ -24,11 +30,14 @@
     "tw-animate-css": "^1.4.0"
   },
   "devDependencies": {
+    "@types/node": "^22.20.2",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
     "@vitejs/plugin-react": "^5.0.0",
+    "@vitest/coverage-v8": "^4.1.11",
     "typescript": "~5.9.0",
     "vite": "^7.0.0",
-    "vite-plugin-pwa": "^1.3.0"
+    "vite-plugin-pwa": "^1.3.0",
+    "vitest": "^4.1.11"
   }
 }

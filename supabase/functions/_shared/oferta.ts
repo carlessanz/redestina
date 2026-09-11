@@ -91,7 +91,7 @@ export function parseDisponibleFins(texto: string): string | null {
  * identificador con riesgo de colisión es peor que uno bueno, pero mucho mejor que
  * perder el excedente que el productor acaba de dictar.
  */
-async function generarId(
+export async function generarId(
   supabase: Cliente,
   productor: string,
   producto: string,

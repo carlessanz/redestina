@@ -23,7 +23,15 @@ function orDefault(v: string | null | undefined, fallback: string): string {
 
 /** Devuelve los `components` (solo `body`, 7 variables) de `oferta_excedent`. */
 export function construirComponentsOferta(d: DatosOfertaPlantilla): unknown[] {
-  const producte = orDefault(d.variedad ? `${d.producto} · ${d.variedad}` : d.producto, '—')
+  // ⚠️ Se comprueba `producto` ANTES de interpolar. Con `producto: null` y una variedad
+  // puesta, la plantilla anterior producía la cadena literal «null · Pera» —y `orDefault` no
+  // la salvaba, porque ya no estaba vacía—, así que eso es lo que le habría llegado a la
+  // entidad receptora por WhatsApp. El intake no deja variedad sin producto, pero el alta
+  // desde el panel del productor no lo impide y los tipos lo permiten.
+  const producte = orDefault(
+    d.producto && d.variedad ? `${d.producto} · ${d.variedad}` : (d.producto ?? d.variedad),
+    '—',
+  )
   const quantitat = d.kg
     ? `${d.kg} kg${d.caixes ? ` · ${d.caixes} caixes` : ''}`
     : 'a convenir'

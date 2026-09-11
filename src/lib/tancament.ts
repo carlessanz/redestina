@@ -118,15 +118,20 @@ export function calcularTancament(id: string): Promise<ResultatRpc<ResumCalcul>>
 }
 
 /**
- * Cerrar el ejercicio.
+ * Cerrar **este** cierre: recalcula, emite los resúmenes definitivos y lo pasa a `tancat`.
  *
- * ⚠️ `congelar_ejercicio()` es hoy del **job**: la migración 20261109100200 le revoca el
- * EXECUTE a `authenticated`. Se llama igual y se enseña el error de la base tal cual, en
- * vez de esconder el botón: la acción existe en el circuito y quien la pulsa merece leer
- * por qué no puede, no encontrarse un panel sin ella.
+ * ⚠️ Antes esto llamaba a `congelar_ejercicio(int)`, que es del **job**: tiene revocado el
+ * EXECUTE a `authenticated` desde `20261109100300`, así que respondía `42501` a cualquier
+ * sesión y **el botón no funcionaba nunca**. El comentario de entonces decía que se enseñaba
+ * el error «para que quien lo pulsa lea por qué no puede», pero no había ningún «por qué»:
+ * era la llamada equivocada. Y además congelaba TODOS los cierres del año, no el que se
+ * tiene delante — incluido el real, desde un botón puesto sobre un ensayo.
+ *
+ * `cerrar_cierre(uuid)` es la buena: existe desde la misma migración, tiene su GRANT, exige
+ * `pot_aprovar()` —y `es_super_admin()` si el cierre es real— y actúa sobre uno solo.
  */
-export function congelarExercici(exercici: number): Promise<ResultatRpc<Record<string, unknown>>> {
-  return crida('congelar_ejercicio', { p_ejercicio: exercici }, 'tan.err_generic')
+export function tancarTancament(id: string): Promise<ResultatRpc<Record<string, unknown>>> {
+  return crida('cerrar_cierre', { p_cierre: id }, 'tan.err_generic')
 }
 
 /** El ejercicio ya se ha presentado en el 182. */

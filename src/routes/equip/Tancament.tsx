@@ -96,11 +96,15 @@ export default function Tancament() {
   }, [])
 
   const carregaTotals = useCallback(async () => {
+    // Se trae también `tipo` para poder separar donación de transacción: sumarlos daría un
+    // total que no es de ninguno de los dos, y «donants» contaría dos veces a una
+    // organización que este año haya donado Y vendido.
     const { data } = await supabase
       .from('cierres_donante')
-      .select('cierre_id, kg_total, valor_total, certificado_numero')
+      .select('cierre_id, tipo, kg_total, valor_total, certificado_numero')
     const acumulat: Record<string, Totals> = {}
-    for (const d of (data as { cierre_id: string; kg_total: number | string; valor_total: number | string; certificado_numero: string | null }[] | null) ?? []) {
+    for (const d of (data as { cierre_id: string; tipo: string | null; kg_total: number | string; valor_total: number | string; certificado_numero: string | null }[] | null) ?? []) {
+      if ((d.tipo ?? 'donacio') !== 'donacio') continue
       const t0 = acumulat[d.cierre_id] ?? { donants: 0, kg: 0, valor: 0, certificats: 0 }
       t0.donants += 1
       t0.kg += Number(d.kg_total ?? 0)

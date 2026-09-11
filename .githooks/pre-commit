@@ -1,0 +1,40 @@
+#!/bin/sh
+# Las comprobaciones que no necesitan credenciales, antes de cada commit.
+#
+# POR QUÉ EXISTE (deuda §12.1 y §12.47). El proyecto tenía tres controles automáticos —`tsc`,
+# `deno check` y el arnés de RLS— y **ninguno se ejecutaba solo**: valían lo que valiera la
+# disciplina de quien commitea. Lo que eso costó está medido: `deno check` no había pasado
+# nunca sobre las Edge Functions y escondía tres errores de tipos reales.
+#
+# QUÉ NO ESTÁ AQUÍ, y es deliberado:
+#   · `scripts/comprobar-rls.ts` — necesita credenciales y una base viva. Su sitio es §13, a
+#     mano, o un CI con secretos. Meterlo aquí haría que el hook fallara sin red.
+#   · `vite build` — el empaquetado no encuentra nada que `tsc` no encuentre antes, y son
+#     segundos en cada commit.
+#
+# SE INSTALA UNA VEZ POR CLON (no viaja solo, git no ejecuta hooks versionados):
+#   git config core.hooksPath .githooks
+#
+# Y SE SALTA, cuando de verdad hace falta, con `git commit --no-verify`. Está puesto a
+# propósito: un hook que no se puede saltar se acaba desinstalando entero.
+
+set -e
+
+echo "→ tipos (aplicación y pruebas)"
+npm run --silent check:tipos
+
+echo "→ vitest"
+npx vitest run
+
+# `deno check` solo si el commit toca lo que `tsc` no mira. Es la parte lenta y la que menos
+# cambia; correrla siempre haría el hook molesto sin ganar nada.
+if git diff --cached --name-only | grep -qE '^(scripts/|supabase/functions/)'; then
+  echo "→ deno check"
+  deno check scripts/*.ts
+  for d in supabase/functions/*/; do
+    [ "$(basename "$d")" = "_shared" ] && continue
+    deno check --config "$d/deno.json" "$d/index.ts"
+  done
+fi
+
+echo "✓ comprobaciones en verde"
