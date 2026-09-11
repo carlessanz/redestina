@@ -2108,11 +2108,41 @@ listos para mostrar.
 —los helpers filtran por `membresias.activo`—: le sale la pantalla «Compte pendent de validació».
 Quien concede el acceso de verdad es el equipo, desde Aprovacions (§6quater).
 
-**No vincula nunca con una ficha existente.** `productores.email` y `phone` son UNIQUE sobre 345
-fichas reales: si el correo o el teléfono chocan, responde `409 dades_en_us` y no crea nada. Vincular
-automáticamente sería permitir apropiarse de una organización real conociendo su correo. `entidades`
-no tiene ninguna restricción de unicidad, así que ahí el duplicado se cuela y lo detecta el equipo al
-validar (deuda §12.28).
+**Detecta que la organización ya existe, y aun así NO vincula** (etapa 2 de la brecha 2,
+11-09-2026). Antes solo veía los choques con `productores` —y los veía porque allí `email` y `phone`
+son UNIQUE—, así que una entidad ya fichada se registraba otra vez y solo lo notaba el equipo al
+validar. Ahora consulta las fichas de las dos tablas y **`v_organizaciones`**, con el mismo criterio
+que usó la migración de la etapa 1: **correo o teléfono exactos** (el teléfono, por sus últimas 9
+cifras), **nunca el parecido del nombre** —juntar dos organizaciones distintas es mezclar los kilos y
+el certificado fiscal de dos donantes—. Tres caminos:
+
+| Coincidencia | Qué hace |
+| --- | --- |
+| Ninguna | Alta normal. La ficha **estrena su fila en `organizaciones`** (`creada_por` = la cuenta recién creada) |
+| Con una organización que **no** tiene ficha de ese tipo | **Es la misma organización estrenando papel.** Se da el alta con `organizacion_id` NULL y una nota en el comentario de la ficha; responde `200 { revisio_equip: true }` |
+| Con una organización que **ya** tiene ficha de ese tipo | `409 dades_en_us` con `camp`, como hasta ahora — **y ahora también para entidades** |
+
+⚠️ **El papel nuevo no se enlaza solo, y no es timidez.** Enlazar sería convertir «conozco el correo
+de esta organización» en «soy esta organización» por un rodeo: hoy el acceso lo da `membresias`, que
+apunta a una ficha, así que el enlace no abriría nada **todavía**; pero la unificación existe para
+que mañana los convenios, los albaranes y los certificados se resuelvan **por organización**, y ese
+día el enlace se convierte —sin que nadie lo vuelva a mirar— en acceso a los kilos y al certificado
+fiscal de la otra ficha, creado por un POST sin sesión. Aprobar un alta es un clic y nada en esa
+pantalla diría que además se confirma una identidad. Tampoco se le crea una organización propia: eso
+fabricaría el duplicado que esto viene a detectar. `NULL` significa «identidad todavía no decidida»,
+y la decide el equipo.
+
+**Las consultas van a las fichas, no a la vista**, y después la vista. `v_organizaciones` expone un
+solo correo y un solo teléfono por organización (el del productor cuando hay las dos, por el
+`coalesce`), así que filtrar por ella dejaría invisible el correo de la otra ficha — que es justo el
+caso a cazar. Las fichas dicen QUIÉN casa; la vista, QUÉ PAPELES tiene ya esa organización, que es lo
+único que separa el papel nuevo del duplicado. Si la vista falla, se trata como duplicado: rechazar
+un alta legítima lo arregla el equipo; dar por nueva una organización que ya está, no.
+
+**La compensación cubre cuatro pasos** (cuenta → organización → ficha → membresía): si falla la ficha
+se borran organización y cuenta; si falla la membresía, ficha, organización y cuenta. La organización
+es además **best-effort**: si no se puede crear, la ficha nace sin ella antes que perder un alta —y
+desde `20270313100000` ni eso, porque el trigger se la pone igual.
 
 **Enumeración aceptada a propósito.** Un correo ya registrado devuelve `409 email_ja_registrat`, al
 revés que `recuperar-password`, que siempre responde 200 genérico. La incoherencia es deliberada: la
@@ -2762,11 +2792,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ningún canal** (y con el modo test encendido tampoco podría recuperar la contraseña, §8). Y quien
     espera validación se entera de que se la han aprobado entrando a mirar. Falta una notificación
     —que dependerá de la tabla `notificacion` con *fallback* de canal del funcional (§1bis)—.
-28. **El registro no deduplica contra las organizaciones existentes.** En `productores` los UNIQUE de
-    `email`/`phone` al menos cortan el alta con `dades_en_us`; `entidades` no tiene ninguna
-    restricción de unicidad, así que una entidad ya fichada puede registrarse otra vez y solo lo
-    detecta el equipo al validar. Se arregla de verdad con la `organizacion` unificada (§1bis,
-    brecha 2), no con un parche aquí.
+28. ~~**El registro no deduplica contra las organizaciones existentes.**~~ — **resuelta la parte
+    accionable (11-09-2026)**: `registro` consulta `v_organizaciones` y distingue los tres casos
+    (§9). Lo que queda **no es del registro**: no hay ninguna RPC para que el equipo **enlace** una
+    ficha con la organización que ya existe, así que el caso «misma organización, papel nuevo» acaba
+    en una ficha con `organizacion_id` NULL y una nota en su comentario, y el enlace se hace a mano
+    con `service_role`. Es la etapa siguiente: `enllacar_organitzacio(tipo, ficha, org)` con
+    `pot_aprovar()` y su botón en Aprovacions. Mientras tanto la nota es lo único accionable — y **la
+    interfaz todavía no enseña el `revisio_equip: true`** que devuelve la función, así que quien
+    registra ve la pantalla genérica de «fet».
 29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
     `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
     derivada `rebutjada`; los dos listados la pintan en rojo.
@@ -3268,6 +3302,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     arreglo de paso. Encontrado al arreglar el reparto por ventanas (`20270303100000`), donde queda
     anotado en la cabecera. **No se ha dado todavía**: hoy ninguna jornada tiene dos registros del
     mismo producto.
+
+91. **La detección de organización del registro tiene dos puntos ciegos conocidos, los dos hacia el
+    lado seguro.** Solo mira `entidades.telefono` (no `telefono2`/`telefono3`), igual que la
+    migración de la etapa 1; y el filtro que va a la consulta es un regex tolerante a separadores
+    anclado al FINAL del campo, así que un teléfono guardado en medio de texto
+    (`612345678 / 933000000`) no se encuentra. Los dos fallos producen un **duplicado que ve el
+    equipo, nunca una fusión equivocada**, que es el orden correcto de preferencias. El arreglo de
+    verdad es una columna normalizada o un índice funcional sobre las últimas 9 cifras, no más
+    expresiones regulares.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 

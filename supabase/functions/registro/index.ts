@@ -5,15 +5,19 @@
 // así que todo lo que hay aquí gira alrededor de eso: validar antes de tocar nada,
 // frenar el abuso, y no dejar residuos si algo falla a medias.
 //
-// Crea tres cosas, en este orden, porque es el único que permite compensar:
+// Crea cuatro cosas, en este orden, porque es el único que permite compensar:
 //   1. la cuenta de Auth (Admin API; el trigger on_auth_user_created crea el perfil)
-//   2. la ficha de `productores` o `entidades`
-//   3. la `membresias` con activo = false y aprovacio = 'pendent'
-// Si falla el paso 2 se borra la cuenta; si falla el 3, la ficha y la cuenta. El peor
-// residuo posible —una cuenta de Auth sin membresía— es inocuo: sin membresía activa
-// no ve absolutamente nada (mis_productores/mis_entidades filtran por `activo`).
+//   2. la fila de `organizaciones` (identidad de la organización; solo si es un alta nueva)
+//   3. la ficha de `productores` o `entidades`, apuntando a esa organización
+//   4. la `membresias` con activo = false y aprovacio = 'pendent'
+// Si falla el paso 3 se borran la organización y la cuenta; si falla el 4, la ficha, la
+// organización y la cuenta. El peor residuo posible —una cuenta de Auth sin membresía— es
+// inocuo: sin membresía activa no ve absolutamente nada (mis_productores/mis_entidades
+// filtran por `activo`). El paso 2 es ADEMÁS best-effort: si no se puede crear la
+// organización, la ficha nace sin ella —exactamente como las que se crean a mano— antes
+// que perder un alta por una identidad que el equipo puede enlazar después.
 //
-// Y DESDE LA FASE 2, una cuarta cosa que **no se compensa a propósito**: el convenio en
+// Y DESDE LA FASE 2, una quinta cosa que **no se compensa a propósito**: el convenio en
 // `esborrany` y su enlace de firma (§3.2.4, «Dentro del registro»). Si ese paso falla, el
 // alta se da por buena igualmente y el equipo prepara el convenio desde la campaña: negar
 // un registro entero porque no se pudo preparar un contrato que todavía nadie ha leído
@@ -36,9 +40,44 @@
 // TAMPOCO VINCULA con una ficha existente aunque el correo coincida: eso convertiría
 // «conozco el email de esta organización» en «soy esta organización». Un duplicado lo
 // resuelve el equipo al aprobar; una suplantación, no.
+//
+// ⚠️ DESDE LA ETAPA 2 DE LA ORGANIZACIÓN UNIFICADA (§1bis brecha 2, deuda §12.28) SÍ DETECTA
+//    que la organización ya consta, que es cosa distinta de vincularla. Antes solo veía los
+//    choques con `productores` —y los veía porque `email` y `phone` son UNIQUE allí—, así que
+//    una entidad ya fichada se registraba otra vez sin que nada lo notara. Ahora se consultan
+//    las fichas de las dos tablas y `v_organizaciones`, y salen tres caminos (el detalle del
+//    criterio, en `coincidencies.ts`):
+//      1. nada coincide → alta normal, y la ficha estrena su fila en `organizaciones`
+//      2. coincide una organización que NO tiene ficha de este tipo → es la misma
+//         organización estrenando papel: **se da el alta, SIN enlazar**, con una nota en el
+//         comentario de la ficha para que lo decida el equipo (ver abajo)
+//      3. coincide una organización que YA tiene ficha de este tipo → 409 `dades_en_us`
+//
+//    El caso 2 no se enlaza solo, y no es timidez: enlazar sería exactamente lo que el
+//    párrafo de arriba prohíbe, solo que con un rodeo. Hoy el acceso lo da `membresias`, que
+//    apunta a una ficha, así que enlazar no abriría nada todavía; pero la unificación existe
+//    para que mañana los convenios, los albaranes y los certificados se resuelvan POR
+//    ORGANIZACIÓN, y ese día el enlace se convierte, sin que nadie lo vuelva a mirar, en
+//    acceso a los kilos y al certificado fiscal de la otra ficha — creado por un POST sin
+//    sesión de quien solo sabía un correo. Aprobar un alta es un clic y nada en esa pantalla
+//    diría que además se está confirmando una identidad. Así que se detecta, se avisa y se
+//    deja la decisión donde tiene dueño.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
+import {
+  type Decisio,
+  decidir,
+  type FitxaCoincident,
+  mateixEmail,
+  type MotiuCoincidencia,
+  mateixTelefon,
+  notaPaperNou,
+  type OrgCoincident,
+  patroTelefon,
+  type TipusFitxa,
+  ultimes9,
+} from "./coincidencies.ts";
 
 // Sin tipos generados de la base, como en `_shared/gate.ts`: anotar el cliente con
 // `ReturnType<typeof createClient>` resuelve el esquema a `never` y todo insert deja
@@ -266,6 +305,7 @@ Deno.serve(async (req) => {
   let supabase: Cliente = null;
   let userId: string | null = null;
   let fitxaId: string | null = null;
+  let organitzacioId: string | null = null;
   let taula: "productores" | "entidades" = "productores";
 
   try {
@@ -322,29 +362,39 @@ Deno.serve(async (req) => {
       );
     }
 
-    // `productores.email` y `productores.phone` son UNIQUE: sin este precheck el
-    // insert reventaría con 23505 después de haber creado ya la cuenta de Auth.
-    // `entidades` no tiene ninguna restricción de unicidad, así que no aplica: un
-    // receptor duplicado lo detecta el equipo en la cola.
-    if (d.rol === "productor") {
-      const { data: xocEmail } = await supabase
-        .from("productores").select("id").ilike("email", patroLike(d.email)).limit(1);
-      if ((xocEmail ?? []).length > 0) {
-        return responder(
-          { error: "Aquest correu ja consta en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "email" },
-          409,
-        );
-      }
-      if (d.telefon) {
-        const { data: xocTel } = await supabase
-          .from("productores").select("id").eq("phone", d.telefon).limit(1);
-        if ((xocTel ?? []).length > 0) {
-          return responder(
-            { error: "Aquest telefon ja consta en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "telefon" },
-            409,
-          );
-        }
-      }
+    // ¿Esta organización ya existe? (etapa 2). Sustituye al precheck que solo miraba
+    // `productores` —y que solo existía porque allí `email` y `phone` son UNIQUE y el
+    // insert habría reventado con 23505 con la cuenta de Auth ya creada—. El 23505 se
+    // sigue capturando abajo por la carrera entre esta consulta y el insert.
+    const tipusRol: TipusFitxa = d.rol === "productor" ? "productor" : "entidad";
+    const t0 = performance.now();
+    const decisio = await decidirCoincidencia(supabase, d, tipusRol);
+    console.log(JSON.stringify({
+      fn: "registro",
+      pas: "coincidencies",
+      cas: decisio.cas,
+      // Los papeles con los que ha casado, no el correo ni el teléfono: esto es un log de
+      // una función pública y lo que se busca aquí es entender una decisión, no reconstruir
+      // los datos de quien la provocó.
+      fitxes: decisio.cas === "paper_nou"
+        ? decisio.fitxes.map((f) => f.tipus)
+        : decisio.cas === "duplicat"
+        ? [decisio.fitxa.tipus]
+        : [],
+      ms: Math.round((performance.now() - t0) * 10) / 10,
+    }));
+
+    if (decisio.cas === "duplicat") {
+      return responder(
+        {
+          error: decisio.camp === "email"
+            ? "Aquest correu ja consta en una fitxa. Contacta amb l'equip de Redestina."
+            : "Aquest telefon ja consta en una fitxa. Contacta amb l'equip de Redestina.",
+          code: "dades_en_us",
+          camp: decisio.camp,
+        },
+        409,
+      );
     }
 
     // -----------------------------------------------------------------------
@@ -373,8 +423,31 @@ Deno.serve(async (req) => {
     userId = creada.user.id as string;
 
     // -----------------------------------------------------------------------
-    // 2. Ficha de la organización.
+    // 2. La organización. Solo cuando no coincide nada: si el alta es el papel nuevo de
+    //    una que ya consta, la ficha nace SIN organización a propósito —crearle una
+    //    segunda identidad a la misma organización sería fabricar el duplicado que esto
+    //    viene a detectar, y enlazarla con la existente es la decisión que se le deja al
+    //    equipo—. Nunca corta el alta: si falla, se sigue con `organizacion_id` nulo.
     // -----------------------------------------------------------------------
+    if (decisio.cas === "alta") {
+      const { data: org, error: errOrg } = await supabase
+        .from("organizaciones").insert({ creada_por: userId }).select("id").single();
+      if (errOrg || !org) {
+        console.warn("[registro] organizacion no creada:", errOrg?.code, errOrg?.message);
+      } else {
+        organitzacioId = org.id as string;
+      }
+    }
+
+    // -----------------------------------------------------------------------
+    // 3. Ficha de la organización.
+    // -----------------------------------------------------------------------
+    // La nota del caso «papel nuevo» va en el comentario de la ficha: es lo que ve el
+    // equipo cuando entra desde la cola de «Registres pendents» a completarla (§6quater).
+    const nota = decisio.cas === "paper_nou"
+      ? notaPaperNou(decisio.fitxes, new Date().toISOString())
+      : null;
+
     taula = d.rol === "productor" ? "productores" : "entidades";
     const fila: Record<string, unknown> = d.rol === "productor"
       ? {
@@ -386,6 +459,8 @@ Deno.serve(async (req) => {
         nif: d.nif,
         direccion: d.domicili,
         codigo_postal: d.codiPostal,
+        organizacion_id: organitzacioId,
+        comentario: nota,
         // es_test = false: una organización que se registra sola NO recibe envíos
         // mientras el modo test esté activo (§8). Lo marca el equipo si toca.
         es_test: false,
@@ -400,6 +475,8 @@ Deno.serve(async (req) => {
         direccion: d.domicili,
         codigo_postal: d.codiPostal,
         tipo_receptor: d.tipoReceptor,
+        organizacion_id: organitzacioId,
+        comentarios: nota,
         // opt_in = false: el consentimiento de WhatsApp se recoge aparte (§12.3).
         opt_in: false,
         es_test: false,
@@ -412,6 +489,7 @@ Deno.serve(async (req) => {
       .from(taula).insert(fila).select("id").single();
 
     if (errFitxa || !fitxa) {
+      await esborrarOrganitzacio(supabase, organitzacioId);
       await esborrarUsuari(supabase, userId);
       if (errFitxa?.code === "23505") {
         const camp = /phone/i.test(errFitxa.message ?? "") ? "telefon" : "email";
@@ -426,7 +504,7 @@ Deno.serve(async (req) => {
     fitxaId = fitxa.id as string;
 
     // -----------------------------------------------------------------------
-    // 3. Membresía PENDIENTE. Es la pieza que da (o no da) acceso.
+    // 4. Membresía PENDIENTE. Es la pieza que da (o no da) acceso.
     // -----------------------------------------------------------------------
     const { error: errMembresia } = await supabase.from("membresias").insert({
       user_id: userId,
@@ -442,18 +520,33 @@ Deno.serve(async (req) => {
 
     if (errMembresia) {
       await supabase.from(taula).delete().eq("id", fitxaId);
+      await esborrarOrganitzacio(supabase, organitzacioId);
       await esborrarUsuari(supabase, userId);
       console.error("[registro] insert membresia:", errMembresia.message);
       return responder({ error: "No s'ha pogut completar el registre", code: "error_intern" }, 500);
     }
 
     // -----------------------------------------------------------------------
-    // 4. El convenio en borrador y su enlace de firma (§3.2.4). Fuera del camino
+    // 5. El convenio en borrador y su enlace de firma (§3.2.4). Fuera del camino
     //    de compensación: si falla, el alta sigue siendo válida (ver cabecera).
     // -----------------------------------------------------------------------
     const conveni = await prepararConveni(supabase, d, fitxaId);
 
-    return responder({ ok: true, conveni }, 200);
+    // `revisio_equip` solo dice que el alta necesita una mirada antes de activarse; NO
+    // dice con qué organización ha coincidido ni qué papeles tiene. Que exista una ficha
+    // con ese correo ya lo revela el 409 de arriba (enumeración aceptada a propósito,
+    // §9); describir la otra ficha sería contar algo que quien registra no ha probado ser.
+    return responder({
+      ok: true,
+      conveni,
+      revisio_equip: decisio.cas === "paper_nou",
+      ...(decisio.cas === "paper_nou"
+        ? {
+          missatge:
+            "Ja tenim dades d'aquesta organitzacio. L'equip revisara la sol·licitud abans d'activar l'acces.",
+        }
+        : {}),
+    }, 200);
   } catch (err) {
     // Cualquier cosa no prevista: se intenta dejar la base como estaba, en orden
     // inverso al de creación. Si la compensación también falla queda en el log con
@@ -463,10 +556,23 @@ Deno.serve(async (req) => {
       const { error } = await supabase.from(taula).delete().eq("id", fitxaId);
       if (error) console.error("[registro] residuo ficha:", taula, fitxaId, error.message);
     }
+    if (supabase) await esborrarOrganitzacio(supabase, organitzacioId);
     if (supabase && userId) await esborrarUsuari(supabase, userId);
     return responder({ error: "Error intern", code: "error_intern" }, 500);
   }
 });
+
+/**
+ * Compensación: borra la organización recién creada. Nunca lanza, y **solo puede borrar la
+ * que acaba de crear esta petición**: si la ficha no llegó a existir, la fila de
+ * `organizaciones` no la referencia nadie. No se llama nunca con la organización de una
+ * coincidencia, porque en el caso «papel nuevo» esta función no crea ninguna.
+ */
+async function esborrarOrganitzacio(supabase: Cliente, id: string | null): Promise<void> {
+  if (!id) return;
+  const { error } = await supabase.from("organizaciones").delete().eq("id", id);
+  if (error) console.error("[registro] residuo organizacion:", id, error.message);
+}
 
 /** Compensación: borra la cuenta de Auth recién creada. Nunca lanza. */
 async function esborrarUsuari(supabase: Cliente, userId: string): Promise<void> {
@@ -476,6 +582,113 @@ async function esborrarUsuari(supabase: Cliente, userId: string): Promise<void> 
   }
 }
 
+
+// ---------------------------------------------------------------------------
+// ¿Esta organización ya existe? (etapa 2 de la brecha 2, deuda §12.28)
+// ---------------------------------------------------------------------------
+// Lo que se consulta son LAS FICHAS, y después la vista. No al revés, y no es un detalle:
+// `v_organizaciones` expone un solo correo y un solo teléfono por organización (el de la
+// ficha de productor cuando hay las dos, por el `coalesce`), así que filtrar la vista por
+// correo dejaría invisible el correo de la otra ficha — y ese es justo el caso que esto
+// viene a cazar. Las fichas dicen QUIÉN casa; `v_organizaciones` dice QUÉ PAPELES tiene ya
+// la organización de quien ha casado, que es lo que separa el caso 2 del caso 3.
+//
+// Cuatro consultas —correo y teléfono, en las dos tablas— en paralelo: son cuatro idas y
+// vueltas que cuestan lo que la más lenta, y evitan tener que escapar valores dentro de un
+// `or=(…)` de PostgREST. Un correo válido puede llevar comas y paréntesis, que son
+// separadores de esa sintaxis; un `ilike` suelto no tiene ese problema.
+//
+// `limit(5)` en cada una: con más de cinco fichas casando por el mismo correo ya no hay
+// ninguna decisión automática que tomar, y la nota se leería sola.
+const MAX_COINCIDENCIES = 5;
+
+async function decidirCoincidencia(
+  supabase: Cliente,
+  d: Dades,
+  tipusRol: TipusFitxa,
+): Promise<Decisio> {
+  const nou9 = ultimes9(d.telefon);
+  const patro = nou9 ? patroTelefon(nou9) : null;
+  const buit = { data: [] as Record<string, unknown>[] };
+
+  const prod = () =>
+    supabase.from("productores").select("id, organizacion_id, name, empresa, email, phone");
+  const ent = () =>
+    supabase.from("entidades").select("id, organizacion_id, nombre, email, telefono");
+
+  const [pEmail, pTel, eEmail, eTel] = await Promise.all([
+    prod().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
+    patro ? prod().filter("phone", "match", patro).limit(MAX_COINCIDENCIES) : buit,
+    ent().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
+    patro ? ent().filter("telefono", "match", patro).limit(MAX_COINCIDENCIES) : buit,
+  ]);
+
+  // Se vuelve a comprobar en memoria lo que devolvió la consulta. El `ilike` con los
+  // comodines escapados ya es igualdad, pero el `match` del teléfono es un filtro grueso
+  // sobre texto libre: lo que decide es `mateixTelefon`, con las últimas 9 cifras, que es
+  // el mismo criterio con el que la migración de la etapa 1 enganchó los cuatro pares.
+  const fitxes = new Map<string, FitxaCoincident>();
+  const afegir = (
+    tipus: TipusFitxa,
+    fila: Record<string, unknown>,
+    per: MotiuCoincidencia,
+  ) => {
+    const id = fila.id as string;
+    const clau = `${tipus}:${id}`;
+    const previa = fitxes.get(clau);
+    if (previa) {
+      if (!previa.per.includes(per)) previa.per.push(per);
+      return;
+    }
+    const nom = tipus === "productor"
+      ? ((fila.empresa as string | null) || (fila.name as string | null))
+      : (fila.nombre as string | null);
+    fitxes.set(clau, {
+      tipus,
+      id,
+      organitzacio: (fila.organizacion_id as string | null) ?? null,
+      nom: nom ?? null,
+      per: [per],
+    });
+  };
+
+  for (const f of (pEmail.data ?? [])) {
+    if (mateixEmail(f.email as string, d.email)) afegir("productor", f, "email");
+  }
+  for (const f of (pTel.data ?? [])) {
+    if (mateixTelefon(f.phone as string, d.telefon)) afegir("productor", f, "telefon");
+  }
+  for (const f of (eEmail.data ?? [])) {
+    if (mateixEmail(f.email as string, d.email)) afegir("entidad", f, "email");
+  }
+  for (const f of (eTel.data ?? [])) {
+    if (mateixTelefon(f.telefono as string, d.telefon)) afegir("entidad", f, "telefon");
+  }
+
+  const llista = [...fitxes.values()];
+  if (llista.length === 0) return decidir(tipusRol, [], []);
+
+  const ids = [...new Set(llista.map((f) => f.organitzacio).filter((x): x is string => !!x))];
+  let orgs: OrgCoincident[] = [];
+  if (ids.length > 0) {
+    const { data, error } = await supabase
+      .from("v_organizaciones")
+      .select("id, nombre, es_generadora, es_receptora")
+      .in("id", ids);
+    if (error) {
+      // Sin la vista no se puede afirmar que el papel esté libre. Fail-safe hacia el lado
+      // que NO crea nada nuevo: se trata como duplicado y lo mira una persona. Lo caro
+      // aquí no es rechazar un alta legítima —el equipo la recupera— sino dar por nueva
+      // una organización que ya está.
+      console.error("[registro] v_organizaciones:", error.code, error.message);
+      const fitxa = llista[0];
+      return { cas: "duplicat", camp: fitxa.per.includes("email") ? "email" : "telefon", fitxa };
+    }
+    orgs = (data ?? []) as OrgCoincident[];
+  }
+
+  return decidir(tipusRol, llista, orgs);
+}
 
 // ---------------------------------------------------------------------------
 // El convenio dentro del alta (fase 2, §3.2.4 «Dentro del registro»)
