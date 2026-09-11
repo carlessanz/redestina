@@ -288,7 +288,15 @@ export interface Documento {
   bytes: number | null
   paginas: number | null
   estado: DocumentoEstado
+  /** Generaciones que fallaron Y lo reportaron (lo sube `marcar_documento_error`) */
   intentos: number
+  /**
+   * Veces que el job de reintento lo ha encolado, conteste el generador o no.
+   * ⚠️ `estado === 'error' && intentos === 0` es la firma de «nadie contestó»: la función
+   * murió sin reportar, típicamente cortada por el límite de CPU del runtime. Es la única
+   * forma de distinguir ese caso de un error normal, y no hace falta ningún marcador.
+   */
+  reencolados: number
   ultimo_error: string | null
   envio: Record<string, unknown> | null
   vigente: boolean

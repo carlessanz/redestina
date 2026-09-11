@@ -45,7 +45,7 @@ import {
 type Fila = Pick<
   Documento,
   | 'id' | 'tipo' | 'subtipo' | 'numero_completo' | 'version' | 'serie' | 'ejercicio'
-  | 'modo' | 'idioma' | 'estado' | 'ultimo_error' | 'paginas' | 'emitido_at' | 'vigente'
+  | 'modo' | 'idioma' | 'estado' | 'intentos' | 'ultimo_error' | 'paginas' | 'emitido_at' | 'vigente'
 >
 
 /** Cada estado con su color de token. El error es rojo; el coral no significa fallo. */
@@ -59,6 +59,22 @@ const CLAU_ESTAT: Record<DocumentoEstado, string> = {
   emitido: 'doc.st_emitido',
   pendiente_fichero: 'doc.st_pendent',
   error: 'doc.st_error',
+}
+
+/**
+ * ¿Este error lo reportó la función, o murió sin decir nada?
+ *
+ * `marcar_documento_error()` SIEMPRE sube `intentos`, así que un error con `intentos = 0`
+ * solo puede venir del job dándolo por perdido tras cinco silencios — y el silencio
+ * típico es que el runtime cortara la generación por pasarse de CPU. No hace falta
+ * ningún marcador en la fila: la firma se deduce (§12.89).
+ *
+ * Importa distinguirlos porque la acción es distinta: un error reportado se lee en
+ * `ultimo_error` y suele ser un dato que falta; un silencio hay que ir a buscarlo a los
+ * logs de la función.
+ */
+function senseResposta(d: Fila): boolean {
+  return d.estado === 'error' && d.intentos === 0
 }
 
 function data(iso: string): string {
@@ -91,7 +107,7 @@ export default function Documents() {
     // la fila y deja de compilar (§7, deuda 46).
     const { data: files, error: errCarrega } = await supabase
       .from('documentos')
-      .select('id, tipo, subtipo, numero_completo, version, serie, ejercicio, modo, idioma, estado, ultimo_error, paginas, emitido_at, vigente')
+      .select('id, tipo, subtipo, numero_completo, version, serie, ejercicio, modo, idioma, estado, intentos, ultimo_error, paginas, emitido_at, vigente')
       .order('emitido_at', { ascending: false })
     return { files: (files as Fila[] | null) ?? [], errCarrega }
   }, [])
@@ -241,7 +257,9 @@ export default function Documents() {
                       className={ESTIL_ESTAT[d.estado]}
                       title={d.estado === 'error' ? (d.ultimo_error ?? undefined) : undefined}
                     >
-                      {t(esperant ? 'doc.st_generating' : CLAU_ESTAT[d.estado])}
+                      {t(esperant
+                        ? 'doc.st_generating'
+                        : senseResposta(d) ? 'doc.st_encallat' : CLAU_ESTAT[d.estado])}
                     </Badge>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">

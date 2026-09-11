@@ -52,6 +52,14 @@ const BUCKET = "documentos";
 const BUCKET_ACTIVOS = "activos";
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/$/, "");
 
+/**
+ * Umbral del aviso de render lento, en ms. Es el presupuesto del spike, no el límite: el
+ * runtime corta a los 2 s de CPU. Medido el 11-09-2026, un documento de 6 páginas tarda
+ * 174 ms en renderizar y gasta 390 ms de CPU en total (§12.87), así que esto no salta
+ * hoy; salta cuando algo empiece a acercarse, que es cuando todavía se puede arreglar.
+ */
+const MS_RENDER_AVIS = 800;
+
 interface FilaDocumento {
   id: string;
   tipo: string;
@@ -179,7 +187,7 @@ Deno.serve(async (req) => {
 
     // Desglose de CPU: el límite del runtime es 2 s por petición y el criterio de
     // salida del spike, 800 ms. Sin este log no hay forma de saber dónde se va.
-    console.log(JSON.stringify({
+    const traza = {
       fn: "generar-documento",
       documento: doc.id,
       tipo: doc.tipo,
@@ -191,7 +199,18 @@ Deno.serve(async (req) => {
       ms_subida: Number(msSubida.toFixed(1)),
       ms_total: Number((performance.now() - t0).toFixed(1)),
       activos_en_frio: msActivos > 1,
-    }));
+    };
+
+    // Por encima del presupuesto del spike, el mismo JSON pero en `warn`, para que se
+    // pueda filtrar por nivel sin leer 400 líneas. Es un aviso ANTICIPADO, no un fallo:
+    // el techo real son 2 s de CPU y esto salta a 800 ms de render. Existe porque el día
+    // que un documento se pase del techo no habrá log que mirar — el runtime mata el
+    // isolate a mitad y no se escribe nada (§12.87, §12.89).
+    if (traza.ms_render > MS_RENDER_AVIS) {
+      console.warn(JSON.stringify({ ...traza, avis: "render_lent", llindar: MS_RENDER_AVIS }));
+    } else {
+      console.log(JSON.stringify(traza));
+    }
 
     return json({
       ok: true,

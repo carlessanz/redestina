@@ -605,7 +605,7 @@ dominio nunca apunta al PDF, se le pregunta con `documento_vigente()`. Columnas:
 valores, de REC a PROVA) · `subtipo` · `objeto_tipo` (6) · `objeto_id` · `numero_completo` ·
 `version` · `serie` · `ejercicio` · **`modo`** (`real`/`prueba`) · `idioma` · `plantilla_id` ·
 `datos jsonb` · `sha256_datos` · `ruta` · `sha256_fichero` · `bytes` · `paginas` · `estado`
-(`pendiente_fichero`/`emitido`/`error`) · `intentos` · `ultimo_error` · `envio jsonb` ·
+(`pendiente_fichero`/`emitido`/`error`) · `intentos` · **`reencolados`** · `ultimo_error` · `envio jsonb` ·
 `vigente` · `sustituido_por` · `emitido_por` · `emitido_at` · `fichero_at`. Índices:
 `unique (numero_completo, version)`; único parcial `(objeto_tipo, objeto_id, tipo) where vigente`;
 `(objeto_tipo, objeto_id)`; parcial `(estado) where estado <> 'emitido'`.
@@ -743,6 +743,16 @@ el job, quien acaba de pulsar «Emet» mira cinco minutos una pantalla que dice 
 de 5 intentos es deliberado: lo que falla cinco veces (una plantilla rota, un parámetro que falta)
 no se arregla repitiendo. **Sin el secreto en `app_config`, los tres disparadores son no-op con
 `notice`**, que es lo que permite emitir documentos de prueba en local sin que nada salga a la red.
+
+⚠️ **Dos contadores, porque son dos fallos distintos** (`20270302100000`, §12.89). `intentos` son
+las generaciones que fallaron **y lo dijeron** (lo sube `marcar_documento_error()`); `reencolados`,
+las veces que el job lo intentó **conteste alguien o no**. El segundo existe porque un corte por CPU
+mata el isolate sin dejar que se reporte nada: con solo `intentos`, ese documento se quedaba en 0
+para siempre y el job lo reencolaba cada 5 minutos indefinidamente. Al agotarse cualquiera de los
+dos topes, el job **lo da por perdido**: lo pasa a `error` con el motivo escrito, y así el caso
+invisible entra por la misma puerta que ya existía —contador del menú, filtro y tooltip— sin
+inventar un estado nuevo. **`estado = 'error'` con `intentos = 0` es la firma de «nadie contestó»**,
+y la interfaz la deduce sin ningún marcador (badge «Encallat», `doc.st_encallat`).
 
 **GRANT**: `authenticated` tiene `SELECT` completo en `documentos`, `documento_envios`,
 `series_documentales`, `plantillas_documento` y `municipios`; `INSERT`/`UPDATE` (sin DELETE) en
@@ -2833,6 +2843,30 @@ Redestina en producción real quedan pasos de configuración y negocio.
     `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
     borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
     370 KB.
+89. ~~**Un corte por CPU no encendía ninguna luz, y además no paraba nunca.**~~ — **resuelto
+    (11-09-2026, `20270302100000_documentos_encallados.sql`)**. Al medir el CPU de verdad (§12.87)
+    se vio que el único fallo del que se hablaba era justo el único que el circuito no sabía
+    contar. Si el runtime corta la generación por pasarse de los 2 s, **mata el isolate a mitad**:
+    no hay excepción que capturar, el `catch` de `generar-documento` no llega a llamar a
+    `marcar_documento_error()` y la fila se queda en `pendiente_fichero` con `ultimo_error` NULL.
+    Dos consecuencias, las dos encontradas leyendo el código con la medición delante, no probando:
+    **(1)** el contador del menú y el filtro de la bandeja miran `estado = 'error'`, así que ese
+    documento desaparecía en silencio —quien lo emitió veía «no s'ha pogut generar» a los 30 s de
+    polling y el equipo no veía nada—; **(2)** el tope de `intentos < 5` del job **no lo acotaba**,
+    porque `intentos` solo sube cuando la función reporta: se quedaba en 0 y el job reencolaba
+    cada 5 minutos para siempre, 288 llamadas al día muriendo igual. El comentario de
+    `20260928100700` daba ese caso por cubierto y no lo estaba.
+    Arreglo: `documentos.reencolados` cuenta los intentos del job **contesten o no**, y al agotar
+    cualquiera de los dos topes el job marca `error` con el motivo escrito (§4, «Jobs»). Verificado
+    en local: cinco pasadas suben el contador, la sexta da el documento por perdido y la séptima ya
+    no lo toca; un error reportado de verdad conserva su mensaje y sigue reintentándose.
+    `generar-documento` emite además `console.warn` con `avis: "render_lent"` por encima de 800 ms
+    de `ms_render` — un aviso **anticipado**, porque el día que se pase del techo real no habrá log
+    que mirar.
+    ⚠️ Lo que **no** cubre: si el corte pasa con el tope ya agotado por otra causa, el motivo que
+    se conserva es el primero (el `coalesce` no pisa un `ultimo_error` que ya existía). Y el umbral
+    de 800 ms es el presupuesto del spike, no el límite: entre ese aviso y la muerte real hay
+    margen, que es justo para lo que sirve.
 
 ## 13. Al terminar cualquier cambio
 

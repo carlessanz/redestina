@@ -291,6 +291,9 @@ const ca: Dict = {
   'doc.c_version': 'Versió', 'doc.c_mode': 'Mode', 'doc.c_status': 'Estat',
   'doc.c_date': 'Data', 'doc.c_actions': 'Accions',
   'doc.st_emitido': 'Emès', 'doc.st_pendent': 'Pendent de PDF', 'doc.st_error': 'Error',
+  // «Encallat» i «Error» no són el mateix: l'error el va reportar la funció i es llegeix
+  // al tooltip; l'encallat és silenci, i s'ha d'anar a buscar als logs (§12.89).
+  'doc.st_encallat': 'Encallat',
   'doc.st_generating': 'Generant…',
   'doc.mode_real': 'Real', 'doc.mode_test': 'Prova',
   'doc.sub_emes': 'Emès', 'doc.sub_conciliat': 'Conciliat', 'doc.sub_firmat': 'Signat',
@@ -1124,6 +1127,7 @@ const es: Dict = {
   'doc.c_version': 'Versión', 'doc.c_mode': 'Modo', 'doc.c_status': 'Estado',
   'doc.c_date': 'Fecha', 'doc.c_actions': 'Acciones',
   'doc.st_emitido': 'Emitido', 'doc.st_pendent': 'Pendiente de PDF', 'doc.st_error': 'Error',
+  'doc.st_encallat': 'Encallado',
   'doc.st_generating': 'Generando…',
   'doc.mode_real': 'Real', 'doc.mode_test': 'Prueba',
   'doc.sub_emes': 'Emitido', 'doc.sub_conciliat': 'Conciliado', 'doc.sub_firmat': 'Firmado',
