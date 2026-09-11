@@ -2297,6 +2297,33 @@ deno run -A scripts/set-config.ts documentos_secret '<valor>'   # app_config
 supabase secrets set DOCUMENTOS_SECRET='<el mismo valor>'       # secreto de la función
 ```
 
+Logs de las Edge Functions **en remoto**. ⚠️ Este CLI **no tiene `functions logs`** (`supabase
+functions` solo trae list/delete/download/deploy/new/serve), así que durante un tiempo se dio por
+hecho que había que abrir el panel. No hace falta: el **Management API de analítica** los sirve por
+SQL, con el mismo token del keychain que se usa para Auth (§9).
+
+```bash
+TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+SQL="select timestamp, event_message from function_logs order by timestamp desc limit 20"
+curl -sS -G "https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/analytics/endpoints/logs.all" \
+  -H "Authorization: Bearer $TOKEN" --data-urlencode "sql=$SQL"
+```
+
+`function_logs` son los `console.*` de las funciones (ahí sale el JSON de tiempos de
+`generar-documento`, §12.87) y `edge_logs` las peticiones HTTP. El `cpu_time_used` y la memoria de
+cada isolate viven en el evento `shutdown`, dentro de `metadata`, y hay que desplegarlo:
+
+```bash
+SQL="select f.timestamp, m.cpu_time_used, m.reason from function_logs f
+     cross join unnest(f.metadata) as m
+     where f.event_message = 'shutdown' order by f.timestamp desc limit 3"
+```
+
+⚠️ La ventana por defecto es **corta** (minutos, no horas): una consulta sin filtro de tiempo
+devuelve solo lo más reciente, así que si buscas una ejecución concreta conviene provocarla y
+consultar acto seguido. Y un `unnest` mal escrito responde `Backend error! Retry your query`, que
+**no** es un fallo transitorio: es la consulta.
+
 Emergencia de RLS (§4bis), por orden: primero el interruptor,
 
 ```bash
@@ -2765,15 +2792,17 @@ Redestina en producción real quedan pasos de configuración y negocio.
 86. **No hay rectificativo del CT.** El CD lo tiene porque el modelo 182 lo exige; el certificado de
     transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
 
-87. **El CPU real de `generar-documento` sigue sin medirse con precisión, pero hay margen de
-    sobra.** Tras publicar (11-09-2026) la función genera en producción el documento de 6 páginas y
-    123 KB, con la huella cuadrando y **sin que el runtime la corte** —si excediera los 2 s de CPU,
-    la cortaría—. La cifra exacta no se pudo leer: **este CLI de Supabase no tiene `functions
-    logs`**. Lo que sí acota el problema es comparar los dos round-trips del mismo documento:
-    **324 ms en local** (incluida la subida a Storage) frente a **1.582-1.875 ms en remoto**. Esa
-    diferencia de ~1,3 s es red y Storage remoto, no trabajo de CPU —el render es el mismo código
-    sobre los mismos datos—, así que el CPU se queda muy por debajo del techo. Para la cifra exacta
-    hace falta el panel de Supabase o el Management API de logs.
+87. ~~**El CPU real de `generar-documento` sigue sin medirse con precisión.**~~ — **medido
+    (11-09-2026)**, y el criterio de salida del spike queda cerrado con holgura. Documento de
+    6 páginas y 123.614 bytes en producción: **`ms_render` 174,3 ms** (presupuesto del spike:
+    800 ms), `ms_activos` 1 ms con los activos ya en caliente, `ms_subida` 107,8 ms y `ms_total`
+    462,6 ms. El propio runtime declara **`cpu_time_used` 72 ms** en su evento `shutdown` y 22 MB
+    de memoria: un 3,6 % del techo de 2 s de CPU y un 8,7 % de los 256 MB.
+    ⚠️ **`ms_render` es reloj de pared y `cpu_time_used` es CPU**, y por eso el segundo sale más
+    bajo que el primero: no son la misma magnitud y el límite del runtime aplica al segundo.
+    Lo que impedía leerlo era creer que hacía falta el panel: **este CLI no tiene `functions
+    logs`, pero el Management API sí sirve los logs de consola** (§11), y desde ahí se lee el
+    JSON entero sin salir de la terminal.
 88. **Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**
     `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
     borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
