@@ -134,6 +134,13 @@ tampoco prueba nada** (deuda §12.44): una función sin cambios puede volver a e
   `const` de módulo evaluados al cargar, y un isolate caliente no ve el secreto nuevo.
 - En la duda, redesplegarlas todas: es idempotente y no cuesta nada.
 
+**Antes de desplegar, guarda las huellas** para poder saber después qué cambió de verdad
+(deuda §12.44 — la salida del CLI no sirve):
+
+```bash
+deno run -A scripts/huellas-funciones.ts guardar
+```
+
 **Las catorce, cada una con su flag** (el flag tiene que coincidir con lo que declara
 `config.toml`, que es quien manda):
 
@@ -153,6 +160,16 @@ supabase functions deploy recordatorios-documentales --no-verify-jwt # lo llama 
 supabase functions deploy enlace-publico --no-verify-jwt             # confirmación y firma públicas
 supabase functions deploy subir-documento-externo                    # verify_jwt
 ```
+
+Al terminar, **qué cambió de verdad**:
+
+```bash
+deno run -A scripts/huellas-funciones.ts comparar
+```
+
+Compara el `ezbr_sha256` de cada bundle con el de antes del despliegue. Es la única señal
+fiable: `No change found` solo concluye cuando aparece, y su ausencia no prueba nada.
+⚠️ Dice si el bundle **cambió entre dos momentos**, no si coincide con el código del repo.
 
 Luego comprueba que las catorce quedaron `ACTIVE` y con el `verify_jwt` que toca:
 
