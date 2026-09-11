@@ -141,7 +141,7 @@ tampoco prueba nada** (deuda §12.44): una función sin cambios puede volver a e
 deno run -A scripts/huellas-funciones.ts guardar
 ```
 
-**Las catorce, cada una con su flag** (el flag tiene que coincidir con lo que declara
+**Las quince, cada una con su flag** (el flag tiene que coincidir con lo que declara
 `config.toml`, que es quien manda):
 
 ```bash
@@ -159,6 +159,7 @@ supabase functions deploy descargar-documento                        # verify_jw
 supabase functions deploy recordatorios-documentales --no-verify-jwt # lo llama pg_cron
 supabase functions deploy enlace-publico --no-verify-jwt             # confirmación y firma públicas
 supabase functions deploy subir-documento-externo                    # verify_jwt
+supabase functions deploy limpiar-documentos-prueba                  # verify_jwt (super_admin)
 ```
 
 Al terminar, **qué cambió de verdad**:
@@ -171,14 +172,14 @@ Compara el `ezbr_sha256` de cada bundle con el de antes del despliegue. Es la ú
 fiable: `No change found` solo concluye cuando aparece, y su ausencia no prueba nada.
 ⚠️ Dice si el bundle **cambió entre dos momentos**, no si coincide con el código del repo.
 
-Luego comprueba que las catorce quedaron `ACTIVE` y con el `verify_jwt` que toca:
+Luego comprueba que las quince quedaron `ACTIVE` y con el `verify_jwt` que toca:
 
 ```bash
 supabase functions list
 ```
 
 `true` en `whatsapp-send`, `priorizar-entidades`, `enviar-email`, `crear-oferta`, `enviar-acceso`,
-`descargar-documento` y `subir-documento-externo`; `false` en `whatsapp-webhook`,
+`descargar-documento`, `subir-documento-externo` y `limpiar-documentos-prueba`; `false` en `whatsapp-webhook`,
 `intake-recordatorios`, `recuperar-password`, `registro`, `generar-documento`,
 `recordatorios-documentales` y `enlace-publico`.
 
@@ -257,8 +258,8 @@ deno run -A scripts/comprobar-rls.ts
 ```
 
 **La referencia vigente está en `AGENTS.md §13`, no aquí** — este fichero se quedó desfasado una
-vez y dio por buena una cifra de antes del sistema documental. Hoy en remoto son **329/329
-correctas y 46 saltadas**, terminando en «Sin fallos de permisos» y con código de salida 0.
+vez y dio por buena una cifra de antes del sistema documental. Hoy en remoto son **408/408
+correctas y 52 saltadas**, terminando en «Sin fallos de permisos» y con código de salida 0.
 
 Las **saltadas son normales**: producción no tiene —ni debe tener— el fixture de
 `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o

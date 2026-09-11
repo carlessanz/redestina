@@ -3246,8 +3246,10 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, fijada tras publicar el sistema documental (11-09-2026):
-   **329/329 correctas y 46 saltadas**, «Sin fallos de permisos», exit 0. Las 46 saltadas son
+   Referencia en **remoto**, fijada tras publicar el saneamiento (11-09-2026):
+   **408/408 correctas y 52 saltadas**, «Sin fallos de permisos», exit 0. (Era 329/329 + 46 antes
+   del certificado a demanda, la RLS sin correlación y los cuatro checks que vigilan que
+   `cierre_base` solo la lea el equipo.) Las 46 saltadas son
    normales: producción no tiene —ni debe tener— el fixture de
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
