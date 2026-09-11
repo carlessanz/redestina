@@ -2436,7 +2436,13 @@ Redestina en producción real quedan pasos de configuración y negocio.
     con ambigüedades reales: hay nombres de municipio repetidos entre provincias). Hasta entonces
     la columna es nula en las 12 ubicaciones y la priorización sigue comparando cadenas.
 
-**Deuda técnica:**
+**Deuda técnica.** ⚠️ **Léase con la clave de §12bis.** No todo lo que hay en esta lista es
+arreglable, y confundirlo hace que la lista entera se vuelva ruido: se lee, se comprueba que no se
+puede hacer nada con la mitad, y se aprende a ignorarla. §12bis separa **lo que es un defecto** de
+**lo que es una decisión con su precio anotado** y de **lo que depende de material que no está en
+el código**. Los números **no se renumeran nunca**: hay comentarios en `src/`, `supabase/functions/`
+y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silencio.
+
 
 1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*. Ya hay **430 pruebas de
    Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
@@ -2936,6 +2942,49 @@ Redestina en producción real quedan pasos de configuración y negocio.
     se conserva es el primero (el `coalesce` no pisa un `ultimo_error` que ya existía). Y el umbral
     de 800 ms es el presupuesto del spike, no el límite: entre ese aviso y la muerte real hay
     margen, que es justo para lo que sirve.
+
+## 12bis. Decisiones con precio conocido, y lo que espera a otro
+
+Índice de las entradas de §12 que **no son defectos pendientes**. Se quedan donde están —con su
+número, que el código cita— pero conviene saber qué se está mirando antes de intentar arreglarlas.
+
+### Decisiones deliberadas: se tomaron sabiendo lo que costaban
+
+| # | La decisión | El precio que se aceptó |
+|---|---|---|
+| 10 | No editar migraciones ya aplicadas | Hay `truncate` mezclado con DDL en el histórico. Editarlas está prohibido (§7) |
+| 12 | No reponderar `prioritat` | 97 de 111 entidades son prioridad 1: aporta poco al ranking, y arreglarlo es trabajo de negocio |
+| 24 | Replica identity por defecto | Los DELETE de Realtime se reparten sin evaluar RLS. Hoy el payload es solo un id |
+| 26 | Sin captcha en el registro | Turnstile es un servicio externo y §7 lo prohíbe. Lo que frena un abuso masivo es el tope durable, no el límite por IP |
+| 34 | Áreas táctiles de 36 px salvo en cuatro sitios | Subirlas todas es rediseñar la aplicación entera para ganar 8 px en botones secundarios |
+| 37 | El aviso de instalación se prueba con un evento sintético | `beforeinstallprompt` no lo dispara ningún navegador de escritorio. La instalación real solo se comprueba en un móvil |
+| 54 | El fail-open de `roles_activos` | Con el interruptor apagado dos checks del arnés salen en rojo. Es el fail-open de §4bis, no una regresión |
+| 63 | Las herramientas locales asumen un operador | Un `functions serve` por vez, y el arnés borra los documentos de prueba de quien sea |
+| 66 | «Amb discrepància» es un filtro, no un veredicto | El veredicto real exigiría una llamada por fila |
+| 67 | Rectificar solo corrige `kg_neto` | Es lo que se rectifica en la práctica; lo demás sería un segundo editor dentro de un diálogo |
+| 70 | Los kilos por línea del cierre son derivados | D13 manda certificar el neto del REC; las líneas tienen que ser por canalización. **El total del donante es exacto** |
+| 76 | La filigrana no se puede comprobar con un `grep` | `pdftotext` la trocea porque va girada 45° |
+| 80 | El DNI del firmante fuera de `documentos.datos` | `sha256_datos` no lo cubre; lo prueba la fila de `evidencias` |
+| 81 | `sense_conveni` replica la resta, no la regla | Evita 111 llamadas por oferta. La autoridad sigue siendo la RPC |
+| 82 | Regla de trabajo, no deuda | Un agente no hace `git checkout` de un fichero compartido |
+| 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
+| 86 | No hay rectificativo del CT | El CD lo tiene porque el 182 lo exige; el CT no entra en ese ciclo |
+
+### Espera material de la fase 0 o de un tercero
+
+| # | Qué falta | De quién depende |
+|---|---|---|
+| 15 · 17 | Plantillas aprobadas y el paso a producción de Meta | **Meta** |
+| 71 · 77 · 84 | Los textos legales de RES, CD, CT, PLA y los seis convenios | **La asesoría** |
+| 85 | Prueba end-to-end del CT | Bloqueada por `datos_provisionales`, que es la barrera funcionando |
+
+### Son interruptores de producción, no código
+
+| # | Qué |
+|---|---|
+| 4 | `disponible_hasta` cuando el texto no es fechable: lo normaliza el panel |
+| 30 | `VITE_ACCESSOS_TEST` — apagarlo es decisión de negocio |
+| 72 | `abrir_cierre` no se prueba como «permitir» porque dejaría una cabecera sin forma de borrarla |
 
 ## 13. Al terminar cualquier cambio
 
