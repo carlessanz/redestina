@@ -11,6 +11,7 @@ import { assegurarContacte } from '../../lib/contactes'
 import { ENTIDAD_CAMPOS, PRODUCTOR_CAMPOS } from '../../lib/crudCampos'
 import RecordDetail from '../../components/RecordDetail'
 import BadgeConveni from '../../components/BadgeConveni'
+import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 
 type Registre = Record<string, unknown> & { id: string }
 
@@ -56,13 +57,18 @@ export default function FitxaRegistre({ tabla }: Props) {
       onBack={() => navigate(llista)}
       onSaved={() => navigate(llista)}
       avisos={(
-        // El estado del convenio y, si no hay ninguno vigente, la nota heredada del Excel
-        // marcada como lo que es: papel histórico que NO habilita a operar.
-        <BadgeConveni
-          tipusOrg={esProductor ? 'productor' : 'entidad'}
-          orgId={id ?? null}
-          conveniPaper={(registre?.[esProductor ? 'conveni' : 'estat'] as string | null) ?? null}
-        />
+        <>
+          {/* El estado del convenio y, si no hay ninguno vigente, la nota heredada del Excel
+              marcada como lo que es: papel histórico que NO habilita a operar. */}
+          <BadgeConveni
+            tipusOrg={esProductor ? 'productor' : 'entidad'}
+            orgId={id ?? null}
+            conveniPaper={(registre?.[esProductor ? 'conveni' : 'estat'] as string | null) ?? null}
+          />
+          {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
+              aquí, semanas después, y no solo en la cola de registros pendientes. */}
+          <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null} />
+        </>
       )}
       onSendMessage={(phone, name) => {
         void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))

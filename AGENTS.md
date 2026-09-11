@@ -422,6 +422,8 @@ src/
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
+    EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
+                               Solo del equipo: lee la otra tabla de fichas (§12.28)
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
@@ -2868,9 +2870,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     mueve la ficha y sus convenios a la organización buena y retira la que se queda vacía.
     ⚠️ **Lo que NO decide la máquina**: si las dos organizaciones traen convenio vigente del mismo
     tipo, se niega y pide resolver uno antes — juntar dos acuerdos firmados no es un efecto
-    colateral de un clic. Y el deshacer existe (`organitzacio` NULL separa la ficha en una
-    organización nueva) pero **hoy solo se alcanza por SQL**: la pantalla enlaza, no desenlaza, y
-    lo avisa antes de hacerlo.
+    colateral de un clic.
+    **El deshacer tiene botón** (`EnllacOrganitzacio`, 11-09-2026): donde una ficha comparte
+    organización se ofrece separarla, y eso llama a la misma RPC con `organitzacio` NULL. Va en
+    **dos** sitios y por motivos distintos: en Aprovacions, porque es donde se acaba de enlazar; y
+    en la **ficha del equipo**, porque un enlace equivocado se descubre semanas después, cuando ese
+    registro hace mucho que no está en ninguna cola. Donde la ficha está sola en su organización no
+    se pinta nada: no hay nada que separar.
 29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
     `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
     derivada `rebutjada`; los dos listados la pintan en rojo.

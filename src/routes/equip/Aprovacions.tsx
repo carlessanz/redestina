@@ -36,6 +36,7 @@ import { useAppContext } from '../../hooks/useAppContext'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
 import type { Convenio, Membresia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -370,6 +371,17 @@ export default function Aprovacions() {
                     {!esProductor && !tipusReceptor && (
                       <div className="text-xs text-destructive">{t('appr.reg_no_tr')}</div>
                     )}
+                    {/* Si ya comparte organización, lo que toca ofrecer es el deshacer. Va
+                        antes que las candidatas porque después de enlazar es lo único que
+                        queda: la candidata desaparece de la lista en cuanto son la misma. */}
+                    <div className="mt-2 empty:mt-0">
+                      <EnllacOrganitzacio
+                        tipus={r.tipo}
+                        fitxa={fitxa?.id ?? null}
+                        potAprovar={potAprovar}
+                        onCanviat={() => void carregaRegistres()}
+                      />
+                    </div>
                     {(candidats[r.id] ?? []).length > 0 && (
                       <div className="mt-2 rounded-md bg-aviso-fondo p-2 text-xs text-aviso">
                         <div className="font-medium">{t('appr.link_found')}</div>

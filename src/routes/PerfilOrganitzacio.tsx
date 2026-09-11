@@ -105,6 +105,17 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const correu = String(fila?.email ?? '').trim()
   const descripcio = OPCIONS.find((o) => o.valor === canal)?.descKey ?? 'perf.channel_auto_desc'
 
+  // ⚠️ La dependencia del efecto es el **id**, no el objeto, y no es cosmética.
+  // `useOrganitzacio()` saca ese objeto de `ctx.organitzacions`, que `useAppContext` rehace
+  // ENTERO cada vez que recarga —y recarga con cada `SIGNED_IN`, que supabase-js reemite más
+  // de una vez; §6ter ya documenta un fallo anterior por lo mismo—. Con el objeto como
+  // dependencia, ese evento reejecuta este efecto y devuelve el formulario a lo guardado: lo
+  // tecleado y el canal elegido desaparecen **sin decir nada**. Con el id, un contexto nuevo
+  // que apunta a la misma organización no toca nada.
+  // Observado una vez en producción (el canal volvió solo a «auto») y NO reproducible a
+  // voluntad: esto no cierra esa observación, quita la fragilidad que la explicaría.
+  const idOrganitzacio = organitzacio?.id ?? null
+
   useEffect(() => {
     // Volver a «cargando» y soltar la fila anterior es lo que impide enseñar —y guardar—
     // los datos de una organización con los campos de la otra.
@@ -112,10 +123,10 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     setFila(null)
     setCanal('auto')
     setCanalDesat('auto')
-    if (!organitzacio) { setCarregant(false); return }
+    if (!idOrganitzacio) { setCarregant(false); return }
     let viu = true
     void (async () => {
-      const { data } = await supabase.from(tabla).select('*').eq('id', organitzacio.id).maybeSingle()
+      const { data } = await supabase.from(tabla).select('*').eq('id', idOrganitzacio).maybeSingle()
       if (!viu) return
       const f = (data as Fila) ?? null
       setFila(f)
@@ -139,7 +150,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [organitzacio, tabla])
+  }, [idOrganitzacio, tabla])
 
   async function desa() {
     if (!organitzacio || !fila) return
