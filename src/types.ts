@@ -45,6 +45,16 @@ export interface WaMessage {
   type: string | null
   body: string | null
   status: string | null
+  /**
+   * La respuesta cruda de Meta. En un saliente rechazado, `registrarFallo()` deja aquí el
+   * error de la Graph API — el código y el mensaje que explican POR QUÉ no se entregó.
+   *
+   * Estaba sin modelar (deuda §12.9) y la consecuencia no era cosmética: **el panel tenía el
+   * dato y no lo podía enseñar**, así que un envío fallido decía «NO ENVIAT» sin decir si era
+   * un token caducado (190), un número fuera de la lista de prueba (131030) o la ventana de
+   * 24 h cerrada (131047) — tres cosas con tres arreglos distintos (§8ter).
+   */
+  raw: Record<string, unknown> | null
   created_at: string
 }
 

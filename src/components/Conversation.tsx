@@ -56,11 +56,37 @@ function formatTime(iso: string): string {
   return `${date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} ${time}`
 }
 
+/**
+ * Cuántos mensajes se traen de golpe. No es un número mágico: es «lo que cabe en pantalla
+ * con margen», y lo que evita que abrir un contacto con meses de conversación descargue el
+ * hilo entero para enseñar los últimos diez (deuda §12.6).
+ */
+const PAGINA = 50
+
+/**
+ * El error de Meta que hay dentro de `wa_messages.raw`, en una línea legible.
+ *
+ * La Graph API lo devuelve como `{ error: { code, message, error_subcode } }`. Se enseña el
+ * código porque es lo que distingue las tres causas que desde el panel se ven iguales: 190
+ * es un token caducado, 131030 un destinatario fuera de los verificados y 131047 la ventana
+ * de 24 h cerrada (§8ter). Sin él, «no se ha enviado» no dice qué arreglar.
+ */
+function motiuMeta(m: WaMessage): string | null {
+  const err = (m.raw as { error?: { code?: unknown; message?: unknown } } | null)?.error
+  if (!err) return null
+  const codi = err.code != null ? `[${String(err.code)}] ` : ''
+  const text = typeof err.message === 'string' ? err.message : ''
+  const linia = `${codi}${text}`.trim()
+  return linia === '' ? null : linia
+}
+
 export default function Conversation({ contact, onBack, onDeleted }: Props) {
   const { t } = useT()
   const [messages, setMessages] = useState<WaMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
+  const [hiHaMes, setHiHaMes] = useState(false)
+  const [carregantMes, setCarregantMes] = useState(false)
   const [draft, setDraft] = useState('')
   const [sending, setSending] = useState(false)
   const [notice, setNotice] = useState<Notice | null>(null)
@@ -72,13 +98,21 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
     let cancelled = false
     setLoading(true)
     setLoadError(null)
+    // Se piden los ÚLTIMOS `PAGINA` y se le da la vuelta, en vez de traer el hilo entero
+    // (deuda §12.6). Un contacto con meses de conversación cargaba todo en cada apertura
+    // para enseñar los últimos diez mensajes.
     supabase.from('wa_messages')
-      .select('id, wa_message_id, contact_phone, direction, type, body, status, created_at')
-      .eq('contact_phone', contact.phone).order('created_at', { ascending: true })
+      .select('id, wa_message_id, contact_phone, direction, type, body, status, raw, created_at')
+      .eq('contact_phone', contact.phone).order('created_at', { ascending: false }).limit(PAGINA)
       .then(({ data, error }) => {
         if (cancelled) return
         if (error) setLoadError(error.message)
-        else setMessages((data as WaMessage[]) ?? [])
+        else {
+          const filas = ((data as WaMessage[]) ?? []).slice().reverse()
+          setMessages(filas)
+          // Si ha venido la página entera, es que probablemente hay más por detrás.
+          setHiHaMes(filas.length === PAGINA)
+        }
         setLoading(false)
       })
     const channel = supabase
@@ -93,7 +127,26 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
     return () => { cancelled = true; void supabase.removeChannel(channel) }
   }, [contact.phone])
 
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+  // ⚠️ El salto al fondo mira el ÚLTIMO mensaje, no el array entero: al cargar más hacia
+  // atrás el array cambia pero el último sigue siendo el mismo, así que la vista se queda
+  // donde estaba. Con `[messages]` a secas, pedir historial te devolvía al final de golpe.
+  const ultimId = messages.length ? messages[messages.length - 1].id : null
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [ultimId])
+
+  /** Trae la página anterior, desde el mensaje más antiguo que haya en pantalla. */
+  async function carregaMes() {
+    if (carregantMes || messages.length === 0) return
+    setCarregantMes(true)
+    const { data } = await supabase.from('wa_messages')
+      .select('id, wa_message_id, contact_phone, direction, type, body, status, raw, created_at')
+      .eq('contact_phone', contact.phone)
+      .lt('created_at', messages[0].created_at)
+      .order('created_at', { ascending: false }).limit(PAGINA)
+    const filas = ((data as WaMessage[]) ?? []).slice().reverse()
+    setMessages((prev) => [...filas, ...prev])
+    setHiHaMes(filas.length === PAGINA)
+    setCarregantMes(false)
+  }
 
   async function enviarTexto() {
     // trim quita espacios/saltos sobrantes al principio y final, pero conserva los
@@ -205,6 +258,14 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
         {!loading && !loadError && messages.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('msg.no_messages')}</p>
         )}
+        {hiHaMes && (
+          <div className="flex justify-center">
+            <Button variant="ghost" size="sm" className="h-11 md:h-8"
+              disabled={carregantMes} onClick={() => void carregaMes()}>
+              {t(carregantMes ? 'msg.loading' : 'msg.load_more')}
+            </Button>
+          </div>
+        )}
         {messages.map((m) => {
           // Un envío que Meta rechazó se marca en rojo y con etiqueta propia: si se
           // pintara como un saliente normal, parecería entregado y nadie sabría que
@@ -223,6 +284,15 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
                   {fallido ? <> · {t('msg.not_delivered')}</>
                     : m.direction === 'outbound' && m.status && <> · {m.status}</>}
                 </span>
+                {/* El motivo que devolvió Meta. Estaba en `raw` desde siempre y el panel no
+                    lo modelaba (§12.9), así que «NO ENVIAT» no distinguía un token caducado
+                    de un número fuera de la lista de prueba — tres causas con tres arreglos
+                    distintos (§8ter). */}
+                {fallido && motiuMeta(m) && (
+                  <span className="mt-1 block text-[0.65rem] text-destructive/80">
+                    {motiuMeta(m)}
+                  </span>
+                )}
               </div>
             </div>
           )
