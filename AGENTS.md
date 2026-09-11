@@ -2688,8 +2688,11 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     borde. No desbordaba la página solo porque el `grid-cols-2` de Tailwind es `minmax(0,1fr)`.
     El arreglo **no depende de la longitud del texto**, que era el criterio: se retira el
     `whitespace-nowrap` que `TabsTrigger` trae de serie, la lista puede crecer a lo alto y el botón
-    puede encoger (`min-w-0`). Verificado con una etiqueta hipotética de 36 caracteres: tres líneas
-    y **0 px de desbordamiento**. De paso el área táctil sube de 34,5 px a 44 en móvil.
+    puede encoger (`min-w-0`). De paso el área táctil sube de 34,5 px a 44 en móvil.
+    Comprobado **dos veces y por separado**, a 320 px sobre la aplicación corriendo: con la etiqueta
+    real, `white-space: normal`, 111,13 px de texto en una caja de 98 que envuelve a dos líneas y
+    **0 px de desbordamiento**; y con una etiqueta inventada de 50 caracteres, la pastilla crece a
+    88 px de alto, el ancho no se mueve y el desbordamiento **sigue en 0**.
 37. **El aviso de instalación no se puede probar de verdad en automático.** `beforeinstallprompt` no lo
     dispara ningún navegador de escritorio ni Playwright, así que las pruebas lanzan un evento
     sintético: se verifica que **el banner reacciona**, no que Chrome lo emita. La instalación real
