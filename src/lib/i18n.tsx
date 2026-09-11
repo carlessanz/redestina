@@ -122,6 +122,7 @@ const ca: Dict = {
   'reg.err_massa': 'Hi ha hagut massa sol·licituds. Torna-ho a provar d’aquí una estona.',
   'reg.ok_title': 'Sol·licitud rebuda',
   'reg.ok_desc': 'El teu compte s’ha creat i està pendent de validació per l’equip de Redestina. Quan l’activin, el teu panell s’obrirà; mentrestant ja pots iniciar sessió per veure’n l’estat.',
+  'reg.ok_revisio': 'Ja tenim dades d’aquesta organització al sistema. No és cap problema: l’equip ho revisarà abans d’activar l’accés, per assegurar-se que les dues fitxes són realment la mateixa organització.',
   'reg.go_login': 'Anar a l’inici de sessió',
   'reg.have_account': 'Ja tens compte?',
   // dashboard
@@ -1008,6 +1009,7 @@ const es: Dict = {
   'reg.err_massa': 'Ha habido demasiadas solicitudes. Vuelve a probar dentro de un rato.',
   'reg.ok_title': 'Solicitud recibida',
   'reg.ok_desc': 'Tu cuenta se ha creado y está pendiente de validación por el equipo de Redestina. Cuando la activen, tu panel se abrirá; mientras tanto ya puedes iniciar sesión para ver su estado.',
+  'reg.ok_revisio': 'Ya tenemos datos de esta organización en el sistema. No es ningún problema: el equipo lo revisará antes de activar el acceso, para asegurarse de que las dos fichas son realmente la misma organización.',
   'reg.go_login': 'Ir al inicio de sesión',
   'reg.have_account': '¿Ya tienes cuenta?',
   'dash.title': 'Panel Redestina',

@@ -58,6 +58,10 @@ export default function Registre() {
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
   const [fet, setFet] = useState(false)
+  // La función distingue «alta normal» de «esta organización ya nos consta y estrena papel»
+  // (§9). Las dos acaban en la misma pantalla porque las dos esperan al equipo, pero la
+  // segunda le debe a la persona el motivo: si no, la espera parece la de todo el mundo.
+  const [revisio, setRevisio] = useState(false)
 
   if (carregant) return <ComprovantSessio />
   if (session && !fet) return <Navigate to="/panell" replace />
@@ -99,9 +103,11 @@ export default function Registre() {
           web: parany,
         }),
       })
-      const dades = (await res.json().catch(() => null)) as { code?: string; error?: string } | null
+      const dades = (await res.json().catch(() => null)) as
+        { code?: string; error?: string; revisio_equip?: boolean } | null
       setOcupat(false)
       if (res.ok) {
+        setRevisio(dades?.revisio_equip === true)
         setFet(true)
         return
       }
@@ -128,6 +134,9 @@ export default function Registre() {
             <CheckCircle2 className="mx-auto size-8 text-primary" />
             <h1 className="mt-3 text-lg font-semibold">{t('reg.ok_title')}</h1>
             <p className="mt-2 text-sm text-muted-foreground">{t('reg.ok_desc')}</p>
+            {revisio && (
+              <p className="mt-3 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">{t('reg.ok_revisio')}</p>
+            )}
             <Button asChild className="mt-5 w-full">
               <Link to="/login">{t('reg.go_login')}</Link>
             </Button>

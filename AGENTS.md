@@ -2844,9 +2844,11 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ficha con la organización que ya existe, así que el caso «misma organización, papel nuevo» acaba
     en una ficha con `organizacion_id` NULL y una nota en su comentario, y el enlace se hace a mano
     con `service_role`. Es la etapa siguiente: `enllacar_organitzacio(tipo, ficha, org)` con
-    `pot_aprovar()` y su botón en Aprovacions. Mientras tanto la nota es lo único accionable — y **la
-    interfaz todavía no enseña el `revisio_equip: true`** que devuelve la función, así que quien
-    registra ve la pantalla genérica de «fet».
+    `pot_aprovar()` y su botón en Aprovacions. Mientras tanto la nota es lo único accionable, y la
+    persona que registra **sí ve el motivo**: la pantalla de «fet» añade, con el `revisio_equip` que
+    devuelve la función, que ya constan datos de esa organización y que el equipo lo revisará antes
+    de activar el acceso — las dos altas esperan al equipo, pero solo una tiene un motivo particular,
+    y callárselo haría parecer que la espera es la de todo el mundo.
 29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
     `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
     derivada `rebutjada`; los dos listados la pintan en rojo.
