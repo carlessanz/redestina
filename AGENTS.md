@@ -2464,13 +2464,19 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
    técnico lo normaliza en el panel y hasta entonces el job de vencidas no actúa sobre ese excedente.
-5. `ProducersList` **y `ContactList`** cargan **todos** los `wa_messages` sin filtro ni paginación
-   para contar los no contestados, y se suscriben a Realtime sin filtro. No escala. Igual `OffersList`, que
-   recarga entero ante cualquier cambio de Realtime; el `Dashboard`, que al entrar agrega
-   toda la base (productores, entidades, excedentes, canalizaciones, mensajes) en el cliente; y
-   **`AppShell`**, que trae toda la tabla `wa_messages` en cada login de una cuenta con panel de equipo
-   para calcular el contador del menú. Los buscadores de `ProducersList`/`OffersList` filtran **en
-   cliente** sobre lo ya cargado.
+5. 🟡 **Cargas de tabla entera sin filtro ni paginación** — *la peor, resuelta (11-09-2026)*.
+   `ProducersList`, `ContactList` y `AppShell` se traían **toda** `wa_messages` para contar los
+   mensajes sin contestar, y `AppShell` lo hacía **en cada login** de una cuenta con panel de
+   equipo, todo para pintar un número en el menú. Ahora lo agrega la base con
+   `missatges_sense_contestar()` (`20270306100000`), que es una consulta de siete líneas y un
+   índice. Las suscripciones de Realtime pasan a **invalidar** el contador en vez de acumular
+   filas en memoria: acumulando, una pestaña abierta desde por la mañana llevaba encima todo el
+   día. `countUnanswered()` se queda como especificación legible de la regla —tiene sus pruebas—
+   y como respaldo.
+   ⚠️ **Sigue abierto** lo demás, y no es poco: `OffersList` recarga entero ante cualquier evento
+   de Realtime; el `Dashboard` agrega **seis tablas** en el cliente al entrar; y los buscadores de
+   `ProducersList`/`OffersList` filtran **en cliente** sobre lo ya cargado, así que la paginación
+   de esos listados exige rehacer búsqueda, orden y el reparto test/resto en servidor.
 6. `Conversation` carga el hilo completo sin paginación.
 7. ~~`ContactList` conserva la prop `single` (modo conversación única)~~ — **resuelto**: esa prop ya
    no existe (props actuales: `contacts`, `loading`, `error`, `selectedPhone`, `onSelect`, `onReload`).

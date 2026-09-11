@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import { countUnanswered } from '../lib/mensajes'
-import type { MessageRow } from '../lib/mensajes'
+import { pendentsPerTelefon } from '../lib/contactes'
 import type { Productor } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,18 +46,19 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
 
   useEffect(() => {
     let cancelled = false
-    let rows: MessageRow[] = []
-    supabase.from('wa_messages').select('contact_phone, direction, created_at')
-      .then(({ data, error: loadError }) => {
-        if (cancelled) return
-        if (loadError) { console.error('wa_messages select:', loadError.message); return }
-        rows = (data as MessageRow[]) ?? []
-        setUnanswered(countUnanswered(rows))
-      })
+    // Los pendientes los cuenta la BASE (§12.5). Antes esto se traía `wa_messages` entera
+    // —sin filtro ni paginación— para calcular un número por teléfono, y volvía a hacerlo
+    // ante cualquier evento de Realtime.
+    const recompta = () => {
+      void pendentsPerTelefon().then((c) => { if (!cancelled) setUnanswered(c) })
+    }
+    recompta()
     const channel = supabase
       .channel('wa-messages-productores')
       .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'wa_messages' },
-        (payload) => { rows = [...rows, payload.new as MessageRow]; setUnanswered(countUnanswered(rows)) })
+        // Un mensaje nuevo **invalida** la cuenta; no se acumula en memoria. La diferencia
+        // importa: acumulando, la pestaña abierta desde ayer llevaba encima todo el día.
+        () => recompta())
       .subscribe()
     return () => { cancelled = true; void supabase.removeChannel(channel) }
   }, [])

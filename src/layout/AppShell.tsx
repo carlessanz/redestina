@@ -15,8 +15,7 @@ import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import { itemsPlans, navPerRol } from '../lib/nav'
-import { countUnanswered } from '../lib/mensajes'
-import type { MessageRow } from '../lib/mensajes'
+import { pendentsPerTelefon } from '../lib/contactes'
 import AppSidebar from './AppSidebar'
 import BottomNav from './BottomNav'
 import UserMenu from './UserMenu'
@@ -79,7 +78,10 @@ export default function AppShell() {
         supabase.from('convenios')
           .select('id', { count: 'exact', head: true })
           .eq('estado', 'firmat'),
-        supabase.from('wa_messages').select('contact_phone, direction, created_at'),
+        // El contador de mensajes sin contestar lo agrega la base (§12.5). Esta línea se
+        // traía la tabla `wa_messages` ENTERA en cada login de una cuenta con panel de
+        // equipo, y todo para pintar un número en el menú.
+        pendentsPerTelefon(),
         // Documentos cuyo PDF no se ha podido generar. El job los reintenta solo cada
         // 5 minutos hasta 5 veces, así que lo que sigue en `error` es lo que ya nadie
         // va a arreglar sin mirarlo.
@@ -88,7 +90,7 @@ export default function AppShell() {
           .eq('estado', 'error'),
       ])
       if (!viu) return
-      const pendents = countUnanswered((missatges.data as MessageRow[]) ?? [])
+      const pendents = missatges
       setComptadors({
         aprovacions: (respostes.count ?? 0) + (registres.count ?? 0) + (convenis.count ?? 0),
         missatges: Object.values(pendents).reduce((s, n) => s + n, 0),
