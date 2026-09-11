@@ -258,8 +258,8 @@ deno run -A scripts/comprobar-rls.ts
 ```
 
 **La referencia vigente está en `AGENTS.md §13`, no aquí** — este fichero se quedó desfasado una
-vez y dio por buena una cifra de antes del sistema documental. Hoy en remoto son **408/408
-correctas y 52 saltadas**, terminando en «Sin fallos de permisos» y con código de salida 0.
+vez y dio por buena una cifra de antes del sistema documental — **y ha vuelto a pasar**: decía
+408/408 cuando §13 ya iba por 442. No copies aquí la cifra: mírala allí.
 
 Las **saltadas son normales**: producción no tiene —ni debe tener— el fixture de
 `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
