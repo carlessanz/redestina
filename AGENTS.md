@@ -3005,6 +3005,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     primero haría falta reproducir el empaquetado byte a byte, que el CLI no ofrece.
     **Validado el 11-09-2026**: un redespliegue sin tocar nada dice `No change found` **y** deja
     las 15 huellas idénticas, así que el `ezbr_sha256` sí depende del contenido.
+    ⚠️ **Y la plataforma reempaqueta por su cuenta.** El 11-09-2026, una hora después de
+    desplegar solo `registro`, las **15** huellas habían cambiado respecto a la base guardada.
+    No fue un despliegue mío: las 15 tenían `updated_at` **en el mismo segundo** (10:42:03), que
+    es la firma de una operación de Supabase sobre todo el proyecto. Comprobado que no movió nada
+    que importe —las 15 siguen `ACTIVE`, con su `verify_jwt`, y los cuatro endpoints públicos
+    responden 400/200/403/401 como antes—.
+    Consecuencia para leer la herramienta: **«han cambiado todas» tiene ya tres causas** y solo
+    una es un problema — el `deno.lock` o un `deno.json` tocado (cambio real y esperado), un
+    reempaquetado de la plataforma (nada que hacer, `updated_at` idéntico lo delata), o un
+    despliegue masivo que no se pretendía. Antes de alarmarse, mirar `updated_at`.
     ⚠️ **Y `deno.lock` entra en el bundle de TODAS.** Al publicar ese día cambiaron las 14,
     incluida `descargar-documento`, que solo importa `autorizacion.ts` y `cors.ts` —ninguno
     tocado—. La causa era el `deno.lock`, que se había actualizado al instalar Vitest. Es el mismo
