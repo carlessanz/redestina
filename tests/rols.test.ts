@@ -275,3 +275,36 @@ describe('organitzacioActiva', () => {
     expect(organitzacioActiva(dos, 'productor')?.id).toBe('p-1')
   })
 })
+
+// ---------------------------------------------------------------------------
+// La precedencia del panel inicial (deuda §12.38)
+// ---------------------------------------------------------------------------
+// `vista_defecto` llegaba del servidor y se descartaba, así que la pantalla de perfil
+// dejaba elegir un panel y elegirlo no hacía nada. Estas pruebas fijan el orden: el
+// dispositivo manda sobre la cuenta, y la cuenta sobre el primero que haya.
+describe('rolInicial: dispositivo, cuenta, y lo que queda', () => {
+  const doble = mapejaContext(cru({
+    es_intern: false,
+    vista_defecto: 'receptor',
+    organizaciones: [org('productor', 'p1', 'Mas de Prova'), org('entidad', 'e1', 'Comercial')],
+  }))
+
+  it('lo último usado en este dispositivo manda sobre la ficha', () => {
+    expect(rolInicial(doble, 'productor')).toBe('productor')
+  })
+
+  it('sin preferencia del dispositivo, manda la de la cuenta', () => {
+    expect(rolInicial(doble, null)).toBe('receptor')
+  })
+
+  it('una `vista_defecto` que ya no corresponde se ignora', () => {
+    // La membresía de entidad se retiró: el panel guardado ya no existe para esta cuenta.
+    const soloProductor = mapejaContext(cru({
+      es_intern: false,
+      vista_defecto: 'receptor',
+      organizaciones: [org('productor', 'p1', 'Mas')],
+    }))
+    expect(soloProductor.vistaDefecte).toBeNull()
+    expect(rolInicial(soloProductor, null)).toBe('productor')
+  })
+})

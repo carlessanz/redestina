@@ -2615,9 +2615,15 @@ Redestina en producción real quedan pasos de configuración y negocio.
     dispara ningún navegador de escritorio ni Playwright, así que las pruebas lanzan un evento
     sintético: se verifica que **el banner reacciona**, no que Chrome lo emita. La instalación real
     solo se comprueba en un móvil.
-38. **`vista_defecto` se calcula en el servidor y el frontend lo descarta** (§4bis). El panel inicial
-    de `/panell` se decide por `localStorage` (`preferit`) + `ctx.rols[0]`; el campo no llega siquiera
-    a `ContextSessio`. Inofensivo, pero es lógica servida y no usada.
+38. ~~**`vista_defecto` se calcula en el servidor y el frontend lo descarta.**~~ — **resuelta
+    (11-09-2026)**. Y no era «inofensivo» como decía esta entrada: la pantalla de perfil **deja
+    escribir ese campo** (hay `grant update` desde `20260730090000:134`), así que había un ajuste
+    que el usuario podía cambiar y que no hacía absolutamente nada. El comentario de `rolInicial()`
+    llegó a afirmar que «`vista_defecto` manda si el usuario la ha elegido», que era falso.
+    Precedencia, ahora fijada con pruebas: **el dispositivo** (`localStorage`, la decisión más
+    reciente y concreta) → **la cuenta** (`vista_defecto`, que es lo que hace útil el ajuste en un
+    dispositivo nuevo) → el primer panel que tenga. Un `vista_defecto` que ya no corresponde —una
+    membresía retirada— se ignora en vez de mandar a una ruta denegada.
 39. ~~**`crearExcedente()` no reintenta ante colisión del correlativo.**~~ — **resuelta (fase 3)**:
     `generarId()` pide el número a `siguiente_numero(prefijo, ejercicio)` en vez de contar filas con
     un `like`, y ante `23505` reintenta hasta 3 veces. El formato `E-AAMMDD-XXX-YYY-N` no cambia.

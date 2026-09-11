@@ -36,6 +36,16 @@ export interface ContextSessio {
   /** Paneles a los que esta cuenta tiene acceso; puede ser más de uno (doble rol). */
   rols: Rol[]
   /**
+   * Panel preferido **de la cuenta**, elegido en su ficha (`perfiles.vista_defecto`).
+   *
+   * La base lo devolvía desde el principio y `mapejaContext` no lo copiaba (deuda §12.38),
+   * así que era lógica servida y descartada — y peor que inofensiva: la pantalla de perfil
+   * deja escribir ese campo, o sea que **había un ajuste que no hacía nada**. Distinto de la
+   * preferencia de `localStorage`, que es de ESTE dispositivo; el orden entre las dos lo
+   * decide `rolInicial()`.
+   */
+  vistaDefecte: Rol | null
+  /**
    * Alta hecha desde el registro público y todavía sin validar por el equipo. No sale en
    * `organitzacions` —la RPC solo devuelve las membresías activas—, así que sin esta marca
    * la persona vería la pantalla genérica de «sin panel» y no entendería que hay algo en
@@ -94,6 +104,9 @@ export function mapejaContext(cru: ContextCru): ContextSessio {
     rolesActivos: cru.roles_activos,
     organitzacions,
     rols,
+    // Solo se acepta si la cuenta tiene de verdad ese panel: un `vista_defecto` viejo que ya
+    // no corresponde (una membresía retirada) no debe mandar a ningún sitio.
+    vistaDefecte: cru.vista_defecto && rols.includes(cru.vista_defecto) ? cru.vista_defecto : null,
     registrePendent: cru.registre_pendent ?? false,
     registreRebutjat: cru.registre_rebutjat ?? false,
     degradat: false,
@@ -114,15 +127,30 @@ export function contextDegradat(userId: string, email: string | null): ContextSe
     rolesActivos: false,
     organitzacions: [],
     rols: ['intern'],
+    vistaDefecte: null,
     registrePendent: false,
     registreRebutjat: false,
     degradat: true,
   }
 }
 
-/** Panel que se abre al entrar. `vista_defecto` manda si el usuario la ha elegido. */
+/**
+ * Panel que se abre al entrar, por orden de precedencia:
+ *
+ *   1. **`preferit`** — el último que se usó en ESTE dispositivo (`localStorage`). Manda
+ *      porque es la decisión más reciente y la más concreta: quien acaba de trabajar en el
+ *      panel de receptor espera volver a él.
+ *   2. **`ctx.vistaDefecte`** — el que la cuenta tiene elegido en su ficha. Es lo que hace
+ *      que ese ajuste sirva para algo en un dispositivo nuevo, donde no hay `localStorage`.
+ *   3. El primero que tenga.
+ *
+ * Antes el paso 2 no existía: `vista_defecto` llegaba del servidor y se descartaba
+ * (deuda §12.38). El comentario de esta función decía «`vista_defecto` manda si el usuario
+ * la ha elegido», y no era verdad.
+ */
 export function rolInicial(ctx: ContextSessio, preferit: Rol | null): Rol | null {
   if (preferit && ctx.rols.includes(preferit)) return preferit
+  if (ctx.vistaDefecte && ctx.rols.includes(ctx.vistaDefecte)) return ctx.vistaDefecte
   return ctx.rols[0] ?? null
 }
 
