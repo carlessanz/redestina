@@ -2310,19 +2310,31 @@ curl -sS -G "https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/analytics
 ```
 
 `function_logs` son los `console.*` de las funciones (ahí sale el JSON de tiempos de
-`generar-documento`, §12.87) y `edge_logs` las peticiones HTTP. El `cpu_time_used` y la memoria de
-cada isolate viven en el evento `shutdown`, dentro de `metadata`, y hay que desplegarlo:
+`generar-documento`, §12.87) y `edge_logs` las peticiones HTTP. El `cpu_time_used`, la región y la
+memoria de cada isolate viven en el evento `shutdown`, dentro de `metadata`, y hay que desplegarlo
+con `unnest`. **Saca siempre `execution_id`**, o los números no se pueden atribuir:
 
 ```bash
-SQL="select f.timestamp, m.cpu_time_used, m.reason from function_logs f
-     cross join unnest(f.metadata) as m
-     where f.event_message = 'shutdown' order by f.timestamp desc limit 3"
+SQL="select f.timestamp, f.event_message, m.execution_id, m.region, m.cpu_time_used
+     from function_logs f cross join unnest(f.metadata) as m
+     order by f.timestamp desc limit 30"
+curl -sS -G "https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/analytics/endpoints/logs.all" \
+  -H "Authorization: Bearer $TOKEN" --data-urlencode "sql=$SQL" \
+  --data-urlencode "iso_timestamp_start=2026-09-11T00:50:00.000Z" \
+  --data-urlencode "iso_timestamp_end=2026-09-11T00:58:00.000Z"
 ```
 
-⚠️ La ventana por defecto es **corta** (minutos, no horas): una consulta sin filtro de tiempo
-devuelve solo lo más reciente, así que si buscas una ejecución concreta conviene provocarla y
-consultar acto seguido. Y un `unnest` mal escrito responde `Backend error! Retry your query`, que
-**no** es un fallo transitorio: es la consulta.
+⚠️ **La ventana por defecto son minutos, no horas.** Sin `iso_timestamp_start`/`iso_timestamp_end`
+solo se ve lo más reciente y una ejecución de hace un rato parece no existir. Esos dos parámetros
+son la forma de ir a buscarla; van **fuera** del SQL, como parámetros de la petición.
+
+⚠️ **El `cpu_time_used` de una ejecución NO es el del `shutdown` más reciente.** Un isolate sigue
+vivo un rato tras responder, así que su `shutdown` llega minutos después y entremedias se apagan
+otros. Hay que casar `execution_id` con el del log de la ejecución. Cómo salió mal esto la primera
+vez, y cuál es la señal de haberse equivocado, en §12.87.
+
+⚠️ Un `unnest` mal escrito responde `Backend error! Retry your query`, que **no** es un fallo
+transitorio: es la consulta.
 
 Emergencia de RLS (§4bis), por orden: primero el interruptor,
 
@@ -2793,16 +2805,30 @@ Redestina en producción real quedan pasos de configuración y negocio.
     transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
 
 87. ~~**El CPU real de `generar-documento` sigue sin medirse con precisión.**~~ — **medido
-    (11-09-2026)**, y el criterio de salida del spike queda cerrado con holgura. Documento de
-    6 páginas y 123.614 bytes en producción: **`ms_render` 174,3 ms** (presupuesto del spike:
-    800 ms), `ms_activos` 1 ms con los activos ya en caliente, `ms_subida` 107,8 ms y `ms_total`
-    462,6 ms. El propio runtime declara **`cpu_time_used` 72 ms** en su evento `shutdown` y 22 MB
-    de memoria: un 3,6 % del techo de 2 s de CPU y un 8,7 % de los 256 MB.
-    ⚠️ **`ms_render` es reloj de pared y `cpu_time_used` es CPU**, y por eso el segundo sale más
-    bajo que el primero: no son la misma magnitud y el límite del runtime aplica al segundo.
-    Lo que impedía leerlo era creer que hacía falta el panel: **este CLI no tiene `functions
-    logs`, pero el Management API sí sirve los logs de consola** (§11), y desde ahí se lee el
-    JSON entero sin salir de la terminal.
+    (11-09-2026)**. El criterio de salida del spike queda cerrado, con un margen cómodo pero no
+    enorme. Documento de 6 páginas y 123.614 bytes en producción: **`ms_render` 174,3 ms**
+    (presupuesto del spike: 800 ms), `ms_activos` 1 ms con los activos ya en caliente,
+    `ms_subida` 107,8 ms y `ms_total` 462,6 ms. El runtime declara en su `shutdown`
+    **`cpu_time_used` 390 ms** y 22 MB: un **19,5 %** del techo de 2 s de CPU y un 8,7 % de los
+    256 MB. Cinco generaciones reales medidas dan **325-572 ms de CPU**, así que ese es el orden
+    de magnitud a asumir para un documento de 6 páginas; los convenios de 8-10 páginas de la
+    fase 2 no tienen un factor 10 de margen, tienen un factor 4.
+    ⚠️ **`cpu_time_used` es del ISOLATE entero, no de la petición**: cubre el arranque, la
+    evaluación de módulos con `pdf-lib` dentro, la petición, la subida y las RPC. Por eso sale
+    **mayor** que `ms_render`, que solo mide maquetar el PDF, aunque una sea CPU y el otro reloj
+    de pared.
+    ⚠️ **Hay que cruzar por `execution_id`, no coger el `shutdown` más reciente.** La primera
+    lectura de este dato dio 72 ms y era de otro isolate: el del cron `documentos-pendientes`,
+    que arranca cada 5 min, no encuentra nada y se apaga. Esos no-op gastan **33-77 ms**, o sea
+    que un valor de esa horquilla es la señal característica de haber leído el isolate
+    equivocado. El `shutdown` bueno llega **minutos después** del log de la generación (el
+    isolate sigue vivo esperando más peticiones), así que no es ni siquiera el siguiente.
+    ⚠️ **Una emisión puede ejecutarse dos veces, en dos regiones.** Dos de las tres generaciones
+    de la publicación salen con el mismo `documento` y distinto `execution_id` en `eu-west-1` y
+    `eu-west-3`, con un segundo de diferencia; la de después tuvo una sola. No pasa nada porque
+    la función es idempotente (con `fichero_at` ya puesto responde 200 sin hacer nada) —que es
+    justo para lo que se escribió esa guarda—, pero esa emisión costó el doble y la causa no
+    está averiguada.
 88. **Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**
     `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
     borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
