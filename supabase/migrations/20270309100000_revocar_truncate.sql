@@ -1,0 +1,51 @@
+-- Quitar el TRUNCATE que `authenticated` tenía sobre 51 tablas.
+--
+-- DE DÓNDE VENÍA. Del bootstrap de Supabase, que hace `grant all on all tables in schema
+-- public` a `anon`, `authenticated` y `service_role`. Este proyecto revocó **todo a `anon`**
+-- (`20260721160000:56`) y añadió a `authenticated` los privilegios que necesita, pero nunca
+-- retiró lo que ya tenía de antes. Resultado: `authenticated` conserva `TRUNCATE` en
+-- `documentos`, `albaranes`, `convenios`, `evidencias`, `productores`, `entidades`,
+-- `excedentes`, `canalizaciones`… 51 tablas.
+--
+-- POR QUÉ IMPORTA, que es lo que hace que esto no sea cosmético:
+--
+--   1. **La RLS no se aplica a TRUNCATE.** Toda la doctrina de §4 es «los GRANT dicen qué
+--      operaciones puede intentar un rol; las políticas, sobre qué filas», y se apoya en que
+--      hacen falta **las dos capas**. Para TRUNCATE no hay ninguna: las políticas no lo ven.
+--
+--   2. **Los triggers de inmutabilidad tampoco.** `documentos_no_esborrar` es un
+--      `before delete … for each row`, y **TRUNCATE no dispara triggers de fila**. O sea que
+--      la garantía sobre la que descansa el circuito documental entero —un documento emitido
+--      no se borra, y borrar uno de prueba exige el interruptor `redestina.reinicio_prueba`—
+--      se saltaba sin tocar ninguna de sus defensas.
+--
+-- ⚠️ NO ERA ALCANZABLE, y conviene decirlo con precisión para no exagerar el hallazgo:
+--    PostgREST expone SELECT/INSERT/UPDATE/DELETE y RPC, **no TRUNCATE**, y no hay ninguna
+--    función que lo ejecute. Con la clave publicable no había forma de llegar. Esto no cierra
+--    una puerta abierta: repone una capa que faltaba justo donde no había otra.
+--
+-- QUÉ NO CAMBIA. `service_role` conserva todo —lo usan las Edge Functions y las migraciones
+-- corren como propietario—, así que ningún camino existente se rompe. Nada en el repo usa
+-- TRUNCATE como `authenticated`: los dos `truncate` del histórico
+-- (`20260717080924`, `20260717084210`) son migraciones, que corren como propietario.
+
+revoke truncate on all tables in schema public from authenticated;
+
+-- Y que no vuelva con la siguiente tabla. Sin esta línea, el problema se reintroduce solo:
+-- cada `create table` hereda los privilegios por defecto, y el bootstrap los concede todos.
+-- Es el gemelo de §12.55 —«no volver a escribir nunca un GRANT masivo sobre `all tables`»—
+-- por el lado de los privilegios que se heredan sin que nadie los escriba.
+alter default privileges in schema public revoke truncate on tables from authenticated;
+
+-- ⚠️ QUEDAN CINCO FUERA, y es deliberado: `storage.objects`, `storage.buckets`,
+--    `storage.buckets_analytics`, `supabase_functions.hooks` y `supabase_functions.migrations`.
+--    No están en `public`, son del bootstrap de Supabase y valen igual en cualquier proyecto
+--    suyo. Tampoco son alcanzables: PostgREST solo expone `public`, y ni la API de Storage ni
+--    la de funciones ofrecen TRUNCATE. Tocarlas sería cambiar el andamiaje de la plataforma
+--    sin evidencia de que haga falta, que es la misma razón por la que no se hace
+--    `config push` (§9).
+--
+-- Comprobable de un vistazo, que es como se detectó:
+--   select table_schema, count(*) from information_schema.role_table_grants
+--    where grantee = 'authenticated' and privilege_type = 'TRUNCATE'
+--    group by 1;    -- `public` debe dar 0; storage y supabase_functions, lo suyo

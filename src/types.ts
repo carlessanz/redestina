@@ -35,6 +35,8 @@ export interface Productor {
   activo: boolean | null
   /** Usuario de prueba: solo estos reciben WhatsApp/email (fuente de verdad, §8) */
   es_test: boolean
+  /** La organización de la que esta ficha es el papel de generadora (§1bis, brecha 2) */
+  organizacion_id: string | null
 }
 
 export interface WaMessage {
@@ -69,6 +71,39 @@ export interface WaMessage {
  */
 export type ProductorLlistat = Productor & { rebutjada: boolean }
 export type EntidadLlistat = Entidad & { rebutjada: boolean }
+
+// --- Organización unificada (etapa 1, migración 20270310100000) ---
+//
+// La identidad común de las dos tablas de fichas. ⚠️ `Organizacion` **no tiene nombre ni
+// NIF**: eso vive en las fichas y se lee por `v_organizaciones`, para que no haya dos
+// fuentes de verdad que puedan divergir. Para pintar algo, usa `OrganizacioVista`.
+
+export interface Organizacion {
+  id: string
+  /** Canal que la organización PIDE, frente al que se deduce hoy de su ficha (deuda §12.22) */
+  canal_preferido: 'whatsapp' | 'email' | null
+  notas: string | null
+  creada_por: string | null
+  created_at: string
+}
+
+/** Lo que devuelve `v_organizaciones`: la identidad más lo que dicen sus fichas. */
+export interface OrganizacioVista {
+  id: string
+  nombre: string | null
+  nif: string | null
+  email: string | null
+  telefono: string | null
+  poblacion: string | null
+  productor_id: string | null
+  entidad_id: string | null
+  /** DERIVADOS de tener ficha, no declarados: es receptora porque tiene ficha de entidad */
+  es_generadora: boolean
+  es_receptora: boolean
+  tipo_receptor: string | null
+  canal_preferido: 'whatsapp' | 'email' | null
+  created_at: string
+}
 
 export interface ProductorUbicacion {
   id: string
@@ -119,6 +154,8 @@ export interface Entidad {
   opt_in: boolean | null
   /** Usuario de prueba: solo estos reciben WhatsApp/email (fuente de verdad, §8) */
   es_test: boolean
+  /** La organización de la que esta ficha es el papel de receptora (§1bis, brecha 2) */
+  organizacion_id: string | null
   created_at: string
 }
 

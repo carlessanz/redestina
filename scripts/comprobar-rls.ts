@@ -351,6 +351,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   //    —indistinguible de «falta la migración»—. Que sea inalcanzable lo garantiza el
   //    `revoke` de 20270301100200, no un check.
   { tabla: "planes_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea plans a mà (van per RPC)" },
+  // Organización unificada (20270310100000). La tabla no tiene GRANT de escritura para
+  // nadie: si alguien lo concediera, este check se pondría rojo antes de que llegara a
+  // producción una forma de reasignar la ficha de una organización a otra.
+  { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu les organitzacions" },
+  { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es cada organitzacio" },
+  { tabla: "organizaciones", op: "insertar", esperado: "denegar", descripcion: "NO crea organitzacions a ma" },
   {
     tabla: "guardar_plan_basico",
     op: "rpc",
@@ -958,6 +964,21 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "ve EL SEU conveni (només el seu)",
       requiereFixture: "el conveni vigent de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // Organización unificada: ve LA SUYA y solo la suya. No lleva `requiereFixture` porque
+    // toda ficha tiene organización desde la migración del relleno: si esto sale con 0 filas,
+    // es que la política está mal o el relleno dejó huecos, no que falten datos.
+    {
+      tabla: "organizaciones",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve LA SEVA organitzacio (nomes la seva)",
+    },
+    {
+      tabla: "organizaciones",
+      op: "insertar",
+      esperado: "denegar",
+      descripcion: "NO crea organitzacions",
     },
     // Plan de prevención (fase 5): ve EL SUYO. Mismo patrón que el convenio —el fixture lo
     // crea para TEST-PROD-1, así que la comprobación de TEST-PROD-2 sale SALTADA, y eso es

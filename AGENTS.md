@@ -174,7 +174,9 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
 
 **Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
-**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** → ~~(3) back office~~ y
+**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **etapa 1 hecha**
+(`organizaciones` + `v_organizaciones`, §4): la identidad existe y cada ficha cuelga de la suya.
+Falta migrar a los consumidores, que es donde está el trabajo → ~~(3) back office~~ y
 ~~(4) onboarding~~ **resueltas** (cola de aprobaciones con tres colas, alta self-service y convenio
 en el registro) → (5) demandas → ~~(6) albaranes/conciliación real y certificados~~ **resueltos**
 (fases 3, 4 y 5 del sistema documental: §4) → (7) notificaciones + encuestas → (8) adjuntos de
@@ -186,9 +188,10 @@ WhatsApp → ~~(9) diagnóstico/planes~~ 🟡 (la estructura está; **falta el c
 la asesoría (los ocho tipos de documento y los tres convenios), los datos fiscales reales de
 Espigoladors con la firma y el sello de la apoderada, las taras por tipo de caja, los costes por kilo
 del ejercicio y el cuestionario de diagnóstico. Todo el circuito funciona con valores provisionales
-**marcados como tales**, y el certificado se niega a emitirse mientras lo sean. La más urgente ahora es la **organización unificada multirol**: mientras
-`productores` y `entidades` sean dos tablas sin clave común, el registro público no puede detectar
-que una organización ya existe (deuda §12.28).
+**marcados como tales**, y el certificado se niega a emitirse mientras lo sean. La más urgente ahora sigue siendo la **organización unificada multirol**, ya con
+su etapa 1 hecha: la clave común existe (`organizaciones`, §4), y lo que falta es que los
+consumidores la usen — empezando por el registro público, que es quien no podía detectar que una
+organización ya existe (deuda §12.28).
 
 ## 2. Stack
 
@@ -511,6 +514,33 @@ WhatsApp/correo** (fuente de verdad del envío, §8), editable por ficha.
 
 **`productor_ubicaciones`** — un productor puede tener varias: `alias`, `gmaps_url`,
 `coord_lat`, `coord_lng`, `municipio`, `es_principal`.
+
+**`organizaciones`** (`20270310100000`) — **la identidad común de las dos tablas de fichas**, y
+la etapa 1 de la brecha 2 de §1bis. `productores.organizacion_id` y `entidades.organizacion_id`
+apuntan a ella, con índice único parcial: **una organización tiene como mucho una ficha de cada
+tipo**. La vista `v_organizaciones` (`security_invoker`) dice quién es cada una **leyéndolo de
+sus fichas**; `es_generadora`/`es_receptora` son **derivados de tener ficha**, no declarados.
+
+⚠️ **No guarda ni nombre ni NIF a propósito.** Duplicarlos crearía dos fuentes de verdad para el
+mismo dato, y en cuanto alguien editara una ficha nadie sabría cuál manda. Aquí solo vive lo que
+no tiene otro sitio: la identidad y `canal_preferido`, que es el campo que pide el funcional y la
+deuda §12.22 —hoy el canal se **deduce** de la ficha y la persona no puede decir el suyo—.
+
+⚠️ **Y lo que los datos dijeron, que cambia lo que §12.28 daba por hecho.** Esa deuda afirma que
+unificar «exigiría deduplicar 111 entidades sin clave única». **Medido contra producción el
+11-09-2026: no hay nada que deduplicar.** De 345 productores y 119 entidades hay exactamente
+**cuatro** pares que son la misma organización —los del equipo, §9—, y coinciden por **correo o
+teléfono exactos**. Las otras 456 fichas son organizaciones distintas entre sí. El **NIF no sirve
+de clave**: lo tiene el 49 % de los productores y el 55 % de las entidades, y **cero NIF aparecen
+en las dos tablas**. El relleno es, por tanto, una fila por ficha y cuatro enlaces conocidos, no
+una fusión con riesgo de juntar lo que no va junto.
+
+⚠️ **El criterio de enganche es correo o teléfono, nunca el parecido del nombre.** Juntar dos
+organizaciones distintas significa mezclar los kilos y el certificado fiscal de dos donantes: se
+prefiere dejar dos filas separadas —el estado de hoy, que funciona— a arriesgar una fusión mala.
+
+🟡 **Es la etapa 1 y no cierra ninguna deuda por sí sola**: desbloquea las ocho de la brecha 2
+(11, 16, 20, 22, 27, 28, 31, 79), y cada una sigue necesitando su trabajo encima.
 
 **`entidades`** — entidades sociales receptoras (25 columnas del Excel SDA). Los tres campos
 de capacidad (`productes_frescos`, `transport_plataforma`, `descarrega_toro`) vienen como
@@ -958,6 +988,19 @@ sería imposible aunque una política fallara), y `perfiles` con **`GRANT UPDATE
 (`nombre`, `telefono`, `idioma`, `vista_defecto`: nadie reactiva su propia cuenta). `app_config` es
 **solo `service_role`** (§9). Realtime en `wa_contacts`, `wa_messages`, `excedentes`,
 `canalizaciones` y `oferta_respuestas`.
+
+⚠️ **`authenticated` tenía `TRUNCATE` sobre 51 tablas de `public`, y eso no lo ve ninguna
+política.** Venía del bootstrap de Supabase (`grant all`), que el proyecto revocó **a `anon`**
+(`20260721160000:56`) pero nunca a `authenticated`. Importa por dos cosas: **la RLS no se aplica a
+TRUNCATE** —así que para esa operación no había una capa, había cero— y **TRUNCATE no dispara
+triggers de fila**, con lo que `documentos_no_esborrar` —la garantía sobre la que descansa el
+circuito documental entero— se saltaba sin tocar ninguna de sus defensas. Revocado en
+`20270309100000`, junto con el `alter default privileges` para que no vuelva con la siguiente
+tabla.
+**No era alcanzable**, y conviene decirlo sin exagerar: PostgREST expone SELECT/INSERT/UPDATE/
+DELETE y RPC, no TRUNCATE, y no hay ninguna función que lo ejecute. No se cerró una puerta
+abierta: se repuso una capa donde no había otra. Quedan fuera cinco tablas de `storage` y
+`supabase_functions`, que son de la plataforma y tampoco son alcanzables.
 
 **Las políticas RLS por sí solas no bastan.** Supabase ya no expone automáticamente las
 tablas nuevas del esquema `public` a los roles de la Data API
@@ -3256,7 +3299,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **383 comprobaciones, todas
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **399 comprobaciones, todas
    correctas y 15 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
    de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
