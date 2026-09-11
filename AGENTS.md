@@ -2261,10 +2261,16 @@ supabase secrets set --env-file .secrets.env
 # el default del CLI, que es `true` — correcto, pero no escrito en ninguna parte, que es
 # exactamente la distancia de la que nació la deuda 43).
 
-# Publicar en producción: el procedimiento completo (build, commit, push, redespliegue de las
-# funciones que lo necesiten y verificación de dominio, CORS y permisos) vive en el skill
-# `/publicar` (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos
-# a mano: recoge los flags de cada función y las trampas de verificación.
+# Publicar en producción: el procedimiento completo vive en el skill `/publicar`
+# (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos a mano:
+# recoge los flags de cada función y las trampas de verificación.
+# ⚠️ El orden es **base de datos → Edge Functions → frontend**, de abajo arriba, y cada capa
+# solo depende de otra ya publicada. El `git push` es lo que dispara Vercel, así que va el
+# ÚLTIMO: hacerlo antes publica la interfaz nueva contra un esquema viejo, y una pantalla que
+# consulta una tabla que no existe responde 42P01 hasta que se aplique la migración. La
+# consecuencia es que las migraciones tienen que ser compatibles hacia atrás —el frontend
+# vigente sigue sirviéndose durante esa ventana—: añadir sí, renombrar o borrar exige dos
+# publicaciones.
 
 deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
 deno run -A scripts/import-ara.ts             # importar los CSV maestros
@@ -2887,8 +2893,9 @@ Redestina en producción real quedan pasos de configuración y negocio.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
    aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale
    SALTADA, con el mismo criterio.
-4. Para **publicar en producción**, el skill `/publicar` (§11): verifica el deploy de Vercel,
-   redespliega las Edge Functions que lo necesiten y comprueba dominio, CORS y permisos.
+4. Para **publicar en producción**, el skill `/publicar` (§11): aplica las migraciones,
+   redespliega las Edge Functions que lo necesiten, publica el frontend —en ese orden, §11— y
+   comprueba dominio, CORS y permisos.
 5. Si el cambio toca estilos: ningún color ni tamaño fuera de los tokens (§2bis); si cambió un
    token, `design/tokens.json`, `src/index.css` y `design/preview.html` van en el mismo commit.
 6. **Actualizar este fichero** si cambió arquitectura, datos, contratos, convenciones,
