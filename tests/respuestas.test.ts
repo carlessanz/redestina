@@ -20,6 +20,8 @@ import {
   normalizar,
   clasificar,
   parseNumero,
+  atendreElDialeg,
+  CADUCIDAD_DIALOGO_HORAS,
 } from '../supabase/functions/_shared/respuestas.ts'
 
 describe('normalizar', () => {
@@ -304,5 +306,127 @@ describe('parseNumero', () => {
     expect(parseNumero('1.5')).toBe(1.5)
     expect(parseNumero('0.75')).toBe(0.75)
     expect(parseNumero('12.34')).toBe(12.34)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Quién atiende el mensaje: el diálogo de la oferta o el intake (deuda §12.16)
+// ---------------------------------------------------------------------------
+// EL PROBLEMA, MEDIDO. Un número que es productor Y entidad —hay cuatro en producción,
+// §9— tiene dos conversaciones posibles a la vez: el formulario de intake y el sí/no de
+// una oferta pendiente. Hasta ahora la oferta ganaba SIEMPRE, sin mirar si seguía siendo
+// la última pregunta que le habíamos hecho, y `clasificar()` resuelve como sí/no siete de
+// diecisiete respuestas plausibles a preguntas del intake («no ho sé» a la varietat, «No»
+// a les observacions, «Sí»/«No» escritos en `retorn`, «ok matins» a l'horari…). Cada una
+// de esas cerraba la oferta con una respuesta que iba a otra pregunta, y la que aceptaba
+// abría el paso `kg`, que consume todos los mensajes siguientes: a partir de ahí el
+// productor no podía publicar nada, y el diálogo no caducaba nunca.
+//
+// LA REGLA que lo ordena: **un mensaje contesta a la última pregunta que le hicimos.**
+// La prioridad de la oferta no se retira —es correcta cuando la oferta es lo último que
+// se le ha dicho— sino que se condiciona a eso, con dos instantes que ya existen en la
+// base (`oferta_respuestas.enviado_at` e `intake_sessions.updated_at`) y una marca en un
+// jsonb que ya estaba y no se usaba.
+describe('atendreElDialeg · quién tiene la palabra', () => {
+  const AHORA = new Date('2026-09-11T12:00:00Z').getTime()
+  const hace = (h: number) => new Date(AHORA - h * 60 * 60 * 1000).toISOString()
+
+  it('sin intake abierto, la oferta pendiente atiende (la prioridad de siempre)', () => {
+    const a = atendreElDialeg({ pas: null, enviadoAt: hace(2), intakeAt: null }, AHORA)
+    expect(a.dialogo).toBe(true)
+    expect(a.motivo).toBe('oferta_pendent')
+  })
+
+  // El caso caro: la oferta se mandó ayer, la persona está ahora mismo rellenando el
+  // formulario y contesta «no ho sé» a la varietat. Antes eso rechazaba la oferta.
+  it('si el intake ha hablado DESPUÉS de enviarse la oferta, contesta el intake', () => {
+    const a = atendreElDialeg({ pas: null, enviadoAt: hace(20), intakeAt: hace(1) }, AHORA)
+    expect(a.dialogo).toBe(false)
+    expect(a.motivo).toBe('intake_te_la_paraula')
+  })
+
+  // Y el simétrico, que es lo que impide que la guarda se coma el caso normal: si lo
+  // último que ha pasado es que le hemos mandado una oferta, el sí/no es para la oferta
+  // aunque haya un formulario a medias de hace un rato.
+  it('si la oferta se envió después del último paso del intake, contesta la oferta', () => {
+    const a = atendreElDialeg({ pas: null, enviadoAt: hace(1), intakeAt: hace(3) }, AHORA)
+    expect(a.dialogo).toBe(true)
+    expect(a.motivo).toBe('oferta_pendent')
+  })
+
+  it('una sesión de intake olvidada (más de 12 h) no reclama nada', () => {
+    const a = atendreElDialeg(
+      { pas: null, enviadoAt: hace(20), intakeAt: hace(CADUCIDAD_DIALOGO_HORAS + 1) },
+      AHORA,
+    )
+    expect(a.dialogo).toBe(true)
+    expect(a.motivo).toBe('oferta_pendent')
+  })
+
+  it('con el diálogo en curso manda el diálogo: la última pregunta es suya', () => {
+    for (const pas of ['kg', 'preu']) {
+      const a = atendreElDialeg(
+        { pas, enviadoAt: hace(30), ultimoDialogoAt: hace(1), intakeAt: hace(2) },
+        AHORA,
+      )
+      expect(a.dialogo).toBe(true)
+      expect(a.motivo).toBe('dialeg_en_curs')
+      expect(a.reiniciarDialogo).toBe(false)
+    }
+  })
+
+  // El bloqueo permanente: un diálogo abandonado en el paso `kg` consumía todos los
+  // mensajes del número para siempre. Caduca a las mismas 12 h que el intake.
+  it('un diálogo abandonado caduca y deja de secuestrar el número', () => {
+    const viu = atendreElDialeg(
+      { pas: 'kg', enviadoAt: hace(50), ultimoDialogoAt: hace(CADUCIDAD_DIALOGO_HORAS), intakeAt: null },
+      AHORA,
+    )
+    expect(viu.motivo).toBe('dialeg_en_curs')
+
+    const caducat = atendreElDialeg(
+      { pas: 'kg', enviadoAt: hace(50), ultimoDialogoAt: hace(CADUCIDAD_DIALOGO_HORAS + 0.1), intakeAt: null },
+      AHORA,
+    )
+    // Caducado no significa resuelto: la fila sigue `pendent` y el mensaje se vuelve a
+    // clasificar desde cero, igual que hace el intake con una sesión olvidada.
+    expect(caducat.dialogo).toBe(true)
+    expect(caducat.reiniciarDialogo).toBe(true)
+    expect(caducat.motivo).toBe('dialeg_caducat')
+  })
+
+  // Las filas anteriores a este cambio no tienen marca de diálogo, y son justo las que
+  // pueden llevar meses bloqueando un número: dar por vivo lo que no se puede fechar
+  // habría conservado el problema.
+  it('sin marca de diálogo se usa la fecha de envío para fecharlo', () => {
+    const recent = atendreElDialeg({ pas: 'kg', enviadoAt: hace(2), intakeAt: null }, AHORA)
+    expect(recent.reiniciarDialogo).toBe(false)
+
+    const antic = atendreElDialeg({ pas: 'kg', enviadoAt: hace(72), intakeAt: null }, AHORA)
+    expect(antic.reiniciarDialogo).toBe(true)
+  })
+
+  it('un diálogo caducado también cede la palabra a un intake más reciente', () => {
+    const a = atendreElDialeg(
+      { pas: 'kg', enviadoAt: hace(72), ultimoDialogoAt: hace(70), intakeAt: hace(1) },
+      AHORA,
+    )
+    expect(a.dialogo).toBe(false)
+    expect(a.motivo).toBe('intake_te_la_paraula')
+  })
+
+  // Fechas que no se pueden leer: ante la duda manda la oferta, que es la pregunta
+  // explícita que le hemos hecho. Callar y dejar pasar al intake convertiría un dato
+  // corrupto en «la oferta no existe».
+  it('una fecha ilegible o ausente no cede la palabra al intake', () => {
+    expect(atendreElDialeg({ pas: null, enviadoAt: null, intakeAt: hace(1) }, AHORA).dialogo).toBe(true)
+    expect(atendreElDialeg({ pas: null, enviadoAt: hace(5), intakeAt: 'ahir' }, AHORA).dialogo).toBe(true)
+  })
+
+  // La guarda es monótona y por eso no se da la vuelta sola: en cuanto el diálogo
+  // arranca, el intake deja de avanzar, así que su `updated_at` se queda donde estaba.
+  it('el «fet» de un diálogo terminado no cuenta como diálogo en curso', () => {
+    const a = atendreElDialeg({ pas: 'fet', enviadoAt: hace(2), intakeAt: hace(1) }, AHORA)
+    expect(a.motivo).toBe('intake_te_la_paraula')
   })
 })

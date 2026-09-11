@@ -10,6 +10,7 @@ import { priorizar } from "../_shared/priorizacion.ts";
 import type { EntidadPriorizable, ExcedenteContexto } from "../_shared/priorizacion.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
+import { preferenciasDeCanal } from "../_shared/organizacion.ts";
 import { modoTestActivo } from "../_shared/gate.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
@@ -118,9 +119,10 @@ Deno.serve(async (req) => {
     );
 
     // Canal recomendado por entidad (`canal.ts`): el correo es el canal por defecto y
-    // WhatsApp solo cuando de verdad se puede. Se decide AQUÍ, no en el panel, para
-    // que la política viva en un solo sitio; el panel solo la pinta y la obedece.
-    // La ventana de 24 h y el opt-in salen de `wa_contacts`, que el ranking no mira.
+    // WhatsApp solo cuando de verdad se puede, salvo que la organización haya pedido uno
+    // (`organizaciones.canal_preferido`, §12.22) y ese sea viable. Se decide AQUÍ, no en
+    // el panel, para que la política viva en un solo sitio; el panel solo la pinta y la
+    // obedece. La ventana de 24 h y el opt-in salen de `wa_contacts`, que el ranking no mira.
     const telefonos = (entidades ?? [])
       .map((e: { telefono: string | null }) => e.telefono).filter(Boolean) as string[];
     const { data: contactos } = telefonos.length
@@ -131,6 +133,14 @@ Deno.serve(async (req) => {
 
     const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null }>();
     for (const e of entidades ?? []) porId.set(e.id, e);
+
+    // La preferencia de canal de la organización de cada entidad. Fail-soft: si no se
+    // puede leer, el mapa viene vacío y todo el mundo se decide como hasta ahora.
+    const preferencias = await preferenciasDeCanal(
+      supabase,
+      "entidad",
+      (entidades ?? []).map((e: { id: string }) => e.id),
+    );
 
     // `es_test` decide si PUEDE recibir (§8); el canal, POR DÓNDE. Son cosas
     // distintas y el panel necesita las dos para explicar por qué un botón está gris.
@@ -151,6 +161,7 @@ Deno.serve(async (req) => {
         email: ficha?.email,
         opt_in: contacto?.opt_in,
         last_inbound_at: contacto?.last_inbound_at,
+        canal_preferido: preferencias.get(e.id) ?? null,
       });
       return {
         ...e,
@@ -160,6 +171,11 @@ Deno.serve(async (req) => {
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,
         email_possible: d.emailPosible,
+        // Qué pidió la organización y si se ha podido respetar. Va al panel para que un
+        // incumplimiento no pase en silencio: «ha demanat WhatsApp però la finestra és
+        // tancada» es accionable; cambiar de canal sin decirlo, no.
+        canal_preferit: d.preferido,
+        preferencia_respectada: d.preferenciaRespetada,
         // Aviso, no bloqueo: el bloqueo duro lo hace la base al aprobar (§fase 2).
         sense_conveni: sinConvenio.has(e.id),
       };

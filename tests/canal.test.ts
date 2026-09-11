@@ -238,3 +238,128 @@ describe('con correo válido siempre hay canal', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// La preferencia de la organización (deuda §12.22)
+// ---------------------------------------------------------------------------
+// `organizaciones.canal_preferido` deja que la organización DIGA su canal, en vez de que
+// se deduzca siempre de lo que hay en su ficha. Lo que estas pruebas fijan es el límite:
+// **una preferencia elige entre los canales viables, no crea uno**. Pedir WhatsApp no abre
+// la ventana de 24 h ni sustituye al opt-in —son requisitos de Meta— así que una
+// preferencia que se saltara eso no conseguiría un envío, conseguiría un rechazo de la
+// Graph API (131047) o una plantilla sin consentimiento.
+//
+// Y el otro límite, el que da sentido a `preferenciaRespetada`: cuando no se puede
+// cumplir, tiene que NOTARSE. Una preferencia ignorada en silencio es peor que no tenerla,
+// porque la persona cree haber elegido y el equipo no sabe que no se cumplió.
+describe('decidirCanal · la preferencia de la organización', () => {
+  const conFinestra = { telefono: '34612345678', email: 'a@exemple.cat', last_inbound_at: haceHoras(2) }
+  const sensePermis = { telefono: '34612345678', email: 'a@exemple.cat', opt_in: false, last_inbound_at: haceHoras(48) }
+
+  it('sin preferencia todo se comporta como antes, y se dice que no había', () => {
+    const d = decidirCanal(conFinestra, AHORA)
+    expect(d.canal).toBe('whatsapp')
+    expect(d.motivo).toBe('finestra_oberta')
+    expect(d.preferido).toBeNull()
+    expect(d.preferenciaRespetada).toBeNull()
+  })
+
+  it('una preferencia ausente y una explícitamente nula son lo mismo', () => {
+    const a = decidirCanal(sensePermis, AHORA)
+    const b = decidirCanal({ ...sensePermis, canal_preferido: null }, AHORA)
+    expect(b).toEqual(a)
+  })
+
+  // El caso que hoy no se podía expresar: se PUEDE mandar por WhatsApp y aun así se manda
+  // por correo, porque es lo que han pedido.
+  it('pide correo y se respeta, aunque WhatsApp fuera posible', () => {
+    const d = decidirCanal({ ...conFinestra, canal_preferido: 'email' }, AHORA)
+    expect(d.canal).toBe('email')
+    expect(d.motivo).toBe('preferencia_email')
+    expect(d.preferenciaRespetada).toBe(true)
+    // La viabilidad no se toca: sigue siendo cierto que WhatsApp se podía.
+    expect(d.whatsappPosible).toBe(true)
+  })
+
+  it('pide WhatsApp y se respeta cuando es viable', () => {
+    const porFinestra = decidirCanal({ ...conFinestra, canal_preferido: 'whatsapp' }, AHORA)
+    expect(porFinestra.canal).toBe('whatsapp')
+    expect(porFinestra.motivo).toBe('preferencia_whatsapp')
+    expect(porFinestra.preferenciaRespetada).toBe(true)
+
+    const perOptIn = decidirCanal(
+      { telefono: '34612345678', email: 'a@exemple.cat', opt_in: true, last_inbound_at: haceHoras(72), canal_preferido: 'whatsapp' },
+      AHORA,
+    )
+    expect(perOptIn.canal).toBe('whatsapp')
+    expect(perOptIn.preferenciaRespetada).toBe(true)
+  })
+
+  // ⚠️ El límite duro. Estas tres son las tres filas de la tabla de §8bis en las que
+  // WhatsApp no es viable, y la preferencia no puede moverlas.
+  it('pedir WhatsApp NO salta la ventana ni el opt-in ni la falta de móvil', () => {
+    const casos = [
+      { ...sensePermis, canal_preferido: 'whatsapp' as const, motivo: 'sense_optin_ni_finestra' },
+      { telefono: null, email: 'a@exemple.cat', canal_preferido: 'whatsapp' as const, motivo: 'sense_telefon' },
+      { telefono: '34931234567', email: 'a@exemple.cat', canal_preferido: 'whatsapp' as const, motivo: 'telefon_no_mobil' },
+    ]
+    for (const { motivo, ...datos } of casos) {
+      const d = decidirCanal(datos, AHORA)
+      expect(d.canal).toBe('email')
+      expect(d.whatsappPosible).toBe(false)
+      // El motivo sigue siendo el accionable (qué falta para poder usar WhatsApp)…
+      expect(d.motivo).toBe(motivo)
+      expect(d.motivoWhatsapp).toBe(motivo)
+      // …y esto es lo que impide que el incumplimiento pase en silencio.
+      expect(d.preferido).toBe('whatsapp')
+      expect(d.preferenciaRespetada).toBe(false)
+    }
+  })
+
+  // `sense_correu` estaba en el vocabulario desde el principio y no lo producía nadie:
+  // este es exactamente su caso.
+  it('pedir correo sin tener correo cae a WhatsApp, y lo dice', () => {
+    const d = decidirCanal(
+      { telefono: '34612345678', email: null, last_inbound_at: haceHoras(1), canal_preferido: 'email' },
+      AHORA,
+    )
+    expect(d.canal).toBe('whatsapp')
+    expect(d.motivo).toBe('sense_correu')
+    expect(d.preferenciaRespetada).toBe(false)
+  })
+
+  it('una preferencia no inventa un canal cuando no hay ninguno', () => {
+    for (const preferido of ['whatsapp', 'email'] as const) {
+      const d = decidirCanal({ telefono: null, email: null, canal_preferido: preferido }, AHORA)
+      expect(d.canal).toBe('cap')
+      expect(d.motivo).toBe('sense_canal')
+      expect(d.preferenciaRespetada).toBe(false)
+    }
+  })
+
+  // La invariante de arriba, repetida con preferencia: ninguna preferencia puede dejar sin
+  // canal a quien tiene correo, ni elegir un canal que la propia decisión declara imposible.
+  it('con preferencia se mantienen las dos invariantes del módulo', () => {
+    const telefonos = [null, '34931234567', '34612345678', '351912345678']
+    const optIns = [true, false, null]
+    const entrantes = [null, haceHoras(1), haceHoras(48)]
+    for (const canal_preferido of ['whatsapp', 'email', null] as const) {
+      for (const telefono of telefonos) {
+        for (const opt_in of optIns) {
+          for (const last_inbound_at of entrantes) {
+            const conCorreu = decidirCanal(
+              { telefono, opt_in, last_inbound_at, email: 'a@exemple.cat', canal_preferido }, AHORA,
+            )
+            expect(conCorreu.canal).not.toBe('cap')
+            expect(conCorreu.canal === 'whatsapp' ? conCorreu.whatsappPosible : conCorreu.emailPosible).toBe(true)
+
+            const senseCorreu = decidirCanal(
+              { telefono, opt_in, last_inbound_at, email: null, canal_preferido }, AHORA,
+            )
+            expect(senseCorreu.canal).toBe(senseCorreu.whatsappPosible ? 'whatsapp' : 'cap')
+          }
+        }
+      }
+    }
+  })
+})

@@ -10,6 +10,8 @@ export type Canal = 'whatsapp' | 'email' | 'cap'
 export type MotivoCanal =
   | 'finestra_oberta' | 'opt_in' | 'sense_telefon' | 'telefon_no_mobil'
   | 'sense_optin_ni_finestra' | 'sense_correu' | 'sense_canal'
+  // La organización ha pedido este canal y era viable (§12.22).
+  | 'preferencia_whatsapp' | 'preferencia_email'
 
 export interface EntidadPuntuada {
   id: string
@@ -27,6 +29,10 @@ export interface EntidadPuntuada {
   motiu_canal: MotivoCanal
   whatsapp_possible: boolean
   email_possible: boolean
+  /** Lo que la organización pidió (`organizaciones.canal_preferido`), o null. */
+  canal_preferit: 'whatsapp' | 'email' | null
+  /** false = se le ha cambiado el canal porque el pedido no era viable. */
+  preferencia_respectada: boolean | null
 }
 
 export interface PriorizacionResult {

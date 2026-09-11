@@ -560,6 +560,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     <div className="text-xs">
                       <span className={`font-medium ${canalClases(ent.canal)}`}>{t(`od.canal_${ent.canal}`)}</span>
                       <span className="text-muted-foreground"> · {t(`od.canal_why_${ent.motiu_canal}`)}</span>
+                      {/* Una preferencia que se ignora en silencio es peor que no tenerla. */}
+                      {ent.preferencia_respectada === false && (
+                        <span className="text-aviso"> · {t('od.canal_pref_no', { canal: t(`od.canal_${ent.canal_preferit}`) })}</span>
+                      )}
                     </div>
                   </div>
                 </div>

@@ -9,6 +9,11 @@
 // resuelve el doble rol (un productor que también es entidad y contesta a una oferta
 // se atiende aquí).
 //
+// Esa prioridad se mantiene, pero **condicionada a que la oferta sea la última pregunta
+// que le hemos hecho**: si el intake habló después, contesta el intake. La regla, lo que
+// se midió para llegar a ella y sus dos guardas están en el bloque de `atendreElDialeg()`,
+// unas líneas más abajo (deuda §12.16).
+//
 // El estado del diálogo vive en oferta_respuestas.dialeg_pas/dialeg_dades, igual
 // que intake_sessions para el intake. Mientras el diálogo está en curso la fila
 // sigue 'pendent' (así el emparejamiento "última pendent del teléfono" la sigue
@@ -16,9 +21,127 @@
 
 import { sendBotones, sendText } from "./whatsapp.ts";
 import { leerRespuesta } from "./intake.ts";
+import { rolesDelTelefono } from "./organizacion.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
+
+// ---------------------------------------------------------------------------
+// Quién atiende el mensaje: el diálogo de la oferta o el intake (deuda §12.16)
+// ---------------------------------------------------------------------------
+// LA REGLA, EN UNA LÍNEA: **un mensaje contesta a la última pregunta que le hicimos.**
+//
+// La prioridad de siempre —oferta antes que intake— es la respuesta correcta en el caso
+// normal, y no se toca: una oferta pendiente es una pregunta concreta que ya le hemos
+// hecho, y el intake es un formulario que la persona empieza. Lo que estaba mal era
+// aplicarla SIN MIRAR si esa pregunta seguía siendo la última.
+//
+// ⚠️ LO QUE SE MIDIÓ (11-09-2026). De 17 respuestas plausibles a preguntas del intake,
+//    `clasificar()` resuelve 7 como sí/no, y todas ellas cerrarían la oferta pendiente de
+//    un número de doble rol en vez de contestar al formulario:
+//      · «no ho sé» a «quina varietat és?»        → rebutjada
+//      · «No» a «alguna observació?»              → rebutjada
+//      · «Sí» / «No» escritos (no polsats) en `retorn` → acceptada / rebutjada
+//      · «ok matins» a «quin horari va bé?»       → acceptada
+//    Y la aceptación es la cara cara: abre el paso `kg`, que **consume todos los mensajes
+//    siguientes**, así que a partir de ahí el productor no puede publicar nada. El
+//    diálogo, además, no caducaba nunca (el intake sí, a las 12 h), o sea que ese bloqueo
+//    era permanente.
+//
+// Dos guardas, las dos con los datos que ya existen en la base (ninguna columna nueva):
+//
+//   1. **El intake tiene la palabra si habló después de enviarse la oferta.** Se compara
+//      `intake_sessions.updated_at` con `oferta_respuestas.enviado_at`. Es monótono: en
+//      cuanto el diálogo arranca, el intake deja de avanzar, así que la comparación no se
+//      da la vuelta sola.
+//   2. **El diálogo caduca a las 12 h**, las mismas que el intake. La marca de tiempo va
+//      en `dialeg_dades.darrer_missatge_at`, una columna jsonb que ya existía y estaba sin
+//      usar. Un diálogo caducado no resuelve la fila —sigue `pendent` para el panel—: solo
+//      deja de secuestrar el número, y el mensaje se vuelve a clasificar desde cero, igual
+//      que hace el intake con una sesión olvidada.
+//
+// La organización unificada NO decide nada aquí, y es importante: la elección no depende
+// de quién escribe sino de qué se le preguntó el último. Lo que la etapa 1 aporta es poder
+// **decir** que el número es de doble rol de verdad (las dos fichas comparten
+// organización) en vez de deducirlo de que dos filas compartan teléfono — y eso se
+// registra en el log, donde se puede auditar.
+
+/** Un diálogo de aceptación inactivo tanto tiempo se da por olvidado (como el intake). */
+export const CADUCIDAD_DIALOGO_HORAS = 12;
+
+export interface ContextoAtencion {
+  /** `oferta_respuestas.dialeg_pas`: null, 'kg', 'preu' o 'fet'. */
+  pas: string | null;
+  /** `oferta_respuestas.enviado_at`: cuándo se le mandó la oferta. */
+  enviadoAt: string | null;
+  /** `dialeg_dades.darrer_missatge_at`: último mensaje del diálogo, si lo hubo. */
+  ultimoDialogoAt?: string | null;
+  /** `intake_sessions.updated_at` de este teléfono, o null si no hay sesión. */
+  intakeAt?: string | null;
+}
+
+export type MotivoAtencion =
+  | "dialeg_en_curs"
+  | "dialeg_caducat"
+  | "intake_te_la_paraula"
+  | "oferta_pendent";
+
+export interface Atencion {
+  /** `true` = lo atiende el diálogo de la oferta; `false` = pasa al intake. */
+  dialogo: boolean;
+  /** `true` si hay que reclasificar el sí/no inicial (diálogo caducado). */
+  reiniciarDialogo: boolean;
+  motivo: MotivoAtencion;
+}
+
+function instante(valor: string | null | undefined): number | null {
+  if (!valor) return null;
+  const t = new Date(valor).getTime();
+  return Number.isFinite(t) ? t : null;
+}
+
+/**
+ * Decide quién atiende el mensaje. PURA y sin red, como `canal.ts` y `priorizacion.ts`:
+ * recibe los cuatro instantes y devuelve la decisión, para poder razonarla y probarla.
+ */
+export function atendreElDialeg(ctx: ContextoAtencion, ahora = Date.now()): Atencion {
+  const enCurso = ctx.pas === "kg" || ctx.pas === "preu";
+  const limite = CADUCIDAD_DIALOGO_HORAS * 3600_000;
+
+  if (enCurso) {
+    // Sin marca propia se usa el envío de la oferta: las filas anteriores a este cambio
+    // no tienen `darrer_missatge_at`, y son justo las que pueden llevar meses bloqueando
+    // un número. Dar por vivo lo que no se puede fechar sería conservar el problema.
+    const referencia = instante(ctx.ultimoDialogoAt) ?? instante(ctx.enviadoAt);
+    if (referencia === null || ahora - referencia <= limite) {
+      return { dialogo: true, reiniciarDialogo: false, motivo: "dialeg_en_curs" };
+    }
+    // Caducado: se trata como si no hubiera diálogo, y se vuelve a mirar quién habló
+    // el último antes de clasificar nada.
+    if (intakeHaHabladoDespues(ctx, ahora)) {
+      return { dialogo: false, reiniciarDialogo: true, motivo: "intake_te_la_paraula" };
+    }
+    return { dialogo: true, reiniciarDialogo: true, motivo: "dialeg_caducat" };
+  }
+
+  if (intakeHaHabladoDespues(ctx, ahora)) {
+    return { dialogo: false, reiniciarDialogo: false, motivo: "intake_te_la_paraula" };
+  }
+  return { dialogo: true, reiniciarDialogo: false, motivo: "oferta_pendent" };
+}
+
+/** ¿La última cosa que se habló con este número fue el intake, y sigue vivo? */
+function intakeHaHabladoDespues(ctx: ContextoAtencion, ahora: number): boolean {
+  const intake = instante(ctx.intakeAt);
+  if (intake === null) return false;
+  // Una sesión olvidada no reclama nada: el intake también la descarta a las 12 h.
+  if (ahora - intake > CADUCIDAD_DIALOGO_HORAS * 3600_000) return false;
+  const enviado = instante(ctx.enviadoAt);
+  // Sin fecha de envío no se puede afirmar que la oferta sea posterior; la oferta es la
+  // pregunta explícita, así que ante la duda se queda con ella.
+  if (enviado === null) return false;
+  return intake > enviado;
+}
 
 // Normaliza para comparar: quita acentos, signos y espacios de más.
 export function normalizar(texto: string): string {
@@ -151,6 +274,47 @@ export function parseNumero(texto: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+/**
+ * Marca de tiempo del diálogo, dentro de `dialeg_dades` (jsonb que ya existía y no se
+ * usaba). Se escribe cuando el diálogo AVANZA de paso; si se queda atascado repitiendo la
+ * misma pregunta, la marca no se mueve y a las 12 h el número se libera solo.
+ */
+function marcaDialogo(previas: Record<string, unknown> | null | undefined): Record<string, unknown> {
+  return { ...(previas ?? {}), darrer_missatge_at: new Date().toISOString() };
+}
+
+/**
+ * Deja constancia de a quién se está atendiendo cuando el número tiene los dos papeles.
+ *
+ * No decide nada: solo hace auditable lo que hasta ahora era invisible. Y desde la etapa 1
+ * de la organización unificada puede afirmar si las dos fichas son **la misma
+ * organización** —comparando `organizacion_id`— en vez de deducirlo de que compartan
+ * teléfono, que es lo que nunca se pudo distinguir de dos fichas con la misma centralita.
+ */
+async function registrarDobleRol(
+  supabase: Cliente,
+  telefono: string,
+  motivo: MotivoAtencion,
+): Promise<void> {
+  try {
+    const roles = await rolesDelTelefono(supabase, telefono);
+    if (!roles.productor || !roles.entidad) {
+      console.log(`[respuestas] ${telefono}: ${motivo}`);
+      return;
+    }
+    const org = roles.mismaOrganizacion
+      ? `organització ${roles.productor.organizacion_id}`
+      : "dues organitzacions diferents amb el mateix telèfon";
+    console.log(
+      `[respuestas] doble rol (${org}): ${roles.productor.nombre ?? roles.productor.id} · ` +
+        `${roles.entidad.nombre ?? roles.entidad.id} → ${motivo}`,
+    );
+  } catch (err) {
+    // El log no puede romper la conversación.
+    console.error("registrarDobleRol:", err instanceof Error ? err.message : String(err));
+  }
+}
+
 /** Cierra la aceptación: la fila queda 'acceptada' y pendiente de aprobación. */
 async function finalizarAceptacion(
   supabase: Cliente,
@@ -212,7 +376,7 @@ export async function procesarRespuestaOferta(
   // La respuesta se vincula a la última oferta pendiente enviada a este número.
   const { data: filas } = await supabase
     .from("oferta_respuestas")
-    .select("id, excedente_id, dialeg_pas")
+    .select("id, excedente_id, entidad_id, dialeg_pas, dialeg_dades, enviado_at")
     .eq("telefono", from)
     .eq("estado", "pendent")
     .order("enviado_at", { ascending: false })
@@ -220,7 +384,26 @@ export async function procesarRespuestaOferta(
   const fila = (filas ?? [])[0];
   if (!fila) return false;
 
-  const pas: string | null = fila.dialeg_pas ?? null;
+  // ¿A quién le toca contestar este mensaje? (deuda §12.16, ver la cabecera del módulo)
+  // Solo se pregunta cuando hay una oferta pendiente, que es cuando puede haber conflicto.
+  const { data: sesiones } = await supabase
+    .from("intake_sessions").select("updated_at").eq("telefono", from)
+    .order("updated_at", { ascending: false }).limit(1);
+  const atencion = atendreElDialeg({
+    pas: fila.dialeg_pas ?? null,
+    enviadoAt: fila.enviado_at ?? null,
+    ultimoDialogoAt: (fila.dialeg_dades ?? {}).darrer_missatge_at ?? null,
+    intakeAt: (sesiones ?? [])[0]?.updated_at ?? null,
+  });
+
+  if (!atencion.dialogo || atencion.reiniciarDialogo) {
+    await registrarDobleRol(supabase, from, atencion.motivo);
+  }
+  if (!atencion.dialogo) return false;
+
+  // Un diálogo caducado se reclasifica desde cero: la fila sigue `pendent`, pero deja de
+  // consumir todo lo que escriba este número.
+  const pas: string | null = atencion.reiniciarDialogo ? null : (fila.dialeg_pas ?? null);
 
   // ---- Paso: quants kg ----
   if (pas === "kg") {
@@ -240,7 +423,8 @@ export async function procesarRespuestaOferta(
       exc.preu_minim != null;
     if (conPreu) {
       await supabase.from("oferta_respuestas")
-        .update({ kg_solicitados: kg, dialeg_pas: "preu" }).eq("id", fila.id);
+        .update({ kg_solicitados: kg, dialeg_pas: "preu", dialeg_dades: marcaDialogo(fila.dialeg_dades) })
+        .eq("id", fila.id);
       await sendBotones(
         supabase, from,
         `El preu mínim d'aquesta oferta és ${Number(exc.preu_minim)} €/kg. Hi estàs d'acord?`,
@@ -298,7 +482,8 @@ export async function procesarRespuestaOferta(
   const disp = Math.max(0, Number(exc?.kg_total ?? 0) - usados);
 
   await supabase.from("oferta_respuestas")
-    .update({ dialeg_pas: "kg", mensaje_respuesta: texto }).eq("id", fila.id);
+    .update({ dialeg_pas: "kg", mensaje_respuesta: texto, dialeg_dades: marcaDialogo(fila.dialeg_dades) })
+    .eq("id", fila.id);
   await sendText(
     supabase, from,
     `Perfecte! Quants kg en vols?${disp ? ` (disponibles: ${disp} kg aprox)` : ""} ` +

@@ -25,6 +25,7 @@ import { sendText } from "../_shared/whatsapp.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { esCuentaPermitida, modoTestActivo } from "../_shared/gate.ts";
 import { decidirCanal } from "../_shared/canal.ts";
+import { preferenciaDeCuenta } from "../_shared/organizacion.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
   .split(",").map((o) => o.trim()).filter(Boolean);
@@ -98,11 +99,15 @@ Deno.serve(async (req) => {
       );
     }
 
-    // Canal (`canal.ts`): 'auto' es el modo normal — WhatsApp solo si de verdad se
-    // puede (móvil + opt-in o ventana abierta) y, si no, correo. `email`,
-    // `whatsapp` y `ambos` siguen forzando el canal, para poder reenviar a mano.
+    // Canal (`canal.ts`): 'auto' es el modo normal — el que pida la organización de la
+    // cuenta (`organizaciones.canal_preferido`, §12.22) si es viable y, si no, WhatsApp
+    // solo cuando de verdad se puede (móvil + opt-in o ventana abierta) y correo en
+    // cualquier otro caso. `email`, `whatsapp` y `ambos` siguen forzando el canal, para
+    // poder reenviar a mano.
     let canal: string = canalPedido;
     let motivoCanal: string | null = null;
+    let preferido: string | null = null;
+    let preferenciaRespetada: boolean | null = null;
     if (canalPedido === "auto") {
       const { data: contacto } = perfil.telefono
         ? await supabase.from("wa_contacts").select("opt_in, last_inbound_at")
@@ -113,11 +118,22 @@ Deno.serve(async (req) => {
         email: perfil.email ?? email,
         opt_in: contacto?.opt_in,
         last_inbound_at: contacto?.last_inbound_at,
+        canal_preferido: await preferenciaDeCuenta(supabase, perfil.id),
       });
       // 'cap' no puede pasar aquí (la cuenta siempre tiene correo), pero si pasara,
       // el correo es el destino evidente: es el identificador de la cuenta.
       canal = decision.canal === "whatsapp" ? "whatsapp" : "email";
       motivoCanal = decision.motivo;
+      preferido = decision.preferido;
+      preferenciaRespetada = decision.preferenciaRespetada;
+      if (preferenciaRespetada === false) {
+        // Que no pase en silencio: quien mira los logs tiene que poder ver que se ha
+        // contactado por un canal distinto del que la organización pidió.
+        console.warn(
+          `[enviar-acceso] preferència no respectada: ${email} demana ${preferido} ` +
+            `i s'envia per ${canal} (${motivoCanal})`,
+        );
+      }
     }
 
     const redirectTo = Deno.env.get("APP_URL") ?? ALLOWED_ORIGINS[0];
@@ -135,7 +151,13 @@ Deno.serve(async (req) => {
     const codi = props?.email_otp;
     if (!enlace || !codi) return responder({ error: "Enlace incompleto" }, 500);
 
-    const resultado: Record<string, unknown> = { ok: true, canal, motiu_canal: motivoCanal };
+    const resultado: Record<string, unknown> = {
+      ok: true,
+      canal,
+      motiu_canal: motivoCanal,
+      canal_preferit: preferido,
+      preferencia_respectada: preferenciaRespetada,
+    };
 
     // --- WhatsApp: SOLO el código, y con el cuerpo redactado en la consola -----
     // Va primero para poder caer al correo si falla (ver más abajo).
@@ -158,6 +180,9 @@ Deno.serve(async (req) => {
           canal = "email";
           resultado.canal = "email";
           resultado.motiu_canal = "whatsapp_ha_fallat";
+          // Si el canal que ha fallado era el que la organización pedía, el respaldo es
+          // también un incumplimiento de la preferencia y se dice.
+          if (preferido === "whatsapp") resultado.preferencia_respectada = false;
         }
       }
     }

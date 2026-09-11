@@ -467,6 +467,7 @@ supabase/
     _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5)
     _shared/gate.ts            Gate de envío: quién PUEDE recibir (es_test, cuenta) + modoTestActivo (§8)
     _shared/canal.ts           Política de canal: por dónde se contacta; el correo es el defecto (§8bis)
+    _shared/organizacion.ts    organizaciones: preferencia de canal y doble rol real (§8bis, §12.16)
     _shared/autorizacion.ts    Autorización por rol: contextoUsuario/exigirEquipo (§4bis; service_role ignora RLS)
     priorizar-entidades/       POST: ranking de entidades para un excedente (JWT)
     whatsapp-send/index.ts     POST: reglas de envío; delega en _shared
@@ -1900,6 +1901,17 @@ Vive en **`_shared/canal.ts`**, función **pura y sin red** (mismo criterio que 
 reciben WhatsApp. Fuera de España no se puede saber por el prefijo, así que se acepta: más vale intentarlo
 y que lo rechace Meta que descartarlo por nuestra cuenta.
 
+**La organización puede DECIR su canal** (`organizaciones.canal_preferido`, desde la etapa 1 de la
+organización unificada). `decidirCanal()` lo recibe **por parámetro** —el módulo sigue siendo puro y
+sin red; quien lee la tabla es `_shared/organizacion.ts`— y lo respeta **cuando el canal pedido es
+viable**. ⚠️ Una preferencia **no es un permiso**: pedir WhatsApp no abre la ventana de 24 h ni
+sustituye al opt-in (son requisitos de Meta, no gustos), así que si no se puede se cae al otro canal
+y la decisión lo dice con `preferenciaRespetada: false` — el panel y los logs lo enseñan, porque una
+preferencia ignorada en silencio es peor que no tenerla. `null` = deducir como siempre, que es el
+caso de las 464 fichas de hoy. Lo aplican `priorizar-entidades` (por entidad: `canal_preferit`,
+`preferencia_respectada`) y `enviar-acceso` (`canal: 'auto'`, por la organización de la cuenta); se
+escribe con `actualizar_meu_canal()` desde el perfil (§4bis).
+
 **Quién PUEDE recibir (§8, `es_test`) y POR DÓNDE (esto) son cosas distintas y se aplican las dos.** Hoy,
 con el modo test activo, la política de canal solo llega a alcanzar a los usuarios `es_test`.
 
@@ -2725,13 +2737,25 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     se encienda: el checkpoint exige cuatro cosas más en ese mismo commit, y esa parada es el
     recordatorio.
 16. **Doble rol** productor+entidad (Carles Sanz, Sebas Sale, Raquel Diaz, Laura Masdeu): tablas
-    separadas sin FK, un teléfono puede estar en ambas. En el **panel** ya está resuelto —se ven los
-    dos menús a la vez (§6ter)—, pero **en WhatsApp no**: el webhook lo desambigua por prioridad
-    (§5), y el **diálogo de aceptación** (SÍ → kg → preu) manda sobre el intake, así que un
-    productor-entidad con una oferta `pendent` que responda verá su conversación conducida por la
-    aceptación (mientras `dialeg_pas` esté activo consume sus mensajes), no por el intake. Desde el
-    31-07-2026 esto es **alcanzable de verdad**: hay cuatro cuentas de doble rol con móvil en la
-    whitelist de Meta (§9), así que es el primer sitio donde conviene mirar si algo se comporta raro.
+    separadas sin FK, un teléfono puede estar en ambas. En el **panel** está resuelto (§6ter), y
+    desde la etapa 1 de `organizaciones` el sistema **sabe** que las dos fichas son la misma
+    organización (comparando `organizacion_id`) en vez de deducirlo de que compartan teléfono.
+    En **WhatsApp** manda desde el 11-09-2026 la regla «**un mensaje contesta a la última pregunta
+    que le hicimos**» (`atendreElDialeg()`, pura, en `_shared/respuestas.ts`): la oferta pendiente
+    sigue teniendo prioridad sobre el intake —es una pregunta concreta y ya hecha—, **salvo que el
+    intake haya hablado después** de enviarse la oferta (`intake_sessions.updated_at` >
+    `oferta_respuestas.enviado_at`).
+    ⚠️ **Lo que arregló, medido**: de 17 respuestas plausibles a preguntas del intake, `clasificar()`
+    resuelve **7** como sí/no («no ho sé» a la varietat, «No» a les observacions, «Sí» escrit a
+    `retorn`, «ok matins» a l'horari…), y cada una cerraba la oferta con una respuesta dirigida a
+    otra pregunta. La que aceptaba abría el paso `kg`, que consume **todos** los mensajes siguientes
+    y **no caducaba nunca**, así que dejaba el número **secuestrado de forma permanente**: ese
+    productor no podía volver a publicar nada por WhatsApp. Ahora el diálogo caduca a las 12 h como
+    el intake (marca en `dialeg_dades.darrer_missatge_at`, jsonb que ya existía); caducar **no
+    resuelve la fila** —sigue `pendent` para el panel—, solo libera el número.
+    La organización **no decide nada aquí** —la elección depende de qué se preguntó el último— pero
+    sí se **registra** en el log a quién se está atendiendo y si las dos fichas son la misma
+    organización, que antes era indistinguible de dos organizaciones con el mismo teléfono.
 17. Coexisten dos gates: **`es_test`** (fuente de verdad de la app, §8) y las whitelists
     `meta_test_recipients`/`email_test_recipients` (requisito técnico de Meta en test). En test un
     destinatario debe cumplir **ambos**; se inicializaron alineados. El **Dashboard** aún gestiona
@@ -2751,18 +2775,32 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     Lo único que se pierde es `canalizaciones.comentarios = 'Preu acordat: …'`, que la RPC no
     escribe: **no lo lee nadie** —ninguna pantalla pinta esa columna— y el precio vive en
     `oferta_respuestas.preu_ofert`, que es su sitio.
-20. **Rol único por usuario**: `usuario_roles` admite varias filas pero la interfaz asumirá el más
-    alto. El funcional (§1bis) pide multirol real por organización; las `membresias` ya lo permiten,
-    la UI aún no.
+20. ~~**Rol único por usuario.**~~ — **cerrada por medición (11-09-2026): las dos mitades de esta
+    entrada ya no describen nada.**
+    La primera —«la interfaz asumirá el más alto»— **no es una aproximación, es la definición**: la
+    jerarquía de `usuario_roles` es **acumulativa** (`admin` es todo lo de `tecnic` y más;
+    `super_admin`, todo lo de `admin` y más), así que quedarse con el más alto es la lectura
+    correcta, no una simplificación. En producción hay **una** cuenta con dos filas
+    (`hola@carlessanz.com`: `admin` + `super_admin`) y quedarse con `super_admin` es exactamente lo
+    que debe pasar. `mi_rol()` ordena y `limit 1`.
+    La segunda —«el multirol por organización la UI aún no»— se resolvió el **31-07-2026**: el menú
+    pinta **todos los paneles a la vez** (§6ter) y el panel activo se deriva de la URL. Y desde
+    `20270311100000` la base impone una ficha de cada tipo por cuenta (§12.31).
+    Lo que sí queda, y no es esto: `rol_org` (`titular`/`operador`) vale **siempre `titular`** de
+    facto —el producto no tiene cargos dentro de la organización—, así que la rama `operador` de
+    `PerfilOrganitzacio` es código sin cobertura (§9).
 21. **El canal preferente (§8bis) no llega a todos los envíos.** Lo aplican `OfferDetail` (botón
     «Enviar») y `enviar-acceso`; el **intake**, los **recordatorios** y el **ALTA/BAJA** siguen siendo
     WhatsApp puro, que es correcto —son respuestas dentro de una conversación que la persona ha
     iniciado por WhatsApp—, pero un productor que solo tenga correo no puede publicar una oferta de
     forma conversacional. La vía para él es el panel (§6ter). Falta también el fallback a correo en
     `whatsapp-send` mismo: hoy lo orquesta el llamante.
-22. **Sin preferencia de canal declarada por la persona.** El canal se deduce de lo que hay en la
-    ficha (móvil, opt-in, ventana). El funcional pide un campo explícito de «canal preferido» por
-    organización: cuando exista, mandará sobre la deducción.
+22. ~~**Sin preferencia de canal declarada por la persona.**~~ — **resuelta (11-09-2026)**:
+    `organizaciones.canal_preferido` se escribe con `actualizar_meu_canal()` desde el perfil y lo
+    respetan `decidirCanal()` y sus dos consumidores (§8bis). Queda el límite, que es **de Meta y no
+    del código**: la preferencia elige **entre los canales viables**; pedir WhatsApp sin opt-in y con
+    la ventana cerrada sigue saliendo por correo, ahora marcado como preferencia incumplida en el
+    panel y en el log — que es la diferencia entre no poder cumplirla y ignorarla.
 23. ~~**`excedentes` tiene el único predicado de RLS que no puede ser InitPlan.**~~ — **resuelta
     (`20270304100400`)**: el `EXISTS` correlacionado se sustituye por el SRF `security definer`
     `modalitats_compatibles_meves()` y un `modalitat in (select …)`, que el planner resuelve una vez
