@@ -545,3 +545,13 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/subir-documento-externo/deno.json"
 entrypoint = "./functions/subir-documento-externo/index.ts"
+
+# Limpieza de los PDF huérfanos de los ciclos de prueba (§12.51, §12.88). La otra mitad de
+# `reiniciar_documentos_prova()`: SQL borra las filas y esto los objetos del bucket, que SQL no
+# puede tocar. Con JWT porque quien la lanza es una persona desde el panel, y dentro exige
+# super_admin. Solo mira dentro de `proves/` y solo borra lo que ninguna fila reclama.
+[functions.limpiar-documentos-prueba]
+enabled = true
+verify_jwt = true
+import_map = "./functions/limpiar-documentos-prueba/deno.json"
+entrypoint = "./functions/limpiar-documentos-prueba/index.ts"

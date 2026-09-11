@@ -25,7 +25,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { type BytesActivos, cargarActivos } from "../_shared/pdf/fuentes.ts";
-import type { DatosAlbaran, PlantillaLegal } from "../_shared/pdf/render/comu.ts";
+import type {
+  ConfirmacionAlbaran,
+  DatosAlbaran,
+  PlantillaLegal,
+} from "../_shared/pdf/render/comu.ts";
 import { renderEnt } from "../_shared/pdf/render/ent.ts";
 import { renderOpe } from "../_shared/pdf/render/ope.ts";
 import { type LineaProva, renderProva } from "../_shared/pdf/render/prova.ts";
@@ -358,6 +362,7 @@ async function renderizar(
   // lo archiva en la carpeta del original, `ruta_documento`).
   const tipoBase = doc.tipo.replace(/^R-/, "");
   if (tipoBase === "REC" || tipoBase === "ENT" || tipoBase === "OPE") {
+    const confirmaciones = await confirmacionesAlbaran(supabase, doc.objeto_id);
     const op = {
       datos: datos as DatosAlbaran,
       sha256Datos: doc.sha256_datos,
@@ -365,6 +370,7 @@ async function renderizar(
       modo: doc.modo === "prueba" ? ("prueba" as const) : ("real" as const),
       rectificativo: doc.tipo.startsWith("R-"),
       subtipo: doc.subtipo,
+      confirmaciones,
     };
     if (tipoBase === "REC") return await renderRec(activos, op);
     if (tipoBase === "ENT") return await renderEnt(activos, op);
@@ -489,6 +495,120 @@ async function renderizar(
     default:
       throw new Error(`Tipo de documento sin renderizador: ${doc.tipo}`);
   }
+}
+
+
+// ---------------------------------------------------------------------------
+// Lo que el ALBARÁN necesita y el snapshot NO PUEDE llevar
+// ---------------------------------------------------------------------------
+// ⚠️ Aquí hay una trampa de orden que conviene tener escrita, porque el arreglo
+//    «evidente» —meter las evidencias en `albaran_datos()`— no arregla nada:
+//
+//      1. `emitir_albaran()` congela el snapshot y crea la fila de `documentos`.
+//      2. `marcar_entregado()` exige `estado = 'emitido'` y solo entonces crea los
+//         enlaces de confirmación.
+//      3. Quien recibe confirma, y se escribe la evidencia.
+//
+//    O sea que cuando la confirmación existe, el snapshot lleva rato siendo inmutable
+//    (`documentos_inmutable` congela `datos`). Meterlas en el snapshot solo serviría
+//    para los albaranes futuros, y ni eso: en el instante de emitir todavía no hay
+//    ninguna confirmación que meter.
+//
+//    Por eso se leen aquí, con `service_role`, en el momento de generar el PDF. Es el
+//    mismo camino que ya usa el convenio para el trazo de la firma y el DNI, y por el
+//    mismo motivo: hay datos que no pertenecen al snapshot y sin embargo el papel los
+//    tiene que enseñar.
+//
+// De `evidencias` se toman `nombre`, `cargo` y `created_at`, y del enlace su `canal`.
+// **La IP y el user-agent no se piden siquiera**: el albarán lo descarga también la otra
+// parte, y el texto legal ya dice que quedan registrados.
+
+/** La confirmación más reciente de cada enlace de confirmación del albarán. */
+async function confirmacionesAlbaran(
+  supabase: Cliente,
+  albaranId: string,
+): Promise<ConfirmacionAlbaran[]> {
+  const t0 = performance.now();
+  // ⚠️ `rol_parte` es de `20270304100200` y esta función se despliega por su cuenta: en un
+  //    entorno donde esa migración no esté aplicada, pedir la columna devuelve `42703` y
+  //    dejaría el albarán SIN bloque de conformidad, que es peor que dejarlo sin rol. Por
+  //    eso se pide y, si no existe, se repite la consulta sin ella. En cuanto la migración
+  //    entra, el primer intento acierta y esto no vuelve a ejecutarse.
+  //
+  // La lista de columnas va en UN literal, en las dos variantes (§7, deuda 46).
+  const consulta = (conRol: boolean) =>
+    supabase
+      .from("enlaces_token")
+      .select(
+        conRol
+          ? "id, proposito, objeto_tipo, objeto_id, canal, rol_parte, created_at"
+          : "id, proposito, objeto_tipo, objeto_id, canal, created_at",
+      )
+      .eq("objeto_tipo", "albaran")
+      .eq("objeto_id", albaranId)
+      .eq("proposito", "confirmacion_albaran");
+
+  let { data: enlaces, error: errEnlaces } = await consulta(true);
+  if (errEnlaces && ["42703", "PGRST204"].includes(String(errEnlaces.code))) {
+    console.warn("generar-documento: enlaces_token sin `rol_parte`; se pinta sin atribuir parte");
+    ({ data: enlaces, error: errEnlaces } = await consulta(false));
+  }
+  if (errEnlaces) {
+    // Un albarán sin su bloque de conformidad relleno se sigue pudiendo emitir; uno que
+    // no se emite, no. Se avisa y se sigue.
+    console.warn("generar-documento: enlaces del albarà:", errEnlaces.message);
+    return [];
+  }
+  const filas = (enlaces ?? []) as { id: string; canal: string | null; rol_parte?: string | null }[];
+  if (filas.length === 0) return [];
+  const infoDe = new Map(filas.map((e) => [e.id, e]));
+
+  const { data: evs, error: errEvs } = await supabase
+    .from("evidencias")
+    .select("id, enlace_id, tipo, nombre, cargo, created_at")
+    .in("enlace_id", [...infoDe.keys()])
+    .eq("tipo", "confirmacion")
+    .order("created_at", { ascending: true });
+  if (errEvs) {
+    console.warn("generar-documento: evidencias del albarà:", errEvs.message);
+    return [];
+  }
+
+  // Una por enlace, la última: reconfirmar sustituye, no acumula.
+  const porEnlace = new Map<string, ConfirmacionAlbaran>();
+  for (
+    const e of (evs ?? []) as {
+      id: string;
+      enlace_id: string;
+      nombre: string | null;
+      cargo: string | null;
+      created_at: string | null;
+    }[]
+  ) {
+    const info = infoDe.get(e.enlace_id);
+    const rol = info?.rol_parte;
+    porEnlace.set(e.enlace_id, {
+      nombre: e.nombre,
+      cargo: e.cargo,
+      at: e.created_at,
+      canal: info?.canal ?? null,
+      rol: rol === "entrega" || rol === "recibe" ? rol : null,
+      // Referencia corta, no el uuid entero: sirve para encontrar la fila sin
+      // publicar el identificador completo en un papel que circula.
+      referencia: e.id.slice(0, 8),
+    });
+  }
+
+  const ms = performance.now() - t0;
+  if (ms > 1) {
+    console.log(JSON.stringify({
+      fn: "generar-documento",
+      confirmacions_ms: Number(ms.toFixed(1)),
+      enllacos: filas.length,
+      confirmacions: porEnlace.size,
+    }));
+  }
+  return [...porEnlace.values()];
 }
 
 

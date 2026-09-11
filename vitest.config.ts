@@ -20,7 +20,9 @@ import { fileURLToPath, URL } from 'node:url'
 //   · `_shared/pdf/maquetador.ts`, `fuentes.ts` y los renderizadores — importan `npm:pdf-lib`.
 //     Lo que sí se prueba de ahí es `bloques.ts` y `lletres.ts`, que son puros y son donde
 //     está la lógica que decide lo que dice un documento.
-//   · `_shared/whatsapp.ts`, `cors.ts`, `resend.ts` — leen `Deno.env` al cargar el módulo.
+//   · `_shared/whatsapp.ts` y `cors.ts` — leen `Deno.env` al cargar el módulo.
+//     (`resend.ts` ya NO: sus secretos se leen dentro de las funciones y su interruptor de
+//     envío vive en `esEnvioReal()`, que es pura y sí está probada.)
 //
 // El alias `@` tiene que repetirse aquí: media aplicación importa por `@/components/ui/...`
 // y sin él las pruebas de `src/` no resuelven.

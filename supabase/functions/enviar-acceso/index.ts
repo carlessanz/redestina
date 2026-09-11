@@ -182,8 +182,8 @@ Deno.serve(async (req) => {
         subject: "El teu accés a Redestina",
         html,
         text: `Accés a Redestina: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora).`,
-      });
-      resultado.email = r.ok ? "enviat" : `error: ${JSON.stringify(r.data)}`;
+      }, { supabase, proposito: "acces", funcion: "enviar-acceso" });
+      resultado.email = r.ok ? (r.simulado ? "simulat" : "enviat") : `error: ${JSON.stringify(r.data)}`;
     }
 
     return responder(resultado, 200);

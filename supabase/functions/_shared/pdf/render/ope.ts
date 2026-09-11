@@ -90,10 +90,18 @@ export async function renderOpe(
   }
 
   // Las DOS partes confirman (§3.3.2): un bloque de firma por cada una, rotulados con
-  // su razón social para que no haya duda de quién firma dónde.
+  // su razón social para que no haya duda de quién firma dónde. El `rol` es lo que
+  // permite casar cada bloque con su confirmación registrada (`enlaces_token.rol_parte`);
+  // usa el vocabulario de `albaran_partes()`, no uno propio.
   ctx.op.conformidades = [
-    `${t.entrega} · ${datos.partes?.entrega?.razon_social ?? ""}`.trim().replace(/ ·\s*$/, ""),
-    `${t.rep} · ${datos.partes?.recibe?.razon_social ?? ""}`.trim().replace(/ ·\s*$/, ""),
+    {
+      rotulo: `${t.entrega} · ${datos.partes?.entrega?.razon_social ?? ""}`.trim().replace(/ ·\s*$/, ""),
+      rol: "entrega",
+    },
+    {
+      rotulo: `${t.rep} · ${datos.partes?.recibe?.razon_social ?? ""}`.trim().replace(/ ·\s*$/, ""),
+      rol: "recibe",
+    },
   ];
 
   return await cerrarAlbaran(ctx);

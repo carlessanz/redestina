@@ -35,6 +35,13 @@
 //      revocar y emitir uno nuevo— o llamen. Es el modelo asistido del funcional
 //      (§1bis) aplicado al recordatorio: decide una persona, no un cron.
 //
+// Y como el aviso lo tiene que resolver una persona, el correo la lleva HASTA EL SITIO:
+// cada fila enlaza con la pantalla donde se revoca y se reenvía —`/equip/convenis/<id>`,
+// que llama a `enviar_convenio()` (emite uno nuevo y revoca el anterior), o
+// `/equip/albarans/<id>`, que llama a `marcar_entregado()`— y se identifica por el
+// NÚMERO del documento, no por un trozo de uuid. Eso es lo que separa un aviso de un
+// aviso accionable (deudas §12.57 y §12.74).
+//
 // Mejora sobre «un correo por enlace»: se manda **un solo resumen por ejecución**,
 // con todos los enlaces vencidos en una tabla. El cron es diario, así que un correo
 // al día con la lista se lee; N correos sueltos se archivan sin mirar. Además, un
@@ -96,6 +103,26 @@ const LIMITE_CONSULTA = 200;
  * espera a mañana, que para un recordatorio es intrascendente.
  */
 const MAX_POR_EJECUCION = 50;
+
+/**
+ * La pantalla del panel donde se resuelve cada cosa. Es lo que convierte el aviso en algo
+ * accionable: el correo NO puede llevar el enlace original —de `enlaces_token` solo se
+ * guarda el hash— pero sí puede llevar a quien lee al sitio exacto donde se revoca y se
+ * reenvía (`enviar_convenio()` emite uno nuevo y revoca el anterior; `marcar_entregado()`
+ * vuelve a crear los de confirmación). Sin esto, el recordatorio decía «hay algo
+ * pendiente» y dejaba al equipo buscándolo a mano (deudas §12.57 y §12.74).
+ */
+function enlacePanel(objetoTipo: string, objetoId: string): string | null {
+  if (objetoTipo === "convenio") return `${APP_URL}/equip/convenis/${objetoId}`;
+  if (objetoTipo === "albaran") return `${APP_URL}/equip/albarans/${objetoId}`;
+  return null;
+}
+
+/** Qué hay que hacer con cada tipo de enlace, dicho en una línea. */
+const ACCION_TEXTO: Record<string, string> = {
+  firma_convenio: "Reenviar (revoca l'anterior) o signatura assistida",
+  confirmacion_albaran: "Reenviar o confirmar des del panell",
+};
 
 interface FilaEnlace {
   id: string;
@@ -181,8 +208,73 @@ interface Vencido {
   dias: number;
 }
 
-/** El resumen que se manda al equipo. Todo lo que viene de la base va escapado. */
-function cuerpoResumen(vencidos: Vencido[], ahoraMs: number): string {
+/**
+ * Cómo se llama el objeto que espera respuesta, para que el equipo sepa CUÁL es sin
+ * abrirlo. Antes el resumen imprimía los ocho primeros caracteres del uuid, que no
+ * identifica nada: un albarán se conoce por su número (`ENT-2026-00042`) y un convenio
+ * pendiente de firma **todavía no tiene número** —se pide al firmar—, así que ahí lo que
+ * identifica es el tipo y la organización.
+ */
+interface Identificacion {
+  numero: string | null;
+  etiqueta: string | null;
+}
+
+const CONVENIO_TEXTO: Record<string, string> = {
+  don_gen: "Conveni de donació · generador",
+  don_rec: "Conveni de donació · receptor",
+  com: "Conveni comercial",
+};
+
+async function identificar(
+  supabase: Cliente,
+  vencidos: Vencido[],
+): Promise<Map<string, Identificacion>> {
+  const mapa = new Map<string, Identificacion>();
+  const porTipo = (tipo: string) =>
+    [...new Set(vencidos.filter((v) => v.fila.objeto_tipo === tipo).map((v) => v.fila.objeto_id))];
+
+  const albaranes = porTipo("albaran");
+  const convenios = porTipo("convenio");
+
+  // Dos consultas como mucho por ejecución, y solo si hay algo que avisar.
+  if (albaranes.length > 0) {
+    // La lista de columnas, en UN literal (§7, deuda 46).
+    const { data, error } = await supabase
+      .from("albaranes")
+      .select("id, tipo, numero_completo, estado")
+      .in("id", albaranes);
+    if (error) console.warn("recordatorios-documentales: albaranes:", error.message);
+    for (const a of (data ?? []) as { id: string; tipo: string; numero_completo: string | null }[]) {
+      mapa.set(a.id, { numero: a.numero_completo, etiqueta: `Albarà ${a.tipo}` });
+    }
+  }
+  if (convenios.length > 0) {
+    const { data, error } = await supabase
+      .from("convenios")
+      .select("id, tipo, numero_completo, estado")
+      .in("id", convenios);
+    if (error) console.warn("recordatorios-documentales: convenios:", error.message);
+    for (const c of (data ?? []) as { id: string; tipo: string; numero_completo: string | null }[]) {
+      mapa.set(c.id, { numero: c.numero_completo, etiqueta: CONVENIO_TEXTO[c.tipo] ?? "Conveni" });
+    }
+  }
+  return mapa;
+}
+
+/**
+ * El resumen que se manda al equipo. Todo lo que viene de la base va escapado.
+ *
+ * Cada fila lleva **el enlace a la pantalla donde se resuelve**, no el enlace de firma
+ * —ese no se puede reconstruir— y **el número del documento**, no un trozo de uuid. Es
+ * lo que hace que el aviso se pueda accionar sin buscar nada a mano.
+ */
+function cuerpoResumen(
+  vencidos: Vencido[],
+  ahoraMs: number,
+  ids: Map<string, Identificacion>,
+  limitados: number,
+): string {
   const filas = vencidos.map((v) => {
     const destinatario = v.fila.destinatario_email
       ? escaparHtml(v.fila.destinatario_nombre ?? v.fila.destinatario_email)
@@ -190,22 +282,44 @@ function cuerpoResumen(vencidos: Vencido[], ahoraMs: number): string {
     const correo = v.fila.destinatario_email
       ? `<br><span style="color:#5f6b5a">${escaparHtml(v.fila.destinatario_email)}</span>`
       : "";
+    const id = ids.get(v.fila.objeto_id);
+    // El número si lo tiene; si no (un conveni en `pendent_firma` todavía no lo tiene:
+    // se pide al firmar), el tipo. El uuid corto se queda como último recurso.
+    const queEs = escaparHtml(
+      id?.numero ?? id?.etiqueta ?? OBJETO_TEXTO[v.fila.objeto_tipo] ?? v.fila.objeto_tipo,
+    );
+    const url = enlacePanel(v.fila.objeto_tipo, v.fila.objeto_id);
+    const accion = escaparHtml(ACCION_TEXTO[v.fila.proposito] ?? "Obre'l al panell");
+    const boton = url
+      ? `<a href="${url}" style="color:#4e6b45;font-weight:600;text-decoration:underline">Obre i reenvia</a>
+         <br><span style="color:#5f6b5a;font-size:12px">${accion}</span>`
+      : `<span style="color:#5f6b5a">${accion}</span>`;
     return `<tr style="border-top:1px solid #e0d9ca">
       <td style="padding:8px 10px;vertical-align:top">${destinatario}${correo}</td>
       <td style="padding:8px 10px;vertical-align:top">${
       escaparHtml(PROPOSITO_TEXTO[v.fila.proposito] ?? v.fila.proposito)
-    }<br><span style="color:#5f6b5a">${
-      escaparHtml(OBJETO_TEXTO[v.fila.objeto_tipo] ?? v.fila.objeto_tipo)
-    } · ${escaparHtml(v.fila.objeto_id.slice(0, 8))}</span></td>
+    }<br><span style="color:#5f6b5a">${queEs}</span></td>
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${v.dias} dies</td>
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${
       diasParaCaducar(v.fila.caduca_at, ahoraMs)
     } dies</td>
+      <td style="padding:8px 10px;vertical-align:top">${boton}</td>
     </tr>`;
   }).join("\n");
 
   const n = vencidos.length;
-  return `<p style="margin:0 0 14px">${
+  // El tope de la ejecución, DICHO (deuda §12.58). Antes solo se veía en `motivos`, o sea
+  // en ningún sitio que alguien mire: quien lee el correo daba por hecho que la lista
+  // estaba completa.
+  const recorte = limitados > 0
+    ? `<p style="margin:0 0 14px;padding:10px 12px;background:#fdf1f0;border-left:3px solid #ef7d77">
+        <strong>La llista està retallada.</strong> Hi ha ${limitados} enllaç${
+      limitados === 1 ? "" : "os"
+    } més que també toquen avui i que s'han deixat per demà
+        (el màxim per execució és ${MAX_POR_EJECUCION}).</p>`
+    : "";
+
+  return `${recorte}<p style="margin:0 0 14px">${
     n === 1
       ? "Hi ha <strong>1 enllaç</strong> que"
       : `Hi ha <strong>${n} enllaços</strong> que`
@@ -216,6 +330,7 @@ function cuerpoResumen(vencidos: Vencido[], ahoraMs: number): string {
     <th style="padding:0 10px 6px">Què espera</th>
     <th style="padding:0 10px 6px">Enviat fa</th>
     <th style="padding:0 10px 6px">Caduca en</th>
+    <th style="padding:0 10px 6px">Resoldre</th>
   </tr>
   ${filas}
 </table>`;
@@ -290,7 +405,7 @@ async function facturasPendientes(
   ahoraMs: number,
   modoTest: boolean,
   salta: (m: Motivo) => void,
-): Promise<{ pendientes: FacturaPendiente[]; revisadas: number }> {
+): Promise<{ pendientes: FacturaPendiente[]; revisadas: number; limitadas: number }> {
   // La lista de columnas, en UN literal (§7, deuda 46).
   const { data, error } = await supabase
     .from("cierres_donante")
@@ -304,10 +419,10 @@ async function facturasPendientes(
 
   if (error) {
     console.error("recordatorios-documentales: select cierres_donante:", error.message);
-    return { pendientes: [], revisadas: 0 };
+    return { pendientes: [], revisadas: 0, limitadas: 0 };
   }
   const candidatas = (data ?? []) as FilaCierreDonante[];
-  if (candidatas.length === 0) return { pendientes: [], revisadas: 0 };
+  if (candidatas.length === 0) return { pendientes: [], revisadas: 0, limitadas: 0 };
 
   // El reloj: el enlace de subida vivo de cada donante.
   const { data: enlaces } = await supabase
@@ -333,6 +448,7 @@ async function facturasPendientes(
   }
 
   const pendientes: FacturaPendiente[] = [];
+  let limitadas = 0;
   for (const cd of candidatas) {
     const enlace = reloj.get(cd.id);
     if (!enlace) {
@@ -352,6 +468,7 @@ async function facturasPendientes(
       continue;
     }
     if (pendientes.length >= MAX_POR_EJECUCION) {
+      limitadas++;
       salta("limit_execucio");
       continue;
     }
@@ -404,7 +521,7 @@ async function facturasPendientes(
     });
   }
 
-  return { pendientes, revisadas: candidatas.length };
+  return { pendientes, revisadas: candidatas.length, limitadas };
 }
 
 /** El correo al donante. Todo lo que viene de la base va escapado. */
@@ -424,12 +541,13 @@ ${escaparHtml(f.numero ?? "")} de l'exercici ${f.ejercicio ?? ""} i encara no en
     f.kg === null ? "—" : `${f.kg} kg`
   }</td></tr>
 </table>
-<p style="margin:0 0 14px">Pots pujar-la des de l'enllaç que t'enviàvem amb el resum —encara és vàlid— o des del teu panell a Redestina.
-Si l'has perdut, respon a aquest correu i te'n fem arribar un de nou.</p>`;
+<p style="margin:0 0 14px">Pots pujar-la des de l'enllaç que t'enviàvem amb el resum —encara és vàlid— o
+des de <strong>Els meus documents</strong> al teu panell, amb el botó d'aquest correu.
+Si has perdut l'enllaç, respon a aquest correu i te'n fem arribar un de nou.</p>`;
 }
 
 /** La segunda tabla del resumen del equipo. */
-function cuerpoFacturas(facturas: FacturaPendiente[]): string {
+function cuerpoFacturas(facturas: FacturaPendiente[], limitadas: number): string {
   const filas = facturas.map((f) =>
     `<tr style="border-top:1px solid #e0d9ca">
       <td style="padding:8px 10px;vertical-align:top">${escaparHtml(f.nombre || "—")}<br>
@@ -443,11 +561,19 @@ function cuerpoFacturas(facturas: FacturaPendiente[]): string {
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${
       f.hito >= HITOS_DIAS[HITOS_DIAS.length - 1] ? "Cal trucar" : "Avisat"
     }</td>
+      <td style="padding:8px 10px;vertical-align:top"><a href="${APP_URL}/equip/tancament/${
+      encodeURIComponent(f.cd.cierre_id)
+    }" style="color:#4e6b45;font-weight:600;text-decoration:underline">Obre el tancament</a></td>
     </tr>`
   ).join("\n");
 
   const n = facturas.length;
-  return `<p style="margin:18px 0 14px">${
+  const recorte = limitadas > 0
+    ? `<p style="margin:18px 0 0;padding:10px 12px;background:#fdf1f0;border-left:3px solid #ef7d77">
+        <strong>La llista de factures està retallada</strong>: ${limitadas} més toquen avui i s'han deixat per demà
+        (el màxim per execució és ${MAX_POR_EJECUCION}).</p>`
+    : "";
+  return `${recorte}<p style="margin:18px 0 14px">${
     n === 1 ? "Hi ha <strong>1 factura</strong> pendent" : `Hi ha <strong>${n} factures</strong> pendents`
   } del tancament anual. Al donant ja se li ha escrit.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px">
@@ -457,6 +583,7 @@ function cuerpoFacturas(facturas: FacturaPendiente[]): string {
     <th style="padding:0 10px 6px;text-align:right">Import</th>
     <th style="padding:0 10px 6px">Enviat fa</th>
     <th style="padding:0 10px 6px">Estat</th>
+    <th style="padding:0 10px 6px">Resoldre</th>
   </tr>
   ${filas}
 </table>`;
@@ -542,6 +669,7 @@ Deno.serve(async (req) => {
   }
 
   const vencidos: Vencido[] = [];
+  let limitados = 0;
   for (const fila of candidatos) {
     const r = tocaAviso(fila, ahoraMs);
     if (!r.toca) {
@@ -549,6 +677,7 @@ Deno.serve(async (req) => {
       continue;
     }
     if (vencidos.length >= MAX_POR_EJECUCION) {
+      limitados++;
       salta("limit_execucio");
       continue;
     }
@@ -577,6 +706,17 @@ Deno.serve(async (req) => {
   // las dos listas dentro, y para eso hay que tener las dos antes de escribirlo.
   const facturas = await facturasPendientes(supabase, ahoraMs, modoTest, salta);
 
+  // El tope de la ejecución sale como CAMPO PROPIO, no enterrado en `motivos` (deuda
+  // §12.58). `limit_execucio` seguía ahí, pero en un diccionario de motivos junto a otros
+  // nueve: quien lee la respuesta —o el log— no tenía forma de ver de un vistazo que la
+  // lista venía recortada, y una lista recortada que no lo dice se lee como completa.
+  const limit = {
+    tope: MAX_POR_EJECUCION,
+    enllacos: limitados,
+    factures: facturas.limitadas,
+    retallat: limitados + facturas.limitadas > 0,
+  };
+
   const resumen = (ok: boolean, avisados: number, avisadasFacturas = 0) => {
     const saltados = candidatos.length - avisados;
     console.log(JSON.stringify({
@@ -587,16 +727,25 @@ Deno.serve(async (req) => {
       saltados,
       factures_revisades: facturas.revisadas,
       factures_avisades: avisadasFacturas,
+      limit,
       motivos,
       modo_test: modoTest,
       ms_total: Number((performance.now() - t0).toFixed(1)),
     }));
+    if (limit.retallat) {
+      console.warn(JSON.stringify({
+        fn: "recordatorios-documentales",
+        avis: "limit_execucio",
+        ...limit,
+      }));
+    }
     return json({
       ok,
       revisados: candidatos.length,
       avisados,
       saltados,
       factures: { revisades: facturas.revisadas, avisades: avisadasFacturas },
+      limit,
       motivos,
     }, 200);
   };
@@ -615,11 +764,21 @@ Deno.serve(async (req) => {
         titulo: "Ens falta la teva factura",
         preheader: `${f.numero ?? "El resum anual"} · ${eur(f.importe)} · fa ${f.dias} dies.`,
         cuerpoHtml: cuerpoFactura(f),
-        boton: { texto: "Obre Redestina", url: APP_URL },
+        // Al sitio donde se sube, no a la portada (deuda §12.74). El token de subida no
+        // se puede reenviar —de `enlaces_token` solo se guarda el hash— pero el panel
+        // del donante sí tiene el formulario, y resuelve `puc_pujar_document_extern()`
+        // por su cuenta. Sin sesión aterriza en el login, que sigue siendo el camino.
+        boton: { texto: "Puja la factura", url: `${APP_URL}/productor/documents` },
         nota: f.hito >= HITOS_DIAS[HITOS_DIAS.length - 1]
           ? "Aquest és el segon i darrer avís automàtic. A partir d'ara et trucarà algú de l'equip."
           : "Si ja ens l'has enviada, no cal que facis res: aquest avís s'atura tot sol quan la registrem.",
       }),
+    }, {
+      supabase,
+      proposito: "recordatori_factura",
+      objetoTipo: "cierre_donante",
+      objetoId: f.cd.id,
+      funcion: "recordatorios-documentales",
     });
     if (!envioDonante.ok) {
       console.error(
@@ -666,6 +825,10 @@ Deno.serve(async (req) => {
     return resumen(true, 0, avisadasFacturas);
   }
 
+  // Los números de los objetos que esperan respuesta. Dos consultas como mucho, y solo
+  // aquí: si no hay resumen que mandar, no se preguntan.
+  const identificaciones = await identificar(supabase, vencidos);
+
   const n = vencidos.length;
   const nf = facturas.pendientes.length;
   const partes: string[] = [];
@@ -679,8 +842,8 @@ Deno.serve(async (req) => {
       titulo: "Pendents de resposta",
       preheader: `${partes.join(" i ")} a 7 o 14 dies.`,
       cuerpoHtml: [
-        n > 0 ? cuerpoResumen(vencidos, ahoraMs) : "",
-        nf > 0 ? cuerpoFacturas(facturas.pendientes) : "",
+        n > 0 ? cuerpoResumen(vencidos, ahoraMs, identificaciones, limitados) : "",
+        nf > 0 ? cuerpoFacturas(facturas.pendientes, facturas.limitadas) : "",
       ].filter(Boolean).join("\n"),
       boton: { texto: "Obre Redestina", url: APP_URL },
       // El porqué, dicho al equipo con las mismas palabras que la cabecera de este
@@ -688,13 +851,13 @@ Deno.serve(async (req) => {
       nota:
         "Els <strong>enllaços</strong> els avisem a l'equip i no a les persones destinatàries perquè el sistema <strong>no pot reenviar-los</strong>: " +
         "de cada token només se'n desa l'empremta, i el text original només existeix al correu que es va enviar. " +
-        "Per tornar a provar-ho cal revocar l'enllaç i emetre'n un de nou des del panell, o bé trucar. " +
+        "Per això cada fila porta un enllaç <strong>al panell</strong>, a la pantalla on es revoca i se n'emet un de nou (o es truca). " +
         "Mira la columna <strong>Què espera</strong>: una <strong>signatura de conveni</strong> no es resol com una " +
         "<strong>confirmació d'albarà</strong> —l'albarà el pot confirmar l'equip pel panell passat el termini, i el conveni no: " +
         "o es torna a enviar, o es fa una <strong>signatura assistida</strong> a la propera visita—. " +
         "Les <strong>factures</strong>, en canvi, sí que s'avisen al donant; a partir del segon avís queden marcades per trucar.",
     }),
-  });
+  }, { supabase, proposito: "recordatori_equip", funcion: "recordatorios-documentales" });
 
   if (!envio.ok) {
     // No se suben los contadores de los enlaces: el hito sigue pendiente y se reintenta

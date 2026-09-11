@@ -104,12 +104,20 @@ async function guardar(
 // Preguntas
 // ---------------------------------------------------------------------------
 
+/**
+ * Hace la pregunta del paso. **Devuelve si salió** (deuda §12.3).
+ *
+ * Antes no devolvía nada y ninguna de las 14 llamadas miraba el resultado, así que un
+ * fallo de red dejaba al productor sin la pregunta **con la sesión ya avanzada**: su
+ * siguiente mensaje se interpretaba contra un paso que él no había visto nunca. Ahora
+ * quien llama decide, y la regla es una: **el paso solo avanza si la pregunta salió.**
+ */
 async function preguntar(
   supabase: Cliente,
   sesion: Sesion,
   paso: Paso,
   pagina = 0,
-): Promise<void> {
+): Promise<boolean> {
   const to = sesion.telefono;
   const datos = sesion.datos_parciales ?? {};
 
@@ -118,51 +126,46 @@ async function preguntar(
       const { data } = await supabase.from("productos").select("familia");
       const familias = [...new Set((data ?? []).map((p: { familia: string }) => p.familia))]
         .filter(Boolean).sort() as string[];
-      await sendLista(
+      const r = await sendLista(
         supabase, to,
         "De quina família és el producte?",
         "Tria família",
         paginar(familias.map((f) => ({ id: `familia:${f}`, titulo: f })), pagina, "familia"),
       );
-      return;
+      return r.ok;
     }
     case "producte": {
       const { data } = await supabase
         .from("productos").select("nombre").eq("familia", datos.familia).order("nombre");
       const productos = (data ?? []).map((p: { nombre: string }) => p.nombre) as string[];
-      await sendLista(
+      const r = await sendLista(
         supabase, to,
         `Quin producte de ${datos.familia}?`,
         "Tria producte",
         paginar(productos.map((n) => ({ id: `producte:${n}`, titulo: n })), pagina, "producte"),
       );
-      return;
+      return r.ok;
     }
     case "varietat":
-      await sendText(supabase, to, "Quina varietat és? (escriu '-' si no aplica)");
-      return;
+      return (await sendText(supabase, to, "Quina varietat és? (escriu '-' si no aplica)")).ok;
     case "kg":
-      await sendText(
+      return (await sendText(
         supabase, to,
         "Quants kg aproximadament? Si ho tens en unitats o manats, digue-ho i ho convertim.",
-      );
-      return;
+      )).ok;
     case "caixes":
-      await sendText(supabase, to, "Quantes caixes són? (escriu '-' si no ho saps)");
-      return;
+      return (await sendText(supabase, to, "Quantes caixes són? (escriu '-' si no ho saps)")).ok;
     case "tipus_caixa":
-      await sendLista(
+      return (await sendLista(
         supabase, to, "Quin tipus de caixa?", "Tria tipus",
         TIPOS_CAIXA.map((t) => ({ id: `tipus_caixa:${t}`, titulo: t })),
-      );
-      return;
+      )).ok;
     case "retorn":
-      await sendBotones(supabase, to, "Cal retornar els envasos?", [
+      return (await sendBotones(supabase, to, "Cal retornar els envasos?", [
         { id: "retorn:Sí", titulo: "Sí" },
         { id: "retorn:No", titulo: "No" },
         { id: "retorn:Caixes pròpies", titulo: "Caixes pròpies" },
-      ]);
-      return;
+      ])).ok;
     case "ubicacio": {
       const { data } = await supabase
         .from("productor_ubicaciones")
@@ -171,11 +174,10 @@ async function preguntar(
       const ubis = (data ?? []) as Array<{ id: string; alias: string; municipio: string }>;
       // Con cero ubicaciones no se puede enviar una lista vacía: Meta la rechaza.
       if (ubis.length === 0) {
-        await sendText(
+        return (await sendText(
           supabase, to,
           "On es recull? Comparteix un punt de Google Maps (enganxa l'enllaç).",
-        );
-        return;
+        )).ok;
       }
       const filas: FilaLista[] = ubis.map((u) => ({
         id: `ubicacio:${u.id}`,
@@ -183,44 +185,42 @@ async function preguntar(
         descripcion: u.municipio ?? undefined,
       }));
       filas.push({ id: "ubicacio:nova", titulo: "Comparteix un punt" });
-      await sendLista(supabase, to, "On es recull?", "Tria ubicació", filas);
-      return;
+      return (await sendLista(supabase, to, "On es recull?", "Tria ubicació", filas)).ok;
     }
     case "disponible_fins":
-      await sendText(supabase, to, "Fins quin dia està disponible? (per exemple 23/07)");
-      return;
+      return (await sendText(supabase, to, "Fins quin dia està disponible? (per exemple 23/07)")).ok;
     case "horari":
-      await sendText(supabase, to, "Quin horari de recollida va bé? (matí, tarda, hores…)");
-      return;
+      return (await sendText(supabase, to, "Quin horari de recollida va bé? (matí, tarda, hores…)")).ok;
     case "modalitat":
-      await sendBotones(supabase, to, "Quina modalitat és?", [
+      return (await sendBotones(supabase, to, "Quina modalitat és?", [
         { id: "modalitat:donacio", titulo: "Donació" },
         { id: "modalitat:venda", titulo: "Venda" },
         { id: "modalitat:maquila", titulo: "Maquila" },
-      ]);
-      return;
+      ])).ok;
     case "preu_minim":
-      await sendText(
+      return (await sendText(
         supabase, to,
         "A quin preu mínim (€/kg) la vols oferir? Escriu un número (p. ex. 0.80).",
-      );
-      return;
+      )).ok;
     case "causa": {
       const { data } = await supabase.from("causas").select("codigo, nombre").order("nombre");
       const causas = (data ?? []) as Array<{ codigo: string; nombre: string }>;
-      await sendLista(
+      const r = await sendLista(
         supabase, to, "Quina és la causa de l'excedent?", "Tria causa",
         paginar(
           causas.map((c) => ({ id: `causa:${c.codigo}`, titulo: c.nombre, descripcion: c.codigo })),
           pagina, "causa",
         ),
       );
-      return;
+      return r.ok;
     }
     case "observacions":
-      await sendText(supabase, to, "Alguna observació? (escriu '-' si no n'hi ha)");
-      return;
+      return (await sendText(supabase, to, "Alguna observació? (escriu '-' si no n'hi ha)")).ok;
   }
+
+  // Paso sin pregunta: no se ha enviado nada, así que tampoco se puede avanzar.
+  console.error("intake: paso sin pregunta:", paso);
+  return false;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,7 +356,11 @@ export async function procesarIntake(
     datos._intentos = 0;
     await guardar(supabase, sesion, { datos_parciales: datos });
     const pasoActual = (sesion.paso_actual ?? "familia") as Paso;
-    await preguntar(supabase, { ...sesion, datos_parciales: datos }, pasoActual);
+    // Aquí no se avanza de paso, así que un fallo de envío no descoloca nada: solo deja
+    // el recordatorio sin efecto y el siguiente volverá a intentarlo.
+    if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, pasoActual))) {
+      console.error("intake: no se pudo reanudar el paso", pasoActual, "de", from);
+    }
     return true;
   }
 
@@ -381,7 +385,11 @@ export async function procesarIntake(
         console.error("intake_sessions insert:", error.message);
         return true;
       }
-      await preguntar(supabase, data as Sesion, "familia");
+      // Si la primera pregunta no sale, la sesión queda en `familia` sin haberla hecho.
+      // No se borra: el recordatorio de los 10 minutos ofrece «Continuar», que la repite.
+      if (!(await preguntar(supabase, data as Sesion, "familia"))) {
+        console.error("intake: no se pudo enviar la primera pregunta a", from);
+      }
       return true;
     }
     await sendBotones(
@@ -406,14 +414,24 @@ export async function procesarIntake(
   if (id === `${paso}:mes`) {
     const pagina = Number(datos[`_pagina_${paso}`] ?? 0) + 1;
     datos[`_pagina_${paso}`] = pagina;
+    // Se pregunta ANTES de guardar la página: si la lista no sale, el contador no se
+    // mueve y volver a pulsar «Més…» ofrece la misma página, no la siguiente.
+    if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso, pagina))) {
+      console.error("intake: no se pudo enviar la página", pagina, "de", paso, "a", from);
+      return true;
+    }
     await guardar(supabase, sesion, { datos_parciales: datos });
-    await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso, pagina);
     return true;
   }
 
   const valor = await interpretar(supabase, sesion, paso, texto, id);
 
   if (valor === null) {
+    // ⚠️ El contador sube porque la RESPUESTA no se ha entendido, que es lo que cuenta
+    //    aquí. Un fallo de envío nunca lo toca: las dos ramas de abajo pueden fallar y
+    //    `_intentos` ya está escrito con lo que decidió `interpretar()`, no con lo que
+    //    decida la red. Confundir las dos cosas expulsaría del formulario a quien
+    //    contesta bien y tiene mala cobertura.
     const intentos = Number(datos._intentos ?? 0) + 1;
     datos._intentos = intentos;
     await guardar(supabase, sesion, { datos_parciales: datos });
@@ -422,8 +440,8 @@ export async function procesarIntake(
         supabase, from,
         "No acabo d'entendre la resposta. Escriu *Stop* per aturar.",
       );
-    } else {
-      await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso);
+    } else if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
+      console.error("intake: no se pudo repetir la pregunta", paso, "a", from);
     }
     return true;
   }
@@ -433,8 +451,24 @@ export async function procesarIntake(
 
   const siguiente = siguientePaso(paso, datos);
   if (siguiente) {
+    // ⚠️ EL ORDEN ES EL ARREGLO (deuda §12.3). Antes se guardaba el paso nuevo y DESPUÉS
+    //    se preguntaba, sin mirar si la pregunta salía: con un fallo de red el productor
+    //    se quedaba sin verla y su siguiente mensaje se leía contra un paso que no había
+    //    visto —una fecha respondida como si fuera un horario—. Ahora se pregunta primero
+    //    y el paso solo avanza si salió.
+    //
+    //    `preguntar()` no necesita la fila guardada: recibe el estado por parámetro, así
+    //    que preguntar antes de escribir no cambia ninguna pregunta.
+    const salio = await preguntar(supabase, { ...sesion, datos_parciales: datos }, siguiente);
+    if (!salio) {
+      // La respuesta SÍ se guarda —está entendida y validada— pero el paso no avanza. Es
+      // idempotente: cuando la persona vuelva a contestar (o pulse «Continuar» en el
+      // recordatorio de los 10 minutos) se reescribe el mismo valor y se reintenta.
+      console.error("intake: no se pudo preguntar", siguiente, "a", from, "— el paso no avanza");
+      await guardar(supabase, sesion, { datos_parciales: datos });
+      return true;
+    }
     await guardar(supabase, sesion, { paso_actual: siguiente, datos_parciales: datos });
-    await preguntar(supabase, { ...sesion, datos_parciales: datos }, siguiente);
     return true;
   }
 

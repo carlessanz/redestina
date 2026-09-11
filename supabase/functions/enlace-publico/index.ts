@@ -463,6 +463,12 @@ async function avisarRechazo(
         to,
         subject: `Redestina · rebuig ${etiqueta} a l'albarà ${albaran.numero_completo ?? ""}`,
         html,
+      }, {
+        supabase,
+        proposito: "avis_rebuig",
+        objetoTipo: "albaran",
+        objetoId: albaran.id,
+        funcion: "enlace-publico",
       });
       if (r.ok) enviados.push(to);
       else {
@@ -1173,26 +1179,26 @@ async function subirFactura(
   // ---------------------------------------------------------------- la ruta
   // La decide SQL. El modo del cierre entra tal cual: una factura de un cierre de prueba
   // se archiva bajo `proves/`, que es lo que después borra `reiniciar_cierre_prueba`.
-  const idExterno = crypto.randomUUID();
+  // `ruta_documento_externo()` devuelve la ruta ENTERA (20270304100000). Antes aquí se pedía
+  // la de un documento emitido con un número inventado y se le cambiaba la hoja a mano —el
+  // mismo apaño que en `subir-documento-externo`, y este segundo sitio no estaba anotado en
+  // la deuda §12.62—.
   let ruta: string;
   try {
-    const { data, error } = await supabase.rpc("ruta_documento", {
+    const { data, error } = await supabase.rpc("ruta_documento_externo", {
       p_objeto_tipo: "cierre_donante",
       p_objeto_id: cd.id,
-      p_tipo: "externs",
-      p_numero_completo: idExterno,
-      p_version: 1,
-      p_modo: cierre.modo,
+      p_tipo: "factura",
       p_ejercicio: cierre.ejercicio ?? new Date().getFullYear(),
+      p_extension: extension,
+      p_modo: cierre.modo,
     });
     if (error) throw new Error(error.message);
-    const completa = String(data ?? "");
-    const carpeta = completa.slice(0, completa.lastIndexOf("/") + 1);
-    if (!carpeta) throw new Error("ruta_documento() no ha devuelto ninguna carpeta");
-    ruta = `${carpeta}${idExterno}-factura.${extension}`;
+    ruta = String(data ?? "");
+    if (!ruta) throw new Error("ruta_documento_externo() no ha devuelto ninguna ruta");
   } catch (e) {
     const texto = e instanceof Error ? e.message : String(e);
-    console.error("enlace-publico: ruta_documento:", texto);
+    console.error("enlace-publico: ruta_documento_externo:", texto);
     return responder(
       { error: "No s'ha pogut desar el fitxer.", code: "sense_carpeta" },
       409,
@@ -1912,7 +1918,13 @@ async function avisarFirma(
     });
 
     for (const to of destinos) {
-      const r = await sendEmail({ to, subject: `Redestina · conveni signat ${numero}`, html });
+      const r = await sendEmail({ to, subject: `Redestina · conveni signat ${numero}`, html }, {
+        supabase,
+        proposito: "avis_firma",
+        objetoTipo: "convenio",
+        objetoId: conv.id,
+        funcion: "enlace-publico",
+      });
       if (r.ok) enviados.push(to);
       else {
         saltados.push(to);
@@ -2008,6 +2020,12 @@ async function enviarCodi(
       nota:
         "Si no has demanat aquest codi, no facis res: sense ell la signatura no es pot completar.",
     }),
+  }, {
+    supabase,
+    proposito: "codi_firma",
+    objetoTipo: enlace.objeto_tipo,
+    objetoId: enlace.objeto_id,
+    funcion: "enlace-publico",
   });
   if (!envio.ok) {
     console.error("enlace-publico: codi no enviat:", envio.status, envio.data);

@@ -130,11 +130,60 @@ export interface OpcionesAlbaran {
   /** Versión del documento; la 2ª es la que se emite al conciliar. */
   subtipo?: string | null;
   /**
-   * Rótulos de los bloques de conformidad, en orden. Vacío = uno solo, sin rótulo
-   * (REC y ENT: confirma quien recibe). El OPE pasa dos, porque confirman las dos
-   * partes (§3.3.2 del funcional).
+   * Espacios de conformidad, en orden. Vacío = uno solo, sin rótulo (REC y ENT: confirma
+   * quien recibe). El OPE pasa dos, porque confirman las dos partes (§3.3.2 del
+   * funcional), y cada uno dice **de qué parte es** para poder casarlo con su
+   * confirmación (`enlaces_token.rol_parte`).
    */
-  conformidades?: string[];
+  conformidades?: EspacioConformidad[];
+  /**
+   * Las confirmaciones ya registradas por enlace, si las hay (deuda §12.60).
+   *
+   * ⚠️ NO SALEN DEL SNAPSHOT, y no pueden salir. `documentos.datos` se congela **al
+   *    emitir**, y `marcar_entregado()` exige que el albarán esté ya `emitido`: cuando
+   *    alguien confirma, el snapshot lleva rato siendo inmutable. Así que esto lo lee
+   *    `generar-documento` de `evidencias` con `service_role` —el mismo camino que ya
+   *    usa el convenio para el trazo y el DNI— y lo entrega ya resuelto. El
+   *    renderizador sigue sin hablar con la base.
+   */
+  confirmaciones?: ConfirmacionAlbaran[];
+}
+
+/** Un espacio de firma: su rótulo y, si se sabe, de qué parte del albarán es. */
+export interface EspacioConformidad {
+  rotulo: string;
+  /** Vocabulario de `albaran_partes()`: `entrega` o `recibe`. */
+  rol?: RolParte | null;
+}
+
+export type RolParte = "entrega" | "recibe";
+
+/**
+ * Una confirmación registrada. Lo que se imprime y lo que NO:
+ *
+ *   · Sí: quién dijo ser, su cargo, cuándo, por qué vía y una referencia auditable.
+ *   · No: **la IP ni el user-agent**. El texto legal ya dice que quedan registrados, y
+ *     un albarán lo descarga también la otra parte: la dirección desde la que alguien
+ *     confirmó es un dato personal que no tiene por qué viajar en el papel. Está en
+ *     `evidencias`, que es donde se consulta si alguna vez hay que probar algo.
+ */
+export interface ConfirmacionAlbaran {
+  /** `evidencias.nombre`: quién declaró ser. */
+  nombre?: string | null;
+  /** `evidencias.cargo`. */
+  cargo?: string | null;
+  /** `evidencias.created_at`. */
+  at?: string | null;
+  /** `enlaces_token.canal`: `email` (enlace) o `asistido`. */
+  canal?: string | null;
+  /**
+   * `enlaces_token.rol_parte`. **Nullable a propósito**: los enlaces anteriores a
+   * `20270304100200` no lo tienen y no se rellena a posteriori. Sin rol, una confirmación
+   * no se atribuye a ninguna parte: se lista aparte.
+   */
+  rol?: RolParte | null;
+  /** Referencia corta de la evidencia, para poder encontrarla sin publicar su uuid entero. */
+  referencia?: string | null;
 }
 
 export interface Renderizado {
@@ -212,6 +261,11 @@ export interface Diccionario {
   carrec: string;
   data_signatura: string;
   signatura: string;
+  confirmat_enllac: string;
+  confirmat_assistit: string;
+  confirmacions: string;
+  referencia: string;
+  pendent_signatura: string;
   legal: string;
   provisional_titol: string;
   provisional_avis: string;
@@ -282,6 +336,11 @@ const CA: Diccionario = {
   carrec: "Càrrec",
   data_signatura: "Data",
   signatura: "Signatura",
+  confirmat_enllac: "Confirmat des de l'enllaç",
+  confirmat_assistit: "Confirmat amb acompanyament de l'equip",
+  confirmacions: "Confirmacions registrades",
+  referencia: "Referència",
+  pendent_signatura: "Pendent de signatura",
   legal: "Condicions",
   provisional_titol: "Text provisional, pendent de validació",
   provisional_avis:
@@ -368,6 +427,11 @@ const ES: Diccionario = {
   carrec: "Cargo",
   data_signatura: "Fecha",
   signatura: "Firma",
+  confirmat_enllac: "Confirmado desde el enlace",
+  confirmat_assistit: "Confirmado con acompañamiento del equipo",
+  confirmacions: "Confirmaciones registradas",
+  referencia: "Referencia",
+  pendent_signatura: "Pendiente de firma",
   legal: "Condiciones",
   provisional_titol: "Texto provisional, pendiente de validación",
   provisional_avis:
@@ -792,12 +856,18 @@ export function pintarLineas(
 /**
  * Cierre, texto legal y espacio de conformidad, y guarda. Es lo último que se llama.
  *
- * ⚠️ El bloque de conformidad se imprime SIEMPRE en blanco, incluso cuando el albarán ya
- *    está confirmado por enlace. La evidencia de esa confirmación (quién, cuándo, desde
- *    dónde) vive en `evidencias` y **no está en el snapshot** que compone `albaran_datos()`,
- *    así que este renderizador no la puede imprimir sin salirse de su contrato de no
- *    hablar con la base. Queda anotado en el informe: cuando el snapshot la incluya,
- *    aquí solo hay que rellenar estos tres campos.
+ * El bloque de conformidad ya NO se imprime siempre en blanco (deuda §12.60): si el
+ * albarán se ha confirmado por enlace, `op.confirmaciones` trae quién, cuándo y por qué
+ * vía, y el bloque se rellena. Dos reglas que conviene tener a la vista:
+ *
+ *   · **Con un solo espacio de conformidad** (REC y ENT: confirma quien recibe) la
+ *     confirmación se imprime DENTRO de él. No hay ambigüedad posible: un espacio, una
+ *     parte, una confirmación.
+ *   · **Con varios** (el OPE, que confirman las dos partes) se casa cada confirmación con
+ *     su espacio por `enlaces_token.rol_parte`. La que no traiga rol —los enlaces
+ *     anteriores a `20270304100200` no lo tienen— NO se atribuye a nadie: se lista
+ *     aparte, bajo «Confirmacions registrades». Se dice lo que consta, y no se dice de
+ *     quién no consta.
  */
 export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
   const { m, t, datos, op } = ctx;
@@ -859,9 +929,39 @@ export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
   m.espacio(10);
   m.titulo(t.conformitat, 2);
   m.parrafo(t.conformitat_text, { tamano: 9.5, despues: 12 });
-  const rotulos = op.conformidades && op.conformidades.length > 0 ? op.conformidades : [""];
-  for (const rotulo of rotulos) {
-    pintarConformidad(m, t, rotulo);
+  const espacios: EspacioConformidad[] = op.conformidades && op.conformidades.length > 0
+    ? op.conformidades
+    : [{ rotulo: "" }];
+  const confirmaciones = [...(op.confirmaciones ?? [])].filter(Boolean);
+
+  // A quién le toca cada confirmación:
+  //   · Un solo espacio (REC, ENT): la última confirmación es la suya, sin más. Ahí no
+  //     hay ambigüedad posible, y además los enlaces anteriores a `rol_parte` tampoco la
+  //     tenían nunca.
+  //   · Varios espacios (OPE): solo se casa por `rol`. Una confirmación sin rol NO se
+  //     atribuye —se lista aparte—, porque ponerla bajo «Entrega» sin saberlo sería
+  //     inventarse quién firmó qué en un documento legal.
+  const sueltas: ConfirmacionAlbaran[] = [];
+  const asignadas = new Map<number, ConfirmacionAlbaran>();
+  if (espacios.length === 1) {
+    if (confirmaciones.length > 0) asignadas.set(0, confirmaciones[confirmaciones.length - 1]);
+    sueltas.push(...confirmaciones.slice(0, Math.max(0, confirmaciones.length - 1)));
+  } else {
+    for (const c of confirmaciones) {
+      const i = c.rol ? espacios.findIndex((e) => e.rol === c.rol) : -1;
+      if (i >= 0 && !asignadas.has(i)) asignadas.set(i, c);
+      else sueltas.push(c);
+    }
+  }
+
+  espacios.forEach((e, i) => pintarConformidad(m, t, e.rotulo, asignadas.get(i)));
+
+  if (sueltas.length > 0) {
+    m.espacio(6);
+    m.titulo(t.confirmacions, 3);
+    for (const c of sueltas) {
+      m.campos(lineasConfirmacion(t, c), { anchoEtiqueta: 150, despues: 8 });
+    }
   }
 
   m.finalizar();
@@ -869,8 +969,32 @@ export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
   return { bytes, paginas: m.numPaginas };
 }
 
-/** Un espacio de firma en blanco: nombre, cargo, fecha y trazo. */
-export function pintarConformidad(m: Maquetador, t: Diccionario, rotulo = ""): void {
+/**
+ * Las cuatro líneas de una confirmación ya registrada. La cuarta ocupa el sitio de la
+ * firma manuscrita y dice **por qué vía** se confirmó y con qué referencia: una firma
+ * electrónica simple no deja trazo que dibujar, lo que la acredita es la evidencia.
+ */
+function lineasConfirmacion(t: Diccionario, c: ConfirmacionAlbaran): [string, string][] {
+  const via = c.canal === "asistido" ? t.confirmat_assistit : t.confirmat_enllac;
+  const referencia = c.referencia ? ` · ${t.referencia} ${c.referencia}` : "";
+  return [
+    [t.nom_cognoms, (c.nombre ?? "").trim()],
+    [t.carrec, (c.cargo ?? "").trim()],
+    [t.data_signatura, fecha(c.at, true)],
+    [t.signatura, `${via}${referencia}`],
+  ];
+}
+
+/**
+ * Un espacio de conformidad: en blanco si nadie ha confirmado todavía, o relleno con la
+ * confirmación registrada.
+ */
+export function pintarConformidad(
+  m: Maquetador,
+  t: Diccionario,
+  rotulo = "",
+  confirmacion?: ConfirmacionAlbaran,
+): void {
   // El rótulo y sus cuatro campos son un bloque: sin esto, «Rep · Obrador de Prova SL»
   // se quedaba solo al pie de una página y su espacio de firma empezaba en la siguiente.
   m.asegurar(rotulo ? 90 : 74);
@@ -878,7 +1002,7 @@ export function pintarConformidad(m: Maquetador, t: Diccionario, rotulo = ""): v
     m.parrafo(rotulo, { fuente: m.fuentes.cuerpoFuerte, tamano: 10, despues: 6 });
   }
   m.campos(
-    [
+    confirmacion ? lineasConfirmacion(t, confirmacion) : [
       [t.nom_cognoms, ""],
       [t.carrec, ""],
       [t.data_signatura, ""],

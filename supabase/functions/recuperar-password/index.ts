@@ -91,7 +91,7 @@ Deno.serve(async (req) => {
               "Si no has estat tu, pots ignorar aquest correu: la teva contrasenya no canviarà. L'enllaç caduca aviat i només es pot fer servir una vegada.",
           }),
           text: `Restableix la teva contrasenya de Redestina obrint aquest enllaç: ${link}`,
-        });
+        }, { supabase, proposito: "recuperacio", funcion: "recuperar-password" });
       }
     }
   } catch (err) {

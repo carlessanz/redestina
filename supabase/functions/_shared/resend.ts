@@ -5,23 +5,66 @@
 //
 // Requiere los secrets RESEND_API_KEY y RESEND_FROM (remitente de un dominio
 // VERIFICADO en Resend; sin dominio verificado Resend solo entrega al correo
-// propietario de la cuenta). Ver AGENTS.md §10.
+// propietario de la cuenta) y **RESEND_ENVIO_REAL**, el interruptor de envío real:
+// mientras no valga exactamente "true", no sale ni un correo (§8, gemelo de
+// WHATSAPP_ENVIO_REAL). Ver AGENTS.md §10.
 //
 // Aquí vive TAMBIÉN la plantilla visual de los correos (`plantillaEmail`): en un
 // solo sitio, porque un correo mal maquetado no lo detecta `tsc` ni ninguna
 // prueba, solo la persona que lo recibe.
 
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY") ?? "";
-// Por defecto, el remitente de pruebas de Resend (solo entrega al owner).
-const RESEND_FROM = Deno.env.get("RESEND_FROM") ?? "Redestina <onboarding@resend.dev>";
+// Los secretos se leen DENTRO de las funciones, no en el cuerpo del módulo. Mismo motivo
+// que en `_shared/whatsapp.ts`: escrito como `const X = Deno.env.get(...)` a nivel de
+// módulo, cualquier `import` desde Node moría con `ReferenceError: Deno is not defined`
+// **antes de ejecutar nada**, y eso dejaba fuera del arnés de pruebas todo este fichero
+// —incluida la plantilla de correo, que es el único sitio donde se maqueta un correo—.
+// En Deno no cambia nada: el entorno del isolate no varía durante su vida.
+function apiKey(): string {
+  return Deno.env.get("RESEND_API_KEY") ?? "";
+}
+
+/** Por defecto, el remitente de pruebas de Resend (solo entrega al owner de la cuenta). */
+function remitente(): string {
+  return Deno.env.get("RESEND_FROM") ?? "Redestina <onboarding@resend.dev>";
+}
+
+/**
+ * Interruptor de envío real, gemelo de `WHATSAPP_ENVIO_REAL` (§8).
+ *
+ * Mientras `RESEND_ENVIO_REAL` no valga exactamente `"true"`, **no sale ni un correo**:
+ * se devuelve una respuesta simulada (`ok: true`, `simulado: true`) y el flujo de quien
+ * llama continúa con normalidad. Es seguro por omisión —si el secreto no está, no se
+ * escribe a nadie— y es lo que permite ensayar en local el camino feliz completo: los
+ * recordatorios documentales solo mueven sus contadores «si el correo salió», y hasta
+ * ahora en local nunca salía, así que esa mitad del código no se podía recorrer sin
+ * interceptar `fetch` (deudas §12.59 y §12.73).
+ *
+ * ⚠️ AL DESPLEGAR: en remoto hay que crear el secreto ANTES de redesplegar las funciones
+ *    que mandan correo, o dejarán de mandarlo en silencio (bueno para la bandeja de
+ *    nadie, malo para el reset de contraseña). `supabase secrets set RESEND_ENVIO_REAL=true`.
+ */
+function envioReal(): boolean {
+  return esEnvioReal(Deno.env.get("RESEND_ENVIO_REAL"));
+}
+
+/**
+ * La decisión, aparte del runtime y sin `Deno`, para que se pueda probar tal cual desde
+ * Node (mismo criterio que `tocaAviso()` en `recordatorios-documentales`). Es una sola
+ * comparación, y es justo la que decide si sale un correo: `"true"` exacto y nada más
+ * —ni `"TRUE"`, ni `"1"`, ni `" true"`—. Un interruptor que se deja convencer por
+ * variantes es un interruptor que un día está encendido sin que nadie lo haya encendido.
+ */
+export function esEnvioReal(valor: string | undefined | null): boolean {
+  return valor === "true";
+}
 
 // El logo tiene que ser una URL absoluta y pública: los clientes de correo no
 // resuelven rutas relativas, no cargan `data:` (Gmail lo bloquea) y no saben
 // pintar SVG. `public/logo-email.png` es el logo en negativo (para la cabecera verde)
 // rasterizado a 410×120; se regenera desde `public/logo-redestina-negativo.svg`.
-const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com")
-  .replace(/\/+$/, "");
-const LOGO_URL = `${APP_URL}/logo-email.png`;
+function appUrl(): string {
+  return (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/+$/, "");
+}
 
 export interface EmailPayload {
   to: string;
@@ -49,10 +92,118 @@ export interface EmailResult {
   ok: boolean;
   status: number;
   data: unknown;
+  /** `true` si no se contactó con Resend (`RESEND_ENVIO_REAL` apagado). */
+  simulado?: boolean;
 }
 
-export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
-  if (!RESEND_API_KEY) {
+// deno-lint-ignore no-explicit-any
+type Cliente = any;
+
+/**
+ * Con qué se registra el envío en la base. Es OPCIONAL: sin esto, `sendEmail()` se
+ * comporta exactamente como antes y no escribe nada.
+ *
+ * ⚠️ **No se guarda el asunto, y no es un olvido.** Dos correos del circuito llevan una
+ *    credencial en el propio asunto —el código de 6 cifras de la firma asistida
+ *    (`enlace-publico`, `accion: 'enviar_codi'`) y cualquier otro que se sume mañana—, y
+ *    `documento_envios` la lee todo el equipo interno. Es el mismo motivo por el que
+ *    `sendText()` tiene `bodyConsola` (§9): lo que se registra para diagnosticar no es lo
+ *    que se manda. Con destinatario, propósito, estado y error ya se puede contestar la
+ *    única pregunta que la deuda §12.25 plantea —«¿este correo salió o no?»— sin publicar
+ *    nada más.
+ */
+export interface TrazaEnvio {
+  /** Cliente con `service_role`: la tabla no tiene GRANT de escritura para nadie más. */
+  supabase: Cliente;
+  /** Para qué se escribió: `oferta`, `acces`, `recuperacio`, `document`, `recordatori`… */
+  proposito: string;
+  /** `documentos.id`, cuando el correo va por un documento emitido. */
+  documentoId?: string | null;
+  /** Objeto del dominio al que se refiere (`albaran`, `convenio`, `cierre_donante`…). */
+  objetoTipo?: string | null;
+  objetoId?: string | null;
+  /** Qué Edge Function lo mandó, para poder filtrar por origen. */
+  funcion?: string | null;
+}
+
+/**
+ * Se apaga solo. La generalización de `documento_envios` (columnas `proposito`,
+ * `objeto_tipo`, `objeto_id`, `funcion` y el estado `simulat`) viaja en una migración
+ * aparte: mientras no esté aplicada, el primer intento falla con `42703`/`PGRST204`, se
+ * avisa UNA vez por isolate y se deja de intentar. Así esto se puede desplegar antes o
+ * después que la migración, en cualquier orden, sin llenar el log.
+ */
+let registroDisponible = true;
+
+async function registrarEnvio(
+  traza: TrazaEnvio,
+  destinatario: string,
+  r: EmailResult,
+): Promise<void> {
+  if (!registroDisponible) return;
+  // deno-lint-ignore no-explicit-any
+  const datos = r.data as any;
+  const estado = !r.ok ? "error" : r.simulado ? "simulat" : "enviat";
+  try {
+    const { error } = await traza.supabase.from("documento_envios").insert({
+      documento_id: traza.documentoId ?? null,
+      objeto_tipo: traza.objetoTipo ?? null,
+      objeto_id: traza.objetoId ?? null,
+      proposito: traza.proposito,
+      funcion: traza.funcion ?? null,
+      destinatario,
+      canal: "email",
+      estado,
+      proveedor_id: typeof datos?.id === "string" ? datos.id : null,
+      error: r.ok ? null : String(datos?.error?.message ?? datos?.message ?? `HTTP ${r.status}`)
+        .slice(0, 500),
+      enviado_at: estado === "enviat" ? new Date().toISOString() : null,
+    });
+    if (!error) return;
+    // `42P01` tabla, `42703` columna, `PGRST204` columna desconocida para PostgREST.
+    if (["42P01", "42703", "PGRST204"].includes(String(error.code))) {
+      registroDisponible = false;
+      console.warn(
+        "[resend] documento_envios todavía no admite el registro genérico de correos " +
+          `(${error.code}): falta la migración. No se volverá a intentar en este isolate.`,
+      );
+      return;
+    }
+    console.warn("[resend] documento_envios insert:", error.message);
+  } catch (err) {
+    console.warn("[resend] registrarEnvio:", err instanceof Error ? err.message : String(err));
+  }
+}
+
+/**
+ * Manda un correo. **Nunca lanza.**
+ *
+ * `traza` es opcional: cuando viene, el resultado —salió, se simuló o falló— queda en
+ * `documento_envios`, que es lo que hace que un fallo de correo deje de ser
+ * indistinguible de un acierto desde el panel (deuda §12.25). El registro nunca cambia
+ * el resultado: si la fila no se puede escribir, el correo ya se ha mandado igual.
+ */
+export async function sendEmail(payload: EmailPayload, traza?: TrazaEnvio): Promise<EmailResult> {
+  const r = await enviarResend(payload);
+  if (traza) await registrarEnvio(traza, payload.to, r);
+  return r;
+}
+
+async function enviarResend(payload: EmailPayload): Promise<EmailResult> {
+  if (!envioReal()) {
+    // Modo simulado: no se contacta con Resend. El flujo de quien llama continúa como si
+    // el correo hubiera salido —es lo que permite recorrer en local el camino feliz—, y
+    // el `simulado: true` es lo que distingue una prueba de un envío de verdad.
+    console.log(`[SIMULADO] no se envía correo a ${payload.to} (RESEND_ENVIO_REAL != true)`);
+    return {
+      ok: true,
+      status: 200,
+      data: { simulado: true, id: `sim-${crypto.randomUUID()}` },
+      simulado: true,
+    };
+  }
+  const clave = apiKey();
+  if (!clave) {
     console.error("[resend] Falta RESEND_API_KEY: no se envía email.");
     return { ok: false, status: 500, data: { error: "email_no_configurado" } };
   }
@@ -60,11 +211,11 @@ export async function sendEmail(payload: EmailPayload): Promise<EmailResult> {
     const res = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        Authorization: `Bearer ${clave}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        from: RESEND_FROM,
+        from: remitente(),
         to: payload.to,
         subject: payload.subject,
         ...(payload.html ? { html: payload.html } : {}),
@@ -122,6 +273,8 @@ export interface PlantillaOpciones {
 // Construye el correo completo. Maquetado con tablas y estilos en línea porque es
 // lo único que renderizan igual Gmail, Outlook y Apple Mail; nada de flex/grid.
 export function plantillaEmail(o: PlantillaOpciones): string {
+  const APP_URL = appUrl();
+  const LOGO_URL = `${APP_URL}/logo-email.png`;
   const preheader = o.preheader
     ? `<div style="display:none;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${FONDO}">${
       escaparHtml(o.preheader)

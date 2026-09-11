@@ -369,6 +369,28 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // de `pot_aprovar()`, así que un externo no llega ni a la comprobación siguiente.
   { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions d'un tancament" },
   { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio" },
+  { tabla: "rectificar_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat de transaccio" },
+  // 🔴 La base de cálculo del cierre. Hasta 20270303100500 estas cuatro funciones eran
+  //    `security definer` con GRANT a `authenticated` y **sin comprobación de rol por
+  //    dentro**: un productor con sesión podía pedir por PostgREST la donación de todos
+  //    los donantes con nombre, kilos y coste por kilo. El arnés no lo miraba —comprobaba
+  //    `datos_182` y daba por hecho el resto de la familia—, así que estos cuatro checks
+  //    son la vigilancia que faltaba, no una comprobación de cortesía.
+  { tabla: "cierre_base", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul del tancament" },
+  { tabla: "cierre_pendents", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO llegeix el que falta per conciliar" },
+  { tabla: "cierre_base_periodo", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul d'un periode" },
+  { tabla: "cierre_pendents_periodo", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "NO llegeix els pendents d'un periode" },
+  // Certificado de donación a demanda (CDP). Nada de su circuito es de un externo: ni la
+  // tabla —que no tiene GRANT de escritura para nadie— ni ninguna de sus cinco acciones,
+  // todas de `pot_aprovar()`. Que el donante vea SU certificado se comprueba en el bloque
+  // `productor`, que es donde esa afirmación significa algo.
+  { tabla: "cierres_periodo", op: "insertar", esperado: "denegar", descripcion: "NO escriu al certificat a demanda (no hi ha GRANT)" },
+  { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula cap certificat a demanda" },
+  { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap certificat a demanda" },
+  { tabla: "registrar_factura_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_numero: "F-ARNES" }, descripcion: "NO registra la factura d'un periode" },
+  { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat a demanda" },
+  { tabla: "marcar_enviado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat a demanda" },
+  { tabla: "reiniciar_periodes_prova", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO reinicia els certificats a demanda de prova" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -431,12 +453,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "NO cambia los parámetros (es del super_admin)",
     },
     // Enlaces y evidencias: el equipo ve el estado, nunca las credenciales ni el DNI.
+    //
+    // ⚠️ `rol_parte` está en la lista a propósito (§12.68). Es una columna AÑADIDA a una
+    //    tabla con GRANT por columnas, y una columna nueva no hereda nada: si algún día
+    //    se recrea la tabla o se olvida el `grant select (rol_parte)`, esto sale `42501
+    //    permission denied for column` y no «0 filas», así que el fallo se ve.
     {
       tabla: "enlaces_token",
       op: "leer",
       esperado: "permitir",
-      columnas: "id, proposito, estado, caduca_at",
-      descripcion: "ve el estado de los enlaces",
+      columnas: "id, proposito, estado, caduca_at, rol_parte",
+      descripcion: "ve el estado de los enlaces y de qué parte son",
       requiereFixture: "algún enlace emitido (fase 2/3: firma de convenio o confirmación de albarán)",
     },
     {
@@ -570,6 +597,26 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // que en el circuito de donación. El técnico ve las filas y no mueve ninguna.
     { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions (és de pot_aprovar)" },
     { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio (és de pot_aprovar)" },
+    { tabla: "rectificar_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica un certificat de transaccio (és de pot_aprovar)" },
+    // La base de cálculo SÍ es del equipo: es una lectura, y es lo que hace auditable la
+    // cifra de un certificado. Sobre el ejercicio 1999 no devuelve nada, así que lo que
+    // se mide es la autorización y no los datos.
+    { tabla: "cierre_base", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "pot llegir la base de calcul del tancament" },
+    { tabla: "cierre_base_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot llegir la base de calcul d'un periode" },
+    { tabla: "cierre_pendents_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "pot llegir els pendents d'un periode" },
+    // Certificado a demanda (CDP): el equipo lo LEE y no escribe nada. Calcular y emitir
+    // son de `pot_aprovar()`, igual que en el cierre anual —y por el mismo motivo: los
+    // dos documentos tienen el mismo efecto fiscal sobre el periodo que cubren—.
+    {
+      tabla: "cierres_periodo",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els certificats de donacio a demanda",
+      requiereFixture: "algún certificado a demanda calculado (calcular_certificado_periodo con una cuenta que pueda aprobar)",
+    },
+    { tabla: "cierres_periodo", op: "insertar", esperado: "denegar", descripcion: "NO crea certificats a demanda a mà (van per RPC)" },
+    { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula un certificat a demanda (és de pot_aprovar)" },
+    { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet un certificat a demanda (és de pot_aprovar)" },
     // Plan de prevención (fase 5). El equipo lo ve todo y **sí** puede contestar el
     // cuestionario de cualquier organización: el diagnóstico es un servicio asistido. Lo
     // que se comprueba es la autorización (`puc_gestionar_pla`), no el guardado: guardar
@@ -733,6 +780,59 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "pot emetre un certificat de transaccio (autoritza; l'acumulat no existeix)",
     },
     {
+      tabla: "rectificar_certificado_transaccion",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
+      descripcion: "pot rectificar un certificat de transaccio (autoritza; l'acumulat no existeix)",
+    },
+    // Certificado de donación a demanda (CDP). Todas sobre un uuid inventado o sobre el
+    // ejercicio **1999**: la autorización pasa y la función falla después con 22023, sin
+    // dejar rastro. Emitir uno de verdad consumiría un número de la serie CDP, que es
+    // exactamente lo que un arnés no debe hacer.
+    {
+      tabla: "calcular_certificado_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" },
+      descripcion: "pot calcular un certificat a demanda (autoritza; el donant no existeix)",
+    },
+    {
+      tabla: "emitir_certificado_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_periodo: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot emetre un certificat a demanda (autoritza; el periode no existeix)",
+    },
+    {
+      tabla: "rectificar_certificado_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
+      descripcion: "pot rectificar un certificat a demanda (autoritza; el periode no existeix)",
+    },
+    {
+      tabla: "registrar_factura_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_numero: "F-ARNES" },
+      descripcion: "pot registrar la factura d'un periode (autoritza; el periode no existeix)",
+    },
+    {
+      tabla: "reiniciar_periodes_prova",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_ejercicio: 1999 },
+      descripcion: "pot reiniciar els certificats a demanda de prova (exercici 1999: no hi ha res)",
+    },
+    {
+      tabla: "cierres_periodo",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els certificats de donacio a demanda",
+      requiereFixture: "algún certificado a demanda calculado (calcular_certificado_periodo)",
+    },
+    {
       tabla: "planes_prevencion",
       op: "leer",
       esperado: "permitir",
@@ -831,6 +931,24 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve el detall del SEU acumulat",
       requiereFixture: "un cierre de prueba calculado con su ficha (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Certificado a demanda: mismo puente y misma regla que el anual
+    // (`cierres_periodo_meus()`, los de prueba solo si la ficha es `es_test`). Sin
+    // fixture sale SALTADA, y eso es lo correcto: con RLS activa, 0 filas no distingue
+    // «la política me bloquea» de «no hay nada que ver» (§12.48).
+    {
+      tabla: "cierres_periodo",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU certificat a demanda (només el seu)",
+      requiereFixture: "un certificado a demanda calculado con su ficha (calcular_certificado_periodo en modo prueba)",
+    },
+    {
+      tabla: "cierre_periodo_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el detall del SEU certificat a demanda",
+      requiereFixture: "un certificado a demanda calculado con su ficha (calcular_certificado_periodo en modo prueba)",
+    },
     // Convenios (fase 2): ve EL SUYO. TEST-PROD-1 lo tiene vigente (firmado y
     // contrafirmado por el fixture); TEST-PROD-2 no tiene ninguno, así que su comprobación
     // sale SALTADA — y eso es lo correcto: si viera el de TEST-PROD-1 sería un escape.
@@ -870,6 +988,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "ve las ofertas compatibles",
       requiereFixture: "una oferta publicada de una modalitat compatible con su tipo_receptor",
+    },
+    // El puente de la RLS de ofertas (§12.23). No es una RPC que la interfaz llame: lo
+    // que se verifica es que **el EXECUTE sigue concedido a `authenticated`**, porque la
+    // expresión de una política se evalúa con los privilegios de quien consulta. Si
+    // alguien lo revocara, el receptor no vería «menos ofertas»: le reventaría cualquier
+    // `select` sobre `excedentes`.
+    {
+      tabla: "modalitats_compatibles_meves",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "puede llamar al puente de modalidades compatibles (lo usa su propia RLS)",
     },
     { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
@@ -925,6 +1054,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Ni el cierre del donante del que ha recibido: el certificado es del donante.
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO ve l'acumulat anual de cap donant" },
     { tabla: "cierre_donante_lineas", op: "leer", esperado: "denegar", descripcion: "NO ve les línies de cap tancament" },
+    // Ni el certificado a demanda: es del donante, como el anual.
+    { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "NO ve cap certificat a demanda" },
+    { tabla: "cierre_periodo_lineas", op: "leer", esperado: "denegar", descripcion: "NO ve les línies de cap certificat a demanda" },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -938,6 +1070,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
+    { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
@@ -958,6 +1091,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
+    { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
@@ -1016,6 +1150,15 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // ninguno de escritura sobre estas tablas— y no un `not null`.
   cierres_ejercicio: { ejercicio: 2020, modo: "prueba" },
   cierres_donante: { productor_id: "00000000-0000-0000-0000-000000000000" },
+  // Igual que las dos de arriba: `cierres_periodo` no tiene GRANT de escritura para nadie.
+  // La ventana y el ejercicio tienen que cuadrar entre sí (check `any_natural`), o lo que
+  // cortaría sería ese check y no el permiso.
+  cierres_periodo: {
+    productor_id: "00000000-0000-0000-0000-000000000000",
+    periodo_desde: "1999-01-01",
+    periodo_hasta: "1999-12-31",
+    ejercicio: 1999,
+  },
   espigoladas: { fecha: "1999-01-01" },
   // `convenios` no tiene GRANT de escritura para nadie: la fila se rellena lo justo para
   // que lo que corte sea el permiso y no un `not null` ni el check excluyente.

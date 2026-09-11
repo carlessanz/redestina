@@ -23,13 +23,11 @@
 // («se sube exactamente a `documentos.ruta`») y por el mismo motivo: quien decide en qué
 // carpeta acaba un dato personal es la base, no un `+` de TypeScript.
 //
-// ⚠️ Con un matiz que hay que dejar escrito: `ruta_documento()` está pensada para un
-//    documento EMITIDO y termina siempre en `<numero>-v<n>.pdf`. Un externo no tiene ni
-//    número de serie nuestro ni versión, y puede ser un JPG. Así que se le pide la ruta
-//    con `p_tipo = 'externs'` y se le cambia **solo la hoja** por
-//    `<uuid>-<tipo>.<ext>`: la carpeta —lo único que decide quién puede ver el fichero—
-//    sigue viniendo entera de SQL. El arreglo limpio es una `ruta_documento_externo()`
-//    en una migración de `dades`; queda anotado en el informe.
+// La función concreta es `ruta_documento_externo()` (20270304100000) y no `ruta_documento()`:
+// esta última está pensada para un documento EMITIDO y termina siempre en `<numero>-v<n>.pdf`,
+// que un externo no tiene —ni número de serie nuestro, ni versión, y puede ser un JPG—.
+// Devuelve la ruta ENTERA, carpeta y nombre, así que aquí no se compone ni se recorta ninguna
+// cadena: antes se pedía la ruta con un número FALSO y se le cambiaba la hoja a mano (§12.62).
 //
 // QUIÉN PUEDE SUBIR: el equipo, o el titular del objeto. Se pregunta con **una sola
 // llamada**, `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` (20261109100400),
@@ -74,9 +72,10 @@ async function sha256(bytes: Uint8Array): Promise<string> {
 }
 
 /**
- * La carpeta que dice SQL, con la hoja sustituida (ver el aviso de la cabecera).
- * Si `ruta_documento()` no puede resolver el propietario, levanta `0A000` y esta función
- * lo convierte en un 409: no se sube nada a una carpeta inventada.
+ * La ruta entera, decidida en SQL. Si no se puede resolver el propietario del objeto,
+ * `ruta_documento_externo()` levanta `0A000` y esta función lo convierte en un 409: no se
+ * sube nada a una carpeta inventada. El `tipo` y la extensión los valida también SQL, que es
+ * quien está componiendo un camino.
  */
 async function rutaExterno(
   supabase: Cliente,
@@ -87,21 +86,18 @@ async function rutaExterno(
   extension: string,
   modo = "real",
 ): Promise<string> {
-  const id = crypto.randomUUID();
-  const { data, error } = await supabase.rpc("ruta_documento", {
+  const { data, error } = await supabase.rpc("ruta_documento_externo", {
     p_objeto_tipo: objetoTipo,
     p_objeto_id: objetoId,
-    p_tipo: "externs",
-    p_numero_completo: id,
-    p_version: 1,
-    p_modo: modo,
+    p_tipo: tipo,
     p_ejercicio: ejercicio,
+    p_extension: extension,
+    p_modo: modo,
   });
   if (error) throw Object.assign(new Error(error.message), { code: error.code });
   const ruta = String(data ?? "");
-  const carpeta = ruta.slice(0, ruta.lastIndexOf("/") + 1);
-  if (!carpeta) throw new Error("ruta_documento() no ha devuelto ninguna carpeta");
-  return `${carpeta}${id}-${tipo}.${extension}`;
+  if (!ruta) throw new Error("ruta_documento_externo() no ha devuelto ninguna ruta");
+  return ruta;
 }
 
 Deno.serve(async (req) => {
@@ -266,7 +262,7 @@ Deno.serve(async (req) => {
     ruta = await rutaExterno(supabase, objetoTipo, objetoId, tipo, ejercicio, extension, modo);
   } catch (e) {
     const texto = e instanceof Error ? e.message : String(e);
-    console.error("subir-documento-externo: ruta_documento:", texto);
+    console.error("subir-documento-externo: ruta_documento_externo:", texto);
     return responder(
       { error: "No s'ha pogut decidir on desar el fitxer", code: "sense_carpeta", detall: texto },
       409,

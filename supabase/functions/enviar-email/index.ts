@@ -66,6 +66,12 @@ Deno.serve(async (req) => {
   try {
     const input = await req.json();
     const { to, subject, html, text, plantilla } = input;
+    // Para la traza del envío (deuda §12.25). Los tres son OPCIONALES y no cambian el
+    // contrato: sin ellos el correo se registra como `oferta` sin objeto, que es lo que
+    // manda hoy el panel desde `OfferDetail`.
+    const proposito = typeof input?.proposito === "string" ? input.proposito : "oferta";
+    const objetoTipo = typeof input?.objeto_tipo === "string" ? input.objeto_tipo : null;
+    const objetoId = typeof input?.objeto_id === "string" ? input.objeto_id : null;
     if (!to || typeof to !== "string") {
       return responder({ error: "Falta 'to' (email destino)" }, 400);
     }
@@ -135,9 +141,15 @@ Deno.serve(async (req) => {
       }
     }
 
-    const r = await sendEmail({ to, subject, html: htmlFinal, text });
+    const r = await sendEmail({ to, subject, html: htmlFinal, text }, {
+      supabase,
+      proposito,
+      objetoTipo,
+      objetoId,
+      funcion: "enviar-email",
+    });
     if (!r.ok) return responder(r.data, r.status === 0 ? 502 : r.status);
-    return responder({ ok: true, data: r.data }, 200);
+    return responder({ ok: true, data: r.data, simulat: r.simulado === true }, 200);
   } catch (err) {
     console.error("enviar-email:", err instanceof Error ? err.message : String(err));
     return responder({ error: "Error interno o JSON inválido" }, 500);

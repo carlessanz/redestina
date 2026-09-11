@@ -477,6 +477,8 @@ supabase/
     descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
     recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
+    limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
+                               La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo
 docs/                          Material de trabajo local — IGNORADO POR GIT (§7)
@@ -2210,6 +2212,13 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
   valor va en `app_config.recordatorios_secret` para que el job lo pueda enviar (§4, §5). Nunca
   en git.
 - `RESEND_API_KEY` — API key de Resend (ofertas por email y reset de contraseña). Nunca en git.
+- `RESEND_ENVIO_REAL` — **`"true"` exacto o no sale ni un correo** (gemelo del de WhatsApp, §8).
+  Permite ensayar el circuito entero en local sin salir a la red y sin `RESEND_API_KEY`: la
+  comprobación va **antes** de mirar la clave.
+  🔴 **Crearlo ANTES de redesplegar** las cinco funciones que mandan correo (`enviar-email`,
+  `enviar-acceso`, `recuperar-password`, `recordatorios-documentales`, `enlace-publico`). Al revés,
+  **el correo se apaga entero y en silencio** — incluido `recuperar-password`, así que alguien
+  puede quedarse fuera de la aplicación sin ningún mensaje de error.
 - `RESEND_FROM` — remitente (`from`) de un dominio **verificado** en Resend.
   Valor actual: `Redestina <no-reply@espigoladors.com>`. Ausente = usa `onboarding@resend.dev`, que solo
   entrega al correo owner de la cuenta.
@@ -2341,6 +2350,7 @@ supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 6
 supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama pg_cron
 supabase functions deploy enlace-publico --no-verify-jwt        # confirmación pública (§9)
 supabase functions deploy subir-documento-externo               # con verify_jwt (multipart, 10 MB)
+supabase functions deploy limpiar-documentos-prueba            # con verify_jwt (super_admin; §12.51)
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -2558,8 +2568,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    sigue en `null` en 111 entidades y sin él un receptor no ve ninguna oferta —es triaje manual—, y
    `usuario_roles` no tiene FK a `perfiles`, así que PostgREST no puede embeber los dos (la futura
    pantalla «Equip» tendrá que cruzarlos en cliente).
-3. El intake avanza de paso aunque falle el envío: si la red falla, el productor no recibe la
-   pregunta pero la sesión ya avanzó, y su siguiente mensaje se lee como respuesta al paso nuevo.
+3. ~~**El intake avanza de paso aunque falle el envío.**~~ — **resuelta (11-09-2026)**:
+   `preguntar()` devuelve `boolean`, las 14 ramas miran el `.ok` de su envío, y **el orden se
+   invierte** — se pregunta primero y el paso solo avanza si salió. La respuesta sí se guarda
+   (está entendida y validada); lo que no se mueve es `paso_actual`, así que el reintento es
+   idempotente.
+   ⚠️ **`_intentos` no lo toca un fallo de red**, y esa distinción es el fondo del asunto: ese
+   contador sube solo cuando `interpretar()` no entiende la respuesta. Confundir las dos cosas
+   expulsaría del formulario a quien contesta bien y tiene mala cobertura.
+   Verificado contra la base local con la Graph API devolviendo 500 a voluntad: con el código
+   anterior, un fallo en el paso «producte» dejaba la sesión en «varietat» sin que el productor
+   viera la pregunta, y su siguiente mensaje («Poma») se guardaba como **variedad**.
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
    técnico lo normaliza en el panel y hasta entonces el job de vencidas no actúa sobre ese excedente.
@@ -2666,9 +2685,20 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     a todos los suscriptores porque, con la replica identity por defecto, el WAL solo lleva la
     clave primaria). Hoy es inocuo: el payload es solo un id. Dejaría de serlo si algún día se
     pusiera `replica identity full` en una tabla con datos personales.
-25. **Un fallo de envío por correo sigue sin dejar rastro.** WhatsApp ya lo registra (§8ter,
-    `status='error'`), pero si Resend rechaza un envío solo queda en los logs de la Edge Function:
-    en el panel no se distingue de un envío correcto.
+25. 🟡 **Un fallo de envío por correo ya deja rastro en la base; falta que el panel lo lea.**
+    Y la entrada se quedaba corta: `documento_envios` **no la escribía nadie y no la leía nadie**,
+    y el caso que describía —correos con documento adjunto— **no existe**, porque
+    `EmailPayload.attachments` está declarado y ningún llamante adjunta nada. O sea que en la
+    práctica **ningún** correo dejaba rastro: ni los de acceso, ni los de recuperación, ni las
+    ofertas, ni el código de firma.
+    `20270307100000` la generaliza —`documento_id` nullable, objeto polimórfico, `proposito`,
+    `funcion` y el estado `simulat`— y `sendEmail()` la escribe con `service_role`.
+    ⚠️ **No se guarda el asunto, y no es un olvido**: el correo del código de firma lleva las seis
+    cifras en el propio `subject`, y esta tabla la lee todo el equipo. Mismo criterio que
+    `bodyConsola` en `sendText()` (§9).
+    ⚠️ `registrarEnvio()` **se apaga solo** si la migración no está (`42P01`/`42703`/`PGRST204`),
+    avisando una vez por isolate: así función y migración se pueden desplegar en cualquier orden.
+    **Lo que falta**: la pantalla. Sin ella el dato existe pero el equipo no lo ve.
 26. **El registro público no tiene captcha y su límite por IP vive en memoria** (§9): se pierde en
     cada arranque en frío del isolate y no se comparte entre instancias. Lo que de verdad frena un
     abuso masivo es el tope de 20 pendientes por hora. Turnstile queda pendiente; hoy no compensa,
@@ -2864,10 +2894,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `objeto_tipo` y ya no queda ninguna rama que levante `0A000`. Cada fase rellenó la suya, que era
     el plan.
 
-51. **`reiniciar_documentos_prova()` borra las FILAS, no los objetos de `proves/` en Storage.**
-    SQL no puede borrar del bucket. Hasta que la RPC de reinicio del cierre (fase 4) lo haga a
-    través de una Edge Function, cada ciclo de prueba deja sus PDF huérfanos en
-    `proves/<ejercicio>/`. Son inalcanzables (bucket privado y sin políticas), pero ocupan.
+51. ~~**`reiniciar_documentos_prova()` borra las FILAS, no los objetos de Storage.**~~ —
+    **resuelta (11-09-2026)** con la Edge Function **`limpiar-documentos-prueba`**, la otra mitad
+    de esa RPC. Tres guardas, y ninguna es prescindible: solo lista dentro de `proves/`, solo borra
+    lo que **ninguna fila reclama** —ni `documentos.ruta`, ni `documentos_externos.ruta`, ni
+    `evidencias.trazo_firma_ruta`— y exige sesión de `super_admin`. Admite `{"seco": true}`.
+    ⚠️ **Las tres comprobaciones de «reclamado» hacen falta, y la prueba lo demostró en vivo**: de
+    los 10 objetos bajo `proves/` en local, el único protegido fue la **factura que sube el donante
+    en el ensayo del cierre**, que no está en `documentos`. Con la comprobación obvia se habría
+    borrado, rompiendo la conciliación del ensayo en curso.
+    Ejecutada contra local: 9 huérfanos, 1,13 MB recuperados, segunda pasada a cero.
 52. **El arnés, al pasar por el super_admin, borra todos los documentos `modo='prueba'`** de la
     base contra la que corre (`emitir_documento_prova` + `limpiar: reiniciar_documentos_prova`).
     Hoy es inocuo; a partir de la fase 4 no debe ejecutarse a la vez que un ciclo de cierre de
@@ -2900,24 +2936,38 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `42501` citando el CIF sembrado. Un certificado con efecto fiscal no sale con un CIF inválido.
     Sustituir los datos reales sigue siendo checkpoint de negocio (§12 checkpoint 10).
 
-57. **El recordatorio de un enlace no llega a quien tiene que responder.** Llega al equipo,
-    porque el token no se puede reconstruir desde su hash (§9). Cierra el circuito, pero mete una
-    persona en medio de algo que debería ser automático. La salida no es guardar el token en claro
-    —eso es exactamente lo que la tabla evita— sino que la bandeja del panel ofrezca «revocar i
-    reenviar» en un clic y que el aviso enlace ahí; hoy el correo solo puede describir el enlace.
-58. **`MAX_POR_EJECUCION = 50` en `recordatorios-documentales`.** Si se acumulan más enlaces
-    vencidos, los que sobran se cuentan como `limit_execucio` y esperan al día siguiente. Es
-    intrascendente para un recordatorio y acota el coste del gate, pero es un tope silencioso:
-    solo se ve en `motivos`.
-59. **El camino de envío correcto de los recordatorios no tiene prueba automática sin stub.** En
-    local no hay `RESEND_API_KEY`, así que la única forma de ejercitarlo fue interceptar `fetch`.
-    Lo que sí queda probado sin stub es la invariante que importa: **si el correo no sale, los
-    contadores no se mueven**, y el hito se reintenta mañana.
+57. ~~**El recordatorio de un enlace no se puede accionar.**~~ — **resuelta (11-09-2026)**. Sigue
+    yendo al equipo —el token en claro no existe y eso no cambia—, pero ahora **lleva hasta el
+    sitio**: cada fila tiene su enlace a `/equip/convenis/<id>` o `/equip/albarans/<id>`, que es
+    donde `enviar_convenio()` y `marcar_entregado()` emiten uno nuevo, y dice qué hay que hacer.
+    Y **se identifica por el número, no por un trozo de uuid**: `ENT-2026-00042`, o el tipo del
+    convenio cuando todavía no tiene número —se pide al firmar—.
+    No hizo falta ninguna RPC nueva: las dos ya existían, cableadas y con pantalla. Lo único que
+    faltaba era el enlace.
+58. ~~**`MAX_POR_EJECUCION = 50` es un tope silencioso.**~~ — **resuelta (11-09-2026)**: el tope
+    sigue en 50 —acota el coste del gate y para un recordatorio es intrascendente— pero ahora **se
+    dice** en tres sitios: campo propio `limit: {tope, enllacos, factures, retallat}` en la
+    respuesta, `console.warn` con `avis: "limit_execucio"` para poder filtrarlo por nivel, y un
+    recuadro en el propio correo. Una lista recortada que no lo dice se lee como completa.
+59. ~~**El camino de envío de los recordatorios no tiene prueba automática sin stub.**~~ —
+    **resuelta (11-09-2026)** con `RESEND_ENVIO_REAL` (deuda 73). Ejercitado en local sin ningún
+    stub: `{"ok":true,"revisados":1,"avisados":1,…}`. Ese `avisados: 1` era justo lo inalcanzable,
+    porque el contador solo se mueve si el correo salió y en local nunca salía.
 
-60. **El bloque de conformidad de los albaranes se imprime siempre en blanco**, aunque el albarán
-    ya esté confirmado por enlace. La evidencia (quién, cuándo, desde dónde) vive en `evidencias`, y
-    `albaran_datos()` no la mete en el snapshot; el renderizador no habla con la base a propósito.
-    Cuando el snapshot la incluya, son tres campos que rellenar.
+60. ~~**El bloque de conformidad de los albaranes se imprime siempre en blanco.**~~ — **resuelta
+    (11-09-2026)**, y el arreglo «evidente» no habría servido de nada: ⚠️ el snapshot se congela
+    **al emitir**, y `marcar_entregado()` exige `estado='emitido'`, así que cuando llega la
+    confirmación `documentos.datos` lleva rato siendo inmutable. Meter las evidencias en
+    `albaran_datos()` no arregla ningún PDF existente. Se leen con `service_role` desde
+    `generar-documento`, que es el camino que el convenio ya usaba.
+    El OPE se resuelve gracias a **`rol_parte`** (deuda 68, de la misma tanda): cada confirmación
+    se casa con su espacio. ⚠️ Una confirmación **sin rol** —los enlaces anteriores a esa
+    migración— **no se atribuye a nadie**: se lista aparte. Ponerla bajo «Entrega» sin saberlo
+    sería inventarse quién firmó qué en un documento legal.
+    **La IP y el user-agent no se imprimen**: el albarán lo descarga también la otra parte, el
+    texto legal ya dice que quedan registrados, y `evidencias` es donde se consultan.
+    Coste medido: **+1,3 ms** en un OPE con dos confirmaciones y **0 ms** en un ENT, más ~5 ms de
+    las dos consultas — sobre los 174 ms de `ms_render` de §12.87.
 61. ~~**El REC de una espigolada imprime el UUID de la jornada.**~~ — **resuelta
     (`20270304100100`)**: `albaran_datos()` pone `coalesce(espigoladas.ref_externa, id::text)`. Solo
     afecta a lo que se emita desde ahora: un snapshot ya congelado no cambia, ni debe.
@@ -2991,13 +3041,21 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cierre y no hay RPC que la borre. Se cubre por el lado del «denegar», y con
     `reiniciar_cierre_prueba`/`conciliacion_retroactiva` sobre un uuid inventado.
 
-73. **El camino feliz de los recordatorios de factura no se puede probar en local.** `sendEmail()`
-    exige `RESEND_API_KEY` y **no tiene modo simulado**, al revés que `WHATSAPP_ENVIO_REAL`, que sí
-    permite ensayar el envío sin salir a la red. Solo se ejercitan la selección y el fail-safe (si
-    el correo no sale, los contadores no se mueven). Un `RESEND_ENVIO_REAL` equivalente cerraría
-    este hueco y el de la deuda 59.
-74. **El recordatorio al donante no lleva enlace**, por lo mismo que el de los convenios (deuda 57):
-    de `enlaces_token` solo se guarda el hash. Le dice que use el del resumen o su panel.
+73. ~~**`sendEmail()` no tiene modo simulado.**~~ — **resuelta (11-09-2026)**: existe
+    **`RESEND_ENVIO_REAL`**, gemelo exacto del de WhatsApp. Mientras no valga `"true"` exacto no
+    sale nada y se devuelve `{simulado:true}`; la comprobación va **antes** de mirar
+    `RESEND_API_KEY`, para que en local sin clave funcione el camino entero.
+    La decisión está aislada en `esEnvioReal()`, que es pura y **tiene pruebas** —incluido que
+    `TRUE`, `1`, `yes` y `" true"` no encienden nada—. El interruptor de WhatsApp lleva desde julio
+    sin nadie que lo vigile; este no.
+    🔴 **El secreto va ANTES del despliegue.** Si se redespliegan las cinco funciones que mandan
+    correo sin crearlo, **el correo se apaga entero y en silencio** — incluido
+    `recuperar-password`, o sea que alguien puede quedarse fuera de la aplicación sin ningún
+    mensaje de error.
+74. ~~**El recordatorio al donante no lleva enlace.**~~ — **resuelta (11-09-2026)**: el botón del
+    correo apunta a `/productor/documents`, que es donde está el formulario de subida (§12.65) y
+    donde `puc_pujar_document_extern()` resuelve el permiso. Sin sesión aterriza en el login, que
+    sigue siendo el camino.
 75. **`documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla**, así
     que el donante puede leer su propio token. Es inocuo —es suyo— pero **`envio` no debe pintarse
     tal cual en ninguna pantalla**, y el día que guarde algo de otra persona habrá que pasarlo a
@@ -3085,10 +3143,9 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     la función es idempotente (con `fichero_at` ya puesto responde 200 sin hacer nada) —que es
     justo para lo que se escribió esa guarda—, pero esa emisión costó el doble y la causa no
     está averiguada.
-88. **Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**
-    `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
-    borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
-    370 KB.
+88. 🟡 **Los tres PDF de la prueba de publicación siguen en `proves/2026/PROVA/`** — pero ya hay
+    con qué quitarlos: `limpiar-documentos-prueba` (deuda 51). **No se han borrado todavía**: eso
+    se hace en producción y con `{"seco": true}` primero.
 89. ~~**Un corte por CPU no encendía ninguna luz, y además no paraba nunca.**~~ — **resuelto
     (11-09-2026, `20270302100000_documentos_encallados.sql`)**. Al medir el CPU de verdad (§12.87)
     se vio que el único fallo del que se hablaba era justo el único que el circuito no sabía
