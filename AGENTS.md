@@ -3090,7 +3090,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     calcula la diferencia en TypeScript. La regla sigue en la tabla y la autoridad sigue siendo la
     RPC (`exigir_convenio`): una divergencia solo produce un aviso de más o de menos en el panel.
 82. ⚠️ **Un agente NO debe hacer `git checkout` de un fichero compartido para restaurar su entorno
-    de pruebas.** Pasó el 10-09-2026 y costó trabajo: un agente montó rutas e i18n temporales para
+    de pruebas.** *(Y desde el 11-09-2026 hay red: `tests/cobertura.test.ts` comprueba que cada
+    entrada del menú tiene ruta, que cada ruta resuelve a un fichero y que **toda clave i18n usada
+    existe en los dos idiomas**. Se ganó el sueldo el primer día: cazó 17 claves que dos pantallas
+    nuevas usaban sin definir, con nombre y fichero, en vez de que salieran en producción como
+    identificadores crudos en el menú. La obligación de «auditar antes de cada commit» dependía de
+    que alguien se acordara; ahora la ejecuta `npm run check`.)* Pasó el 10-09-2026 y costó trabajo: un agente montó rutas e i18n temporales para
     poder medir, y al terminar restauró `src/router/index.tsx` y `src/lib/i18n.tsx` con
     `git checkout` — llevándose por delante la integración de la fase 4 que estaba en el árbol sin
     commitear. **El build no lo detecta**: unas rutas que no existen y unas claves que faltan
