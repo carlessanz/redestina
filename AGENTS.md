@@ -1229,6 +1229,11 @@ inválido; cierra la deuda 56.
 ⚠️ **Una guarda escrita como `es_intern()` a secas deja fuera a `service_role` en silencio.** Pasó
 con `datos_182`: devolvía **0 filas**, indistinguible de «este cierre no tiene certificados». La
 forma correcta en todo el circuito es `auth.uid() is not null and not es_intern()`.
+**Y volvió a pasar el 11-09-2026 con `actualizar_meu_canal`** (`20270314100100`), que tenía el GRANT
+de `service_role` y respondía `42501` al usarlo: se vio al verificar el despliegue llamándola con la
+service key. Un GRANT que no sirve para nada es **peor** que no tenerlo — el día que una Edge
+Function la llame, el fallo parecerá de permisos de datos y no lo será. Al escribir una guarda
+nueva, comprobarla **con la service key**, no solo con una sesión.
 
 ⚠️ **`auth.uid() is null` significa `service_role`.** Las RPC documentales comprueban el rol solo
 cuando hay sesión de usuario (`if auth.uid() is not null and not es_super_admin() then raise`),
