@@ -354,6 +354,12 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
 ```text
 index.html                     Carga Sora e Inter (Google Fonts), theme-color verde
 vercel.json                    Rewrite de SPA (sin él, recargar una ruta profunda da 404)
+vitest.config.ts               Config de las pruebas, aparte de vite.config.ts (§11)
+tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO debe ver
+.githooks/pre-commit           Tipos + vitest + deno check antes de cada commit (§13)
+tests/                         Pruebas unitarias (Vitest). Módulos de negocio, no pantallas
+  deno.d.ts                    El global `Deno` declarado al mínimo, para que tsc compruebe
+  cobertura.test.ts            Que el menú, las rutas y las claves i18n apunten a algo real
 design/                        Sistema de diseño (§2bis): tokens.json, DESIGN.md, preview.html, PLAN.md
 public/                        Logo en seis variantes SVG, favicon, iconos PWA y logo-email.png (§2bis)
 .env.local.example             Plantilla de variables del frontend (sí se versiona)
@@ -433,6 +439,7 @@ scripts/
   crear-usuarios-whatsapp.ts   5 cuentas de organización sobre las fichas REALES con móvil en
                                Meta; no crea ni toca ninguna ficha, solo enlaza (§9)
   prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
+  huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
   diagnostico-whatsapp.ts      Interroga la Graph API y distingue token caducado / número / permisos (§8ter)
   sql/rls-emergencia.sql       Paracaídas: restaura las políticas permisivas (NO es migración)
@@ -2382,11 +2389,18 @@ y si no basta, `scripts/sql/rls-emergencia.sql` en el SQL Editor.
 
 `npm run build` corre `tsc` con `strict`, `noUnusedLocals` y `noUnusedParameters`, **pero solo
 sobre `src/`**: ni los scripts de Deno ni las Edge Functions entran en ese `tsconfig`, así que
-durante meses no los comprobó nadie. Hoy hay **tres** comprobaciones automáticas: `tsc`,
-`deno check` (scripts y las nueve funciones) y `scripts/comprobar-rls.ts`, que verifica los
-permisos de verdad, contra la base y con sesiones reales. Ejecuta las tres tras cada cambio que
-toque datos o políticas. Si
-tocas algo de `supabase/functions/_shared/`, **redespliega todas** las funciones que lo importan.
+durante meses no los comprobó nadie. Hoy hay **cuatro** comprobaciones automáticas: `tsc` (de la
+aplicación **y** de las pruebas, con `tsconfig.tests.json`), **`vitest`**, `deno check` (scripts y
+las 14 funciones) y `scripts/comprobar-rls.ts`, que verifica los permisos de verdad, contra la
+base y con sesiones reales. Las tres primeras van juntas en `npm run check` y en el hook de
+pre-commit; el arnés se queda fuera porque necesita credenciales. Si tocas algo de
+`supabase/functions/_shared/`, **redespliega todas** las funciones que lo importan.
+
+⚠️ **Las pruebas no viven en `src/` y eso es deliberado.** Importan dos mundos que la aplicación
+no conoce —los módulos Deno de `_shared/`, que se referencian con extensión `.ts`, y utilidades de
+Node— así que tienen su propio `tsconfig`. Meter `"node"` en los tipos del `tsconfig` de la
+aplicación dejaría `process`, `Buffer` y `fs` visibles dentro de `src/`, que se empaqueta para el
+navegador: haría compilar código que revienta en producción.
 
 ## 12. Checkpoints de negocio y deuda técnica
 
