@@ -702,6 +702,14 @@ de 7/14 días). **El token en claro solo existe en el correo**: en la base queda
 bytes aleatorios, como una contraseña. `canal='asistido'` es el enlace que abre el dinamizador
 delante de la persona (modelo asistido, §1bis), no un atajo.
 
+⚠️ **`enlaces_token.rol_parte`** (`entrega`/`recibe`, nullable, `20270304100200`) dice de qué parte
+del albarán es cada enlace, con el mismo vocabulario que `albaranes.partes`. Existe por el **OPE**,
+que crea **dos** enlaces —el generador entrega, la entidad recibe— y hasta ahora quedaban
+indistinguibles (deuda 68). Los enlaces anteriores se quedan a `null` **y no se rellenan**: en REC y
+ENT la parte se deduce del tipo, y un dato inventado en una tabla de evidencia vale menos que un
+hueco. Lleva **`grant select` de columna propio**: en una tabla con GRANT por columnas, una columna
+nueva no hereda nada.
+
 **`evidencias`** — lo que hace que una firma propia valga algo: `enlace_id` (FK cascade), `tipo`
 (`apertura`·`firma`·`confirmacion`·`subida`·`codigo`), `nombre`, `cargo`,
 **`documento_identidad`**, `declaracion_representacion`, `trazo_firma_ruta`, `ip inet`,
@@ -1060,12 +1068,27 @@ funciones, no políticas:
 | `cierre_base` · `cierre_pendents` · `datos_182` · `comparar_cierre_prueba` · `provincia_por_cp` | Las consultas. La base de cálculo son donaciones **conciliadas** con la fecha de recogida dentro del año **en hora de Madrid**, con los kilos del REC conciliado repartidos entre las canalizaciones del registro (D13) |
 | `cerrar_cierre(cierre)` | Cierra **un** cierre por su uuid: recalcula, emite los resúmenes definitivos y pasa a `tancat`. `pot_aprovar()`, y **`es_super_admin()` si el cierre es real** |
 | `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
+| `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
+| `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
+| `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
 | `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
+
+⚠️ **`marcar_entregado()` devuelve además `rol_part`** en cada enlace, y **`resolver_enlace()`
+devuelve `rol_parte`**. `resolver_enlace` hubo que borrarla y recrearla: `create or replace` **no
+cambia el `returns table`**, así que **hay que repetir el `revoke`/`grant`** (se hizo en
+`20270304100200`) — la misma trampa que el `parallel restricted` de `get_my_session_context()`.
+
+⚠️ **`emitir_albaran()` escribe `canalizaciones.data_hora_recollida`** si estaba vacía, con la misma
+fecha del acto con la que elige el ejercicio de la serie. **Nunca pisa una fecha existente y no hubo
+backfill**: el `coalesce(data_hora_recollida, conciliada_at, created_at)` de `cierre_base`,
+`cierre_pendents` y `cierre_base_transaccion` se queda donde está. ⚠️ Solo la escriben **ENT y OPE**
+—el REC no tiene `canalizacion_id`—, así que en una donación la fecha guardada es la de la **entrega
+a la entidad**, no la de la entrada del donante (deuda 69).
 
 ⚠️ **`get_my_session_context()` devuelve además `conveni_pendent`.** Al recrearla hay que repetir
 `parallel restricted`, como siempre (se hizo en `20270111100100`).
@@ -2573,11 +2596,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 22. **Sin preferencia de canal declarada por la persona.** El canal se deduce de lo que hay en la
     ficha (móvil, opt-in, ventana). El funcional pide un campo explícito de «canal preferido» por
     organización: cuando exista, mandará sobre la deducción.
-23. **`excedentes` tiene el único predicado de RLS que no puede ser InitPlan**: el `EXISTS` de
-    `20260730098000_rls_ofertas_sense_recursio.sql` está correlacionado con `excedentes.modalitat`,
-    así que se evalúa como SubPlan **una vez por fila**, y dentro recorre `entidades` (que reevalúa
-    su propia RLS). Con 7 excedentes no se nota; el arreglo, cuando haga falta, es un SRF
-    `security definer` sin correlación que devuelva las modalidades compatibles de la cuenta.
+23. ~~**`excedentes` tiene el único predicado de RLS que no puede ser InitPlan.**~~ — **resuelta
+    (`20270304100400`)**: el `EXISTS` correlacionado se sustituye por el SRF `security definer`
+    `modalitats_compatibles_meves()` y un `modalitat in (select …)`, que el planner resuelve una vez
+    y hashea. Medido con `explain (analyze)`: desaparecen el `SubPlan` por fila y el `Seq Scan on
+    entidades` anidado —con su segunda llamada a `mis_entidades()`—, y el plan pasa de 57 líneas a
+    23. Matiz honesto: sale como `hashed SubPlan`, no como `InitPlan`, igual que las otras tres
+    ramas sin correlación; el comportamiento es el mismo (una evaluación y hash).
+    **Equivalencia verificada**, que es lo que de verdad importaba: para las 7 cuentas de la base
+    local —y repitiéndolo con `roles_activos` apagado— el conjunto de ofertas visible con la
+    política vieja y con la nueva es **idéntico**.
 24. **Los eventos DELETE de Realtime se entregan sin evaluar RLS** (`realtime.apply_rls` los reparte
     a todos los suscriptores porque, con la replica identity por defecto, el WAL solo lleva la
     clave primaria). Hoy es inocuo: el payload es solo un id. Dejaría de serlo si algún día se
@@ -2825,11 +2853,19 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ya esté confirmado por enlace. La evidencia (quién, cuándo, desde dónde) vive en `evidencias`, y
     `albaran_datos()` no la mete en el snapshot; el renderizador no habla con la base a propósito.
     Cuando el snapshot la incluya, son tres campos que rellenar.
-61. **El REC de una espigolada imprime el UUID de la jornada** como referencia, porque el snapshot
-    no trae `espigoladas.ref_externa`. Es correcto y es ilegible en papel.
-62. **`subir-documento-externo` compone a mano la hoja del nombre de fichero**: `ruta_documento()`
-    solo sabe de documentos emitidos (termina siempre en `-v<n>.pdf`) y un externo no tiene versión
-    ni es siempre un PDF. El arreglo limpio es una `ruta_documento_externo()` en una migración.
+61. ~~**El REC de una espigolada imprime el UUID de la jornada.**~~ — **resuelta
+    (`20270304100100`)**: `albaran_datos()` pone `coalesce(espigoladas.ref_externa, id::text)`. Solo
+    afecta a lo que se emita desde ahora: un snapshot ya congelado no cambia, ni debe.
+    ⚠️ El arreglo **solo luce si el equipo rellena `ref_externa`**, que es opcional y hoy está vacía
+    casi siempre; el `coalesce` deja el UUID donde no la haya.
+62. ~~**`subir-documento-externo` compone a mano la hoja del nombre de fichero.**~~ — **resuelta
+    (`20270304100000`)**: `ruta_documento_externo()` devuelve la ruta entera. Y eran **dos**
+    consumidores, no uno: la subida de factura de `enlace-publico` hacía exactamente el mismo apaño
+    y no estaba anotada.
+    Verificado lo que de verdad importaba: **la ruta generada es idéntica a la de antes en los 12
+    objetos de la base local** (ENT, OPE, REC y tres cierres en modo prueba, incluido un albarán sin
+    ejercicio). Si no lo fuera, los ficheros ya subidos quedarían en una carpeta y los nuevos en
+    otra.
 63. **Las herramientas locales asumen un único operador, y con agentes en paralelo eso rompe.** Dos
     casos vistos el mismo día: el arnés borrando los documentos de prueba que otro acababa de
     generar (deuda 52), y **dos `supabase functions serve` a la vez**, que no caben porque el
@@ -2849,15 +2885,24 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `propuesta_conciliacion()` cruzando el REC con todos sus ENT, y eso sería una llamada por fila.
 67. **Rectificar solo permite corregir `kg_neto` por línea**, no el producto ni las cajas. Es lo que
     se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
-68. **El OPE no tiene interfaz propia para sus dos confirmaciones.** `marcar_entregado` crea los dos
-    enlaces y la ficha los enseña, pero sin distinguir quién es cada parte.
+68. 🟡 **El OPE no distingue sus dos confirmaciones** — *resuelto en la base
+    (`20270304100200`)*: `enlaces_token.rol_parte` y `marcar_entregado()` escribiéndolo en las tres
+    ramas, con el mismo vocabulario que `albaranes.partes`. **Queda que la ficha lo pinte**,
+    aguantando el `null` de los enlaces anteriores: en REC y ENT la parte se deduce del tipo del
+    albarán, pero en un OPE viejo no hay de dónde sacarla.
 
-69. **La fecha del cierre no es siempre la de recogida.** `cierre_base()` usa
-    `coalesce(data_hora_recollida, conciliada_at, created_at)` porque hoy `data_hora_recollida` está
-    **vacía en todas las canalizaciones** —ni `repartir_espigolada` ni `aprovar_resposta` la
-    escriben— y sin ese respaldo el cierre saldría vacío. En el filo del 31 de diciembre el año
-    podría salir mal; lo tapa el job, que congela esa misma noche. Se cierra de verdad escribiendo
-    la fecha al emitir el albarán.
+69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
+    `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
+    no dependen del respaldo `coalesce(data_hora_recollida, conciliada_at, created_at)`, que puede
+    caer semanas después.
+    **Lo que queda, y no estaba en la deuda original**: solo la escriben **ENT y OPE** —el REC no
+    tiene `canalizacion_id`—, así que en una **donación** la fecha guardada es la de la entrega a la
+    entidad, no la de la entrada del donante; si esa entrega cruza el 31 de diciembre, el año podría
+    no ser el del REC.
+    ⚠️ **El histórico no se ha tocado a propósito**, y no debe tocarse sin el equipo delante: un
+    backfill cambiaría el ejercicio fiscal de datos ya certificados. Por construcción el cambio no
+    alcanza nada cerrado —`emitir_albaran` exige `borrador` y `cierre_base` solo mira `conciliada`,
+    estado al que no se llega sin emitir antes—, verificado con tres transacciones revertidas.
 70. **Los kilos por línea del cierre son derivados, no medidos.** D13 manda certificar el neto del
     albarán de recepción, pero las líneas tienen que ser por canalización para saber a qué entidades
     llegó el producto: el neto se reparte proporcionalmente a `kg_conciliados`, con el residuo del
@@ -3048,7 +3093,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **312 comprobaciones, todas
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **314 comprobaciones, todas
    correctas y 13 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
    de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
