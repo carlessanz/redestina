@@ -2632,8 +2632,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     de un bloque que sí se recorre (§12.48). Se recupera dando de alta una organización
     por `/registre` y añadiendo su credencial con `"rol": "pendent"` (§9). Con ello, la **cola de
     «Registres pendents» también vuelve a tener con qué probarse**, que hoy está vacía.
-33. **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK: la tabla
-    guarda un correo suelto (§4). Pasó dos veces el 31-07-2026 y se limpió a mano.
+33. 🟡 **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK:
+    la tabla guarda un correo suelto (§4). Pasó dos veces el 31-07-2026 y se limpió a mano.
+    **Estado comprobado el 11-09-2026**: de las 11 filas de producción, **10 tienen ficha detrás**
+    y la única que no —`tecnologia@espigoladors.com`, «Owner Resend (test)»— es deliberada: es el
+    correo propietario de la cuenta de Resend, el único al que se entregaba antes de verificar el
+    dominio. O sea que **hoy no hay ningún huérfano**.
+    ⚠️ Y por eso no se puede automatizar con «borra lo que no tenga ficha»: esa regla se llevaría
+    por delante justamente la fila que tiene que estar. Sigue siendo disciplina al borrar.
 34. **Áreas táctiles: se subieron las cuatro que importan, no todas.** «M'interessa» (44 px en móvil),
     el `SidebarTrigger` (36), el ojo de la contraseña (de 16×16 a 32×32) y el «atrás» del detalle de
     oferta. El resto de la interfaz sigue en `h-9` (36 px), por debajo de los 44 px que recomiendan
