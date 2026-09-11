@@ -523,6 +523,13 @@ apuntan a ella, con índice único parcial: **una organización tiene como mucho
 tipo**. La vista `v_organizaciones` (`security_invoker`) dice quién es cada una **leyéndolo de
 sus fichas**; `es_generadora`/`es_receptora` son **derivados de tener ficha**, no declarados.
 
+⚠️ **`canal_preferido` se escribe por RPC, no por `update`.** La tabla no tiene GRANT de
+escritura para nadie, como el resto del circuito documental: la única entrada es
+`actualizar_meu_canal()` (§4bis), y la pantalla es la ficha propia (`PerfilOrganitzacio`). No es
+una columna más de `actualizar_mi_productor` **porque no es de la ficha**: una organización con
+los dos papeles tiene UN canal preferido, y meterlo en las dos RPC crearía dos escrituras que
+pueden discrepar sobre el mismo dato — justo lo que esta tabla existe para evitar.
+
 ⚠️ **No guarda ni nombre ni NIF a propósito.** Duplicarlos crearía dos fuentes de verdad para el
 mismo dato, y en cuanto alguien editara una ficha nadie sabría cuál manda. Aquí solo vive lo que
 no tiene otro sitio: la identidad y `canal_preferido`, que es el campo que pide el funcional y la
@@ -1149,6 +1156,7 @@ funciones, no políticas:
 | `manifestar_interes(excedente, entidad, kg, preu, caixes)` | El receptor acepta desde el panel. Deja la fila igual que el diálogo de WhatsApp (`acceptada` + `aprovacio='pendent'`, `canal='panel'`), así **cae en la misma cola de aprobación** que ya existe. Valida compatibilidad y `preu_minim` |
 | `aprovar_resposta(resposta, kg, preu, motiu)` | Aprobar y canalizar **en una transacción** (hoy `OfferDetail` hace 3-4 llamadas sueltas). Exige `pot_aprovar()` |
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
+| `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
 | `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
 | `siguiente_numero(serie, ejercicio)` | El correlativo, dentro de la transacción de emisión. **Sin `execute` para `authenticated`** |

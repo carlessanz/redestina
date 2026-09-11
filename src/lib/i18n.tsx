@@ -491,6 +491,21 @@ const ca: Dict = {
   // fitxa de la pròpia organització
   'perf.subtitle': 'Dades de contacte de la teva organització.',
   'perf.read_only': 'Només el titular pot editar aquestes dades.',
+  // canal preferit de contacte (etapa 3 de l'organització unificada, §12.22)
+  'perf.channel_title': 'Com vols que et contactem',
+  'perf.channel_help': 'Tries per on ho provem primer. Si aquell canal no es pot fer servir en aquell moment, t’enviem el mateix missatge per l’altre: no et quedes sense rebre-ho.',
+  'perf.channel_label': 'Canal preferit',
+  'perf.channel_auto': 'Que ho decideixi Redestina (recomanat)',
+  'perf.channel_auto_desc': 'Fem servir WhatsApp quan es pot i, si no, el correu. És l’opció que arriba més vegades.',
+  'perf.channel_whatsapp': 'Prefereixo WhatsApp',
+  'perf.channel_whatsapp_desc': 'Provem sempre WhatsApp primer i, quan no es pot, t’ho enviem per correu.',
+  'perf.channel_email': 'Prefereixo el correu',
+  'perf.channel_email_desc': 'T’escrivim sempre per correu, encara que tinguem el teu mòbil.',
+  'perf.channel_limits_title': 'WhatsApp no depèn només de tu',
+  'perf.channel_limits': 'Les regles de WhatsApp les posa Meta, no Redestina: només et podem escriure si ens has escrit tu en les últimes 24 hores o si has acceptat rebre’n els missatges. Quan no es compleix cap de les dues coses, t’enviem el mateix per correu.',
+  'perf.channel_no_phone': 'A més, ara mateix no tens cap telèfon a la fitxa: fins que n’hi afegeixis un, sempre serà per correu.',
+  'perf.channel_no_email_title': 'Falta el correu',
+  'perf.channel_no_email': 'El correu és el canal de reserva de tothom. Sense adreça a la fitxa hi ha avisos que no et podrem fer arribar.',
   // mercat del receptor
   'mk.title': 'Excedents disponibles', 'mk.subtitle': 'Ofertes que encaixen amb el vostre tipus.',
   'mk.empty': 'Ara mateix no hi ha cap oferta disponible.',
@@ -1343,6 +1358,21 @@ const es: Dict = {
   // ficha de la propia organización
   'perf.subtitle': 'Datos de contacto de tu organización.',
   'perf.read_only': 'Solo el titular puede editar estos datos.',
+  // canal preferido de contacto (etapa 3 de la organización unificada, §12.22)
+  'perf.channel_title': 'Cómo quieres que te contactemos',
+  'perf.channel_help': 'Eliges por dónde lo intentamos primero. Si ese canal no se puede usar en ese momento, te enviamos el mismo mensaje por el otro: no te quedas sin recibirlo.',
+  'perf.channel_label': 'Canal preferido',
+  'perf.channel_auto': 'Que lo decida Redestina (recomendado)',
+  'perf.channel_auto_desc': 'Usamos WhatsApp cuando se puede y, si no, el correo. Es la opción que llega más veces.',
+  'perf.channel_whatsapp': 'Prefiero WhatsApp',
+  'perf.channel_whatsapp_desc': 'Probamos siempre WhatsApp primero y, cuando no se puede, te lo enviamos por correo.',
+  'perf.channel_email': 'Prefiero el correo',
+  'perf.channel_email_desc': 'Te escribimos siempre por correo, aunque tengamos tu móvil.',
+  'perf.channel_limits_title': 'WhatsApp no depende solo de ti',
+  'perf.channel_limits': 'Las reglas de WhatsApp las pone Meta, no Redestina: solo podemos escribirte si nos has escrito tú en las últimas 24 horas o si has aceptado recibir sus mensajes. Cuando no se cumple ninguna de las dos cosas, te enviamos lo mismo por correo.',
+  'perf.channel_no_phone': 'Además, ahora mismo no tienes ningún teléfono en la ficha: hasta que añadas uno, siempre será por correo.',
+  'perf.channel_no_email_title': 'Falta el correo',
+  'perf.channel_no_email': 'El correo es el canal de reserva de todo el mundo. Sin dirección en la ficha hay avisos que no te podremos hacer llegar.',
   // mercado del receptor
   'mk.title': 'Excedentes disponibles', 'mk.subtitle': 'Ofertas que encajan con vuestro tipo.',
   'mk.empty': 'Ahora mismo no hay ninguna oferta disponible.',

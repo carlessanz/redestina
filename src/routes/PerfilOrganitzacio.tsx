@@ -14,8 +14,26 @@
 // vaciaba todo lo que no coincidiera. El `key` del router y el `setFila(null)` de abajo
 // cierran esa ventana; la prop, además, quita el ternario que caía en «entidad» por
 // defecto.
+//
+// CANAL PREFERIDO (etapa 3 de la organización unificada, deuda §12.22). El canal se
+// venía DEDUCIENDO de lo que hay en la ficha —móvil, opt-in, ventana de 24 h— en
+// `_shared/canal.ts`, y la persona no tenía dónde decir el suyo. Ahora sí:
+// `organizaciones.canal_preferido` ('whatsapp' | 'email' | null). Tres cosas que el
+// diseño de esta parte da por sentadas:
+//
+//   1. **Es una preferencia, no una garantía.** WhatsApp exige ventana de 24 h abierta u
+//      opt-in: son requisitos de Meta, no gustos nuestros (§8). Si no se cumplen, el
+//      envío cae al correo igualmente. Eso se dice ARRIBA y en el mismo cuerpo de texto
+//      que el resto, no en letra pequeña, porque la alternativa es que alguien elija
+//      WhatsApp y crea que ya no se le escribirá por correo.
+//   2. **`null` no es un hueco, es una opción con nombre**: «que lo decida Redestina»,
+//      que es lo que más veces llega y por eso va primero y es el valor de fábrica.
+//   3. **`organizaciones` no tiene GRANT de escritura para nadie** (§4): se guarda por la
+//      RPC `actualizar_meu_canal`, con la misma guarda de titular que la autoedición de
+//      la ficha.
 
 import { useEffect, useState } from 'react'
+import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -23,9 +41,22 @@ import { useOrganitzacio } from '../hooks/useAppContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select'
 
 type Fila = Record<string, unknown>
+
+/** `auto` es el sentinela de `canal_preferido = null`: Radix no admite `value=""`. */
+type Tria = 'auto' | 'whatsapp' | 'email'
+
+const OPCIONS: { valor: Tria; labelKey: string; descKey: string }[] = [
+  { valor: 'auto', labelKey: 'perf.channel_auto', descKey: 'perf.channel_auto_desc' },
+  { valor: 'whatsapp', labelKey: 'perf.channel_whatsapp', descKey: 'perf.channel_whatsapp_desc' },
+  { valor: 'email', labelKey: 'perf.channel_email', descKey: 'perf.channel_email_desc' },
+]
 
 /** Campos editables por tipo: los mismos que acepta la RPC correspondiente. */
 const CAMPS = {
@@ -58,6 +89,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const { t } = useT()
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
+  const [canal, setCanal] = useState<Tria>('auto')
+  const [canalDesat, setCanalDesat] = useState<Tria>('auto')
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
 
@@ -65,19 +98,46 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const camps = CAMPS[tipus]
   const potEditar = organitzacio?.rol_org === 'titular'
 
+  // El aviso se calcula sobre lo que hay EN EL FORMULARIO, no sobre lo guardado: quien
+  // acaba de teclear su móvil ya no debería seguir leyendo que no tiene ninguno.
+  const clauTelefon = tipus === 'productor' ? 'phone' : 'telefono'
+  const telefon = String(fila?.[clauTelefon] ?? '').trim()
+  const correu = String(fila?.email ?? '').trim()
+  const descripcio = OPCIONS.find((o) => o.valor === canal)?.descKey ?? 'perf.channel_auto_desc'
+
   useEffect(() => {
     // Volver a «cargando» y soltar la fila anterior es lo que impide enseñar —y guardar—
     // los datos de una organización con los campos de la otra.
     setCarregant(true)
     setFila(null)
+    setCanal('auto')
+    setCanalDesat('auto')
     if (!organitzacio) { setCarregant(false); return }
     let viu = true
-    void supabase.from(tabla).select('*').eq('id', organitzacio.id).maybeSingle()
-      .then(({ data }) => {
+    void (async () => {
+      const { data } = await supabase.from(tabla).select('*').eq('id', organitzacio.id).maybeSingle()
+      if (!viu) return
+      const f = (data as Fila) ?? null
+      setFila(f)
+
+      // La preferencia vive en la organización, no en la ficha. Desde `20270313100000`
+      // toda ficha tiene la suya —trigger + `not null`—, así que este `if` no protege de un
+      // caso alcanzable: protege del día en que alguien desactive el trigger. Si faltara,
+      // la pantalla se queda en «auto» y la RPC responde `22023` al guardar.
+      const orgId = (f?.organizacion_id as string | null) ?? null
+      if (orgId) {
+        const { data: org } = await supabase
+          .from('organizaciones')
+          .select('id, canal_preferido')
+          .eq('id', orgId)
+          .maybeSingle()
         if (!viu) return
-        setFila((data as Fila) ?? null)
-        setCarregant(false)
-      })
+        const tria = ((org as { canal_preferido: Tria | null } | null)?.canal_preferido ?? 'auto') as Tria
+        setCanal(tria)
+        setCanalDesat(tria)
+      }
+      setCarregant(false)
+    })()
     return () => { viu = false }
   }, [organitzacio, tabla])
 
@@ -88,8 +148,22 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     for (const c of camps) args[c.arg] = (fila[c.clave] as string) || null
     const { error } = await supabase.rpc(
       tipus === 'productor' ? 'actualizar_mi_productor' : 'actualizar_mi_entidad', args)
+    if (error) { setDesant(false); toast.error(error.message); return }
+
+    // Dos escrituras porque son dos tablas y dos listas blancas; la del canal solo si ha
+    // cambiado, para no tocar `organizaciones` en cada «Desar».
+    if (canal !== canalDesat) {
+      const { data, error: errCanal } = await supabase.rpc('actualizar_meu_canal', {
+        p_tipo: tipus,
+        p_ficha: organitzacio.id,
+        p_canal: canal === 'auto' ? null : canal,
+      })
+      if (errCanal) { setDesant(false); toast.error(errCanal.message); return }
+      const org = data as { canal_preferido: Tria | null } | null
+      setCanalDesat((org?.canal_preferido ?? 'auto') as Tria)
+    }
+
     setDesant(false)
-    if (error) { toast.error(error.message); return }
     toast.success(t('rec.saved'))
   }
 
@@ -108,12 +182,12 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           </p>
         </div>
         {potEditar && (
-          <Button onClick={() => void desa()} disabled={desant}>
+          <Button onClick={() => void desa()} disabled={desant} className="min-h-11 whitespace-normal">
             {desant ? t('c.saving') : t('c.save')}
           </Button>
         )}
       </CardHeader>
-      <CardContent>
+      <CardContent className="space-y-8">
         <div className="grid gap-4 sm:grid-cols-2">
           {camps.map((c) => (
             <div key={c.clave}>
@@ -126,6 +200,65 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
             </div>
           ))}
         </div>
+
+        <section className="space-y-3 border-t border-border pt-6">
+          <div>
+            <h3 className="text-base font-semibold">{t('perf.channel_title')}</h3>
+            {/* La frase que enmarca la elección: se elige por dónde se PRUEBA primero. */}
+            <p className="mt-1 text-sm text-muted-foreground">{t('perf.channel_help')}</p>
+          </div>
+
+          <div className="max-w-sm">
+            <Label htmlFor="canal-preferit" className="mb-1.5 block text-xs text-muted-foreground">
+              {t('perf.channel_label')}
+            </Label>
+            <Select
+              value={canal}
+              disabled={!potEditar}
+              onValueChange={(v) => setCanal(v as Tria)}
+            >
+              {/* text-base en móvil: por debajo de 16 px iOS amplía la página al enfocar y
+                  no deshace el zoom al salir (§2, regla 1). El `SelectTrigger` de shadcn
+                  trae `text-sm` fijo, pero `cn()` es tailwind-merge y se queda con el
+                  último del mismo grupo, así que esto lo sustituye de verdad. La ALTURA no
+                  se toca: `data-[size=default]:h-9` es un selector de atributo y ganaría
+                  por especificidad a un `h-11` suelto — quedaría un override escrito que
+                  no hace nada. El trigger se queda en los 36 px del resto (deuda §12.34). */}
+              <SelectTrigger id="canal-preferit" className="w-full text-base md:text-sm">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                {OPCIONS.map((o) => (
+                  <SelectItem key={o.valor} value={o.valor} className="text-base md:text-sm">
+                    {t(o.labelKey)}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <p className="mt-2 text-sm text-muted-foreground">{t(descripcio)}</p>
+          </div>
+
+          {canal === 'whatsapp' && (
+            <Alert className="border-aviso/30 bg-aviso-fondo text-aviso">
+              <Info />
+              <AlertTitle className="line-clamp-none whitespace-normal">{t('perf.channel_limits_title')}</AlertTitle>
+              <AlertDescription className="text-aviso">
+                <p>{t('perf.channel_limits')}</p>
+                {!telefon && <p>{t('perf.channel_no_phone')}</p>}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {!correu && (
+            <Alert className="border-aviso/30 bg-aviso-fondo text-aviso">
+              <Info />
+              <AlertTitle className="line-clamp-none whitespace-normal">{t('perf.channel_no_email_title')}</AlertTitle>
+              <AlertDescription className="text-aviso">
+                <p>{t('perf.channel_no_email')}</p>
+              </AlertDescription>
+            </Alert>
+          )}
+        </section>
       </CardContent>
     </Card>
   )
