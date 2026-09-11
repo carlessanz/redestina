@@ -3,7 +3,7 @@ import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { pendentsPerTelefon } from '../lib/contactes'
-import type { Productor } from '../types'
+import type { Productor, ProductorLlistat } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -26,7 +26,7 @@ function casa(p: Productor, q: string): boolean {
 
 export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
-  const [producers, setProducers] = useState<Productor[]>([])
+  const [producers, setProducers] = useState<ProductorLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [unanswered, setUnanswered] = useState<Record<string, number>>({})
@@ -34,7 +34,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
 
   useEffect(() => {
     let cancelled = false
-    supabase.from('productores').select('*').order('name', { ascending: true })
+    supabase.from('v_productores_llistat').select('*').order('name', { ascending: true })
       .then(({ data, error: loadError }) => {
         if (cancelled) return
         if (loadError) setError(loadError.message)
@@ -66,8 +66,8 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
   const { test, resto } = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     const filtrados = producers.filter((p) => casa(p, q))
-    const test: Productor[] = []
-    const resto: Productor[] = []
+    const test: ProductorLlistat[] = []
+    const resto: ProductorLlistat[] = []
     for (const p of filtrados) {
       if (p.es_test) test.push(p)
       else resto.push(p)
@@ -75,7 +75,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
     return { test, resto }
   }, [producers, busqueda])
 
-  function tabla(lista: Productor[], marcarTest: boolean) {
+  function tabla(lista: ProductorLlistat[], marcarTest: boolean) {
     return (
       <div className="overflow-x-auto">
         <Table>
@@ -96,6 +96,9 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
                     <span className="flex flex-wrap items-center gap-2">
                       {p.name}
                       {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
+                      {/* Un alta rechazada se MARCA, no se esconde: el super_admin
+                          llega a la ficha desde aquí y es quien la borra (§12.29). */}
+                      {p.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
                       {sinContestar > 0 && <Badge variant="destructive">{t('prod.unanswered', { n: sinContestar })}</Badge>}
                     </span>
                   </TableCell>

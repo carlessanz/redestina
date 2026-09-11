@@ -2585,10 +2585,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     restricción de unicidad, así que una entidad ya fichada puede registrarse otra vez y solo lo
     detecta el equipo al validar. Se arregla de verdad con la `organizacion` unificada (§1bis,
     brecha 2), no con un parche aquí.
-29. **Una ficha rechazada se queda en los listados.** `rebutjar_registre` no borra nada a propósito
-    (auditoría y motivo visible), pero `ProducersList`/`EntitiesList` no filtran por `aprovacio`, así
-    que esa organización aparece como una más hasta que el super_admin la borre a mano desde su
-    ficha. Y la cuenta de Auth huérfana hay que borrarla aparte.
+29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
+    `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
+    derivada `rebutjada`; los dos listados la pintan en rojo.
+    **Se marca y NO se esconde**, y la diferencia importa: **el super_admin llega a la ficha
+    desde ese listado** y es quien tiene que borrarla, así que esconderla convertiría el ruido
+    en un residuo inalcanzable — exactamente lo que ya pasó con `email_test_recipients` (§12.33).
+    ⚠️ Las vistas llevan **`security_invoker = true`**, y no es un detalle: sin él correrían con
+    los permisos del propietario y **se saltarían la RLS** de las tablas de debajo, que es lo
+    único que protege las 452 fichas con nombre, NIF, teléfono y dirección.
+    Sigue abierto lo que la entrada decía al final: **la cuenta de Auth huérfana hay que borrarla
+    aparte**, y eso no lo arregla una vista.
 30. **Las contraseñas de las cuentas de prueba viajan en el bundle** con `VITE_ACCESSOS_TEST=true`
     (§6quater, §10). Está acotado y se apaga con la variable, pero mientras esté encendido cualquiera
     que abra `/login` entra como ellas. Desde el 31-07-2026 el alcance ya no es solo «organizaciones

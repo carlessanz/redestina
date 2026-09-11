@@ -58,6 +58,18 @@ export interface WaMessage {
   created_at: string
 }
 
+/**
+ * Lo que devuelven `v_productores_llistat` / `v_entidades_llistat`: la ficha más la marca de
+ * que su alta del registro público fue **rechazada** (deuda §12.29).
+ *
+ * `rebutjar_registre()` no borra nada a propósito —queda la auditoría y la persona ve el
+ * motivo—, pero solo marca la **membresía**: la ficha se quedaba en los listados del equipo
+ * como una organización más. Se marca y **no se esconde**: el super_admin llega a la ficha
+ * desde ese listado y es quien tiene que borrarla; esconderla la volvería inalcanzable.
+ */
+export type ProductorLlistat = Productor & { rebutjada: boolean }
+export type EntidadLlistat = Entidad & { rebutjada: boolean }
+
 export interface ProductorUbicacion {
   id: string
   productor_id: string | null

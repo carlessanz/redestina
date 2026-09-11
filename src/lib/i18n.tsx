@@ -437,6 +437,8 @@ const ca: Dict = {
   // detall d'oferta
   'od.albara_pending': 'Sense albarà encara', 'od.albara_rec': 'Albarà de recepció',
   'grp.test': 'Usuaris de prova · {n}', 'grp.rest': 'Resta · {n}', 'badge.test': 'Test',
+  // Alta del registro público rechazada: la ficha se queda (es auditoría) y se marca.
+  'badge.rejected': 'Alta rebutjada',
   // cua d'aprovacions (equip)
   'appr.title': 'Aprovacions pendents',
   'appr.subtitle': 'Entitats que han acceptat una oferta i esperen la vostra confirmació.',
@@ -1277,6 +1279,7 @@ const es: Dict = {
   // detalle de oferta
   'od.albara_pending': 'Sin albarán todavía', 'od.albara_rec': 'Albarán de recepción',
   'grp.test': 'Usuarios de prueba · {n}', 'grp.rest': 'Resto · {n}', 'badge.test': 'Test',
+  'badge.rejected': 'Alta rechazada',
   // cola de aprobaciones (equipo)
   'appr.title': 'Aprobaciones pendientes',
   'appr.subtitle': 'Entidades que han aceptado una oferta y esperan vuestra confirmación.',

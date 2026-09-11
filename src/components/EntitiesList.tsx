@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import type { Entidad } from '../types'
+import type { Entidad, EntidadLlistat } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Badge } from '@/components/ui/badge'
@@ -27,14 +27,14 @@ function casa(e: Entidad, q: string): boolean {
 
 export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
-  const [entidades, setEntidades] = useState<Entidad[]>([])
+  const [entidades, setEntidades] = useState<EntidadLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
 
   useEffect(() => {
     let cancelled = false
-    supabase.from('entidades').select('*').order('nombre', { ascending: true })
+    supabase.from('v_entidades_llistat').select('*').order('nombre', { ascending: true })
       .then(({ data, error: loadError }) => {
         if (cancelled) return
         if (loadError) setError(loadError.message)
@@ -48,8 +48,8 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
   const { test, resto } = useMemo(() => {
     const q = busqueda.trim().toLowerCase()
     const filtradas = entidades.filter((e) => casa(e, q))
-    const test: Entidad[] = []
-    const resto: Entidad[] = []
+    const test: EntidadLlistat[] = []
+    const resto: EntidadLlistat[] = []
     for (const e of filtradas) {
       if (e.es_test) test.push(e)
       else resto.push(e)
@@ -57,7 +57,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
     return { test, resto }
   }, [entidades, busqueda])
 
-  function tabla(lista: Entidad[], marcarTest: boolean) {
+  function tabla(lista: EntidadLlistat[], marcarTest: boolean) {
     return (
       <div className="overflow-x-auto">
         <Table>
@@ -81,6 +81,9 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
                     <span className="flex flex-wrap items-center gap-2">
                       {e.nombre}
                       {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
+                      {/* Un alta rechazada se MARCA, no se esconde: el super_admin
+                          llega a la ficha desde aquí y es quien la borra (§12.29). */}
+                      {e.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">{e.poblacion ?? '—'}</TableCell>
