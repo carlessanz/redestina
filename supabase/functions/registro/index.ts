@@ -423,13 +423,23 @@ Deno.serve(async (req) => {
     userId = creada.user.id as string;
 
     // -----------------------------------------------------------------------
-    // 2. La organización. Solo cuando no coincide nada: si el alta es el papel nuevo de
-    //    una que ya consta, la ficha nace SIN organización a propósito —crearle una
-    //    segunda identidad a la misma organización sería fabricar el duplicado que esto
-    //    viene a detectar, y enlazarla con la existente es la decisión que se le deja al
-    //    equipo—. Nunca corta el alta: si falla, se sigue con `organizacion_id` nulo.
+    // 2. La organización, SIEMPRE — también en el caso «papel nuevo».
+    //
+    //    ⚠️ Esto antes era `if (decisio.cas === "alta")`, con la idea de que una ficha que
+    //    parece el papel nuevo de una organización que ya consta naciera SIN organización,
+    //    para no fabricar una segunda identidad de la misma. **Esa idea ya no se puede
+    //    cumplir**: desde `20270313100000` la columna es `not null` y el trigger
+    //    `*_estrena_organizacion` le pone una en el BEFORE INSERT. O sea que la identidad
+    //    provisional se crea igual; lo único que cambiaba era que la creaba el trigger, sin
+    //    `creada_por` y sin que la compensación de más abajo supiera de ella — si fallaba la
+    //    membresía, la ficha se borraba y esa organización quedaba huérfana.
+    //
+    //    Crearla aquí siempre no cambia el modelo: la ficha sigue teniendo identidad propia
+    //    hasta que alguien la enlace, y el equipo lo hace con `enllacar_organitzacio()`
+    //    desde Aprovacions, que fusiona las dos (§12.28). Lo que marca el caso es la nota.
+    //    Nunca corta el alta: si falla, la ficha nace con la del trigger.
     // -----------------------------------------------------------------------
-    if (decisio.cas === "alta") {
+    {
       const { data: org, error: errOrg } = await supabase
         .from("organizaciones").insert({ creada_por: userId }).select("id").single();
       if (errOrg || !org) {

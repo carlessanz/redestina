@@ -288,6 +288,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // con una ficha que no es suya —aquí, una inventada— tiene que cortar con 42501 ANTES de
   // mirar si existe. Si algún día devolviera el 22023 de «no té organització», estaría
   // contestando sobre fichas ajenas.
+  // Enlazar organizaciones es del equipo (§12.28, etapa 3). Las dos mitades por separado:
+  // VER las candidatas ya expone nombre, NIF, correo y teléfono de otra organización, así que
+  // la consulta se corta igual que la escritura — si solo se vigilara `enllacar`, cualquier
+  // cuenta externa podría ir preguntando por uuids a ver qué organizaciones se le parecen.
+  { tabla: "organitzacions_candidates", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu quines organitzacions coincideixen amb una fitxa" },
+  { tabla: "enllacar_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000", p_organitzacio: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO enllaça cap fitxa amb una altra organitzacio" },
   { tabla: "actualizar_meu_canal", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000", p_canal: "email" }, descripcion: "NO canvia el canal preferit d'una altra organització" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },

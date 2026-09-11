@@ -39,6 +39,9 @@ import DialegMotiu from '../../components/DialegMotiu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
 interface Fila {
   id: string
@@ -77,6 +80,25 @@ type Registre = Pick<Membresia, 'id' | 'user_id' | 'tipo' | 'rol_org' | 'created
   entidades: FitxaEntitat | null
 }
 
+/**
+ * Una organización que ya consta y que podría ser la misma que la de esta ficha.
+ * La calcula `organitzacions_candidates()` al vuelo (correo o teléfono exactos, nunca el
+ * nombre); `enllacable` es false cuando esa organización YA tiene ficha de este tipo, que
+ * es un duplicado y no un papel nuevo.
+ */
+interface Candidat {
+  organitzacio: string
+  nom: string | null
+  nif: string | null
+  email: string | null
+  telefon: string | null
+  poblacio: string | null
+  es_generadora: boolean
+  es_receptora: boolean
+  motiu: 'email' | 'telefon' | 'email_i_telefon'
+  enllacable: boolean
+}
+
 /** La persona detrás de la membresía; se cruza a mano (ver `carregaRegistres`). */
 interface Perfil {
   id: string
@@ -110,12 +132,17 @@ export default function Aprovacions() {
   const [carregant, setCarregant] = useState(true)
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
+  const [candidats, setCandidats] = useState<Record<string, Candidat[]>>({})
   const [carregantReg, setCarregantReg] = useState(true)
   const [convenis, setConvenis] = useState<ConveniPendent[]>([])
   const [carregantConv, setCarregantConv] = useState(true)
   /** Id de la fila que se está resolviendo, para no dejar pulsar dos veces. */
   const [ocupat, setOcupat] = useState<string | null>(null)
   /** El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35). */
+  // El enlace se confirma en un diálogo propio y no con `window.confirm` (deuda §12.35):
+  // fusiona dos organizaciones y desde esta pantalla no se deshace.
+  const [enllacDe, setEnllacDe] = useState<{ registre: Registre; candidat: Candidat } | null>(null)
+
   const [motiuDe, setMotiuDe] = useState<
     { tipus: 'registre'; registre: Registre } | { tipus: 'conveni'; conveni: ConveniPendent } | null
   >(null)
@@ -140,11 +167,11 @@ export default function Aprovacions() {
     // `productores` y `entidades` sí son embebibles (hay FK real); `perfiles` NO, porque
     // `membresias.user_id` referencia `auth.users`, no `perfiles`: la persona se cruza
     // en una segunda consulta con los user_id que hayan salido.
+    // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en tres cadenas
+    // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data, error } = await supabase
       .from('membresias')
-      .select('id, user_id, tipo, rol_org, created_at, ' +
-        'productores(id, name, empresa, email, phone, poblacion), ' +
-        'entidades(id, nombre, email, telefono, poblacion, tipo_receptor)')
+      .select('id, user_id, tipo, rol_org, created_at, productores(id, name, empresa, email, phone, poblacion), entidades(id, nombre, email, telefono, poblacion, tipo_receptor)')
       .eq('aprovacio', 'pendent')
       .order('created_at', { ascending: true })
 
@@ -154,6 +181,7 @@ export default function Aprovacions() {
       console.warn('registres pendents:', error.message)
       setRegistres([])
       setPerfils({})
+      setCandidats({})
       setCarregantReg(false)
       return
     }
@@ -171,6 +199,19 @@ export default function Aprovacions() {
       for (const p of ((dadesPerfils as Perfil[] | null) ?? [])) per[p.id] = p
       setPerfils(per)
     }
+
+    // ¿Alguna de estas organizaciones ya consta? Se pregunta por ficha —son pocas: el freno
+    // durable del registro corta a 20 pendientes por hora (§9)— y en paralelo. Un fallo aquí
+    // no puede dejar la cola sin pintar: la sección de enlace es un añadido, no la cola.
+    const ambFitxa = pendents.filter((r) => (r.tipo === 'productor' ? r.productores : r.entidades))
+    const parells = await Promise.all(ambFitxa.map(async (r) => {
+      const fitxa = r.tipo === 'productor' ? r.productores : r.entidades
+      const { data: cands, error: errCand } = await supabase.rpc('organitzacions_candidates',
+        { p_tipo: r.tipo, p_ficha: fitxa!.id })
+      if (errCand) { console.warn('candidates:', errCand.message); return [r.id, [] as Candidat[]] as const }
+      return [r.id, ((cands as Candidat[] | null) ?? [])] as const
+    }))
+    setCandidats(Object.fromEntries(parells))
     setCarregantReg(false)
   }, [])
 
@@ -238,6 +279,24 @@ export default function Aprovacions() {
     setMotiuDe(null)
     if (error) { toast.error(textError(error)); return }
     toast.success(t('appr.reg_rejected'))
+    void carregaRegistres()
+  }
+
+  async function enllacar(r: Registre, c: Candidat) {
+    const fitxa = r.tipo === 'productor' ? r.productores : r.entidades
+    if (!fitxa) return
+    setOcupat(r.id)
+    const { error } = await supabase.rpc('enllacar_organitzacio',
+      { p_tipo: r.tipo, p_ficha: fitxa.id, p_organitzacio: c.organitzacio })
+    setOcupat(null)
+    setEnllacDe(null)
+    // Los mensajes de la RPC ya vienen en catalán y explican el motivo (ficha del mismo tipo,
+    // convenios que chocan): enseñarlos tal cual dice más que un texto genérico.
+    if (error) {
+      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : error.message)
+      return
+    }
+    toast.success(t('appr.link_ok'))
     void carregaRegistres()
   }
 
@@ -310,6 +369,29 @@ export default function Aprovacions() {
                     <div className="text-xs text-muted-foreground">{context}</div>
                     {!esProductor && !tipusReceptor && (
                       <div className="text-xs text-destructive">{t('appr.reg_no_tr')}</div>
+                    )}
+                    {(candidats[r.id] ?? []).length > 0 && (
+                      <div className="mt-2 rounded-md bg-aviso-fondo p-2 text-xs text-aviso">
+                        <div className="font-medium">{t('appr.link_found')}</div>
+                        <p className="mt-0.5">{t('appr.link_hint')}</p>
+                        <ul className="mt-1.5 space-y-1">
+                          {(candidats[r.id] ?? []).map((c) => (
+                            <li key={c.organitzacio} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                              <span className="font-medium">{c.nom || '—'}</span>
+                              <span>· {t(`appr.link_why_${c.motiu}`)}</span>
+                              {c.enllacable ? (
+                                <Button size="sm" variant="outline" className="h-8 whitespace-normal"
+                                  disabled={!potAprovar || ocupat === r.id}
+                                  onClick={() => setEnllacDe({ registre: r, candidat: c })}>
+                                  {t('appr.link_do')}
+                                </Button>
+                              ) : (
+                                <span className="text-muted-foreground">· {t('appr.link_blocked')}</span>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
                     )}
                   </div>
                   <div className="flex shrink-0 flex-wrap items-center gap-2">
@@ -429,6 +511,34 @@ export default function Aprovacions() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Enlazar fusiona dos organizaciones y desde aquí no se deshace, así que se dice lo
+          que va a pasar antes de hacerlo — y con un diálogo propio, no `window.confirm`. */}
+      <Dialog open={enllacDe !== null} onOpenChange={(v) => { if (!v) setEnllacDe(null) }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>{t('appr.link_title')}</DialogTitle>
+            <DialogDescription>
+              {t('appr.link_desc', {
+                fitxa: enllacDe
+                  ? (enllacDe.registre.tipo === 'productor'
+                      ? (enllacDe.registre.productores?.empresa || enllacDe.registre.productores?.name || '—')
+                      : (enllacDe.registre.entidades?.nombre || '—'))
+                  : '',
+                org: enllacDe?.candidat.nom ?? '',
+              })}
+            </DialogDescription>
+          </DialogHeader>
+          <p className="text-sm text-muted-foreground">{t('appr.link_warn')}</p>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setEnllacDe(null)}>{t('c.cancel')}</Button>
+            <Button disabled={ocupat !== null}
+              onClick={() => { if (enllacDe) void enllacar(enllacDe.registre, enllacDe.candidat) }}>
+              {t('appr.link_do')}
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
 
       {/* El motivo de las dos acciones que lo exigen. Un único diálogo para las dos colas:
           lo que cambia es a quién se lo cuenta, no lo que se pregunta. */}

@@ -1159,6 +1159,8 @@ funciones, no políticas:
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
 | `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló |
+| `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo** con el criterio de siempre —correo o teléfono exactos, nunca el nombre—. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
+| `enllacar_organitzacio(tipo, ficha, organitzacio)` | **Fusiona**: mueve la ficha —y sus convenios, solo los suyos— a esa organización y retira la que deja vacía. `pot_aprovar()`. Se niega con el motivo si el destino ya tiene ficha de ese tipo o si las dos traen convenio vigente del mismo tipo. Con `organitzacio` NULL **separa** la ficha en una organización nueva, que es el deshacer |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
 | `siguiente_numero(serie, ejercicio)` | El correlativo, dentro de la transacción de emisión. **Sin `execute` para `authenticated`** |
 | `formato_numero(serie, ejercicio, n)` | `REC-2026-00042` |
@@ -2144,7 +2146,7 @@ el certificado fiscal de dos donantes—. Tres caminos:
 | Coincidencia | Qué hace |
 | --- | --- |
 | Ninguna | Alta normal. La ficha **estrena su fila en `organizaciones`** (`creada_por` = la cuenta recién creada) |
-| Con una organización que **no** tiene ficha de ese tipo | **Es la misma organización estrenando papel.** Se da el alta con `organizacion_id` NULL y una nota en el comentario de la ficha; responde `200 { revisio_equip: true }` |
+| Con una organización que **no** tiene ficha de ese tipo | **Es la misma organización estrenando papel.** El alta sigue, la ficha estrena **identidad provisional propia** y se le deja una nota en el comentario; responde `200 { revisio_equip: true }`. El equipo las une después con `enllacar_organitzacio()` (§4bis) |
 | Con una organización que **ya** tiene ficha de ese tipo | `409 dades_en_us` con `camp`, como hasta ahora — **y ahora también para entidades** |
 
 ⚠️ **El papel nuevo no se enlaza solo, y no es timidez.** Enlazar sería convertir «conozco el correo
@@ -2154,8 +2156,18 @@ que mañana los convenios, los albaranes y los certificados se resuelvan **por o
 día el enlace se convierte —sin que nadie lo vuelva a mirar— en acceso a los kilos y al certificado
 fiscal de la otra ficha, creado por un POST sin sesión. Aprobar un alta es un clic y nada en esa
 pantalla diría que además se confirma una identidad. Tampoco se le crea una organización propia: eso
-fabricaría el duplicado que esto viene a detectar. `NULL` significa «identidad todavía no decidida»,
-y la decide el equipo.
+fabricaría el duplicado que esto viene a detectar; pero **tampoco puede quedarse sin ninguna**:
+desde `20270313100000` la columna es `not null` y el trigger le pone una. Así que nace con una
+**identidad provisional propia** —que es, de hecho, ese duplicado, solo que **con una nota que lo
+dice**— y el equipo la une a la buena desde Aprovacions. Unir es **fusionar**, no rellenar un hueco:
+lo hace `enllacar_organitzacio()` (§4bis).
+
+⚠️ **Y esto no siempre estuvo bien contado.** La etapa 2 se escribió creyendo que la ficha quedaba
+con `organizacion_id` NULL, y así lo decían su código y esta sección: era falso desde el momento en
+que se publicó, porque el trigger de la etapa 1 va delante. No tenía consecuencia visible —la nota
+seguía siendo el marcador— salvo una: en ese camino la organización la creaba el trigger, fuera del
+alcance de la compensación, así que si fallaba el alta de la membresía la ficha se borraba y esa
+organización **quedaba huérfana**. Desde el 11-09-2026 `registro` la crea siempre él.
 
 **Las consultas van a las fichas, no a la vista**, y después la vista. `v_organizaciones` expone un
 solo correo y un solo teléfono por organización (el del productor cuando hay las dos, por el
@@ -2843,17 +2855,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ningún canal** (y con el modo test encendido tampoco podría recuperar la contraseña, §8). Y quien
     espera validación se entera de que se la han aprobado entrando a mirar. Falta una notificación
     —que dependerá de la tabla `notificacion` con *fallback* de canal del funcional (§1bis)—.
-28. ~~**El registro no deduplica contra las organizaciones existentes.**~~ — **resuelta la parte
-    accionable (11-09-2026)**: `registro` consulta `v_organizaciones` y distingue los tres casos
-    (§9). Lo que queda **no es del registro**: no hay ninguna RPC para que el equipo **enlace** una
-    ficha con la organización que ya existe, así que el caso «misma organización, papel nuevo» acaba
-    en una ficha con `organizacion_id` NULL y una nota en su comentario, y el enlace se hace a mano
-    con `service_role`. Es la etapa siguiente: `enllacar_organitzacio(tipo, ficha, org)` con
-    `pot_aprovar()` y su botón en Aprovacions. Mientras tanto la nota es lo único accionable, y la
-    persona que registra **sí ve el motivo**: la pantalla de «fet» añade, con el `revisio_equip` que
-    devuelve la función, que ya constan datos de esa organización y que el equipo lo revisará antes
-    de activar el acceso — las dos altas esperan al equipo, pero solo una tiene un motivo particular,
-    y callárselo haría parecer que la espera es la de todo el mundo.
+28. ~~**El registro no deduplica contra las organizaciones existentes.**~~ — **resuelta entera
+    (11-09-2026)**: `registro` consulta `v_organizaciones` y distingue los tres casos (§9), y el
+    equipo **une las dos fichas desde Aprovacions** con `enllacar_organitzacio()`
+    (`20270315100000`). La persona que registra ve además el motivo de su espera, con el
+    `revisio_equip` que devuelve la función — las dos altas esperan al equipo, pero solo una tiene
+    un motivo particular, y callárselo haría parecer que la espera es la de todo el mundo.
+    ⚠️ **Enlazar resultó ser FUSIONAR, no rellenar un hueco**, y eso solo se vio al ir a
+    construirlo: la etapa 2 daba por hecho que la ficha quedaba con `organizacion_id` NULL, y el
+    trigger de la etapa 1 va delante y le pone una. O sea que el caso «papel nuevo» **sí producía
+    el duplicado que la detección venía a evitar**, solo que con una nota que lo decía. La RPC
+    mueve la ficha y sus convenios a la organización buena y retira la que se queda vacía.
+    ⚠️ **Lo que NO decide la máquina**: si las dos organizaciones traen convenio vigente del mismo
+    tipo, se niega y pide resolver uno antes — juntar dos acuerdos firmados no es un efecto
+    colateral de un clic. Y el deshacer existe (`organitzacio` NULL separa la ficha en una
+    organización nueva) pero **hoy solo se alcanza por SQL**: la pantalla enlaza, no desenlaza, y
+    lo avisa antes de hacerlo.
 29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
     `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
     derivada `rebutjada`; los dos listados la pintan en rojo.
@@ -3427,7 +3444,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **403 comprobaciones, todas
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **411 comprobaciones, todas
    correctas y 15 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
    de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
