@@ -3381,7 +3381,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **399 comprobaciones, todas
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **403 comprobaciones, todas
    correctas y 15 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
    de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que

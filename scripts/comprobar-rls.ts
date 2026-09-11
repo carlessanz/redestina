@@ -283,6 +283,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "albaranes", op: "insertar", esperado: "denegar", descripcion: "NO crea albaranes a mano (van por RPC)" },
   // Cierre anual (fase 4). Aquí solo lo que vale para CUALQUIER externo; que el donante
   // vea SU fila de `cierres_donante` se comprueba en el bloque `productor`.
+  // El canal preferido de OTRA organización. `actualizar_meu_canal` es la única escritura
+  // de `organizaciones` (§4bis), y su guarda es `soc_titular` sobre la ficha que se le pasa:
+  // con una ficha que no es suya —aquí, una inventada— tiene que cortar con 42501 ANTES de
+  // mirar si existe. Si algún día devolviera el 22023 de «no té organització», estaría
+  // contestando sobre fichas ajenas.
+  { tabla: "actualizar_meu_canal", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000", p_canal: "email" }, descripcion: "NO canvia el canal preferit d'una altra organització" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
