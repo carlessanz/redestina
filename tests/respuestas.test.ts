@@ -195,29 +195,51 @@ describe('casos límite (comportamiento medido, deuda §12.14)', () => {
     )).toBeNull()
   })
 
-  // ❌ FALLO REAL, medido: «no hi ha problema» es una ACEPTACIÓN en lenguaje corriente y se
-  // clasifica como rechazo, porque son 4 palabras y empieza por «no ». La fila queda
-  // `rebutjada` y la entidad recibe «gràcies per contestar». No se ablanda la aserción: se
-  // deja escrito el resultado real y se anota en el informe.
-  it('«no hi ha problema» (aceptación) se lee como RECHAZO', () => {
-    expect(clasificar('no hi ha problema')).toBe('rebutjada')
-    expect(clasificar('cap problema no')).toBe('rebutjada')
+  // Nació como fallo medido: «no hi ha problema» es una ACEPTACIÓN en lenguaje corriente y
+  // se clasificaba como rechazo —4 palabras y empieza por «no »—, la fila quedaba
+  // `rebutjada` y la entidad recibía «gràcies per contestar» sin que nadie lo revisara.
+  // Ahora hay una lista de frases enteras cuyo significado no se compone de sus palabras.
+  it('«no hi ha problema» es una aceptación, no un rechazo', () => {
+    expect(clasificar('no hi ha problema')).toBe('acceptada')
+    expect(clasificar('no hay problema')).toBe('acceptada')
+    expect(clasificar('no hi ha cap problema')).toBe('acceptada')
   })
 
-  // ❌ FALLO REAL, medido: un «sí» seguido de una negación se queda con el «sí» porque los
-  // negativos se comprueban por «empieza/termina por» y aquí el «no» va en medio. La regla
-  // que protege de lo contrario («no la vull») deja este flanco abierto.
-  it('«sí, però no ens va bé» se lee como ACEPTACIÓN', () => {
-    expect(clasificar('si no ens va be')).toBe('acceptada')
+  // Y este era el caro: un «sí» seguido de una negación se quedaba con el «sí», porque los
+  // negativos se comprueban por «empieza/termina por» y aquí el «no» va en medio. Se
+  // comprometían kilos que nadie había pedido. Ahora no se adivina: con una negación suelta
+  // dentro de un mensaje afirmativo, se deja sin clasificar para que lo mire una persona.
+  it('«sí, però no ens va bé» no se clasifica: hay señales de los dos signos', () => {
+    expect(clasificar('si no ens va be')).toBeNull()
+    expect(clasificar('si pero no ens va be')).toBeNull()
   })
 
-  // ❌ FALLO REAL, medido: «si us plau» / «si de cas» son subordinadas condicionales, no un
-  // «sí». La heurística no distingue el «si» sin acento del «sí» acentuado porque
-  // `normalizar()` quita los acentos antes de mirar —que es lo que hace que «SI» en
-  // mayúsculas funcione—.
-  it('«si us plau» y «si de cas» se leen como ACEPTACIÓN', () => {
-    expect(clasificar('si us plau')).toBe('acceptada')
-    expect(clasificar('si de cas us truco')).toBe('acceptada')
+  // ⚠️ Lo que NO se ha tocado, y es deliberado: el negativo sigue ganando cuando la frase
+  // entera está en la lista. Si esta prueba se pone roja, la mejora de arriba se ha comido
+  // la regla que protege de leer «no la vull» como «vull».
+  it('una negación compuesta sigue siendo un rechazo', () => {
+    expect(clasificar('no la vull')).toBe('rebutjada')
+    expect(clasificar('no ho vull')).toBe('rebutjada')
+    expect(clasificar('no em va be')).toBe('rebutjada')
+  })
+
+  // Tercer fallo medido: «si us plau» / «si de cas» son subordinadas condicionales, no un
+  // «sí», y se leían como aceptación. La heurística no puede distinguir el «si» átono del
+  // «sí» tónico —`normalizar()` quita los acentos antes de mirar, que es lo que hace que
+  // «SI» en mayúsculas funcione—, así que lo que se reconoce es el GIRO entero.
+  it('un «si» condicional no es una aceptación', () => {
+    expect(clasificar('si us plau')).toBeNull()
+    expect(clasificar('si de cas us truco')).toBeNull()
+    expect(clasificar('si pot ser')).toBeNull()
+  })
+
+  // Y el «sí» de verdad sigue funcionando, que es lo que la lista de arriba podría haberse
+  // llevado por delante.
+  it('el «sí» a secas y sus variantes se siguen aceptando', () => {
+    expect(clasificar('si')).toBe('acceptada')
+    expect(clasificar('sí')).toBe('acceptada')
+    expect(clasificar('SI')).toBe('acceptada')
+    expect(clasificar('si gracies')).toBe('acceptada')
   })
 
   // Hueco de vocabulario: el castellano «de acuerdo» no está en la lista (sí está el

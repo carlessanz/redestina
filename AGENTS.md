@@ -2476,8 +2476,23 @@ Redestina en producción real quedan pasos de configuración y negocio.
 13. `oferta_respuestas` se registra desde el **cliente** (`OfferDetail`), no desde `whatsapp-send`:
     mantiene la Edge Function intacta pero acopla el registro al panel. Las respuestas por **email**
     no tienen captura automática (no hay inbound de correo): se marcan a mano.
-14. La clasificación sí/no de `procesarRespuestaOferta` es una **heurística por lista de palabras**:
-    un texto corto que empiece por «sí/no» con una oferta pendiente podría clasificarse mal.
+14. 🟡 **La clasificación sí/no sigue siendo una heurística por lista de palabras**, pero ya
+    está **medida** y tres errores reales están corregidos (11-09-2026, `tests/respuestas.test.ts`,
+    67 pruebas). Los tres cerraban una oferta al revés **sin que nadie lo revisara** —la fila
+    queda resuelta y se contesta «gràcies per contestar»—:
+    · «**si no ens va be**» («sí, pero no nos va bien») se leía **acceptada**: el «no» va en medio
+      y no casaba por empieza/termina, pero el «si » inicial sí. El caro: comprometía kilos que
+      nadie había pedido.
+    · «**no hi ha problema**» se leía **rebutjada**, siendo una aceptación.
+    · «**si us plau**» se leía **acceptada**, siendo una cortesía — `normalizar()` quita los
+      acentos antes de comparar (hace falta para que «SI» funcione), así que el `si` átono y el
+      `sí` tónico son indistinguibles.
+    La regla que los cubre sin fingir comprensión del lenguaje: **ante señales de los dos signos,
+    no se decide**. Un `null` deja el mensaje en la consola para una persona, que es el resultado
+    correcto cuando la máquina no sabe; una fila pendiente es preferible a una resuelta al revés.
+    ⚠️ Lo que **sigue abierto**: es una lista de palabras, y hay huecos de vocabulario conocidos
+    —el castellano «de acuerdo» no está (sí el catalán `d'acord`)— y una frontera arbitraria en
+    las 5 palabras: «no ens va bé això» se clasifica y «no ens va gens bé això» no.
 15. ~~La selección de plantilla de primer contacto por rol no se ejercita en test.~~ —
     **resuelta (11-09-2026)**: `tests/plantillas.test.ts` cubre las dos ramas del flag. La
     encendida se ejercita recompilando el mismo fuente con `PLANTILLES_CA_APROVADES = true`, y la

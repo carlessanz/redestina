@@ -23,7 +23,7 @@ type Cliente = any;
 // Normaliza para comparar: quita acentos, signos y espacios de más.
 export function normalizar(texto: string): string {
   return texto
-    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita diacríticos: í→i (ç se conserva)
+    .normalize("NFD").replace(/[̀-ͯ]/g, "") // quita diacríticos: í→i, y también ç→c
     .toLowerCase()
     .replace(/[!¡.,;:·’']/g, " ")
     .replace(/\s+/g, " ")
@@ -42,13 +42,56 @@ const NEGATIVOS = [
 ];
 
 /**
+ * Giros en los que el "si" inicial NO es un sí: es la conjunción condicional.
+ *
+ * `normalizar()` quita los acentos antes de comparar —hace falta para que «SI» en mayúsculas
+ * funcione—, así que el `si` átono y el `sí` tónico son indistinguibles. Sin esta lista,
+ * «si us plau» («por favor») se leía como una aceptación y comprometía kilos que nadie
+ * había pedido.
+ */
+const SI_CONDICIONAL = [
+  "si us plau", "si de cas", "si cal", "si pot ser", "si fos", "si poguessim",
+  "si es possible", "si acaso", "si puede ser", "si hace falta", "si fuera",
+];
+
+/**
+ * Frases donde el "no" inicial no niega la oferta, sino un obstáculo: son aceptaciones.
+ * «No hi ha problema» se leía como rechazo, se contestaba «gràcies per contestar» y nadie
+ * lo revisaba.
+ */
+const NO_QUE_ACEPTA = [
+  "no hi ha problema", "no hi ha cap problema", "no hay problema",
+  "no hay ningun problema", "no hay ningun inconveniente", "no hi ha cap inconvenient",
+];
+
+/**
  * Exportada para poder probarla: es una heurística por lista de palabras (deuda 14), o sea
  * el sitio con más probabilidad de clasificar mal un mensaje real. Sin test, esa fragilidad
  * solo se descubre cuando una entidad acepta una oferta y el sistema entiende que la rechaza.
+ *
+ * ⚠️ TRES CASOS QUE SE MEDIERON Y SE ARREGLARON, porque los tres cerraban mal una oferta
+ * sin que nadie lo revisara —la fila queda resuelta y se contesta «gràcies per contestar»—:
+ *
+ *   · «si no ens va be» («sí, pero no nos va bien») se leía **acceptada**: el «no» iba en
+ *     medio y no casaba por empieza/termina, pero el «si » inicial sí. Es el caro: compromete
+ *     kilos que nadie pidió.
+ *   · «no hi ha problema» se leía **rebutjada**, siendo una aceptación.
+ *   · «si us plau» se leía **acceptada**, siendo una cortesía.
+ *
+ * La regla que los cubre sin inventar comprensión del lenguaje: **ante señales de los dos
+ * signos, no se decide**. Devolver `null` deja el mensaje en la consola para una persona,
+ * que es el resultado correcto cuando la máquina no sabe. Es preferible una fila pendiente
+ * a una fila resuelta al revés.
  */
 export function clasificar(texto: string): "acceptada" | "rebutjada" | null {
   const t = normalizar(texto);
   if (!t) return null;
+
+  // Las excepciones van ANTES que todo: son frases enteras cuyo significado no se compone
+  // de sus palabras sueltas.
+  if (NO_QUE_ACEPTA.some((p) => t === p || t.startsWith(p + " "))) return "acceptada";
+  const condicional = SI_CONDICIONAL.some((p) => t === p || t.startsWith(p + " "));
+
   // Solo mensajes cortos disparan por "empieza/termina por"; un párrafo largo
   // exige coincidencia exacta (que no se dará) para no crear falsos positivos.
   const corto = t.split(" ").length <= 5;
@@ -56,10 +99,20 @@ export function clasificar(texto: string): "acceptada" | "rebutjada" | null {
     lista.some((p) =>
       t === p || (corto && (t.startsWith(p + " ") || t.endsWith(" " + p)))
     );
-  // El negativo va primero: "no la vull" no debe leerse como "vull".
+
+  // El negativo va PRIMERO y gana: "no la vull" no debe leerse como "vull". Esto no se
+  // toca; es lo que hace que las negaciones compuestas se clasifiquen bien.
   if (casa(NEGATIVOS)) return "rebutjada";
-  if (casa(AFIRMATIVOS)) return "acceptada";
-  return null;
+
+  // Un "si" condicional no cuenta como afirmación: lo que sigue es una condición, no un sí.
+  if (condicional || !casa(AFIRMATIVOS)) return null;
+
+  // Afirmativo, pero con una negación suelta por medio: «si no ens va be» es un rechazo que
+  // ninguna frase de NEGATIVOS recoge —el «no» va en el centro, no al principio ni al final—
+  // y que el «si » inicial convertía en aceptación. No se adivina: se deja para una persona.
+  if (/(^| )no( |$)/.test(t)) return null;
+
+  return "acceptada";
 }
 
 // Botones de confirmación del preu mínim.
