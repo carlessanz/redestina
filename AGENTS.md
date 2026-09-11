@@ -2306,6 +2306,12 @@ npm run check:tipos           # solo tsc: tsconfig.json y tsconfig.tests.json
 # El hook de pre-commit se instala UNA VEZ por clon (git no ejecuta hooks versionados solo):
 git config core.hooksPath .githooks
 
+# Qué Edge Functions han cambiado DE VERDAD entre dos despliegues (§12.44). La salida del
+# CLI no sirve para saberlo; el `ezbr_sha256` sí, pero hace falta guardar el de antes.
+deno run -A scripts/huellas-funciones.ts guardar    # ANTES de desplegar
+deno run -A scripts/huellas-funciones.ts comparar   # después
+deno run -A scripts/huellas-funciones.ts listar     # solo mirar
+
 deno run -A scripts/crear-usuarios-prueba.ts --dry-run   # simular el alta de los 12 usuarios de prueba
 deno run -A scripts/crear-usuarios-prueba.ts             # crearlos (idempotente)
 deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas de WhatsApp (§9)
@@ -2670,7 +2676,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     con el JWT de una sesión de equipo entra y actúan los gates internos (`403 no_test_user`); el
     preflight sigue devolviendo el origen correcto, porque un `OPTIONS` no lleva JWT. Las nueve
     funciones coinciden ya con §11.
-44. **Un `functions deploy` sin cambios de código no siempre dice `No change found`.** El
+44. 🟡 **Un `functions deploy` sin cambios de código no siempre dice `No change found`** —
+    *ya hay forma de saberlo (11-09-2026)*: **`scripts/huellas-funciones.ts`**. Guarda el
+    `ezbr_sha256` de las 14 funciones antes de desplegar y dice después cuáles cambiaron de
+    verdad. Es lo que esta entrada pedía y no se había hecho por falta del valor de antes.
+    ⚠️ Lo que **no** responde, y conviene no confundirlo: si el bundle desplegado coincide con
+    el código del repo. Dice si **cambió entre dos momentos**, que es otra pregunta. Para lo
+    primero haría falta reproducir el empaquetado byte a byte, que el CLI no ofrece.
+    Lo que sigue valiendo del análisis original: El
     10-09-2026, cinco funciones desplegadas hacía diez minutos volvieron a empaquetarse
     («Deploying… script size: 1.8 MB») sin que su código hubiera cambiado. Es inocuo —el
     despliegue es idempotente— pero significa que **la salida del CLI no sirve para saber si el
