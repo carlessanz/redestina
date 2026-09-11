@@ -2765,6 +2765,18 @@ Redestina en producción real quedan pasos de configuración y negocio.
 86. **No hay rectificativo del CT.** El CD lo tiene porque el modelo 182 lo exige; el certificado de
     transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
 
+87. **El CPU real de `generar-documento` sigue sin medirse con precisión.** Tras publicar
+    (11-09-2026) la función genera en producción el documento de 6 páginas y 123 KB, con la huella
+    cuadrando y sin que el runtime la corte —y **si excediera los 2 s de CPU, la cortaría**, así que
+    el límite no se supera—. Pero la cifra exacta no se pudo leer: **este CLI de Supabase no tiene
+    `functions logs`**, y el round-trip medido desde aquí (1,6-1,9 s con el isolate caliente)
+    incluye red, subida a Storage y escritura en la base, así que no sirve como medida de CPU. Para
+    cerrarlo del todo hace falta el panel de Supabase o el Management API de logs.
+88. **Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**
+    `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
+    borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
+    370 KB.
+
 ## 13. Al terminar cualquier cambio
 
 1. `npm run build` en verde.
@@ -2772,9 +2784,11 @@ Redestina en producción real quedan pasos de configuración y negocio.
    otro (§11 trae la orden con su `--config`, que es obligatorio).
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**: era 56/56 + 1 saltada antes del sistema documental; con los checks
-   de la fase 1 la matriz sube a **81 comprobaciones**, y la cifra hay que fijarla ejecutándola
-   tras el primer `db push` (previsión: 78/78 correctas y 3 saltadas).
+   Referencia en **remoto**, fijada tras publicar el sistema documental (11-09-2026):
+   **329/329 correctas y 46 saltadas**, «Sin fallos de permisos», exit 0. Las 46 saltadas son
+   normales: producción no tiene —ni debe tener— el fixture de
+   `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
+   convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
    `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **312 comprobaciones, todas
    correctas y 13 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
