@@ -59,7 +59,7 @@ const EQUIP: NavGrup[] = [
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges' },
       { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
       { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck },
-      { to: '/equip/espigolades/nova', labelKey: 'nav.espigolades', icon: Leaf },
+      { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/tancament', labelKey: 'nav.tancament', icon: Calculator },
       { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins },
       { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },

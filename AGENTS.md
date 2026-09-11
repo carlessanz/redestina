@@ -2681,9 +2681,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ⚠️ Quedan **seis `window.confirm()`**. Ese sí devuelve un booleano y su bloqueo se comporta
     como «cancelar», que es el lado seguro; aun así son seis sitios donde el navegador integrado
     decide por la persona.
-36. **Las pestañas de `/registre` caben con 1 px de margen** a 320 px («Entitat receptora» ocupa 115 px
-    en una pastilla de 116). No está roto y por eso no se tocó, pero cualquier traducción más larga o
-    un cambio de fuente lo rompe.
+36. ~~**Las pestañas de `/registre` caben con 1 px de margen.**~~ — **resuelta (11-09-2026)**, y
+    medido en Chrome real a 320 px sobre la aplicación construida, no sobre una maqueta: era **peor**
+    de lo que decía la entrada. El texto «Entitat receptora» ocupaba **111,14 px** en una caja de
+    contenido de **98 px**: se comía entero el `px-2` de la pastilla y se quedaba a 2,86 px del
+    borde. No desbordaba la página solo porque el `grid-cols-2` de Tailwind es `minmax(0,1fr)`.
+    El arreglo **no depende de la longitud del texto**, que era el criterio: se retira el
+    `whitespace-nowrap` que `TabsTrigger` trae de serie, la lista puede crecer a lo alto y el botón
+    puede encoger (`min-w-0`). Verificado con una etiqueta hipotética de 36 caracteres: tres líneas
+    y **0 px de desbordamiento**. De paso el área táctil sube de 34,5 px a 44 en móvil.
 37. **El aviso de instalación no se puede probar de verdad en automático.** `beforeinstallprompt` no lo
     dispara ningún navegador de escritorio ni Playwright, así que las pruebas lanzan un evento
     sintético: se verifica que **el banner reacciona**, no que Chrome lo emita. La instalación real
@@ -2876,10 +2882,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     inservible: probar las funciones con `deno run` directo contra la base local —mismo código y
     HTTP real—, que es como se verificó la fase 3.
 
-64. **`/equip/espigolades` no tiene listado**, solo alta (`/nova`) y detalle: por eso la entrada
-    del menú apunta a `/nova`. En cuanto haya más de un puñado de jornadas hará falta la pantalla.
-65. **El panel no sube documentos externos.** `subir-documento-externo` existe y funciona, pero la
-    ficha del albarán solo **lista** lo que hay: falta el formulario de subida.
+64. ~~**`/equip/espigolades` no tiene listado.**~~ — **resuelta (11-09-2026)**: tercera pantalla
+    en `Espigolades.tsx`, con buscador y las columnas que sirven para encontrar una jornada (data,
+    productor, referència, registres, quilos, estat). El menú ya apunta al listado y no al alta, y
+    el «Enrere» del detalle vuelve a las espigoladas en vez de a los albaranes, que era el sitio
+    menos malo mientras no había listado.
+    Las tres consultas están acotadas a lo que sale en pantalla —los nombres se piden con `.in()`
+    sobre los `productor_id` visibles, no las 343 fichas—, pero **el listado sigue sin paginar**,
+    como el resto: eso es §12.5.
+65. ~~**El panel no sube documentos externos.**~~ — **resuelta (11-09-2026)**: formulario en la
+    ficha del albarán, con el mismo patrón que el del productor. No hizo falta tocar el servidor:
+    `subir-documento-externo` ya aceptaba `objeto_tipo: 'albaran'`.
+    ⚠️ **`factura` NO está entre las opciones, a propósito**: una factura es del cierre anual del
+    donante, y colgarla de un albarán la dejaría fuera de `registrar_factura()`.
+    Sigue sin poderse **borrar ni descargar** un externo desde ahí: `documentos_externos` no tiene
+    RPC de borrado y `descargar-documento` solo sirve `documentos`. Se decide en la base, no en la
+    pantalla.
 66. **«Amb discrepància» es un filtro, no un veredicto.** `v_albaranes_bandeja` solo sabe si hubo
     rechazo o si lo confirmado no cuadra con el neto de ese albarán; la diferencia real la calcula
     `propuesta_conciliacion()` cruzando el REC con todos sus ENT, y eso sería una llamada por fila.

@@ -17,12 +17,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
-import { descarregarDocument, esperarGeneracio } from '../../lib/documents'
+import { descarregarDocument, esperarGeneracio, pujarDocumentExtern } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
   marcarEntregat, propostaConciliacio, rectificarAlbara,
@@ -76,6 +76,10 @@ interface EvidenciaFila {
   ip: string | null
   created_at: string
 }
+
+/** Lo que el equipo puede aportar desde aquí. Sin `factura`: esa es del cierre anual. */
+type TipusExtern = 'albaran_productor' | 'foto_incidencia' | 'altre'
+const TIPUS_EXTERN: TipusExtern[] = ['albaran_productor', 'foto_incidencia', 'altre']
 
 interface EnllacFila {
   id: string
@@ -158,6 +162,15 @@ export default function AlbaraDetall() {
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
   const [descarregant, setDescarregant] = useState<string | null>(null)
+
+  // Subida de un documento externo. `factura` NO está entre las opciones a propósito: una
+  // factura es del cierre anual del donante, no de una entrega, y colgarla de un albarán la
+  // dejaría fuera del circuito que la reconcilia (`registrar_factura()`).
+  const [tipusExtern, setTipusExtern] = useState<TipusExtern>('albaran_productor')
+  const [numeroExtern, setNumeroExtern] = useState('')
+  const [dataExtern, setDataExtern] = useState('')
+  const [pujant, setPujant] = useState(false)
+  const fitxer = useRef<HTMLInputElement | null>(null)
 
   const [dialegAnullar, setDialegAnullar] = useState(false)
   const [dialegRectificar, setDialegRectificar] = useState(false)
@@ -380,6 +393,31 @@ export default function AlbaraDetall() {
     if (segon.ok) toast.success(t('doc.downloaded', { name: segon.data.nombre }))
     else toast.error(t(segon.motiuKey))
     setDescarregant(null)
+    await carrega()
+  }
+
+  /**
+   * Sube un documento que aporta la otra parte (el albarán en papel del productor, la foto
+   * de una incidencia…). El fichero no toca Storage desde aquí: va a la Edge Function
+   * `subir-documento-externo`, que es quien resuelve el permiso con
+   * `puc_pujar_document_extern()` y elige la ruta. Aquí no se construye ninguna URL.
+   */
+  async function puja(f: File) {
+    if (!id) return
+    setPujant(true)
+    const res = await pujarDocumentExtern({
+      fitxer: f,
+      objecteTipus: 'albaran',
+      objecteId: id,
+      tipus: tipusExtern,
+      numero: numeroExtern.trim() || null,
+      data: dataExtern || null,
+    })
+    setPujant(false)
+    if (!res.ok) { toast.error(t(res.motiuKey)); return }
+    toast.success(t('alb.ex_uploaded', { name: res.data.nombre }))
+    setNumeroExtern('')
+    setDataExtern('')
     await carrega()
   }
 
@@ -670,7 +708,7 @@ export default function AlbaraDetall() {
       {/* ── Documentos externos ── */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('alb.externals')}</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="space-y-3">
           {externs.length === 0 && <p className="text-sm text-muted-foreground">{t('alb.no_externals')}</p>}
           {externs.map((x) => (
             <div key={x.id} className="border-b pb-2 text-sm">
@@ -679,6 +717,58 @@ export default function AlbaraDetall() {
               <span className="text-muted-foreground"> · {dataCurta(x.fecha ?? x.created_at)} · {t(`alb.or_${x.origen}`)}</span>
             </div>
           ))}
+
+          {/* ── Aportar uno desde el panel (deuda §12.65) ──
+              El albarán en papel del productor y las fotos de incidencia llegaban por
+              WhatsApp o por correo y se quedaban ahí: la Edge Function existía y el panel
+              no la llamaba. El tipo, el número y la fecha son del documento que se sube,
+              no de este albarán. */}
+          <div className="grid gap-3 rounded-md border border-input p-3 sm:grid-cols-2">
+            <div className="space-y-1.5">
+              <Label htmlFor="ex-tipus">{t('alb.ex_type')}</Label>
+              {/* ⚠️ `text-base md:text-sm` obligatorio en un `<select>` estilado a mano (§2). */}
+              <select
+                id="ex-tipus"
+                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={tipusExtern}
+                onChange={(e) => setTipusExtern(e.target.value as TipusExtern)}
+              >
+                {TIPUS_EXTERN.map((tp) => <option key={tp} value={tp}>{t(`alb.ex_${tp}`)}</option>)}
+              </select>
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ex-num">{t('alb.ex_number')}</Label>
+              <Input id="ex-num" value={numeroExtern} onChange={(e) => setNumeroExtern(e.target.value)} />
+            </div>
+            <div className="space-y-1.5">
+              <Label htmlFor="ex-data">{t('alb.ex_date')}</Label>
+              <Input id="ex-data" type="date" value={dataExtern}
+                onChange={(e) => setDataExtern(e.target.value)} />
+            </div>
+            <div className="flex items-end">
+              {/* El `<input type=file>` va escondido y lo dispara el botón: es el único
+                  control que no se puede pintar con el sistema de diseño. */}
+              <input
+                ref={fitxer}
+                type="file"
+                accept="application/pdf,image/jpeg,image/png"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0]
+                  e.target.value = ''
+                  if (f) void puja(f)
+                }}
+              />
+              <Button className="h-11 w-full whitespace-normal md:h-9" disabled={pujant}
+                onClick={() => fitxer.current?.click()}>
+                {pujant
+                  ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
+                  : <Upload className="mr-1 size-4" aria-hidden />}
+                {t('alb.ex_upload')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground sm:col-span-2">{t('alb.ex_hint')}</p>
+          </div>
         </CardContent>
       </Card>
 

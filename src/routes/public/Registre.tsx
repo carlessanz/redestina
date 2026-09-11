@@ -149,9 +149,30 @@ export default function Registre() {
             <div className="grid gap-2">
               <Label>{t('reg.rol_label')}</Label>
               <Tabs value={rol} onValueChange={(v) => { setRol(v as RolRegistre); setError(null) }}>
-                <TabsList className="grid w-full grid-cols-2">
-                  <TabsTrigger value="productor">{t('reg.rol_prod')}</TabsTrigger>
-                  <TabsTrigger value="receptor">{t('reg.rol_ent')}</TabsTrigger>
+                {/* Las dos pastillas NO pueden depender de lo larga que sea su etiqueta.
+                    Medido a 320 px: la pastilla da 114 px de hueco y «Entitat receptora»
+                    ocupa 111,14 px, o sea que el `px-2` de la pestaña ya está consumido
+                    entero y quedan 2,9 px hasta el borde. No desborda la página —el
+                    `grid-cols-2` de Tailwind es `minmax(0,1fr)` y la columna no crece— pero
+                    cualquier traducción más larga se sale del botón.
+                    El arreglo no es acortar el texto: se le quita el `whitespace-nowrap`
+                    que trae `TabsTrigger` de serie y se deja que la lista crezca a lo alto
+                    (`h-auto`), así una etiqueta larga rompe a dos líneas en vez de
+                    desbordar. `min-w-0` es lo que permite al botón encoger por debajo de su
+                    contenido; `min-h-11` mantiene los 44 px de área táctil en móvil. */}
+                <TabsList className="grid w-full grid-cols-2 group-data-[orientation=horizontal]/tabs:h-auto">
+                  <TabsTrigger
+                    value="productor"
+                    className="h-auto min-h-11 min-w-0 py-2 text-center leading-tight whitespace-normal md:min-h-9"
+                  >
+                    {t('reg.rol_prod')}
+                  </TabsTrigger>
+                  <TabsTrigger
+                    value="receptor"
+                    className="h-auto min-h-11 min-w-0 py-2 text-center leading-tight whitespace-normal md:min-h-9"
+                  >
+                    {t('reg.rol_ent')}
+                  </TabsTrigger>
                 </TabsList>
               </Tabs>
             </div>

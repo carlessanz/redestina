@@ -1,8 +1,13 @@
 // La espigolada manual: la jornada de campo y su reparto en lotes.
 //
-// Dos pantallas en un fichero, como `Llistats.tsx`, porque son las dos mitades de la misma
-// cosa: primero se apunta lo que se ha recogido (`NovaEspigolada`), luego se reparte
-// (`EspigoladaDetall`).
+// Tres pantallas en un fichero, como `Llistats.tsx`, porque son las tres caras de la misma
+// cosa: el listado (`Espigolades`) para encontrar una jornada, el alta (`NovaEspigolada`)
+// para apuntar lo que se ha recogido y el detalle (`EspigoladaDetall`) para repartirlo.
+//
+// EL LISTADO LLEGÓ TARDE, y por eso conviene decir qué pasaba antes: la entrada del menú
+// apuntaba directamente a `/nova` (deuda §12.64), así que una jornada creada hace dos
+// semanas solo se alcanzaba por su URL o rebotando desde el albarán de recepción. Con más
+// de un puñado de jornadas eso deja de ser una molestia y pasa a ser trabajo perdido.
 //
 // LO QUE HAY QUE ENTENDER PARA LEER ESTO. Una espigolada no es una oferta: nadie la publica
 // ni nadie la solicita. `crear_espigolada()` crea de un golpe la cabecera, **un registro por
@@ -15,9 +20,9 @@
 // El caso que hay que poder hacer sin pensar es el del plan: 1.000 kg de tomate en 29 cajas
 // repartidos 400 / 400 / 200 con una nota por lote.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -30,6 +35,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+import {
+  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
+} from '@/components/ui/table'
 
 /** Clases de un `<select>` estilado a mano. `text-base md:text-sm` es obligatorio (§2). */
 const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm'
@@ -53,6 +61,174 @@ function num(v: string): number | null {
   if (s === '') return null
   const n = Number(s.replace(',', '.'))
   return Number.isNaN(n) ? null : n
+}
+
+/** Una jornada abierta todavía tiene trabajo; una cerrada ya no. Nada más que distinguir. */
+function estilEstatEspigolada(estat: string): string {
+  return estat === 'oberta' ? 'bg-aviso-fondo text-aviso' : 'bg-muted text-muted-foreground'
+}
+
+// ---------------------------------------------------------------------------
+// Listado de jornadas
+// ---------------------------------------------------------------------------
+
+/** Una fila del listado: la jornada más lo que se le ha podido contar por encima. */
+interface FilaEspigolada {
+  esp: Espigolada
+  productor: string
+  registres: number
+  kgTotal: number
+}
+
+export function Espigolades() {
+  const { t } = useT()
+  const [files, setFiles] = useState<FilaEspigolada[]>([])
+  const [carregant, setCarregant] = useState(true)
+  const [error, setError] = useState<string | null>(null)
+  const [cerca, setCerca] = useState('')
+
+  useEffect(() => {
+    let viu = true
+    void (async () => {
+      // ⚠️ Cada lista de columnas en UN literal (§7, deuda 46).
+      const { data, error: err } = await supabase
+        .from('espigoladas')
+        .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, estado, creada_por, created_at')
+        .order('fecha', { ascending: false })
+        .order('created_at', { ascending: false })
+      if (!viu) return
+      if (err) { setError(err.message); setCarregant(false); return }
+      const jornades = (data as Espigolada[] | null) ?? []
+
+      // Los kilos salen de los registros de la propia jornada (`excedentes.kg_total`), que
+      // es lo que `crear_espigolada()` acaba de escribir: no hace falta tocar albaranes ni
+      // canalizaciones para poner una cifra en una lista. Y los nombres se piden SOLO de
+      // los ids que salen en pantalla — traerse las 343 fichas de productor para rellenar
+      // una columna es exactamente la deuda §12.5.
+      const ids = jornades.map((e) => e.id)
+      const idsProd = [...new Set(jornades.map((e) => e.productor_id))]
+      const [regs, prods] = await Promise.all([
+        ids.length
+          ? supabase.from('excedentes').select('id, espigolada_id, kg_total').in('espigolada_id', ids)
+          : Promise.resolve({ data: [] }),
+        idsProd.length
+          ? supabase.from('productores').select('id, name, empresa').in('id', idsProd)
+          : Promise.resolve({ data: [] }),
+      ])
+      if (!viu) return
+
+      const compte: Record<string, { n: number; kg: number }> = {}
+      for (const r of (regs.data ?? []) as { espigolada_id: string | null; kg_total: number | null }[]) {
+        if (!r.espigolada_id) continue
+        const acc = compte[r.espigolada_id] ?? { n: 0, kg: 0 }
+        acc.n += 1
+        acc.kg += Number(r.kg_total ?? 0)
+        compte[r.espigolada_id] = acc
+      }
+      const noms: Record<string, string> = {}
+      for (const p of (prods.data ?? []) as { id: string; name: string | null; empresa: string | null }[]) {
+        noms[p.id] = p.empresa || p.name || '—'
+      }
+
+      setFiles(jornades.map((esp) => ({
+        esp,
+        productor: noms[esp.productor_id] ?? '—',
+        registres: compte[esp.id]?.n ?? 0,
+        kgTotal: compte[esp.id]?.kg ?? 0,
+      })))
+      setCarregant(false)
+    })()
+    return () => { viu = false }
+  }, [])
+
+  // El buscador filtra en cliente sobre lo ya cargado, como los demás listados: son
+  // jornadas de campo, no las 452 fichas del padrón.
+  const visibles = useMemo(() => {
+    const q = cerca.trim().toLowerCase()
+    if (!q) return files
+    return files.filter((f) => {
+      const camps = [f.productor, f.esp.ref_externa, f.esp.notas, f.esp.fecha, dataCurta(f.esp.fecha)]
+      return camps.some((c) => (c ?? '').toLowerCase().includes(q))
+    })
+  }, [files, cerca])
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>{t('esp.list_title')}</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">{t('esp.list_subtitle')}</p>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        <div className="flex flex-wrap items-center gap-2">
+          <Input
+            type="search"
+            className="min-w-48 flex-1"
+            placeholder={t('esp.search')}
+            value={cerca}
+            onChange={(e) => setCerca(e.target.value)}
+          />
+          <Button asChild className="h-11 whitespace-normal md:h-9">
+            <Link to="/equip/espigolades/nova">
+              <Plus className="size-4" aria-hidden />{t('esp.new_title')}
+            </Link>
+          </Button>
+        </div>
+
+        {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+        {error && <p className="text-sm text-destructive">{error}</p>}
+
+        {!carregant && !error && visibles.length === 0 && (
+          <p className="text-sm text-muted-foreground">
+            {files.length === 0 ? t('esp.empty') : t('esp.no_match')}
+          </p>
+        )}
+
+        {!carregant && !error && visibles.length > 0 && (
+          <div className="overflow-x-auto">
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('esp.c_date')}</TableHead>
+                  <TableHead>{t('esp.c_producer')}</TableHead>
+                  <TableHead>{t('esp.c_ref')}</TableHead>
+                  <TableHead className="text-right">{t('esp.c_records')}</TableHead>
+                  <TableHead className="text-right">{t('esp.c_kg')}</TableHead>
+                  <TableHead>{t('esp.c_status')}</TableHead>
+                  <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibles.map((f) => (
+                  <TableRow key={f.esp.id}>
+                    <TableCell className="font-medium whitespace-nowrap tabular-nums">
+                      {dataCurta(f.esp.fecha)}
+                    </TableCell>
+                    <TableCell className="max-w-56 truncate">{f.productor}</TableCell>
+                    <TableCell className="text-muted-foreground">{f.esp.ref_externa ?? '—'}</TableCell>
+                    <TableCell className="text-right tabular-nums">{f.registres}</TableCell>
+                    <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(f.kgTotal)}</TableCell>
+                    <TableCell>
+                      <Badge className={estilEstatEspigolada(f.esp.estado)}>
+                        {t(`esp.st_${f.esp.estado}`)}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex justify-end">
+                        {/* `h-11` en móvil: es la acción de la fila y 32 px es poco para un pulgar. */}
+                        <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
+                          <Link to={`/equip/espigolades/${f.esp.id}`}>{t('c.detail')}</Link>
+                        </Button>
+                      </div>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  )
 }
 
 // ---------------------------------------------------------------------------
@@ -401,11 +577,13 @@ export function EspigoladaDetall() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={() => navigate('/equip/albarans')}>
+        {/* Desde que hay listado, «Enrere» vuelve a él: antes mandaba a `/equip/albarans`
+            porque era lo más parecido a un sitio del que se pudiera haber venido. */}
+        <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={() => navigate('/equip/espigolades')}>
           <ArrowLeft className="size-4" />{t('c.back')}
         </Button>
         <h1 className="text-xl">{t('esp.title', { date: dataCurta(espigolada.fecha) })}</h1>
-        <Badge className={espigolada.estado === 'oberta' ? 'bg-aviso-fondo text-aviso' : 'bg-muted text-muted-foreground'}>
+        <Badge className={estilEstatEspigolada(espigolada.estado)}>
           {t(`esp.st_${espigolada.estado}`)}
         </Badge>
       </div>
