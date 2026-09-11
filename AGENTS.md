@@ -3155,9 +3155,11 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     la función es idempotente (con `fichero_at` ya puesto responde 200 sin hacer nada) —que es
     justo para lo que se escribió esa guarda—, pero esa emisión costó el doble y la causa no
     está averiguada.
-88. 🟡 **Los tres PDF de la prueba de publicación siguen en `proves/2026/PROVA/`** — pero ya hay
-    con qué quitarlos: `limpiar-documentos-prueba` (deuda 51). **No se han borrado todavía**: eso
-    se hace en producción y con `{"seco": true}` primero.
+88. ~~**Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**~~ —
+    **borrados en producción (11-09-2026)** con `limpiar-documentos-prueba` (deuda 51):
+    `PROVA-2026-0001/0002/0003-v1.pdf`, **370.801 bytes**. En seco primero —3 revisados, 3
+    huérfanos, 0 borrados—, comprobado que ninguna fila los reclamaba, y después de verdad. La
+    segunda pasada encuentra 0, así que es idempotente y `proves/` queda vacío.
 89. ~~**Un corte por CPU no encendía ninguna luz, y además no paraba nunca.**~~ — **resuelto
     (11-09-2026, `20270302100000_documentos_encallados.sql`)**. Al medir el CPU de verdad (§12.87)
     se vio que el único fallo del que se hablaba era justo el único que el circuito no sabía
