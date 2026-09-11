@@ -2765,13 +2765,15 @@ Redestina en producción real quedan pasos de configuración y negocio.
 86. **No hay rectificativo del CT.** El CD lo tiene porque el modelo 182 lo exige; el certificado de
     transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
 
-87. **El CPU real de `generar-documento` sigue sin medirse con precisión.** Tras publicar
-    (11-09-2026) la función genera en producción el documento de 6 páginas y 123 KB, con la huella
-    cuadrando y sin que el runtime la corte —y **si excediera los 2 s de CPU, la cortaría**, así que
-    el límite no se supera—. Pero la cifra exacta no se pudo leer: **este CLI de Supabase no tiene
-    `functions logs`**, y el round-trip medido desde aquí (1,6-1,9 s con el isolate caliente)
-    incluye red, subida a Storage y escritura en la base, así que no sirve como medida de CPU. Para
-    cerrarlo del todo hace falta el panel de Supabase o el Management API de logs.
+87. **El CPU real de `generar-documento` sigue sin medirse con precisión, pero hay margen de
+    sobra.** Tras publicar (11-09-2026) la función genera en producción el documento de 6 páginas y
+    123 KB, con la huella cuadrando y **sin que el runtime la corte** —si excediera los 2 s de CPU,
+    la cortaría—. La cifra exacta no se pudo leer: **este CLI de Supabase no tiene `functions
+    logs`**. Lo que sí acota el problema es comparar los dos round-trips del mismo documento:
+    **324 ms en local** (incluida la subida a Storage) frente a **1.582-1.875 ms en remoto**. Esa
+    diferencia de ~1,3 s es red y Storage remoto, no trabajo de CPU —el render es el mismo código
+    sobre los mismos datos—, así que el CPU se queda muy por debajo del techo. Para la cifra exacta
+    hace falta el panel de Supabase o el Management API de logs.
 88. **Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**
     `reiniciar_documentos_prova()` borró las tres filas y devolvió el contador a 0, pero no puede
     borrar del bucket (deuda 51). Son inalcanzables —bucket privado y sin políticas— y ocupan
