@@ -2833,6 +2833,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ⚠️ Lo que **no** responde, y conviene no confundirlo: si el bundle desplegado coincide con
     el código del repo. Dice si **cambió entre dos momentos**, que es otra pregunta. Para lo
     primero haría falta reproducir el empaquetado byte a byte, que el CLI no ofrece.
+    **Validado el 11-09-2026**: un redespliegue sin tocar nada dice `No change found` **y** deja
+    las 15 huellas idénticas, así que el `ezbr_sha256` sí depende del contenido.
+    ⚠️ **Y `deno.lock` entra en el bundle de TODAS.** Al publicar ese día cambiaron las 14,
+    incluida `descargar-documento`, que solo importa `autorizacion.ts` y `cors.ts` —ninguno
+    tocado—. La causa era el `deno.lock`, que se había actualizado al instalar Vitest. Es el mismo
+    caso que el `deno.json` de abajo, y sin saberlo se lee como un fallo de la herramienta: si
+    cambian **todas** a la vez, mira primero el lock.
     Lo que sigue valiendo del análisis original: El
     10-09-2026, cinco funciones desplegadas hacía diez minutos volvieron a empaquetarse
     («Deploying… script size: 1.8 MB») sin que su código hubiera cambiado. Es inocuo —el
