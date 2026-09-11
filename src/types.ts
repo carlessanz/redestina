@@ -653,6 +653,72 @@ export interface CierreDonanteLinea {
   created_at: string
 }
 
+// --- Certificado de donación a demanda (CDP, migraciones 20270303*) ---
+//
+// Tabla hermana de `cierres_donante`: el mismo acumulado, pero de una VENTANA de fechas
+// dentro de un ejercicio en vez del año natural. No cuelga de ningún `cierres_ejercicio`
+// —un certificado a demanda no abre cierre, menos aún el real— y por eso lleva su propio
+// `modo`.
+
+export type EstatCierrePeriodo =
+  | 'calculat' | 'factura_rebuda' | 'coincident' | 'discrepancia'
+  | 'certificat_emes' | 'enviat' | 'substituit'
+
+export interface CierrePeriodo {
+  id: string
+  productor_id: string
+  /** Ventana certificada, cerrada por los dos lados y dentro de un solo año natural */
+  periodo_desde: string
+  periodo_hasta: string
+  ejercicio: number
+  /** `prueba` → serie P-CDP, marca de agua y destinatario forzado */
+  modo: 'prueba' | 'real'
+  datos_fiscales: Record<string, string | null> | null
+  kg_total: number
+  valor_total: number
+  estado: EstatCierrePeriodo
+  /** Además de los del anual: `periode_parteix_excedent` y `periode_encavalcat` */
+  bloqueos: BloqueigCierre[]
+  /** Serie propia `CDP-2026-0001`, nunca la del cierre anual */
+  certificado_numero: string | null
+  certificado_at: string | null
+  rectificaciones: number
+  factura_numero: string | null
+  factura_fecha: string | null
+  factura_importe: number | null
+  factura_doc_externo_id: string | null
+  /** D4: solo el super_admin, y con motivo registrado */
+  excepcion_sin_factura: boolean
+  excepcion_motivo: string | null
+  excepcion_por: string | null
+  /** El acumulado ANUAL que lo sustituyó: el anual manda */
+  cierre_donante_id: string | null
+  /** O el certificado a demanda POSTERIOR que contiene a este periodo */
+  sustituido_por_periodo: string | null
+  sustituido_at: string | null
+  calculado_at: string | null
+  enviado_at: string | null
+  creado_por: string | null
+  created_at: string
+}
+
+export interface CierrePeriodoLinea {
+  id: string
+  cierre_periodo_id: string
+  canalizacion_id: string
+  albaran_rec_id: string | null
+  producto: string | null
+  mes: number | null
+  kg_neto: number
+  coste_kg: number | null
+  valor: number
+  entidad_id: string | null
+  retroactiva: boolean
+  /** La ventana parte su excedente: estos kg son una PARTE del neto del REC */
+  excedente_partido: boolean
+  created_at: string
+}
+
 // --- Convenios y firma (fase 2, migraciones 20270111*) ---
 
 export type ConvenioTipo = 'don_gen' | 'don_rec' | 'com'

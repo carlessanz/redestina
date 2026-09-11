@@ -874,6 +874,56 @@ canalizaciones ni albaranes**.
 Job `congelar-ejercicio` en `pg_cron` a `59 22 31 12 *` **UTC**, que son las 23:59 de Madrid en
 horario de invierno.
 
+**Certificado a demanda (`20270303*`)** — `cierres_periodo` y `cierre_periodo_lineas`: el mismo
+acumulado de un donante, pero de una **ventana de fechas** dentro de un ejercicio. Tabla hermana y
+no un `tipo` más de `cierres_donante`, por dos cosas que no se pueden forzar: aquella cuelga de
+`cierres_ejercicio` —de donde salen modo y ejercicio, y un certificado a demanda **no abre cierre**,
+menos aún el real— y su clave `(cierre_id, productor_id, tipo)` dejaría **uno** por año, cuando un
+donante puede pedir varios. Serie propia **`CDP`** (+`P-CDP`), nunca la del anual: los números del
+182 son correlativos y solo del cierre. **El documento se emite con `documentos.tipo = 'CD'`** —el
+renderizador se elige por `tipo`, y `cd.ts` ya imprimía un periodo—, así que lo que lo distingue es
+la serie y `objeto_tipo = 'cierre_periodo'`, el séptimo. Se archiva en la carpeta `CD/` del donante.
+
+**El anual manda.** `emitir_certificado()` deja los parciales del mismo donante y ejercicio en
+`substituit`, con su documento `vigente = false` y `sustituido_por` apuntando al anual; y
+**`datos_182()` sigue leyendo solo el cierre anual**, o la gestoría recibiría filas duplicadas. Entre
+parciales rige lo mismo: uno que **contenga** a otro lo sustituye —es el caso normal, «lo de este año
+a fecha de hoy» repetido— y un solapamiento **a medias** lo bloquea `periode_encavalcat`.
+
+⚠️ **El texto de alcance va en el CUERPO del PDF, no en una marca de agua**: un certificado a fecha
+intermedia es un documento válido de otra cosa, no un borrador. Entra por `plantillas_documento` con
+la variante **`parcial`** del tipo `CD` (`20270303100200`; texto de trabajo **no validado por la
+asesoría**, marcado como borrador en tres sitios igual que los convenios), y por eso
+`emitir_certificado_periodo()` se niega si esa plantilla no está vigente: sin ella el PDF saldría con
+el cuerpo del certificado anual y afirmaría algo que no es cierto.
+
+🔴 **El reparto del neto del REC estaba mal para cualquier ventana que no fuera el año entero.** Se
+calculaba con `partition by excedente_id` **sobre las filas ya filtradas por fecha**, así que un
+corte que partiera un excedente atribuía el neto ENTERO a las líneas visibles: kilos **inflados**, no
+incompletos, en un documento con efecto fiscal. Medido: una ventana que dejaba fuera 40 de 1.000 kg
+seguía diciendo 1.000. Desde `20270303100000` el reparto y el residuo se calculan sobre **todas** las
+canalizaciones conciliadas del excedente y la fecha se filtra **después** (961,17 kg en ese mismo
+caso); `cierre_base()` y `cierre_pendents()` pasan a ser envoltorios de las versiones por periodo,
+para que no haya dos definiciones de «qué entra en un cierre». Como red, `cierre_base_periodo()`
+marca `excedent_partit` y el certificado a demanda lo convierte en el bloqueo
+`periode_parteix_excedent`, que **bloquea de verdad**: repartir un albarán entre dos certificados es
+una decisión de negocio, no un detalle de cálculo.
+
+🔴 **Y la base de cálculo la podía leer cualquier cuenta con sesión.** `cierre_base()` y
+`cierre_pendents()` son `security definer` con GRANT a `authenticated` y **no comprobaban rol**, al
+revés que sus vecinas `datos_182()` y `comparar_cierre_prueba()`: un productor o una entidad podía
+llamar a `cierre_base(2026)` por PostgREST y recibir **la donación de todos los donantes** —nombre,
+producto, kilos conciliados y coste por kilo, fila a fila—. No estaba en ninguna lista de deuda y el
+arnés no lo miraba. Cerrado en `20270303100500` con el idioma de siempre
+(`auth.uid() is not null and not es_intern()`, para no dejar fuera a `service_role`), y ahora lo
+vigilan cuatro checks por cada cuenta externa.
+
+⚠️ **Y un fallo silencioso que el seed de la plantilla habría introducido**: `cierre_emet_document()`
+pedía la plantilla con `tipo` e `idioma` y un `limit 1` **sin mirar la variante ni ordenar**. En
+cuanto existe una `CD`/`parcial` vigente hay dos plantillas vigentes de tipo `CD`, y ese `limit 1`
+podía elegir cualquiera: **el certificado ANUAL podía salir impreso con el texto que dice que no
+sirve para el 182**. No da ningún error; solo se ve leyendo el PDF.
+
 ⚠️ **Cuatro columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
 `enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad` y
 `parametros_documentales.apoderada_dni`. RLS no sabe restringir columnas; el GRANT sí (mismo
@@ -1068,6 +1118,12 @@ funciones, no políticas:
 | `cierre_base` · `cierre_pendents` · `datos_182` · `comparar_cierre_prueba` · `provincia_por_cp` | Las consultas. La base de cálculo son donaciones **conciliadas** con la fecha de recogida dentro del año **en hora de Madrid**, con los kilos del REC conciliado repartidos entre las canalizaciones del registro (D13) |
 | `cerrar_cierre(cierre)` | Cierra **un** cierre por su uuid: recalcula, emite los resúmenes definitivos y pasa a `tancat`. `pot_aprovar()`, y **`es_super_admin()` si el cierre es real** |
 | `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
+| `cierre_base_periodo(desde, hasta, modo)` · `cierre_pendents_periodo(desde, hasta)` | La base de cálculo de una ventana. `cierre_base`/`cierre_pendents` son envoltorios suyos. **Solo equipo** (`42501`): antes no lo eran, y era una fuga |
+| `calcular_certificado_periodo(productor, desde, hasta, modo)` | El borrador del certificado a demanda y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, si acaba en el futuro o si esa ventana ya tiene certificado |
+| `registrar_factura_periodo(periodo, numero, fecha, importe, doc_externo)` | La factura del periodo. Existe para que el camino normal del certificado a demanda sea el mismo del anual y la excepción de D4 siga siendo una excepción |
+| `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos, factura coincidente o D4 con `es_super_admin()`— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos |
+| `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
+| `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
 | `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
 | `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
@@ -2998,8 +3054,11 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     funcionando, no un fallo—, así que no hay ninguna fila `documentos` de tipo `CT` que generar. El
     renderizador se probó en directo y el despacho son ocho líneas. Se cierra el día que el fixture
     pueda desmarcar el flag, o con los datos reales de la Fundación.
-86. **No hay rectificativo del CT.** El CD lo tiene porque el modelo 182 lo exige; el certificado de
-    transacción no entra en ese ciclo, así que no se finge que exista un `R-CT`.
+86. ~~**No hay rectificativo del CT.**~~ — **resuelto (11-09-2026)**: existe
+    `rectificar_certificado_transaccion()`. La entrada decía que el CT «no entra en el ciclo del 182,
+    así que no se finge que exista un R-CT», y eso sigue siendo cierto —**no hay serie `R-CT`**—,
+    pero de ahí no se seguía que un CT con un error tuviera que quedarse sin salida. Rectifica como
+    el CD: misma numeración, versión siguiente, sin consumir número.
 
 87. ~~**El CPU real de `generar-documento` sigue sin medirse con precisión.**~~ — **medido
     (11-09-2026)**. El criterio de salida del spike queda cerrado, con un margen cómodo pero no
@@ -3054,6 +3113,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     se conserva es el primero (el `coalesce` no pisa un `ultimo_error` que ya existía). Y el umbral
     de 800 ms es el presupuesto del spike, no el límite: entre ese aviso y la muerte real hay
     margen, que es justo para lo que sirve.
+
+90. 🟠 **Una espigolada con dos registros del mismo producto contaría los kilos dos veces.**
+    El reparto del neto del REC particiona por `excedente_id`, y en una espigolada el REC cuelga de
+    la **jornada** y se empareja con los registros **por producto**. Si una misma jornada tuviera dos
+    registros del mismo producto, cada uno recibiría el neto entero de esa línea del REC.
+    La clave correcta sería `(albaran_rec_id, producto)`, pero cambiarla altera el **cierre anual**,
+    que ya ha calculado con la actual — es una decisión aparte y con el equipo delante, no un
+    arreglo de paso. Encontrado al arreglar el reparto por ventanas (`20270303100000`), donde queda
+    anotado en la cabecera. **No se ha dado todavía**: hoy ninguna jornada tiene dos registros del
+    mismo producto.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
@@ -3114,8 +3183,8 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
    Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **314 comprobaciones, todas
-   correctas y 13 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
+   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **383 comprobaciones, todas
+   correctas y 15 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
    de salida 0.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
    aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale

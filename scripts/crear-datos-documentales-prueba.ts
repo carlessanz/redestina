@@ -699,6 +699,7 @@ if (yaExiste) {
   // sobre lo que ya hay.
   await prepararCierre();
   if (cierrePrueba) await prepararTransaccio(cierrePrueba);
+  await prepararCertificatPeriode();
   await prepararPlans();
   await prepararConvenis();
   console.log();
@@ -930,8 +931,59 @@ console.log(`  recepció ${propuesta.kg_recepcio} kg · entregues ${propuesta.kg
 console.log(`  diferència ${propuesta.diferencia} kg (${propuesta.diferencia_pct} %), ` +
   `tolerància ${propuesta.tolerancia_pct} % → ${propuesta.dins_tolerancia ? "dins" : "FORA"}`);
 
+// ---------------------------------------------------------------------------
+// Lo que el CERTIFICADO A DEMANDA necesita (CDP)
+// ---------------------------------------------------------------------------
+// Un certificado de periodo **calculado y sin emitir**, de TEST-PROD-1, en modo prueba y
+// con la ventana del caso real: del 1 de enero **a hoy**. Con eso, las cuatro
+// comprobaciones `requiereFixture` del arnés sobre `cierres_periodo` y
+// `cierre_periodo_lineas` dejan de salir SALTADAS y pasan a afirmar algo: que el donante
+// ve EL SUYO y que el receptor no ve NINGUNO.
+//
+// ⚠️ NO lo emite, por el mismo motivo que el CT: `emitir_certificado_periodo()` exige que
+//    `parametros_documentales.datos_provisionales` sea `false`, y el fixture no toca ese
+//    interruptor. Emitir consumiría además un número de la serie `P-CDP`.
+//
+// La ventana termina HOY y no el 31 de diciembre porque la RPC se niega a certificar un
+// periodo que todavía no ha acabado: certificar el futuro es emitir un papel que los
+// kilos que faltan por conciliar dejarían desfasado al día siguiente.
+//
+// IDEMPOTENTE: si ya hay un certificado de periodo de prueba de esta organización y
+// ejercicio, no se crea otro (la ventana cambiaría cada día).
+async function prepararCertificatPeriode() {
+  paso("Certificado de donación a demanda (CDP)");
+
+  const { data: ya } = await db.from("cierres_periodo")
+    .select("id, periodo_desde, periodo_hasta, kg_total, valor_total")
+    .eq("productor_id", productor).eq("modo", "prueba").eq("ejercicio", ejercicio)
+    .limit(1).maybeSingle();
+
+  if (ya) {
+    console.log(`  ja hi ha un certificat a demanda de prova (${ya.periodo_desde} → ${ya.periodo_hasta}, ` +
+      `${ya.kg_total} kg): no se'n crea cap altre`);
+    return;
+  }
+
+  // Hoy en hora de Madrid, que es el huso con el que la base decide el año natural.
+  // `sv-SE` da exactamente `AAAA-MM-DD`, que es lo que espera un `date` de Postgres.
+  const hoy = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+
+  const cp = await rpc<Record<string, unknown>>("calcular_certificado_periodo", {
+    p_productor: productor,
+    p_desde: `${ejercicio}-01-01`,
+    p_hasta: hoy,
+    p_modo: "prueba",
+  });
+
+  const bloqueos = (cp.bloqueos ?? []) as { codigo: string; bloqueja: boolean }[];
+  console.log(`  periode ${ejercicio}-01-01 → ${hoy}: ${cp.kg_total} kg, ${cp.valor_total} €`);
+  console.log(`  bloquejos: ${bloqueos.length === 0 ? "cap" : bloqueos.map((b) => b.codigo).join(", ")}`);
+  console.log("  (no s'emet: les dades de la Fundació encara són provisionals)");
+}
+
 await prepararCierre();
 if (cierrePrueba) await prepararTransaccio(cierrePrueba);
+await prepararCertificatPeriode();
 await prepararPlans();
 await prepararConvenis();
 
