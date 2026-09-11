@@ -174,9 +174,11 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
 
 **Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
-**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **etapa 1 hecha**
-(`organizaciones` + `v_organizaciones`, §4): la identidad existe y cada ficha cuelga de la suya.
-Falta migrar a los consumidores, que es donde está el trabajo → ~~(3) back office~~ y
+**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **en curso**:
+la identidad existe y cada ficha cuelga de la suya (`organizaciones` + `v_organizaciones`, §4), con
+el trigger que garantiza que las nuevas también (`20270313100000`); los **convenios** ya son de la
+organización y no de la ficha (§12.79), y una cuenta tiene **una ficha de cada tipo** (§12.31).
+Faltan los consumidores de WhatsApp y del registro (§12.16, §12.28) → ~~(3) back office~~ y
 ~~(4) onboarding~~ **resueltas** (cola de aprobaciones con tres colas, alta self-service y convenio
 en el registro) → (5) demandas → ~~(6) albaranes/conciliación real y certificados~~ **resueltos**
 (fases 3, 4 y 5 del sistema documental: §4) → (7) notificaciones + encuestas → (8) adjuntos de
@@ -539,8 +541,17 @@ una fusión con riesgo de juntar lo que no va junto.
 organizaciones distintas significa mezclar los kilos y el certificado fiscal de dos donantes: se
 prefiere dejar dos filas separadas —el estado de hoy, que funciona— a arriesgar una fusión mala.
 
-🟡 **Es la etapa 1 y no cierra ninguna deuda por sí sola**: desbloquea las ocho de la brecha 2
-(11, 16, 20, 22, 27, 28, 31, 79), y cada una sigue necesitando su trabajo encima.
+⚠️ **El relleno inicial no basta, y esto casi se escapa.** `20270310100000` rellenó las 464
+fichas que había **en ese momento** y ahí se acababa: cualquier ficha creada después —un alta desde
+`/registre`, una del panel, un fixture— nacía **sin organización y sin dar ningún error**, porque la
+columna era nullable. Se vio por casualidad a los pocos minutos, al cambiar la clave de `convenios`.
+Lo que mantiene la invariante es el trigger `*_estrena_organizacion` (`20270313100000`) más el
+`not null`: el primero la rellena, el segundo hace que no se pueda saltar. **Migrar los datos y
+mantener la invariante son dos cosas distintas**, y un `update` de relleno solo hace la primera.
+
+🟡 **La etapa 1 no cerraba ninguna deuda por sí sola**: desbloqueaba las ocho de la brecha 2
+(11, 16, 20, 22, 27, 28, 31, 79). Cerradas ya **31** (una ficha por tipo, `20270311100000`) y **79**
+(convenios por organización, `20270312100000`); las otras seis siguen necesitando su trabajo encima.
 
 **`entidades`** — entidades sociales receptoras (25 columnas del Excel SDA). Los tres campos
 de capacidad (`productes_frescos`, `transport_plataforma`, `descarrega_toro`) vienen como
@@ -2773,12 +2784,18 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ficticias»: las cinco cuentas de WhatsApp (§9) enseñan **fichas de personas reales del equipo**
     —nombre, correo de trabajo y móvil—. Nunca cuentas con rol de plataforma, eso sigue vetado.
     Apagarlo al dejar de ser una demo.
-31. **La interfaz solo alcanza la primera organización de cada tipo.** `membresias` no tiene UNIQUE
-    por `(user_id, tipo)`, así que una cuenta puede ser titular de dos productores; `organitzacioActiva`
-    y `useOrganitzacio` hacen `find`, o sea que **la segunda es inalcanzable**. Ya pasaba antes, pero
-    ahora se nota más: el menú pinta una cabecera por panel afirmando visualmente «este es tu panel de
-    productor», y con dos fichas esa cabecera miente. El arreglo de verdad exige que el `id` viaje en
-    la URL (`/productor/:orgId/…`) o la `organizacion` unificada del funcional (§1bis, brecha 2).
+31. ~~**La interfaz solo alcanza la primera organización de cada tipo.**~~ — **resuelta al revés
+    de como esta entrada proponía (`20270311100000`)**, y el motivo es la medición: de **14
+    membresías vivas en producción, CERO cuentas tienen dos fichas del mismo tipo**. El problema no
+    existe todavía.
+    Así que en vez de rehacer la navegación de los dos paneles externos para meter el `orgId` en la
+    URL —el arreglo «de verdad» que pedía, para un caso que nadie ha tenido— se **impone en la base
+    la invariante que el código ya asume**: índice único parcial sobre `membresias (user_id, tipo)
+    where activo and aprovacio = 'aprovada'`. Si algún día hace falta de verdad, quitarlo es una
+    línea, y entonces tocará hacer el selector **con un caso real delante que diga cómo debe
+    comportarse**.
+    ⚠️ Parcial a propósito: una membresía **rechazada o desactivada no ocupa sitio**, o alguien a
+    quien se le rechazó un alta no podría volver a intentarlo.
 32. **Nueve comprobaciones del arnés se quedaron sin cuenta que las recorra.** Los bloques
     `sense_rol` (3) y `pendent` (6) de `scripts/comprobar-rls.ts` siguen escritos —son la
     especificación de lo que esas cuentas deben *no* poder hacer— pero el arnés recorre las cuentas de
@@ -3126,9 +3143,23 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     fecha de corte) se traduce a un mensaje propio en vez de soltar el error crudo.
     De paso se estrenó `conveniVigent()` de `src/lib/convenis.ts`, que llevaba escrito desde la
     fase 2 **sin que lo llamara nadie**.
-79. **Una organización con doble rol necesita dos convenios**, uno por ficha, porque `productores` y
-    `entidades` siguen siendo dos tablas sin clave común. Es la deuda §12.16 asomando en el circuito
-    de firma; se cierra con la `organizacion` unificada (§1bis, brecha 2).
+79. ~~**Una organización con doble rol necesita dos convenios.**~~ — **resuelta
+    (`20270312100000`)**, y la entrada era cierta **solo a medias**. Mirando `convenios_exigidos`:
+    en **donación** son **dos tipos distintos** (`don_gen` a quien entrega, `don_rec` a quien
+    recibe), así que una organización que dona y recibe firma los dos **con razón** y ahí no había
+    nada que arreglar. La redundancia estaba en **venta y maquila**, donde las dos partes necesitan
+    el **mismo** tipo `com`: con el índice por ficha, una organización de doble rol firmaba **dos
+    veces el mismo acuerdo**. Ahora el índice único y `convenio_vigente()` van por
+    `organizacion_id`, resolviendo la ficha con `organizacion_de()`.
+    `productor_id` y `entidad_id` **se quedan**, y no por compatibilidad: dicen **con qué papel** se
+    firmó, que es lo que congela `datos_org`.
+    ⚠️ **Se hizo ahora porque salía gratis: en producción hay CERO convenios**, así que no se migró
+    ningún documento firmado. El día que haya cientos, esto sería una migración de documentos legales.
+    🟠 **Lleva dentro una decisión de negocio sin confirmar**: se asume que el convenio comercial
+    `com` es **uno por organización** y cubre su compra y su venta, no uno por papel. Es la lectura
+    natural y encaja con que la matriz pida el mismo tipo a las dos partes, pero **es una lectura**.
+    Si la asesoría dice otra cosa se revierte con dos líneas, y sin datos que rehacer mientras no se
+    firme nada. Va con los textos de los convenios, que tampoco están validados (§12.77).
 80. **El DNI del firmante no entra en `documentos.datos` aunque el PDF lo imprima.** `documentos`
     tiene `grant select` sobre la tabla entera, así que meterlo ahí deshacía el GRANT por columnas
     de `evidencias`. El renderizador lo lee de `evidencias` con `service_role`. **Precio conocido:
@@ -3294,7 +3325,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    Referencia en **remoto**, fijada tras publicar el saneamiento (11-09-2026):
    **408/408 correctas y 52 saltadas**, «Sin fallos de permisos», exit 0. (Era 329/329 + 46 antes
    del certificado a demanda, la RLS sin correlación y los cuatro checks que vigilan que
-   `cierre_base` solo la lea el equipo.) Las 46 saltadas son
+   `cierre_base` solo la lea el equipo.) Las saltadas son
    normales: producción no tiene —ni debe tener— el fixture de
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
