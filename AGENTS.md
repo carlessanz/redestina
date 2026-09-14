@@ -1809,6 +1809,28 @@ menú (`AppShell`) **suma las dos colas**.
   compilar. Si la lista es larga, que la línea sea larga (deuda §12.46).
 - **Migraciones**: `supabase/migrations/AAAAMMDDHHMMSS_descripcion.sql`. Nunca editar una ya
   aplicada; añadir una nueva.
+- **Una sola rama en Supabase, siempre `main` (norma del 14-09-2026).** No se crean ramas en
+  el proyecto remoto: ni de preview, ni persistentes, ni para probar una migración. Todo el
+  esquema vive en la base de producción y se llega a ella por `db push`, igual que el código
+  vive en `main` y se llega por push. **Si aparece una rama de preview, se integra en `main` y
+  se borra del proyecto de Supabase.**
+  ⚠️ **No confundir con la rama por defecto, que NO es una rama paralela.** El proyecto tiene
+  el branching conectado a GitHub (§12.44) y eso hace que la API liste una entrada `main` con
+  `is_default: true` y —lo que lo delata— **`project_ref` igual a `parent_project_ref`**: esa
+  entrada *es* el proyecto de producción, no una copia suya. Una rama de preview de verdad
+  tiene **otro `project_ref`**, es decir, **otra base de datos**, y aparece además como un
+  proyecto aparte en la cuenta. Comprobado el 14-09-2026: solo existe la entrada por defecto
+  y ningún proyecto hermano. Cómo mirarlo:
+  ```bash
+  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+  curl -sS -H "Authorization: Bearer $TOKEN" \
+    https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/branches
+  # Correcto: UNA entrada, is_default true, project_ref == parent_project_ref.
+  # Cualquier otra fila es una rama de preview: hay que integrarla y borrarla.
+  ```
+  El riesgo real no es de hoy sino de mañana: **el branching crea una rama de preview cuando
+  se abre un PR**. Como aquí se trabaja siempre en `main` sin PRs (§«Rama de trabajo» de
+  `CLAUDE.md`), no llega a pasar — y esta norma es lo que lo mantiene así.
 - **Sin Supabase local (14-09-2026)**: este proyecto trabaja SIEMPRE contra el proyecto
   remoto enlazado. No se usa `supabase start`, ni Docker, ni el rango de puertos 553xx que
   usaba antes. `supabase/config.toml` conserva solo lo que hace falta para el remoto
@@ -2430,12 +2452,20 @@ Cuatro cosas que costaron descubrir y siguen valiendo:
    `20260721120100_modelo_poma.sql`. Editarlas está prohibido (§7): el nombre es parte de su
    identidad.
 
-5. **El proyecto de Supabase sigue llamándose `pdApp-wp` en el dashboard.** Lo dice
-   `supabase/.temp/linked-project.json` (`name`), que es lo que `supabase link` lee del remoto:
-   el `ref` (`uxppvaldhptdomvdhsmn`) es lo que importa y no cambia, pero el nombre visible en
-   supabase.com es el primero de los tres. Renombrarlo es un ajuste del dashboard, no del repo,
-   y **no rompe nada** — a diferencia de crear un repo con ese nombre (arriba). Se anota para
-   que nadie busque «Redestina» en la lista de proyectos y crea que falta.
+5. ~~**El proyecto de Supabase sigue llamándose `pdApp-wp` en el dashboard.**~~ — **falso, y
+   la corrección enseña más que el dato.** Escrito el 14-09-2026 leyendo
+   `supabase/.temp/linked-project.json`, que trae `"name": "pdApp-wp"`. **El proyecto se llama
+   `Redestina`**, y se comprueba preguntando al remoto en vez de a un fichero local:
+   ```bash
+   TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+   curl -sS -H "Authorization: Bearer $TOKEN" \
+     https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn   # → "name": "Redestina"
+   ```
+   ⚠️ **`linked-project.json` es una CACHÉ del momento en que se enlazó** (aquí, el 17-07-2026,
+   cuando el proyecto sí se llamaba así), no un espejo del remoto: `link` lo escribió una vez y
+   nadie lo ha vuelto a tocar desde entonces. El `ref` que guarda sí es estable y por eso el
+   fichero sirve; el `name` lleva casi dos meses caducado. La lección vale para los cuatro
+   ficheros de `supabase/.temp/`: **dicen cómo era el remoto cuando se enlazó, no cómo es**.
 
 ~~⚠️ El rebranding es textual, no visual: falta el logo.~~ — **resuelto (10-09-2026)** con el
 sistema de diseño (§2bis): logo nuevo en seis variantes, iconos de la PWA, favicon y `logo-email.png`

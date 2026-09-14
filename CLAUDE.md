@@ -60,6 +60,13 @@ migración es la real — por eso va siempre `supabase db push --dry-run` antes 
 máquina, y su contenido apunta al remoto. Renombrarlo rompe `npm run dev`. Detalle en
 `AGENTS.md §7` y §11.
 
+**Y una sola rama, siempre `main`** (norma del 14-09-2026): no se crean ramas en el proyecto
+de Supabase —ni de preview, ni para probar una migración—, igual que no se crean ramas de git.
+Si aparece una rama de preview, se integra en `main` y se borra del proyecto. La entrada `main`
+que lista la API **no** es una rama paralela: es el propio proyecto de producción, y se
+distingue porque su `project_ref` coincide con el `parent_project_ref`. Cómo comprobarlo, en
+`AGENTS.md §7`.
+
 ## Antes de dar por terminado un cambio
 
 1. `npm run build` (corre `tsc` en modo `strict`).
