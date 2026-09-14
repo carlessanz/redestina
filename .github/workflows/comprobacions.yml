@@ -49,7 +49,8 @@ jobs:
 
       - run: npm ci
 
-      # Tipos (app y pruebas) + vitest + deno check, lo mismo que el hook local.
+      # Tipos (app y pruebas) + las dos reglas de hooks + vitest + deno check: lo mismo
+      # que el hook local.
       - run: npm run check
 
       # El empaquetado no entra en `check` y sí puede fallar solo (§13.2).

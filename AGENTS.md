@@ -2808,7 +2808,8 @@ npm run test:watch            # durante el desarrollo
 npm run test:cobertura        # con cobertura v8 sobre src/lib y _shared
 
 # Los tres controles de una vez (lo que conviene ejecutar antes de dar nada por terminado):
-npm run check                 # tipos (app + pruebas) + vitest + deno check
+npm run check                 # tipos (app + pruebas) + lint de hooks + vitest + deno check
+npm run lint                  # solo ESLint: las dos reglas de react-hooks, línea base en cero
 npm run check:tipos           # solo tsc: tsconfig.json y tsconfig.tests.json
 
 # El hook de pre-commit se instala UNA VEZ por clon (git no ejecuta hooks versionados solo):
@@ -3002,10 +3003,18 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    cada push. Se sigue ejecutando a mano, que es lo que pide §13.
    ⚠️ **Y el workflow no despliega nada.** Publicar sigue siendo manual y en su orden (base →
    funciones → frontend, §11): un CI que desplegara Edge Functions se saltaría ese orden.
-   Lo que sigue faltando: **linter**. No hay ESLint, y se decidió (14-09-2026) **no** estrenarlo
-   entero: `tsc` ya corre con `strict`, `noUnusedLocals` y `noUnusedParameters`, que es de donde
-   sale la mayor parte de su valor, y pasarlo de golpe sobre 40 componentes daría cientos de avisos
-   que nadie va a triar. Lo que sí falta por hacer es `eslint-plugin-react-hooks` **a solas**. Lo que costó no tener nada de esto está medido: `deno check` no
+   ✅ **Y linter, el mismo día, pero acotado a UNA cosa**: `eslint.config.js` activa solo
+   `react-hooks/rules-of-hooks` y `react-hooks/exhaustive-deps`, y **apaga explícitamente todo lo
+   demás**. No es pereza: `tsc` ya corre con `strict`, `noUnusedLocals` y `noUnusedParameters`, de
+   donde sale la mayor parte del valor de un linter en TypeScript, y estrenar el conjunto entero
+   sobre 40 componentes escritos sin él daría cientos de avisos de estilo que nadie va a triar — y
+   un linter cuyos avisos se ignoran es peor que ninguno, porque enseña a ignorar la salida en
+   rojo. Las dos que quedan **no son estilo**: cazan errores que compilan y fallan en ejecución
+   (una dependencia que falta no da error de tipos, da una pantalla que no se refresca).
+   **La línea base es CERO** sobre los 118 ficheros de `src/`, verificada además con una
+   contraprueba —un `useEffect` con dependencia omitida, que el linter caza—. Va dentro de
+   `npm run check` y por tanto del hook y del CI. ⚠️ Si algún día empieza a dar avisos que se dejan
+   pasar, deja de servir: al añadir una regla, o se arregla todo lo que saca o no se añade. Lo que costó no tener nada de esto está medido: `deno check` no
    había pasado nunca sobre las Edge Functions (§12.45) y escondía tres errores de tipos reales.
 2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
    (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/56 + 1 saltada
