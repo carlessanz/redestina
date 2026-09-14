@@ -388,6 +388,8 @@ tests/                         Pruebas unitarias (Vitest). Módulos de negocio, 
   deno.d.ts                    El global `Deno` declarado al mínimo, para que tsc compruebe
   cobertura.test.ts            Que el menú, las rutas y las claves i18n apunten a algo real
 design/                        Sistema de diseño (§2bis): tokens.json, DESIGN.md, preview.html, PLAN.md
+.github/workflows/             CI: tipos + vitest + deno check + build en cada push y PR (§12.1).
+                               El arnés de RLS NO está aquí: necesita credenciales de producción
 public/                        Logo en seis variantes SVG, favicon, iconos PWA y logo-email.png (§2bis)
 .env.local.example             Plantilla de variables del frontend (sí se versiona)
 .claude/skills/publicar/       Skill /publicar: el procedimiento de publicación (§11)
@@ -2989,9 +2991,21 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    Ya hay **522 pruebas de
    Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
    `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
-   Lo que sigue faltando: **linter** (no hay ESLint) y **CI de verdad** — el hook se puede saltar
-   con `--no-verify` y no protege a quien no lo haya instalado, y el arnés de RLS sigue fuera
-   porque necesita credenciales. Lo que costó no tener nada de esto está medido: `deno check` no
+   ✅ **Y CI hay desde el 14-09-2026**: `.github/workflows/comprobacions.yml` corre en cada push a
+   `main` y en cada PR lo mismo que el hook —tipos de app y pruebas, las 522 de vitest y el
+   `deno check` de los scripts y las 15 funciones— más `npm run build`, que no entra en `check` y
+   puede fallar solo. Deno se instala explícitamente: sin él, la tercera parte de `npm run check`
+   no comprueba nada. Verde en su primera ejecución (`895b727`).
+   ⚠️ **El arnés de RLS se queda fuera a propósito**, y no por pereza: abre sesiones reales contra
+   **producción** con las credenciales de `scripts/data/cuentas-prueba.json`, que está fuera de git.
+   Meterlo en CI significaría dárselas a GitHub y dejar que un runner escriba en la base real en
+   cada push. Se sigue ejecutando a mano, que es lo que pide §13.
+   ⚠️ **Y el workflow no despliega nada.** Publicar sigue siendo manual y en su orden (base →
+   funciones → frontend, §11): un CI que desplegara Edge Functions se saltaría ese orden.
+   Lo que sigue faltando: **linter**. No hay ESLint, y se decidió (14-09-2026) **no** estrenarlo
+   entero: `tsc` ya corre con `strict`, `noUnusedLocals` y `noUnusedParameters`, que es de donde
+   sale la mayor parte de su valor, y pasarlo de golpe sobre 40 componentes daría cientos de avisos
+   que nadie va a triar. Lo que sí falta por hacer es `eslint-plugin-react-hooks` **a solas**. Lo que costó no tener nada de esto está medido: `deno check` no
    había pasado nunca sobre las Edge Functions (§12.45) y escondía tres errores de tipos reales.
 2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
    (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/56 + 1 saltada
