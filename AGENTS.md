@@ -3607,14 +3607,27 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, fijada tras publicar la etapa 3 de la organización unificada
-   (11-09-2026): **442/442 correctas y 52 saltadas**, «Sin fallos de permisos», exit 0. (Era
-   432/432 + 52 antes de las guardas de `enllacar_organitzacio` y `organitzacions_candidates`;
-   408/408 antes de los checks de `organizaciones` y `v_organizaciones`, que hasta esa publicación
-   no tenían tabla contra la que correr en remoto; y 329/329 + 46 antes del certificado a demanda.) Las saltadas son
-   normales: producción no tiene —ni debe tener— el fixture de
-   `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
-   convenios de prueba no tienen qué mirar.
+   Referencia en **remoto** (14-09-2026): **485/485 correctas y 14 saltadas**, «Sin fallos de
+   permisos», exit 0. (Era 480/480 + 14 antes del check de `data_tall_convenis`; 442/442 + 52
+   tras la etapa 3 de la organización unificada; 432/432 + 52 antes de las guardas de
+   `enllacar_organitzacio` y `organitzacions_candidates`; 408/408 antes de los checks de
+   `organizaciones` y `v_organizaciones`, que hasta aquella publicación no tenían tabla contra
+   la que correr en remoto; y 329/329 + 46 antes del certificado a demanda.)
+   ⚠️ **Esta cifra depende de qué DATOS haya en la base, no solo de qué checks existan, y el
+   14-09-2026 eso se vio de golpe**: las saltadas cayeron de 52 a 14 y las correctas subieron de
+   442 a 480 **sin una sola migración ni un check nuevo** — el total, 494, era idéntico—. Lo que
+   cambió es que **apareció en producción el fixture de `crear-datos-documentales-prueba.ts`**
+   (9 albaranes, 15 documentos, un cierre, dos convenios), así que 38 comprobaciones que no
+   tenían qué mirar pasaron a ejecutarse. Consecuencia al leer un desfase: **antes de buscar una
+   regresión, mirar si han aparecido o desaparecido datos**, porque una cifra que sube sin
+   checks nuevos no es una mejora, es otro contenido de la base.
+   ⚠️ Y ese fixture **no debería estar ahí**: este párrafo decía —y sigue valiendo como norma—
+   que producción no tiene ni debe tener datos de prueba. Mientras siga, esta es la referencia;
+   si se retira, las saltadas vuelven a ~52 y las correctas bajan en la misma proporción. Los
+   documentos que dejó están en `modo = 'real'` y han consumido números de las series legales
+   (`REC-2026-00001`, `ENT-2026-00001`…`00004`, `OPE-2026-00001`, `CONV-DON-GEN-2026-0001`,
+   `PLA-2026-0001/2`), y **no se pueden borrar**: `documentos_no_esborrar` solo permite el
+   `delete` con `modo = 'prueba'` (§4). O sea que el primer albarán real de 2026 será el `00002`.
    ⚠️ **Ya no hay una segunda referencia «en local».** Hasta el 14-09-2026 esta lista traía
    también la del stack local con el fixture entero (411 comprobaciones), que salía más alta
    porque allí sí existían albaranes, cierres y convenios de prueba. **Sin stack local esa cifra

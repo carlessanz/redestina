@@ -256,6 +256,17 @@ const DOCUMENTAL_EXTERN: Check[] = [
     columnas: "id, razon_social, cif",
     descripcion: "NO ve los parámetros documentales",
   },
+  // La excepción deliberada al check de arriba, y por eso van juntos: de esa tabla un externo
+  // no lee ni una fila, pero SÍ tiene que poder saber la fecha de corte de los convenios —es
+  // el aviso de su propio panel—, y para eso existe `data_tall_convenis()` (20270316100000).
+  // Si algún día este check empezara a fallar, el panel externo dejaría de avisar del corte y
+  // la persona se encontraría el 42501 de `exigir_convenio()` sin previo aviso.
+  {
+    tabla: "data_tall_convenis",
+    op: "rpc",
+    esperado: "permitir",
+    descripcion: "SÍ pot llegir la data de tall dels convenis (només aquesta columna)",
+  },
   {
     tabla: "enlaces_token",
     op: "leer",
