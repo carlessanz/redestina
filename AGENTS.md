@@ -391,6 +391,8 @@ src/
   layout/BottomNav.tsx         Barra inferior de móvil (productor y receptor)
   layout/UserMenu.tsx          Avatar, idioma y salir (salir está también en el pie del menú lateral)
   hooks/useSessio.tsx          Sesión cruda (¿hay token?) + evento PASSWORD_RECOVERY (§6quater)
+  hooks/useConveni.ts          ¿La organización activa tiene convenio vigente? Y la fecha de corte
+  components/AvisConveni.tsx   La banda que lo avisa en los paneles de productor y receptor
   hooks/useAppContext.tsx      get_my_session_context(): quién eres (§4bis). El panel activo se
                                DERIVA de la URL; useOrganitzacio(tipus) para las pantallas
   hooks/use-mobile.ts          Hook del breakpoint (lo usa el sidebar de shadcn)
@@ -758,9 +760,13 @@ negocio sino el ejemplo ejecutable del formato.
 ⚠️ La FK `documentos.plantilla_id → plantillas_documento(id)` vive en
 **`20260928100250_fk_documentos_plantilla.sql`**, no en `…100100`, y no es una preferencia:
 `100100 < 100200`, así que en cualquier entorno recreado desde cero ese fichero se aplica **antes**
-de que exista `documentos` y el `alter table` fallaría. Que hoy funcione en local —donde `100200`
-ya estaba aplicada y `100100` llegó fuera de orden— habría escondido el problema hasta el primer
-`db reset`.
+de que exista `documentos` y el `alter table` fallaría. Que en su día funcionara fue un accidente
+del orden en que se aplicaron —`100200` ya estaba y `100100` llegó después—, y entonces lo habría
+destapado el primer `db reset`.
+⚠️ **Ese destapador ya no existe**: sin stack local (§7) no hay `db reset` ni ninguna forma barata
+de recrear el esquema desde cero, así que **este fallo está latente y solo saldría en el peor
+momento** — el día que alguien monte un proyecto nuevo desde las migraciones. La FK ya está en su
+fichero aparte, que es lo que lo arregla; lo que se pierde es la manera de comprobarlo.
 
 **`enlaces_token`** — firmar y confirmar **sin tener cuenta** (`20260928100300`): `proposito`
 (`firma_convenio`·`confirmacion_albaran`·`subida_factura`), `objeto_tipo` + `objeto_id`,
@@ -1218,6 +1224,17 @@ funciones, no políticas:
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
+| `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
+
+**El convenio en el panel externo (14-09-2026).** Decisión de producto: el panel **se sigue
+viendo** sin convenio, lo que no se puede es operar. `useConveni` lee los convenios de la
+organización (su propia RLS ya los filtra) y la fecha de corte, y `AvisConveni` pinta una banda
+encima de cualquier pantalla de productor o receptor con tres mensajes distintos, porque son tres
+situaciones distintas: sin convenio, enviado y sin firmar, o firmado pendiente de contrafirma.
+Antes del corte es un aviso y se puede operar. Desde el corte, la banda pasa a roja y se apagan
+las dos acciones que la base va a rechazar igualmente con `42501`: «Publicar oferta» y
+«M'interessa». **El equipo no pasa por aquí**: opera en nombre de otros y no tiene organización
+propia. Con `fecha_corte_convenios` a null (hoy), nada se bloquea: solo se avisa.
 
 ⚠️ **`marcar_entregado()` devuelve además `rol_part`** en cada enlace, y **`resolver_enlace()`
 devuelve `rol_parte`**. `resolver_enlace` hubo que borrarla y recrearla: `create or replace` **no
@@ -3104,8 +3121,10 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 
 49. ~~**El trigger de encolado de PDF no existe todavía.**~~ — **resuelta**:
     `20260928100700_jobs_documentales.sql` trae el trigger y los dos jobs (§4 «Sistema
-    documental»). Sin el secreto en `app_config` son no-op con `notice`, que es lo que permite
-    emitir documentos de prueba en local sin que nada salga a la red.
+    documental»). Sin el secreto en `app_config` son no-op con `notice`. Eso servía para emitir
+    documentos de prueba **en el stack local** sin que nada saliera a la red; retirado ese stack
+    (§7), lo que queda es una **red distinta y más simple**: un proyecto al que se le olvide el
+    secreto no encola nada en silencio, y el `notice` lo dice.
 50. ~~**`ruta_documento()` solo resuelve `PROVA`.**~~ — **resuelta (fase 5)**: cubre los seis
     `objeto_tipo` y ya no queda ninguna rama que levante `0A000`. Cada fase rellenó la suya, que era
     el plan.
@@ -3260,7 +3279,9 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 73. ~~**`sendEmail()` no tiene modo simulado.**~~ — **resuelta (11-09-2026)**: existe
     **`RESEND_ENVIO_REAL`**, gemelo exacto del de WhatsApp. Mientras no valga `"true"` exacto no
     sale nada y se devuelve `{simulado:true}`; la comprobación va **antes** de mirar
-    `RESEND_API_KEY`, para que en local sin clave funcione el camino entero.
+    `RESEND_API_KEY`, así que el camino entero se puede ejercitar **sin clave de Resend** — que
+    era lo que hacía falta cuando eso se probaba en el stack local, y sigue valiendo para
+    cualquier entorno al que no se le quiera dar la clave.
     La decisión está aislada en `esEnvioReal()`, que es pura y **tiene pruebas** —incluido que
     `TRUE`, `1`, `yes` y `" true"` no encienden nada—. El interruptor de WhatsApp lleva desde julio
     sin nadie que lo vigile; este no.
@@ -3443,7 +3464,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 34 | Áreas táctiles de 36 px salvo en cuatro sitios | Subirlas todas es rediseñar la aplicación entera para ganar 8 px en botones secundarios |
 | 37 | El aviso de instalación se prueba con un evento sintético | `beforeinstallprompt` no lo dispara ningún navegador de escritorio. La instalación real solo se comprueba en un móvil |
 | 54 | El fail-open de `roles_activos` | Con el interruptor apagado dos checks del arnés salen en rojo. Es el fail-open de §4bis, no una regresión |
-| 63 | Las herramientas locales asumen un operador | Un `functions serve` por vez, y el arnés borra los documentos de prueba de quien sea |
+| 63 | Las herramientas asumen un operador | Sin stack local ya no hay pelea por el `functions serve` (§7); **queda** que el arnés borra los documentos de prueba de quien sea, y ahora sobre el remoto |
 | 66 | «Amb discrepància» es un filtro, no un veredicto | El veredicto real exigiría una llamada por fila |
 | 67 | Rectificar solo corrige `kg_neto` | Es lo que se rectifica en la práctica; lo demás sería un segundo editor dentro de un diálogo |
 | 70 | Los kilos por línea del cierre son derivados | D13 manda certificar el neto del REC; las líneas tienen que ser por canalización. **El total del donante es exacto** |
@@ -3473,8 +3494,8 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
-   `deno check` de los scripts y las 14 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **430 pruebas en 15 ficheros**, todas correctas y ninguna pendiente.
+   `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
+   Referencia: **483 pruebas en 18 ficheros**, todas correctas y ninguna pendiente.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
    (`git config core.hooksPath .githooks`, una vez por clon).
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
@@ -3488,10 +3509,11 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    normales: producción no tiene —ni debe tener— el fixture de
    `crear-datos-documentales-prueba.ts`, así que los checks que necesitan albaranes, cierres o
    convenios de prueba no tienen qué mirar.
-   Referencia en **local** con el fixture (`crear-usuarios-prueba.ts` +
-   `crear-datos-documentales-prueba.ts`) y `roles_activos` en `true`: **411 comprobaciones, todas
-   correctas y 15 saltadas** por falta de datos, terminando en «Sin fallos de permisos» con código
-   de salida 0.
+   ⚠️ **Ya no hay una segunda referencia «en local».** Hasta el 14-09-2026 esta lista traía
+   también la del stack local con el fixture entero (411 comprobaciones), que salía más alta
+   porque allí sí existían albaranes, cierres y convenios de prueba. **Sin stack local esa cifra
+   no se puede reproducir**, así que se retira en vez de dejarla envejecer: la única referencia
+   viva es la de arriba, contra el remoto (§7).
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
    aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale
    SALTADA, con el mismo criterio.
