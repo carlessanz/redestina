@@ -50,13 +50,24 @@ Actualiza `AGENTS.md` cuando cambie cualquiera de estas cosas:
 - variables de entorno o comandos
 - deuda técnica: lo que se resuelva se tacha, lo que se introduzca se anota
 
+## Una sola base de datos: la remota
+
+**Este proyecto no usa Supabase local** (desde el 14-09-2026). No hay `supabase start`, ni
+Docker, ni puertos 553xx: el CLI trabaja solo contra el proyecto enlazado, `npm run dev` levanta
+el frontend en tu máquina **apuntando al remoto**, y la primera base donde se ejecuta una
+migración es la real — por eso va siempre `supabase db push --dry-run` antes de `db push`.
+⚠️ `.env.local` **no es «Supabase local»**: es el nombre que Vite da a las variables de esta
+máquina, y su contenido apunta al remoto. Renombrarlo rompe `npm run dev`. Detalle en
+`AGENTS.md §7` y §11.
+
 ## Antes de dar por terminado un cambio
 
 1. `npm run build` (corre `tsc` en modo `strict`).
 2. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles: comprueba los
-   permisos de verdad, contra la base y con sesiones reales. Hoy está en **56/56 y 1 saltada**
-   (el receptor comercial, que no tiene ninguna oferta de `venda` publicada que ver). Cualquier
-   FALLA es una regresión: el arnés ya no marca en rojo lo que solo es falta de datos.
+   permisos de verdad, contra la base y con sesiones reales. **La cifra de referencia vive en
+   `AGENTS.md §13` y no se copia aquí** — este párrafo la duplicó una vez y se quedó vieja
+   (decía 56/56 cuando §13 iba por 442). Cualquier FALLA es una regresión: el arnés no marca en
+   rojo lo que solo es falta de datos.
 3. `AGENTS.md` actualizado.
 4. Commit en castellano.
 5. Para **publicar en producción**, el skill `/publicar`: hace el commit, el push, el redespliegue

@@ -1298,8 +1298,9 @@ sesión** → `401` (no `403`).
 
 `deno run -A scripts/comprobar-rls.ts` (§11): abre sesión con cada cuenta —con la publishable
 key, como el navegador— y comprueba una matriz declarativa de *(cuenta, tabla, operación) →
-permitir/denegar*. Referencia con el sistema documental: **95/95 correctas y 12 saltadas** (107
-comprobaciones). Abre sesión de verdad contra el proyecto remoto, así que una cuenta que no puede
+permitir/denegar*. **La cifra de referencia está en §13 y solo ahí**: este párrafo llegó a decir
+95/95 cuando §13 ya iba por 442, que es el desfase exacto que el skill `/publicar` también sufrió
+dos veces. Abre sesión de verdad contra el proyecto remoto, así que una cuenta que no puede
 entrar sale en rojo: no hay ninguna rama alternativa desde que se retiró el Supabase local (§7).
 
 Del sistema documental comprueba que el técnico lee plantillas y parámetros pero **no los
@@ -2426,6 +2427,13 @@ Cuatro cosas que costaron descubrir y siguen valiendo:
 4. **Las migraciones ya aplicadas conservan `POMA` en sus comentarios**, y una se llama
    `20260721120100_modelo_poma.sql`. Editarlas está prohibido (§7): el nombre es parte de su
    identidad.
+
+5. **El proyecto de Supabase sigue llamándose `pdApp-wp` en el dashboard.** Lo dice
+   `supabase/.temp/linked-project.json` (`name`), que es lo que `supabase link` lee del remoto:
+   el `ref` (`uxppvaldhptdomvdhsmn`) es lo que importa y no cambia, pero el nombre visible en
+   supabase.com es el primero de los tres. Renombrarlo es un ajuste del dashboard, no del repo,
+   y **no rompe nada** — a diferencia de crear un repo con ese nombre (arriba). Se anota para
+   que nadie busque «Redestina» en la lista de proyectos y crea que falta.
 
 ~~⚠️ El rebranding es textual, no visual: falta el logo.~~ — **resuelto (10-09-2026)** con el
 sistema de diseño (§2bis): logo nuevo en seis variantes, iconos de la PWA, favicon y `logo-email.png`
