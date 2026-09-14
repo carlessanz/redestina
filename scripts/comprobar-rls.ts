@@ -450,8 +450,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Organización unificada (20270310100000). La tabla no tiene GRANT de escritura para
   // nadie: si alguien lo concediera, este check se pondría rojo antes de que llegara a
   // producción una forma de reasignar la ficha de una organización a otra.
-  { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu les organitzacions" },
-  { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es cada organitzacio" },
+  // ⚠️ Los dos de LECTURA no están aquí y sí en cada bloque, a propósito (14-09-2026): lo
+  //    que se ve depende de tener organización, y `sense_rol` y `pendent` no tienen ninguna
+  //    —sus membresías son inexistentes o `activo = false`—, así que para ellas 0 filas es el
+  //    comportamiento CORRECTO y no una falta de fixture. Heredarlos como «permitir» ponía
+  //    cuatro comprobaciones en rojo describiendo lo que debe pasar. No salió antes porque
+  //    esos dos bloques llevaban desde julio sin ninguna cuenta que los recorriera (§12.32).
   { tabla: "organizaciones", op: "insertar", esperado: "denegar", descripcion: "NO crea organitzacions a ma" },
   {
     tabla: "guardar_plan_basico",
@@ -1025,6 +1029,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // a «permitir, solo los suyos» con su fixture.
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
+    { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
+    { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
     // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
@@ -1165,6 +1171,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
+    { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
+    { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): la entidad ve SUS albaranes de entrega…
     {
@@ -1231,6 +1239,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
     { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
+    { tabla: "organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
+    { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
@@ -1252,6 +1262,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "no ve ningún acumulado anual" },
     { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
+    { tabla: "organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
+    { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
@@ -1268,6 +1280,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
+    { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
+    { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
     ...DOCUMENTAL_EXTERN,
     // Su ficha de productor y su ficha de entidad no le dan más albaranes que los de esas
     // dos organizaciones. Hoy las cuentas de doble rol cuelgan de fichas reales, que no

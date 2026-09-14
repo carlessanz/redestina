@@ -3323,7 +3323,25 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     comportarse**.
     ⚠️ Parcial a propósito: una membresía **rechazada o desactivada no ocupa sitio**, o alguien a
     quien se le rechazó un alta no podría volver a intentarlo.
-32. **143 comprobaciones del arnés se quedaron sin cuenta que las recorra.** ⚠️ Esta entrada decía
+32. ~~**143 comprobaciones del arnés se quedaron sin cuenta que las recorra.**~~ — **resuelta el
+    14-09-2026**: se dieron de alta las dos cuentas que faltaban y el arnés pasa de **504/504 a
+    649/649**. Fueron **145**, no 143, porque por el camino se le añadieron dos checks a cada
+    bloque.
+    🔴 **Y al recorrerlos por primera vez desde julio salieron CUATRO en rojo**, que es exactamente
+    para lo que sirve esta cobertura: `DOCUMENTAL_EXTERN` incluía «ve las organizaciones» como
+    `permitir`, y los bloques `sense_rol` y `pendent` lo heredaban — pero esas cuentas **no tienen
+    organización** (membresía inexistente o `activo = false`), así que sus 0 filas eran el
+    comportamiento **correcto**. El check describía como fallo lo que debe pasar. Los dos de lectura
+    salen del bloque común y pasan a declararse por perfil: `permitir` en productor, receptor y
+    doble rol; `denegar` en los dos sin organización. **Un check que nadie ejecuta envejece igual
+    que una entrada de deuda.**
+    ⚠️ **Las dos cuentas son datos REALES en producción** y hay que saberlo: `hola+pendent-arnes@`
+    (alta por `/registre`, organización `TEST-PENDENT-ARNES`, **membresía en `pendent` que no se
+    debe aprobar** — si se aprueba, el bloque deja de tener con qué probarse) y `hola+senserol-arnes@`
+    (cuenta de Auth sin membresía ni rol). Sus credenciales viven en `scripts/data/cuentas-prueba.json`,
+    fuera de git. La primera aparece en el listado de productores del equipo y en la cola de
+    «Registres pendents»: es el precio de tener esa cobertura.
+    El texto original: ⚠️ Esta entrada decía
     «nueve» y la cifra era de otra época: contaba solo los checks **propios** de cada bloque e
     ignoraba que los dos **heredan los 60 de `DOCUMENTAL_EXTERN`**. Medido el 14-09-2026:
     `sense_rol` son 10 + 60 = **70** y `pendent` 13 + 60 = **73**. El diagnóstico cualitativo sí era
@@ -3646,8 +3664,8 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     fail-open deliberado de §4bis, no una regresión: hay que encender el interruptor antes de
     juzgar el resultado. Está escrito en la cabecera del script.
 
-55. **Los cuatro campos sensibles del sistema documental los protege un GRANT, no una política,
-    y eso se puede deshacer sin querer.** `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
+55. 🟡 **Los campos sensibles los protege un GRANT, no una política, y eso se puede deshacer sin
+    querer** — *la vigilancia, resuelta el 14-09-2026; la causa de fondo, no*. `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
     `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están fuera del
     GRANT de SELECT (§4). Un `grant select on all tables in schema public to authenticated`
     —exactamente la línea que ya existe en `20260721160000`— los volvería a abrir **sin que
@@ -3944,8 +3962,10 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     de 800 ms es el presupuesto del spike, no el límite: entre ese aviso y la muerte real hay
     margen, que es justo para lo que sirve.
 
-90. 🟠 **Una espigolada con dos registros del mismo producto contaría los kilos dos veces.**
-    El reparto del neto del REC particiona por `excedente_id`, y en una espigolada el REC cuelga de
+90. ~~**Una espigolada con dos registros del mismo producto contaría los kilos dos veces.**~~ —
+    **resuelta (14-09-2026, `20270320100000`)**; el diagnóstico completo se conserva porque explica
+    una clase de error que puede repetirse.
+    El reparto del neto del REC particionaba por `excedente_id`, y en una espigolada el REC cuelga de
     la **jornada** y se empareja con los registros **por producto**. Si una misma jornada tuviera dos
     registros del mismo producto, cada uno recibiría el neto entero de esa línea del REC.
     La clave correcta sería `(albaran_rec_id, producto)`.
@@ -4213,8 +4233,12 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **504/504 correctas
-   y 14 saltadas**, «Sin fallos de permisos», exit 0. Son las 497 anteriores más los **7** checks
+   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **649/649 correctas
+   y 14 saltadas**, «Sin fallos de permisos», exit 0.
+   ⚠️ **El salto de 504 a 649 no es de checks nuevos, es de COBERTURA**: al dar de alta las cuentas
+   `pendent` y `sense_rol` (deuda 32) empezaron a recorrerse dos bloques que llevaban desde julio
+   escritos y sin ejecutar. Antes de leer un desfase de esta cifra, mirar cuántas **cuentas** tiene
+   `cuentas-prueba.json`: son 9. Las 504 anteriores eran las 497 más los **7** checks
    nuevos de la deuda 55 —`enlaces_token.codigo_hash` en el bloque del equipo, y
    `documentos.envio` en el del equipo y en `DOCUMENTAL_EXTERN`, que recorren 5 cuentas—. Todos
    son `denegar`, así que ninguno puede quedar saltado.
