@@ -3493,13 +3493,20 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     - El `verify_jwt` lo sigue mandando `config.toml`, que viaja en el repo, así que el despliegue
       automático lo respeta. Verificado tras los dos redespliegues: quince `ACTIVE` y los quince
       flags correctos.
-    - 🔴 **Y esto deja a `huellas-funciones.ts` sin poder responder su pregunta en una
+    - 🔴 **Y esto dejaba a `huellas-funciones.ts` sin poder responder su pregunta en una
       publicación.** Medido el 14-09-2026 con el experimento limpio: el commit `5f70be6` tocó
-      **dos ficheros markdown** —`AGENTS.md` y el skill, ninguno entra en ningún bundle— y tras
-      el push **las quince huellas cambiaron**. Así que **el `ezbr_sha256` cambia en cada
-      despliegue real aunque el código sea byte a byte idéntico**: el empaquetado no es
-      reproducible. Como el branching redespliega las quince en cada push, `comparar` **siempre**
-      dirá «15 cambiadas» después de publicar, diga lo que diga el código.
+      **dos ficheros markdown** —ninguno entra en ningún bundle— y tras el push **las quince
+      huellas cambiaron**. De ahí se concluyó que «el `ezbr_sha256` cambia en cada despliegue real
+      aunque el código sea idéntico».
+      ✅ **Esa conclusión era demasiado amplia, y se corrige el mismo día**: lo que no es
+      reproducible es **el empaquetado del branching**, no el del CLI. Medido tras desactivarlo, en
+      la tanda de deuda técnica: se desplegaron **las quince a mano** y solo cambiaron **tres**
+      huellas —justo las tres cuyo código había cambiado (`whatsapp-webhook`, `registro` y
+      `crear-oferta`, por `_shared/intake.ts` y `_shared/oferta.ts`)—; y un redespliegue posterior
+      de una función intacta, que respondió `Deployed Functions` y no `No change found`, dejó su
+      huella **idéntica**. O sea que **con despliegue manual el `ezbr_sha256` sí depende solo del
+      contenido**, y `comparar` vuelve a responder «¿qué cambió de verdad?» con precisión — que es
+      justo para lo que se escribió.
       ⚠️ Esto **no contradice** la validación del 11-09 («un redespliegue sin tocar nada deja las
       15 huellas idénticas»), la precisa: aquel caso era `functions deploy` respondiendo
       `No change found`, o sea **no desplegó**. La regla fina es **`No change found` = no
