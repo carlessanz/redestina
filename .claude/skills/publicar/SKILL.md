@@ -162,11 +162,11 @@ supabase functions deploy subir-documento-externo                    # verify_jw
 supabase functions deploy limpiar-documentos-prueba                  # verify_jwt (super_admin)
 ```
 
-⚠️ **El `git push` del paso 5 va a desplegar las quince otra vez, y eso es normal.** El proyecto
-tiene **Supabase Branching conectado a `main`**, así que publicar dispara por su cuenta el
-despliegue de todas las funciones desde el código del repo, unos 45 s después (§12.44). Desplegar
-aquí a mano **sigue haciendo falta**: es lo que evita la ventana del orden de arriba. Lo que no hay
-que hacer es alarmarse al ver las quince con `updated_at` idéntico después de publicar.
+🔴 **Este paso es la ÚNICA forma de publicar una función: si no la despliegas aquí, no se
+despliega.** Hasta el 14-09-2026 el branching de Supabase desplegaba las quince en cada push y
+tapaba cualquier olvido; se desactivó para que no pudieran aparecer ramas de preview (§7), así que
+esa red ya no existe. Un `git push` con una función cambiada y sin `functions deploy` deja el
+código viejo corriendo en producción **sin ningún aviso**.
 
 Al terminar puedes comparar, pero **sabiendo lo que la herramienta ya no puede decirte**:
 
@@ -174,12 +174,11 @@ Al terminar puedes comparar, pero **sabiendo lo que la herramienta ya no puede d
 deno run -A scripts/huellas-funciones.ts comparar
 ```
 
-🔴 **En una publicación dirá «15 cambiadas» siempre, y no significa nada.** El `ezbr_sha256`
-cambia en cada despliegue real aunque el código sea idéntico (medido: un commit de solo markdown
-cambió las quince), y el branching redespliega las quince en cada push. Para saber qué cambió de
-verdad en esta publicación, `git diff` — no la herramienta. Sigue sirviendo para comparar dos
-momentos **sin push ni despliegue en medio**, que es como se caza que la plataforma toque algo
-por su cuenta. Detalle en §12.44.
+⚠️ **Dice qué bundles cambiaron entre dos momentos, no si coinciden con el repo.** Y el
+`ezbr_sha256` cambia en **cada despliegue real aunque el código sea idéntico** (medido: con el
+branching activo, un commit de solo markdown cambió las quince), así que solo es informativo sobre
+las funciones que acabas de desplegar. Ahora que el branching está apagado vuelve a ser útil: si
+cambia una que no tocaste, pregúntate por qué. Detalle en §12.44.
 
 Luego comprueba que las quince quedaron `ACTIVE` y con el `verify_jwt` que toca:
 

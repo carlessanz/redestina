@@ -62,10 +62,11 @@ máquina, y su contenido apunta al remoto. Renombrarlo rompe `npm run dev`. Deta
 
 **Y una sola rama, siempre `main`** (norma del 14-09-2026): no se crean ramas en el proyecto
 de Supabase —ni de preview, ni para probar una migración—, igual que no se crean ramas de git.
-Si aparece una rama de preview, se integra en `main` y se borra del proyecto. La entrada `main`
-que lista la API **no** es una rama paralela: es el propio proyecto de producción, y se
-distingue porque su `project_ref` coincide con el `parent_project_ref`. Cómo comprobarlo, en
-`AGENTS.md §7`.
+El **branching está desactivado** desde esa fecha, así que ya no puede aparecer ninguna sola;
+si la API vuelve a listar algo, es que alguien lo reactivó. Detalle en `AGENTS.md §7`.
+⚠️ El precio de apagarlo, que hay que tener presente: **las Edge Functions ya no se despliegan
+con el `git push`** — antes lo hacía el branching—, así que si no las despliegas tú con
+`functions deploy`, producción sigue con el código viejo y nada lo avisa.
 
 ## Antes de dar por terminado un cambio
 

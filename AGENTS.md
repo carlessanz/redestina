@@ -1814,23 +1814,25 @@ menú (`AppShell`) **suma las dos colas**.
   esquema vive en la base de producción y se llega a ella por `db push`, igual que el código
   vive en `main` y se llega por push. **Si aparece una rama de preview, se integra en `main` y
   se borra del proyecto de Supabase.**
-  ⚠️ **No confundir con la rama por defecto, que NO es una rama paralela.** El proyecto tiene
-  el branching conectado a GitHub (§12.44) y eso hace que la API liste una entrada `main` con
-  `is_default: true` y —lo que lo delata— **`project_ref` igual a `parent_project_ref`**: esa
-  entrada *es* el proyecto de producción, no una copia suya. Una rama de preview de verdad
-  tiene **otro `project_ref`**, es decir, **otra base de datos**, y aparece además como un
-  proyecto aparte en la cuenta. Comprobado el 14-09-2026: solo existe la entrada por defecto
-  y ningún proyecto hermano. Cómo mirarlo:
+  ✅ **Y ya no puede aparecer sola: el branching está DESACTIVADO** desde el 14-09-2026
+  (`supabase branches disable`). Hasta ese día el proyecto lo tenía conectado a GitHub, y eso
+  hacía dos cosas: desplegar las quince funciones en cada push (§12.44) y —el motivo de
+  apagarlo— **crear una rama de preview, con su propia base de datos, al abrir un PR**. Se
+  apagó a propósito, aceptando el coste: **el despliegue de funciones pasa a ser siempre
+  manual** (§11 y paso 4 de `/publicar`).
   ```bash
   TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
   curl -sS -H "Authorization: Bearer $TOKEN" \
     https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/branches
-  # Correcto: UNA entrada, is_default true, project_ref == parent_project_ref.
-  # Cualquier otra fila es una rama de preview: hay que integrarla y borrarla.
+  # Correcto hoy: []  (lista vacía = branching desactivado)
   ```
-  El riesgo real no es de hoy sino de mañana: **el branching crea una rama de preview cuando
-  se abre un PR**. Como aquí se trabaja siempre en `main` sin PRs (§«Rama de trabajo» de
-  `CLAUDE.md`), no llega a pasar — y esta norma es lo que lo mantiene así.
+  ⚠️ **Si algún día vuelve a listar algo, hay que saber leerlo.** Una entrada con
+  `is_default: true` y **`project_ref` igual a `parent_project_ref`** *es* el proyecto de
+  producción, no una copia: eso significa que alguien ha vuelto a activar el branching, y se
+  desactiva otra vez. Una entrada con **otro `project_ref`** es una rama de preview de verdad
+  —**otra base de datos**, y además un proyecto aparte en la cuenta—: esa se integra en `main`
+  y se borra. Verificado tras desactivar: la lista quedó vacía, el proyecto sigue
+  `ACTIVE_HEALTHY`, la base responde y las quince funciones siguen `ACTIVE`.
 - **Sin Supabase local (14-09-2026)**: este proyecto trabaja SIEMPRE contra el proyecto
   remoto enlazado. No se usa `supabase start`, ni Docker, ni el rango de puertos 553xx que
   usaba antes. `supabase/config.toml` conserva solo lo que hace falta para el remoto
@@ -2558,14 +2560,12 @@ supabase secrets set --env-file .secrets.env
 # el default del CLI, que es `true` — correcto, pero no escrito en ninguna parte, que es
 # exactamente la distancia de la que nació la deuda 43).
 #
-# ⚠️ Y estos despliegues NO son la única forma de que se publique una función: el proyecto tiene
-# **Supabase Branching conectado a la rama `main` de GitHub** (`status: FUNCTIONS_DEPLOYED`), así
-# que **cada `git push origin main` despliega las quince** desde el código del repo, unos 45 s
-# después. Respeta `config.toml`, que viaja en el repo, así que los `verify_jwt` no se tuercen.
-# Consecuencia: un cambio commiteado en `supabase/functions/` se publica con el push, se quiera
-# o no — no existe «commiteo ahora y despliego la función más tarde». Desplegar a mano antes del
-# push sigue haciendo falta: es lo que evita la ventana del orden de abajo. Detalle y cómo se
-# averiguó, en §12.44.
+# ⚠️ **Estos despliegues son la ÚNICA forma de publicar una función, desde el 14-09-2026.** Hasta
+# ese día el proyecto tenía Supabase Branching conectado a `main` y cada `git push` desplegaba las
+# quince por su cuenta (§12.44); se desactivó (§7) porque ese mismo mecanismo crea una rama de
+# preview —otra base de datos— al abrir un PR. El coste aceptado es este: **si no las despliegas
+# tú, no se despliegan**. Un `git push` con una función cambiada y sin `functions deploy` deja el
+# código viejo corriendo en producción sin ningún aviso.
 
 # Publicar en producción: el procedimiento completo vive en el skill `/publicar`
 # (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos a mano:
@@ -3113,7 +3113,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     # → [{"name":"main","git_branch":"main","is_default":true,"status":"FUNCTIONS_DEPLOYED",…}]
     ```
 
-    `status: FUNCTIONS_DEPLOYED` es literal: **cada push a `main` despliega las quince Edge
+    ✅ **Y se apagó el mismo día** (`supabase branches disable`, §7): el mecanismo que explicaba
+    los redespliegues es también el que crea una rama de preview al abrir un PR, y el proyecto no
+    quiere ramas. Así que lo de abajo describe **cómo funcionaba hasta el 14-09-2026**; desde
+    entonces las funciones **solo** se despliegan a mano y un push ya no toca ninguna. Se deja
+    escrito entero porque es lo que explica el histórico de `updated_at` y de versiones, y porque
+    si alguien reactiva el branching vuelve a valer tal cual.
+
+    `status: FUNCTIONS_DEPLOYED` era literal: **cada push a `main` desplegaba las quince Edge
     Functions desde el código del repo**, unos 45 s después. Medido dos veces el mismo día: push
     de `dc429ea` a las 14:54:23 → las quince a las 14:55:10; push de `a905364` a las 17:33:04 →
     las quince a las 17:33:50, con la versión de cada una subida en uno. La segunda se observó
@@ -3130,13 +3137,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     los sitios donde mirar.
 
     **Lo que cambia en la práctica**, y no es poco:
-    - **El paso 4 de `/publicar` no es opcional aunque el push despliegue solo.** Desplegar a mano
-      *antes* es lo que evita la ventana; si se dejara al push, las funciones nuevas llegarían
-      después del frontend nuevo, que es justo el orden que §11 prohíbe.
+    - **El paso 4 de `/publicar` es ahora la ÚNICA vía.** Mientras el branching estuvo activo,
+      desplegar a mano antes seguía haciendo falta para no invertir el orden de §11; ahora, además,
+      es que no hay red: si no lo haces tú, no se despliega nada.
     - **Redesplegar a mano y luego publicar deja las funciones desplegadas dos veces.** Es inocuo
       —idempotente, mismo código— pero explica el `updated_at` posterior al despliegue manual.
-    - 🟠 **Un cambio commiteado en `supabase/functions/` se publica con el push, se quiera o no.**
-      No hay «commitear ahora y desplegar la función más tarde»: el push es el despliegue.
+    - 🟠 **Se invirtió el riesgo.** Con el branching, un cambio commiteado en
+      `supabase/functions/` se publicaba con el push se quisiera o no; sin él, un cambio commiteado
+      **NO se publica** hasta que alguien despliegue. El fallo que hay que vigilar ahora es el
+      contrario: código nuevo en el repo y el viejo corriendo en producción, sin ningún aviso.
     - El `verify_jwt` lo sigue mandando `config.toml`, que viaja en el repo, así que el despliegue
       automático lo respeta. Verificado tras los dos redespliegues: quince `ACTIVE` y los quince
       flags correctos.
