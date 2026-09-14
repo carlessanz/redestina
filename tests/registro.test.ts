@@ -16,10 +16,14 @@
 
 import { describe, expect, it } from 'vitest'
 import {
+  algunTelefonCoincideix,
+  clausTelefon,
   decidir,
+  esForta,
   type FitxaCoincident,
   mateixEmail,
   mateixTelefon,
+  motiuTelefon,
   notaPaperNou,
   type OrgCoincident,
   patroTelefon,
@@ -65,7 +69,7 @@ describe('patroTelefon: el filtro grueso que va a la consulta', () => {
   const re = (nou: string) => new RegExp(patroTelefon(nou))
 
   it('encuentra el número esté guardado como esté', () => {
-    // `entidades.telefono` es texto libre: el importador lo normaliza, pero cualquier
+    // Los campos de teléfono son texto libre: el importador los normaliza, pero cualquier
     // edición posterior desde la ficha puede dejar espacios, guiones o un nombre detrás.
     expect(re('612345678').test('34612345678')).toBe(true)
     expect(re('612345678').test('+34 612 345 678')).toBe(true)
@@ -78,10 +82,116 @@ describe('patroTelefon: el filtro grueso que va a la consulta', () => {
     expect(re('612345678').test('34600000000')).toBe(false)
   })
 
-  it('solo mira el final, que es lo que significa «las últimas 9»', () => {
-    // Con el número en medio de la celda, el patrón no casa: es un filtro que se queda
-    // corto a propósito, y por eso quien decide es `mateixTelefon` sobre lo que vuelva.
-    expect(re('612345678').test('612345678 / 933000000')).toBe(false)
+  it('lo encuentra también en MEDIO del campo (deuda §12.91)', () => {
+    // Era el fallo visible: con el patrón anclado al final, un campo con dos números no
+    // casaba, y como el ancla viaja en la consulta la fila ni llegaba a memoria.
+    expect(re('612345678').test('612345678 / 933000000')).toBe(true)
+    expect(re('612345678').test('Joan 612 345 678 (matins)')).toBe(true)
+  })
+
+  it('casa de más, y por eso NO es el criterio', () => {
+    // `612345678` está dentro de `6123456789`, que es otro número. El prefiltro lo trae y
+    // `mateixTelefon` lo descarta: una fila de más se tira, una que no se consulta no
+    // se recupera.
+    expect(re('612345678').test('6123456789')).toBe(true)
+    expect(mateixTelefon('6123456789', '612345678')).toBe(false)
+    // Y lo mismo cuando las nueve cifras aparecen dentro de una tirada más larga que no
+    // se descompone en números enteros: el prefiltro la trae, el criterio la tira.
+    expect(re('612345678').test('612345678912')).toBe(true)
+    expect(mateixTelefon('612345678912', '612345678')).toBe(false)
+  })
+})
+
+describe('clausTelefon: un campo de texto libre puede llevar más de un número', () => {
+  it('un solo número da su clave, venga como venga', () => {
+    expect(clausTelefon('34612345678')).toEqual(['612345678'])
+    expect(clausTelefon('+34 612 345 678')).toEqual(['612345678'])
+    expect(clausTelefon('612345678 (Joan)')).toEqual(['612345678'])
+  })
+
+  it('dos números en la misma celda dan las dos claves', () => {
+    // La mitad NO evidente de la deuda §12.91: `ultimes9()` del campo entero devuelve las
+    // del SEGUNDO número, así que quien se registraba con el primero no casaba ni con el
+    // patrón arreglado.
+    expect(clausTelefon('612345678 / 933000000').sort())
+      .toEqual(['612345678', '933000000'])
+    expect(clausTelefon('612345678 933000000').sort())
+      .toEqual(['612345678', '933000000'])
+  })
+
+  it('nunca devuelve menos que ultimes9: lo que ya casaba sigue casando', () => {
+    // Garantía de no regresión — la clave de siempre está siempre dentro del conjunto.
+    for (const camp of ['34612345678', '0034612345678', '612345678 / 933000000', '933 000 000']) {
+      expect(clausTelefon(camp)).toContain(ultimes9(camp))
+    }
+  })
+
+  it('no inventa claves desplazando el corte una cifra', () => {
+    // Un número que no empieza por prefijo español se lee como siempre (sus últimas 9) y
+    // ahí se para: ir desplazando el corte fabricaría claves que no son ningún teléfono, y
+    // cada clave de más es una coincidencia falsa que alguien tiene que mirar.
+    expect(clausTelefon('393331234567')).toEqual(['331234567'])
+  })
+
+  it('un campo sin teléfono comparable no da ninguna clave', () => {
+    expect(clausTelefon('sense telefon')).toEqual([])
+    expect(clausTelefon('12345678')).toEqual([])
+    expect(clausTelefon(null)).toEqual([])
+  })
+})
+
+describe('algunTelefonCoincideix: la ficha tiene varias columnas de teléfono', () => {
+  it('lo encuentra en telefono2 y en telefono3', () => {
+    // `entidades` las trae del Excel SDA; mirar solo `telefono` dejaba fuera al contacto
+    // que dio su móvil como segundo número.
+    expect(algunTelefonCoincideix([null, '34612345678', null], '612345678')).toBe(true)
+    expect(algunTelefonCoincideix(['933000000', null, '612345678'], '34612345678')).toBe(true)
+  })
+
+  it('lo encuentra en telefono_alt, que es donde el import dejó los extra', () => {
+    expect(algunTelefonCoincideix(['933000000', '612345678'], '34612345678')).toBe(true)
+  })
+
+  it('un número distinto no casa por compartir el final', () => {
+    // La dirección del fallo importa: de más, una ficha duplicada que el equipo resuelve;
+    // de menos —o mal—, dos organizaciones fundidas con sus kilos y su certificado fiscal.
+    expect(algunTelefonCoincideix(['34612345679', '933000000'], '612345678')).toBe(false)
+    expect(algunTelefonCoincideix(['612345678', null], '345678')).toBe(false)
+  })
+
+  it('sin teléfono no casa con ninguna ficha', () => {
+    expect(algunTelefonCoincideix(['34612345678', null, null], null)).toBe(false)
+    expect(algunTelefonCoincideix([null, null], '34612345678')).toBe(false)
+  })
+})
+
+describe('motiuTelefon: la columna decide la FUERZA de la coincidencia', () => {
+  it('la principal manda, aunque el número esté también en una secundaria', () => {
+    expect(motiuTelefon('34612345678', ['933000000'], '612345678')).toBe('telefon')
+    expect(motiuTelefon('34612345678', ['612345678'], '612345678')).toBe('telefon')
+  })
+
+  it('solo en una secundaria, la señal es débil', () => {
+    expect(motiuTelefon('933000000', ['34612345678'], '612345678')).toBe('telefon_secundari')
+    expect(motiuTelefon(null, [null, '612345678'], '34612345678')).toBe('telefon_secundari')
+  })
+
+  it('sin coincidencia, nada', () => {
+    expect(motiuTelefon('933000000', ['934000000'], '612345678')).toBeNull()
+    expect(motiuTelefon('612345678', ['933000000'], null)).toBeNull()
+  })
+})
+
+describe('esForta: qué coincidencia puede llegar a denegar un alta', () => {
+  it('el correo y el teléfono principal son fuertes', () => {
+    expect(esForta(['email'])).toBe(true)
+    expect(esForta(['telefon'])).toBe(true)
+    expect(esForta(['telefon_secundari', 'email'])).toBe(true)
+  })
+
+  it('un teléfono secundario, solo, no', () => {
+    expect(esForta(['telefon_secundari'])).toBe(false)
+    expect(esForta([])).toBe(false)
   })
 })
 
@@ -90,6 +200,12 @@ describe('mateixTelefon y mateixEmail: el criterio de verdad', () => {
     expect(mateixTelefon('34612345678', '+34 612 345 678')).toBe(true)
     expect(mateixTelefon('612345678', '34612345678')).toBe(true)
     expect(mateixTelefon('34612345678', '34612345679')).toBe(false)
+  })
+
+  it('y casa aunque el campo guarde dos números', () => {
+    expect(mateixTelefon('612345678 / 933000000', '34612345678')).toBe(true)
+    expect(mateixTelefon('612345678 / 933000000', '933000000')).toBe(true)
+    expect(mateixTelefon('612345678 / 933000000', '34600000000')).toBe(false)
   })
 
   it('un teléfono que no llega a 9 cifras no coincide ni consigo mismo', () => {
@@ -196,6 +312,59 @@ describe('decidir: los tres casos', () => {
   })
 })
 
+describe('una coincidencia SOLO por columna secundaria nunca deniega', () => {
+  // La regla, y el motivo: `telefono2`, `telefono3` y `telefono_alt` guardan centralitas,
+  // fijos compartidos y el contacto de otra persona. Medido en producción: `Càritas
+  // l'Aldea` y `Càritas Roquetes` comparten número. Con el 409, una de las dos no se
+  // podría registrar y no tendría más salida que llamar por teléfono. Un fallo de la
+  // detección ha de producir un duplicado que el equipo ve, nunca un alta denegada.
+
+  it('ni cuando la ficha es del MISMO tipo que se registra', () => {
+    const d = decidir('productor', [fitxa({ per: ['telefon_secundari'] })], [org()])
+    expect(d.cas).toBe('paper_nou')
+  })
+
+  it('ni cuando la organización ya tiene ese papel cubierto', () => {
+    const d = decidir(
+      'productor',
+      [fitxa({ tipus: 'entidad', id: 'e1', per: ['telefon_secundari'] })],
+      [org({ es_generadora: true, es_receptora: true })],
+    )
+    expect(d.cas).toBe('paper_nou')
+  })
+
+  it('pero la misma coincidencia por la columna principal SÍ deniega', () => {
+    // El contraste es la prueba: lo que cambia entre los dos casos es solo la columna.
+    expect(decidir('productor', [fitxa({ per: ['telefon'] })], [org()]))
+      .toMatchObject({ cas: 'duplicat', camp: 'telefon' })
+  })
+
+  it('y una débil no rebaja a una fuerte que esté al lado', () => {
+    // Con las dos, la fuerte manda y el alta se deniega como siempre.
+    expect(decidir('productor', [fitxa({ per: ['telefon_secundari', 'email'] })], [org()]))
+      .toMatchObject({ cas: 'duplicat', camp: 'email' })
+    // Y si la fuerte está en OTRA ficha, el duplicado señala a esa, no a la débil.
+    const d = decidir(
+      'entidad',
+      [
+        fitxa({ tipus: 'entidad', id: 'feble', per: ['telefon_secundari'], organitzacio: 'o9' }),
+        fitxa({ tipus: 'entidad', id: 'forta', per: ['email'] }),
+      ],
+      [org({ es_receptora: true })],
+    )
+    expect(d).toMatchObject({ cas: 'duplicat' })
+    if (d.cas !== 'duplicat') return
+    expect(d.fitxa.id).toBe('forta')
+  })
+
+  it('la ficha débil no se tira: va en la nota, que es lo que lee el equipo', () => {
+    const d = decidir('productor', [fitxa({ per: ['telefon_secundari'] })], [org()])
+    if (d.cas !== 'paper_nou') return
+    expect(d.fitxes).toHaveLength(1)
+    expect(notaPaperNou(d.fitxes, '2026-09-14T08:00:00.000Z')).toContain('telefon secundari')
+  })
+})
+
 describe('notaPaperNou: lo único que el equipo tiene para decidir', () => {
   const nota = notaPaperNou(
     [
@@ -209,6 +378,14 @@ describe('notaPaperNou: lo único que el equipo tiene para decidir', () => {
     expect(nota).toContain('2026-09-11')
     expect(nota).toContain('fitxa de productor «Mas de Prova SCP» (coincideix el correu)')
     expect(nota).toContain('fitxa de entitat sense nom (coincideix el correu i telefon)')
+  })
+
+  it('avisa cuando lo único que hay es un teléfono secundario', () => {
+    // Sin esta línea, la nota de una centralita compartida se lee igual que la de un
+    // correo que coincide, y el equipo no tiene con qué distinguirlas.
+    const feble = notaPaperNou([fitxa({ per: ['telefon_secundari'] })], '2026-09-14T08:00:00.000Z')
+    expect(feble).toContain('senyal feble')
+    expect(nota).not.toContain('senyal feble')
   })
 
   it('deja escrito que la ficha NO se ha enlazado', () => {

@@ -42,6 +42,70 @@ async function verifySignature(
   return diff === 0;
 }
 
+/**
+ * Asegura que el contacto existe ANTES de guardar el mensaje. Devuelve si lo consiguió.
+ *
+ * ⚠️ POR QUÉ NO BASTA EL `upsert` SUELTO DE ANTES (deuda §12.11). Hasta hoy, si el upsert
+ * del contacto fallaba se escribía un `console.error` y se seguía insertando el mensaje:
+ * quedaba un `wa_messages` sin contacto, en silencio y sin que nada lo notara. Con la FK
+ * `wa_messages.contact_phone → wa_contacts.phone` declarada, ese mismo caso deja de ser un
+ * huérfano callado y pasa a ser un `23503` que **pierde el mensaje entrante de un
+ * productor**, que es peor que la deuda que la FK viene a cerrar. De ahí esto.
+ *
+ * TRES COSAS, Y NINGUNA ES LA OBVIA:
+ *
+ *   1. **Se reintenta**, porque el fallo realista de un insert de una fila es transitorio
+ *      (un corte de red, un pico de la base). Un solo reintento con una pausa corta se
+ *      come casi todo ese caso, y el webhook tiene que responder deprisa.
+ *
+ *   2. **Se comprueba si el contacto ESTÁ, que es distinto de si el upsert fue bien.** Lo
+ *      más probable cuando la escritura falla es que la fila ya estuviera —el contacto se
+ *      crea una vez y escribe muchas—, y ahí el mensaje se puede guardar perfectamente.
+ *      Sin esta lectura, un fallo de escritura inocuo nos haría dar por perdido un
+ *      entrante que no corría ningún peligro.
+ *
+ *   3. **No se devuelve 500 para que Meta reintente**, que es la respuesta de manual y
+ *      aquí está descartada por dos motivos: el webhook responde siempre 200 tras validar
+ *      la firma (§5), y un reenvío de Meta repite EL LOTE ENTERO — los mensajes no se
+ *      duplicarían (el upsert va por `wa_message_id`) pero `procesarIntake()` sí volvería
+ *      a correr sobre los que ya se atendieron, que no es idempotente: contestaría dos
+ *      veces y avanzaría el formulario sin que nadie haya respondido nada.
+ *
+ * Si aun así no se puede: quien llama lo grita en el log con el mensaje entero, que es el
+ * único rastro que queda cuando no hay dónde guardarlo.
+ */
+async function asegurarContacto(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  phone: string,
+): Promise<boolean> {
+  for (let intento = 1; intento <= 2; intento++) {
+    const { error } = await supabase
+      .from("wa_contacts")
+      .upsert(
+        { phone, name: null, opt_in: false },
+        { onConflict: "phone", ignoreDuplicates: true },
+      );
+    if (!error) return true;
+    console.error(
+      `[webhook] wa_contacts upsert (intento ${intento}):`,
+      error.code ?? "",
+      error.message,
+    );
+
+    // ¿Está igualmente? Entonces el mensaje tiene dónde anclarse y no hay nada que hacer.
+    const { data, error: errLectura } = await supabase
+      .from("wa_contacts")
+      .select("phone")
+      .eq("phone", phone)
+      .maybeSingle();
+    if (!errLectura && data) return true;
+
+    if (intento === 1) await new Promise((r) => setTimeout(r, 150));
+  }
+  return false;
+}
+
 Deno.serve(async (req) => {
   // GET: verificación del webhook por parte de Meta
   if (req.method === "GET") {
@@ -110,14 +174,10 @@ Deno.serve(async (req) => {
           // respuesta es interactiva (botón o lista del intake).
           const { texto: cuerpo } = leerRespuesta(message);
 
-          // Crear el contacto si no existe (sin tocar los existentes)
-          const { error: contactError } = await supabase
-            .from("wa_contacts")
-            .upsert(
-              { phone: from, name: null, opt_in: false },
-              { onConflict: "phone", ignoreDuplicates: true },
-            );
-          if (contactError) console.error("wa_contacts upsert:", contactError.message);
+          // Crear el contacto si no existe (sin tocar los existentes). Va delante porque
+          // es el ANCLA del mensaje: `wa_messages.contact_phone` apunta aquí, y sin esta
+          // fila el entrante no se puede guardar. El detalle, en `asegurarContacto`.
+          const contactoOk = await asegurarContacto(supabase, from);
 
           // Upsert, no insert: Meta reintenta las entregas y el mismo wa_message_id
           // puede llegar más de una vez (índice único en wa_message_id).
@@ -135,7 +195,42 @@ Deno.serve(async (req) => {
             },
             { onConflict: "wa_message_id", ignoreDuplicates: true },
           );
-          if (messageError) console.error("wa_messages upsert:", messageError.message);
+          if (messageError) {
+            // AQUÍ es donde se perdería un entrante, así que aquí se grita. Un
+            // `console.error` con el mensaje de PostgREST no permitía recuperar nada: sin
+            // el cuerpo, un aviso de que «algo llegó» no sirve para atender a nadie.
+            //
+            // ⚠️ Sí, esto escribe el teléfono y el texto del mensaje en el log, y es la
+            // única vez que esta función lo hace. Es proporcionado por una razón concreta:
+            // **el destino natural de ese contenido era `wa_messages`**, que lee cualquier
+            // miembro del equipo desde Mensajería, así que esto no amplía quién lo puede
+            // ver — solo dónde queda cuando el insert falla. Y hay una diferencia a favor:
+            // los logs caducan con el resto de los logs, mientras que `wa_messages` se
+            // guarda para siempre. Del cuerpo van los primeros 200 caracteres: basta para
+            // reconocer el mensaje y volver a pedirlo, que es para lo que sirve.
+            const CUERPO_MAX = 200;
+            console.error(JSON.stringify({
+              fn: "whatsapp-webhook",
+              alerta: "entrante_no_guardado",
+              contacto_ok: contactoOk,
+              codigo: messageError.code ?? null,
+              detalle: messageError.message,
+              wa_message_id: message.id,
+              from,
+              type: message.type ?? null,
+              cuerpo: cuerpo ? cuerpo.slice(0, CUERPO_MAX) : null,
+              truncado: (cuerpo?.length ?? 0) > CUERPO_MAX,
+            }));
+          } else if (!contactoOk) {
+            // El mensaje sí se guardó pero su contacto no existe: es el huérfano de la
+            // deuda §12.11, y mientras la FK no esté declarada sigue siendo posible.
+            console.error(JSON.stringify({
+              fn: "whatsapp-webhook",
+              alerta: "entrante_sin_contacto",
+              wa_message_id: message.id,
+              from,
+            }));
+          }
 
           // Abre/renueva la ventana de servicio de 24 h para este contacto.
           const { error: windowError } = await supabase

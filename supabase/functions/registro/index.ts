@@ -71,7 +71,7 @@ import {
   type FitxaCoincident,
   mateixEmail,
   type MotiuCoincidencia,
-  mateixTelefon,
+  motiuTelefon,
   notaPaperNou,
   type OrgCoincident,
   patroTelefon,
@@ -381,6 +381,14 @@ Deno.serve(async (req) => {
         : decisio.cas === "duplicat"
         ? [decisio.fitxa.tipus]
         : [],
+      // Y por qué casaron, que es lo que separa un 409 de una revisión del equipo: sin
+      // esto, un `paper_nou` que en realidad viene de una centralita compartida no se
+      // distingue de uno que viene del correo. Son etiquetas, no datos de nadie.
+      motius: decisio.cas === "paper_nou"
+        ? [...new Set(decisio.fitxes.flatMap((f) => f.per))]
+        : decisio.cas === "duplicat"
+        ? decisio.fitxa.per
+        : [],
       ms: Math.round((performance.now() - t0) * 10) / 10,
     }));
 
@@ -603,14 +611,67 @@ async function esborrarUsuari(supabase: Cliente, userId: string): Promise<void> 
 // viene a cazar. Las fichas dicen QUIÉN casa; `v_organizaciones` dice QUÉ PAPELES tiene ya
 // la organización de quien ha casado, que es lo que separa el caso 2 del caso 3.
 //
-// Cuatro consultas —correo y teléfono, en las dos tablas— en paralelo: son cuatro idas y
-// vueltas que cuestan lo que la más lenta, y evitan tener que escapar valores dentro de un
-// `or=(…)` de PostgREST. Un correo válido puede llevar comas y paréntesis, que son
-// separadores de esa sintaxis; un `ilike` suelto no tiene ese problema.
+// Una consulta por campo —el correo y CADA columna de teléfono, en las dos tablas—, todas
+// en paralelo: son idas y vueltas que cuestan lo que la más lenta, y evitan tener que
+// escapar valores dentro de un `or=(…)` de PostgREST. Un correo válido puede llevar comas
+// y paréntesis, que son separadores de esa sintaxis; un `ilike` suelto no tiene ese
+// problema. Un registro es una operación rara: no hay nada que ahorrar aquí.
 //
 // `limit(5)` en cada una: con más de cinco fichas casando por el mismo correo ya no hay
 // ninguna decisión automática que tomar, y la nota se leería sola.
 const MAX_COINCIDENCIES = 5;
+
+// Y no hay UNA columna de teléfono por ficha, sino varias (deuda §12.91): la de entidades
+// las trae del Excel SDA (`telefono2`, `telefono3` son el contacto de otra persona de la
+// misma organización) y la de productores tiene `telefono_alt`, que es DONDE EL IMPORTADOR
+// DEJÓ los números extra cuando venían tres en la misma celda (§6). Mirar solo la primera
+// dejaba fuera precisamente los casos que el import apartó por venir mal.
+//
+// ⚠️ PERO LAS SECUNDARIAS NO VALEN LO MISMO, y mezclarlas habría salido caro. Una
+// coincidencia en la columna principal deniega el alta (409 `dades_en_us`); una en una
+// secundaria, jamás — como mucho manda la ficha a revisión del equipo. Medido contra
+// producción antes de decidirlo: dentro de productores hay 2 números compartidos por dos
+// fichas distintas y dentro de entidades 1 (`Càritas l'Aldea` y `Càritas Roquetes`), así
+// que sin esta distinción cualquiera de esas organizaciones se habría quedado **sin poder
+// registrarse**, con un 409 y un «contacta amb l'equip» por toda salida. Un fallo de la
+// detección tiene que producir un duplicado que el equipo ve; nunca un alta denegada, y
+// nunca una fusión. Lo impone `esForta()`, en `coincidencies.ts`.
+const TEL_PRINCIPAL_PRODUCTOR = "phone";
+const TEL_PRINCIPAL_ENTITAT = "telefono";
+const TEL_SECUNDARIS_PRODUCTOR = ["telefono_alt"] as const;
+const TEL_SECUNDARIS_ENTITAT = ["telefono2", "telefono3"] as const;
+const CAMPS_TEL_PRODUCTOR = [TEL_PRINCIPAL_PRODUCTOR, ...TEL_SECUNDARIS_PRODUCTOR];
+const CAMPS_TEL_ENTITAT = [TEL_PRINCIPAL_ENTITAT, ...TEL_SECUNDARIS_ENTITAT];
+
+/**
+ * Las filas que el prefiltro de teléfono trae de una tabla, buscando por cada una de sus
+ * columnas y quitando las repetidas. Una consulta por columna, todas en paralelo: es lo
+ * mismo que se hace con el correo y por el mismo motivo —un `or=(…)` de PostgREST habría
+ * que escaparlo, y aquí el coste de una ida y vuelta más es el de la más lenta—.
+ *
+ * Un error NO aborta el alta: se registra y se sigue con lo que hayan traído las demás.
+ * Quedarse sin ver una coincidencia produce un duplicado que el equipo resuelve; negar el
+ * registro produce una persona que no puede darse de alta.
+ */
+async function filesPerTelefon(
+  consulta: () => Cliente,
+  camps: readonly string[],
+  patro: string | null,
+): Promise<Record<string, unknown>[]> {
+  if (!patro) return [];
+  const resultats = await Promise.all(
+    camps.map((c) => consulta().filter(c, "match", patro).limit(MAX_COINCIDENCIES)),
+  );
+  const files = new Map<string, Record<string, unknown>>();
+  for (const [i, r] of resultats.entries()) {
+    if (r.error) {
+      console.error("[registro] coincidencies telefon:", camps[i], r.error.code, r.error.message);
+      continue;
+    }
+    for (const f of (r.data ?? []) as Record<string, unknown>[]) files.set(f.id as string, f);
+  }
+  return [...files.values()];
+}
 
 async function decidirCoincidencia(
   supabase: Cliente,
@@ -619,24 +680,25 @@ async function decidirCoincidencia(
 ): Promise<Decisio> {
   const nou9 = ultimes9(d.telefon);
   const patro = nou9 ? patroTelefon(nou9) : null;
-  const buit = { data: [] as Record<string, unknown>[] };
 
   const prod = () =>
-    supabase.from("productores").select("id, organizacion_id, name, empresa, email, phone");
+    supabase.from("productores").select("id, organizacion_id, name, empresa, email, phone, telefono_alt");
   const ent = () =>
-    supabase.from("entidades").select("id, organizacion_id, nombre, email, telefono");
+    supabase.from("entidades").select("id, organizacion_id, nombre, email, telefono, telefono2, telefono3");
 
-  const [pEmail, pTel, eEmail, eTel] = await Promise.all([
+  const [pEmail, eEmail, pTel, eTel] = await Promise.all([
     prod().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
-    patro ? prod().filter("phone", "match", patro).limit(MAX_COINCIDENCIES) : buit,
     ent().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
-    patro ? ent().filter("telefono", "match", patro).limit(MAX_COINCIDENCIES) : buit,
+    filesPerTelefon(prod, CAMPS_TEL_PRODUCTOR, patro),
+    filesPerTelefon(ent, CAMPS_TEL_ENTITAT, patro),
   ]);
 
   // Se vuelve a comprobar en memoria lo que devolvió la consulta. El `ilike` con los
   // comodines escapados ya es igualdad, pero el `match` del teléfono es un filtro grueso
-  // sobre texto libre: lo que decide es `mateixTelefon`, con las últimas 9 cifras, que es
-  // el mismo criterio con el que la migración de la etapa 1 enganchó los cuatro pares.
+  // sobre texto libre —y desde que dejó de ir anclado al final del campo, más grueso
+  // todavía—: lo que decide es `algunTelefonCoincideix`, con claves de 9 cifras, que es el
+  // mismo criterio con el que la migración de la etapa 1 enganchó los cuatro pares. Sin
+  // esta segunda vuelta, el prefiltro daría por la misma organización a dos que no lo son.
   const fitxes = new Map<string, FitxaCoincident>();
   const afegir = (
     tipus: TipusFitxa,
@@ -662,17 +724,31 @@ async function decidirCoincidencia(
     });
   };
 
-  for (const f of (pEmail.data ?? [])) {
+  // ⚠️ El teléfono se mira en TODAS las columnas de la fila, no solo en aquella por la que
+  // la consulta la encontró: una ficha puede casar por `telefono3` y tener el mismo número
+  // en `telefono`, y entonces la coincidencia es fuerte. `motiuTelefon` se queda con la más
+  // fuerte de las dos, que es la única forma de que la columna por la que llegó la fila no
+  // cambie la decisión.
+  const tel = (f: Record<string, unknown>, principal: string, secundaris: readonly string[]) =>
+    motiuTelefon(
+      f[principal] as string | null,
+      secundaris.map((c) => f[c] as string | null),
+      d.telefon,
+    );
+
+  for (const f of ((pEmail.data ?? []) as Record<string, unknown>[])) {
     if (mateixEmail(f.email as string, d.email)) afegir("productor", f, "email");
   }
-  for (const f of (pTel.data ?? [])) {
-    if (mateixTelefon(f.phone as string, d.telefon)) afegir("productor", f, "telefon");
+  for (const f of pTel) {
+    const motiu = tel(f, TEL_PRINCIPAL_PRODUCTOR, TEL_SECUNDARIS_PRODUCTOR);
+    if (motiu) afegir("productor", f, motiu);
   }
-  for (const f of (eEmail.data ?? [])) {
+  for (const f of ((eEmail.data ?? []) as Record<string, unknown>[])) {
     if (mateixEmail(f.email as string, d.email)) afegir("entidad", f, "email");
   }
-  for (const f of (eTel.data ?? [])) {
-    if (mateixTelefon(f.telefono as string, d.telefon)) afegir("entidad", f, "telefon");
+  for (const f of eTel) {
+    const motiu = tel(f, TEL_PRINCIPAL_ENTITAT, TEL_SECUNDARIS_ENTITAT);
+    if (motiu) afegir("entidad", f, motiu);
   }
 
   const llista = [...fitxes.values()];

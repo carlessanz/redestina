@@ -53,12 +53,25 @@
 //
 //   1. **Las columnas sensibles no se leen desde el navegador, ni siendo del equipo.**
 //      `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
-//      `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están
-//      fuera del GRANT de SELECT, y eso lo comprueba un check `denegar` que pide esa
-//      columna y espera `permission denied for column`. Es fácil de romper sin querer:
-//      basta con que alguien vuelva a ejecutar un `grant select on all tables … to
-//      authenticated` como el de 20260721160000 y las cuatro quedarían legibles otra vez,
-//      **sin que ninguna política cambie**. Sin este check, nadie se enteraría.
+//      `evidencias.documento_identidad`, `parametros_documentales.apoderada_dni` y
+//      —desde 20270320100300— `documentos.envio` están fuera del GRANT de SELECT, y eso
+//      lo comprueba un check `denegar` que pide esa columna y espera `permission denied
+//      for column`. Es fácil de romper sin querer: basta con que alguien vuelva a
+//      ejecutar un `grant select on all tables … to authenticated` como el de
+//      20260721160000 y las cinco quedarían legibles otra vez, **sin que ninguna política
+//      cambie**. Sin este check, nadie se enteraría.
+//
+//      ⚠️ Hasta el 14-09-2026 eran TRES vigiladas de cuatro: `codigo_hash` aparecía en el
+//         `revoke` y en este comentario, pero no tenía check propio, así que reabrirlo
+//         solo a él habría salido verde (deuda §12.55). Ahora son cinco de cinco, y la
+//         regla para la próxima columna sensible es: el `revoke` en la migración y el
+//         check aquí, en el mismo cambio.
+//
+//      ⚠️ `documentos.envio` es la única de las cinco que se comprueba también con una
+//         cuenta EXTERNA (en `DOCUMENTAL_EXTERN`), y es el caso que importa: un donante sí
+//         ve su fila de `documentos`, así que con el GRANT por tabla leía el token en
+//         claro de su propio enlace de subida de factura. En las otras cuatro la tabla
+//         entera ya le está negada.
 //   2. **Escribir el texto de un documento legal es `pot_aprovar()`, no ser del equipo.**
 //      El técnico lee las plantillas y no las toca; el super_admin sí.
 //   3. **El nomenclátor es catálogo, no dato.** `municipios` la lee cualquier cuenta con
@@ -212,7 +225,8 @@ interface Check {
   /**
    * Columnas que se piden en un `leer` (o en la lectura previa de un `actualizar`).
    * Por defecto `*`, que es lo que hace la app. Hace falta declararlas en las tablas con
-   * **GRANT por columnas** —`enlaces_token`, `evidencias`, `parametros_documentales`—,
+   * **GRANT por columnas** —`enlaces_token`, `evidencias`, `parametros_documentales` y,
+   * desde 20270320100300, `documentos`—,
    * porque ahí `select *` lo corta el GRANT antes de que RLS diga nada: la comprobación
    * mediría el permiso de columna y no la política. Con la lista explícita se mide lo que
    * se quería medir, y la columna sensible se comprueba **aparte**, con su propio check
@@ -326,6 +340,19 @@ const DOCUMENTAL_EXTERN: Check[] = [
     esperado: "denegar",
     columnas: "id, tipo",
     descripcion: "NO ve ninguna evidencia de firma",
+  },
+  // El caso exacto de la deuda §12.75, y el único que era alcanzable de verdad: un
+  // donante SÍ ve su fila de `documentos` por `documents_meus()`, así que con el GRANT
+  // por tabla leía el `envio` de su propio resumen anual — que lleva el token en claro
+  // del enlace de subida de factura. Desde 20270320100300 la columna está fuera del
+  // GRANT y esto responde `42501 permission denied for column`. Si alguien restaurara el
+  // GRANT por tabla, este check pasaría de «rechazado» a «ve 1 fila» y saldría rojo.
+  {
+    tabla: "documentos",
+    op: "leer",
+    esperado: "denegar",
+    columnas: "envio",
+    descripcion: "NO lee el sobre d'enviament del seu propi document (pot dur un token)",
   },
   // El coste por kilo es interno: el donante ve el valor de SU certificado, no la tabla
   // con la que se valora toda la base.
@@ -485,17 +512,36 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "usuario_roles", op: "insertar", esperado: "denegar", descripcion: "NO se puede dar roles a sí mismo" },
     // Sistema documental (fase 1). El equipo lo LEE todo y no escribe nada: un documento
     // nace dentro de la transacción de una RPC, nunca desde el navegador.
+    // ⚠️ `columnas` explícitas desde 20270320100300: `documentos` pasó a GRANT por
+    //    columnas y un `select *` responde ahora `42501 permission denied for column
+    //    "envio"`. Sin la lista, este check diría «rechazado» sin haber evaluado ninguna
+    //    política — el mismo mecanismo que ya tenían `enlaces_token` y `evidencias`.
     {
       tabla: "documentos",
       op: "leer",
       esperado: "permitir",
+      columnas: "id, tipo, numero_completo, estado, modo, vigente",
       descripcion: "ve los documentos emitidos",
       requiereFixture: "algún documento emitido (super_admin → emitir_documento_prova())",
+    },
+    // Y NI EL EQUIPO lee `envio`: ese sobre puede llevar el token en claro del enlace de
+    // subida de factura (`emitir_resumen()`), que en `enlaces_token` solo existe hasheado.
+    // Cierra la deuda §12.75; sin este check, volver a `grant select on documentos` no lo
+    // notaría nadie.
+    {
+      tabla: "documentos",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "envio",
+      descripcion: "NI el equipo lee el sobre de envío (puede llevar un token)",
     },
     { tabla: "series_documentales", op: "leer", esperado: "permitir", descripcion: "ve los contadores de serie" },
     { tabla: "documento_envios", op: "leer", esperado: "permitir", descripcion: "ve los envíos de documentos", requiereFixture: "algún envío registrado (fase 1, al mandar un documento por correo)" },
     { tabla: "documentos", op: "insertar", esperado: "denegar", descripcion: "NO crea documentos a mano (van por RPC)" },
-    { tabla: "documentos", op: "actualizar", esperado: "denegar", descripcion: "NO edita un documento emitido" },
+    // ⚠️ `columnas` también aquí: la rama `actualizar` LEE la fila antes de tocarla, y
+    //    con `select *` esa lectura se corta ahora por el GRANT de columna. Sin fila que
+    //    tocar, el check pasa a "no demuestra nada" y deja de medir la política.
+    { tabla: "documentos", op: "actualizar", esperado: "denegar", columnas: "id, intentos", descripcion: "NO edita un documento emitido" },
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO quema números de una serie legal" },
     { tabla: "emitir_documento_prova", op: "rpc", esperado: "denegar", args: { p_fallar: false }, descripcion: "NO emite documentos de prueba (es del super_admin)" },
     // Plantillas: el técnico las LEE (necesita saber con qué texto se emite) pero no las
@@ -547,6 +593,18 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "denegar",
       columnas: "token_hash",
       descripcion: "NI el equipo lee el hash del token (GRANT por columnas)",
+    },
+    // ⚠️ `codigo_hash` estaba en el `revoke` de 20260928100300 y en la cabecera de este
+    //    fichero desde el primer día, pero NO tenía check propio: reabrirlo solo a él
+    //    —un `grant select (codigo_hash)` de más en una migración— habría salido verde.
+    //    Es el segundo factor de la firma asistida, o sea la otra mitad de la credencial
+    //    que ya se vigila arriba. Cierra la deuda §12.55.
+    {
+      tabla: "enlaces_token",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "codigo_hash",
+      descripcion: "NI el equipo lee el hash del codi de 6 xifres (GRANT por columnas)",
     },
     {
       tabla: "evidencias",
@@ -996,6 +1054,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "documentos",
       op: "leer",
       esperado: "permitir",
+      columnas: "id, tipo, numero_completo, estado, vigente",
       descripcion: "ve los documentos de SUS albaranes",
       requiereFixture: "un REC emitido de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
     },
@@ -1126,6 +1185,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "documentos",
       op: "leer",
       esperado: "permitir",
+      columnas: "id, tipo, numero_completo, estado, vigente",
       descripcion: "ve los documentos de SUS entregas",
       requiereFixture: "un ENT emitido a su entidad (scripts/crear-datos-documentales-prueba.ts)",
     },
@@ -1165,7 +1225,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "entidades", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
-    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", columnas: "id, tipo", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
@@ -1186,7 +1246,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "membresias", op: "leer", esperado: "permitir", descripcion: "ve SU membresía pendiente (pantalla de espera)" },
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO se activa a sí misma" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO se aprueba a sí misma (lo corta pot_aprovar)" },
-    { tabla: "documentos", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
+    { tabla: "documentos", op: "leer", esperado: "denegar", columnas: "id, tipo", descripcion: "no ve nada" },
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "albaranes", op: "leer", esperado: "denegar", descripcion: "no ve ningún albarán" },
     { tabla: "espigoladas", op: "leer", esperado: "denegar", descripcion: "no ve ninguna espigolada" },
