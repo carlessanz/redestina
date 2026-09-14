@@ -1252,7 +1252,7 @@ funciones, no políticas:
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
-| `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. GRANT **solo `authenticated`**: el equipo tiene `enviar_convenio`/`marcar_entregado`, y un GRANT a `service_role` que siempre fallaría es peor que no tenerlo (§4bis) |
+| `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
 | `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
@@ -3857,10 +3857,16 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, pendiente de fijar tras publicar el interruptor de WhatsApp y los
-   documentos del panel externo: la anterior era **485/485 correctas y 14 saltadas**, «Sin
-   fallos de permisos», exit 0, y esta tanda añade **cuatro** checks (`pendents_meus` y
-   `acunar_enllac_propi`, en el bloque externo y en el del equipo). (Era 480/480 + 14 antes del check de `data_tall_convenis`; 442/442 + 52
+   Referencia en **remoto**, fijada al publicar el interruptor de WhatsApp y los documentos
+   del panel externo (14-09-2026): **497/497 correctas y 14 saltadas**, «Sin fallos de
+   permisos», exit 0.
+   ⚠️ **Subió 12, no 4, y el motivo conviene tenerlo claro al leer un desfase**: los checks
+   nuevos son **dos** (`pendents_meus` permitir y `acunar_enllac_propi` denegar), pero la
+   matriz se declara **por bloque y se ejecuta por cuenta**, así que dos checks en el bloque
+   externo y en el del equipo salen multiplicados por las cuentas de cada bloque. Contar
+   checks declarados y comprobaciones ejecutadas como si fueran lo mismo hace parecer una
+   regresión lo que es aritmética.
+   (Era 485/485 + 14 antes de esta tanda; 480/480 + 14 antes del check de `data_tall_convenis`; 442/442 + 52
    tras la etapa 3 de la organización unificada; 432/432 + 52 antes de las guardas de
    `enllacar_organitzacio` y `organitzacions_candidates`; 408/408 antes de los checks de
    `organizaciones` y `v_organizaciones`, que hasta aquella publicación no tenían tabla contra
