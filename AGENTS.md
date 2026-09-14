@@ -412,6 +412,7 @@ src/
                                DERIVA de la URL; useOrganitzacio(tipus) para las pantallas
   hooks/use-mobile.ts          Hook del breakpoint (lo usa el sidebar de shadcn)
   hooks/useInstalacio.ts       ¿Se puede instalar la PWA, y cómo? (automática o manual iOS; §2)
+  hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
   routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés»
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
                                Registre (/registre), RestablirClau (/restablir) y
@@ -443,6 +444,12 @@ src/
                                confirmar, i l'enllaç propi per fer-ho (§6ter)
     documentsPanell.ts         Helpers purs de les pantalles de documents (agrupar per
                                exercici, quin PDF val, l'ordre del conveni)
+    procesOferta.ts            EL MODELO DEL PROCESO (§6ter): de los estados reales a
+                               «etapa + què passa + què toca + qui», por rol. Puro, con test
+    seguentPas.ts              Lo mismo para las fichas largas del equipo: albarà, conveni,
+                               exercici, donant
+    pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
+                               de módulo; alimenta los badges del menú Y el tablero (§6ter)
     albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
     enllacPublic.ts            Cliente de enlace-publico, sin sesión (§9)
     email.ts                   enviarEmail(): llama a la Edge Function enviar-email
@@ -458,6 +465,9 @@ src/
     documents/                 Las cuatro piezas que comparten los dos paneles externos:
                                PendentsDeTu (firmar/confirmar desde el panel), LlistaConvenis,
                                LlistaDocuments y TaulaAlbarans (§6ter)
+    proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
+                               PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
+                               BotoAmbMotiu (§6ter)
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
@@ -1577,6 +1587,43 @@ que corresponde al momento de cierre y todavía no está implementado.
 | **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents** · perfil` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
 | **Receptor** | `/receptor/mercat · interessos · historic · **documents** · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+
+### El modelo del proceso: la aplicación lo narra, no solo lo ejecuta (14-09-2026)
+
+Hasta hoy ninguna pantalla contaba en qué punto estaba una oferta ni qué tocaba después: los
+únicos textos de «qué pasa ahora» vivían en WhatsApp y en un correo que reciben 78 de 345
+productores. **`src/lib/procesOferta.ts` lo define UNA vez y lo consumen los tres paneles**: de
+los estados reales (`excedentes.estado`, `oferta_respuestas.estado × aprovacio`,
+`albaranes.estado`) a un `PuntProces` —etapa, «què passa», «què toca ara», «qui»— en **claves
+i18n**, para que `tests/procesOferta.test.ts` pueda exigir que existan en `ca` y `es` (las claves
+se componen, y `cobertura.test.ts` solo ve literales).
+
+Cinco etapas y dos salidas para la oferta (`publicada → assignada → recollida → confirmada →
+tancada`; `sense_desti`, `cancellada`) y seis para el **interés** del receptor. Tres reglas que
+no son obvias: **`vencuda` no es etapa ni salida** (la oferta sigue viva; conserva el índice de
+la etapa que sustituye); **un REC anulado o rectificado no cuenta como recogida**; y **«en
+gestió» se dispara con un hecho distinto según quién mira** (al equipo le basta haberla enviado;
+al productor solo le importa que alguien haya mostrado interés). `seguentPas.ts` hace lo mismo
+para albarà, conveni, exercici y donant, **con claves propias en tercera persona**: las
+`mydoc.next_*` del cierre están en segunda persona hacia el donante y compartirlas obligaría a una
+de las dos voces a mentir.
+
+Lo pintan cinco componentes de `src/components/proces/`, con una regla heredada de
+`PendentsDeTu`: **lo que te toca a ti va en `aviso`; lo demás, neutro** (`QueTocaAra` solo pinta
+`aviso-fondo` cuando `emToca`). `BotoAmbMotiu` pone tooltip a un botón deshabilitado con su
+porqué, pero el porqué va **además** visible en `QueTocaAra`: en táctil no hay hover.
+
+**El menú del equipo sigue el camino de una oferta** (`nav.ts`): Operació (Ofertes, Espigolades,
+Aprovacions, Missatgeria, Albarans) → Tancament anual (Costos **antes** que Tancament: es su
+prerrequisito) → Organitzacions (Productors, Entitats, Convenis) → Sistema (Documents,
+Configuració). Sin números en las etiquetas: son también el título de la barra y el tooltip
+plegado. Y **los badges salen de una sola fuente**, la RPC `pendents_equip()` guardada en
+`pendentsEquip.ts` (store de módulo, `useSyncExternalStore`), la misma que lee el tablero: se
+refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción. Sin Realtime.
+
+**Vocabulario fijado**: «oferta» (no «excedent») en la interfaz operativa; «Coberta» en vez de
+«Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
+que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
 
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
@@ -4288,7 +4335,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **544 pruebas en 20 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **744 pruebas en 22 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

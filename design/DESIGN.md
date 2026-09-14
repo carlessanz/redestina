@@ -75,6 +75,7 @@ La aplicación habla en catalán a los usuarios y en castellano en el código y 
 - Los errores dicen qué ha pasado y qué hacer, en una línea cada cosa. En rojo (`error`), nunca en coral.
 - Los avisos de éxito son breves y desaparecen solos (toast); los que requieren acción se quedan (alerta).
 - Vocabulario: «registro» y «lote» (nunca «excedente»), «alimentos fuera del circuito de venta habitual (AFCV)», «canalización», «dinamización».
+  ⚠️ **Matiz fijado el 14-09-2026:** en la interfaz **operativa** se dice **«oferta»** hasta el rename de datos de la v3 (la tabla sigue siendo `excedentes`); «registre» y «lot» quedan para los documentos emitidos (albarà, certificat) y «AFCV» solo en textos legales y en la landing. «Excedent» desaparece de las pantallas. Meter los tres términos del funcional en la UI sin el modelo detrás crearía un tercer vocabulario.
 
 ## 6. Patrones de componentes
 

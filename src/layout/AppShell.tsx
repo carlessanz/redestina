@@ -9,13 +9,14 @@
 //     necesita padding inferior y el composer del chat nunca queda debajo
 
 import { useEffect, useState } from 'react'
-import { Outlet, useMatches } from 'react-router'
-import { supabase } from '../lib/supabase'
+import { Outlet, useLocation, useMatches } from 'react-router'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import { itemsPlans, navPerRol } from '../lib/nav'
-import { pendentsPerTelefon } from '../lib/contactes'
+import type { Comptador } from '../lib/nav'
+import { buidaComptadors, refrescaComptadors } from '../lib/pendentsEquip'
+import { useComptadorsEquip } from '../hooks/useComptadorsEquip'
 import { carregaPendents } from '../lib/pendents'
 import AppSidebar from './AppSidebar'
 import BottomNav from './BottomNav'
@@ -37,7 +38,9 @@ export default function AppShell() {
   const { t } = useT()
   const { ctx, rolActiu } = useAppContext()
   const matches = useMatches()
-  const [comptadors, setComptadors] = useState<{ aprovacions?: number; missatges?: number; documents?: number }>({})
+  // Solo los dos contadores EXTERNOS viven aquí; los del equipo salen del store
+  // (`useComptadorsEquip`) y se funden más abajo.
+  const [comptadorsExterns, setComptadorsExterns] = useState<Partial<Record<Comptador, number>>>({})
 
   const handle = (matches[matches.length - 1]?.handle ?? {}) as RouteHandle
   // La barra inferior enseña SOLO el panel en el que estás, aunque el menú lateral los
@@ -52,55 +55,28 @@ export default function AppShell() {
   const itemsBarra = items.filter((i) => i.barra !== false)
   const ambBarraInferior = rolActiu !== 'intern' && itemsBarra.length > 0 && itemsBarra.length <= 4
 
-  // Contadores del menú del equipo. Se calculan una vez aquí y se reparten, para no
-  // repetir la consulta en cada sección.
+  // Contadores del menú del equipo: salen del store de `pendentsEquip.ts`, la misma
+  // fuente que la tarjeta «Pendent de l'equip» del tablero, así que las dos cifras no
+  // pueden discrepar. Hasta el 14-09-2026 se calculaban aquí con cinco consultas, una vez
+  // por sesión, y no se refrescaban nunca: aprobar un registro bajaba la cola pero el
+  // badge seguía igual hasta recargar.
+  //
+  // Se refrescan en cada cambio de ruta —cubre «actúo y navego»— y las pantallas llaman a
+  // `refrescaComptadors()` tras cada acción —cubre «actúo y me quedo»—. Sin Realtime: un
+  // canal más por sesión para unos números que solo tienen que ser correctos cuando se
+  // miran no compensa.
   //
   // Depende de TENER el panel de equipo, no de estar mirándolo: desde que el menú los
   // enseña todos a la vez, el grupo del equipo se ve también desde /productor y sus
-  // badges quedarían en blanco justo cuando avisan de algo. Además es un booleano
-  // estable, así que la consulta —que se trae todos los wa_messages, deuda §12.5— deja
-  // de relanzarse cada vez que se cruza de un panel a otro.
+  // badges quedarían en blanco justo cuando avisan de algo.
   const esIntern = ctx?.rols.includes('intern') ?? false
+  const { pathname } = useLocation()
   useEffect(() => {
-    if (!esIntern) { setComptadors({}); return }
-    let viu = true
-    void (async () => {
-      const [respostes, registres, convenis, missatges, documents] = await Promise.all([
-        supabase.from('oferta_respuestas')
-          .select('id', { count: 'exact', head: true })
-          .eq('estado', 'acceptada').eq('aprovacio', 'pendent'),
-        // Altas del registro público sin validar: la otra cola de la misma pantalla.
-        // Si la migración no está aplicada, `count` llega null y cuenta 0: el badge no
-        // rompe el menú por una columna que todavía no existe.
-        supabase.from('membresias')
-          .select('id', { count: 'exact', head: true })
-          .eq('aprovacio', 'pendent'),
-        // Convenios firmados esperando contrafirma: la tercera cola de Aprovacions.
-        // Si la migración no está aplicada, `count` llega null y suma 0.
-        supabase.from('convenios')
-          .select('id', { count: 'exact', head: true })
-          .eq('estado', 'firmat'),
-        // El contador de mensajes sin contestar lo agrega la base (§12.5). Esta línea se
-        // traía la tabla `wa_messages` ENTERA en cada login de una cuenta con panel de
-        // equipo, y todo para pintar un número en el menú.
-        pendentsPerTelefon(),
-        // Documentos cuyo PDF no se ha podido generar. El job los reintenta solo cada
-        // 5 minutos hasta 5 veces, así que lo que sigue en `error` es lo que ya nadie
-        // va a arreglar sin mirarlo.
-        supabase.from('documentos')
-          .select('id', { count: 'exact', head: true })
-          .eq('estado', 'error'),
-      ])
-      if (!viu) return
-      const pendents = missatges
-      setComptadors({
-        aprovacions: (respostes.count ?? 0) + (registres.count ?? 0) + (convenis.count ?? 0),
-        missatges: Object.values(pendents).reduce((s, n) => s + n, 0),
-        documents: documents.count ?? 0,
-      })
-    })()
-    return () => { viu = false }
-  }, [esIntern])
+    if (!esIntern) { buidaComptadors(); return }
+    void refrescaComptadors()
+  }, [esIntern, pathname])
+  const { comptadors: comptadorsEquip } = useComptadorsEquip()
+  const comptadors: Partial<Record<Comptador, number>> = { ...comptadorsEquip, ...comptadorsExterns }
 
   // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
   // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
@@ -113,7 +89,7 @@ export default function AppShell() {
     void (async () => {
       const r = await carregaPendents()
       if (!viu || !r.ok) return
-      setComptadors((c) => ({
+      setComptadorsExterns((c) => ({
         ...c,
         pendents_productor: r.data.filter((p) => p.tipo_org === 'productor').length,
         pendents_receptor: r.data.filter((p) => p.tipo_org === 'entidad').length,

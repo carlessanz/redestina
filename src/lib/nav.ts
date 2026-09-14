@@ -21,6 +21,10 @@ import type { Rol } from './rols'
 /** Contadores que el sidebar pinta como badge; se resuelven en AppSidebar. */
 export type Comptador =
   | 'aprovacions' | 'missatges' | 'documents'
+  // Albarans que esperan al EQUIPO (borradores por emitir + REC por conciliar; no cuenta
+  // los que esperan a la otra parte) y productos canalizados este año sin coste por kilo.
+  // Los alimenta `pendents_equip()` (14-09-2026), la misma fuente que el tablero.
+  | 'albarans' | 'costos'
   // Lo que el panel externo tiene pendiente de firmar o confirmar (`pendents_meus()`).
   // Uno por panel: una cuenta con doble rol no debe ver en su menú de productor lo que
   // espera su entidad.
@@ -54,20 +58,33 @@ export interface NavGrup {
   items: NavItem[]
 }
 
+// El menú del equipo sigue, de arriba abajo, EL CAMINO DE UNA OFERTA; lo que no es de la
+// oferta (organizaciones, archivo técnico, configuración) va debajo. Hasta el 14-09-2026 el
+// orden era el de las fases de desarrollo, y se leía al revés: «Costos per quilo» iba detrás
+// del Tancament al que precede (sin coste no hay certificado), «Convenis» —lo que habilita
+// operar— era la última entrada, y «Espigolades», que es un ORIGEN de oferta, iba después de
+// los albaranes. Sin números en las etiquetas: son también el título de la barra superior y
+// el tooltip del menú plegado. La secuencia numerada vive en el «Com funciona» del tablero
+// (`FASES_EQUIP` en procesOferta.ts), que enlaza a cada entrada en este mismo orden.
 const EQUIP: NavGrup[] = [
   { items: [{ to: '/equip/tauler', labelKey: 'nav.dashboard', icon: LayoutDashboard, end: true }] },
   {
     titolKey: 'nav.grp_operacio',
     items: [
       { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package },
+      // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
+      { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
       { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges' },
-      { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
-      { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck },
-      { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
+      { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck, comptador: 'albarans' },
+    ],
+  },
+  {
+    titolKey: 'nav.grp_tancament',
+    items: [
+      // ANTES del Tancament: es su prerrequisito (`cost.blocking_hint`).
+      { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins, comptador: 'costos' },
       { to: '/equip/tancament', labelKey: 'nav.tancament', icon: Calculator },
-      { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins },
-      { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },
     ],
   },
   {
@@ -75,9 +92,19 @@ const EQUIP: NavGrup[] = [
     items: [
       { to: '/equip/productors', labelKey: 'nav.producers', icon: Users },
       { to: '/equip/entitats', labelKey: 'nav.entities', icon: Building2 },
+      // Papeleo POR ORGANIZACIÓN (la campaña va por fichas), no una etapa de la oferta.
+      // Sin badge: los «per contrasignar» ya suman en Aprovacions.
+      { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },
     ],
   },
-  { items: [{ to: '/equip/configuracio', labelKey: 'nav.settings', icon: Settings2 }] },
+  {
+    titolKey: 'nav.grp_sistema',
+    items: [
+      // Archivo técnico (PDF, envíos), no trabajo del lote.
+      { to: '/equip/documents', labelKey: 'nav.documents', icon: FileText, comptador: 'documents' },
+      { to: '/equip/configuracio', labelKey: 'nav.settings', icon: Settings2 },
+    ],
+  },
 ]
 
 const PRODUCTOR: NavGrup[] = [
