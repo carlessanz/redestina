@@ -1797,9 +1797,34 @@ menú (`AppShell`) **suma las dos colas**.
   propio, para que un clon en otra máquina no lo suba sin querer. **Ni `.claude/launch.json`**, que
   lo genera el panel de navegador al arrancar `npm run dev` y fija el puerto de esta máquina.
 - **Claves de Supabase**: usar las **nuevas** — `sb_publishable_...` en el frontend,
-  `sb_secret_...` en el servidor. **No** usar las obsoletas `anon`/`service_role` (claves JWT
-  antiguas). Los *roles* de Postgres `anon`/`authenticated`/`service_role` sí se siguen usando
-  en RLS: no confundir rol con clave.
+  `sb_secret_...` en el servidor. Los *roles* de Postgres `anon`/`authenticated`/`service_role`
+  sí se siguen usando en RLS: **no confundir rol con clave**.
+  ✅ **Y ya no es solo una convención: las claves legacy están DESHABILITADAS** en el proyecto
+  desde el 14-09-2026. Antes existían y seguían siendo válidas —o sea que cualquiera con la
+  `anon` antigua podía usarla— aunque este repo no las usara en ningún sitio. Ahora una
+  petición con la `anon` legacy responde **401**, comprobado.
+  ```bash
+  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+  REF=uxppvaldhptdomvdhsmn
+  curl -sS -H "Authorization: Bearer $TOKEN" \
+    https://api.supabase.com/v1/projects/$REF/api-keys/legacy        # → {"enabled":false}
+  # Reactivar (solo si algo externo las necesitara): ...?enabled=true
+  ```
+  ⚠️ **El `enabled` va como parámetro de query, no en el cuerpo**: `PUT …/api-keys/legacy`
+  con `-d '{"enabled":false}'` responde `400 expected string, received undefined`. Con
+  `?enabled=false` funciona. Cuesta diez minutos averiguarlo si no está escrito.
+  ⚠️ **`SB_SECRET_KEY` y `SUPABASE_SERVICE_ROLE_KEY` tienen HOY el mismo valor**, y eso
+  despista: no significa que el servidor use la legacy. La plataforma inyecta sola las
+  variables `SUPABASE_*` en cada Edge Function y rellena `SUPABASE_SERVICE_ROLE_KEY` con la
+  clave **secreta nueva**. Se confirma comparando el sha256 del valor local de `SB_SECRET_KEY`
+  —que empieza por `sb_secret_`— con el hash que muestra `supabase secrets list`.
+  **Comprobado el 14-09-2026 en los cinco sitios**: `.env.local` y `.env.local.example`
+  (publishable nueva), `.secrets.env` (secret nueva), el secreto `SB_SECRET_KEY` del servidor
+  (nueva), las quince Edge Functions (todas leen `SB_SECRET_KEY`; **cero** referencias a
+  `ANON_KEY` o `SERVICE_ROLE_KEY` en `src/`, `scripts/` y `supabase/functions/`) y **el bundle
+  servido en producción**, que lleva `sb_publishable_…` y ningún JWT. Ese último es el que de
+  verdad cierra la pregunta: mirar la variable en Vercel dice qué está configurado, mirar el
+  bundle dice qué se está ejecutando.
 - **Errores**: `sendWhatsApp()` nunca lanza; devuelve `{ ok, status, data }`. El mapeo a texto
   legible vive en `noticeFromError()` (`Conversation.tsx`), que cubre los códigos propios
   (`window_closed`, `no_opt_in`, `unknown_contact`, `unauthorized`) y el `131047` de Meta.
@@ -2333,6 +2358,10 @@ que resetearlas por la Admin API. Y el aislamiento depende de que `roles_activos
   `true` (hoy lo está, también en Vercel producción). Son solo de organizaciones ficticias `TEST-*`
   (§6quater), pero cualquiera que abra `/login` puede entrar como ellas y ver lo que ellas ven.
   Apagar la variable al salir de la fase de demo.
+- **Las claves legacy (`anon` y `service_role` en formato JWT) están deshabilitadas** desde el
+  14-09-2026: una petición con la `anon` antigua responde 401. El proyecto ya usaba solo las
+  nuevas en los cinco sitios, pero las viejas seguían siendo válidas — que es distinto de no
+  usarlas. Detalle, comprobación y cómo revertir, en §7.
 - Los datos personales **ya están en remoto**: 341 productores y 111 entidades, importados
   el 21-07-2026. Lo único que los protege es la autenticación de arriba; verificado que con
   la publishable key las tablas responden `42501`. Dar de alta una cuenta equivale a dar
