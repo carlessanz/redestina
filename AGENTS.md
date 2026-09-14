@@ -3645,8 +3645,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `emitir_documento_prova()` pisaba la fila anterior; no era eso —dos emisiones seguidas dan
     `0001` y `0002`, cada una con su `objeto_id`—, era el arnés limpiando. El síntoma
     característico es «mi documento estaba y ya no está».
-53. **`documento_envios` no tiene fixture en el arnés** — y las otras saltadas tienen una causa
-    que nadie había mirado. ⚠️ **Medido el 14-09-2026**: de las 14 comprobaciones sin datos, **ocho
+53. ~~**`documento_envios` no tiene fixture en el arnés**~~ — **resuelta el 14-09-2026**, y la
+    forma de resolverla es la que tiene gracia: no hacía falta ningún fixture, hacía falta **usar la
+    función**. En cuanto existió la pantalla que la lee (deuda 25) se mandó un correo de verdad
+    desde `enviar-email` y la tabla dejó de estar vacía; el check pasa de SALTADA a ejecutarse y las
+    saltadas bajan de 14 a 13. Una tabla que **nadie escribía y nadie leía** no se arregla sembrando
+    datos: se arregla cuando alguien la usa.
+    Y las otras saltadas tienen una causa que nadie había mirado. ⚠️ **Medido el 14-09-2026**: de las 14 comprobaciones sin datos, **ocho
     son del bloque `productor-altre`, que es la cuenta de `TEST-PROD-2`**, y el fixture crea la
     espigolada entera —REC, ENT, cierre, conveni, pla— en **`TEST-PROD-1`**. No es que falten datos
     borrados: es que nunca existieron para esa ficha. **Y no se arregla ampliando el fixture**:
@@ -4233,8 +4238,9 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **649/649 correctas
-   y 14 saltadas**, «Sin fallos de permisos», exit 0.
+   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **650/650 correctas
+   y 13 saltadas**, «Sin fallos de permisos», exit 0. (La saltada que baja es
+   `equip · documento_envios`, que dejó de estarlo en cuanto se mandó el primer correo, §12.53.)
    ⚠️ **El salto de 504 a 649 no es de checks nuevos, es de COBERTURA**: al dar de alta las cuentas
    `pendent` y `sense_rol` (deuda 32) empezaron a recorrerse dos bloques que llevaban desde julio
    escritos y sin ejecutar. Antes de leer un desfase de esta cifra, mirar cuántas **cuentas** tiene
