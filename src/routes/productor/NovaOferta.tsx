@@ -82,6 +82,10 @@ export default function NovaOferta() {
       return
     }
     toast.success(t('po.created', { ref: r.data?.id_excedente ?? '' }))
+    // La confirmación por correo es el equivalente del mensaje que el intake manda por
+    // WhatsApp. Solo se dice cuando ha salido de verdad: anunciar un correo que no se ha
+    // enviado (sin correo en la ficha, o modo test) haría esperar algo que no llega.
+    if (r.data?.confirmacio_email === 'enviat') toast.success(t('po.created_email'))
     navigate('/productor/ofertes')
   }
 

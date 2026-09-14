@@ -23,7 +23,7 @@ import { createClient } from "@supabase/supabase-js";
 import { escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { sendText } from "../_shared/whatsapp.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
-import { esCuentaPermitida, modoTestActivo } from "../_shared/gate.ts";
+import { esCuentaPermitida, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciaDeCuenta } from "../_shared/organizacion.ts";
 
@@ -119,6 +119,7 @@ Deno.serve(async (req) => {
         opt_in: contacto?.opt_in,
         last_inbound_at: contacto?.last_inbound_at,
         canal_preferido: await preferenciaDeCuenta(supabase, perfil.id),
+        whatsapp_activo: await whatsappActivo(supabase),
       });
       // 'cap' no puede pasar aquí (la cuenta siempre tiene correo), pero si pasara,
       // el correo es el destino evidente: es el identificador de la cuenta.
@@ -179,7 +180,9 @@ Deno.serve(async (req) => {
         if (!r.ok && canal === "whatsapp") {
           canal = "email";
           resultado.canal = "email";
-          resultado.motiu_canal = "whatsapp_ha_fallat";
+          // Se distingue el interruptor de una avería: «WhatsApp está apagado» es una
+          // decisión nuestra y no hay nada que arreglar; «ha fallado» sí pide mirar §8ter.
+          resultado.motiu_canal = r.desactivado ? "whatsapp_desactivat" : "whatsapp_ha_fallat";
           // Si el canal que ha fallado era el que la organización pedía, el respaldo es
           // también un incumplimiento de la preferencia y se dice.
           if (preferido === "whatsapp") resultado.preferencia_respectada = false;

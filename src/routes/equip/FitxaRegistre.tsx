@@ -54,6 +54,7 @@ export default function FitxaRegistre({ tabla }: Props) {
       registro={registre}
       nombreKey={esProductor ? 'name' : 'nombre'}
       telefonoKey={esProductor ? 'phone' : 'telefono'}
+      emailKey="email"
       onBack={() => navigate(llista)}
       onSaved={() => navigate(llista)}
       avisos={(

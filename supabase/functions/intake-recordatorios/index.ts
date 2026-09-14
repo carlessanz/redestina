@@ -15,7 +15,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendBotones } from "../_shared/whatsapp.ts";
-import { esTelefonoTest, modoTestActivo } from "../_shared/gate.ts";
+import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 
 // Ventana de inactividad: se avisa a partir de 10 min y hasta la caducidad de 12 h
 // (a partir de ahí la sesión se descarta sola en el próximo mensaje).
@@ -43,6 +43,15 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SB_SECRET_KEY")!,
   );
+
+  // Interruptor global (§8). El job de pg_cron ya no debería llegar aquí —`disparar_
+  // recordatorios_intake()` es no-op con WhatsApp apagado—, pero esto es la barrera de la
+  // función: un recordatorio que no se puede enviar no tiene equivalente por correo (no
+  // hay sesión de intake sin WhatsApp), así que simplemente no se hace nada. No se toca
+  // `recordatorio_enviado_at`: al reactivar, las sesiones que sigan en ventana lo reciben.
+  if (!(await whatsappActivo(supabase))) {
+    return json({ ok: true, revisadas: 0, enviados: 0, whatsapp_actiu: false });
+  }
 
   const ahora = Date.now();
   const hace10min = new Date(ahora - MIN_INACTIVO_MS).toISOString();

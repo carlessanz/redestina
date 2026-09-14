@@ -393,7 +393,8 @@ src/
   hooks/useSessio.tsx          Sesión cruda (¿hay token?) + evento PASSWORD_RECOVERY (§6quater)
   hooks/useConveni.ts          ¿La organización activa tiene convenio vigente? Y la fecha de corte
   components/AvisConveni.tsx   La banda que lo avisa en los paneles de productor y receptor
-  hooks/useAppContext.tsx      get_my_session_context(): quién eres (§4bis). El panel activo se
+  hooks/useAppContext.tsx      get_my_session_context(): quién eres (§4bis) + useWhatsappActiu()
+                               (§8). El panel activo se
                                DERIVA de la URL; useOrganitzacio(tipus) para las pantallas
   hooks/use-mobile.ts          Hook del breakpoint (lo usa el sidebar de shadcn)
   hooks/useInstalacio.ts       ¿Se puede instalar la PWA, y cómo? (automática o manual iOS; §2)
@@ -422,7 +423,7 @@ src/
     mensajes.ts                countUnanswered(): mensajes «sin contestar» por teléfono (§5)
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
-    settings.ts                getTestMode()/setTestMode(): modo test global (app_settings, §8)
+    settings.ts                Los dos interruptores de app_settings: modo test y whatsapp_activo (§8)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
     albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
     enllacPublic.ts            Cliente de enlace-publico, sin sesión (§9)
@@ -434,6 +435,8 @@ src/
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
+    DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
+                               mensajería cuando WhatsApp está apagado (§8)
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
@@ -656,8 +659,16 @@ default privileges (§9). La fila del secreto se inserta fuera de git con la ser
 Clave/valor de **configuración no secreta** que gestiona el equipo desde **Configuración** (a
 diferencia de `app_config`, solo `service_role` para secretos). RLS: `authenticated`
 select/insert/update, y `service_role`. Hoy guarda **`test_mode`** (`'true'`/`'false'`, default
-`'true'`): el **modo test global** (§8). Lo leen las Edge Functions (`modoTestActivo`) y lo togglea
-`src/lib/settings.ts` desde la página Configuración.
+`'true'`): el **modo test global** (§8), y **`whatsapp_activo`** (`'true'`/`'false'`, default
+`'true'`, `20270317100000`): el **interruptor global de WhatsApp** (§8). Los leen las Edge Functions
+(`modoTestActivo`, `whatsappActivo`) y los togglea `src/lib/settings.ts` desde la página
+Configuración.
+
+⚠️ **Los dos son fail-safe, pero en sentidos CONTRARIOS, y es deliberado.** En `test_mode` la duda
+—fila ausente, error de lectura, valor raro— debe **cortar** un envío a quien no es de prueba; en
+`whatsapp_activo` la duda no puede dejar la plataforma **muda**, así que solo un `'false'` explícito
+lo apaga. Confundirlos al copiar el patrón invierte la garantía sin que nada falle. Escribir exige
+`es_super_admin()` (`20260730095000:147-156`), igual para los dos.
 
 ### Sistema documental (fase 1)
 
@@ -1149,12 +1160,16 @@ public, anon`. Son `security definer` para poder consultarse **desde una políti
 ⚠️ por eso **nunca** hay que poner `force row level security` en `perfiles`/`usuario_roles`/
 `membresias`.
 
-`roles_activos()` · `es_intern()` · `pot_aprovar()` · `es_super_admin()` · `mi_rol()` ·
+`roles_activos()` · **`whatsapp_activo()`** (§8; `20270317100000`, mismo molde que
+`roles_activos()` pero con el `coalesce` a `'true'`) · `es_intern()` · `pot_aprovar()` ·
+`es_super_admin()` · `mi_rol()` ·
 `mis_productores()` · `mis_entidades()` · `soc_titular(tipo, org)` ·
 **`get_my_session_context()`** (una llamada al entrar: rol, `vista_defecto` y organizaciones; desde
 `20260731100000` devuelve además **`registre_pendent`** y **`registre_rebutjat`** — sin ellas la
 interfaz no podría distinguir a quien espera validación de quien simplemente no tiene organización:
-los dos llegan con `organizaciones = []`, porque la membresía pendiente es `activo = false`).
+los dos llegan con `organizaciones = []`, porque la membresía pendiente es `activo = false`; y desde
+`20270317100000`, **`whatsapp_actiu`** — el interruptor global viaja aquí porque `app_settings` solo
+la lee el equipo y esto lo necesitan los tres paneles).
 
 ⚠️ **Dos matices del contexto que el resto de la doc no capturaba** (verificado 2026-08-01):
 - `get_my_session_context()` calcula `es_intern`/`pot_aprovar`/`es_super_admin` con **`mi_rol()`**
@@ -1337,9 +1352,13 @@ Si Meta devuelve error, la función lo reenvía **tal cual** con su status HTTP.
 `X-Hub-Signature-256` (HMAC-SHA256 del cuerpo **crudo**, comparación en tiempo constante) →
 upsert del contacto → **upsert** del mensaje por `wa_message_id` → actualiza
 `last_inbound_at` → Realtime. Tras validar la firma **siempre responde 200**, para que Meta
-no reintente. **Gate `es_test`**: el mensaje se registra y abre la ventana, pero solo se
-**responde** (ALTA/BAJA, respuesta a oferta, intake) si el número es de un productor/entidad
-marcado `es_test`; si no, se deja en la consola para una persona (§8).
+no reintente. **Orden exacto**: registra el mensaje → actualiza `last_inbound_at` →
+**interruptor `whatsapp_activo`** → gate `es_test` → ALTA/BAJA → respuesta a oferta → intake.
+**Gate `es_test`**: el mensaje se registra y abre la ventana, pero solo se **responde** (ALTA/BAJA,
+respuesta a oferta, intake) si el número es de un productor/entidad marcado `es_test`; si no, se
+deja en la consola para una persona (§8). **Con el interruptor apagado no se contesta a nadie**, y
+el mensaje se registra igual: el entrante existió, y la consola es donde el equipo lo ve para
+responder por correo.
 
 **Estados** — los `value.statuses` actualizan `wa_messages.status` casando por
 `wa_message_id`.
@@ -1878,6 +1897,53 @@ menú (`AppShell`) **suma las dos colas**.
 > antes. Afecta a TODO: intake, recordatorios, ALTA/BAJA y ofertas a entidades. Para volver a
 > simular: `supabase secrets set WHATSAPP_ENVIO_REAL=false`. El webhook siempre recibe.
 
+### Interruptor global `whatsapp_activo` (14-09-2026)
+
+**El super_admin puede apagar WhatsApp en toda la plataforma** desde Configuración
+(`app_settings.whatsapp_activo`, §4). Apagado: **no sale ni un mensaje** por WhatsApp —intake,
+recordatorios, ALTA/BAJA, ofertas, accesos— y todo lo que tiene equivalente sale por correo (§8bis).
+
+**Por qué no servía ninguno de los interruptores que ya había.** `WHATSAPP_ENVIO_REAL` es un
+secreto de entorno (no lo toca nadie desde el panel) y, sobre todo, **simula devolviendo
+`ok:true`**: ningún respaldo a correo se dispara y el mensaje se pierde en silencio. `test_mode`
+decide **a quién** se envía, no **por dónde**.
+
+| Capa | Qué hace con el interruptor apagado |
+| --- | --- |
+| `_shared/gate.ts` `whatsappActivo()` | La lectura. Fail-safe **encendido** (§4) |
+| `_shared/canal.ts` `decidirCanal()` | `whatsapp_activo: false` → `whatsappPosible = false` y motivo `whatsapp_desactivat`; el resto de la cascada es la de siempre (§8bis) |
+| `_shared/whatsapp.ts` `enviar()` | **Último cierre**: `503 {code:'whatsapp_desactivat'}` |
+| `whatsapp-webhook` | Registra el entrante y abre la ventana; **no contesta nada** (§5) |
+| `whatsapp-send` | `503 whatsapp_desactivat` **antes** de los gates de destinatario |
+| `intake-recordatorios` | No-op, y el job de `pg_cron` ni la despierta (`disparar_recordatorios_intake()` lo comprueba en SQL) |
+| `priorizar-entidades` / `enviar-acceso` | Pasan el flag a `decidirCanal()`; el sobre lleva `whatsapp_actiu` |
+| Frontend | Lo recibe en `get_my_session_context()` (`useWhatsappActiu()`): botones de WhatsApp ocultos, composer bloqueado, lista de Meta atenuada |
+
+⚠️ **`enviar()` devuelve `ok:false`, NO un simulado**, y ahí está todo el mecanismo: con `ok:true`
+el intake avanzaría de paso sin haber preguntado nada (deuda 3), `enviar-acceso` no caería a correo
+y el panel daría por enviada una oferta que nadie ha recibido.
+
+⚠️ **No se registra nada en `wa_messages` al cortar.** Un corte nuestro no es un rechazo de Meta:
+una fila `status='error'` pintada en rojo mandaría al equipo a diagnosticar un token que está
+perfectamente (§8ter). Queda un `console.warn`.
+
+⚠️ **Se lee en cada envío, sin caché**, a propósito: una caché de unos segundos dejaría a los
+isolates calientes enviando después de apagarlo, que es exactamente lo que promete no pasar. El
+coste es una lectura por clave primaria de una tabla de tres filas, y solo en el camino de salida.
+
+⚠️ **El precio, y hay que verlo ANTES de pulsar**: las fichas con móvil y **sin correo** quedan
+incontactables (`canal: 'cap'`). La confirmación de Configuración cuenta cuántas son
+(`fitxesSenseCorreuAmbTelefon()`). Y el **intake conversacional no tiene equivalente por correo**
+—no hay sesión de intake sin WhatsApp—: la vía para publicar es el panel del productor
+(`crear-oferta`), que ya existía y no toca WhatsApp en ningún punto.
+
+**Lo que gana el correo** para cubrir los momentos que eran solo de WhatsApp: el correo de la
+oferta lleva botón **«Mostra interès»** a `/receptor/mercat` (donde `manifestar_interes()` cae en la
+misma cola de aprobación); `crear-oferta` manda la **confirmación de oferta registrada** con su
+referencia (`proposito='oferta_confirmacio'`), que es lo que el intake manda por WhatsApp; y las
+fichas y los listados del equipo tienen **«Envia un correu»** (`DialegCorreu`), que sustituye a la
+mensajería manual y queda en `documento_envios` (`proposito='missatge'`).
+
 **Reglas de envío** (decisión D1 del manual; implementadas en `whatsapp-send`; se evalúan
 antes del interruptor de arriba, así que en modo PoC un envío bloqueado por regla ni siquiera
 llega a simularse):
@@ -1890,7 +1956,8 @@ llega a simularse):
 Contacto inexistente → `404 unknown_contact`. Sin sesión válida → `401 unauthorized`.
 
 ⚠️ **Orden real de las comprobaciones en `whatsapp-send`**: los gates `403` van **antes** que el
-`404`/`409` de esta tabla. Secuencia: `exigirEquipo` (`401`) → validación de campos (`400`) → gate
+`404`/`409` de esta tabla. Secuencia: `exigirEquipo` (`401`) → validación de campos (`400`) →
+**interruptor global (`503 whatsapp_desactivat`)** → gate
 `es_test` (`403 no_test_user`) → gate `meta_test_recipients` (`403 no_test_recipient`) → contacto
 inexistente (`404`) → ventana/opt-in (`409`/`403`). Un destinatario existente pero no-test recibe
 `403`, nunca llega al `404`.
@@ -1991,7 +2058,14 @@ Vive en **`_shared/canal.ts`**, función **pura y sin red** (mismo criterio que 
 | Móvil **y** ventana de 24 h abierta | **WhatsApp** (texto libre, gratis, consentimiento implícito: nos acaba de escribir) |
 | Móvil **y** `opt_in = true` | **WhatsApp** (plantilla; fuera de ventana es lo único que entrega Meta) |
 | Sin teléfono · teléfono fijo · sin opt-in y ventana cerrada | **Correo** |
+| **Interruptor `whatsapp_activo` apagado** (§8) | **Correo**, con motivo `whatsapp_desactivat`, sea cual sea la ficha |
 | Ni móvil útil ni correo | **ninguno**, y el panel lo dice para que se complete la ficha |
+
+⚠️ **El interruptor se evalúa el PRIMERO**, antes incluso del teléfono: apagado, WhatsApp no es
+viable para nadie y da igual qué tenga la ficha. Entra **por parámetro** (`whatsapp_activo`, ausente
+= activo), así que el módulo sigue siendo puro y sin red; quien lee `app_settings` es `gate.ts`. Una
+preferencia de WhatsApp cae entonces a correo con `preferenciaRespetada: false`, y una ficha sin
+correo queda en `cap` — que es el precio de apagarlo, dicho en el panel en vez de fingir un envío.
 
 `esMovil()` descarta los fijos españoles (`34` + algo que no sea `6`/`7`): son 6 en el import de ARA y no
 reciben WhatsApp. Fuera de España no se puede saber por el prefijo, así que se acepta: más vale intentarlo
@@ -2719,6 +2793,15 @@ deno run -A scripts/roles-activos.ts off     # o, en el SQL Editor:
 
 y si no basta, `scripts/sql/rls-emergencia.sql` en el SQL Editor.
 
+**Apagar WhatsApp en toda la plataforma** (§8) es la pantalla de Configuración; la vía de
+emergencia, cuando no se puede entrar, es la misma tabla:
+
+```sql
+update app_settings set value = 'false' where key = 'whatsapp_activo';
+```
+
+No hace falta redesplegar ni cerrar sesiones: el interruptor se lee en cada envío.
+
 `npm run build` corre `tsc` con `strict`, `noUnusedLocals` y `noUnusedParameters`, **pero solo
 sobre `src/`**: ni los scripts de Deno ni las Edge Functions entran en ese `tsconfig`, así que
 durante meses no los comprobó nadie. Hoy hay **cuatro** comprobaciones automáticas: `tsc` (de la
@@ -2800,7 +2883,7 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    ⚠️ **«Sin CI» describe el repo, no el proyecto**: no hay `.github/workflows/` ni un solo
    run en GitHub, pero el **branching de Supabase despliega las quince Edge Functions en cada
    push a `main`** (§12.44). Dar «sin CI» por «nada automático» es lo que hizo buscar tres
-   veces en el sitio equivocado. Ya hay **430 pruebas de
+   veces en el sitio equivocado. Ya hay **507 pruebas de
    Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
    `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
    Lo que sigue faltando: **linter** (no hay ESLint) y **CI de verdad** — el hook se puede saltar
@@ -2932,12 +3015,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     Lo que sí queda, y no es esto: `rol_org` (`titular`/`operador`) vale **siempre `titular`** de
     facto —el producto no tiene cargos dentro de la organización—, así que la rama `operador` de
     `PerfilOrganitzacio` es código sin cobertura (§9).
-21. **El canal preferente (§8bis) no llega a todos los envíos.** Lo aplican `OfferDetail` (botón
-    «Enviar») y `enviar-acceso`; el **intake**, los **recordatorios** y el **ALTA/BAJA** siguen siendo
-    WhatsApp puro, que es correcto —son respuestas dentro de una conversación que la persona ha
-    iniciado por WhatsApp—, pero un productor que solo tenga correo no puede publicar una oferta de
-    forma conversacional. La vía para él es el panel (§6ter). Falta también el fallback a correo en
-    `whatsapp-send` mismo: hoy lo orquesta el llamante.
+21. 🟡 **El canal preferente (§8bis) no llega a todos los envíos** — *la mayor parte, cubierta
+    (14-09-2026)*. Con el interruptor global (§8) el correo ya cubre los momentos que eran solo de
+    WhatsApp: la **confirmación de oferta registrada** (`crear-oferta`), la **respuesta de la
+    entidad** (botón «Mostra interès» al panel, donde `manifestar_interes()` cae en la misma cola) y
+    la **mensajería manual** del equipo (`DialegCorreu`).
+    Lo que **sigue abierto**: el **intake conversacional** y su **recordatorio** no tienen —ni pueden
+    tener— equivalente por correo (no hay sesión de intake sin WhatsApp); la vía para publicar sin
+    WhatsApp es el panel (§6ter). El **ALTA/BAJA** solo significa algo dentro de WhatsApp. Y sigue sin
+    haber **fallback a correo dentro de `whatsapp-send`**: lo orquesta el llamante, que es quien sabe
+    qué texto tiene sentido por correo.
 22. ~~**Sin preferencia de canal declarada por la persona.**~~ — **resuelta (11-09-2026)**:
     `organizaciones.canal_preferido` se escribe con `actualizar_meu_canal()` desde el perfil y lo
     respetan `decidirCanal()` y sus dos consumidores (§8bis). Queda el límite, que es **de Meta y no
@@ -3592,6 +3679,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     verdad es una columna normalizada o un índice funcional sobre las últimas 9 cifras, no más
     expresiones regulares.
 
+92. **El correo de la oferta no captura la respuesta sin cuenta.** El botón «Mostra interès» lleva
+    a `/receptor/mercat`, que exige sesión — y de las 111 entidades importadas casi ninguna la
+    tiene. El equivalente real del diálogo de WhatsApp sería un propósito `resposta_oferta` en
+    `enlaces_token` + `enlace-publico`, para contestar kg y precio desde el correo sin registrarse.
+    Se dejó fuera a propósito (fase 2): mientras tanto, la entidad contesta el correo y el equipo
+    marca la respuesta a mano en `OfferDetail`, que es el camino que ya existía.
+93. **`whatsappActivo()` se lee sin caché: una consulta más por cada saliente.** Es deliberado (§8):
+    cachearla dejaría a los isolates calientes enviando después de apagar el interruptor. Si algún
+    día pesara, la respuesta no es una caché de tiempo sino no llegar hasta ahí — el webhook y
+    `whatsapp-send` ya cortan mucho antes.
+94. **El intake por WhatsApp no manda el correo de confirmación de la oferta.** Lo manda
+    `crear-oferta` (el panel); `_shared/oferta.ts` sigue confirmando solo por WhatsApp, que es
+    coherente —quien publica por WhatsApp está en esa conversación— pero significa que la misma
+    oferta se confirma por un canal u otro según por dónde entró, y no por lo que la organización
+    prefiera. El sitio donde arreglarlo es `crearExcedenteDesdeSesion()`.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas de §12 que **no son defectos pendientes**. Se quedan donde están —con su
@@ -3633,13 +3736,15 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 |---|---|
 | 4 | `disponible_hasta` cuando el texto no es fechable: lo normaliza el panel |
 | 30 | `VITE_ACCESSOS_TEST` — apagarlo es decisión de negocio |
+| 92 | El «Mostra interès» del correo va al panel con sesión; el enlace con token sin cuenta es fase 2 |
+| 93 | `whatsappActivo()` sin caché: es lo que hace que apagar el interruptor sea inmediato |
 | 72 | `abrir_cierre` no se prueba como «permitir» porque dejaría una cabecera sin forma de borrarla |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **483 pruebas en 18 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **507 pruebas en 19 ficheros**, todas correctas y ninguna pendiente.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
    (`git config core.hooksPath .githooks`, una vez por clon).
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.

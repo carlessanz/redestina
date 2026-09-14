@@ -17,6 +17,8 @@
 //
 // No cambia el comportamiento en Deno: el entorno del isolate no cambia durante su vida, asi
 // que da igual cuando se pregunte.
+import { whatsappActivo } from "./gate.ts";
+
 function apiVersion(): string {
   return Deno.env.get("WHATSAPP_API_VERSION") ?? "v23.0";
 }
@@ -53,9 +55,47 @@ export interface RespuestaMeta {
   data: unknown;
   /** true si no se contactó con Meta (modo prueba de concepto). */
   simulado?: boolean;
+  /**
+   * true si el envío se cortó porque el interruptor global de WhatsApp está apagado
+   * (§8). NO es un fallo de Meta: quien llama no debe registrarlo como tal.
+   */
+  desactivado?: boolean;
 }
 
-async function enviar(payload: Record<string, unknown>): Promise<RespuestaMeta> {
+/**
+ * El ÚNICO punto por el que sale algo hacia Meta, y por eso también el último cierre del
+ * interruptor global (§8).
+ *
+ * ⚠️ DEVUELVE `ok:false`, NO UN SIMULADO. La diferencia es todo el mecanismo: con `ok:true`
+ *    el intake avanzaría de paso sin haber preguntado nada (deuda 3), `enviar-acceso` no
+ *    caería a correo y `OfferDetail` daría por enviada una oferta que nadie ha recibido.
+ *
+ * ⚠️ SE LEE EN CADA ENVÍO, SIN CACHÉ, y es deliberado: una caché de unos segundos dejaría a
+ *    los isolates calientes enviando después de apagar el interruptor, que es exactamente
+ *    lo que promete no pasar. El coste es una lectura por clave primaria de una tabla de
+ *    tres filas, y solo en el camino de salida: con el interruptor apagado, el webhook y
+ *    `whatsapp-send` cortan mucho antes, así que no son 14 lecturas por intake.
+ */
+async function enviar(
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+  payload: Record<string, unknown>,
+): Promise<RespuestaMeta> {
+  if (!(await whatsappActivo(supabase))) {
+    // deno-lint-ignore no-explicit-any
+    const destino = (payload as any)?.to ?? "?";
+    console.warn(`[whatsapp_desactivat] no s'envia a ${destino}`);
+    return {
+      ok: false,
+      status: 503,
+      waMessageId: null,
+      desactivado: true,
+      data: {
+        code: "whatsapp_desactivat",
+        error: "WhatsApp està desactivat des de Configuració.",
+      },
+    };
+  }
   if (!envioReal()) {
     // Modo PoC: no se contacta con Meta. Se devuelve una respuesta simulada para
     // que el flujo (intake, panel) continúe con normalidad.
@@ -172,10 +212,10 @@ export async function sendText(
    */
   opciones?: { bodyConsola?: string },
 ): Promise<RespuestaMeta> {
-  const r = await enviar({ to, type: "text", text: { body, preview_url: false } });
+  const r = await enviar(supabase, { to, type: "text", text: { body, preview_url: false } });
   const cuerpo = opciones?.bodyConsola ?? body;
   if (r.ok) await registrarSaliente(supabase, to, "text", cuerpo, r.waMessageId, r.data);
-  else await registrarFallo(supabase, to, "text", cuerpo, r);
+  else if (!r.desactivado) await registrarFallo(supabase, to, "text", cuerpo, r);
   return r;
 }
 
@@ -194,14 +234,14 @@ export async function sendTemplate(
   idioma: string,
   components: unknown[] = [],
 ): Promise<RespuestaMeta> {
-  const r = await enviar({
+  const r = await enviar(supabase, {
     to,
     type: "template",
     template: { name: nombre, language: { code: idioma }, components },
   });
   const bodyConsola = TEXTO_PLANTILLA[nombre] ?? `[plantilla: ${nombre}]`;
   if (r.ok) await registrarSaliente(supabase, to, "template", bodyConsola, r.waMessageId, r.data);
-  else await registrarFallo(supabase, to, "template", bodyConsola, r);
+  else if (!r.desactivado) await registrarFallo(supabase, to, "template", bodyConsola, r);
   return r;
 }
 
@@ -213,7 +253,7 @@ export async function sendBotones(
   texto: string,
   botones: Boton[],
 ): Promise<RespuestaMeta> {
-  const r = await enviar({
+  const r = await enviar(supabase, {
     to,
     type: "interactive",
     interactive: {
@@ -229,7 +269,7 @@ export async function sendBotones(
     },
   });
   if (r.ok) await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId);
-  else await registrarFallo(supabase, to, "interactive", texto, r);
+  else if (!r.desactivado) await registrarFallo(supabase, to, "interactive", texto, r);
   return r;
 }
 
@@ -242,7 +282,7 @@ export async function sendLista(
   etiquetaBoton: string,
   filas: FilaLista[],
 ): Promise<RespuestaMeta> {
-  const r = await enviar({
+  const r = await enviar(supabase, {
     to,
     type: "interactive",
     interactive: {
@@ -263,6 +303,6 @@ export async function sendLista(
     },
   });
   if (r.ok) await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId);
-  else await registrarFallo(supabase, to, "interactive", texto, r);
+  else if (!r.desactivado) await registrarFallo(supabase, to, "interactive", texto, r);
   return r;
 }

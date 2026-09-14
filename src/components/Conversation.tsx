@@ -8,6 +8,7 @@ import { plantillaPrimerContacte, textoSalutacio } from '../lib/plantillas'
 import type { RolContacte } from '../lib/plantillas'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { useWhatsappActiu } from '../hooks/useAppContext'
 import type { WaContact, WaMessage } from '../types'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -31,6 +32,7 @@ function noticeFromError(data: unknown, t: Tfn): Notice {
   const payload = data as { error?: unknown; code?: string } | null
   const err = payload?.error
   switch (payload?.code) {
+    case 'whatsapp_desactivat': return { kind: 'warning', text: t('msg.w_wa_off') }
     case 'window_closed': return { kind: 'warning', text: t('msg.w_closed') }
     case 'no_opt_in': return { kind: 'warning', text: t('msg.w_optin') }
     case 'no_test_user': return { kind: 'warning', text: t('msg.w_no_test') }
@@ -82,6 +84,9 @@ function motiuMeta(m: WaMessage): string | null {
 
 export default function Conversation({ contact, onBack, onDeleted }: Props) {
   const { t } = useT()
+  // Interruptor global (§8). El historial se sigue leyendo —los entrantes se registran
+  // aunque no se conteste—, pero no se puede enviar nada.
+  const waActiu = useWhatsappActiu()
   const [messages, setMessages] = useState<WaMessage[]>([])
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -309,18 +314,23 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
         </div>
       )}
 
-      {!ventanaAbierta && (
+      {!waActiu ? (
+        <div className="mx-5 mb-1 flex items-start gap-2 rounded-md border border-aviso/30 bg-aviso-fondo px-3 py-2 text-sm text-aviso">
+          <Lock className="mt-0.5 size-4 shrink-0" />
+          <span>{t('msg.wa_off_banner')}</span>
+        </div>
+      ) : !ventanaAbierta ? (
         <div className="mx-5 mb-1 flex items-start gap-2 rounded-md border border-aviso/30 bg-aviso-fondo px-3 py-2 text-sm text-aviso">
           <Lock className="mt-0.5 size-4 shrink-0" />
           <span>{t('msg.banner', { name: contact.name ?? t('msg.this_contact') })}</span>
         </div>
-      )}
+      ) : null}
 
       <footer className="flex flex-wrap items-center gap-2 border-t bg-card px-3 py-2.5 md:px-5 md:py-3">
         <Tooltip>
           <TooltipTrigger asChild>
             <Button type="button" variant={ventanaAbierta ? 'outline' : 'default'}
-              onClick={handleSendTemplate} disabled={sending || justSent}>
+              onClick={handleSendTemplate} disabled={sending || justSent || !waActiu}>
               {justSent ? t('msg.sent_wait') : ventanaAbierta ? t('msg.greeting') : t('msg.first_msg')}
             </Button>
           </TooltipTrigger>
@@ -334,9 +344,9 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             onKeyDown={handleTextareaKeyDown}
-            disabled={sending || !ventanaAbierta}
+            disabled={sending || !ventanaAbierta || !waActiu}
           />
-          <Button type="submit" disabled={sending || !draft.trim() || !ventanaAbierta}>
+          <Button type="submit" disabled={sending || !draft.trim() || !ventanaAbierta || !waActiu}>
             {sending ? t('c.sending') : t('c.send')}
           </Button>
         </form>

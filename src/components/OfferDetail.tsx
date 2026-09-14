@@ -97,6 +97,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // (p. ej. si el intake dejó una fecha parseada o el usuario la edita).
   const [fecha, setFecha] = useState<string>(excedente.disponible_hasta ?? '')
   const [testMode, setTestMode] = useState(true)
+  // Interruptor global de WhatsApp (§8). Sale del sobre de `priorizar-entidades`, igual
+  // que `modoTest`: lo decide el servidor y el panel solo obedece.
+  const [whatsappActiu, setWhatsappActiu] = useState(true)
   // Los dos motivos que antes se pedían con `window.prompt` (deuda §12.35). Van con estado
   // porque el de rechazo lo abre la fila de una respuesta concreta, no un botón suelto.
   const [rebutjant, setRebutjant] = useState<RespuestaConEntidad | null>(null)
@@ -192,6 +195,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     void priorizarEntidades(excedente.id).then((r) => {
       setRanking(r.ranking)
       setTestMode(r.modoTest)
+      setWhatsappActiu(r.whatsappActiu)
       setRankingError(r.error)
       setCargandoRanking(false)
     })
@@ -343,6 +347,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
    */
   async function enviarOfertaWhatsApp(ent: EntidadPuntuada, silencioso = false): Promise<boolean> {
     const avisar = (fn: typeof toast.error, msg: string) => { if (!silencioso) fn(msg) }
+    // Interruptor global (§8). Se comprueba aquí además de esconder el botón porque el
+    // estado puede haber cambiado desde que se cargó la pantalla, y el servidor
+    // respondería un 503 que no dice nada útil al equipo.
+    if (!whatsappActiu) { avisar(toast.error, t('od.wa_off')); return false }
     // Botón siempre clicable: cada motivo se avisa con un toast, no con un return mudo.
     if (!ent.telefono) { avisar(toast.error, t('od.need_phone', { name: ent.nombre })); return false }
     if (testMode && !ent.es_test) { avisar(toast.error, t('od.not_test_toast', { name: ent.nombre })); return false }
@@ -361,7 +369,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       }
       return false
     }
-    if (data?.code === 'no_test_user') avisar(toast.error, t('od.not_test_toast', { name: ent.nombre }))
+    if (data?.code === 'whatsapp_desactivat') avisar(toast.error, t('od.wa_off'))
+    else if (data?.code === 'no_test_user') avisar(toast.error, t('od.not_test_toast', { name: ent.nombre }))
     else if (data?.code === 'no_test_recipient') avisar(toast.error, t('od.no_test_meta', { name: ent.nombre }))
     else if (data?.code === 'unknown_contact') avisar(toast.error, t('od.must_write', { name: ent.nombre }))
     else {
@@ -434,6 +443,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         titulo: t('od.email_title'),
         preheader: t('od.email_preheader', { producto: exc.producto ?? '' }),
         nota: t('od.email_note'),
+        // El equivalente del diálogo sí/no de WhatsApp (§5): quien recibe la oferta por
+        // correo tiene un sitio donde decir que la quiere, en vez de tener que contestar
+        // un correo que nadie captura de forma estructurada.
+        boton: { texto: t('od.email_button'), url: `${window.location.origin}/receptor/mercat` },
       },
     })
     if (r.ok) { await registrarEnvio(ent, 'email'); toast.success(t('od.sent_email', { name: ent.nombre })); return }
@@ -574,8 +587,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   </label>
                   {/* Envío por el canal recomendado. Los otros dos fuerzan uno concreto. */}
                   <Button size="sm" onClick={() => void enviarOferta(ent)}>{t('od.send')}</Button>
-                  <Button size="sm" variant="outline" title={t('od.force_wa')}
-                    onClick={() => void enviarOfertaWhatsApp(ent)}>{t('od.whatsapp')}</Button>
+                  {whatsappActiu && (
+                    <Button size="sm" variant="outline" title={t('od.force_wa')}
+                      onClick={() => void enviarOfertaWhatsApp(ent)}>{t('od.whatsapp')}</Button>
+                  )}
                   <Button size="sm" variant="outline" title={t('od.force_email')}
                     onClick={() => void enviarOfertaEmail(ent)}>{t('od.email')}</Button>
                 </div>

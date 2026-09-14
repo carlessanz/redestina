@@ -19,6 +19,8 @@ import { createClient } from "@supabase/supabase-js";
 import { crearExcedente } from "../_shared/oferta.ts";
 import { CAMPOS, faltantes } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
+import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
+import { esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
   .split(",").map((o) => o.trim()).filter(Boolean);
@@ -42,6 +44,51 @@ function corsPara(req: Request): Record<string, string> {
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
     "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
   };
+}
+
+/**
+ * Confirmación de la oferta por correo. **Nunca hace fallar la petición**: la oferta ya
+ * está creada y su referencia va en la respuesta, así que un problema de correo no puede
+ * convertirse en un 500 que haga pensar al productor que no se ha guardado nada.
+ *
+ * Respeta los gates de §8 igual que cualquier otro envío: con el modo test activo solo
+ * sale hacia fichas `es_test`.
+ */
+async function confirmarPorCorreo(
+  productor: { name?: string | null; email?: string | null },
+  idExcedente: string,
+  excedenteId: string,
+  // deno-lint-ignore no-explicit-any
+  datos: any,
+  // deno-lint-ignore no-explicit-any
+  supabase: any,
+): Promise<"enviat" | "simulat" | "omes" | "error"> {
+  const destino = (productor.email ?? "").trim();
+  if (!destino) return "omes";
+  if ((await modoTestActivo(supabase)) && !(await esEmailTest(supabase, destino))) return "omes";
+
+  const producte = String(datos?.producte ?? datos?.familia ?? "").trim();
+  const r = await sendEmail({
+    to: destino,
+    subject: `Oferta registrada: ${idExcedente}`,
+    html: plantillaEmail({
+      titulo: "Hem registrat la teva oferta",
+      preheader: `Referència ${idExcedente}`,
+      cuerpoHtml: `<p>Hola ${escaparHtml(productor.name ?? "")},</p>` +
+        `<p>Hem registrat la teva oferta${producte ? ` de ${escaparHtml(producte)}` : ""} ` +
+        `amb la referència <strong>${escaparHtml(idExcedente)}</strong>.</p>` +
+        `<p>L'equip de Redestina buscarà qui la pugui aprofitar i t'avisarem quan estigui canalitzada.</p>`,
+      boton: { texto: "Veure les meves ofertes", url: `${appUrl()}/productor/ofertes` },
+    }),
+  }, {
+    supabase,
+    proposito: "oferta_confirmacio",
+    objetoTipo: "excedente",
+    objetoId: excedenteId,
+    funcion: "crear-oferta",
+  });
+  if (!r.ok) return "error";
+  return r.simulado ? "simulat" : "enviat";
 }
 
 Deno.serve(async (req) => {
@@ -127,8 +174,9 @@ Deno.serve(async (req) => {
       return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan }, 400);
     }
 
+    // ⚠️ La lista de columnas, en UN literal (§7, deuda 46).
     const { data: productor } = await supabase
-      .from("productores").select("id, name").eq("id", productorId).maybeSingle();
+      .from("productores").select("id, name, email").eq("id", productorId).maybeSingle();
     if (!productor) return responder({ error: "Productor no trobat" }, 404);
 
     // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
@@ -142,7 +190,15 @@ Deno.serve(async (req) => {
     );
     if (!r.ok) return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
 
-    return responder({ ok: true, id: r.excedenteId, id_excedente: r.idExcedente }, 200);
+    // La confirmación que el intake manda por WhatsApp (`_shared/oferta.ts`), aquí por
+    // correo: quien publica desde el panel también tiene derecho a su referencia por
+    // escrito, y con WhatsApp apagado (§8) esta es la única que va a recibir.
+    const confirmacio = await confirmarPorCorreo(productor, r.idExcedente ?? "", r.excedenteId ?? "", datos, supabase);
+
+    return responder(
+      { ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio },
+      200,
+    );
   } catch (err) {
     console.error("crear-oferta:", err instanceof Error ? err.message : String(err));
     return responder({ error: "Error interno o JSON inválido" }, 500);

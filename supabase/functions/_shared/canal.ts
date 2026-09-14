@@ -51,6 +51,12 @@ export interface DatosContacto {
    * `null`/ausente = no lo ha dicho, se deduce como siempre.
    */
   canal_preferido?: CanalPreferido;
+  /**
+   * El interruptor global `app_settings.whatsapp_activo` (§8), que lee quien llama
+   * (`gate.ts`). **Ausente = activo**, para que el módulo siga comportándose igual en
+   * cualquier llamada que no lo pase.
+   */
+  whatsapp_activo?: boolean;
 }
 
 /**
@@ -69,6 +75,7 @@ export type MotivoCanal =
   | "sense_optin_ni_finestra"
   | "sense_correu"
   | "sense_canal"
+  | "whatsapp_desactivat"
   | "preferencia_whatsapp"
   | "preferencia_email";
 
@@ -117,7 +124,14 @@ export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCana
   let motivoWhatsapp: MotivoCanal | null = null;
   let motivoWa: MotivoCanal = "sense_telefon";
 
-  if (!telefono) {
+  if (d.whatsapp_activo === false) {
+    // El interruptor global va ANTES que el teléfono: con WhatsApp apagado da igual qué
+    // ficha tenga la organización, el canal no existe. Lo que sigue es la cascada de
+    // siempre, así que una preferencia de WhatsApp cae a correo marcada como incumplida
+    // y una ficha sin correo queda en `cap` —que es el precio de apagarlo, y el panel lo
+    // dice en vez de fingir un envío.
+    motivoWhatsapp = "whatsapp_desactivat";
+  } else if (!telefono) {
     motivoWhatsapp = "sense_telefon";
   } else if (!esMovil(telefono)) {
     motivoWhatsapp = "telefon_no_mobil";

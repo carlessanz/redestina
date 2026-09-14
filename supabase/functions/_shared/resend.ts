@@ -62,7 +62,10 @@ export function esEnvioReal(valor: string | undefined | null): boolean {
 // resuelven rutas relativas, no cargan `data:` (Gmail lo bloquea) y no saben
 // pintar SVG. `public/logo-email.png` es el logo en negativo (para la cabecera verde)
 // rasterizado a 410×120; se regenera desde `public/logo-redestina-negativo.svg`.
-function appUrl(): string {
+// Exportada porque la necesita cualquiera que meta un enlace en un correo (hoy también
+// `crear-oferta`), y cada copia suelta del patrón es un sitio más donde olvidar el
+// `APP_URL` al cambiar de dominio (§10ter).
+export function appUrl(): string {
   return (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/+$/, "");
 }
 

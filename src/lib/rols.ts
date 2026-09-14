@@ -59,9 +59,18 @@ export interface ContextSessio {
    * desplegada, o la RPC falla). Se trata como equipo interno: es el comportamiento
    * que la app ha tenido siempre, y con `roles_activos` apagado es además el correcto.
    */
-  degradat: boolean  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto */
+  degradat: boolean
+  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto. */
   conveni_pendent?: boolean
-
+  /**
+   * Interruptor global de WhatsApp (`app_settings.whatsapp_activo`, §8). Viaja en el
+   * contexto de sesión y no se consulta aparte porque `app_settings` solo la lee el
+   * equipo (RLS `es_intern()`) y esto lo necesitan los tres paneles.
+   *
+   * **Fail-safe ENCENDIDO**: una RPC vieja que no devuelva la clave deja la app como
+   * estaba, que es lo correcto mientras la migración no esté aplicada.
+   */
+  whatsappActiu: boolean
 }
 
 /** Forma cruda que devuelve la RPC (snake_case, como en la base). */
@@ -80,9 +89,11 @@ export interface ContextCru {
   organizaciones: Organitzacio[]
   /** Opcionales: los añade la migración del registro público; sin ella llegan `undefined`. */
   registre_pendent?: boolean
-  registre_rebutjat?: boolean  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto */
+  registre_rebutjat?: boolean
+  /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto. */
   conveni_pendent?: boolean
-
+  /** Interruptor global de WhatsApp (20270317100000); sin esa migración llega `undefined`. */
+  whatsapp_actiu?: boolean
 }
 
 export function mapejaContext(cru: ContextCru): ContextSessio {
@@ -109,6 +120,7 @@ export function mapejaContext(cru: ContextCru): ContextSessio {
     vistaDefecte: cru.vista_defecto && rols.includes(cru.vista_defecto) ? cru.vista_defecto : null,
     registrePendent: cru.registre_pendent ?? false,
     registreRebutjat: cru.registre_rebutjat ?? false,
+    whatsappActiu: cru.whatsapp_actiu !== false,
     degradat: false,
   }
 }
@@ -130,6 +142,9 @@ export function contextDegradat(userId: string, email: string | null): ContextSe
     vistaDefecte: null,
     registrePendent: false,
     registreRebutjat: false,
+    // Sin contexto no se puede saber, y lo que no se sabe no apaga nada: se deja como
+    // siempre ha estado. El servidor corta igual si el interruptor está apagado.
+    whatsappActiu: true,
     degradat: true,
   }
 }

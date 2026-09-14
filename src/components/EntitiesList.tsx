@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useWhatsappActiu } from '../hooks/useAppContext'
+import DialegCorreu from './DialegCorreu'
+import type { DestinatariCorreu } from './DialegCorreu'
 import type { Entidad, EntidadLlistat } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -27,6 +30,9 @@ function casa(e: Entidad, q: string): boolean {
 
 export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
+  const waActiu = useWhatsappActiu()
+  // Un solo diálogo para toda la tabla: la fila solo dice a quién se escribe.
+  const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
   const [entidades, setEntidades] = useState<EntidadLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -98,8 +104,16 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => onOpenDetail(e)}>{t('c.detail')}</Button>
-                      <Button size="sm" disabled={!tel} title={tel ? undefined : t('ent.no_phone')}
-                        onClick={() => tel && onSendMessage(tel, e.nombre)}>{t('c.message')}</Button>
+                      {/* Con WhatsApp apagado (§8) se quita, no se deshabilita. */}
+                      {waActiu && (
+                        <Button size="sm" disabled={!tel} title={tel ? undefined : t('ent.no_phone')}
+                          onClick={() => tel && onSendMessage(tel, e.nombre)}>{t('c.message')}</Button>
+                      )}
+                      <Button variant="outline" size="sm" disabled={!e.email}
+                        title={e.email ? undefined : t('correu.no_email')}
+                        onClick={() => setCorreuA({ email: e.email, nom: e.nombre, tipus: 'entidad', id: e.id })}>
+                        {t('c.email_action')}
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -140,6 +154,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
           </section>
         )}
       </CardContent>
+      <DialegCorreu obert={correuA !== null} onObert={(v) => { if (!v) setCorreuA(null) }} destinatari={correuA} />
     </Card>
   )
 }

@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import type { ReactNode } from 'react'
-import { ArrowLeft, MessageCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -10,6 +10,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useWhatsappActiu } from '../hooks/useAppContext'
+import DialegCorreu from './DialegCorreu'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -25,6 +27,8 @@ interface Props {
   registro: Registro | null
   nombreKey: string
   telefonoKey?: string
+  /** Campo del correo de la ficha. Sin él no se ofrece «Correu». */
+  emailKey?: string
   onBack: () => void
   onSaved: () => void
   onSendMessage?: (phone: string, name: string | null) => void
@@ -38,10 +42,12 @@ interface Props {
 }
 
 export default function RecordDetail({
-  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, onBack, onSaved,
+  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, emailKey, onBack, onSaved,
   onSendMessage, avisos,
 }: Props) {
   const { t } = useT()
+  const waActiu = useWhatsappActiu()
+  const [correuObert, setCorreuObert] = useState(false)
   const esNuevo = registro == null
   const [form, setForm] = useState<Record<string, unknown>>(() => ({ ...(registro ?? {}) }))
   const [guardando, setGuardando] = useState(false)
@@ -115,6 +121,7 @@ export default function RecordDetail({
   }
 
   const telValor = telefonoKey ? String(form[telefonoKey] ?? '').replace(/\D/g, '') : ''
+  const emailValor = emailKey ? String(form[emailKey] ?? '').trim() : ''
 
   function control(c: CampoDef) {
     const tp = c.tipo ?? 'text'
@@ -184,9 +191,15 @@ export default function RecordDetail({
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            {telefonoKey && telValor && onSendMessage && (
+            {/* Con WhatsApp apagado (§8) desaparece; el correo ocupa su sitio. */}
+            {waActiu && telefonoKey && telValor && onSendMessage && (
               <Button variant="outline" onClick={enviarMensaje}>
                 <MessageCircle className="size-4" /> {t('c.message')}
+              </Button>
+            )}
+            {emailKey && emailValor && !esNuevo && (
+              <Button variant="outline" onClick={() => setCorreuObert(true)}>
+                <Mail className="size-4" /> {t('c.email_action')}
               </Button>
             )}
             <Button onClick={() => void guardar()} disabled={guardando}>
@@ -214,6 +227,16 @@ export default function RecordDetail({
           )}
         </CardContent>
       </Card>
+      <DialegCorreu
+        obert={correuObert}
+        onObert={setCorreuObert}
+        destinatari={{
+          email: emailValor || null,
+          nom: String(form[nombreKey] ?? '') || null,
+          tipus: tabla === 'productores' ? 'productor' : 'entidad',
+          id: String(registro?.id ?? ''),
+        }}
+      />
     </div>
   )
 }

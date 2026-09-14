@@ -18,6 +18,13 @@ export interface EmailPayload {
     boton?: { texto: string; url: string }
     nota?: string
   }
+  /**
+   * Traza del envío (`documento_envios`, deuda §12.25). Opcionales: sin ellos el servidor
+   * registra el envío como `oferta`, que era el único caso cuando se escribió.
+   */
+  proposito?: string
+  objeto_tipo?: string
+  objeto_id?: string
 }
 
 export interface EmailResult {

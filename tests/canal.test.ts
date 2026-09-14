@@ -363,3 +363,83 @@ describe('decidirCanal · la preferencia de la organización', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// El interruptor global de WhatsApp (§8)
+// ---------------------------------------------------------------------------
+// Apagarlo no es «no enviar»: es que WhatsApp deja de ser un canal viable, y a partir de
+// ahí manda la cascada de siempre. Lo que se comprueba aquí es justamente que no hace
+// falta ninguna regla nueva —el correo toma el relevo, la preferencia incumplida se marca
+// y quien no tiene correo se queda sin canal, que es el precio de apagarlo—.
+
+describe('decidirCanal · interruptor global apagado', () => {
+  // El caso más favorable posible para WhatsApp: móvil, ventana abierta y opt-in. Si aun
+  // así sale correo, es que el interruptor manda sobre todo lo demás.
+  const elMejorCaso = {
+    telefono: '34612345678',
+    email: 'a@exemple.cat',
+    opt_in: true,
+    last_inbound_at: haceHoras(1),
+  }
+
+  it('con el interruptor apagado, el mejor caso de WhatsApp sale por correo', () => {
+    const d = decidirCanal({ ...elMejorCaso, whatsapp_activo: false }, AHORA)
+    expect(d.canal).toBe('email')
+    expect(d.whatsappPosible).toBe(false)
+    expect(d.motivo).toBe('whatsapp_desactivat')
+    expect(d.motivoWhatsapp).toBe('whatsapp_desactivat')
+  })
+
+  it('ausente o true, se comporta exactamente como antes', () => {
+    const sinCampo = decidirCanal(elMejorCaso, AHORA)
+    const conTrue = decidirCanal({ ...elMejorCaso, whatsapp_activo: true }, AHORA)
+    expect(sinCampo.canal).toBe('whatsapp')
+    expect(conTrue).toEqual(sinCampo)
+  })
+
+  it('una preferencia de WhatsApp se incumple y se dice', () => {
+    const d = decidirCanal(
+      { ...elMejorCaso, canal_preferido: 'whatsapp', whatsapp_activo: false }, AHORA,
+    )
+    expect(d.canal).toBe('email')
+    expect(d.preferenciaRespetada).toBe(false)
+    expect(d.preferido).toBe('whatsapp')
+    // El motivo que se enseña es el accionable, y aquí lo accionable es el interruptor.
+    expect(d.motivo).toBe('whatsapp_desactivat')
+  })
+
+  it('una preferencia de correo se respeta igual', () => {
+    const d = decidirCanal(
+      { ...elMejorCaso, canal_preferido: 'email', whatsapp_activo: false }, AHORA,
+    )
+    expect(d.canal).toBe('email')
+    expect(d.motivo).toBe('preferencia_email')
+    expect(d.preferenciaRespetada).toBe(true)
+  })
+
+  // El precio de apagarlo, escrito como prueba para que no sorprenda a nadie: quien solo
+  // tiene móvil se queda incontactable hasta que se le complete la ficha.
+  it('sin correo en la ficha, se queda SIN CANAL', () => {
+    const d = decidirCanal({ ...elMejorCaso, email: null, whatsapp_activo: false }, AHORA)
+    expect(d.canal).toBe('cap')
+    expect(d.motivo).toBe('sense_canal')
+    expect(d.motivoWhatsapp).toBe('whatsapp_desactivat')
+  })
+
+  it('el interruptor manda sobre cualquier combinación de ficha', () => {
+    for (const telefono of [null, '34931234567', '34612345678', '351912345678']) {
+      for (const opt_in of [true, false, null]) {
+        for (const last_inbound_at of [null, haceHoras(1), haceHoras(48)]) {
+          for (const canal_preferido of ['whatsapp', 'email', null] as const) {
+            const d = decidirCanal(
+              { telefono, opt_in, last_inbound_at, canal_preferido, email: 'a@exemple.cat', whatsapp_activo: false },
+              AHORA,
+            )
+            expect(d.whatsappPosible).toBe(false)
+            expect(d.canal).toBe('email')
+          }
+        }
+      }
+    }
+  })
+})

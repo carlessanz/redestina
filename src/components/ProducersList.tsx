@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from 'react'
 import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useWhatsappActiu } from '../hooks/useAppContext'
+import DialegCorreu from './DialegCorreu'
+import type { DestinatariCorreu } from './DialegCorreu'
 import { pendentsPerTelefon } from '../lib/contactes'
 import type { Productor, ProductorLlistat } from '../types'
 import { Button } from '@/components/ui/button'
@@ -26,6 +29,9 @@ function casa(p: Productor, q: string): boolean {
 
 export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
+  const waActiu = useWhatsappActiu()
+  // Un solo diálogo para toda la tabla: la fila solo dice a quién se escribe.
+  const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
   const [producers, setProducers] = useState<ProductorLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -109,8 +115,17 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
                   <TableCell>
                     <div className="flex justify-end gap-2">
                       <Button variant="outline" size="sm" onClick={() => onOpenDetail(p)}>{t('c.detail')}</Button>
-                      <Button size="sm" disabled={!p.phone} title={p.phone ? undefined : t('prod.no_phone')}
-                        onClick={() => p.phone && onSendMessage(p.phone, p.name)}>{t('c.message')}</Button>
+                      {/* Con WhatsApp apagado (§8) el botón no se deshabilita, se quita:
+                          deshabilitado invita a preguntarse qué le pasa a esa ficha. */}
+                      {waActiu && (
+                        <Button size="sm" disabled={!p.phone} title={p.phone ? undefined : t('prod.no_phone')}
+                          onClick={() => p.phone && onSendMessage(p.phone, p.name)}>{t('c.message')}</Button>
+                      )}
+                      <Button variant="outline" size="sm" disabled={!p.email}
+                        title={p.email ? undefined : t('correu.no_email')}
+                        onClick={() => setCorreuA({ email: p.email, nom: p.name, tipus: 'productor', id: p.id })}>
+                        {t('c.email_action')}
+                      </Button>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -151,6 +166,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
           </section>
         )}
       </CardContent>
+      <DialegCorreu obert={correuA !== null} onObert={(v) => { if (!v) setCorreuA(null) }} destinatari={correuA} />
     </Card>
   )
 }

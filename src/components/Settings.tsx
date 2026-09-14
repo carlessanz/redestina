@@ -1,18 +1,26 @@
 import { useEffect, useState } from 'react'
-import { ShieldCheck, ShieldAlert, Loader2 } from 'lucide-react'
+import { ShieldCheck, ShieldAlert, Loader2, MessageCircle, MessageCircleOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
-import { getTestMode, setTestMode } from '../lib/settings'
+import {
+  fitxesSenseCorreuAmbTelefon, getTestMode, getWhatsappActiu, setTestMode, setWhatsappActiu,
+} from '../lib/settings'
+import { useAppContext } from '../hooks/useAppContext'
 import { cn } from '../lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Settings() {
   const { t, lang, setLang } = useT()
+  const { recarrega } = useAppContext()
   const [testMode, setTest] = useState<boolean | null>(null)
+  const [waActiu, setWaActiu] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
-  useEffect(() => { void getTestMode().then(setTest) }, [])
+  useEffect(() => {
+    void getTestMode().then(setTest)
+    void getWhatsappActiu().then(setWaActiu)
+  }, [])
 
   async function cambiarTestMode(activo: boolean) {
     if (activo === testMode || saving) return
@@ -24,6 +32,30 @@ export default function Settings() {
     if (error) { toast.error(error); return }
     setTest(activo)
     toast.success(activo ? t('set.saved_on') : t('set.saved_off'))
+  }
+
+  /**
+   * Apagar WhatsApp es la decisión más grande de esta pantalla, así que antes de pedir
+   * confirmación se cuenta lo que cuesta: las fichas con teléfono y sin correo quedan
+   * incontactables. Que ese número salga DESPUÉS de pulsar no serviría de nada.
+   */
+  async function cambiarWhatsapp(activo: boolean) {
+    if (activo === waActiu || saving) return
+    if (!activo) {
+      setSaving(true)
+      const n = await fitxesSenseCorreuAmbTelefon()
+      setSaving(false)
+      if (!window.confirm(t('set.wa_confirm_off', { productors: n.productors, entitats: n.entitats }))) return
+    }
+    setSaving(true)
+    const error = await setWhatsappActiu(activo)
+    setSaving(false)
+    if (error) { toast.error(error); return }
+    setWaActiu(activo)
+    // El interruptor viaja en el contexto de sesión: sin recargarlo, el resto de la
+    // aplicación (botones, banners) seguiría pintando el estado anterior.
+    await recarrega()
+    toast.success(activo ? t('set.wa_saved_on') : t('set.wa_saved_off'))
   }
 
   return (
@@ -72,6 +104,50 @@ export default function Settings() {
               </div>
 
               <p className="text-xs text-muted-foreground">{t('set.test_help')}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* WhatsApp: el canal entero, encendido o apagado. */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('set.wa_title')}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {waActiu === null ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> {t('c.loading')}
+            </p>
+          ) : (
+            <>
+              <div className={cn('flex items-start gap-3 rounded-lg border p-3',
+                waActiu ? 'border-exito/30 bg-exito-fondo' : 'border-aviso/30 bg-aviso-fondo')}>
+                {waActiu
+                  ? <MessageCircle className="mt-0.5 size-5 shrink-0 text-exito" />
+                  : <MessageCircleOff className="mt-0.5 size-5 shrink-0 text-aviso" />}
+                <div className="text-sm">
+                  <div className={cn('font-semibold', waActiu ? 'text-exito' : 'text-aviso')}>
+                    {waActiu ? t('set.wa_on') : t('set.wa_off')}
+                  </div>
+                  <p className="mt-0.5 text-muted-foreground">
+                    {waActiu ? t('set.wa_on_desc') : t('set.wa_off_desc')}
+                  </p>
+                </div>
+              </div>
+
+              <div className="inline-flex rounded-md border p-0.5">
+                <button type="button" disabled={saving} onClick={() => void cambiarWhatsapp(true)}
+                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
+                    waActiu ? 'bg-exito text-white' : 'text-muted-foreground hover:bg-muted')}>
+                  {t('set.on')}
+                </button>
+                <button type="button" disabled={saving} onClick={() => void cambiarWhatsapp(false)}
+                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
+                    !waActiu ? 'bg-aviso text-white' : 'text-muted-foreground hover:bg-muted')}>
+                  {t('set.off')}
+                </button>
+              </div>
+
+              <p className="text-xs text-muted-foreground">{t('set.wa_help')}</p>
             </>
           )}
         </CardContent>

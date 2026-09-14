@@ -123,3 +123,17 @@ export function useOrganitzacio(tipus: 'productor' | 'entidad'): Organitzacio | 
   const { ctx } = useAppContext()
   return ctx?.organitzacions.find((o) => o.tipo === tipus) ?? null
 }
+
+/**
+ * ¿WhatsApp está activo como canal? (`app_settings.whatsapp_activo`, §8).
+ *
+ * Viene en el contexto de sesión, así que no cuesta ninguna consulta y lo pueden usar los
+ * tres paneles — un productor no puede leer `app_settings` por su cuenta.
+ *
+ * **Fail-safe encendido**: sin contexto o con una RPC anterior a la migración, `true`. Lo
+ * que decide de verdad es el servidor; esto es para no enseñar botones que van a fallar.
+ */
+export function useWhatsappActiu(): boolean {
+  const { ctx } = useAppContext()
+  return ctx?.whatsappActiu ?? true
+}

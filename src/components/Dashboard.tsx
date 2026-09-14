@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { X } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useWhatsappActiu } from '../hooks/useAppContext'
+import { cn } from '../lib/utils'
 import {
   anadirNumeroTest, borrarNumeroTest, listarNumerosTest, type MetaTestRecipient,
 } from '../lib/metaTest'
@@ -106,6 +108,7 @@ function GestorWhitelist({ titulo, ayuda, items, placeholderClave, placeholderEt
 
 export default function Dashboard() {
   const { t } = useT()
+  const waActiu = useWhatsappActiu()
   const [prodPhones, setProdPhones] = useState<(string | null)[]>([])
   const [entidades, setEntidades] = useState<{ telefono: string | null; email: string | null; opt_in: boolean | null }[]>([])
   const [excedentes, setExcedentes] = useState<ExcRow[]>([])
@@ -237,6 +240,11 @@ export default function Dashboard() {
       </section>
 
       <section className="grid gap-3 lg:grid-cols-2">
+        {/* Con WhatsApp apagado (§8) la lista de Meta no decide nada: se atenúa y se dice,
+            en vez de esconderla —sigue siendo el estado que hay que dejar bien antes de
+            volver a encender el canal—. */}
+        <div className={cn('space-y-2', !waActiu && 'opacity-60')}>
+        {!waActiu && <p className="text-xs text-aviso">{t('dash.wa_off')}</p>}
         <GestorWhitelist
           titulo={t('dash.meta_title')} ayuda={t('dash.meta_help')}
           items={lista.map((r) => ({ clave: r.phone, etiqueta: r.etiqueta }))}
@@ -245,6 +253,7 @@ export default function Dashboard() {
           onAdd={async (c, e) => { const err = await anadirNumeroTest(c, e); if (!err) setLista(await listarNumerosTest()); return err }}
           onDelete={async (c) => { await borrarNumeroTest(c); setLista(await listarNumerosTest()) }}
         />
+        </div>
         <GestorWhitelist
           titulo={t('dash.email_title')} ayuda={t('dash.email_help')}
           items={listaEmail.map((r) => ({ clave: r.email, etiqueta: r.etiqueta }))}

@@ -117,6 +117,18 @@ describe('mapejaContext', () => {
     expect(ctx.organitzacions).toEqual([])
     expect(ctx.registrePendent).toBe(false)
     expect(ctx.registreRebutjat).toBe(false)
+    // Y el interruptor de WhatsApp al revés: sin la migración llega `undefined` y la
+    // aplicación tiene que seguir comportándose como siempre, o sea con el canal activo.
+    expect(ctx.whatsappActiu).toBe(true)
+  })
+
+  it('el interruptor de WhatsApp solo se apaga con un `false` explícito', () => {
+    expect(mapejaContext(cru({ whatsapp_actiu: false })).whatsappActiu).toBe(false)
+    expect(mapejaContext(cru({ whatsapp_actiu: true })).whatsappActiu).toBe(true)
+    // El contexto degradado es el de emergencia (no se ha podido leer la sesión): ahí
+    // tampoco se apaga nada, porque lo que no se sabe no puede dejar la app muda. Quien
+    // corta de verdad es el servidor.
+    expect(contextDegradat('u-1', 'a@b.cat').whatsappActiu).toBe(true)
   })
 
   it('distingue «esperando validación» de «rechazado», que llegan los dos sin organizaciones', () => {

@@ -12,6 +12,8 @@ export type MotivoCanal =
   | 'sense_optin_ni_finestra' | 'sense_correu' | 'sense_canal'
   // La organización ha pedido este canal y era viable (§12.22).
   | 'preferencia_whatsapp' | 'preferencia_email'
+  // El interruptor global está apagado (§8): WhatsApp no es viable para nadie.
+  | 'whatsapp_desactivat'
 
 export interface EntidadPuntuada {
   id: string
@@ -40,6 +42,8 @@ export interface PriorizacionResult {
   ranking: EntidadPuntuada[]
   /** Modo test global tal y como lo ve el servidor (fuente de verdad). */
   modoTest: boolean
+  /** Interruptor global de WhatsApp (§8), también tal y como lo ve el servidor. */
+  whatsappActiu: boolean
   error: string | null
 }
 
@@ -48,7 +52,7 @@ export async function priorizarEntidades(excedenteId: string): Promise<Priorizac
     const { data } = await supabase.auth.getSession()
     const token = data.session?.access_token
     if (!token) {
-      return { ok: false, ranking: [], modoTest: true, error: 'Sesión caducada. Vuelve a entrar.' }
+      return { ok: false, ranking: [], modoTest: true, whatsappActiu: true, error: 'Sesión caducada. Vuelve a entrar.' }
     }
     const res = await fetch(`${supabaseUrl}/functions/v1/priorizar-entidades`, {
       method: 'POST',
@@ -59,18 +63,27 @@ export async function priorizarEntidades(excedenteId: string): Promise<Priorizac
       body: JSON.stringify({ excedente_id: excedenteId }),
     })
     const body = (await res.json().catch(() => null)) as
-      | { ranking?: EntidadPuntuada[]; modo_test?: boolean; error?: string }
+      | { ranking?: EntidadPuntuada[]; modo_test?: boolean; whatsapp_actiu?: boolean; error?: string }
       | null
     if (!res.ok) {
-      return { ok: false, ranking: [], modoTest: true, error: body?.error ?? `Error ${res.status}` }
+      return { ok: false, ranking: [], modoTest: true, whatsappActiu: true, error: body?.error ?? `Error ${res.status}` }
     }
-    // Fail-safe, igual que el servidor: ante la duda, modo test activo.
-    return { ok: true, ranking: body?.ranking ?? [], modoTest: body?.modo_test !== false, error: null }
+    // Fail-safe, igual que el servidor y en los dos sentidos: ante la duda, modo test
+    // activo (no enviar a quien no toca) y WhatsApp activo (no esconder un canal que sí
+    // está). Los dos defectos van hacia lo que la aplicación ha hecho siempre.
+    return {
+      ok: true,
+      ranking: body?.ranking ?? [],
+      modoTest: body?.modo_test !== false,
+      whatsappActiu: body?.whatsapp_actiu !== false,
+      error: null,
+    }
   } catch (err) {
     return {
       ok: false,
       ranking: [],
       modoTest: true,
+      whatsappActiu: true,
       error: `No se pudo priorizar: ${err instanceof Error ? err.message : String(err)}`,
     }
   }

@@ -10,7 +10,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendText, sendTemplate } from "../_shared/whatsapp.ts";
-import { esTelefonoTest, modoTestActivo } from "../_shared/gate.ts";
+import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 
 // CORS restringido a los orígenes del panel; ya no '*'.
@@ -101,6 +101,19 @@ Deno.serve(async (req) => {
     }
     if (type === "template" && (!input.template || typeof input.template !== "string")) {
       return responder({ error: "Falta 'template' para un mensaje de plantilla" }, 400);
+    }
+
+    // Interruptor global de WhatsApp (§8). Va antes que los gates de destinatario: con
+    // WhatsApp apagado da igual quién sea el destinatario, y el motivo que tiene que
+    // llegar al panel es este y no un `no_test_user` que despistaría.
+    if (!(await whatsappActivo(supabase))) {
+      return responder(
+        {
+          error: "WhatsApp està desactivat des de Configuració.",
+          code: "whatsapp_desactivat",
+        },
+        503,
+      );
     }
 
     // Gate "modo test" (§8): si el modo test global (app_settings.test_mode) está

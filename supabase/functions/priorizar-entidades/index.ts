@@ -11,7 +11,7 @@ import type { EntidadPriorizable, ExcedenteContexto } from "../_shared/priorizac
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
-import { modoTestActivo } from "../_shared/gate.ts";
+import { modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
   .split(",").map((o) => o.trim()).filter(Boolean);
@@ -146,6 +146,11 @@ Deno.serve(async (req) => {
     // distintas y el panel necesita las dos para explicar por qué un botón está gris.
     const modoTest = await modoTestActivo(supabase);
 
+    // Y el interruptor global (§8): con WhatsApp apagado no es un canal viable para nadie,
+    // así que `decidirCanal` devolverá `email` (o `cap` sin correo) y el panel obedece sin
+    // tener que consultar `app_settings`, que un externo ni siquiera puede leer.
+    const waActivo = await whatsappActivo(supabase);
+
     // Y `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
     const sinConvenio = await entidadesSinConvenio(
       supabase,
@@ -162,6 +167,7 @@ Deno.serve(async (req) => {
         opt_in: contacto?.opt_in,
         last_inbound_at: contacto?.last_inbound_at,
         canal_preferido: preferencias.get(e.id) ?? null,
+        whatsapp_activo: waActivo,
       });
       return {
         ...e,
@@ -185,6 +191,7 @@ Deno.serve(async (req) => {
       excedente_id,
       contexto,
       modo_test: modoTest,
+      whatsapp_actiu: waActivo,
       modalitat: excedente.modalitat ?? null,
       ranking: rankingConCanal,
     });

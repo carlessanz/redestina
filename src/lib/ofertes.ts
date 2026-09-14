@@ -58,10 +58,17 @@ export async function carregaCamps(
 }
 
 /** Crea la oferta. Devuelve el identificador legible (E-AAMMDD-XXX-YYY-N). */
+/**
+ * Qué ha pasado con el correo de confirmación de la oferta. `omes` = la ficha no tiene
+ * correo o el modo test lo bloquea; `simulat` = `RESEND_ENVIO_REAL` apagado. Ninguno hace
+ * fallar el alta: la oferta ya está creada y su referencia va en la misma respuesta.
+ */
+export type ConfirmacioEmail = 'enviat' | 'simulat' | 'omes' | 'error'
+
 export async function creaOferta(
   productorId: string,
   datos: Record<string, unknown>,
-): Promise<Resultat<{ id: string; id_excedente: string }>> {
+): Promise<Resultat<{ id: string; id_excedente: string; confirmacio_email?: ConfirmacioEmail }>> {
   try {
     const t = await token()
     if (!t) return { ok: false, error: 'unauthorized' }

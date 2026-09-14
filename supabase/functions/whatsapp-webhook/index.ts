@@ -8,7 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendText } from "../_shared/whatsapp.ts";
 import { leerRespuesta, procesarIntake } from "../_shared/intake.ts";
 import { procesarRespuestaOferta } from "../_shared/respuestas.ts";
-import { esTelefonoTest, modoTestActivo } from "../_shared/gate.ts";
+import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 
 const encoder = new TextEncoder();
 
@@ -81,6 +81,9 @@ Deno.serve(async (req) => {
 
     const payload = JSON.parse(rawBody);
 
+    // Una lectura por petición, no por mensaje: un lote de Meta puede traer varios.
+    const waActivo = await whatsappActivo(supabase);
+
     for (const entry of payload.entry ?? []) {
       for (const change of entry.changes ?? []) {
         const value = change.value ?? {};
@@ -140,6 +143,12 @@ Deno.serve(async (req) => {
             .update({ last_inbound_at: new Date().toISOString() })
             .eq("phone", from);
           if (windowError) console.error("last_inbound_at update:", windowError.message);
+
+          // Interruptor global de WhatsApp (§8). Va DESPUÉS de registrar el mensaje y de
+          // abrir la ventana de 24 h —el entrante existió y queda en la consola para que
+          // una persona lo atienda por correo— y ANTES de cualquier respuesta: apagado no
+          // se contesta nada, ni ALTA/BAJA, ni el diálogo de oferta, ni el intake.
+          if (!waActivo) continue;
 
           // Gate "modo test" (§8): si el modo test global (app_settings.test_mode)
           // está activo —lo está por defecto—, el mensaje entrante queda registrado y

@@ -37,6 +37,7 @@ import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -87,6 +88,7 @@ const CAMPS = {
 
 export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'entidad' }) {
   const { t } = useT()
+  const waActiu = useWhatsappActiu()
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
   const [canal, setCanal] = useState<Tria>('auto')
@@ -256,6 +258,10 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               <AlertDescription className="text-aviso">
                 <p>{t('perf.channel_limits')}</p>
                 {!telefon && <p>{t('perf.channel_no_phone')}</p>}
+                {/* La opción sigue ahí: la preferencia se guarda y vuelve a valer cuando
+                    se reactive el canal. Lo que no se puede es callar que hoy no se
+                    cumplirá (§8bis: una preferencia ignorada en silencio es peor). */}
+                {!waActiu && <p>{t('perf.channel_wa_off')}</p>}
               </AlertDescription>
             </Alert>
           )}

@@ -23,84 +23,14 @@ import {
   esEmailTest,
   esCuentaPermitida,
   modoTestActivo,
+  whatsappActivo,
   destinatariosPrueba,
 } from '../supabase/functions/_shared/gate.ts'
 
-// ---------------------------------------------------------------------------
-// El doble del cliente
-// ---------------------------------------------------------------------------
-
-type Fila = Record<string, unknown>
-/** Una tabla son sus filas, o la palabra `error` si se quiere simular que la consulta falla. */
-type Tabla = Fila[] | 'error'
-type BaseFalsa = Record<string, Tabla>
-
-class Consulta {
-  private filtros: ((f: Fila) => boolean)[] = []
-  private tope: number | null = null
-
-  constructor(private tabla: Tabla) {}
-
-  select(_columnas?: string) { return this }
-
-  eq(columna: string, valor: unknown) {
-    this.filtros.push((f) => f[columna] === valor)
-    return this
-  }
-
-  /** `ilike` sin comodines, que es como lo usa el gate: igualdad sin distinguir mayúsculas. */
-  ilike(columna: string, valor: unknown) {
-    const v = String(valor).toLowerCase()
-    this.filtros.push((f) => String(f[columna] ?? '').toLowerCase() === v)
-    return this
-  }
-
-  in(columna: string, valores: unknown[]) {
-    this.filtros.push((f) => valores.includes(f[columna]))
-    return this
-  }
-
-  limit(n: number) {
-    this.tope = n
-    return this
-  }
-
-  private resolver(): { data: Fila[] | null; error: { message: string } | null } {
-    if (this.tabla === 'error') return { data: null, error: { message: 'consulta fallida' } }
-    let filas = this.tabla.filter((f) => this.filtros.every((p) => p(f)))
-    if (this.tope !== null) filas = filas.slice(0, this.tope)
-    return { data: filas, error: null }
-  }
-
-  maybeSingle(): Promise<{ data: Fila | null; error: { message: string } | null }> {
-    const { data, error } = this.resolver()
-    return Promise.resolve({ data: data?.[0] ?? null, error })
-  }
-
-  // Thenable: `await consulta` y `Promise.all([...])` funcionan igual que con supabase-js.
-  then<R>(
-    alCumplir: (v: { data: Fila[] | null; error: { message: string } | null }) => R,
-    alFallar?: (e: unknown) => R,
-  ): Promise<R> {
-    return Promise.resolve(this.resolver()).then(alCumplir, alFallar)
-  }
-}
-
-// El tipo del cliente es `any` en el propio `gate.ts` (no hay tipos de Deno aquí), así que
-// el doble lo devuelve igual: es el único `any` de estas pruebas y es inevitable.
-// deno-lint-ignore no-explicit-any
-type ClienteFalso = any
-
-function crearCliente(base: BaseFalsa): { cliente: ClienteFalso; consultadas: string[] } {
-  const consultadas: string[] = []
-  const cliente = {
-    from(tabla: string) {
-      consultadas.push(tabla)
-      return new Consulta(base[tabla] ?? [])
-    },
-  }
-  return { cliente, consultadas }
-}
+// El doble del cliente vive en `tests/soporte/clienteFalso.ts`: lo comparten estas
+// pruebas y las de `whatsapp.ts`.
+import { crearCliente } from './soporte/clienteFalso.ts'
+import type { BaseFalsa } from './soporte/clienteFalso.ts'
 
 // ---------------------------------------------------------------------------
 
@@ -330,6 +260,57 @@ describe('modoTestActivo · el fail-safe', () => {
       ],
     })
     expect(await modoTestActivo(cliente)).toBe(true)
+  })
+})
+
+describe('whatsappActivo · el fail-safe, al revés', () => {
+  // La duda aquí NO puede cortar: si esta función se equivoca hacia `false`, la plataforma
+  // se queda muda sin que nadie lo haya decidido. Por eso el defecto es ENCENDIDO, justo el
+  // contrario que en `modoTestActivo`, y por eso cada cara de la duda tiene su prueba.
+  it('solo un «false» explícito lo apaga', async () => {
+    const { cliente } = crearCliente({ app_settings: [{ key: 'whatsapp_activo', value: 'false' }] })
+    expect(await whatsappActivo(cliente)).toBe(false)
+  })
+
+  it('con «true» está activo', async () => {
+    const { cliente } = crearCliente({ app_settings: [{ key: 'whatsapp_activo', value: 'true' }] })
+    expect(await whatsappActivo(cliente)).toBe(true)
+  })
+
+  it('si la fila NO EXISTE, se comporta como ACTIVO', async () => {
+    const { cliente } = crearCliente({ app_settings: [] })
+    expect(await whatsappActivo(cliente)).toBe(true)
+  })
+
+  it('si la consulta FALLA, se comporta como ACTIVO', async () => {
+    const { cliente } = crearCliente({ app_settings: 'error' })
+    expect(await whatsappActivo(cliente)).toBe(true)
+  })
+
+  it('si el valor es basura o está vacío, se comporta como ACTIVO', async () => {
+    for (const value of ['', 'FALSE', 'no', '0', null, undefined]) {
+      const { cliente } = crearCliente({ app_settings: [{ key: 'whatsapp_activo', value }] })
+      expect(await whatsappActivo(cliente)).toBe(true)
+    }
+  })
+
+  it('lee la clave whatsapp_activo y no la del modo test', async () => {
+    const { cliente } = crearCliente({
+      app_settings: [
+        { key: 'test_mode', value: 'false' },
+        { key: 'whatsapp_activo', value: 'true' },
+      ],
+    })
+    expect(await whatsappActivo(cliente)).toBe(true)
+    // Y al revés: apagar WhatsApp no apaga el modo test.
+    const { cliente: c2 } = crearCliente({
+      app_settings: [
+        { key: 'test_mode', value: 'true' },
+        { key: 'whatsapp_activo', value: 'false' },
+      ],
+    })
+    expect(await modoTestActivo(c2)).toBe(true)
+    expect(await whatsappActivo(c2)).toBe(false)
   })
 })
 

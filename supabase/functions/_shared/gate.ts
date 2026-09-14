@@ -82,6 +82,24 @@ export async function modoTestActivo(supabase: Cliente): Promise<boolean> {
 }
 
 /**
+ * ¿Está activo WhatsApp como canal? (`app_settings.whatsapp_activo`, interruptor global
+ * del super_admin desde Configuración, §8). Apagado, no sale ni un mensaje por WhatsApp:
+ * ni intake, ni recordatorios, ni ALTA/BAJA, ni ofertas.
+ *
+ * **Fail-safe al revés que `modoTestActivo`, y es deliberado.** Allí la duda debe cortar un
+ * envío; aquí la duda no puede dejar a la plataforma muda, así que si falta la fila o hay
+ * un error de lectura se devuelve `true`. Solo un `'false'` explícito apaga WhatsApp.
+ *
+ * Quién decide QUÉ canal se usa es `canal.ts` (esto entra ahí por parámetro); esta función
+ * es solo la lectura del interruptor.
+ */
+export async function whatsappActivo(supabase: Cliente): Promise<boolean> {
+  const { data } = await supabase
+    .from("app_settings").select("value").eq("key", "whatsapp_activo").maybeSingle();
+  return data?.value !== "false";
+}
+
+/**
  * Barrera del MODO PRUEBA de un documento: a quién se le puede mandar.
  *
  * ⚠️ ES INDEPENDIENTE DE `test_mode`, Y ESE ES TODO EL PUNTO. El modo test global (§8) es
