@@ -12,16 +12,17 @@
 // nombre de la organización arriba—, que es el caso del 99% de las cuentas.
 
 import { NavLink, useLocation } from 'react-router'
-import { Building2, Tractor, Users } from 'lucide-react'
+import { Building2, LogOut, Tractor, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
+import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import { navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
 import {
-  Sidebar, SidebarContent, SidebarGroup, SidebarGroupContent,
+  Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuBadge, SidebarMenuButton,
   SidebarMenuItem, SidebarSeparator, useSidebar,
 } from '@/components/ui/sidebar'
@@ -49,7 +50,10 @@ export default function AppSidebar({ comptadors }: Props) {
   // `ctx` es null mientras se resuelve la sesión: sin el fallback esto reventaría.
   const rols = ctx?.rols ?? []
   const multi = rols.length > 1
-  const titol = multi ? 'Redestina' : (organitzacio?.nombre ?? t('app.team'))
+  // Con varios paneles no hay una organización que poner al lado del logo, y repetir
+  // «Redestina» junto a un logo que ya lo dice era ruido: se deja solo el logo. Con un
+  // panel sí aporta, porque es el nombre de la organización.
+  const titol = multi ? null : (organitzacio?.nombre ?? t('app.team'))
 
   // En móvil, elegir una sección cierra el panel; si no, se queda encima del contenido.
   const alNavegar = () => { if (isMobile) setOpenMobile(false) }
@@ -60,9 +64,11 @@ export default function AppSidebar({ comptadors }: Props) {
         {/* A `/panell`, no a `/`: la raíz es la página pública y sacaría de la aplicación. */}
         <NavLink to="/panell" className="flex items-center gap-2.5 overflow-hidden" onClick={alNavegar}>
           <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-7 w-auto shrink-0" />
-          <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
-            {titol}
-          </span>
+          {titol && (
+            <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
+              {titol}
+            </span>
+          )}
         </NavLink>
       </SidebarHeader>
 
@@ -127,6 +133,24 @@ export default function AppSidebar({ comptadors }: Props) {
           )
         })}
       </SidebarContent>
+
+      {/* Salir, también aquí. El menú de la persona (arriba a la derecha) lo sigue
+          teniendo, con el idioma y la ficha, pero llegar hasta el avatar para cerrar
+          sesión obliga a cruzar la pantalla entera. En modo icono queda el icono con
+          su tooltip, como el resto. */}
+      <SidebarFooter className="pb-3">
+        <SidebarMenu>
+          <SidebarMenuItem>
+            <SidebarMenuButton
+              tooltip={t('nav.logout')}
+              onClick={() => { alNavegar(); void supabase.auth.signOut() }}
+            >
+              <LogOut />
+              <span>{t('nav.logout')}</span>
+            </SidebarMenuButton>
+          </SidebarMenuItem>
+        </SidebarMenu>
+      </SidebarFooter>
     </Sidebar>
   )
 }

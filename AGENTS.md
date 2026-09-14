@@ -238,7 +238,11 @@ que al añadir una hay que medirla, no estimarla.
 
 **Layout** (desde 2026-07-30): **menú lateral vertical plegable** (`sidebar` de shadcn: 16rem ↔ 3rem
 en modo icono, estado en cookie, atajo Ctrl/Cmd+B) + barra superior de 14 con el título de la
-sección y el menú de la persona (idioma y salir). En móvil el menú se abre como panel deslizante y,
+sección y el menú de la persona (idioma, ficha y salir). Desde el 14-09-2026 el menú lateral
+tiene **pie con «Sortir»**: es la única acción duplicada a propósito, porque cruzar la pantalla
+hasta el avatar para cerrar sesión es incómodo. Y su cabecera enseña **solo el logo** cuando la
+cuenta tiene varios paneles: el nombre al lado repetía lo que ya dice el logo. Con un único
+panel sigue saliendo el nombre de la organización, que ahí sí informa. En móvil el menú se abre como panel deslizante y,
 **solo en los paneles de productor y receptor**, hay además **barra inferior** con sus 3-4 secciones
 (el equipo tiene siete, no caben). La barra inferior es hermana flex `shrink-0`, no `fixed`: así
 ninguna pantalla necesita padding inferior y el composer del chat nunca queda debajo.
@@ -383,9 +387,9 @@ src/
                                se monta más abajo, dentro de RequireSessio; §6quater)
   router/index.tsx             Mapa de rutas: públicas + privadas por rol (§6quater)
   layout/AppShell.tsx          Sidebar + barra superior + contenido + barra inferior (§2)
-  layout/AppSidebar.tsx        Menú lateral plegable; con varios paneles los pinta todos (§6ter)
+  layout/AppSidebar.tsx        Menú lateral plegable; con varios paneles los pinta todos, y pie con «Sortir» (§6ter)
   layout/BottomNav.tsx         Barra inferior de móvil (productor y receptor)
-  layout/UserMenu.tsx          Avatar, idioma y salir
+  layout/UserMenu.tsx          Avatar, idioma y salir (salir está también en el pie del menú lateral)
   hooks/useSessio.tsx          Sesión cruda (¿hay token?) + evento PASSWORD_RECOVERY (§6quater)
   hooks/useAppContext.tsx      get_my_session_context(): quién eres (§4bis). El panel activo se
                                DERIVA de la URL; useOrganitzacio(tipus) para las pantallas
@@ -451,6 +455,12 @@ scripts/
   crear-usuarios-prueba.ts     5 organizaciones ficticias TEST-* y 7 cuentas, idempotente (§9)
   crear-usuarios-whatsapp.ts   5 cuentas de organización sobre las fichas REALES con móvil en
                                Meta; no crea ni toca ninguna ficha, solo enlaza (§9)
+  crear-datos-documentales-prueba.ts  La espigolada del plan de punta a punta: lotes, REC, tres
+                               ENT, convenios, dos ofertas y el cierre de prueba. Fixture del arnés
+  crear-respuestas-prueba.ts   Las respuestas de las entidades a una oferta en sus tres estados
+                               (aprobada y canalizada, pendiente de aprobar, rechazada). Usa las
+                               SESIONES de las cuentas de prueba, no la service key, para pasar
+                               por manifestar_interes() y aprovar_resposta()
   prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
@@ -2545,6 +2555,13 @@ deno run -A scripts/crear-usuarios-prueba.ts --dry-run   # simular el alta de lo
 deno run -A scripts/crear-usuarios-prueba.ts             # crearlos (idempotente)
 deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas de WhatsApp (§9)
 deno run -A scripts/crear-usuarios-whatsapp.ts           # crearlas (no toca ninguna ficha)
+
+# Fixtures de datos. El orden importa: las respuestas necesitan las ofertas y los convenios
+# que deja el documental, y los dos necesitan las cuentas de arriba.
+deno run -A scripts/crear-datos-documentales-prueba.ts --dry-run
+deno run -A scripts/crear-datos-documentales-prueba.ts   # espigolada, lotes, albaranes y cierre
+deno run -A scripts/crear-respuestas-prueba.ts --dry-run
+deno run -A scripts/crear-respuestas-prueba.ts           # respuestas: aprobada, pendiente y rechazada
 
 # ⚠️ Una tanda con huecos necesita --include-all. Pasó con la fase 1 documental: el spike
 # aplicó 20260928100600 y ...100800 dejando huecos por debajo, así que las seis migraciones

@@ -1,5 +1,8 @@
-// Menú de la persona: idioma, panel activo y salir. Vive SOLO en la barra superior;
-// duplicarlo también en el pie del menú lateral es el error clásico de este layout.
+// Menú de la persona: idioma, ficha y salir, en la barra superior.
+//
+// «Salir» está TAMBIÉN en el pie del menú lateral desde el 14-09-2026, a petición de uso:
+// cruzar toda la pantalla hasta el avatar para cerrar sesión es incómodo, y es la única
+// acción que se repite a propósito. El idioma y la ficha siguen viviendo solo aquí.
 
 import { LogOut, User } from 'lucide-react'
 import { supabase } from '../lib/supabase'
