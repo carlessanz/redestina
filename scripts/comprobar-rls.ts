@@ -72,10 +72,10 @@
 //
 // ⚠️ Dos de estas comprobaciones dependen del interruptor `roles_activos` (§4bis): con
 //    el interruptor APAGADO —que es como nace cualquier entorno recreado desde las
-//    migraciones, incluido el local— `es_super_admin()` devuelve true para cualquier
+//    migraciones— `es_super_admin()` devuelve true para cualquier
 //    autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. No es
-//    una regresión: es el fail-open deliberado. Contra remoto, donde el interruptor está
-//    encendido, pasa.
+//    una regresión: es el fail-open deliberado. En el proyecto remoto, donde el
+//    interruptor está encendido, pasa.
 
 // ALBARANES Y ESPIGOLADA (fase 3, migraciones 20261012*). Entran seis tablas más
 // —`albaranes`, `albaran_lineas`, `espigoladas`, `documentos_externos`, `tipos_caja` y
@@ -1447,94 +1447,15 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
 const cuentas = await leerCuentas();
 const resultados: Resultado[] = [];
 
-// Tablas que el equipo ve vacías: no tienen filas, punto. Una expectativa de "permitir"
-// sobre ellas no demuestra nada, así que se salta en vez de dar un falso negativo (es lo
-// que pasa contra una base local recién sembrada, donde no hay ofertas ni mensajes).
-// ── Cómo se abre la sesión: login real en remoto, JWT firmado en local ──────────
+// ── Cómo se abre la sesión: login real contra el proyecto remoto ───────────────
 //
-// En el CLI local `[auth.email] enable_signup = false` —que es obligatorio y debe seguir
-// así (§9)— arrastra `GOTRUE_EXTERNAL_EMAIL_ENABLED=false` en el contenedor, así que
-// `signInWithPassword` responde «Email logins are disabled» para TODAS las cuentas y el
-// arnés salía 0/7 contra local sin que hubiera nada roto. No se arregla tocando ese flag:
-// además de ser la postura correcta, un `config push` accidental dejaría al equipo fuera
-// de producción (§9, «No hacer supabase config push»).
-//
-// Contra local, entonces, se firma el JWT con el secreto del stack y se evita GoTrue por
-// completo. PostgREST valida la firma igual y **RLS se aplica exactamente igual**: lo que
-// decide es el `sub` del token, no cómo se obtuvo. Verificado con `get_my_session_context`,
-// que devuelve el rol real de cada cuenta.
-const esLocal = URL_BASE.includes("127.0.0.1") || URL_BASE.includes("localhost");
-const JWT_SECRET_LOCAL = Deno.env.get("SUPABASE_JWT_SECRET") ??
-  "super-secret-jwt-token-with-at-least-32-characters-long"; // el del CLI, público
-
-function base64url(entrada: Uint8Array | string): string {
-  const bytes = typeof entrada === "string" ? new TextEncoder().encode(entrada) : entrada;
-  let bin = "";
-  for (const b of bytes) bin += String.fromCharCode(b);
-  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
-}
-
-async function firmarJwtLocal(userId: string, email: string): Promise<string> {
-  const cabecera = base64url(JSON.stringify({ alg: "HS256", typ: "JWT" }));
-  const ahora = Math.floor(Date.now() / 1000);
-  const cuerpo = base64url(JSON.stringify({
-    sub: userId,
-    email,
-    role: "authenticated",
-    aud: "authenticated",
-    iat: ahora,
-    exp: ahora + 3600,
-    app_metadata: { provider: "email" },
-    user_metadata: {},
-  }));
-  const clave = await crypto.subtle.importKey(
-    "raw",
-    new TextEncoder().encode(JWT_SECRET_LOCAL),
-    { name: "HMAC", hash: "SHA-256" },
-    false,
-    ["sign"],
-  );
-  const firma = new Uint8Array(
-    await crypto.subtle.sign("HMAC", clave, new TextEncoder().encode(`${cabecera}.${cuerpo}`)),
-  );
-  return `${cabecera}.${cuerpo}.${base64url(firma)}`;
-}
-
-/** email → uuid de auth.users. Solo en local, y solo para poder firmar el token. */
-async function idsLocales(): Promise<Map<string, string>> {
-  const secreto = Deno.env.get("SB_SECRET_KEY");
-  if (!secreto) {
-    console.error("Contra la base local hace falta SB_SECRET_KEY para resolver los uuid.");
-    console.error("El login por correo está apagado en el CLI local (§9), así que el arnés");
-    console.error("firma el JWT en vez de iniciar sesión. Con `supabase status` tienes la clave.");
-    Deno.exit(1);
-  }
-  const admin = createClient(URL_BASE, secreto, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
-  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (error) {
-    console.error("No se pudo listar los usuarios locales:", error.message);
-    Deno.exit(1);
-  }
-  return new Map(data.users.map((u) => [u.email ?? "", u.id]));
-}
-
-const idsPorEmail = esLocal ? await idsLocales() : new Map<string, string>();
+// El arnés abre sesión con `signInWithPassword` y la publishable key, igual que el
+// navegador, y así RLS se evalúa con el `sub` real de cada cuenta. Este proyecto no usa
+// Supabase local (§9), así que no hay ninguna rama alternativa: si una cuenta no puede
+// entrar, es un fallo de verdad y sale en rojo.
 
 /** Cliente con la sesión de esa cuenta, o el motivo por el que no se pudo abrir. */
 async function abrirSesion(cuenta: Cuenta): Promise<{ cliente?: SupabaseClient; error?: string }> {
-  if (esLocal) {
-    const id = idsPorEmail.get(cuenta.email);
-    if (!id) return { error: `no existe en la base local: ${cuenta.email}` };
-    const jwt = await firmarJwtLocal(id, cuenta.email);
-    return {
-      cliente: createClient(URL_BASE, PUBLISHABLE, {
-        auth: { autoRefreshToken: false, persistSession: false },
-        global: { headers: { Authorization: `Bearer ${jwt}` } },
-      }),
-    };
-  }
   const cliente = createClient(URL_BASE, PUBLISHABLE, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
@@ -1545,6 +1466,8 @@ async function abrirSesion(cuenta: Cuenta): Promise<{ cliente?: SupabaseClient; 
   return error ? { error: error.message } : { cliente };
 }
 
+// Tablas que el equipo ve vacías: no tienen filas, punto. Una expectativa de "permitir"
+// sobre ellas no demuestra nada, así que se salta en vez de dar un falso negativo.
 const vacias = new Set<string>();
 
 // El equipo primero: es quien lo ve todo, así que sirve para saber qué tablas están
@@ -1557,11 +1480,8 @@ const ordenadas = [...cuentas].sort((a, b) => {
 for (const cuenta of ordenadas) {
   const { cliente, error: authError } = await abrirSesion(cuenta);
   if (authError || !cliente) {
-    // Una cuenta que no existe en ESTA base no es un fallo de permisos: es falta de
-    // datos, igual que una tabla vacía (§12.48). Pasa en local con las cuentas que
-    // cuelgan de fichas reales del equipo, que el fixture no crea. Sale SALTADA con el
-    // motivo, y el aviso de «no las cubre nadie» sigue vigilando la cobertura perdida.
-    const ausente = esLocal && (authError ?? "").startsWith("no existe en la base local");
+    // Contra el proyecto remoto, no poder abrir sesión es un fallo de verdad: la cuenta
+    // existe en `scripts/data/cuentas-prueba.json` y tiene que poder entrar.
     resultados.push({
       cuenta: cuenta.etiqueta,
       rol: cuenta.rol,
@@ -1570,10 +1490,8 @@ for (const cuenta of ordenadas) {
         op: "leer",
         esperado: "permitir",
         descripcion: "iniciar sesión",
-        ...(ausente ? { requiereFixture: `la cuenta ${cuenta.email} en esta base` } : {}),
       },
-      ok: ausente,
-      saltada: ausente,
+      ok: false,
       detalle: authError ?? "sin cliente",
     });
     continue;

@@ -20,9 +20,11 @@
 // sobreviven son exactamente 1..N consecutivos y `max(numero) = count(*)`. Y tiene que
 // pasar 5 veces seguidas, limpiando con `reiniciar_documentos_prova()` entre pasadas.
 //
-// SE EJECUTA CONTRA LOCAL. Con la service key: `emitir_documento_prova()` exige
-// `es_super_admin()` cuando hay sesión de usuario, y deja pasar a `service_role`
-// (auth.uid() null), que es quien la llama aquí y quien la llamará desde el servidor.
+// SE EJECUTA CONTRA EL PROYECTO REMOTO enlazado (este proyecto no usa Supabase local).
+// Con la service key: `emitir_documento_prova()` exige `es_super_admin()` cuando hay
+// sesión de usuario, y deja pasar a `service_role` (auth.uid() null), que es quien la
+// llama aquí y quien la llamará desde el servidor. Escribe solo en documentos de prueba
+// y se limpia con `reiniciar_documentos_prova()`.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -45,7 +47,7 @@ const url = Deno.env.get("SUPABASE_URL");
 const secret = Deno.env.get("SB_SECRET_KEY");
 if (!url || !secret) {
   console.error("Faltan SUPABASE_URL o SB_SECRET_KEY en el entorno.");
-  console.error("Contra el stack local: SUPABASE_URL=http://127.0.0.1:55321");
+  console.error("Salen de .env.local: VITE_SUPABASE_URL y la service key del proyecto remoto.");
   Deno.exit(1);
 }
 

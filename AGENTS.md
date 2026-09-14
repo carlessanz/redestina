@@ -207,6 +207,12 @@ organización ya existe (deuda §12.28).
 | Scripts | Deno 2.x (`scripts/import-ara.ts`) |
 | Hosting frontend | Vercel (proyecto `redestina`) |
 
+> ⚠️ **Una sola base: la remota.** Desde el 14-09-2026 este proyecto **no usa Supabase local**.
+> No hay `supabase start` ni Docker: el CLI se usa solo contra el proyecto enlazado (migraciones
+> con `db push`, funciones con `functions deploy`) y `npm run dev` levanta el frontend en tu
+> máquina apuntando al remoto con `.env.local`. Las consecuencias para el trabajo diario están
+> en §7 (convenciones) y §11 (comandos).
+
 **Con router** (`react-router` v7, desde 2026-07-30: los paneles por rol necesitan URL propia,
 enlace profundo y gesto «atrás»; el `useState<View>` anterior no daba ninguna de las tres) y sin
 librería de estado. Desde el 31-07-2026 el router es además la **capa raíz**, con rutas públicas y
@@ -452,7 +458,7 @@ scripts/
   sql/rls-emergencia.sql       Paracaídas: restaura las políticas permisivas (NO es migración)
   data/                        Los CSV — IGNORADO POR GIT (datos personales, §7)
 supabase/
-  config.toml                  Config del CLI (puertos 553xx, ver §7)
+  config.toml                  Config del CLI: project_id, migraciones y verify_jwt por función (§7)
   migrations/*.sql             Migraciones versionadas
   functions/
     _shared/cors.ts            originPermitido()/corsPara(): CORS de las funciones públicas (§10)
@@ -810,7 +816,7 @@ trigger, un `net.http_post` perdido deja un documento sin PDF para siempre y nad
 el job, quien acaba de pulsar «Emet» mira cinco minutos una pantalla que dice «Generant…». El tope
 de 5 intentos es deliberado: lo que falla cinco veces (una plantilla rota, un parámetro que falta)
 no se arregla repitiendo. **Sin el secreto en `app_config`, los tres disparadores son no-op con
-`notice`**, que es lo que permite emitir documentos de prueba en local sin que nada salga a la red.
+`notice`**, que es lo que permite emitir documentos de prueba sin que nada salga a la red.
 
 ⚠️ **Dos contadores, porque son dos fallos distintos** (`20270302100000`, §12.89). `intentos` son
 las generaciones que fallaron **y lo dijeron** (lo sube `marcar_documento_error()`); `reencolados`,
@@ -1266,8 +1272,8 @@ sesión** → `401` (no `403`).
 `deno run -A scripts/comprobar-rls.ts` (§11): abre sesión con cada cuenta —con la publishable
 key, como el navegador— y comprueba una matriz declarativa de *(cuenta, tabla, operación) →
 permitir/denegar*. Referencia con el sistema documental: **95/95 correctas y 12 saltadas** (107
-comprobaciones). Contra local hay que darle también `SB_SECRET_KEY`: ahí no inicia sesión, firma el
-JWT, porque el CLI apaga el login por correo (§9).
+comprobaciones). Abre sesión de verdad contra el proyecto remoto, así que una cuenta que no puede
+entrar sale en rojo: no hay ninguna rama alternativa desde que se retiró el Supabase local (§7).
 
 Del sistema documental comprueba que el técnico lee plantillas y parámetros pero **no los
 escribe**, que el super_admin sí, que ninguna cuenta externa ve plantillas, parámetros, enlaces ni
@@ -1362,8 +1368,8 @@ igual que el script y emitiendo `insert … on conflict … do update`. Basta co
 migración nueva con el mismo formato; no editar la ya aplicada.
 
 `scripts/import-ara.ts` (Deno) carga los 5 CSV de `scripts/data/`. **Idempotente**: se puede
-ejecutar las veces que haga falta. Admite `--dry-run`. Verificado end-to-end contra la base
-local (dos pasadas: la segunda actualiza, no duplica).
+ejecutar las veces que haga falta. Admite `--dry-run`. Verificado end-to-end con dos pasadas
+seguidas: la segunda actualiza, no duplica.
 
 | CSV | Filas | Destino | Clave |
 | --- | --- | --- | --- |
@@ -1773,18 +1779,20 @@ menú (`AppShell`) **suma las dos colas**.
   compilar. Si la lista es larga, que la línea sea larga (deuda §12.46).
 - **Migraciones**: `supabase/migrations/AAAAMMDDHHMMSS_descripcion.sql`. Nunca editar una ya
   aplicada; añadir una nueva.
-- **Puertos del Supabase local**: este proyecto usa el rango **553xx** (API 55321, BD 55322,
-  Studio 55323…), desplazado respecto al 543xx por defecto. En esta máquina conviven varios
-  stacks de Supabase a la vez y el rango por defecto está ocupado por otros proyectos; con
-  los puertos propios, `supabase start` levanta este entorno **sin parar los demás**. Si
-  añades un servicio nuevo a `config.toml`, dale también un puerto 553xx libre.
+- **Sin Supabase local (14-09-2026)**: este proyecto trabaja SIEMPRE contra el proyecto
+  remoto enlazado. No se usa `supabase start`, ni Docker, ni el rango de puertos 553xx que
+  usaba antes. `supabase/config.toml` conserva solo lo que hace falta para el remoto
+  (`project_id`, `major_version`, migraciones, `edge_runtime` y el bloque de cada función);
+  las secciones del stack local se retiraron. Las migraciones se aplican con
+  `supabase db push --dry-run` y después `supabase db push` (§11), así que el SQL tiene que
+  ser revisable e idempotente: el primer sitio donde se ejecuta ya es la base real.
 
 ## 8. Reglas de negocio
 
 > ⚠️ **Envío real ACTIVADO en remoto** (`WHATSAPP_ENVIO_REAL=true`, 2026-07-22). El interruptor
 > (env var) gobierna el único punto que llama a la Graph API (`enviar()` en `_shared/whatsapp.ts`):
 > solo si vale exactamente `"true"` sale algo. En remoto ya lo está, así que **sí se contacta con
-> Meta**; en local, sin el secreto, se **simula** (`status='simulat'`). Lo que evita el desastre en
+> Meta**; sin el secreto, o con cualquier otro valor, se **simula** (`status='simulat'`). Lo que evita el desastre en
 > remoto es que el número **sigue en el entorno de test de Meta**: Meta solo entrega a los ≤5
 > verificados (los de `meta_test_recipients`); el resto lo rechaza con `131030`. **Aviso: si el
 > número pasa a producción con el interruptor en `true`, enviaría a TODOS** — revisar lista y flujo
@@ -2297,9 +2305,9 @@ curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/js
   -d '{"external_email_enabled": true}'
 ```
 
-En el **CLI local** los dos flags no son independientes: `external.email` sigue a
-`enable_signup`, así que con `enable_signup = false` el login por email tampoco funciona en
-local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a **remoto**.
+Los dos flags se gobiernan **solo desde el proyecto remoto**, con el Management API de arriba.
+Este proyecto no tiene stack local (§7), así que `supabase config push` no entra en el flujo
+—y seguiría prohibido (§9)— y `npm run dev` trabaja con `.env.local`, que apunta al remoto.
 
 ## 10. Variables de entorno
 
@@ -2310,7 +2318,7 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
 - `VITE_ACCESSOS_TEST` — `"true"` enseña en `/login` los accesos de un clic a las cuentas de prueba
   (§6quater). **Es una variable de build**: cambiarla exige recompilar y volver a desplegar, no basta
   con editarla en Vercel. Con cualquier otro valor —o ausente— el módulo con las contraseñas se cae
-  del bundle. Hoy vale `true` en local y en Vercel producción.
+  del bundle. Hoy vale `true` en tu `.env.local` y en Vercel producción.
 
 **Edge Functions** (secrets de Supabase):
 
@@ -2336,7 +2344,7 @@ local. No importa en la práctica: `npm run dev` usa `.env.local`, que apunta a 
   en git.
 - `RESEND_API_KEY` — API key de Resend (ofertas por email y reset de contraseña). Nunca en git.
 - `RESEND_ENVIO_REAL` — **`"true"` exacto o no sale ni un correo** (gemelo del de WhatsApp, §8).
-  Permite ensayar el circuito entero en local sin salir a la red y sin `RESEND_API_KEY`: la
+  Permite ensayar el circuito entero sin salir a la red y sin `RESEND_API_KEY`: la
   comprobación va **antes** de mirar la clave.
   🔴 **Crearlo ANTES de redesplegar** las cinco funciones que mandan correo (`enviar-email`,
   `enviar-acceso`, `recuperar-password`, `recordatorios-documentales`, `enlace-publico`). Al revés,
@@ -2374,10 +2382,10 @@ repositorio en silencio.
 
 Cuatro cosas que costaron descubrir y siguen valiendo:
 
-1. ⚠️ **`supabase stop` ANTES de cambiar `project_id`.** Al revés, el CLI filtra por el nombre nuevo,
-   no encuentra los contenedores viejos y deja doce huérfanos ocupando los puertos 553xx. Para
-   limpiarlos, **filtrar por nombre** (`docker ps -q --filter name=_Redestina`): en esta máquina
-   conviven otros stacks de Supabase y un `docker stop $(docker ps -q)` se los llevaría por delante.
+1. **`project_id` y los contenedores locales** (ya no aplica, se anota como historia). Cuando este
+   proyecto todavía levantaba Supabase local, cambiar `project_id` sin un `supabase stop` previo
+   dejaba doce contenedores huérfanos, porque el CLI filtra por el nombre nuevo. Desde el
+   14-09-2026 no hay stack local (§7), así que el aviso se queda solo como lección.
 2. ⚠️ **El próximo cambio de dominio exige redirección 308, no corte.** Los dos dominios anteriores
    se apagaron sin redirección, y las dos veces valió el mismo argumento: seguimos en modo test y no
    ha recibido correo ningún destinatario real, solo `hola+*@carlessanz.com` y las organizaciones
@@ -2454,11 +2462,14 @@ Lo único que queda del rename es **el logo** (§10bis, deuda 41).
 ## 11. Comandos
 
 ```bash
-npm run dev                # Vite en local
+npm run dev                # Vite en tu máquina, siempre contra el Supabase REMOTO
 npm run build              # tsc && vite build  (solo mira src/: ni scripts ni Edge Functions)
 npm run preview            # servir el build
 
-supabase db push                                          # aplicar migraciones
+# ⚠️ No hay Supabase local (§7): la primera base donde se ejecuta una migración es la REAL.
+# Por eso el orden es siempre dry-run y después push.
+supabase db push --dry-run                                # qué se aplicaría, sin aplicar nada
+supabase db push                                          # aplicar migraciones en el remoto
 supabase functions deploy whatsapp-send        # con verify_jwt
 supabase functions deploy whatsapp-webhook --no-verify-jwt
 supabase functions deploy priorizar-entidades  # con verify_jwt
@@ -2494,15 +2505,14 @@ supabase secrets set --env-file .secrets.env
 deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
 deno run -A scripts/import-ara.ts             # importar los CSV maestros
 
-deno run -A scripts/comprobar-rls.ts          # arnés de RLS: matriz de permisos por cuenta (§4bis)
-# ⚠️ Contra la base LOCAL el arnés NO inicia sesión: el CLI apaga el login por correo
-# (§9), así que firma el JWT con el secreto del stack. Necesita SB_SECRET_KEY para
-# resolver los uuid, y las cuentas creadas con crear-usuarios-prueba.ts.
-SUPABASE_URL=http://127.0.0.1:55321 VITE_SUPABASE_PUBLISHABLE_KEY=sb_publishable_… \
-  SB_SECRET_KEY=sb_secret_… deno run -A scripts/comprobar-rls.ts
+# Arnés de RLS: matriz de permisos por cuenta (§4bis). Abre sesión de verdad con cada
+# cuenta de scripts/data/cuentas-prueba.json contra el proyecto remoto.
+set -a; . ./.env.local; set +a
+SUPABASE_URL="$VITE_SUPABASE_URL" deno run -A scripts/comprobar-rls.ts
 
-# Numeración documental sin huecos (§4 «Sistema documental»)
-SUPABASE_URL=http://127.0.0.1:55321 SB_SECRET_KEY=sb_secret_… \
+# Numeración documental sin huecos (§4 «Sistema documental»). Necesita la service key y
+# escribe solo documentos de prueba, que limpia `reiniciar_documentos_prova()`.
+SUPABASE_URL="$VITE_SUPABASE_URL" SB_SECRET_KEY=sb_secret_… \
   deno run -A scripts/prueba-numeracion.ts                    # 5 pasadas × 50 emisiones
   deno run -A scripts/prueba-numeracion.ts --pasadas 2 --emisiones 200 --fallos 0.3
 
@@ -2536,15 +2546,13 @@ deno run -A scripts/crear-usuarios-prueba.ts             # crearlos (idempotente
 deno run -A scripts/crear-usuarios-whatsapp.ts --dry-run # simular las 5 cuentas de WhatsApp (§9)
 deno run -A scripts/crear-usuarios-whatsapp.ts           # crearlas (no toca ninguna ficha)
 
-supabase migration up --local                 # aplicar migraciones pendientes SOLO en local (no borra datos)
-
-# ⚠️ La tanda documental necesita --include-all. El spike aplicó 20260928100600 y ...100800
-# dejando huecos por debajo, así que las seis migraciones de la segunda mitad de la fase 1
-# son «anteriores a la última aplicada» y el CLI las rechaza con
+# ⚠️ Una tanda con huecos necesita --include-all. Pasó con la fase 1 documental: el spike
+# aplicó 20260928100600 y ...100800 dejando huecos por debajo, así que las seis migraciones
+# de la segunda mitad son «anteriores a la última aplicada» y el CLI las rechaza con
 # LegacyMigrationMissingRemoteError. No es un error: es el precio de haber adelantado dos
-# ficheros en el spike.
-supabase migration up --local --include-all
-supabase db push --include-all            # en remoto, la primera vez tras la fase 1
+# ficheros.
+supabase db push --include-all --dry-run  # comprobarlo antes, siempre
+supabase db push --include-all
 
 # Secreto del sistema documental, en los DOS sitios (el job lo manda, la función lo valida):
 deno run -A scripts/set-config.ts documentos_secret '<valor>'   # app_config
@@ -3177,10 +3185,10 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     generar (deuda 52), y **dos `supabase functions serve` a la vez**, que no caben porque el
     runtime es un contenedor de Docker con nombre fijo por proyecto
     (`supabase_edge_runtime_<proyecto>`) — el segundo muere con `Conflict … already in use` y puede
-    dejar el primero colgado en un estado que ni `docker rm -f` deshace. Regla: el serve lo levanta
-    quien va a probar, y no se mantiene uno de fondo. Alternativa cuando el contenedor está
-    inservible: probar las funciones con `deno run` directo contra la base local —mismo código y
-    HTTP real—, que es como se verificó la fase 3.
+    dejar el primero colgado en un estado que ni `docker rm -f` deshace. Quedó sin efecto el
+    14-09-2026, cuando se retiró el Supabase local (§7): las funciones se prueban desplegadas en
+    el remoto, y la técnica que sí se conserva es ejecutarlas con `deno run` directo —mismo código
+    y HTTP real—, apuntando a la base remota.
 
 64. ~~**`/equip/espigolades` no tiene listado.**~~ — **resuelta (11-09-2026)**: tercera pantalla
     en `Espigolades.tsx`, con buscador y las columnas que sirven para encontrar una jornada (data,

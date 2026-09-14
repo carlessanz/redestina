@@ -55,8 +55,9 @@ orquesta. Lo mismo con el bloque `[functions.<nombre>]` de `config.toml` (`verif
 1. Lee la función más parecida a la que vas a escribir (`registro`, `enviar-acceso`, `recuperar-password`,
    `crear-oferta`) y reutiliza su forma.
 2. Escribe, y comprueba tipos con `deno check --config` de **cada** función tocada.
-3. Prueba en local si el bloque lo permite (`supabase functions serve`); para medir CPU en el runtime real
-   pide a la sesión que orquesta que despliegue: **tú no despliegas ni cambias secretos**.
+3. No hay Supabase local en este proyecto, así que no se prueba con `supabase functions serve`: para
+   ejercitar la función pide a la sesión que orquesta que la despliegue en el proyecto remoto.
+   **Tú no despliegas ni cambias secretos.**
 4. **No hagas commit ni push.**
 
 ## Qué entregas (informe final, en castellano)

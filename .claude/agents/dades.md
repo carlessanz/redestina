@@ -52,11 +52,12 @@ literal** en tu informe final; lo aplica la sesión que orquesta.
 1. Lee las migraciones existentes que tocan las mismas tablas y los patrones que el plan cita
    (`20260730092000_funciones_sesion_y_rol.sql`, `20260730098000_rls_ofertas_sense_recursio.sql`,
    `20260731100000_registre_public.sql`, `20260722130000_intake_recordatorios.sql`).
-2. Escribe las migraciones y aplícalas **en local**: `supabase migration up --local` (puertos 553xx).
-   Si falla a mitad, arregla el fichero; no apliques nada en remoto: eso lo hace la sesión que orquesta
-   con `supabase db push` y `/publicar`.
+2. Escribe las migraciones. **No las apliques tú**: este proyecto no tiene Supabase local, así que la
+   única base es la remota y quien aplica es la sesión que orquesta, con `supabase db push --dry-run`
+   primero y `supabase db push` después. Deja el SQL revisable y idempotente, porque el primer sitio
+   donde se ejecuta ya es el proyecto real.
 3. Amplía el arnés: cada lectura «permitir» de una cuenta externa lleva `requiereFixture`; las escrituras
-   solo sobre fixtures `TEST-*` y se revierten. Ejecútalo contra local con la publishable key local.
+   solo sobre fixtures `TEST-*` y se revierten. Lo ejecuta contra el remoto la sesión que orquesta.
 4. `deno check scripts/*.ts` en verde.
 5. **No hagas commit ni push.** No despliegues nada.
 
