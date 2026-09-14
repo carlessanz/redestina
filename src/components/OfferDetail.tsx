@@ -9,6 +9,7 @@ import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
 import { useT } from '../lib/i18n'
+import { useConfirma } from './DialegConfirma'
 import { textoRecollidaConfirmada } from '../lib/textos'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
@@ -81,6 +82,7 @@ function aprovacioClases(a: string): string {
 
 export default function OfferDetail({ excedente, onBack }: Props) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
   // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
@@ -310,10 +312,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const kg = Number(fd.get('kg') || 0)
     if (!r.entidad_id || !kg) { toast.error(t('od.no_text')); return }
     // Aviso no bloqueante si se canaliza más de lo que falta por cubrir.
-    if (kg > faltan && !window.confirm(t('od.over_alloc', { n: faltan }))) return
+    if (kg > faltan && !(await confirma({
+      titol: t('od.over_alloc_t'),
+      descripcio: t('od.over_alloc', { n: faltan }),
+    }))) return
 
     const falta = await avisoConvenio(r.entidad_id)
-    if (falta && !window.confirm(t('od.conv_missing', { parts: falta }))) return
+    if (falta && !(await confirma({
+      titol: t('od.conv_missing_t'),
+      descripcio: t('od.conv_missing', { parts: falta }),
+    }))) return
 
     const preuRaw = String(fd.get('preu') ?? '')
     const preu = preuRaw !== '' ? Number(preuRaw) : null
@@ -463,7 +471,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const entidad_id = String(fd.get('entidad') || '')
     const kg_confirmados = Number(fd.get('kg') || 0)
     if (!entidad_id || !kg_confirmados) return
-    if (kg_confirmados > faltan && !window.confirm(t('od.over_alloc', { n: faltan }))) return
+    if (kg_confirmados > faltan && !(await confirma({
+      titol: t('od.over_alloc_t'),
+      descripcio: t('od.over_alloc', { n: faltan }),
+    }))) return
     await supabase.from('canalizaciones').insert({
       excedente_id: excedente.id, entidad_id, kg_confirmados,
       caixes_entregades: Number(fd.get('caixes') || 0) || null,
@@ -491,7 +502,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }
 
   async function cancelarOferta() {
-    if (!window.confirm(t('od.confirm_cancel'))) return
+    if (!(await confirma({
+      titol: t('od.confirm_cancel_t'),
+      descripcio: t('od.confirm_cancel'),
+      confirmar: t('od.cancel_offer'),
+      destructiu: true,
+    }))) return
     await supabase.from('excedentes').update({ estado: 'cancelada' }).eq('id', excedente.id)
     await recargar()
   }
@@ -768,6 +784,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         destructiu
         onConfirma={(m) => void marcarNoColocada(m)}
       />
+
+      {dialeg}
     </div>
   )
 }

@@ -4,6 +4,7 @@ import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useConfirma } from './DialegConfirma'
 import type { CampoDef } from '../lib/crudCampos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -46,6 +47,7 @@ export default function RecordDetail({
   onSendMessage, avisos,
 }: Props) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   const waActiu = useWhatsappActiu()
   const [correuObert, setCorreuObert] = useState(false)
   const esNuevo = registro == null
@@ -103,7 +105,12 @@ export default function RecordDetail({
   async function borrar() {
     if (!registro) return
     const nombre = String(form[nombreKey] ?? tipo)
-    if (!window.confirm(t('rec.confirm_delete', { name: nombre }))) return
+    if (!(await confirma({
+      titol: t('rec.confirm_delete_t', { name: nombre }),
+      descripcio: t('rec.confirm_delete'),
+      confirmar: t('c.delete'),
+      destructiu: true,
+    }))) return
     setError(null)
     setGuardando(true)
     const { error: delError } = await supabase.from(tabla).delete().eq('id', registro.id)
@@ -237,6 +244,8 @@ export default function RecordDetail({
           id: String(registro?.id ?? ''),
         }}
       />
+
+      {dialeg}
     </div>
   )
 }

@@ -3316,15 +3316,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     había arreglado por el camino— pero no los **dos de `OfferDetail.tsx`** (rechazar una
     aprobación y marcar no colocada), que nadie había anotado. Los tres usan ya el `DialegMotiu`
     que existía. `grep -rn "window.prompt" src/` no devuelve ninguno.
-    ⚠️ Quedan **ocho `window.confirm()`**, no seis (recontados uno a uno el 14-09-2026):
-    `Settings.tsx:28,48`, `RecordDetail.tsx:106`, `OfferDetail.tsx:313,316,466,494` y
-    `Conversation.tsx:186`. Ese sí devuelve un booleano y su bloqueo se comporta como «cancelar»,
-    que es el lado seguro.
-    ⚠️ **Pero ese argumento no cubre los dos peores.** En `RecordDetail.tsx:106` y
-    `Conversation.tsx:186` el `confirm` es la puerta de un borrado irreversible —el segundo se
-    lleva los `wa_messages` del contacto y su `wa_contacts`—, así que si el navegador integrado
-    bloquea el diálogo no pasa nada **y la persona no recibe ninguna señal de por qué**: que es
-    exactamente el fallo que motivó retirar `prompt()`. Esos dos van primero.
+    ✅ **Y los `window.confirm()` también, el 14-09-2026.** Eran **ocho**, no seis: `Settings.tsx`
+    ×2, `RecordDetail.tsx`, `OfferDetail.tsx` ×4 y `Conversation.tsx`. El argumento para tolerarlos
+    —su bloqueo se comporta como «cancelar», que es el lado seguro— no cubría los dos peores: en
+    `RecordDetail` y `Conversation` eran la puerta de un borrado irreversible, así que con el
+    diálogo bloqueado no pasaba nada **y la persona no recibía ninguna señal de por qué**, que es
+    exactamente el fallo que motivó retirar `prompt()`.
+    Los sustituye **`useConfirma()`** (`src/components/DialegConfirma.tsx`), el hermano de
+    `DialegMotiu` para cuando no hay motivo que pedir. ⚠️ **Es un hook que devuelve una promesa, y
+    no un componente suelto, a propósito**: `window.confirm` es síncrono y se usa en línea en medio
+    de funciones que siguen con la escritura, así que un diálogo normal obliga a partir cada una en
+    dos —guardar la acción pendiente y ejecutarla en el `onConfirma`—, que es donde se cuelan los
+    errores. Con la promesa la forma del código no cambia: `if (!(await confirma({…}))) return`.
+    ⚠️ Cerrar por Escape o pulsando fuera resuelve `false`, y al desmontarse el componente también:
+    una promesa sin resolver deja colgada para siempre la función que la espera.
+    De paso, los textos se repartieron: **el título pregunta y la descripción dice la
+    consecuencia**, en vez de repetir «¿seguro que…?» dentro de un diálogo que ya lo pregunta.
 36. ~~**Las pestañas de `/registre` caben con 1 px de margen.**~~ — **resuelta (11-09-2026)**, y
     medido en Chrome real a 320 px sobre la aplicación construida, no sobre una maqueta: era **peor**
     de lo que decía la entrada. El texto «Entitat receptora» ocupaba **111,14 px** en una caja de

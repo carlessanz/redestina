@@ -8,6 +8,7 @@ import { plantillaPrimerContacte, textoSalutacio } from '../lib/plantillas'
 import type { RolContacte } from '../lib/plantillas'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { useConfirma } from './DialegConfirma'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import type { WaContact, WaMessage } from '../types'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,7 @@ function motiuMeta(m: WaMessage): string | null {
 
 export default function Conversation({ contact, onBack, onDeleted }: Props) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   // Interruptor global (§8). El historial se sigue leyendo —los entrantes se registran
   // aunque no se conteste—, pero no se puede enviar nada.
   const waActiu = useWhatsappActiu()
@@ -183,7 +185,12 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
   // de wa_contacts. Si el contacto vuelve a escribir, el webhook lo recrea.
   async function borrarHilo() {
     if (!onDeleted) return
-    if (!window.confirm(t('msg.confirm_delete_thread', { name: contact.name ?? contact.phone }))) return
+    if (!(await confirma({
+      titol: t('msg.confirm_delete_thread_t', { name: contact.name ?? contact.phone }),
+      descripcio: t('msg.confirm_delete_thread'),
+      confirmar: t('c.delete'),
+      destructiu: true,
+    }))) return
     const { error: msgError } = await supabase.from('wa_messages').delete().eq('contact_phone', contact.phone)
     if (msgError) { setNotice({ kind: 'error', text: msgError.message }); return }
     const { error: contactError } = await supabase.from('wa_contacts').delete().eq('phone', contact.phone)
@@ -351,6 +358,8 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
           </Button>
         </form>
       </footer>
+
+      {dialeg}
     </main>
   )
 }

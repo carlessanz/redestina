@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react'
 import { ShieldCheck, ShieldAlert, Loader2, MessageCircle, MessageCircleOff } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { useConfirma } from './DialegConfirma'
 import type { Lang } from '../lib/i18n'
 import {
   fitxesSenseCorreuAmbTelefon, getTestMode, getWhatsappActiu, setTestMode, setWhatsappActiu,
@@ -12,6 +13,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Settings() {
   const { t, lang, setLang } = useT()
+  const { confirma, dialeg } = useConfirma()
   const { recarrega } = useAppContext()
   const [testMode, setTest] = useState<boolean | null>(null)
   const [waActiu, setWaActiu] = useState<boolean | null>(null)
@@ -25,7 +27,12 @@ export default function Settings() {
   async function cambiarTestMode(activo: boolean) {
     if (activo === testMode || saving) return
     // Apagarlo es sensible: pasa a enviarse a TODOS. Confirmación explícita.
-    if (!activo && !window.confirm(t('set.confirm_off'))) return
+    if (!activo && !(await confirma({
+      titol: t('set.confirm_off_t'),
+      descripcio: t('set.confirm_off'),
+      confirmar: t('set.turn_off'),
+      destructiu: true,
+    }))) return
     setSaving(true)
     const error = await setTestMode(activo)
     setSaving(false)
@@ -45,7 +52,12 @@ export default function Settings() {
       setSaving(true)
       const n = await fitxesSenseCorreuAmbTelefon()
       setSaving(false)
-      if (!window.confirm(t('set.wa_confirm_off', { productors: n.productors, entitats: n.entitats }))) return
+      if (!(await confirma({
+        titol: t('set.wa_confirm_off_t'),
+        descripcio: t('set.wa_confirm_off', { productors: n.productors, entitats: n.entitats }),
+        confirmar: t('set.turn_off'),
+        destructiu: true,
+      }))) return
     }
     setSaving(true)
     const error = await setWhatsappActiu(activo)
@@ -178,6 +190,8 @@ export default function Settings() {
           <p>{t('set.sending_3')}</p>
         </CardContent>
       </Card>
+
+      {dialeg}
     </div>
   )
 }
