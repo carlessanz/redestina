@@ -2979,9 +2979,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 
 1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*.
    ⚠️ **«Sin CI» describe el repo, no el proyecto**: no hay `.github/workflows/` ni un solo
-   run en GitHub, pero el **branching de Supabase despliega las quince Edge Functions en cada
+   run en GitHub, pero el **branching de Supabase desplegaba las quince Edge Functions en cada
    push a `main`** (§12.44). Dar «sin CI» por «nada automático» es lo que hizo buscar tres
-   veces en el sitio equivocado. Ya hay **507 pruebas de
+   veces en el sitio equivocado.
+   ⚠️ **Ese matiz CADUCÓ el 14-09-2026**, y conviene no arrastrarlo: al desactivar el branching
+   (§7) desapareció la única automatización que había fuera del repo, así que hoy «sin CI» sí
+   describe las dos cosas. No queda nada automático salvo el hook local, que se salta con
+   `--no-verify` y no protege a quien no lo haya instalado.
+   Ya hay **522 pruebas de
    Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
    `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
    Lo que sigue faltando: **linter** (no hay ESLint) y **CI de verdad** — el hook se puede saltar
@@ -3023,17 +3028,49 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    de Realtime; el `Dashboard` agrega **seis tablas** en el cliente al entrar; y los buscadores de
    `ProducersList`/`OffersList` filtran **en cliente** sobre lo ya cargado, así que la paginación
    de esos listados exige rehacer búsqueda, orden y el reparto test/resto en servidor.
-6. `Conversation` carga el hilo completo sin paginación.
+6. ~~`Conversation` carga el hilo completo sin paginación.~~ — **resuelta, y nadie lo anotó**
+   (visto el 14-09-2026 al revisar la lista entera). `Conversation.tsx:66` define `PAGINA = 50`, la
+   carga inicial pide los últimos 50 por `contact_phone` (`:109-111`) y `carregaMes()` (`:141-155`)
+   pagina hacia atrás con cursor `.lt('created_at', …)`. El propio comentario del fichero
+   (`:106-108`) cita esta deuda. De paso se resolvió un detalle fino: el autoscroll mira solo el
+   último id (`:134-138`), así que cargar historial no te devuelve al final.
 7. ~~`ContactList` conserva la prop `single` (modo conversación única)~~ — **resuelto**: esa prop ya
    no existe (props actuales: `contacts`, `loading`, `error`, `selectedPhone`, `onSelect`, `onReload`).
 8. ~~`index.css` es un único fichero global (~825 líneas) con clases sin namespace.~~ — **resuelto**: desde el paso a Tailwind v4 + shadcn solo contiene tokens y base (§2bis).
-9. `types.ts` no modela `raw`; `MessageRow` en `ProducersList` duplica parte de `WaMessage`.
-10. Hay migraciones que **borran datos** (`truncate wa_messages`) mezcladas con DDL.
+9. ~~`types.ts` no modela `raw`; `MessageRow` en `ProducersList` duplica parte de `WaMessage`.~~ —
+   **las dos mitades eran falsas** (14-09-2026). `raw` existe en `types.ts:59` con su bloque de
+   documentación, y se pide explícitamente en `Conversation.tsx:110,146`; `MessageRow` se mudó a
+   `lib/mensajes.ts:7`, donde ya no es duplicación sino el tipo de entrada de un módulo que no
+   importa nada a propósito, para poder probarlo sin cliente de Supabase.
+   **Y se cierra sin sustituirla por su versión ampliada, a propósito.** Quedan ~12 `interface`
+   escritas a mano (`Dashboard.tsx:17-18`, `AlbaraDetall.tsx:59,70,84`, `Espigolades.tsx:76,454,463`…),
+   pero describen **la forma de un `.select()` concreto**, no una entidad del dominio. §7 dice que
+   supabase-js deduce el tipo de la fila del literal de columnas: un tipo centralizado que se desvíe
+   de ese literal **miente sin fallar**, que es peor que la interfaz local. La regla que queda:
+   *una forma usada en dos o más ficheros sube a `types.ts` (con `Pick<>` sobre la tabla); la de un
+   solo `select` se queda donde está*.
+10. Hay migraciones que **borran datos** (`truncate wa_messages`) mezcladas con DDL. Son **dos**, y
+    solo una mezcla: `20260717080924_productores_y_limpieza.sql:3-4` (el `truncate` y un `delete`, en
+    el mismo fichero que crea `productores`) y `20260717084210_vaciar_mensajes.sql:1`, que es un
+    fichero de limpieza de una sola línea. Las demás apariciones de «truncate» en el repo son la
+    revocación de `20270309100000`, no borrado.
 11. Sin FK entre `productores`, `wa_contacts` y `wa_messages` (unidas por `phone`).
 12. `prioritat` casi no discrimina (97 de 111 entidades son prioridad 1): aporta poco al ranking.
-13. `oferta_respuestas` se registra desde el **cliente** (`OfferDetail`), no desde `whatsapp-send`:
-    mantiene la Edge Function intacta pero acopla el registro al panel. Las respuestas por **email**
-    no tienen captura automática (no hay inbound de correo): se marcan a mano.
+13. ~~`oferta_respuestas` se registra desde el **cliente**~~ — **cerrada por medición
+    (14-09-2026): estaba contada de más, y lo que describe no es un agujero.** De los tres momentos
+    de la fila —nacer, contestarse, aprobarse— **solo el primero** sigue en el cliente
+    (`OfferDetail.tsx:246-259`, con tres llamadas en `:359`, `:424` y `:452`); la respuesta ya la
+    escribe el webhook (`_shared/respuestas.ts`) y el interés del panel, la RPC
+    `manifestar_interes()`. Tampoco hay riesgo de suplantación: `OfferDetail` solo se monta desde
+    `equip/OfertaDetall.tsx:34`, `oferta_respuestas` tiene GRANT completo para `authenticated` desde
+    `20260723100000:35`, y `registrarEnvio` solo corre si el envío salió (`r.ok`).
+    **El único fallo real es una ventana de milisegundos**: si el navegador se cierra entre el envío
+    y el `upsert`, el envío existe y la traza no. Moverlo al servidor costaría cambiar el contrato de
+    `whatsapp-send` **y** el de `enviar-email` más tres llamadas, para cerrar eso. No compensa.
+    ⚠️ Lo que **sí** sigue abierto de esta entrada: las respuestas por **email** no tienen captura
+    automática (no hay inbound de correo) y se marcan a mano (`marcarRespuesta()`, `:262-268`), que
+    es la deuda 92 por el otro lado. Y `src/types.ts:244` declara `canal: 'whatsapp' | 'email'`
+    cuando la RPC escribe también `'panel'`: el tipo miente, aunque nadie hace un `switch` exhaustivo.
 14. 🟡 **La clasificación sí/no sigue siendo una heurística por lista de palabras**, pero ya
     está **medida** y tres errores reales están corregidos (11-09-2026, `tests/respuestas.test.ts`,
     67 pruebas). Los tres cerraban una oferta al revés **sin que nadie lo revisara** —la fila
@@ -3161,7 +3198,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cada arranque en frío del isolate y no se comparte entre instancias. Lo que de verdad frena un
     abuso masivo es el tope de 20 pendientes por hora. Turnstile queda pendiente; hoy no compensa,
     porque el coste de un alta basura es una fila que el equipo rechaza con un clic.
-27. **Ni el registro ni la aprobación envían correo.** `email_confirm: true` da el correo por
+27. **Ni el registro ni la aprobación envían correo** — y es **decisión, no descuido** (reclasificada
+    el 14-09-2026, §12bis). El propio código lo explica en `registro/index.ts:33-38`: con el modo
+    test activo la cuenta recién creada no pasaría `esCuentaPermitida`, así que el correo se
+    descartaría en silencio. Medido: la bloquearían **tres** condiciones independientes, no una —sin
+    fila en `usuario_roles`, membresía `activo = false` hasta que alguien apruebe, y ficha
+    `es_test = false`—. Lo que queda como deuda de verdad es la consecuencia, no la causa:
+    `email_confirm: true` da el correo por
     verificado sin comprobarlo, así que **un error tipográfico en el correo deja la cuenta sin
     ningún canal** (y con el modo test encendido tampoco podría recuperar la contraseña, §8). Y quien
     espera validación se entera de que se la han aprobado entrando a mirar. Falta una notificación
@@ -3215,8 +3258,11 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     comportarse**.
     ⚠️ Parcial a propósito: una membresía **rechazada o desactivada no ocupa sitio**, o alguien a
     quien se le rechazó un alta no podría volver a intentarlo.
-32. **Nueve comprobaciones del arnés se quedaron sin cuenta que las recorra.** Los bloques
-    `sense_rol` (3) y `pendent` (6) de `scripts/comprobar-rls.ts` siguen escritos —son la
+32. **143 comprobaciones del arnés se quedaron sin cuenta que las recorra.** ⚠️ Esta entrada decía
+    «nueve» y la cifra era de otra época: contaba solo los checks **propios** de cada bloque e
+    ignoraba que los dos **heredan los 60 de `DOCUMENTAL_EXTERN`**. Medido el 14-09-2026:
+    `sense_rol` son 10 + 60 = **70** y `pendent` 13 + 60 = **73**. El diagnóstico cualitativo sí era
+    correcto. Los bloques `sense_rol` y `pendent` de `scripts/comprobar-rls.ts` siguen escritos —son la
     especificación de lo que esas cuentas deben *no* poder hacer— pero el arnés recorre las cuentas de
     `cuentas-prueba.json`, y desde el recorte del 31-07-2026 ninguna tiene esos roles: por eso la
     referencia pasó de 65/66 a **56/56 + 1 saltada**. No es un fallo de comportamiento, es
@@ -3238,14 +3284,26 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     oferta. El resto de la interfaz sigue en `h-9` (36 px), por debajo de los 44 px que recomiendan
     Apple y Google: subirlos todos es rediseñar la aplicación entera para ganar 8 px en botones
     secundarios. Los ítems de los menús desplegables (idioma, `UserMenu`) siguen en 32 px.
+    ⚠️ **«El resto sigue en `h-9`» se quedó corto, y en el buen sentido** (recontado el 14-09-2026):
+    hay **27 botones con `h-11 md:h-8`**, o sea 44 px en móvil y 32 solo en escritorio, repartidos
+    por las pantallas del equipo y los componentes de documentos. El fondo sigue siendo cierto —las
+    variantes base de `ui/button.tsx:24-30`, `ui/input.tsx:11` y `ui/select.tsx:40` están todas por
+    debajo de 44 px, y son ~250 controles—, pero la interfaz ya no es uniforme: quien mida esto otra
+    vez debe contar `h-11` antes de concluir.
 35. ~~**`window.prompt()` en dos sitios.**~~ — **resuelta (11-09-2026)**. Y eran **tres**, no dos:
     la entrada nombraba `productor/OfertaDetall.tsx` y `equip/Aprovacions.tsx` —este último ya se
     había arreglado por el camino— pero no los **dos de `OfferDetail.tsx`** (rechazar una
     aprobación y marcar no colocada), que nadie había anotado. Los tres usan ya el `DialegMotiu`
     que existía. `grep -rn "window.prompt" src/` no devuelve ninguno.
-    ⚠️ Quedan **seis `window.confirm()`**. Ese sí devuelve un booleano y su bloqueo se comporta
-    como «cancelar», que es el lado seguro; aun así son seis sitios donde el navegador integrado
-    decide por la persona.
+    ⚠️ Quedan **ocho `window.confirm()`**, no seis (recontados uno a uno el 14-09-2026):
+    `Settings.tsx:28,48`, `RecordDetail.tsx:106`, `OfferDetail.tsx:313,316,466,494` y
+    `Conversation.tsx:186`. Ese sí devuelve un booleano y su bloqueo se comporta como «cancelar»,
+    que es el lado seguro.
+    ⚠️ **Pero ese argumento no cubre los dos peores.** En `RecordDetail.tsx:106` y
+    `Conversation.tsx:186` el `confirm` es la puerta de un borrado irreversible —el segundo se
+    lleva los `wa_messages` del contacto y su `wa_contacts`—, así que si el navegador integrado
+    bloquea el diálogo no pasa nada **y la persona no recibe ninguna señal de por qué**: que es
+    exactamente el fallo que motivó retirar `prompt()`. Esos dos van primero.
 36. ~~**Las pestañas de `/registre` caben con 1 px de margen.**~~ — **resuelta (11-09-2026)**, y
     medido en Chrome real a 320 px sobre la aplicación construida, no sobre una maqueta: era **peor**
     de lo que decía la entrada. El texto «Entitat receptora» ocupaba **111,14 px** en una caja de
@@ -3478,9 +3536,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `emitir_documento_prova()` pisaba la fila anterior; no era eso —dos emisiones seguidas dan
     `0001` y `0002`, cada una con su `objeto_id`—, era el arnés limpiando. El síntoma
     característico es «mi documento estaba y ya no está».
-53. **`documentos` y `documento_envios` no tienen fixture en el arnés.** Los dos checks de
-    lectura del equipo salen SALTADA (§12.48) hasta que exista algún documento persistente.
-    `crear-datos-documentales-prueba.ts` (fase 4) es quien los creará.
+53. **`documento_envios` no tiene fixture en el arnés.** ⚠️ La entrada decía «`documentos` y
+    `documento_envios`» y que «`crear-datos-documentales-prueba.ts` (fase 4) es quien los creará»,
+    **en futuro**: ese script existe desde hace tiempo y ya emite documentos, así que la mitad de
+    `documentos` está cubierta. Lo que sigue sin fixture —y sin ningún script que lo arregle— es
+    `documento_envios`, porque **nadie la lee** (deuda 25): su check sale SALTADA (§12.48) siempre.
+    Se cubre el día que exista la pantalla de envíos, no antes.
 54. **Dos checks nuevos dependen de `roles_activos`.** Con el interruptor apagado —como nace
     cualquier entorno recreado desde las migraciones— `es_super_admin()` devuelve `true` para
     cualquier autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. Es el
@@ -3492,9 +3553,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están fuera del
     GRANT de SELECT (§4). Un `grant select on all tables in schema public to authenticated`
     —exactamente la línea que ya existe en `20260721160000`— los volvería a abrir **sin que
-    ninguna política cambie ni ningún test de RLS lo note**. Hoy lo vigila el arnés con cuatro
-    checks dedicados; el arreglo de verdad es no volver a escribir nunca un GRANT masivo sobre
-    `all tables`, y añadir el `revoke` correspondiente si alguna vez se hace.
+    ninguna política cambie ni ningún test de RLS lo note**.
+    🔴 **Y el riesgo no es futuro, ya está puesto** (medido el 14-09-2026): además de aquel GRANT,
+    `20260721160000:66` deja un **`alter default privileges in schema public grant select on tables
+    to authenticated`**. O sea que **toda tabla nueva nace con SELECT sobre todas sus columnas**, sin
+    que nadie vuelva a escribir un GRANT masivo: basta con crear una tabla con un campo sensible y
+    olvidar el `revoke`. Las dos migraciones documentales empiezan por ese `revoke` justamente por
+    eso (`20260928100300:220-225`, `20260928100400:142-147`), y quien añada una columna a una tabla
+    con GRANT por columnas tiene que otorgarla a mano (el precedente es `20270304100200:39`).
+    ⚠️ **Y el arnés vigila TRES de los cuatro, no cuatro**: `enlaces_token.codigo_hash` aparece en el
+    `revoke` y en el comentario de cabecera, pero **no tiene check propio**, así que reabrirlo solo a
+    él saldría en verde.
 56. ~~**`parametros_documentales` está sembrada con datos provisionales, y nada impide emitir con
     ellos.**~~ — **resuelta (fase 4)**: `emitir_certificado()` es quien lo comprueba, y levanta
     `42501` citando el CIF sembrado. Un certificado con efecto fiscal no sale con un CIF inválido.
@@ -3765,20 +3834,44 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     El reparto del neto del REC particiona por `excedente_id`, y en una espigolada el REC cuelga de
     la **jornada** y se empareja con los registros **por producto**. Si una misma jornada tuviera dos
     registros del mismo producto, cada uno recibiría el neto entero de esa línea del REC.
-    La clave correcta sería `(albaran_rec_id, producto)`, pero cambiarla altera el **cierre anual**,
-    que ya ha calculado con la actual — es una decisión aparte y con el equipo delante, no un
-    arreglo de paso. Encontrado al arreglar el reparto por ventanas (`20270303100000`), donde queda
-    anotado en la cabecera. **No se ha dado todavía**: hoy ninguna jornada tiene dos registros del
-    mismo producto.
+    La clave correcta sería `(albaran_rec_id, producto)`.
+    ⚠️ **El SQL vivo NO es el que dice esta entrada.** `20270303100000` fue sustituida por
+    `20270303100500_cierre_base_nomes_equip.sql` (`create or replace`, para añadir la guarda de rol),
+    así que el reparto que hoy corre está en **`20270303100500:100-121`** — y **la advertencia en
+    prosa se quedó en la migración vieja**: quien lea el fichero que manda no la encuentra. Es el
+    coste de recrear una función y no llevarse sus comentarios.
+    ⚠️ **El defecto, dicho con precisión, es una asimetría**: el join con el REC **ya** empareja por
+    `(albarán, producto)` (`:79-93`), y el reparto particiona por `excedente_id` (`:100`). Son cuatro
+    sitios que deben cambiar juntos —`suma_can` (`:100`), el `row_number()` del residuo (`:101`), la
+    ventana de `correccion` (`:114`) y el `bool_or` de `excedent_partit` (`:121`)—: cambiar tres de
+    cuatro es peor que no cambiar ninguno. Y la clave necesita `coalesce(albaran_rec_id,
+    excedente_id)`, porque cuando `rec_neto is null` el id también lo es y todos los nulos caerían en
+    una sola partición.
+    **No se ha dado todavía**, y eso es lo que lo hace barato: medido en producción el 14-09-2026,
+    **cero** jornadas con dos registros del mismo producto y **cero** certificados emitidos. Los
+    documentos ya emitidos no se tocan igualmente —llevan su snapshot y su `sha256_datos`—, así que
+    arreglarlo no reabre ninguno. Mismo argumento que la deuda 79: se hace ahora porque sale gratis.
 
-91. **La detección de organización del registro tiene dos puntos ciegos conocidos, los dos hacia el
-    lado seguro.** Solo mira `entidades.telefono` (no `telefono2`/`telefono3`), igual que la
-    migración de la etapa 1; y el filtro que va a la consulta es un regex tolerante a separadores
-    anclado al FINAL del campo, así que un teléfono guardado en medio de texto
-    (`612345678 / 933000000`) no se encuentra. Los dos fallos producen un **duplicado que ve el
-    equipo, nunca una fusión equivocada**, que es el orden correcto de preferencias. El arreglo de
-    verdad es una columna normalizada o un índice funcional sobre las últimas 9 cifras, no más
-    expresiones regulares.
+91. **La detección de organización del registro tiene puntos ciegos, todos hacia el lado seguro.**
+    ⚠️ **La primera mitad de esta entrada era FALSA** y se corrige (14-09-2026): decía «solo mira
+    `entidades.telefono`», y `registro/index.ts:632` mira **también `productores.phone`**. El hueco
+    real es otro: no mira `entidades.telefono2` ni `telefono3` —que existen desde
+    `20260721120100:62-63`— **ni `productores.telefono_alt`**, que la entrada ni mencionaba y guarda
+    precisamente los números extra que el import de ARA encontró en la misma celda.
+    El segundo punto ciego sí era exacto: el filtro es un regex tolerante a separadores **anclado al
+    FINAL** del campo (`registro/coincidencies.ts:88-90`), así que un teléfono guardado en medio de
+    texto (`612345678 / 933000000`) no casa — y como el ancla va en la consulta, la fila **ni
+    siquiera llega a memoria**, con lo que `mateixTelefon()` (que sí compara las últimas 9 cifras)
+    nunca la ve.
+    Todos producen un **duplicado que ve el equipo, nunca una fusión equivocada**, que es el orden
+    correcto de preferencias.
+    ⚠️ **La columna normalizada y el índice funcional se descartan**, al revés de lo que decía esta
+    entrada: con 111 entidades y ~450 fichas no hay problema de rendimiento que lo justifique, y la
+    lógica de «últimas 9 cifras» está **triplicada** (TypeScript en `coincidencies.ts`, y SQL en
+    `20270310100000:111-114` y `20270315100000:64-99`) porque SQL no puede importar TypeScript.
+    Unificarla exigiría mover la decisión a una RPC, y entonces `coincidencies.ts` dejaría de poder
+    probarse desde Vitest — que es justo lo que `tests/registro.test.ts` explica que se ganó. Queda
+    como decisión con precio conocido (§12bis).
 
 92. **El correo de la oferta no captura la respuesta sin cuenta.** El botón «Mostra interès» lleva
     a `/receptor/mercat`, que exige sesión — y de las 111 entidades importadas casi ninguna la
@@ -3833,6 +3926,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      desde siempre. Viene de `20260723140000`, no de la tanda del interruptor. Se arregla con
      un `before update` de tres líneas; mientras no esté, **no leer esa columna como fecha del
      último cambio**.
+     ⚠️ **Y no es una tabla, son cuatro**: `app_settings`, `app_config`, `intake_sessions` y
+     **`perfiles`** (`20260730090000:36`). Esta última es la que de verdad importa, porque tiene
+     `grant update (nombre, telefono, idioma, vista_defecto)` para los propios usuarios
+     (`20260730090000:134`): la gente edita su ficha y la columna no se mueve nunca. No existe
+     ningún `set_updated_at()` genérico que reutilizar —las tres tablas que sí lo mantienen
+     (`costes_producto`, `convenios`, `planes_prevencion`) lo hacen con un `new.updated_at := now()`
+     inline dentro de su trigger de control, que valida transiciones propias y no sirve aquí—.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
@@ -3843,9 +3943,12 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 | # | La decisión | El precio que se aceptó |
 |---|---|---|
+| 9 | Los tipos de fila de un `select` se quedan en su fichero | Un tipo centralizado que se desvíe del literal de columnas **miente sin fallar** (§7). Solo sube a `types.ts` una forma usada en dos o más sitios |
 | 10 | No editar migraciones ya aplicadas | Hay `truncate` mezclado con DDL en el histórico. Editarlas está prohibido (§7) |
+| 13 | El `pendent` de una oferta lo escribe el cliente | Solo ese momento; respuesta y aprobación ya son servidor. Moverlo costaría cambiar dos contratos de Edge Function para cerrar una ventana de milisegundos |
 | 12 | No reponderar `prioritat` | 97 de 111 entidades son prioridad 1: aporta poco al ranking, y arreglarlo es trabajo de negocio |
 | 24 | Replica identity por defecto | Los DELETE de Realtime se reparten sin evaluar RLS. Hoy el payload es solo un id |
+| 27 | El registro no manda correo | Con el modo test activo el gate lo descartaría en silencio, por tres motivos a la vez. Está escrito en `registro/index.ts:33-38` |
 | 26 | Sin captcha en el registro | Turnstile es un servicio externo y §7 lo prohíbe. Lo que frena un abuso masivo es el tope durable, no el límite por IP |
 | 34 | Áreas táctiles de 36 px salvo en cuatro sitios | Subirlas todas es rediseñar la aplicación entera para ganar 8 px en botones secundarios |
 | 37 | El aviso de instalación se prueba con un evento sintético | `beforeinstallprompt` no lo dispara ningún navegador de escritorio. La instalación real solo se comprueba en un móvil |
@@ -3857,6 +3960,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 76 | La filigrana no se puede comprobar con un `grep` | `pdftotext` la trocea porque va girada 45° |
 | 80 | El DNI del firmante fuera de `documentos.datos` | `sha256_datos` no lo cubre; lo prueba la fila de `evidencias` |
 | 81 | `sense_conveni` replica la resta, no la regla | Evita 111 llamadas por oferta. La autoridad sigue siendo la RPC |
+| 91 | Las «últimas 9 cifras» están triplicadas (TS + dos migraciones) | SQL no puede importar TypeScript. Unificarlo exigiría una RPC, y entonces `coincidencies.ts` dejaría de ser probable desde Vitest. Con ~450 fichas no hay problema de rendimiento |
 | 82 | Regla de trabajo, no deuda | Un agente no hace `git checkout` de un fichero compartido |
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
 | 86 | No hay rectificativo del CT | El CD lo tiene porque el 182 lo exige; el CT no entra en ese ciclo |
