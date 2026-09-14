@@ -168,15 +168,18 @@ despliegue de todas las funciones desde el código del repo, unos 45 s después 
 aquí a mano **sigue haciendo falta**: es lo que evita la ventana del orden de arriba. Lo que no hay
 que hacer es alarmarse al ver las quince con `updated_at` idéntico después de publicar.
 
-Al terminar, **qué cambió de verdad**:
+Al terminar puedes comparar, pero **sabiendo lo que la herramienta ya no puede decirte**:
 
 ```bash
 deno run -A scripts/huellas-funciones.ts comparar
 ```
 
-Compara el `ezbr_sha256` de cada bundle con el de antes del despliegue. Es la única señal
-fiable: `No change found` solo concluye cuando aparece, y su ausencia no prueba nada.
-⚠️ Dice si el bundle **cambió entre dos momentos**, no si coincide con el código del repo.
+🔴 **En una publicación dirá «15 cambiadas» siempre, y no significa nada.** El `ezbr_sha256`
+cambia en cada despliegue real aunque el código sea idéntico (medido: un commit de solo markdown
+cambió las quince), y el branching redespliega las quince en cada push. Para saber qué cambió de
+verdad en esta publicación, `git diff` — no la herramienta. Sigue sirviendo para comparar dos
+momentos **sin push ni despliegue en medio**, que es como se caza que la plataforma toque algo
+por su cuenta. Detalle en §12.44.
 
 Luego comprueba que las quince quedaron `ACTIVE` y con el `verify_jwt` que toca:
 

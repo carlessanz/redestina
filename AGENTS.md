@@ -3108,10 +3108,24 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     - El `verify_jwt` lo sigue mandando `config.toml`, que viaja en el repo, así que el despliegue
       automático lo respeta. Verificado tras los dos redespliegues: quince `ACTIVE` y los quince
       flags correctos.
-    - **La línea base de huellas hay que regrabarla DESPUÉS de publicar**, no solo antes. El
-      fichero se quedó con la foto del 11-09 a las 10:46 —anterior al despliegue de aquel día— y
-      tres días después `comparar` decía «15 cambiadas» midiendo aquel despliegue, no nada nuevo.
-      Una línea base que envejece convierte la herramienta en un detector de falsos positivos.
+    - 🔴 **Y esto deja a `huellas-funciones.ts` sin poder responder su pregunta en una
+      publicación.** Medido el 14-09-2026 con el experimento limpio: el commit `5f70be6` tocó
+      **dos ficheros markdown** —`AGENTS.md` y el skill, ninguno entra en ningún bundle— y tras
+      el push **las quince huellas cambiaron**. Así que **el `ezbr_sha256` cambia en cada
+      despliegue real aunque el código sea byte a byte idéntico**: el empaquetado no es
+      reproducible. Como el branching redespliega las quince en cada push, `comparar` **siempre**
+      dirá «15 cambiadas» después de publicar, diga lo que diga el código.
+      ⚠️ Esto **no contradice** la validación del 11-09 («un redespliegue sin tocar nada deja las
+      15 huellas idénticas»), la precisa: aquel caso era `functions deploy` respondiendo
+      `No change found`, o sea **no desplegó**. La regla fina es **`No change found` = no
+      desplegó = huella igual; despliegue real = huella nueva, con o sin cambio de código**.
+      Para qué sirve todavía: comparar dos momentos **sin push ni despliegue en medio** —por
+      ejemplo, para cazar el día que la plataforma toque algo por su cuenta—. Para «¿qué cambió
+      en esta publicación?» la respuesta es `git diff`, no la herramienta.
+    - **La línea base hay que regrabarla DESPUÉS de publicar** de todos modos, o la comparación
+      siguiente arrastra además el despliegue anterior. El fichero se quedó con la foto del 11-09
+      a las 10:46 —anterior al despliegue de aquel día— y tres días después `comparar` decía «15
+      cambiadas» midiendo aquello. Eso es ruido **encima** del ruido de arriba.
     Comprobado las tres veces que no movió nada que importe: las 15 siguen `ACTIVE`, con su
     `verify_jwt` —que es lo que de verdad podría torcerse, como en la deuda 43— y los cuatro
     endpoints públicos responden 400/200/403/401.
