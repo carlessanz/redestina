@@ -162,6 +162,12 @@ supabase functions deploy subir-documento-externo                    # verify_jw
 supabase functions deploy limpiar-documentos-prueba                  # verify_jwt (super_admin)
 ```
 
+⚠️ **El `git push` del paso 5 va a desplegar las quince otra vez, y eso es normal.** El proyecto
+tiene **Supabase Branching conectado a `main`**, así que publicar dispara por su cuenta el
+despliegue de todas las funciones desde el código del repo, unos 45 s después (§12.44). Desplegar
+aquí a mano **sigue haciendo falta**: es lo que evita la ventana del orden de arriba. Lo que no hay
+que hacer es alarmarse al ver las quince con `updated_at` idéntico después de publicar.
+
 Al terminar, **qué cambió de verdad**:
 
 ```bash
@@ -186,6 +192,16 @@ supabase functions list
 ⚠️ El `verify_jwt` que acaba aplicándose sale de **`config.toml`**, no del flag de la línea de
 comandos: si una función discrepa de esa lista, se corrige ahí y se vuelve a desplegar. Pasó con
 `whatsapp-send`, que estuvo en `false` hasta el 10-09-2026 (deuda 43, ya cerrada).
+
+⚠️ **Y al final de la publicación, regraba la línea base:**
+
+```bash
+deno run -A scripts/huellas-funciones.ts guardar   # DESPUÉS de publicar, no solo antes
+```
+
+Sin esto el fichero se queda con la foto de *antes* del despliegue y la siguiente publicación lee
+«15 cambiadas» midiendo la anterior. Pasó: la base del 11-09 seguía puesta el 14-09 y dio un falso
+positivo que costó descartar.
 
 ## 5. Frontend
 

@@ -2525,6 +2525,15 @@ supabase secrets set --env-file .secrets.env
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
 # el default del CLI, que es `true` — correcto, pero no escrito en ninguna parte, que es
 # exactamente la distancia de la que nació la deuda 43).
+#
+# ⚠️ Y estos despliegues NO son la única forma de que se publique una función: el proyecto tiene
+# **Supabase Branching conectado a la rama `main` de GitHub** (`status: FUNCTIONS_DEPLOYED`), así
+# que **cada `git push origin main` despliega las quince** desde el código del repo, unos 45 s
+# después. Respeta `config.toml`, que viaja en el repo, así que los `verify_jwt` no se tuercen.
+# Consecuencia: un cambio commiteado en `supabase/functions/` se publica con el push, se quiera
+# o no — no existe «commiteo ahora y despliego la función más tarde». Desplegar a mano antes del
+# push sigue haciendo falta: es lo que evita la ventana del orden de abajo. Detalle y cómo se
+# averiguó, en §12.44.
 
 # Publicar en producción: el procedimiento completo vive en el skill `/publicar`
 # (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos a mano:
@@ -2726,7 +2735,11 @@ el código**. Los números **no se renumeran nunca**: hay comentarios en `src/`,
 y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silencio.
 
 
-1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*. Ya hay **430 pruebas de
+1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*.
+   ⚠️ **«Sin CI» describe el repo, no el proyecto**: no hay `.github/workflows/` ni un solo
+   run en GitHub, pero el **branching de Supabase despliega las quince Edge Functions en cada
+   push a `main`** (§12.44). Dar «sin CI» por «nada automático» es lo que hizo buscar tres
+   veces en el sitio equivocado. Ya hay **430 pruebas de
    Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
    `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
    Lo que sigue faltando: **linter** (no hay ESLint) y **CI de verdad** — el hook se puede saltar
@@ -3055,20 +3068,59 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     primero haría falta reproducir el empaquetado byte a byte, que el CLI no ofrece.
     **Validado el 11-09-2026**: un redespliegue sin tocar nada dice `No change found` **y** deja
     las 15 huellas idénticas, así que el `ezbr_sha256` sí depende del contenido.
-    ⚠️ **Algo redespliega las quince por su cuenta, y no se sabe qué.** El 11-09-2026 pasó
-    **dos veces** (10:42:03 y 10:47:19): las 15 funciones con `updated_at` en el **mismo segundo**
-    y **la versión subida** (`crear-oferta` 35 → 36), sin ningún despliegue por mi parte —solo
-    había desplegado `registro`, 40 minutos antes—, sin procesos de `supabase` en la máquina y sin
-    CI en el repo (§12.1). Que suba la versión descarta que sea solo un reempaquetado interno: es
-    un redespliegue. **La causa no está averiguada**; lo que se sabe es que el código desplegado
-    no cambia y que no lo provoca publicar.
-    Comprobado las dos veces que no movió nada que importe: las 15 siguen `ACTIVE`, con su
+    ✅ **Quién redespliega las quince: el `git push`. Averiguado el 14-09-2026, reproducido en
+    vivo.** Esta entrada dijo dos veces «la causa no está averiguada» y una de ellas remataba con
+    «**y que no lo provoca publicar**», que es exactamente al revés: lo provoca publicar y nada
+    más. **El proyecto tiene Supabase Branching conectado a la rama `main` de GitHub** desde el
+    17-07-2026, casi desde el principio — se ve en el Management API, y no hace falta el panel:
+
+    ```bash
+    TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+    curl -sS -H "Authorization: Bearer $TOKEN" \
+      https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/branches
+    # → [{"name":"main","git_branch":"main","is_default":true,"status":"FUNCTIONS_DEPLOYED",…}]
+    ```
+
+    `status: FUNCTIONS_DEPLOYED` es literal: **cada push a `main` despliega las quince Edge
+    Functions desde el código del repo**, unos 45 s después. Medido dos veces el mismo día: push
+    de `dc429ea` a las 14:54:23 → las quince a las 14:55:10; push de `a905364` a las 17:33:04 →
+    las quince a las 17:33:50, con la versión de cada una subida en uno. La segunda se observó
+    **mientras ocurría**, viendo el despliegue a medias (seis funciones ya en la versión nueva y
+    nueve en la vieja) — en ese estado transitorio las que se están desplegando enseñan un
+    `entrypoint_path` en `/tmp/user_fn_<ref>_<id>_<version>/source/…` en vez del `/app/…` de
+    siempre, que es la firma de la API frente al CLI.
+
+    ⚠️ **Por qué se buscó tres veces en el sitio equivocado**: se descartó «CI» mirando el repo
+    (§12.1 dice «sin CI», y es cierto — no hay `.github/workflows/` ni un solo run en GitHub), y
+    se dio por hecho que la automatización tendría que vivir ahí. Vive en el **proyecto de
+    Supabase**, no en el repositorio, así que ninguna cantidad de mirar el repo la habría
+    encontrado. Cuando algo de infraestructura pasa por su cuenta, el repo es solo la mitad de
+    los sitios donde mirar.
+
+    **Lo que cambia en la práctica**, y no es poco:
+    - **El paso 4 de `/publicar` no es opcional aunque el push despliegue solo.** Desplegar a mano
+      *antes* es lo que evita la ventana; si se dejara al push, las funciones nuevas llegarían
+      después del frontend nuevo, que es justo el orden que §11 prohíbe.
+    - **Redesplegar a mano y luego publicar deja las funciones desplegadas dos veces.** Es inocuo
+      —idempotente, mismo código— pero explica el `updated_at` posterior al despliegue manual.
+    - 🟠 **Un cambio commiteado en `supabase/functions/` se publica con el push, se quiera o no.**
+      No hay «commitear ahora y desplegar la función más tarde»: el push es el despliegue.
+    - El `verify_jwt` lo sigue mandando `config.toml`, que viaja en el repo, así que el despliegue
+      automático lo respeta. Verificado tras los dos redespliegues: quince `ACTIVE` y los quince
+      flags correctos.
+    - **La línea base de huellas hay que regrabarla DESPUÉS de publicar**, no solo antes. El
+      fichero se quedó con la foto del 11-09 a las 10:46 —anterior al despliegue de aquel día— y
+      tres días después `comparar` decía «15 cambiadas» midiendo aquel despliegue, no nada nuevo.
+      Una línea base que envejece convierte la herramienta en un detector de falsos positivos.
+    Comprobado las tres veces que no movió nada que importe: las 15 siguen `ACTIVE`, con su
     `verify_jwt` —que es lo que de verdad podría torcerse, como en la deuda 43— y los cuatro
     endpoints públicos responden 400/200/403/401.
-    Consecuencia para leer la herramienta: **«han cambiado todas» tiene ya tres causas** y solo
-    una es un problema — el `deno.lock` o un `deno.json` tocado (cambio real y esperado), un
-    reempaquetado de la plataforma (nada que hacer, `updated_at` idéntico lo delata), o un
-    despliegue masivo que no se pretendía. Antes de alarmarse, mirar `updated_at`.
+    Consecuencia para leer la herramienta: **«han cambiado todas» tiene tres causas y ninguna es
+    un misterio** — el `deno.lock` o un `deno.json` tocado (cambio real y esperado), **el
+    despliegue automático del branching tras un push** (`updated_at` idéntico en las quince, unos
+    45 s después de publicar), o una línea base de huellas vieja, que es la que más engaña porque
+    no corresponde a ningún cambio. Antes de alarmarse, mirar `updated_at` **y cuándo se guardaron
+    las huellas**.
     ⚠️ **Y `deno.lock` entra en el bundle de TODAS.** Al publicar ese día cambiaron las 14,
     incluida `descargar-documento`, que solo importa `autorizacion.ts` y `cors.ts` —ninguno
     tocado—. La causa era el `deno.lock`, que se había actualizado al instalar Vitest. Es el mismo
