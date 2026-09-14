@@ -1074,7 +1074,25 @@ reparto por rol de plataforma y por organización vive en **§4bis** (tabla `usu
 escritura donde hace falta: `INSERT`/`UPDATE`/`DELETE` en `wa_contacts`, `productores`, `entidades`,
 `canalizaciones`, `oferta_respuestas` y `productor_ubicaciones`; `DELETE` en `wa_messages`;
 `UPDATE` en `excedentes`; `INSERT`/`DELETE` en las dos whitelists de test; `SELECT`/`INSERT`/
-`UPDATE` en `app_settings`. Casos deliberadamente cerrados a nivel de GRANT, antes incluso de
+`UPDATE` en `app_settings`.
+
+⚠️ **Y desde `20270322100100` eso es lo que dice el GRANT, no solo la intención.** Hasta esa fecha
+`authenticated` tenía `INSERT`, `UPDATE` y `DELETE` **a nivel de tabla en casi todo `public`** —
+`documentos`, `albaranes`, `convenios`, `enlaces_token`, `series_documentales`, `municipios`…—, no
+por ningún GRANT del repo sino por el `alter default privileges` que Supabase deja puesto para
+`postgres`: **cada `create table` heredaba `arwdxtm` sin que nadie escribiera una línea**. Las
+frases de este párrafo —«sin `INSERT` en `wa_messages`», «sin `INSERT` en `excedentes`», «ninguna
+escritura en `documentos`…»— describían lo que debía ser, no lo que había. Revocado en **33
+relaciones** (27 tablas y 6 vistas) más cuatro parciales, con su `alter default privileges`, igual
+que el TRUNCATE de `20270309100000`.
+**No era alcanzable**: las 33 tienen RLS y ninguna política que autorice la operación revocada, así
+que PostgREST las rechazaba igual. No se cerró una puerta: se repuso la segunda capa. Lo que cambia
+es el mensaje (`42501` en vez de «0 filas afectadas») y que una política mal escrita mañana ya no
+baste para abrir la escritura por accidente.
+🔴 **Consecuencia al crear una tabla nueva**: `authenticated` nace con **SELECT y nada más**. Una
+tabla escribible desde el panel necesita ahora su `grant insert, update, delete … to authenticated`
+**explícito**, además de su política. Es lo que se quiere: que escribir sea una decisión que se lee
+en el diff. Casos deliberadamente cerrados a nivel de GRANT, antes incluso de
 evaluar RLS: **sin `INSERT` en `wa_messages`** (el envío pasa siempre por la Edge Function), **sin
 `INSERT` en `excedentes`** (los crea el servidor, que es quien genera `id_excedente` y
 `texto_oferta`), **sin escritura en `usuario_roles` ni `membresias`** (la escalada de privilegios
@@ -4137,7 +4155,18 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      (`costes_producto`, `convenios`, `planes_prevencion`) lo hacen con un `new.updated_at := now()`
      inline dentro de su trigger de control, que valida transiciones propias y no sirve aquí—.
 
-101. **`reiniciar_cierre_prueba()` borra los documentos `P-CT` pero no devuelve su contador a 0.**
+101. ~~**`reiniciar_cierre_prueba()` borra los documentos `P-CT` pero no devuelve su contador a
+     0.**~~ — **resuelta (14-09-2026, `20270322100000`)**. Comprobado **antes** de tocar el
+     contador, que era el orden que importaba: la función **sí** borra los CT —`cierre_emet_document()`
+     inserta siempre `objeto_tipo = 'cierre_donante'` y su `delete` no filtra por tipo ni serie—,
+     así que añadir `'P-CT'` a su `serie in (...)` no deja ningún contador por debajo de un
+     documento vivo. Con eso `reiniciar_documentos_prova()` se queda en **`'PROVA'` a secas** y el
+     arnés **deja de poder tocar un ensayo de cierre en curso**, que era el último flanco de la
+     deuda 52. Verificado en producción: tras un ciclo completo, `P-RES`, `P-CD`, `P-CT` y `P-CDP`
+     no se mueven.
+     ⚠️ Queda un límite que **no es nuevo**: el reseteo va por `ce.ejercicio`, no por cierre, y
+     puede haber varios cierres de prueba del mismo año. `P-RES` y `P-CD` ya lo tenían desde
+     noviembre; `P-CT` pasa a compartirlo. El texto original:
      Su `update` nombra `serie in ('P-RES', 'P-CD')` y es de noviembre de 2026, anterior al
      certificado de transacción (`20270301100100`). Encontrado el 14-09-2026 al acotar
      `reiniciar_documentos_prova()` (deuda 52): resulta que **el único sitio del código que ponía
@@ -4160,8 +4189,28 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      debe denegar o solo avisar al equipo — la misma distinción principal/secundaria que la
      deuda 91 resolvió para los teléfonos.
 
-103. 🟠 **`authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito
-     documental, y lo único que lo para es la RLS.** Medido el 14-09-2026 sobre producción:
+103. ~~**`authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito
+     documental.**~~ — **resuelta (14-09-2026, `20270322100100`)**, y eran **33 relaciones, no
+     siete**: 27 tablas y **6 vistas**, más cuatro revocaciones parciales. El criterio se **midió,
+     no se supuso** —«tiene el privilegio y ninguna política que lo autorice», **por operación y no
+     por tabla**, que es lo que deja a `excedentes` con su UPDATE, a `wa_messages` con su DELETE y a
+     `plantillas_documento` con su INSERT/UPDATE—.
+     🔴 **Lo que de verdad podía romperse, y por eso se comprobó antes**: dos triggers escriben en
+     tablas ahora revocadas cuando los dispara una sesión de equipo —`trg_ficha_estrena_organizacion`
+     (→ `organizaciones`, al crear una ficha) y `trg_canalizaciones_crea_albaranes` (→ `albaranes`,
+     al canalizar)—. Los dos son **`security definer`**, así que corren como `postgres` y no dependen
+     del GRANT de quien los dispara; si fueran invoker, este `revoke` habría roto el alta de fichas y
+     la canalización desde el panel. Verificado además **en producción con una sesión de equipo
+     real**: crear una ficha sigue funcionando y el trigger le asigna su organización.
+     ⚠️ **Tres privilegios se quedaron fuera a propósito** y siguen siendo deuda menor:
+     `meta_test_recipients.UPDATE`, `email_test_recipients.UPDATE` y `app_settings.DELETE`. Vienen
+     del mismo sitio y §4 no los reconoce, pero esas tablas tienen política `for all`, así que hoy
+     **sí** son alcanzables: quitarlos sería un cambio de capacidad, no reponer una capa.
+     ⚠️ Y el mismo punto ciego que la deuda del TRUNCATE: hay un segundo juego de privilegios por
+     defecto en `public` **para el rol `supabase_admin`** que sigue concediendo `arwdDxtm`. No
+     alcanza a nuestras tablas —las crea `postgres`— y **no se puede tocar desde una migración**:
+     `postgres` no es miembro de `supabase_admin`, así que el `alter` tumbaría el `db push`.
+     El texto original: Medido el 14-09-2026 sobre producción:
      `documentos`, `documento_envios`, `series_documentales`, `municipios`, `albaranes`, `convenios`
      y `cierres_donante` tienen `authenticated=arwdxtm` mientras §4 afirma «ninguna escritura». No
      viene de ningún GRANT del repo: es el `alter default privileges` que Supabase deja puesto para
@@ -4174,6 +4223,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      El arreglo es un `revoke insert, update, delete … from authenticated` por tabla más su `alter
      default privileges`, y **merece su propia migración**: tocar los privilegios de escritura de
      todo `public` de una vez es justo lo que no se hace en un cambio que iba de otra cosa.
+
+104. **`parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por columnas.**
+     `20260928100400:161` concede `grant update (…)` dejando `id` fuera a propósito («la fila 1 es
+     la fila 1»), pero el privilegio de tabla que llegó por los privilegios por defecto lo subsume:
+     `has_table_privilege('authenticated', …, 'UPDATE')` es `true`. En la práctica lo remata el
+     `check (id = 1)`, así que es inocuo. Encontrado el 14-09-2026 al medir la deuda 103 y **no
+     arreglado ahí** porque la única forma segura es `revoke update` + volver a conceder la lista
+     exacta de columnas, y eso es una decisión aparte sobre una tabla con política propia y con
+     check «permitir» en el arnés.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
