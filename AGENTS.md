@@ -3991,6 +3991,23 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     nunca la ve.
     Todos producen un **duplicado que ve el equipo, nunca una fusión equivocada**, que es el orden
     correcto de preferencias.
+    ✅ **Resuelta el 14-09-2026**: se miran las tres columnas secundarias, el patrón deja de ir
+    anclado y `clausTelefon()` saca **todas** las claves de 9 cifras que contiene un campo — porque
+    arreglar solo el ancla no bastaba: `mateixTelefon()` comparaba las últimas 9 del campo entero, y
+    en `612345678 / 933000000` esas son las del **segundo** número, así que la fila llegaba a memoria
+    y se descartaba igual.
+    🔴 **Y la fuerza de la señal depende ahora de la columna, que es lo que evita un daño nuevo.**
+    Una coincidencia por columna **principal** se comporta como siempre, `409 dades_en_us` incluido;
+    una por **secundaria no deniega jamás**: cae en el camino de «papel nuevo», con su nota para el
+    equipo. El motivo es que un `409` **no es un duplicado que alguien revisa, es un alta denegada**,
+    y una centralita compartida dice «se cogen el teléfono en el mismo sitio», no «son la misma
+    organización». Medido en producción: 7 números compartidos por organizaciones distintas, de los
+    cuales **1** es principal↔principal (sigue denegando, y ya denegaba antes) y **6** pasan a
+    revisión; sin la regla habrían sido 7 denegaciones. `Decisio.camp` se estrecha a `MotiuFort`, así
+    que un 409 no puede citar una columna débil ni por error de refactor: lo sostiene el compilador.
+    ⚠️ **Dos de esos seis son ganancia neta**: `Group Fructusweb` y `Josep Salvadó` tienen **dos
+    fichas cada uno con `organizacion_id` distinto** — duplicados reales que hoy no ve nadie y que
+    saldrán marcados en cuanto esa organización vuelva a pasar por el registro.
     ⚠️ **La columna normalizada y el índice funcional se descartan**, al revés de lo que decía esta
     entrada: con 111 entidades y ~450 fichas no hay problema de rendimiento que lo justifique, y la
     lógica de «últimas 9 cifras» está **triplicada** (TypeScript en `coincidencies.ts`, y SQL en
@@ -4188,7 +4205,9 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **522 pruebas en 20 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **544 pruebas en 20 ficheros**, todas correctas y ninguna pendiente.
+   ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
+   `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
    (`git config core.hooksPath .githooks`, una vez por clon).
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
