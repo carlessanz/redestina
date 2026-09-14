@@ -3091,7 +3091,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     el mismo fichero que crea `productores`) y `20260717084210_vaciar_mensajes.sql:1`, que es un
     fichero de limpieza de una sola línea. Las demás apariciones de «truncate» en el repo son la
     revocación de `20270309100000`, no borrado.
-11. Sin FK entre `productores`, `wa_contacts` y `wa_messages` (unidas por `phone`).
+11. 🟡 **Sin FK entre `productores`, `wa_contacts` y `wa_messages`** — y al medirlo resultó que
+    la entrada pedía de más. **`wa_messages.contact_phone → wa_contacts.phone` sí se declara**
+    (`20270321100000`, `not valid` + `validate` aparte, `on delete restrict`): había **0
+    huérfanos** sobre 352 mensajes, y los índices y el UNIQUE que Postgres exige ya existían.
+    ⚠️ **`productores.phone → wa_contacts.phone` NO se declara, y no debe**: **274 de los 345
+    productores no tienen contacto de WhatsApp**, y eso es correcto —una ficha existe haya escrito
+    o no, y 61 ni siquiera tienen móvil utilizable—. Una FK ahí afirmaría algo falso por
+    construcción y rompería el alta de fichas. La relación existe; no es una FK.
+    ⚠️ **El orden con el despliegue no es negociable**: el webhook tenía que dejar de tragarse el
+    fallo del upsert del contacto **antes** de poner la FK, porque con ella ese caso pasa de
+    huérfano silencioso a `23503` que **pierde el entrante**.
 12. `prioritat` casi no discrimina (97 de 111 entidades son prioridad 1): aporta poco al ranking.
 13. ~~`oferta_respuestas` se registra desde el **cliente**~~ — **cerrada por medición
     (14-09-2026): estaba contada de más, y lo que describe no es un agujero.** De los tres momentos
@@ -3957,11 +3967,18 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cachearla dejaría a los isolates calientes enviando después de apagar el interruptor. Si algún
     día pesara, la respuesta no es una caché de tiempo sino no llegar hasta ahí — el webhook y
     `whatsapp-send` ya cortan mucho antes.
-94. **El intake por WhatsApp no manda el correo de confirmación de la oferta.** Lo manda
-    `crear-oferta` (el panel); `_shared/oferta.ts` sigue confirmando solo por WhatsApp, que es
-    coherente —quien publica por WhatsApp está en esa conversación— pero significa que la misma
-    oferta se confirma por un canal u otro según por dónde entró, y no por lo que la organización
-    prefiera. El sitio donde arreglarlo es `crearExcedenteDesdeSesion()`.
+94. ~~**El intake por WhatsApp no manda el correo de confirmación de la oferta.**~~ — **resuelta
+    (14-09-2026)**: `confirmarPorCorreo()` sale de `crear-oferta/index.ts` y pasa a
+    `_shared/correu-oferta.ts` como `confirmarOfertaPerCorreu()`, que usan los dos caminos.
+    ⚠️ **El bloqueo real no era el que decía esta entrada.** El cliente de Supabase ya estaba
+    disponible en `crearExcedenteDesdeSesion()`; lo que faltaba era **el correo del productor**,
+    porque `_shared/intake.ts:330` pedía `select("id, name")`. Sin ensanchar ese literal, mover la
+    función no habría servido de nada: habría devuelto `"omes"` siempre.
+    ⚠️ **El intake manda los DOS, y no es redundancia por descuido**: el WhatsApp contesta una
+    conversación en curso —alguien acaba de escribir y merece respuesta por donde escribió— y el
+    correo es el registro duradero y buscable de la referencia, que hará falta semanas después
+    cuando el hilo haya bajado veinte mensajes; además deja traza en `documento_envios`, que el
+    WhatsApp no deja. Se duplica poco: solo 78 de 345 productores tienen correo.
 
 95. **La generación del token está copiada en tres migraciones aplicadas.**
     `marcar_entregado()`, `enviar_convenio()` e `iniciar_firma_asistida()` llevan cada una su
@@ -4017,6 +4034,19 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      que se arreglaba, porque un contador por debajo de los documentos vivos choca con el índice
      único `(numero_completo, version)` en la siguiente emisión. Se cierra añadiendo `'P-CT'` a ese
      `serie in (...)`, y ese día `reiniciar_documentos_prova()` puede quedarse en `'PROVA'` a secas.
+
+102. **`entidades.email2` es la cuarta columna ciega de la detección de organizaciones, y la
+     única que queda.** Encontrada el 14-09-2026 al ampliar la deuda 91 a los teléfonos
+     secundarios. **Medido en producción**: 17 entidades tienen `email2`, los 17 distintos del
+     principal, y **uno ya casa con el `email` de un productor de otra organización** — o sea, un
+     candidato real a «misma organización» que hoy no ve ni el registro ni la migración de la
+     etapa 1. Técnicamente es una consulta más en `decidirCoincidencia()` y comparar contra
+     `[email, email2]`.
+     ⚠️ **No se hizo con las de teléfono a propósito, y el motivo importa**: el correo es hoy el
+     criterio que **deniega** un alta (`409 dades_en_us`), así que ampliarlo no es simétrico a
+     ampliar los teléfonos. Antes de tocarlo hay que decidir si una coincidencia por `email2`
+     debe denegar o solo avisar al equipo — la misma distinción principal/secundaria que la
+     deuda 91 resolvió para los teléfonos.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 

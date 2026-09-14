@@ -1,6 +1,7 @@
 // Cierre del intake: identificador, alta del excedente y texto de la oferta.
 
 import { sendText } from "./whatsapp.ts";
+import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -298,7 +299,8 @@ export async function crearExcedente(
 export async function crearExcedenteDesdeSesion(
   supabase: Cliente,
   sesion: SesionCompleta,
-  productor: { id: string; name: string },
+  /** `email` es opcional: solo 78 de 345 productores tienen, y sin él no se manda correo. */
+  productor: { id: string; name: string; email?: string | null },
 ): Promise<void> {
   const producto = String(sesion.datos_parciales.producte ?? "");
   const r = await crearExcedente(supabase, sesion.datos_parciales, productor, "intake");
@@ -316,5 +318,17 @@ export async function crearExcedenteDesdeSesion(
     supabase, sesion.telefono,
     `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${r.idExcedente}. ` +
       `T'avisarem quan estigui canalitzada.`,
+  );
+
+  // Y por correo, si la ficha lo tiene (deuda §12.94). No sustituye al WhatsApp de arriba:
+  // ese contesta la conversación en curso, y este deja el registro buscable de la referencia
+  // más su traza en `documento_envios`. Hasta hoy la misma oferta se confirmaba de una manera
+  // u otra según por dónde hubiera entrado, que es lo que §8bis dice que no decide el canal.
+  //
+  // No se comprueba el resultado a propósito: la oferta está creada y el productor ya tiene su
+  // referencia por WhatsApp, así que un fallo de correo no cambia nada de lo que él ve. Queda
+  // registrado en `documento_envios` con su motivo.
+  await confirmarOfertaPerCorreu(
+    productor, r.idExcedente ?? "", r.excedenteId ?? "", sesion.datos_parciales, supabase, "intake",
   );
 }

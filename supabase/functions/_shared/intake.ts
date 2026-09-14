@@ -326,8 +326,11 @@ export async function procesarIntake(
   message: any,
 ): Promise<boolean> {
   // Solo se atiende a productores dados de alta.
+  // `email` hace falta para la confirmación por correo de la oferta (§12.94): sin él,
+  // `confirmarOfertaPerCorreu` devolvería siempre "omes" y el intake seguiría confirmando
+  // solo por WhatsApp. La lista de columnas va en UN literal (§7).
   const { data: productor } = await supabase
-    .from("productores").select("id, name").eq("phone", from).maybeSingle();
+    .from("productores").select("id, name, email").eq("phone", from).maybeSingle();
   if (!productor) return false;
 
   const { texto, id } = leerRespuesta(message);
