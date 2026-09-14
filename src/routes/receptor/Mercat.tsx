@@ -10,6 +10,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
+import { useConveni } from '../../hooks/useConveni'
 import { manifestaInteres } from '../../lib/ofertes'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import { Button } from '@/components/ui/button'
@@ -22,6 +23,7 @@ import {
 
 export default function Mercat() {
   const { t } = useT()
+  const { bloqueja } = useConveni()
   const organitzacio = useOrganitzacio('entidad')
   const [ofertes, setOfertes] = useState<Excedente[]>([])
   const [meves, setMeves] = useState<Record<string, OfertaRespuesta>>({})
@@ -121,7 +123,12 @@ export default function Mercat() {
                     {/* Sin `size="sm"` y a 44px en móvil: es la única acción del panel
                         del receptor y se repite en cada fila. En escritorio vuelve a la
                         altura normal, donde se pulsa con ratón y 36px sobran. */}
-                    <Button className="h-11 md:h-9" onClick={() => obre(o)}>{t('mk.interested')}</Button>
+                    <Button
+                      className="h-11 md:h-9"
+                      disabled={bloqueja}
+                      title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+                      onClick={() => obre(o)}
+                    >{t('mk.interested')}</Button>
                   </DialogTrigger>
                   {/* ⚠️ `max-h` + scroll: el diálogo cabe con el teclado cerrado (458px
                       en 667), pero al enfocar «quants kg» el área visible baja a ~350px

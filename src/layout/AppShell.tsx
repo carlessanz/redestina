@@ -20,6 +20,7 @@ import AppSidebar from './AppSidebar'
 import BottomNav from './BottomNav'
 import UserMenu from './UserMenu'
 import AvisInstallacio from '../components/AvisInstallacio'
+import AvisConveni from '../components/AvisConveni'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 /** Metadatos que cada ruta puede declarar en su `handle`. */
@@ -142,6 +143,9 @@ export default function AppShell() {
                   paddingRight: `max(${handle.ample ? '0.5rem' : '1rem'}, env(safe-area-inset-right))`,
                 }}
               >
+                {/* Falta el convenio: se avisa aquí, encima de cualquier pantalla del
+                    panel, y no en la puerta. Ver `AvisConveni`. */}
+                {rolActiu !== 'intern' && <AvisConveni />}
                 <Outlet />
               </div>
             )}

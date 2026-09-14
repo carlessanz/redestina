@@ -14,6 +14,7 @@ import { useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
+import { useConveni } from '../../hooks/useConveni'
 import { carregaCamps, creaOferta } from '../../lib/ofertes'
 import type { CampoOferta, CatalogosOferta } from '../../lib/ofertes'
 import { Button } from '@/components/ui/button'
@@ -31,6 +32,7 @@ function aplica(campo: CampoOferta, datos: Datos): boolean {
 
 export default function NovaOferta() {
   const { t } = useT()
+  const { bloqueja } = useConveni()
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const [campos, setCampos] = useState<CampoOferta[]>([])
@@ -181,7 +183,9 @@ export default function NovaOferta() {
         </div>
         {error && <p className="text-sm text-destructive">{error}</p>}
         <div className="flex flex-wrap gap-2 border-t pt-4">
-          <Button onClick={() => void enviar()} disabled={enviant}>
+          {/* Desde la fecha de corte, sin convenio vigente la RPC devuelve 42501: el
+              botón se apaga para no dejar al productor delante de un error. */}
+          <Button onClick={() => void enviar()} disabled={enviant || bloqueja} title={bloqueja ? t('avis_conv.bloquejat') : undefined}>
             {enviant ? t('c.saving') : t('po.publish')}
           </Button>
           <Button variant="outline" onClick={() => navigate('/productor/ofertes')}>{t('c.cancel')}</Button>

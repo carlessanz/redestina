@@ -467,6 +467,8 @@ scripts/
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
   diagnostico-whatsapp.ts      Interroga la Graph API y distingue token caducado / número / permisos (§8ter)
+  estado-documentos.ts         ¿Hay documentos, y su PDF está en el bucket? Separa las tres causas de
+                               una bandeja vacía: sin filas, RLS, o el disparador no-op sin secreto
   sql/rls-emergencia.sql       Paracaídas: restaura las políticas permisivas (NO es migración)
   data/                        Los CSV — IGNORADO POR GIT (datos personales, §7)
 supabase/
