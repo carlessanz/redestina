@@ -272,8 +272,39 @@ const DOCUMENTAL_EXTERN: Check[] = [
     op: "leer",
     esperado: "denegar",
     columnas: "id, estado",
-    descripcion: "NO ve ningún enlace (los suyos los tiene en el correo)",
+    descripcion: "NO ve ningún enlace (los suyos, por pendents_meus)",
   },
+  // Lo que tiene pendiente SÍ lo puede consultar, y es la vuelta del check de arriba: la
+  // tabla sigue cerrada, y lo que se abre es una RPC que devuelve el estado sin el token.
+  // Las dos cosas a la vez son la garantía; una sola no dice nada.
+  {
+    tabla: "pendents_meus",
+    op: "rpc",
+    esperado: "permitir",
+    descripcion: "SÍ pot consultar què té pendent de signar o confirmar",
+  },
+  // Y no puede acuñar un enlace de un objeto que no es suyo. El uuid inventado no existe,
+  // así que lo que se comprueba es que la guarda de pertenencia corta con 42501 ANTES de
+  // mirar si el convenio existe: si respondiera «no existe», estaría diciendo algo de la
+  // base a quien no tiene por qué saberlo.
+  {
+    tabla: "acunar_enllac_propi",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_proposito: "firma_convenio",
+      p_objeto_tipo: "convenio",
+      p_objeto_id: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO acunya cap enllaç d'un conveni que no és seu",
+  },
+  // ⚠️ NO HAY CHECK DE «SÍ acuña el suyo», y es deliberado. Acuñar deja una fila en
+  //    `enlaces_token` Y REVOCA el enlace activo de ese convenio — el que la persona tiene
+  //    en su correo. El arnés corre también contra producción, así que un check así le
+  //    rompería el enlace a alguien real para comprobar una permisión, y no hay ninguna RPC
+  //    que lo deshaga (`limpiar` no sirve: los enlaces no se borran). La permisión se
+  //    verifica a mano con el fixture local, y lo que sí se vigila aquí es la guarda, que
+  //    es la mitad que puede fallar en silencio.
   {
     tabla: "evidencias",
     op: "leer",
@@ -710,6 +741,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // tenía el panel abierto.
     { tabla: "firmar_convenio_por_enlace", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000" }, descripcion: "NI l'equip firma per algú (només el servidor)" },
     { tabla: "validar_codi_firma", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_codi: "000000" }, descripcion: "NI l'equip valida el codi (només el servidor)" },
+    // Ni acuña un enlace «propio»: un enlace de `canal = 'panel'` es el de quien tiene la
+    // sesión, y el equipo no es titular de ninguna organización. Para lo suyo están
+    // `enviar_convenio`, `iniciar_firma_asistida` y `marcar_entregado`.
+    { tabla: "acunar_enllac_propi", op: "rpc", esperado: "denegar", args: { p_proposito: "firma_convenio", p_objeto_tipo: "convenio", p_objeto_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO acunya enllaços propis (no és titular de res)" },
+    // La consulta sí la puede hacer: devuelve las de SUS organizaciones, y el equipo no
+    // tiene ninguna, así que son 0 filas. Lo que se comprueba es que no dé 42501.
+    { tabla: "pendents_meus", op: "rpc", esperado: "permitir", descripcion: "consulta els seus pendents (cap, no té organització)" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },

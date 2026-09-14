@@ -16,6 +16,7 @@ import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { estilEstatConveni } from '../lib/convenis'
+import { ORDRE_CONVENI as ORDRE } from '../lib/documentsPanell'
 import type { ConvenioEstado, ConvenioTipo } from '../types'
 import { Badge } from '@/components/ui/badge'
 
@@ -25,10 +26,6 @@ interface Fila {
   estado: ConvenioEstado
 }
 
-/** Orden del circuito: el estado más avanzado es el que describe a la organización. */
-const ORDRE: ConvenioEstado[] = [
-  'substituit', 'resolt', 'esborrany', 'retornat', 'pendent_firma', 'firmat', 'vigent',
-]
 
 export default function BadgeConveni({
   tipusOrg,

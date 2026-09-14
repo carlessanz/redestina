@@ -406,8 +406,8 @@ src/
   routes/equip/                Envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja del sistema documental)
                                + Albarans/AlbaraDetall/Espigolades (fase 3)
-  routes/productor/            Inicio, listado, alta de oferta y detalle
-  routes/receptor/             Mercat, interessos i històric
+  routes/productor/            Inicio, listado, alta de oferta, detalle y Documents
+  routes/receptor/             Mercat, interessos, històric i Documents
   types.ts                     Tipos de todas las tablas
   index.css                    Tokens del sistema de diseño (:root + @theme inline) y base (§2bis)
   lib/
@@ -425,6 +425,10 @@ src/
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
     settings.ts                Los dos interruptores de app_settings: modo test y whatsapp_activo (§8)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
+    pendents.ts                pendents_meus() i acunar_enllac_propi(): què falta signar o
+                               confirmar, i l'enllaç propi per fer-ho (§6ter)
+    documentsPanell.ts         Helpers purs de les pantalles de documents (agrupar per
+                               exercici, quin PDF val, l'ordre del conveni)
     albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
     enllacPublic.ts            Cliente de enlace-publico, sin sesión (§9)
     email.ts                   enviarEmail(): llama a la Edge Function enviar-email
@@ -437,6 +441,9 @@ src/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
     DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
                                mensajería cuando WhatsApp está apagado (§8)
+    documents/                 Las cuatro piezas que comparten los dos paneles externos:
+                               PendentsDeTu (firmar/confirmar desde el panel), LlistaConvenis,
+                               LlistaDocuments y TaulaAlbarans (§6ter)
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
@@ -789,6 +796,13 @@ fichero aparte, que es lo que lo arregla; lo que se pierde es la manera de compr
 de 7/14 días). **El token en claro solo existe en el correo**: en la base queda el sha256 de 32
 bytes aleatorios, como una contraseña. `canal='asistido'` es el enlace que abre el dinamizador
 delante de la persona (modelo asistido, §1bis), no un atajo.
+
+⚠️ **`canal='panel'`** (`20270318100000`) lo acuña el propio titular desde su panel con
+`acunar_enllac_propi()`, y **caduca en 1 hora**, no en 30 días: se consume al momento —el
+frontend navega con él— pero la firma se comprueba en el POST, y rellenar un convenio puede
+pasar del cuarto de hora. Los tres canales se imprimen **distintos** en la página de
+evidencias del PDF: decir «firma asistida» de una firma propia, o «por correo» de una hecha
+desde el panel, sería afirmar algo falso en un documento legal.
 
 ⚠️ **`enlaces_token.rol_parte`** (`entrega`/`recibe`, nullable, `20270304100200`) dice de qué parte
 del albarán es cada enlace, con el mismo vocabulario que `albaranes.partes`. Existe por el **OPE**,
@@ -1237,6 +1251,9 @@ funciones, no políticas:
 | `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
+| `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
+| `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. GRANT **solo `authenticated`**: el equipo tiene `enviar_convenio`/`marcar_entregado`, y un GRANT a `service_role` que siempre fallaría es peor que no tenerlo (§4bis) |
+| `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
 | `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
@@ -1515,8 +1532,50 @@ que corresponde al momento de cierre y todavía no está implementado.
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
 | **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
-| **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · perfil` | Sus ofertas, su progreso y el **alta con el mismo cuestionario del intake** |
-| **Receptor** | `/receptor/mercat · interessos · historic · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés y su histórico |
+| **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents** · perfil` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
+| **Receptor** | `/receptor/mercat · interessos · historic · **documents** · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+
+### Els meus documents: lo pendiente y el archivo (14-09-2026)
+
+Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo
+mismo salvo los importes, y comparten los cuatro componentes de `src/components/documents/`:
+
+| Bloque | Productor | Receptor |
+| --- | --- | --- |
+| **Pendent de tu** (`PendentsDeTu`) | ✅ | ✅ |
+| Convenis (`LlistaConvenis`) | ✅ | ✅ |
+| Acumulado del año, factura y certificado | ✅ **con importe** | ❌ **por diseño** |
+| Albarans (`TaulaAlbarans`) | REC | ENT y R-ENT |
+| Certificats a demanda (`cierre_periodo`) | ✅ | ❌ |
+| Pla de prevenció | ✅ | ✅ |
+
+⚠️ **Listar no necesitaba nada de base**: `documents_meus()` ya devolvía convenios, planes y
+certificados a demanda desde la fase 5, y **las pantallas los descartaban en silencio** (el
+productor los cargaba y los tiraba; el receptor los filtraba en el `select`). Lo que faltaba
+de verdad era lo **pendiente**, porque `enlaces_token` es invisible para un externo.
+
+**Firmar y confirmar desde el panel**, sin salir de la aplicación: el botón llama a
+`acunar_enllac_propi()` y navega a `/signar/:token` o `/confirmar/:token` con
+`state.tornar`. **No hay un segundo circuito de firma**: mismo texto compuesto por el
+servidor, misma huella, misma evidencia, y las páginas siguen siendo públicas —lo que
+autoriza es el token—. Con sesión enseñan además «Torna al panell».
+
+⚠️ **Acuñar desde el panel REVOCA el enlace del correo.** Es el precio, y es aceptable
+porque quien acuña es esa misma persona y lo usa al momento; si lo pierde, el panel le da
+otro. El corolario es que **no hay check del arnés que lo ejercite en positivo**: correría
+también contra producción y le rompería el enlace a alguien real.
+
+⚠️ **Lo pendiente lo decide el estado del OBJETO, no el del enlace.** Un convenio en
+`pendent_firma` está pendiente aunque su enlace haya caducado, y como el botón acuña uno
+nuevo, el viejo deja de importar. El último enlace se enseña solo como información («te lo
+mandamos el día X»).
+
+**`AvisConveni`** ya no dice «mira el correu»: enlaza a la pantalla de documentos del panel
+activo, y distingue el cuarto caso (`retornat`). El menú de los dos paneles lleva contador
+(`pendents_productor` / `pendents_receptor`, uno por panel para que el doble rol no los
+mezcle) y la barra inferior de móvil un **punto**, no una cifra: la celda mide ~85 px y ya
+va justa con la etiqueta (§2). La etiqueta del receptor pasa de «Albarans» a «Documents»
+porque ahora también hay convenios y plan.
 
 Los tres cuelgan de `RequireSessio` y de `/panell`, que es la raíz por rol (§6quater); la raíz `/`
 es desde el 31-07-2026 la página pública.
@@ -1722,7 +1781,13 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/registre` | Alta self-service por rol (§9) |
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
+| `/signar/:token` | **Firma del convenio sin sesión** (fase 2). Mismo criterio |
 | `/panell` | Lo que antes era `/`: manda a cada cual a su panel |
+
+⚠️ **`/signar` y `/confirmar` siguen siendo públicas, y desde el 14-09-2026 también se
+llega a ellas CON sesión**, desde el panel (`acunar_enllac_propi`, §6ter). No cambia quién
+autoriza —sigue siendo el token— ni el contenido: lo único que añaden es el botón «Torna al
+panell», que sale solo si hay sesión, y el destino viaja en `location.state.tornar`.
 
 ⚠️ **`/admin` no está enlazado, pero eso no es una protección.** Quien conozca la URL ve el mismo
 formulario; lo que protege el panel del equipo son `RoleGuard` y las políticas de la base, no el
@@ -2219,6 +2284,15 @@ donante una factura por una cifra concreta (anexo B.1).
 
 `enlace-publico` gana el propósito `firma_convenio` con tres acciones: `firmar`, `enviar_codi` y
 `validar_codi`. Es **firma electrónica simple**: lo que la acredita no es el trazo, es la evidencia.
+
+**Tres vías para llegar al mismo sitio**, y el PDF las distingue: por **correo** (el enlace que
+manda `enviar_convenio`), **asistida** (la abre el dinamizador delante de la persona, con
+segundo factor si hay correo) y, desde el 14-09-2026, **desde el panel** con sesión
+(`acunar_enllac_propi`, §6ter). La del panel **no lleva segundo factor** —`enviar_codi` y
+`validar_codi` siguen rechazando cualquier canal que no sea `asistido`— porque el factor ya
+es la sesión. La cuenta que la acuñó queda en `evidencias.payload.panell` y **no** en
+`asistido_por`: esa columna significa «alguien del equipo condujo la firma», y decir eso de
+una firma propia sería falso.
 
 **El texto que se firma lo compone el servidor** (`_shared/pdf/convenio.ts`, el mismo módulo que
 imprime el PDF, para que el texto hasheado y el impreso sean el mismo) y su sha256 se **recalcula**
@@ -3480,9 +3554,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
 68. 🟡 **El OPE no distingue sus dos confirmaciones** — *resuelto en la base
     (`20270304100200`)*: `enlaces_token.rol_parte` y `marcar_entregado()` escribiéndolo en las tres
-    ramas, con el mismo vocabulario que `albaranes.partes`. **Queda que la ficha lo pinte**,
-    aguantando el `null` de los enlaces anteriores: en REC y ENT la parte se deduce del tipo del
-    albarán, pero en un OPE viejo no hay de dónde sacarla.
+    ramas, con el mismo vocabulario que `albaranes.partes`. **El panel externo YA lo pinta**
+    (14-09-2026): `PendentsDeTu` saca una fila por parte y la etiqueta («com a qui entrega» /
+    «com a qui rep»), que es donde de verdad importaba —una organización con las dos fichas veía
+    si no dos filas idénticas—. **Queda la ficha del equipo**, aguantando el `null` de los
+    enlaces anteriores: en REC y ENT la parte se deduce del tipo del albarán, pero en un OPE
+    viejo no hay de dónde sacarla.
 
 69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
     `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
@@ -3695,6 +3772,34 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     oferta se confirma por un canal u otro según por dónde entró, y no por lo que la organización
     prefiera. El sitio donde arreglarlo es `crearExcedenteDesdeSesion()`.
 
+95. **La generación del token está copiada en tres migraciones aplicadas.**
+    `marcar_entregado()`, `enviar_convenio()` e `iniciar_firma_asistida()` llevan cada una su
+    copia del cálculo (dos `gen_random_uuid()` + reloj → sha256 → base64url). Desde
+    `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa, pero las tres viejas se
+    quedan como están: **editar una migración aplicada está prohibido** (§7). Se unifican el día
+    que alguna se recree por otro motivo.
+96. **La cuenta que firma desde el panel viaja en `p_datos.panell`, no en la evidencia.**
+    `firmar_convenio_por_enlace()` acepta `p_evidencia` con una lista fija de claves y compone
+    `datos_org` con claves explícitas, así que una clave de más en `p_datos` acaba solo en
+    `evidencias.payload` — que es donde tiene que estar— pero por un rodeo. No va en
+    `asistido_por` a propósito: esa columna significa «alguien del equipo condujo la firma».
+    Cuando esa RPC se recree, debería aceptar `p_evidencia.payload` y entrar por la puerta.
+97. **Acuñar un enlace desde el panel revoca el que la persona tenga en el correo.** Es la
+    misma regla que `enviar_convenio()` —dos enlaces vivos son dos firmas posibles y la segunda
+    no tendría dónde ir— y el precio es aceptable porque quien acuña es esa misma persona. El
+    corolario, que sí es deuda: **no hay check del arnés que ejercite la permisión en positivo**,
+    porque correría también contra producción. La guarda sí se comprueba.
+98. **`nav.entity_documents` pasa a valer «Documents», que es lo que dice el menú del equipo.**
+    `tests/cobertura.test.ts` exige que las `labelKey` no se repitan —por los tooltips del menú
+    plegado— y no se repiten: son claves distintas. Lo que coincide es el TEXTO, y solo se vería
+    en una cuenta que tuviera a la vez panel de equipo y de receptor, que hoy no existe (las de
+    doble rol son productor+receptor).
+99. **El plan de prevención se lista desde `documentos`, no desde `planes_prevencion`.** Es lo
+    único que se puede hacer hoy: la tabla y sus RPC existen desde la fase 5 y **no hay ninguna
+    pantalla de planes**, ni de equipo ni externa, así que del plan solo existe su PDF. El día
+    que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
+    su documento.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas de §12 que **no son defectos pendientes**. Se quedan donde están —con su
@@ -3738,20 +3843,24 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 30 | `VITE_ACCESSOS_TEST` — apagarlo es decisión de negocio |
 | 92 | El «Mostra interès» del correo va al panel con sesión; el enlace con token sin cuenta es fase 2 |
 | 93 | `whatsappActivo()` sin caché: es lo que hace que apagar el interruptor sea inmediato |
+| 95 | Tres copias del token: editar una migración aplicada está prohibido |
+| 97 | Acuñar desde el panel revoca el enlace del correo, y por eso no se prueba en positivo |
 | 72 | `abrir_cierre` no se prueba como «permitir» porque dejaría una cabecera sin forma de borrarla |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **507 pruebas en 19 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **522 pruebas en 20 ficheros**, todas correctas y ninguna pendiente.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
    (`git config core.hooksPath .githooks`, una vez por clon).
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto** (14-09-2026): **485/485 correctas y 14 saltadas**, «Sin fallos de
-   permisos», exit 0. (Era 480/480 + 14 antes del check de `data_tall_convenis`; 442/442 + 52
+   Referencia en **remoto**, pendiente de fijar tras publicar el interruptor de WhatsApp y los
+   documentos del panel externo: la anterior era **485/485 correctas y 14 saltadas**, «Sin
+   fallos de permisos», exit 0, y esta tanda añade **cuatro** checks (`pendents_meus` y
+   `acunar_enllac_propi`, en el bloque externo y en el del equipo). (Era 480/480 + 14 antes del check de `data_tall_convenis`; 442/442 + 52
    tras la etapa 3 de la organización unificada; 432/432 + 52 antes de las guardas de
    `enllacar_organitzacio` y `organitzacions_candidates`; 408/408 antes de los checks de
    `organizaciones` y `v_organizaciones`, que hasta aquella publicación no tenían tabla contra

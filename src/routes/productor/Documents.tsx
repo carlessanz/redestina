@@ -1,4 +1,5 @@
-// Los documentos de un donante: su acumulado del año, sus albaranes y su certificado.
+// Los documentos de un productor: lo que le falta hacer, sus convenios, su acumulado del
+// año, sus albaranes de recepción, sus certificados y su plan de prevención.
 //
 // ES LA ÚNICA PANTALLA DEL PROYECTO DONDE UNA ORGANIZACIÓN VE UN IMPORTE SUYO, y por eso
 // conviene decir de dónde sale y de dónde no. Sale de `cierres_donante`, que la RLS
@@ -12,6 +13,11 @@
 // (`P-RES-2026-0001`) o de `documentos.ejercicio`, que también son datos suyos. Si algún día
 // aparece aquí un `select` a `cierres_ejercicio`, devolverá null y no será un error: será un
 // año en blanco, que es peor.
+//
+// NINGUNA CONSULTA FILTRA POR ORGANIZACIÓN, y no es un olvido: la RLS ya devuelve solo lo
+// suyo. Un `.eq()` de más aquí daría la falsa impresión de que es el filtro lo que protege.
+// La excepción son los convenios, que sí llevan `.eq()` por columna: una cuenta con doble
+// rol vería también los de su otra ficha, y esta pantalla es la del productor.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { AlertTriangle, Download, Loader2, Upload } from 'lucide-react'
@@ -21,18 +27,19 @@ import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
-import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
+import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import {
   dataTancament, estilEstatDonant, euros, exerciciDeNumero,
 } from '../../lib/tancament'
-import type { CierreDonante, Documento } from '../../types'
+import type { CierreDonante, Convenio, Documento } from '../../types'
+import PendentsDeTu from '../../components/documents/PendentsDeTu'
+import LlistaConvenis from '../../components/documents/LlistaConvenis'
+import LlistaDocuments from '../../components/documents/LlistaDocuments'
+import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
-} from '@/components/ui/table'
 
 type Donant = Pick<
   CierreDonante,
@@ -42,8 +49,22 @@ type Donant = Pick<
 
 type DocFila = Pick<
   Documento,
-  'id' | 'objeto_id' | 'objeto_tipo' | 'tipo' | 'numero_completo' | 'version' | 'modo' | 'ejercicio' | 'estado' | 'vigente' | 'emitido_at'
+  'id' | 'objeto_id' | 'objeto_tipo' | 'tipo' | 'subtipo' | 'numero_completo' | 'version' | 'modo' | 'ejercicio' | 'estado' | 'vigente' | 'emitido_at'
 >
+
+type ConveniFila = Pick<
+  Convenio,
+  'id' | 'tipo' | 'tipo_org' | 'estado' | 'numero_completo' | 'ejercicio'
+  | 'enviado_at' | 'firmado_at' | 'contrafirmado_at' | 'created_at'
+>
+
+/** Una ventana de `cierres_periodo`: el certificado a demanda y sus fechas. */
+interface PeriodeFila {
+  id: string
+  periodo_desde: string
+  periodo_hasta: string
+  modo: 'real' | 'prueba'
+}
 
 export default function ProductorDocuments() {
   const { t } = useT()
@@ -52,10 +73,14 @@ export default function ProductorDocuments() {
   const [donants, setDonants] = useState<Donant[]>([])
   const [docs, setDocs] = useState<DocFila[]>([])
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
+  const [convenis, setConvenis] = useState<ConveniFila[]>([])
+  const [periodes, setPeriodes] = useState<PeriodeFila[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [pujant, setPujant] = useState<string | null>(null)
   const fitxers = useRef<Record<string, HTMLInputElement | null>>({})
+
+  const orgId = org?.id ?? null
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
@@ -69,7 +94,7 @@ export default function ProductorDocuments() {
 
     const { data: docData } = await supabase
       .from('documentos')
-      .select('id, objeto_id, objeto_tipo, tipo, numero_completo, version, modo, ejercicio, estado, vigente, emitido_at')
+      .select('id, objeto_id, objeto_tipo, tipo, subtipo, numero_completo, version, modo, ejercicio, estado, vigente, emitido_at')
       .eq('vigente', true)
       .order('emitido_at', { ascending: false })
 
@@ -79,13 +104,31 @@ export default function ProductorDocuments() {
       .eq('tipo', 'REC')
       .order('emitido_at', { ascending: false, nullsFirst: true })
 
+    // Los convenios SÍ se filtran por columna: la RLS deja ver los de todas las fichas de
+    // la cuenta, y una con doble rol vería aquí los de su entidad. Mismo criterio que
+    // `useConveni`.
+    const { data: convData } = orgId
+      ? await supabase
+        .from('convenios')
+        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at')
+        .eq('productor_id', orgId)
+        .order('created_at', { ascending: false })
+      : { data: [] }
+
+    const { data: perData } = await supabase
+      .from('cierres_periodo')
+      .select('id, periodo_desde, periodo_hasta, modo')
+      .order('periodo_hasta', { ascending: false })
+
     return {
       donants: (donData as Donant[] | null) ?? [],
       docs: (docData as DocFila[] | null) ?? [],
       albarans: (albData as AlbaranBandeja[] | null) ?? [],
+      convenis: (convData as ConveniFila[] | null) ?? [],
+      periodes: (perData as PeriodeFila[] | null) ?? [],
       errDon: null,
     }
-  }, [])
+  }, [orgId])
 
   const refresca = useCallback(async () => {
     const r = await carrega()
@@ -93,6 +136,8 @@ export default function ProductorDocuments() {
     setDonants(r.donants ?? [])
     setDocs(r.docs ?? [])
     setAlbarans(r.albarans ?? [])
+    setConvenis(r.convenis ?? [])
+    setPeriodes(r.periodes ?? [])
   }, [carrega])
 
   useEffect(() => {
@@ -104,6 +149,8 @@ export default function ProductorDocuments() {
       setDonants(r.donants ?? [])
       setDocs(r.docs ?? [])
       setAlbarans(r.albarans ?? [])
+      setConvenis(r.convenis ?? [])
+      setPeriodes(r.periodes ?? [])
       setCarregant(false)
     })()
     return () => { viu = false }
@@ -133,7 +180,22 @@ export default function ProductorDocuments() {
     return { exercici, prova, docs: seus }
   }, [perDonant])
 
-  const algunaProva = useMemo(() => donants.some((d) => info(d).prova), [donants, info])
+  const algunaProva = useMemo(
+    () => donants.some((d) => info(d).prova) || periodes.some((p) => p.modo === 'prueba'),
+    [donants, info, periodes],
+  )
+
+  /** Los documentos de un tipo de objeto, que es como se reparten por secciones. */
+  const docsDe = useCallback(
+    (objetoTipo: string) => docs.filter((d) => d.objeto_tipo === objetoTipo),
+    [docs],
+  )
+
+  const perPeriode = useMemo(() => {
+    const mapa: Record<string, PeriodeFila> = {}
+    for (const p of periodes) mapa[p.id] = p
+    return mapa
+  }, [periodes])
 
   async function puja(d: Donant, fitxer: File) {
     setPujant(d.id)
@@ -161,6 +223,13 @@ export default function ProductorDocuments() {
           <p>{t('mydoc.test_banner')}</p>
         </div>
       )}
+
+      {/* --- Lo que espera su firma o su confirmación. Va PRIMERO porque es lo único de
+              esta pantalla que le pide algo; el resto es archivo. --- */}
+      <PendentsDeTu tipusOrg="productor" tornarA="/productor/documents" />
+
+      {/* --- Sus convenios --- */}
+      <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador} />
 
       {/* --- El acumulado del año --- */}
       <Card>
@@ -275,6 +344,40 @@ export default function ProductorDocuments() {
             : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador} />}
         </CardContent>
       </Card>
+
+      {/* --- Certificados a demanda: el mismo acumulado, pero de una ventana de fechas.
+              Se emiten con `tipo = 'CD'`, así que lo que los distingue del anual es el
+              objeto al que cuelgan (`cierre_periodo`), no el tipo. --- */}
+      {docsDe('cierre_periodo').length > 0 && (
+        <LlistaDocuments
+          files={docsDe('cierre_periodo')}
+          descarregador={descarregador}
+          titolKey="mydoc.cdp_title"
+          buitKey="mydoc.cdp_title"
+          extra={(d) => {
+            const p = perPeriode[d.objeto_id]
+            if (!p) return null
+            return (
+              <p className="text-xs">
+                {t('mydoc.cdp_period', {
+                  desde: dataTancament(p.periodo_desde),
+                  fins: dataTancament(p.periodo_hasta),
+                })}
+              </p>
+            )
+          }}
+        />
+      )}
+
+      {/* --- Su plan de prevención. Se lista desde `documentos` y no desde
+              `planes_prevencion` porque no hay ninguna pantalla de planes todavía: lo
+              único que existe del plan es su PDF. --- */}
+      <LlistaDocuments
+        files={docsDe('plan')}
+        descarregador={descarregador}
+        titolKey="mydoc.pla_title"
+        buitKey="mydoc.pla_empty"
+      />
     </div>
   )
 }
@@ -284,89 +387,6 @@ function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
     <div>
       <p className="text-xs text-muted-foreground">{etiqueta}</p>
       <p className="font-medium tabular-nums">{valor}</p>
-    </div>
-  )
-}
-
-/**
- * Tabla de albaranes de una organización. La comparten los dos paneles: al productor le
- * enseña los REC (lo que se le recogió) y al receptor los ENT (lo que se le entregó), y en
- * ninguno de los dos casos hay una sola columna de dinero — `albaran_lineas` no la tiene, a
- * propósito: un albarán con un precio convierte una donación en una venta a ojos de quien
- * lo lea.
- */
-export function TaulaAlbarans({
-  files, docs, descarregador,
-}: {
-  files: AlbaranBandeja[]
-  docs: Pick<Documento, 'id' | 'objeto_id' | 'objeto_tipo' | 'numero_completo' | 'estado' | 'vigente'>[]
-  descarregador: ReturnType<typeof useDescarregaDocument>
-}) {
-  const { t } = useT()
-  const perAlbara = useMemo(() => {
-    const mapa: Record<string, string> = {}
-    for (const d of docs) {
-      if (d.objeto_tipo === 'albaran' && d.vigente) mapa[d.objeto_id] = d.id
-    }
-    return mapa
-  }, [docs])
-
-  return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('alb.c_number')}</TableHead>
-            <TableHead>{t('alb.c_product')}</TableHead>
-            <TableHead className="text-right">{t('alb.c_kg')}</TableHead>
-            <TableHead>{t('alb.c_status')}</TableHead>
-            <TableHead>{t('doc.c_date')}</TableHead>
-            <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {files.map((f) => {
-            const docId = perAlbara[f.id]
-            return (
-              <TableRow key={f.id}>
-                <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                  {f.numero_completo ?? t('alb.no_number')}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{f.producto ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
-                  {kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)}
-                </TableCell>
-                <TableCell>
-                  <Badge className={estilEstatAlbara(f.estado)}>{t(`alb.st_${f.estado}`)}</Badge>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {dataCurta(f.emitido_at)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    {docId
-                      ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-11 whitespace-normal md:h-8"
-                          disabled={descarregador.ocupat === docId}
-                          onClick={() => void descarregador.descarrega(docId)}
-                        >
-                          {descarregador.generant === docId
-                            ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                            : <Download className="mr-1 size-3.5" aria-hidden />}
-                          {t('doc.download')}
-                        </Button>
-                      )
-                      : <span className="text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>}
-                  </div>
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
     </div>
   )
 }

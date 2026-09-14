@@ -16,6 +16,7 @@ import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import { itemsPlans, navPerRol } from '../lib/nav'
 import { pendentsPerTelefon } from '../lib/contactes'
+import { carregaPendents } from '../lib/pendents'
 import AppSidebar from './AppSidebar'
 import BottomNav from './BottomNav'
 import UserMenu from './UserMenu'
@@ -101,6 +102,26 @@ export default function AppShell() {
     return () => { viu = false }
   }, [esIntern])
 
+  // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
+  // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
+  // que no entran en aquel; y con una sola llamada, porque la base ya sabe repartir por
+  // tipo de organización.
+  const esExtern = (ctx?.rols.includes('productor') || ctx?.rols.includes('receptor')) ?? false
+  useEffect(() => {
+    if (!esExtern) return
+    let viu = true
+    void (async () => {
+      const r = await carregaPendents()
+      if (!viu || !r.ok) return
+      setComptadors((c) => ({
+        ...c,
+        pendents_productor: r.data.filter((p) => p.tipo_org === 'productor').length,
+        pendents_receptor: r.data.filter((p) => p.tipo_org === 'entidad').length,
+      }))
+    })()
+    return () => { viu = false }
+  }, [esExtern])
+
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
       <AppSidebar comptadors={comptadors} />
@@ -157,7 +178,7 @@ export default function AppShell() {
             render (`useIsMobile()` devuelve false hasta que corre su efecto). */}
         {rolActiu !== 'intern' && <AvisInstallacio ambBarraInferior={ambBarraInferior} />}
 
-        {ambBarraInferior && <BottomNav items={itemsBarra} />}
+        {ambBarraInferior && <BottomNav items={itemsBarra} comptadors={comptadors} />}
       </SidebarInset>
     </SidebarProvider>
   )

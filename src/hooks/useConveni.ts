@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from './useAppContext'
 import type { ConvenioEstado } from '../types'
+import { ORDRE_CONVENI as ORDRE } from '../lib/documentsPanell'
 
 /** Lo que el panel necesita saber, ya masticado. */
 export interface EstatConveni {
@@ -33,10 +34,6 @@ export interface EstatConveni {
   carregant: boolean
 }
 
-/** Orden del circuito: el estado más avanzado es el que describe a la organización. */
-const ORDRE: ConvenioEstado[] = [
-  'substituit', 'resolt', 'esborrany', 'retornat', 'pendent_firma', 'firmat', 'vigent',
-]
 
 export function useConveni(): EstatConveni {
   const { rolActiu, organitzacio } = useAppContext()

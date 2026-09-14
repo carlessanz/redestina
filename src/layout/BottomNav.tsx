@@ -8,9 +8,21 @@
 import { NavLink, useLocation } from 'react-router'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
-import type { NavItem } from '../lib/nav'
+import type { Comptador, NavItem } from '../lib/nav'
 
-export default function BottomNav({ items }: { items: NavItem[] }) {
+export default function BottomNav({
+  items,
+  comptadors = {},
+}: {
+  items: NavItem[]
+  /**
+   * Los mismos contadores del menú lateral. Aquí NO se pinta el número: la celda mide
+   * ~85 px y ya va justa con la etiqueta (§2), así que un badge con cifra empujaría el
+   * texto. Un punto dice lo único que hace falta en una barra de navegación: «aquí
+   * dentro hay algo».
+   */
+  comptadors?: Partial<Record<Comptador, number>>
+}) {
   const { t } = useT()
   const location = useLocation()
 
@@ -39,7 +51,15 @@ export default function BottomNav({ items }: { items: NavItem[] }) {
                   try { navigator.vibrate?.(10) } catch { /* iOS no lo soporta */ }
                 }}
               >
-                <item.icon className={cn('size-6 transition-transform', actiu && 'scale-110')} />
+                <span className="relative">
+                  <item.icon className={cn('size-6 transition-transform', actiu && 'scale-110')} />
+                  {item.comptador && (comptadors[item.comptador] ?? 0) > 0 && (
+                    <span
+                      aria-hidden
+                      className="absolute -top-0.5 -right-0.5 size-2 rounded-full bg-error"
+                    />
+                  )}
+                </span>
                 {/* `truncate` + `w-full`: las etiquetas son largas a propósito —`nav.ts`
                     las eligió únicas entre paneles para que los tooltips del menú
                     plegado no se repitan—, así que no se pueden acortar. Sin recortar,

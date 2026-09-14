@@ -838,12 +838,27 @@ async function manejarPost(
   }
 
   // ------------------------------------------------------------- la escritura
+  // Con `canal = 'panel'` (20270318100000) quien confirma lo hace desde su panel con
+  // sesión: queda dicho en el payload, que es donde va lo respondido. La cuenta sale de la
+  // fila del enlace, nunca del cuerpo de la petición — quien confirma podría escribir
+  // cualquier uuid.
+  let panell: { user_id: string | null; email: string | null } | null = null;
+  if (enlace.canal === "panel") {
+    const { data: fila } = await supabase
+      .from("enlaces_token").select("id, creado_por, destinatario_email").eq("id", enlace.id).maybeSingle();
+    panell = {
+      user_id: (fila?.creado_por as string | null) ?? null,
+      email: (fila?.destinatario_email as string | null) ?? null,
+    };
+  }
+
   const payload = {
     kg_confirmados: kgConfirmados,
     caixes_retornades: caixesRetornades,
     incidencias: body.incidencias ?? null,
     rechazo,
     motivo_rechazo: motivoRechazo || null,
+    ...(panell ? { panell } : {}),
   };
 
   const { data, error } = await supabase.rpc("registrar_confirmacion", {
@@ -1761,11 +1776,26 @@ async function firmarConvenio(
   // Quién conduce una firma asistida: la cuenta del equipo que creó el enlace. No puede
   // salir del cuerpo de la petición —quien firma no tiene sesión y podría escribir
   // cualquier uuid—, así que se lee de la fila.
+  //
+  // Con `canal = 'panel'` (20270318100000) la cuenta que acuñó el enlace es la de quien
+  // firma, no la de un dinamizador, así que NO va en `asistido_por` —esa columna significa
+  // «alguien del equipo condujo la firma» y decir eso de una firma propia sería falso—.
+  // Va en `payload.panell`, dentro de la evidencia: `firmar_convenio_por_enlace()` compone
+  // `datos_org` con claves explícitas, así que una clave de más en `p_datos` acaba solo en
+  // `evidencias.payload` y no contamina el snapshot del documento.
   let asistidoPor: string | null = null;
-  if (enlace.canal === "asistido") {
+  let panell: { user_id: string | null; email: string | null } | null = null;
+  if (enlace.canal === "asistido" || enlace.canal === "panel") {
     const { data: fila } = await supabase
-      .from("enlaces_token").select("id, canal, creado_por").eq("id", enlace.id).maybeSingle();
-    asistidoPor = (fila?.creado_por as string | null) ?? null;
+      .from("enlaces_token").select("id, canal, creado_por, destinatario_email").eq("id", enlace.id).maybeSingle();
+    if (enlace.canal === "asistido") {
+      asistidoPor = (fila?.creado_por as string | null) ?? null;
+    } else {
+      panell = {
+        user_id: (fila?.creado_por as string | null) ?? null,
+        email: (fila?.destinatario_email as string | null) ?? null,
+      };
+    }
   }
 
   const datosOrg = {
@@ -1778,6 +1808,8 @@ async function firmarConvenio(
     representant: nombre,
     carrec: cargo,
     email: textNet(body.email) || null,
+    // Solo cuando se ha firmado desde el panel; ver la nota de arriba.
+    ...(panell ? { panell } : {}),
   };
 
   const { data, error } = await supabase.rpc("firmar_convenio_por_enlace", {

@@ -19,7 +19,12 @@ import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
 
 /** Contadores que el sidebar pinta como badge; se resuelven en AppSidebar. */
-export type Comptador = 'aprovacions' | 'missatges' | 'documents'
+export type Comptador =
+  | 'aprovacions' | 'missatges' | 'documents'
+  // Lo que el panel externo tiene pendiente de firmar o confirmar (`pendents_meus()`).
+  // Uno por panel: una cuenta con doble rol no debe ver en su menú de productor lo que
+  // espera su entidad.
+  | 'pendents_productor' | 'pendents_receptor'
 
 export interface NavItem {
   to: string
@@ -83,7 +88,7 @@ const PRODUCTOR: NavGrup[] = [
       // `Sprout` y no `Package`: el panel del equipo ya usa `Package` para «Ofertes», y
       // con los dos menús a la vez el mismo icono dos veces no distingue nada.
       { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true },
-      { to: '/productor/documents', labelKey: 'nav.my_documents', icon: FolderOpen },
+      { to: '/productor/documents', labelKey: 'nav.my_documents', icon: FolderOpen, comptador: 'pendents_productor' },
       { to: '/productor/perfil', labelKey: 'nav.my_producer_org', icon: UserCircle },
     ],
   },
@@ -95,7 +100,7 @@ const RECEPTOR: NavGrup[] = [
       { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true },
       { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
-      { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt },
+      { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },
       { to: '/receptor/perfil', labelKey: 'nav.my_entity', icon: Building2 },
     ],
   },

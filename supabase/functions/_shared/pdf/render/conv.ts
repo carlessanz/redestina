@@ -435,6 +435,10 @@ async function pintarEvidencias(
   // `firmar_convenio_por_enlace()` exige que exista antes de dejar firmar.
   const huboCodigo = codigos.length > 0;
   const asistida = op.canal === "asistido" || firmas.some((e) => (e.assistit_per ?? "") !== "");
+  // Tres vías, no dos (20270318100000). Un convenio firmado desde el panel con sesión no
+  // es una firma asistida —no hay nadie del equipo delante— ni llegó por correo: decir
+  // cualquiera de las dos cosas en una página de evidencias sería afirmar algo falso.
+  const desDelPanell = op.canal === "panel";
 
   for (const ev of firmas) {
     m.campos(
@@ -445,7 +449,9 @@ async function pintarEvidencias(
         [t.ev_declaracio, ev.declaracio ? t.ev_declaracio_si : null],
         [t.ev_data, fechaHoraConvenio(ev.created_at)],
         [t.ev_ip, ev.ip],
-        [t.ev_canal, asistida ? t.ev_canal_assistit : t.ev_canal_email],
+        [t.ev_canal, desDelPanell
+          ? t.ev_canal_panell
+          : asistida ? t.ev_canal_assistit : t.ev_canal_email],
         [t.ev_assistit_per, ev.assistit_per],
         [t.ev_codi, huboCodigo ? t.ev_codi_si : t.ev_codi_no],
       ]),

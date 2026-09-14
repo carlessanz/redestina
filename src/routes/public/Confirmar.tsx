@@ -18,12 +18,13 @@
 // NI UN IMPORTE, tampoco aquí. Un albarán no lleva dinero.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { carregaEnllac, confirmaEnllac } from '../../lib/enllacPublic'
 import type { DadesEnllac } from '../../lib/enllacPublic'
 import LayoutAcces from '../../components/LayoutAcces'
+import { useSessio } from '../../hooks/useSessio'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -35,6 +36,11 @@ type Rebuig = 'cap' | 'parcial' | 'total'
 export default function Confirmar() {
   const { t } = useT()
   const { token } = useParams<{ token: string }>()
+  // Pública y lo seguirá siendo —lo que autoriza es el token—, pero desde el 14-09-2026
+  // también se llega desde el panel con sesión (`acunar_enllac_propi`), y entonces hace
+  // falta el camino de vuelta.
+  const { session } = useSessio()
+  const tornar = (useLocation().state as { tornar?: string } | null)?.tornar ?? '/panell'
 
   const [dades, setDades] = useState<DadesEnllac | null>(null)
   const [carregant, setCarregant] = useState(true)
@@ -121,6 +127,11 @@ export default function Confirmar() {
                 {t('conf.retry')}
               </Button>
             )}
+            {session && (
+              <Button asChild variant="outline" className="h-11 w-full whitespace-normal">
+                <Link to={tornar}>{t('pub.back_panel')}</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </LayoutAcces>
@@ -136,6 +147,11 @@ export default function Confirmar() {
             <p className="text-sm">{t('conf.done_body')}</p>
             {dades.albara.numero_completo && (
               <p className="text-sm tabular-nums text-muted-foreground">{dades.albara.numero_completo}</p>
+            )}
+            {session && (
+              <Button asChild variant="outline" className="h-11 w-full whitespace-normal">
+                <Link to={tornar}>{t('pub.back_panel')}</Link>
+              </Button>
             )}
           </CardContent>
         </Card>

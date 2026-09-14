@@ -318,7 +318,7 @@ export type DocumentoTipo =
   | 'CONV' | 'RES' | 'CD' | 'CT' | 'PLA' | 'PROVA'
 
 export type DocumentoObjetoTipo =
-  | 'albaran' | 'convenio' | 'cierre_donante' | 'espigolada' | 'plan' | 'prova'
+  | 'albaran' | 'convenio' | 'cierre_donante' | 'cierre_periodo' | 'espigolada' | 'plan' | 'prova'
 
 export type DocumentoEstado = 'pendiente_fichero' | 'emitido' | 'error'
 

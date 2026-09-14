@@ -152,6 +152,7 @@ export interface DiccionarioConvenio {
   ev_canal: string;
   ev_canal_email: string;
   ev_canal_assistit: string;
+  ev_canal_panell: string;
   ev_assistit_per: string;
   ev_codi: string;
   ev_codi_si: string;
@@ -239,6 +240,7 @@ const CA: DiccionarioConvenio = {
   ev_canal: "Via",
   ev_canal_email: "Enllaç enviat per correu",
   ev_canal_assistit: "Firma assistida, amb una persona de l'equip present",
+  ev_canal_panell: "Signat des del panell de Redestina, amb sessió iniciada",
   ev_assistit_per: "Conduïda per",
   ev_codi: "Segon factor",
   ev_codi_si: "Codi de 6 xifres enviat per correu i validat",
@@ -335,6 +337,7 @@ const ES: DiccionarioConvenio = {
   ev_canal: "Vía",
   ev_canal_email: "Enlace enviado por correo",
   ev_canal_assistit: "Firma asistida, con una persona del equipo presente",
+  ev_canal_panell: "Firmado desde el panel de Redestina, con sesión iniciada",
   ev_assistit_per: "Conducida por",
   ev_codi: "Segundo factor",
   ev_codi_si: "Código de 6 cifras enviado por correo y validado",

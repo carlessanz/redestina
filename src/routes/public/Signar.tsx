@@ -28,7 +28,7 @@
 //    leer. Se pide porque el convenio lo necesita, no porque nadie vaya a consultarlo.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useParams } from 'react-router'
+import { Link, useLocation, useParams } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import {
@@ -36,6 +36,7 @@ import {
 } from '../../lib/enllacPublic'
 import type { DadesConveni, DadesOrganitzacio } from '../../lib/enllacPublic'
 import LayoutAcces from '../../components/LayoutAcces'
+import { useSessio } from '../../hooks/useSessio'
 import SignaturePad from '../../components/SignaturePad'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -71,6 +72,12 @@ const BUIDA: DadesOrganitzacio = {
 export default function Signar() {
   const { t } = useT()
   const { token } = useParams<{ token: string }>()
+  // La página es pública y lo seguirá siendo: lo que autoriza es el token. Pero desde el
+  // 14-09-2026 también se llega aquí DESDE EL PANEL, con sesión (`acunar_enllac_propi`), y
+  // entonces hay que ofrecer el camino de vuelta: acabar de firmar y quedarse en una
+  // pantalla sin salida es el final más fácil de arreglar y el más fácil de olvidar.
+  const { session } = useSessio()
+  const tornar = (useLocation().state as { tornar?: string } | null)?.tornar ?? '/panell'
 
   const [dades, setDades] = useState<DadesConveni | null>(null)
   const [carregant, setCarregant] = useState(true)
@@ -199,6 +206,11 @@ export default function Signar() {
                 {t('conf.retry')}
               </Button>
             )}
+            {session && (
+              <Button asChild variant="outline" className="h-11 w-full whitespace-normal">
+                <Link to={tornar}>{t('pub.back_panel')}</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </LayoutAcces>
@@ -216,6 +228,11 @@ export default function Signar() {
               <p className="text-sm tabular-nums text-muted-foreground">{fet.numero}</p>
             )}
             <p className="text-sm text-muted-foreground">{t('sig.done_next')}</p>
+            {session && (
+              <Button asChild variant="outline" className="h-11 w-full whitespace-normal">
+                <Link to={tornar}>{t('pub.back_panel')}</Link>
+              </Button>
+            )}
           </CardContent>
         </Card>
       </LayoutAcces>
