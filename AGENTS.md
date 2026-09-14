@@ -1040,12 +1040,22 @@ cuanto existe una `CD`/`parcial` vigente hay dos plantillas vigentes de tipo `CD
 podía elegir cualquiera: **el certificado ANUAL podía salir impreso con el texto que dice que no
 sirve para el 182**. No da ningún error; solo se ve leyendo el PDF.
 
-⚠️ **Cuatro columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
-`enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad` y
-`parametros_documentales.apoderada_dni`. RLS no sabe restringir columnas; el GRANT sí (mismo
-patrón que `perfiles`, §4bis). Consecuencia práctica: **un `select('*')` sobre esas tres tablas
-responde `42501 permission denied for column`** — hay que pedir columnas explícitas, y en un solo
-literal (§7).
+⚠️ **CINCO columnas quedan fuera del GRANT de SELECT y ninguna política lo suple**:
+`enlaces_token.token_hash`, `enlaces_token.codigo_hash`, `evidencias.documento_identidad`,
+`parametros_documentales.apoderada_dni` y —desde `20270320100300`— **`documentos.envio`**. RLS no
+sabe restringir columnas; el GRANT sí (mismo patrón que `perfiles`, §4bis). Consecuencia práctica:
+**un `select('*')` sobre esas cuatro tablas responde `42501 permission denied for column`** — hay
+que pedir columnas explícitas, y en un solo literal (§7).
+
+⚠️ **`documentos.envio` es la única que un EXTERNO podía leer de verdad, y por eso se cerró**: el
+sobre del correo lleva, en el resumen anual, **el token en claro** del enlace de subida de factura
+(`emitir_resumen()`), y el donante ve su propia fila por `documents_meus()`. El mismo secreto que
+`enlaces_token` guarda hasheado se servía en claro desde la tabla de al lado. Cuando se cerró no
+había ninguno emitido (0 de 15 documentos), así que fue preventivo.
+⚠️ **Corolario para quien añada una columna a `documentos`**: desde ese `revoke`, **toda columna
+nueva nace sin SELECT** y hay que otorgarla a mano. Es la contrapartida del `alter default
+privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al añadir una columna
+(precedente: `enlaces_token.rol_parte`, `20270304100200:39`).
 
 ### Integridad
 
@@ -1235,7 +1245,8 @@ funciones, no políticas:
 | `formato_numero(serie, ejercicio, n)` | `REC-2026-00042` |
 | `ruta_documento(objeto_tipo, objeto_id, tipo, numero, version, modo, ejercicio)` | La carpeta por organización (§4 «Sistema documental»). `stable`, no `immutable`: lee el dominio. Solo `service_role` |
 | `puede_ver_documento(documento, user default null)` | Autoriza la descarga. `service_role` puede preguntar por un usuario concreto; un `authenticated` que pase el uuid de otro se lleva `42501` |
-| `documento_vigente(objeto_tipo, objeto_id, tipo)` | Qué PDF vale hoy. **`security invoker` a propósito**: la RLS de `documentos` se aplica igual que en un `select` |
+| `documento_vigente(objeto_tipo, objeto_id, tipo)` | Qué PDF vale hoy. **`security invoker` a propósito**: la RLS de `documentos` se aplica igual que en un `select`. Desde `20270320100300` devuelve **`returns table` con las 27 columnas legibles, no el compuesto `documentos`**: con `returns documentos` habría devuelto `envio` —el token— y además su `select d.*` habría dejado de funcionar en cuanto esa columna salió del GRANT (un `d.*` exige privilegio sobre TODAS). Se pudo cambiar el tipo de retorno porque **no la llamaba nadie**: cero referencias y cero dependencias en `pg_depend` |
+| `set_updated_at()` (`20270320100100`) | Trigger genérico `before update`: `updated_at = now()` del servidor. En `app_settings`, `app_config` y `perfiles`. **NO en `intake_sessions`**, donde esa columna es actividad de la persona y no mtime de la fila (§12.100) |
 | `documents_meus(user default null)` | Puente `security definer` (`setof uuid`) entre `documentos` y las organizaciones del usuario. **Fase 1: vacío**; cada fase la reescribe con `create or replace` sin tocar la tabla ni su política |
 | `emitir_documento_prova(fallar default false)` | Documento de humo, serie `PROVA`, `modo='prueba'`. Exige `es_super_admin()`. Con `fallar` levanta excepción **después** de pedir el número: es lo que prueba `scripts/prueba-numeracion.ts` |
 | `reiniciar_documentos_prova()` | Borra los documentos `modo='prueba'` y pone a 0 `PROVA`/`P-*` del ejercicio. Única excepción a la inmutabilidad |
@@ -3641,9 +3652,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     olvidar el `revoke`. Las dos migraciones documentales empiezan por ese `revoke` justamente por
     eso (`20260928100300:220-225`, `20260928100400:142-147`), y quien añada una columna a una tabla
     con GRANT por columnas tiene que otorgarla a mano (el precedente es `20270304100200:39`).
-    ⚠️ **Y el arnés vigila TRES de los cuatro, no cuatro**: `enlaces_token.codigo_hash` aparece en el
-    `revoke` y en el comentario de cabecera, pero **no tiene check propio**, así que reabrirlo solo a
-    él saldría en verde.
+    ✅ **Y ya son CINCO de cinco** (14-09-2026): `codigo_hash` tiene por fin su check propio —hasta
+    ese día estaba en el `revoke` y en el comentario, pero reabrirlo solo a él habría salido verde— y
+    `documentos.envio` entra con **dos**, uno de equipo y otro de cuenta externa. El externo es el
+    que de verdad mide: un donante **sí** ve su fila por `documents_meus()`, así que si alguien
+    restaurara el GRANT por tabla ese check pasaría de «rechazado» a «ve 1 fila» y saldría **rojo**.
+    La regla para la próxima columna sensible: el `revoke` en la migración y el check en el arnés,
+    **en el mismo cambio**.
 56. ~~**`parametros_documentales` está sembrada con datos provisionales, y nada impide emitir con
     ellos.**~~ — **resuelta (fase 4)**: `emitir_certificado()` es quien lo comprueba, y levanta
     `42501` citando el CIF sembrado. Un certificado con efecto fiscal no sale con un CIF inválido.
@@ -3778,10 +3793,18 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     correo apunta a `/productor/documents`, que es donde está el formulario de subida (§12.65) y
     donde `puc_pujar_document_extern()` resuelve el permiso. Sin sesión aterriza en el login, que
     sigue siendo el camino.
-75. **`documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla**, así
-    que el donante puede leer su propio token. Es inocuo —es suyo— pero **`envio` no debe pintarse
-    tal cual en ninguna pantalla**, y el día que guarde algo de otra persona habrá que pasarlo a
-    GRANT por columnas.
+75. ~~**`documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla.**~~
+    — **resuelta (14-09-2026, `20270320100300`)**: GRANT por columnas con las 27 que no son `envio`.
+    El argumento de que «es inocuo, el token es suyo» valía mientras `envio` guardara solo cosas del
+    destinatario, y **caducaba solo**: el del resumen anual es el enlace de subida de factura. Fue
+    preventivo —0 de 15 documentos llevaban token, porque aún no se ha emitido ningún resumen—.
+    🔴 **Lo que se llevó por delante y nadie había previsto**: `documento_vigente()` es
+    `security invoker` y hacía `select d.*`, que exige privilegio sobre TODAS las columnas. O sea
+    que el `revoke` la rompía; y aunque no la rompiera, su `returns documentos` devolvía `envio`, así
+    que **la función era ella sola la puerta trasera del GRANT que se estaba poniendo**. Se recreó
+    con `returns table` de 27 columnas, y se pudo cambiar el tipo de retorno porque **no la llama
+    nadie** (cero referencias en `src/`, `scripts/` y `supabase/functions/`; cero dependencias en
+    `pg_depend`). ⚠️ Por PostgREST eso es ahora **un array de cero o una fila**, no un objeto.
 76. **La filigrana de los documentos de prueba no se puede comprobar con un `grep` literal**:
     `pdftotext` la trocea porque va girada 45°. Cualquier verificación automática tiene que buscar
     fragmentos (`PR`, `O`, `V`, `A`…), no la frase entera.
@@ -3931,10 +3954,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cuatro es peor que no cambiar ninguno. Y la clave necesita `coalesce(albaran_rec_id,
     excedente_id)`, porque cuando `rec_neto is null` el id también lo es y todos los nulos caerían en
     una sola partición.
-    **No se ha dado todavía**, y eso es lo que lo hace barato: medido en producción el 14-09-2026,
-    **cero** jornadas con dos registros del mismo producto y **cero** certificados emitidos. Los
-    documentos ya emitidos no se tocan igualmente —llevan su snapshot y su `sha256_datos`—, así que
-    arreglarlo no reabre ninguno. Mismo argumento que la deuda 79: se hace ahora porque sale gratis.
+    ✅ **Resuelta el 14-09-2026** (`20270320100000`): la clave pasa a
+    `(coalesce(albaran_rec_id, excedente_id), producto)` y **se calcula una sola vez** en la CTE
+    `conrec`, para que las cuatro ventanas no puedan volver a separarse — que es lo que permitió que
+    esto existiera.
+    ⚠️ **El `producto` en la clave no es de adorno, y esto no estaba en el diagnóstico**: `rec_neto`
+    es la suma de las líneas **de ese producto** dentro del REC, así que un REC de espigolada con dos
+    productos tiene dos netos bajo el mismo `albaran_rec_id`. Particionar solo por el albarán habría
+    mezclado dos netos en un denominador: un error peor que el original.
+    **Medido antes y después**: con dos excedentes de la misma jornada y producto sobre un REC de
+    300 kg, el reparto viejo daba **600** y el nuevo da **300**; y sobre los datos reales el
+    resultado es **idéntico** al anterior (`except all` en las dos direcciones, 0 filas), porque no
+    hay ninguna jornada con el producto repetido. Salió gratis como la deuda 79: **cero certificados
+    emitidos**, así que no movió ningún número ya certificado.
+    La invariante que ahora se comprueba: por cada `(albaran_rec_id, producto)`, `sum(kg_neto)` es
+    exactamente `rec_neto`. Verificado en producción tras aplicar: `REC-2026-00001` · Tomàquet ·
+    1000,000 = 1000,000 · diferencia 0.
 
 91. **La detección de organización del registro tiene puntos ciegos, todos hacia el lado seguro.**
     ⚠️ **La primera mitad de esta entrada era FALSA** y se corrige (14-09-2026): decía «solo mira
@@ -3986,7 +4021,19 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa, pero las tres viejas se
     quedan como están: **editar una migración aplicada está prohibido** (§7). Se unifican el día
     que alguna se recree por otro motivo.
-96. **La cuenta que firma desde el panel viaja en `p_datos.panell`, no en la evidencia.**
+96. ~~**La cuenta que firma desde el panel viaja en `p_datos.panell`, no en la evidencia.**~~ —
+    **resuelta (14-09-2026, `20270320100200`)**: `firmar_convenio_por_enlace()` acepta
+    `p_evidencia.payload` y lo funde con `p_datos`. **Si las dos traen la misma clave gana el
+    payload**, y el motivo es el que ordena toda la tabla de evidencias: `p_datos` es lo que la
+    persona **tecleó** —cuerpo de una petición pública, sin sesión— y `p_evidencia` es lo que el
+    **servidor observó**. Se conserva `p_datos` dentro del payload porque lo declarado también es
+    evidencia y `sha256_texto` no lo cubre.
+    ⚠️ El `jsonb_typeof(…) = 'object'` de la implementación no es adorno: `'{"a":1}'::jsonb ||
+    '"x"'::jsonb` **no da error**, da un array — un payload que no fuera objeto habría convertido la
+    evidencia en una lista sin que nadie se enterara.
+    Es compatible hacia atrás, así que `enlace-publico` sigue funcionando por el rodeo hasta que se
+    toque; lo que le queda es mover `panell` de `p_datos` a `p_evidencia.payload`
+    (`enlace-publico/index.ts:1812` y `:1815`). El texto original de la entrada:
     `firmar_convenio_por_enlace()` acepta `p_evidencia` con una lista fija de claves y compone
     `datos_org` con claves explícitas, así que una clave de más en `p_datos` acaba solo en
     `evidencias.payload` — que es donde tiene que estar— pero por un rodeo. No va en
@@ -4008,8 +4055,24 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
     su documento.
 
-100. **`app_settings.updated_at` no dice cuándo se cambió un interruptor, sino cuándo se creó
-     la fila.** La columna tiene `default now()` y **ningún trigger**, así que un `update` del
+100. ~~**`app_settings.updated_at` no dice cuándo se cambió un interruptor.**~~ — **resuelta el
+     14-09-2026** (`20270320100100`): `set_updated_at()` genérico con trigger en `app_settings`,
+     `app_config` y `perfiles`. Ninguna de las tres tenía trigger alguno. Verificado en producción:
+     un `update … set value = value` mueve la marca sin cambiar el valor.
+     🔴 **`intake_sessions` se queda FUERA, y eso no es la deuda a medio hacer: es el resultado de
+     comprobarlo.** Ahí `updated_at` **no es el mtime de la fila**, es «la última vez que esta
+     persona dijo algo», y tres comportamientos vivos lo leen así: `intake-recordatorios:89` escribe
+     solo `recordatorio_enviado_at` **para no reiniciar la ventana de 10 min** (lo dice su propio
+     comentario), `intake.ts:341` descarta la sesión a las 12 h contando desde ahí, y
+     `atendreElDialeg()` (`respuestas.ts:390`) desempata con él **quién contesta un mensaje** en una
+     cuenta de doble rol (§12.16). Un trigger genérico los rompería los tres en silencio, y el peor
+     sería el tercero: el cron adelantaría la marca, el sistema creería que el intake «habló
+     después» que la oferta y **secuestraría la respuesta**. Lo mantiene `guardar()`, que es quien
+     sabe qué cuenta como actividad.
+     ⚠️ Efecto colateral aceptado: `src/lib/settings.ts:26`, `scripts/set-config.ts:32` y
+     `scripts/roles-activos.ts:51` mandaban un `updated_at` con el reloj del cliente; ahora lo pisa
+     el del servidor. Una sola fuente de tiempo, y no falsificable.
+     El texto original: La columna tiene `default now()` y **ningún trigger**, así que un `update` del
      `value` la deja intacta. Encontrado el 14-09-2026 al apagar y encender `whatsapp_activo`
      en producción: los dos cambios dejaron el mismo `updated_at`, el del `insert` de la
      migración. Importa ahora más que antes, porque apagar WhatsApp es el tipo de cosa que el
@@ -4047,6 +4110,21 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      ampliar los teléfonos. Antes de tocarlo hay que decidir si una coincidencia por `email2`
      debe denegar o solo avisar al equipo — la misma distinción principal/secundaria que la
      deuda 91 resolvió para los teléfonos.
+
+103. 🟠 **`authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito
+     documental, y lo único que lo para es la RLS.** Medido el 14-09-2026 sobre producción:
+     `documentos`, `documento_envios`, `series_documentales`, `municipios`, `albaranes`, `convenios`
+     y `cierres_donante` tienen `authenticated=arwdxtm` mientras §4 afirma «ninguna escritura». No
+     viene de ningún GRANT del repo: es el `alter default privileges` que Supabase deja puesto para
+     el rol `postgres`, así que **cada tabla nueva lo hereda sin que nadie escriba una línea**.
+     ⚠️ **No es alcanzable hoy**, y conviene decirlo sin exagerar: las siete tienen RLS con política
+     de SELECT únicamente, así que un `insert`/`update`/`delete` no encuentra política y se rechaza
+     — el arnés ya lo comprueba. Lo que falta no es el cierre: es **la segunda capa**. Es exactamente
+     la misma forma que la deuda del `TRUNCATE` (`20270309100000`), donde tampoco había nada
+     explotable y se repuso la capa que faltaba.
+     El arreglo es un `revoke insert, update, delete … from authenticated` por tabla más su `alter
+     default privileges`, y **merece su propia migración**: tocar los privilegios de escritura de
+     todo `public` de una vez es justo lo que no se hace en un cambio que iba de otra cosa.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
@@ -4109,11 +4187,16 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, fijada al publicar el interruptor de WhatsApp y los documentos
-   del panel externo (14-09-2026): **497/497 correctas y 14 saltadas**, «Sin fallos de
-   permisos», exit 0. Verificada de nuevo tras acotar `reiniciar_documentos_prova()`
-   (`20270319100000`): **no se mueve**, que es lo correcto — esa migración no toca ningún
-   permiso.
+   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **504/504 correctas
+   y 14 saltadas**, «Sin fallos de permisos», exit 0. Son las 497 anteriores más los **7** checks
+   nuevos de la deuda 55 —`enlaces_token.codigo_hash` en el bloque del equipo, y
+   `documentos.envio` en el del equipo y en `DOCUMENTAL_EXTERN`, que recorren 5 cuentas—. Todos
+   son `denegar`, así que ninguno puede quedar saltado.
+   ⚠️ **Esos checks hay que correrlos DESPUÉS de aplicar `20270320100300`, no antes.** Contra una
+   base sin esa migración salen en **rojo a propósito**, porque la columna todavía es legible: es
+   la prueba de que el check mide algo, no una regresión.
+   (Verificada también tras acotar `reiniciar_documentos_prova()`, `20270319100000`: ahí **no se
+   movió**, que era lo correcto — esa migración no toca ningún permiso.)
    ⚠️ **Y ya se sabe por qué son 14 y no menos**: ocho de ellas son del bloque
    `productor-altre`, la cuenta de `TEST-PROD-2`, y el fixture crea sus datos en
    `TEST-PROD-1` (deuda 53). No es cobertura perdida por una regresión: son datos que no
