@@ -228,13 +228,25 @@ variantes, el favicon y los iconos están en `public/` (§2bis).
 ancho a partes iguales con `flex-1`, así que a 360 px cada celda da ~90 px y las etiquetas de este
 proyecto piden 66-112 px —son largas a propósito: `nav.ts` las elige únicas entre paneles para que
 los tooltips del menú plegado no se repitan (§2bis, `text-nav`)—. Medido: con cuatro entradas la
-barra pide **exactamente 360 px** en los dos paneles; con cinco pedía **393** y desbordaba. Y
-`truncate` **no** lo arregla: el `li` es `flex-1` y un flex item con `min-width: auto` no encoge por
-debajo de su contenido, así que el `nowrap` convierte el salto de línea en desbordamiento.
+barra pide **exactamente 360 px** en los dos paneles; con cinco pedía **393** y desbordaba.
 Consecuencias: una entrada que no quepa se marca **`barra: false`** en `NavItem` y se queda solo en
 el menú lateral (hoy, «Nova oferta» en productor —ya es `primari` y cabe dentro de Inici— e
 «Històric» en receptor); y **cualquier etiqueta nueva o traducción más larga rompe la barra**, así
 que al añadir una hay que medirla, no estimarla.
+
+✅ **Y por debajo de 360 px ya no rompe: lo arregla `min-w-0`** (14-09-2026). Este párrafo decía que
+«`truncate` **no** lo arregla», y solo era cierto a medias: el `truncate` estaba puesto desde el
+principio y **no llegaba a actuar**, porque el `li` es `flex-1` con `min-width: auto` y un flex item
+así no encoge por debajo de su contenido. O sea que el diagnóstico era correcto y la conclusión no:
+lo que faltaba era `min-w-0` en el `li`, que es justo lo que desbloquea el recorte. Medido a 320 px
+en català con Playwright sobre la aplicación desplegada: el panel del productor pedía **347 px** y el
+del receptor **334**, y la última pestaña salía **cortada contra el borde** de la pantalla; con
+`min-w-0` los dos piden **320**, las cuatro celdas miden exactamente un cuarto y lo que sobra se
+recorta con puntos suspensivos, alineado («Els meus i…»). A 360 y 390 px no se recorta nada.
+⚠️ Lo del productor era **anterior** a cualquier cambio de etiqueta —no lo había medido nadie a
+320 px, porque la auditoría de 2026-08-01 midió el desbordamiento de la PÁGINA, que era y sigue
+siendo 0: el `ul` se pasaba de ancho sin que el documento scrolleara—. Al medir una barra, mirar
+`nav ul` (`scrollWidth` vs `clientWidth`), no solo `document.documentElement`.
 
 **Layout** (desde 2026-07-30): **menú lateral vertical plegable** (`sidebar` de shadcn: 16rem ↔ 3rem
 en modo icono, estado en cookie, atajo Ctrl/Cmd+B) + barra superior de 14 con el título de la
@@ -1987,6 +1999,18 @@ decide **a quién** se envía, no **por dónde**.
 ⚠️ **`enviar()` devuelve `ok:false`, NO un simulado**, y ahí está todo el mecanismo: con `ok:true`
 el intake avanzaría de paso sin haber preguntado nada (deuda 3), `enviar-acceso` no caería a correo
 y el panel daría por enviada una oferta que nadie ha recibido.
+
+✅ **Ejercitado en producción el 14-09-2026**, apagando y volviendo a encender desde la sesión del
+super_admin. Lo medido, con el mismo envío en los dos estados: encendido, `whatsapp-send` responde
+`403 no_test_user` (el gate del destinatario); apagado, **`503 whatsapp_desactivat`** —o sea que el
+interruptor corta **antes**, como dice el orden de más abajo—. `priorizar-entidades` pasa a
+`whatsapp_actiu: false` y el motivo de canal de cada entidad cambia de `telefon_no_mobil` a
+`whatsapp_desactivat`. `get_my_session_context()` devuelve `whatsapp_actiu: false`, que es lo que
+apaga los botones del panel. Y **ni un `wa_messages` nuevo** en toda la prueba. Dos cosas más que
+quedaron comprobadas de paso: un `admin` que no es super_admin recibe **200 con cero filas
+afectadas** al intentar escribir la clave (así deniega un `update` la RLS, §12.48), y el cambio es
+**inmediato en los dos sentidos** sin redesplegar ni cerrar sesiones —los isolates calientes
+obedecieron al instante—, que es justo lo que compra leerlo sin caché (§12.93).
 
 ⚠️ **No se registra nada en `wa_messages` al cortar.** Un corte nuestro no es un rechazo de Meta:
 una fila `status='error'` pintada en rojo mandaría al equipo a diagnosticar un token que está
@@ -3799,6 +3823,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     pantalla de planes**, ni de equipo ni externa, así que del plan solo existe su PDF. El día
     que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
     su documento.
+
+100. **`app_settings.updated_at` no dice cuándo se cambió un interruptor, sino cuándo se creó
+     la fila.** La columna tiene `default now()` y **ningún trigger**, así que un `update` del
+     `value` la deja intacta. Encontrado el 14-09-2026 al apagar y encender `whatsapp_activo`
+     en producción: los dos cambios dejaron el mismo `updated_at`, el del `insert` de la
+     migración. Importa ahora más que antes, porque apagar WhatsApp es el tipo de cosa que el
+     equipo querría poder fechar —«¿desde cuándo no sale nada?»— y esa columna responde que
+     desde siempre. Viene de `20260723140000`, no de la tanda del interruptor. Se arregla con
+     un `before update` de tres líneas; mientras no esté, **no leer esa columna como fecha del
+     último cambio**.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 

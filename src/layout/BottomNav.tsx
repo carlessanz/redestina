@@ -37,7 +37,7 @@ export default function BottomNav({
             ? location.pathname === item.to
             : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)
           return (
-            <li key={item.to} className="flex-1">
+            <li key={item.to} className="min-w-0 flex-1">
               <NavLink
                 to={item.to}
                 aria-current={actiu ? 'page' : undefined}
@@ -64,7 +64,15 @@ export default function BottomNav({
                     las eligió únicas entre paneles para que los tooltips del menú
                     plegado no se repitan—, así que no se pueden acortar. Sin recortar,
                     «Els meus interessos» rompía a 2-3 líneas en una celda de ~85px y las
-                    cuatro pestañas dejaban de estar alineadas. */}
+                    cuatro pestañas dejaban de estar alineadas.
+                    ⚠️ Y el `truncate` NO actúa por sí solo: el `li` es `flex-1` y un flex
+                    item con `min-width: auto` no encoge por debajo de su contenido, así
+                    que las celdas pedían más ancho del que había y la última quedaba
+                    CORTADA POR EL BORDE de la pantalla. Lo que lo arregla es el `min-w-0`
+                    del `li`: con él las cuatro celdas miden exactamente un cuarto y el
+                    recorte sale con puntos suspensivos, alineado. Medido a 320 px en
+                    català (14-09-2026): productor pedía 347 px y receptor 334; con
+                    `min-w-0`, los dos piden 320. */}
                 <span className="w-full truncate px-0.5 text-center text-nav font-medium leading-none">
                   {t(item.labelKey)}
                 </span>
