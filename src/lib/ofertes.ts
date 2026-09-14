@@ -10,13 +10,36 @@ import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
 
 export type TipoCampo = 'familia' | 'producte' | 'text' | 'numero' | 'opcions' | 'ubicacio' | 'causa'
 
+/** Los cinco bloques del cuestionario, en el orden en que se pintan. */
+export type SeccioOferta = 'producte' | 'quantitat' | 'recollida' | 'modalitat' | 'causa'
+
+export interface BlocOferta {
+  clau: SeccioOferta
+  titol: string
+  descripcio?: string
+}
+
+export interface OpcioOferta {
+  id: string
+  titulo: string
+  /** Una línea: qué implica elegir esta opción. La traen las tres modalidades. */
+  descripcion?: string
+}
+
 export interface CampoOferta {
   clave: string
   tipo: TipoCampo
   etiqueta: string
   ayuda?: string
+  /**
+   * En qué bloque va. **Opcional en el cliente aunque el servidor la dé siempre**: este
+   * fichero se despliega antes que la Edge Function (§11, de abajo arriba), así que hay una
+   * ventana en la que la respuesta todavía es la vieja. Sin `seccion` el formulario pinta
+   * un solo bloque sin título, que es lo que había antes.
+   */
+  seccion?: SeccioOferta
   obligatorio: boolean
-  opciones?: { id: string; titulo: string }[]
+  opciones?: OpcioOferta[]
   condicion?: { campo: string; en: string[] }
 }
 
@@ -41,7 +64,12 @@ async function token(): Promise<string | null> {
 /** Descriptor de los 14 pasos + catálogos. Nunca lanza. */
 export async function carregaCamps(
   productorId: string,
-): Promise<Resultat<{ campos: CampoOferta[]; catalogos: CatalogosOferta }>> {
+): Promise<Resultat<{
+  campos: CampoOferta[]
+  /** Igual que `CampoOferta.seccion`: puede no llegar todavía. */
+  secciones?: BlocOferta[]
+  catalogos: CatalogosOferta
+}>> {
   try {
     const t = await token()
     if (!t) return { ok: false, error: 'unauthorized' }

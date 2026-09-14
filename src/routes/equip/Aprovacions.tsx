@@ -19,9 +19,16 @@
 //
 // 3. APROVACIONS D'OFERTES — aceptaciones de entidades pendientes de confirmar. Antes
 //    solo se veían entrando en cada oferta; con receptores aceptando desde su panel
-//    (canal 'panel') la cola crece sin que nadie la mire. Aprobar sigue haciéndose en el
-//    detalle de la oferta, donde está el contexto (kg que faltan, preu, resto de
-//    respuestas).
+//    (canal 'panel') la cola crece sin que nadie la mire. **Y aquí solo había un botón
+//    «Obrir l'oferta»**, sin decirlo: la decisión más frecuente del equipo era la única
+//    que esta pantalla no dejaba tomar. Ahora se aprueba y se rechaza desde la fila,
+//    con lo que falta por cubrir delante y con las dos confirmaciones de siempre
+//    (canalizar de más, convenio que falta). El detalle de la oferta sigue a un clic
+//    para lo que aquí no cabe: el resto de respuestas y el ranking de entidades.
+//
+//    ⚠️ La operación NO se reimplementa: es la misma `aprovarResposta()` de
+//    `src/lib/aprovarResposta.ts` que usa `OfferDetail`. Dos copias de las mismas sesenta
+//    líneas acabarían divergiendo justo en la comprobación de convenios (§12.19, §12.78).
 //
 // ⚠️ Las tres colas son independientes a propósito: si una migración todavía no está
 //    aplicada, su consulta falla por tabla o columna inexistente y esa sección se queda
@@ -34,11 +41,16 @@ import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
+import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../../lib/aprovarResposta'
+import { kgPerOferta } from '../../lib/ofertes'
+import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Convenio, Membresia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -47,13 +59,23 @@ import {
 interface Fila {
   id: string
   excedente_id: string
+  /** Nullable en la tabla; sin él no se puede comprobar el convenio ni canalizar. */
+  entidad_id: string | null
   kg_solicitados: number | null
   preu_ofert: number | null
   canal: string
   respondido_at: string | null
   enviado_at: string
   entidades: { nombre: string; poblacion: string | null } | null
-  excedentes: { id_excedente: string | null; producto: string | null; kg_total: number | null } | null
+  excedentes: {
+    id_excedente: string | null
+    producto: string | null
+    kg_total: number | null
+    /** Decide si se pide preu y qué convenios exige la operación. */
+    modalitat: string | null
+    productor_id: string | null
+    preu_minim: number | null
+  } | null
 }
 
 /** Ficha embebida por la FK `membresias.productor_id → productores.id`. */
@@ -119,6 +141,26 @@ type ConveniPendent = Pick<
 
 const TIPUS_RECEPTOR = ['social', 'animal', 'transformador', 'comercial']
 
+/**
+ * Las tres cosas que se rechazan con motivo comparten diálogo: lo que cambia es a quién se
+ * lo cuenta, no lo que se pregunta. Con un tercer caso, los ternarios anidados dejaban de
+ * leerse, así que las claves van en una tabla.
+ */
+const TEXTOS_MOTIU = {
+  registre: {
+    titol: 'appr.reg_reject', descripcio: 'appr.reg_reject_desc',
+    etiqueta: 'appr.reg_reject_reason', confirmar: 'appr.reg_reject',
+  },
+  conveni: {
+    titol: 'conv.return_title', descripcio: 'conv.return_desc',
+    etiqueta: 'conv.return_label', confirmar: 'conv.return',
+  },
+  resposta: {
+    titol: 'od.reject_appr', descripcio: 'appr.rej_desc',
+    etiqueta: 'appr.rej_reason', confirmar: 'od.reject_appr',
+  },
+} as const
+
 function quan(iso: string): string {
   const d = new Date(iso)
   return `${d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} ` +
@@ -129,8 +171,17 @@ export default function Aprovacions() {
   const { t } = useT()
   const navigate = useNavigate()
   const { ctx } = useAppContext()
+  const { confirma, dialeg } = useConfirma()
   const [files, setFiles] = useState<Fila[]>([])
   const [carregant, setCarregant] = useState(true)
+  /** Kg ya canalizados por oferta, para decir cuántos faltan antes de aprobar. */
+  const [kgCanalitzats, setKgCanalitzats] = useState<Record<string, number>>({})
+  /**
+   * Lo que el equipo ha tecleado encima de lo que pidió la entidad, por fila. Es una capa
+   * y no el valor: mientras no se toque el campo manda `kg_solicitados`, así que un
+   * refresco de Realtime no pisa lo escrito ni lo escrito congela lo que llega.
+   */
+  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string }>>({})
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
   const [candidats, setCandidats] = useState<Record<string, Candidat[]>>({})
@@ -145,7 +196,10 @@ export default function Aprovacions() {
   const [enllacDe, setEnllacDe] = useState<{ registre: Registre; candidat: Candidat } | null>(null)
 
   const [motiuDe, setMotiuDe] = useState<
-    { tipus: 'registre'; registre: Registre } | { tipus: 'conveni'; conveni: ConveniPendent } | null
+    | { tipus: 'registre'; registre: Registre }
+    | { tipus: 'conveni'; conveni: ConveniPendent }
+    | { tipus: 'resposta'; fila: Fila }
+    | null
   >(null)
 
   // Con el contexto degradado (RPC de sesión no desplegada) se asume que sí: es como se
@@ -153,15 +207,21 @@ export default function Aprovacions() {
   const potAprovar = ctx?.potAprovar ?? true
 
   const carrega = useCallback(async () => {
+    // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en dos cadenas
+    // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data } = await supabase
       .from('oferta_respuestas')
-      .select('id, excedente_id, kg_solicitados, preu_ofert, canal, respondido_at, enviado_at, ' +
-        'entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total)')
+      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, productor_id, preu_minim)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
-    setFiles((data as unknown as Fila[]) ?? [])
+    const files = (data as unknown as Fila[]) ?? []
+    setFiles(files)
     setCarregant(false)
+    // Cuánto lleva cubierto cada oferta: sin eso, «aprovar 300 kg» aquí es un número sin
+    // contexto, y la confirmación de canalizar de más no tendría contra qué comparar.
+    // Una sola consulta para todas las filas, no una por fila.
+    setKgCanalitzats(await kgPerOferta([...new Set(files.map((f) => f.excedente_id))]))
   }, [])
 
   const carregaRegistres = useCallback(async () => {
@@ -301,6 +361,74 @@ export default function Aprovacions() {
     void carregaRegistres()
   }
 
+  /** Lo que falta por cubrir de esa oferta. Es contra lo que se avisa al canalizar de más. */
+  function faltenDe(f: Fila): number {
+    return Math.max(0, Number(f.excedentes?.kg_total ?? 0) - (kgCanalitzats[f.excedente_id] ?? 0))
+  }
+
+  /** Lo que hay hoy en los dos campos: lo tecleado si se ha tocado, y si no lo que pidió. */
+  function valorKg(f: Fila): string {
+    return edicions[f.id]?.kg ?? (f.kg_solicitados != null ? String(f.kg_solicitados) : '')
+  }
+  function valorPreu(f: Fila): string {
+    const teclejat = edicions[f.id]?.preu
+    if (teclejat !== undefined) return teclejat
+    // Si la entidad no dijo precio, se parte del mínimo del productor, que es el suelo.
+    const defecte = f.preu_ofert ?? f.excedentes?.preu_minim
+    return defecte != null ? String(defecte) : ''
+  }
+
+  /**
+   * Aprobar desde la cola. Es la misma operación del detalle de la oferta —las dos llaman a
+   * `aprovarResposta()`— con los mismos dos avisos delante: canalizar más de lo que falta,
+   * y aprobar sin convenio vigente. Lo que cambia es de dónde salen los kg.
+   */
+  async function aprovarFila(f: Fila) {
+    const kg = Number(valorKg(f) || 0)
+    if (!f.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
+    if (kg > faltenDe(f) && !(await confirma({
+      titol: t('od.over_alloc_t'),
+      descripcio: t('od.over_alloc', { n: faltenDe(f) }),
+    }))) return
+
+    const falta = await comprovaConvenis(
+      { modalitat: f.excedentes?.modalitat ?? null, productor_id: f.excedentes?.productor_id ?? null },
+      f.entidad_id, t,
+    )
+    if (falta && !(await confirma({
+      titol: t('od.conv_missing_t'),
+      descripcio: t('od.conv_missing', { parts: falta }),
+    }))) return
+
+    const preuText = valorPreu(f)
+    setOcupat(f.id)
+    const res = await aprovarResposta({
+      id: f.id, kg, preu: preuText !== '' ? Number(preuText) : null,
+    })
+    setOcupat(null)
+    if (!res.ok) {
+      toast.error(res.codi === 'sense_conveni' ? t('od.conv_blocked') : res.missatge)
+      return
+    }
+    toast.success(t('od.approved'))
+    // La fila se va de la cola al momento: esperar al refresco de Realtime deja el botón
+    // pulsable un instante más, que es como se aprueba dos veces la misma cosa.
+    setFiles((prev) => prev.filter((x) => x.id !== f.id))
+    void carrega()
+    void refrescaComptadors()
+  }
+
+  async function rebutjarFila(f: Fila, motiu: string) {
+    setOcupat(f.id)
+    const res = await rebutjarResposta({ id: f.id, motiu })
+    setOcupat(null)
+    setMotiuDe(null)
+    if (!res.ok) { toast.error(res.missatge); return }
+    toast.success(t('od.rejected_ok'))
+    setFiles((prev) => prev.filter((x) => x.id !== f.id))
+    void refrescaComptadors()
+  }
+
   async function contrafirmar(c: ConveniPendent) {
     setOcupat(c.id)
     const res = await contrafirmarConveni(c.id)
@@ -324,7 +452,7 @@ export default function Aprovacions() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{t('appr.reg_title')}</CardTitle>
+          <CardTitle>{t('appr.reg_title')} ({registres.length})</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('appr.reg_subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -406,7 +534,7 @@ export default function Aprovacions() {
                       </div>
                     )}
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button size="sm" variant="outline" disabled={!ruta}
                       onClick={() => ruta && navigate(ruta)}>
                       {t('appr.reg_view')}
@@ -430,7 +558,7 @@ export default function Aprovacions() {
       {/* ── 2. Convenis per contrasignar ── */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('appr.conv_title')}</CardTitle>
+          <CardTitle>{t('appr.conv_title')} ({convenis.length})</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('appr.conv_subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -470,7 +598,7 @@ export default function Aprovacions() {
                     </div>
                     {!nif && <div className="text-xs text-destructive">{t('appr.conv_no_nif')}</div>}
                   </div>
-                  <div className="flex shrink-0 flex-wrap items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
                     <Button asChild size="sm" variant="outline">
                       <Link to={`/equip/convenis/${c.id}`}>{t('c.detail')}</Link>
                     </Button>
@@ -494,33 +622,81 @@ export default function Aprovacions() {
       {/* ── 3. Aprovacions d'ofertes ── */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('appr.title')}</CardTitle>
+          <CardTitle>{t('appr.title')} ({files.length})</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('appr.subtitle')}</p>
+          {!potAprovar && (
+            <p className="mt-1 text-sm text-aviso">{t('appr.need_approver')}</p>
+          )}
         </CardHeader>
         <CardContent className="space-y-2">
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
           {!carregant && files.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
-          {files.map((f) => (
-            <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-              <div className="min-w-0">
-                <div className="font-medium">
-                  {f.entidades?.nombre ?? '—'}
-                  {f.entidades?.poblacion ? ` · ${f.entidades.poblacion}` : ''}
-                </div>
-                <div className="text-xs text-muted-foreground">
-                  <code>{f.excedentes?.id_excedente ?? '—'}</code> · {f.excedentes?.producto ?? '—'}
-                  {f.kg_solicitados != null ? ` · ${f.kg_solicitados} ${t('od.rs_kg')}` : ''}
-                  {f.preu_ofert != null ? ` · ${f.preu_ofert} ${t('od.rs_preu')}` : ''}
-                  {` · ${t(`od.ch_${f.canal}`)} · ${quan(f.respondido_at ?? f.enviado_at)}`}
+          {files.map((f) => {
+            const esVenda = f.excedentes?.modalitat === 'venda' || f.excedentes?.modalitat === 'maquila'
+            const total = Number(f.excedentes?.kg_total ?? 0)
+            const bloquejat = !potAprovar || ocupat === f.id
+            return (
+              <div key={f.id} className="rounded-lg border p-3">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-medium">
+                      {f.entidades?.nombre ?? '—'}
+                      {f.entidades?.poblacion ? ` · ${f.entidades.poblacion}` : ''}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      <code>{f.excedentes?.id_excedente ?? '—'}</code> · {f.excedentes?.producto ?? '—'}
+                      {f.kg_solicitados != null ? ` · ${f.kg_solicitados} ${t('od.rs_kg')}` : ''}
+                      {f.preu_ofert != null ? ` · ${f.preu_ofert} ${t('od.rs_preu')}` : ''}
+                      {` · ${t(`od.ch_${f.canal}`)} · ${quan(f.respondido_at ?? f.enviado_at)}`}
+                    </div>
+                    {/* Contra qué se decide: aprobar 300 kg de una oferta que ya está
+                        cubierta no es lo mismo que de una que empieza. */}
+                    <div className="text-xs font-medium text-primary">
+                      {t('appr.progres', { n: faltenDe(f), m: total })}
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap items-end justify-end gap-2">
+                    {/* `text-base md:text-sm`: en iOS un control por debajo de 16px amplía
+                        la página al enfocarlo y no lo deshace (§2, regla 1 de móvil). */}
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {t('od.rs_kg')}
+                      <Input type="number" inputMode="numeric" min="0"
+                        className="h-11 w-24 text-base md:h-9 md:text-sm"
+                        value={valorKg(f)}
+                        onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], kg: e.target.value } }))} />
+                    </label>
+                    {esVenda && (
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        {t('od.rs_preu')}
+                        <Input type="number" inputMode="decimal" step="0.01" min="0"
+                          className="h-11 w-24 text-base md:h-9 md:text-sm"
+                          value={valorPreu(f)}
+                          onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], preu: e.target.value } }))} />
+                      </label>
+                    )}
+                    <Button size="sm" className="h-11 whitespace-normal md:h-9"
+                      disabled={bloquejat} title={potAprovar ? undefined : t('appr.need_approver')}
+                      onClick={() => void aprovarFila(f)}>
+                      {t('od.approve')}
+                    </Button>
+                    <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-9"
+                      disabled={bloquejat} title={potAprovar ? undefined : t('appr.need_approver')}
+                      onClick={() => setMotiuDe({ tipus: 'resposta', fila: f })}>
+                      {t('od.reject_appr')}
+                    </Button>
+                    {/* El detalle sigue a un clic: aquí no caben el resto de respuestas ni
+                        el ranking de entidades, y a veces son justo lo que hay que mirar. */}
+                    <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-9"
+                      onClick={() => navigate(`/equip/ofertes/${f.excedente_id}`)}>
+                      {t('appr.open')}
+                    </Button>
+                  </div>
                 </div>
               </div>
-              <Button size="sm" onClick={() => navigate(`/equip/ofertes/${f.excedente_id}`)}>
-                {t('appr.open')}
-              </Button>
-            </div>
-          ))}
+            )
+          })}
         </CardContent>
       </Card>
 
@@ -557,18 +733,21 @@ export default function Aprovacions() {
       <DialegMotiu
         obert={motiuDe !== null}
         onObert={(v) => { if (!v) setMotiuDe(null) }}
-        titol={t(motiuDe?.tipus === 'conveni' ? 'conv.return_title' : 'appr.reg_reject')}
-        descripcio={t(motiuDe?.tipus === 'conveni' ? 'conv.return_desc' : 'appr.reg_reject_desc')}
-        etiqueta={t(motiuDe?.tipus === 'conveni' ? 'conv.return_label' : 'appr.reg_reject_reason')}
-        confirmar={t(motiuDe?.tipus === 'conveni' ? 'conv.return' : 'appr.reg_reject')}
-        destructiu={motiuDe?.tipus === 'registre'}
+        titol={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].titol)}
+        descripcio={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].descripcio)}
+        etiqueta={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].etiqueta)}
+        confirmar={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].confirmar)}
+        destructiu={motiuDe?.tipus !== 'conveni'}
         ocupat={ocupat !== null}
         onConfirma={(m) => {
           if (!motiuDe) return
           if (motiuDe.tipus === 'conveni') void retornar(motiuDe.conveni, m)
+          else if (motiuDe.tipus === 'resposta') void rebutjarFila(motiuDe.fila, m)
           else void rebutjarRegistre(motiuDe.registre, m)
         }}
       />
+
+      {dialeg}
     </div>
   )
 }

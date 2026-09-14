@@ -4,14 +4,25 @@
 // ya solo deja ver las compatibles con la matriz `modalitat_receptor_compat` (§4bis).
 // Mostrar interés es la RPC `manifestar_interes`, que deja la fila exactamente igual
 // que el diálogo de WhatsApp y cae en la misma cola de aprobación del equipo.
+//
+// ⚠️ LA OFERTA YA SOLICITADA NO DICE «Sol·licitats 300 kg», DICE EN QUÉ PUNTO ESTÁ. Esa
+// píldora no distinguía «l'equip encara ho ha de decidir» de «ja és teva», que para quien
+// tiene que reservar furgoneta y cámara es toda la diferencia. La etapa la calcula
+// `puntInteres()`, el mismo módulo que narra la pantalla de Interessos.
+//
+// ⚠️ `estado === 'pendent'` SÍ enseña el botón: significa que el equipo le mandó la oferta
+// y todavía no ha contestado. Es la fila que existe justamente para que la conteste.
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
+import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import { manifestaInteres } from '../../lib/ofertes'
+import { puntInteres } from '../../lib/procesOferta'
+import { classeEtapaInteres } from './Interessos'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -79,7 +90,7 @@ export default function Mercat() {
     })
     setEnviant(false)
     if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
-    toast.success(t('mk.sent'))
+    toast.success(t('mk.sent2'))
     setObert(null)
     await carrega()
   }
@@ -89,7 +100,7 @@ export default function Mercat() {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('mk.title')}</CardTitle>
+        <CardTitle>{t('mk.titol_ofertes')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('mk.subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-2">
@@ -100,6 +111,15 @@ export default function Mercat() {
         {ofertes.map((o) => {
           const meva = meves[o.id]
           const esVenda = o.modalitat === 'venda' || o.modalitat === 'maquila'
+          // Sin `meva`, o con la fila todavía `pendent`, esta oferta se puede pedir.
+          const punt = meva && meva.estado !== 'pendent'
+            ? puntInteres({
+              estado: meva.estado,
+              aprovacio: meva.aprovacio,
+              kg: meva.kg_solicitados,
+              ofertaEstado: o.estado,
+            })
+            : null
           return (
             <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
               <div className="min-w-0">
@@ -113,9 +133,12 @@ export default function Mercat() {
                   {o.disponible_hasta ? ` · ${t('mk.until', { date: o.disponible_hasta })}` : ''}
                 </div>
               </div>
-              {meva && meva.estado === 'acceptada' ? (
-                <span className="rounded-full bg-exito-fondo px-2 py-0.5 text-xs font-medium text-exito">
-                  {t('mk.already', { n: meva.kg_solicitados ?? 0 })}
+              {punt ? (
+                <span className={cn(
+                  'rounded-full px-2 py-0.5 text-xs font-medium',
+                  classeEtapaInteres(punt.etapa, punt.emToca),
+                )}>
+                  {t(punt.claus.titol, punt.vars)}
                 </span>
               ) : (
                 <Dialog open={obert?.id === o.id} onOpenChange={(v) => !v && setObert(null)}>
@@ -138,9 +161,12 @@ export default function Mercat() {
                       panel del equipo, que no se han revisado. */}
                   <DialogContent className="max-h-[85dvh] overflow-y-auto">
                     <DialogHeader><DialogTitle>{t('mk.dialog_title')}</DialogTitle></DialogHeader>
-                    <p className="text-sm text-muted-foreground">
-                      {t('mk.dialog_desc', { product: o.producto ?? '' })}
+                    {/* El producto va como dato y no dentro de la frase: el texto explica
+                        quién decide, y repetir el nombre dentro lo alargaba sin decir más. */}
+                    <p className="font-medium">
+                      {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
                     </p>
+                    <p className="text-sm text-muted-foreground">{t('mk.dialog_desc2')}</p>
                     {o.texto_oferta && (
                       <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-xs">
                         {o.texto_oferta}

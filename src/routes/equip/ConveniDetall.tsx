@@ -30,8 +30,13 @@ import {
   iniciarFirmaAssistida, resoldreConveni, retornarConveni, urlSignatura,
 } from '../../lib/convenis'
 import type { EnllacFirma } from '../../lib/convenis'
+import { PASSOS_CONVENI_CLAUS, seguentPasConveni } from '../../lib/seguentPas'
+import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Convenio, Documento, EnlaceToken, Evidencia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import PasosProces from '../../components/proces/PasosProces'
+import QueTocaAra from '../../components/proces/QueTocaAra'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -168,6 +173,7 @@ export default function ConveniDetall() {
     setEnllacNou(res.data.enllac)
     setCodiAssistit(null)
     toast.success(t('conv.sent'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -214,6 +220,7 @@ export default function ConveniDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('conv.countersigned'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -225,6 +232,7 @@ export default function ConveniDetall() {
     setDialegRetorn(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('conv.returned'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -236,6 +244,7 @@ export default function ConveniDetall() {
     setDialegResol(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('conv.resolved'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -246,6 +255,28 @@ export default function ConveniDetall() {
   const potContrafirmar = conv.estado === 'firmat'
   const potResoldre = conv.estado === 'vigent'
   const firmant = conv.firmante ?? {}
+
+  // Cada estado cita SU hito, no «la última fecha»: `pendent_firma` habla de cuándo se
+  // envió, `vigent` de desde cuándo se puede operar y `resolt` de con qué fecha de efecto.
+  // Formateada aquí porque `seguentPas.ts` es puro y no sabe de idiomas ni de husos.
+  const dataDelPas = conv.estado === 'vigent'
+    ? conv.contrafirmado_at
+    : conv.estado === 'resolt' ? conv.fecha_efecto_resolucion : conv.enviado_at
+
+  const punt = seguentPasConveni({
+    estado: conv.estado,
+    nom: firmant.nombre,
+    carrec: firmant.cargo,
+    data: dataCurta(dataDelPas),
+    motiu: conv.motivo_devolucion,
+  })
+
+  // ⚠️ `retornat` NO se pinta como salida, aunque esté fuera de las cuatro etapas: el propio
+  // módulo le da índice 0 porque un convenio devuelto vuelve al principio del circuito y se
+  // sigue trabajando con él. Apagar el camino diría lo contrario. Fuera quedan solo
+  // `resolt` y `substituit`, que son índice -1.
+  const foraDeCami = punt.index < 0
+  const motiuRol = potAprovar ? undefined : t('conv.need_approver')
 
   return (
     <div className="space-y-4">
@@ -270,6 +301,13 @@ export default function ConveniDetall() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <PasosProces
+            etapes={PASSOS_CONVENI_CLAUS}
+            actual={punt.index}
+            sortida={foraDeCami ? punt.claus.titol : undefined}
+          />
+          <QueTocaAra punt={punt} compacte />
+
           <div className="grid gap-2 text-sm sm:grid-cols-2">
             <p className="text-muted-foreground">{t('conv.d_sent', { date: dataCurta(conv.enviado_at) })}</p>
             <p className="text-muted-foreground">{t('conv.d_signed', { date: dataCurta(conv.firmado_at) })}</p>
@@ -316,21 +354,24 @@ export default function ConveniDetall() {
             <div className="flex flex-wrap gap-2">
               {potContrafirmar && (
                 <>
-                  <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat || !potAprovar}
+                  <BotoAmbMotiu className="h-11 whitespace-normal md:h-9"
+                    disabled={ocupat || !potAprovar} motiu={motiuRol}
                     onClick={() => void contrafirma()}>
                     {ocupat && <Loader2 className="size-4 animate-spin" />}{t('conv.countersign')}
-                  </Button>
-                  <Button variant="outline" className="h-11 whitespace-normal md:h-9"
-                    disabled={ocupat || !potAprovar} onClick={() => setDialegRetorn(true)}>
+                  </BotoAmbMotiu>
+                  <BotoAmbMotiu variant="outline" className="h-11 whitespace-normal md:h-9"
+                    disabled={ocupat || !potAprovar} motiu={motiuRol}
+                    onClick={() => setDialegRetorn(true)}>
                     {t('conv.return')}
-                  </Button>
+                  </BotoAmbMotiu>
                 </>
               )}
               {potResoldre && (
-                <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
-                  disabled={ocupat || !potAprovar} onClick={() => setDialegResol(true)}>
+                <BotoAmbMotiu variant="destructive" className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || !potAprovar} motiu={motiuRol}
+                  onClick={() => setDialegResol(true)}>
                   {t('conv.resolve')}
-                </Button>
+                </BotoAmbMotiu>
               )}
             </div>
           )}

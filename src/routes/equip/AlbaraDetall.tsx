@@ -28,8 +28,13 @@ import {
   marcarEntregat, propostaConciliacio, rectificarAlbara,
 } from '../../lib/albarans'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
+import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
+import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import PasosProces from '../../components/proces/PasosProces'
+import QueTocaAra from '../../components/proces/QueTocaAra'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -309,6 +314,7 @@ export default function AlbaraDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('alb.emitted'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -328,6 +334,7 @@ export default function AlbaraDetall() {
     }))
     setEnllacosNous(nous)
     toast.success(t('alb.delivered', { n: nous.length }))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -354,6 +361,7 @@ export default function AlbaraDetall() {
     if (!res.ok) { toast.error(res.missatge); return }
     setDialegConciliar(false)
     toast.success(t('alb.reconciled'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -365,6 +373,7 @@ export default function AlbaraDetall() {
     if (!res.ok) { toast.error(res.missatge); return }
     setDialegAnullar(false)
     toast.success(t('alb.cancelled'))
+    void refrescaComptadors()
     await carrega()
   }
 
@@ -377,6 +386,7 @@ export default function AlbaraDetall() {
     setDialegRectificar(false)
     const nou = (res.data as { id?: string }).id
     toast.success(t('alb.rectified'))
+    void refrescaComptadors()
     if (nou) navigate(`/equip/albarans/${nou}`)
     else await carrega()
   }
@@ -439,6 +449,64 @@ export default function AlbaraDetall() {
   const rep = part(albara.partes, 'recibe')
   const origen = part(albara.partes, 'origen')
 
+  // Días desde que se marcó entregado. Es lo único que `seguentPasAlbara` no puede sacar del
+  // estado: «entregat» sin más no distingue el de esta mañana del que lleva tres semanas
+  // esperando una confirmación que no llega —y eso es precisamente lo que decide si toca
+  // llamar—. `entregado_at` es la columna que lo guarda; con el albarán en borrador es null
+  // y el módulo lo trata como 0 (la frase no se usa en ese estado).
+  const diesEntregat = albara.entregado_at
+    ? Math.max(0, Math.floor((Date.now() - new Date(albara.entregado_at).getTime()) / 86_400_000))
+    : null
+
+  const punt = seguentPasAlbara({
+    tipo: albara.tipo,
+    estado: albara.estado,
+    diesEntregat,
+    motiu: albara.motivo_anulacion,
+  })
+  const foraDeCami = punt.index < 0
+
+  // El porqué de cada botón gris, en un solo sitio. Se calcula aparte de `disabled` a
+  // propósito: si la condición y su explicación se escribieran juntas en el JSX acabarían
+  // discrepando la primera vez que cambie una de las dos. La condición sigue siendo la que
+  // esta pantalla tenía; esto solo la pone en palabras.
+  const inactiu = albara.estado === 'anulado' || albara.estado === 'rectificado'
+
+  const motiuEmetre = esBorrador
+    ? undefined
+    : t(inactiu ? 'alb.why_inactive' : 'alb.why_already_emitted')
+
+  const motiuEntregar = albara.estado === 'emitido'
+    ? undefined
+    : t(inactiu ? 'alb.why_inactive'
+      : esBorrador ? 'alb.why_emit_first'
+        : 'alb.why_already_delivered')
+
+  const potConciliar = albara.tipo === 'REC'
+    && (albara.estado === 'entregado' || albara.estado === 'confirmado')
+  const motiuConciliar = potConciliar
+    ? undefined
+    : t(albara.tipo !== 'REC' ? 'alb.why_only_rec'
+      : inactiu ? 'alb.why_inactive'
+        : esBorrador ? 'alb.why_emit_first'
+          : albara.estado === 'emitido' ? 'alb.why_deliver_first'
+            : 'alb.why_already_reconciled')
+
+  const potRectificar = potAprovar && !esBorrador && !inactiu
+  const motiuRectificar = potRectificar
+    ? undefined
+    : t(!potAprovar ? 'alb.need_approver'
+      : esBorrador ? 'alb.why_only_emitted'
+        : 'alb.why_inactive')
+
+  const potAnullar = potAprovar
+    && albara.estado !== 'anulado' && albara.estado !== 'conciliado'
+  const motiuAnullar = potAnullar
+    ? undefined
+    : t(!potAprovar ? 'alb.need_approver'
+      : albara.estado === 'conciliado' ? 'alb.why_no_cancel'
+        : 'alb.why_already_cancelled')
+
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
@@ -451,6 +519,20 @@ export default function AlbaraDetall() {
         {albara.rechazo !== 'cap' && (
           <Badge className="bg-error-fondo text-error">{t(`alb.rj_${albara.rechazo}`)}</Badge>
         )}
+      </div>
+
+      {/* Dónde está y qué toca. Va antes que nada porque es la pregunta con la que se entra
+          aquí; el resto de la ficha son los datos con los que se responde. */}
+      <div className="space-y-3">
+        <div className="rounded-xl border bg-card p-4">
+          <PasosProces
+            etapes={PASSOS_ALBARA_CLAUS}
+            actual={punt.index}
+            sortida={foraDeCami ? punt.claus.titol : undefined}
+            destructiva={albara.estado === 'anulado'}
+          />
+        </div>
+        <QueTocaAra punt={punt} compacte />
       </div>
 
       {albara.motivo_rechazo && (
@@ -640,36 +722,71 @@ export default function AlbaraDetall() {
       {/* ── Acciones ── */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('alb.actions')}</CardTitle></CardHeader>
-        <CardContent className="flex flex-wrap gap-2">
-          {esBorrador && (
-            <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={() => void emet()}>
-              {ocupat && <Loader2 className="size-4 animate-spin" />}{t('alb.emit')}
-            </Button>
-          )}
-          {albara.estado === 'emitido' && (
-            <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={() => void entrega()}>
+        {/* Las tres del circuito SIEMPRE se ven, en su orden, y la que no toca se ve gris
+            con su porqué. Antes solo aparecía la que se podía pulsar, así que el orden del
+            proceso había que deducirlo de qué botón había hoy en pantalla: quien llegaba con
+            un albarán emitido no tenía forma de saber que después de entregar viene
+            conciliar. La condición de cada `disabled` es exactamente la que decidía antes si
+            el botón se pintaba. */}
+        <CardContent className="space-y-3">
+          <div className="flex flex-wrap gap-2">
+            <BotoAmbMotiu
+              className="h-11 whitespace-normal md:h-9"
+              variant={esBorrador ? 'default' : 'outline'}
+              disabled={ocupat || !esBorrador}
+              motiu={motiuEmetre}
+              onClick={() => void emet()}
+            >
+              {ocupat && esBorrador && <Loader2 className="size-4 animate-spin" />}{t('alb.emit')}
+            </BotoAmbMotiu>
+            <BotoAmbMotiu
+              className="h-11 whitespace-normal md:h-9"
+              variant={albara.estado === 'emitido' ? 'default' : 'outline'}
+              disabled={ocupat || albara.estado !== 'emitido'}
+              motiu={motiuEntregar}
+              onClick={() => void entrega()}
+            >
               {t('alb.mark_delivered')}
-            </Button>
-          )}
-          {albara.tipo === 'REC' && (albara.estado === 'entregado' || albara.estado === 'confirmado') && (
-            <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={() => void obreConciliacio()}>
+            </BotoAmbMotiu>
+            <BotoAmbMotiu
+              className="h-11 whitespace-normal md:h-9"
+              variant={potConciliar ? 'default' : 'outline'}
+              disabled={ocupat || !potConciliar}
+              motiu={motiuConciliar}
+              onClick={() => void obreConciliacio()}
+            >
               {t('alb.reconcile')}
-            </Button>
-          )}
-          {potAprovar && albara.estado !== 'anulado' && albara.estado !== 'conciliado' && (
-            <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
-              onClick={() => setDialegAnullar(true)}>
-              {t('alb.cancel')}
-            </Button>
-          )}
-          {potAprovar && !esBorrador && albara.estado !== 'anulado' && albara.estado !== 'rectificado' && (
-            <Button variant="outline" className="h-11 whitespace-normal md:h-9"
-              onClick={() => setDialegRectificar(true)}>
-              {t('alb.rectify')}
-            </Button>
-          )}
+            </BotoAmbMotiu>
+          </div>
+
+          {/* Las dos excepciones, separadas: rectificar y anular no son pasos del proceso,
+              son salidas de él, y mezcladas con las tres de arriba se pulsan por error. */}
+          <div className="space-y-2 border-t pt-3">
+            <p className="text-xs text-muted-foreground">{t('alb.actions_exceptions')}</p>
+            <div className="flex flex-wrap gap-2">
+              <BotoAmbMotiu
+                variant="outline"
+                className="h-11 whitespace-normal md:h-9"
+                disabled={ocupat || !potRectificar}
+                motiu={motiuRectificar}
+                onClick={() => setDialegRectificar(true)}
+              >
+                {t('alb.rectify')}
+              </BotoAmbMotiu>
+              <BotoAmbMotiu
+                variant="destructive"
+                className="h-11 whitespace-normal md:h-9"
+                disabled={ocupat || !potAnullar}
+                motiu={motiuAnullar}
+                onClick={() => setDialegAnullar(true)}
+              >
+                {t('alb.cancel')}
+              </BotoAmbMotiu>
+            </div>
+          </div>
+
           {!potAprovar && (
-            <p className="w-full text-xs text-muted-foreground">{t('alb.need_approver')}</p>
+            <p className="text-xs text-muted-foreground">{t('alb.need_approver')}</p>
           )}
         </CardContent>
       </Card>

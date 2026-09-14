@@ -12,7 +12,7 @@
 // única que se resuelve sola con el tiempo… o no se resuelve nunca.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
@@ -30,6 +30,10 @@ type Noms = Record<string, string>
 
 export default function Albarans() {
   const { t } = useT()
+  const [params, setParams] = useSearchParams()
+  const PESTANYES = ['tots', 'esborranys', 'pendents', 'conciliar', 'tancats'] as const
+  const tabParam = params.get('tab')
+  const tab = (PESTANYES as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'tots'
   const [files, setFiles] = useState<AlbaranBandeja[]>([])
   const [productors, setProductors] = useState<Noms>({})
   const [entitats, setEntitats] = useState<Noms>({})
@@ -191,7 +195,10 @@ export default function Albarans() {
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {!carregant && !error && (
-          <Tabs defaultValue="tots">
+          <Tabs value={tab} onValueChange={(v) => setParams(v === 'tots' ? {} : { tab: v }, { replace: true })}>
+            {/* La pestaña se lee de la URL (`?tab=esborranys|pendents|conciliar|tancats`): es lo
+                que permite que «Pendent de l'equip» (tablero) y los badges lleven a la cola
+                exacta y no a «Tots». Un valor desconocido cae en «tots». */}
             {/* Cinco etiquetas no caben a 360 px: la lista scrollea sola en vez de empujar
                 la página entera hacia la derecha. */}
             <div className="-mx-1 overflow-x-auto px-1">

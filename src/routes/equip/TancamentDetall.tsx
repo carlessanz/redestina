@@ -32,8 +32,17 @@ import {
   registrarFactura, reiniciarTancamentProva, simularFactura,
 } from '../../lib/tancament'
 import type { FilaComparacio } from '../../lib/tancament'
-import type { BloqueigCierre, CierreDonante, CierreEjercicio, Documento } from '../../types'
+import {
+  PASSOS_EXERCICI_CLAUS, seguentPasDonant, seguentPasExercici,
+} from '../../lib/seguentPas'
+import { refrescaComptadors } from '../../lib/pendentsEquip'
+import type {
+  BloqueigCierre, CierreDonante, CierreEjercicio, Documento, EstatCierreDonante,
+} from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import PasosProces from '../../components/proces/PasosProces'
+import QueTocaAra from '../../components/proces/QueTocaAra'
 import { BadgeMode } from './Tancament'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -332,6 +341,40 @@ export default function TancamentDetall() {
   const esProva = cap?.modo === 'prueba'
   const editable = cap?.estado === 'obert' || cap?.estado === 'provisional'
 
+  /**
+   * En qué punto está el ejercicio.
+   *
+   * ⚠️ `obert` son TRES situaciones y el estado no las distingue, así que las dos cosas que
+   * faltan se calculan aquí: **`calculat`** es `calculado_at` —la marca que deja
+   * `calcular_cierre()`, y la única prueba de que se ha pasado— y **`bloquejats`** es el
+   * número de donantes con algún bloqueo `bloqueja: true`, que es exactamente el mismo
+   * recuento que ya alimenta la tarjeta «Bloquejats» (`totals.bloquejats`): dos recuentos
+   * del mismo hecho acabarían discrepando.
+   */
+  const puntExercici = useMemo(() => seguentPasExercici({
+    estado: cap?.estado ?? 'obert',
+    calculat: cap?.calculado_at != null,
+    bloquejats: totals.bloquejats,
+  }), [cap?.estado, cap?.calculado_at, totals.bloquejats])
+
+  // Cuál de los cuatro botones globales es «el siguiente». Sale del mismo punto que la
+  // frase de arriba, para que el botón resaltado y el texto no puedan decir cosas distintas.
+  const accioSeguent = puntExercici.etapa === 'obert_net' ? 'resum'
+    : puntExercici.etapa === 'provisional' ? 'tanca'
+      : puntExercici.etapa === 'tancat' ? 'declara'
+        : puntExercici.etapa === 'declarat' ? null
+          : 'calcula'   // obert_sense_calcul y obert_bloquejats: recalcular
+
+  const motiuTancat = editable ? undefined : t('tan.why_closed')
+  // 🔴 «Marca com a declarat» estaba habilitado con el ejercicio abierto: se podía dar por
+  // presentado ante Hacienda un cierre que ni siquiera se había calculado. La base lo
+  // rechazaba, pero el botón no lo decía. Declarar es lo último del circuito, después de
+  // cerrar.
+  const potDeclarar = cap?.estado === 'tancat'
+  const motiuDeclarar = potDeclarar
+    ? undefined
+    : t(cap?.estado === 'declarat' ? 'tan.why_already_declared' : 'tan.why_close_first')
+
   // --- Acciones de la cabecera --------------------------------------------
 
   async function calcula() {
@@ -342,6 +385,7 @@ export default function TancamentDetall() {
     toast.success(t('tan.calculated', {
       n: res.data.donants, kg: kg(res.data.kg_total), b: res.data.bloquejats,
     }))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -364,7 +408,7 @@ export default function TancamentDetall() {
       else fallits.push(`${nom(d)}: ${res.missatge}`)
     }
     setOcupat(false)
-    if (fets > 0) toast.success(t('tan.summaries_sent', { n: fets }))
+    if (fets > 0) { toast.success(t('tan.summaries_sent', { n: fets })); void refrescaComptadors() }
     if (fallits.length > 0) toast.error(fallits.join(' · '))
     await refresca()
   }
@@ -377,6 +421,7 @@ export default function TancamentDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.closed'))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -386,6 +431,7 @@ export default function TancamentDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.declared'))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -400,6 +446,7 @@ export default function TancamentDetall() {
     toast.success(t('tan.reset_done', {
       d: res.data.documents, c: res.data.canalitzacions, a: res.data.albarans,
     }))
+    void refrescaComptadors()
     console.info('reiniciar_cierre_prueba', motiu, res.data)
     await refresca()
   }
@@ -488,6 +535,7 @@ export default function TancamentDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.summary_done', { n: res.data.numero ?? '' }))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -499,6 +547,7 @@ export default function TancamentDetall() {
     setFactura(null)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t(res.data.estado === 'coincident' ? 'tan.inv_ok' : 'tan.inv_diff'))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -510,6 +559,7 @@ export default function TancamentDetall() {
     setSimula(null)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t(res.data.estado === 'coincident' ? 'tan.inv_ok' : 'tan.inv_diff'))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -520,6 +570,7 @@ export default function TancamentDetall() {
     setExcepcio(null)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.cert_done', { n: res.data.numero ?? '' }))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -531,6 +582,7 @@ export default function TancamentDetall() {
     setRectifica(null)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.cert_rectified', { n: res.data.numero ?? '' }))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -540,6 +592,7 @@ export default function TancamentDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.marked_sent'))
+    void refrescaComptadors()
     await refresca()
   }
 
@@ -571,6 +624,9 @@ export default function TancamentDetall() {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          <PasosProces etapes={PASSOS_EXERCICI_CLAUS} actual={puntExercici.index} />
+          <QueTocaAra punt={puntExercici} compacte />
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Dada etiqueta={t('tan.c_donors')} valor={String(donants.length)} />
             <Dada etiqueta={t('tan.c_kg')} valor={kg(totals.kg)} />
@@ -583,55 +639,71 @@ export default function TancamentDetall() {
           </div>
 
           {potAprovar && (
-            <div className="flex flex-wrap gap-2">
-              <Button
-                className="h-11 whitespace-normal md:h-9"
-                disabled={ocupat || !editable}
-                onClick={() => void calcula()}
-              >
-                {t('tan.a_calculate')}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 whitespace-normal md:h-9"
-                disabled={ocupat || !editable}
-                onClick={() => void resumsProvisionals()}
-              >
-                {t('tan.a_provisional')}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 whitespace-normal md:h-9"
-                disabled={ocupat || !editable}
-                onClick={() => void tanca()}
-              >
-                {t('tan.a_close')}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 whitespace-normal md:h-9"
-                disabled={ocupat || cap.estado === 'declarat'}
-                onClick={() => void declara()}
-              >
-                {t('tan.a_declare')}
-              </Button>
-              <Button
-                variant="outline"
-                className="h-11 whitespace-normal md:h-9"
-                onClick={() => void exporta182()}
-              >
-                {t('tan.a_export_182')}
-              </Button>
-              {esProva && (
-                <Button
-                  variant="destructive"
+            <div className="space-y-3">
+              {/* Los cuatro pasos del cierre, en su orden. Antes iban mezclados con el
+                  export y el reinicio, así que la secuencia había que saberla de memoria. */}
+              <div className="flex flex-wrap gap-2">
+                <BotoAmbMotiu
+                  variant={accioSeguent === 'calcula' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-9"
-                  disabled={ocupat}
-                  onClick={() => setReinici(true)}
+                  disabled={ocupat || !editable}
+                  motiu={motiuTancat}
+                  onClick={() => void calcula()}
                 >
-                  {t('tan.a_reset')}
-                </Button>
-              )}
+                  {t('tan.a_calculate')}
+                </BotoAmbMotiu>
+                <BotoAmbMotiu
+                  variant={accioSeguent === 'resum' ? 'default' : 'outline'}
+                  className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || !editable}
+                  motiu={motiuTancat}
+                  onClick={() => void resumsProvisionals()}
+                >
+                  {t('tan.a_provisional')}
+                </BotoAmbMotiu>
+                <BotoAmbMotiu
+                  variant={accioSeguent === 'tanca' ? 'default' : 'outline'}
+                  className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || !editable}
+                  motiu={motiuTancat}
+                  onClick={() => void tanca()}
+                >
+                  {t('tan.a_close')}
+                </BotoAmbMotiu>
+                <BotoAmbMotiu
+                  variant={accioSeguent === 'declara' ? 'default' : 'outline'}
+                  className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || !potDeclarar}
+                  motiu={motiuDeclarar}
+                  onClick={() => void declara()}
+                >
+                  {t('tan.a_declare')}
+                </BotoAmbMotiu>
+              </div>
+
+              {/* Lo que no es un paso: consultar el 182 y deshacer un ensayo. */}
+              <div className="space-y-2 border-t pt-3">
+                <p className="text-xs text-muted-foreground">{t('tan.actions_other')}</p>
+                <div className="flex flex-wrap gap-2">
+                  <Button
+                    variant="outline"
+                    className="h-11 whitespace-normal md:h-9"
+                    onClick={() => void exporta182()}
+                  >
+                    {t('tan.a_export_182')}
+                  </Button>
+                  {esProva && (
+                    <Button
+                      variant="destructive"
+                      className="h-11 whitespace-normal md:h-9"
+                      disabled={ocupat}
+                      onClick={() => setReinici(true)}
+                    >
+                      {t('tan.a_reset')}
+                    </Button>
+                  )}
+                </div>
+              </div>
             </div>
           )}
           {!potAprovar && <p className="text-sm text-muted-foreground">{t('tan.readonly')}</p>}
@@ -875,6 +947,33 @@ function FilaDonant({
   const coincident = d.estado === 'coincident'
   const teCertificat = d.certificado_numero !== null
 
+  // Qué toca con ESTE donante. La frase va junto al badge, no en un tooltip: son nueve
+  // estados y «Factura pendent» no dice por cuánto ni que hay que registrarla.
+  const punt = seguentPasDonant({ estado: d.estado, importe: euros(d.valor_total) })
+
+  /** Cuál de los botones de la fila es el siguiente. El resto van en `outline`. */
+  const seguent: Record<EstatCierreDonante, 'resum' | 'factura' | 'certificat' | 'enviat' | null> = {
+    calculat: 'resum',
+    resum_enviat: 'factura',
+    factura_pendent: 'factura',
+    factura_rebuda: 'factura',
+    coincident: 'certificat',
+    // La discrepancia se resuelve corrigiendo la factura; la excepción de D4 es la salida
+    // rara y no se resalta nunca, para que no parezca el camino normal.
+    discrepancia: 'factura',
+    certificat_emes: 'enviat',
+    enviat: null,
+    declarat: null,
+  }
+  const ara = seguent[d.estado]
+
+  const motiuResum = bloquejat
+    ? t('tan.why_blocked')
+    : Number(d.kg_total) <= 0 ? t('tan.why_no_kg') : undefined
+  const motiuCertificat = bloquejat
+    ? t('tan.why_blocked')
+    : !coincident ? t('tan.why_no_invoice') : undefined
+
   return (
     <TableRow>
       <TableCell className="max-w-56">
@@ -886,11 +985,12 @@ function FilaDonant({
       </TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(d.kg_total)}</TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(d.valor_total)}</TableCell>
-      <TableCell>
+      <TableCell className="max-w-52">
         <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
         {d.excepcion_sin_factura && (
           <Badge className="ml-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.exception')}</Badge>
         )}
+        <p className="mt-1 text-xs text-muted-foreground">{t(punt.claus.toca, punt.vars)}</p>
       </TableCell>
       <TableCell><Bloquejos llista={d.bloqueos ?? []} /></TableCell>
       <TableCell className="text-sm">
@@ -933,24 +1033,26 @@ function FilaDonant({
         <div className="flex flex-col items-stretch gap-1">
           {potAprovar && (
             <>
-              <Button
-                size="sm" variant="outline"
+              <BotoAmbMotiu
+                size="sm" variant={ara === 'resum' ? 'default' : 'outline'}
                 className="h-11 whitespace-normal md:h-8"
                 disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
+                motiu={motiuResum}
                 onClick={() => onResum(true)}
               >
                 {t('tan.a_summary')}
-              </Button>
-              <Button
+              </BotoAmbMotiu>
+              <BotoAmbMotiu
                 size="sm" variant="outline"
                 className="h-11 whitespace-normal md:h-8"
                 disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
+                motiu={motiuResum}
                 onClick={() => onResum(false)}
               >
                 {t('tan.a_summary_final')}
-              </Button>
+              </BotoAmbMotiu>
               <Button
-                size="sm" variant="outline"
+                size="sm" variant={ara === 'factura' ? 'default' : 'outline'}
                 className="h-11 whitespace-normal md:h-8"
                 disabled={ocupat}
                 onClick={onFactura}
@@ -968,14 +1070,16 @@ function FilaDonant({
                 </Button>
               )}
               {!teCertificat && (
-                <Button
+                <BotoAmbMotiu
                   size="sm"
+                  variant={ara === 'certificat' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || bloquejat || !coincident}
+                  motiu={motiuCertificat}
                   onClick={onCertificat}
                 >
                   {t('tan.a_certificate')}
-                </Button>
+                </BotoAmbMotiu>
               )}
               {/* La excepción de D4: sin factura coincidente, solo el super_admin y con
                   motivo. Se enseña únicamente cuando de verdad hace falta —hay bloqueo de
@@ -1002,7 +1106,7 @@ function FilaDonant({
                   </Button>
                   {d.enviado_at === null && (
                     <Button
-                      size="sm" variant="outline"
+                      size="sm" variant={ara === 'enviat' ? 'default' : 'outline'}
                       className="h-11 whitespace-normal md:h-8"
                       disabled={ocupat}
                       onClick={onEnviat}

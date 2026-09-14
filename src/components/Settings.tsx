@@ -8,6 +8,13 @@ import {
   fitxesSenseCorreuAmbTelefon, getTestMode, getWhatsappActiu, setTestMode, setWhatsappActiu,
 } from '../lib/settings'
 import { useAppContext } from '../hooks/useAppContext'
+import {
+  anadirNumeroTest, borrarNumeroTest, listarNumerosTest, type MetaTestRecipient,
+} from '../lib/metaTest'
+import {
+  anadirEmailTest, borrarEmailTest, listarEmailsTest, type EmailTestRecipient,
+} from '../lib/emailTest'
+import GestorWhitelist from './GestorWhitelist'
 import { cn } from '../lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -18,10 +25,17 @@ export default function Settings() {
   const [testMode, setTest] = useState<boolean | null>(null)
   const [waActiu, setWaActiu] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
+  // Las dos whitelists del entorno de pruebas (§4, §8). Vivían en el Tauler y ocupaban
+  // media pantalla de la landing del equipo: no son trabajo del día, son el ajuste que
+  // acompaña al modo de pruebas de aquí arriba.
+  const [lista, setLista] = useState<MetaTestRecipient[]>([])
+  const [listaEmail, setListaEmail] = useState<EmailTestRecipient[]>([])
 
   useEffect(() => {
     void getTestMode().then(setTest)
     void getWhatsappActiu().then(setWaActiu)
+    void listarNumerosTest().then(setLista)
+    void listarEmailsTest().then(setListaEmail)
   }, [])
 
   async function cambiarTestMode(activo: boolean) {
@@ -165,6 +179,46 @@ export default function Settings() {
         </CardContent>
       </Card>
 
+      {/* Las listas de prueba: la segunda barrera técnica del entorno de test. */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-base">{t('set.lists_title')}</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{t('set.lists_help')}</p>
+        </CardHeader>
+        <CardContent className="space-y-3">
+          {/* Con WhatsApp apagado (§8) la lista de Meta no decide nada: se atenúa y se dice,
+              en vez de esconderla —sigue siendo el estado que hay que dejar bien antes de
+              volver a encender el canal—. */}
+          <div className={cn('space-y-2', waActiu === false && 'opacity-60')}>
+            {waActiu === false && <p className="text-xs text-aviso">{t('dash.wa_off')}</p>}
+            <GestorWhitelist
+              titulo={t('dash.meta_title')} ayuda={t('dash.meta_help')}
+              items={lista.map((r) => ({ clave: r.phone, etiqueta: r.etiqueta }))}
+              placeholderClave={t('dash.ph_phone')} placeholderEtiqueta={t('dash.ph_label')} max={5}
+              addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
+              onAdd={async (c, e) => {
+                const err = await anadirNumeroTest(c, e)
+                if (!err) setLista(await listarNumerosTest())
+                return err
+              }}
+              onDelete={async (c) => { await borrarNumeroTest(c); setLista(await listarNumerosTest()) }}
+            />
+          </div>
+          <GestorWhitelist
+            titulo={t('dash.email_title')} ayuda={t('dash.email_help')}
+            items={listaEmail.map((r) => ({ clave: r.email, etiqueta: r.etiqueta }))}
+            placeholderClave={t('dash.ph_email')} placeholderEtiqueta={t('dash.ph_label')} max={20}
+            addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
+            onAdd={async (c, e) => {
+              const err = await anadirEmailTest(c, e)
+              if (!err) setListaEmail(await listarEmailsTest())
+              return err
+            }}
+            onDelete={async (c) => { await borrarEmailTest(c); setListaEmail(await listarEmailsTest()) }}
+          />
+        </CardContent>
+      </Card>
+
       {/* Idioma */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('set.language')}</CardTitle></CardHeader>
@@ -187,7 +241,7 @@ export default function Settings() {
         <CardContent className="space-y-1.5 text-sm text-muted-foreground">
           <p>{t('set.sending_1')}</p>
           <p>{t('set.sending_2')}</p>
-          <p>{t('set.sending_3')}</p>
+          <p>{t('set.sending_3b')}</p>
         </CardContent>
       </Card>
 

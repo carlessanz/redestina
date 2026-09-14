@@ -16,6 +16,7 @@ import {
   PASOS,
   CAMPOS,
   MODALITATS,
+  SECCIONES,
   aplica,
   faltantes,
   type CampoOferta,
@@ -198,5 +199,91 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
   // filtro; quien la corta después es `crearExcedente`, que guarda `kg_total: kg || null`.
   it('un 0 pasa el guardia (lo corta después crearExcedente)', () => {
     expect(faltantes({ ...donacionCompleta(), kg: 0 })).toEqual([])
+  })
+})
+
+describe('el cuestionario se explica a sí mismo', () => {
+  // Estos textos son lo único que el productor tiene para decidir, y valen para los DOS
+  // canales: lo que se escribe aquí lo lee quien rellena el formulario del panel y quien
+  // contesta al bot. Un campo sin `ayuda` es una pregunta que solo entiende quien ya sabe
+  // la respuesta —pasaba con `modalitat`, que ofrecía tres palabras sin decir que deciden
+  // qué entidades pueden recibir la oferta y qué documento se acaba emitiendo—.
+  it('los 14 campos tienen ayuda, y no vacía', () => {
+    for (const c of CAMPOS) {
+      expect(c.ayuda, `${c.clave} no tiene ayuda`).toBeDefined()
+      expect(c.ayuda!.trim(), `la ayuda de ${c.clave} está vacía`).not.toBe('')
+    }
+  })
+
+  it('las tres modalitats explican qué implica elegirlas', () => {
+    expect(campo('modalitat').opciones).toHaveLength(3)
+    for (const o of campo('modalitat').opciones!) {
+      expect(o.descripcion, `la modalitat "${o.id}" no se explica`).toBeDefined()
+      expect(o.descripcion!.trim()).not.toBe('')
+    }
+    // Y la que tiene consecuencia fiscal lo dice: es la única que emite certificado.
+    expect(MODALITATS.find((m) => m.id === 'donacio')!.descripcion).toContain('certificat')
+  })
+
+  it('la ayuda de tipus_caixa nombra una opción que existe de verdad', () => {
+    // Si alguien renombra el vocabulario de cajas, esta ayuda se queda señalando a una
+    // opción fantasma y nadie lo vería hasta que un productor la buscara en el desplegable.
+    const opciones = campo('tipus_caixa').opciones!.map((o) => o.titulo)
+    expect(opciones).toContain('Productor/a')
+    expect(campo('tipus_caixa').ayuda).toContain('Productor/a')
+  })
+
+  it('el ejemplo de formato de la fecha sobrevive a la explicación', () => {
+    // La ayuda creció para decir qué pasa al vencer, pero el ejemplo va al final: sin él,
+    // «fins quin dia» se contesta en cualquier formato y `parseDisponibleFins` no lo entiende.
+    expect(campo('disponible_fins').ayuda).toMatch(/23\/07$/)
+  })
+})
+
+describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', () => {
+  it('cada campo declara una sección, y esa sección existe', () => {
+    const claves = SECCIONES.map((s) => s.clau)
+    for (const c of CAMPOS) {
+      expect(claves, `la sección de ${c.clave} no está en SECCIONES`).toContain(c.seccion)
+    }
+  })
+
+  it('ninguna sección se queda sin campos', () => {
+    for (const s of SECCIONES) {
+      expect(
+        CAMPOS.some((c) => c.seccion === s.clau),
+        `la sección "${s.clau}" no la usa ningún campo`,
+      ).toBe(true)
+    }
+  })
+
+  // Lo que hace que la estructura sirva para algo: los campos de una sección van SEGUIDOS.
+  // Si se intercalaran, el panel tendría que pintar dos veces la misma cabecera y el orden
+  // del formulario dejaría de ser el orden de `PASOS` —que es el que recorre el bot—.
+  it('PASOS no intercala secciones: una vez cerrada, no vuelve a abrirse', () => {
+    const vistas: string[] = []
+    for (const c of CAMPOS) {
+      if (vistas[vistas.length - 1] === c.seccion) continue
+      expect(vistas, `la sección "${c.seccion}" reaparece en ${c.clave}`).not.toContain(c.seccion)
+      vistas.push(c.seccion)
+    }
+    expect(vistas).toEqual(SECCIONES.map((s) => s.clau))
+  })
+
+  it('el reparto es el que espera el panel', () => {
+    const porSeccion = (s: string) => CAMPOS.filter((c) => c.seccion === s).map((c) => c.clave)
+    expect(porSeccion('producte')).toEqual(['familia', 'producte', 'varietat'])
+    expect(porSeccion('quantitat')).toEqual(['kg', 'caixes', 'tipus_caixa', 'retorn'])
+    expect(porSeccion('recollida')).toEqual(['ubicacio', 'disponible_fins', 'horari'])
+    expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim'])
+    expect(porSeccion('causa')).toEqual(['causa', 'observacions'])
+  })
+
+  it('las cabeceras están en català y no pasan por i18n', () => {
+    const modalitat = SECCIONES.find((s) => s.clau === 'modalitat')!
+    expect(modalitat.titol).toBe('Com vols donar-hi sortida')
+    expect(modalitat.descripcio).toBe(
+      'Decideix quines entitats la poden rebre i quin document es genera.',
+    )
   })
 })

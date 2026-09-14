@@ -162,7 +162,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
 | catálogos (categorías/unidades/motivos/destinos) | `productos`/`causas`/`factores_conversion` | 🟡 |
-| back office, cola de **aprobaciones**, Super Admin | `Aprovacions` con **dos colas**: respuestas a ofertas y **registros pendientes**; aprobar exige `pot_aprovar()` | 🟡 |
+| back office, cola de **aprobaciones**, Super Admin | `Aprovacions` con **tres colas** (registros, convenios por contrasignar, intereses), aprobando **desde la cola**; aprobar exige `pot_aprovar()` | 🟡 |
 | **alta de organización** (onboarding) | **registro público self-service** (`/registre` → Edge Function `registro`) con validación del equipo (§9) | 🟡 |
 | **roles y permisos** | RLS por rol y organización, encendida en producción (§4bis) | ✅ |
 | parte pública / catálogo público | **landing pública** en `/` + `/login`, `/admin` y `/registre` (§6quater). Catálogo público de ofertas, no | 🟡 |
@@ -450,6 +450,10 @@ src/
                                exercici, donant
     pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
                                de módulo; alimenta los badges del menú Y el tablero (§6ter)
+    progresOfertes.ts          progres_meves_ofertes(): cuántas entidades interesadas por oferta,
+                               SIN nombres, para el panel del productor (§6ter)
+    aprovarResposta.ts         comprovaConvenis() + aprovarResposta() + rebutjarResposta(): la
+                               aprobación de un interés, compartida por OfferDetail y Aprovacions
     albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
     enllacPublic.ts            Cliente de enlace-publico, sin sesión (§9)
     email.ts                   enviarEmail(): llama a la Edge Function enviar-email
@@ -468,21 +472,24 @@ src/
     proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
                                BotoAmbMotiu (§6ter)
+    equip/                     PendentsEquip (la cola de trabajo del tablero) y ComFunciona
+                               (los seis pasos de FASES_EQUIP, enlazados) (§6ter)
+    GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
-    Dashboard.tsx              Landing tras login: guía del proceso, KPIs y gestor de la lista Meta
-    OffersList.tsx             Ofertas activas con kg en vivo (Realtime) + buscador
+    Dashboard.tsx              Tablero = cola de trabajo: Pendent de l'equip, Com funciona, KPIs (§6ter)
+    OffersList.tsx             Ofertas con kg en vivo (Realtime) + buscador; pestañas Actives/Tancades/Totes
     OfferDetail.tsx            Detalle: priorización, canalizaciones, opt-in, cierre, cancelar
     ProducersList.tsx          Tabla de productores: buscador, separación Meta, detalle/nuevo/enviar
     EntitiesList.tsx           Tabla de entidades: buscador, badge "Meta", detalle/nueva/enviar
     RecordDetail.tsx           Ficha CRUD genérica (editar/crear/borrar) de productor o entidad
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
-    Settings.tsx               Configuración: interruptor del modo test global + idioma (§8)
+    Settings.tsx               Configuración: modo test, WhatsApp, idioma y las whitelists de prueba (§8)
 scripts/
   import-ara.ts                Importación idempotente de los 5 CSV maestros
   crear-usuario.ts             Alta de cuentas por la Admin API (no envía correos)
@@ -635,6 +642,17 @@ solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al ac
 
 **`canalizaciones`** — detalle por entidad: `kg_confirmados`, `kg_reales`, cajas, albaranes,
 firmas. Relación **`excedentes` 1—N `canalizaciones`** (una oferta, varias entidades).
+
+⚠️ **El productor ya NO lee `oferta_respuestas` de sus ofertas** (`20270324100000`). La política de
+SELECT de `20260730098000` traía la rama `excedente_id in (select
+excedents_dels_meus_productors())`, que le concedía `entidad_id`, `telefono` y `preu_ofert` —
+comprobado el 14-09-2026 con sesión real de `TEST-PROD-1`: tres filas—. Ninguna pantalla lo pedía;
+la rama nació en una migración que arreglaba una recursión entre políticas, antes de que existiera
+ninguna decisión sobre qué ve el generador. Desde entonces el productor ve su embudo **solo
+agregado**, por `progres_meves_ofertes()`. ⚠️ Se retiró **una referencia** a
+`excedents_dels_meus_productors()`, no la función: la política de `canalizaciones` la sigue usando,
+y eso es lo que hace que el productor no quede a ciegas —al aprobarse un interés nace la
+canalización, y esa sí la ve, porque a esas alturas hay una entrega que coordinar.
 
 **`oferta_respuestas`** — flujo de **aceptación** (`20260723100000_oferta_respuestas.sql`; ampliada
 en `20260723130000_aceptacion_ofertas.sql`): `excedente_id` (FK, `on delete cascade`), `entidad_id`
@@ -1312,6 +1330,8 @@ funciones, no políticas:
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
+| `pendents_equip()` (`20270323100000`) | **La cola de trabajo del equipo en una sola llamada**: doce filas `(cua, n, ref, detall)`, **siempre las doce** aunque `n` valga 0. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
+| `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
 
 **El convenio en el panel externo (14-09-2026).** Decisión de producto: el panel **se sigue
 viendo** sin convenio, lo que no se puede es operar. `useConveni` lee los convenios de la
@@ -1724,12 +1744,16 @@ el mismo módulo del que el intake saca sus pasos. El alta llama a `POST /crear-
 Realtime ya cableado.
 
 Navegación anterior (barra superior de 6 secciones en `App.tsx`): retirada. **Configuració** (`Settings.tsx`)
-reúne el interruptor del **modo test** (§8) y el idioma. El **Dashboard** (`Dashboard.tsx`) es la
-landing tras el login: guía del proceso (los 4 momentos), KPIs agregados (ofertas por estado
-—incluidas `cancelada`—, kg canalizados/pendientes, productores/entidades y cuántos pueden
-recibir por estar en la lista Meta, mensajes recibidos/sin contestar, sesiones de intake) y el
-**gestor de la lista de test de Meta**. `OffersList`, `ProducersList` y `EntitiesList` llevan
-**buscador**; `ProducersList` **y** `EntitiesList` separan en dos grupos —primero los usuarios de
+reúne el interruptor del **modo test** (§8), el de WhatsApp, el idioma y —desde el 15-09-2026— las
+**dos whitelists de prueba** (`GestorWhitelist`), que antes ocupaban media pantalla del tablero. El
+**Dashboard** (`Dashboard.tsx`) es la landing tras el login y desde el 15-09-2026 es una **cola de
+trabajo**, en este orden: banner del modo test (solo si está activo), **«Pendent de l'equip»**
+(`components/equip/PendentsEquip.tsx`, una fila por cola de `pendents_equip()` con cifra, por qué
+importa y botón a donde se resuelve; «Res pendent» si todo es 0), **«Com funciona»** (seis pasos de
+`FASES_EQUIP`, enlazados) y los KPIs agregados, ahora clicables. `OffersList` lleva pestañas
+**Actives / Tancades / Totes** —antes las cerradas no eran alcanzables desde ninguna pantalla— y
+`Albarans` lee `?tab=`, que es a donde apuntan los botones del tablero. `OffersList`, `ProducersList`
+y `EntitiesList` llevan **buscador**; `ProducersList` **y** `EntitiesList` separan en dos grupos —primero los usuarios de
 prueba (`es_test`, badge "Test", pueden recibir), luego el resto—. Mensajería muestra la lista
 completa de contactos (ya no la conversación única), con **buscador** bajo el título «Contactes»,
 un **filtro por tipo** (Tots / Productors / Receptors: clasifica cada contacto cruzando su teléfono
@@ -1922,15 +1946,26 @@ Dos límites que **no se pueden relajar**:
    contraseñas **se cae del bundle**. Verificado con `grep` sobre `dist/`, no por confianza: la
    contraprueba con el flag encendido sí las encuentra.
 
-### Aprovacions: dos colas
+### Aprovacions: tres colas, y se aprueba desde la cola
 
-`src/routes/equip/Aprovacions.tsx` tiene ahora **«Registres pendents»** (altas del registro público:
+`src/routes/equip/Aprovacions.tsx` tiene **«Registres pendents»** (altas del registro público:
 `membresias` con `aprovacio='pendent'`, embebiendo la ficha, más una segunda consulta a `perfiles`
-—`membresias.user_id` referencia `auth.users`, no `perfiles`, así que PostgREST no los embebe) y la
-cola de respuestas a ofertas de siempre. Cada fila enlaza a la ficha para poder **completarla antes**
-de aprobar (una entidad nueva llega con `estat = null` y hasta que se rellene no entra en la
-priorización). Los botones llaman a `aprovar_registre` / `rebutjar_registre` (§4bis). El contador del
-menú (`AppShell`) **suma las dos colas**.
+—`membresias.user_id` referencia `auth.users`, no `perfiles`, así que PostgREST no los embebe),
+**«Convenis per contrasignar»** y la cola de **intereses** de las entidades. Cada fila de registro
+enlaza a la ficha para poder **completarla antes** de aprobar (una entidad nueva llega con
+`estat = null` y hasta que se rellene no entra en la priorización). Los botones llaman a
+`aprovar_registre` / `rebutjar_registre` (§4bis). El contador del menú **suma las tres colas** y
+sale del mismo store que el tablero (`pendentsEquip.ts`); el desglose va en el título de cada cola.
+
+**Desde el 15-09-2026 la cola de intereses se aprueba ahí mismo**, sin ir al detalle de la oferta:
+cada fila dice «Falten {n} de {m} kg», trae los kg prellenados (y el precio en `venda`/`maquila`) y
+ofrece «Aprova i canalitza» / «Rebutja» / «Obre l'oferta». La lógica se sacó de `OfferDetail` a
+`src/lib/aprovarResposta.ts` (`comprovaConvenis`, `aprovarResposta`, `rebutjarResposta`) y **las dos
+pantallas la comparten**: mismo aviso previo de convenio (§12.78), mismo `codi: 'sense_conveni'`
+traducido a `od.conv_blocked`, misma confirmación al canalizar de más. Una cuenta `tecnic` ve los
+botones grises con el motivo («Només admin»): no se le esconde nada, se le dice por qué (§6ter).
+⚠️ `appr.rej_desc` y `appr.rej_reason` se usan a través de la tabla `TEXTOS_MOTIU`, no como literal
+dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si faltaran.
 
 ## 7. Convenciones
 
@@ -4279,6 +4314,19 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      arreglado ahí** porque la única forma segura es `revoke update` + volver a conceder la lista
      exacta de columnas, y eso es una decisión aparte sobre una tabla con política propia y con
      check «permitir» en el arnés.
+105. **Las descripciones de la modalidad no llegan por WhatsApp.** `camposOferta.ts` da a cada
+     `modalitat` una `descripcion` («Ho dones. Entitats socials… Genera un certificat…») que el
+     panel enseña bajo cada opción, pero el intake la pregunta con `sendBotones`, cuyos botones
+     solo admiten título (20 caracteres). Pasarla a `sendLista` permitiría una `description` por
+     fila, con **tope de 72 caracteres** — y la de `donacio` mide 97. Es una mejora del intake,
+     no un defecto: por WhatsApp se sigue eligiendo a ciegas, como siempre.
+106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
+     la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
+     pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
+     acción de cierre, y el equipo cierra conciliando el albarán. Decidido a propósito en el plan
+     de UX (15-09-2026): un trigger que lo escribiera tocaría una RPC del circuito legal por una
+     cifra decorativa. El día que se quiera la columna coherente, es `conciliar_albaran()` quien
+     debería escribirla.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
@@ -4335,7 +4383,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **744 pruebas en 22 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **760 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4343,9 +4391,17 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, tras la tanda de deuda técnica del 14-09-2026: **650/650 correctas
-   y 13 saltadas**, «Sin fallos de permisos», exit 0. (La saltada que baja es
-   `equip · documento_envios`, que dejó de estarlo en cuanto se mandó el primer correo, §12.53.)
+   Referencia en **remoto**, tras las RPC del proceso (`20270323100000`, `20270324100000`):
+   **669/669 correctas y 13 saltadas**, «Sin fallos de permisos», exit 0. Son las 650 anteriores
+   más 19: `pendents_equip` (permitir ×2, denegar ×7), `progres_meves_ofertes` (×5) y la lectura
+   de `oferta_respuestas` por cuenta externa (×5: `denegar` en productor, `permitir` en receptor y
+   **en doble rol**, que ve por su ficha de entidad lo que ella misma contestó — un `denegar` ahí
+   habría sido rojo del check, no de la política).
+   ⚠️ Y la rama `rpc` del arnés **ahora cuenta filas**: hasta ese día daba por buena cualquier
+   llamada sin error, así que un puente que devolviera vacío salía verde igual que uno correcto.
+   Con `requiereFixture` sale saltada, y el flag `vacioEsDenegar` (solo `rpc`+`denegar`) declara
+   que «0 filas» es el rechazo esperado.
+   (La de antes era 650/650 + 13; la saltada que bajó fue `equip · documento_envios`, §12.53.)
    ⚠️ **El salto de 504 a 649 no es de checks nuevos, es de COBERTURA**: al dar de alta las cuentas
    `pendent` y `sense_rol` (deuda 32) empezaron a recorrerse dos bloques que llevaban desde julio
    escritos y sin ejecutar. Antes de leer un desfase de esta cifra, mirar cuántas **cuentas** tiene

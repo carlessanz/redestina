@@ -13,9 +13,13 @@ import { useConfirma } from './DialegConfirma'
 import { textoRecollidaConfirmada } from '../lib/textos'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
-import { conveniVigent } from '../lib/convenis'
+import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../lib/aprovarResposta'
+import { etiquetaEstatOferta, PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
+import { refrescaComptadors } from '../lib/pendentsEquip'
+import PasosProces from './proces/PasosProces'
+import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
-import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
+import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -41,6 +45,8 @@ interface AlbaraDelRegistre {
   numero_completo: string | null
   estado: string
   canalizacion_id: string | null
+  /** Para contar los días que lleva esperando la confirmación del productor. */
+  entregado_at: string | null
 }
 
 // Fila de oferta_respuestas con el nombre de la entidad (embed de PostgREST).
@@ -143,18 +149,21 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     void navigator.clipboard.writeText(texto).then(marcar)
   }, [t])
 
-  const recargar = useCallback(async () => {
+  // Devuelve el excedente recargado: quien acaba de aprobar necesita saber si con eso el
+  // estado ha pasado a `bloqueada`, y leer `exc` justo después daría el valor anterior.
+  const recargar = useCallback(async (): Promise<Excedente | null> => {
     const [e, c, a] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', excedente.id).single(),
       supabase.from('canalizaciones').select('*').eq('excedente_id', excedente.id).order('created_at', { ascending: true }),
       // ⚠️ La lista de columnas en UN literal (§7, deuda 46).
       supabase.from('albaranes')
-        .select('id, tipo, numero_completo, estado, canalizacion_id')
+        .select('id, tipo, numero_completo, estado, canalizacion_id, entregado_at')
         .eq('excedente_id', excedente.id),
     ])
     if (e.data) setExc(e.data)
     setCanalizaciones(c.data ?? [])
     setAlbarans((a.data as AlbaraDelRegistre[] | null) ?? [])
+    return e.data ?? null
   }, [excedente.id])
 
   useEffect(() => { void recargar() }, [recargar])
@@ -270,41 +279,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }
 
   /**
-   * ¿Falta algún convenio? Se pregunta ANTES de aprobar, no después.
+   * Aprobar una aceptación y convertirla en canalización.
    *
-   * `aprovar_resposta()` ya aplica la regla, pero desde la fecha de corte lo hace levantando
-   * `42501 sense_conveni` a mitad de operación, y antes de esa fecha el aviso sale por
-   * `raise notice`, que PostgREST descarta (deuda §12.78). O sea que sin esta consulta previa
-   * el equipo o no se entera de nada o se lleva un error opaco. La autoridad sigue siendo la
-   * RPC: esto solo decide si hay que avisar.
-   */
-  async function avisoConvenio(entidadId: string): Promise<string | null> {
-    const val = (exc.modalitat ?? 'donacio') as 'donacio' | 'venda' | 'maquila'
-    const falta: string[] = []
-    // `productor_id` es nullable: una oferta sin productor (no debería haberla, pero el tipo
-    // lo admite) no se puede comprobar, y callar es mejor que afirmar que falta el convenio.
-    if (exc.productor_id) {
-      const prod = await conveniVigent('productor', exc.productor_id, val, 'entrega')
-      if (prod.ok && prod.data === false) falta.push(t('od.conv_producer'))
-    }
-    const ent = await conveniVigent('entidad', entidadId, val, 'recibe')
-    if (ent.ok && ent.data === false) falta.push(t('od.conv_entity'))
-    return falta.length ? falta.join(' · ') : null
-  }
-
-  /**
-   * Aprobar una aceptación y convertirla en canalización, **en una sola transacción**.
-   *
-   * Antes esto eran cuatro escrituras sueltas (insert de canalización, update de la respuesta,
-   * update del excedente) sin transacción y **sin comprobar nada**. Como este es el único
-   * sitio desde el que el equipo aprueba, la comprobación de convenios que `aprovar_resposta()`
-   * sí hace no se estaba aplicando en la práctica: pasada `fecha_corte_convenios`, una
-   * canalización sin convenio entraba igual. No era deuda de elegancia (§12.19), era una regla
-   * de negocio sin aplicar.
-   *
-   * Lo único que se pierde por el camino es `canalizaciones.comentarios = 'Preu acordat: …'`,
-   * que la RPC no escribe. No lo lee nadie: el precio vive en `oferta_respuestas.preu_ofert`,
-   * que es su sitio, y ninguna pantalla pinta esa columna.
+   * La operación entera —la comprobación previa de convenios y la RPC transaccional— vive
+   * en `src/lib/aprovarResposta.ts`, porque el equipo también aprueba desde la cola de
+   * Aprovacions y dos copias de esto acabarían divergiendo justo en la comprobación
+   * (§12.19, §12.78). Aquí queda lo que es de esta pantalla: los dos diálogos y el refresco.
    */
   async function aprovarRespuesta(e: FormEvent<HTMLFormElement>, r: RespuestaConEntidad) {
     e.preventDefault()
@@ -317,7 +297,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       descripcio: t('od.over_alloc', { n: faltan }),
     }))) return
 
-    const falta = await avisoConvenio(r.entidad_id)
+    const falta = await comprovaConvenis(exc, r.entidad_id, t)
     if (falta && !(await confirma({
       titol: t('od.conv_missing_t'),
       descripcio: t('od.conv_missing', { parts: falta }),
@@ -325,25 +305,26 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
     const preuRaw = String(fd.get('preu') ?? '')
     const preu = preuRaw !== '' ? Number(preuRaw) : null
-    const { error } = await supabase.rpc('aprovar_resposta', {
-      p_resposta: r.id, p_kg: kg, p_preu: preu, p_motiu: null,
-    })
-    if (error) {
-      // `42501` llega por dos motivos distintos y el mensaje tiene que distinguirlos: no
-      // poder aprobar, o no haber convenio desde la fecha de corte.
-      const esConveni = (error.message ?? '').includes('sense_conveni')
-      toast.error(esConveni ? t('od.conv_blocked') : error.message)
+    const res = await aprovarResposta({ id: r.id, kg, preu })
+    if (!res.ok) {
+      toast.error(res.codi === 'sense_conveni' ? t('od.conv_blocked') : res.missatge)
       return
     }
     toast.success(t('od.approved'))
-    await recargar(); await recargarRespuestas()
+    const nou = await recargar()
+    await recargarRespuestas()
+    avisaSiCoberta(nou)
+    // Aprobar vacía una fila de la cola de Aprovacions: el badge del menú tiene que bajar
+    // sin esperar a la próxima navegación.
+    void refrescaComptadors()
   }
 
   async function rebutjarAprovacio(r: RespuestaConEntidad, motiu: string) {
-    await supabase.from('oferta_respuestas').update({
-      aprovacio: 'rebutjada', motiu_aprovacio: motiu || null, aprovat_at: new Date().toISOString(),
-    }).eq('id', r.id)
+    const res = await rebutjarResposta({ id: r.id, motiu })
+    if (!res.ok) { toast.error(res.missatge); return }
     await recargarRespuestas()
+    toast.success(t('od.rejected_ok'))
+    void refrescaComptadors()
   }
 
   /**
@@ -487,7 +468,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       await supabase.from('excedentes').update({ estado: 'parcial' }).eq('id', excedente.id)
     }
     form.reset()
-    await recargar()
+    const nou = await recargar()
+    avisaSiCoberta(nou)
+    void refrescaComptadors()
   }
 
   async function guardarKgReales(canalId: string, kgReales: number) {
@@ -499,6 +482,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     await supabase.from('excedentes').update({ estado: 'no_colocada', motivo_no_colocada: motivo }).eq('id', excedente.id)
     setNoColocada(false)
     await recargar()
+    // La oferta desaparece del listado de actives: sin este aviso, el único indicio de que
+    // ha pasado algo era que la pantalla cambiaba de estado.
+    toast.success(t('od.uncoll_ok'))
+    void refrescaComptadors()
   }
 
   async function cancelarOferta() {
@@ -510,10 +497,51 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     }))) return
     await supabase.from('excedentes').update({ estado: 'cancelada' }).eq('id', excedente.id)
     await recargar()
+    toast.success(t('od.cancel_ok'))
+    void refrescaComptadors()
   }
 
   const nombrePorId = (id: string | null) => ranking.find((e) => e.id === id)?.nombre ?? id ?? '—'
   const vencida = exc.disponible_hasta != null && new Date(exc.disponible_hasta) < new Date() && faltan > 0
+
+  /**
+   * Cubrir los kg hace aparecer de golpe el bloque «Recollida confirmada», que hasta ese
+   * momento no estaba en la pantalla. Sin decirlo, parece que la interfaz se ha movido sola.
+   */
+  function avisaSiCoberta(nou: Excedente | null) {
+    if (exc.estado !== 'bloqueada' && nou?.estado === 'bloqueada') toast.success(t('od.now_blocked'))
+  }
+
+  const interessades = respuestas.filter((r) => r.estado === 'acceptada').length
+  const perAprovar = respuestas.filter(
+    (r) => r.estado === 'acceptada' && r.aprovacio === 'pendent',
+  ).length
+  const diesEsperant = albaraRec?.entregado_at
+    ? Math.floor((Date.now() - new Date(albaraRec.entregado_at).getTime()) / 86_400_000)
+    : null
+
+  // Dónde está la oferta y qué toca. Lo decide `procesOferta.ts`, el mismo módulo que lo
+  // cuenta en el panel del productor: las dos pantallas no pueden discrepar sobre el punto
+  // en que está el mismo lote.
+  const punt = puntOferta({
+    estado: exc.estado,
+    kgTotal: total,
+    kgCanalitzats: canalizados,
+    nEnviades: respuestas.length,
+    nInteressades: interessades,
+    nPerAprovar: perAprovar,
+    albaraRec: albaraRec
+      ? {
+        estado: albaraRec.estado as EstadoAlbaran,
+        numero: albaraRec.numero_completo,
+        diesEsperant,
+      }
+      : null,
+    motiu: exc.motivo_no_colocada,
+    vencuda: vencida,
+  }, 'equip')
+  const foraDelCami = punt.index < 0
+  const estat = etiquetaEstatOferta(exc.estado)
 
   return (
     <div className="space-y-4">
@@ -524,9 +552,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h1 className="text-xl font-bold"><code>{exc.id_excedente}</code></h1>
-          <p className="text-sm text-muted-foreground">
-            {exc.producto}{exc.variedad ? ` · ${exc.variedad}` : ''} — {exc.estado}
-          </p>
+          <div className="flex flex-wrap items-center gap-2">
+            <p className="text-sm text-muted-foreground">
+              {exc.producto}{exc.variedad ? ` · ${exc.variedad}` : ''}
+            </p>
+            {/* Antes aquí salía `exc.estado` en crudo: el listado decía «No col·locada» y
+                la ficha de la misma oferta, «no_colocada». */}
+            <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estat.clase}`}>
+              {t(estat.key)}
+            </span>
+          </div>
           {exc.modalitat && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-xs font-semibold text-primary">
@@ -543,6 +578,20 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           <span className="text-sm text-muted-foreground">{faltan > 0 ? t('off.falten', { n: faltan }) : t('off.complet')}</span>
         </div>
       </div>
+
+      {/* Dónde está y qué toca. Va aquí arriba a propósito: es la pregunta con la que se
+          abre esta pantalla, y hasta hoy había que deducirla del estado y de los kg. */}
+      <Card>
+        <CardContent className="space-y-3 pt-6">
+          <PasosProces
+            etapes={PASSOS_OFERTA_CLAUS}
+            actual={punt.index}
+            sortida={foraDelCami ? punt.claus.titol : undefined}
+            destructiva={punt.etapa === 'cancellada'}
+          />
+          <QueTocaAra punt={punt} />
+        </CardContent>
+      </Card>
 
       {exc.texto_oferta && (
         <Card>
@@ -617,7 +666,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">{t('od.responses')}</CardTitle></CardHeader>
+        <CardHeader>
+          <CardTitle className="text-base">{t('od.responses')}</CardTitle>
+          {/* Dos badges en la misma fila, uno de la entidad y otro del equipo: sin esta
+              frase, «acceptada» se lee como «ya está hecho» y no cuenta ningún kilo. */}
+          <p className="mt-1 text-sm text-muted-foreground">{t('od.acc_vs_apr')}</p>
+        </CardHeader>
         <CardContent className="space-y-2">
           {respuestas.length === 0 && <p className="text-sm text-muted-foreground">{t('od.resp_none')}</p>}
           {respuestas.map((r) => {
@@ -753,11 +807,22 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         </Card>
       )}
 
+      {/* Las dos salidas del camino. Eran dos botones rojos sueltos al final de la página,
+          sin nada que dijera en qué se diferencian: las dos sacan la oferta del listado,
+          pero una cuenta en las estadísticas como intento fallido y la otra no. */}
       {exc.estado !== 'no_colocada' && exc.estado !== 'cerrada' && exc.estado !== 'cancelada' && (
-        <div className="flex flex-wrap gap-2">
-          <Button variant="destructive" onClick={() => setNoColocada(true)}>{t('od.mark_uncoll')}</Button>
-          <Button variant="destructive" onClick={() => void cancelarOferta()}>{t('od.cancel_offer')}</Button>
-        </div>
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">{t('od.close_title')}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">{t('od.close_help')}</p>
+          </CardHeader>
+          <CardContent className="flex flex-wrap gap-2">
+            <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
+              onClick={() => setNoColocada(true)}>{t('od.mark_uncoll')}</Button>
+            <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
+              onClick={() => void cancelarOferta()}>{t('od.cancel_offer')}</Button>
+          </CardContent>
+        </Card>
       )}
 
       <DialegMotiu

@@ -145,6 +145,41 @@
 //    tampoco se comprueba aquí que cerrar el cierre REAL exija `es_super_admin()`: haría
 //    falta una cabecera de verdad en la base. Eso lo verifican las pruebas SQL de
 //    20261109100300, dentro de una transacción con rollback.
+//
+// COLA DEL EQUIPO Y PROGRESO DE UNA OFERTA (20270323100000). Dos RPC nuevas, y con ellas
+// la primera afirmación del arnés sobre una función de AGREGACIÓN:
+//
+//   · `pendents_equip()` es de dentro. Cuenta registros pendientes, respuestas por
+//     aprobar, albaranes, productos sin coste del ejercicio y el estado del cierre
+//     abierto: cifras internas, aunque sean solo cifras. La comprueban en positivo el
+//     técnico y el super_admin, y en negativo los CINCO perfiles externos (va en
+//     `DOCUMENTAL_EXTERN`), incluidos `sense_rol` y `pendent`, que desde el 14-09-2026
+//     vuelven a tener cuenta y por tanto dejan de ser bloques sin recorrer (§12.32).
+//   · `progres_meves_ofertes()` es del generador: cuántas entidades han recibido, aceptado
+//     y esperan aprobación en cada oferta suya, **sin un solo nombre**. Un receptor no
+//     obtiene nada.
+//
+// ⚠️ Para que esos dos checks midieran algo hubo que enseñarle a la rama `rpc` a CONTAR
+//    FILAS. Hasta hoy daba por buena cualquier llamada que no diera error, así que un
+//    puente `security definer` que devolviera vacío salía verde igual que uno que
+//    devolviera lo suyo — y el `requiereFixture` de una `rpc` era decorativo. Ahora «0
+//    filas» se lee con el mismo criterio que en un `select`: saltada si falta el fixture,
+//    y denegación cuando el check lo declara con `vacioEsDenegar`.
+//
+// 🔴 «CUÁNTAS, SIN NOMBRES» (20270324100000). La política de SELECT de `oferta_respuestas`
+//    le daba al generador `entidad_id`, `telefono` y `preu_ofert` de cada respuesta a sus
+//    ofertas —rama heredada de `20260730098000`, que arreglaba una recursión y no una
+//    política—. Ninguna pantalla lo pedía, así que era un permiso ancho que nadie usaba.
+//    Retirada esa rama, hay tres checks nuevos y cada uno afirma una cosa distinta:
+//
+//      · `productor` → **denegar**. Es el decisivo: esas dos cuentas no tienen ficha de
+//        entidad, así que el resultado limpio es cero. (En un `leer`, «denegar» ya
+//        significa 0 filas: RLS filtra sin dar error.)
+//      · `receptor`  → **permitir**. La otra cara: al estrechar había que no llevarse por
+//        delante la rama `mis_entidades()`, que es la que sostiene `Mercat` e `Interessos`.
+//      · `doble_rol` → **permitir**, y aquí NO cabía un «denegar»: esa cuenta tiene las dos
+//        fichas y sigue viendo, como receptora, lo que ella misma ha contestado. El arnés
+//        cuenta filas, no su procedencia.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -207,14 +242,34 @@ interface Check {
   /** Solo para `rpc`: nombre de la función si no coincide con `tabla`. */
   rpc?: string;
   /**
-   * Solo para `leer`+`permitir`: qué fixture hace falta para que esta comprobación
-   * signifique algo. Con RLS activa, **0 filas es indistinguible** de «la política me
-   * bloquea» y de «no hay nada que ver»: el `select` no da error, simplemente filtra.
-   * Así que cuando no hay datos esto se marca SALTADA, no FALLA — afirmar un fallo de
-   * permisos sería afirmar más de lo que se sabe. El texto dice qué crear para
+   * Para `leer`+`permitir` y para `rpc`+`permitir`: qué fixture hace falta para que esta
+   * comprobación signifique algo. Con RLS activa, **0 filas es indistinguible** de «la
+   * política me bloquea» y de «no hay nada que ver»: el `select` no da error, simplemente
+   * filtra. Así que cuando no hay datos esto se marca SALTADA, no FALLA — afirmar un fallo
+   * de permisos sería afirmar más de lo que se sabe. El texto dice qué crear para
    * recuperar la cobertura, y sale en el informe.
+   *
+   * ⚠️ Hasta el 14-09-2026 solo valía para `leer`: en una `rpc` se declaraba y no lo
+   *    consultaba nadie, porque esa rama no miraba cuántas filas volvían y daba por
+   *    buena cualquier llamada que no diera error. Con los puentes por organización
+   *    (`pendents_meus`, `progres_meves_ofertes`) eso deja de ser aceptable: son
+   *    exactamente el caso en el que 0 filas puede ser «no es mío» o «no hay nada».
    */
   requiereFixture?: string;
+  /**
+   * Solo para `rpc`+`denegar`: devolver **cero filas** cuenta como denegación, además
+   * del rechazo con error que es lo normal. Es la misma convención que ya rige en `leer`
+   * («denegar» ahí significa 0 filas, porque RLS filtra en vez de dar error), y hace
+   * falta para los puentes `security definer` que resuelven «lo mío» por organización:
+   * `progres_meves_ofertes()` no levanta 42501 a un receptor, le devuelve el conjunto
+   * vacío que le corresponde. Lo que se quiere afirmar —«no obtiene nada de otro»— es el
+   * resultado, no el mecanismo, así que el check pasa con las dos formas.
+   *
+   * No es el valor por defecto a propósito: en el resto de las RPC, una que debía
+   * rechazar y devuelve vacío es un fallo, y darlo por bueno en silencio taparía
+   * justamente la guarda que falta.
+   */
+  vacioEsDenegar?: boolean;
   /**
    * Solo para `rpc`: argumentos. El valor literal "@meva_membresia" se sustituye en
    * tiempo de ejecución por el id de la propia membresía —y por el uuid nulo si la
@@ -311,6 +366,17 @@ const DOCUMENTAL_EXTERN: Check[] = [
     op: "rpc",
     esperado: "permitir",
     descripcion: "SÍ pot consultar què té pendent de signar o confirmar",
+  },
+  // La cola de trabajo del equipo NO es de nadie más (20270323100000). Cuenta registros
+  // pendientes, respuestas por aprobar, albaranes, costes que faltan y el estado del cierre
+  // abierto: son cifras internas, y la guarda es `auth.uid() is not null and not es_intern()`,
+  // así que a una cuenta externa le responde 42501. Lo heredan los cinco perfiles externos,
+  // incluidos `sense_rol` y `pendent`, que desde el 14-09-2026 vuelven a tener cuenta.
+  {
+    tabla: "pendents_equip",
+    op: "rpc",
+    esperado: "denegar",
+    descripcion: "NO veu la cua de treball de l'equip",
   },
   // Y no puede acuñar un enlace de un objeto que no es suyo. El uuid inventado no existe,
   // así que lo que se comprueba es que la guarda de pertenencia corta con 42501 ANTES de
@@ -825,6 +891,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // La consulta sí la puede hacer: devuelve las de SUS organizaciones, y el equipo no
     // tiene ninguna, así que son 0 filas. Lo que se comprueba es que no dé 42501.
     { tabla: "pendents_meus", op: "rpc", esperado: "permitir", descripcion: "consulta els seus pendents (cap, no té organització)" },
+    // La cola de trabajo consolidada (20270323100000). Devuelve SIEMPRE una fila por cola
+    // —doce— aunque todas valgan 0, así que aquí no cabe ninguna saltada: si alguna vez
+    // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
+    // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
+    // leer; lo que se comprueba es que la guarda le deja pasar.
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -1004,6 +1076,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "Comprobación del arnés de RLS" },
       descripcion: "pot resoldre un conveni (autoritza; el conveni no existeix)",
     },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
     {
       tabla: "convenios",
       op: "leer",
@@ -1031,6 +1104,42 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
     { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
+    // 🔴 Y NO las lee directamente (20270324100000). Hasta esa migración sí podía: la
+    //    política de SELECT traía desde `20260730098000` la rama
+    //    `excedente_id in (select excedents_dels_meus_productors())`, y con el GRANT por
+    //    tabla eso le daba `entidad_id`, `telefono` y `preu_ofert` de cada respuesta.
+    //    Medido contra producción el 14-09-2026: TEST-PROD-1 veía tres filas. Ninguna
+    //    pantalla lo pedía, así que era un permiso ancho que nadie usaba — la clase de
+    //    cosa que solo sale si alguien la mira.
+    //    `denegar` en un `leer` significa ya «0 filas», que es como deniega una política
+    //    (no hay error: RLS filtra). No hace falta `vacioEsDenegar`, que es el flag de las
+    //    `rpc`, donde sí había que decidirlo.
+    //    ⚠️ Este check FALLA mientras 20270324100000 no esté aplicada, y eso es lo
+    //       correcto: es su prueba.
+    {
+      tabla: "oferta_respuestas",
+      op: "leer",
+      esperado: "denegar",
+      descripcion: "NO llegeix qui s'ha interessat per les seves ofertes (només l'agregat)",
+    },
+    // El embudo de SUS ofertas (20270323100000): cuántas entidades la han recibido, la han
+    // aceptado y esperan aprobación. Devuelve una fila por oferta ACTIVA, así que sin
+    // ninguna activa son 0 filas y eso no prueba nada: de ahí el `requiereFixture`.
+    //
+    // ⚠️ Lo que este check NO afirma, y conviene no leerlo de más: que la RPC no devuelva
+    //    nombres. Eso lo garantiza su tipo de retorno —cuatro columnas, ninguna con
+    //    `entidad_id`—, no una política, así que romperlo exigiría cambiar la firma. Y
+    //    tampoco afirma que el productor no pueda llegar a esos nombres por otro camino:
+    //    la política de SELECT de `oferta_respuestas` (20260730098000) se los da hoy
+    //    directamente por PostgREST. Es una decisión abierta, no algo que esta migración
+    //    haya cerrado.
+    {
+      tabla: "progres_meves_ofertes",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "veu quantes entitats s'han interessat per les SEVES ofertes",
+      requiereFixture: "alguna oferta activa (borrador/publicada/parcial/bloquejada) de la seva ficha (scripts/crear-datos-documentales-prueba.ts)",
+    },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
     // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
@@ -1165,6 +1274,32 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "puede llamar al puente de modalidades compatibles (lo usa su propia RLS)",
     },
+    // La otra cara de 20270324100000: al estrechar la política había que asegurarse de no
+    // llevarse por delante la rama `mis_entidades()`, que es la que deja a una entidad ver
+    // lo que ELLA ha contestado (`Mercat` e `Interessos` la usan). Sin este check, un
+    // `using (es_intern())` de más se vería como «todo bien».
+    {
+      tabla: "oferta_respuestas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu les respostes on la SEVA entitat és la receptora",
+      requiereFixture: "alguna resposta de la seva entitat (scripts/crear-respuestas-prueba.ts)",
+    },
+    // El embudo de ofertas es del GENERADOR, y un receptor no tiene ninguna: la RPC
+    // resuelve por `mis_productores()`, que aquí está vacío, así que devuelve el conjunto
+    // vacío. **No levanta 42501 a propósito** —mismo criterio que `pendents_meus()` y
+    // `documents_meus()`: un puente por organización responde «nada tuyo», no un error, y
+    // así una cuenta que pierde su ficha de productor deja de ver datos sin que la pantalla
+    // se rompa—. Por eso el check lleva `vacioEsDenegar`: lo que se afirma es el resultado
+    // («no obté res de ningú altre»), no el mecanismo, y pasaría igual si algún día se
+    // decidiera que sí levante.
+    {
+      tabla: "progres_meves_ofertes",
+      op: "rpc",
+      esperado: "denegar",
+      vacioEsDenegar: true,
+      descripcion: "NO veu el progrés de les ofertes d'altri (no té fitxa de productor)",
+    },
     { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "oferta_respuestas", op: "insertar", esperado: "denegar", descripcion: "NO escribe respuestas a mano (van por RPC)" },
@@ -1282,6 +1417,32 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
     { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
     { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
+    // ⚠️ AQUÍ NO CABE UN «denegar», aunque 20270324100000 le retire la rama de productor:
+    //    esta cuenta tiene TAMBIÉN ficha de entidad, y por `mis_entidades()` sigue viendo
+    //    las respuestas que ha dado ELLA. Medido el 14-09-2026: su entidad tiene 2
+    //    respuestas y sus ofertas tienen otras 2; después de la migración ve las 2
+    //    primeras y ninguna de las segundas. El arnés no sabe distinguir las dos
+    //    procedencias —cuenta filas, no su origen—, así que lo que aquí se afirma es que
+    //    la rama de receptor SIGUE viva; que la de productor ha muerto lo afirman los dos
+    //    checks del bloque `productor`, donde sí es decisivo (esas cuentas no tienen
+    //    ficha de entidad y por tanto el resultado limpio es cero).
+    {
+      tabla: "oferta_respuestas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu les respostes de la seva ENTITAT (no les de les seves ofertes)",
+      requiereFixture: "alguna resposta de la ficha de entidad de esta cuenta (scripts/crear-respuestas-prueba.ts)",
+    },
+    // Ve el embudo de las ofertas de su ficha de PRODUCTOR, y solo de esa: tener además
+    // ficha de entidad no le añade ninguna oferta. Con `requiereFixture` porque esa ficha
+    // es real y puede no tener ninguna oferta activa.
+    {
+      tabla: "progres_meves_ofertes",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "veu el progrés de les ofertes de la SEVA fitxa de productor",
+      requiereFixture: "alguna oferta activa de la ficha de productor de esta cuenta",
+    },
     ...DOCUMENTAL_EXTERN,
     // Su ficha de productor y su ficha de entidad no le dan más albaranes que los de esas
     // dos organizaciones. Hoy las cuentas de doble rol cuelgan de fichas reales, que no
@@ -1558,7 +1719,7 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
 
   if (check.op === "rpc") {
     const funcion = check.rpc ?? check.tabla;
-    const { error } = await cliente.rpc(funcion, await resolverArgs(cliente, check.args ?? {}));
+    const { data, error } = await cliente.rpc(funcion, await resolverArgs(cliente, check.args ?? {}));
     if (error) {
       if (esRechazo(error)) {
         return { ok: check.esperado === "denegar", detalle: `rechazado (${error.code ?? "42501"})` };
@@ -1579,7 +1740,21 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       }
       return { ok: check.esperado === "permitir", detalle: "ejecutada (y limpiada)" };
     }
-    return { ok: check.esperado === "permitir", detalle: "ejecutada" };
+    // Cuántas filas ha devuelto, cuando devuelve un conjunto. Sin esto, una RPC que
+    // responde vacío era indistinguible de una que responde lo esperado, y las dos salían
+    // «ejecutada» en verde: es lo que dejaba sin efecto el `requiereFixture` de una `rpc`
+    // y lo que impedía afirmar que un puente por organización no le da nada a quien no es
+    // de esa organización. Una RPC escalar (`data_tall_convenis`) no devuelve array y se
+    // queda como estaba.
+    const filas = Array.isArray(data) ? data.length : null;
+    if (filas === 0) {
+      const esperadoAqui = check.vacioEsDenegar ? "denegar" : "permitir";
+      return { ok: check.esperado === esperadoAqui, detalle: "0 filas (ejecutada)" };
+    }
+    return {
+      ok: check.esperado === "permitir",
+      detalle: filas === null ? "ejecutada" : `ejecutada (${filas} filas)`,
+    };
   }
 
   return { ok: true, detalle: "operación no implementada (saltada)" };
@@ -1647,8 +1822,10 @@ for (const cuenta of ordenadas) {
     // `vacias` cubre la tabla entera sin filas; `requiereFixture`, el subconjunto que esta
     // cuenta debería ver y que hoy no existe (p. ej. un receptor comercial cuando no hay
     // ninguna oferta de venda publicada: `excedentes` tiene filas, pero ninguna suya).
-    const sinDatos = check.op === "leer" && check.esperado === "permitir" &&
-      detalle.startsWith("0 filas");
+    // `rpc` entra aquí desde el 14-09-2026: un puente por organización que devuelve vacío
+    // es el mismo caso que un `select` filtrado por RLS, y merece la misma lectura.
+    const sinDatos = (check.op === "leer" || check.op === "rpc") &&
+      check.esperado === "permitir" && detalle.startsWith("0 filas");
     const saltada = (check.op === "leer" && check.esperado === "permitir" &&
       vacias.has(check.tabla)) || (sinDatos && check.requiereFixture !== undefined);
     resultados.push({ cuenta: cuenta.etiqueta, rol: cuenta.rol, check, ok: saltada ? true : ok, saltada, detalle });
