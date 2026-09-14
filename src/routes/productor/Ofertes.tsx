@@ -4,7 +4,7 @@
 // una segunda fuente de datos ni una copia del estado. El progreso y los badges
 // reutilizan el mismo criterio visual que OffersList.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { PlusCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
@@ -37,6 +37,19 @@ function useMevesOfertes(productorId: string | null) {
   const [kg, setKg] = useState<Record<string, number>>({})
   const [carregant, setCarregant] = useState(true)
 
+  /**
+   * Los ids de mis ofertas, para poder decidir si un evento de `canalizaciones` me toca.
+   * En una `ref` y no en el estado: solo lo lee el manejador de Realtime, y meterlo en las
+   * dependencias del efecto lo volvería a suscribir con cada recarga.
+   */
+  const meusIds = useRef<Set<string>>(new Set())
+
+  /** ¿Esta fila de `canalizaciones` cuelga de una de mis ofertas? */
+  function esMeva(fila: Record<string, unknown> | undefined): boolean {
+    const id = fila?.excedente_id
+    return typeof id === 'string' && meusIds.current.has(id)
+  }
+
   const carrega = useCallback(async () => {
     if (!productorId) { setCarregant(false); return }
     const { data } = await supabase
@@ -45,6 +58,7 @@ function useMevesOfertes(productorId: string | null) {
       .order('created_at', { ascending: false })
     const files = (data ?? []) as Excedente[]
     setOfertes(files)
+    meusIds.current = new Set(files.map((o) => o.id))
     setKg(await kgPerOferta(files.map((o) => o.id)))
     setCarregant(false)
   }, [productorId])
@@ -57,11 +71,26 @@ function useMevesOfertes(productorId: string | null) {
       .on('postgres_changes',
         { event: '*', schema: 'public', table: 'excedentes', filter: `productor_id=eq.${productorId}` },
         () => void carrega())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'canalizaciones' },
+      // ⚠️ `canalizaciones` NO tiene `productor_id`, así que no se puede acotar con el
+      // `filter` del servidor como su hermana de arriba: un filtro de Realtime es una sola
+      // comparación sobre una columna de la propia tabla. Lo que sí sabe la fila es de qué
+      // excedente es, así que el evento se descarta aquí cuando no es de ninguna de mis
+      // ofertas — antes, la canalización de cualquier productor recargaba la pantalla de
+      // todos los que tuvieran la suya abierta (§12.5).
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'canalizaciones' },
+        (payload) => { if (esMeva(payload.new)) void carrega() })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'canalizaciones' },
+        (payload) => { if (esMeva(payload.new) || esMeva(payload.old)) void carrega() })
+      // El DELETE se queda sin guarda a propósito: con la replica identity por defecto solo
+      // viaja la clave primaria (§12.24), así que no hay `excedente_id` con el que decidir.
+      // Borrar una canalización es excepcional; una recarga de más no hace daño, y perderse
+      // la que sí era mía dejaría los kilos mal en pantalla.
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'canalizaciones' },
         () => void carrega())
       .subscribe()
     return () => { void supabase.removeChannel(canal) }
   }, [carrega, productorId])
+
 
   return { ofertes, kg, carregant }
 }

@@ -365,12 +365,35 @@ export interface Documento {
   fichero_at: string | null
 }
 
+/**
+ * ⚠️ Este tipo se quedó en la versión de `20260928100200` y describía mal la tabla desde
+ * que `20270307100000` la generalizó: entonces dejó de ser «los envíos de un documento»
+ * para ser **el rastro de TODOS los correos** (accesos, recuperaciones, ofertas, el código
+ * de firma), con `documento_id` nullable. Corregido el 14-09-2026 al estrenar la pantalla
+ * que la lee (deuda §12.25).
+ *
+ * ⚠️ **No guarda el asunto, y es deliberado**: el correo del código de firma lleva las seis
+ * cifras en el propio `subject`, y esta tabla la lee todo el equipo (§12.25).
+ */
 export interface DocumentoEnvio {
   id: string
-  documento_id: string
+  /** Nullable desde 20270307100000: la mayoría de los correos no llevan documento. */
+  documento_id: string | null
+  /** El objeto del dominio al que se refiere, polimórfico y sin FK. */
+  objeto_tipo: string | null
+  objeto_id: string | null
+  /**
+   * Para qué se mandó: `oferta`, `oferta_confirmacio`, `missatge`, `acces`, `recuperacio`,
+   * `document`, `codi_firma`… Es texto libre, cada Edge Function pone el suyo, así que la
+   * pantalla enseña en crudo el que no conozca en vez de inventarle una traducción.
+   */
+  proposito: string
+  /** Qué Edge Function lo mandó: por dónde empezar a mirar cuando algo no sale. */
+  funcion: string | null
   destinatario: string
   canal: 'email'
-  estado: 'pendent' | 'enviat' | 'error'
+  /** `simulat` = `RESEND_ENVIO_REAL` apagado: no salió, y no es un fallo (§10). */
+  estado: 'pendent' | 'enviat' | 'simulat' | 'error'
   proveedor_id: string | null
   error: string | null
   enviado_at: string | null
@@ -423,7 +446,14 @@ export interface EnlaceToken {
   objeto_id: string
   destinatario_email: string | null
   destinatario_nombre: string | null
-  canal: 'email' | 'asistido'
+  /** `panel` desde 20270318100000: lo acuña el propio titular con su sesión, y caduca en 1 h. */
+  canal: 'email' | 'asistido' | 'panel'
+  /**
+   * De qué parte del albarán es este enlace (20270304100200). **Nulo en los anteriores, y
+   * no se rellenan**: en REC y ENT la parte se deduce del tipo, y un dato inventado en una
+   * tabla de evidencia vale menos que un hueco (§4).
+   */
+  rol_parte: 'entrega' | 'recibe' | null
   codigo_caduca_at: string | null
   caduca_at: string
   abierto_at: string | null

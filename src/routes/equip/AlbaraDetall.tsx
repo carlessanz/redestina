@@ -88,6 +88,17 @@ interface EnllacFila {
   estado: string
   caduca_at: string
   usado_at: string | null
+  /**
+   * De qué parte del albarán es este enlace (deuda §12.68). En un OPE hay DOS —el
+   * generador entrega, la entidad recibe— y sin esto se pintaban idénticos salvo por el
+   * destinatario.
+   *
+   * ⚠️ `null` en los enlaces anteriores a `20270304100200`, y **no se rellenan**: en REC y
+   * ENT la parte se deduce del tipo del albarán, pero en un OPE viejo no hay de dónde
+   * sacarla. Ahí se queda sin etiqueta, que es lo honesto — un dato inventado en una tabla
+   * de evidencia vale menos que un hueco (§4).
+   */
+  rol_parte: 'entrega' | 'recibe' | null
 }
 
 const BUIDA: LiniaForm = {
@@ -216,7 +227,7 @@ export default function AlbaraDetall() {
         .eq('objeto_tipo', 'albaran').eq('objeto_id', id)
         .order('created_at', { ascending: false }),
       supabase.from('enlaces_token')
-        .select('id, destinatario_email, destinatario_nombre, estado, caduca_at, usado_at')
+        .select('id, destinatario_email, destinatario_nombre, estado, caduca_at, usado_at, rol_parte')
         .eq('objeto_tipo', 'albaran').eq('objeto_id', id)
         .order('created_at', { ascending: false }),
     ])
@@ -779,7 +790,14 @@ export default function AlbaraDetall() {
           {enllacos.length === 0 && <p className="text-sm text-muted-foreground">{t('alb.no_links')}</p>}
           {enllacos.map((e) => (
             <div key={e.id} className="border-b pb-2 text-sm">
-              <p className="font-medium">{e.destinatario_nombre || e.destinatario_email || '—'}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="font-medium">{e.destinatario_nombre || e.destinatario_email || '—'}</p>
+                {/* Sin `rol_parte` no se pone nada: es un enlace anterior a la migración
+                    y en un OPE la parte no se puede deducir (§12.68). */}
+                {e.rol_parte && (
+                  <Badge variant="outline">{t(`alb.part_${e.rol_parte}`)}</Badge>
+                )}
+              </div>
               <p className="text-muted-foreground">
                 {t(`alb.lk_${e.estado}`)} · {t('alb.expires', { date: dataCurta(e.caduca_at) })}
               </p>

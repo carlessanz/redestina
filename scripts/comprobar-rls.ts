@@ -223,7 +223,22 @@ interface Check {
    * Solo para `rpc`+`permitir`: función que deshace lo que la comprobación acaba de
    * crear. Una RPC que se espera que funcione **hace algo**, y el arnés no puede dejar
    * rastro: `emitir_documento_prova` emite un documento de verdad, así que se limpia
-   * con `reiniciar_documentos_prova` (que solo toca `modo = 'prueba'`, §documental).
+   * con `reiniciar_documentos_prova`.
+   *
+   * ⚠️ Esa limpieza corre **contra la base real** (§7: no hay base local) y hasta
+   * `20270319100000` borraba `where modo = 'prueba'` a secas, o sea TODO lo que hubiera
+   * en modo prueba. Eso no era la salvaguarda, era el problema: lo que el arnés podía
+   * llevarse por delante es **el ensayo de cierre de diciembre**, que sí emite en modo
+   * prueba (series `P-RES`, `P-CD`, `P-CT`, `P-CDP`) y tiene su propia limpieza
+   * —`reiniciar_cierre_prueba()` y `reiniciar_periodes_prova()`—. Desde esa migración el
+   * borrado va acotado a las series que esta RPC posee (`PROVA`, y `P-CT` mientras nadie
+   * más devuelva su contador a 0), así que una pasada del arnés en mitad de un ensayo ya
+   * no lo destruye, y no puede alcanzar ningún documento de una serie legal.
+   *
+   * El fixture de `crear-datos-documentales-prueba.ts` nunca estuvo en peligro, dicho
+   * sea para que nadie lo vuelva a diagnosticar mal: sus albaranes son `modo = 'real'`
+   * (`emitir_albaran()` lo inserta literal) y su cierre de prueba se calcula pero no se
+   * emite, así que hoy este borrado alcanza cero filas.
    */
   limpiar?: string;
   /** Argumentos de `limpiar`, cuando la función de limpieza los necesita. */
@@ -756,6 +771,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "series_documentales", op: "leer", esperado: "permitir", descripcion: "ve los contadores de serie" },
     // La emite de verdad y se limpia acto seguido: es la única comprobación del arnés
     // que ejercita el circuito documental entero (número + snapshot + ruta).
+    // La limpieza solo alcanza las series que esa RPC posee (`PROVA` y `P-CT`, desde
+    // `20270319100000`), así que el arnés es inocuo para un ensayo de cierre en curso y
+    // no deja hueco en ninguna serie legal. Ver `limpiar` arriba.
     {
       tabla: "emitir_documento_prova",
       op: "rpc",

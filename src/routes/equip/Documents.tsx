@@ -21,6 +21,20 @@
 // (firma de convenios). Preferimos una pestaña que diga honestamente que aún no hay
 // enlaces a una consulta contra una tabla que no existe, que llenaría la pantalla de un
 // error de PostgREST.
+//
+// «Enviaments» (deuda §12.25) lee `documento_envios`, que `sendEmail()` escribe con
+// `service_role` desde julio y que **no leía ninguna pantalla**: un correo rechazado por
+// Resend era, desde aquí, indistinguible de uno que llegó. Dos avisos que conviene tener
+// delante antes de tocarla:
+//
+//   · **No es la pestaña «Amb error».** Aquella son los PDF que no se han podido GENERAR
+//     (`documentos.estado`); esta son los correos que no han podido SALIR
+//     (`documento_envios.estado`). Un documento puede estar perfectamente emitido y su
+//     correo haber fallado, y al revés. Los textos de las dos lo dicen.
+//   · **`documento_envios` NO guarda el asunto, y es deliberado** (§12.25): el correo del
+//     código de firma asistida lleva las seis cifras dentro del `subject`, y esta tabla la
+//     lee todo el equipo. Con destinatario, propósito, estado y error se contesta la única
+//     pregunta que hay que contestar —«¿este correo salió?»— sin publicar una credencial.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Download, Loader2 } from 'lucide-react'
@@ -62,6 +76,69 @@ const CLAU_ESTAT: Record<DocumentoEstado, string> = {
 }
 
 /**
+ * Un correo registrado en `documento_envios`.
+ *
+ * No sale de `types.ts` porque el tipo `DocumentoEnvio` que hay allí es anterior a la
+ * migración `20270307100000`, que generalizó la tabla: le faltan `objeto_tipo`,
+ * `objeto_id`, `proposito` y `funcion`, `documento_id` ya no es obligatorio y `estado`
+ * admite `simulat`. Se declara aquí lo que esta pantalla necesita, y el bloque para
+ * `types.ts` va en el informe — ese fichero lo toca la sesión que orquesta.
+ */
+interface Enviament {
+  id: string
+  documento_id: string | null
+  destinatario: string
+  estado: 'pendent' | 'enviat' | 'simulat' | 'error'
+  proposito: string
+  funcion: string | null
+  error: string | null
+  enviado_at: string | null
+  created_at: string
+}
+
+/** Solo se traen los últimos: la tabla crece con cada correo y no se pagina (§12.5). */
+const MAX_ENVIAMENTS = 200
+
+/**
+ * Estado del ENVÍO, que no es el del documento.
+ *
+ * `simulat` va en neutro y no en rojo a propósito: con `RESEND_ENVIO_REAL` apagado el
+ * correo no sale, pero eso no es un fallo — es el interruptor haciendo su trabajo (§10).
+ */
+const ESTIL_ENVIAMENT: Record<Enviament['estado'], string> = {
+  enviat: 'bg-exito-fondo text-exito',
+  pendent: 'bg-aviso-fondo text-aviso',
+  simulat: 'bg-secondary text-secondary-foreground',
+  error: 'bg-error-fondo text-error',
+}
+
+const CLAU_ENVIAMENT: Record<Enviament['estado'], string> = {
+  enviat: 'doc.se_enviat',
+  pendent: 'doc.se_pendent',
+  simulat: 'doc.se_simulat',
+  error: 'doc.se_error',
+}
+
+/**
+ * Para qué se escribió cada correo. Es un `text` libre en la base —cada Edge Function pone
+ * el suyo—, así que lo que no esté aquí se enseña **en crudo** en vez de traducirse a una
+ * clave inventada: un propósito nuevo aparecerá tal cual y se añade cuando se vea.
+ */
+const CLAU_PROPOSIT: Record<string, string> = {
+  oferta: 'doc.pr_oferta',
+  oferta_confirmacio: 'doc.pr_oferta_confirmacio',
+  missatge: 'doc.pr_missatge',
+  acces: 'doc.pr_acces',
+  recuperacio: 'doc.pr_recuperacio',
+  document: 'doc.pr_document',
+  avis_rebuig: 'doc.pr_avis_rebuig',
+  avis_firma: 'doc.pr_avis_firma',
+  codi_firma: 'doc.pr_codi_firma',
+  recordatori_equip: 'doc.pr_recordatori_equip',
+  recordatori_factura: 'doc.pr_recordatori_factura',
+}
+
+/**
  * ¿Este error lo reportó la función, o murió sin decir nada?
  *
  * `marcar_documento_error()` SIEMPRE sube `intentos`, así que un error con `intentos = 0`
@@ -82,6 +159,14 @@ function data(iso: string): string {
   return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
 }
 
+/** Con hora: de un correo importa el momento, no solo el día. */
+function dataHora(iso: string): string {
+  const d = new Date(iso)
+  return d.toLocaleString('es-ES', {
+    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
+  })
+}
+
 function casa(d: Fila, q: string): boolean {
   if (!q) return true
   const camps = [d.numero_completo, d.tipo, d.subtipo, d.serie, String(d.ejercicio)]
@@ -92,6 +177,7 @@ export default function Documents() {
   const { t } = useT()
   const [documents, setDocuments] = useState<Fila[]>([])
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
+  const [enviaments, setEnviaments] = useState<Enviament[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cerca, setCerca] = useState('')
@@ -135,6 +221,24 @@ export default function Documents() {
         .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
         .in('estado', ['emitido', 'entregado', 'confirmado'])
       if (!cancelled) setAlbarans((data as AlbaranBandeja[] | null) ?? [])
+    })()
+    return () => { cancelled = true }
+  }, [])
+
+  // Los correos, también aparte y también fail-soft: si la migración que generalizó
+  // `documento_envios` no está aplicada, PostgREST responde `42703` por las columnas
+  // nuevas y lo único que pasa es que esta pestaña sale vacía.
+  useEffect(() => {
+    let cancelled = false
+    void (async () => {
+      // ⚠️ Lista de columnas en UN literal (§7). No se pide el asunto porque la tabla
+      // NO lo guarda, y es deliberado (§12.25).
+      const { data: files } = await supabase
+        .from('documento_envios')
+        .select('id, documento_id, destinatario, estado, proposito, funcion, error, enviado_at, created_at')
+        .order('created_at', { ascending: false })
+        .limit(MAX_ENVIAMENTS)
+      if (!cancelled) setEnviaments((files as Enviament[] | null) ?? [])
     })()
     return () => { cancelled = true }
   }, [])
@@ -212,6 +316,27 @@ export default function Documents() {
             && Number(a.kg_confirmados) !== Number(a.kg_neto))),
     }
   }, [albarans, cerca])
+
+  /** El número del documento asociado, si lo hay: ya está cargado, no hace falta un join. */
+  const numeroPerDocument = useMemo(() => {
+    const m = new Map<string, string>()
+    for (const d of documents) if (d.numero_completo) m.set(d.id, d.numero_completo)
+    return m
+  }, [documents])
+
+  const enviamentsFiltrats = useMemo(() => {
+    const q = cerca.trim().toLowerCase()
+    if (!q) return enviaments
+    return enviaments.filter((e) => [
+      e.destinatario, e.proposito, e.funcion,
+      e.documento_id ? numeroPerDocument.get(e.documento_id) : null,
+    ].some((c) => (c ?? '').toLowerCase().includes(q)))
+  }, [enviaments, cerca, numeroPerDocument])
+
+  const enviamentsAmbError = useMemo(
+    () => enviamentsFiltrats.filter((e) => e.estado === 'error').length,
+    [enviamentsFiltrats],
+  )
 
   function taula(llista: Fila[], buitKey: string) {
     if (llista.length === 0) {
@@ -343,6 +468,65 @@ export default function Documents() {
     )
   }
 
+  /** Los correos: quién, para qué, por dónde salió y si salió. */
+  function taulaEnviaments() {
+    if (enviamentsFiltrats.length === 0) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          {t(enviaments.length === 0 ? 'doc.empty_sends' : 'doc.no_match_sends')}
+        </p>
+      )
+    }
+    return (
+      <div className="overflow-x-auto">
+        <Table>
+          <TableHeader>
+            <TableRow>
+              <TableHead>{t('doc.c_date')}</TableHead>
+              <TableHead>{t('doc.c_to')}</TableHead>
+              <TableHead>{t('doc.c_purpose')}</TableHead>
+              <TableHead>{t('doc.c_function')}</TableHead>
+              <TableHead>{t('doc.c_document')}</TableHead>
+              <TableHead>{t('doc.c_status')}</TableHead>
+            </TableRow>
+          </TableHeader>
+          <TableBody>
+            {enviamentsFiltrats.map((e) => {
+              const numero = e.documento_id ? numeroPerDocument.get(e.documento_id) : null
+              return (
+                <TableRow key={e.id}>
+                  <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
+                    {dataHora(e.enviado_at ?? e.created_at)}
+                  </TableCell>
+                  <TableCell className="font-medium break-all">{e.destinatario}</TableCell>
+                  <TableCell>
+                    <Badge variant="outline">
+                      {CLAU_PROPOSIT[e.proposito] ? t(CLAU_PROPOSIT[e.proposito]) : e.proposito}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-muted-foreground">{e.funcion ?? '—'}</TableCell>
+                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                    {/* Sin número no se inventa nada: la mayoría de los correos no llevan
+                        documento, y el `documento_id` de los que lo llevan puede apuntar a
+                        uno que ya no está (la FK es `on delete cascade`, pero la fila del
+                        envío se va con él). */}
+                    {numero ?? '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge className={ESTIL_ENVIAMENT[e.estado]}>{t(CLAU_ENVIAMENT[e.estado])}</Badge>
+                    {e.estado === 'error' && e.error && (
+                      <p className="mt-1 max-w-xs text-xs text-error">{e.error}</p>
+                    )}
+                  </TableCell>
+                </TableRow>
+              )
+            })}
+          </TableBody>
+        </Table>
+      </div>
+    )
+  }
+
   const buitKey = documents.length === 0 ? 'doc.empty' : 'doc.no_match'
 
   return (
@@ -371,6 +555,7 @@ export default function Documents() {
                 <TabsTrigger value="error">{t('doc.tab_error', { n: ambError.length })}</TabsTrigger>
                 <TabsTrigger value="conciliar">{t('doc.tab_toreconcile', { n: perConciliar.length })}</TabsTrigger>
                 <TabsTrigger value="discrepancia">{t('doc.tab_mismatch', { n: ambDiscrepancia.length })}</TabsTrigger>
+                <TabsTrigger value="enviaments">{t('doc.tab_sends', { n: enviamentsFiltrats.length })}</TabsTrigger>
                 <TabsTrigger value="enllacos">{t('doc.tab_links')}</TabsTrigger>
               </TabsList>
             </div>
@@ -392,6 +577,19 @@ export default function Documents() {
             <TabsContent value="discrepancia" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('doc.hint_mismatch')}</p>
               {taulaAlbarans(ambDiscrepancia, 'doc.empty_mismatch')}
+            </TabsContent>
+
+            <TabsContent value="enviaments" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('doc.hint_sends')}</p>
+              {enviamentsAmbError > 0 && (
+                <p className="text-sm text-error">{t('doc.sends_failed', { n: enviamentsAmbError })}</p>
+              )}
+              {enviaments.length >= MAX_ENVIAMENTS && (
+                <p className="text-xs text-muted-foreground">
+                  {t('doc.limit_sends', { n: MAX_ENVIAMENTS })}
+                </p>
+              )}
+              {taulaEnviaments()}
             </TabsContent>
 
             <TabsContent value="enllacos" className="space-y-2">

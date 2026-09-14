@@ -416,7 +416,7 @@ src/
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia, escrita por RPC con lista blanca
   routes/equip/                Envoltorios de las pantallas que ya existían + Aprovacions
-                               + Documents (bandeja del sistema documental)
+                               + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
                                + Albarans/AlbaraDetall/Espigolades (fase 3)
   routes/productor/            Inicio, listado, alta de oferta, detalle y Documents
   routes/receptor/             Mercat, interessos, històric i Documents
@@ -3024,8 +3024,22 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    filas en memoria: acumulando, una pestaña abierta desde por la mañana llevaba encima todo el
    día. `countUnanswered()` se queda como especificación legible de la regla —tiene sus pruebas—
    y como respaldo.
+   ✅ **Y el Dashboard, que era la excepción que esta entrada daba por resuelta sin serlo**
+   (14-09-2026): seguía trayéndose **`wa_messages` entera** y recontándola con una copia local de
+   la regla. Ahora usa `pendentsPerTelefon()` —la misma RPC y el mismo helper que el badge del
+   menú, así que las dos cifras ya no pueden divergir— y pide los recibidos y las sesiones de
+   intake con `count: 'exact', head: true`. Las que **siguen pidiendo filas van comentadas con su
+   motivo**: la KPI de la lista de Meta cruza teléfonos con otra tabla, y los kg pendientes son
+   `kg_total − canalizado` **por oferta**; con un `count` se rompen.
+   ✅ **`productor/Ofertes.tsx`**: su suscripción a `canalizaciones` era global —la canalización de
+   cualquier productor recargaba la pantalla de todos—. `canalizaciones` no tiene `productor_id` y
+   el filtro de Realtime es una sola comparación sobre la propia tabla, así que se filtra en el
+   manejador contra los ids de mis ofertas. ⚠️ **El DELETE se queda sin guarda a propósito**: con
+   la replica identity por defecto solo viaja la clave primaria (§12.24), así que no hay
+   `excedente_id` con el que decidir.
    ⚠️ **Sigue abierto** lo demás, y no es poco: `OffersList` recarga entero ante cualquier evento
-   de Realtime; el `Dashboard` agrega **seis tablas** en el cliente al entrar; y los buscadores de
+   de Realtime; el `Dashboard` agregaba **ocho** tablas al entrar —no seis, como decía esta
+   entrada— y aún agrega cuatro; y los buscadores de
    `ProducersList`/`OffersList` filtran **en cliente** sobre lo ya cargado, así que la paginación
    de esos listados exige rehacer búsqueda, orden y el reparto test/resto en servidor.
 6. ~~`Conversation` carga el hilo completo sin paginación.~~ — **resuelta, y nadie lo anotó**
@@ -3193,7 +3207,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `bodyConsola` en `sendText()` (§9).
     ⚠️ `registrarEnvio()` **se apaga solo** si la migración no está (`42P01`/`42703`/`PGRST204`),
     avisando una vez por isolate: así función y migración se pueden desplegar en cualquier orden.
-    **Lo que falta**: la pantalla. Sin ella el dato existe pero el equipo no lo ve.
+    ✅ **Y ya hay pantalla (14-09-2026)**: sexta pestaña «Enviaments» en la bandeja del equipo, con
+    fecha, destinatario, propósito, función, documento y estado, y el error debajo cuando lo hay.
+    ⚠️ **Lo que había que separar, y se separó en el TEXTO y no solo en la estructura**: el error de
+    **generar el PDF** (que ya salía en la pestaña «Amb error», y vive en `documentos.estado`) no es
+    el error de **enviarlo** (que es este). La pestaña vieja lo dice ahora explícitamente.
+    ⚠️ `simulat` se pinta **en neutro, no en rojo**: con `RESEND_ENVIO_REAL` apagado el correo no
+    sale, pero eso no es un fallo. Y un propósito desconocido se enseña **en crudo** en vez de
+    inventarle una traducción, porque cada Edge Function pone el suyo y son texto libre.
 26. **El registro público no tiene captcha y su límite por IP vive en memoria** (§9): se pierde en
     cada arranque en frío del isolate y no se comparte entre instancias. Lo que de verdad frena un
     abuso masivo es el tope de 20 pendientes por hora. Turnstile queda pendiente; hoy no compensa,
@@ -3526,17 +3547,36 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     en el ensayo del cierre**, que no está en `documentos`. Con la comprobación obvia se habría
     borrado, rompiendo la conciliación del ensayo en curso.
     Ejecutada contra local: 9 huérfanos, 1,13 MB recuperados, segunda pasada a cero.
-52. **El arnés, al pasar por el super_admin, borra todos los documentos `modo='prueba'`** de la
-    base contra la que corre (`emitir_documento_prova` + `limpiar: reiniciar_documentos_prova`).
-    Hoy es inocuo; a partir de la fase 4 no debe ejecutarse a la vez que un ciclo de cierre de
-    prueba en curso, o hay que acotar la limpieza a la serie `PROVA`.
+52. 🟡 **El arnés, al pasar por el super_admin, borraba todos los documentos `modo='prueba'`** de
+    la base contra la que corre (`emitir_documento_prova` + `limpiar: reiniciar_documentos_prova`).
+    **Acotado el 14-09-2026** (`20270319100000`): el `delete` —y el `update` de contadores, que
+    tiene que decir lo mismo o la siguiente emisión choca con el único `(numero_completo,
+    version)`— miran ahora la **serie**, no solo el modo. Es lo que esta misma entrada pedía.
+    ⚠️ **Y por el camino se cayó el diagnóstico con el que se empezó, que conviene dejar escrito
+    porque era verosímil y falso.** Se creyó que el arnés se estaba comiendo el fixture de
+    `crear-datos-documentales-prueba.ts`. No: **`emitir_albaran()` inserta `modo` con el literal
+    `'real'`** (`20261012100500:452`), así que los albaranes del fixture nunca estuvieron en modo
+    prueba aunque sean de prueba; y el fixture **calcula** el cierre pero no **emite** —
+    `emitir_certificado*` se niega mientras `datos_provisionales` sea `true`—. Medido: las 15 filas
+    de `documentos` en producción están las 15 en `modo='real'`, o sea que ese `delete` alcanzaba
+    **cero filas**. Lo que sí podía destruir, y ahora no, es el **ensayo de cierre de diciembre**.
+    ⚠️ **Queda una serie fuera: `P-CT`.** Sigue dentro del criterio de borrado a propósito, porque
+    **nadie más devuelve su contador a 0** (ver la deuda 101). El día que `reiniciar_cierre_prueba()`
+    la adopte, este criterio puede quedarse en `'PROVA'` a secas.
     ⚠️ **Ya ha mordido una vez**, el mismo día que se escribió: durante el spike, el arnés
     ejecutándose en paralelo hizo desaparecer los documentos que la Edge Function acababa de
     generar y devolvió el contador a `PROVA-2026-0001`. Desde fuera parecía que
     `emitir_documento_prova()` pisaba la fila anterior; no era eso —dos emisiones seguidas dan
     `0001` y `0002`, cada una con su `objeto_id`—, era el arnés limpiando. El síntoma
     característico es «mi documento estaba y ya no está».
-53. **`documento_envios` no tiene fixture en el arnés.** ⚠️ La entrada decía «`documentos` y
+53. **`documento_envios` no tiene fixture en el arnés** — y las otras saltadas tienen una causa
+    que nadie había mirado. ⚠️ **Medido el 14-09-2026**: de las 14 comprobaciones sin datos, **ocho
+    son del bloque `productor-altre`, que es la cuenta de `TEST-PROD-2`**, y el fixture crea la
+    espigolada entera —REC, ENT, cierre, conveni, pla— en **`TEST-PROD-1`**. No es que falten datos
+    borrados: es que nunca existieron para esa ficha. **Y no se arregla ampliando el fixture**:
+    cada albarán que emite consume un número de una serie **legal** en producción, que es de lo que
+    §13 ya se queja (el primer REC real de 2026 será el `00002`). Esas ocho saltadas son el precio
+    de no ensuciar más las series, y se quedan. ⚠️ La entrada decía «`documentos` y
     `documento_envios`» y que «`crear-datos-documentales-prueba.ts` (fase 4) es quien los creará»,
     **en futuro**: ese script existe desde hace tiempo y ya emite documentos, así que la mitad de
     `documentos` está cubierta. Lo que sigue sin fixture —y sin ningún script que lo arregle— es
@@ -3650,9 +3690,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ramas, con el mismo vocabulario que `albaranes.partes`. **El panel externo YA lo pinta**
     (14-09-2026): `PendentsDeTu` saca una fila por parte y la etiqueta («com a qui entrega» /
     «com a qui rep»), que es donde de verdad importaba —una organización con las dos fichas veía
-    si no dos filas idénticas—. **Queda la ficha del equipo**, aguantando el `null` de los
-    enlaces anteriores: en REC y ENT la parte se deduce del tipo del albarán, pero en un OPE
-    viejo no hay de dónde sacarla.
+    si no dos filas idénticas—. ✅ **Y la ficha del equipo también, desde el 14-09-2026**:
+    `rol_parte` entra en el `select` de `AlbaraDetall`, en su tipo y como badge junto a cada
+    enlace. Claves **propias** (`alb.part_*`, «Qui entrega» / «Qui rep»), no las del panel externo
+    (`pend.part_*`, «com a qui entrega»): allí se le habla a quien tiene que firmar, aquí se
+    describe a un tercero. ⚠️ Con `rol_parte` nulo —los enlaces anteriores a `20270304100200`— **no
+    se pinta ningún badge** en vez de adivinar: en REC y ENT la parte se deduce del tipo del
+    albarán, pero en un OPE viejo no hay de dónde sacarla.
 
 69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
     `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
@@ -3934,6 +3978,16 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      (`costes_producto`, `convenios`, `planes_prevencion`) lo hacen con un `new.updated_at := now()`
      inline dentro de su trigger de control, que valida transiciones propias y no sirve aquí—.
 
+101. **`reiniciar_cierre_prueba()` borra los documentos `P-CT` pero no devuelve su contador a 0.**
+     Su `update` nombra `serie in ('P-RES', 'P-CD')` y es de noviembre de 2026, anterior al
+     certificado de transacción (`20270301100100`). Encontrado el 14-09-2026 al acotar
+     `reiniciar_documentos_prova()` (deuda 52): resulta que **el único sitio del código que ponía
+     `P-CT` a 0 era el `like 'P-%'` que se estaba quitando**, así que esa serie se quedó dentro del
+     criterio de borrado para no dejar un contador huérfano — que habría sido peor que el problema
+     que se arreglaba, porque un contador por debajo de los documentos vivos choca con el índice
+     único `(numero_completo, version)` en la siguiente emisión. Se cierra añadiendo `'P-CT'` a ese
+     `serie in (...)`, y ese día `reiniciar_documentos_prova()` puede quedarse en `'PROVA'` a secas.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas de §12 que **no son defectos pendientes**. Se quedan donde están —con su
@@ -3997,7 +4051,13 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
    Referencia en **remoto**, fijada al publicar el interruptor de WhatsApp y los documentos
    del panel externo (14-09-2026): **497/497 correctas y 14 saltadas**, «Sin fallos de
-   permisos», exit 0.
+   permisos», exit 0. Verificada de nuevo tras acotar `reiniciar_documentos_prova()`
+   (`20270319100000`): **no se mueve**, que es lo correcto — esa migración no toca ningún
+   permiso.
+   ⚠️ **Y ya se sabe por qué son 14 y no menos**: ocho de ellas son del bloque
+   `productor-altre`, la cuenta de `TEST-PROD-2`, y el fixture crea sus datos en
+   `TEST-PROD-1` (deuda 53). No es cobertura perdida por una regresión: son datos que no
+   existen, y ampliar el fixture costaría más números de series legales.
    ⚠️ **Subió 12, no 4, y el motivo conviene tenerlo claro al leer un desfase**: los checks
    nuevos son **dos** (`pendents_meus` permitir y `acunar_enllac_propi` denegar), pero la
    matriz se declara **por bloque y se ejecuta por cuenta**, así que dos checks en el bloque

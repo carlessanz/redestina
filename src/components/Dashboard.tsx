@@ -10,30 +10,14 @@ import {
 import {
   anadirEmailTest, borrarEmailTest, listarEmailsTest, type EmailTestRecipient,
 } from '../lib/emailTest'
+import { pendentsPerTelefon } from '../lib/contactes'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-interface MsgRow { contact_phone: string; direction: 'inbound' | 'outbound'; created_at: string }
 interface ExcRow { id: string; estado: string; kg_total: number | null }
 
 const ACTIVOS = ['borrador', 'publicada', 'parcial', 'bloqueada']
-
-function contarSinContestar(rows: MsgRow[]): number {
-  const lastOutbound: Record<string, string> = {}
-  for (const r of rows) {
-    if (r.direction === 'outbound' && (lastOutbound[r.contact_phone] ?? '') < r.created_at) {
-      lastOutbound[r.contact_phone] = r.created_at
-    }
-  }
-  let total = 0
-  for (const r of rows) {
-    if (r.direction !== 'inbound') continue
-    const last = lastOutbound[r.contact_phone]
-    if (!last || r.created_at > last) total += 1
-  }
-  return total
-}
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 
@@ -114,7 +98,8 @@ export default function Dashboard() {
   const [excedentes, setExcedentes] = useState<ExcRow[]>([])
   const [canalKg, setCanalKg] = useState<Record<string, number>>({})
   const [kgConfirmadosTotal, setKgConfirmadosTotal] = useState(0)
-  const [mensajes, setMensajes] = useState<MsgRow[]>([])
+  const [missatgesRebuts, setMissatgesRebuts] = useState(0)
+  const [missatgesPendents, setMissatgesPendents] = useState(0)
   const [intakeActivas, setIntakeActivas] = useState(0)
   const [lista, setLista] = useState<MetaTestRecipient[]>([])
   const [listaEmail, setListaEmail] = useState<EmailTestRecipient[]>([])
@@ -124,13 +109,28 @@ export default function Dashboard() {
 
   const cargar = useCallback(async () => {
     setLoading(true)
-    const [prod, ent, exc, canal, msg, intake, meta, mails] = await Promise.all([
+    // Qué se pide y qué NO (deuda §12.5). Lo que solo alimenta un número se cuenta en la
+    // base con `head: true`: la fila no viaja. Lo que sigue pidiendo filas es porque una KPI
+    // las necesita de verdad, y se dice cuál —una cifra rota para ahorrar una consulta sería
+    // un mal cambio—.
+    const [prod, ent, exc, canal, rebuts, pendents, intake, meta, mails] = await Promise.all([
+      // Filas: `enMeta` cruza cada teléfono con la whitelist de Meta, que vive en otra tabla
+      // y no se puede cruzar desde aquí con un `count`.
       supabase.from('productores').select('phone'),
+      // Filas: igual que arriba, y además `opt_in`/`email` son tres recuentos sobre la misma
+      // lista — tres `head` en vez de una lectura de tres columnas no compensa.
       supabase.from('entidades').select('telefono, email, opt_in'),
+      // Filas: los kg pendientes son `kg_total − canalizado` **por oferta**, así que hace
+      // falta la pareja (id, kg_total) y no un recuento por estado.
       supabase.from('excedentes').select('id, estado, kg_total'),
       supabase.from('canalizaciones').select('excedente_id, kg_confirmados'),
-      supabase.from('wa_messages').select('contact_phone, direction, created_at'),
-      supabase.from('intake_sessions').select('id'),
+      // Antes: `wa_messages` ENTERA (las tres columnas, sin filtro ni límite) para sacar de
+      // ella dos números. Ahora los recibidos los cuenta la base…
+      supabase.from('wa_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound'),
+      // …y los «sin contestar» los agrega `missatges_sense_contestar()`, la misma RPC que ya
+      // usan `ProducersList`, `ContactList` y el badge del menú. La regla no se reimplementa.
+      pendentsPerTelefon(),
+      supabase.from('intake_sessions').select('id', { count: 'exact', head: true }),
       listarNumerosTest(),
       listarEmailsTest(),
     ])
@@ -146,8 +146,9 @@ export default function Dashboard() {
     }
     setCanalKg(porExc)
     setKgConfirmadosTotal(totalKg)
-    setMensajes((msg.data as MsgRow[]) ?? [])
-    setIntakeActivas((intake.data ?? []).length)
+    setMissatgesRebuts(rebuts.count ?? 0)
+    setMissatgesPendents(Object.values(pendents).reduce((suma, n) => suma + n, 0))
+    setIntakeActivas(intake.count ?? 0)
     setLista(meta)
     setListaEmail(mails)
     setLoading(false)
@@ -171,14 +172,14 @@ export default function Dashboard() {
     const entConOptIn = entidades.filter((e) => e.opt_in).length
     const entEnMeta = entidades.filter((e) => numerosSet.has(soloDigitos(e.telefono))).length
     const entConEmail = entidades.filter((e) => e.email).length
-    const recibidos = mensajes.filter((m) => m.direction === 'inbound').length
     return {
       ofertas, kg: { canalizados: kgConfirmadosTotal, pendientes },
       productores: { total: prodPhones.length, conMovil, enMeta: prodEnMeta },
       entidades: { total: entidades.length, conOptIn: entConOptIn, enMeta: entEnMeta, conEmail: entConEmail },
-      mensajes: { recibidos, sinContestar: contarSinContestar(mensajes), intakeActivas },
+      mensajes: { recibidos: missatgesRebuts, sinContestar: missatgesPendents, intakeActivas },
     }
-  }, [excedentes, canalKg, kgConfirmadosTotal, prodPhones, entidades, mensajes, intakeActivas, numerosSet])
+  }, [excedentes, canalKg, kgConfirmadosTotal, prodPhones, entidades,
+      missatgesRebuts, missatgesPendents, intakeActivas, numerosSet])
 
   const PROCESO = [
     { n: 1, tk: 'dash.p1t', dk: 'dash.p1d' },
