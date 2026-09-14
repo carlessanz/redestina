@@ -1,0 +1,56 @@
+# Las comprobaciones del repo, en cada push y en cada PR.
+#
+# POR QUÉ EXISTE (deuda §12.1). Hasta hoy lo único automático era
+# `.githooks/pre-commit`, que hay que instalar a mano en cada clon
+# (`git config core.hooksPath .githooks`), se salta con `--no-verify` y no protege a quien
+# no lo tenga puesto. Y el matiz que esa deuda arrastraba —«el branching de Supabase
+# despliega las funciones en cada push, así que algo automático hay»— caducó el 14-09-2026,
+# cuando se desactivó el branching (§7): desde entonces no había nada.
+#
+# ⚠️ EL ARNÉS DE RLS NO ESTÁ AQUÍ, Y ES DELIBERADO. `scripts/comprobar-rls.ts` abre sesiones
+# reales contra el proyecto de producción con las credenciales de
+# `scripts/data/cuentas-prueba.json` (fuera de git). Meterlo en CI exigiría dar esas
+# credenciales a GitHub y dejar que un runner escriba en la base real en cada push. Sigue
+# ejecutándose a mano, que es lo que §13 pide tras un cambio de datos, políticas o roles.
+#
+# ⚠️ NO HAY DESPLIEGUE AQUÍ. Publicar sigue siendo manual y en su orden —base → funciones →
+# frontend— con el skill `/publicar` (§11). Este workflow solo comprueba.
+
+name: Comprobacions
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Un push que llega mientras corre el anterior lo cancela: interesa el último estado, no la
+# cola entera.
+concurrency:
+  group: comprobacions-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  comprovar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+
+      # `npm run check` acaba en `deno check` de los scripts y las 15 Edge Functions, que es
+      # justo lo que `tsc` no mira (§11). Sin Deno, esa tercera parte no se comprueba.
+      - uses: denoland/setup-deno@v2
+        with:
+          deno-version: v2.x
+
+      - run: npm ci
+
+      # Tipos (app y pruebas) + vitest + deno check, lo mismo que el hook local.
+      - run: npm run check
+
+      # El empaquetado no entra en `check` y sí puede fallar solo (§13.2).
+      - run: npm run build
