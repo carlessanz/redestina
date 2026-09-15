@@ -1470,6 +1470,11 @@ responder por correo.
 **Estados** — los `value.statuses` actualizan `wa_messages.status` casando por
 `wa_message_id`.
 
+⚠️ **De un saliente INTERACTIVO se guardan además las opciones que se ofrecieron**
+(`raw = { boton?, opciones }`, desde el 15-09-2026): `body` solo lleva la pregunta, así que sin
+eso no había forma de saber después qué filas se mandaron ni si una descripción llegó cortada
+(§12.107). Van **ya recortadas** a los topes de Meta, que corta sin avisar.
+
 **Palabras clave** — `BAJA` pone `opt_in=false` + `opt_out_at`; `ALTA` pone `opt_in=true` +
 `opt_in_at`. **Ambas responden confirmación** por WhatsApp (estamos en ventana, es gratis) y
 se registran como `outbound`.
@@ -3222,7 +3227,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **67 cerradas**.
+Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **68 cerradas**,
+sobre 107 numeradas.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -3555,6 +3561,20 @@ Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y *
     que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
     su documento.
 
+107. ~~**De un interactivo saliente no quedaba registro de las opciones que se ofrecieron.**~~
+     — **resuelta (15-09-2026)**, y salió de intentar comprobar la 105: el intake había mandado
+     la lista de modalidades, se veía el saliente en `wa_messages` con su `body` —«Quina
+     modalitat és?»— y **no había forma de saber desde la base qué filas llevaba**, que era
+     exactamente lo que había que verificar. Medido: de los interactivos salientes, **80 de 81
+     tenían `raw` a null**, mientras que los 115 de texto y los 10 de plantilla lo llevaban
+     todos. `sendText` y `sendTemplate` pasaban su `raw` a `registrarSaliente()` y
+     `sendBotones`/`sendLista` no — y son justo los únicos cuyo contenido **no** cabe en `body`.
+     Ahora guardan `{ boton?, opciones: [{ id, titulo, descripcion? }] }`.
+     ⚠️ **Se guarda lo RECORTADO, no lo que se quiso mandar**, y esa es la mitad que importa:
+     Meta corta el título de fila a 24 y la descripción a 72 **sin avisar** (§6bis), así que un
+     registro de lo pretendido serviría para todo menos para el caso a diagnosticar. Lo exige
+     `tests/whatsapp.test.ts` con un título de 30 y una descripción de 90.
+
 106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
      la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
      pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
@@ -3618,14 +3638,14 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **67** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **68** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 107.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 108.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -3703,12 +3723,13 @@ se va solo **cómo se llegó hasta aquí**.
 | 103 | `authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito documental | `20270322100100` |
 | 104 | `parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por columnas | `20270325100000` |
 | 105 | Las descripciones de la modalidad no llegan por WhatsApp | 15-09-2026 |
+| 107 | Un interactivo saliente no registraba las opciones ofrecidas | 15-09-2026 |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **785 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **788 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

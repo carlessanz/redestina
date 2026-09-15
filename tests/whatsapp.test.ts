@@ -107,3 +107,73 @@ describe('whatsapp · sin la fila del interruptor', () => {
     expect(escrituras.map((e) => e.tabla)).toEqual(['wa_messages'])
   })
 })
+
+// ---------------------------------------------------------------------------
+// Lo que se OFRECIÓ queda registrado (deuda §12.107)
+// ---------------------------------------------------------------------------
+// De un interactivo saliente, `body` guarda solo la pregunta —«Quina modalitat és?»— y las
+// opciones no quedaban en ninguna parte: medido en producción, 80 de 81 interactivos
+// salientes tenían `raw` a null, mientras que los de texto y plantilla lo llevaban todos.
+// Eso se notó el 15-09-2026 al intentar comprobar por qué el intake había mandado una lista
+// y con qué descripciones: desde la base no se podía saber, y la única prueba posible era
+// preguntarle a la persona qué veía en el móvil.
+//
+// ⚠️ Se guarda lo RECORTADO, no lo que se quiso mandar. Meta corta el título de fila a 24
+// caracteres y la descripción a 72 **sin avisar** —llega partido a media palabra y no hay
+// error—, así que el registro tiene que decir lo que salió; si dijera lo que se pretendía,
+// serviría para todo menos para el caso que hay que diagnosticar.
+describe('whatsapp · el registro de un interactivo guarda sus opciones', () => {
+  const ENVIA_DE_VERDAD = { app_settings: [{ key: 'whatsapp_activo', value: 'true' }] }
+
+  // Sin `WHATSAPP_ENVIO_REAL` el envío cae en el modo simulado: no sale a la red y se
+  // registra igual, que es justo lo que hace falta para mirar lo que se registró.
+  const original = (globalThis as Record<string, unknown>).Deno
+  beforeAll(() => {
+    ;(globalThis as Record<string, unknown>).Deno = { env: { get: () => undefined } }
+  })
+  afterAll(() => {
+    if (original === undefined) delete (globalThis as Record<string, unknown>).Deno
+    else (globalThis as Record<string, unknown>).Deno = original
+  })
+
+  /** El `raw` con el que se registró el saliente en `wa_messages`. */
+  function rawRegistrado(escrituras: { tabla: string; valores: unknown }[]) {
+    const fila = escrituras.find((e) => e.tabla === 'wa_messages')
+    return (fila?.valores as { raw?: Record<string, unknown> } | undefined)?.raw
+  }
+
+  it('sendLista guarda el botón y cada fila con su descripción', async () => {
+    const { cliente, escrituras } = crearCliente(ENVIA_DE_VERDAD)
+    await sendLista(cliente, '34612345678', 'Quina modalitat és?', 'Tria modalitat', [
+      { id: 'modalitat:donacio', titulo: 'Donació', descripcion: 'Entitats socials.' },
+      { id: 'modalitat:venda', titulo: 'Venda' },
+    ])
+    const raw = rawRegistrado(escrituras) as { boton: string; opciones: unknown[] } | undefined
+    expect(raw?.boton).toBe('Tria modalitat')
+    expect(raw?.opciones).toEqual([
+      { id: 'modalitat:donacio', titulo: 'Donació', descripcion: 'Entitats socials.' },
+      { id: 'modalitat:venda', titulo: 'Venda' },
+    ])
+  })
+
+  it('y lo guarda YA RECORTADO, que es lo que de verdad llegó', async () => {
+    const { cliente, escrituras } = crearCliente(ENVIA_DE_VERDAD)
+    await sendLista(cliente, '34612345678', 'Tria', 'Obre', [
+      { id: 'x', titulo: 'T'.repeat(30), descripcion: 'D'.repeat(90) },
+    ])
+    const raw = rawRegistrado(escrituras) as { opciones: { titulo: string; descripcion: string }[] }
+    expect(raw.opciones[0].titulo).toHaveLength(24)
+    expect(raw.opciones[0].descripcion).toHaveLength(72)
+  })
+
+  it('sendBotones guarda los suyos, también recortados a 20', async () => {
+    const { cliente, escrituras } = crearCliente(ENVIA_DE_VERDAD)
+    await sendBotones(cliente, '34612345678', 'Continuar?', [
+      { id: 'si', titulo: 'Sí' },
+      { id: 'no', titulo: 'N'.repeat(25) },
+    ])
+    const raw = rawRegistrado(escrituras) as { opciones: { id: string; titulo: string }[] }
+    expect(raw.opciones[0]).toEqual({ id: 'si', titulo: 'Sí' })
+    expect(raw.opciones[1].titulo).toHaveLength(20)
+  })
+})

@@ -253,6 +253,11 @@ export async function sendBotones(
   texto: string,
   botones: Boton[],
 ): Promise<RespuestaMeta> {
+  const opciones = botones.slice(0, MAX_BOTONES).map((b) => ({
+    id: b.id,
+    // Meta limita el título del botón a 20 caracteres.
+    titulo: b.titulo.slice(0, 20),
+  }));
   const r = await enviar(supabase, {
     to,
     type: "interactive",
@@ -260,15 +265,18 @@ export async function sendBotones(
       type: "button",
       body: { text: texto },
       action: {
-        buttons: botones.slice(0, MAX_BOTONES).map((b) => ({
-          type: "reply",
-          // Meta limita el título del botón a 20 caracteres.
-          reply: { id: b.id, title: b.titulo.slice(0, 20) },
-        })),
+        buttons: opciones.map((o) => ({ type: "reply", reply: { id: o.id, title: o.titulo } })),
       },
     },
   });
-  if (r.ok) await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId);
+  // ⚠️ Se guarda lo que se OFRECIÓ, ya recortado. `body` solo lleva la pregunta, así que de un
+  // interactivo saliente las opciones son la única parte que no queda en ninguna parte — y es
+  // justo la que hace falta para diagnosticar «¿por qué eligió eso?» o «¿llegó cortado?»
+  // (deuda §12.107). Los recortes van aplicados a propósito: interesa lo que salió, no lo que
+  // se quiso mandar.
+  if (r.ok) {
+    await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId, { opciones });
+  }
   else if (!r.desactivado) await registrarFallo(supabase, to, "interactive", texto, r);
   return r;
 }
@@ -282,6 +290,13 @@ export async function sendLista(
   etiquetaBoton: string,
   filas: FilaLista[],
 ): Promise<RespuestaMeta> {
+  // Meta limita el título de fila a 24 caracteres y la descripción a 72, y **recorta sin
+  // avisar**: un texto que se pasa llega partido a media palabra, no da error (§6bis).
+  const opciones = filas.slice(0, MAX_FILAS_LISTA).map((f) => ({
+    id: f.id,
+    titulo: f.titulo.slice(0, 24),
+    ...(f.descripcion ? { descripcion: f.descripcion.slice(0, 72) } : {}),
+  }));
   const r = await enviar(supabase, {
     to,
     type: "interactive",
@@ -292,17 +307,23 @@ export async function sendLista(
         // El botón que abre la lista admite 20 caracteres.
         button: etiquetaBoton.slice(0, 20),
         sections: [{
-          rows: filas.slice(0, MAX_FILAS_LISTA).map((f) => ({
-            id: f.id,
-            // Meta limita el título de fila a 24 caracteres y la descripción a 72.
-            title: f.titulo.slice(0, 24),
-            ...(f.descripcion ? { description: f.descripcion.slice(0, 72) } : {}),
+          rows: opciones.map((o) => ({
+            id: o.id,
+            title: o.titulo,
+            ...(o.descripcion ? { description: o.descripcion } : {}),
           })),
         }],
       },
     },
   });
-  if (r.ok) await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId);
+  // Lo que se OFRECIÓ, ya recortado: es la única forma de ver después si una descripción
+  // llegó partida, porque `body` solo guarda la pregunta (deuda §12.107).
+  if (r.ok) {
+    await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId, {
+      boton: etiquetaBoton.slice(0, 20),
+      opciones,
+    });
+  }
   else if (!r.desactivado) await registrarFallo(supabase, to, "interactive", texto, r);
   return r;
 }
