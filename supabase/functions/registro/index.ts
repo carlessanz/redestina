@@ -69,7 +69,7 @@ import {
   type Decisio,
   decidir,
   type FitxaCoincident,
-  mateixEmail,
+  motiuEmail,
   type MotiuCoincidencia,
   motiuTelefon,
   notaPaperNou,
@@ -643,6 +643,15 @@ const TEL_SECUNDARIS_ENTITAT = ["telefono2", "telefono3"] as const;
 const CAMPS_TEL_PRODUCTOR = [TEL_PRINCIPAL_PRODUCTOR, ...TEL_SECUNDARIS_PRODUCTOR];
 const CAMPS_TEL_ENTITAT = [TEL_PRINCIPAL_ENTITAT, ...TEL_SECUNDARIS_ENTITAT];
 
+// Y con el CORREO pasa lo mismo desde el 15-09-2026 (deuda §12.102): `entidades.email2` era
+// la última columna ciega. Se mira igual que las de teléfono y **con la misma regla**: una
+// coincidencia ahí no puede denegar, porque ese campo guarda el correo de otra persona de la
+// casa. `productores` no tiene ninguna secundaria —su `email` es UNIQUE—, así que la lista
+// vacía no es un hueco por rellenar: es que no hay dónde mirar.
+const EMAIL_PRINCIPAL = "email";
+const EMAIL_SECUNDARIS_PRODUCTOR = [] as const;
+const EMAIL_SECUNDARIS_ENTITAT = ["email2"] as const;
+
 /**
  * Las filas que el prefiltro de teléfono trae de una tabla, buscando por cada una de sus
  * columnas y quitando las repetidas. Una consulta por columna, todas en paralelo: es lo
@@ -653,19 +662,19 @@ const CAMPS_TEL_ENTITAT = [TEL_PRINCIPAL_ENTITAT, ...TEL_SECUNDARIS_ENTITAT];
  * Quedarse sin ver una coincidencia produce un duplicado que el equipo resuelve; negar el
  * registro produce una persona que no puede darse de alta.
  */
-async function filesPerTelefon(
+async function filesPerColumnes(
   consulta: () => Cliente,
   camps: readonly string[],
-  patro: string | null,
+  filtra: ((q: Cliente, camp: string) => Cliente) | null,
 ): Promise<Record<string, unknown>[]> {
-  if (!patro) return [];
+  if (!filtra || camps.length === 0) return [];
   const resultats = await Promise.all(
-    camps.map((c) => consulta().filter(c, "match", patro).limit(MAX_COINCIDENCIES)),
+    camps.map((c) => filtra(consulta(), c).limit(MAX_COINCIDENCIES)),
   );
   const files = new Map<string, Record<string, unknown>>();
   for (const [i, r] of resultats.entries()) {
     if (r.error) {
-      console.error("[registro] coincidencies telefon:", camps[i], r.error.code, r.error.message);
+      console.error("[registro] coincidencies:", camps[i], r.error.code, r.error.message);
       continue;
     }
     for (const f of (r.data ?? []) as Record<string, unknown>[]) files.set(f.id as string, f);
@@ -684,13 +693,19 @@ async function decidirCoincidencia(
   const prod = () =>
     supabase.from("productores").select("id, organizacion_id, name, empresa, email, phone, telefono_alt");
   const ent = () =>
-    supabase.from("entidades").select("id, organizacion_id, nombre, email, telefono, telefono2, telefono3");
+    supabase.from("entidades").select("id, organizacion_id, nombre, email, email2, telefono, telefono2, telefono3");
 
-  const [pEmail, eEmail, pTel, eTel] = await Promise.all([
-    prod().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
-    ent().ilike("email", patroLike(d.email)).limit(MAX_COINCIDENCIES),
-    filesPerTelefon(prod, CAMPS_TEL_PRODUCTOR, patro),
-    filesPerTelefon(ent, CAMPS_TEL_ENTITAT, patro),
+  // Cada columna, su consulta. Un `or=(…)` de PostgREST habría que escaparlo, y aquí el
+  // coste de una ida y vuelta más es el de la más lenta: van todas en paralelo.
+  const perTel = patro ? (q: Cliente, c: string) => q.filter(c, "match", patro) : null;
+  const perEmail = (q: Cliente, c: string) => q.ilike(c, patroLike(d.email));
+
+  const [pEmail, eEmail, eEmail2, pTel, eTel] = await Promise.all([
+    prod().ilike(EMAIL_PRINCIPAL, patroLike(d.email)).limit(MAX_COINCIDENCIES),
+    ent().ilike(EMAIL_PRINCIPAL, patroLike(d.email)).limit(MAX_COINCIDENCIES),
+    filesPerColumnes(ent, EMAIL_SECUNDARIS_ENTITAT, perEmail),
+    filesPerColumnes(prod, CAMPS_TEL_PRODUCTOR, perTel),
+    filesPerColumnes(ent, CAMPS_TEL_ENTITAT, perTel),
   ]);
 
   // Se vuelve a comprobar en memoria lo que devolvió la consulta. El `ilike` con los
@@ -735,16 +750,26 @@ async function decidirCoincidencia(
       secundaris.map((c) => f[c] as string | null),
       d.telefon,
     );
+  // El correo se mira en TODAS las columnas de la fila, no solo en aquella por la que la
+  // consulta la encontró — mismo argumento que el teléfono de aquí al lado.
+  const mail = (f: Record<string, unknown>, secundaris: readonly string[]) =>
+    motiuEmail(
+      f[EMAIL_PRINCIPAL] as string | null,
+      secundaris.map((c) => f[c] as string | null),
+      d.email,
+    );
 
   for (const f of ((pEmail.data ?? []) as Record<string, unknown>[])) {
-    if (mateixEmail(f.email as string, d.email)) afegir("productor", f, "email");
+    const motiu = mail(f, EMAIL_SECUNDARIS_PRODUCTOR);
+    if (motiu) afegir("productor", f, motiu);
   }
   for (const f of pTel) {
     const motiu = tel(f, TEL_PRINCIPAL_PRODUCTOR, TEL_SECUNDARIS_PRODUCTOR);
     if (motiu) afegir("productor", f, motiu);
   }
-  for (const f of ((eEmail.data ?? []) as Record<string, unknown>[])) {
-    if (mateixEmail(f.email as string, d.email)) afegir("entidad", f, "email");
+  for (const f of [...((eEmail.data ?? []) as Record<string, unknown>[]), ...eEmail2]) {
+    const motiu = mail(f, EMAIL_SECUNDARIS_ENTITAT);
+    if (motiu) afegir("entidad", f, motiu);
   }
   for (const f of eTel) {
     const motiu = tel(f, TEL_PRINCIPAL_ENTITAT, TEL_SECUNDARIS_ENTITAT);

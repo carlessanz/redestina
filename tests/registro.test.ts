@@ -23,6 +23,7 @@ import {
   type FitxaCoincident,
   mateixEmail,
   mateixTelefon,
+  motiuEmail,
   motiuTelefon,
   notaPaperNou,
   type OrgCoincident,
@@ -391,5 +392,81 @@ describe('notaPaperNou: lo único que el equipo tiene para decidir', () => {
   it('deja escrito que la ficha NO se ha enlazado', () => {
     // Sin esta frase, el equipo podría dar por hecho que el sistema ya lo ha resuelto.
     expect(nota).toContain('SENSE enllacar')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El correo secundario (deuda §12.102)
+// ---------------------------------------------------------------------------
+// `entidades.email2` era la última columna ciega de la detección. Entra con la MISMA regla
+// que los teléfonos secundarios —se mira, no deniega— y estas pruebas son las que sostienen
+// esa mitad: que se detecte es fácil de ver en producción; que no pueda denegar, no, porque
+// el caso solo aparece cuando alguien se registra con ese correo.
+describe('motiuEmail: la columna decide la FUERZA, como en el teléfono', () => {
+  it('el correo principal es fuerte', () => {
+    expect(motiuEmail('hola@exemple.cat', ['altre@exemple.cat'], 'hola@exemple.cat')).toBe('email')
+  })
+
+  it('comparar ignora mayúsculas y espacios de los lados', () => {
+    expect(motiuEmail(' Hola@Exemple.CAT ', [], 'hola@exemple.cat')).toBe('email')
+  })
+
+  it('el secundario casa, pero como señal débil', () => {
+    expect(motiuEmail('altre@exemple.cat', ['hola@exemple.cat'], 'hola@exemple.cat'))
+      .toBe('email_secundari')
+    expect(motiuEmail(null, [null, 'hola@exemple.cat'], 'hola@exemple.cat')).toBe('email_secundari')
+  })
+
+  it('si casa en las dos columnas, manda la fuerte', () => {
+    expect(motiuEmail('hola@exemple.cat', ['hola@exemple.cat'], 'hola@exemple.cat')).toBe('email')
+  })
+
+  it('sin coincidencia, nada; y un campo vacío no casa con otro vacío', () => {
+    expect(motiuEmail('altre@exemple.cat', ['tercer@exemple.cat'], 'hola@exemple.cat')).toBeNull()
+    expect(motiuEmail('', [''], '')).toBeNull()
+    expect(motiuEmail(null, [null], null)).toBeNull()
+  })
+})
+
+describe('un correo secundario, solo, tampoco deniega', () => {
+  it('no es una coincidencia fuerte', () => {
+    expect(esForta(['email_secundari'])).toBe(false)
+    expect(esForta(['email_secundari', 'telefon_secundari'])).toBe(false)
+  })
+
+  it('pero con cualquier columna principal al lado, sí', () => {
+    expect(esForta(['email_secundari', 'telefon'])).toBe(true)
+    expect(esForta(['email_secundari', 'email'])).toBe(true)
+  })
+
+  // Este es EL caso de la deuda: la entidad ya existe, se registra con el correo que ella
+  // tiene en `email2`, y antes esto no se veía siquiera. Ahora se ve — y aun así el alta
+  // sigue, porque denegarla dejaría fuera a quien comparte el correo de su gestoría.
+  it('una ficha del MISMO tipo que solo casa por el correo secundario no es duplicado', () => {
+    const d = decidir(
+      'entidad',
+      [fitxa({ tipus: 'entidad', per: ['email_secundari'] })],
+      [org({ es_generadora: false, es_receptora: true })],
+    )
+    expect(d.cas).toBe('paper_nou')
+  })
+
+  it('y si además casa el correo principal, vuelve a ser duplicado', () => {
+    const d = decidir(
+      'entidad',
+      [fitxa({ tipus: 'entidad', per: ['email_secundari', 'email'] })],
+      [org({ es_generadora: false, es_receptora: true })],
+    )
+    expect(d.cas).toBe('duplicat')
+    if (d.cas === 'duplicat') expect(d.camp).toBe('email')
+  })
+
+  it('la nota lo nombra y avisa de que la señal es débil', () => {
+    const nota = notaPaperNou(
+      [fitxa({ tipus: 'entidad', nom: 'Rebost Solidari', per: ['email_secundari'] })],
+      '2026-09-15T10:00:00Z',
+    )
+    expect(nota).toContain('correu secundari')
+    expect(nota).toContain('SECUNDARIA')
   })
 })

@@ -916,7 +916,10 @@ y la interfaz la deduce sin ningún marcador (badge «Encallat», `doc.st_encall
 **GRANT**: `authenticated` tiene `SELECT` completo en `documentos`, `documento_envios`,
 `series_documentales`, `plantillas_documento` y `municipios`; `INSERT`/`UPDATE` (sin DELETE) en
 `plantillas_documento`; y **`SELECT` y `UPDATE` por columnas** en `parametros_documentales`, más
-`SELECT` por columnas en `enlaces_token` y `evidencias`. **Ninguna escritura en `documentos`,
+`SELECT` por columnas en `enlaces_token` y `evidencias`. ⚠️ Lo del **UPDATE por columnas** es cierto
+solo desde `20270325100000` (§12.104): hasta entonces la tabla arrastraba además un `UPDATE` de
+tabla de los privilegios por defecto, que **subsume** al de columnas — o sea que esa frase describía
+la intención y no lo que concedía la base. **Ninguna escritura en `documentos`,
 `documento_envios`, `series_documentales`, `enlaces_token`, `evidencias` ni `municipios`**: la
 superficie de escritura son las RPC `security definer` y `service_role`.
 
@@ -2527,6 +2530,20 @@ validar. Ahora consulta las fichas de las dos tablas y **`v_organizaciones`**, c
 que usó la migración de la etapa 1: **correo o teléfono exactos** (el teléfono, por sus últimas 9
 cifras), **nunca el parecido del nombre** —juntar dos organizaciones distintas es mezclar los kilos y
 el certificado fiscal de dos donantes—. Tres caminos:
+
+⚠️ **Y no hay UNA columna de cada cosa por ficha, sino varias — con fuerzas distintas**
+(§12.91 para los teléfonos, §12.102 para el correo, cerrada el 15-09-2026). Se miran las
+**principales** (`productores.email`/`phone`, `entidades.email`/`telefono`) y las
+**secundarias** (`productores.telefono_alt`, `entidades.telefono2`/`telefono3` y
+**`entidades.email2`**), pero **solo una coincidencia por columna principal puede denegar**
+un alta con `409 dades_en_us`: una secundaria lleva siempre al camino de «papel nuevo», con
+su nota para el equipo. Lo impone `esForta()` en `coincidencies.ts`, y el tipo `MotiuFort`
+hace que el compilador lo sostenga —un `409` no puede citar una columna débil ni por error de
+refactor—. El motivo: esas columnas guardan **el contacto de otra persona de la casa**, no la
+identidad de la organización. El caso que lo decidió está medido en producción: la entidad
+«CS El Roser - Menjador i Rebost» lleva en `email2` el correo del **Ajuntament de Reus**, que
+es un productor de **otra** organización — casi seguro el técnico municipal que lleva el
+centro. Con `email2` denegando, ese ayuntamiento se habría quedado sin poder registrarse.
 
 | Coincidencia | Qué hace |
 | --- | --- |
@@ -4269,18 +4286,24 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      único `(numero_completo, version)` en la siguiente emisión. Se cierra añadiendo `'P-CT'` a ese
      `serie in (...)`, y ese día `reiniciar_documentos_prova()` puede quedarse en `'PROVA'` a secas.
 
-102. **`entidades.email2` es la cuarta columna ciega de la detección de organizaciones, y la
-     única que queda.** Encontrada el 14-09-2026 al ampliar la deuda 91 a los teléfonos
-     secundarios. **Medido en producción**: 17 entidades tienen `email2`, los 17 distintos del
-     principal, y **uno ya casa con el `email` de un productor de otra organización** — o sea, un
-     candidato real a «misma organización» que hoy no ve ni el registro ni la migración de la
-     etapa 1. Técnicamente es una consulta más en `decidirCoincidencia()` y comparar contra
-     `[email, email2]`.
-     ⚠️ **No se hizo con las de teléfono a propósito, y el motivo importa**: el correo es hoy el
-     criterio que **deniega** un alta (`409 dades_en_us`), así que ampliarlo no es simétrico a
-     ampliar los teléfonos. Antes de tocarlo hay que decidir si una coincidencia por `email2`
-     debe denegar o solo avisar al equipo — la misma distinción principal/secundaria que la
-     deuda 91 resolvió para los teléfonos.
+102. ~~**`entidades.email2` es la cuarta columna ciega de la detección de organizaciones.**~~ —
+     **resuelta (15-09-2026)**, y la pregunta que dejaba abierta —¿denegar o solo avisar?— se
+     decidió por **avisar**: `email2` entra como motivo **débil**, igual que los teléfonos
+     secundarios de la deuda 91. Se mira (`motiuEmail`, gemelo de `motiuTelefon`: la columna por
+     la que la consulta encontró la fila no decide la fuerza, así que una ficha que case por
+     `email2` **y** tenga el mismo correo en `email` sigue siendo fuerte), y nunca deniega.
+     ⚠️ **El caso medido es el argumento entero**: la única coincidencia real en producción es la
+     entidad «CS El Roser - Menjador i Rebost», cuyo `email2` es el correo del **Ajuntament de
+     Reus** —un productor de otra organización—. Eso no dice «son la misma casa», dice «el mismo
+     técnico municipal lleva las dos»; con `email2` denegando, ese ayuntamiento se habría quedado
+     **sin poder registrarse**. Un fallo de la detección tiene que producir un duplicado que el
+     equipo ve, nunca un alta denegada.
+     ⚠️ **`FEBLES` es ahora un `Record<Exclude<MotiuCoincidencia, MotiuFort>, true>` y no un
+     array**, que es lo que impide que esto se repita: el día que se añada un motivo nuevo, `tsc`
+     obliga a decir de qué lado cae en vez de dejarlo caer en el fuerte por omisión — que es
+     exactamente cómo `email2` llegó a ser un punto ciego.
+     `productores` no tiene correo secundario (`email` es UNIQUE), así que su lista va vacía a
+     propósito: no es un hueco por rellenar, es que no hay dónde mirar.
 
 103. ~~**`authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito
      documental.**~~ — **resuelta (14-09-2026, `20270322100100`)**, y eran **33 relaciones, no
@@ -4317,14 +4340,26 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
      default privileges`, y **merece su propia migración**: tocar los privilegios de escritura de
      todo `public` de una vez es justo lo que no se hace en un cambio que iba de otra cosa.
 
-104. **`parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por columnas.**
-     `20260928100400:161` concede `grant update (…)` dejando `id` fuera a propósito («la fila 1 es
-     la fila 1»), pero el privilegio de tabla que llegó por los privilegios por defecto lo subsume:
-     `has_table_privilege('authenticated', …, 'UPDATE')` es `true`. En la práctica lo remata el
-     `check (id = 1)`, así que es inocuo. Encontrado el 14-09-2026 al medir la deuda 103 y **no
-     arreglado ahí** porque la única forma segura es `revoke update` + volver a conceder la lista
-     exacta de columnas, y eso es una decisión aparte sobre una tabla con política propia y con
-     check «permitir» en el arnés.
+104. ~~**`parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por
+     columnas.**~~ — **resuelta (15-09-2026, `20270325100000`)**: `revoke update` + volver a
+     conceder la lista exacta de 22 columnas de `20260928100400:161`. Medido antes y después en
+     producción: `has_table_privilege(…, 'UPDATE')` pasa de `true` a **`false`** y las columnas
+     con UPDATE, de **23 a 22** — la que sobraba era `id`, colada por el privilegio de tabla, que
+     es justo la que la migración original dejó fuera («la fila 1 es la fila 1»).
+     **No era alcanzable** —el `check (id = 1)` remataba el único daño posible y la política ya
+     exige `es_super_admin()`—: como el TRUNCATE y la deuda 103, no se cierra una puerta, se
+     repone la capa.
+     ⚠️ **Se comprobó que no rompía nada antes de tocarlo, y las dos comprobaciones importan**:
+     (1) **hoy no la escribe nadie desde la aplicación** —la única referencia en `src/` es una
+     lectura de `fecha_corte_convenios` en `CampanyaConvenis.tsx:84`, y quien la rellena es el
+     fixture con la service key, que ignora GRANT—; (2) el UPDATE que lanza el arnés reescribe
+     **`caducidad_enlace_dias`** (`COLUMNA_INOCUA`), que sigue concedida, así que el «denegar» del
+     técnico lo sigue imponiendo la **RLS** y no el GRANT — si lo cortara el GRANT, ese check
+     saldría verde sin haber probado la política. Verificado tras aplicar: 669/669 + 13, sin
+     moverse.
+     ⚠️ **Se reconcede en vez de cerrar la tabla del todo** porque el comentario de
+     `20260928100400` promete una pantalla de Configuració que **todavía no existe** (checkpoint
+     10): el día que se construya, el permiso ya está y con la forma correcta.
 105. **Las descripciones de la modalidad no llegan por WhatsApp.** `camposOferta.ts` da a cada
      `modalitat` una `descripcion` («Ho dones. Entitats socials… Genera un certificat…») que el
      panel enseña bajo cada opción, pero el intake la pregunta con `sendBotones`, cuyos botones
@@ -4394,7 +4429,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **763 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **773 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4403,7 +4438,9 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
    Referencia en **remoto**, tras las RPC del proceso (`20270323100000`, `20270324100000`):
-   **669/669 correctas y 13 saltadas**, «Sin fallos de permisos», exit 0. Son las 650 anteriores
+   **669/669 correctas y 13 saltadas**, «Sin fallos de permisos», exit 0. **No se movió** al
+   revocar el UPDATE de tabla de `parametros_documentales` (`20270325100000`, §12.104), y eso
+   era lo esperado: esa migración repone una capa que ninguna política alcanzaba. Son las 650 anteriores
    más 19: `pendents_equip` (permitir ×2, denegar ×7), `progres_meves_ofertes` (×5) y la lectura
    de `oferta_respuestas` por cuenta externa (×5: `denegar` en productor, `permitir` en receptor y
    **en doble rol**, que ve por su ficha de entidad lo que ella misma contestó — un `denegar` ahí

@@ -36,8 +36,15 @@ export type TipusFitxa = "productor" | "entidad";
  * `Càritas Roquetes` comparten número, y también lo comparten un ayuntamiento y una
  * entidad de su municipio. Eso dice «estas dos fichas se cogen el teléfono en el mismo
  * sitio», no «son la misma organización».
+ *
+ * ⚠️ Y `email_secundari` es lo mismo con `entidades.email2` (deuda §12.102, 15-09-2026):
+ * ese campo guarda el correo de OTRA persona —quien lleva la gestión, un técnico que
+ * atiende dos entidades—, no la identidad de la organización. Medido en producción: 17
+ * entidades lo tienen relleno, los 17 distintos del principal, y uno ya casa con el `email`
+ * de un productor de otra organización. Se mira, porque ese candidato es real; no deniega,
+ * porque un correo de contacto compartido no prueba que sean la misma casa.
  */
-export type MotiuCoincidencia = "email" | "telefon" | "telefon_secundari";
+export type MotiuCoincidencia = "email" | "telefon" | "email_secundari" | "telefon_secundari";
 
 /**
  * Los motivos que SÍ pueden denegar un alta: el correo y el teléfono principal, que son un
@@ -46,7 +53,18 @@ export type MotiuCoincidencia = "email" | "telefon" | "telefon_secundari";
 export type MotiuFort = "email" | "telefon";
 
 /**
- * Una coincidencia es fuerte si algo más que un teléfono secundario la sostiene.
+ * Los motivos que NO pueden denegar. **Se declara como `Record<…, true>` y no como un
+ * array**: así, el día que `MotiuCoincidencia` gane un valor nuevo, `tsc` obliga a decir de
+ * qué lado cae en vez de dejarlo caer en el fuerte por omisión — que es exactamente cómo
+ * `email2` llegó a ser un punto ciego.
+ */
+const FEBLES: Record<Exclude<MotiuCoincidencia, MotiuFort>, true> = {
+  telefon_secundari: true,
+  email_secundari: true,
+};
+
+/**
+ * Una coincidencia es fuerte si algo más que una columna secundaria la sostiene.
  *
  * ⚠️ LA REGLA QUE ESTO IMPONE: **una coincidencia solo por columna secundaria nunca
  * responde 409.** Denegar es la única salida de esta función que la persona no puede
@@ -55,7 +73,7 @@ export type MotiuFort = "email" | "telefon";
  * dudoso: el alta sigue, la ficha nace con su nota y el equipo la mira (`revisio_equip`).
  */
 export function esForta(per: MotiuCoincidencia[]): boolean {
-  return per.some((p) => p !== "telefon_secundari");
+  return per.some((p) => !(p in FEBLES));
 }
 
 /** Una ficha (de productor o de entidad) que coincide con lo que se está registrando. */
@@ -241,6 +259,23 @@ export function mateixEmail(a: string | null | undefined, b: string | null | und
   return x !== "" && x === y;
 }
 
+/**
+ * El motivo por el que un correo casa con una ficha, **con la fuerza que le corresponde**.
+ * Gemelo exacto de `motiuTelefon`, y por el mismo motivo: la columna por la que la consulta
+ * encontró la fila no puede decidir la fuerza. Una entidad puede casar por `email2` y tener
+ * el mismo correo en `email` —o al revés—, y entonces la coincidencia es fuerte; se queda
+ * con la más fuerte de las dos.
+ */
+export function motiuEmail(
+  principal: string | null | undefined,
+  secundaris: (string | null | undefined)[],
+  nou: string | null | undefined,
+): MotiuCoincidencia | null {
+  if (mateixEmail(principal, nou)) return "email";
+  if (secundaris.some((c) => mateixEmail(c, nou))) return "email_secundari";
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // La decisión
 // ---------------------------------------------------------------------------
@@ -318,12 +353,14 @@ export function decidir(
 const PARAULA_MOTIU: Record<MotiuCoincidencia, string> = {
   email: "correu",
   telefon: "telefon",
+  email_secundari: "correu secundari",
   telefon_secundari: "telefon secundari",
 };
 
 export function notaPaperNou(fitxes: FitxaCoincident[], dataISO: string): string {
   const dia = dataISO.slice(0, 10);
-  const ordre: MotiuCoincidencia[] = ["email", "telefon", "telefon_secundari"];
+  // De más fuerte a más débil: lo que puede denegar primero, y lo que solo sugiere después.
+  const ordre: MotiuCoincidencia[] = ["email", "telefon", "email_secundari", "telefon_secundari"];
   const linies = fitxes.map((f) => {
     const quin = f.tipus === "productor" ? "productor" : "entitat";
     const nom = f.nom ? `«${f.nom}»` : "sense nom";
@@ -342,8 +379,9 @@ export function notaPaperNou(fitxes: FitxaCoincident[], dataISO: string): string
     ...linies,
     ...(feble
       ? [
-        "ATENCIO: nomes coincideix un telefon SECUNDARI (centraleta, fix compartit, contacte",
-        "d'una altra persona). Es una senyal feble: pot ser perfectament una altra organitzacio.",
+        "ATENCIO: nomes coincideix una columna SECUNDARIA (centraleta, fix compartit, correu",
+        "o telefon d'una altra persona de la casa). Es una senyal feble: pot ser perfectament",
+        "una altra organitzacio.",
       ]
       : []),
     "Cal decidir si es la mateixa organitzacio abans d'aprovar l'acces. La fitxa s'ha creat",
