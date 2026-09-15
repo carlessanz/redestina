@@ -3561,20 +3561,6 @@ sobre 107 numeradas.
     que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
     su documento.
 
-107. ~~**De un interactivo saliente no quedaba registro de las opciones que se ofrecieron.**~~
-     — **resuelta (15-09-2026)**, y salió de intentar comprobar la 105: el intake había mandado
-     la lista de modalidades, se veía el saliente en `wa_messages` con su `body` —«Quina
-     modalitat és?»— y **no había forma de saber desde la base qué filas llevaba**, que era
-     exactamente lo que había que verificar. Medido: de los interactivos salientes, **80 de 81
-     tenían `raw` a null**, mientras que los 115 de texto y los 10 de plantilla lo llevaban
-     todos. `sendText` y `sendTemplate` pasaban su `raw` a `registrarSaliente()` y
-     `sendBotones`/`sendLista` no — y son justo los únicos cuyo contenido **no** cabe en `body`.
-     Ahora guardan `{ boton?, opciones: [{ id, titulo, descripcion? }] }`.
-     ⚠️ **Se guarda lo RECORTADO, no lo que se quiso mandar**, y esa es la mitad que importa:
-     Meta corta el título de fila a 24 y la descripción a 72 **sin avisar** (§6bis), así que un
-     registro de lo pretendido serviría para todo menos para el caso a diagnosticar. Lo exige
-     `tests/whatsapp.test.ts` con un título de 30 y una descripción de 90.
-
 106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
      la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
      pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
@@ -3729,7 +3715,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **788 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **793 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

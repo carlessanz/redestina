@@ -61,7 +61,17 @@ export function esCancelar(texto: string | null): boolean {
   return t === "STOP" || t === "CANCELLAR" || t === "CANCELAR";
 }
 
-function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso | null {
+/**
+ * Qué se pregunta después de un paso. Es el orden de `PASOS` salvo por una excepción: el
+ * **preu mínim solo existe en venda y maquila**, y en donació se salta.
+ *
+ * ⚠️ Se EXPORTA para poder probarla. Es la única lógica del cuestionario que no se ve en el
+ * mensaje que llega al móvil —el aspecto de la pregunta sí, el salto no—, así que probarla por
+ * WhatsApp exige recorrer once pasos para mirar el duodécimo; y equivocarse aquí sale caro en
+ * los dos sentidos: pedirle un precio a quien dona, o publicar una venta **sin preu_minim**,
+ * que es el campo que la entidad confirma al aceptar (§5).
+ */
+export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso | null {
   const i = PASOS.indexOf(paso);
   let sig: Paso | null = i >= 0 && i < PASOS.length - 1 ? PASOS[i + 1] : null;
   // El preu mínim solo se pregunta en venda/maquila; en donació se salta.

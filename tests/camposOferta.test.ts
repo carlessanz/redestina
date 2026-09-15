@@ -342,3 +342,45 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
     )
   })
 })
+
+// ---------------------------------------------------------------------------
+// El orden del cuestionario, y el único salto que tiene
+// ---------------------------------------------------------------------------
+// `modalitat` no solo decide qué entidades pueden recibir la oferta: decide también si se
+// pregunta el **preu mínim**. En donació no se pregunta; en venda y maquila sí, y es el campo
+// que la entidad confirma al aceptar (§5). Equivocarse sale caro en los dos sentidos —pedirle
+// un precio a quien dona, o publicar una venta sin precio— y es lo único del paso que NO se ve
+// en el mensaje que llega al móvil: el aspecto de la pregunta se comprueba mirando el WhatsApp,
+// el salto no. Por eso se prueba aquí y no allí.
+import { siguientePaso } from '../supabase/functions/_shared/intake.ts'
+
+describe('siguientePaso: el recorrido del cuestionario', () => {
+  it('sin modalidad elegida, va en el orden de PASOS', () => {
+    for (let i = 0; i < PASOS.length - 1; i++) {
+      const esperado = PASOS[i + 1]
+      // La única excepción es la de abajo; el resto del recorrido es la lista tal cual.
+      if (esperado === 'preu_minim') continue
+      expect(siguientePaso(PASOS[i], {}), `después de ${PASOS[i]}`).toBe(esperado)
+    }
+  })
+
+  it('en donació NO se pregunta el preu mínim', () => {
+    expect(siguientePaso('modalitat', { modalitat: 'donacio' })).toBe('causa')
+  })
+
+  it('en venda y en maquila SÍ', () => {
+    expect(siguientePaso('modalitat', { modalitat: 'venda' })).toBe('preu_minim')
+    expect(siguientePaso('modalitat', { modalitat: 'maquila' })).toBe('preu_minim')
+  })
+
+  // Si la modalidad no llegara —un id que `interpretar()` no hubiera guardado— el salto NO
+  // debe activarse: más vale preguntar un precio de más que publicar una venta sin él.
+  it('con la modalidad ausente o desconocida, pregunta el precio', () => {
+    expect(siguientePaso('modalitat', {})).toBe('preu_minim')
+    expect(siguientePaso('modalitat', { modalitat: 'altres' })).toBe('preu_minim')
+  })
+
+  it('el último paso no lleva a ninguna parte', () => {
+    expect(siguientePaso(PASOS[PASOS.length - 1], {})).toBeNull()
+  })
+})
