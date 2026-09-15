@@ -596,8 +596,9 @@ pueden discrepar sobre el mismo dato — justo lo que esta tabla existe para evi
 
 ⚠️ **No guarda ni nombre ni NIF a propósito.** Duplicarlos crearía dos fuentes de verdad para el
 mismo dato, y en cuanto alguien editara una ficha nadie sabría cuál manda. Aquí solo vive lo que
-no tiene otro sitio: la identidad y `canal_preferido`, que es el campo que pide el funcional y la
-deuda §12.22 —hoy el canal se **deduce** de la ficha y la persona no puede decir el suyo—.
+no tiene otro sitio: la identidad y `canal_preferido`, que es el campo que pide el funcional para
+que la organización pueda **decir** su canal en vez de que se deduzca de lo que tenga la ficha
+(§8bis).
 
 ⚠️ **Y lo que los datos dijeron, que cambia lo que §12.28 daba por hecho.** Esa deuda afirma que
 unificar «exigiría deduplicar 111 entidades sin clave única». **Medido contra producción el
@@ -779,7 +780,7 @@ que editarlo en cada fase** —cuando la fase 3 cree `albaranes`, empieza a comp
 
 **`documento_envios`** — `id`, `documento_id` (FK cascade), `destinatario`, `canal` (**solo
 `email`**), `estado` (`pendent`/`enviat`/`error`), `proveedor_id`, `error`, `enviado_at`,
-`created_at`. Cierra parcialmente la deuda §12.25. `canal` admite solo correo a propósito: un
+`created_at`. `canal` admite solo correo a propósito: un
 documento o un enlace de firma por WhatsApp quedaría publicado en la consola de Mensajería, que
 lee todo el equipo.
 
@@ -1043,6 +1044,18 @@ la variante **`parcial`** del tipo `CD` (`20270303100200`; texto de trabajo **no
 asesoría**, marcado como borrador en tres sitios igual que los convenios), y por eso
 `emitir_certificado_periodo()` se niega si esa plantilla no está vigente: sin ella el PDF saldría con
 el cuerpo del certificado anual y afirmaría algo que no es cierto.
+
+⚠️ **El reparto del neto del REC se calcula por `(coalesce(albaran_rec_id, excedente_id),
+producto)`**, y esa clave es la invariante que hay que conservar si alguna vez se toca
+(`20270320100000`): **por cada `(albaran_rec_id, producto)`, la suma de los `kg_neto` repartidos
+es exactamente `rec_neto`**. El `producto` no es de adorno —un REC de espigolada con dos
+productos tiene dos netos bajo el mismo albarán, y particionar solo por el albarán mezclaría dos
+netos en un denominador—, y el `coalesce` tampoco: cuando `rec_neto` es null el id también lo es,
+y todos los nulos caerían en una sola partición. La clave se calcula **una sola vez** en la CTE
+`conrec` justo para que las cuatro ventanas que la usan no puedan volver a separarse, que es lo
+que permitió que el fallo existiera. ⚠️ El SQL vivo está en **`20270303100500`**, no en
+`20270303100000`: aquella se recreó con `create or replace` y la advertencia en prosa se quedó en
+la vieja.
 
 🔴 **El reparto del neto del REC estaba mal para cualquier ventana que no fuera el año entero.** Se
 calculaba con `partition by excedente_id` **sobre las filas ya filtradas por fecha**, así que un
@@ -1567,6 +1580,22 @@ productores escribiendo por cualquier motivo, eso secuestra conversaciones norma
 opciones y la décima es "Més…". Hace falta porque hay **12 familias** y cuatro superan los
 10 productos (Horta Tub/Bul/Arr 16, Fruita Dolça 14, Horta Fruit 14, Horta Fulla 12).
 
+**Y la lista se usa también donde bastarían tres botones**, desde el 15-09-2026: el paso
+`modalitat` era `sendBotones` y pasó a `sendLista` (§12.105). El motivo no es el número de
+opciones sino que **un botón solo tiene título (20 caracteres) y una fila de lista tiene
+`description` (72)**, así que por WhatsApp se elegía a ciegas entre donació, venda y maquila —y
+elegir mal no se nota hasta el cierre: decide qué entidades pueden recibir la oferta y qué
+documento se emite—. Las filas se derivan de `MODALITATS` en `camposOferta.ts`, el mismo sitio del
+que el panel saca su texto: **una sola fuente, que es lo que impide que los dos canales expliquen
+cosas distintas**.
+
+🔴 **Pasarse de 72 caracteres NO da error: `sendLista` recorta con `slice(0, 72)`** y el mensaje
+llega partido a media palabra. La descripción de `donacio` medía 97 y habría llegado como «…Genera
+un certificat », perdiendo justo lo que justifica el campo. Por eso el tope lo vigila
+`tests/camposOferta.test.ts` —para **toda** opción con descripción, no solo esta— y las constantes
+`MAX_DESC_FILA_LISTA` / `MAX_TITULO_FILA_LISTA` viven en `camposOferta.ts`, con el texto: quien se
+pasa es quien **escribe**, y el `slice` de `whatsapp.ts` es la última red, no la primera.
+
 **Casos que el motor ya contempla:**
 
 - Respuesta que no encaja: se repite la pregunta hasta 2 veces; a partir del 3.er fallo el motor
@@ -2051,6 +2080,11 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
 - **Errores**: `sendWhatsApp()` nunca lanza; devuelve `{ ok, status, data }`. El mapeo a texto
   legible vive en `noticeFromError()` (`Conversation.tsx`), que cubre los códigos propios
   (`window_closed`, `no_opt_in`, `unknown_contact`, `unauthorized`) y el `131047` de Meta.
+- **El tipo de una fila se queda en el fichero que hace ese `select`**, y solo sube a `types.ts`
+  una forma que usen dos o más. Quedan ~12 `interface` escritas a mano en pantallas, y no son
+  duplicación: describen **la forma de un `.select()` concreto**, no una entidad del dominio. Un
+  tipo centralizado que se desvíe del literal de columnas **miente sin fallar**, que es peor que la
+  interfaz local.
 - **La lista de columnas de un `.select()` va en UN literal**, nunca concatenada ni interpolada.
   supabase-js deduce el tipo de la fila analizando ese literal; ante una expresión devuelve
   `GenericStringError` y la fila se queda sin columnas, con lo que todo uso posterior deja de
@@ -2627,12 +2661,12 @@ las cuentas de la sección siguiente.
 
 Cada cuenta que sobra es una ficha más de ruido en los listados del equipo y en la priorización.
 
-⚠️ **Lo que costó el segundo recorte** (deuda §12.32): el arnés pierde los bloques `sense_rol` y
-`pendent` (pasa de 66 a 57 comprobaciones) y ya no hay nada en la cola de «Registres pendents». Ambos
-se recuperan **sin tocar el fixture**: basta con dar de alta una organización desde `/registre`, que
-produce exactamente el caso pendiente, y añadir su credencial a `scripts/data/cuentas-prueba.json`.
-Y al borrar las dos organizaciones quedaron **dos filas huérfanas en `email_test_recipients`**, que
-no tiene FK (§4, deuda §12.33).
+⚠️ **Lo que costó el segundo recorte**: el arnés se quedó sin cuenta que recorriera los bloques
+`sense_rol` y `pendent`, y **143 comprobaciones dejaron de ejecutarse en silencio** durante mes y
+medio. Se recuperó el 14-09-2026 dando de alta las dos cuentas de la sección siguiente —y al
+recorrerlos por primera vez desde julio **cuatro salieron en rojo**, que es exactamente para lo que
+sirve esa cobertura—. Y al borrar las dos organizaciones quedaron **dos filas huérfanas en
+`email_test_recipients`**, que no tiene FK (§4, deuda §12.33).
 
 ### Cuentas para probar WhatsApp (31-07-2026)
 
@@ -2655,6 +2689,21 @@ panel, no para el canal.
 ⚠️ Es idempotente pero **no cambia la contraseña de una cuenta que ya exista**: si se pierden, hay
 que resetearlas por la Admin API. Y el aislamiento depende de que `roles_activos` esté encendido
 (§4bis): con el interruptor apagado, estas cuentas verían toda la base como cualquier otra.
+
+### Dos cuentas más, y una NO se debe aprobar (14-09-2026)
+
+🔴 **`hola+pendent-arnes@carlessanz.com` tiene una membresía en `pendent` que hay que dejar
+como está.** Se dio de alta desde `/registre` —organización `TEST-PENDENT-ARNES`— para que el
+arnés vuelva a recorrer el bloque `pendent`, que llevaba desde julio escrito y sin ejecutar. Si
+alguien la **aprueba** desde «Registres pendents», ese bloque se queda otra vez sin ninguna
+cuenta que lo recorra y **73 comprobaciones dejan de ejecutarse en silencio**. Su compañera,
+`hola+senserol-arnes@carlessanz.com`, es una cuenta de Auth sin membresía ni rol, y cubre el
+bloque `sense_rol` (70 más).
+
+⚠️ **Son datos REALES en producción y hay que saberlo**: la primera aparece en el listado de
+productores del equipo y en la cola de «Registres pendents», donde se queda para siempre. Es el
+precio de tener esa cobertura, y está aceptado. Sus credenciales viven en
+`scripts/data/cuentas-prueba.json`, fuera de git.
 
 ### Lo que sigue pendiente
 
@@ -2998,7 +3047,7 @@ curl -sS -G "https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/analytics
 ```
 
 `function_logs` son los `console.*` de las funciones (ahí sale el JSON de tiempos de
-`generar-documento`, §12.87) y `edge_logs` las peticiones HTTP. El `cpu_time_used`, la región y la
+`generar-documento`, medido más abajo) y `edge_logs` las peticiones HTTP. El `cpu_time_used`, la región y la
 memoria de cada isolate viven en el evento `shutdown`, dentro de `metadata`, y hay que desplegarlo
 con `unnest`. **Saca siempre `execution_id`**, o los números no se pueden atribuir:
 
@@ -3023,6 +3072,19 @@ vez, y cuál es la señal de haberse equivocado, en §12.87.
 
 ⚠️ Un `unnest` mal escrito responde `Backend error! Retry your query`, que **no** es un fallo
 transitorio: es la consulta.
+
+**Cuánto cuesta generar un documento, medido en producción** (11-09-2026, y es el criterio de
+salida del spike): un PDF de 6 páginas y 123.614 bytes da **`ms_render` 174,3 ms** —el
+presupuesto eran 800—, `ms_subida` 107,8 ms y `ms_total` 462,6 ms; el runtime declara
+**`cpu_time_used` 390 ms** y 22 MB, o sea un **19,5 % del techo de 2 s de CPU** y un 8,7 % de los
+256 MB. Cinco generaciones reales dan **325-572 ms de CPU**. ⚠️ **El margen no es de un factor 10,
+es de 4**: los convenios de 8-10 páginas caben, pero no sobra tanto como parece. `generar-documento`
+emite un `console.warn` con `avis: "render_lent"` por encima de 800 ms de `ms_render`, que es un
+aviso **anticipado** —el día que se pase del techo real no habrá log que mirar—.
+⚠️ **`cpu_time_used` es del ISOLATE entero, no de la petición**: incluye el arranque y la
+evaluación de módulos con `pdf-lib` dentro, así que sale mayor que `ms_render` aunque una sea CPU
+y el otro reloj de pared. Y los no-op del cron `documentos-pendientes` gastan **33-77 ms**: un
+valor en esa horquilla es la señal característica de haber leído el isolate equivocado.
 
 Emergencia de RLS (§4bis), por orden: primero el interruptor,
 
@@ -3111,69 +3173,25 @@ Redestina en producción real quedan pasos de configuración y negocio.
     con ambigüedades reales: hay nombres de municipio repetidos entre provincias). Hasta entonces
     la columna es nula en las 12 ubicaciones y la priorización sigue comparando cadenas.
 
-**Deuda técnica.** ⚠️ **Léase con la clave de §12bis.** No todo lo que hay en esta lista es
-arreglable, y confundirlo hace que la lista entera se vuelva ruido: se lee, se comprueba que no se
-puede hacer nada con la mitad, y se aprende a ignorarla. §12bis separa **lo que es un defecto** de
-**lo que es una decisión con su precio anotado** y de **lo que depende de material que no está en
-el código**. Los números **no se renumeran nunca**: hay comentarios en `src/`, `supabase/functions/`
-y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silencio.
+**Deuda técnica: aquí vive solo lo ABIERTO.** Lo cerrado se retiró de esta lista el 15-09-2026 y
+queda indexado en **§12ter**, una línea por entrada. Hasta ese día convivían las dos cosas —65
+entradas resueltas y 41 vivas, 1.263 líneas— y eso derrotaba el propósito de la lista: para saber
+qué quedaba había que leerla entera y descartar dos de cada tres. El detalle de una cerrada está en
+`git log` del fichero, que es donde le toca.
 
+⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
+lista se vuelva ruido otra vez: de las 41 vivas, **30 están catalogadas** allí como decisión con su
+precio anotado, espera de material de un tercero o interruptor de producción. §12bis separa **lo que
+es un defecto** de **lo que no lo es**.
 
-1. 🟡 **Sin linter y sin CI** — *la mitad resuelta (11-09-2026)*.
-   ⚠️ **«Sin CI» describe el repo, no el proyecto**: no hay `.github/workflows/` ni un solo
-   run en GitHub, pero el **branching de Supabase desplegaba las quince Edge Functions en cada
-   push a `main`** (§12.44). Dar «sin CI» por «nada automático» es lo que hizo buscar tres
-   veces en el sitio equivocado.
-   ⚠️ **Ese matiz CADUCÓ el 14-09-2026**, y conviene no arrastrarlo: al desactivar el branching
-   (§7) desapareció la única automatización que había fuera del repo, así que hoy «sin CI» sí
-   describe las dos cosas. No queda nada automático salvo el hook local, que se salta con
-   `--no-verify` y no protege a quien no lo haya instalado.
-   Ya hay **522 pruebas de
-   Vitest** sobre los módulos de negocio y un **hook de pre-commit** que corre tipos, pruebas y
-   `deno check` (§11, §13), así que las comprobaciones ya no dependen de que alguien se acuerde.
-   ✅ **Y CI hay desde el 14-09-2026**: `.github/workflows/comprobacions.yml` corre en cada push a
-   `main` y en cada PR lo mismo que el hook —tipos de app y pruebas, las 522 de vitest y el
-   `deno check` de los scripts y las 15 funciones— más `npm run build`, que no entra en `check` y
-   puede fallar solo. Deno se instala explícitamente: sin él, la tercera parte de `npm run check`
-   no comprueba nada. Verde en su primera ejecución (`895b727`).
-   ⚠️ **El arnés de RLS se queda fuera a propósito**, y no por pereza: abre sesiones reales contra
-   **producción** con las credenciales de `scripts/data/cuentas-prueba.json`, que está fuera de git.
-   Meterlo en CI significaría dárselas a GitHub y dejar que un runner escriba en la base real en
-   cada push. Se sigue ejecutando a mano, que es lo que pide §13.
-   ⚠️ **Y el workflow no despliega nada.** Publicar sigue siendo manual y en su orden (base →
-   funciones → frontend, §11): un CI que desplegara Edge Functions se saltaría ese orden.
-   ✅ **Y linter, el mismo día, pero acotado a UNA cosa**: `eslint.config.js` activa solo
-   `react-hooks/rules-of-hooks` y `react-hooks/exhaustive-deps`, y **apaga explícitamente todo lo
-   demás**. No es pereza: `tsc` ya corre con `strict`, `noUnusedLocals` y `noUnusedParameters`, de
-   donde sale la mayor parte del valor de un linter en TypeScript, y estrenar el conjunto entero
-   sobre 40 componentes escritos sin él daría cientos de avisos de estilo que nadie va a triar — y
-   un linter cuyos avisos se ignoran es peor que ninguno, porque enseña a ignorar la salida en
-   rojo. Las dos que quedan **no son estilo**: cazan errores que compilan y fallan en ejecución
-   (una dependencia que falta no da error de tipos, da una pantalla que no se refresca).
-   **La línea base es CERO** sobre los 118 ficheros de `src/`, verificada además con una
-   contraprueba —un `useEffect` con dependencia omitida, que el linter caza—. Va dentro de
-   `npm run check` y por tanto del hook y del CI. ⚠️ Si algún día empieza a dar avisos que se dejan
-   pasar, deja de servir: al añadir una regla, o se arregla todo lo que saca o no se añade. Lo que costó no tener nada de esto está medido: `deno check` no
-   había pasado nunca sobre las Edge Functions (§12.45) y escondía tres errores de tipos reales.
-2. ~~**No hay roles**~~ — **resuelto (2026-07-30)**: modelo desplegado y **encendido** en producción
-   (§4bis), verificado con el arnés (48/49 **ese día**; la referencia de hoy es 56/56 + 1 saltada
-   —§13— y la
-   diferencia está explicada en la deuda 32). El único rojo era, y sigue siendo, un receptor
-   comercial sin ninguna oferta de `venda` publicada, que es el comportamiento correcto. Queda de deuda: `tipo_receptor`
-   sigue en `null` en 111 entidades y sin él un receptor no ve ninguna oferta —es triaje manual—, y
-   `usuario_roles` no tiene FK a `perfiles`, así que PostgREST no puede embeber los dos (la futura
-   pantalla «Equip» tendrá que cruzarlos en cliente).
-3. ~~**El intake avanza de paso aunque falle el envío.**~~ — **resuelta (11-09-2026)**:
-   `preguntar()` devuelve `boolean`, las 14 ramas miran el `.ok` de su envío, y **el orden se
-   invierte** — se pregunta primero y el paso solo avanza si salió. La respuesta sí se guarda
-   (está entendida y validada); lo que no se mueve es `paso_actual`, así que el reintento es
-   idempotente.
-   ⚠️ **`_intentos` no lo toca un fallo de red**, y esa distinción es el fondo del asunto: ese
-   contador sube solo cuando `interpretar()` no entiende la respuesta. Confundir las dos cosas
-   expulsaría del formulario a quien contesta bien y tiene mala cobertura.
-   Verificado contra la base local con la Graph API devolviendo 500 a voluntad: con el código
-   anterior, un fallo en el paso «producte» dejaba la sesión en «varietat» sin que el productor
-   viera la pregunta, y su siguiente mensaje («Poma») se guardaba como **variedad**.
+🔴 **Los números no se renumeran NUNCA, y borrar tampoco los libera.** Hay comentarios en `src/`,
+`supabase/functions/`, `scripts/` y `tests/` que citan **69** de ellos —48 apuntan a entradas ya
+cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)—. Por eso §12ter
+conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
+apuntarían a la nada. Un número retirado no se reutiliza jamás.
+
+Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **67 cerradas**.
+
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
    técnico lo normaliza en el panel y hasta entonces el job de vencidas no actúa sobre ese excedente.
@@ -3204,59 +3222,15 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
    entrada— y aún agrega cuatro; y los buscadores de
    `ProducersList`/`OffersList` filtran **en cliente** sobre lo ya cargado, así que la paginación
    de esos listados exige rehacer búsqueda, orden y el reparto test/resto en servidor.
-6. ~~`Conversation` carga el hilo completo sin paginación.~~ — **resuelta, y nadie lo anotó**
-   (visto el 14-09-2026 al revisar la lista entera). `Conversation.tsx:66` define `PAGINA = 50`, la
-   carga inicial pide los últimos 50 por `contact_phone` (`:109-111`) y `carregaMes()` (`:141-155`)
-   pagina hacia atrás con cursor `.lt('created_at', …)`. El propio comentario del fichero
-   (`:106-108`) cita esta deuda. De paso se resolvió un detalle fino: el autoscroll mira solo el
-   último id (`:134-138`), así que cargar historial no te devuelve al final.
-7. ~~`ContactList` conserva la prop `single` (modo conversación única)~~ — **resuelto**: esa prop ya
-   no existe (props actuales: `contacts`, `loading`, `error`, `selectedPhone`, `onSelect`, `onReload`).
-8. ~~`index.css` es un único fichero global (~825 líneas) con clases sin namespace.~~ — **resuelto**: desde el paso a Tailwind v4 + shadcn solo contiene tokens y base (§2bis).
-9. ~~`types.ts` no modela `raw`; `MessageRow` en `ProducersList` duplica parte de `WaMessage`.~~ —
-   **las dos mitades eran falsas** (14-09-2026). `raw` existe en `types.ts:59` con su bloque de
-   documentación, y se pide explícitamente en `Conversation.tsx:110,146`; `MessageRow` se mudó a
-   `lib/mensajes.ts:7`, donde ya no es duplicación sino el tipo de entrada de un módulo que no
-   importa nada a propósito, para poder probarlo sin cliente de Supabase.
-   **Y se cierra sin sustituirla por su versión ampliada, a propósito.** Quedan ~12 `interface`
-   escritas a mano (`Dashboard.tsx:17-18`, `AlbaraDetall.tsx:59,70,84`, `Espigolades.tsx:76,454,463`…),
-   pero describen **la forma de un `.select()` concreto**, no una entidad del dominio. §7 dice que
-   supabase-js deduce el tipo de la fila del literal de columnas: un tipo centralizado que se desvíe
-   de ese literal **miente sin fallar**, que es peor que la interfaz local. La regla que queda:
-   *una forma usada en dos o más ficheros sube a `types.ts` (con `Pick<>` sobre la tabla); la de un
-   solo `select` se queda donde está*.
+
 10. Hay migraciones que **borran datos** (`truncate wa_messages`) mezcladas con DDL. Son **dos**, y
     solo una mezcla: `20260717080924_productores_y_limpieza.sql:3-4` (el `truncate` y un `delete`, en
     el mismo fichero que crea `productores`) y `20260717084210_vaciar_mensajes.sql:1`, que es un
     fichero de limpieza de una sola línea. Las demás apariciones de «truncate» en el repo son la
     revocación de `20270309100000`, no borrado.
-11. 🟡 **Sin FK entre `productores`, `wa_contacts` y `wa_messages`** — y al medirlo resultó que
-    la entrada pedía de más. **`wa_messages.contact_phone → wa_contacts.phone` sí se declara**
-    (`20270321100000`, `not valid` + `validate` aparte, `on delete restrict`): había **0
-    huérfanos** sobre 352 mensajes, y los índices y el UNIQUE que Postgres exige ya existían.
-    ⚠️ **`productores.phone → wa_contacts.phone` NO se declara, y no debe**: **274 de los 345
-    productores no tienen contacto de WhatsApp**, y eso es correcto —una ficha existe haya escrito
-    o no, y 61 ni siquiera tienen móvil utilizable—. Una FK ahí afirmaría algo falso por
-    construcción y rompería el alta de fichas. La relación existe; no es una FK.
-    ⚠️ **El orden con el despliegue no es negociable**: el webhook tenía que dejar de tragarse el
-    fallo del upsert del contacto **antes** de poner la FK, porque con ella ese caso pasa de
-    huérfano silencioso a `23503` que **pierde el entrante**.
+
 12. `prioritat` casi no discrimina (97 de 111 entidades son prioridad 1): aporta poco al ranking.
-13. ~~`oferta_respuestas` se registra desde el **cliente**~~ — **cerrada por medición
-    (14-09-2026): estaba contada de más, y lo que describe no es un agujero.** De los tres momentos
-    de la fila —nacer, contestarse, aprobarse— **solo el primero** sigue en el cliente
-    (`OfferDetail.tsx:246-259`, con tres llamadas en `:359`, `:424` y `:452`); la respuesta ya la
-    escribe el webhook (`_shared/respuestas.ts`) y el interés del panel, la RPC
-    `manifestar_interes()`. Tampoco hay riesgo de suplantación: `OfferDetail` solo se monta desde
-    `equip/OfertaDetall.tsx:34`, `oferta_respuestas` tiene GRANT completo para `authenticated` desde
-    `20260723100000:35`, y `registrarEnvio` solo corre si el envío salió (`r.ok`).
-    **El único fallo real es una ventana de milisegundos**: si el navegador se cierra entre el envío
-    y el `upsert`, el envío existe y la traza no. Moverlo al servidor costaría cambiar el contrato de
-    `whatsapp-send` **y** el de `enviar-email` más tres llamadas, para cerrar eso. No compensa.
-    ⚠️ Lo que **sí** sigue abierto de esta entrada: las respuestas por **email** no tienen captura
-    automática (no hay inbound de correo) y se marcan a mano (`marcarRespuesta()`, `:262-268`), que
-    es la deuda 92 por el otro lado. Y `src/types.ts:244` declara `canal: 'whatsapp' | 'email'`
-    cuando la RPC escribe también `'panel'`: el tipo miente, aunque nadie hace un `switch` exhaustivo.
+
 14. 🟡 **La clasificación sí/no sigue siendo una heurística por lista de palabras**, pero ya
     está **medida** y tres errores reales están corregidos (11-09-2026, `tests/respuestas.test.ts`,
     67 pruebas). Los tres cerraban una oferta al revés **sin que nadie lo revisara** —la fila
@@ -3274,15 +3248,7 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ⚠️ Lo que **sigue abierto**: es una lista de palabras, y hay huecos de vocabulario conocidos
     —el castellano «de acuerdo» no está (sí el catalán `d'acord`)— y una frontera arbitraria en
     las 5 palabras: «no ens va bé això» se clasifica y «no ens va gens bé això» no.
-15. ~~La selección de plantilla de primer contacto por rol no se ejercita en test.~~ —
-    **resuelta (11-09-2026)**: `tests/plantillas.test.ts` cubre las dos ramas del flag. La
-    encendida se ejercita recompilando el mismo fuente con `PLANTILLES_CA_APROVADES = true`, y la
-    prueba verifica que la sustitución ha ocurrido de verdad — si el flag se renombrara, la suite
-    falla en vez de probar dos veces el mismo caso. Sigue siendo cierto que **en producción** solo
-    actúa cuando Meta apruebe las plantillas (checkpoint §12.2).
-    ⚠️ Hay ahí un `expect(PLANTILLES_CA_APROVADES).toBe(false)` **puesto para fallar** el día que
-    se encienda: el checkpoint exige cuatro cosas más en ese mismo commit, y esa parada es el
-    recordatorio.
+
 16. **Doble rol** productor+entidad (Carles Sanz, Sebas Sale, Raquel Diaz, Laura Masdeu): tablas
     separadas sin FK, un teléfono puede estar en ambas. En el **panel** está resuelto (§6ter), y
     desde la etapa 1 de `organizaciones` el sistema **sabe** que las dos fichas son la misma
@@ -3305,37 +3271,13 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     organización, que antes era indistinguible de dos organizaciones con el mismo teléfono.
 17. Coexisten dos gates: **`es_test`** (fuente de verdad de la app, §8) y las whitelists
     `meta_test_recipients`/`email_test_recipients` (requisito técnico de Meta en test). En test un
-    destinatario debe cumplir **ambos**; se inicializaron alineados. El **Dashboard** aún gestiona
-    y mide por las listas de Meta (no por `es_test`): coherente hoy porque coinciden, a revisar al
-    pasar a producción de Meta o si se marca `es_test` a alguien fuera de la lista de Meta.
-18. ~~**Aprobación sin roles**~~ — **resuelto (2026-07-30)**: la RPC `aprovar_resposta()` exige
-    `pot_aprovar()` y el trigger `respuestas_control_aprovacio` lo impone aunque se relajen las
-    políticas (§4bis). Efectivo al encender `roles_activos`. El «acuerdo del productor» que exige el
-    funcional sigue implícito en la coordinación asistida del equipo (mejora futura: señal explícita).
-19. ~~**`OfferDetail` aprueba a mano**, con llamadas sueltas en vez de `aprovar_resposta()`.~~ —
-    **resuelta (11-09-2026)**, y no era lo que esta entrada decía. Estaba escrita como un problema
-    de elegancia —cuatro escrituras sin transacción— y era **una regla de negocio sin aplicar**:
-    `aprovar_resposta()` comprueba el convenio vigente de las dos partes, y el panel **no llamaba a
-    la RPC**, así que pasada `fecha_corte_convenios` una canalización sin convenio entraba igual.
-    Como este es el **único sitio desde el que el equipo aprueba**, el bloqueo no existía en la
-    práctica. Ahora va por la RPC, con el aviso previo de §12.78.
-    Lo único que se pierde es `canalizaciones.comentarios = 'Preu acordat: …'`, que la RPC no
-    escribe: **no lo lee nadie** —ninguna pantalla pinta esa columna— y el precio vive en
-    `oferta_respuestas.preu_ofert`, que es su sitio.
-20. ~~**Rol único por usuario.**~~ — **cerrada por medición (11-09-2026): las dos mitades de esta
-    entrada ya no describen nada.**
-    La primera —«la interfaz asumirá el más alto»— **no es una aproximación, es la definición**: la
-    jerarquía de `usuario_roles` es **acumulativa** (`admin` es todo lo de `tecnic` y más;
-    `super_admin`, todo lo de `admin` y más), así que quedarse con el más alto es la lectura
-    correcta, no una simplificación. En producción hay **una** cuenta con dos filas
-    (`hola@carlessanz.com`: `admin` + `super_admin`) y quedarse con `super_admin` es exactamente lo
-    que debe pasar. `mi_rol()` ordena y `limit 1`.
-    La segunda —«el multirol por organización la UI aún no»— se resolvió el **31-07-2026**: el menú
-    pinta **todos los paneles a la vez** (§6ter) y el panel activo se deriva de la URL. Y desde
-    `20270311100000` la base impone una ficha de cada tipo por cuenta (§12.31).
-    Lo que sí queda, y no es esto: `rol_org` (`titular`/`operador`) vale **siempre `titular`** de
-    facto —el producto no tiene cargos dentro de la organización—, así que la rama `operador` de
-    `PerfilOrganitzacio` es código sin cobertura (§9).
+    destinatario debe cumplir **ambos**; se inicializaron alineados. Desde el 15-09-2026 el Dashboard
+    ya **no las gestiona** —el gestor se fue a Configuració con el resto de interruptores (§6ter)—
+    pero su KPI **sigue midiendo por la lista de Meta y no por `es_test`**, que es la fuente de
+    verdad del envío (§8): coherente hoy porque coinciden, a revisar al pasar el número a producción
+    —ese día la lista se vacía y la KPI diría que puede recibir todo el mundo— o si se marca
+    `es_test` a alguien que no esté en ella.
+
 21. 🟡 **El canal preferente (§8bis) no llega a todos los envíos** — *la mayor parte, cubierta
     (14-09-2026)*. Con el interruptor global (§8) el correo ya cubre los momentos que eran solo de
     WhatsApp: la **confirmación de oferta registrada** (`crear-oferta`), la **respuesta de la
@@ -3346,47 +3288,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     WhatsApp es el panel (§6ter). El **ALTA/BAJA** solo significa algo dentro de WhatsApp. Y sigue sin
     haber **fallback a correo dentro de `whatsapp-send`**: lo orquesta el llamante, que es quien sabe
     qué texto tiene sentido por correo.
-22. ~~**Sin preferencia de canal declarada por la persona.**~~ — **resuelta (11-09-2026)**:
-    `organizaciones.canal_preferido` se escribe con `actualizar_meu_canal()` desde el perfil y lo
-    respetan `decidirCanal()` y sus dos consumidores (§8bis). Queda el límite, que es **de Meta y no
-    del código**: la preferencia elige **entre los canales viables**; pedir WhatsApp sin opt-in y con
-    la ventana cerrada sigue saliendo por correo, ahora marcado como preferencia incumplida en el
-    panel y en el log — que es la diferencia entre no poder cumplirla y ignorarla.
-23. ~~**`excedentes` tiene el único predicado de RLS que no puede ser InitPlan.**~~ — **resuelta
-    (`20270304100400`)**: el `EXISTS` correlacionado se sustituye por el SRF `security definer`
-    `modalitats_compatibles_meves()` y un `modalitat in (select …)`, que el planner resuelve una vez
-    y hashea. Medido con `explain (analyze)`: desaparecen el `SubPlan` por fila y el `Seq Scan on
-    entidades` anidado —con su segunda llamada a `mis_entidades()`—, y el plan pasa de 57 líneas a
-    23. Matiz honesto: sale como `hashed SubPlan`, no como `InitPlan`, igual que las otras tres
-    ramas sin correlación; el comportamiento es el mismo (una evaluación y hash).
-    **Equivalencia verificada**, que es lo que de verdad importaba: para las 7 cuentas de la base
-    local —y repitiéndolo con `roles_activos` apagado— el conjunto de ofertas visible con la
-    política vieja y con la nueva es **idéntico**.
+
 24. **Los eventos DELETE de Realtime se entregan sin evaluar RLS** (`realtime.apply_rls` los reparte
     a todos los suscriptores porque, con la replica identity por defecto, el WAL solo lleva la
     clave primaria). Hoy es inocuo: el payload es solo un id. Dejaría de serlo si algún día se
     pusiera `replica identity full` en una tabla con datos personales.
-25. 🟡 **Un fallo de envío por correo ya deja rastro en la base; falta que el panel lo lea.**
-    Y la entrada se quedaba corta: `documento_envios` **no la escribía nadie y no la leía nadie**,
-    y el caso que describía —correos con documento adjunto— **no existe**, porque
-    `EmailPayload.attachments` está declarado y ningún llamante adjunta nada. O sea que en la
-    práctica **ningún** correo dejaba rastro: ni los de acceso, ni los de recuperación, ni las
-    ofertas, ni el código de firma.
-    `20270307100000` la generaliza —`documento_id` nullable, objeto polimórfico, `proposito`,
-    `funcion` y el estado `simulat`— y `sendEmail()` la escribe con `service_role`.
-    ⚠️ **No se guarda el asunto, y no es un olvido**: el correo del código de firma lleva las seis
-    cifras en el propio `subject`, y esta tabla la lee todo el equipo. Mismo criterio que
-    `bodyConsola` en `sendText()` (§9).
-    ⚠️ `registrarEnvio()` **se apaga solo** si la migración no está (`42P01`/`42703`/`PGRST204`),
-    avisando una vez por isolate: así función y migración se pueden desplegar en cualquier orden.
-    ✅ **Y ya hay pantalla (14-09-2026)**: sexta pestaña «Enviaments» en la bandeja del equipo, con
-    fecha, destinatario, propósito, función, documento y estado, y el error debajo cuando lo hay.
-    ⚠️ **Lo que había que separar, y se separó en el TEXTO y no solo en la estructura**: el error de
-    **generar el PDF** (que ya salía en la pestaña «Amb error», y vive en `documentos.estado`) no es
-    el error de **enviarlo** (que es este). La pestaña vieja lo dice ahora explícitamente.
-    ⚠️ `simulat` se pinta **en neutro, no en rojo**: con `RESEND_ENVIO_REAL` apagado el correo no
-    sale, pero eso no es un fallo. Y un propósito desconocido se enseña **en crudo** en vez de
-    inventarle una traducción, porque cada Edge Function pone el suyo y son texto libre.
+
 26. **El registro público no tiene captcha y su límite por IP vive en memoria** (§9): se pierde en
     cada arranque en frío del isolate y no se comparte entre instancias. Lo que de verdad frena un
     abuso masivo es el tope de 20 pendientes por hora. Turnstile queda pendiente; hoy no compensa,
@@ -3402,86 +3309,14 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     ningún canal** (y con el modo test encendido tampoco podría recuperar la contraseña, §8). Y quien
     espera validación se entera de que se la han aprobado entrando a mirar. Falta una notificación
     —que dependerá de la tabla `notificacion` con *fallback* de canal del funcional (§1bis)—.
-28. ~~**El registro no deduplica contra las organizaciones existentes.**~~ — **resuelta entera
-    (11-09-2026)**: `registro` consulta `v_organizaciones` y distingue los tres casos (§9), y el
-    equipo **une las dos fichas desde Aprovacions** con `enllacar_organitzacio()`
-    (`20270315100000`). La persona que registra ve además el motivo de su espera, con el
-    `revisio_equip` que devuelve la función — las dos altas esperan al equipo, pero solo una tiene
-    un motivo particular, y callárselo haría parecer que la espera es la de todo el mundo.
-    ⚠️ **Enlazar resultó ser FUSIONAR, no rellenar un hueco**, y eso solo se vio al ir a
-    construirlo: la etapa 2 daba por hecho que la ficha quedaba con `organizacion_id` NULL, y el
-    trigger de la etapa 1 va delante y le pone una. O sea que el caso «papel nuevo» **sí producía
-    el duplicado que la detección venía a evitar**, solo que con una nota que lo decía. La RPC
-    mueve la ficha y sus convenios a la organización buena y retira la que se queda vacía.
-    ⚠️ **Lo que NO decide la máquina**: si las dos organizaciones traen convenio vigente del mismo
-    tipo, se niega y pide resolver uno antes — juntar dos acuerdos firmados no es un efecto
-    colateral de un clic.
-    **El deshacer tiene botón** (`EnllacOrganitzacio`, 11-09-2026): donde una ficha comparte
-    organización se ofrece separarla, y eso llama a la misma RPC con `organitzacio` NULL. Va en
-    **dos** sitios y por motivos distintos: en Aprovacions, porque es donde se acaba de enlazar; y
-    en la **ficha del equipo**, porque un enlace equivocado se descubre semanas después, cuando ese
-    registro hace mucho que no está en ninguna cola. Donde la ficha está sola en su organización no
-    se pinta nada: no hay nada que separar.
-29. ~~**Una ficha rechazada se queda en los listados.**~~ — **resuelta (11-09-2026)** con
-    `v_productores_llistat` / `v_entidades_llistat` (`20270306100100`), que añaden la marca
-    derivada `rebutjada`; los dos listados la pintan en rojo.
-    **Se marca y NO se esconde**, y la diferencia importa: **el super_admin llega a la ficha
-    desde ese listado** y es quien tiene que borrarla, así que esconderla convertiría el ruido
-    en un residuo inalcanzable — exactamente lo que ya pasó con `email_test_recipients` (§12.33).
-    ⚠️ Las vistas llevan **`security_invoker = true`**, y no es un detalle: sin él correrían con
-    los permisos del propietario y **se saltarían la RLS** de las tablas de debajo, que es lo
-    único que protege las 452 fichas con nombre, NIF, teléfono y dirección.
-    Sigue abierto lo que la entrada decía al final: **la cuenta de Auth huérfana hay que borrarla
-    aparte**, y eso no lo arregla una vista.
+
 30. **Las contraseñas de las cuentas de prueba viajan en el bundle** con `VITE_ACCESSOS_TEST=true`
     (§6quater, §10). Está acotado y se apaga con la variable, pero mientras esté encendido cualquiera
     que abra `/login` entra como ellas. Desde el 31-07-2026 el alcance ya no es solo «organizaciones
     ficticias»: las cinco cuentas de WhatsApp (§9) enseñan **fichas de personas reales del equipo**
     —nombre, correo de trabajo y móvil—. Nunca cuentas con rol de plataforma, eso sigue vetado.
     Apagarlo al dejar de ser una demo.
-31. ~~**La interfaz solo alcanza la primera organización de cada tipo.**~~ — **resuelta al revés
-    de como esta entrada proponía (`20270311100000`)**, y el motivo es la medición: de **14
-    membresías vivas en producción, CERO cuentas tienen dos fichas del mismo tipo**. El problema no
-    existe todavía.
-    Así que en vez de rehacer la navegación de los dos paneles externos para meter el `orgId` en la
-    URL —el arreglo «de verdad» que pedía, para un caso que nadie ha tenido— se **impone en la base
-    la invariante que el código ya asume**: índice único parcial sobre `membresias (user_id, tipo)
-    where activo and aprovacio = 'aprovada'`. Si algún día hace falta de verdad, quitarlo es una
-    línea, y entonces tocará hacer el selector **con un caso real delante que diga cómo debe
-    comportarse**.
-    ⚠️ Parcial a propósito: una membresía **rechazada o desactivada no ocupa sitio**, o alguien a
-    quien se le rechazó un alta no podría volver a intentarlo.
-32. ~~**143 comprobaciones del arnés se quedaron sin cuenta que las recorra.**~~ — **resuelta el
-    14-09-2026**: se dieron de alta las dos cuentas que faltaban y el arnés pasa de **504/504 a
-    649/649**. Fueron **145**, no 143, porque por el camino se le añadieron dos checks a cada
-    bloque.
-    🔴 **Y al recorrerlos por primera vez desde julio salieron CUATRO en rojo**, que es exactamente
-    para lo que sirve esta cobertura: `DOCUMENTAL_EXTERN` incluía «ve las organizaciones» como
-    `permitir`, y los bloques `sense_rol` y `pendent` lo heredaban — pero esas cuentas **no tienen
-    organización** (membresía inexistente o `activo = false`), así que sus 0 filas eran el
-    comportamiento **correcto**. El check describía como fallo lo que debe pasar. Los dos de lectura
-    salen del bloque común y pasan a declararse por perfil: `permitir` en productor, receptor y
-    doble rol; `denegar` en los dos sin organización. **Un check que nadie ejecuta envejece igual
-    que una entrada de deuda.**
-    ⚠️ **Las dos cuentas son datos REALES en producción** y hay que saberlo: `hola+pendent-arnes@`
-    (alta por `/registre`, organización `TEST-PENDENT-ARNES`, **membresía en `pendent` que no se
-    debe aprobar** — si se aprueba, el bloque deja de tener con qué probarse) y `hola+senserol-arnes@`
-    (cuenta de Auth sin membresía ni rol). Sus credenciales viven en `scripts/data/cuentas-prueba.json`,
-    fuera de git. La primera aparece en el listado de productores del equipo y en la cola de
-    «Registres pendents»: es el precio de tener esa cobertura.
-    El texto original: ⚠️ Esta entrada decía
-    «nueve» y la cifra era de otra época: contaba solo los checks **propios** de cada bloque e
-    ignoraba que los dos **heredan los 60 de `DOCUMENTAL_EXTERN`**. Medido el 14-09-2026:
-    `sense_rol` son 10 + 60 = **70** y `pendent` 13 + 60 = **73**. El diagnóstico cualitativo sí era
-    correcto. Los bloques `sense_rol` y `pendent` de `scripts/comprobar-rls.ts` siguen escritos —son la
-    especificación de lo que esas cuentas deben *no* poder hacer— pero el arnés recorre las cuentas de
-    `cuentas-prueba.json`, y desde el recorte del 31-07-2026 ninguna tiene esos roles: por eso la
-    referencia pasó de 65/66 a **56/56 + 1 saltada**. No es un fallo de comportamiento, es
-    **cobertura perdida**; el arnés sigue saltando esos bloques en silencio por no tener cuenta que
-    los recorra, aunque desde el 10-09-2026 sí avisa de la cobertura que se queda huérfana **dentro**
-    de un bloque que sí se recorre (§12.48). Se recupera dando de alta una organización
-    por `/registre` y añadiendo su credencial con `"rol": "pendent"` (§9). Con ello, la **cola de
-    «Registres pendents» también vuelve a tener con qué probarse**, que hoy está vacía.
+
 33. 🟡 **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK:
     la tabla guarda un correo suelto (§4). Pasó dos veces el 31-07-2026 y se limpió a mano.
     **Estado comprobado el 11-09-2026**: de las 11 filas de producción, **10 tienen ficha detrás**
@@ -3501,296 +3336,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     variantes base de `ui/button.tsx:24-30`, `ui/input.tsx:11` y `ui/select.tsx:40` están todas por
     debajo de 44 px, y son ~250 controles—, pero la interfaz ya no es uniforme: quien mida esto otra
     vez debe contar `h-11` antes de concluir.
-35. ~~**`window.prompt()` en dos sitios.**~~ — **resuelta (11-09-2026)**. Y eran **tres**, no dos:
-    la entrada nombraba `productor/OfertaDetall.tsx` y `equip/Aprovacions.tsx` —este último ya se
-    había arreglado por el camino— pero no los **dos de `OfferDetail.tsx`** (rechazar una
-    aprobación y marcar no colocada), que nadie había anotado. Los tres usan ya el `DialegMotiu`
-    que existía. `grep -rn "window.prompt" src/` no devuelve ninguno.
-    ✅ **Y los `window.confirm()` también, el 14-09-2026.** Eran **ocho**, no seis: `Settings.tsx`
-    ×2, `RecordDetail.tsx`, `OfferDetail.tsx` ×4 y `Conversation.tsx`. El argumento para tolerarlos
-    —su bloqueo se comporta como «cancelar», que es el lado seguro— no cubría los dos peores: en
-    `RecordDetail` y `Conversation` eran la puerta de un borrado irreversible, así que con el
-    diálogo bloqueado no pasaba nada **y la persona no recibía ninguna señal de por qué**, que es
-    exactamente el fallo que motivó retirar `prompt()`.
-    Los sustituye **`useConfirma()`** (`src/components/DialegConfirma.tsx`), el hermano de
-    `DialegMotiu` para cuando no hay motivo que pedir. ⚠️ **Es un hook que devuelve una promesa, y
-    no un componente suelto, a propósito**: `window.confirm` es síncrono y se usa en línea en medio
-    de funciones que siguen con la escritura, así que un diálogo normal obliga a partir cada una en
-    dos —guardar la acción pendiente y ejecutarla en el `onConfirma`—, que es donde se cuelan los
-    errores. Con la promesa la forma del código no cambia: `if (!(await confirma({…}))) return`.
-    ⚠️ Cerrar por Escape o pulsando fuera resuelve `false`, y al desmontarse el componente también:
-    una promesa sin resolver deja colgada para siempre la función que la espera.
-    De paso, los textos se repartieron: **el título pregunta y la descripción dice la
-    consecuencia**, en vez de repetir «¿seguro que…?» dentro de un diálogo que ya lo pregunta.
-36. ~~**Las pestañas de `/registre` caben con 1 px de margen.**~~ — **resuelta (11-09-2026)**, y
-    medido en Chrome real a 320 px sobre la aplicación construida, no sobre una maqueta: era **peor**
-    de lo que decía la entrada. El texto «Entitat receptora» ocupaba **111,14 px** en una caja de
-    contenido de **98 px**: se comía entero el `px-2` de la pastilla y se quedaba a 2,86 px del
-    borde. No desbordaba la página solo porque el `grid-cols-2` de Tailwind es `minmax(0,1fr)`.
-    El arreglo **no depende de la longitud del texto**, que era el criterio: se retira el
-    `whitespace-nowrap` que `TabsTrigger` trae de serie, la lista puede crecer a lo alto y el botón
-    puede encoger (`min-w-0`). De paso el área táctil sube de 34,5 px a 44 en móvil.
-    Comprobado **dos veces y por separado**, a 320 px sobre la aplicación corriendo: con la etiqueta
-    real, `white-space: normal`, 111,13 px de texto en una caja de 98 que envuelve a dos líneas y
-    **0 px de desbordamiento**; y con una etiqueta inventada de 50 caracteres, la pastilla crece a
-    88 px de alto, el ancho no se mueve y el desbordamiento **sigue en 0**.
+
 37. **El aviso de instalación no se puede probar de verdad en automático.** `beforeinstallprompt` no lo
     dispara ningún navegador de escritorio ni Playwright, así que las pruebas lanzan un evento
     sintético: se verifica que **el banner reacciona**, no que Chrome lo emita. La instalación real
     solo se comprueba en un móvil.
-38. ~~**`vista_defecto` se calcula en el servidor y el frontend lo descarta.**~~ — **resuelta
-    (11-09-2026)**. Y no era «inofensivo» como decía esta entrada: la pantalla de perfil **deja
-    escribir ese campo** (hay `grant update` desde `20260730090000:134`), así que había un ajuste
-    que el usuario podía cambiar y que no hacía absolutamente nada. El comentario de `rolInicial()`
-    llegó a afirmar que «`vista_defecto` manda si el usuario la ha elegido», que era falso.
-    Precedencia, ahora fijada con pruebas: **el dispositivo** (`localStorage`, la decisión más
-    reciente y concreta) → **la cuenta** (`vista_defecto`, que es lo que hace útil el ajuste en un
-    dispositivo nuevo) → el primer panel que tenga. Un `vista_defecto` que ya no corresponde —una
-    membresía retirada— se ignora en vez de mandar a una ruta denegada.
-39. ~~**`crearExcedente()` no reintenta ante colisión del correlativo.**~~ — **resuelta (fase 3)**:
-    `generarId()` pide el número a `siguiente_numero(prefijo, ejercicio)` en vez de contar filas con
-    un `like`, y ante `23505` reintenta hasta 3 veces. El formato `E-AAMMDD-XXX-YYY-N` no cambia.
-    Verificado con dos altas **en paralelo** del mismo productor y producto: `-2` y `-3`, las dos
-    correctas. El comentario del fichero afirmaba desde julio que reintentaba, y no era verdad.
 
-40. ~~**El albarán se genera con el productor en blanco.**~~ — **ya lo estaba, y el documento no
-    se enteró.** `textoAlbaran()` **no existe** desde la fase 3, que lo retiró: `src/lib/textos.ts`
-    solo exporta `textoRecollidaConfirmada`, que es un aviso de WhatsApp para copiar y pegar, no un
-    documento. Queda el matiz de que ese aviso sigue pasando `dataHora` y `comentaris` vacíos —dos
-    líneas—, pero no tiene efecto legal. Sirve de precedente: **una lista de deuda envejece en las
-    dos direcciones**, y dar por buena una entrada vieja hace escribir código para un problema que
-    ya no está.
-
-41. ~~**El rebranding a Redestina es textual, no visual.**~~ — **resuelta (10-09-2026)**: sistema
-    de diseño implantado (§2bis) con el logo nuevo, sus variantes, iconos PWA, favicon y
-    `logo-email.png`; la barra superior de la landing es clara con el logo en color (como propone
-    `design/DESIGN.md §6`) y el hero, el pie y los accesos van en verde con el negativo. Las Edge
-    Functions con la plantilla de correo nueva hay que **redesplegarlas** (`/publicar`, §11) para
-    que los correos salgan con los colores nuevos.
-42. ~~**La infraestructura todavía responde al nombre viejo.**~~ — **resuelta (10-09-2026)**:
-    proyecto de Vercel, dominio, `ALLOWED_ORIGIN`, `APP_URL`, `RESEND_FROM`, `site_url` y
-    `uri_allow_list` migrados y verificados con preflight real (§10ter). Queda de rastro que
-    el dominio anterior se apagó sin redirección: inocuo hoy porque no hay destinatarios reales,
-    pero es la segunda vez que se usa ese argumento (§10bis).
-43. ~~**`whatsapp-send` desplegada sin `verify_jwt`**~~ — **resuelta (10-09-2026)**: `config.toml`
-    declaraba `verify_jwt = false` y manda sobre el CLI, así que cada `functions deploy` la dejaba
-    en `false` mientras §9 y §11 decían lo contrario. No era una vía de entrada —`exigirEquipo()`
-    ya respondía `401` sin sesión— pero faltaba la barrera de la plataforma *delante* de la propia.
-    Puesto `verify_jwt = true` y redesplegada (v102). Verificado contra producción: sin cabecera
-    `Authorization` corta la plataforma (`UNAUTHORIZED_NO_AUTH_HEADER`) antes de entrar al código;
-    con el JWT de una sesión de equipo entra y actúan los gates internos (`403 no_test_user`); el
-    preflight sigue devolviendo el origen correcto, porque un `OPTIONS` no lleva JWT. Las nueve
-    funciones coinciden ya con §11.
-44. 🟡 **Un `functions deploy` sin cambios de código no siempre dice `No change found`** —
-    *ya hay forma de saberlo (11-09-2026)*: **`scripts/huellas-funciones.ts`**. Guarda el
-    `ezbr_sha256` de las 14 funciones antes de desplegar y dice después cuáles cambiaron de
-    verdad. Es lo que esta entrada pedía y no se había hecho por falta del valor de antes.
-    ⚠️ Lo que **no** responde, y conviene no confundirlo: si el bundle desplegado coincide con
-    el código del repo. Dice si **cambió entre dos momentos**, que es otra pregunta. Para lo
-    primero haría falta reproducir el empaquetado byte a byte, que el CLI no ofrece.
-    **Validado el 11-09-2026**: un redespliegue sin tocar nada dice `No change found` **y** deja
-    las 15 huellas idénticas, así que el `ezbr_sha256` sí depende del contenido.
-    ✅ **Quién redespliega las quince: el `git push`. Averiguado el 14-09-2026, reproducido en
-    vivo.** Esta entrada dijo dos veces «la causa no está averiguada» y una de ellas remataba con
-    «**y que no lo provoca publicar**», que es exactamente al revés: lo provoca publicar y nada
-    más. **El proyecto tiene Supabase Branching conectado a la rama `main` de GitHub** desde el
-    17-07-2026, casi desde el principio — se ve en el Management API, y no hace falta el panel:
-
-    ```bash
-    TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
-    curl -sS -H "Authorization: Bearer $TOKEN" \
-      https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/branches
-    # → [{"name":"main","git_branch":"main","is_default":true,"status":"FUNCTIONS_DEPLOYED",…}]
-    ```
-
-    ✅ **Y se apagó el mismo día** (`supabase branches disable`, §7): el mecanismo que explicaba
-    los redespliegues es también el que crea una rama de preview al abrir un PR, y el proyecto no
-    quiere ramas. Así que lo de abajo describe **cómo funcionaba hasta el 14-09-2026**; desde
-    entonces las funciones **solo** se despliegan a mano y un push ya no toca ninguna. Se deja
-    escrito entero porque es lo que explica el histórico de `updated_at` y de versiones, y porque
-    si alguien reactiva el branching vuelve a valer tal cual.
-
-    `status: FUNCTIONS_DEPLOYED` era literal: **cada push a `main` desplegaba las quince Edge
-    Functions desde el código del repo**, unos 45 s después. Medido dos veces el mismo día: push
-    de `dc429ea` a las 14:54:23 → las quince a las 14:55:10; push de `a905364` a las 17:33:04 →
-    las quince a las 17:33:50, con la versión de cada una subida en uno. La segunda se observó
-    **mientras ocurría**, viendo el despliegue a medias (seis funciones ya en la versión nueva y
-    nueve en la vieja) — en ese estado transitorio las que se están desplegando enseñan un
-    `entrypoint_path` en `/tmp/user_fn_<ref>_<id>_<version>/source/…` en vez del `/app/…` de
-    siempre, que es la firma de la API frente al CLI.
-
-    ⚠️ **Por qué se buscó tres veces en el sitio equivocado**: se descartó «CI» mirando el repo
-    (§12.1 dice «sin CI», y es cierto — no hay `.github/workflows/` ni un solo run en GitHub), y
-    se dio por hecho que la automatización tendría que vivir ahí. Vive en el **proyecto de
-    Supabase**, no en el repositorio, así que ninguna cantidad de mirar el repo la habría
-    encontrado. Cuando algo de infraestructura pasa por su cuenta, el repo es solo la mitad de
-    los sitios donde mirar.
-
-    **Lo que cambia en la práctica**, y no es poco:
-    - **El paso 4 de `/publicar` es ahora la ÚNICA vía.** Mientras el branching estuvo activo,
-      desplegar a mano antes seguía haciendo falta para no invertir el orden de §11; ahora, además,
-      es que no hay red: si no lo haces tú, no se despliega nada.
-    - **Redesplegar a mano y luego publicar deja las funciones desplegadas dos veces.** Es inocuo
-      —idempotente, mismo código— pero explica el `updated_at` posterior al despliegue manual.
-    - 🟠 **Se invirtió el riesgo.** Con el branching, un cambio commiteado en
-      `supabase/functions/` se publicaba con el push se quisiera o no; sin él, un cambio commiteado
-      **NO se publica** hasta que alguien despliegue. El fallo que hay que vigilar ahora es el
-      contrario: código nuevo en el repo y el viejo corriendo en producción, sin ningún aviso.
-    - El `verify_jwt` lo sigue mandando `config.toml`, que viaja en el repo, así que el despliegue
-      automático lo respeta. Verificado tras los dos redespliegues: quince `ACTIVE` y los quince
-      flags correctos.
-    - 🔴 **Y esto dejaba a `huellas-funciones.ts` sin poder responder su pregunta en una
-      publicación.** Medido el 14-09-2026 con el experimento limpio: el commit `5f70be6` tocó
-      **dos ficheros markdown** —ninguno entra en ningún bundle— y tras el push **las quince
-      huellas cambiaron**. De ahí se concluyó que «el `ezbr_sha256` cambia en cada despliegue real
-      aunque el código sea idéntico».
-      ✅ **Esa conclusión era demasiado amplia, y se corrige el mismo día**: lo que no es
-      reproducible es **el empaquetado del branching**, no el del CLI. Medido tras desactivarlo, en
-      la tanda de deuda técnica: se desplegaron **las quince a mano** y solo cambiaron **tres**
-      huellas —justo las tres cuyo código había cambiado (`whatsapp-webhook`, `registro` y
-      `crear-oferta`, por `_shared/intake.ts` y `_shared/oferta.ts`)—; y un redespliegue posterior
-      de una función intacta, que respondió `Deployed Functions` y no `No change found`, dejó su
-      huella **idéntica**. O sea que **con despliegue manual el `ezbr_sha256` sí depende solo del
-      contenido**, y `comparar` vuelve a responder «¿qué cambió de verdad?» con precisión — que es
-      justo para lo que se escribió.
-      ⚠️ Esto **no contradice** la validación del 11-09 («un redespliegue sin tocar nada deja las
-      15 huellas idénticas»), la precisa: aquel caso era `functions deploy` respondiendo
-      `No change found`, o sea **no desplegó**. La regla fina es **`No change found` = no
-      desplegó = huella igual; despliegue real = huella nueva, con o sin cambio de código**.
-      Para qué sirve todavía: comparar dos momentos **sin push ni despliegue en medio** —por
-      ejemplo, para cazar el día que la plataforma toque algo por su cuenta—. Para «¿qué cambió
-      en esta publicación?» la respuesta es `git diff`, no la herramienta.
-    - **La línea base hay que regrabarla DESPUÉS de publicar** de todos modos, o la comparación
-      siguiente arrastra además el despliegue anterior. El fichero se quedó con la foto del 11-09
-      a las 10:46 —anterior al despliegue de aquel día— y tres días después `comparar` decía «15
-      cambiadas» midiendo aquello. Eso es ruido **encima** del ruido de arriba.
-    Comprobado las tres veces que no movió nada que importe: las 15 siguen `ACTIVE`, con su
-    `verify_jwt` —que es lo que de verdad podría torcerse, como en la deuda 43— y los cuatro
-    endpoints públicos responden 400/200/403/401.
-    Consecuencia para leer la herramienta: **«han cambiado todas» tiene tres causas y ninguna es
-    un misterio** — el `deno.lock` o un `deno.json` tocado (cambio real y esperado), **el
-    despliegue automático del branching tras un push** (`updated_at` idéntico en las quince, unos
-    45 s después de publicar), o una línea base de huellas vieja, que es la que más engaña porque
-    no corresponde a ningún cambio. Antes de alarmarse, mirar `updated_at` **y cuándo se guardaron
-    las huellas**.
-    ⚠️ **Y `deno.lock` entra en el bundle de TODAS.** Al publicar ese día cambiaron las 14,
-    incluida `descargar-documento`, que solo importa `autorizacion.ts` y `cors.ts` —ninguno
-    tocado—. La causa era el `deno.lock`, que se había actualizado al instalar Vitest. Es el mismo
-    caso que el `deno.json` de abajo, y sin saberlo se lee como un fallo de la herramienta: si
-    cambian **todas** a la vez, mira primero el lock.
-    Lo que sigue valiendo del análisis original: El
-    10-09-2026, cinco funciones desplegadas hacía diez minutos volvieron a empaquetarse
-    («Deploying… script size: 1.8 MB») sin que su código hubiera cambiado. Es inocuo —el
-    despliegue es idempotente— pero significa que **la salida del CLI no sirve para saber si el
-    bundle desplegado estaba al día**; solo `No change found` es concluyente en un sentido, y su
-    ausencia no prueba nada en el otro.
-    ⚠️ Y al revés, antes de leer un redespliegue masivo como un caso de esto: **el `deno.json` de
-    cada función entra en su bundle**, así que tocar los nueve import maps —como hizo `6e157fe`—
-    cambia las nueve de verdad, aunque el único `index.ts` modificado sea el de
-    `priorizar-entidades`. Al publicarlo (10-09-2026) ninguna de las nueve dijo `No change found`, y
-    eso era lo correcto. `supabase functions list` publica un `ezbr_sha256` por función: es el
-    candidato a comparación fiable entre dos despliegues, pero **todavía no se ha usado así**
-    —haría falta guardar el valor de antes—, así que hoy sigue sin haber forma cómoda de saberlo.
-45. ~~**Las Edge Functions no se podían typecheckear.**~~ — **resuelta (10-09-2026)**: los nueve
-    `deno.json` mapeaban `"@supabase/functions-js"` sin barra final, y un import map **no resuelve
-    subpaths a partir de un mapping exacto**, así que `import "@supabase/functions-js/edge-runtime.d.ts"`
-    —la primera línea de las nueve funciones— fallaba con `TS2307` y `deno check` moría ahí, antes
-    de mirar una sola línea propia. Añadida la entrada `"@supabase/functions-js/":
-    "jsr:/@supabase/functions-js@^2/"` (⚠️ con la barra **después** de `jsr:`; sin ella no resuelve).
-    Las nueve pasan `deno check`. Lo que tapaba: los tres errores de la entrada 46.
-46. ~~**`priorizar-entidades` tenía tres errores de tipos.**~~ — **resuelta (10-09-2026)**, y la
-    causa merece recordarse porque se puede repetir en cualquier consulta: el `.select()` tenía la
-    lista de columnas partida en **dos cadenas concatenadas con `+`**. supabase-js deduce el tipo de
-    la fila **analizando ese literal**, y ante una expresión se rinde y devuelve `GenericStringError`
-    —o sea que `entidades` dejaba de tener columnas y todo uso posterior (`e.id`, `e.telefono`)
-    fallaba—. El `as unknown as EntidadPriorizable[]` de la llamada a `priorizar()` escondía la mitad
-    del problema. Ver la convención del `select` en §7.
-47. ~~**Las tres comprobaciones siguen sin ejecutarse solas.**~~ — **resuelta (11-09-2026)**:
-    `.githooks/pre-commit` corre tipos, `vitest` y —solo si el commit toca `scripts/` o
-    `supabase/functions/`— `deno check`. El arnés de RLS se queda fuera **a propósito**: necesita
-    credenciales y una base viva, y un hook que falla sin red se acaba desinstalando entero.
-    ⚠️ **Hay que instalarlo una vez por clon**: `git config core.hooksPath .githooks`. Git no
-    ejecuta hooks versionados por su cuenta, así que en una máquina nueva no protege nada hasta
-    que alguien lo haga.
-48. ~~**El arnés daba por fallo lo que solo era falta de datos.**~~ — **resuelta (10-09-2026)**. El
-    check «el receptor ve las ofertas compatibles» salía en rojo para el receptor comercial porque
-    no hay ninguna oferta de `venda` publicada, y el arnés remataba con «Revisa las políticas antes
-    de seguir» + `exit 1`. O sea que **el resultado normal se presentaba como una emergencia**, y
-    solo se sabía que era inofensivo leyendo este documento. El 10-09-2026 costó una sesión: el
-    arnés se dio por roto cuando estaba dando el resultado correcto.
-    El fondo del asunto es que **con RLS activa un `select` que devuelve 0 filas no distingue «la
-    política me bloquea» de «no hay nada que ver»**: no hay error, la política simplemente filtra.
-    Marcarlo como fallo afirmaba más de lo que el arnés puede saber. Ahora esas lecturas llevan
-    `requiereFixture` y salen como **saltadas**, con una línea que dice qué crear para recuperar la
-    cobertura. Es la misma idea del mecanismo `vacias` que ya existía para las tablas sin filas,
-    extendida al **subconjunto** que una cuenta debería ver.
-    ⚠️ Lo que eso podía tapar, y por eso lleva red: el check lo comparten las dos cuentas
-    receptoras, así que si RLS se rompiera y **ninguna** viera ofertas, antes habrían sido dos rojos
-    y ahora serían dos saltadas silenciosas. El informe avisa aparte cuando una comprobación queda
-    saltada por **todas** las cuentas de su bloque —«no las cubre nadie»—, que es la señal que de
-    verdad importa. El agrupado es por bloque de la matriz y no por tabla: el check homónimo del
-    equipo, que sí pasa, taparía el de los receptores.
-
-49. ~~**El trigger de encolado de PDF no existe todavía.**~~ — **resuelta**:
-    `20260928100700_jobs_documentales.sql` trae el trigger y los dos jobs (§4 «Sistema
-    documental»). Sin el secreto en `app_config` son no-op con `notice`. Eso servía para emitir
-    documentos de prueba **en el stack local** sin que nada saliera a la red; retirado ese stack
-    (§7), lo que queda es una **red distinta y más simple**: un proyecto al que se le olvide el
-    secreto no encola nada en silencio, y el `notice` lo dice.
-50. ~~**`ruta_documento()` solo resuelve `PROVA`.**~~ — **resuelta (fase 5)**: cubre los seis
-    `objeto_tipo` y ya no queda ninguna rama que levante `0A000`. Cada fase rellenó la suya, que era
-    el plan.
-
-51. ~~**`reiniciar_documentos_prova()` borra las FILAS, no los objetos de Storage.**~~ —
-    **resuelta (11-09-2026)** con la Edge Function **`limpiar-documentos-prueba`**, la otra mitad
-    de esa RPC. Tres guardas, y ninguna es prescindible: solo lista dentro de `proves/`, solo borra
-    lo que **ninguna fila reclama** —ni `documentos.ruta`, ni `documentos_externos.ruta`, ni
-    `evidencias.trazo_firma_ruta`— y exige sesión de `super_admin`. Admite `{"seco": true}`.
-    ⚠️ **Las tres comprobaciones de «reclamado» hacen falta, y la prueba lo demostró en vivo**: de
-    los 10 objetos bajo `proves/` en local, el único protegido fue la **factura que sube el donante
-    en el ensayo del cierre**, que no está en `documentos`. Con la comprobación obvia se habría
-    borrado, rompiendo la conciliación del ensayo en curso.
-    Ejecutada contra local: 9 huérfanos, 1,13 MB recuperados, segunda pasada a cero.
-52. 🟡 **El arnés, al pasar por el super_admin, borraba todos los documentos `modo='prueba'`** de
-    la base contra la que corre (`emitir_documento_prova` + `limpiar: reiniciar_documentos_prova`).
-    **Acotado el 14-09-2026** (`20270319100000`): el `delete` —y el `update` de contadores, que
-    tiene que decir lo mismo o la siguiente emisión choca con el único `(numero_completo,
-    version)`— miran ahora la **serie**, no solo el modo. Es lo que esta misma entrada pedía.
-    ⚠️ **Y por el camino se cayó el diagnóstico con el que se empezó, que conviene dejar escrito
-    porque era verosímil y falso.** Se creyó que el arnés se estaba comiendo el fixture de
-    `crear-datos-documentales-prueba.ts`. No: **`emitir_albaran()` inserta `modo` con el literal
-    `'real'`** (`20261012100500:452`), así que los albaranes del fixture nunca estuvieron en modo
-    prueba aunque sean de prueba; y el fixture **calcula** el cierre pero no **emite** —
-    `emitir_certificado*` se niega mientras `datos_provisionales` sea `true`—. Medido: las 15 filas
-    de `documentos` en producción están las 15 en `modo='real'`, o sea que ese `delete` alcanzaba
-    **cero filas**. Lo que sí podía destruir, y ahora no, es el **ensayo de cierre de diciembre**.
-    ⚠️ **Queda una serie fuera: `P-CT`.** Sigue dentro del criterio de borrado a propósito, porque
-    **nadie más devuelve su contador a 0** (ver la deuda 101). El día que `reiniciar_cierre_prueba()`
-    la adopte, este criterio puede quedarse en `'PROVA'` a secas.
-    ⚠️ **Ya ha mordido una vez**, el mismo día que se escribió: durante el spike, el arnés
-    ejecutándose en paralelo hizo desaparecer los documentos que la Edge Function acababa de
-    generar y devolvió el contador a `PROVA-2026-0001`. Desde fuera parecía que
-    `emitir_documento_prova()` pisaba la fila anterior; no era eso —dos emisiones seguidas dan
-    `0001` y `0002`, cada una con su `objeto_id`—, era el arnés limpiando. El síntoma
-    característico es «mi documento estaba y ya no está».
-53. ~~**`documento_envios` no tiene fixture en el arnés**~~ — **resuelta el 14-09-2026**, y la
-    forma de resolverla es la que tiene gracia: no hacía falta ningún fixture, hacía falta **usar la
-    función**. En cuanto existió la pantalla que la lee (deuda 25) se mandó un correo de verdad
-    desde `enviar-email` y la tabla dejó de estar vacía; el check pasa de SALTADA a ejecutarse y las
-    saltadas bajan de 14 a 13. Una tabla que **nadie escribía y nadie leía** no se arregla sembrando
-    datos: se arregla cuando alguien la usa.
-    Y las otras saltadas tienen una causa que nadie había mirado. ⚠️ **Medido el 14-09-2026**: de las 14 comprobaciones sin datos, **ocho
-    son del bloque `productor-altre`, que es la cuenta de `TEST-PROD-2`**, y el fixture crea la
-    espigolada entera —REC, ENT, cierre, conveni, pla— en **`TEST-PROD-1`**. No es que falten datos
-    borrados: es que nunca existieron para esa ficha. **Y no se arregla ampliando el fixture**:
-    cada albarán que emite consume un número de una serie **legal** en producción, que es de lo que
-    §13 ya se queja (el primer REC real de 2026 será el `00002`). Esas ocho saltadas son el precio
-    de no ensuciar más las series, y se quedan. ⚠️ La entrada decía «`documentos` y
-    `documento_envios`» y que «`crear-datos-documentales-prueba.ts` (fase 4) es quien los creará»,
-    **en futuro**: ese script existe desde hace tiempo y ya emite documentos, así que la mitad de
-    `documentos` está cubierta. Lo que sigue sin fixture —y sin ningún script que lo arregle— es
-    `documento_envios`, porque **nadie la lee** (deuda 25): su check sale SALTADA (§12.48) siempre.
-    Se cubre el día que exista la pantalla de envíos, no antes.
 54. **Dos checks nuevos dependen de `roles_activos`.** Con el interruptor apagado —como nace
     cualquier entorno recreado desde las migraciones— `es_super_admin()` devuelve `true` para
     cualquier autenticado, así que «el equipo NO emite documentos de prueba» sale en rojo. Es el
@@ -3817,99 +3368,12 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     restaurara el GRANT por tabla ese check pasaría de «rechazado» a «ve 1 fila» y saldría **rojo**.
     La regla para la próxima columna sensible: el `revoke` en la migración y el check en el arnés,
     **en el mismo cambio**.
-56. ~~**`parametros_documentales` está sembrada con datos provisionales, y nada impide emitir con
-    ellos.**~~ — **resuelta (fase 4)**: `emitir_certificado()` es quien lo comprueba, y levanta
-    `42501` citando el CIF sembrado. Un certificado con efecto fiscal no sale con un CIF inválido.
-    Sustituir los datos reales sigue siendo checkpoint de negocio (§12 checkpoint 10).
 
-57. ~~**El recordatorio de un enlace no se puede accionar.**~~ — **resuelta (11-09-2026)**. Sigue
-    yendo al equipo —el token en claro no existe y eso no cambia—, pero ahora **lleva hasta el
-    sitio**: cada fila tiene su enlace a `/equip/convenis/<id>` o `/equip/albarans/<id>`, que es
-    donde `enviar_convenio()` y `marcar_entregado()` emiten uno nuevo, y dice qué hay que hacer.
-    Y **se identifica por el número, no por un trozo de uuid**: `ENT-2026-00042`, o el tipo del
-    convenio cuando todavía no tiene número —se pide al firmar—.
-    No hizo falta ninguna RPC nueva: las dos ya existían, cableadas y con pantalla. Lo único que
-    faltaba era el enlace.
-58. ~~**`MAX_POR_EJECUCION = 50` es un tope silencioso.**~~ — **resuelta (11-09-2026)**: el tope
-    sigue en 50 —acota el coste del gate y para un recordatorio es intrascendente— pero ahora **se
-    dice** en tres sitios: campo propio `limit: {tope, enllacos, factures, retallat}` en la
-    respuesta, `console.warn` con `avis: "limit_execucio"` para poder filtrarlo por nivel, y un
-    recuadro en el propio correo. Una lista recortada que no lo dice se lee como completa.
-59. ~~**El camino de envío de los recordatorios no tiene prueba automática sin stub.**~~ —
-    **resuelta (11-09-2026)** con `RESEND_ENVIO_REAL` (deuda 73). Ejercitado en local sin ningún
-    stub: `{"ok":true,"revisados":1,"avisados":1,…}`. Ese `avisados: 1` era justo lo inalcanzable,
-    porque el contador solo se mueve si el correo salió y en local nunca salía.
-
-60. ~~**El bloque de conformidad de los albaranes se imprime siempre en blanco.**~~ — **resuelta
-    (11-09-2026)**, y el arreglo «evidente» no habría servido de nada: ⚠️ el snapshot se congela
-    **al emitir**, y `marcar_entregado()` exige `estado='emitido'`, así que cuando llega la
-    confirmación `documentos.datos` lleva rato siendo inmutable. Meter las evidencias en
-    `albaran_datos()` no arregla ningún PDF existente. Se leen con `service_role` desde
-    `generar-documento`, que es el camino que el convenio ya usaba.
-    El OPE se resuelve gracias a **`rol_parte`** (deuda 68, de la misma tanda): cada confirmación
-    se casa con su espacio. ⚠️ Una confirmación **sin rol** —los enlaces anteriores a esa
-    migración— **no se atribuye a nadie**: se lista aparte. Ponerla bajo «Entrega» sin saberlo
-    sería inventarse quién firmó qué en un documento legal.
-    **La IP y el user-agent no se imprimen**: el albarán lo descarga también la otra parte, el
-    texto legal ya dice que quedan registrados, y `evidencias` es donde se consultan.
-    Coste medido: **+1,3 ms** en un OPE con dos confirmaciones y **0 ms** en un ENT, más ~5 ms de
-    las dos consultas — sobre los 174 ms de `ms_render` de §12.87.
-61. ~~**El REC de una espigolada imprime el UUID de la jornada.**~~ — **resuelta
-    (`20270304100100`)**: `albaran_datos()` pone `coalesce(espigoladas.ref_externa, id::text)`. Solo
-    afecta a lo que se emita desde ahora: un snapshot ya congelado no cambia, ni debe.
-    ⚠️ El arreglo **solo luce si el equipo rellena `ref_externa`**, que es opcional y hoy está vacía
-    casi siempre; el `coalesce` deja el UUID donde no la haya.
-62. ~~**`subir-documento-externo` compone a mano la hoja del nombre de fichero.**~~ — **resuelta
-    (`20270304100000`)**: `ruta_documento_externo()` devuelve la ruta entera. Y eran **dos**
-    consumidores, no uno: la subida de factura de `enlace-publico` hacía exactamente el mismo apaño
-    y no estaba anotada.
-    Verificado lo que de verdad importaba: **la ruta generada es idéntica a la de antes en los 12
-    objetos de la base local** (ENT, OPE, REC y tres cierres en modo prueba, incluido un albarán sin
-    ejercicio). Si no lo fuera, los ficheros ya subidos quedarían en una carpeta y los nuevos en
-    otra.
-63. **Las herramientas locales asumen un único operador, y con agentes en paralelo eso rompe.** Dos
-    casos vistos el mismo día: el arnés borrando los documentos de prueba que otro acababa de
-    generar (deuda 52), y **dos `supabase functions serve` a la vez**, que no caben porque el
-    runtime es un contenedor de Docker con nombre fijo por proyecto
-    (`supabase_edge_runtime_<proyecto>`) — el segundo muere con `Conflict … already in use` y puede
-    dejar el primero colgado en un estado que ni `docker rm -f` deshace. Quedó sin efecto el
-    14-09-2026, cuando se retiró el Supabase local (§7): las funciones se prueban desplegadas en
-    el remoto, y la técnica que sí se conserva es ejecutarlas con `deno run` directo —mismo código
-    y HTTP real—, apuntando a la base remota.
-
-64. ~~**`/equip/espigolades` no tiene listado.**~~ — **resuelta (11-09-2026)**: tercera pantalla
-    en `Espigolades.tsx`, con buscador y las columnas que sirven para encontrar una jornada (data,
-    productor, referència, registres, quilos, estat). El menú ya apunta al listado y no al alta, y
-    el «Enrere» del detalle vuelve a las espigoladas en vez de a los albaranes, que era el sitio
-    menos malo mientras no había listado.
-    Las tres consultas están acotadas a lo que sale en pantalla —los nombres se piden con `.in()`
-    sobre los `productor_id` visibles, no las 343 fichas—, pero **el listado sigue sin paginar**,
-    como el resto: eso es §12.5.
-65. ~~**El panel no sube documentos externos.**~~ — **resuelta (11-09-2026)**: formulario en la
-    ficha del albarán, con el mismo patrón que el del productor. No hizo falta tocar el servidor:
-    `subir-documento-externo` ya aceptaba `objeto_tipo: 'albaran'`.
-    ⚠️ **`factura` NO está entre las opciones, a propósito**: una factura es del cierre anual del
-    donante, y colgarla de un albarán la dejaría fuera de `registrar_factura()`.
-    Sigue sin poderse **borrar ni descargar** un externo desde ahí: `documentos_externos` no tiene
-    RPC de borrado y `descargar-documento` solo sirve `documentos`. Se decide en la base, no en la
-    pantalla.
 66. **«Amb discrepància» es un filtro, no un veredicto.** `v_albaranes_bandeja` solo sabe si hubo
     rechazo o si lo confirmado no cuadra con el neto de ese albarán; la diferencia real la calcula
     `propuesta_conciliacion()` cruzando el REC con todos sus ENT, y eso sería una llamada por fila.
 67. **Rectificar solo permite corregir `kg_neto` por línea**, no el producto ni las cajas. Es lo que
     se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
-68. 🟡 **El OPE no distingue sus dos confirmaciones** — *resuelto en la base
-    (`20270304100200`)*: `enlaces_token.rol_parte` y `marcar_entregado()` escribiéndolo en las tres
-    ramas, con el mismo vocabulario que `albaranes.partes`. **El panel externo YA lo pinta**
-    (14-09-2026): `PendentsDeTu` saca una fila por parte y la etiqueta («com a qui entrega» /
-    «com a qui rep»), que es donde de verdad importaba —una organización con las dos fichas veía
-    si no dos filas idénticas—. ✅ **Y la ficha del equipo también, desde el 14-09-2026**:
-    `rol_parte` entra en el `select` de `AlbaraDetall`, en su tipo y como badge junto a cada
-    enlace. Claves **propias** (`alb.part_*`, «Qui entrega» / «Qui rep»), no las del panel externo
-    (`pend.part_*`, «com a qui entrega»): allí se le habla a quien tiene que firmar, aquí se
-    describe a un tercero. ⚠️ Con `rol_parte` nulo —los enlaces anteriores a `20270304100200`— **no
-    se pinta ningún badge** en vez de adivinar: en REC y ENT la parte se deduce del tipo del
-    albarán, pero en un OPE viejo no hay de dónde sacarla.
 
 69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
     `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
@@ -3934,35 +3398,6 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cierre y no hay RPC que la borre. Se cubre por el lado del «denegar», y con
     `reiniciar_cierre_prueba`/`conciliacion_retroactiva` sobre un uuid inventado.
 
-73. ~~**`sendEmail()` no tiene modo simulado.**~~ — **resuelta (11-09-2026)**: existe
-    **`RESEND_ENVIO_REAL`**, gemelo exacto del de WhatsApp. Mientras no valga `"true"` exacto no
-    sale nada y se devuelve `{simulado:true}`; la comprobación va **antes** de mirar
-    `RESEND_API_KEY`, así que el camino entero se puede ejercitar **sin clave de Resend** — que
-    era lo que hacía falta cuando eso se probaba en el stack local, y sigue valiendo para
-    cualquier entorno al que no se le quiera dar la clave.
-    La decisión está aislada en `esEnvioReal()`, que es pura y **tiene pruebas** —incluido que
-    `TRUE`, `1`, `yes` y `" true"` no encienden nada—. El interruptor de WhatsApp lleva desde julio
-    sin nadie que lo vigile; este no.
-    🔴 **El secreto va ANTES del despliegue.** Si se redespliegan las cinco funciones que mandan
-    correo sin crearlo, **el correo se apaga entero y en silencio** — incluido
-    `recuperar-password`, o sea que alguien puede quedarse fuera de la aplicación sin ningún
-    mensaje de error.
-74. ~~**El recordatorio al donante no lleva enlace.**~~ — **resuelta (11-09-2026)**: el botón del
-    correo apunta a `/productor/documents`, que es donde está el formulario de subida (§12.65) y
-    donde `puc_pujar_document_extern()` resuelve el permiso. Sin sesión aterriza en el login, que
-    sigue siendo el camino.
-75. ~~**`documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla.**~~
-    — **resuelta (14-09-2026, `20270320100300`)**: GRANT por columnas con las 27 que no son `envio`.
-    El argumento de que «es inocuo, el token es suyo» valía mientras `envio` guardara solo cosas del
-    destinatario, y **caducaba solo**: el del resumen anual es el enlace de subida de factura. Fue
-    preventivo —0 de 15 documentos llevaban token, porque aún no se ha emitido ningún resumen—.
-    🔴 **Lo que se llevó por delante y nadie había previsto**: `documento_vigente()` es
-    `security invoker` y hacía `select d.*`, que exige privilegio sobre TODAS las columnas. O sea
-    que el `revoke` la rompía; y aunque no la rompiera, su `returns documentos` devolvía `envio`, así
-    que **la función era ella sola la puerta trasera del GRANT que se estaba poniendo**. Se recreó
-    con `returns table` de 27 columnas, y se pudo cambiar el tipo de retorno porque **no la llama
-    nadie** (cero referencias en `src/`, `scripts/` y `supabase/functions/`; cero dependencias en
-    `pg_depend`). ⚠️ Por PostgREST eso es ahora **un array de cero o una fila**, no un objeto.
 76. **La filigrana de los documentos de prueba no se puede comprobar con un `grep` literal**:
     `pdftotext` la trocea porque va girada 45°. Cualquier verificación automática tiene que buscar
     fragmentos (`PR`, `O`, `V`, `A`…), no la frase entera.
@@ -3971,36 +3406,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     trabajo marcado como borrador para poder probar el circuito antes de la fase 0. Sustituirlo es
     publicar la versión 2 y retirar la 1, **no editar la existente**: en cuanto una plantilla ha
     emitido algo, el trigger la congela.
-78. ~~**`aprovar_resposta()` no puede devolver el aviso de convenio.**~~ — **resuelta
-    (11-09-2026)**: `OfferDetail` llama a `convenio_vigente()` para las dos partes **antes** de
-    aprobar y enseña qué convenio falta, con confirmación. La limitación de la RPC sigue ahí —su
-    tipo de retorno es `canalizaciones` y el `raise notice` lo descarta PostgREST—, pero ya no tiene
-    consecuencia: el aviso llega por delante y el bloqueo duro (`42501 sense_conveni`, desde la
-    fecha de corte) se traduce a un mensaje propio en vez de soltar el error crudo.
-    De paso se estrenó `conveniVigent()` de `src/lib/convenis.ts`, que llevaba escrito desde la
-    fase 2 **sin que lo llamara nadie**.
-79. ~~**Una organización con doble rol necesita dos convenios.**~~ — **resuelta
-    (`20270312100000`)**, y la entrada era cierta **solo a medias**. Mirando `convenios_exigidos`:
-    en **donación** son **dos tipos distintos** (`don_gen` a quien entrega, `don_rec` a quien
-    recibe), así que una organización que dona y recibe firma los dos **con razón** y ahí no había
-    nada que arreglar. La redundancia estaba en **venta y maquila**, donde las dos partes necesitan
-    el **mismo** tipo `com`: con el índice por ficha, una organización de doble rol firmaba **dos
-    veces el mismo acuerdo**. Ahora el índice único y `convenio_vigente()` van por
-    `organizacion_id`, resolviendo la ficha con `organizacion_de()`.
-    `productor_id` y `entidad_id` **se quedan**, y no por compatibilidad: dicen **con qué papel** se
-    firmó, que es lo que congela `datos_org`.
-    ⚠️ **Se hizo ahora porque salía gratis: en producción hay CERO convenios**, así que no se migró
-    ningún documento firmado. El día que haya cientos, esto sería una migración de documentos legales.
-    🟠 **Lleva dentro una decisión de negocio sin confirmar**: se asume que el convenio comercial
-    `com` es **uno por organización** y cubre su compra y su venta, no uno por papel. Es la lectura
-    natural y encaja con que la matriz pida el mismo tipo a las dos partes, pero **es una lectura**.
-    Si la asesoría dice otra cosa se revierte con dos líneas, y sin datos que rehacer mientras no se
-    firme nada. Va con los textos de los convenios, que tampoco están validados (§12.77).
-80. **El DNI del firmante no entra en `documentos.datos` aunque el PDF lo imprima.** `documentos`
-    tiene `grant select` sobre la tabla entera, así que meterlo ahí deshacía el GRANT por columnas
-    de `evidencias`. El renderizador lo lee de `evidencias` con `service_role`. **Precio conocido:
-    `sha256_datos` no cubre ese dato**, así que la huella del snapshot no prueba qué documento de
-    identidad se declaró — eso lo prueba la fila de `evidencias`.
+
+80. **El DNI del firmante no entra en `documentos.datos` aunque el PDF lo imprima.** El
+    renderizador lo lee de `evidencias` con `service_role`. **Precio conocido: `sha256_datos` no
+    cubre ese dato**, así que la huella del snapshot no prueba qué documento de identidad se
+    declaró — eso lo prueba la fila de `evidencias`.
+    ⚠️ **El motivo que esta entrada daba caducó, y la conclusión sobrevive por otro** (revisado el
+    15-09-2026). Decía que `documentos` tenía «`grant select` sobre la tabla entera», y desde
+    `20270320100300` (§12.75) es **por columnas**. Pero `datos` es una de las columnas concedidas
+    —el donante lee ahí su propio documento por `documents_meus()`—, así que meter el DNI dentro
+    seguiría deshaciendo el GRANT por columnas de `evidencias`. Lo que cambia es el argumento, no
+    la decisión.
 
 81. **`sense_conveni` de `priorizar-entidades` replica la resta, no la regla.** Para no llamar a
     `convenio_vigente()` 111 veces por oferta, lee `convenios_exigidos` y los convenios vigentes y
@@ -4034,102 +3450,6 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     funcionando, no un fallo—, así que no hay ninguna fila `documentos` de tipo `CT` que generar. El
     renderizador se probó en directo y el despacho son ocho líneas. Se cierra el día que el fixture
     pueda desmarcar el flag, o con los datos reales de la Fundación.
-86. ~~**No hay rectificativo del CT.**~~ — **resuelto (11-09-2026)**: existe
-    `rectificar_certificado_transaccion()`. La entrada decía que el CT «no entra en el ciclo del 182,
-    así que no se finge que exista un R-CT», y eso sigue siendo cierto —**no hay serie `R-CT`**—,
-    pero de ahí no se seguía que un CT con un error tuviera que quedarse sin salida. Rectifica como
-    el CD: misma numeración, versión siguiente, sin consumir número.
-
-87. ~~**El CPU real de `generar-documento` sigue sin medirse con precisión.**~~ — **medido
-    (11-09-2026)**. El criterio de salida del spike queda cerrado, con un margen cómodo pero no
-    enorme. Documento de 6 páginas y 123.614 bytes en producción: **`ms_render` 174,3 ms**
-    (presupuesto del spike: 800 ms), `ms_activos` 1 ms con los activos ya en caliente,
-    `ms_subida` 107,8 ms y `ms_total` 462,6 ms. El runtime declara en su `shutdown`
-    **`cpu_time_used` 390 ms** y 22 MB: un **19,5 %** del techo de 2 s de CPU y un 8,7 % de los
-    256 MB. Cinco generaciones reales medidas dan **325-572 ms de CPU**, así que ese es el orden
-    de magnitud a asumir para un documento de 6 páginas; los convenios de 8-10 páginas de la
-    fase 2 no tienen un factor 10 de margen, tienen un factor 4.
-    ⚠️ **`cpu_time_used` es del ISOLATE entero, no de la petición**: cubre el arranque, la
-    evaluación de módulos con `pdf-lib` dentro, la petición, la subida y las RPC. Por eso sale
-    **mayor** que `ms_render`, que solo mide maquetar el PDF, aunque una sea CPU y el otro reloj
-    de pared.
-    ⚠️ **Hay que cruzar por `execution_id`, no coger el `shutdown` más reciente.** La primera
-    lectura de este dato dio 72 ms y era de otro isolate: el del cron `documentos-pendientes`,
-    que arranca cada 5 min, no encuentra nada y se apaga. Esos no-op gastan **33-77 ms**, o sea
-    que un valor de esa horquilla es la señal característica de haber leído el isolate
-    equivocado. El `shutdown` bueno llega **minutos después** del log de la generación (el
-    isolate sigue vivo esperando más peticiones), así que no es ni siquiera el siguiente.
-    ⚠️ **Una emisión puede ejecutarse dos veces, en dos regiones.** Dos de las tres generaciones
-    de la publicación salen con el mismo `documento` y distinto `execution_id` en `eu-west-1` y
-    `eu-west-3`, con un segundo de diferencia; la de después tuvo una sola. No pasa nada porque
-    la función es idempotente (con `fichero_at` ya puesto responde 200 sin hacer nada) —que es
-    justo para lo que se escribió esa guarda—, pero esa emisión costó el doble y la causa no
-    está averiguada.
-88. ~~**Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/`.**~~ —
-    **borrados en producción (11-09-2026)** con `limpiar-documentos-prueba` (deuda 51):
-    `PROVA-2026-0001/0002/0003-v1.pdf`, **370.801 bytes**. En seco primero —3 revisados, 3
-    huérfanos, 0 borrados—, comprobado que ninguna fila los reclamaba, y después de verdad. La
-    segunda pasada encuentra 0, así que es idempotente y `proves/` queda vacío.
-89. ~~**Un corte por CPU no encendía ninguna luz, y además no paraba nunca.**~~ — **resuelto
-    (11-09-2026, `20270302100000_documentos_encallados.sql`)**. Al medir el CPU de verdad (§12.87)
-    se vio que el único fallo del que se hablaba era justo el único que el circuito no sabía
-    contar. Si el runtime corta la generación por pasarse de los 2 s, **mata el isolate a mitad**:
-    no hay excepción que capturar, el `catch` de `generar-documento` no llega a llamar a
-    `marcar_documento_error()` y la fila se queda en `pendiente_fichero` con `ultimo_error` NULL.
-    Dos consecuencias, las dos encontradas leyendo el código con la medición delante, no probando:
-    **(1)** el contador del menú y el filtro de la bandeja miran `estado = 'error'`, así que ese
-    documento desaparecía en silencio —quien lo emitió veía «no s'ha pogut generar» a los 30 s de
-    polling y el equipo no veía nada—; **(2)** el tope de `intentos < 5` del job **no lo acotaba**,
-    porque `intentos` solo sube cuando la función reporta: se quedaba en 0 y el job reencolaba
-    cada 5 minutos para siempre, 288 llamadas al día muriendo igual. El comentario de
-    `20260928100700` daba ese caso por cubierto y no lo estaba.
-    Arreglo: `documentos.reencolados` cuenta los intentos del job **contesten o no**, y al agotar
-    cualquiera de los dos topes el job marca `error` con el motivo escrito (§4, «Jobs»). Verificado
-    en local: cinco pasadas suben el contador, la sexta da el documento por perdido y la séptima ya
-    no lo toca; un error reportado de verdad conserva su mensaje y sigue reintentándose.
-    `generar-documento` emite además `console.warn` con `avis: "render_lent"` por encima de 800 ms
-    de `ms_render` — un aviso **anticipado**, porque el día que se pase del techo real no habrá log
-    que mirar.
-    ⚠️ Lo que **no** cubre: si el corte pasa con el tope ya agotado por otra causa, el motivo que
-    se conserva es el primero (el `coalesce` no pisa un `ultimo_error` que ya existía). Y el umbral
-    de 800 ms es el presupuesto del spike, no el límite: entre ese aviso y la muerte real hay
-    margen, que es justo para lo que sirve.
-
-90. ~~**Una espigolada con dos registros del mismo producto contaría los kilos dos veces.**~~ —
-    **resuelta (14-09-2026, `20270320100000`)**; el diagnóstico completo se conserva porque explica
-    una clase de error que puede repetirse.
-    El reparto del neto del REC particionaba por `excedente_id`, y en una espigolada el REC cuelga de
-    la **jornada** y se empareja con los registros **por producto**. Si una misma jornada tuviera dos
-    registros del mismo producto, cada uno recibiría el neto entero de esa línea del REC.
-    La clave correcta sería `(albaran_rec_id, producto)`.
-    ⚠️ **El SQL vivo NO es el que dice esta entrada.** `20270303100000` fue sustituida por
-    `20270303100500_cierre_base_nomes_equip.sql` (`create or replace`, para añadir la guarda de rol),
-    así que el reparto que hoy corre está en **`20270303100500:100-121`** — y **la advertencia en
-    prosa se quedó en la migración vieja**: quien lea el fichero que manda no la encuentra. Es el
-    coste de recrear una función y no llevarse sus comentarios.
-    ⚠️ **El defecto, dicho con precisión, es una asimetría**: el join con el REC **ya** empareja por
-    `(albarán, producto)` (`:79-93`), y el reparto particiona por `excedente_id` (`:100`). Son cuatro
-    sitios que deben cambiar juntos —`suma_can` (`:100`), el `row_number()` del residuo (`:101`), la
-    ventana de `correccion` (`:114`) y el `bool_or` de `excedent_partit` (`:121`)—: cambiar tres de
-    cuatro es peor que no cambiar ninguno. Y la clave necesita `coalesce(albaran_rec_id,
-    excedente_id)`, porque cuando `rec_neto is null` el id también lo es y todos los nulos caerían en
-    una sola partición.
-    ✅ **Resuelta el 14-09-2026** (`20270320100000`): la clave pasa a
-    `(coalesce(albaran_rec_id, excedente_id), producto)` y **se calcula una sola vez** en la CTE
-    `conrec`, para que las cuatro ventanas no puedan volver a separarse — que es lo que permitió que
-    esto existiera.
-    ⚠️ **El `producto` en la clave no es de adorno, y esto no estaba en el diagnóstico**: `rec_neto`
-    es la suma de las líneas **de ese producto** dentro del REC, así que un REC de espigolada con dos
-    productos tiene dos netos bajo el mismo `albaran_rec_id`. Particionar solo por el albarán habría
-    mezclado dos netos en un denominador: un error peor que el original.
-    **Medido antes y después**: con dos excedentes de la misma jornada y producto sobre un REC de
-    300 kg, el reparto viejo daba **600** y el nuevo da **300**; y sobre los datos reales el
-    resultado es **idéntico** al anterior (`except all` en las dos direcciones, 0 filas), porque no
-    hay ninguna jornada con el producto repetido. Salió gratis como la deuda 79: **cero certificados
-    emitidos**, así que no movió ningún número ya certificado.
-    La invariante que ahora se comprueba: por cada `(albaran_rec_id, producto)`, `sum(kg_neto)` es
-    exactamente `rec_neto`. Verificado en producción tras aplicar: `REC-2026-00001` · Tomàquet ·
-    1000,000 = 1000,000 · diferencia 0.
 
 91. **La detección de organización del registro tiene puntos ciegos, todos hacia el lado seguro.**
     ⚠️ **La primera mitad de esta entrada era FALSA** y se corrige (14-09-2026): decía «solo mira
@@ -4179,18 +3499,6 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     cachearla dejaría a los isolates calientes enviando después de apagar el interruptor. Si algún
     día pesara, la respuesta no es una caché de tiempo sino no llegar hasta ahí — el webhook y
     `whatsapp-send` ya cortan mucho antes.
-94. ~~**El intake por WhatsApp no manda el correo de confirmación de la oferta.**~~ — **resuelta
-    (14-09-2026)**: `confirmarPorCorreo()` sale de `crear-oferta/index.ts` y pasa a
-    `_shared/correu-oferta.ts` como `confirmarOfertaPerCorreu()`, que usan los dos caminos.
-    ⚠️ **El bloqueo real no era el que decía esta entrada.** El cliente de Supabase ya estaba
-    disponible en `crearExcedenteDesdeSesion()`; lo que faltaba era **el correo del productor**,
-    porque `_shared/intake.ts:330` pedía `select("id, name")`. Sin ensanchar ese literal, mover la
-    función no habría servido de nada: habría devuelto `"omes"` siempre.
-    ⚠️ **El intake manda los DOS, y no es redundancia por descuido**: el WhatsApp contesta una
-    conversación en curso —alguien acaba de escribir y merece respuesta por donde escribió— y el
-    correo es el registro duradero y buscable de la referencia, que hará falta semanas después
-    cuando el hilo haya bajado veinte mensajes; además deja traza en `documento_envios`, que el
-    WhatsApp no deja. Se duplica poco: solo 78 de 345 productores tienen correo.
 
 95. **La generación del token está copiada en tres migraciones aplicadas.**
     `marcar_entregado()`, `enviar_convenio()` e `iniciar_firma_asistida()` llevan cada una su
@@ -4198,24 +3506,7 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa, pero las tres viejas se
     quedan como están: **editar una migración aplicada está prohibido** (§7). Se unifican el día
     que alguna se recree por otro motivo.
-96. ~~**La cuenta que firma desde el panel viaja en `p_datos.panell`, no en la evidencia.**~~ —
-    **resuelta (14-09-2026, `20270320100200`)**: `firmar_convenio_por_enlace()` acepta
-    `p_evidencia.payload` y lo funde con `p_datos`. **Si las dos traen la misma clave gana el
-    payload**, y el motivo es el que ordena toda la tabla de evidencias: `p_datos` es lo que la
-    persona **tecleó** —cuerpo de una petición pública, sin sesión— y `p_evidencia` es lo que el
-    **servidor observó**. Se conserva `p_datos` dentro del payload porque lo declarado también es
-    evidencia y `sha256_texto` no lo cubre.
-    ⚠️ El `jsonb_typeof(…) = 'object'` de la implementación no es adorno: `'{"a":1}'::jsonb ||
-    '"x"'::jsonb` **no da error**, da un array — un payload que no fuera objeto habría convertido la
-    evidencia en una lista sin que nadie se enterara.
-    Es compatible hacia atrás, así que `enlace-publico` sigue funcionando por el rodeo hasta que se
-    toque; lo que le queda es mover `panell` de `p_datos` a `p_evidencia.payload`
-    (`enlace-publico/index.ts:1812` y `:1815`). El texto original de la entrada:
-    `firmar_convenio_por_enlace()` acepta `p_evidencia` con una lista fija de claves y compone
-    `datos_org` con claves explícitas, así que una clave de más en `p_datos` acaba solo en
-    `evidencias.payload` — que es donde tiene que estar— pero por un rodeo. No va en
-    `asistido_por` a propósito: esa columna significa «alguien del equipo condujo la firma».
-    Cuando esa RPC se recree, debería aceptar `p_evidencia.payload` y entrar por la puerta.
+
 97. **Acuñar un enlace desde el panel revoca el que la persona tenga en el correo.** Es la
     misma regla que `enviar_convenio()` —dos enlaces vivos son dos firmas posibles y la segunda
     no tendría dónde ir— y el precio es aceptable porque quien acuña es esa misma persona. El
@@ -4232,140 +3523,6 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
     que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
     su documento.
 
-100. ~~**`app_settings.updated_at` no dice cuándo se cambió un interruptor.**~~ — **resuelta el
-     14-09-2026** (`20270320100100`): `set_updated_at()` genérico con trigger en `app_settings`,
-     `app_config` y `perfiles`. Ninguna de las tres tenía trigger alguno. Verificado en producción:
-     un `update … set value = value` mueve la marca sin cambiar el valor.
-     🔴 **`intake_sessions` se queda FUERA, y eso no es la deuda a medio hacer: es el resultado de
-     comprobarlo.** Ahí `updated_at` **no es el mtime de la fila**, es «la última vez que esta
-     persona dijo algo», y tres comportamientos vivos lo leen así: `intake-recordatorios:89` escribe
-     solo `recordatorio_enviado_at` **para no reiniciar la ventana de 10 min** (lo dice su propio
-     comentario), `intake.ts:341` descarta la sesión a las 12 h contando desde ahí, y
-     `atendreElDialeg()` (`respuestas.ts:390`) desempata con él **quién contesta un mensaje** en una
-     cuenta de doble rol (§12.16). Un trigger genérico los rompería los tres en silencio, y el peor
-     sería el tercero: el cron adelantaría la marca, el sistema creería que el intake «habló
-     después» que la oferta y **secuestraría la respuesta**. Lo mantiene `guardar()`, que es quien
-     sabe qué cuenta como actividad.
-     ⚠️ Efecto colateral aceptado: `src/lib/settings.ts:26`, `scripts/set-config.ts:32` y
-     `scripts/roles-activos.ts:51` mandaban un `updated_at` con el reloj del cliente; ahora lo pisa
-     el del servidor. Una sola fuente de tiempo, y no falsificable.
-     El texto original: La columna tiene `default now()` y **ningún trigger**, así que un `update` del
-     `value` la deja intacta. Encontrado el 14-09-2026 al apagar y encender `whatsapp_activo`
-     en producción: los dos cambios dejaron el mismo `updated_at`, el del `insert` de la
-     migración. Importa ahora más que antes, porque apagar WhatsApp es el tipo de cosa que el
-     equipo querría poder fechar —«¿desde cuándo no sale nada?»— y esa columna responde que
-     desde siempre. Viene de `20260723140000`, no de la tanda del interruptor. Se arregla con
-     un `before update` de tres líneas; mientras no esté, **no leer esa columna como fecha del
-     último cambio**.
-     ⚠️ **Y no es una tabla, son cuatro**: `app_settings`, `app_config`, `intake_sessions` y
-     **`perfiles`** (`20260730090000:36`). Esta última es la que de verdad importa, porque tiene
-     `grant update (nombre, telefono, idioma, vista_defecto)` para los propios usuarios
-     (`20260730090000:134`): la gente edita su ficha y la columna no se mueve nunca. No existe
-     ningún `set_updated_at()` genérico que reutilizar —las tres tablas que sí lo mantienen
-     (`costes_producto`, `convenios`, `planes_prevencion`) lo hacen con un `new.updated_at := now()`
-     inline dentro de su trigger de control, que valida transiciones propias y no sirve aquí—.
-
-101. ~~**`reiniciar_cierre_prueba()` borra los documentos `P-CT` pero no devuelve su contador a
-     0.**~~ — **resuelta (14-09-2026, `20270322100000`)**. Comprobado **antes** de tocar el
-     contador, que era el orden que importaba: la función **sí** borra los CT —`cierre_emet_document()`
-     inserta siempre `objeto_tipo = 'cierre_donante'` y su `delete` no filtra por tipo ni serie—,
-     así que añadir `'P-CT'` a su `serie in (...)` no deja ningún contador por debajo de un
-     documento vivo. Con eso `reiniciar_documentos_prova()` se queda en **`'PROVA'` a secas** y el
-     arnés **deja de poder tocar un ensayo de cierre en curso**, que era el último flanco de la
-     deuda 52. Verificado en producción: tras un ciclo completo, `P-RES`, `P-CD`, `P-CT` y `P-CDP`
-     no se mueven.
-     ⚠️ Queda un límite que **no es nuevo**: el reseteo va por `ce.ejercicio`, no por cierre, y
-     puede haber varios cierres de prueba del mismo año. `P-RES` y `P-CD` ya lo tenían desde
-     noviembre; `P-CT` pasa a compartirlo. El texto original:
-     Su `update` nombra `serie in ('P-RES', 'P-CD')` y es de noviembre de 2026, anterior al
-     certificado de transacción (`20270301100100`). Encontrado el 14-09-2026 al acotar
-     `reiniciar_documentos_prova()` (deuda 52): resulta que **el único sitio del código que ponía
-     `P-CT` a 0 era el `like 'P-%'` que se estaba quitando**, así que esa serie se quedó dentro del
-     criterio de borrado para no dejar un contador huérfano — que habría sido peor que el problema
-     que se arreglaba, porque un contador por debajo de los documentos vivos choca con el índice
-     único `(numero_completo, version)` en la siguiente emisión. Se cierra añadiendo `'P-CT'` a ese
-     `serie in (...)`, y ese día `reiniciar_documentos_prova()` puede quedarse en `'PROVA'` a secas.
-
-102. ~~**`entidades.email2` es la cuarta columna ciega de la detección de organizaciones.**~~ —
-     **resuelta (15-09-2026)**, y la pregunta que dejaba abierta —¿denegar o solo avisar?— se
-     decidió por **avisar**: `email2` entra como motivo **débil**, igual que los teléfonos
-     secundarios de la deuda 91. Se mira (`motiuEmail`, gemelo de `motiuTelefon`: la columna por
-     la que la consulta encontró la fila no decide la fuerza, así que una ficha que case por
-     `email2` **y** tenga el mismo correo en `email` sigue siendo fuerte), y nunca deniega.
-     ⚠️ **El caso medido es el argumento entero**: la única coincidencia real en producción es la
-     entidad «CS El Roser - Menjador i Rebost», cuyo `email2` es el correo del **Ajuntament de
-     Reus** —un productor de otra organización—. Eso no dice «son la misma casa», dice «el mismo
-     técnico municipal lleva las dos»; con `email2` denegando, ese ayuntamiento se habría quedado
-     **sin poder registrarse**. Un fallo de la detección tiene que producir un duplicado que el
-     equipo ve, nunca un alta denegada.
-     ⚠️ **`FEBLES` es ahora un `Record<Exclude<MotiuCoincidencia, MotiuFort>, true>` y no un
-     array**, que es lo que impide que esto se repita: el día que se añada un motivo nuevo, `tsc`
-     obliga a decir de qué lado cae en vez de dejarlo caer en el fuerte por omisión — que es
-     exactamente cómo `email2` llegó a ser un punto ciego.
-     `productores` no tiene correo secundario (`email` es UNIQUE), así que su lista va vacía a
-     propósito: no es un hueco por rellenar, es que no hay dónde mirar.
-
-103. ~~**`authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito
-     documental.**~~ — **resuelta (14-09-2026, `20270322100100`)**, y eran **33 relaciones, no
-     siete**: 27 tablas y **6 vistas**, más cuatro revocaciones parciales. El criterio se **midió,
-     no se supuso** —«tiene el privilegio y ninguna política que lo autorice», **por operación y no
-     por tabla**, que es lo que deja a `excedentes` con su UPDATE, a `wa_messages` con su DELETE y a
-     `plantillas_documento` con su INSERT/UPDATE—.
-     🔴 **Lo que de verdad podía romperse, y por eso se comprobó antes**: dos triggers escriben en
-     tablas ahora revocadas cuando los dispara una sesión de equipo —`trg_ficha_estrena_organizacion`
-     (→ `organizaciones`, al crear una ficha) y `trg_canalizaciones_crea_albaranes` (→ `albaranes`,
-     al canalizar)—. Los dos son **`security definer`**, así que corren como `postgres` y no dependen
-     del GRANT de quien los dispara; si fueran invoker, este `revoke` habría roto el alta de fichas y
-     la canalización desde el panel. Verificado además **en producción con una sesión de equipo
-     real**: crear una ficha sigue funcionando y el trigger le asigna su organización.
-     ⚠️ **Tres privilegios se quedaron fuera a propósito** y siguen siendo deuda menor:
-     `meta_test_recipients.UPDATE`, `email_test_recipients.UPDATE` y `app_settings.DELETE`. Vienen
-     del mismo sitio y §4 no los reconoce, pero esas tablas tienen política `for all`, así que hoy
-     **sí** son alcanzables: quitarlos sería un cambio de capacidad, no reponer una capa.
-     ⚠️ Y el mismo punto ciego que la deuda del TRUNCATE: hay un segundo juego de privilegios por
-     defecto en `public` **para el rol `supabase_admin`** que sigue concediendo `arwdDxtm`. No
-     alcanza a nuestras tablas —las crea `postgres`— y **no se puede tocar desde una migración**:
-     `postgres` no es miembro de `supabase_admin`, así que el `alter` tumbaría el `db push`.
-     El texto original: Medido el 14-09-2026 sobre producción:
-     `documentos`, `documento_envios`, `series_documentales`, `municipios`, `albaranes`, `convenios`
-     y `cierres_donante` tienen `authenticated=arwdxtm` mientras §4 afirma «ninguna escritura». No
-     viene de ningún GRANT del repo: es el `alter default privileges` que Supabase deja puesto para
-     el rol `postgres`, así que **cada tabla nueva lo hereda sin que nadie escriba una línea**.
-     ⚠️ **No es alcanzable hoy**, y conviene decirlo sin exagerar: las siete tienen RLS con política
-     de SELECT únicamente, así que un `insert`/`update`/`delete` no encuentra política y se rechaza
-     — el arnés ya lo comprueba. Lo que falta no es el cierre: es **la segunda capa**. Es exactamente
-     la misma forma que la deuda del `TRUNCATE` (`20270309100000`), donde tampoco había nada
-     explotable y se repuso la capa que faltaba.
-     El arreglo es un `revoke insert, update, delete … from authenticated` por tabla más su `alter
-     default privileges`, y **merece su propia migración**: tocar los privilegios de escritura de
-     todo `public` de una vez es justo lo que no se hace en un cambio que iba de otra cosa.
-
-104. ~~**`parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por
-     columnas.**~~ — **resuelta (15-09-2026, `20270325100000`)**: `revoke update` + volver a
-     conceder la lista exacta de 22 columnas de `20260928100400:161`. Medido antes y después en
-     producción: `has_table_privilege(…, 'UPDATE')` pasa de `true` a **`false`** y las columnas
-     con UPDATE, de **23 a 22** — la que sobraba era `id`, colada por el privilegio de tabla, que
-     es justo la que la migración original dejó fuera («la fila 1 es la fila 1»).
-     **No era alcanzable** —el `check (id = 1)` remataba el único daño posible y la política ya
-     exige `es_super_admin()`—: como el TRUNCATE y la deuda 103, no se cierra una puerta, se
-     repone la capa.
-     ⚠️ **Se comprobó que no rompía nada antes de tocarlo, y las dos comprobaciones importan**:
-     (1) **hoy no la escribe nadie desde la aplicación** —la única referencia en `src/` es una
-     lectura de `fecha_corte_convenios` en `CampanyaConvenis.tsx:84`, y quien la rellena es el
-     fixture con la service key, que ignora GRANT—; (2) el UPDATE que lanza el arnés reescribe
-     **`caducidad_enlace_dias`** (`COLUMNA_INOCUA`), que sigue concedida, así que el «denegar» del
-     técnico lo sigue imponiendo la **RLS** y no el GRANT — si lo cortara el GRANT, ese check
-     saldría verde sin haber probado la política. Verificado tras aplicar: 669/669 + 13, sin
-     moverse.
-     ⚠️ **Se reconcede en vez de cerrar la tabla del todo** porque el comentario de
-     `20260928100400` promete una pantalla de Configuració que **todavía no existe** (checkpoint
-     10): el día que se construya, el permiso ya está y con la forma correcta.
-105. **Las descripciones de la modalidad no llegan por WhatsApp.** `camposOferta.ts` da a cada
-     `modalitat` una `descripcion` («Ho dones. Entitats socials… Genera un certificat…») que el
-     panel enseña bajo cada opción, pero el intake la pregunta con `sendBotones`, cuyos botones
-     solo admiten título (20 caracteres). Pasarla a `sendLista` permitiría una `description` por
-     fila, con **tope de 72 caracteres** — y la de `donacio` mide 97. Es una mejora del intake,
-     no un defecto: por WhatsApp se sigue eligiendo a ciegas, como siempre.
 106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
      la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
      pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
@@ -4376,16 +3533,17 @@ y `scripts/` que citan dieciséis de ellos, y renumerar los rompería en silenci
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas de §12 que **no son defectos pendientes**. Se quedan donde están —con su
-número, que el código cita— pero conviene saber qué se está mirando antes de intentar arreglarlas.
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: 29 de las 39. Se quedan
+donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
+intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
+también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
+funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en §7).
 
 ### Decisiones deliberadas: se tomaron sabiendo lo que costaban
 
 | # | La decisión | El precio que se aceptó |
 |---|---|---|
-| 9 | Los tipos de fila de un `select` se quedan en su fichero | Un tipo centralizado que se desvíe del literal de columnas **miente sin fallar** (§7). Solo sube a `types.ts` una forma usada en dos o más sitios |
 | 10 | No editar migraciones ya aplicadas | Hay `truncate` mezclado con DDL en el histórico. Editarlas está prohibido (§7) |
-| 13 | El `pendent` de una oferta lo escribe el cliente | Solo ese momento; respuesta y aprobación ya son servidor. Moverlo costaría cambiar dos contratos de Edge Function para cerrar una ventana de milisegundos |
 | 12 | No reponderar `prioritat` | 97 de 111 entidades son prioridad 1: aporta poco al ranking, y arreglarlo es trabajo de negocio |
 | 24 | Replica identity por defecto | Los DELETE de Realtime se reparten sin evaluar RLS. Hoy el payload es solo un id |
 | 27 | El registro no manda correo | Con el modo test activo el gate lo descartaría en silencio, por tres motivos a la vez. Está escrito en `registro/index.ts:33-38` |
@@ -4393,7 +3551,6 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 34 | Áreas táctiles de 36 px salvo en cuatro sitios | Subirlas todas es rediseñar la aplicación entera para ganar 8 px en botones secundarios |
 | 37 | El aviso de instalación se prueba con un evento sintético | `beforeinstallprompt` no lo dispara ningún navegador de escritorio. La instalación real solo se comprueba en un móvil |
 | 54 | El fail-open de `roles_activos` | Con el interruptor apagado dos checks del arnés salen en rojo. Es el fail-open de §4bis, no una regresión |
-| 63 | Las herramientas asumen un operador | Sin stack local ya no hay pelea por el `functions serve` (§7); **queda** que el arnés borra los documentos de prueba de quien sea, y ahora sobre el remoto |
 | 66 | «Amb discrepància» es un filtro, no un veredicto | El veredicto real exigiría una llamada por fila |
 | 67 | Rectificar solo corrige `kg_neto` | Es lo que se rectifica en la práctica; lo demás sería un segundo editor dentro de un diálogo |
 | 70 | Los kilos por línea del cierre son derivados | D13 manda certificar el neto del REC; las líneas tienen que ser por canalización. **El total del donante es exacto** |
@@ -4403,15 +3560,17 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 91 | Las «últimas 9 cifras» están triplicadas (TS + dos migraciones) | SQL no puede importar TypeScript. Unificarlo exigiría una RPC, y entonces `coincidencies.ts` dejaría de ser probable desde Vitest. Con ~450 fichas no hay problema de rendimiento |
 | 82 | Regla de trabajo, no deuda | Un agente no hace `git checkout` de un fichero compartido |
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
-| 86 | No hay rectificativo del CT | El CD lo tiene porque el 182 lo exige; el CT no entra en ese ciclo |
+| 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
+| 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
 
 ### Espera material de la fase 0 o de un tercero
 
 | # | Qué falta | De quién depende |
 |---|---|---|
-| 15 · 17 | Plantillas aprobadas y el paso a producción de Meta | **Meta** |
+| 17 | Las dos whitelists de test conviven con `es_test`, y el Dashboard mide por las de Meta | **Meta**: se revisa al pasar su número a producción |
 | 71 · 77 · 84 | Los textos legales de RES, CD, CT, PLA y los seis convenios | **La asesoría** |
 | 85 | Prueba end-to-end del CT | Bloqueada por `datos_provisionales`, que es la barrera funcionando |
+| 99 | El plan de prevención se lista desde `documentos` y no desde `planes_prevencion` | **La fase 0**: sin el cuestionario (anexo B) no hay pantalla de planes, así que del plan solo existe su PDF |
 
 ### Son interruptores de producción, no código
 
@@ -4425,11 +3584,99 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 | 97 | Acuñar desde el panel revoca el enlace del correo, y por eso no se prueba en positivo |
 | 72 | `abrir_cierre` no se prueba como «permitir» porque dejaría una cabecera sin forma de borrarla |
 
+## 12ter. Deuda cerrada (el índice, no el cuerpo)
+
+Las **67** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
+
+**Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
+código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
+pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
+resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 107.
+
+⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
+sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
+cuentas del arnés que hay en producción y por qué una **no se debe aprobar** (§9), la invariante del
+reparto del neto del REC (§4) y cuánto cuesta de verdad generar un PDF (§11). Si al cerrar una
+entrada queda una lección que describe **cómo se comporta el sistema hoy**, va a su sección; a git
+se va solo **cómo se llegó hasta aquí**.
+
+| # | Qué era | Cerrada |
+|---|---|---|
+| 1 | Sin linter y sin CI | 11-09-2026 |
+| 2 | No hay roles | 30-07-2026 |
+| 3 | El intake avanza de paso aunque falle el envío | 11-09-2026 |
+| 6 | `Conversation` carga el hilo completo sin paginación | 14-09-2026 |
+| 7 | `ContactList` conserva la prop `single` (modo conversación única) | 2026 |
+| 8 | `index.css` es un único fichero global (~825 líneas) con clases sin namespace | 10-09-2026 |
+| 9 | `types.ts` no modela `raw`; `MessageRow` en `ProducersList` duplica parte de `WaMessage` | 14-09-2026 |
+| 11 | Sin FK entre `productores`, `wa_contacts` y `wa_messages` | `20270321100000` |
+| 13 | `oferta_respuestas` se registra desde el cliente | 14-09-2026 |
+| 15 | La selección de plantilla de primer contacto por rol no se ejercita en test | 11-09-2026 |
+| 18 | Aprobación sin roles | 30-07-2026 |
+| 19 | `OfferDetail` aprueba a mano, con llamadas sueltas en vez de `aprovar_resposta()` | 11-09-2026 |
+| 20 | Rol único por usuario | `20270311100000` |
+| 22 | Sin preferencia de canal declarada por la persona | 11-09-2026 |
+| 23 | `excedentes` tiene el único predicado de RLS que no puede ser InitPlan | `20270304100400` |
+| 25 | Un fallo de envío por correo ya deja rastro en la base; falta que el panel lo lea | `20270307100000` |
+| 28 | El registro no deduplica contra las organizaciones existentes | `20270315100000` |
+| 29 | Una ficha rechazada se queda en los listados | `20270306100100` |
+| 31 | La interfaz solo alcanza la primera organización de cada tipo | `20270311100000` |
+| 32 | 143 comprobaciones del arnés se quedaron sin cuenta que las recorra | 14-09-2026 |
+| 35 | `window.prompt()` en dos sitios | 11-09-2026 |
+| 36 | Las pestañas de `/registre` caben con 1 px de margen | 11-09-2026 |
+| 38 | `vista_defecto` se calcula en el servidor y el frontend lo descarta | 11-09-2026 |
+| 39 | `crearExcedente()` no reintenta ante colisión del correlativo | fase 3 |
+| 40 | El albarán se genera con el productor en blanco | fase 3 |
+| 41 | El rebranding a Redestina es textual, no visual | 10-09-2026 |
+| 42 | La infraestructura todavía responde al nombre viejo | 10-09-2026 |
+| 43 | `whatsapp-send` desplegada sin `verify_jwt` | 10-09-2026 |
+| 44 | Un `functions deploy` sin cambios de código no siempre dice `No change found` | 11-09-2026 |
+| 45 | Las Edge Functions no se podían typecheckear | 10-09-2026 |
+| 46 | `priorizar-entidades` tenía tres errores de tipos | 10-09-2026 |
+| 47 | Las tres comprobaciones siguen sin ejecutarse solas | 11-09-2026 |
+| 48 | El arnés daba por fallo lo que solo era falta de datos | 10-09-2026 |
+| 49 | El trigger de encolado de PDF no existe todavía | `20260928100700` |
+| 50 | `ruta_documento()` solo resuelve `PROVA` | fase 5 |
+| 51 | `reiniciar_documentos_prova()` borra las FILAS, no los objetos de Storage | 11-09-2026 |
+| 52 | El arnés, al pasar por el super_admin, borraba todos los documentos `modo='prueba'` | `20270319100000` |
+| 53 | `documento_envios` no tiene fixture en el arnés | 14-09-2026 |
+| 56 | `parametros_documentales` está sembrada con datos provisionales, y nada impide emitir con ellos | fase 4 |
+| 57 | El recordatorio de un enlace no se puede accionar | 11-09-2026 |
+| 58 | `MAX_POR_EJECUCION = 50` es un tope silencioso | 11-09-2026 |
+| 59 | El camino de envío de los recordatorios no tiene prueba automática sin stub | 11-09-2026 |
+| 60 | El bloque de conformidad de los albaranes se imprime siempre en blanco | 11-09-2026 |
+| 61 | El REC de una espigolada imprime el UUID de la jornada | `20270304100100` |
+| 62 | `subir-documento-externo` compone a mano la hoja del nombre de fichero | `20270304100000` |
+| 63 | Las herramientas locales asumen un único operador | 14-09-2026 |
+| 64 | `/equip/espigolades` no tiene listado | 11-09-2026 |
+| 65 | El panel no sube documentos externos | 11-09-2026 |
+| 68 | El OPE no distingue sus dos confirmaciones | `20270304100200` |
+| 73 | `sendEmail()` no tiene modo simulado | 11-09-2026 |
+| 74 | El recordatorio al donante no lleva enlace | 11-09-2026 |
+| 75 | `documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla | `20270320100300` |
+| 78 | `aprovar_resposta()` no puede devolver el aviso de convenio | 11-09-2026 |
+| 79 | Una organización con doble rol necesita dos convenios | `20270312100000` |
+| 86 | No hay rectificativo del CT | 11-09-2026 |
+| 87 | El CPU real de `generar-documento` sigue sin medirse con precisión | 11-09-2026 |
+| 88 | Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/` | 11-09-2026 |
+| 89 | Un corte por CPU no encendía ninguna luz, y además no paraba nunca | `20270302100000` |
+| 90 | Una espigolada con dos registros del mismo producto contaría los kilos dos veces | `20270320100000` |
+| 94 | El intake por WhatsApp no manda el correo de confirmación de la oferta | 14-09-2026 |
+| 96 | La cuenta que firma desde el panel viaja en `p_datos.panell`, no en la evidencia | `20270320100200` |
+| 100 | `app_settings.updated_at` no dice cuándo se cambió un interruptor | `20270320100100` |
+| 101 | `reiniciar_cierre_prueba()` borra los documentos `P-CT` pero no devuelve su contador a 0 | `20270322100000` |
+| 102 | `entidades.email2` es la cuarta columna ciega de la detección de organizaciones | 15-09-2026 |
+| 103 | `authenticated` tiene INSERT, UPDATE y DELETE a nivel de tabla en todo el circuito documental | `20270322100100` |
+| 104 | `parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por columnas | `20270325100000` |
+| 105 | Las descripciones de la modalidad no llegan por WhatsApp | 15-09-2026 |
+
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **773 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **777 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

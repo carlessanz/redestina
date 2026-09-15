@@ -75,12 +75,23 @@ export const OPCIONES_RETORN = ["Sí", "No", "Caixes pròpies"];
 // La `descripcion` de estas tres no es adorno: la modalidad decide qué entidades pueden
 // recibir la oferta (`modalitat_receptor_compat`) y qué documento se acaba emitiendo.
 // Elegirla mal no se nota hasta el cierre.
+//
+// ⚠️ TOPE DURO DE 72 CARACTERES, y no es una preferencia de estilo: el intake pregunta este
+//    paso con una LISTA de WhatsApp (`sendLista`), y la Cloud API limita la `description` de
+//    una fila a 72 caracteres —el `titulo`, a 24—. `sendLista` recorta con `slice(0, 72)`,
+//    así que pasarse no da ningún error: deja la frase cortada a media palabra en el móvil
+//    del productor. La descripción de `donacio` medía 97 y perdía justo el final, donde va
+//    el certificado. Lo vigila `tests/camposOferta.test.ts`.
+//
+// Y son estas mismas las que enseña el panel bajo el desplegable, así que el recorte vale
+// para los dos canales: una sola fuente, que es de lo que va este módulo. Al bajar de 97 se
+// fue «Ho dones» —que ya lo dice el título de la opción, en los dos sitios— y «a final
+// d'any»; lo que DECIDE (quién la puede recibir, y que hay certificado de donación) se queda.
 export const MODALITATS = [
   {
     id: "donacio",
     titulo: "Donació",
-    descripcion:
-      "Ho dones. Entitats socials i d'alimentació animal. Genera un certificat de donació a final d'any.",
+    descripcion: "Entitats socials i d'alimentació animal. Genera certificat de donació.",
   },
   {
     id: "venda",
@@ -93,6 +104,15 @@ export const MODALITATS = [
     descripcion: "Ho transformen per a tu i et tornen producte. Obradors.",
   },
 ];
+
+/**
+ * Lo que admite la `description` de una fila de lista en la Cloud API de Meta. Vive aquí
+ * —y no solo en `whatsapp.ts`— porque quien puede pasarse es quien ESCRIBE el texto, y lo
+ * escribe en este fichero. `whatsapp.ts` conserva su `slice` como última red.
+ */
+export const MAX_DESC_FILA_LISTA = 72;
+/** Y lo que admite el `title` de esa misma fila. */
+export const MAX_TITULO_FILA_LISTA = 24;
 
 export type TipoCampo = "familia" | "producte" | "text" | "numero" | "opcions" | "ubicacio" | "causa";
 

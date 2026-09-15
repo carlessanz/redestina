@@ -16,7 +16,7 @@ import type { FilaLista } from "./whatsapp.ts";
 import { crearExcedenteDesdeSesion } from "./oferta.ts";
 // Los pasos y los vocabularios cerrados viven en camposOferta.ts, compartidos con el
 // formulario del panel del productor: una sola lista, dos interfaces.
-import { PASOS, TIPOS_CAIXA } from "./camposOferta.ts";
+import { MODALITATS, PASOS, TIPOS_CAIXA } from "./camposOferta.ts";
 import type { Paso } from "./camposOferta.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
@@ -192,11 +192,20 @@ async function preguntar(
     case "horari":
       return (await sendText(supabase, to, "Quin horari de recollida va bé? (matí, tarda, hores…)")).ok;
     case "modalitat":
-      return (await sendBotones(supabase, to, "Quina modalitat és?", [
-        { id: "modalitat:donacio", titulo: "Donació" },
-        { id: "modalitat:venda", titulo: "Venda" },
-        { id: "modalitat:maquila", titulo: "Maquila" },
-      ])).ok;
+      // Lista y no botones, aunque solo sean tres opciones: un botón de WhatsApp admite
+      // título y nada más, así que por aquí se elegía a ciegas entre tres palabras
+      // —«Donació», «Venda», «Maquila»— mientras el panel sí explicaba cada una. Y es el
+      // paso que decide qué entidades pueden recibir la oferta y qué documento se emite:
+      // equivocarse no se nota hasta el cierre. La fila de lista sí lleva `description`,
+      // que es la de `MODALITATS`, la misma que lee el panel (deuda §12.105).
+      return (await sendLista(
+        supabase, to, "Quina modalitat és?", "Tria modalitat",
+        MODALITATS.map((m) => ({
+          id: `modalitat:${m.id}`,
+          titulo: m.titulo,
+          descripcion: m.descripcion,
+        })),
+      )).ok;
     case "preu_minim":
       return (await sendText(
         supabase, to,

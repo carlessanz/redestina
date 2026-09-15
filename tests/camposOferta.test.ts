@@ -16,6 +16,8 @@ import {
   PASOS,
   CAMPOS,
   MODALITATS,
+  MAX_DESC_FILA_LISTA,
+  MAX_TITULO_FILA_LISTA,
   SECCIONES,
   aplica,
   faltantes,
@@ -237,6 +239,59 @@ describe('el cuestionario se explica a sí mismo', () => {
     // La ayuda creció para decir qué pasa al vencer, pero el ejemplo va al final: sin él,
     // «fins quin dia» se contesta en cualquier formato y `parseDisponibleFins` no lo entiende.
     expect(campo('disponible_fins').ayuda).toMatch(/23\/07$/)
+  })
+})
+
+describe('los textos caben en una fila de lista de WhatsApp', () => {
+  // El paso `modalitat` se pregunta por WhatsApp con una LISTA, no con botones, porque un
+  // botón solo lleva título: por ahí se elegía entre tres palabras sin saber que la
+  // modalidad decide qué entidades pueden recibir la oferta y qué documento se emite.
+  //
+  // El precio de la lista es este tope. Y lo que lo hace traicionero: `sendLista` recorta
+  // con `slice(0, 72)`, así que pasarse NO da error ni lo rechaza Meta —llega el mensaje,
+  // con la frase cortada a media palabra—. Sin esta prueba, alargar la descripción de una
+  // modalidad se vería por primera vez en el móvil de un productor.
+  it('ninguna modalitat se pasa del tope de la description (72)', () => {
+    for (const m of MODALITATS) {
+      expect(
+        m.descripcion.length,
+        `la descripció de "${m.id}" mide ${m.descripcion.length}: WhatsApp la cortaría en ` +
+          `«${m.descripcion.slice(0, MAX_DESC_FILA_LISTA)}»`,
+      ).toBeLessThanOrEqual(MAX_DESC_FILA_LISTA)
+    }
+  })
+
+  it('ni del tope del title (24)', () => {
+    for (const m of MODALITATS) {
+      expect(m.titulo.length, `el títol de "${m.id}" no cabe en una fila`)
+        .toBeLessThanOrEqual(MAX_TITULO_FILA_LISTA)
+    }
+  })
+
+  // La regla no es de las modalidades, es de cualquier opción con descripción: el día que
+  // otro campo estrene una, el tope le aplica igual porque el intake usa lista para todos
+  // los vocabularios cerrados (`tipus_caixa`, `familia`, `producte`, `causa`).
+  it('vale para toda opción con descripción, la tenga quien la tenga', () => {
+    for (const c of CAMPOS) {
+      for (const o of c.opciones ?? []) {
+        expect(o.titulo.length, `${c.clave}/${o.id}: títol massa llarg`)
+          .toBeLessThanOrEqual(MAX_TITULO_FILA_LISTA)
+        if (o.descripcion === undefined) continue
+        expect(o.descripcion.length, `${c.clave}/${o.id}: descripció massa llarga`)
+          .toBeLessThanOrEqual(MAX_DESC_FILA_LISTA)
+      }
+    }
+  })
+
+  // Lo que el recorte NO podía perder. La descripción de `donacio` medía 97 y el `slice`
+  // se comía justo el final —donde va el certificado—, así que al acortarla se sacrificó
+  // «Ho dones» (lo dice el título) y el «a final d'any»; estas dos cosas son las que
+  // deciden, y si alguien las quita al reescribir el texto, esta prueba lo dice.
+  it('la de donació sigue diciendo quién la recibe y qué documento genera', () => {
+    const d = MODALITATS.find((m) => m.id === 'donacio')!.descripcion!
+    expect(d).toContain('Entitats socials')
+    expect(d).toContain('alimentació animal')
+    expect(d).toContain('certificat de donació')
   })
 })
 
