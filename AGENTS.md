@@ -368,8 +368,9 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   fondos oscuros**: sidebar, pie de la landing, pantallas de acceso; la barra superior de la
   landing es clara y lleva el logo en color),
   `logo-redestina-mono.svg` (un color, `currentColor`), `isotipo-redestina.svg` (solo la hoja:
-  favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. `logo-email.png` es el negativo
-  rasterizado a 410×120 para la cabecera verde de los correos. Nada de `brightness-0 invert` ni
+  favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. **`logo-email.png` es el logo EN
+  COLOR** —el principal— rasterizado a 410×120 con transparencia, y por eso **la cabecera de los
+  correos es clara** (§9bis). Nada de `brightness-0 invert` ni
   filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
   `design/DESIGN.md §4`.
 - **Fuentes**: Sora (500/600/700/800) e Inter (400/500/600/700), libres (OFL), desde Google Fonts
@@ -2400,12 +2401,30 @@ cuerpo, botón y nota, filete coral, pie crema y la línea de por qué recibes e
 `preheader` (la línea que la bandeja enseña junto al asunto) y pinta el botón con la técnica de
 tabla + `bgcolor`, porque Outlook ignora el `padding` de un `<a>`.
 
-**El logo es `public/logo-email.png`**, el logo negativo rasterizado a 410×120 desde
-`logo-redestina-negativo.svg` (se pinta a 150×44): los clientes de correo no pintan SVG, no resuelven
-rutas relativas y Gmail bloquea `data:`. Se sirve por URL absoluta desde `APP_URL`. El `alt` del
-`<img>` va **estilado** (crema, 26px, bold), así que con las imágenes bloqueadas —lo normal en Gmail
-con un remitente nuevo— se sigue leyendo «Redestina» sobre el verde en vez de un icono roto. Si se
-cambia de dominio, basta con `APP_URL`. **Los colores del correo son constantes al principio de
+**El logo es `public/logo-email.png`**, el logo **en color** —el principal— rasterizado a 410×120
+con transparencia y pintado a 150×44: los clientes de correo no pintan SVG, no resuelven rutas
+relativas y Gmail bloquea `data:`. Se sirve por URL absoluta desde `APP_URL`. El `alt` del `<img>`
+va **estilado** (verde, 26px, bold), así que con las imágenes bloqueadas —lo normal en Gmail con un
+remitente nuevo— se sigue leyendo «Redestina» en vez de un icono roto. Si se cambia de dominio,
+basta con `APP_URL`.
+
+🔴 **Y la cabecera es CLARA (`CREMA`) por culpa de eso, no por gusto** (15-09-2026). Nació verde,
+acompañando a un negativo que **el fichero nunca fue**: un comentario decía que `logo-email.png`
+era el negativo, y como el logo real lleva «DESTINA» y la hoja en el mismo `#4e6b45` del fondo,
+durante cinco días **todos los correos salieron enseñando solo «RE»**, en coral. Nadie lo vio
+porque para verlo hay que abrir un correo y el respaldo del `alt` sí funcionaba —con las imágenes
+bloqueadas se leía «Redestina»; con ellas cargadas, media palabra—. Lo que manda es el fichero.
+⚠️ **Fondo, logo, `alt` y subtítulo son CUATRO cosas que van juntas**: pasar la cabecera a oscura
+exige rasterizar `logo-redestina-negativo.svg` y cambiar los dos colores de texto. Lo vigila
+`tests/resend.test.ts`, que calcula el contraste WCAG de cada color de la cabecera contra su
+propio fondo y exige ≥ 4.5 — con la cabecera verde y este logo, falla.
+
+**Los colores se EXPORTAN desde `resend.ts`, y eso es parte del contrato**: el cuerpo de cada
+correo lo compone su Edge Function, así que un `#4e6b45` escrito a mano ahí deja de obedecer al
+sistema —el día que cambie el token, ese correo se queda con el color viejo y nadie lo nota—.
+`enviar-acceso` llevaba tres y `recordatorios-documentales` diecisiete, **uno de ellos un
+`#fdf1f0` que no existe en `design/tokens.json`** (el `coral-suave` real es `#fde9e6`). Hoy los
+dos importan las constantes y no queda ningún hex suelto en ningún correo. **Los colores del correo son constantes al principio de
 `resend.ts`** (`VERDE`, `CREMA`, `CORAL`, `FONDO`, `BORDE`, `TEXTO`, `SUAVE`) copiadas de
 `design/tokens.json`: si cambia un token, se cambian ahí (y en `enviar-acceso/index.ts`, que lleva
 dos en línea) y se redespliegan las funciones.
@@ -2414,10 +2433,19 @@ dos en línea) y se redespliegan las funciones.
 albarán). Pasarle HTML lo publica como markup literal — pasó con `enviar-acceso` el 30-07-2026 y el
 correo llegó enseñando `<p>Hola…</p>`. Para HTML, `plantillaEmail()` directamente.
 
-**El cliente no maqueta.** `enviar-email` acepta un campo opcional **`plantilla`**
-(`{ titulo, preheader?, boton?, nota? }`); cuando viene, el `html`/`text` recibido es solo el
-*contenido* y el servidor lo envuelve. Sin `plantilla` manda el `html` tal cual (compatible hacia
-atrás). Por eso `OfferDetail` ya no construye HTML de correo: pasa `plantilla` y el texto.
+**El cliente no maqueta, y desde el 15-09-2026 tampoco puede.** `enviar-email` acepta un campo
+opcional **`plantilla`** (`{ titulo, preheader?, boton?, nota? }`) y el `html`/`text` recibido es
+siempre solo el *contenido*: el servidor lo envuelve **pase o no pase ese campo**, y sin él el
+asunto hace de título. Antes, sin `plantilla` se mandaba el `html` tal cual «por compatibilidad
+hacia atrás», y esa puerta no servía para nada —los tres llamantes del frontend la pasan— salvo
+para que algún día saliera un correo sin cabecera ni pie sin que nadie se enterara. Por eso
+`OfferDetail` no construye HTML de correo: pasa `plantilla` y el texto.
+
+⚠️ **Los seis emisores usan `plantillaEmail()`** (`enviar-email`, `enviar-acceso`,
+`recuperar-password`, `recordatorios-documentales`, `enlace-publico` y `_shared/correu-oferta.ts`),
+así que tocar esa función cambia **todos** los correos a la vez — que es justamente para lo que
+existe. Y como todas importan `_shared/resend.ts`, tocarla obliga a **redesplegar las siete
+funciones** que la empaquetan, `registro` incluida (§11).
 
 ### Enlaces de acceso (`enviar-acceso`)
 
@@ -3680,7 +3708,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **777 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **785 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

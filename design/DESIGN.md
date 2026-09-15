@@ -55,7 +55,7 @@ Archivos en `public/` (todos SVG con las letras convertidas a trazados; no depen
 | `logo-redestina-mono.svg` | Un solo color (`currentColor`): impresión en blanco y negro, marca de agua. |
 | `isotipo-redestina.svg` | Solo la hoja: favicon, iconos PWA (`icona-*.png`, `apple-touch-icon.png`), avatar del sistema en la mensajería, botón de inicio en móvil. |
 | `isotipo-redestina-mono.svg` | La hoja en `currentColor`. |
-| `logo-email.png` | Versión rasterizada del horizontal para clientes de correo que no pintan SVG. Se regenera desde el SVG. |
+| `logo-email.png` | El horizontal **en color** (`logo-redestina.svg`) rasterizado a 410×120 con transparencia, para clientes de correo que no pintan SVG. Por eso la cabecera del correo es **clara**: este logo lleva «DESTINA» y la hoja en el verde de marca y sobre un fondo verde desaparecen. Si algún día la cabecera pasa a oscura, hay que rasterizar `logo-redestina-negativo.svg` y cambiar también el color del `alt` y del subtítulo. |
 
 Reglas:
 

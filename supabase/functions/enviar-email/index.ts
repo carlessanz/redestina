@@ -82,26 +82,29 @@ Deno.serve(async (req) => {
       return responder({ error: "Falta 'html' o 'text'" }, 400);
     }
 
-    // Si el cliente pide `plantilla`, el correo se MAQUETA AQUÍ (cabecera, logo,
-    // pie), y `html`/`text` son solo el contenido. Así la plantilla vive en un
-    // único sitio (_shared/resend.ts) en vez de duplicada en cada llamante.
-    // Sin `plantilla`, se manda el `html` tal cual: compatible hacia atrás.
-    let htmlFinal: string | undefined = typeof html === "string" ? html : undefined;
-    if (plantilla && typeof plantilla === "object") {
-      const { titulo, preheader, boton, nota } = plantilla as {
-        titulo?: string;
-        preheader?: string;
-        boton?: { texto: string; url: string };
-        nota?: string;
-      };
-      htmlFinal = plantillaEmail({
-        titulo: titulo || subject,
-        preheader,
-        boton,
-        nota,
-        cuerpoHtml: htmlFinal ?? bloquePreformateado(String(text)),
-      });
-    }
+    // El correo se MAQUETA AQUÍ, siempre: `html`/`text` son solo el contenido y la
+    // cabecera, el logo y el pie los pone `plantillaEmail()`. Así la plantilla vive en un
+    // único sitio (`_shared/resend.ts`) y tocarla cambia TODOS los correos a la vez.
+    //
+    // ⚠️ **`plantilla` es opcional, pero envolver ya no lo es** (15-09-2026). Antes, sin ese
+    // campo se mandaba el `html` tal cual «por compatibilidad hacia atrás», y esa puerta no
+    // servía para nada —los tres llamantes del frontend pasan `plantilla`— salvo para que un
+    // día alguien mandara un correo sin cabecera ni pie sin enterarse. Sin `plantilla`, el
+    // asunto hace de título, que es lo que ya hacía el `titulo || subject` de debajo.
+    const opciones = (plantilla && typeof plantilla === "object" ? plantilla : {}) as {
+      titulo?: string;
+      preheader?: string;
+      boton?: { texto: string; url: string };
+      nota?: string;
+    };
+    const contenido = typeof html === "string" ? html : bloquePreformateado(String(text));
+    const htmlFinal = plantillaEmail({
+      titulo: opciones.titulo || subject,
+      preheader: opciones.preheader,
+      boton: opciones.boton,
+      nota: opciones.nota,
+      cuerpoHtml: contenido,
+    });
 
     // Gate "modo test" (§8): si el modo test global está activo (por defecto), solo
     // se envía al correo de una entidad marcada es_test. Fuente de verdad de la app,

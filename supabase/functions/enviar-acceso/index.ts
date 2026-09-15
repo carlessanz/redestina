@@ -20,7 +20,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
+import { escaparHtml, FONDO, plantillaEmail, sendEmail, TEXTO, VERDE } from "../_shared/resend.ts";
 import { sendText } from "../_shared/whatsapp.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { esCuentaPermitida, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
@@ -200,10 +200,12 @@ Deno.serve(async (req) => {
           `<p style="margin:0">Ja pots entrar al panell de Redestina. L'enllaç caduca en <strong>1 hora</strong> i només es pot fer servir una vegada.</p>`,
         boton: { texto: "Entra a Redestina", url: enlace },
         nota:
-          `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:#4e6b45">${
+          // Los colores salen de `resend.ts`, no de aquí: tres hex a mano eran tres sitios
+          // donde un cambio de token no llegaría (§9bis).
+          `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:${VERDE}">${
             redirectTo.replace(/^https?:\/\//, "")
           }</a>, escriu el teu correu i fes servir aquest codi:<br>` +
-          `<span style="display:inline-block;margin-top:10px;padding:8px 14px;background:#ebe6da;border-radius:8px;font-size:20px;font-weight:700;letter-spacing:4px;color:#1d1d1b">${codi}</span>`,
+          `<span style="display:inline-block;margin-top:10px;padding:8px 14px;background:${FONDO};border-radius:8px;font-size:20px;font-weight:700;letter-spacing:4px;color:${TEXTO}">${codi}</span>`,
       });
       const r = await sendEmail({
         to: email,

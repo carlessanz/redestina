@@ -58,7 +58,7 @@ export interface BytesActivos {
   tituloFuerte: Uint8Array;
   cuerpo: Uint8Array;
   cuerpoFuerte: Uint8Array;
-  /** Logo positivo sobre blanco. `logo-email.png` es el NEGATIVO y no sirve aquí. */
+  /** Logo positivo sobre blanco, con su propio activo. */
   logo: Uint8Array | null;
 }
 

@@ -69,7 +69,11 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { destinatariosPrueba, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
-import { escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
+// Los colores salen de `resend.ts`: un hex a mano aquí es un sitio donde un cambio de
+// token no llegaría, y además se cuela un color que el sistema no tiene (§9bis).
+import {
+  BORDE, CORAL, CORAL_SUAVE, escaparHtml, plantillaEmail, sendEmail, SUAVE, VERDE,
+} from "../_shared/resend.ts";
 
 const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com")
   .replace(/\/$/, "");
@@ -280,7 +284,7 @@ function cuerpoResumen(
       ? escaparHtml(v.fila.destinatario_nombre ?? v.fila.destinatario_email)
       : `${escaparHtml(v.fila.destinatario_nombre ?? "—")} <em>(assistit)</em>`;
     const correo = v.fila.destinatario_email
-      ? `<br><span style="color:#5f6b5a">${escaparHtml(v.fila.destinatario_email)}</span>`
+      ? `<br><span style="color:${SUAVE}">${escaparHtml(v.fila.destinatario_email)}</span>`
       : "";
     const id = ids.get(v.fila.objeto_id);
     // El número si lo tiene; si no (un conveni en `pendent_firma` todavía no lo tiene:
@@ -291,14 +295,14 @@ function cuerpoResumen(
     const url = enlacePanel(v.fila.objeto_tipo, v.fila.objeto_id);
     const accion = escaparHtml(ACCION_TEXTO[v.fila.proposito] ?? "Obre'l al panell");
     const boton = url
-      ? `<a href="${url}" style="color:#4e6b45;font-weight:600;text-decoration:underline">Obre i reenvia</a>
-         <br><span style="color:#5f6b5a;font-size:12px">${accion}</span>`
-      : `<span style="color:#5f6b5a">${accion}</span>`;
-    return `<tr style="border-top:1px solid #e0d9ca">
+      ? `<a href="${url}" style="color:${VERDE};font-weight:600;text-decoration:underline">Obre i reenvia</a>
+         <br><span style="color:${SUAVE};font-size:12px">${accion}</span>`
+      : `<span style="color:${SUAVE}">${accion}</span>`;
+    return `<tr style="border-top:1px solid ${BORDE}">
       <td style="padding:8px 10px;vertical-align:top">${destinatario}${correo}</td>
       <td style="padding:8px 10px;vertical-align:top">${
       escaparHtml(PROPOSITO_TEXTO[v.fila.proposito] ?? v.fila.proposito)
-    }<br><span style="color:#5f6b5a">${queEs}</span></td>
+    }<br><span style="color:${SUAVE}">${queEs}</span></td>
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${v.dias} dies</td>
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap">${
       diasParaCaducar(v.fila.caduca_at, ahoraMs)
@@ -312,7 +316,7 @@ function cuerpoResumen(
   // en ningún sitio que alguien mire: quien lee el correo daba por hecho que la lista
   // estaba completa.
   const recorte = limitados > 0
-    ? `<p style="margin:0 0 14px;padding:10px 12px;background:#fdf1f0;border-left:3px solid #ef7d77">
+    ? `<p style="margin:0 0 14px;padding:10px 12px;background:${CORAL_SUAVE};border-left:3px solid ${CORAL}">
         <strong>La llista està retallada.</strong> Hi ha ${limitados} enllaç${
       limitados === 1 ? "" : "os"
     } més que també toquen avui i que s'han deixat per demà
@@ -325,7 +329,7 @@ function cuerpoResumen(
       : `Hi ha <strong>${n} enllaços</strong> que`
   } ${n === 1 ? "porta" : "porten"} 7 o 14 dies sense fer-se servir.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px">
-  <tr style="text-align:left;color:#5f6b5a;font-size:12px;text-transform:uppercase;letter-spacing:.5px">
+  <tr style="text-align:left;color:${SUAVE};font-size:12px;text-transform:uppercase;letter-spacing:.5px">
     <th style="padding:0 10px 6px">Destinatari</th>
     <th style="padding:0 10px 6px">Què espera</th>
     <th style="padding:0 10px 6px">Enviat fa</th>
@@ -527,17 +531,17 @@ async function facturasPendientes(
 /** El correo al donante. Todo lo que viene de la base va escapado. */
 function cuerpoFactura(f: FacturaPendiente): string {
   const prova = f.modo === "prueba"
-    ? `<p style="margin:0 0 14px;color:#5f6b5a"><strong>Aquest és un tancament de prova</strong> (${
+    ? `<p style="margin:0 0 14px;color:${SUAVE}"><strong>Aquest és un tancament de prova</strong> (${
       escaparHtml(f.motivoDestinatario)
     }): no cal fer res.</p>`
     : "";
   return `${prova}<p style="margin:0 0 14px">Fa <strong>${f.dias} dies</strong> que et vam enviar el resum anual
 ${escaparHtml(f.numero ?? "")} de l'exercici ${f.ejercicio ?? ""} i encara no ens ha arribat la teva factura.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px;margin:0 0 14px">
-  <tr><td style="padding:4px 0;color:#5f6b5a">Import</td><td style="padding:4px 0;text-align:right"><strong>${
+  <tr><td style="padding:4px 0;color:${SUAVE}">Import</td><td style="padding:4px 0;text-align:right"><strong>${
     eur(f.importe)
   }</strong></td></tr>
-  <tr><td style="padding:4px 0;color:#5f6b5a">Quilos</td><td style="padding:4px 0;text-align:right">${
+  <tr><td style="padding:4px 0;color:${SUAVE}">Quilos</td><td style="padding:4px 0;text-align:right">${
     f.kg === null ? "—" : `${f.kg} kg`
   }</td></tr>
 </table>
@@ -549,11 +553,11 @@ Si has perdut l'enllaç, respon a aquest correu i te'n fem arribar un de nou.</p
 /** La segunda tabla del resumen del equipo. */
 function cuerpoFacturas(facturas: FacturaPendiente[], limitadas: number): string {
   const filas = facturas.map((f) =>
-    `<tr style="border-top:1px solid #e0d9ca">
+    `<tr style="border-top:1px solid ${BORDE}">
       <td style="padding:8px 10px;vertical-align:top">${escaparHtml(f.nombre || "—")}<br>
-        <span style="color:#5f6b5a">${escaparHtml(f.email)}</span></td>
+        <span style="color:${SUAVE}">${escaparHtml(f.email)}</span></td>
       <td style="padding:8px 10px;vertical-align:top">${escaparHtml(f.numero ?? "—")}<br>
-        <span style="color:#5f6b5a">exercici ${f.ejercicio ?? ""}${
+        <span style="color:${SUAVE}">exercici ${f.ejercicio ?? ""}${
       f.modo === "prueba" ? " · prova" : ""
     }</span></td>
       <td style="padding:8px 10px;vertical-align:top;white-space:nowrap;text-align:right">${eur(f.importe)}</td>
@@ -563,13 +567,13 @@ function cuerpoFacturas(facturas: FacturaPendiente[], limitadas: number): string
     }</td>
       <td style="padding:8px 10px;vertical-align:top"><a href="${APP_URL}/equip/tancament/${
       encodeURIComponent(f.cd.cierre_id)
-    }" style="color:#4e6b45;font-weight:600;text-decoration:underline">Obre el tancament</a></td>
+    }" style="color:${VERDE};font-weight:600;text-decoration:underline">Obre el tancament</a></td>
     </tr>`
   ).join("\n");
 
   const n = facturas.length;
   const recorte = limitadas > 0
-    ? `<p style="margin:18px 0 0;padding:10px 12px;background:#fdf1f0;border-left:3px solid #ef7d77">
+    ? `<p style="margin:18px 0 0;padding:10px 12px;background:${CORAL_SUAVE};border-left:3px solid ${CORAL}">
         <strong>La llista de factures està retallada</strong>: ${limitadas} més toquen avui i s'han deixat per demà
         (el màxim per execució és ${MAX_POR_EJECUCION}).</p>`
     : "";
@@ -577,7 +581,7 @@ function cuerpoFacturas(facturas: FacturaPendiente[], limitadas: number): string
     n === 1 ? "Hi ha <strong>1 factura</strong> pendent" : `Hi ha <strong>${n} factures</strong> pendents`
   } del tancament anual. Al donant ja se li ha escrit.</p>
 <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;font-size:14px">
-  <tr style="text-align:left;color:#5f6b5a;font-size:12px;text-transform:uppercase;letter-spacing:.5px">
+  <tr style="text-align:left;color:${SUAVE};font-size:12px;text-transform:uppercase;letter-spacing:.5px">
     <th style="padding:0 10px 6px">Donant</th>
     <th style="padding:0 10px 6px">Resum</th>
     <th style="padding:0 10px 6px;text-align:right">Import</th>

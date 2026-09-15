@@ -60,8 +60,12 @@ export function esEnvioReal(valor: string | undefined | null): boolean {
 
 // El logo tiene que ser una URL absoluta y pública: los clientes de correo no
 // resuelven rutas relativas, no cargan `data:` (Gmail lo bloquea) y no saben
-// pintar SVG. `public/logo-email.png` es el logo en negativo (para la cabecera verde)
-// rasterizado a 410×120; se regenera desde `public/logo-redestina-negativo.svg`.
+// pintar SVG. `public/logo-email.png` es el logo **en color** (el principal, el mismo de
+// `logo-redestina.svg`) rasterizado a 410×120 con transparencia, y se pinta a 150×44.
+// ⚠️ Este comentario dijo durante cinco días que era el NEGATIVO, y de ahí salió el fallo:
+// la cabecera se pintó verde para acompañar a un negativo que no existía, y como el logo real
+// lleva «DESTINA» y la hoja en el mismo `#4e6b45` del fondo, en los correos solo se leía «RE».
+// Lo que manda es el fichero, no el comentario: la cabecera es **clara** por eso.
 // Exportada porque la necesita cualquiera que meta un enlace en un correo (hoy también
 // `crear-oferta`), y cada copia suelta del patrón es un sitio más donde olvidar el
 // `APP_URL` al cambiar de dominio (§10ter).
@@ -238,14 +242,33 @@ async function enviarResend(payload: EmailPayload): Promise<EmailResult> {
 // --- Plantilla visual -------------------------------------------------------
 
 // Colores del sistema de diseño (design/tokens.json). Si cambian allí, cambian aquí.
-const VERDE = "#4e6b45"; // primary
-const CREMA = "#f5f1ea"; // background / primary-foreground
-const CORAL = "#ef7d77"; // acento de marca
-const FONDO = "#ebe6da"; // muted: fondo exterior del correo
-const BORDE = "#e0d9ca"; // border
-const TEXTO = "#1d1d1b"; // foreground
-const SUAVE = "#5f6b5a"; // muted-foreground
+//
+// ⚠️ **Se EXPORTAN, y eso es el punto**: el contenido de un correo lo compone cada Edge
+// Function, y en cuanto una escribe un `#4e6b45` a mano deja de obedecer a este fichero — el
+// día que cambie el token, ese correo se queda con el color viejo y nadie lo nota. Pasó con
+// `enviar-acceso`, que llevaba tres hex en línea. Quien meta un color en el cuerpo de un
+// correo usa estas constantes.
+export const VERDE = "#4e6b45"; // primary
+export const CREMA = "#f5f1ea"; // background / primary-foreground
+export const CORAL = "#ef7d77"; // acento de marca
+export const CORAL_SUAVE = "#fde9e6"; // fondo de avisos con coral
+export const FONDO = "#ebe6da"; // muted: fondo exterior del correo
+export const BORDE = "#e0d9ca"; // border
+export const TEXTO = "#1d1d1b"; // foreground
+export const SUAVE = "#5f6b5a"; // muted-foreground
 const FUENTE = "-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif";
+
+/**
+ * El fondo de la cabecera. **Claro a propósito**: ahí va el logo PRINCIPAL, que es el de
+ * color, y `design/DESIGN.md §4` dice que ese va «sobre crema o blanco». Cambiarlo a un
+ * fondo oscuro exige cambiar TAMBIÉN el logo por `logo-redestina-negativo.svg` rasterizado,
+ * el color del `alt` y el del subtítulo — son cuatro cosas que van juntas, y `tests/resend`
+ * falla si se mueve una sola.
+ */
+const CABECERA = CREMA;
+/** Lo que va ENCIMA de la cabecera: tiene que contrastar con `CABECERA`. */
+const CABECERA_TEXTO = VERDE;
+const CABECERA_SUBTITULO = SUAVE;
 
 export function escaparHtml(s: string): string {
   return s
@@ -314,12 +337,14 @@ ${preheader}
 
     <table role="presentation" width="600" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:600px;border-collapse:separate">
 
-      <!-- Cabecera: el alt del logo va estilado, así que con las imágenes
-           bloqueadas (Gmail lo hace por defecto) se sigue leyendo «Redestina». -->
-      <tr><td align="center" bgcolor="${VERDE}" style="background:${VERDE};border-radius:16px 16px 0 0;padding:28px 24px 22px">
+      <!-- Cabecera clara con el logo PRINCIPAL. El alt va estilado, así que con las
+           imágenes bloqueadas (Gmail lo hace por defecto) se sigue leyendo «Redestina» —y
+           ahora en verde sobre crema, que es legible: con el fondo verde de antes iba en
+           crema, o sea que el respaldo funcionaba y el logo era lo que no se veía. -->
+      <tr><td align="center" bgcolor="${CABECERA}" style="background:${CABECERA};border-radius:16px 16px 0 0;padding:28px 24px 22px">
         <img src="${LOGO_URL}" width="150" height="44" alt="Redestina"
-             style="display:block;border:0;outline:none;width:150px;height:44px;font-family:${FUENTE};font-size:26px;font-weight:700;color:${CREMA};letter-spacing:1px">
-        <div style="font-family:${FUENTE};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${CREMA};opacity:.85;padding-top:10px">Fundació Espigoladors</div>
+             style="display:block;border:0;outline:none;width:150px;height:44px;font-family:${FUENTE};font-size:26px;font-weight:700;color:${CABECERA_TEXTO};letter-spacing:1px">
+        <div style="font-family:${FUENTE};font-size:12px;letter-spacing:1.5px;text-transform:uppercase;color:${CABECERA_SUBTITULO};padding-top:10px">Fundació Espigoladors</div>
       </td></tr>
 
       <!-- Tarjeta -->
