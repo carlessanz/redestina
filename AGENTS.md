@@ -3180,9 +3180,13 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 41 vivas, **30 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 39 vivas, **32 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero o interruptor de producción. §12bis separa **lo que
 es un defecto** de **lo que no lo es**.
+
+**Las 7 que NO están catalogadas son las únicas que describen trabajo pendiente**: las seis
+parciales (5, 14, 21, 33, 55, 69) y la 16, que es la brecha 2 de §1bis vista desde el código. De
+cada una, la mitad hecha está contada dentro; lo que queda se explica ahí mismo.
 
 🔴 **Los números no se renumeran NUNCA, y borrar tampoco los libera.** Hay comentarios en `src/`,
 `supabase/functions/`, `scripts/` y `tests/` que citan **69** de ellos —48 apuntan a entradas ya
@@ -3533,7 +3537,7 @@ Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y *
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: 29 de las 39. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **32 de las 39**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
