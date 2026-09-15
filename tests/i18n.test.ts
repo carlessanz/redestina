@@ -101,3 +101,34 @@ describe('higiene de las claves', () => {
     expect(sucias).toEqual([])
   })
 })
+
+// ---------------------------------------------------------------------------
+// La convención de singular (`<clau>_1`)
+// ---------------------------------------------------------------------------
+// `t()` sirve `<clau>_1` cuando el parámetro `n` vale 1, y si no existe usa el plural de
+// siempre. Es opt-in, así que lo que puede romperse no es que falte una variante —eso solo
+// devuelve el comportamiento anterior— sino que la variante MIENTA: que exista en un idioma
+// y no en el otro (se leería en catalán una frase castellana), que su clave base no exista
+// (texto muerto que nadie verá nunca), o que introduzca un marcador que quien llama no pasa,
+// porque un `{x}` sin valor se imprime crudo en la pantalla.
+describe('la convención de singular', () => {
+  const variantes = Object.keys(ca).filter((k) => k.endsWith('_1') && ca[`${k.slice(0, -2)}`] !== undefined)
+
+  it('hay variantes que comprobar', () => {
+    expect(variantes.length).toBeGreaterThan(0)
+  })
+
+  it('cada variante existe en los dos idiomas', () => {
+    for (const k of variantes) expect(es[k], `falta ${k} en castellà`).toBeDefined()
+  })
+
+  it('ninguna variante introduce un marcador que su plural no tenga', () => {
+    for (const k of variantes) {
+      const base = k.slice(0, -2)
+      for (const idioma of [ca, es]) {
+        const sobran = marcadores(idioma[k]).filter((m) => !marcadores(idioma[base]).includes(m))
+        expect(sobran, `${k} usa ${sobran.join(', ')}, que ${base} no pasa`).toEqual([])
+      }
+    }
+  })
+})

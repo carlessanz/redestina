@@ -128,7 +128,7 @@ export function Interessos() {
     <Card>
       <CardHeader>
         <CardTitle>{t('int.title')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">{t('int.subtitle2')}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('int.subtitle')}</p>
         <LlegendaEstats items={llegenda} />
       </CardHeader>
       <CardContent className="space-y-2">
@@ -213,12 +213,12 @@ export function Historic() {
     <Card>
       <CardHeader>
         <CardTitle>{t('hist.title')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">{t('hist.subtitle2', { n: totalKg })}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{t('hist.subtitle', { n: totalKg })}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {!carregant && files.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t('hist.empty2')}</p>
+          <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}
         {files.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">

@@ -400,7 +400,7 @@ const ca: Dict = {
   'alb.hint_toreconcile': 'Lliurats o confirmats. Conciliar és escriure els quilos que compten.',
   'alb.c_number': 'Número', 'alb.c_type': 'Tipus', 'alb.c_counterpart': 'Contrapart',
   'alb.c_product': 'Producte', 'alb.c_kg': 'kg', 'alb.c_status': 'Estat', 'alb.c_waiting': 'Espera',
-  'alb.days': '{n} dies',
+  'alb.days': '{n} dies', 'alb.days_1': '{n} dia',
   'alb.st_borrador': 'Esborrany', 'alb.st_emitido': 'Emès', 'alb.st_entregado': 'Entregat',
   'alb.st_confirmado': 'Confirmat', 'alb.st_conciliado': 'Conciliat', 'alb.st_anulado': 'Anul·lat',
   'alb.st_rectificado': 'Rectificat',
@@ -1065,6 +1065,7 @@ const ca: Dict = {
   'proc.p_publicada_qui': 'L’equip de Redestina',
   'proc.p_publicada_gestio_t': 'En mans de l’equip',
   'proc.p_publicada_gestio_passa': '{n} entitats han mostrat interès. L’equip decideix qui se la queda i quants kg.',
+  'proc.p_publicada_gestio_passa_1': 'Una entitat ha mostrat interès. L’equip decideix si se la queda i quants kg.',
   'proc.p_publicada_gestio_toca': 'Res. T’avisarem quan estigui decidit.',
   'proc.p_publicada_gestio_qui': 'L’equip de Redestina',
   'proc.p_assignada_parcial_t': 'Amb destí parcial',
@@ -1146,7 +1147,8 @@ const ca: Dict = {
   'proc.e_publicada_toca': 'Prioritza les entitats i envia-los l’oferta.',
   'proc.e_publicada_qui': 'Tècnic',
   'proc.e_publicada_gestio_t': 'En gestió',
-  'proc.e_publicada_gestio_passa': 'Enviada a {n} entitats · {m} interessades · {k} per aprovar.',
+  'proc.e_publicada_gestio_passa': 'Enviada a {n} entitats. Interès rebut: {m}. Per aprovar: {k}.',
+  'proc.e_publicada_gestio_passa_1': 'Enviada a una entitat. Interès rebut: {m}. Per aprovar: {k}.',
   'proc.e_publicada_gestio_toca': 'Aprova o rebutja els interessos; o envia-la a més entitats.',
   'proc.e_publicada_gestio_qui': 'Admin',
   'proc.e_assignada_parcial_t': 'Parcial',
@@ -1202,7 +1204,9 @@ const ca: Dict = {
   'alb.next_borrador': 'Revisa la recollida i les línies i emet l’albarà. Fins que no s’emet no té número.',
   'alb.next_emitido': 'Emès. Quan surti de la finca, marca’l com a entregat: es crearan els enllaços de confirmació.',
   'alb.next_entregado_rec': 'Entregat fa {n} dies. L’altra part pot confirmar per l’enllaç; un REC ja es pot conciliar.',
+  'alb.next_entregado_rec_1': 'Entregat fa un dia. L’altra part pot confirmar per l’enllaç; un REC ja es pot conciliar.',
   'alb.next_entregado_ent': 'Esperant la confirmació de l’entitat (fa {n} dies).',
+  'alb.next_entregado_ent_1': 'Esperant la confirmació de l’entitat (des d’ahir).',
   'alb.next_confirmado_rec': 'Confirmat. Concilia: escriu els quilos que compten.',
   'alb.next_confirmado_ent': 'Confirmat per l’entitat. Es concilia des de l’albarà de recepció del registre.',
   'alb.next_conciliado': 'Conciliat. Els quilos validats ja compten per als indicadors i el certificat.',
@@ -1241,11 +1245,11 @@ const ca: Dict = {
 
   // panel del receptor (proceso)
   'mk.titol_ofertes': 'Ofertes disponibles',
-  'mk.dialog_desc2': 'Indica quants kg vols. L’equip de Redestina revisa els interessos, decideix qui se la queda i coordina l’entrega.',
-  'mk.sent2': 'Interès enviat. L’equip decideix qui se la queda; t’avisarem.',
-  'int.subtitle2': 'On és cada oferta que has demanat.',
-  'hist.subtitle2': 'Entregues rebudes · {n} kg en total.',
-  'hist.empty2': 'Encara no has rebut cap entrega.',
+  'mk.dialog_desc': 'Indica quants kg vols. L’equip de Redestina revisa els interessos, decideix qui se la queda i coordina l’entrega.',
+  'mk.sent': 'Interès enviat. L’equip decideix qui se la queda; t’avisarem.',
+  'int.subtitle': 'On és cada oferta que has demanat.',
+  'hist.subtitle': 'Entregues rebudes · {n} kg en total.',
+  'hist.empty': 'Encara no has rebut cap entrega.',
   'hist.kg_reals': '{n} kg rebuts', 'hist.kg_assignats': '{n} kg assignats',
   'proc.llegenda_interes_oferta_rebuda': 'T’hem enviat l’oferta i encara no has dit si t’interessa.',
   'proc.llegenda_interes_interes_enviat': 'Has demanat els quilos; l’equip encara no ha decidit qui se’ls queda.',
@@ -1701,7 +1705,7 @@ const es: Dict = {
   'alb.hint_toreconcile': 'Entregados o confirmados. Conciliar es escribir los kilos que cuentan.',
   'alb.c_number': 'Número', 'alb.c_type': 'Tipo', 'alb.c_counterpart': 'Contraparte',
   'alb.c_product': 'Producto', 'alb.c_kg': 'kg', 'alb.c_status': 'Estado', 'alb.c_waiting': 'Espera',
-  'alb.days': '{n} días',
+  'alb.days': '{n} días', 'alb.days_1': '{n} día',
   'alb.st_borrador': 'Borrador', 'alb.st_emitido': 'Emitido', 'alb.st_entregado': 'Entregado',
   'alb.st_confirmado': 'Confirmado', 'alb.st_conciliado': 'Conciliado', 'alb.st_anulado': 'Anulado',
   'alb.st_rectificado': 'Rectificado',
@@ -2356,6 +2360,7 @@ const es: Dict = {
   'proc.p_publicada_qui': 'El equipo de Redestina',
   'proc.p_publicada_gestio_t': 'En manos del equipo',
   'proc.p_publicada_gestio_passa': '{n} entidades han mostrado interés. El equipo decide quién se la queda y cuántos kg.',
+  'proc.p_publicada_gestio_passa_1': 'Una entidad ha mostrado interés. El equipo decide si se la queda y cuántos kg.',
   'proc.p_publicada_gestio_toca': 'Nada. Te avisaremos cuando esté decidido.',
   'proc.p_publicada_gestio_qui': 'El equipo de Redestina',
   'proc.p_assignada_parcial_t': 'Con destino parcial',
@@ -2437,7 +2442,8 @@ const es: Dict = {
   'proc.e_publicada_toca': 'Prioriza las entidades y envíales la oferta.',
   'proc.e_publicada_qui': 'Técnico',
   'proc.e_publicada_gestio_t': 'En gestión',
-  'proc.e_publicada_gestio_passa': 'Enviada a {n} entidades · {m} interesadas · {k} por aprobar.',
+  'proc.e_publicada_gestio_passa': 'Enviada a {n} entidades. Interés recibido: {m}. Por aprobar: {k}.',
+  'proc.e_publicada_gestio_passa_1': 'Enviada a una entidad. Interés recibido: {m}. Por aprobar: {k}.',
   'proc.e_publicada_gestio_toca': 'Aprueba o rechaza los intereses; o envíala a más entidades.',
   'proc.e_publicada_gestio_qui': 'Admin',
   'proc.e_assignada_parcial_t': 'Parcial',
@@ -2493,7 +2499,9 @@ const es: Dict = {
   'alb.next_borrador': 'Revisa la recogida y las líneas y emite el albarán. Hasta que no se emite no tiene número.',
   'alb.next_emitido': 'Emitido. Cuando salga de la finca, márcalo como entregado: se crearán los enlaces de confirmación.',
   'alb.next_entregado_rec': 'Entregado hace {n} días. La otra parte puede confirmar por el enlace; un REC ya se puede conciliar.',
+  'alb.next_entregado_rec_1': 'Entregado hace un día. La otra parte puede confirmar por el enlace; un REC ya se puede conciliar.',
   'alb.next_entregado_ent': 'Esperando la confirmación de la entidad (hace {n} días).',
+  'alb.next_entregado_ent_1': 'Esperando la confirmación de la entidad (desde ayer).',
   'alb.next_confirmado_rec': 'Confirmado. Concilia: escribe los kilos que cuentan.',
   'alb.next_confirmado_ent': 'Confirmado por la entidad. Se concilia desde el albarán de recepción del registro.',
   'alb.next_conciliado': 'Conciliado. Los kilos validados ya cuentan para los indicadores y el certificado.',
@@ -2532,11 +2540,11 @@ const es: Dict = {
 
   // panel del receptor (proceso)
   'mk.titol_ofertes': 'Ofertas disponibles',
-  'mk.dialog_desc2': 'Indica cuántos kg quieres. El equipo de Redestina revisa los intereses, decide quién se la queda y coordina la entrega.',
-  'mk.sent2': 'Interés enviado. El equipo decide quién se la queda; te avisaremos.',
-  'int.subtitle2': 'Dónde está cada oferta que has pedido.',
-  'hist.subtitle2': 'Entregas recibidas · {n} kg en total.',
-  'hist.empty2': 'Todavía no has recibido ninguna entrega.',
+  'mk.dialog_desc': 'Indica cuántos kg quieres. El equipo de Redestina revisa los intereses, decide quién se la queda y coordina la entrega.',
+  'mk.sent': 'Interés enviado. El equipo decide quién se la queda; te avisaremos.',
+  'int.subtitle': 'Dónde está cada oferta que has pedido.',
+  'hist.subtitle': 'Entregas recibidas · {n} kg en total.',
+  'hist.empty': 'Todavía no has recibido ninguna entrega.',
   'hist.kg_reals': '{n} kg recibidos', 'hist.kg_assignats': '{n} kg asignados',
   'proc.llegenda_interes_oferta_rebuda': 'Te hemos enviado la oferta y todavía no has dicho si te interesa.',
   'proc.llegenda_interes_interes_enviat': 'Has pedido los kilos; el equipo todavía no ha decidido quién se los queda.',
@@ -2655,7 +2663,15 @@ export function I18nProvider({ children }: { children: ReactNode }) {
   }, [])
   const t = useCallback(
     (key: string, params?: Record<string, string | number>) => {
-      let s = DICTS[lang][key] ?? DICTS.ca[key] ?? key
+      // Singular por convención: un texto que cuenta cosas («{n} entitats») canta cuando n
+      // vale 1, y se leía «1 entitats han mostrat interès» en el panel del productor. Si
+      // existe `<clau>_1`, con n = 1 se usa esa. Es opt-in: una clave sin su `_1` se
+      // comporta exactamente como antes, así que no obliga a escribir dos textos por cada
+      // número. Solo mira `n` —el contador principal—: un texto con varios contadores que
+      // concuerden se redacta para que no cante (ver `proc.e_publicada_gestio_passa`).
+      const clau = params !== undefined && Number(params.n) === 1
+        && (DICTS[lang][`${key}_1`] ?? DICTS.ca[`${key}_1`]) !== undefined ? `${key}_1` : key
+      let s = DICTS[lang][clau] ?? DICTS.ca[clau] ?? key
       if (params) for (const [k, v] of Object.entries(params)) s = s.replaceAll(`{${k}}`, String(v))
       return s
     },

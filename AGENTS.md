@@ -1980,6 +1980,17 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   claus `f.*`). Els **comentaris del codi** en castellà; els **missatges de WhatsApp**, en català
   (no passen per i18n). Identificadors en inglés salvo los del dominio (`productores`, `entidades`,
   `excedentes`, `canalizaciones`).
+  ⚠️ **Un texto que cuenta cosas necesita su singular: `<clau>_1`** (15-09-2026). `t()` sirve esa
+  variante cuando el parámetro **`n`** vale 1, y si no existe usa el plural de siempre — es opt-in,
+  así que una clave nueva no obliga a escribir dos textos. Salió de leer la pantalla: el panel del
+  productor decía «**1 entitats han mostrat interès**». Hoy la llevan cinco textos (`alb.days`,
+  `alb.next_entregado_rec`/`_ent` y los dos `proc.*_publicada_gestio_passa`).
+  ⚠️ **Solo mira `n`**, el contador principal: un texto con **varios** números que concuerden se
+  **redacta para que no cante** en vez de multiplicar variantes — por eso
+  `proc.e_publicada_gestio_passa` pasó de «{n} entitats · {m} interessades» a «Enviada a {n}
+  entitats. Interès rebut: {m}.», donde `{m}` y `{k}` van tras dos puntos y no concuerdan con nada.
+  Lo vigila `tests/i18n.test.ts`: la variante existe en los dos idiomas, su clave base existe, y no
+  introduce ningún marcador que quien llama no pase.
 - **Secretos**: nunca en el código. Env vars, siempre.
 - **Sin servicios externos nuevos** (10-09-2026). Cualquier capacidad nueva —generación de PDF, firma
   electrónica, almacenamiento de ficheros, colas, notificaciones— se resuelve con **librerías npm dentro
@@ -4383,7 +4394,7 @@ número, que el código cita— pero conviene saber qué se está mirando antes 
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **760 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **763 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

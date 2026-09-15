@@ -90,7 +90,7 @@ export default function Mercat() {
     })
     setEnviant(false)
     if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
-    toast.success(t('mk.sent2'))
+    toast.success(t('mk.sent'))
     setObert(null)
     await carrega()
   }
@@ -166,7 +166,7 @@ export default function Mercat() {
                     <p className="font-medium">
                       {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
                     </p>
-                    <p className="text-sm text-muted-foreground">{t('mk.dialog_desc2')}</p>
+                    <p className="text-sm text-muted-foreground">{t('mk.dialog_desc')}</p>
                     {o.texto_oferta && (
                       <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-xs">
                         {o.texto_oferta}
