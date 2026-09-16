@@ -37,6 +37,7 @@ import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
+import CarregantSeccio from '../../components/CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -212,7 +213,7 @@ export default function ProductorDocuments() {
   }
 
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org')}</p>
-  if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
+  if (carregant) return <CarregantSeccio />
   if (error) return <p className="text-sm text-destructive">{error}</p>
 
   return (

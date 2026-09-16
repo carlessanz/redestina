@@ -21,6 +21,7 @@ import type { EtapaProces } from '../../lib/procesOferta'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
+import CarregantSeccio from '../../components/CarregantSeccio'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type AmbOferta = OfertaRespuesta & {
@@ -132,7 +133,7 @@ export function Interessos() {
         <LlegendaEstats items={llegenda} />
       </CardHeader>
       <CardContent className="space-y-2">
-        {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+        {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('int.empty')}</p>
         )}
@@ -216,7 +217,7 @@ export function Historic() {
         <p className="mt-1 text-sm text-muted-foreground">{t('hist.subtitle', { n: totalKg })}</p>
       </CardHeader>
       <CardContent className="space-y-2">
-        {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+        {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}

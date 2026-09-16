@@ -21,6 +21,7 @@ import { useT } from '../lib/i18n'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
+import CarregantSeccio from './CarregantSeccio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -160,7 +161,7 @@ export default function OffersList({ onOpen }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         <Input type="search" placeholder={t('off.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
-        {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+        {loading && <CarregantSeccio files={5} ambCapcalera={false} />}
         {error && <p className="text-sm text-destructive">{error}</p>}
 
         {!loading && !error && (

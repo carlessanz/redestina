@@ -24,6 +24,7 @@ import { manifestaInteres } from '../../lib/ofertes'
 import { puntInteres } from '../../lib/procesOferta'
 import { classeEtapaInteres } from './Interessos'
 import type { Excedente, OfertaRespuesta } from '../../types'
+import CarregantSeccio from '../../components/CarregantSeccio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -104,7 +105,7 @@ export default function Mercat() {
         <p className="mt-1 text-sm text-muted-foreground">{t('mk.subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-2">
-        {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+        {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && ofertes.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}

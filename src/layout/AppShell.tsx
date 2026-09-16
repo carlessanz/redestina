@@ -130,12 +130,27 @@ export default function AppShell() {
           <UserMenu />
         </header>
 
-        <main className={cn('min-h-0 flex-1', handle.fullBleed ? 'overflow-hidden' : 'overflow-y-auto')}>
+        {/* 🔴 `scrollbar-gutter: stable` ES LO QUE QUITA EL SALTO AL NAVEGAR. `main` es el
+            que scrollea, así que su barra aparece en las pantallas altas y no en las
+            cortas; como el contenido va centrado (`mx-auto`), cada aparición lo desplazaba
+            unos 7 px y al cambiar de sección volvía. Reservando el hueco siempre, el ancho
+            útil no cambia nunca y la pantalla deja de moverse.
+            ⚠️ Va aquí y NO en `html`: el documento no scrollea —el shell es `h-dvh
+               overflow-hidden`—, así que ponerlo arriba no reservaría nada. */}
+        <main
+          className={cn(
+            'min-h-0 flex-1 [scrollbar-gutter:stable]',
+            handle.fullBleed ? 'overflow-hidden' : 'overflow-y-auto',
+          )}
+        >
           {handle.fullBleed
             ? <Outlet />
             : (
+              // `min-h-full`: una sección que aún no ha cargado deja de desplomar el alto
+              // de la página, que era la otra mitad del salto. Con el hueco de la barra ya
+              // reservado arriba, esto evita el rebote vertical.
               <div
-                className={cn('mx-auto w-full py-6', handle.ample ? 'w-[96%] px-2' : 'max-w-6xl px-4')}
+                className={cn('mx-auto min-h-full w-full py-6', handle.ample ? 'w-[96%] px-2' : 'max-w-6xl px-4')}
                 style={{
                   paddingLeft: `max(${handle.ample ? '0.5rem' : '1rem'}, env(safe-area-inset-left))`,
                   paddingRight: `max(${handle.ample ? '0.5rem' : '1rem'}, env(safe-area-inset-right))`,

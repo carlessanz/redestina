@@ -261,7 +261,21 @@ ninguna pantalla necesita padding inferior y el composer del chat nunca queda de
 
 ⚠️ **Contrato de alturas**: el shell es una columna flex `h-dvh overflow-hidden`; `main` es
 `min-h-0 flex-1` y scrollea él, salvo en las rutas marcadas `fullBleed` (Mensajería), que gestionan
-su propio alto. **Ninguna pantalla vuelve a escribir `h-dvh`.** Hay un tercer flag de layout en el
+su propio alto. **Ninguna pantalla vuelve a escribir `h-dvh`.**
+
+🔴 **Y `main` lleva `scrollbar-gutter: stable`, que es lo que impide que la pantalla salte al
+navegar** (16-09-2026). Como `main` es quien scrollea, su barra aparece en las pantallas altas y
+no en las cortas; con el contenido centrado (`mx-auto`), cada aparición lo desplazaba unos 7 px y
+al cambiar de sección volvía — «un movimiento no deseado», dicho por el cliente. Reservando el
+hueco siempre, el ancho útil no cambia nunca.
+⚠️ Va en `main` y **no en `html`**: el documento no scrollea, así que arriba no reservaría nada.
+⚠️ **La barra lateral NUNCA se movió**: es `fixed inset-y-0 left-0` desde `md` (`ui/sidebar.tsx`).
+Lo que se movía era el contenido, y desde fuera se lee igual.
+⚠️ La otra mitad del salto era el **alto**: una ruta recién montada pedía sus datos y pintaba una
+línea de «Carregant…», así que la página se desplomaba y la barra desaparecía. Lo arreglan
+`min-h-full` en el contenedor y **`components/CarregantSeccio`**, un esqueleto con alto de verdad.
+**No es un spinner a propósito**: un spinner no ocupa alto, así que no arregla el salto, solo lo
+adorna. Hay un tercer flag de layout en el
 `RouteHandle`, **`ample`** (no confundir con `fullBleed`): cambia el contenedor de `main` de
 `max-w-6xl px-4` a `w-[96%] px-2` y lo llevan los tres listados del equipo (`productors`, `entitats`,
 `ofertes`), que necesitan más ancho.
