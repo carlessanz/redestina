@@ -3017,6 +3017,15 @@ desde Aprovacions se llama a `enviar-acceso` con el correo de la persona y se le
 un correo con el acceso directo»). `canal: 'email'` y no `'auto'` a propósito: por WhatsApp
 `enviar-acceso` manda solo el código de 6 cifras, no el enlace (§9), y lo que aquí se
 promete es el acceso directo.
+🔴 **Y la fila trae una casilla «usuari de prova» que se marca ANTES de aprobar**
+(16-09-2026). Una organización recién registrada nace `es_test = false`, así que con el modo
+test activo el correo de acceso **se descarta**: pasó de verdad —se aprobó un alta, el aviso
+no salió y nadie se enteró hasta que la persona preguntó—. Marcarlo antes exigía ir a la
+ficha, volver y acordarse, o sea no hacerlo. El `update` va **antes** de `aprovar_registre`
+porque el envío ocurre dentro de la misma función; al revés, la marca llegaría tarde.
+⚠️ Si ese `update` falla **no se aborta la aprobación** —es una marca de pruebas, no el
+alta— pero se avisa, porque entonces el correo tampoco saldrá y hay que saber por qué.
+
 ⚠️ **Y si el correo no sale, la pantalla lo dice.** El caso más probable no es un error: con
 el modo test activo la organización recién aprobada nace `es_test = false` y el gate la
 descarta con `403 no_test_user` — exactamente el motivo por el que el registro nunca mandó

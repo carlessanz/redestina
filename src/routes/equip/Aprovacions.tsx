@@ -44,6 +44,7 @@ import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../../lib/aprovarResposta'
 import { kgPerOferta } from '../../lib/ofertes'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
+import { FilaCasella } from '../../components/Casella'
 import { enviarAcces } from '../../lib/acces'
 import type { Convenio, Membresia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
@@ -185,6 +186,8 @@ export default function Aprovacions() {
   const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string }>>({})
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
+  /** Qué altas se aprueban marcándolas como usuario de prueba. Por id de membresía. */
+  const [deProva, setDeProva] = useState<Set<string>>(new Set())
   const [candidats, setCandidats] = useState<Record<string, Candidat[]>>({})
   const [carregantReg, setCarregantReg] = useState(true)
   const [convenis, setConvenis] = useState<ConveniPendent[]>([])
@@ -333,6 +336,21 @@ export default function Aprovacions() {
   // acceso directo a su panel».
   async function aprovarRegistre(r: Registre) {
     setOcupat(r.id)
+
+    // El `es_test` va ANTES de aprobar, no después: `esCuentaPermitida` lo mira al mandar
+    // el correo, y ese envío ocurre dentro de esta misma función unas líneas más abajo.
+    // Al revés, la marca llegaría tarde y el aviso se descartaría igual.
+    if (deProva.has(r.id)) {
+      const taula = r.tipo === 'productor' ? 'productores' : 'entidades'
+      const fitxaId = r.tipo === 'productor' ? r.productores?.id : r.entidades?.id
+      if (fitxaId) {
+        const { error: errTest } = await supabase.from(taula).update({ es_test: true }).eq('id', fitxaId)
+        // No se aborta la aprobación por esto: es una marca de pruebas, no el alta. Pero se
+        // dice, porque si falló el correo tampoco saldrá y hay que saber por qué.
+        if (errTest) toast.warning(t('appr.reg_es_test_ko'))
+      }
+    }
+
     const { error } = await supabase.rpc('aprovar_registre', { p_membresia: r.id })
     if (error) { setOcupat(null); toast.error(textError(error)); return }
 
@@ -556,6 +574,24 @@ export default function Aprovacions() {
                     )}
                   </div>
                   <div className="flex flex-wrap items-center gap-2">
+                    {/* 🔴 MARCAR «DE PROVA» AQUÍ Y NO EN LA FICHA. Una organización recién
+                        registrada nace `es_test = false`, y con el modo test activo eso
+                        significa que **el correo de acceso que se manda al aprobar se
+                        descarta** (`esCuentaPermitida`, §8). Pasó de verdad: se aprobó un
+                        alta, el aviso no salió y nadie se enteró hasta que la persona
+                        preguntó. Ponerlo antes de aprobar exigía ir a la ficha, volver y
+                        acordarse — o sea, no hacerlo. */}
+                    <FilaCasella
+                      checked={deProva.has(r.id)}
+                      disabled={!potAprovar || ocupat === r.id}
+                      onChange={(v) => setDeProva((p) => {
+                        const n = new Set(p)
+                        if (v) n.add(r.id); else n.delete(r.id)
+                        return n
+                      })}
+                    >
+                      {t('appr.reg_es_test')}
+                    </FilaCasella>
                     <Button size="sm" variant="outline" disabled={!ruta}
                       onClick={() => ruta && navigate(ruta)}>
                       {t('appr.reg_view')}
