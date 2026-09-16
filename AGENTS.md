@@ -1486,6 +1486,18 @@ conduce un **diálogo corto**: un **sí** arranca `dialeg_pas='kg'` («quants kg
 si la modalitat es `venda`/`maquila` con `preu_minim` pide **confirmar el preu** con botones
 (`accept:preu_*`) y finaliza dejando `estado='acceptada'`, `kg_solicitados`, `preu_ofert` y
 `aprovacio='pendent'`; un **no** claro en el paso inicial o en el paso `kg` pasa a `rebutjada`.
+⚠️ **El paso `kg` tiene tope, y se dice antes de preguntar** (16-09-2026): la pregunta lleva
+«El màxim són {n} kg» y un número mayor **no avanza el diálogo** —se responde con el aviso y el
+máximo, y el paso sigue siendo `kg`—. Hicieron falta las dos mitades: decirlo no obliga a nadie, y
+comprobarlo sin decirlo deja a la entidad adivinando. `disp <= 0` significa «no hay tope que
+aplicar» y el número entra igual: un tope inventado rechazaría una petición legítima. El caso que
+lo motivó está medido — una oferta de 300 kg aceptó **1000** en silencio, y el aviso de «canalitzar
+de més» del panel es **no bloqueante**, así que el número podía llegar hasta el albarán.
+⚠️ **Y reenviar una oferta reinicia el diálogo** (`registrarEnvio` en `OfferDetail`): el upsert
+devolvía `estado` a `pendent` pero dejaba `dialeg_pas` donde estuviera, así que a quien ya había
+contestado «sí» el botón «M'interessa» del reenvío le llegaba al paso de los kilos y el bot le
+pedía «només el número» sin que nada explicara por qué.
+
 ⚠️ **Rechazar el preu mínimo NO marca `rebutjada`**: la fila queda `estado='acceptada'` con
 `preu_ofert=null` y `mensaje_respuesta="L'entitat no accepta el preu mínim (a revisar per l'equip)."`,
 y sigue en la cola de aprobación para que el equipo decida. **Mientras el diálogo
