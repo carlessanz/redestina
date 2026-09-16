@@ -2797,9 +2797,20 @@ ficha y cuenta. El orden está elegido para que el peor residuo posible sea una 
 membresía —inocua, no sale en ningún listado— y nunca una ficha huérfana contaminando los 345
 productores reales.
 
-⚠️ **Nadie recibe ningún correo**: ni de bienvenida, ni de verificación del correo, ni al aprobar.
-Hoy la persona se entera entrando. Con el modo test encendido tampoco podría recibirlo: su
-organización nace `es_test = false` y el gate de cuenta (§8) la bloquea. Deuda §12.27.
+⚠️ **El REGISTRO no manda ningún correo** —ni de bienvenida ni de verificación—, y sigue
+siendo deliberado (§12.27). **Pero APROBAR sí, desde el 16-09-2026**: al validar un alta
+desde Aprovacions se llama a `enviar-acceso` con el correo de la persona y se le manda el
+**enlace mágico a su panel**, que es lo que el cliente pidió («al aceptar una organización,
+un correo con el acceso directo»). `canal: 'email'` y no `'auto'` a propósito: por WhatsApp
+`enviar-acceso` manda solo el código de 6 cifras, no el enlace (§9), y lo que aquí se
+promete es el acceso directo.
+⚠️ **Y si el correo no sale, la pantalla lo dice.** El caso más probable no es un error: con
+el modo test activo la organización recién aprobada nace `es_test = false` y el gate la
+descarta con `403 no_test_user` — exactamente el motivo por el que el registro nunca mandó
+nada. Tragárselo repetiría el error con otra cara, porque el equipo creería haber avisado;
+así que el toast distingue «li hem enviat l'accés a X», «amb el mode test actiu no el pot
+rebre: avisa-la tu» y «no ha sortit: avisa-la tu». **Aprobar no depende del correo**: la
+aprobación ya ha ocurrido cuando se intenta enviar.
 
 ### Usuarios de prueba
 

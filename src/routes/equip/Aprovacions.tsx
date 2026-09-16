@@ -44,6 +44,7 @@ import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../../lib/aprovarResposta'
 import { kgPerOferta } from '../../lib/ofertes'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
+import { enviarAcces } from '../../lib/acces'
 import type { Convenio, Membresia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
@@ -323,12 +324,32 @@ export default function Aprovacions() {
     return t('appr.reg_error', { msg: err.message })
   }
 
+  // Aprobar y avisar son DOS cosas, y en ese orden. La aprobación es la que cuenta: si el
+  // correo falla, el alta sigue aprobada y lo que hace falta es que el equipo lo sepa para
+  // avisar por su cuenta — no que la pantalla dé por fallido lo que sí ha ocurrido.
+  //
+  // Hasta el 16-09-2026 no se avisaba de nada y la persona se enteraba entrando a probar
+  // (deuda 27). El cliente lo pidió así: «al aceptar una organización, un correo con el
+  // acceso directo a su panel».
   async function aprovarRegistre(r: Registre) {
     setOcupat(r.id)
     const { error } = await supabase.rpc('aprovar_registre', { p_membresia: r.id })
+    if (error) { setOcupat(null); toast.error(textError(error)); return }
+
+    const correu = perfils[r.user_id]?.email ?? null
+    const enviat = correu ? await enviarAcces(correu) : null
     setOcupat(null)
-    if (error) { toast.error(textError(error)); return }
-    toast.success(t('appr.reg_approved'))
+
+    if (enviat?.ok) {
+      toast.success(t('appr.reg_approved_mail', { email: correu ?? '' }))
+    } else {
+      // ⚠️ El motivo más probable NO es un error: con el modo test activo una organización
+      //    recién aprobada nace `es_test = false` y el gate la descarta (`no_test_user`,
+      //    §8). Decirlo es la diferencia entre que el equipo avise a mano y que crea que ya
+      //    está avisado.
+      toast.success(t('appr.reg_approved'))
+      toast.warning(t(enviat?.codi === 'no_test_user' ? 'appr.mail_test' : 'appr.mail_ko'))
+    }
     void carregaRegistres()
   }
 
