@@ -2123,6 +2123,28 @@ todo desde `/admin` —a la que se entra tecleando la URL, así que no hay «atr
 había forma evidente de salir. El enlace explícito va en `LayoutAcces` y no en cada pantalla porque
 las cuatro comparten marco.
 
+**Y el menú de la persona lleva IDIOMA Y NOTIFICACIONES** (16-09-2026). El canal preferido
+estaba enterrado al final de la ficha de la organización —una pantalla a la que se entra a
+corregir el NIF, no a decidir cómo te avisan—; ahora está también arriba a la derecha, con
+el idioma. Es el mismo dato y la misma RPC (`actualizar_meu_canal`), así que sigue estando
+en la ficha para quien lo busque donde estaba.
+
+⚠️ **Las notificaciones son DOS CASILLAS y `canal_preferido` guarda UN valor**, así que la
+traducción es: las dos marcadas → `null` (auto), una sola → ese canal forzado, ninguna →
+no se permite (nadie puede quedarse incontactable). **«Las dos» no significa enviar dos
+veces**: `decidirCanal()` elige un canal por envío (§8bis), y marcar las dos es decir «usad
+el que funcione». El texto de ayuda lo dice, porque la casilla sola sugiere lo contrario.
+
+⚠️ **El canal es de la ORGANIZACIÓN, no de la persona**: si dos personas la comparten,
+cambiarlo se lo cambia a las dos. Vive en `organizaciones.canal_preferido` justo para que
+una organización con los dos papeles tenga UN canal (§4). El equipo no ve esta sección: no
+tiene organización propia.
+
+🔴 **Y el idioma pasa a guardarse TAMBIÉN en `perfiles.idioma`**, no solo en `localStorage`.
+No es cosmético: **`preparar_convenio()` elige el idioma del documento leyendo esa columna**,
+así que con la preferencia solo en el navegador alguien podía usar la aplicación en
+castellano y recibir el convenio en catalán sin haber elegido nunca esa lengua.
+
 **Y el menú de la persona enseña el correo** bajo el nombre (`UserMenu`): es **con qué cuenta
 estás dentro**, y no se podía leer en ninguna pantalla — con la del equipo y la de la organización
 abiertas en dos pestañas no había forma de saber en cuál estabas sin cerrar sesión. Se omite si el
