@@ -1745,8 +1745,38 @@ que corresponde al momento de cierre y todavía no está implementado.
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
 | **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
-| **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents** · perfil` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
-| **Receptor** | `/receptor/mercat · interessos · historic · **documents** · perfil` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+| **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents**` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
+| **Receptor** | `/receptor/mercat · interessos · historic · **documents**` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+
+### La ficha de la organización sale de los paneles (16-09-2026)
+
+**`/organitzacio` es un apartado propio, fuera de `/productor` y de `/receptor`.** Estaba
+dentro de cada panel —«La meva explotació» y «La meva entitat»— y con **doble rol eso daba
+dos entradas de menú, con dos nombres, para una misma organización**. Ahora hay una sola
+entrada («La meva organització»), se pinta después de todos los paneles y **el equipo no la
+ve**: opera en nombre de otros y no tiene organización propia.
+
+Con **un papel** la pantalla es la de siempre. Con **los dos**, dos pestañas sobre el mismo
+`PerfilOrganitzacio`: `productores` y `entidades` siguen siendo dos filas con columnas
+propias —una tiene explotación y la otra capacidad de recepción— y cada una se guarda con su
+RPC. Lo que se unifica es **dónde se entra**, que es la misma dirección de la brecha 2 de
+§1bis vista desde la interfaz.
+
+⚠️ **`key` por pestaña, y ahora importa más que antes.** Es el mismo componente con otro
+`tipus`; sin `key`, React reutiliza la instancia y cambian la tabla y los campos pero **la
+fila sigue siendo la anterior**, así que «Desar» sobrescribe una ficha con los datos de la
+otra. Con las dos rutas separadas ya pasó una vez (§6ter); conviviendo en una pantalla el
+riesgo es mayor.
+
+⚠️ `/productor/perfil` y `/receptor/perfil` **se quedan como redirección**: hay enlaces y
+marcadores hechos.
+
+**Y una banda nueva, `AvisRegistreIncomplet`**, avisa de lo que el registro no preguntó
+—NIF, domicilio, código postal, población— y lleva a esa pantalla. El alta pide lo mínimo a
+propósito (un formulario largo en la puerta no lo termina nadie), pero esos cuatro campos
+son lo que el convenio imprime: sin ellos, la primera firma se encuentra el formulario a
+medias. **No bloquea nada** —por eso va en aviso y nunca en rojo— y **no duplica la lista de
+obligatorios del convenio**, que la decide el servidor.
 
 ### El modelo del proceso: la aplicación lo narra, no solo lo ejecuta (14-09-2026)
 

@@ -18,7 +18,7 @@ import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
-import { navPerRol } from '../lib/nav'
+import { ORGANITZACIO, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
 import {
@@ -50,6 +50,9 @@ export default function AppSidebar({ comptadors }: Props) {
   // `ctx` es null mientras se resuelve la sesión: sin el fallback esto reventaría.
   const rols = ctx?.rols ?? []
   const multi = rols.length > 1
+  // El equipo no tiene ficha propia: opera en nombre de otros. Sin esto, la entrada de
+  // «La meva organització» le saldría y le llevaría a una pantalla vacía.
+  const extern = rols.includes('productor') || rols.includes('receptor')
   // Con varios paneles no hay una organización que poner al lado del logo, y repetir
   // «Redestina» junto a un logo que ya lo dice era ruido: se deja solo el logo. Con un
   // panel sí aporta, porque es el nombre de la organización.
@@ -141,6 +144,33 @@ export default function AppSidebar({ comptadors }: Props) {
             </div>
           )
         })}
+
+        {/* LA ORGANIZACIÓN, FUERA DE LOS PANELES y después de todos ellos. No pertenece a
+            ninguno: con doble rol había dos entradas —«La meva explotació» y «La meva
+            entitat»— para una misma organización, con dos nombres distintos. El equipo no
+            la ve porque no tiene organización propia: opera en nombre de otros. */}
+        {extern && (
+          <SidebarGroup>
+            <SidebarGroupContent>
+              <SidebarMenu>
+                {ORGANITZACIO[0].items.map((item) => (
+                  <SidebarMenuItem key={item.to}>
+                    <SidebarMenuButton
+                      asChild
+                      isActive={location.pathname.startsWith(item.to)}
+                      tooltip={t(item.labelKey)}
+                    >
+                      <NavLink to={item.to} onClick={alNavegar}>
+                        <item.icon />
+                        <span>{t(item.labelKey)}</span>
+                      </NavLink>
+                    </SidebarMenuButton>
+                  </SidebarMenuItem>
+                ))}
+              </SidebarMenu>
+            </SidebarGroupContent>
+          </SidebarGroup>
+        )}
       </SidebarContent>
 
       {/* Salir, también aquí. El menú de la persona (arriba a la derecha) lo sigue

@@ -13,7 +13,7 @@
 import {
   Building2, Calculator, ClipboardCheck, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, LayoutDashboard, Leaf, Receipt,
-  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, UserCircle, Users,
+  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
@@ -116,7 +116,6 @@ const PRODUCTOR: NavGrup[] = [
       // con los dos menús a la vez el mismo icono dos veces no distingue nada.
       { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true },
       { to: '/productor/documents', labelKey: 'nav.my_documents', icon: FolderOpen, comptador: 'pendents_productor' },
-      { to: '/productor/perfil', labelKey: 'nav.my_producer_org', icon: UserCircle },
     ],
   },
 ]
@@ -128,7 +127,25 @@ const RECEPTOR: NavGrup[] = [
       { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
       { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },
-      { to: '/receptor/perfil', labelKey: 'nav.my_entity', icon: Building2 },
+    ],
+  },
+]
+
+/**
+ * La ficha de la organización, FUERA de los dos paneles (16-09-2026).
+ *
+ * Estaba dentro de cada uno —«La meva explotació» en productor, «La meva entitat» en
+ * receptor— y con doble rol eso daba dos entradas con dos nombres para una misma
+ * organización. Ahora es una sola, con un nombre único, y se pinta después de todos los
+ * paneles: no pertenece a ninguno, igual que la organización no es «de» un papel.
+ *
+ * ⚠️ NO la ve el equipo: opera en nombre de otros y no tiene organización propia. Quien la
+ *    monta (`AppSidebar`) la añade solo si hay algún panel externo.
+ */
+export const ORGANITZACIO: NavGrup[] = [
+  {
+    items: [
+      { to: '/organitzacio', labelKey: 'nav.my_org', icon: Building2, barra: false },
     ],
   },
 ]

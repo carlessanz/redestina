@@ -44,7 +44,7 @@ import Aprovacions from '../routes/equip/Aprovacions'
 import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
 import NovaOferta from '../routes/productor/NovaOferta'
 import ProductorOfertaDetall from '../routes/productor/OfertaDetall'
-import PerfilOrganitzacio from '../routes/PerfilOrganitzacio'
+import LaMevaOrganitzacio from '../routes/LaMevaOrganitzacio'
 import Mercat from '../routes/receptor/Mercat'
 import { Historic, Interessos } from '../routes/receptor/Interessos'
 
@@ -71,6 +71,13 @@ export const router = createBrowserRouter([
           {
             element: <AppShell />,
             children: [
+              // Fuera de los tres paneles a propósito: una organización no es «de» un
+              // papel, y con doble rol una sola entrada evita dos nombres para lo mismo.
+              {
+                path: '/organitzacio',
+                element: <LaMevaOrganitzacio />,
+                handle: { titleKey: 'nav.my_org' },
+              },
               {
                 path: '/equip',
                 element: <RoleGuard rol="intern" />,
@@ -116,7 +123,9 @@ export const router = createBrowserRouter([
                   // ella React reutiliza la instancia entre paneles, arrastrando el estado
                   // de la organización anterior.
                   { path: 'documents', element: <ProductorDocuments />, handle: { titleKey: 'nav.my_documents' } },
-                  { path: 'perfil', element: <PerfilOrganitzacio key="productor" tipus="productor" />, handle: { titleKey: 'nav.my_producer_org' } },
+                  // La ficha vive ahora en `/organitzacio`, fuera de los paneles. Estas
+                  // dos rutas se quedan como redirección: hay enlaces y marcadores hechos.
+                  { path: 'perfil', element: <Navigate to="/organitzacio" replace /> },
                 ],
               },
               {
@@ -128,7 +137,7 @@ export const router = createBrowserRouter([
                   { path: 'interessos', element: <Interessos />, handle: { titleKey: 'nav.my_interests' } },
                   { path: 'historic', element: <Historic />, handle: { titleKey: 'nav.history' } },
                   { path: 'documents', element: <ReceptorDocuments />, handle: { titleKey: 'nav.entity_documents' } },
-                  { path: 'perfil', element: <PerfilOrganitzacio key="entidad" tipus="entidad" />, handle: { titleKey: 'nav.my_entity' } },
+                  { path: 'perfil', element: <Navigate to="/organitzacio" replace /> },
                 ],
               },
             ],
