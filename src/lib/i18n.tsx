@@ -30,7 +30,7 @@ const ca: Dict = {
   // dues vegades (i en mode icona els dos tooltips serien idèntics).
   'nav.my_producer_org': 'La meva explotació', 'nav.my_entity': 'La meva entitat',
   'panel.producer': 'El meu panell de productor', 'panel.receiver': "El meu panell d'entitat receptora",
-  'app.team': 'Equip Redestina',
+  'app.team': 'Admin',
   'app.degraded': 'Mode compatibilitat',
   'app.degraded_hint': "No s'ha pogut llegir el teu rol; s'ha obert el panell d'equip, com sempre.",
   'noacc.title': 'Encara no tens panell',
@@ -216,7 +216,7 @@ const ca: Dict = {
   'od.no_send_wa': 'No s’ha pogut enviar per WhatsApp.', 'od.email_no_test': '{email} no és a la llista de correus de prova.',
   'od.no_send_email': 'No s’ha pogut enviar el correu.', 'od.no_optin': 'Sense opt-in', 'od.not_meta': 'No és a Meta',
   // Canal recomanat (§8bis): el correu és el canal per defecte
-  'od.send': 'Enviar', 'od.force_wa': 'Forçar WhatsApp', 'od.force_email': 'Forçar correu',
+  'od.send': 'Enviar', 'od.sending': 'Enviant…', 'od.force_wa': 'Forçar WhatsApp', 'od.force_email': 'Forçar correu',
   'od.canal_whatsapp': 'WhatsApp', 'od.canal_email': 'Correu', 'od.canal_cap': 'Sense canal',
   'od.canal_why_finestra_oberta': 'ha escrit fa menys de 24 h',
   'od.canal_why_opt_in': 'té opt-in',
@@ -1357,7 +1357,7 @@ const es: Dict = {
   'nav.market': 'Mercado', 'nav.my_interests': 'Mis intereses', 'nav.history': 'Histórico',
   'nav.my_producer_org': 'Mi explotación', 'nav.my_entity': 'Mi entidad',
   'panel.producer': 'Mi panel de productor', 'panel.receiver': 'Mi panel de entidad receptora',
-  'app.team': 'Equipo Redestina',
+  'app.team': 'Admin',
   'app.degraded': 'Modo compatibilidad',
   'app.degraded_hint': 'No se ha podido leer tu rol; se ha abierto el panel de equipo, como siempre.',
   'noacc.title': 'Todavía no tienes panel',
@@ -1532,7 +1532,7 @@ const es: Dict = {
   'od.no_send_wa': 'No se pudo enviar por WhatsApp.', 'od.email_no_test': '{email} no está en la lista de correos de prueba.',
   'od.no_send_email': 'No se pudo enviar el email.', 'od.no_optin': 'Sin opt-in', 'od.not_meta': 'No está en Meta',
   // Canal recomendado (§8bis): el correo es el canal por defecto
-  'od.send': 'Enviar', 'od.force_wa': 'Forzar WhatsApp', 'od.force_email': 'Forzar correo',
+  'od.send': 'Enviar', 'od.sending': 'Enviando…', 'od.force_wa': 'Forzar WhatsApp', 'od.force_email': 'Forzar correo',
   'od.canal_whatsapp': 'WhatsApp', 'od.canal_email': 'Correo', 'od.canal_cap': 'Sin canal',
   'od.canal_why_finestra_oberta': 'ha escrito hace menos de 24 h',
   'od.canal_why_opt_in': 'tiene opt-in',

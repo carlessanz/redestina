@@ -53,6 +53,11 @@ export default function AppSidebar({ comptadors }: Props) {
   // Con varios paneles no hay una organización que poner al lado del logo, y repetir
   // «Redestina» junto a un logo que ya lo dice era ruido: se deja solo el logo. Con un
   // panel sí aporta, porque es el nombre de la organización.
+  //
+  // ⚠️ Para el equipo el rótulo es **«Admin»** y no «Equip Redestina» (16-09-2026): el logo
+  // que tiene al lado ya dice «Redestina», así que la palabra sobraba y lo único que aportaba
+  // era decir en qué panel estás. Con un nombre corto, además, cabe empujado a la derecha sin
+  // pelearse con el logo.
   const titol = multi ? null : (organitzacio?.nombre ?? t('app.team'))
 
   // En móvil, elegir una sección cierra el panel; si no, se queda encima del contenido.
@@ -62,10 +67,14 @@ export default function AppSidebar({ comptadors }: Props) {
     <Sidebar collapsible="icon">
       <SidebarHeader className="gap-3 px-3 py-4">
         {/* A `/panell`, no a `/`: la raíz es la página pública y sacaría de la aplicación. */}
-        <NavLink to="/panell" className="flex items-center gap-2.5 overflow-hidden" onClick={alNavegar}>
+        {/* Logo a la izquierda y rótulo pegado a la DERECHA del menú: con `gap` los dos
+            quedaban juntos en el centro-izquierda y el rótulo parecía parte del logo. El
+            `min-w-0` del span es lo que deja actuar al `truncate` cuando el nombre de una
+            organización es largo (mismo motivo que la barra inferior, §2). */}
+        <NavLink to="/panell" className="flex items-center justify-between gap-2.5 overflow-hidden" onClick={alNavegar}>
           <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-7 w-auto shrink-0" />
           {titol && (
-            <span className="truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
+            <span className="min-w-0 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
               {titol}
             </span>
           )}

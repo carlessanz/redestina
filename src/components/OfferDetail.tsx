@@ -108,6 +108,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Interruptor global de WhatsApp (§8). Sale del sobre de `priorizar-entidades`, igual
   // que `modoTest`: lo decide el servidor y el panel solo obedece.
   const [whatsappActiu, setWhatsappActiu] = useState(true)
+  // Qué entidad tiene un envío EN CURSO. Sin esto, los tres botones de una fila se podían
+  // pulsar otra vez mientras la petición viajaba —y el envío tarda lo bastante como para que
+  // pase—: el 16-09-2026 una oferta salió DOS VECES al mismo número por un doble clic. La
+  // fila de `oferta_respuestas` no se duplica (la protege su índice único), pero el WhatsApp
+  // sí, y eso lo ve la persona. El bloqueo es por fila, no global: mandar la misma oferta a
+  // dos entidades a la vez es legítimo.
+  const [enviant, setEnviant] = useState<string | null>(null)
   // Los dos motivos que antes se pedían con `window.prompt` (deuda §12.35). Van con estado
   // porque el de rechazo lo abre la fila de una respuesta concreta, no un botón suelto.
   const [rebutjant, setRebutjant] = useState<RespuestaConEntidad | null>(null)
@@ -381,6 +388,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
    * `priorizar-entidades`; aquí solo se obedece. Si WhatsApp falla y hay correo, se
    * cae al correo: quedarse sin avisar a nadie es peor que cambiar de canal.
    */
+  /**
+   * Marca la fila como «enviando» mientras dura la petición. El `finally` es lo que importa:
+   * si el envío falla, la fila tiene que volver a poder pulsarse — un botón que se queda
+   * bloqueado tras un error es peor que uno que se puede pulsar dos veces.
+   */
+  async function ambBloqueig(id: string, fn: () => Promise<unknown>) {
+    if (enviant === id) return
+    setEnviant(id)
+    try { await fn() } finally { setEnviant(null) }
+  }
+
   async function enviarOferta(ent: EntidadPuntuada) {
     if (testMode && !ent.es_test) { toast.error(t('od.not_test_toast', { name: ent.nombre })); return }
     if (ent.canal === 'cap') { toast.error(t('od.no_channel', { name: ent.nombre })); return }
@@ -650,14 +668,20 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     <input type="checkbox" checked={ent.opt_in} onChange={() => void toggleOptIn(ent.id, ent.opt_in)} />
                     {t('od.optin')}
                   </label>
-                  {/* Envío por el canal recomendado. Los otros dos fuerzan uno concreto. */}
-                  <Button size="sm" onClick={() => void enviarOferta(ent)}>{t('od.send')}</Button>
+                  {/* Envío por el canal recomendado. Los otros dos fuerzan uno concreto.
+                      Los tres se bloquean mientras esa fila tiene un envío en curso, y el
+                      pulsado lo dice: el toast llega cuando contesta el servidor, y hasta
+                      entonces la única señal de que se ha pulsado es esta. */}
+                  <Button size="sm" disabled={enviant === ent.id}
+                    onClick={() => void ambBloqueig(ent.id, () => enviarOferta(ent))}>
+                    {enviant === ent.id ? t('od.sending') : t('od.send')}
+                  </Button>
                   {whatsappActiu && (
-                    <Button size="sm" variant="outline" title={t('od.force_wa')}
-                      onClick={() => void enviarOfertaWhatsApp(ent)}>{t('od.whatsapp')}</Button>
+                    <Button size="sm" variant="outline" title={t('od.force_wa')} disabled={enviant === ent.id}
+                      onClick={() => void ambBloqueig(ent.id, () => enviarOfertaWhatsApp(ent))}>{t('od.whatsapp')}</Button>
                   )}
-                  <Button size="sm" variant="outline" title={t('od.force_email')}
-                    onClick={() => void enviarOfertaEmail(ent)}>{t('od.email')}</Button>
+                  <Button size="sm" variant="outline" title={t('od.force_email')} disabled={enviant === ent.id}
+                    onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</Button>
                 </div>
               </div>
             )
