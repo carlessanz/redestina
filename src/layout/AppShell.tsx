@@ -105,7 +105,7 @@ export default function AppShell() {
 
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-      <AppSidebar comptadors={comptadors} fitxaFalten={falten.length} />
+      <AppSidebar comptadors={comptadors} fitxaIncompleta={falten.length > 0} />
       <SidebarInset className="flex h-dvh min-h-0 flex-col overflow-hidden">
         {/* El `env(safe-area-inset-*)` lateral solo hace algo en iPhone con muesca EN
             HORIZONTAL, donde el recorte se come ~44px por cada lado y el `px-3` no

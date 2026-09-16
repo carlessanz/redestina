@@ -1814,8 +1814,14 @@ medias sí impide operar, con un paso de por medio.
 ⚠️ **Se calcula UNA vez, en `AppShell` (`useFitxaIncompleta`), y se reparte** a la banda y al
 badge. Calculado por separado, el contador del menú y la banda podrían decir cosas distintas
 — es la misma razón por la que los contadores del equipo salen todos de `pendents_equip()`.
-⚠️ El badge es **el número de campos que faltan**, no un «!»: dice cuánto trabajo queda. Y la
-banda se lee una vez y se ignora; el badge sigue ahí hasta que se arregla.
+🔴 **La marca del menú es un SÍMBOLO DE ALERTA, no una cifra**, aunque la cifra exista. En
+esa posición **todos los demás badges son contadores de cosas pendientes** —aprovacions,
+missatges, albarans, documents—, así que un «3» ahí se lee como «tres avisos» y no como «te
+faltan tres campos»: información de más pagada con un significado equivocado. Lo que hace
+falta decir es «esto está a medias»; QUÉ falta ya lo dicen la banda roja y la propia ficha.
+Por eso `AppSidebar` recibe un **booleano** y no un número.
+⚠️ La banda se lee una vez y se ignora; la marca sigue ahí hasta que se arregla. Por eso
+están las dos.
 
 ### El modelo del proceso: la aplicación lo narra, no solo lo ejecuta (14-09-2026)
 

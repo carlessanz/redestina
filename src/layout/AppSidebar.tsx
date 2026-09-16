@@ -12,7 +12,7 @@
 // nombre de la organización arriba—, que es el caso del 99% de las cuentas.
 
 import { NavLink, useLocation } from 'react-router'
-import { Building2, LogOut, Tractor, Users } from 'lucide-react'
+import { AlertTriangle, Building2, LogOut, Tractor, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
@@ -32,8 +32,11 @@ interface Props {
   // Reutiliza el tipo en vez de repetir la unión: cuando se añade un contador nuevo,
   // repetirla aquí hacía fallar el build con TS7053 desde el otro extremo del proyecto.
   comptadors: Partial<Record<Comptador, number>>
-  /** Cuántos campos le faltan a la ficha. 0 = completa, y entonces no hay badge. */
-  fitxaFalten?: number
+  /**
+   * ¿La ficha de la organización está a medias? Es un booleano y no una cifra a propósito:
+   * lo que se pinta es una alerta, no un contador (ver el comentario del badge).
+   */
+  fitxaIncompleta?: boolean
 }
 
 /** Cabecera de cada panel cuando hay más de uno. */
@@ -43,7 +46,7 @@ const PANELL: Record<Rol, { clau: string; icona: LucideIcon }> = {
   receptor: { clau: 'panel.receiver', icona: Building2 },
 }
 
-export default function AppSidebar({ comptadors, fitxaFalten = 0 }: Props) {
+export default function AppSidebar({ comptadors, fitxaIncompleta = false }: Props) {
   const { t } = useT()
   const { ctx, rolActiu, organitzacio } = useAppContext()
   const { setOpenMobile, isMobile } = useSidebar()
@@ -168,10 +171,20 @@ export default function AppSidebar({ comptadors, fitxaFalten = 0 }: Props) {
                       </NavLink>
                     </SidebarMenuButton>
                     {/* La ficha a medias se marca en el menú, no solo en la banda: la banda
-                        se lee una vez y se ignora, y el badge sigue ahí hasta que se
-                        arregla. Es el número de campos que faltan, no un «!»: dice cuánto
-                        trabajo queda. */}
-                    {fitxaFalten > 0 && <SidebarMenuBadge>{fitxaFalten}</SidebarMenuBadge>}
+                        se lee una vez y se ignora, y la marca sigue ahí hasta que se arregla.
+                        ⚠️ ES UN SÍMBOLO DE ALERTA Y NO UNA CIFRA, aunque la cifra existiera.
+                           En esta posición TODOS los demás badges son contadores de cosas
+                           pendientes —aprovacions, missatges, albarans, documents—, así que
+                           un «3» aquí se lee como «tres avisos» y no como «te faltan tres
+                           campos». El número era información de más pagada con un
+                           significado equivocado; lo que hace falta es «esto está a medias».
+                           El detalle de QUÉ falta ya lo da la banda roja y la propia ficha. */}
+                    {fitxaIncompleta && (
+                      <SidebarMenuBadge>
+                        <AlertTriangle className="size-3.5" aria-hidden />
+                        <span className="sr-only">{t('reg_inc.badge')}</span>
+                      </SidebarMenuBadge>
+                    )}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

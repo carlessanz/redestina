@@ -145,6 +145,22 @@ exactamente para esto (§2). Lo mismo con el verde: `verde-oscuro`, no `primary`
 del menú tenía `peer-hover:text-sidebar-accent-foreground`, así que volvía a desaparecer
 justo en la sección en la que estabas.
 
+### 6quater. Un badge cuenta cosas; un estado se dibuja (16-09-2026)
+
+**En el menú, un badge con número significa «tienes N cosas pendientes de mirar»** — es lo
+que dicen Aprovacions, Missatgeria, Albarans, Documents y Costos. **Un estado no se pone
+ahí como número**: «La meva organització» llevó un «3» (los campos que faltaban por
+rellenar) y se leyó como «tres avisos», porque es lo que significa en todas las entradas
+vecinas.
+
+| Qué quieres decir | Cómo |
+| --- | --- |
+| «Tienes N cosas que mirar» | `SidebarMenuBadge` con la cifra |
+| «Esto está a medias / mal» | `SidebarMenuBadge` con un icono de alerta y `sr-only` con el texto |
+
+⚠️ **El detalle va donde se puede leer**, no en el badge: qué campos faltan lo dicen la banda
+y la propia pantalla. Un badge tiene 20 px y una sola oportunidad de significar algo.
+
 ## 7. Lo que no está decidido
 
 - Modo oscuro: no existe en el branding y no se implementa. El `@custom-variant dark` de `index.css` se queda, sin valores.
