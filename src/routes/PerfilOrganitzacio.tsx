@@ -39,6 +39,7 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
+import SuggerimentPoblacio from '../components/SuggerimentPoblacio'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -208,8 +209,19 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               <Input
                 value={String(fila?.[c.clave] ?? '')}
                 disabled={!potEditar}
+                inputMode={c.clave === 'codigo_postal' ? 'numeric' : undefined}
                 onChange={(e) => setFila((f) => ({ ...(f ?? {}), [c.clave]: e.target.value }))}
               />
+              {/* Del código postal sale la población, que el registro ya no pregunta. Va
+                  bajo el CP y no bajo la población porque es el CP el que la decide. */}
+              {c.clave === 'codigo_postal' && (
+                <SuggerimentPoblacio
+                  codiPostal={String(fila?.codigo_postal ?? '')}
+                  poblacio={String(fila?.poblacion ?? '')}
+                  disabled={!potEditar}
+                  onTria={(nom) => setFila((f) => ({ ...(f ?? {}), poblacion: nom }))}
+                />
+              )}
             </div>
           ))}
         </div>

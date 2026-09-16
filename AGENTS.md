@@ -912,6 +912,21 @@ texto (así sale impreso si alguien emite antes de tiempo), `cif = 'G00000000'` 
 válido** a propósito, y `apoderada_dni`/`email_equipo` quedan NULL porque ninguna migración pone
 datos personales en git. La columna **`datos_provisionales`** lo hace comprobable por código.
 
+**`codis_postals`** (`20270328100000`) — **código postal ↔ municipio**, muchos a muchos:
+`(codi_postal, codi_ine)` como clave, con FK a `municipios`. Del portal oficial de datos
+abiertos de la Generalitat, conjunto «Codis postals per municipis de Catalunya»
+(`analisi.transparenciacatalunya.cat`, id `tp8v-a58g`, descargado el 16-09-2026). **1.412
+parejas y 1.132 códigos postales**, y **los 947 municipios de la tabla tienen alguno** —
+comprobado antes de sembrar. Va en git por lo mismo que `municipios`: dato público sin nada
+personal (§7). **No es un servicio externo**: es un fichero que se baja una vez; la
+aplicación no llama a nadie en ejecución, y actualizarlo es otra migración.
+⚠️ **Un CP no siempre es un municipio, y eso manda en la interfaz**: 936 de los 1.132 (82 %)
+apuntan a uno solo —ahí `SuggerimentPoblacio` rellena sin preguntar— y 196 a varios, donde
+**se ofrece a elegir**. Poner el primero sería escribir un dato que nadie ha dicho, y encima
+parecería confirmado. Tampoco pisa una población ya escrita: la ofrece como sugerencia.
+⚠️ El `codi_municipi` del CSV trae **seis** cifras (INE + dígito de control) y se guarda
+recortado a cinco. Los centinelas `99998 No consta` y `99999 Altres/Diversos` se descartan.
+
 **`municipios`** — el nomenclátor oficial (`20260928100500`): `codi_ine` (5 dígitos, **texto y no
 int** porque los de Barcelona empiezan por 0), `nom` (forma oficial con artículo pospuesto:
 `Ametlla del Vallès, l'`), `comarca`, `provincia`. **947 municipios y 43 comarcas** (Moianès y
@@ -2883,6 +2898,22 @@ revés que `recuperar-password`, que siempre responde 200 genérico. La incohere
 respuesta genérica solo funciona si puedes rematar el flujo por correo («si ya tenías cuenta, te
 hemos escrito») y **este registro no envía ningún correo**; un genérico dejaría a la persona legítima
 esperando una validación que no llegaría nunca.
+
+🔴 **El alta pide MENOS y a la vez EXIGE MÁS** (16-09-2026, pedido por el cliente):
+- **Fuera la población.** Se rellena después en la ficha, donde sale sola del código postal
+  (`codis_postals`). En la puerta había que teclearla a mano, sin validar, y corregirla
+  igual — y es la que produce «Sant Cugat» / «St. Cugat del Vallès» / «SANT CUGAT».
+  **Se sigue aceptando** en el cuerpo por si llega de una pantalla vieja: el contrato es
+  público.
+- **El teléfono pasa a OBLIGATORIO.** Era opcional, y eso dejaba entrar organizaciones a
+  las que **el canal principal del producto no alcanza**: sin móvil no hay intake, ni
+  recordatorio, ni oferta por WhatsApp, y la ficha nace muda sin que nada lo diga. Se exige
+  *tenerlo*, no que sea un móvil: fuera de España el prefijo no lo dice y rechazar un
+  número extranjero legítimo sería peor.
+- **Confirmación de contraseña** en la pantalla. No viaja al servidor —comprobarla allí no
+  añade nada, quien manda el POST a mano manda las dos iguales—: es una guarda contra la
+  errata, y en un alta la errata no se descubre al momento sino al intentar volver, cuando
+  ya hay cuenta, ficha y membresía creadas.
 
 **Anti-abuso proporcionado** (sin captcha, deuda §12.26): honeypot `web` —que responde 200 falso—,
 límite de 5 intentos/10 min por IP **en memoria** (best-effort: se pierde en cada arranque en frío y

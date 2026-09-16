@@ -63,7 +63,9 @@ export default function Registre() {
   const [password, setPassword] = useState('')
   const [verPassword, setVerPassword] = useState(false)
   const [telefon, setTelefon] = useState('')
-  const [poblacio, setPoblacio] = useState('')
+  // La confirmación NO viaja al servidor: es una guarda contra la errata, y comprobarla
+  // allí no añadiría nada — quien manda el POST a mano puede mandar las dos iguales.
+  const [password2, setPassword2] = useState('')
   const [parany, setParany] = useState('') // honeypot: si se rellena, no es una persona
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
@@ -91,10 +93,22 @@ export default function Registre() {
       setError(t('login.pw_short'))
       return
     }
+    if (password !== password2) {
+      setError(t('reg.pw_mismatch'))
+      return
+    }
     // Mismo criterio que el servidor y que el resto de la app (§7: E.164 sin '+').
     // Se comprueba aquí para que el error salga en el idioma de la interfaz.
+    //
+    // 🔴 OBLIGATORIO desde el 16-09-2026: sin teléfono, WhatsApp —que es el canal principal
+    //    del producto— no alcanza a esa organización, y la ficha nace muda sin que nada lo
+    //    diga.
     const telNet = telefon.replace(/\D/g, '')
-    if (telNet && !/^[1-9]\d{6,14}$/.test(telNet)) {
+    if (!telNet) {
+      setError(t('reg.err_telefon_cal'))
+      return
+    }
+    if (!/^[1-9]\d{6,14}$/.test(telNet)) {
       setError(t('reg.err_telefon'))
       return
     }
@@ -111,8 +125,7 @@ export default function Registre() {
           nom_persona: persona.trim(),
           email: email.trim(),
           password,
-          telefon: telNet || null,
-          poblacio: poblacio.trim() || null,
+          telefon: telNet,
           tipo_receptor: rols.includes('receptor') ? tipusReceptor : null,
           web: parany,
         }),
@@ -241,15 +254,17 @@ export default function Registre() {
                 autoComplete="name" required />
             </div>
 
-            <div className="grid gap-2 sm:grid-cols-2">
-              <div className="grid gap-2">
-                <Label htmlFor="tel">{t('reg.phone')}</Label>
-                <Input id="tel" type="tel" value={telefon} onChange={(e) => setTelefon(e.target.value)} autoComplete="tel" />
-              </div>
-              <div className="grid gap-2">
-                <Label htmlFor="pob">{t('reg.town')}</Label>
-                <Input id="pob" value={poblacio} onChange={(e) => setPoblacio(e.target.value)} />
-              </div>
+            {/* La POBLACIÓN ya no se pide aquí: se rellena después en la ficha, donde se
+                elige de la lista real de municipios junto al domicilio y el código postal.
+                En la puerta había que teclearla a mano, sin validar, y corregirla igual. */}
+            <div className="grid gap-2">
+              <Label htmlFor="tel">{t('reg.phone')} *</Label>
+              <Input id="tel" type="tel" inputMode="tel" value={telefon}
+                onChange={(e) => { setTelefon(e.target.value); setError(null) }}
+                autoComplete="tel" required />
+              {/* El prefijo es la trampa de este campo: a nueve dígitos la ficha queda
+                  correcta y WhatsApp no llega nunca, sin ningún error que lo diga. */}
+              <p className="text-xs text-muted-foreground">{t('reg.phone_hint')}</p>
             </div>
 
             <div className="grid gap-2">
@@ -266,6 +281,20 @@ export default function Registre() {
                   autoComplete="new-password" required className="pr-9" />
                 <BotoUll vist={verPassword} onToggle={() => setVerPassword((v) => !v)} />
               </div>
+            </div>
+
+            {/* Una contraseña mal tecleada en un alta no se descubre al momento —no hay
+                «entrar» detrás— sino al intentar volver, y para entonces ya hay cuenta,
+                ficha y membresía creadas. Por eso se confirma. */}
+            <div className="grid gap-2">
+              <Label htmlFor="rpw2">{t('reg.pw_confirm')}</Label>
+              <Input id="rpw2" type={verPassword ? 'text' : 'password'} value={password2}
+                onChange={(e) => { setPassword2(e.target.value); setError(null) }}
+                autoComplete="new-password" required
+                aria-invalid={password2 !== '' && password !== password2} />
+              {password2 !== '' && password !== password2 && (
+                <p className="text-xs text-error">{t('reg.pw_mismatch')}</p>
+              )}
             </div>
 
             {/* Trampa para robots: una persona no ve este campo y por tanto no lo rellena. */}

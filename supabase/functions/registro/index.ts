@@ -165,7 +165,8 @@ interface Dades {
   nomPersona: string;
   email: string;
   password: string;
-  telefon: string | null;
+  /** Obligatorio desde el 16-09-2026: sin teléfono, WhatsApp no alcanza a la organización. */
+  telefon: string;
   poblacio: string | null;
   tipoReceptor: string | null;
   // --- fase 2: lo que el convenio necesita de la ficha, y quién lo firma
@@ -228,21 +229,30 @@ function validar(body: Record<string, unknown>): Validacio {
     return { ok: false, camp: "password", error: "La contrasenya ha de tenir com a minim 6 caracters" };
   }
 
-  // Teléfono E.164 sin '+', solo dígitos (§7). Lo que quede vacío tras normalizar es
-  // que no había teléfono: es opcional, no un error.
-  let telefon: string | null = null;
+  // 🔴 EL TELÉFONO ES OBLIGATORIO desde el 16-09-2026. Era opcional, y eso dejaba entrar
+  // organizaciones a las que **el canal principal del producto no puede alcanzar**: sin
+  // móvil no hay intake, ni recordatorio, ni oferta por WhatsApp, y la ficha nace muda sin
+  // que nada lo diga. Pedido por el cliente: «quitar opcional del registro, porque si no el
+  // WhatsApp no va a funcionar».
+  //
+  // ⚠️ Se exige TENERLO, no que sea un móvil: `esMovil()` descarta los fijos españoles
+  //    (§8bis), pero fuera de España el prefijo no lo dice, y rechazar aquí un número
+  //    extranjero legítimo sería peor que aceptarlo y que lo decida la política de canal.
   const telBrut = textNet(body.telefon);
-  if (telBrut) {
-    const net = telBrut.replace(/\D/g, "");
-    if (!net) {
-      telefon = null;
-    } else if (!/^[1-9]\d{6,14}$/.test(net)) {
-      return { ok: false, camp: "telefon", error: "El telefon no es valid" };
-    } else {
-      telefon = net;
-    }
+  const telNet = telBrut.replace(/\D/g, "");
+  if (!telNet) {
+    return { ok: false, camp: "telefon", error: "Cal un telefon de contacte" };
   }
+  if (!/^[1-9]\d{6,14}$/.test(telNet)) {
+    return { ok: false, camp: "telefon", error: "El telefon no es valid" };
+  }
+  const telefon: string = telNet;
 
+  // La POBLACIÓN ya no se pide en el alta (16-09-2026): se rellena después, desde la ficha,
+  // donde se elige de la lista real de municipios junto con el domicilio y el código postal.
+  // Preguntarla en la puerta obligaba a teclearla a mano y sin validar, y luego había que
+  // corregirla igualmente. **Se sigue ACEPTANDO** por si llega de una pantalla vieja servida
+  // desde una caché: el contrato es público.
   const poblacioBruta = textNet(body.poblacio);
   if (poblacioBruta.length > 120) {
     return { ok: false, camp: "poblacio", error: "La poblacio es massa llarga" };
