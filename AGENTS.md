@@ -1528,6 +1528,34 @@ posteriores al último `outbound` de ese teléfono. Lo usan `ProducersList` (bad
 
 ## 6. Importación de datos maestros
 
+🔴 **LOS DATOS IMPORTADOS YA NO ESTÁN EN LA BASE (16-09-2026).** A petición del cliente —«estamos
+en desarrollo, no quiero esos datos en la base actual»— se borraron las **340 fichas de productor y
+las 111 de entidad que no eran de prueba**, sus 12 ubicaciones y las **451 organizaciones** que
+quedaron sin ficha. Queda **lo de prueba y nada más**: 6 productores + 8 entidades con `es_test`,
+más la ficha del arnés (ver abajo). **Todo lo que este documento cuenta en pasado sobre el import
+sigue siendo cierto** —cómo se hizo, qué peculiaridades tenían los CSV, qué se midió con esas 456
+fichas— pero **ya no describe el contenido de la base**: antes de citar una de esas cifras como
+estado actual, contar filas.
+
+⚠️ **No costó nada colateral, y eso se midió antes de borrar**: de esas 452 fichas no colgaba ni un
+excedente, ni una canalización, ni un convenio, ni un albarán, ni un documento — todo el circuito
+documental pertenece a las fichas de prueba. Lo único que tenían eran las 12 `productor_ubicaciones`.
+Después del borrado, **cero referencias colgando** en las ocho comprobaciones de integridad (FK
+lógicas incluidas, que en mensajería no existen) y **cero objetos huérfanos en Storage**; el arnés
+salió **669/669 + 13**, exactamente la referencia de §13, que es lo que demuestra que la base sigue
+coherente.
+
+⚠️ **Dos filas se quedaron a propósito y no son un descuido:**
+- La ficha **«Compte de proves de l'arnes»** (`TEST-PENDENT-ARNES`), que es `es_test = false` pero
+  cubre el bloque `pendent` del arnés: borrarla apaga **73 comprobaciones en silencio** (§9).
+- `email_test_recipients` conserva **`tecnologia@espigoladors.com`** sin ficha detrás: es el correo
+  propietario de la cuenta de Resend (§12.33). Y `wa_contacts` conserva `34636977820` («Laura
+  Masdeu», 0 mensajes), que ya estaba sin ficha antes del borrado porque su ficha no tiene teléfono.
+
+**Para recuperarlos**: `deno run -A scripts/import-ara.ts`, que es idempotente y sigue teniendo sus
+CSV en `scripts/data/` (fuera de git, §7). Los `id` serían nuevos, así que no es «deshacer»: es
+volver a importar.
+
 Los datos maestros entran por **dos vías distintas, y la diferencia importa**:
 
 | Qué | Cómo | Por qué |
@@ -1897,7 +1925,7 @@ está gris. ⚠️ La condición real de «contactable» es `(!testMode || es_te
 por separado, y con el modo test **apagado todas** son contactables. El `testMode` sale del `modo_test`
 que devuelve `priorizar-entidades`, no de `getTestMode()`.
 
-**Opt-in de entidades**: las 111 tienen `opt_in=false`. Se marca a mano con un toggle en el
+**Opt-in de entidades**: las 111 importadas tenían `opt_in=false` (hoy ya no están en la base, §6). Se marca a mano con un toggle en el
 detalle (mecánica de PoC). En producción se combinará con el ALTA por WhatsApp.
 
 **Canalizaciones**: el panel registra kg por entidad; al cubrir `kg_total` el excedente pasa a
@@ -1987,10 +2015,11 @@ desde `/registre`.
 Dos límites que **no se pueden relajar**:
 
 1. **Ninguna cuenta con rol de plataforma.** Las de equipo (`hola+superadmin`, `hola+equip` y las
-   tres reales) no están ni pueden estar: ven las 452 fichas con nombre, NIF, teléfono y dirección.
+   tres reales) no están ni pueden estar: ven **todas** las fichas con nombre, NIF, teléfono y
+   dirección (eran 452 hasta el borrado del 16-09-2026, §6; volverán a serlo al reimportar).
    El primer grupo sí enseña **fichas de personas reales del equipo**, pero por cuentas *externas*
    creadas aparte (§9), así que cada una ve solo la suya. Se aceptó explícitamente: es contacto
-   profesional del propio equipo, no de los 345 productores externos.
+   profesional del propio equipo, no de los productores externos.
 2. Todo el bloque va tras la variable de build **`VITE_ACCESSOS_TEST`** (§10). Con ella apagada,
    Vite pliega la constante a `false`, el `&&` queda en código muerto y el módulo con las
    contraseñas **se cae del bundle**. Verificado con `grep` sobre `dist/`, no por confianza: la
@@ -2346,7 +2375,7 @@ viable**. ⚠️ Una preferencia **no es un permiso**: pedir WhatsApp no abre la
 sustituye al opt-in (son requisitos de Meta, no gustos), así que si no se puede se cae al otro canal
 y la decisión lo dice con `preferenciaRespetada: false` — el panel y los logs lo enseñan, porque una
 preferencia ignorada en silencio es peor que no tenerla. `null` = deducir como siempre, que es el
-caso de las 464 fichas de hoy. Lo aplican `priorizar-entidades` (por entidad: `canal_preferit`,
+caso de todas las fichas que hay. Lo aplican `priorizar-entidades` (por entidad: `canal_preferit`,
 `preferencia_respectada`) y `enviar-acceso` (`canal: 'auto'`, por la organización de la cuenta); se
 escribe con `actualizar_meu_canal()` desde el perfil (§4bis).
 
@@ -2769,10 +2798,12 @@ precio de tener esa cobertura, y está aceptado. Sus credenciales viven en
   14-09-2026: una petición con la `anon` antigua responde 401. El proyecto ya usaba solo las
   nuevas en los cinco sitios, pero las viejas seguían siendo válidas — que es distinto de no
   usarlas. Detalle, comprobación y cómo revertir, en §7.
-- Los datos personales **ya están en remoto**: 341 productores y 111 entidades, importados
-  el 21-07-2026. Lo único que los protege es la autenticación de arriba; verificado que con
-  la publishable key las tablas responden `42501`. Dar de alta una cuenta equivale a dar
-  acceso a las 452 fichas completas.
+- ~~Los datos personales **ya están en remoto**: 341 productores y 111 entidades~~ — **se
+  borraron el 16-09-2026** (§6): en la base solo quedan las 15 fichas de prueba. La frase sobre
+  la protección sigue valiendo para lo que haya dentro —lo único que lo protege es la
+  autenticación de arriba, y está verificado que con la publishable key las tablas responden
+  `42501`—, pero **el alcance de una cuenta comprometida ya no son 452 fichas de terceros**. El
+  día que se vuelvan a importar (`scripts/import-ara.ts`), vuelve a serlo.
 - La app de Vercel tiene además Deployment Protection (SSO), que es una capa de
   plataforma independiente de todo lo anterior.
 
@@ -3185,8 +3216,9 @@ Redestina en producción real quedan pasos de configuración y negocio.
    actualizar el secreto `WHATSAPP_PHONE_ID` con el número de producción, vaciar
    `meta_test_recipients` y (opcional) apagar el modo test. Un solo commit. Los pasos en Meta,
    con rutas de clic y textos listos para pegar, están en `docs/Guía producción WhatsApp — Redestina.md`.
-3. **Opt-in real de las entidades**: hoy `false` en las 111; el toggle deja la mecánica, pero
-   recoger el consentimiento es trabajo de negocio.
+3. **Opt-in real de las entidades**: `false` en las 111 que se importaron —hoy borradas (§6)—;
+   el toggle deja la mecánica, pero recoger el consentimiento es trabajo de negocio, y habrá que
+   hacerlo sobre las fichas que se reimporten.
 4. **Formato definitivo del albarán**: se genera con placeholders (`src/lib/textos.ts`); el
    formato legal del Excel se confirma al integrarlo.
 5. **Reexportar `prod_actius.csv`** con la columna Producte para rellenar `productos_habituales`
