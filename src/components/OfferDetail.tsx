@@ -261,6 +261,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Deja constancia de que la oferta se envió a la entidad, en estado 'pendent'.
   // La respuesta por WhatsApp la actualizará el webhook; onConflict hace que
   // reenviar a la misma entidad reinicie la fila en vez de duplicarla.
+  //
+  // ⚠️ REINICIAR ES TAMBIÉN BORRAR EL DIÁLOGO A MEDIAS, y eso faltaba (16-09-2026).
+  // El upsert devolvía `estado` a 'pendent' pero dejaba `dialeg_pas` donde estuviera, así
+  // que una entidad que hubiera contestado «sí» a un envío anterior se quedaba en el paso
+  // `kg`: al reenviarle la oferta y pulsar «M'interessa», el botón llegaba al paso de los
+  // kilos, no se parseaba como número y el bot le contestaba «escriu només el número» sin
+  // que nada explicara de dónde salía esa pregunta. Visto en producción, con la oferta de
+  // prueba de venda. Reenviar es volver a preguntar desde el principio.
   async function registrarEnvio(ent: EntidadPuntuada, canal: 'whatsapp' | 'email') {
     const { error } = await supabase.from('oferta_respuestas').upsert({
       excedente_id: excedente.id,
@@ -271,6 +279,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       enviado_at: new Date().toISOString(),
       respondido_at: null,
       mensaje_respuesta: null,
+      dialeg_pas: null,
+      dialeg_dades: {},
+      kg_solicitados: null,
+      caixes_solicitades: null,
+      preu_ofert: null,
     }, { onConflict: 'excedente_id,entidad_id' })
     if (error) console.error('oferta_respuestas upsert:', error.message)
     await recargarRespuestas()

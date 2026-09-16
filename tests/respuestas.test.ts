@@ -21,6 +21,8 @@ import {
   clasificar,
   parseNumero,
   atendreElDialeg,
+  avisKgExcessius,
+  textMaxim,
   CADUCIDAD_DIALOGO_HORAS,
 } from '../supabase/functions/_shared/respuestas.ts'
 
@@ -428,5 +430,53 @@ describe('atendreElDialeg · quién tiene la palabra', () => {
   it('el «fet» de un diálogo terminado no cuenta como diálogo en curso', () => {
     const a = atendreElDialeg({ pas: 'fet', enviadoAt: hace(2), intakeAt: hace(1) }, AHORA)
     expect(a.motivo).toBe('intake_te_la_paraula')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El tope de kilos
+// ---------------------------------------------------------------------------
+// El caso que lo motivó es real y está medido: una oferta de 300 kg aceptó una petición
+// de 1000 sin decir nada, y la fila se quedó esperando al equipo con ese número dentro.
+// Lo que se prueba aquí es que el tope se DICE y se APLICA, y —igual de importante— que
+// no se inventa cuando no se sabe cuántos kg quedan.
+describe('textMaxim', () => {
+  it('dice el máximo cuando se sabe', () => {
+    expect(textMaxim(300)).toBe(' El màxim són 300 kg.')
+  })
+
+  it('no dice nada si no hay tope que aplicar', () => {
+    expect(textMaxim(0)).toBe('')
+    expect(textMaxim(-5)).toBe('')
+  })
+
+  it('no arrastra decimales que no aportan nada', () => {
+    expect(textMaxim(212.5)).toBe(' El màxim són 212.5 kg.')
+  })
+})
+
+describe('avisKgExcessius', () => {
+  it('avisa y da el valor máximo cuando el número se pasa', () => {
+    const a = avisKgExcessius(1000, 300)
+    expect(a).not.toBeNull()
+    expect(a).toContain('300')
+    expect(a).toContain('1000')
+  })
+
+  it('deja pasar lo que cabe, incluido el total exacto', () => {
+    expect(avisKgExcessius(300, 300)).toBeNull()
+    expect(avisKgExcessius(1, 300)).toBeNull()
+  })
+
+  // Sin tope conocido el número entra igual: un tope inventado rechazaría una petición
+  // legítima, y el equipo sigue viendo la cifra al aprobar, que es donde estaba antes.
+  it('sin kg disponibles conocidos no inventa ningún tope', () => {
+    expect(avisKgExcessius(1000, 0)).toBeNull()
+  })
+
+  // Lo que se le pide al aviso es que la persona pueda RESPONDERLO sin pensar: el número
+  // que tiene que escribir sale literal en el texto.
+  it('el texto trae el número exacto que hay que escribir', () => {
+    expect(avisKgExcessius(500, 212.5)).toContain('escriu 212.5')
   })
 })

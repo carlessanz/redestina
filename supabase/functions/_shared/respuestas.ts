@@ -274,6 +274,53 @@ export function parseNumero(texto: string | null): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
+// ---------------------------------------------------------------------------
+// Los kg que quedan, y el aviso cuando se piden de más
+// ---------------------------------------------------------------------------
+// POR QUÉ EXISTE (16-09-2026). El paso `kg` aceptaba cualquier número positivo: en
+// producción se pidieron **1000 kg de una oferta de 300** y el diálogo siguió hasta el
+// final sin decir nada. La fila quedaba `acceptada` con esos 1000 kg esperando al equipo,
+// y el aviso de «canalitzar de més» del panel es **no bloqueante**, así que el número
+// inventado podía atravesar el circuito entero hasta el albarán.
+//
+// Son DOS piezas y hacen falta las dos: el máximo **se dice al preguntar** —nadie acierta
+// un número que no conoce— y además **se comprueba al responder**, porque decirlo no
+// obliga a nadie. Al pasarse se vuelve a preguntar en vez de recortar en silencio: cuántos
+// kg quiere la entidad es un dato suyo, y un recorte nuestro se descubriría en la entrega.
+//
+// ⚠️ `disp <= 0` significa «no hay tope que aplicar», no «no caben kg»: `kg_total` podría
+// no estar, y **un tope inventado rechazaría una petición legítima**. Con la oferta ya
+// cubierta el número entra igual y lo ve el equipo al aprobar, que es donde estaba antes.
+
+/** El trozo « El màxim són N kg.» que acompaña a la pregunta, o nada si no se sabe. */
+export function textMaxim(disp: number): string {
+  return disp > 0 ? ` El màxim són ${formatKg(disp)} kg.` : "";
+}
+
+/** El aviso de pasarse, o `null` si el número cabe (o si no hay tope que aplicar). */
+export function avisKgExcessius(kg: number, disp: number): string | null {
+  if (disp <= 0 || kg <= disp) return null;
+  const max = formatKg(disp);
+  return `D'aquesta oferta en queden ${max} kg i n'has demanat ${formatKg(kg)}. ` +
+    `Escriu un número igual o inferior a ${max}. Si els vols tots, escriu ${max}.`;
+}
+
+/** Sin decimales cuando no hacen falta: «300», no «300.00». */
+function formatKg(n: number): string {
+  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+}
+
+/** Los kg de la oferta que todavía no tienen entidad. 0 = no se sabe (ver arriba). */
+async function kgDisponibles(supabase: Cliente, excedenteId: string): Promise<number> {
+  const { data: exc } = await supabase
+    .from("excedentes").select("kg_total").eq("id", excedenteId).maybeSingle();
+  const { data: cans } = await supabase
+    .from("canalizaciones").select("kg_confirmados").eq("excedente_id", excedenteId);
+  const usados = (cans ?? []).reduce(
+    (s: number, c: { kg_confirmados: number | null }) => s + Number(c.kg_confirmados ?? 0), 0);
+  return Math.max(0, Number(exc?.kg_total ?? 0) - usados);
+}
+
 /**
  * Marca de tiempo del diálogo, dentro de `dialeg_dades` (jsonb que ya existía y no se
  * usaba). Se escribe cuando el diálogo AVANZA de paso; si se queda atascado repitiendo la
@@ -412,9 +459,21 @@ export async function procesarRespuestaOferta(
       await rechazar(supabase, from, fila.id, texto ?? "");
       return true;
     }
+    const disp = await kgDisponibles(supabase, fila.excedente_id);
     const kg = parseNumero(texto);
     if (kg === null || kg <= 0) {
-      await sendText(supabase, from, "Escriu quants kg en vols, només el número (p. ex. 200).");
+      await sendText(
+        supabase,
+        from,
+        `Escriu quants kg en vols, només el número (p. ex. 200).${textMaxim(disp)}`,
+      );
+      return true;
+    }
+    // Pasarse NO avanza el diálogo: se repite la pregunta con el tope. El paso sigue
+    // siendo `kg`, así que el siguiente número vuelve a entrar por aquí.
+    const excessiu = avisKgExcessius(kg, disp);
+    if (excessiu) {
+      await sendText(supabase, from, excessiu);
       return true;
     }
     const { data: exc } = await supabase
@@ -485,21 +544,15 @@ export async function procesarRespuestaOferta(
 
   // Aceptación: arranca el diálogo pidiendo kg (la fila sigue 'pendent' para que
   // el próximo mensaje la vuelva a emparejar).
-  const { data: exc } = await supabase
-    .from("excedentes").select("kg_total").eq("id", fila.excedente_id).maybeSingle();
-  const { data: cans } = await supabase
-    .from("canalizaciones").select("kg_confirmados").eq("excedente_id", fila.excedente_id);
-  const usados = (cans ?? []).reduce(
-    (s: number, c: { kg_confirmados: number | null }) => s + Number(c.kg_confirmados ?? 0), 0);
-  const disp = Math.max(0, Number(exc?.kg_total ?? 0) - usados);
+  const disp = await kgDisponibles(supabase, fila.excedente_id);
 
   await supabase.from("oferta_respuestas")
     .update({ dialeg_pas: "kg", mensaje_respuesta: texto, dialeg_dades: marcaDialogo(fila.dialeg_dades) })
     .eq("id", fila.id);
   await sendText(
-    supabase, from,
-    `Perfecte! Quants kg en vols?${disp ? ` (disponibles: ${disp} kg aprox)` : ""} ` +
-      "Escriu un número.",
+    supabase,
+    from,
+    `Perfecte! Quants kg en vols?${textMaxim(disp)} Escriu només el número.`,
   );
   return true;
 }
