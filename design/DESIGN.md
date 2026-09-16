@@ -172,6 +172,22 @@ vecinas.
 ⚠️ **El detalle va donde se puede leer**, no en el badge: qué campos faltan lo dicen la banda
 y la propia pantalla. Un badge tiene 20 px y una sola oportunidad de significar algo.
 
+### 6quinquies. Sobre el verde de acceso, todo va dentro de una tarjeta (16-09-2026)
+
+Las pantallas de acceso (`LayoutAcces`) tienen **fondo verde a pantalla completa**, y ahí
+los tokens de superficie clara no valen: `text-muted-foreground`, `border-input` y
+`text-secondary` están calculados contra blanco o crema, y sobre el verde quedan **oscuro
+sobre oscuro**. Pasó al añadir el formulario del código de acceso: se pintó suelto y no se
+leía nada.
+
+| Qué | Cómo |
+| --- | --- |
+| Un formulario, un bloque de campos | **Dentro de una `Card`** (`rounded-2xl`), como el de la contraseña |
+| Un enlace o texto suelto sobre el verde | `text-primary-foreground` y sus opacidades — nunca `muted-foreground` |
+
+⚠️ **La regla se comprueba mirando, no leyendo el token.** Un color que funciona en el panel
+puede ser invisible aquí, y al revés: son dos fondos distintos.
+
 ## 7. Lo que no está decidido
 
 - Modo oscuro: no existe en el branding y no se implementa. El `@custom-variant dark` de `index.css` se queda, sin valores.

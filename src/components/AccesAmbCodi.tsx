@@ -26,6 +26,7 @@ import { KeyRound, Loader2 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
@@ -55,40 +56,57 @@ export default function AccesAmbCodi() {
     // Con sesión, `ArrelApp` se encarga del resto: no hace falta navegar desde aquí.
   }
 
+  // ⚠️ ESTO VIVE SOBRE EL VERDE DE `LayoutAcces`, y esa es toda la razón de lo que sigue.
+  //    La primera versión pintaba el formulario suelto, con `border-input` y
+  //    `text-muted-foreground`: tokens pensados para fondo claro, que sobre el verde
+  //    quedaban gris oscuro sobre verde oscuro — ilegible. Va DENTRO de una `Card` igual
+  //    que el formulario de contraseña de arriba, y el enlace plegado en claro.
   if (!obert) {
     return (
-      <button
-        type="button"
-        onClick={() => setObert(true)}
-        className="mt-3 inline-flex min-h-11 items-center gap-1.5 text-sm text-secondary underline underline-offset-4 md:min-h-0"
-      >
-        <KeyRound className="size-4" aria-hidden />
-        {t('codi.obrir')}
-      </button>
+      <div className="mt-4 text-center">
+        <button
+          type="button"
+          onClick={() => setObert(true)}
+          className="inline-flex min-h-11 items-center gap-1.5 text-sm font-medium text-primary-foreground/90 underline underline-offset-4 hover:text-primary-foreground"
+        >
+          <KeyRound className="size-4" aria-hidden />
+          {t('codi.obrir')}
+        </button>
+      </div>
     )
   }
 
   return (
-    <form className="mt-3 grid gap-3 rounded-md border border-input p-3" onSubmit={entra}>
-      <p className="text-sm text-muted-foreground">{t('codi.ajuda')}</p>
-      <div className="grid gap-1.5">
-        <Label htmlFor="codi-email">{t('login.email')}</Label>
-        <Input id="codi-email" type="email" autoComplete="username" required
-          value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
-      </div>
-      <div className="grid gap-1.5">
-        <Label htmlFor="codi-codi">{t('codi.camp')}</Label>
-        {/* `one-time-code` es lo que hace que iOS lo ofrezca desde el teclado al copiarlo. */}
-        <Input id="codi-codi" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
-          required className="tabular-nums tracking-[0.3em]"
-          value={codi} onChange={(e) => { setCodi(e.target.value.replace(/\D/g, '')); setError(null) }} />
-      </div>
-      {error && <p className="text-sm text-error">{error}</p>}
-      <Button type="submit" className="h-11 w-full whitespace-normal"
-        disabled={ocupat || codi.length < 6 || email.trim() === ''}>
-        {ocupat && <Loader2 className="size-4 animate-spin" />}
-        {ocupat ? t('c.sending') : t('codi.entra')}
-      </Button>
-    </form>
+    <Card className="mt-4 rounded-2xl">
+      <CardContent className="pt-6">
+        <form className="grid gap-3" onSubmit={entra}>
+          <p className="text-sm text-muted-foreground">{t('codi.ajuda')}</p>
+          <div className="grid gap-1.5">
+            <Label htmlFor="codi-email">{t('login.email')}</Label>
+            <Input id="codi-email" type="email" autoComplete="username" required
+              value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
+          </div>
+          <div className="grid gap-1.5">
+            <Label htmlFor="codi-codi">{t('codi.camp')}</Label>
+            {/* `one-time-code` es lo que hace que iOS lo ofrezca desde el teclado al copiarlo. */}
+            <Input id="codi-codi" inputMode="numeric" autoComplete="one-time-code" maxLength={6}
+              required className="tabular-nums tracking-[0.3em]"
+              value={codi} onChange={(e) => { setCodi(e.target.value.replace(/\D/g, '')); setError(null) }} />
+          </div>
+          {error && <p className="text-sm text-error">{error}</p>}
+          <Button type="submit" className="h-11 w-full whitespace-normal"
+            disabled={ocupat || codi.length < 6 || email.trim() === ''}>
+            {ocupat && <Loader2 className="size-4 animate-spin" />}
+            {ocupat ? t('c.sending') : t('codi.entra')}
+          </Button>
+          {/* Poder cerrarlo: quien lo abre por curiosidad se queda con dos formularios de
+              correo a la vista, y eso confunde más que ayuda. */}
+          <button type="button" onClick={() => setObert(false)}
+            className="min-h-11 text-sm text-muted-foreground underline underline-offset-4 md:min-h-0">
+            {t('c.cancel')}
+          </button>
+        </form>
+      </CardContent>
+    </Card>
   )
 }
