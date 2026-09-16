@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -457,14 +457,25 @@ export default function ConveniDetall() {
                 </span>
                 {!d.vigente && <Badge className="ml-2 bg-muted text-muted-foreground">{t('alb.superseded')}</Badge>}
               </div>
-              <Button size="sm" className="h-11 whitespace-normal md:h-8"
-                disabled={descarregador.ocupat === d.id}
-                onClick={() => void descarregador.descarrega(d.id)}>
-                {descarregador.ocupat === d.id
-                  ? <Loader2 className="size-4 animate-spin" />
-                  : <Download className="size-4" />}
-                {t('doc.download')}
-              </Button>
+              {/* Repasar el texto firmado es lo que se hace aquí a diario; la descarga
+                  es para adjuntarlo a algo. Por eso «Veure» va primero, y en `outline`:
+                  el botón sólido de la fila sigue siendo el de descargar. */}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                  disabled={descarregador.ocupat === d.id}
+                  onClick={() => void descarregador.mostra(d.id)}>
+                  <Eye className="size-4" aria-hidden />
+                  {t('doc.view')}
+                </Button>
+                <Button size="sm" className="h-11 whitespace-normal md:h-8"
+                  disabled={descarregador.ocupat === d.id}
+                  onClick={() => void descarregador.descarrega(d.id)}>
+                  {descarregador.ocupat === d.id
+                    ? <Loader2 className="size-4 animate-spin" />
+                    : <Download className="size-4" />}
+                  {t('doc.download')}
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>
@@ -526,6 +537,9 @@ export default function ConveniDetall() {
         )}
         onConfirma={(m) => void resol(m)}
       />
+
+      {/* El visor de PDF. Una sola vez por pantalla. */}
+      {descarregador.visor}
     </div>
   )
 }

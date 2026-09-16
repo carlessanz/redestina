@@ -36,13 +36,12 @@
 //     lee todo el equipo. Con destinatario, propósito, estado y error se contesta la única
 //     pregunta que hay que contestar —«¿este correo salió?»— sin publicar una credencial.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Download, Eye, Loader2 } from 'lucide-react'
 import { Link } from 'react-router'
-import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { descarregarDocument, esperarGeneracio } from '../../lib/documents'
+import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
@@ -181,12 +180,6 @@ export default function Documents() {
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cerca, setCerca] = useState('')
-  /** Id de la fila cuya descarga está en curso, para no dejar pulsar dos veces. */
-  const [ocupat, setOcupat] = useState<string | null>(null)
-  /** Id de la fila cuyo PDF estamos esperando («Generant…»). */
-  const [generant, setGenerant] = useState<string | null>(null)
-  // La espera puede durar 30 s: si la pantalla se desmonta antes, hay que cortarla.
-  const avortar = useRef<AbortController | null>(null)
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas va en UN literal: partida, supabase-js pierde el tipo de
@@ -243,56 +236,16 @@ export default function Documents() {
     return () => { cancelled = true }
   }, [])
 
-  useEffect(() => () => avortar.current?.abort(), [])
-
   /** Recarga silenciosa: tras generarse un PDF, la fila ya no dice «Generant…». */
   const refresca = useCallback(async () => {
     const { files, errCarrega } = await carrega()
     if (!errCarrega) setDocuments(files)
   }, [carrega])
 
-  async function descarrega(fila: Fila) {
-    setOcupat(fila.id)
-    const res = await descarregarDocument(fila.id)
-
-    if (res.ok) {
-      toast.success(t('doc.downloaded', { name: res.data.nombre }))
-      setOcupat(null)
-      return
-    }
-    // Cualquier motivo que no sea «todavía no hay fichero» se cuenta y se acaba aquí.
-    if (res.codi !== 'sense_fitxer') {
-      toast.error(t(res.motiuKey))
-      setOcupat(null)
-      return
-    }
-
-    // El documento existe y se puede ver, pero el PDF aún se está generando: se espera
-    // por polling (2 s / 30 s) y se reintenta una vez. Sin esto, el equipo solo vería un
-    // error confuso en el segundo que separa la emisión de la generación.
-    setGenerant(fila.id)
-    toast.info(t('doc.generating_wait'))
-    avortar.current?.abort()
-    const control = new AbortController()
-    avortar.current = control
-
-    const espera = await esperarGeneracio(fila.id, control.signal)
-    setGenerant(null)
-
-    if (espera.resultat === 'cancellat') { setOcupat(null); return }
-    if (espera.resultat !== 'emitido') {
-      if (espera.motiuKey) toast.error(t(espera.motiuKey))
-      await refresca()
-      setOcupat(null)
-      return
-    }
-
-    const segon = await descarregarDocument(fila.id)
-    if (segon.ok) toast.success(t('doc.downloaded', { name: segon.data.nombre }))
-    else toast.error(t(segon.motiuKey))
-    await refresca()
-    setOcupat(null)
-  }
+  // La espera de «Generant…» y la descarga las lleva el hook: eran las mismas veinte
+  // líneas que `AlbaraDetall` y los paneles externos, y `ocupat`/`generant` significan aquí
+  // exactamente lo mismo que significaban en el estado local.
+  const descarregador = useDescarregaDocument(refresca)
 
   const { tots, ambError } = useMemo(() => {
     const q = cerca.trim().toLowerCase()
@@ -359,7 +312,7 @@ export default function Documents() {
           </TableHeader>
           <TableBody>
             {llista.map((d) => {
-              const esperant = generant === d.id
+              const esperant = descarregador.generant === d.id
               return (
                 <TableRow key={d.id}>
                   <TableCell className="font-medium whitespace-nowrap tabular-nums">
@@ -391,16 +344,30 @@ export default function Documents() {
                     {data(d.emitido_at)}
                   </TableCell>
                   <TableCell>
-                    <div className="flex justify-end">
-                      {/* `h-11` en móvil: es la acción principal de la fila y 32 px es
-                          poco para un pulgar. En escritorio vuelve al alto del resto. */}
+                    {/* `h-11` en móvil: son las acciones de la fila y 32 px es poco para
+                        un pulgar. En escritorio vuelven al alto del resto. «Veure» va
+                        delante: en esta bandeja se abre un PDF para comprobarlo, y la
+                        descarga es lo excepcional. */}
+                    <div className="flex justify-end gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-11 whitespace-normal md:h-8"
+                        disabled={descarregador.ocupat === d.id}
+                        onClick={() => void descarregador.mostra(d.id)}
+                      >
+                        {esperant
+                          ? <Loader2 className="size-4 animate-spin" />
+                          : <Eye className="size-4" aria-hidden />}
+                        {esperant ? t('doc.generating') : t('doc.view')}
+                      </Button>
                       <Button
                         size="sm"
                         className="h-11 whitespace-normal md:h-8"
-                        disabled={ocupat === d.id}
-                        onClick={() => void descarrega(d)}
+                        disabled={descarregador.ocupat === d.id}
+                        onClick={() => void descarregador.descarrega(d.id)}
                       >
-                        {ocupat === d.id
+                        {descarregador.ocupat === d.id
                           ? <Loader2 className="size-4 animate-spin" />
                           : <Download className="size-4" />}
                         {esperant ? t('doc.generating') : t('doc.download')}
@@ -597,6 +564,10 @@ export default function Documents() {
             </TabsContent>
           </Tabs>
         )}
+
+        {/* El visor de PDF. Una sola vez por pantalla: el modal se pinta en un portal,
+            así que da igual dentro de qué pestaña esté la fila que lo abrió. */}
+        {descarregador.visor}
       </CardContent>
     </Card>
   )

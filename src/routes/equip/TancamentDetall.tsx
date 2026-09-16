@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, Download, Loader2 } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -747,6 +747,7 @@ export default function TancamentDetall() {
                       descarregant={descarregador.ocupat}
                       generant={descarregador.generant}
                       onDescarrega={(docId) => void descarregador.descarrega(docId)}
+                      onMostra={(docId) => void descarregador.mostra(docId)}
                       onResum={(prov) => void resum(d, prov)}
                       onFactura={() => setFactura(d)}
                       onSimula={() => setSimula(d)}
@@ -888,6 +889,9 @@ export default function TancamentDetall() {
         ocupat={ocupat}
         onConfirma={(motiu) => void reinicia(motiu)}
       />
+
+      {/* El visor de PDF. Una sola vez por pantalla. */}
+      {descarregador.visor}
     </div>
   )
 }
@@ -923,7 +927,8 @@ function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
 
 function FilaDonant({
   d, docs, esProva, potAprovar, esSuperAdmin, ocupat, descarregant, generant,
-  onDescarrega, onResum, onFactura, onSimula, onCertificat, onExcepcio, onRectifica, onEnviat,
+  onDescarrega, onMostra, onResum, onFactura, onSimula, onCertificat, onExcepcio, onRectifica,
+  onEnviat,
 }: {
   d: Donant
   docs: DocFila[]
@@ -934,6 +939,7 @@ function FilaDonant({
   descarregant: string | null
   generant: string | null
   onDescarrega: (docId: string) => void
+  onMostra: (docId: string) => void
   onResum: (provisional: boolean) => void
   onFactura: () => void
   onSimula: () => void
@@ -1011,20 +1017,35 @@ function FilaDonant({
           : (
             <div className="space-y-1">
               {docs.filter((doc) => doc.vigente).map((doc) => (
-                <Button
-                  key={doc.id}
-                  size="sm"
-                  variant="outline"
-                  className="h-11 w-full justify-start whitespace-normal md:h-8"
-                  disabled={descarregant === doc.id}
-                  onClick={() => onDescarrega(doc.id)}
-                >
-                  {generant === doc.id
-                    ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                    : <Download className="mr-1 size-3.5" aria-hidden />}
-                  <span className="tabular-nums">{doc.numero_completo}</span>
-                  {doc.version > 1 && <span className="ml-1 text-muted-foreground">v{doc.version}</span>}
-                </Button>
+                // «Veure» primero: al repasar un cierre se abre el resumen o el
+                // certificado para leerlo, no para guardarlo. El número sigue en el botón
+                // de descarga, que es donde ya estaba; los dos van en el mismo grupo para
+                // que se lea que son del mismo documento.
+                <div key={doc.id} className="flex flex-wrap gap-1">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-11 whitespace-normal md:h-8"
+                    disabled={descarregant === doc.id}
+                    onClick={() => onMostra(doc.id)}
+                  >
+                    <Eye className="mr-1 size-3.5" aria-hidden />
+                    {t('doc.view')}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-11 justify-start whitespace-normal md:h-8"
+                    disabled={descarregant === doc.id}
+                    onClick={() => onDescarrega(doc.id)}
+                  >
+                    {generant === doc.id
+                      ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
+                      : <Download className="mr-1 size-3.5" aria-hidden />}
+                    <span className="tabular-nums">{doc.numero_completo}</span>
+                    {doc.version > 1 && <span className="ml-1 text-muted-foreground">v{doc.version}</span>}
+                  </Button>
+                </div>
               ))}
             </div>
           )}

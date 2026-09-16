@@ -9,7 +9,7 @@
 // cruzando los dos paneles. Aquí no le pertenece a ninguno.
 
 import { useMemo } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Eye, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
@@ -76,21 +76,35 @@ export default function TaulaAlbarans({
                   {dataCurta(f.emitido_at)}
                 </TableCell>
                 <TableCell>
-                  <div className="flex justify-end">
+                  {/* «Veure» delante de «Descarrega»: repasar un albarán es lo que se hace
+                      a diario, guardarlo es la excepción. Sin PDF no hay ninguno de los dos. */}
+                  <div className="flex justify-end gap-2">
                     {docId
                       ? (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          className="h-11 whitespace-normal md:h-8"
-                          disabled={descarregador.ocupat === docId}
-                          onClick={() => void descarregador.descarrega(docId)}
-                        >
-                          {descarregador.generant === docId
-                            ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                            : <Download className="mr-1 size-3.5" aria-hidden />}
-                          {t('doc.download')}
-                        </Button>
+                        <>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-11 whitespace-normal md:h-8"
+                            disabled={descarregador.ocupat === docId}
+                            onClick={() => void descarregador.mostra(docId)}
+                          >
+                            <Eye className="mr-1 size-3.5" aria-hidden />
+                            {t('doc.view')}
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-11 whitespace-normal md:h-8"
+                            disabled={descarregador.ocupat === docId}
+                            onClick={() => void descarregador.descarrega(docId)}
+                          >
+                            {descarregador.generant === docId
+                              ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
+                              : <Download className="mr-1 size-3.5" aria-hidden />}
+                            {t('doc.download')}
+                          </Button>
+                        </>
                       )
                       : <span className="text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>}
                   </div>

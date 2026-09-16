@@ -15,7 +15,7 @@ import { estilEstatConveni } from '../../lib/convenis'
 import { docVigent } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
 import type { Convenio, Documento } from '../../types'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Eye, Loader2 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -93,21 +93,35 @@ export default function LlistaConvenis({
                           {dataCurta(c.contrafirmado_at ?? c.firmado_at ?? c.enviado_at ?? c.created_at)}
                         </TableCell>
                         <TableCell>
-                          <div className="flex justify-end">
+                          {/* Leer el convenio es lo habitual —lo que hay que consultar es
+                              qué se firmó—, así que «Veure» va delante. */}
+                          <div className="flex justify-end gap-2">
                             {doc
                               ? (
-                                <Button
-                                  size="sm"
-                                  variant="outline"
-                                  className="h-11 whitespace-normal md:h-8"
-                                  disabled={descarregador.ocupat === doc.id}
-                                  onClick={() => void descarregador.descarrega(doc.id)}
-                                >
-                                  {descarregador.generant === doc.id
-                                    ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                                    : <Download className="mr-1 size-3.5" aria-hidden />}
-                                  {t('doc.download')}
-                                </Button>
+                                <>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-11 whitespace-normal md:h-8"
+                                    disabled={descarregador.ocupat === doc.id}
+                                    onClick={() => void descarregador.mostra(doc.id)}
+                                  >
+                                    <Eye className="mr-1 size-3.5" aria-hidden />
+                                    {t('doc.view')}
+                                  </Button>
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-11 whitespace-normal md:h-8"
+                                    disabled={descarregador.ocupat === doc.id}
+                                    onClick={() => void descarregador.descarrega(doc.id)}
+                                  >
+                                    {descarregador.generant === doc.id
+                                      ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
+                                      : <Download className="mr-1 size-3.5" aria-hidden />}
+                                    {t('doc.download')}
+                                  </Button>
+                                </>
                               )
                               : <span className="text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>}
                           </div>

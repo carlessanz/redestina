@@ -62,13 +62,15 @@ function codiDeResposta(status: number, code: unknown): CodiDescarrega {
 }
 
 /**
- * Pide la URL firmada y la abre.
+ * Pide la URL firmada y **no abre nada**: quien llama decide si la descarga o la enseña.
  *
- * El `?download=` hace que el navegador **guarde** el PDF con el número del documento en
- * vez de abrir una pestaña con un nombre de fichero ilegible. La pestaña que abre
- * `window.open` se cierra sola en cuanto empieza la descarga.
+ * ⚠️ La URL que devuelve sirve el PDF **inline** —`content-type: application/pdf`, sin
+ * `content-disposition` ni `x-frame-options`, medido contra producción—, que es lo que
+ * permite incrustarla en el visor (`VisorPdf`). Quien quiera forzar el guardado le añade el
+ * `?download=`, como hace `descarregarDocument()` aquí debajo: **ese parámetro es justamente
+ * lo que hace que un iframe no pinte nada**, así que no se añade «por si acaso».
  */
-export async function descarregarDocument(documentoId: string): Promise<ResultatDescarrega> {
+export async function urlDocument(documentoId: string): Promise<ResultatDescarrega> {
   let dades: Descarrega
   try {
     const { data } = await supabase.auth.getSession()
@@ -98,14 +100,28 @@ export async function descarregarDocument(documentoId: string): Promise<Resultat
     return falla('xarxa')
   }
 
-  const separador = dades.url.includes('?') ? '&' : '?'
-  const enllac = `${dades.url}${separador}download=${encodeURIComponent(dades.nombre)}`
+  return { ok: true, data: dades }
+}
+
+/**
+ * Pide la URL firmada y la abre para GUARDARLA.
+ *
+ * El `?download=` hace que el navegador **guarde** el PDF con el número del documento en
+ * vez de abrir una pestaña con un nombre de fichero ilegible. La pestaña que abre
+ * `window.open` se cierra sola en cuanto empieza la descarga.
+ */
+export async function descarregarDocument(documentoId: string): Promise<ResultatDescarrega> {
+  const res = await urlDocument(documentoId)
+  if (!res.ok) return res
+
+  const separador = res.data.url.includes('?') ? '&' : '?'
+  const enllac = `${res.data.url}${separador}download=${encodeURIComponent(res.data.nombre)}`
   const finestra = window.open(enllac, '_blank', 'noopener,noreferrer')
   // Un bloqueador de ventanas emergentes deja la descarga sin ocurrir y sin decirlo:
   // devolvemos el motivo para que la pantalla pueda avisar en vez de quedarse muda.
   if (!finestra) return falla('popup_bloquejat')
 
-  return { ok: true, data: dades }
+  return res
 }
 
 export type ResultatEspera = 'emitido' | 'error' | 'espera_esgotada' | 'cancellat'

@@ -17,12 +17,13 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Download, Loader2, Upload } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
-import { descarregarDocument, esperarGeneracio, pujarDocumentExtern } from '../../lib/documents'
+import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
+import { pujarDocumentExtern } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
   marcarEntregat, propostaConciliacio, rectificarAlbara,
@@ -177,7 +178,6 @@ export default function AlbaraDetall() {
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
-  const [descarregant, setDescarregant] = useState<string | null>(null)
 
   // Subida de un documento externo. `factura` NO está entre las opciones a propósito: una
   // factura es del cierre anual del donante, no de una entrega, y colgarla de un albarán la
@@ -193,9 +193,6 @@ export default function AlbaraDetall() {
   const [dialegConciliar, setDialegConciliar] = useState(false)
   const [proposta, setProposta] = useState<PropostaConciliacio | null>(null)
   const [enllacosNous, setEnllacosNous] = useState<{ nom: string; url: string }[]>([])
-
-  const avortar = useRef<AbortController | null>(null)
-  useEffect(() => () => avortar.current?.abort(), [])
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -391,31 +388,10 @@ export default function AlbaraDetall() {
     else await carrega()
   }
 
-  /** Igual que la bandeja de documentos: si el PDF aún se genera, se espera por polling. */
-  async function descarrega(docId: string) {
-    setDescarregant(docId)
-    const res = await descarregarDocument(docId)
-    if (res.ok) { toast.success(t('doc.downloaded', { name: res.data.nombre })); setDescarregant(null); return }
-    if (res.codi !== 'sense_fitxer') { toast.error(t(res.motiuKey)); setDescarregant(null); return }
-
-    toast.info(t('doc.generating_wait'))
-    avortar.current?.abort()
-    const control = new AbortController()
-    avortar.current = control
-    const espera = await esperarGeneracio(docId, control.signal)
-    if (espera.resultat === 'cancellat') { setDescarregant(null); return }
-    if (espera.resultat !== 'emitido') {
-      if (espera.motiuKey) toast.error(t(espera.motiuKey))
-      setDescarregant(null)
-      await carrega()
-      return
-    }
-    const segon = await descarregarDocument(docId)
-    if (segon.ok) toast.success(t('doc.downloaded', { name: segon.data.nombre }))
-    else toast.error(t(segon.motiuKey))
-    setDescarregant(null)
-    await carrega()
-  }
+  // La descarga con su espera de «Generant…» la lleva el hook: era la misma secuencia que
+  // la bandeja de documentos, copiada. `descarregador.ocupat` es lo que antes era
+  // `descarregant`, y al acabar recarga la ficha igual que hacía la versión de aquí.
+  const descarregador = useDescarregaDocument(carrega)
 
   /**
    * Sube un documento que aporta la otra parte (el albarán en papel del productor, la foto
@@ -821,13 +797,24 @@ export default function AlbaraDetall() {
                 </span>
                 {!d.vigente && <Badge className="ml-2 bg-muted text-muted-foreground">{t('alb.superseded')}</Badge>}
               </div>
-              <Button size="sm" className="h-11 whitespace-normal md:h-8"
-                disabled={descarregant === d.id} onClick={() => void descarrega(d.id)}>
-                {descarregant === d.id
-                  ? <Loader2 className="size-4 animate-spin" />
-                  : <Download className="size-4" />}
-                {t('doc.download')}
-              </Button>
+              {/* «Veure» delante: al revisar un albarán se abre el PDF para comprobar
+                  los kilos, no para guardarlo. El botón sólido sigue siendo la descarga. */}
+              <div className="flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                  disabled={descarregador.ocupat === d.id}
+                  onClick={() => void descarregador.mostra(d.id)}>
+                  <Eye className="size-4" aria-hidden />
+                  {t('doc.view')}
+                </Button>
+                <Button size="sm" className="h-11 whitespace-normal md:h-8"
+                  disabled={descarregador.ocupat === d.id}
+                  onClick={() => void descarregador.descarrega(d.id)}>
+                  {descarregador.ocupat === d.id
+                    ? <Loader2 className="size-4 animate-spin" />
+                    : <Download className="size-4" />}
+                  {t('doc.download')}
+                </Button>
+              </div>
             </div>
           ))}
         </CardContent>
@@ -947,6 +934,9 @@ export default function AlbaraDetall() {
         proposta={proposta} linies={linies} ocupat={ocupat}
         onConfirma={(k, m, d) => void concilia(k, m, d)}
       />
+
+      {/* El visor de PDF. Una sola vez por pantalla. */}
+      {descarregador.visor}
     </div>
   )
 }

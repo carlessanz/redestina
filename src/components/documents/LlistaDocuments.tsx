@@ -9,7 +9,7 @@
 // indistinguibles.
 
 import type { ReactNode } from 'react'
-import { Download, Loader2 } from 'lucide-react'
+import { Download, Eye, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { etiquetaTipusDocument } from '../../lib/documentsPanell'
@@ -86,7 +86,20 @@ export default function LlistaDocuments({
                         {dataCurta(d.emitido_at)}
                       </TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
+                        {/* «Veure» va primero: mirar el documento es lo frecuente y
+                            guardarlo la excepción. Se apagan los dos a la vez, porque los
+                            dos piden la misma URL firmada. */}
+                        <div className="flex justify-end gap-2">
+                          <Button
+                            size="sm"
+                            variant="outline"
+                            className="h-11 whitespace-normal md:h-8"
+                            disabled={descarregador.ocupat === d.id || d.estado === 'error'}
+                            onClick={() => void descarregador.mostra(d.id)}
+                          >
+                            <Eye className="mr-1 size-3.5" aria-hidden />
+                            {t('doc.view')}
+                          </Button>
                           <Button
                             size="sm"
                             variant="outline"

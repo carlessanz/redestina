@@ -139,6 +139,9 @@ export default function ReceptorDocuments() {
         titolKey="mydoc.pla_title"
         buitKey="mydoc.pla_empty"
       />
+
+      {/* El visor de PDF. Una sola vez por pantalla: el hook es uno y el modal también. */}
+      {descarregador.visor}
     </div>
   )
 }

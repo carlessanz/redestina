@@ -20,7 +20,7 @@
 // rol vería también los de su otra ficha, y esta pantalla es la del productor.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Download, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, Download, Eye, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -283,20 +283,35 @@ export default function ProductorDocuments() {
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
+                  {/* Cada documento, su pareja: mirarlo (lo frecuente) y guardarlo. El
+                      número va en el botón de descarga, que es el que ya lo llevaba; el de
+                      ver queda al lado, dentro del mismo grupo, para que se lea que los dos
+                      son del mismo documento. */}
                   {seus.map((doc) => (
-                    <Button
-                      key={doc.id}
-                      size="sm"
-                      variant="outline"
-                      className="h-11 whitespace-normal md:h-9"
-                      disabled={descarregador.ocupat === doc.id}
-                      onClick={() => void descarregador.descarrega(doc.id)}
-                    >
-                      {descarregador.generant === doc.id
-                        ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
-                        : <Download className="mr-1 size-4" aria-hidden />}
-                      <span className="tabular-nums">{doc.numero_completo}</span>
-                    </Button>
+                    <div key={doc.id} className="flex flex-wrap items-center gap-2">
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-11 whitespace-normal md:h-9"
+                        disabled={descarregador.ocupat === doc.id}
+                        onClick={() => void descarregador.mostra(doc.id)}
+                      >
+                        <Eye className="mr-1 size-4" aria-hidden />
+                        {t('doc.view')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-11 whitespace-normal md:h-9"
+                        disabled={descarregador.ocupat === doc.id}
+                        onClick={() => void descarregador.descarrega(doc.id)}
+                      >
+                        {descarregador.generant === doc.id
+                          ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
+                          : <Download className="mr-1 size-4" aria-hidden />}
+                        <span className="tabular-nums">{doc.numero_completo}</span>
+                      </Button>
+                    </div>
                   ))}
 
                   {/* El `<input type=file>` va escondido y lo dispara el botón: un input de
@@ -378,6 +393,9 @@ export default function ProductorDocuments() {
         titolKey="mydoc.pla_title"
         buitKey="mydoc.pla_empty"
       />
+
+      {/* El visor de PDF. Una sola vez por pantalla: el hook es uno y el modal también. */}
+      {descarregador.visor}
     </div>
   )
 }

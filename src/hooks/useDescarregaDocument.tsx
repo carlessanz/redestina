@@ -12,7 +12,9 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
-import { descarregarDocument, esperarGeneracio } from '../lib/documents'
+import { type Descarrega, descarregarDocument, esperarGeneracio, urlDocument } from '../lib/documents'
+import { useIsMobile } from './use-mobile'
+import VisorPdf, { type PdfObert } from '../components/VisorPdf'
 
 export interface Descarregador {
   /** Id del documento cuya descarga está en curso; `null` si no hay ninguna. */
@@ -20,6 +22,13 @@ export interface Descarregador {
   /** Id del documento cuyo PDF se está esperando («Generant…»). */
   generant: string | null
   descarrega: (documentoId: string) => Promise<void>
+  /**
+   * Abre el PDF en el visor, sin descargarlo. En móvil abre una pestaña: iOS Safari no
+   * renderiza un PDF dentro de un iframe de forma fiable (ver `VisorPdf`).
+   */
+  mostra: (documentoId: string) => Promise<void>
+  /** El modal. La pantalla lo pinta donde quiera; sin esto el visor no aparece. */
+  visor: React.ReactNode
 }
 
 /**
@@ -30,6 +39,8 @@ export function useDescarregaDocument(onAcabat?: () => void | Promise<void>): De
   const { t } = useT()
   const [ocupat, setOcupat] = useState<string | null>(null)
   const [generant, setGenerant] = useState<string | null>(null)
+  const [pdf, setPdf] = useState<PdfObert | null>(null)
+  const esMobil = useIsMobile()
   // La espera puede durar 30 s: si la pantalla se desmonta antes, hay que cortarla.
   const avortar = useRef<AbortController | null>(null)
   // El callback en una ref: si la pantalla lo redefine en cada render (y lo hace, porque
@@ -39,6 +50,41 @@ export function useDescarregaDocument(onAcabat?: () => void | Promise<void>): De
   acabat.current = onAcabat
 
   useEffect(() => () => avortar.current?.abort(), [])
+
+  /**
+   * Pide la URL y, si el PDF todavía se está generando, espera y reintenta UNA vez. Es la
+   * parte que comparten ver y descargar: un documento recién emitido tarda unos segundos en
+   * tener fichero, y eso no depende de qué quieras hacer con él después.
+   *
+   * Devuelve `null` cuando ya ha avisado del motivo — quien llama solo tiene que parar.
+   */
+  const obtenirUrl = useCallback(async (documentoId: string): Promise<Descarrega | null> => {
+    const res = await urlDocument(documentoId)
+    if (res.ok) return res.data
+    if (res.codi !== 'sense_fitxer') { toast.error(t(res.motiuKey)); return null }
+
+    setGenerant(documentoId)
+    toast.info(t('doc.generating_wait'))
+    avortar.current?.abort()
+    const control = new AbortController()
+    avortar.current = control
+
+    const espera = await esperarGeneracio(documentoId, control.signal)
+    setGenerant(null)
+
+    if (espera.resultat === 'cancellat') return null
+    if (espera.resultat !== 'emitido') {
+      if (espera.motiuKey) toast.error(t(espera.motiuKey))
+      await acabat.current?.()
+      return null
+    }
+
+    const segon = await urlDocument(documentoId)
+    await acabat.current?.()
+    if (segon.ok) return segon.data
+    toast.error(t(segon.motiuKey))
+    return null
+  }, [t])
 
   const descarrega = useCallback(async (documentoId: string) => {
     setOcupat(documentoId)
@@ -80,5 +126,27 @@ export function useDescarregaDocument(onAcabat?: () => void | Promise<void>): De
     setOcupat(null)
   }, [t])
 
-  return { ocupat, generant, descarrega }
+  /**
+   * Lo mismo que `descarrega`, pero al final ENSEÑA el PDF en vez de entregarlo. La espera
+   * de «Generant…» es idéntica y por eso vive en `obtenirUrl`: un documento recién emitido
+   * tarda unos segundos en tener fichero, y eso no depende de si lo quieres ver o guardar.
+   */
+  const mostra = useCallback(async (documentoId: string) => {
+    setOcupat(documentoId)
+    const url = await obtenirUrl(documentoId)
+    setOcupat(null)
+    if (!url) return
+    // En móvil no hay visor: se abre como siempre (ver `VisorPdf`).
+    if (esMobil) {
+      window.open(url.url, '_blank', 'noopener,noreferrer')
+      return
+    }
+    setPdf({ url: url.url, nombre: url.nombre, documentoId })
+  }, [esMobil, obtenirUrl])
+
+  const visor = (
+    <VisorPdf pdf={pdf} onTancar={() => setPdf(null)} onDescarregar={(id) => void descarrega(id)} />
+  )
+
+  return { ocupat, generant, descarrega, mostra, visor }
 }
