@@ -351,7 +351,19 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     if (!ent.telefono) { avisar(toast.error, t('od.need_phone', { name: ent.nombre })); return false }
     if (testMode && !ent.es_test) { avisar(toast.error, t('od.not_test_toast', { name: ent.nombre })); return false }
     if (!exc.texto_oferta) { toast.error(t('od.no_text')); return false }
-    const r = await sendWhatsApp({ to: ent.telefono, type: 'text', body: exc.texto_oferta })
+    // Con botones, no en texto plano: la entidad tiene que poder DECIDIR sin adivinar la
+    // palabra exacta. Los ids son los que consume `_shared/respuestas.ts` (§5). El texto va
+    // entero —el más largo en producción mide 429 caracteres y el tope de un interactivo es
+    // 1024—, así que no se recorta nada de la oferta.
+    const r = await sendWhatsApp({
+      to: ent.telefono,
+      type: 'botones',
+      body: exc.texto_oferta,
+      botones: [
+        { id: 'accept:si', titulo: "M'interessa" },
+        { id: 'accept:no', titulo: 'Ara no' },
+      ],
+    })
     if (r.ok) { await registrarEnvio(ent, 'whatsapp'); toast.success(t('od.sent_wa', { name: ent.nombre })); return true }
     const data = r.data as { code?: string } | null
     if (data?.code === 'window_closed') {

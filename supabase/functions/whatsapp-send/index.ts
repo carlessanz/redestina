@@ -9,7 +9,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { sendText, sendTemplate } from "../_shared/whatsapp.ts";
+import { sendBotones, sendTemplate, sendText } from "../_shared/whatsapp.ts";
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 
@@ -93,11 +93,29 @@ Deno.serve(async (req) => {
     if (!to || typeof to !== "string") {
       return responder({ error: "Falta 'to' (teléfono E.164 sin +, ej. 34612345678)" }, 400);
     }
-    if (type !== "text" && type !== "template") {
-      return responder({ error: "'type' debe ser 'text' o 'template'" }, 400);
+    if (type !== "text" && type !== "template" && type !== "botones") {
+      return responder({ error: "'type' debe ser 'text', 'botones' o 'template'" }, 400);
     }
-    if (type === "text" && (!input.body || typeof input.body !== "string")) {
+    if ((type === "text" || type === "botones") && (!input.body || typeof input.body !== "string")) {
       return responder({ error: "Falta 'body' para un mensaje de texto" }, 400);
+    }
+    // `botones` es texto libre con respuestas rápidas: mismas reglas de ventana que `text`
+    // (lo decide la condición de más abajo), pero con la pregunta ya hecha. Existe porque
+    // mandar una oferta en texto plano obligaba a la entidad a ADIVINAR que había que
+    // contestar «Sí»: si escribía cualquier otra cosa, el webhook no la clasificaba y el
+    // mensaje caía al intake, que le ofrecía publicar una oferta suya (§5).
+    if (type === "botones") {
+      const bs = input.botones;
+      if (!Array.isArray(bs) || bs.length === 0 || bs.length > 3) {
+        return responder({ error: "'botones' debe ser una lista de 1 a 3" }, 400);
+      }
+      if (!bs.every((b: unknown) =>
+        typeof b === "object" && b !== null &&
+        typeof (b as { id?: unknown }).id === "string" &&
+        typeof (b as { titulo?: unknown }).titulo === "string"
+      )) {
+        return responder({ error: "Cada botón necesita 'id' y 'titulo'" }, 400);
+      }
     }
     if (type === "template" && (!input.template || typeof input.template !== "string")) {
       return responder({ error: "Falta 'template' para un mensaje de plantilla" }, 400);
@@ -188,7 +206,7 @@ Deno.serve(async (req) => {
     // Reglas de envío (decisión D1 del manual): el texto libre es una respuesta de
     // servicio y solo cabe con la ventana abierta; la plantilla la iniciamos nosotros
     // y por eso exige consentimiento.
-    if (type === "text") {
+    if (type === "text" || type === "botones") {
       const lastInbound = contact.last_inbound_at
         ? new Date(contact.last_inbound_at).getTime()
         : 0;
@@ -217,6 +235,8 @@ Deno.serve(async (req) => {
     // compartidos con el webhook. Aquí solo quedan las reglas de negocio.
     const r = type === "text"
       ? await sendText(supabase, to, input.body)
+      : type === "botones"
+      ? await sendBotones(supabase, to, input.body, input.botones)
       : await sendTemplate(
         supabase,
         to,

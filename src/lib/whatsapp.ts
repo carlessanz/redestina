@@ -2,6 +2,16 @@ import { supabase, supabaseUrl } from './supabase'
 
 export type SendPayload =
   | { to: string; type: 'text'; body: string }
+  /**
+   * Texto con respuestas rápidas (1-3). Mismas reglas de ventana que `text`: es una
+   * respuesta de servicio, no una plantilla.
+   *
+   * Existe para la oferta al receptor. Mandarla en texto plano obligaba a la entidad a
+   * **adivinar** que había que contestar «Sí»; cualquier otra cosa no la clasificaba el
+   * webhook y el mensaje caía al intake, que le ofrecía publicar una oferta suya. Los `id`
+   * son el contrato con `_shared/respuestas.ts`: solo consume los que empiezan por `accept:`.
+   */
+  | { to: string; type: 'botones'; body: string; botones: { id: string; titulo: string }[] }
   | {
       to: string
       type: 'template'

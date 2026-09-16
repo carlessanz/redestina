@@ -463,7 +463,19 @@ export async function procesarRespuestaOferta(
   }
 
   // ---- Sin diálogo iniciado: clasificar el sí/no inicial ----
-  const inicial = clasificar(texto ?? "");
+  //
+  // ⚠️ El BOTÓN manda sobre el texto, y por eso va primero. La oferta se envía con dos
+  // respuestas rápidas («M'interessa» / «Ara no», ids `accept:si` y `accept:no`), así que
+  // aquí llega un id inequívoco y no hay nada que adivinar. Antes solo existía `clasificar()`
+  // y eso tenía una consecuencia que se vio en producción el 16-09-2026: quien contestaba
+  // «Hola» a una oferta no era ni un sí ni un no, la función devolvía `false`, el mensaje
+  // caía al intake y el sistema le ofrecía **publicar una oferta suya**. Con el botón, ese
+  // camino deja de depender de que la persona acierte con la palabra.
+  const inicial = id === "accept:si"
+    ? "acceptada" as const
+    : id === "accept:no"
+    ? "rebutjada" as const
+    : clasificar(texto ?? "");
   if (!inicial) return false;
 
   if (inicial === "rebutjada") {
