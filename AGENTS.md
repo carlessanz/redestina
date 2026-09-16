@@ -1338,7 +1338,8 @@ funciones, no políticas:
 | `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
 | `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
-| `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior** |
+| `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
+| `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
@@ -1758,8 +1759,13 @@ también contra producción y le rompería el enlace a alguien real.
 nuevo, el viejo deja de importar. El último enlace se enseña solo como información («te lo
 mandamos el día X»).
 
-**`AvisConveni`** ya no dice «mira el correu»: enlaza a la pantalla de documentos del panel
-activo, y distingue el cuarto caso (`retornat`). El menú de los dos paneles lleva contador
+**`AvisConveni`** ya no dice «mira el correu», y desde el 16-09-2026 **lleva un botón que firma,
+no un enlace a otra pantalla**: llama a `signar_conveni_propi()` y navega a `/signar/:token`. Hasta
+ese día solo actuaban los dos casos que el equipo ya había enviado, y **el caso normal del alta
+self-service no tenía nada que pulsar** —`registro` deja el convenio en `esborrany` y ahí se
+quedaba—, así que la persona leía que le faltaba el convenio y no podía hacer nada. `firmat` es el
+único estado sin botón: ahí la pelota es del equipo (falta la contrafirma). Distingue el cuarto
+caso (`retornat`). El menú de los dos paneles lleva contador
 (`pendents_productor` / `pendents_receptor`, uno por panel para que el doble rol no los
 mezcle) y la barra inferior de móvil un **punto**, no una cifra: la celda mide ~85 px y ya
 va justa con la etiqueta (§2). La etiqueta del receptor pasa de «Albarans» a «Documents»
@@ -1970,7 +1976,7 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/` | **Landing pública** (`routes/public/Landing.tsx`): hero, «Com funciona» (los 4 momentos, con copy propio `land.*`), «Per a qui» y pie. Con sesión redirige a `/panell` |
 | `/login` | Acceso de **productores y entidades**, con enlace al registro y los accesos de prueba |
 | `/admin` | Acceso del **equipo**, con el copy de siempre. **No se enlaza desde lo público** |
-| `/registre` | Alta self-service por rol (§9) |
+| `/registre` | Alta self-service por rol, **y desde el 16-09-2026 por los dos a la vez** (§9): el selector era un `Tabs` —que por definición deja elegir uno— y son dos conmutadores con `aria-pressed`. Sin `@radix-ui/react-checkbox`: son dos opciones y una dependencia no se paga por eso |
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
 | `/signar/:token` | **Firma del convenio sin sesión** (fase 2). Mismo criterio |
@@ -1989,6 +1995,17 @@ secreto de la ruta.
 supabase-js consume los tokens del hash en cualquier ruta. Desde que la raíz es pública, quien
 captura el evento `PASSWORD_RECOVERY` es `ArrelApp`, que desvía a `/restablir`. Si algún día se
 cambia `APP_URL`, hay que revisar esto **y** la allow-list de Auth (§10).
+
+**Volver a la portada, desde las cuatro pantallas de acceso** (16-09-2026). El logo de
+`LayoutAcces` ya enlazaba a `/`, pero **nadie lee un logo como un botón**: desde `/login` y sobre
+todo desde `/admin` —a la que se entra tecleando la URL, así que no hay «atrás» del navegador— no
+había forma evidente de salir. El enlace explícito va en `LayoutAcces` y no en cada pantalla porque
+las cuatro comparten marco.
+
+**Y el menú de la persona enseña el correo** bajo el nombre (`UserMenu`): es **con qué cuenta
+estás dentro**, y no se podía leer en ninguna pantalla — con la del equipo y la de la organización
+abiertas en dos pestañas no había forma de saber en cuál estabas sin cerrar sesión. Se omite si el
+nombre ya *es* el correo, para no escribir dos veces la misma línea.
 
 **Deep-link**: antes la URL nunca cambiaba (el login se pintaba encima). Ahora `RequireSessio`
 guarda la URL pedida en `location.state.from` y las dos pantallas de acceso vuelven a ella al
@@ -2624,7 +2641,21 @@ añade algún campo nuevo al snapshot, hay que preguntarse si nombra al donante.
 `POST /functions/v1/registro` — **pública** (`--no-verify-jwt`), porque la llama quien todavía no
 tiene cuenta. Crea, en este orden: la cuenta (`admin.createUser`, `email_confirm: true`), la ficha
 (`productores` o `entidades`, con `es_test = false`) y la **membresía `pendent` con `activo = false`**
-(§4bis). Contrato completo y códigos de error en el propio fichero; los mensajes van en catalán,
+(§4bis).
+
+⚠️ **Y desde el 16-09-2026 se pueden pedir LOS DOS PAPELES a la vez.** El cuerpo acepta
+**`rols: string[]`** (`rol` en singular se sigue aceptando: el contrato es público y una pantalla
+servida desde una caché vieja no puede romperse en el alta). Con los dos, se crea **una sola
+`organizaciones`** y bajo ella **dos fichas, dos membresías y dos convenios** —`don_gen` y
+`don_rec`—, que es exactamente lo que el índice único parcial de esa tabla permite: una ficha de
+cada tipo. Antes había que registrarse **dos veces con dos correos distintos**, y eso dejaba dos
+organizaciones que el equipo tenía que fusionar a mano con `enllacar_organitzacio()` — el trabajo
+que la brecha 2 de §1bis existe para evitar.
+⚠️ **La detección de duplicados se decide una vez POR PAPEL y se combina con la regla más
+estricta**: si cualquiera de los dos ya está cubierto, el alta entera se deniega con `409`. No se
+puede partir —dar la ficha de productor y negar la de entidad— porque la persona pidió las dos y
+quedarse a medias en silencio es peor que rechazar. La compensación sigue el mismo criterio: apila
+las fichas creadas y las deshace todas en orden inverso. Contrato completo y códigos de error en el propio fichero; los mensajes van en catalán,
 listos para mostrar.
 
 **Abre el alta sin abrir el acceso.** La persona puede iniciar sesión y no ve absolutamente nada

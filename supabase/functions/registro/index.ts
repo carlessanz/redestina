@@ -151,7 +151,16 @@ const TIPUS_RECEPTOR = ["social", "animal", "transformador", "comercial"] as con
 type Rol = typeof ROLS[number];
 
 interface Dades {
-  rol: Rol;
+  /**
+   * Los papeles que estrena esta organización. **Puede ser más de uno**: hasta el
+   * 16-09-2026 el registro obligaba a elegir productor O receptora, y quien era las dos
+   * cosas —que es el caso normal de media docena de organizaciones reales— tenía que
+   * registrarse dos veces, con dos correos, y acababa con dos organizaciones distintas
+   * que el equipo luego tenía que fusionar a mano con `enllacar_organitzacio()`. Ahora
+   * las dos fichas nacen **bajo la misma `organizaciones`**, que es exactamente lo que
+   * el índice único parcial de esa tabla permite: una ficha de cada tipo, no más.
+   */
+  rols: Rol[];
   nomOrganitzacio: string;
   nomPersona: string;
   email: string;
@@ -187,9 +196,14 @@ function patroLike(valor: string): string {
 }
 
 function validar(body: Record<string, unknown>): Validacio {
-  const rol = textNet(body.rol) as Rol;
-  if (!ROLS.includes(rol)) {
-    return { ok: false, camp: "rol", error: "Cal triar si ets productor o receptor" };
+  // `rols` es lo nuevo; `rol` se sigue aceptando porque el contrato es público y una
+  // pantalla vieja servida desde una caché no tiene por qué romperse en el alta.
+  const brut = Array.isArray(body.rols)
+    ? body.rols
+    : (textNet(body.rol) ? [body.rol] : []);
+  const rols = [...new Set(brut.map((r) => textNet(r)))] as Rol[];
+  if (rols.length === 0 || rols.some((r) => !ROLS.includes(r))) {
+    return { ok: false, camp: "rol", error: "Cal triar si ets productor, receptor o totes dues coses" };
   }
 
   const nomOrganitzacio = textNet(body.nom_organitzacio);
@@ -240,7 +254,7 @@ function validar(body: Record<string, unknown>): Validacio {
   // rechaza en vez de ignorarse, para que un formulario mal cableado se note.
   const tipoBrut = textNet(body.tipo_receptor);
   let tipoReceptor: string | null = null;
-  if (rol === "receptor") {
+  if (rols.includes("receptor")) {
     if (!(TIPUS_RECEPTOR as readonly string[]).includes(tipoBrut)) {
       return { ok: false, camp: "tipo_receptor", error: "Cal triar quin tipus de receptor ets" };
     }
@@ -283,7 +297,7 @@ function validar(body: Record<string, unknown>): Validacio {
   return {
     ok: true,
     dades: {
-      rol, nomOrganitzacio, nomPersona, email, password, telefon, poblacio, tipoReceptor,
+      rols, nomOrganitzacio, nomPersona, email, password, telefon, poblacio, tipoReceptor,
       nif, domicili, codiPostal, representant, carrec, firmarAra, emailSignant,
     },
   };
@@ -304,9 +318,15 @@ Deno.serve(async (req) => {
   // Fuera del try: la compensación del catch necesita saber qué se llegó a crear.
   let supabase: Cliente = null;
   let userId: string | null = null;
-  let fitxaId: string | null = null;
   let organitzacioId: string | null = null;
-  let taula: "productores" | "entidades" = "productores";
+  // Antes era una ficha y una tabla; con el doble papel son hasta dos, y la compensación
+  // tiene que poder deshacer las dos. Se van apilando a medida que se crean.
+  const creades: { taula: "productores" | "entidades"; id: string }[] = [];
+  const desferFitxes = async () => {
+    for (const f of [...creades].reverse()) {  // copia: `reverse()` muta, y el array se sigue usando
+      await supabase!.from(f.taula).delete().eq("id", f.id);
+    }
+  };
 
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
@@ -366,9 +386,18 @@ Deno.serve(async (req) => {
     // `productores` —y que solo existía porque allí `email` y `phone` son UNIQUE y el
     // insert habría reventado con 23505 con la cuenta de Auth ya creada—. El 23505 se
     // sigue capturando abajo por la carrera entre esta consulta y el insert.
-    const tipusRol: TipusFitxa = d.rol === "productor" ? "productor" : "entidad";
+    // ⚠️ SE DECIDE UNA VEZ POR PAPEL, no una vez por alta, y el resultado se combina con
+    //    la regla más estricta: si CUALQUIERA de los dos papeles ya está cubierto, el alta
+    //    entera se deniega. No se puede partir —«te doy la ficha de productor y la de
+    //    entidad no»— porque la persona ha pedido las dos y quedarse a medias sin decirlo
+    //    sería peor que rechazar: acabaría con media organización y sin saber por qué.
+    const tipusRols: TipusFitxa[] = d.rols.map((r) => r === "productor" ? "productor" : "entidad");
     const t0 = performance.now();
-    const decisio = await decidirCoincidencia(supabase, d, tipusRol);
+    const decisions = [];
+    for (const tr of tipusRols) decisions.push(await decidirCoincidencia(supabase, d, tr));
+    const decisio = decisions.find((x) => x.cas === "duplicat")
+      ?? decisions.find((x) => x.cas === "paper_nou")
+      ?? decisions[0];
     console.log(JSON.stringify({
       fn: "registro",
       pas: "coincidencies",
@@ -466,8 +495,13 @@ Deno.serve(async (req) => {
       ? notaPaperNou(decisio.fitxes, new Date().toISOString())
       : null;
 
-    taula = d.rol === "productor" ? "productores" : "entidades";
-    const fila: Record<string, unknown> = d.rol === "productor"
+    // Los convenios que se llegan a preparar, uno por papel. Se acumulan aquí porque el
+    // bucle de abajo crea ficha, membresía y convenio de cada uno en la misma vuelta.
+    const convenis: ConveniPreparat[] = [];
+
+    for (const rol of d.rols) {
+    const taula: "productores" | "entidades" = rol === "productor" ? "productores" : "entidades";
+    const fila: Record<string, unknown> = rol === "productor"
       ? {
         name: d.nomPersona,
         empresa: d.nomOrganitzacio,
@@ -507,6 +541,7 @@ Deno.serve(async (req) => {
       .from(taula).insert(fila).select("id").single();
 
     if (errFitxa || !fitxa) {
+      await desferFitxes();
       await esborrarOrganitzacio(supabase, organitzacioId);
       await esborrarUsuari(supabase, userId);
       if (errFitxa?.code === "23505") {
@@ -519,16 +554,17 @@ Deno.serve(async (req) => {
       console.error("[registro] insert ficha:", taula, errFitxa?.message);
       return responder({ error: "No s'ha pogut crear la fitxa", code: "error_intern" }, 500);
     }
-    fitxaId = fitxa.id as string;
+    const fitxaId = fitxa.id as string;
+    creades.push({ taula, id: fitxaId });
 
     // -----------------------------------------------------------------------
     // 4. Membresía PENDIENTE. Es la pieza que da (o no da) acceso.
     // -----------------------------------------------------------------------
     const { error: errMembresia } = await supabase.from("membresias").insert({
       user_id: userId,
-      tipo: d.rol === "productor" ? "productor" : "entidad",
-      productor_id: d.rol === "productor" ? fitxaId : null,
-      entidad_id: d.rol === "receptor" ? fitxaId : null,
+      tipo: rol === "productor" ? "productor" : "entidad",
+      productor_id: rol === "productor" ? fitxaId : null,
+      entidad_id: rol === "receptor" ? fitxaId : null,
       // Quien registra la organización es su titular: es quien podrá editar la ficha
       // (soc_titular) cuando el equipo apruebe.
       rol_org: "titular",
@@ -537,18 +573,23 @@ Deno.serve(async (req) => {
     });
 
     if (errMembresia) {
-      await supabase.from(taula).delete().eq("id", fitxaId);
+      await desferFitxes();
       await esborrarOrganitzacio(supabase, organitzacioId);
       await esborrarUsuari(supabase, userId);
       console.error("[registro] insert membresia:", errMembresia.message);
       return responder({ error: "No s'ha pogut completar el registre", code: "error_intern" }, 500);
     }
 
+    // Un convenio por papel: el generador firma `don_gen` y la receptora `don_rec`, que
+    // es lo que dice `convenios_exigidos`. Fuera del camino de compensación, como antes.
+    const c = await prepararConveni(supabase, d, rol, fitxaId);
+    if (c) convenis.push(c);
+    }
+
     // -----------------------------------------------------------------------
     // 5. El convenio en borrador y su enlace de firma (§3.2.4). Fuera del camino
     //    de compensación: si falla, el alta sigue siendo válida (ver cabecera).
     // -----------------------------------------------------------------------
-    const conveni = await prepararConveni(supabase, d, fitxaId);
 
     // `revisio_equip` solo dice que el alta necesita una mirada antes de activarse; NO
     // dice con qué organización ha coincidido ni qué papeles tiene. Que exista una ficha
@@ -556,7 +597,10 @@ Deno.serve(async (req) => {
     // §9); describir la otra ficha sería contar algo que quien registra no ha probado ser.
     return responder({
       ok: true,
-      conveni,
+      // `conveni` en singular se mantiene para quien ya lo leía; `convenis` es el que
+      // dice la verdad cuando la organización estrena los dos papeles.
+      conveni: convenis[0] ?? null,
+      convenis,
       revisio_equip: decisio.cas === "paper_nou",
       ...(decisio.cas === "paper_nou"
         ? {
@@ -570,9 +614,11 @@ Deno.serve(async (req) => {
     // inverso al de creación. Si la compensación también falla queda en el log con
     // todos los ids, que es lo que hace falta para limpiarlo a mano.
     console.error("[registro] error:", err instanceof Error ? err.message : String(err));
-    if (supabase && fitxaId) {
-      const { error } = await supabase.from(taula).delete().eq("id", fitxaId);
-      if (error) console.error("[registro] residuo ficha:", taula, fitxaId, error.message);
+    if (supabase) {
+      for (const f of [...creades].reverse()) {
+        const { error } = await supabase.from(f.taula).delete().eq("id", f.id);
+        if (error) console.error("[registro] residuo ficha:", f.taula, f.id, error.message);
+      }
     }
     if (supabase) await esborrarOrganitzacio(supabase, organitzacioId);
     if (supabase && userId) await esborrarUsuari(supabase, userId);
@@ -837,11 +883,12 @@ interface ConveniPreparat {
 async function prepararConveni(
   supabase: Cliente,
   d: Dades,
+  rol: Rol,
   fitxaId: string,
 ): Promise<ConveniPreparat | null> {
   try {
-    const tipoOrg = d.rol === "productor" ? "productor" : "entidad";
-    const tipo = d.rol === "productor" ? "don_gen" : "don_rec";
+    const tipoOrg = rol === "productor" ? "productor" : "entidad";
+    const tipo = rol === "productor" ? "don_gen" : "don_rec";
 
     const { data: conv, error: errPrep } = await supabase.rpc("preparar_convenio", {
       p_tipo_org: tipoOrg,

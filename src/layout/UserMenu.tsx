@@ -38,6 +38,14 @@ export default function UserMenu() {
       <DropdownMenuContent align="end" className="w-60">
         <DropdownMenuLabel className="font-normal">
           <div className="truncate text-sm font-medium">{ctx?.nombre ?? ctx?.email ?? '—'}</div>
+          {/* El correo es CON QUÉ CUENTA estás dentro, y eso no se podía leer en ninguna
+              pantalla: con varias cuentas de prueba abiertas en pestañas distintas —o con
+              la del equipo y la de la organización— no había forma de saber en cuál
+              estabas sin cerrar sesión. Se omite si el nombre ya ES el correo, para no
+              escribir dos veces la misma línea. Pedido el 16-09-2026. */}
+          {ctx?.email && ctx.email !== ctx.nombre && (
+            <div className="truncate text-xs text-muted-foreground">{ctx.email}</div>
+          )}
           {organitzacio?.nombre && (
             <div className="truncate text-xs text-muted-foreground">{organitzacio.nombre}</div>
           )}

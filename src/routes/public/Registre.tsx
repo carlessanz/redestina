@@ -10,9 +10,10 @@
 import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link, Navigate, useSearchParams } from 'react-router'
-import { CheckCircle2 } from 'lucide-react'
+import { Check, CheckCircle2 } from 'lucide-react'
 import { supabaseUrl } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { cn } from '../../lib/utils'
 import { useSessio } from '../../hooks/useSessio'
 import type { TipusReceptor } from '../../lib/rols'
 import LayoutAcces, { ComprovantSessio } from '../../components/LayoutAcces'
@@ -21,7 +22,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
@@ -35,9 +35,19 @@ const TIPUS: { valor: TipusReceptor; clau: string }[] = [
   { valor: 'comercial', clau: 'reg.tr_comercial' },
 ]
 
-/** Los CTA de la landing dicen «entitat»; dentro se llama «receptor». */
-function rolDeLaUrl(valor: string | null): RolRegistre {
-  return valor === 'entitat' || valor === 'receptor' ? 'receptor' : 'productor'
+/**
+ * Los CTA de la landing dicen «entitat»; dentro se llama «receptor».
+ *
+ * ⚠️ DEVUELVE UNA LISTA, y desde el 16-09-2026 se pueden marcar LOS DOS. El selector era
+ * un `Tabs`, que por definición deja elegir uno: una organización que genera excedente y
+ * además recibe —seis de las que hay -- tenía que registrarse dos veces con dos correos
+ * distintos y acababa con dos organizaciones que el equipo fusionaba a mano. Con dos
+ * casillas, las dos fichas nacen bajo la misma `organizaciones`, que es justo lo que su
+ * índice único parcial permite. La URL sigue preseleccionando una sola, que es lo que el
+ * enlace de la landing significa.
+ */
+function rolsDeLaUrl(valor: string | null): RolRegistre[] {
+  return valor === 'entitat' || valor === 'receptor' ? ['receptor'] : ['productor']
 }
 
 export default function Registre() {
@@ -45,7 +55,7 @@ export default function Registre() {
   const { session, carregant } = useSessio()
   const [params] = useSearchParams()
 
-  const [rol, setRol] = useState<RolRegistre>(() => rolDeLaUrl(params.get('rol')))
+  const [rols, setRols] = useState<RolRegistre[]>(() => rolsDeLaUrl(params.get('rol')))
   const [tipusReceptor, setTipusReceptor] = useState<TipusReceptor | ''>('')
   const [organitzacio, setOrganitzacio] = useState('')
   const [persona, setPersona] = useState('')
@@ -69,7 +79,11 @@ export default function Registre() {
   async function enviar(e: FormEvent) {
     e.preventDefault()
     if (ocupat) return
-    if (rol === 'receptor' && !tipusReceptor) {
+    if (rols.length === 0) {
+      setError(t('reg.rol_required'))
+      return
+    }
+    if (rols.includes('receptor') && !tipusReceptor) {
       setError(t('reg.tipus_required'))
       return
     }
@@ -92,14 +106,14 @@ export default function Registre() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          rol,
+          rols,
           nom_organitzacio: organitzacio.trim(),
           nom_persona: persona.trim(),
           email: email.trim(),
           password,
           telefon: telNet || null,
           poblacio: poblacio.trim() || null,
-          tipo_receptor: rol === 'receptor' ? tipusReceptor : null,
+          tipo_receptor: rols.includes('receptor') ? tipusReceptor : null,
           web: parany,
         }),
       })
@@ -157,36 +171,52 @@ export default function Registre() {
           <form className="grid gap-4" onSubmit={enviar}>
             <div className="grid gap-2">
               <Label>{t('reg.rol_label')}</Label>
-              <Tabs value={rol} onValueChange={(v) => { setRol(v as RolRegistre); setError(null) }}>
-                {/* Las dos pastillas NO pueden depender de lo larga que sea su etiqueta.
-                    Medido a 320 px: la pastilla da 114 px de hueco y «Entitat receptora»
-                    ocupa 111,14 px, o sea que el `px-2` de la pestaña ya está consumido
-                    entero y quedan 2,9 px hasta el borde. No desborda la página —el
-                    `grid-cols-2` de Tailwind es `minmax(0,1fr)` y la columna no crece— pero
-                    cualquier traducción más larga se sale del botón.
-                    El arreglo no es acortar el texto: se le quita el `whitespace-nowrap`
-                    que trae `TabsTrigger` de serie y se deja que la lista crezca a lo alto
-                    (`h-auto`), así una etiqueta larga rompe a dos líneas en vez de
-                    desbordar. `min-w-0` es lo que permite al botón encoger por debajo de su
-                    contenido; `min-h-11` mantiene los 44 px de área táctil en móvil. */}
-                <TabsList className="grid w-full grid-cols-2 group-data-[orientation=horizontal]/tabs:h-auto">
-                  <TabsTrigger
-                    value="productor"
-                    className="h-auto min-h-11 min-w-0 py-2 text-center leading-tight whitespace-normal md:min-h-9"
-                  >
-                    {t('reg.rol_prod')}
-                  </TabsTrigger>
-                  <TabsTrigger
-                    value="receptor"
-                    className="h-auto min-h-11 min-w-0 py-2 text-center leading-tight whitespace-normal md:min-h-9"
-                  >
-                    {t('reg.rol_ent')}
-                  </TabsTrigger>
-                </TabsList>
-              </Tabs>
+              {/* DOS CONMUTADORES, NO UNAS PESTAÑAS. Era un `Tabs`, que por definición deja
+                  elegir uno solo; el requisito nuevo es poder ser las dos cosas. Se hace
+                  con botones y `aria-pressed` en vez de traer `@radix-ui/react-checkbox`:
+                  son dos opciones, el estado es una lista de dos valores y añadir una
+                  dependencia para eso no se paga.
+
+                  Se conservan las medidas del `Tabs` que había, que estaban tomadas y no
+                  estimadas: a 320 px cada celda da 114 px de hueco y «Entitat receptora»
+                  ocupa 111,14, o sea 2,9 px hasta el borde. Por eso NO hay
+                  `whitespace-nowrap` y sí `min-w-0` —lo que permite encoger por debajo del
+                  contenido— y `min-h-11`, los 44 px de área táctil en móvil (§12.34). */}
+              <div className="grid w-full grid-cols-2 gap-2">
+                {([
+                  { valor: 'productor' as const, clau: 'reg.rol_prod' },
+                  { valor: 'receptor' as const, clau: 'reg.rol_ent' },
+                ]).map(({ valor, clau }) => {
+                  const actiu = rols.includes(valor)
+                  return (
+                    <button
+                      key={valor}
+                      type="button"
+                      aria-pressed={actiu}
+                      onClick={() => {
+                        setRols((prev) => prev.includes(valor)
+                          ? prev.filter((r) => r !== valor)
+                          : [...prev, valor])
+                        setError(null)
+                      }}
+                      className={cn(
+                        'flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-md border px-2 py-2 text-center text-sm leading-tight whitespace-normal transition-colors md:min-h-9',
+                        actiu
+                          ? 'border-primary bg-primary text-primary-foreground'
+                          : 'border-input bg-background hover:bg-accent',
+                      )}
+                    >
+                      {actiu && <Check className="size-4 shrink-0" aria-hidden />}
+                      {t(clau)}
+                    </button>
+                  )
+                })}
+              </div>
+              {/* Que se puedan marcar las dos no es evidente mirando dos botones: se dice. */}
+              <p className="text-xs text-muted-foreground">{t('reg.rol_help')}</p>
             </div>
 
-            {rol === 'receptor' && (
+            {rols.includes('receptor') && (
               <div className="grid gap-2">
                 <Label htmlFor="tr">{t('reg.tipus_label')}</Label>
                 <Select value={tipusReceptor} onValueChange={(v) => { setTipusReceptor(v as TipusReceptor); setError(null) }}>

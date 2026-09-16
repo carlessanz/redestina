@@ -86,3 +86,28 @@ export async function acunarEnllacPropi(p: Pendent): Promise<ResultatRpc<EnllacP
     return { ok: false, missatge: 'pend.err_generic', codi: null }
   }
 }
+
+/**
+ * Firma del convenio propio desde el panel, sin depender de que el equipo lo haya
+ * enviado. Prepara el borrador si no existe, lo pasa a `pendent_firma` y acuña el enlace
+ * de una hora; el token en claro solo existe en esta respuesta.
+ *
+ * Es hermana de `acunarEnllacPropi()` y no la sustituye: aquella firma lo que YA está
+ * enviado (y vale también para albaranes), esta arranca el circuito desde cero. Devuelven
+ * la misma forma a propósito, para que quien llama no tenga que saber cuál contestó.
+ */
+export async function signarConveniPropi(
+  tipusOrg: 'productor' | 'entidad',
+  orgId: string,
+): Promise<ResultatRpc<EnllacPropi>> {
+  try {
+    const { data, error } = await supabase.rpc('signar_conveni_propi', {
+      p_tipo_org: tipusOrg,
+      p_org: orgId,
+    })
+    if (error) return { ok: false, missatge: error.message || 'pend.err_generic', codi: error.code ?? null }
+    return { ok: true, data: data as EnllacPropi }
+  } catch {
+    return { ok: false, missatge: 'pend.err_generic', codi: null }
+  }
+}
