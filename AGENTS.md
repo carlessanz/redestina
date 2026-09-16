@@ -3798,8 +3798,18 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   Referencia en **remoto**, tras las RPC del proceso (`20270323100000`, `20270324100000`):
-   **669/669 correctas y 13 saltadas**, «Sin fallos de permisos», exit 0. **No se movió** al
+   🔴 **Referencia HOY: 595/596 + 11, con una FALLA conocida y con fecha de caducidad**
+   (16-09-2026). El cliente pidió borrar su usuario de prueba para rehacer el registro desde
+   cero, y esa cuenta —`hola+wa-carles@carlessanz.com`— **es la del bloque `doble-rol` del
+   arnés**: al no poder iniciar sesión, sus ~74 comprobaciones dejan de ejecutarse y la única
+   FALLA que sale es «Invalid login credentials», no un permiso mal puesto. **Se restaura
+   sola** en cuanto se vuelva a dar de alta con **ese mismo correo y la contraseña que ya
+   consta en `scripts/data/cuentas-prueba.json`** (fuera de git); con otra contraseña hay que
+   actualizar ese fichero o el bloque se queda mudo — que es la deuda 32 otra vez, y por eso
+   se escribe aquí en vez de confiar en que alguien se acuerde.
+   Referencia **anterior**, y la que hay que volver a ver, tras las RPC del proceso
+   (`20270323100000`, `20270324100000`): **669/669 correctas y 13 saltadas**, «Sin fallos de
+   permisos», exit 0. **No se movió** al
    revocar el UPDATE de tabla de `parametros_documentales` (`20270325100000`, §12.104), y eso
    era lo esperado: esa migración repone una capa que ninguna política alcanzaba. Son las 650 anteriores
    más 19: `pendents_equip` (permitir ×2, denegar ×7), `progres_meves_ofertes` (×5) y la lectura
