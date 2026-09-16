@@ -1102,6 +1102,34 @@ nueva nace sin SELECT** y hay que otorgarla a mano. Es la contrapartida del `alt
 privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al añadir una columna
 (precedente: `enlaces_token.rol_parte`, `20270304100200:39`).
 
+### Borrado de una ficha: hoy son TRES comportamientos distintos (deuda 108)
+
+Medido el 16-09-2026 sobre las 18 claves foráneas que apuntan a `productores`,
+`entidades` y `organizaciones`. La regla de §7 dice qué debe pasar; esto es lo que pasa:
+
+| `delete_rule` | Cuántas | Quiénes | Qué ocurre de verdad |
+| --- | --- | --- | --- |
+| `CASCADE` | 6 | `convenios`, `membresias`, `planes_prevencion` (×2 tablas) | Se van con la ficha ✅ |
+| `NO ACTION` | 9 | `excedentes`, `canalizaciones`, `espigoladas`, `cierres_donante`, `cierres_periodo`, `intake_sessions`, `productor_ubicaciones`, y `organizaciones` desde las dos fichas | **Rechazan el borrado** con `23503`. No deja huérfanos, pero el panel enseña el error crudo de Postgres |
+| `SET NULL` | 3 | `oferta_respuestas.entidad_id`, `cierre_donante_lineas.entidad_id`, `cierre_periodo_lineas.entidad_id` | 🔴 **El borrado pasa y la fila se queda apuntando a nadie** — el huérfano exacto que la regla prohíbe |
+
+⚠️ **Lo peor no es ninguno de los tres por separado, es que sean tres.** Borrar una entidad
+cuyo único rastro son respuestas a ofertas **funciona** y deja esas respuestas sin entidad
+(el detalle de la oferta enseña entonces un interés de nadie); borrar una que además tenga
+una canalización **falla**; y las dos cosas salen del mismo botón, `RecordDetail:116`, que
+hace un `.delete()` a pelo sobre la tabla.
+
+⚠️ **Y la organización SIEMPRE se queda**: `organizaciones` es `NO ACTION` desde las dos
+fichas, así que al borrar la última ficha su organización sobrevive vacía. Las dos purgas
+del 16-09-2026 —las 451 del import y la de Carles Sanz— tuvieron que retirarla **a mano**,
+en un paso aparte, justo por esto.
+
+**Lo que falta para cumplir la regla**: un único camino de borrado (RPC `security definer`,
+en una transacción) que (1) se niegue con el motivo si la ficha tiene documentos emitidos,
+albaranes o cierres, (2) borre en orden lo operativo, (3) retire la organización si queda
+vacía, y (4) lo use **tanto el panel como cualquier limpieza manual**. Mientras no exista,
+cada borrado es un procedimiento a mano que hay que medir antes (§12.108).
+
 ### Integridad
 
 Las tablas Redestina sí tienen foreign keys. Las de mensajería **no**: `productores`,
@@ -1350,6 +1378,23 @@ funciones, no políticas:
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
 | `pendents_equip()` (`20270323100000`) | **La cola de trabajo del equipo en una sola llamada**: doce filas `(cua, n, ref, detall)`, **siempre las doce** aunque `n` valga 0. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
+
+> 🔴 **EL CORTE ESTÁ ENCENDIDO desde el 16-09-2026**: `fecha_corte_convenios = 2026-09-16`,
+> a petición del cliente («bloquear hasta que no se haya firmado»). Ya no es un aviso: sin
+> convenio vigente, «Publicar oferta» y «M'interessa» están apagados en el panel **y** la
+> base los rechaza con `42501 sense_conveni`. Alcance decidido explícitamente: **se bloquean
+> las acciones, no el panel** — quien no ha firmado sigue viendo sus pantallas, que es donde
+> vive el botón de firmar.
+>
+> 🔴 **Y encenderlo destapó un fallo que lo habría hecho inútil.** `convenio_vigente()` busca
+> el convenio por `convenios.organizacion_id`, y **los cinco convenios de la base lo tenían
+> NULL** —el `vigent` incluido—, así que la función **no podía devolver `true` para nadie**:
+> con el corte puesto, una organización quedaba bloqueada para siempre aunque firmara.
+> Causa: `20270312100000` añadió la columna y la rellenó una vez, pero `preparar_convenio()`
+> nunca la escribe y no había trigger — la misma lección que §4 ya tenía escrita para
+> `organizaciones` («migrar los datos y mantener la invariante son dos cosas distintas») sin
+> aplicar aquí. Cerrado en `20270327100000` con relleno + trigger + `not null`. **Solo era
+> alcanzable con la fecha de corte puesta**, o sea el día en que más caro salía.
 
 **El convenio en el panel externo (14-09-2026).** Decisión de producto: el panel **se sigue
 viendo** sin convenio, lo que no se puede es operar. `useConveni` lee los convenios de la
@@ -2087,6 +2132,19 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   entitats. Interès rebut: {m}.», donde `{m}` y `{k}` van tras dos puntos y no concuerdan con nada.
   Lo vigila `tests/i18n.test.ts`: la variante existe en los dos idiomas, su clave base existe, y no
   introduce ningún marcador que quien llama no pase.
+- 🔴 **BORRAR UNA FICHA ES BORRAR TODO LO SUYO, Y NUNCA DEJAR HUÉRFANOS** (regla del
+  16-09-2026, a petición del cliente). Da igual por dónde se pida —el botón de
+  `RecordDetail`, una RPC, o SQL a mano desde una sesión de Claude Code—: al retirar un
+  productor o una entidad **no puede quedar ni una fila apuntando a la ficha que ya no
+  está**, ni una organización vacía, ni un objeto en Storage sin dueño. Y el borrado es
+  **todo o nada**: media organización borrada es peor que ninguna.
+  ⚠️ **La excepción que NO es negociable**: los documentos emitidos, los albaranes y los
+  cierres **no se borran jamás** —`documentos_no_esborrar` lo impide por trigger y la
+  numeración legal no puede tener huecos (§4)—. Así que una ficha con documentos emitidos
+  **no se borra: se rechaza el borrado con el motivo**. «Cascada» significa arrastrar lo
+  operativo (ofertas, respuestas, canalizaciones, ubicaciones, sesiones de intake,
+  convenios, membresías, planes), nunca lo fiscal.
+  🔴 **HOY ESTO NO SE CUMPLE — es la deuda 108.** Ver §4 «Borrado de una ficha».
 - **Secretos**: nunca en el código. Env vars, siempre.
 - **Sin servicios externos nuevos** (10-09-2026). Cualquier capacidad nueva —generación de PDF, firma
   electrónica, almacenamiento de ficheros, colas, notificaciones— se resuelve con **librerías npm dentro
@@ -3643,6 +3701,17 @@ sobre 107 numeradas.
      de UX (15-09-2026): un trigger que lo escribiera tocaría una RPC del circuito legal por una
      cifra decorativa. El día que se quiera la columna coherente, es `conciliar_albaran()` quien
      debería escribirla.
+
+108. 🔴 **Borrar una ficha no borra lo suyo: son tres comportamientos y uno deja
+     huérfanos.** La regla está en §7 y el estado medido en §4 «Borrado de una ficha».
+     Resumen: 6 claves `CASCADE`, 9 `NO ACTION` —que rechazan el borrado con un `23503`
+     crudo en pantalla— y **3 `SET NULL`**, que dejan `oferta_respuestas` y las líneas de
+     cierre apuntando a una entidad que ya no existe. El botón del panel
+     (`RecordDetail:116`) hace un `.delete()` a pelo sobre la tabla, así que el resultado
+     depende de qué tenga la ficha detrás. Falta el camino único de borrado que describe §4.
+     ⚠️ **No es «poner CASCADE en todo»**: los documentos emitidos, los albaranes y los
+     cierres no se pueden borrar por diseño (`documentos_no_esborrar`, numeración legal sin
+     huecos), así que una ficha con documentos **se niega a borrarse**, no se arrastra.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
