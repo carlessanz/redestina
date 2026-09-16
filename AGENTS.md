@@ -1950,14 +1950,14 @@ el contexto previo al login (vacío) y `SenseAcces` no volvía a mirar al llegar
 sus accesos de prueba, filtros de Missatgeria, Espigolades, Aprovacions, textos del proceso y del
 tablero. Solo textos (`i18n.tsx`, `accessosTest.ts`); rutas (`/productor/…`), tipos y columnas no
 cambian. Cabecera pública rehecha: 64px, navegación junto al logo (antes centrada y lejos de la
-marca), enlaces en peso medio con hover y foco, divisor entre idioma y acciones. Los círculos
-numerados de «Com funciona» van en coral. Escala responsive equilibrada: cabecera 64px (móvil) / 80px (md+), logo
+marca), enlaces en peso medio con hover y foco, divisor entre idioma y acciones. Solo los títulos de sección (h2) van en coral; los círculos numerados y los títulos de
+tarjeta (h3) van en verde (`bg-primary` / `text-primary`). Escala responsive equilibrada: cabecera 64px (móvil) / 80px (md+), logo
 h-10/11/12 según ancho, navegación `text-sm` → 15px en lg, y el título del hero baja a
 `sm:text-4xl xl:text-5xl` con `max-w-4xl` y `text-balance` para no dominar sobre la marca
 (los anclajes usan `scroll-mt-16 md:scroll-mt-20`, a juego con la altura).
 
-**Home (16-09-2026).** Los títulos de sección y de tarjeta bajo el hero de `Landing.tsx` van en
-`text-coral-texto` (el coral de marca en su variante de texto accesible, no `text-coral`).
+**Home (16-09-2026).** Los títulos de sección bajo el hero de `Landing.tsx` van en
+`text-coral-texto` (los de tarjeta, en verde) (el coral de marca en su variante de texto accesible, no `text-coral`).
 
 ### Doble rol: los paneles se ven todos a la vez (31-07-2026)
 
@@ -3063,6 +3063,17 @@ alguien la **aprueba** desde «Registres pendents», ese bloque se queda otra ve
 cuenta que lo recorra y **73 comprobaciones dejan de ejecutarse en silencio**. Su compañera,
 `hola+senserol-arnes@carlessanz.com`, es una cuenta de Auth sin membresía ni rol, y cubre el
 bloque `sense_rol` (70 más).
+
+🔴 **Y YA HA PASADO UNA VEZ: el 16-09-2026 alguien la aprobó** —sin mala intención, probando
+la cola— y el arnés pasó a sacar **cuatro FALLA** que parecían una regresión de permisos y no
+lo eran: una membresía aprobada y activa *sí* debe ver su ficha, así que la RLS estaba
+haciendo lo correcto. Lo destapó el paso 7 de `/publicar`. **Se restaura poniéndola otra vez
+en `pendent` con `activo = false`** (y limpiando `aprovat_at`/`aprovat_per`/`motiu_aprovacio`);
+desde una sesión con `service_role` el trigger `membresias_control_aprovacio` no estorba,
+porque solo exige `pot_aprovar()` cuando hay `auth.uid()`.
+⚠️ **La señal para reconocerlo**: las FALLA son todas de la cuenta `pendent-arnes` y dicen
+«ve 1 fila(s)» donde se esperaba ninguna. Si además falla `doble-rol` al iniciar sesión, eso
+es otra cosa (la cuenta no existe o cambió de contraseña), no esto.
 
 ⚠️ **Son datos REALES en producción y hay que saberlo**: la primera aparece en el listado de
 productores del equipo y en la cola de «Registres pendents», donde se queda para siempre. Es el

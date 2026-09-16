@@ -124,10 +124,10 @@ export default function Landing() {
             {PROCES.map((p) => (
               <Card key={p.n}>
                 <CardContent className="pt-6">
-                  <span className="inline-flex size-7 items-center justify-center rounded-full bg-coral text-sm font-bold text-coral-foreground">
+                  <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
                     {p.n}
                   </span>
-                  <h3 className="mt-2 text-sm font-semibold text-coral-texto">{t(p.tk)}</h3>
+                  <h3 className="mt-2 text-sm font-semibold text-primary">{t(p.tk)}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{t(p.dk)}</p>
                 </CardContent>
               </Card>
@@ -143,7 +143,7 @@ export default function Landing() {
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold text-coral-texto">{t('land.prod_title')}</h3>
+                <h3 className="text-lg font-semibold text-primary">{t('land.prod_title')}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{t('land.prod_d')}</p>
                 <Button asChild className="mt-5">
                   <Link to="/registre?rol=productor">{t('land.prod_cta')}</Link>
@@ -152,7 +152,7 @@ export default function Landing() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold text-coral-texto">{t('land.rec_title')}</h3>
+                <h3 className="text-lg font-semibold text-primary">{t('land.rec_title')}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{t('land.rec_d')}</p>
                 <Button asChild className="mt-5">
                   <Link to="/registre?rol=entitat">{t('land.rec_cta')}</Link>
