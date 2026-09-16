@@ -24,23 +24,19 @@
 // de los dos textos inventa la fecha, sale de `data_tall_convenis()`.
 
 import { useState } from 'react'
-import { useLocation, useNavigate } from 'react-router'
-import { toast } from 'sonner'
 import { AlertTriangle, FileSignature } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { useConveni } from '../hooks/useConveni'
 import { useAppContext } from '../hooks/useAppContext'
-import { signarConveniPropi } from '../lib/pendents'
 import { cn } from '../lib/utils'
+import DialegFirmaConveni from './DialegFirmaConveni'
 import { Button } from '@/components/ui/button'
 
 export default function AvisConveni() {
   const { t } = useT()
-  const navigate = useNavigate()
-  const location = useLocation()
   const { rolActiu, organitzacio } = useAppContext()
-  const { estat, dataTall, avisa, bloqueja } = useConveni()
-  const [ocupat, setOcupat] = useState(false)
+  const { estat, dataTall, avisa, bloqueja, recarrega } = useConveni()
+  const [obert, setObert] = useState(false)
 
   if (!avisa) return null
 
@@ -55,21 +51,6 @@ export default function AvisConveni() {
   // La pelota está en su tejado en todo menos en `firmat`, que espera al equipo.
   const potSignar = estat !== 'firmat' && organitzacio !== null
   const tipusOrg = rolActiu === 'receptor' ? 'entidad' : 'productor'
-
-  async function signar() {
-    if (ocupat || !organitzacio) return
-    setOcupat(true)
-    const r = await signarConveniPropi(tipusOrg, organitzacio.id)
-    setOcupat(false)
-    if (!r.ok) {
-      // El mensaje del servidor es el útil («ja l'has signat», «no hi ha plantilla
-      // vigent»): un «ha habido un error» dejaría a la persona sin saber qué hacer.
-      toast.error(r.missatge === 'pend.err_generic' ? t('c.error') : r.missatge)
-      return
-    }
-    // Misma página pública de firma que el enlace del correo, con el botón de volver.
-    navigate(r.data.url_path, { state: { tornar: location.pathname } })
-  }
 
   const consequencia = bloqueja
     ? t('avis_conv.bloquejat')
@@ -98,11 +79,22 @@ export default function AvisConveni() {
         <Button
           size="sm"
           className="ml-auto h-11 shrink-0 whitespace-normal md:h-8"
-          disabled={ocupat}
-          onClick={() => void signar()}
+          onClick={() => setObert(true)}
         >
-          {ocupat ? t('avis_conv.signant') : t('avis_conv.signa_ara')}
+          {t('avis_conv.signa_ara')}
         </Button>
+      )}
+      {/* Se firma AQUÍ, sin salir del panel: el diálogo acuña el enlace al abrirse y monta
+          el mismo formulario que la página pública (`DialegFirmaConveni`). Antes navegaba
+          a `/signar/:token` y eso sacaba de la aplicación. */}
+      {organitzacio && (
+        <DialegFirmaConveni
+          obert={obert}
+          tipusOrg={tipusOrg}
+          orgId={organitzacio.id}
+          onTancar={() => setObert(false)}
+          onFirmat={() => { setObert(false); recarrega() }}
+        />
       )}
     </div>
   )

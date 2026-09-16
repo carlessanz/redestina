@@ -15,7 +15,7 @@
 //
 // El equipo no pasa por aquí: trabaja en nombre de otros y no tiene organización propia.
 
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from './useAppContext'
 import type { ConvenioEstado } from '../types'
@@ -32,6 +32,12 @@ export interface EstatConveni {
   /** Sin convenio vigente Y con el corte ya pasado. Es el que decide si se bloquea. */
   bloqueja: boolean
   carregant: boolean
+  /**
+   * Vuelve a leer el estado. Hace falta desde que se puede firmar sin salir del panel
+   * (`DialegFirmaConveni`): al cerrar el diálogo, la banda tiene que dejar de avisar sin
+   * que nadie recargue la página a mano.
+   */
+  recarrega: () => void
 }
 
 
@@ -40,6 +46,10 @@ export function useConveni(): EstatConveni {
   const [estat, setEstat] = useState<ConvenioEstado | null>(null)
   const [dataTall, setDataTall] = useState<string | null>(null)
   const [carregant, setCarregant] = useState(true)
+  // Un contador y no un booleano: dos firmas seguidas tienen que provocar dos lecturas, y
+  // un flag que ya está a `true` no vuelve a disparar el efecto.
+  const [tic, setTic] = useState(0)
+  const recarrega = useCallback(() => setTic((n) => n + 1), [])
 
   const orgId = organitzacio?.id ?? null
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
@@ -69,12 +79,12 @@ export function useConveni(): EstatConveni {
     })()
 
     return () => { viu = false }
-  }, [extern, orgId, columna])
+  }, [extern, orgId, columna, tic])
 
   const avisa = extern && !carregant && estat !== 'vigent'
   // `new Date('2027-04-01')` es medianoche UTC y aquí basta: la fecha de corte es un día
   // entero, no un instante, y la base decide de verdad con `current_date`.
   const passat = dataTall !== null && new Date(dataTall) <= new Date()
 
-  return { estat, dataTall, avisa, bloqueja: avisa && passat, carregant }
+  return { estat, dataTall, avisa, bloqueja: avisa && passat, carregant, recarrega }
 }

@@ -24,6 +24,7 @@ import { FileSignature, Loader2, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { acunarEnllacPropi, carregaPendents } from '../../lib/pendents'
+import DialegFirmaConveni from '../DialegFirmaConveni'
 import type { Pendent } from '../../lib/pendents'
 import { rutaPerProposit } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
@@ -56,8 +57,23 @@ export default function PendentsDeTu({
   /** Identifica la fila: en un OPE hay dos, una por parte. */
   const clau = (p: Pendent) => `${p.objeto_id}:${p.rol_parte ?? ''}`
 
+  // FIRMAR UN CONVENIO SE HACE AQUÍ MISMO, en un diálogo, desde el 16-09-2026: salir a la
+  // página pública sacaba de la aplicación y metía el convenio en una columna de 28rem.
+  // El diálogo acuña su propio enlace (`signar_conveni_propi`), así que este camino no
+  // necesita `acunarEnllacPropi` — y por eso no se llama antes de abrirlo: serían dos
+  // enlaces, y el segundo revocaría al primero.
+  //
+  // ⚠️ La CONFIRMACIÓN DE ALBARÁN sigue navegando a `/confirmar/:token`. No es olvido: esa
+  //    pantalla se abre sobre todo desde el correo y desde una finca, y llevarla a un
+  //    diálogo es el mismo trabajo otra vez. Queda pendiente.
+  const [firmant, setFirmant] = useState<{ tipus: 'productor' | 'entidad'; org: string } | null>(null)
+
   async function obre(p: Pendent) {
     if (obrint) return
+    if (p.proposito === 'firma_convenio') {
+      setFirmant({ tipus: p.tipo_org === 'entidad' ? 'entidad' : 'productor', org: p.org_id })
+      return
+    }
     setObrint(clau(p))
     const r = await acunarEnllacPropi(p)
     setObrint(null)
@@ -127,6 +143,18 @@ export default function PendentsDeTu({
           )
         })}
       </CardContent>
+
+      {/* Firmar sin salir del panel. Al cerrar se relee la lista: el convenio que se acaba
+          de firmar ya no está pendiente y la tarjeta desaparece sola. */}
+      {firmant && (
+        <DialegFirmaConveni
+          obert
+          tipusOrg={firmant.tipus}
+          orgId={firmant.org}
+          onTancar={() => setFirmant(null)}
+          onFirmat={() => { setFirmant(null); void carrega() }}
+        />
+      )}
     </Card>
   )
 }

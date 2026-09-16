@@ -478,6 +478,9 @@ src/
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
+    FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
+                               pública y para el diálogo; `ample` decide el reparto (§6quater)
+    DialegFirmaConveni.tsx     Firmar sin salir del panel: 80vw × 88vh, acuña el enlace al abrir
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
@@ -2026,6 +2029,22 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
 | `/signar/:token` | **Firma del convenio sin sesión** (fase 2). Mismo criterio |
 | `/panell` | Lo que antes era `/`: manda a cada cual a su panel |
+
+🔴 **Y desde el 16-09-2026 EL CONVENIO YA NO SE FIRMA SALIENDO DE LA APLICACIÓN.** Con
+sesión, el botón del aviso y el de «Pendent de tu» abren un **diálogo** (80 vw × 88 vh,
+`DialegFirmaConveni`) que acuña el enlace al abrirse y monta dentro el mismo formulario.
+Navegar a la página pública sacaba del panel y metía un convenio entero en una tarjeta de
+28 rem, con metros de scroll — «se va fuera con una pantalla nueva y además está en un
+espacio muy reducido», dijo el cliente.
+⚠️ **No hay dos formularios**: `components/FirmaConveni` es el mismo en los dos sitios, y
+lo único que cambia es `ample`. Con `ample` las dos columnas aparecen **solo desde `lg`**
+(izquierda lo que se rellena, derecha lo que se lee y se acepta) y los campos van de dos en
+dos desde `sm`; la página pública se queda en columna única **incluso en escritorio**,
+porque quien llega por el correo puede estar en un móvil y de pie en un camino.
+⚠️ **El diálogo no se cierra al pinchar fuera** (`onInteractOutside` prevenido): con nueve
+campos rellenados y un trazo hecho, un clic despistado sería caro.
+⚠️ **La confirmación de albarán SIGUE navegando** a `/confirmar/:token`: se abre sobre todo
+desde el correo y desde una finca, y llevarla al diálogo es el mismo trabajo otra vez.
 
 ⚠️ **`/signar` y `/confirmar` siguen siendo públicas, y desde el 14-09-2026 también se
 llega a ellas CON sesión**, desde el panel (`acunar_enllac_propi`, §6ter). No cambia quién
