@@ -2761,6 +2761,22 @@ no_test_user` con el modo test activo, §8). `canal` es **opcional y por defecto
 la política de `_shared/canal.ts` (§8bis), admite `'ambos'`, y ante fallo de WhatsApp **cae a correo**,
 devolviendo `motiu_canal`.
 
+🔴 **Y el código SE PUEDE ESCRIBIR EN ALGÚN SITIO desde el 16-09-2026, que hasta entonces no
+era cierto.** `enviar-acceso` llevaba desde julio diciendo «entra a redestina.carlessanz.com,
+escriu el teu correu i fes servir aquest codi» y **no existía ninguna pantalla que lo
+aceptara**: cero referencias a `verifyOtp` en `src/`. Lo vio el cliente al recibir el correo
+y preguntar dónde se usaba. **Y no era solo cosmético: por WhatsApp se manda el código y NADA
+MÁS, así que esa vía de acceso estaba rota entera.** El formulario es
+`components/AccesAmbCodi`, dentro de `/login`, y canjea con `supabase.auth.verifyOtp({ email,
+token, type: 'email' })` — la pareja del `admin.generateLink` que emitió el código, así que la
+sesión es idéntica a la del enlace y no hay un segundo sistema de login que mantener.
+⚠️ Los dos textos apuntaban a la **raíz**, que es la portada y no tiene dónde escribir nada;
+ahora apuntan a `/login`.
+⚠️ **El correo es parte de la credencial**, no un campo de más: seis cifras solo valen contra
+la dirección a la que se enviaron, y pedirlo es lo que impide probarlas contra cualquier
+cuenta. El error es uno solo para «malo», «caducado» y «no cuadra»: distinguirlos diría si
+ese correo existe.
+
 **Por correo va el enlace; por WhatsApp, solo el código de 6 cifras.** Un enlace mágico es una
 credencial al portador, y `sendText()` guarda el cuerpo en `wa_messages`, que el equipo lee desde
 Mensajería: el enlace quedaría publicado en la consola. Por eso `sendText()` acepta `bodyConsola`,

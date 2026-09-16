@@ -170,7 +170,7 @@ Deno.serve(async (req) => {
           supabase,
           perfil.telefono,
           `El teu codi d'accés a Redestina és ${codi}. Caduca en 1 hora. ` +
-            `Entra a ${redirectTo}, escriu el teu correu i el codi.`,
+            `Entra a ${redirectTo}/login, escriu el teu correu i el codi.`,
           { bodyConsola: "[codi d'accés enviat · ocult]" },
         );
         resultado.whatsapp = r.ok ? "enviat" : `error: ${JSON.stringify(r.data)}`;
@@ -202,16 +202,21 @@ Deno.serve(async (req) => {
         nota:
           // Los colores salen de `resend.ts`, no de aquí: tres hex a mano eran tres sitios
           // donde un cambio de token no llegaría (§9bis).
-          `Si el botó no funciona, entra a <a href="${redirectTo}" style="color:${VERDE}">${
+          // ⚠️ APUNTA A `/login`, NO A LA RAÍZ. Hasta el 16-09-2026 mandaba a la portada,
+          //    donde no hay ningún sitio donde escribir un código — el cliente recibió el
+          //    correo y preguntó, con razón, dónde se usaba. El formulario está en `/login`
+          //    (`AccesAmbCodi`); la portada es una página de marketing.
+          `Si el botó no funciona, entra a <a href="${redirectTo}/login" style="color:${VERDE}">${
             redirectTo.replace(/^https?:\/\//, "")
-          }</a>, escriu el teu correu i fes servir aquest codi:<br>` +
+          }/login</a>, escriu el teu correu i fes servir aquest codi:<br>` +
           `<span style="display:inline-block;margin-top:10px;padding:8px 14px;background:${FONDO};border-radius:8px;font-size:20px;font-weight:700;letter-spacing:4px;color:${TEXTO}">${codi}</span>`,
       });
       const r = await sendEmail({
         to: email,
         subject: "El teu accés a Redestina",
         html,
-        text: `Accés a Redestina: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora).`,
+        text: `Accés a Redestina: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora). `
+          + `Escriu-lo a ${redirectTo}/login amb el teu correu.`,
       }, { supabase, proposito: "acces", funcion: "enviar-acceso" });
       resultado.email = r.ok ? (r.simulado ? "simulat" : "enviat") : `error: ${JSON.stringify(r.data)}`;
     }

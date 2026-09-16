@@ -10,6 +10,7 @@ import { accessosActius } from '../../lib/accessosTest'
 import LayoutAcces, { ComprovantSessio } from '../../components/LayoutAcces'
 import FormulariAcces from '../../components/FormulariAcces'
 import AccessosTest from '../../components/AccessosTest'
+import AccesAmbCodi from '../../components/AccesAmbCodi'
 
 export default function LoginUsuaris() {
   const { t } = useT()
@@ -26,6 +27,9 @@ export default function LoginUsuaris() {
   return (
     <LayoutAcces>
       <FormulariAcces titol={t('login.user_title')} subtitol={t('login.user_subtitle')} />
+      {/* El código de 6 cifras que manda `enviar-acceso`. Va AQUÍ y no en una ruta aparte
+          porque es una forma de entrar más, y quien lo tiene ya está buscando la puerta. */}
+      <AccesAmbCodi />
       <p className="mt-4 text-center text-sm text-secondary/80">
         {t('login.no_account')}{' '}
         <Link to="/registre" className="font-medium text-secondary underline">
