@@ -32,6 +32,8 @@ interface Props {
   // Reutiliza el tipo en vez de repetir la unión: cuando se añade un contador nuevo,
   // repetirla aquí hacía fallar el build con TS7053 desde el otro extremo del proyecto.
   comptadors: Partial<Record<Comptador, number>>
+  /** Cuántos campos le faltan a la ficha. 0 = completa, y entonces no hay badge. */
+  fitxaFalten?: number
 }
 
 /** Cabecera de cada panel cuando hay más de uno. */
@@ -41,7 +43,7 @@ const PANELL: Record<Rol, { clau: string; icona: LucideIcon }> = {
   receptor: { clau: 'panel.receiver', icona: Building2 },
 }
 
-export default function AppSidebar({ comptadors }: Props) {
+export default function AppSidebar({ comptadors, fitxaFalten = 0 }: Props) {
   const { t } = useT()
   const { ctx, rolActiu, organitzacio } = useAppContext()
   const { setOpenMobile, isMobile } = useSidebar()
@@ -165,6 +167,11 @@ export default function AppSidebar({ comptadors }: Props) {
                         <span>{t(item.labelKey)}</span>
                       </NavLink>
                     </SidebarMenuButton>
+                    {/* La ficha a medias se marca en el menú, no solo en la banda: la banda
+                        se lee una vez y se ignora, y el badge sigue ahí hasta que se
+                        arregla. Es el número de campos que faltan, no un «!»: dice cuánto
+                        trabajo queda. */}
+                    {fitxaFalten > 0 && <SidebarMenuBadge>{fitxaFalten}</SidebarMenuBadge>}
                   </SidebarMenuItem>
                 ))}
               </SidebarMenu>

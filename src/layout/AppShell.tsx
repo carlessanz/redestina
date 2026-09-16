@@ -24,6 +24,7 @@ import UserMenu from './UserMenu'
 import AvisInstallacio from '../components/AvisInstallacio'
 import AvisConveni from '../components/AvisConveni'
 import AvisRegistreIncomplet from '../components/AvisRegistreIncomplet'
+import { useFitxaIncompleta } from '../hooks/useFitxaIncompleta'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 /** Metadatos que cada ruta puede declarar en su `handle`. */
@@ -78,6 +79,9 @@ export default function AppShell() {
   }, [esIntern, pathname])
   const { comptadors: comptadorsEquip } = useComptadorsEquip()
   const comptadors: Partial<Record<Comptador, number>> = { ...comptadorsEquip, ...comptadorsExterns }
+  // Una sola vez, aquí: lo miran la banda de aviso Y el badge del menú, y calculado por
+  // separado podrían decir cosas distintas (§6ter, misma razón que `pendents_equip()`).
+  const { falten } = useFitxaIncompleta()
 
   // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
   // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
@@ -101,7 +105,7 @@ export default function AppShell() {
 
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-      <AppSidebar comptadors={comptadors} />
+      <AppSidebar comptadors={comptadors} fitxaFalten={falten.length} />
       <SidebarInset className="flex h-dvh min-h-0 flex-col overflow-hidden">
         {/* El `env(safe-area-inset-*)` lateral solo hace algo en iPhone con muesca EN
             HORIZONTAL, donde el recorte se come ~44px por cada lado y el `px-3` no
@@ -162,7 +166,7 @@ export default function AppShell() {
                 {/* Debajo del convenio a propósito: firmar es lo que desbloquea operar, y
                     completar la ficha es lo que hace que firmar salga bien. Ese es el
                     orden en que importan. */}
-                {rolActiu !== 'intern' && <AvisRegistreIncomplet />}
+                {rolActiu !== 'intern' && <AvisRegistreIncomplet falten={falten} />}
                 <Outlet />
               </div>
             )}

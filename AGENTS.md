@@ -1804,8 +1804,18 @@ marcadores hechos.
 —NIF, domicilio, código postal, población— y lleva a esa pantalla. El alta pide lo mínimo a
 propósito (un formulario largo en la puerta no lo termina nadie), pero esos cuatro campos
 son lo que el convenio imprime: sin ellos, la primera firma se encuentra el formulario a
-medias. **No bloquea nada** —por eso va en aviso y nunca en rojo— y **no duplica la lista de
-obligatorios del convenio**, que la decide el servidor.
+medias. **No duplica la lista de obligatorios del convenio**, que la decide el servidor.
+
+🔴 **Va en ROJO, y la entrada del menú lleva badge** (16-09-2026). Nació en tono de aviso
+porque «no bloquea nada», y eso **dejó de ser cierto el mismo día**: con
+`fecha_corte_convenios` puesta, sin convenio vigente no se puede publicar ni mostrar
+interés, y sin estos campos el convenio no se firma en condiciones. O sea que una ficha a
+medias sí impide operar, con un paso de por medio.
+⚠️ **Se calcula UNA vez, en `AppShell` (`useFitxaIncompleta`), y se reparte** a la banda y al
+badge. Calculado por separado, el contador del menú y la banda podrían decir cosas distintas
+— es la misma razón por la que los contadores del equipo salen todos de `pendents_equip()`.
+⚠️ El badge es **el número de campos que faltan**, no un «!»: dice cuánto trabajo queda. Y la
+banda se lee una vez y se ignora; el badge sigue ahí hasta que se arregla.
 
 ### El modelo del proceso: la aplicación lo narra, no solo lo ejecuta (14-09-2026)
 
