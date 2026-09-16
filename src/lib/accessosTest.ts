@@ -49,11 +49,11 @@ export const GRUPS_ACCESSOS: GrupAccessos[] = [
     // excepción de cada una va en su propia etiqueta.
     titolKey: 'test.grp_wa',
     comptes: [
-      { organitzacio: 'Carles Sanz', tipus: 'Productor + receptor social', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
-      { organitzacio: 'Sebas Sale', tipus: 'Productor + receptor social', email: 'hola+wa-sebas@carlessanz.com', password: '4MQGu-aUxNb-6rV5s' },
-      { organitzacio: 'Raquel Diaz', tipus: 'Productor + receptor social', email: 'hola+wa-raquel@carlessanz.com', password: 'uavod-gDiVJ-VqKT5' },
-      { organitzacio: 'Anna Garreta', tipus: 'Només receptor social', email: 'hola+wa-anna@carlessanz.com', password: 'EYFOH-HT0qK-neQbS' },
-      { organitzacio: 'Laura Masdeu', tipus: 'Productor + receptor social · SENSE WhatsApp', email: 'hola+wa-laura@carlessanz.com', password: 'zTfJ0-Yo9aG-doIjq' },
+      { organitzacio: 'Carles Sanz', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
+      { organitzacio: 'Sebas Sale', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-sebas@carlessanz.com', password: '4MQGu-aUxNb-6rV5s' },
+      { organitzacio: 'Raquel Diaz', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-raquel@carlessanz.com', password: 'uavod-gDiVJ-VqKT5' },
+      { organitzacio: 'Anna Garreta', tipus: 'Només Receptora (social)', email: 'hola+wa-anna@carlessanz.com', password: 'EYFOH-HT0qK-neQbS' },
+      { organitzacio: 'Laura Masdeu', tipus: 'Entitat productora + Receptora (social) · SENSE WhatsApp', email: 'hola+wa-laura@carlessanz.com', password: 'zTfJ0-Yo9aG-doIjq' },
     ],
   },
   // Un solo usuario por organización: el producto no tiene cargos dentro de la empresa,
@@ -61,8 +61,8 @@ export const GRUPS_ACCESSOS: GrupAccessos[] = [
   {
     titolKey: 'test.grp_prod',
     comptes: [
-      { organitzacio: 'Mas de Prova SCP', tipus: 'Productor', email: 'hola+prodowner-masprova@carlessanz.com', password: 'PyaCL-ia5jD-E6Ba9' },
-      { organitzacio: 'Horta de Prova SL', tipus: 'Productor', email: 'hola+prodowner-hortaprova@carlessanz.com', password: 'VUQPK-k4sLa-hSZWE' },
+      { organitzacio: 'Mas de Prova SCP', tipus: 'Entitat productora', email: 'hola+prodowner-masprova@carlessanz.com', password: 'PyaCL-ia5jD-E6Ba9' },
+      { organitzacio: 'Horta de Prova SL', tipus: 'Entitat productora', email: 'hola+prodowner-hortaprova@carlessanz.com', password: 'VUQPK-k4sLa-hSZWE' },
     ],
   },
   // Sin receptor de alimentación animal: esa línea de servicio no se usa todavía.

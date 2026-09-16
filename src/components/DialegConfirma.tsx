@@ -86,3 +86,72 @@ export function useConfirma() {
 
   return { confirma, dialeg }
 }
+
+// ─── Tria entre varias salidas ────────────────────────────────────────────────────────
+//
+// El mismo patrón de promesa, para cuando la pregunta no es «sí o no» sino «¿cuál de estas?».
+// Nació para borrar una ficha de una organización con doble rol (productora + receptora): el
+// equipo tiene que poder decir si borra solo ese papel o los dos. Resuelve con el `valor` de la
+// opción pulsada, o `null` si se cancela o se cierra por Escape/fuera (el lado seguro).
+
+export interface OpcioTria {
+  valor: string
+  text: string
+  destructiu?: boolean
+}
+
+export interface OpcionsTria {
+  titol: string
+  descripcio?: string
+  opcions: OpcioTria[]
+}
+
+export function useTria() {
+  const { t } = useT()
+  const [opcions, setOpcions] = useState<OpcionsTria | null>(null)
+  const resol = useRef<((v: string | null) => void) | null>(null)
+
+  const tria = useCallback((o: OpcionsTria) => new Promise<string | null>((resolve) => {
+    resol.current = resolve
+    setOpcions(o)
+  }), [])
+
+  const tanca = useCallback((valor: string | null) => {
+    setOpcions(null)
+    const r = resol.current
+    resol.current = null
+    r?.(valor)
+  }, [])
+
+  useEffect(() => () => { resol.current?.(null); resol.current = null }, [])
+
+  const dialeg = (
+    <Dialog open={opcions !== null} onOpenChange={(v) => { if (!v) tanca(null) }}>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>{opcions?.titol}</DialogTitle>
+          {opcions?.descripcio && (
+            <DialogDescription className="whitespace-pre-line">{opcions.descripcio}</DialogDescription>
+          )}
+        </DialogHeader>
+        <DialogFooter className="flex-col gap-2 sm:flex-row sm:flex-wrap">
+          <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => tanca(null)}>
+            {t('c.cancel')}
+          </Button>
+          {opcions?.opcions.map((o) => (
+            <Button
+              key={o.valor}
+              variant={o.destructiu ? 'destructive' : 'default'}
+              className="h-11 whitespace-normal md:h-9"
+              onClick={() => tanca(o.valor)}
+            >
+              {o.text}
+            </Button>
+          ))}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+
+  return { tria, dialeg }
+}

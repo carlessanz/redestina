@@ -106,6 +106,11 @@ export function SenseAcces() {
       .then(({ data }) => setMotiu((data as { motiu_aprovacio: string | null } | null)?.motiu_aprovacio ?? null))
   }, [rebutjat])
 
+  // Carrera al entrar con un acceso directo: `/panell` puede resolverse con el contexto de
+  // ANTES del login (vacío) y mandar aquí; cuando llega el de la cuenta nueva, esta pantalla
+  // se quedaba puesta aunque la cuenta sí tuviera panel. Si ya lo tiene, se la devuelve.
+  if (ctx && ctx.rols.length > 0) return <Navigate to="/panell" replace />
+
   const { Icona, classeIcona, titol, desc } = pendent
     ? { Icona: Hourglass, classeIcona: 'text-primary', titol: 'noacc.pending_title', desc: 'noacc.pending_desc' }
     : rebutjat

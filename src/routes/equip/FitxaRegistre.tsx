@@ -47,7 +47,7 @@ export default function FitxaRegistre({ tabla }: Props) {
   return (
     <RecordDetail
       tipoKey={esProductor ? 'rec.producer' : 'rec.entity'}
-      femenino={!esProductor}
+      femenino /* «entitat productora» / «entitat receptora»: las dos en femenino */
       volverKey={esProductor ? 'nav.producers' : 'nav.entities'}
       tabla={tabla}
       campos={esProductor ? PRODUCTOR_CAMPOS : ENTIDAD_CAMPOS}

@@ -36,3 +36,8 @@ supabase/functions/*/deno.lock
 
 # Cobertura de Vitest
 coverage/
+
+# Caché incremental de tsc. La genera `npm run check:tipos` y es de esta máquina:
+# no describe el proyecto y cambia en cada ejecución.
+tsconfig.tsbuildinfo
+*.tsbuildinfo

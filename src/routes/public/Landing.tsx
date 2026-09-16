@@ -44,26 +44,31 @@ export default function Landing() {
           Sticky sobre toda la página: es hija directa de la raíz, no del hero, o al salir el
           hero de pantalla se iría con él. */}
       <header className="sticky top-0 z-40 border-b border-border bg-card text-foreground">
-        <div className="mx-auto flex max-w-6xl items-center gap-2 px-4 py-3">
-          <Link to="/" aria-label="Redestina" className="flex items-center">
-            <img src="/logo-redestina.svg" alt="Redestina" className="h-8 w-auto" />
+        {/* Estándar de cabecera: altura fija (64px), logo y navegación agrupados a la izquierda
+            —la navegación centrada «flotaba» lejos de la marca— y acciones a la derecha,
+            separadas del idioma por un divisor. Enlaces en peso medio y con zona de clic y
+            foco visibles, no texto suelto en gris claro. */}
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 md:h-20 md:px-6">
+          <Link to="/" aria-label="Redestina" className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
+            <img src="/logo-redestina.svg" alt="Redestina" className="h-10 w-auto md:h-11 lg:h-12" />
           </Link>
 
-          <nav className="mx-auto hidden items-center gap-6 md:flex">
-            <a href="#com-funciona" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+          <nav className="ml-6 hidden items-center gap-1 md:flex lg:ml-10">
+            <a href="#com-funciona" className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 lg:text-[15px] transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {t('land.nav_how')}
             </a>
-            <a href="#per-a-qui" className="text-sm text-muted-foreground transition-colors hover:text-foreground">
+            <a href="#per-a-qui" className="rounded-md px-3 py-2 text-sm font-medium text-foreground/80 lg:text-[15px] transition-colors hover:bg-muted hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               {t('land.nav_who')}
             </a>
           </nav>
 
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <SelectorIdioma />
-            <Button asChild variant="ghost" size="sm">
+            <span aria-hidden className="mx-1 hidden h-6 w-px bg-border sm:block" />
+            <Button asChild variant="ghost" className="font-medium">
               <Link to="/login">{t('land.enter')}</Link>
             </Button>
-            <Button asChild size="sm">
+            <Button asChild className="font-medium">
               <Link to="/registre">{t('land.signup')}</Link>
             </Button>
           </div>
@@ -72,7 +77,7 @@ export default function Landing() {
 
       {/* Hero en verde, con los botones en crema (BOTO_SOBRE_VERD) */}
       <section className="bg-primary px-4 py-16 text-center text-primary-foreground md:py-24">
-        <h1 className="text-3xl font-bold md:text-5xl">{t('land.hero_title')}</h1>
+        <h1 className="mx-auto max-w-4xl text-3xl leading-tight font-bold text-balance sm:text-4xl xl:text-5xl">{t('land.hero_title')}</h1>
         <p className="mx-auto mt-4 max-w-2xl text-primary-foreground/80 md:text-lg">
           {t('land.hero_sub')}
         </p>
@@ -112,17 +117,17 @@ export default function Landing() {
       </section>
 
       {/* Cómo funciona: misma maquetación que el tablero del equipo (Dashboard, «dash.how») */}
-      <section id="com-funciona" className="scroll-mt-16 bg-background">
+      <section id="com-funciona" className="scroll-mt-16 md:scroll-mt-20 bg-background">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
-          <h2 className="text-2xl font-bold md:text-3xl">{t('land.how_title')}</h2>
+          <h2 className="text-2xl font-bold text-coral-texto md:text-3xl">{t('land.how_title')}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PROCES.map((p) => (
               <Card key={p.n}>
                 <CardContent className="pt-6">
-                  <span className="inline-flex size-7 items-center justify-center rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                  <span className="inline-flex size-7 items-center justify-center rounded-full bg-coral text-sm font-bold text-coral-foreground">
                     {p.n}
                   </span>
-                  <h3 className="mt-2 text-sm font-semibold">{t(p.tk)}</h3>
+                  <h3 className="mt-2 text-sm font-semibold text-coral-texto">{t(p.tk)}</h3>
                   <p className="mt-1 text-sm text-muted-foreground">{t(p.dk)}</p>
                 </CardContent>
               </Card>
@@ -132,13 +137,13 @@ export default function Landing() {
       </section>
 
       {/* Para quién: los dos perfiles que se pueden registrar, cada uno con su alta */}
-      <section id="per-a-qui" className="scroll-mt-16 bg-muted/50">
+      <section id="per-a-qui" className="scroll-mt-16 md:scroll-mt-20 bg-muted/50">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
-          <h2 className="text-2xl font-bold md:text-3xl">{t('land.who_title')}</h2>
+          <h2 className="text-2xl font-bold text-coral-texto md:text-3xl">{t('land.who_title')}</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold">{t('land.prod_title')}</h3>
+                <h3 className="text-lg font-semibold text-coral-texto">{t('land.prod_title')}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{t('land.prod_d')}</p>
                 <Button asChild className="mt-5">
                   <Link to="/registre?rol=productor">{t('land.prod_cta')}</Link>
@@ -147,7 +152,7 @@ export default function Landing() {
             </Card>
             <Card>
               <CardContent className="pt-6">
-                <h3 className="text-lg font-semibold">{t('land.rec_title')}</h3>
+                <h3 className="text-lg font-semibold text-coral-texto">{t('land.rec_title')}</h3>
                 <p className="mt-2 text-sm text-muted-foreground">{t('land.rec_d')}</p>
                 <Button asChild className="mt-5">
                   <Link to="/registre?rol=entitat">{t('land.rec_cta')}</Link>

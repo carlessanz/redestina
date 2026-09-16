@@ -1914,6 +1914,51 @@ Las pantallas del equipo son **los mismos componentes de siempre** (`Dashboard`,
 `OfferDetail`, `ProducersList`, `EntitiesList`, `RecordDetail`, `ContactList`, `Conversation`,
 `Settings`), sin tocar: lo único que cambió es quién los monta y de dónde sale el `id`.
 
+### Doble rol: borrar una ficha pregunta por los dos papeles (16-09-2026)
+
+En la ficha del equipo (`RecordDetail`, rutas `/equip/productors/:id` y `/equip/entitats/:id`),
+**Esborrar** busca primero la ficha del otro papel con el mismo `organizacion_id`. Si existe, en
+vez del «¿seguro?» abre `useTria()` (nuevo, en `DialegConfirma.tsx`, mismo patrón de promesa;
+resuelve `null` al cancelar) con tres salidas: cancelar, **solo esta ficha** o **las dos**. Se
+borra primero la ficha abierta y luego la hermana; si la segunda falla se avisa con
+`rec.dual_partial` y se vuelve al listado. Solo frontend: sin migración (el `delete` sobre las dos
+tablas ya lo tenía `authenticated`). La fila de `organizaciones` no se toca, igual que antes.
+
+**Aviso de cuentas afectadas (16-09-2026).** Antes de abrir cualquiera de los dos diálogos se
+cuentan las `membresias` de las fichas que se van a borrar; si hay alguna, la descripción avisa de
+que esas cuentas se quedarán sin panel y sin acceso (las membresías caen en cascada). Motivo: se
+borraron las dos fichas de Carles Sanz y la cuenta de prueba `hola+wa-carles@` se quedó sin entrar
+a ningún sitio. Para recuperarla: recrear las dos fichas con `hola@carlessanz.com` (y `es_test`)
+y relanzar `scripts/crear-usuarios-whatsapp.ts`, que enlaza por correo sin tocar la contraseña.
+En el login, las etiquetas del grupo WhatsApp pasan a «Productor + Receptor (social)».
+
+**Vocabulario (16-09-2026).** En el menú del equipo, grupo «Organitzacions», «Productors» y
+«Entitats» pasan a **«Entitats productores»** y **«Entitats receptores»** (es: «Entidades
+productoras/receptoras»), porque las dos son entidades y una misma puede ser las dos cosas. Cambian
+`nav.producers`, `nav.entities`, `prod.title`, `rec.producer` y `rec.entity` (ambos en femenino).
+Los KPI del tablero (`dash.k_*`) no se han tocado.
+
+**Carrera del acceso directo → «Encara no tens panell» (16-09-2026).** Con datos correctos
+(verificado en producción: `hola+wa-sebas@` tiene sus dos membresías activas y la RPC devuelve
+las dos organizaciones), una cuenta podía quedarse en `/sense-acces`: `/panell` se resolvía con
+el contexto previo al login (vacío) y `SenseAcces` no volvía a mirar al llegar el bueno. Arreglo:
+`SenseAcces` redirige a `/panell` si el contexto ya trae paneles, y `carrega()` de
+`useAppContext` descarta respuestas de cargas anteriores (contador `darrera`).
+
+**«Entitat productora» en toda la interfaz (16-09-2026).** Todo el texto visible que decía
+«productor/a» pasa a «entitat productora» (es: «entidad productora»): portada, registro, login y
+sus accesos de prueba, filtros de Missatgeria, Espigolades, Aprovacions, textos del proceso y del
+tablero. Solo textos (`i18n.tsx`, `accessosTest.ts`); rutas (`/productor/…`), tipos y columnas no
+cambian. Cabecera pública rehecha: 64px, navegación junto al logo (antes centrada y lejos de la
+marca), enlaces en peso medio con hover y foco, divisor entre idioma y acciones. Los círculos
+numerados de «Com funciona» van en coral. Escala responsive equilibrada: cabecera 64px (móvil) / 80px (md+), logo
+h-10/11/12 según ancho, navegación `text-sm` → 15px en lg, y el título del hero baja a
+`sm:text-4xl xl:text-5xl` con `max-w-4xl` y `text-balance` para no dominar sobre la marca
+(los anclajes usan `scroll-mt-16 md:scroll-mt-20`, a juego con la altura).
+
+**Home (16-09-2026).** Los títulos de sección y de tarjeta bajo el hero de `Landing.tsx` van en
+`text-coral-texto` (el coral de marca en su variante de texto accesible, no `text-coral`).
+
 ### Doble rol: los paneles se ven todos a la vez (31-07-2026)
 
 Una cuenta puede tener más de un panel —productor y receptor, y también el del equipo—. Hasta hoy el

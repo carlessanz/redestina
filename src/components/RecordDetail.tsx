@@ -4,7 +4,7 @@ import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import { useConfirma } from './DialegConfirma'
+import { useConfirma, useTria } from './DialegConfirma'
 import type { CampoDef } from '../lib/crudCampos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -48,6 +48,7 @@ export default function RecordDetail({
 }: Props) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
+  const { tria, dialeg: dialegTria } = useTria()
   const waActiu = useWhatsappActiu()
   const [correuObert, setCorreuObert] = useState(false)
   const esNuevo = registro == null
@@ -102,21 +103,79 @@ export default function RecordDetail({
     onSaved()
   }
 
+  /**
+   * La ficha del OTRO papel de la misma organización (doble rol: productora + receptora), si
+   * existe. Se enlazan por `organizacion_id` (§ organizaciones); sin él, la ficha está sola.
+   */
+  async function fitxaGermana(): Promise<{ id: string; nom: string | null } | null> {
+    const org = (registro?.organizacion_id as string | null | undefined) ?? null
+    if (!org) return null
+    if (tabla === 'productores') {
+      const { data } = await supabase.from('entidades').select('id, nombre').eq('organizacion_id', org).maybeSingle()
+      const e = data as { id: string; nombre: string | null } | null
+      return e ? { id: e.id, nom: e.nombre } : null
+    }
+    const { data } = await supabase.from('productores').select('id, name, empresa').eq('organizacion_id', org).maybeSingle()
+    const p = data as { id: string; name: string | null; empresa: string | null } | null
+    return p ? { id: p.id, nom: p.empresa || p.name } : null
+  }
+
   async function borrar() {
     if (!registro) return
     const nombre = String(form[nombreKey] ?? tipo)
-    if (!(await confirma({
+    const germana = await fitxaGermana()
+    const taulaGermana = tabla === 'productores' ? 'entidades' : 'productores'
+
+    // Cuántas cuentas de usuario cuelgan de estas fichas (`membresias`, que se borran en cascada).
+    // Borrar la ficha deja a esas cuentas sin panel —y sin acceso—, y eso tiene que saberse ANTES.
+    const idsProd = [tabla === 'productores' ? registro.id : germana?.id].filter(Boolean) as string[]
+    const idsEnt = [tabla === 'entidades' ? registro.id : germana?.id].filter(Boolean) as string[]
+    const comptesDe = async (col: 'productor_id' | 'entidad_id', ids: string[]) => {
+      if (!ids.length) return [] as string[]
+      const { data } = await supabase.from('membresias').select('user_id').in(col, ids)
+      return ((data as { user_id: string }[] | null) ?? []).map((m) => m.user_id)
+    }
+    const comptesAquesta = new Set(await comptesDe(tabla === 'productores' ? 'productor_id' : 'entidad_id', [registro.id]))
+    const comptesTotes = new Set([...await comptesDe('productor_id', idsProd), ...await comptesDe('entidad_id', idsEnt)])
+    const avisComptes = (n: number) => (n > 0 ? `\n\n${t('rec.delete_accounts', { n })}` : '')
+
+    // Doble rol: se pregunta si se borra solo este papel o los dos. Con uno solo, el «¿seguro?» de siempre.
+    let tambeGermana = false
+    if (germana) {
+      const esProd = tabla === 'productores'
+      const opcio = await tria({
+        titol: t('rec.confirm_delete_t', { name: nombre }),
+        descripcio: t('rec.dual_delete_desc', { role: t(esProd ? 'rec.role_receptora' : 'rec.role_productora') }) + avisComptes(comptesTotes.size),
+        opcions: [
+          { valor: 'aquesta', text: t(esProd ? 'rec.dual_only_producer' : 'rec.dual_only_entity'), destructiu: true },
+          { valor: 'dues', text: t('rec.dual_both'), destructiu: true },
+        ],
+      })
+      if (!opcio) return
+      tambeGermana = opcio === 'dues'
+    } else if (!(await confirma({
       titol: t('rec.confirm_delete_t', { name: nombre }),
-      descripcio: t('rec.confirm_delete'),
+      descripcio: t('rec.confirm_delete') + avisComptes(comptesAquesta.size),
       confirmar: t('c.delete'),
       destructiu: true,
     }))) return
+
     setError(null)
     setGuardando(true)
     const { error: delError } = await supabase.from(tabla).delete().eq('id', registro.id)
+    if (delError) { setGuardando(false); setError(mensajeError(delError)); return }
+    if (tambeGermana && germana) {
+      const { error: delError2 } = await supabase.from(taulaGermana).delete().eq('id', germana.id)
+      if (delError2) {
+        setGuardando(false)
+        // La primera ya no existe: se avisa y se vuelve al listado, para no dejar la pantalla sobre una ficha borrada.
+        toast.error(t('rec.dual_partial', { err: mensajeError(delError2) }))
+        onSaved()
+        return
+      }
+    }
     setGuardando(false)
-    if (delError) { setError(mensajeError(delError)); return }
-    toast.success(t('rec.deleted'))
+    toast.success(tambeGermana ? t('rec.dual_deleted') : t('rec.deleted'))
     onSaved()
   }
 
@@ -246,6 +305,7 @@ export default function RecordDetail({
       />
 
       {dialeg}
+      {dialegTria}
     </div>
   )
 }

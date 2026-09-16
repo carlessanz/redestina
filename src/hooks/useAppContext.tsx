@@ -13,7 +13,7 @@
 // hasta que la guarda lo arreglaba. Derivándolo del pathname siempre están en fase, y
 // además se pueden pintar los dos menús a la vez sin que nada tenga que «conmutar».
 
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import type { ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
@@ -48,10 +48,16 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   const { pathname } = useLocation()
   const rolRuta = rolDeLaRuta(pathname)
 
+  // Cada carga lleva un número: si otra más nueva (p. ej. el SIGNED_IN de un acceso directo)
+  // arranca mientras esta espera, la vieja no pisa el contexto al terminar.
+  const darrera = useRef(0)
+
   const carrega = useCallback(async () => {
+    const n = ++darrera.current
     setCarregant(true)
     const { data: sessio } = await supabase.auth.getSession()
     const usuari = sessio.session?.user
+    if (n !== darrera.current) return
     if (!usuari) {
       setCtx(null)
       setCarregant(false)
@@ -68,6 +74,7 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
       nou = mapejaContext(data as ContextCru)
     }
 
+    if (n !== darrera.current) return
     setCtx(nou)
     setCarregant(false)
   }, [])
