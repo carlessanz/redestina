@@ -26,6 +26,7 @@ import { useT } from '../../lib/i18n'
 import { dataCurta } from '../../lib/albarans'
 import { enviarConveni, enviarCorreuConveni, prepararConveni } from '../../lib/convenis'
 import type { CampanyaFila, FitxaIncompleta } from '../../lib/convenis'
+import { Casella } from '../../components/Casella'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -355,9 +356,7 @@ export default function CampanyaConvenis() {
                       return (
                         <TableRow key={clau}>
                           <TableCell>
-                            <input
-                              type="checkbox"
-                              className="size-5 accent-primary"
+                            <Casella
                               aria-label={f.nom ?? clau}
                               disabled={f.nomes_firma_assistida || f.te_conveni_vigent || enviant}
                               checked={triades.has(clau)}

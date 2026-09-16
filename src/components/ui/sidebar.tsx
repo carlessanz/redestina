@@ -584,8 +584,19 @@ function SidebarMenuBadge({
       data-slot="sidebar-menu-badge"
       data-sidebar="menu-badge"
       className={cn(
-        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1 text-xs font-medium text-sidebar-foreground tabular-nums select-none",
-        "peer-hover/menu-button:text-sidebar-accent-foreground peer-data-[active=true]/menu-button:text-sidebar-accent-foreground",
+        // ⚠️ CHIP BLANCO CON TEXTO CORAL, NO TEXTO SUELTO (16-09-2026). De serie esto era
+        //    `text-sidebar-foreground` sin fondo: sobre el verde del menú, un «1» claro
+        //    sobre verde oscuro que no lo veía nadie — que es justo lo contrario de lo que
+        //    un contador existe para hacer. La regla del sistema (design/DESIGN.md §6):
+        //    **sobre fondo de color, el badge es un chip BLANCO** y el color lo lleva el
+        //    texto, coral si avisa y verde si informa.
+        // ⚠️ `text-coral-texto` y NO `text-coral`: el coral de marca da 2.67:1 sobre blanco
+        //    y esto es texto pequeño. `coral-texto` es el token que existe justo para esto
+        //    (4.47:1). Ver §2bis — «nunca texto pequeño en coral».
+        "pointer-events-none absolute right-1 flex h-5 min-w-5 items-center justify-center rounded-md px-1.5 bg-card text-xs font-semibold text-coral-texto tabular-nums select-none shadow-sm",
+        // El color NO cambia al pasar por encima ni con la entrada activa: antes lo hacía
+        // (`text-sidebar-accent-foreground`) y el contador volvía a desaparecer justo en la
+        // sección en la que estabas.
         "peer-data-[size=sm]/menu-button:top-1",
         "peer-data-[size=default]/menu-button:top-1.5",
         "peer-data-[size=lg]/menu-button:top-2.5",

@@ -103,6 +103,48 @@ Los componentes son los de shadcn/ui en `src/components/ui/` (estilo new-york). 
 
 **Parte pública.** Fondo crema, `display` en Sora 800, claim en `subtitulo`, bloques alternos crema/blanco. El coral aparece como acento gráfico (subrayado, contador, el «RE» de las secciones), no como fondo de grandes áreas.
 
+### 6bis. Los controles miden todos lo mismo (16-09-2026)
+
+🔴 **Ningún control de formulario se estila a mano.** Casilla, desplegable, campo de texto:
+si hace falta uno, se usa el componente que ya existe o se añade allí. La regla nace de un
+caso concreto —el cliente vio dos casillas de tamaños distintos en la misma pantalla de
+firma— y de lo que salió al mirar: había **tres** apariencias de casilla en la aplicación,
+`mt-1 size-5 accent-primary`, `size-5 accent-primary` y **una sin ninguna clase**, o sea el
+control por defecto del navegador, que ni siquiera mide igual en Safari que en Chrome.
+
+| Control | Se usa | Nunca |
+| --- | --- | --- |
+| Casilla | `components/Casella` (`Casella` suelta, `FilaCasella` con etiqueta) | `<input type="checkbox">` a pelo |
+| Campo de texto | `ui/input` | Un `<input>` estilado a mano |
+| Desplegable | `ui/select`, o un `<select>` nativo con `text-base md:text-sm` (§2 regla 1) | Un `<select>` sin ese tamaño: iOS amplía la página y no lo deshace |
+
+⚠️ **`size-5` NO basta dentro de un flex, y ese era el fallo de verdad**: fija el tamaño
+*preferido*, no el mínimo, así que una casilla junto a una etiqueta larga **se deja
+aplastar por ella**. Las dos de la firma llevaban la misma clase y se veían distintas por
+eso. Lo que lo arregla es **`shrink-0`**, y por eso vive dentro del componente y no en cada
+sitio que lo use.
+
+⚠️ **El cuadro mide 20 px; el área táctil, 44.** Se agranda la fila (`FilaCasella`), no el
+dibujo: una casilla de 44 px de lado deja de parecer una casilla.
+
+### 6ter. Badges sobre fondo de color: chip blanco, color en el texto (16-09-2026)
+
+**Sobre cualquier superficie de color —el menú lateral verde, una banda de aviso— un badge
+es un chip BLANCO y el color lo lleva el texto**: coral si avisa de algo que hay que hacer,
+verde si solo informa. Ante la duda, coral.
+
+Venía de que el contador del menú lateral era texto claro sin fondo sobre el verde oscuro
+del `sidebar`: un «1» que no veía nadie, que es lo contrario de lo que un contador existe
+para hacer.
+
+⚠️ **El texto va en `coral-texto`, no en `coral`.** El coral de marca da 2.67:1 sobre blanco
+y un badge es texto pequeño; `coral-texto` (#c9503f, 4.47:1) es el token que existe
+exactamente para esto (§2). Lo mismo con el verde: `verde-oscuro`, no `primary`.
+
+⚠️ **Y el color no puede cambiar al pasar por encima ni con la entrada activa.** El badge
+del menú tenía `peer-hover:text-sidebar-accent-foreground`, así que volvía a desaparecer
+justo en la sección en la que estabas.
+
 ## 7. Lo que no está decidido
 
 - Modo oscuro: no existe en el branding y no se implementa. El `@custom-variant dark` de `index.css` se queda, sin valores.

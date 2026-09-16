@@ -373,6 +373,19 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   correos es clara** (§9bis). Nada de `brightness-0 invert` ni
   filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
   `design/DESIGN.md §4`.
+- 🔴 **Ningún control de formulario se estila a mano** (16-09-2026). Casilla →
+  `components/Casella` (`Casella` suelta, `FilaCasella` con etiqueta y 44 px de fila);
+  campo → `ui/input`; desplegable → `ui/select` o un `<select>` con `text-base md:text-sm`.
+  Salió de que el cliente viera **dos casillas de tamaños distintos en la misma pantalla**:
+  había tres apariencias en la aplicación y una era el control por defecto del navegador.
+  ⚠️ El fallo que lo explica: **`size-5` no basta dentro de un flex** —fija el tamaño
+  preferido, no el mínimo—, así que una casilla junto a una etiqueta larga se deja aplastar
+  por ella. Lo que lo arregla es `shrink-0`, y por eso vive en el componente. `design/DESIGN.md §6bis`.
+- 🔴 **Un badge sobre fondo de color es un chip BLANCO con el texto en color** —`coral-texto`
+  si avisa, `verde-oscuro` si informa; ante la duda, coral—. Nunca texto suelto: el contador
+  del menú lateral era `text-sidebar-foreground` sin fondo sobre el verde del `sidebar`, o
+  sea invisible. Y **el color no cambia al pasar por encima ni con la entrada activa**, que
+  es lo que lo hacía desaparecer justo en la sección en la que estabas. `design/DESIGN.md §6ter`.
 - **Fuentes**: Sora (500/600/700/800) e Inter (400/500/600/700), libres (OFL), desde Google Fonts
   en `index.html`. No hay fuentes propias en el repo.
 - Modo oscuro: no existe en el branding y no se implementa (`@custom-variant dark` se queda sin valores).

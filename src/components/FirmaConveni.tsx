@@ -57,6 +57,8 @@ import type { DadesConveni, DadesOrganitzacio } from '../lib/enllacPublic'
 import { useSessio } from '../hooks/useSessio'
 import { cn } from '../lib/utils'
 import SignaturePad from './SignaturePad'
+import { FilaCasella } from './Casella'
+import { marcadorsDelFormulari, omplirMarcadors } from '../lib/marcadors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -260,6 +262,14 @@ export default function FirmaConveni(
     )
   }
 
+  // ⚠️ SOLO PARA MIRAR. `dades.textConveni` se queda intacto y es lo que respalda la huella
+  //    que viaja de vuelta; esto es una copia con los datos del formulario puestos, para que
+  //    nadie lea «amb NIF {{organitzacio.nif}}» justo antes de firmar. Detalle y el porqué
+  //    de que no rompa nada, en `lib/marcadors.ts`.
+  const textVisible = dades.textConveni
+    ? omplirMarcadors(dades.textConveni, marcadorsDelFormulari({ ...org }, nom, carrec))
+    : null
+
   const exigits = dades.obligatoris.length > 0 ? dades.obligatoris : OBLIGATORIS_PER_DEFECTE
   const falten = CAMPS.filter((c) => exigits.includes(c.clau) && org[c.clau].trim() === '')
   const calCodi = dades.calCodi && !codiValidat
@@ -311,15 +321,19 @@ export default function FirmaConveni(
               de vuelta al firmar y es lo que convierte un «firmó» en un «firmó ESTO». */}
           <section className="space-y-3">
             <h2 className="text-base">{t('sig.text_title')}</h2>
-            {dades.textConveni ? (
+            {/* ⚠️ CON DOS COLUMNAS, ESTA CAJA NO SCROLLEA. Antes sí, y eso daba el doble
+                scroll que se veía: una barra dentro de otra, y cada rueda de ratón movía la
+                que no tocaba. Desde `lg` crece a su alto natural y quien scrollea es la
+                columna (ver el grid de abajo); por debajo de `lg` —y en la página pública—
+                se queda la ventana de 24rem de siempre, que ahí sí hace falta porque no hay
+                ninguna columna que scrollee por ella. */}
+            {textVisible ? (
               <div className={cn(
-                'overflow-y-auto rounded-md border bg-secondary p-3',
-                // En el diálogo el convenio manda: ocupa su columna entera en vez de una
-                // ventanita de 24rem con el resto del formulario empujado debajo.
-                ample ? 'max-h-[min(55vh,40rem)]' : 'max-h-96',
+                'rounded-md border bg-secondary p-3',
+                ample ? 'max-h-96 overflow-y-auto lg:max-h-none lg:overflow-visible' : 'max-h-96 overflow-y-auto',
               )}>
                 <p className="whitespace-pre-wrap text-sm text-secondary-foreground">
-                  {dades.textConveni}
+                  {textVisible}
                 </p>
               </div>
             ) : (
@@ -363,18 +377,14 @@ export default function FirmaConveni(
               es imposible de acertar con un dedo. */}
           <section className="space-y-2">
             <h2 className="text-base">{t('sig.declare_title')}</h2>
-            <label className="flex min-h-11 items-start gap-3 rounded-md border p-3 text-base">
-              <input type="checkbox" className="mt-1 size-5 accent-primary"
-                checked={declaracio} onChange={(e) => setDeclaracio(e.target.checked)} />
-              {/* El texto de las dos declaraciones viene del convenio, no de la interfaz:
-                  es parte de lo que se firma. La clave i18n es solo el respaldo. */}
-              <span className="text-sm">{dades.declaracioRepresentacio ?? t('sig.declare_rep')}</span>
-            </label>
-            <label className="flex min-h-11 items-start gap-3 rounded-md border p-3 text-base">
-              <input type="checkbox" className="mt-1 size-5 accent-primary"
-                checked={acceptacio} onChange={(e) => setAcceptacio(e.target.checked)} />
-              <span className="text-sm">{dades.declaracioAcceptacio ?? t('sig.declare_accept')}</span>
-            </label>
+            {/* El texto de las dos declaraciones viene del convenio, no de la interfaz: es
+                parte de lo que se firma. La clave i18n es solo el respaldo. */}
+            <FilaCasella caixa checked={declaracio} onChange={setDeclaracio}>
+              {dades.declaracioRepresentacio ?? t('sig.declare_rep')}
+            </FilaCasella>
+            <FilaCasella caixa checked={acceptacio} onChange={setAcceptacio}>
+              {dades.declaracioAcceptacio ?? t('sig.declare_accept')}
+            </FilaCasella>
           </section>
     </>
   )
@@ -467,8 +477,10 @@ export default function FirmaConveni(
   )
 
   return (
-    <div className="space-y-6">
-      <header>
+    // Con `ample` el componente ocupa el alto que le den y reparte por dentro; sin él,
+    // crece a su contenido y scrollea la página, que es lo correcto en un móvil.
+    <div className={cn('space-y-6', ample && 'lg:flex lg:h-full lg:flex-col')}>
+      <header className={cn(ample && 'lg:shrink-0')}>
         <h1 className="text-lg font-semibold">{t('sig.title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">
           {/* El nombre del modelo lo da el servidor ya traducido al idioma DEL CONVENIO,
@@ -491,9 +503,15 @@ export default function FirmaConveni(
         // que se lee y se acepta: el convenio queda al lado del formulario en vez de
         // empujarlo un metro hacia abajo, que era la queja. Por debajo de `lg` el grid
         // colapsa a una columna y el resultado es el de la página.
-        <div className="grid gap-6 lg:grid-cols-2 lg:items-start">
-          <div className="space-y-6">{seccio_org}{seccio_firmant}</div>
-          <div className="space-y-6">
+        /* Cada columna con su propia barra y el diálogo sin ninguna: es lo que quita el
+           scroll anidado. `min-h-0` es lo que permite que un hijo de flex/grid encoja por
+           debajo de su contenido — sin él, `overflow-y-auto` no llega a activarse nunca y
+           la columna empuja el diálogo. */
+        <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:items-stretch">
+          <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
+            {seccio_org}{seccio_firmant}
+          </div>
+          <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
             {seccio_text}{seccio_checks}{seccio_trac}{seccio_codi}{seccio_enviar}
           </div>
         </div>

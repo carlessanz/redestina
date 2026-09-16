@@ -20,6 +20,7 @@ import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
+import { Casella } from './Casella'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -689,8 +690,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
-                  <label className="flex items-center gap-1 text-xs text-muted-foreground">
-                    <input type="checkbox" checked={ent.opt_in} onChange={() => void toggleOptIn(ent.id, ent.opt_in)} />
+                  <label className="flex items-center gap-2 text-xs text-muted-foreground">
+                    <Casella checked={ent.opt_in} onChange={() => void toggleOptIn(ent.id, ent.opt_in)} />
                     {t('od.optin')}
                   </label>
                   {/* Envío por el canal recomendado. Los otros dos fuerzan uno concreto.
