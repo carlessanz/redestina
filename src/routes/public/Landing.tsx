@@ -116,10 +116,20 @@ export default function Landing() {
         </nav>
       </section>
 
+      {/* ⚠️ LOS TÍTULOS DE SECCIÓN VAN EN `coral-oscuro`, QUE ES EL COLOR EXACTO DEL «RE»
+          DEL LOGO (#e56a5c), y es una decisión del cliente tomada sabiendo lo que cuesta
+          (16-09-2026): sobre el crema de la portada da **2,85:1**, por debajo del 3:1 que
+          WCAG pide incluso para texto grande. Se midió y se le dijo; su respuesta fue «me
+          da igual la legibilidad, quiero ese naranja».
+          🔴 NO ES UN DESCUIDO Y NO SE «ARREGLA» PONIENDO `coral-texto`: eso ya estuvo y se
+             cambió a propósito porque no se parecía al logo. Si alguien vuelve a medir el
+             contraste y quiere corregirlo, que lo hable antes con el cliente.
+          ⚠️ Esto vale SOLO para estos títulos de la portada. El resto del texto en coral
+             sigue en `coral-texto` (4,47:1), que es para lo que ese token existe. */}
       {/* Cómo funciona: misma maquetación que el tablero del equipo (Dashboard, «dash.how») */}
       <section id="com-funciona" className="scroll-mt-16 md:scroll-mt-20 bg-background">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
-          <h2 className="text-2xl font-bold text-coral-texto md:text-3xl">{t('land.how_title')}</h2>
+          <h2 className="text-2xl font-bold text-coral-oscuro md:text-3xl">{t('land.how_title')}</h2>
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PROCES.map((p) => (
               <Card key={p.n}>
@@ -139,7 +149,7 @@ export default function Landing() {
       {/* Para quién: los dos perfiles que se pueden registrar, cada uno con su alta */}
       <section id="per-a-qui" className="scroll-mt-16 md:scroll-mt-20 bg-muted/50">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
-          <h2 className="text-2xl font-bold text-coral-texto md:text-3xl">{t('land.who_title')}</h2>
+          <h2 className="text-2xl font-bold text-coral-oscuro md:text-3xl">{t('land.who_title')}</h2>
           <div className="grid gap-4 md:grid-cols-2">
             <Card>
               <CardContent className="pt-6">

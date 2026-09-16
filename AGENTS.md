@@ -1950,8 +1950,15 @@ el contexto previo al login (vacío) y `SenseAcces` no volvía a mirar al llegar
 sus accesos de prueba, filtros de Missatgeria, Espigolades, Aprovacions, textos del proceso y del
 tablero. Solo textos (`i18n.tsx`, `accessosTest.ts`); rutas (`/productor/…`), tipos y columnas no
 cambian. Cabecera pública rehecha: 64px, navegación junto al logo (antes centrada y lejos de la
-marca), enlaces en peso medio con hover y foco, divisor entre idioma y acciones. Solo los títulos de sección (h2) van en coral; los círculos numerados y los títulos de
-tarjeta (h3) van en verde (`bg-primary` / `text-primary`). Escala responsive equilibrada: cabecera 64px (móvil) / 80px (md+), logo
+marca), enlaces en peso medio con hover y foco, divisor entre idioma y acciones. Solo los títulos de sección (h2) llevan el color de marca; los círculos numerados y los
+títulos de tarjeta (h3) van en verde (`bg-primary` / `text-primary`).
+🔴 **Y desde el 16-09-2026 esos h2 van en `coral-oscuro` (#e56a5c), que es el color EXACTO
+del «RE» del logo, no en `coral-texto`.** Es decisión del cliente tomada sabiendo el precio:
+sobre el crema de la portada da **2,85:1**, por debajo del 3:1 que WCAG pide incluso para
+texto grande. Se midió, se le dijo, y su respuesta fue «me da igual la legibilidad, quiero
+ese naranja». **No se «arregla» volviendo a `coral-texto`** —eso ya estuvo y se cambió
+justamente porque no se parecía al logo—: quien vuelva a medirlo y quiera corregirlo, que lo
+hable antes con él. Vale **solo** para esos dos títulos. Escala responsive equilibrada: cabecera 64px (móvil) / 80px (md+), logo
 h-10/11/12 según ancho, navegación `text-sm` → 15px en lg, y el título del hero baja a
 `sm:text-4xl xl:text-5xl` con `max-w-4xl` y `text-balance` para no dominar sobre la marca
 (los anclajes usan `scroll-mt-16 md:scroll-mt-20`, a juego con la altura).

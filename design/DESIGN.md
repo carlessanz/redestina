@@ -141,6 +141,17 @@ para hacer.
 y un badge es texto pequeño; `coral-texto` (#c9503f, 4.47:1) es el token que existe
 exactamente para esto (§2). Lo mismo con el verde: `verde-oscuro`, no `primary`.
 
+🔴 **Y el coral es SOLO de los badges** (decisión del cliente, 16-09-2026). No es el color
+de acento de cualquier cosa que quiera destacar: los círculos numerados de la portada, por
+ejemplo, **son círculos y no badges**, y van en verde. Antes de pintar algo en coral, la
+pregunta es «¿esto es un badge?».
+
+🔴 **La excepción, y es una sola: los dos h2 de la portada van en `coral-oscuro` (#e56a5c),
+el color exacto del «RE» del logo.** Da 2,85:1 sobre el crema —por debajo del 3:1 de WCAG
+para texto grande— y aun así es lo que se quiere: el cliente lo pidió con el número delante.
+Está anotado en el propio `Landing.tsx` para que nadie lo revierta creyendo que es un fallo.
+**No se extiende a más texto**: el resto del coral escrito sigue en `coral-texto`.
+
 ⚠️ **Y el color no puede cambiar al pasar por encima ni con la entrada activa.** El badge
 del menú tenía `peer-hover:text-sidebar-accent-foreground`, así que volvía a desaparecer
 justo en la sección en la que estabas.
