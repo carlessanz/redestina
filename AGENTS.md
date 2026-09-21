@@ -508,6 +508,11 @@ src/
     FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
                                pública y para el diálogo; `ample` decide el reparto (§6quater)
     DialegFirmaConveni.tsx     Firmar sin salir del panel: 80vw × 88vh, acuña el enlace al abrir
+    FormulariConfirmacio.tsx   EL formulario de confirmación del albarán. Uno solo, para
+                               /confirmar/:token y para el diálogo asistido del equipo
+    FormulariFactura.tsx       Ídem con la factura del donante (/factura/:token)
+    FormulariNovaOferta.tsx    EL cuestionario de alta de oferta. `productorId` por PROP:
+                               es lo que permite que el equipo publique en nombre de otro
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
@@ -2229,6 +2234,26 @@ porque quien llega por el correo puede estar en un móvil y de pie en un camino.
 campos rellenados y un trazo hecho, un clic despistado sería caro.
 ⚠️ **La confirmación de albarán SIGUE navegando** a `/confirmar/:token`: se abre sobre todo
 desde el correo y desde una finca, y llevarla al diálogo es el mismo trabajo otra vez.
+
+**Y ese «mismo trabajo otra vez» se hizo el 21-09-2026, por el modelo asistido.** Las tres
+pantallas públicas que quedaban están partidas ya con el patrón de `FirmaConveni`: el formulario
+en `components/`, la página como marco (`LayoutAcces` + `Card`) y el mismo componente dentro del
+diálogo del equipo. Son `FormulariConfirmacio` (de `/confirmar/:token`), `FormulariFactura` (de
+`/factura/:token`) y `FormulariNovaOferta` (de `/productor/ofertes/nova`).
+
+⚠️ **La tercera no se partió por simetría**: `productorId` salía de `useOrganitzacio('productor')`,
+que un interno **no tiene**, así que el alta de oferta era literalmente inalcanzable para quien
+opera en nombre de otros — aunque `crear-oferta` ya aceptara al equipo y ya sellara
+`canal='asistido'` desde julio. Ahora entra por prop.
+
+⚠️ **`ample` decide el título, no solo el ancho.** Dentro del diálogo el título lo pone su
+cabecera, así que el formulario omite el suyo y conserva **la referencia** —el número del albarán
+o del resumen—, que es lo que dice de qué se está hablando.
+
+⚠️ **El bloqueo por convenio entra por prop en el alta de oferta**, y no se lee dentro:
+`useConveni` mira las organizaciones **de la cuenta**, y la del equipo no tiene ninguna. Leído
+dentro daría `false` siempre en el alta asistida y dejaría al dinamizador delante de un `42501`
+que la pantalla podía haber anticipado.
 
 ⚠️ **`/signar` y `/confirmar` siguen siendo públicas, y desde el 14-09-2026 también se
 llega a ellas CON sesión**, desde el panel (`acunar_enllac_propi`, §6ter). No cambia quién
