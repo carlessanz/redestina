@@ -1987,6 +1987,15 @@ tiene en el correo (§12.97). `DialegAssistit` sirve para el albarán **y** para
 mismo gesto y solo cambia el propósito—; `DialegFirmaAssistida` se queda aparte porque su enlace
 lo acuña otra RPC y lleva segundo factor.
 
+**Y los dos actos asistidos están TAMBIÉN donde ya se trabajaba**, no solo en la pantalla
+guiada: `AlbaraDetall` lleva «Confirmació assistida» cuando el albarán está `entregado`, y
+`TancamentDetall` lleva «Factura amb acompanyament» junto al botón de factura de cada donante.
+Quien está revisando un albarán no tiene por qué salir a otra pantalla para llamar por teléfono.
+
+⚠️ **En el albarán eso cierra un hueco real, no añade un atajo**: `marcar_entregado()` solo crea
+enlace `where d.email is not null`, así que **una ficha sin correo no tenía forma de confirmar
+nunca**. La vía asistida no necesita correo — el enlace no se manda, se abre.
+
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
 Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo

@@ -44,6 +44,7 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import { BadgeMode } from './Tancament'
+import DialegAssistit from '../../components/equip/DialegAssistit'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -243,6 +244,9 @@ export default function TancamentDetall() {
 
   // Diálogos, cada uno con el donante sobre el que actúa.
   const [factura, setFactura] = useState<Donant | null>(null)
+  // La subida conducida por teléfono: el donante dicta el número y el importe y el
+  // equipo sube el PDF que le acaba de mandar. Queda como asistida, con su nombre.
+  const [facturaAssistida, setFacturaAssistida] = useState<Donant | null>(null)
   const [simula, setSimula] = useState<Donant | null>(null)
   const [excepcio, setExcepcio] = useState<Donant | null>(null)
   const [rectifica, setRectifica] = useState<Donant | null>(null)
@@ -750,6 +754,7 @@ export default function TancamentDetall() {
                       onMostra={(docId) => void descarregador.mostra(docId)}
                       onResum={(prov) => void resum(d, prov)}
                       onFactura={() => setFactura(d)}
+                      onFacturaAssistida={() => setFacturaAssistida(d)}
                       onSimula={() => setSimula(d)}
                       onCertificat={() => void certificat(d, null)}
                       onExcepcio={() => setExcepcio(d)}
@@ -763,6 +768,16 @@ export default function TancamentDetall() {
           )}
         </CardContent>
       </Card>
+
+      {facturaAssistida && (
+        <DialegAssistit
+          obert
+          que="factura"
+          objecteId={facturaAssistida.id}
+          onTancar={() => setFacturaAssistida(null)}
+          onFet={() => { setFacturaAssistida(null); void carrega() }}
+        />
+      )}
 
       {/* --- Contraste con las cifras reales (solo en prueba) --- */}
       {esProva && potAprovar && (
@@ -927,7 +942,7 @@ function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
 
 function FilaDonant({
   d, docs, esProva, potAprovar, esSuperAdmin, ocupat, descarregant, generant,
-  onDescarrega, onMostra, onResum, onFactura, onSimula, onCertificat, onExcepcio, onRectifica,
+  onDescarrega, onMostra, onResum, onFactura, onFacturaAssistida, onSimula, onCertificat, onExcepcio, onRectifica,
   onEnviat,
 }: {
   d: Donant
@@ -942,6 +957,8 @@ function FilaDonant({
   onMostra: (docId: string) => void
   onResum: (provisional: boolean) => void
   onFactura: () => void
+  /** La vía asistida: acuña el enlace y abre el formulario del donante en un diálogo. */
+  onFacturaAssistida: () => void
   onSimula: () => void
   onCertificat: () => void
   onExcepcio: () => void
@@ -1079,6 +1096,17 @@ function FilaDonant({
                 onClick={onFactura}
               >
                 {t('tan.a_invoice')}
+              </Button>
+              {/* La misma factura, pero subida CON el donante al teléfono: el formulario
+                  que él vería, dentro de un diálogo, y la evidencia marcada como asistida
+                  con el nombre de quien la conduce (§9). */}
+              <Button
+                size="sm" variant="outline"
+                className="h-11 whitespace-normal md:h-8"
+                disabled={ocupat}
+                onClick={onFacturaAssistida}
+              >
+                {t('tan.a_invoice_assisted')}
               </Button>
               {esProva && (
                 <Button

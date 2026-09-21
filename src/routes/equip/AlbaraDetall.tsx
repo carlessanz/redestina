@@ -36,6 +36,7 @@ import DialegMotiu from '../../components/DialegMotiu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
+import DialegAssistit from '../../components/equip/DialegAssistit'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -193,6 +194,8 @@ export default function AlbaraDetall() {
   const [dialegConciliar, setDialegConciliar] = useState(false)
   const [proposta, setProposta] = useState<PropostaConciliacio | null>(null)
   const [enllacosNous, setEnllacosNous] = useState<{ nom: string; url: string }[]>([])
+  // La confirmación conducida por teléfono, con la persona al otro lado (§9).
+  const [dlgAssistit, setDlgAssistit] = useState(false)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -766,6 +769,35 @@ export default function AlbaraDetall() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── La vía asistida ──
+          Hasta el 21-09-2026 este albarán solo se podía confirmar desde el enlace del
+          correo, y una ficha SIN correo no tenía enlace ninguno (`marcar_entregado` solo
+          lo crea `where d.email is not null`): se quedaba sin poder confirmar nunca. Esto
+          lo conduce el equipo con la persona al teléfono, y queda registrado como
+          asistido —con su nombre— en la evidencia y en el PDF, no como «enviado por
+          correo», que era lo que el documento afirmaba antes. */}
+      {albara.estado === 'entregado' && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('canalz.b_confirmacio_assistida')}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">{t('alb.assisted_hint')}</p>
+            <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgAssistit(true)}>
+              {t('canalz.b_confirmacio_assistida')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {dlgAssistit && (
+        <DialegAssistit
+          obert
+          que="albara"
+          objecteId={albara.id}
+          onTancar={() => setDlgAssistit(false)}
+          onFet={() => { setDlgAssistit(false); void carrega() }}
+        />
+      )}
 
       {/* Los enlaces recién creados, con su token. Solo existen en esta pantalla y una vez. */}
       {enllacosNous.length > 0 && (
