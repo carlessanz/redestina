@@ -44,7 +44,11 @@
 import fontkit from "npm:@pdf-lib/fontkit@1";
 import type { PDFDocument, PDFFont, PDFImage } from "npm:pdf-lib@1";
 
-/** Nombres de fichero esperados dentro de la carpeta `activos/` de la función. */
+/**
+ * Los ficheros de origen, en la carpeta `activos/` de la función. Ya no se leen en
+ * ejecución —van incrustados, ver `cargarActivos`— pero siguen siendo la fuente de verdad
+ * y son lo que lee `scripts/incrustar-activos.ts`.
+ */
 export const FICHEROS = {
   titulo: "Sora-SemiBold.ttf",
   tituloFuerte: "Sora-Bold.ttf",
@@ -78,36 +82,52 @@ export interface Fuentes {
  * las peticiones siguientes reutilizan los mismos bytes (son inmutables: nadie los
  * escribe, solo se pasan a `embedFont`, que copia).
  */
-const cache = new Map<string, Promise<BytesActivos>>();
+/** Los cinco activos de un PDF, en base64. Los sirve el módulo generado de la función. */
+export interface ActivosBase64 {
+  titulo: string;
+  tituloFuerte: string;
+  cuerpo: string;
+  cuerpoFuerte: string;
+  logo: string;
+}
 
-export function cargarActivos(base: URL): Promise<BytesActivos> {
-  const clave = base.href;
-  const guardado = cache.get(clave);
-  if (guardado) return guardado;
+/**
+ * Decodifica una vez por isolate. Son inmutables —nadie los escribe, solo se pasan a
+ * `embedFont`, que copia—, así que la caché de módulo es segura.
+ */
+let cache: BytesActivos | null = null;
 
-  const leer = async (nombre: string) => await Deno.readFile(new URL(nombre, base));
-  const promesa = (async (): Promise<BytesActivos> => {
-    const [titulo, tituloFuerte, cuerpo, cuerpoFuerte] = await Promise.all([
-      leer(FICHEROS.titulo),
-      leer(FICHEROS.tituloFuerte),
-      leer(FICHEROS.cuerpo),
-      leer(FICHEROS.cuerpoFuerte),
-    ]);
-    // El logo es opcional: un documento sin logo es feo, uno que no se genera es un
-    // fallo. Si falta el fichero, se sigue adelante sin él.
-    let logo: Uint8Array | null = null;
-    try {
-      logo = await leer(FICHEROS.logo);
-    } catch (e) {
-      console.warn("pdf: sin logo:", e instanceof Error ? e.message : String(e));
-    }
-    return { titulo, tituloFuerte, cuerpo, cuerpoFuerte, logo };
-  })();
+function deBase64(b64: string): Uint8Array {
+  const binario = atob(b64);
+  const bytes = new Uint8Array(binario.length);
+  for (let i = 0; i < binario.length; i++) bytes[i] = binario.charCodeAt(i);
+  return bytes;
+}
 
-  // Si la lectura falla no se cachea el fallo: el siguiente intento vuelve a probar.
-  promesa.catch(() => cache.delete(clave));
-  cache.set(clave, promesa);
-  return promesa;
+/**
+ * 🔴 **Los activos van DENTRO del bundle, no en el disco, y eso se aprendió rompiéndolo**
+ * (21-09-2026). Hasta ese día se leían con `Deno.readFile` de la carpeta `activos/`, que
+ * `static_files` de `config.toml` sube. Un redespliegue con el CLI nuevo cambió el modo de
+ * empaquetado y esos ficheros **dejaron de llegar al isolate**: `generar-documento` empezó
+ * a responder `path not found` en TODOS los documentos, y como el trigger encola y el job
+ * reintenta, el síntoma era una bandeja llena de `error` sin que nada más avisara. Medido
+ * en producción: en ese runtime no existe ni el directorio del propio módulo.
+ *
+ * Un módulo importado viaja siempre con el bundle, se despliegue como se despliegue. Los
+ * .ttf y el .png siguen en la carpeta y son la fuente de verdad; `incrustats.ts` es su
+ * copia empaquetada y se regenera con `deno run -A scripts/incrustar-activos.ts`.
+ */
+export function cargarActivos(b64: ActivosBase64): BytesActivos {
+  if (cache) return cache;
+  cache = {
+    titulo: deBase64(b64.titulo),
+    tituloFuerte: deBase64(b64.tituloFuerte),
+    cuerpo: deBase64(b64.cuerpo),
+    cuerpoFuerte: deBase64(b64.cuerpoFuerte),
+    // El logo es opcional: un documento sin logo es feo, uno que no se genera es un fallo.
+    logo: b64.logo ? deBase64(b64.logo) : null,
+  };
+  return cache;
 }
 
 /** Registra fontkit y embebe las cuatro fuentes en este documento. */

@@ -537,6 +537,8 @@ scripts/
                                por manifestar_interes() y aprovar_resposta()
   prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
+  incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
+                               en base64, dentro del bundle (§11)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
   diagnostico-whatsapp.ts      Interroga la Graph API y distingue token caducado / número / permisos (§8ter)
   estado-documentos.ts         ¿Hay documentos, y su PDF está en el bucket? Separa las tres causas de
@@ -573,7 +575,8 @@ supabase/
                                PENDIENTE; el acceso lo concede el equipo al aprobar, §9)
     enviar-acceso/index.ts     POST: enlace mágico por correo y código de 6 cifras por WhatsApp (§9)
     generar-documento/         POST (secreto): renderiza el PDF y lo sube al bucket. activos/ con
-                               las fuentes y el logo, declarados con static_files en config.toml
+                               las fuentes y el logo, y su copia EN EL BUNDLE (incrustats.ts):
+                               static_files ya no llega al isolate (§11)
     descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
     recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
@@ -3535,7 +3538,20 @@ supabase secrets set --env-file .secrets.env
 # quince por su cuenta (§12.44); se desactivó (§7) porque ese mismo mecanismo crea una rama de
 # preview —otra base de datos— al abrir un PR. El coste aceptado es este: **si no las despliegas
 # tú, no se despliegan**. Un `git push` con una función cambiada y sin `functions deploy` deja el
-# código viejo corriendo en producción sin ningún aviso.
+#
+# 🔴 **Y UN REDESPLIEGUE PUEDE ROMPER LO QUE NO TOCASTE.** El 21-09-2026, redesplegar
+# `generar-documento` sin cambiar una línea suya dejó la generación de PDF **rota en
+# producción**: los ficheros de `static_files` —las cuatro fuentes y el logo— dejaron de
+# llegar al isolate y `Deno.readFile` respondía `path not found` en TODOS los documentos.
+# El CLI cambió el modo de empaquetado, y en el runtime nuevo no existe ni el directorio
+# del propio módulo. Se arregló llevando los activos DENTRO del bundle
+# (`activos/incrustats.ts`, que genera `scripts/incrustar-activos.ts`).
+# ⚠️ **La lección operativa, que vale para cualquier función**: el despliegue no da ningún
+# error —dice «Deployed Functions» igual— y el fallo solo se ve ejecutándola. Tras
+# redesplegar `generar-documento`, **emitir un documento de prueba y comprobar que sale**
+# (`emitir_documento_prova()` con sesión de super_admin; limpieza con
+# `reiniciar_documentos_prova()` + la función `limpiar-documentos-prueba`). La referencia
+# es un PDF de 6 páginas y ~123.600 bytes.
 
 # Publicar en producción: el procedimiento completo vive en el skill `/publicar`
 # (.claude/skills/publicar/SKILL.md). Ejecutarlo es preferible a repetir los pasos a mano:
@@ -3581,6 +3597,10 @@ npm run check:tipos           # solo tsc: tsconfig.json y tsconfig.tests.json
 
 # El hook de pre-commit se instala UNA VEZ por clon (git no ejecuta hooks versionados solo):
 git config core.hooksPath .githooks
+
+# Los activos del PDF viajan DENTRO del bundle, no en el disco (§11, 21-09-2026). Tras
+# cambiar una fuente o el logo hay que regenerar el módulo y redesplegar generar-documento:
+deno run -A scripts/incrustar-activos.ts
 
 # Qué Edge Functions han cambiado DE VERDAD entre dos despliegues (§12.44). La salida del
 # CLI no sirve para saberlo; el `ezbr_sha256` sí, pero hace falta guardar el de antes.

@@ -124,9 +124,13 @@ entrypoint = "./functions/enviar-acceso/index.ts"
 # privado. No verifica JWT porque la llaman el trigger de encolado y el job de reintento
 # por pg_net, que no tienen sesión; se protege con el secreto compartido
 # `x-documentos-secret` (mismo patrón que intake-recordatorios).
-# ⚠️ `static_files` no es opcional: dentro del runtime, `Deno.readFile` NO ve el sistema
-# de ficheros del contenedor, así que sin este bloque no hay fuentes ni logo. Comprobado
-# también que no se puede sortear copiando los ficheros al contenedor.
+# 🔴 `static_files` YA NO SIRVE PARA NADA AQUÍ, y se deja solo porque los ficheros siguen
+# siendo la fuente de verdad. El 21-09-2026 un redespliegue con el CLI nuevo cambió el
+# empaquetado y esos ficheros DEJARON DE LLEGAR al isolate: `Deno.readFile` respondía
+# `path not found` para todos los documentos, y en el árbol real no existía ni el
+# directorio del propio módulo. Las fuentes y el logo van ahora DENTRO del bundle, en
+# `activos/incrustats.ts` (se regenera con `deno run -A scripts/incrustar-activos.ts`).
+# No volver a depender de esta línea para leer nada en ejecución.
 [functions.generar-documento]
 enabled = true
 verify_jwt = false

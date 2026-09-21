@@ -25,6 +25,8 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { type BytesActivos, cargarActivos } from "../_shared/pdf/fuentes.ts";
+// Generado por `scripts/incrustar-activos.ts`: las fuentes y el logo en base64.
+import * as INCRUSTATS from "./activos/incrustats.ts";
 import type {
   ConfirmacionAlbaran,
   DatosAlbaran,
@@ -48,8 +50,12 @@ import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
 
-/** Los activos (TTF y logo) viven en la carpeta de ESTA función, no en `_shared/`. */
-const ACTIVOS = new URL("./activos/", import.meta.url);
+/**
+ * Los activos (TTF y logo) viven en la carpeta de ESTA función, no en `_shared/`, y
+ * viajan **dentro del bundle**: `activos/incrustats.ts` los lleva en base64. No se leen
+ * del disco porque en el runtime no hay disco que valga — ver la nota de `cargarActivos`.
+ */
+const ACTIVOS = INCRUSTATS;
 
 const BUCKET = "documentos";
 /** Bucket privado con la firma y el sello de la apoderada (20260928100600). */
@@ -163,7 +169,7 @@ Deno.serve(async (req) => {
 
   try {
     const tActivos = performance.now();
-    const activos = await cargarActivos(ACTIVOS);
+    const activos = cargarActivos(ACTIVOS);
     const msActivos = performance.now() - tActivos;
 
     const tRender = performance.now();
