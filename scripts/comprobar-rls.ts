@@ -336,6 +336,41 @@ interface Check {
 // evaluar la política. Con la lista explícita, lo que rechaza es la RLS, que es lo que se
 // quiere verificar.
 const DOCUMENTAL_EXTERN: Check[] = [
+  // --- La vía asistida es DEL EQUIPO, y estos tres checks son lo que lo sostiene ---
+  // `acunar_enllac_assistit()` acuña un enlace `canal='asistido'` que luego permite firmar o
+  // confirmar sin sesión. Si un externo pudiera llamarla, podría acuñarse un enlace sobre un
+  // albarán ajeno y confirmarlo por su cuenta: es la puerta más peligrosa de las cuatro
+  // funciones nuevas, y por eso su guarda exige sesión de EQUIPO (no solo sesión).
+  {
+    tabla: "acunar_enllac_assistit",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_proposito: "confirmacion_albaran",
+      p_objeto_tipo: "albaran",
+      p_objeto_id: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO pot encunyar un enllac assistit (nomes l'equip)",
+  },
+  {
+    tabla: "manifestar_interes_assistit",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_excedente: "00000000-0000-0000-0000-000000000000",
+      p_entidad: "00000000-0000-0000-0000-000000000000",
+      p_kg: 1,
+    },
+    descripcion: "NO pot registrar un interes en nom d'una altra entitat",
+  },
+  // Las dos lecturas de la pantalla guiada son `security definer`: si se abrieran, un externo
+  // vería el convenio, los intereses y los albaranes de cualquier lote, con nombres.
+  {
+    tabla: "canalitzacions_actives",
+    op: "rpc",
+    esperado: "denegar",
+    descripcion: "NO pot llistar les canalitzacions de tothom",
+  },
   { tabla: "plantillas_documento", op: "leer", esperado: "denegar", descripcion: "NO ve las plantillas de documento" },
   {
     tabla: "parametros_documentales",
@@ -599,6 +634,41 @@ const DOCUMENTAL_EXTERN: Check[] = [
 // si alguien relaja una política sin querer, aquí sale en rojo.
 const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   equip: [
+    // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
+    // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
+    //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
+    //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
+    //    revoca el anterior—, así que ejercitarla en positivo contra producción le
+    //    rompería el enlace a alguien de verdad. Es el mismo criterio con el que
+    //    `borrar_ficha_completa()` tampoco se prueba en positivo.
+    {
+      tabla: "acunar_enllac_assistit",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_proposito: "confirmacion_albaran",
+        p_objeto_tipo: "albaran",
+        p_objeto_id: "00000000-0000-0000-0000-000000000000",
+      },
+      descripcion: "pot encunyar un enllac assistit (autoritza; l'albara no existeix)",
+    },
+    {
+      tabla: "manifestar_interes_assistit",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_excedente: "00000000-0000-0000-0000-000000000000",
+        p_entidad: "00000000-0000-0000-0000-000000000000",
+        p_kg: 1,
+      },
+      descripcion: "pot registrar un interes assistit (autoritza; l'oferta no existeix)",
+    },
+    {
+      tabla: "canalitzacions_actives",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "veu els lots en curs de la pantalla guiada",
+    },
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
     { tabla: "entidades", op: "leer", esperado: "permitir", descripcion: "ve las entidades" },
     { tabla: "excedentes", op: "leer", esperado: "permitir", descripcion: "ve todas las ofertas" },
@@ -952,6 +1022,41 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
+    // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
+    //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
+    //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
+    //    revoca el anterior—, así que ejercitarla en positivo contra producción le
+    //    rompería el enlace a alguien de verdad. Es el mismo criterio con el que
+    //    `borrar_ficha_completa()` tampoco se prueba en positivo.
+    {
+      tabla: "acunar_enllac_assistit",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_proposito: "confirmacion_albaran",
+        p_objeto_tipo: "albaran",
+        p_objeto_id: "00000000-0000-0000-0000-000000000000",
+      },
+      descripcion: "pot encunyar un enllac assistit (autoritza; l'albara no existeix)",
+    },
+    {
+      tabla: "manifestar_interes_assistit",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_excedente: "00000000-0000-0000-0000-000000000000",
+        p_entidad: "00000000-0000-0000-0000-000000000000",
+        p_kg: 1,
+      },
+      descripcion: "pot registrar un interes assistit (autoritza; l'oferta no existeix)",
+    },
+    {
+      tabla: "canalitzacions_actives",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "veu els lots en curs de la pantalla guiada",
+    },
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
     { tabla: "app_settings", op: "actualizar", esperado: "permitir", descripcion: "puede tocar el modo test" },
     { tabla: "app_config", op: "leer", esperado: "denegar", descripcion: "NO lee los secretos" },

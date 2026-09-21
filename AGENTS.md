@@ -4233,8 +4233,16 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 686/686 correctas y 14 saltadas, «Sin fallos de permisos»**
-   (21-09-2026). Son las 668 anteriores más **18**: el borrado único de una ficha
+   ✅ **Referencia HOY: 713/713 correctas y 14 saltadas, «Sin fallos de permisos»**
+   (21-09-2026). Son las 686 anteriores más **27**, de la vía asistida
+   (`20270329100000`…`20270401100000`): tres checks en `DOCUMENTAL_EXTERN` —que recorre
+   **siete** cuentas externas, de ahí 21— y los mismos tres en los dos bloques de equipo.
+   ⚠️ Los tres «permitir» se llaman con un uuid **inexistente** a propósito: lo que afirman
+   es que la guarda de ROL deja pasar, no que la operación se complete.
+   `acunar_enllac_assistit()` escribe —acuña un enlace y revoca el anterior—, así que
+   ejercitarla en positivo contra producción le rompería el enlace a alguien de verdad. Es
+   el mismo criterio de `borrar_ficha_completa()`.
+   Antes de eso eran 668 más **18**: el borrado único de una ficha
    (`20260921153439`, deuda 108) mete dos checks en `DOCUMENTAL_EXTERN` —que recorre siete
    cuentas externas— y dos en cada bloque del equipo (`tecnic`, `super_admin`). ⚠️ Ninguno de
    los 18 ejercita `borrar_ficha_completa()` contra una ficha de verdad: el arnés corre contra
