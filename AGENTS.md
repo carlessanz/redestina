@@ -1147,33 +1147,69 @@ nueva nace sin SELECT** y hay que otorgarla a mano. Es la contrapartida del `alt
 privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al añadir una columna
 (precedente: `enlaces_token.rol_parte`, `20270304100200:39`).
 
-### Borrado de una ficha: hoy son TRES comportamientos distintos (deuda 108)
+### Borrado de una ficha: un único camino, `borrar_ficha_completa()`
+
+✅ **Desde `20260921153439` hay UNA puerta** (§4bis), y es la que aplica la regla de §7.
+Hace, en una sola transacción: (1) comprueba los **bloqueos fiscales** —albaranes que ya no
+son borrador, cierres anuales o a demanda, líneas de cierre que citan la ficha, convenios o
+planes **con número**, y cualquier `documentos` emitido de esos objetos— y si hay alguno se
+niega con `22023 bloqueig_esborrat: <codis>` **sin tocar nada**; (2) si no, arrastra lo
+operativo en orden —adjuntos y enlaces de los albaranes en borrador, esos albaranes, las
+sesiones de intake (antes que los excedentes, que las referencian), respuestas,
+canalizaciones, ofertas, espigoladas, ubicaciones y los enlaces de firma de sus convenios—;
+(3) borra la ficha, que arrastra en `CASCADE` convenios, membresías y planes; y (4)
+**retira la organización si se queda sin ninguna ficha**. Con `tambe_germana` hace lo mismo
+con la otra ficha del doble rol **dentro de la misma transacción**: o las dos o ninguna.
+
+⚠️ **Las claves foráneas NO se cambiaron, y es deliberado.** «Poner `CASCADE` en todo»
+sería lo contrario de la regla: se llevaría por delante cierres y líneas de cierre, que son
+la evidencia fiscal que el circuito existe para conservar. Las `NO ACTION` se quedan y
+pasan a ser la **última red** —si algún día la función se dejara un camino, la base rechaza
+en vez de dejar un hueco—. Lo que cambia es que ahora hay una sola puerta, que comprueba
+antes y **dice el motivo**.
+
+⚠️ **Dos cosas se quedan fuera a propósito**: `wa_contacts`/`wa_messages` (no tienen FK a la
+ficha, solo comparten teléfono —§ «Integridad»—, y el hilo documenta por qué se retiró;
+se borra desde la papelera de Mensajería) y `email_test_recipients`, que sigue siendo
+disciplina manual (§12.33). Y lo que SQL no puede hacer: **retirar los ficheros de
+Storage**. Sus rutas salen en `fitxers_orfes` del resultado, para que lo haga quien llama.
+
+🔴 **Exige `es_super_admin()`, no `pot_aprovar()`**, y conviene saber por qué: borrar una
+ficha ya lo exigía —lo imponen las políticas `productores: baixa super_admin` y
+`entidades: baixa super_admin` (`20260730095000`)— y una función `security definer` **no
+evalúa esas políticas por dentro**, así que su guarda es la única que queda. Ponerla en
+`pot_aprovar()` no habría sido elegir un rol: habría **ampliado en silencio** a los `admin`
+un privilegio destructivo, en el mismo cambio que les quita el `23503` que los frenaba.
+
+**Por qué hizo falta: los TRES comportamientos que HABÍA** (histórico, hasta el
+21-09-2026; se conserva porque explica qué compra la función y qué no se puede «simplificar»
+después volviendo a tocar las FK).
 
 Medido el 16-09-2026 sobre las 18 claves foráneas que apuntan a `productores`,
-`entidades` y `organizaciones`. La regla de §7 dice qué debe pasar; esto es lo que pasa:
+`entidades` y `organizaciones`. La regla de §7 decía qué debía pasar; esto es lo que pasaba
+cuando el borrado era un `.delete()` a pelo desde el panel:
 
-| `delete_rule` | Cuántas | Quiénes | Qué ocurre de verdad |
+| `delete_rule` | Cuántas | Quiénes | Qué ocurría de verdad |
 | --- | --- | --- | --- |
 | `CASCADE` | 6 | `convenios`, `membresias`, `planes_prevencion` (×2 tablas) | Se van con la ficha ✅ |
 | `NO ACTION` | 9 | `excedentes`, `canalizaciones`, `espigoladas`, `cierres_donante`, `cierres_periodo`, `intake_sessions`, `productor_ubicaciones`, y `organizaciones` desde las dos fichas | **Rechazan el borrado** con `23503`. No deja huérfanos, pero el panel enseña el error crudo de Postgres |
 | `SET NULL` | 3 | `oferta_respuestas.entidad_id`, `cierre_donante_lineas.entidad_id`, `cierre_periodo_lineas.entidad_id` | 🔴 **El borrado pasa y la fila se queda apuntando a nadie** — el huérfano exacto que la regla prohíbe |
 
-⚠️ **Lo peor no es ninguno de los tres por separado, es que sean tres.** Borrar una entidad
-cuyo único rastro son respuestas a ofertas **funciona** y deja esas respuestas sin entidad
-(el detalle de la oferta enseña entonces un interés de nadie); borrar una que además tenga
-una canalización **falla**; y las dos cosas salen del mismo botón, `RecordDetail:116`, que
-hace un `.delete()` a pelo sobre la tabla.
+⚠️ **Lo peor no era ninguno de los tres por separado, era que fueran tres.** Borrar una
+entidad cuyo único rastro eran respuestas a ofertas **funcionaba** y dejaba esas respuestas
+sin entidad (el detalle de la oferta enseñaba entonces un interés de nadie); borrar una que
+además tuviera una canalización **fallaba**; y las dos cosas salían del mismo botón,
+`RecordDetail:116`, que hacía un `.delete()` a pelo sobre la tabla.
 
-⚠️ **Y la organización SIEMPRE se queda**: `organizaciones` es `NO ACTION` desde las dos
-fichas, así que al borrar la última ficha su organización sobrevive vacía. Las dos purgas
+⚠️ **Y la organización SIEMPRE se quedaba**: `organizaciones` es `NO ACTION` desde las dos
+fichas, así que al borrar la última ficha su organización sobrevivía vacía. Las dos purgas
 del 16-09-2026 —las 451 del import y la de Carles Sanz— tuvieron que retirarla **a mano**,
-en un paso aparte, justo por esto.
+en un paso aparte, justo por esto. Es el paso (4) de la función de arriba.
 
-**Lo que falta para cumplir la regla**: un único camino de borrado (RPC `security definer`,
-en una transacción) que (1) se niegue con el motivo si la ficha tiene documentos emitidos,
-albaranes o cierres, (2) borre en orden lo operativo, (3) retire la organización si queda
-vacía, y (4) lo use **tanto el panel como cualquier limpieza manual**. Mientras no exista,
-cada borrado es un procedimiento a mano que hay que medir antes (§12.108).
+⚠️ **Lo que NO cambió y sigue vigente**: el reparto de las 18 FK es exactamente el mismo
+—la tabla de arriba describe la base de hoy—. Lo que cambió es que ya no se llega a ellas
+por un `.delete()` suelto. Un borrado que se salte `borrar_ficha_completa()` vuelve a tener
+los tres comportamientos, así que **el panel y cualquier limpieza manual usan la RPC**.
 
 ### Integridad
 
@@ -1377,6 +1413,8 @@ funciones, no políticas:
 | `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo** con el criterio de siempre —correo o teléfono exactos, nunca el nombre—. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
 | `enllacar_organitzacio(tipo, ficha, organitzacio)` | **Fusiona**: mueve la ficha —y sus convenios, solo los suyos— a esa organización y retira la que deja vacía. `pot_aprovar()`. Se niega con el motivo si el destino ya tiene ficha de ese tipo o si las dos traen convenio vigente del mismo tipo. Con `organitzacio` NULL **separa** la ficha en una organización nueva, que es el deshacer |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
+| `borrar_ficha_completa(tipo, ficha, tambe_germana default false)` (`20260921153439`) | **EL** camino de borrado de una ficha (§4 «Borrado de una ficha»). Se niega con el motivo si hay documentos, albaranes o cierres (`22023 bloqueig_esborrat: <codis>`, con el texto legible en `details`); si no, arrastra lo operativo, borra la ficha y **retira la organización si queda vacía**. Con `tambe_germana`, las dos fichas del doble rol en la **misma transacción** — que es lo que hoy no garantiza el panel con sus dos `.delete()` sueltos. **`es_super_admin()`**, como las políticas de `delete` que sustituye; `42501 no_autoritzat` si no. Devuelve `jsonb` con lo borrado y `fitxers_orfes`, las rutas de Storage que SQL no puede retirar |
+| `bloqueigs_esborrat_fitxa(tipo, ficha)` (`20260921153439`) | La misma pregunta, **sin borrar**: una fila `(codi, n, detall)` por motivo y **cero filas = se puede borrar**. Existe por lo mismo que `comprovaConvenis()` (§12.78): el panel tiene que poder avisar **antes**, no enterarse con un error a mitad. Códigos: `albarans` · `tancaments` · `linies_tancament` · `convenis` · `plans` · `documents`. `es_intern()` |
 | `siguiente_numero(serie, ejercicio)` | El correlativo, dentro de la transacción de emisión. **Sin `execute` para `authenticated`** |
 | `formato_numero(serie, ejercicio, n)` | `REC-2026-00042` |
 | `ruta_documento(objeto_tipo, objeto_id, tipo, numero, version, modo, ejercicio)` | La carpeta por organización (§4 «Sistema documental»). `stable`, no `immutable`: lee el dominio. Solo `service_role` |
@@ -2325,7 +2363,10 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   **no se borra: se rechaza el borrado con el motivo**. «Cascada» significa arrastrar lo
   operativo (ofertas, respuestas, canalizaciones, ubicaciones, sesiones de intake,
   convenios, membresías, planes), nunca lo fiscal.
-  🔴 **HOY ESTO NO SE CUMPLE — es la deuda 108.** Ver §4 «Borrado de una ficha».
+  ✅ **Lo cumple `borrar_ficha_completa()`** desde el 21-09-2026 (`20260921153439`), que es
+  la **única** puerta: el panel y cualquier limpieza manual pasan por ella. Un `.delete()`
+  suelto sobre `productores` o `entidades` vuelve a tener los tres comportamientos de
+  antes, así que no se usa. Ver §4 «Borrado de una ficha» y §4bis.
 - **Secretos**: nunca en el código. Env vars, siempre.
 - **Sin servicios externos nuevos** (10-09-2026). Cualquier capacidad nueva —generación de PDF, firma
   electrónica, almacenamiento de ficheros, colas, notificaciones— se resuelve con **librerías npm dentro
@@ -2394,6 +2435,14 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   compilar. Si la lista es larga, que la línea sea larga (deuda §12.46).
 - **Migraciones**: `supabase/migrations/AAAAMMDDHHMMSS_descripcion.sql`. Nunca editar una ya
   aplicada; añadir una nueva.
+  ⚠️ **Si se aplica con `apply_migration` del MCP de Supabase (no `db push`), el timestamp que
+  queda registrado en `supabase_migrations.schema_migrations` es el de la FECHA REAL en que se
+  ejecuta** (`AAAAMMDDHHMMSS` de verdad), no el que lleve el nombre del fichero local —
+  confirmado el 21-09-2026 con `20260921153439_borrar_ficha_completa.sql`. Este repo escribe
+  sus migraciones con fechas «de proyecto» muy por delante del calendario real (iba por
+  `20270328…`), así que el nombre local y la versión remota **discreparán** si no se corrige a
+  mano: hay que renombrar el fichero local a la versión que devolvió el MCP en cuanto se aplica,
+  o el repo y la base dejan de cuadrar (§ nota de memoria «acceso-supabase-por-mcp-no-por-cli»).
 - **Una sola rama en Supabase, siempre `main` (norma del 14-09-2026).** No se crean ramas en
   el proyecto remoto: ni de preview, ni persistentes, ni para probar una migración. Todo el
   esquema vive en la base de producción y se llega a ella por `db push`, igual que el código
@@ -3660,7 +3709,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 15-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **68 cerradas**,
+Estado al 21-09-2026: **38 entradas vivas** (6 parciales 🟡 y 32 abiertas) y **69 cerradas**,
 sobre 107 numeradas.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
@@ -4002,20 +4051,9 @@ sobre 107 numeradas.
      cifra decorativa. El día que se quiera la columna coherente, es `conciliar_albaran()` quien
      debería escribirla.
 
-108. 🔴 **Borrar una ficha no borra lo suyo: son tres comportamientos y uno deja
-     huérfanos.** La regla está en §7 y el estado medido en §4 «Borrado de una ficha».
-     Resumen: 6 claves `CASCADE`, 9 `NO ACTION` —que rechazan el borrado con un `23503`
-     crudo en pantalla— y **3 `SET NULL`**, que dejan `oferta_respuestas` y las líneas de
-     cierre apuntando a una entidad que ya no existe. El botón del panel
-     (`RecordDetail:116`) hace un `.delete()` a pelo sobre la tabla, así que el resultado
-     depende de qué tenga la ficha detrás. Falta el camino único de borrado que describe §4.
-     ⚠️ **No es «poner CASCADE en todo»**: los documentos emitidos, los albaranes y los
-     cierres no se pueden borrar por diseño (`documentos_no_esborrar`, numeración legal sin
-     huecos), así que una ficha con documentos **se niega a borrarse**, no se arrastra.
-
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **32 de las 39**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **32 de las 38**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -4068,14 +4106,14 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **68** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **69** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 108.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 109.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -4154,6 +4192,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 104 | `parametros_documentales` tiene `UPDATE` de tabla, y eso se traga su GRANT por columnas | `20270325100000` |
 | 105 | Las descripciones de la modalidad no llegan por WhatsApp | 15-09-2026 |
 | 107 | Un interactivo saliente no registraba las opciones ofrecidas | 15-09-2026 |
+| 108 | Borrar una ficha no borraba lo suyo: tres comportamientos y uno dejaba huérfanos | `20260921153439` |
 
 ## 13. Al terminar cualquier cambio
 
@@ -4167,12 +4206,18 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 668/668 correctas y 14 saltadas, «Sin fallos de permisos»**
-   (21-09-2026). Es la cifra a batir, y se recuperó arreglando **las dos cuentas que el arnés
-   necesita y que llevaban días mudas o mintiendo**: `hola+wa-carles@` (bloque `doble-rol`,
-   ~74 comprobaciones) tenía la contraseña desincronizada con el repo y se alineó con la
-   Admin API (§9), y `hola+pendent-arnes@` estaba aprobada por error y se devolvió a
-   `pendent` (§9). **Cualquier FALLA es una regresión.**
+   ✅ **Referencia HOY: 686/686 correctas y 14 saltadas, «Sin fallos de permisos»**
+   (21-09-2026). Son las 668 anteriores más **18**: el borrado único de una ficha
+   (`20260921153439`, deuda 108) mete dos checks en `DOCUMENTAL_EXTERN` —que recorre siete
+   cuentas externas— y dos en cada bloque del equipo (`tecnic`, `super_admin`). ⚠️ Ninguno de
+   los 18 ejercita `borrar_ficha_completa()` contra una ficha de verdad: el arnés corre contra
+   producción y una regresión del bloqueo **borraría la ficha**. Lo positivo lo mide
+   `bloqueigs_esborrat_fitxa()`, que es de solo lectura. **Cualquier FALLA es una regresión.**
+   Referencia anterior, **668/668 correctas y 14 saltadas**: se recuperó arreglando **las dos
+   cuentas que el arnés necesita y que llevaban días mudas o mintiendo**: `hola+wa-carles@`
+   (bloque `doble-rol`, ~74 comprobaciones) tenía la contraseña desincronizada con el repo y se
+   alineó con la Admin API (§9), y `hola+pendent-arnes@` estaba aprobada por error y se
+   devolvió a `pendent` (§9).
    ⚠️ **Sube a 14 saltadas, no baja**, y no es una pérdida nueva: las tres que se suman son
    del bloque `doble-rol`, que antes no se recorría en absoluto —`oferta_respuestas`,
    `progres_meves_ofertes` y `albaranes` de esa cuenta—. Le faltan datos: las fichas de Carles

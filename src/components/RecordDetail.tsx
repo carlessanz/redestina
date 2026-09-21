@@ -63,6 +63,32 @@ export default function RecordDetail({
     return err.code === '23505' ? t('rec.err_unique') : err.message
   }
 
+  /**
+   * `borrar_ficha_completa()` (§4/§7, deuda 108) responde `22023 bloqueig_esborrat: <codis>`
+   * cuando la ficha —o su hermana de doble rol— tiene documentación que no se borra jamás.
+   * Los códigos van en el MESSAGE separados por comas, con el sufijo `@germana` cuando el
+   * bloqueo lo aporta la otra ficha.
+   */
+  function missatgeEsborrat(err: { code?: string; message: string }): string {
+    const marca = 'bloqueig_esborrat:'
+    const i = err.message.indexOf(marca)
+    if (i === -1) {
+      if (err.code === '42501') return t('rec.no_permission_delete')
+      return mensajeError(err)
+    }
+    const motius = err.message
+      .slice(i + marca.length)
+      .split(',')
+      .map((c) => c.trim())
+      .filter(Boolean)
+      .map((c) => {
+        const [base, germana] = c.split('@')
+        const text = t(`rec.block_${base}`)
+        return germana ? text + t('rec.block_germana') : text
+      })
+    return `${t('rec.blocked')} ${motius.join('; ')}`
+  }
+
   function normalizar(): Record<string, unknown> {
     const out: Record<string, unknown> = {}
     for (const c of campos) {
@@ -124,7 +150,7 @@ export default function RecordDetail({
     if (!registro) return
     const nombre = String(form[nombreKey] ?? tipo)
     const germana = await fitxaGermana()
-    const taulaGermana = tabla === 'productores' ? 'entidades' : 'productores'
+    const tipusPropi: 'productor' | 'entidad' = tabla === 'productores' ? 'productor' : 'entidad'
 
     // Cuántas cuentas de usuario cuelgan de estas fichas (`membresias`, que se borran en cascada).
     // Borrar la ficha deja a esas cuentas sin panel —y sin acceso—, y eso tiene que saberse ANTES.
@@ -162,19 +188,17 @@ export default function RecordDetail({
 
     setError(null)
     setGuardando(true)
-    const { error: delError } = await supabase.from(tabla).delete().eq('id', registro.id)
-    if (delError) { setGuardando(false); setError(mensajeError(delError)); return }
-    if (tambeGermana && germana) {
-      const { error: delError2 } = await supabase.from(taulaGermana).delete().eq('id', germana.id)
-      if (delError2) {
-        setGuardando(false)
-        // La primera ya no existe: se avisa y se vuelve al listado, para no dejar la pantalla sobre una ficha borrada.
-        toast.error(t('rec.dual_partial', { err: mensajeError(delError2) }))
-        onSaved()
-        return
-      }
-    }
+    // Único camino de borrado (§4/§7, deuda 108): una sola RPC transaccional que se niega
+    // con el motivo si hay documentos, albaranes o cierres, y que arrastra las dos fichas
+    // del doble rol a la vez si se pidió — nada de dos `.delete()` sueltos que puedan dejar
+    // media organización borrada.
+    const { error: delError } = await supabase.rpc('borrar_ficha_completa', {
+      p_tipo: tipusPropi,
+      p_ficha_id: registro.id,
+      p_tambe_germana: tambeGermana,
+    })
     setGuardando(false)
+    if (delError) { setError(missatgeEsborrat(delError)); return }
     toast.success(tambeGermana ? t('rec.dual_deleted') : t('rec.deleted'))
     onSaved()
   }

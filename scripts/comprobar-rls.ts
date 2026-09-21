@@ -271,10 +271,14 @@ interface Check {
    */
   vacioEsDenegar?: boolean;
   /**
-   * Solo para `rpc`: argumentos. El valor literal "@meva_membresia" se sustituye en
-   * tiempo de ejecución por el id de la propia membresía —y por el uuid nulo si la
-   * cuenta no ve ninguna—, para que la comprobación mida la AUTORIZACIÓN y no un
-   * "esa fila no existe" que llegaría igual con permisos de sobra.
+   * Solo para `rpc`: argumentos. Dos valores literales se sustituyen en tiempo de
+   * ejecución, para que la comprobación mida la AUTORIZACIÓN y no un "esa fila no existe"
+   * que llegaría igual con permisos de sobra:
+   *
+   *   · `@meva_membresia`      → el id de la propia membresía (uuid nulo si no ve ninguna)
+   *   · `@fitxa_amb_documents` → un productor con algún albarán fuera de borrador, o sea
+   *                              una ficha que NO se puede borrar (20270329100000). Uuid
+   *                              nulo si el fixture documental no está puesto.
    */
   args?: Record<string, unknown>;
   /**
@@ -563,6 +567,32 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat a demanda" },
   { tabla: "marcar_enviado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat a demanda" },
   { tabla: "reiniciar_periodes_prova", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO reinicia els certificats a demanda de prova" },
+  // Borrado de una ficha (20270329100000, deuda §12.108). Las dos funciones nuevas están
+  // cerradas a cualquiera que no sea del equipo, y la destructiva además al que no sea
+  // super_admin. El uuid es el nulo a propósito: la guarda va ANTES de buscar la ficha, así
+  // que un externo se lleva el `42501` sin que la función llegue a mirar ninguna fila —que
+  // es justo lo que hace que este check sea inofensivo aunque apunte a la RPC que borra—.
+  //
+  // ⚠️ Y por eso NO hay ningún check que la ejercite en positivo contra una ficha de
+  //    verdad, ni siquiera esperando el bloqueo: el arnés corre contra producción (§7), y
+  //    si el bloqueo hubiera regresado, la comprobación **borraría la ficha y todo lo
+  //    suyo**. La cobertura en positivo se hace con `bloqueigs_esborrat_fitxa()`, que es
+  //    de solo lectura y contesta la misma pregunta (bloque `super_admin`). Mismo criterio
+  //    que §12.97 con `acunar_enllac_propi`.
+  {
+    tabla: "borrar_ficha_completa",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_tipo: "productor", p_ficha_id: "00000000-0000-0000-0000-000000000000", p_tambe_germana: false },
+    descripcion: "NO esborra cap fitxa (ni la seva)",
+  },
+  {
+    tabla: "bloqueigs_esborrat_fitxa",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO consulta els bloquejos d'esborrat d'una fitxa",
+  },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -897,6 +927,29 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
     { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
+    // Borrado de una ficha (20270329100000, deuda §12.108). El técnico SÍ puede preguntar
+    // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
+    // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
+    // super_admin, igual que las políticas `productores: baixa super_admin` y
+    // `entidades: baixa super_admin` que la RPC `security definer` deja de evaluar.
+    //
+    // La consulta va contra el uuid nulo: devuelve 0 filas y eso, en un `permitir` sin
+    // `requiereFixture`, cuenta como ejecutada. Lo que se mide aquí es que la guarda le
+    // deja pasar, no lo que contesta; lo que contesta se mide en el bloque `super_admin`.
+    {
+      tabla: "bloqueigs_esborrat_fitxa",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot consultar què bloqueja l'esborrat d'una fitxa",
+    },
+    {
+      tabla: "borrar_ficha_completa",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_tipo: "productor", p_ficha_id: "00000000-0000-0000-0000-000000000000", p_tambe_germana: false },
+      descripcion: "NO esborra fitxes (és de super_admin)",
+    },
   ],
   super_admin: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve las fichas de productor" },
@@ -1083,6 +1136,40 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       descripcion: "ve tots els convenis",
       requiereFixture: "algún convenio (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // ── Borrado de una ficha (20270329100000, deuda §12.108) ───────────────────
+    //
+    // La contraparte del «denegar» del técnico: el super_admin SÍ pasa la guarda. Sobre el
+    // uuid nulo la autorización pasa y la función falla después con `22023
+    // fitxa_no_trobada`, que es lo que el arnés lee como «dejó pasar» — el mismo patrón que
+    // `contrafirmar_convenio` y `cerrar_cierre`, y por el mismo motivo: ejercitarla contra
+    // una ficha real la borraría, y esto corre contra producción (§7).
+    {
+      tabla: "borrar_ficha_completa",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo: "productor", p_ficha_id: "00000000-0000-0000-0000-000000000000", p_tambe_germana: false },
+      descripcion: "pot esborrar una fitxa (autoritza; la fitxa no existeix)",
+    },
+    // Y AQUÍ SE MIDE EL BLOQUEO DE VERDAD, sin poder romper nada: una ficha con albaranes
+    // emitidos, cierres o documentos **tiene que devolver al menos un motivo**. Si algún
+    // día alguien relaja el paso 1 de `borrar_ficha_completa()`, esta comprobación se queda
+    // sin filas antes de que ninguna ficha se pierda.
+    //
+    // ⚠️ Lo que este check NO puede afirmar: sin el fixture sale SALTADA, y una regresión
+    //    del bloqueo se vería igual (0 filas → «falta fixture»). Es la misma limitación de
+    //    todos los `requiereFixture`; lo que la acota es que el marcador
+    //    `@fitxa_amb_documents` resuelve a un productor que **demostrablemente** tiene un
+    //    albarán fuera de borrador, así que si esa ficha existe y aquí no sale ningún
+    //    motivo, la línea de «sense» está describiendo un fallo. Al leer el informe, una
+    //    saltada en esta línea con el fixture puesto hay que ir a mirarla.
+    {
+      tabla: "bloqueigs_esborrat_fitxa",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo: "productor", p_ficha: "@fitxa_amb_documents" },
+      descripcion: "una fitxa amb albarans emesos NO es pot esborrar (i diu per què)",
+      requiereFixture: "un albarán emitido de una ficha de prueba (scripts/crear-datos-documentales-prueba.ts)",
     },
   ],
   productor: [
@@ -1587,6 +1674,17 @@ async function resolverArgs(
     if (valor === "@meva_membresia") {
       const { data } = await cliente.from("membresias").select("id").limit(1).maybeSingle();
       salida[clave] = data?.id ?? UUID_NULO;
+    } else if (valor === "@fitxa_amb_documents") {
+      // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
+      // se puede borrar (20270329100000). Se busca en vez de codificar `TEST-PROD-1` para
+      // que el check siga midiendo algo si el fixture cambia de nombre; si no hay ninguno,
+      // cae al uuid nulo y el `requiereFixture` del check lo marca como saltado.
+      const { data } = await cliente.from("v_albaranes_bandeja")
+        .select("productor_id")
+        .neq("estado", "borrador")
+        .not("productor_id", "is", null)
+        .limit(1).maybeSingle();
+      salida[clave] = (data as { productor_id: string } | null)?.productor_id ?? UUID_NULO;
     } else {
       salida[clave] = valor;
     }
