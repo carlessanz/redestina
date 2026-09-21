@@ -3122,10 +3122,23 @@ la cuenta se quedó **en Auth pero sin ninguna membresía**: quien pulsaba el bo
 `organizaciones`— pero colgando de **otra** cuenta, `hola+productor-receptor@carlessanz.com`, que
 **no está en `accessosTest.ts`** y a la que solo se entra escribiendo correo y contraseña.
 
-Se ha reparado **enlazando**, no recreando: dos membresías `titular` aprobadas y activas de
+Se reparó **enlazando**, no recreando: dos membresías `titular` aprobadas y activas de
 `wa-carles` a esas dos fichas, que es exactamente lo que hace `scripts/crear-usuarios-whatsapp.ts`.
-El botón vuelve a funcionar sin tocar código ni contraseñas, y su etiqueta («Entitat productora +
-Receptora (social)») vuelve a ser cierta.
+
+🔴 **Y aun así el botón SEGUÍA sin abrir nada, porque eran DOS fallos encadenados** (21-09-2026).
+Enlazar arregló las membresías, pero la cuenta se había **recreado el 16-09 con otra contraseña**, y
+`crear-usuarios-whatsapp.ts` es idempotente **y no toca la contraseña de una cuenta que ya existe**
+(§9): así que el botón seguía llevando la del repo y la base tenía otra. El login respondía
+`invalid_credentials`, no «pendent de validació» — el mismo síntoma para dos causas distintas.
+**Lo que manda es el repo**, y sin ambigüedad: `accessosTest.ts` y `scripts/data/cuentas-prueba.json`
+decían la **misma** contraseña, así que lo desincronizado era la base. Se alineó con la Admin API
+(`PUT /auth/v1/admin/users/<id>`), no al revés — cambiar los dos ficheros dejaría el de `scripts/data/`
+fuera de git y otra vez a merced de que alguien se acuerde (deuda 32).
+⚠️ **El orden de comprobación que ahorra el rodeo**: primero `POST /auth/v1/token` con la credencial
+del botón (¿entra?), después `membresias` (¿tiene panel?) y solo entonces
+`get_my_session_context()`. Al revés se diagnostica el segundo fallo sin ver el primero.
+⚠️ Y al leer ese contexto, la clave es **`organizaciones`** (castellano), no `organitzacions`: leer
+la catalana devuelve vacío y parece que la cuenta no tiene panel cuando sí lo tiene.
 
 ⚠️ **Las dos fichas tienen ahora DOS cuentas titulares**, `wa-carles` y `productor-receptor`. No
 es un problema —`membresias` admite varios usuarios por ficha y el producto no distingue cargos
@@ -3148,9 +3161,12 @@ con `fecha_corte_convenios` encendida (§4bis) la única organización que podí
 ⚠️ `Menjador Social de Prova` se deja a propósito en `pendent_firma`: es la única que queda para
 enseñar la firma en directo desde el panel y la contrafirma desde la cola.
 
-⚠️ **`hola+pendent-arnes@` sigue aprobada** (lo estaba ya el 21-09-2026, ver el apartado anterior).
-La cola de «Registres pendents» marca 0 y el bloque `pendent` del arnés sigue sin recorrerse.
-Restaurarla antes de la próxima tanda del arnés.
+✅ **`hola+pendent-arnes@` vuelve a estar en `pendent`** (21-09-2026). Estuvo aprobada por error
+desde el 16-09 y eso sacaba las cuatro FALLA descritas arriba; se restauró con el procedimiento de
+esta sección —`aprovacio='pendent'`, `activo=false` y `aprovat_at`/`aprovat_per`/`motiu_aprovacio`
+a NULL, desde `service_role`— y el arnés volvió a **668/668 sin fallos**. La cola de «Registres
+pendents» vuelve a marcar 1, que es lo correcto: **esa fila se queda ahí para siempre y no se
+aprueba**.
 
 ### Lo que sigue pendiente
 
@@ -4151,16 +4167,18 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   🔴 **Referencia HOY: 595/596 + 11, con una FALLA conocida y con fecha de caducidad**
-   (16-09-2026). El cliente pidió borrar su usuario de prueba para rehacer el registro desde
-   cero, y esa cuenta —`hola+wa-carles@carlessanz.com`— **es la del bloque `doble-rol` del
-   arnés**: al no poder iniciar sesión, sus ~74 comprobaciones dejan de ejecutarse y la única
-   FALLA que sale es «Invalid login credentials», no un permiso mal puesto. **Se restaura
-   sola** en cuanto se vuelva a dar de alta con **ese mismo correo y la contraseña que ya
-   consta en `scripts/data/cuentas-prueba.json`** (fuera de git); con otra contraseña hay que
-   actualizar ese fichero o el bloque se queda mudo — que es la deuda 32 otra vez, y por eso
-   se escribe aquí en vez de confiar en que alguien se acuerde.
-   Referencia **anterior**, y la que hay que volver a ver, tras las RPC del proceso
+   ✅ **Referencia HOY: 668/668 correctas y 14 saltadas, «Sin fallos de permisos»**
+   (21-09-2026). Es la cifra a batir, y se recuperó arreglando **las dos cuentas que el arnés
+   necesita y que llevaban días mudas o mintiendo**: `hola+wa-carles@` (bloque `doble-rol`,
+   ~74 comprobaciones) tenía la contraseña desincronizada con el repo y se alineó con la
+   Admin API (§9), y `hola+pendent-arnes@` estaba aprobada por error y se devolvió a
+   `pendent` (§9). **Cualquier FALLA es una regresión.**
+   ⚠️ **Sube a 14 saltadas, no baja**, y no es una pérdida nueva: las tres que se suman son
+   del bloque `doble-rol`, que antes no se recorría en absoluto —`oferta_respuestas`,
+   `progres_meves_ofertes` y `albaranes` de esa cuenta—. Le faltan datos: las fichas de Carles
+   se recrearon el 16-09 y no tienen ni respuestas ni ofertas activas ni albaranes. O sea que
+   pasar de 595/596 a 668/668 **no es +73 checks nuevos**: es cobertura que vuelve.
+   Referencia **anterior**, tras las RPC del proceso
    (`20270323100000`, `20270324100000`): **669/669 correctas y 13 saltadas**, «Sin fallos de
    permisos», exit 0. **No se movió** al
    revocar el UPDATE de tabla de `parametros_documentales` (`20270325100000`, §12.104), y eso
