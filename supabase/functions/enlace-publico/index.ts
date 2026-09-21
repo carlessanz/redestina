@@ -615,6 +615,10 @@ async function manejarGet(
     estado: enlace.estado_efectivo,
     caduca_at: enlace.caduca_at,
     destinatari: enlace.destinatario_nombre,
+    // El formulario tiene que poder decir «aquesta confirmació quedarà registrada com a
+    // assistida»: quien la conduce es el equipo, y la persona que la firma merece saber
+    // con qué etiqueta va a quedar en la evidencia y en el PDF. Igual que en el convenio.
+    assistida: enlace.canal === "asistido",
     documento: {
       id: albaran.id,
       tipo: albaran.tipo,
@@ -838,10 +842,21 @@ async function manejarPost(
   }
 
   // ------------------------------------------------------------- la escritura
-  // Con `canal = 'panel'` (20270318100000) quien confirma lo hace desde su panel con
-  // sesión: queda dicho en el payload, que es donde va lo respondido. La cuenta sale de la
-  // fila del enlace, nunca del cuerpo de la petición — quien confirma podría escribir
-  // cualquier uuid.
+  // Tres canales, y cada uno deja una huella distinta:
+  //
+  //   · `email`    — el enlace que Redestina envió. No añade nada.
+  //   · `panel`    — quien confirma lo hace desde su panel con sesión (20270318100000).
+  //                  La cuenta va en `payload.panell`, NUNCA en `asistido_por`: esa
+  //                  columna significa «alguien del equipo condujo el acto», y decir eso
+  //                  de una confirmación propia sería falso en un documento legal.
+  //   · `asistido` — el dinamizador la conduce con la persona delante (20270329100000).
+  //                  Aquí NO se compone nada: `registrar_confirmacion()` escribe
+  //                  `asistido_por` leyéndolo de `enlaces_token.creado_por` dentro de
+  //                  SQL, y solo cuando el canal es ese. Que lo imponga la base y no
+  //                  esta función es lo que impide que un llamador futuro se lo salte.
+  //
+  // En los dos casos la cuenta sale de la fila del enlace, nunca del cuerpo de la
+  // petición — quien confirma no tiene sesión y podría escribir cualquier uuid.
   let panell: { user_id: string | null; email: string | null } | null = null;
   if (enlace.canal === "panel") {
     const { data: fila } = await supabase
@@ -852,13 +867,16 @@ async function manejarPost(
     };
   }
 
+  // `p_payload` es LO RESPONDIDO por la persona; `p_evidencia.payload`, lo que el
+  // servidor constata sobre el acto. `registrar_confirmacion()` los funde con el segundo
+  // encima (20270329100000), igual que `firmar_convenio_por_enlace` (20270320100200).
+  // `panell` cambia de sitio por eso: no es una respuesta, es una constatación.
   const payload = {
     kg_confirmados: kgConfirmados,
     caixes_retornades: caixesRetornades,
     incidencias: body.incidencias ?? null,
     rechazo,
     motivo_rechazo: motivoRechazo || null,
-    ...(panell ? { panell } : {}),
   };
 
   const { data, error } = await supabase.rpc("registrar_confirmacion", {
@@ -871,6 +889,7 @@ async function manejarPost(
       user_agent: req.headers.get("user-agent"),
       // Del servidor, siempre. Ver la nota larga de `actaConfirmacion`.
       sha256_texto: shaTexto,
+      ...(panell ? { payload: { panell } } : {}),
     },
   });
 
@@ -1050,6 +1069,8 @@ async function getFactura(
     estado: enlace.estado_efectivo,
     caduca_at: enlace.caduca_at,
     destinatari: enlace.destinatario_nombre,
+    // Mismo motivo que en el albarán: el formulario lo dice antes de que se suba nada.
+    assistida: enlace.canal === "asistido",
     documento: {
       id: cd.id,
       tipo: "RES",
@@ -1288,6 +1309,18 @@ async function subirFactura(
   const resultado = (fila ?? {}) as Record<string, unknown>;
   const estado = String(resultado.estado ?? "");
 
+  // ⚠️ Esta evidencia se inserta DIRECTAMENTE, sin pasar por ninguna RPC, así que aquí
+  //    `asistido_por` lo compone esta función y no SQL —al revés que en la confirmación
+  //    del albarán—. La regla es la misma y no se puede relajar: solo con `canal =
+  //    'asistido'`, y leyendo la cuenta de la fila del enlace, nunca del cuerpo de la
+  //    petición. Quien sube la factura no tiene sesión y podría mandar cualquier uuid.
+  let asistidoPor: string | null = null;
+  if (enlace.canal === "asistido") {
+    const { data: fila } = await supabase
+      .from("enlaces_token").select("id, creado_por").eq("id", enlace.id).maybeSingle();
+    asistidoPor = (fila?.creado_por as string | null) ?? null;
+  }
+
   // La evidencia de la subida. Va DESPUÉS del registro a propósito: lo que se prueba es
   // que la factura entró, y si el registro falla no ha entrado nada.
   await supabase.from("evidencias").insert({
@@ -1296,6 +1329,7 @@ async function subirFactura(
     nombre: textNet(body.nombre).slice(0, 120) || enlace.destinatario_nombre,
     ip: ip || null,
     user_agent: req.headers.get("user-agent"),
+    asistido_por: asistidoPor,
     payload: {
       numero,
       fecha,

@@ -111,6 +111,13 @@ export interface DadesEnllac {
   codiVerificacio: string | null
   /** URL firmada de 60 s del PDF, si el servidor la da. Nunca una ruta de Storage. */
   pdf_url: string | null
+  /**
+   * El enlace lo acuñó el equipo para conducir la confirmación con la persona delante
+   * (`canal = 'asistido'`, `20270329100000`). La pantalla lo dice antes de confirmar:
+   * el acto queda etiquetado así en la evidencia y en el PDF, y quien firma tiene que
+   * saberlo. `false` para los enlaces por correo y para los del propio panel.
+   */
+  assistida: boolean
 }
 
 export type ResultatEnllac<T> =
@@ -163,6 +170,9 @@ function normalitza(cos: Record<string, unknown>): DadesEnllac {
   return {
     proposito: text(cos.proposito) ?? 'confirmacion_albaran',
     estado: text(cos.estado) ?? 'activo',
+    // Ante la duda, NO asistida: afirmar que alguien del equipo acompañó el acto cuando
+    // no consta es exactamente el error que la columna `asistido_por` existe para evitar.
+    assistida: cos.assistida === true,
     albara: {
       id: text(alb.id) ?? '',
       tipo: text(alb.tipo) ?? '',
@@ -305,6 +315,13 @@ export interface DadesFactura {
   }
   /** URL firmada de 60 s del resumen anual. Nunca una ruta de Storage. */
   pdf_url: string | null
+  /**
+   * El enlace lo acuñó el equipo para conducir la subida de la factura con la persona delante
+   * (`canal = 'asistido'`, `20270329100000`). La pantalla lo dice antes de confirmar:
+   * el acto queda etiquetado así en la evidencia y en el PDF, y quien la sube tiene que
+   * saberlo. `false` para los enlaces por correo y para los del propio panel.
+   */
+  assistida: boolean
 }
 
 /** Lo que el servidor decidió con la factura recién subida. */
@@ -332,6 +349,7 @@ function normalitzaFactura(cos: Record<string, unknown>): DadesFactura {
     proposito: text(cos.proposito) ?? 'subida_factura',
     estado: text(cos.estado) ?? text(cos.estado_efectivo) ?? 'activo',
     destinatari: text(cos.destinatari),
+    assistida: cos.assistida === true,
     resum: {
       id: text(doc.id) ?? '',
       numero: text(doc.numero_completo) ?? text(doc.numero),

@@ -2928,6 +2928,34 @@ el sitio de la firma manuscrita y es lo que un tercero lee para saber cómo se a
 ⚠️ Toca **`_shared/pdf/`**, que solo importan tres funciones —`generar-documento`, `enlace-publico`
 y `recordatorios-documentales`—, así que no hay que redesplegar las quince.
 
+**Las tres vías en `enlace-publico`, y dónde se decide cada una** (21-09-2026). El canal lo dice
+`enlaces_token.canal` y la función **no lo recibe del cuerpo**: quien confirma o sube una factura no
+tiene sesión y podría escribir cualquier cosa.
+
+| Canal | Qué deja | Quién lo compone |
+| --- | --- | --- |
+| `email` | Nada más que la evidencia normal | — |
+| `panel` | `payload.panell` = `{user_id, email}` de la fila del enlace. **Nunca `asistido_por`** | `enlace-publico` |
+| `asistido` | `evidencias.asistido_por` = `enlaces_token.creado_por` | **SQL** en la confirmación; `enlace-publico` en la factura |
+
+⚠️ **La asimetría de la última columna no es un descuido.** La confirmación del albarán pasa por
+`registrar_confirmacion()`, así que la regla vive dentro de SQL y ningún llamador futuro puede
+saltársela; la subida de factura **inserta en `evidencias` directamente** desde la función, sin RPC,
+así que ahí la garantía la sostiene TypeScript. Quien toque `subirFactura()` tiene que conservar las
+dos mitades: solo con `canal='asistido'`, y leyendo la cuenta de la fila.
+
+⚠️ **Y `panell` cambió de sitio**: iba en `p_payload` —«lo que respondió la persona»— y ahora va en
+`p_evidencia.payload`, que es lo que el servidor **constata** sobre el acto. Los funde
+`registrar_confirmacion()` con el segundo encima (`20270329100000`), igual que
+`firmar_convenio_por_enlace` (`20270320100200`). Mezclar declarado y constatado en un mismo objeto es
+lo que hace que después nadie sepa cuál de los dos es.
+
+**Los dos GET exponen `assistida`**, como ya hacía el del convenio: el formulario tiene que poder
+decir «aquesta confirmació quedarà registrada com a assistida» **antes** de que se firme nada. El
+cliente lo lee en `DadesEnllac.assistida` y `DadesFactura.assistida` (`src/lib/enllacPublic.ts`), y
+ante la duda vale `false` — afirmar un acompañamiento que no consta es justo el error que
+`asistido_por` existe para evitar.
+
 `registro` acepta los datos del convenio y crea el borrador con su enlace: devuelve el token **solo**
 si firma quien registra (misma sesión, misma persona); si firma otra, el enlace queda esperando y lo
 envía el equipo, porque `registro` sigue sin mandar ningún correo (§8).
