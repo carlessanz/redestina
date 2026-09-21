@@ -2007,6 +2007,20 @@ Quien está revisando un albarán no tiene por qué salir a otra pantalla para l
 enlace `where d.email is not null`, así que **una ficha sin correo no tenía forma de confirmar
 nunca**. La vía asistida no necesita correo — el enlace no se manda, se abre.
 
+✅ **Comprobado end-to-end contra producción el 21-09-2026**, con la vía de factura sobre un
+cierre de prueba: `acunar_enllac_assistit()` deja la fila con `canal = 'asistido'` y
+`creado_por` = la cuenta que la acuñó, y el GET de `enlace-publico` **sin `Authorization`**
+—que es exactamente lo que hace el formulario embebido en el diálogo— responde
+`assistida: true` y sin ningún hash. Después se revocó el enlace: el ensayo no deja rastro
+más que su fila.
+
+⚠️ **Lo que NO se ha ejercitado todavía es el ciclo entero**, y no por falta de ganas: cada
+recorrido **quema numeración legal** (ALB/ALR, CONV) de forma irreversible, igual que ya ocurre
+con cualquier prueba de albarán. El guion de la demo —`Horta de Prova SL` como generador, con su
+`don_gen` en `esborrany`, y `Menjador Social de Prova` como receptora, con su `don_rec` en
+`pendent_firma` a propósito (§9)— está listo para cuando se decida pagar ese precio. **No usar
+`Mas de Prova SCP`**: su `don_gen` ya está `vigent` y la fase 1 saldría resuelta.
+
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
 Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo

@@ -121,7 +121,8 @@ export function interesAssistit(
 
 /** El enlace que el equipo abre con la persona delante. Devuelve el token EN CLARO. */
 export interface EnllacAssistit {
-  enlace_id: string
+  /** `enlaces_token.id`. La RPC lo llama `id`, no `enlace_id`. */
+  id: string
   token: string
   url_path: string
   caduca_at: string
