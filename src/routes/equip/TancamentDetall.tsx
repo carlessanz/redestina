@@ -45,7 +45,7 @@ import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
-import { dadesFiscalsProvisionals } from '../../lib/canalitzacio'
+import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { BadgeMode } from './Tancament'
 import DialegAssistit from '../../components/equip/DialegAssistit'
 import Bloquejos from '../../components/equip/Bloquejos'
@@ -408,7 +408,7 @@ export default function TancamentDetall() {
    */
   const motiuCertificatsTots = cap?.estado !== 'tancat'
     ? t('tan.why_close_first')
-    : provisionals
+    : bloquejaProvisionals(provisionals, cap?.modo)
       ? t('tan.why_provisional')
       : totals.pendentsCert === 0 ? t('tan.why_no_cert_candidates') : undefined
   // 🔴 «Marca com a declarat» estaba habilitado con el ejercicio abierto: se podía dar por
@@ -788,7 +788,8 @@ export default function TancamentDetall() {
                 <BotoAmbMotiu
                   variant={accioSeguent === 'certificats' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-9"
-                  disabled={ocupat || cap?.estado !== 'tancat' || provisionals
+                  disabled={ocupat || cap?.estado !== 'tancat'
+                    || bloquejaProvisionals(provisionals, cap?.modo)
                     || totals.pendentsCert === 0}
                   motiu={motiuCertificatsTots}
                   onClick={() => void certificatsTots()}
@@ -1097,7 +1098,8 @@ function FilaDonant({
     ? t('tan.why_blocked')
     : Number(d.kg_total) <= 0
       ? t('tan.why_no_kg')
-      : provisionals ? t('tan.why_provisional') : undefined
+      : bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
+        ? t('tan.why_provisional') : undefined
 
   return (
     <TableRow>
@@ -1225,7 +1227,8 @@ function FilaDonant({
                   size="sm"
                   variant={ara === 'certificat' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat || bloquejat || Number(d.kg_total) <= 0 || provisionals}
+                  disabled={ocupat || bloquejat || Number(d.kg_total) <= 0
+                    || bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')}
                   motiu={motiuCertificat}
                   onClick={onCertificat}
                 >

@@ -27,6 +27,7 @@ import { kg } from '../../lib/albarans'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import Bloquejos from './Bloquejos'
+import { bloquejaProvisionals } from '../../lib/canalitzacio'
 import type { CierrePeriodo } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -107,7 +108,7 @@ export default function DialegCertificatPeriode(
       ? t('tan.why_blocked')
       : senseKg
         ? t('cdp.why_no_kg')
-        : provisionals ? t('tan.why_provisional') : undefined
+        : bloquejaProvisionals(provisionals, modo) ? t('tan.why_provisional') : undefined
 
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>

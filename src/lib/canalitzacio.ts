@@ -81,6 +81,29 @@ export function estatCanalitzacio(
  * Ante cualquier duda —error de lectura, fila ausente— responde `true`: decir «ya puedes
  * certificar» cuando no se puede es el único de los dos errores que cuesta caro.
  */
+/**
+ * ¿Los datos provisionales BLOQUEAN esta emisión?
+ *
+ * Desde el 21-09-2026 **solo en modo real**. Un documento `modo = 'prueba'` usa serie con
+ * prefijo `P-`, sale con marca de agua y `destinatariosPrueba` (§8) solo lo deja llegar a
+ * una organización `es_test` o al buzón del equipo: no puede alcanzar a un donante real,
+ * así que exigirle los datos fiscales de verdad solo conseguía que el ciclo no se pudiera
+ * ensayar entero. Lo mismo hacen las RPC desde `20260921214526`.
+ *
+ * ⚠️ El modo tiene que constar: si no se sabe —no hay ejercicio todavía— se **bloquea**,
+ * igual que `dadesFiscalsProvisionals()` responde `true` ante la duda. Decir «ya puedes
+ * certificar» cuando no se puede sigue siendo el único error que cuesta caro.
+ *
+ * ⚠️ Esto NO relaja lo que el PDF dice: el snapshot sigue llevando `dades_provisionals`,
+ * así que un certificado de ensayo se imprime declarando que los datos lo son.
+ */
+export function bloquejaProvisionals(
+  provisionals: boolean,
+  mode: string | null | undefined,
+): boolean {
+  return provisionals && mode !== 'prueba'
+}
+
 export async function dadesFiscalsProvisionals(): Promise<boolean> {
   try {
     const { data, error } = await supabase

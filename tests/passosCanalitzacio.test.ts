@@ -189,6 +189,27 @@ describe('el orden de las comprobaciones es la regla de negocio', () => {
     expect(pas.motiuKey).toBe('canal.bl_dades_provisionals')
   })
 
+  it('en modo PRUEBA los datos provisionales ya NO bloquean el certificado', () => {
+    // Decisión del cliente del 21-09-2026, y la base hace lo mismo desde
+    // `20260921214526`. Un documento `modo = 'prueba'` usa serie `P-CD`, sale con marca de
+    // agua y solo llega a fichas `es_test` o al buzón del equipo, así que no puede
+    // alcanzar a un donante real: exigirle los datos fiscales de verdad solo conseguía que
+    // el último escalón de la guía de prueba fuera inalcanzable para siempre.
+    const f: FetsCanal = {
+      ...complet(), exercici: { estado: 'tancat', modo: 'prueba' }, dadesProvisionals: true,
+    }
+    const pas = escalaCanal(f).find((p) => p.pas === 'certificat')!
+    expect(pas.estat).not.toBe('bloquejat')
+  })
+
+  it('y en REAL siguen bloqueando aunque el resto del ciclo esté completo', () => {
+    // El contraste del anterior: lo que se relajó es el MODO, no la regla.
+    const f: FetsCanal = {
+      ...complet(), exercici: { estado: 'tancat', modo: 'real' }, dadesProvisionals: true,
+    }
+    expect(escalaCanal(f).find((p) => p.pas === 'certificat')!.estat).toBe('bloquejat')
+  })
+
   it('sin decir nada de los datos fiscales se asume lo PEOR, no lo cómodo', () => {
     // `dadesProvisionals` sin pasar = provisional. Un certificado emitido con un CIF
     // inválido es el único error caro de los dos.

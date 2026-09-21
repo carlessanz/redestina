@@ -16,7 +16,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
-import { dadesFiscalsProvisionals } from '../../lib/canalitzacio'
+import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { estilEstatDonant } from '../../lib/tancament'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { useAppContext } from '../../hooks/useAppContext'
@@ -112,7 +112,7 @@ export default function CertificatsFitxa(
 
   const motiu = !potAprovar
     ? t('fit.cert_readonly')
-    : provisionals ? t('tan.why_provisional') : undefined
+    : bloquejaProvisionals(provisionals, esTest ? 'prueba' : 'real') ? t('tan.why_provisional') : undefined
 
   return (
     <div className="rounded-md border bg-card p-3">

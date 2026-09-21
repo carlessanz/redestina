@@ -481,6 +481,11 @@ src/
                                confirmar, i l'enllaç propi per fer-ho (§6ter)
     documentsPanell.ts         Helpers purs de les pantalles de documents (agrupar per
                                exercici, quin PDF val, l'ordre del conveni)
+    campsFundacio.ts           Els camps de `parametros_documentales` i `campsPendents()`:
+                               QUÈ falta per poder desmarcar `datos_provisionales`. Pur,
+                               amb test (§12.10)
+    parametresFundacio.ts      Llegir i desar aquella fila. La meitat amb xarxa, a part
+                               perquè l'altra es pugui provar des de Vitest
     procesOferta.ts            EL MODELO DEL PROCESO (§6ter): de los estados reales a
                                «etapa + què passa + què toca + qui», por rol. Puro, con test
     seguentPas.ts              Lo mismo para las fichas largas del equipo: albarà, conveni,
@@ -523,6 +528,8 @@ src/
                                DialegFirmaAssistida (conveni) y DialegNovaOfertaAssistida
                                (l'alta, des de l'índex del cicle) (§6ter)
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
+    equip/DadesFundacio.tsx    Los datos fiscales de la Fundación, en Configuració: es lo que
+                               desbloquea el certificado REAL (§12.10). Solo super_admin
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
@@ -545,7 +552,7 @@ src/
     RecordDetail.tsx           Ficha CRUD genérica (editar/crear/borrar) de productor o entidad
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
-    Settings.tsx               Configuración: modo test, WhatsApp, idioma y las whitelists de prueba (§8)
+    Settings.tsx               Configuración: modo test, WhatsApp, idioma, **las dades de la Fundació** y las whitelists de prueba (§8)
 scripts/
   import-ara.ts                Importación idempotente de los 5 CSV maestros
   crear-usuario.ts             Alta de cuentas por la Admin API (no envía correos)
@@ -1518,7 +1525,7 @@ funciones, no políticas:
 | `calcular_certificado_periodo(productor, desde, hasta, modo)` | El borrador del certificado a demanda y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, si acaba en el futuro o si esa ventana ya tiene certificado |
 | `registrar_factura_periodo(periodo, numero, fecha, importe, doc_externo)` | La factura del periodo. Existe para que el camino normal del certificado a demanda sea el mismo del anual y la excepción de D4 siga siendo una excepción |
 | `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20260921211329` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
-| `emitir_certificados_cierre(cierre)` (`20260921211356`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y que `datos_provisionales` sea falso —esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo—. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
+| `emitir_certificados_cierre(cierre)` (`20260921211356`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y —**solo si el cierre es REAL** (`20260921214526`)— que `datos_provisionales` sea falso; esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
 | `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
 | `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
@@ -1531,7 +1538,7 @@ funciones, no políticas:
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
 | `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
-| `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true`** |
+| `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true` — solo en modo real** (`20260921214526`); en prueba usa la serie `P-CT` |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
@@ -1591,9 +1598,23 @@ rectificativa — el error de un clic no se deshace, se documenta. Un cierre de 
 ninguna de esas consecuencias, y exigir el super_admin ahí solo conseguiría que el ensayo no se
 hiciera.
 
-⚠️ **`emitir_certificado()` se niega mientras `parametros_documentales.datos_provisionales` sea
-`true`**, citando el CIF sembrado. Un certificado con efecto fiscal no puede salir con un CIF
-inválido; cierra la deuda 56.
+⚠️ **`emitir_certificado()` se niega mientras `parametros_documentales.datos_provisionales`
+sea `true` — pero SOLO EN MODO REAL** (`20260921214526`). Un certificado con efecto fiscal no
+puede salir con un CIF inválido; uno de **prueba** sí, porque no lo tiene: serie con prefijo
+`P-`, marca de agua, y `destinatariosPrueba` (§8) solo lo deja llegar a una organización
+`es_test` o al buzón del equipo. Hasta el 21-09-2026 la guarda cortaba los dos, así que el
+último escalón de la guía de prueba **no se podía recorrer nunca** — ni en la demo, ni al
+validar una migración. Vale igual para las otras seis de la familia:
+`emitir_certificado_periodo`, `emitir_certificado_transaccion`, `emitir_certificados_cierre` y
+las tres `rectificar_certificado*`. Cierra la deuda 56 **solo para el modo real**.
+⚠️ **La interfaz lo decide con `bloquejaProvisionals(provisionals, mode)`**
+(`src/lib/canalitzacio.ts`), y ahí el modo **puede faltar** —no hay ejercicio todavía— y
+entonces bloquea, igual que `dadesFiscalsProvisionals()` responde `true` ante la duda. En SQL no
+puede faltar (`modo` es `not null` con check), así que `modo = 'real'` y `modo <> 'prueba'` son
+la misma condición: la asimetría es deliberada y no se «corrige».
+⚠️ **Lo que NO se relajó**: el snapshot sigue llevando `dades_provisionals`, así que el PDF de
+prueba **declara impreso** que los datos lo son. Comprobado emitiendo uno el 21-09-2026
+(`P-CD-2026-0001`, 2 páginas, `factura` a null, `dades_provisionals: true`).
 
 ⚠️ **Una guarda escrita como `es_intern()` a secas deja fuera a `service_role` en silencio.** Pasó
 con `datos_182`: devolvía **0 filas**, indistinguible de «este cierre no tiene certificados». La
@@ -2029,11 +2050,15 @@ vocabulario para el mismo proceso. Los pasos y lo que los bloquea viven en
 cierre anual tienen sus pantallas con sus editores; esta enlaza a ellas. Un segundo editor de
 líneas es un segundo sitio donde el número de kilos puede acabar siendo otro.
 
-⚠️ **El certificado está bloqueado y no por código.** `emitir_certificado()` se niega mientras
-`parametros_documentales.datos_provisionales` sea `true`, y hoy lo es. La pantalla lo enseña
-como el último escalón, visible y con su motivo, en vez de esconder el botón: es material de la
-fase 0 lo que falta (§12.10), no software. `dadesFiscalsProvisionals()` responde `true` ante
-cualquier duda — decir «ya puedes certificar» cuando no se puede es el único error caro.
+⚠️ **El certificado REAL está bloqueado, y no por código.** `emitir_certificado()` se niega
+mientras `parametros_documentales.datos_provisionales` sea `true`, y hoy lo es: es material de
+la fase 0 lo que falta (§12.10), no software. La pantalla lo enseña como el último escalón,
+visible y con su motivo, en vez de esconder el botón. `dadesFiscalsProvisionals()` responde
+`true` ante cualquier duda — decir «ya puedes certificar» cuando no se puede es el único error
+caro.
+✅ **En modo PRUEBA sí se emite** desde el 21-09-2026 (`20260921214526`), así que el ciclo
+guiado se puede recorrer **entero**, certificado incluido. Lo decide
+`bloquejaProvisionals(provisionals, mode)`, no `dadesFiscalsProvisionals()` a secas.
 
 ⚠️ **Una espigolada no recorre las seis fases**: entra por la 5 con su REC ya creado
 (`crear_espigolada`). Sus fases 2-4 salen `fet` **con su motivo**, nunca `pendent`.
@@ -2270,8 +2295,9 @@ el mismo módulo del que el intake saca sus pasos. El alta llama a `POST /crear-
 Realtime ya cableado.
 
 Navegación anterior (barra superior de 6 secciones en `App.tsx`): retirada. **Configuració** (`Settings.tsx`)
-reúne el interruptor del **modo test** (§8), el de WhatsApp, el idioma y —desde el 15-09-2026— las
-**dos whitelists de prueba** (`GestorWhitelist`), que antes ocupaban media pantalla del tablero. El
+reúne el interruptor del **modo test** (§8), el de WhatsApp, el idioma, —desde el 21-09-2026— las
+**dades de la Fundació** (`DadesFundacio`, §12.10: es lo que desbloquea el certificado real) y
+—desde el 15-09-2026— las **dos whitelists de prueba** (`GestorWhitelist`), que antes ocupaban media pantalla del tablero. El
 **Dashboard** (`Dashboard.tsx`) es la landing tras el login y desde el 15-09-2026 es una **cola de
 trabajo**, en este orden: banner del modo test (solo si está activo), **«Pendent de l'equip»**
 (`components/equip/PendentsEquip.tsx`, una fila por cola de `pendents_equip()` con cifra, por qué
@@ -2696,7 +2722,13 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   network allowlist`, que parece un problema de permisos de la cuenta y no lo es.
   ⚠️ El token va por `SUPABASE_ACCESS_TOKEN` porque el login del CLI vive en `~/.supabase`, que
   es justo lo que el HOME nuevo deja de ver; el llavero **sí** sigue accesible, porque es por
-  usuario y no depende de HOME. **Esto importa para las Edge Functions**: son la única capa que
+  usuario y no depende de HOME.
+  🔴 **Pero esto NO alcanza a `db push`, y la diferencia importa**: `functions deploy` habla por
+  HTTPS con `api.supabase.com` y pasa por el proxy del sandbox; `db push` abre una **conexión
+  Postgres directa** al pooler (`aws-0-eu-west-1.pooler.supabase.com:5432`), que no va por el
+  proxy y ni siquiera resuelve — falla con `getaddrinfo ENOTFOUND`, que parece un problema de
+  DNS y es el sandbox. O sea: **las Edge Functions se publican con el CLI, las migraciones
+  siguen yendo por `apply_migration` del MCP**, con el renombrado que eso obliga. **Esto importa para las Edge Functions**: son la única capa que
   el MCP no puede publicar cómodamente —habría que pasarle a mano cada fichero de `_shared/`,
   incluido el `activos/incrustats.ts` con las fuentes en base64—, así que sin este rodeo no hay
   forma de desplegarlas desde una sesión con sandbox.
@@ -4035,8 +4067,25 @@ Redestina en producción real quedan pasos de configuración y negocio.
     valores provisionales visibles (§4). Antes de emitir nada con efecto fiscal hay que sustituir
     razón social, CIF, domicilio, inscripción, los datos de la apoderada, los PNG de firma y sello
     (al bucket privado `activos`), `email_equipo` y `fecha_corte_convenios`, y poner
-    `datos_provisionales = false`. ⚠️ **`email_equipo` es NULL** y es el destinatario de TODO lo
-    que se emite en modo prueba: hasta que se rellene, un cierre de ensayo no tiene a dónde enviar.
+    `datos_provisionales = false`.
+    ✅ **Y ya se rellenan desde la aplicación** (21-09-2026): la sección «Dades de la Fundació»
+    de **Configuració** (`components/equip/DadesFundacio.tsx`) escribe esa fila, así que esto
+    deja de ser «SQL a mano». Lo que sigue faltando es el **material** —los datos reales, el DNI
+    de la apoderada y los PNG de firma y sello—, no la pantalla.
+    ⚠️ El interruptor `datos_provisionales` **no se puede desmarcar mientras algún campo siga
+    vacío o conserve lo sembrado**, y eso incluye dos literales que NO contienen la palabra
+    «PROVISIONAL» y habrían pasado un filtro ingenuo: el CIF `G00000000` y el CP `00000`. Lo
+    comprueba `campsPendents()` (`src/lib/campsFundacio.ts`, puro y con pruebas). **No valida
+    ningún CIF**: solo reconoce lo que sembró `20260928100400`.
+    ⚠️ **`apoderada_dni` se escribe pero no se lee** (GRANT de UPDATE sí, de SELECT no, §4), así
+    que el campo sale siempre vacío y dejarlo en blanco **no lo borra**. Por eso queda fuera de
+    `campsPendents()`: exigirlo bloquearía el interruptor para siempre.
+    ✅ **`email_equipo` ya no es NULL**: apunta a `hola@carlessanz.com`, que está en
+    `email_test_recipients`. Era el destinatario de TODO lo que se emite en modo prueba y estaba
+    en `example.invalid`, o sea que un ensayo no tenía a dónde llegar.
+    ⚠️ **Desde el 21-09-2026 esto ya no bloquea los ENSAYOS** (`20260921214526`): con
+    `datos_provisionales = true` se emite en **modo prueba** —serie `P-*`, marca de agua y
+    `destinatariosPrueba`— y solo se niega el modo real.
 11. **Textos legales de las plantillas.** `plantillas_documento` solo trae sembrada la de `PROVA`
     (el ejemplo del formato). Los textos ca/es de REC, ENT, OPE, CONV, RES, CD, CT y PLA los
     entrega la fase 0 y los introduce el equipo desde la pantalla: una migración no inserta texto
@@ -4322,7 +4371,11 @@ sobre 111 numeradas.
     OPE, CONV, RES ni CD: los textos son material de la fase 0. `documentos.plantilla_id` queda
     `null` y el renderizador imprime su texto de trabajo con el aviso.
 
-85. **El certificado de transacción no tiene prueba end-to-end.** `emitir_certificado_transaccion`
+85. 🟡 **El certificado de transacción no tenía prueba end-to-end, y ya la puede tener**
+    (21-09-2026). Lo que lo bloqueaba —`datos_provisionales = true` en el fixture— dejó de
+    cortar en modo prueba con `20260921214526`, así que el CT **sí se puede ejercitar** con
+    serie `P-CT`. Lo que queda es hacerlo: nadie lo ha recorrido todavía. El cuerpo original,
+    que explica el caso: `emitir_certificado_transaccion`
     aborta con `42501` porque el fixture deja `datos_provisionales = true` —que es la barrera
     funcionando, no un fallo—, así que no hay ninguna fila `documentos` de tipo `CT` que generar. El
     renderizador se probó en directo y el despacho son ocho líneas. Se cierra el día que el fixture
@@ -4492,7 +4545,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 |---|---|---|
 | 17 | Las dos whitelists de test conviven con `es_test`, y el Dashboard mide por las de Meta | **Meta**: se revisa al pasar su número a producción |
 | 71 · 77 · 84 | Los textos legales de RES, CD, CT, PLA y los seis convenios | **La asesoría** |
-| 85 | Prueba end-to-end del CT | Bloqueada por `datos_provisionales`, que es la barrera funcionando |
+| 85 | Prueba end-to-end del CT | 🟡 **Ya no está bloqueada**: desde `20260921214526` el CT se emite en modo prueba (`P-CT`). Queda ejercitarlo, que es trabajo, no espera |
 | 99 | El plan de prevención se lista desde `documentos` y no desde `planes_prevencion` | **La fase 0**: sin el cuestionario (anexo B) no hay pantalla de planes, así que del plan solo existe su PDF |
 
 ### Son interruptores de producción, no código
@@ -4601,7 +4654,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **828 pruebas en 25 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **841 pruebas en 26 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

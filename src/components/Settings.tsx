@@ -15,6 +15,7 @@ import {
   anadirEmailTest, borrarEmailTest, listarEmailsTest, type EmailTestRecipient,
 } from '../lib/emailTest'
 import GestorWhitelist from './GestorWhitelist'
+import DadesFundacio from './equip/DadesFundacio'
 import { cn } from '../lib/utils'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -178,6 +179,11 @@ export default function Settings() {
           )}
         </CardContent>
       </Card>
+
+      {/* Los datos de la Fundación: lo que encabeza todos los documentos y lo que
+          desbloquea la emisión con efecto fiscal. Va antes que las listas de prueba
+          porque pesa más: sin esta fila rellenada no se puede certificar nada. */}
+      <DadesFundacio />
 
       {/* Las listas de prueba: la segunda barrera técnica del entorno de test. */}
       <Card>

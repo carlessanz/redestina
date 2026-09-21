@@ -288,7 +288,9 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
           // No es código: la fila de `parametros_documentales` sigue con valores
           // provisionales y `emitir_certificado()` se niega (42501). Es el último escalón
           // del ciclo y se enseña EXPLICADO, no escondido (§12.10).
-          bloqueig: f.dadesProvisionals !== false
+          // Solo bloquea en REAL: un certificado de prueba lleva marca de agua y no
+          // sale de las fichas `es_test` (mismo criterio que `bloquejaProvisionals`).
+          bloqueig: f.dadesProvisionals !== false && f.exercici?.modo !== 'prueba'
             ? 'canal.bl_dades_provisionals'
             : !totConciliat ? 'canal.bl_sense_conciliar' : undefined,
         }
