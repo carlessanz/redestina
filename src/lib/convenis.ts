@@ -40,9 +40,18 @@ export interface ResultatEnviament {
 export interface ResultatFirmaAssistida {
   conveni: Convenio
   enllac: EnllacFirma
-  /** 6 cifras, 10 minutos. `null` cuando la ficha no tiene correo: entonces no hay 2º factor. */
+  /**
+   * 🔴 **Siempre `null` desde `20270401100000`, y la clave se conserva solo para no romper
+   * a quien la leyera.** La RPC generaba el código y se lo devolvía **a quien conduce la
+   * firma**, que ya tiene el enlace: dos factores en la misma mano no son dos factores. Y
+   * nada lo enviaba por correo, aunque el texto de la pantalla lo afirmara. Ahora el único
+   * código que existe es el que la persona pide **desde su propia pantalla**.
+   */
   codi: string | null
+  /** El correo al que la persona podría pedir el código desde su pantalla. */
   destinatari_codi: string | null
+  /** `false` = esa ficha no tiene correo, así que no habrá segundo factor. */
+  pot_demanar_codi?: boolean
 }
 
 /** Fila de `v_fitxes_incompletes_conveni` (vista, no tabla: por eso vive aquí). */

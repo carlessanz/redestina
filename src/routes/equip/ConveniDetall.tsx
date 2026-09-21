@@ -102,7 +102,8 @@ export default function ConveniDetall() {
 
   /** El enlace recién creado. Solo vive en esta pantalla y una vez (ver cabecera). */
   const [enllacNou, setEnllacNou] = useState<EnllacFirma | null>(null)
-  const [codiAssistit, setCodiAssistit] = useState<string | null>(null)
+  /** ¿La ficha tiene correo? Decide qué se le dice a quien conduce la firma sobre el 2º factor. */
+  const [potDemanarCodi, setPotDemanarCodi] = useState(false)
   const [correu, setCorreu] = useState('')
 
   const [dialegRetorn, setDialegRetorn] = useState(false)
@@ -171,7 +172,7 @@ export default function ConveniDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     setEnllacNou(res.data.enllac)
-    setCodiAssistit(null)
+    setPotDemanarCodi(false)
     toast.success(t('conv.sent'))
     void refrescaComptadors()
     await carrega()
@@ -184,10 +185,10 @@ export default function ConveniDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     setEnllacNou(res.data.enllac)
-    // El código puede venir a `null`: sin correo en la ficha no hay segundo factor, y eso
-    // se dice en pantalla en vez de dejar a quien conduce la firma esperando un SMS que
-    // no existe (§3.2.5).
-    setCodiAssistit(res.data.codi)
+    // Sin correo en la ficha no hay segundo factor posible, y eso se dice en pantalla en
+    // vez de dejar a quien conduce la firma esperando un código que nadie va a mandar
+    // (§3.2.5). Con correo, lo pide la persona desde su propia pantalla.
+    setPotDemanarCodi(res.data.pot_demanar_codi === true)
     toast.success(t('conv.assisted_ready'))
     await carrega()
   }
@@ -389,13 +390,23 @@ export default function ConveniDetall() {
             <p className="text-sm text-muted-foreground">{t('conv.link_new_hint')}</p>
             <Input readOnly value={urlSignatura(enllacNou.token)}
               onFocus={(e) => e.currentTarget.select()} />
-            {codiAssistit && (
-              <p className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">
-                {t('conv.assisted_code', { codi: codiAssistit })}
-              </p>
-            )}
-            {enllacNou.canal === 'asistido' && !codiAssistit && (
-              <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">{t('conv.assisted_no_code')}</p>
+            {/* 🔴 Aquí NO se enseña ningún código, y ese es el cambio de `20270401100000`.
+                Antes la RPC lo generaba y se lo devolvía a quien conduce la firma, que ya
+                tiene el enlace: dos factores en la misma mano no son dos factores. El
+                único código que existe ahora es el que la persona pide desde SU pantalla,
+                y por eso lo que se dice aquí es dónde lo va a pedir. */}
+            {enllacNou.canal === 'asistido' && (
+              potDemanarCodi
+                ? (
+                  <p className="rounded-md bg-secondary p-3 text-sm text-secondary-foreground">
+                    {t('conv.assisted_code_self')}
+                  </p>
+                )
+                : (
+                  <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+                    {t('conv.assisted_no_code')}
+                  </p>
+                )
             )}
             <div className="flex flex-wrap gap-2">
               <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">

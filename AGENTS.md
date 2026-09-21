@@ -2909,7 +2909,11 @@ pulsa «Envia'm el codi» en su propia pantalla**.
 que una organización sin correo sigue pudiendo firmar asistida —lo que ya decidió §3.2.5— y en cuanto
 la persona pide el código desde su pantalla, el hash aparece y la puerta se cierra sola.
 ⚠️ La clave `codi` del retorno **se conserva, siempre `null`**, para no romper a quien ya la leía, y
-se añade `pot_demanar_codi`. `enviado_at = now()` se queda como estaba aunque aquí no se envíe nada:
+se añade `pot_demanar_codi`. **Y la pantalla dejó de enseñar el código el 21-09-2026**
+(`ConveniDetall`): con la RPC ya cambiada seguía pintando «Aquesta fitxa no té correu», que era
+falso —el correo puede existir; lo que ya no existe es el código ahí—. Ahora dice **dónde lo va
+a pedir la persona**, y la clave `conv.assisted_code` se retiró porque afirmaba que se había
+enviado por correo. `enviado_at = now()` se queda como estaba aunque aquí no se envíe nada:
 es incoherente con `acunar_enllac_propi()`, pero hay pantallas que leen esa fecha para decir «te lo
 mandamos el día X» y cambiarlo es otro trabajo con su propia verificación.
 
