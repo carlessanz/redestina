@@ -1461,6 +1461,9 @@ funciones, no políticas:
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
 | `pendents_equip()` (`20270323100000`) | **La cola de trabajo del equipo en una sola llamada**: doce filas `(cua, n, ref, detall)`, **siempre las doce** aunque `n` valga 0. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
+| `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20270329100000`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
+| `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20270330100000`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
+| `canalitzacio_assistida(excedente)` · `canalitzacions_actives(limit)` (`20270331100000`) | Las lecturas de la pantalla guiada. ⚠️ Son `security definer`, así que **podrían** devolver lo que el GRANT por columnas protege: por eso **no leen `enlaces_token` en absoluto** —lo pendiente lo dice el estado del OBJETO (§6ter)—. Y devuelven **hechos, no el paso**: qué toca lo calcula `passosCanalitzacio.ts`, y calcularlo dos veces garantiza que diverjan |
 
 > 🔴 **EL CORTE ESTÁ ENCENDIDO desde el 16-09-2026**: `fecha_corte_convenios = 2026-09-16`,
 > a petición del cliente («bloquear hasta que no se haya firmado»). Ya no es un aviso: sin
@@ -2890,6 +2893,30 @@ con `service_role` solo para la página de evidencias.
 El segundo factor (6 cifras, 10 min) es **solo** de la firma asistida. `enviar_codi` **manda el
 correo antes de escribir `codigo_hash`**: al revés, un fallo de correo dejaría el enlace exigiendo un
 código que nadie tiene. En un enlace por correo responde `409 no_cal_codi`.
+
+🔴 **Y desde el 21-09-2026 `iniciar_firma_asistida()` NO genera ese código** (`20270401100000`), que
+es lo que lo convierte en un segundo factor de verdad. Antes lo generaba y **se lo devolvía a quien
+conduce la firma**, que ya tiene el enlace: dos factores en la misma mano no son dos factores, son un
+actor con dos cosas. Y la interfaz lo empeoraba afirmando que «también se ha enviado por correo»
+cuando **nada lo enviaba** — `iniciar_firma_asistida()` es SQL puro y solo lo devolvía; el único
+código que llega al correo de la organización es el que acuña `enviar_codi` **cuando la persona
+pulsa «Envia'm el codi» en su propia pantalla**.
+⚠️ **La solución fue quitar, no añadir.** Con `codigo_hash` a null la guarda de
+`firmar_convenio_por_enlace` no exige código (su condición es `if en.codigo_hash is not null`), así
+que una organización sin correo sigue pudiendo firmar asistida —lo que ya decidió §3.2.5— y en cuanto
+la persona pide el código desde su pantalla, el hash aparece y la puerta se cierra sola.
+⚠️ La clave `codi` del retorno **se conserva, siempre `null`**, para no romper a quien ya la leía, y
+se añade `pot_demanar_codi`. `enviado_at = now()` se queda como estaba aunque aquí no se envíe nada:
+es incoherente con `acunar_enllac_propi()`, pero hay pantallas que leen esa fecha para decir «te lo
+mandamos el día X» y cambiarlo es otro trabajo con su propia verificación.
+
+**La confirmación de un albarán también tiene vía asistida** (`20270329100000`,
+`acunar_enllac_assistit` en §4bis). Hasta entonces no la tenía, y la consecuencia no era cosmética:
+`marcar_entregado()` inserta sin `canal` —o sea `'email'`— y `registrar_confirmacion()` nunca escribía
+`asistido_por`, así que **una confirmación conducida por teléfono quedaba documentada en el PDF como
+«enviada por correo»**. Ahora `registrar_confirmacion()` escribe `asistido_por` **solo cuando el
+enlace es `asistido`**, y leyéndolo de `enlaces_token.creado_por`, nunca del cuerpo de la petición:
+quien confirma no tiene sesión y podría mandar cualquier uuid.
 
 `registro` acepta los datos del convenio y crea el borrador con su enlace: devuelve el token **solo**
 si firma quien registra (misma sesión, misma persona); si firma otra, el enlace queda esperando y lo
