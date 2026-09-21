@@ -515,9 +515,10 @@ src/
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
                                BotoAmbMotiu (§6ter)
     equip/                     PendentsEquip (la cola de trabajo del tablero), ComFunciona
-                               (los seis pasos de FASES_EQUIP, enlazados) y los dos diálogos
-                               asistidos: DialegAssistit (albarà y factura) y
-                               DialegFirmaAssistida (conveni) (§6ter)
+                               (los seis pasos de FASES_EQUIP, enlazados) y los TRES diálogos
+                               asistidos: DialegAssistit (albarà y factura),
+                               DialegFirmaAssistida (conveni) y DialegNovaOfertaAssistida
+                               (l'alta, des de l'índex del cicle) (§6ter)
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
@@ -2005,13 +2006,39 @@ conserva escritura directa sobre `oferta_respuestas` y `canalizaciones`, así qu
 se usa esta pantalla**, y no se puede afirmar que siempre se use mientras los atajos estén
 abiertos.
 
-**Los dos diálogos asistidos** (`components/equip/`) clonan `DialegFirmaConveni`: 80 vw × 88 vh,
+**Los tres diálogos asistidos** (`components/equip/`) clonan `DialegFirmaConveni`: 80 vw × 88 vh,
 no se cierran al pinchar fuera —con los kilos tecleados y a media llamada, un clic despistado
 sería caro— y **acuñan el enlace AL ABRIR, no al montar**: `acunar_enllac_assistit()` revoca el
 enlace anterior de ese objeto, así que acuñarlo de más le rompería a esa persona el enlace que
 tiene en el correo (§12.97). `DialegAssistit` sirve para el albarán **y** para la factura —es el
 mismo gesto y solo cambia el propósito—; `DialegFirmaAssistida` se queda aparte porque su enlace
 lo acuña otra RPC y lleva segundo factor.
+
+✅ **Y el tercero, `DialegNovaOfertaAssistida`, abre el ciclo en vez de continuarlo**
+(21-09-2026). Hasta ese día el alta asistida solo se alcanzaba **desde dentro de un lote que ya
+existiera**: `FormulariNovaOferta` aceptaba `productorId` por prop desde julio, pero no había
+ninguna puerta para estrenar uno. El botón vive en el índice —que es donde alguien va a buscar
+«un lote nuevo»— y al crear la oferta **navega a su ciclo**, así que el recorrido empieza donde
+termina el alta. No es un segundo formulario: es el mismo que usa el productor en su panel, con
+el mismo descriptor de `crear-oferta/campos`. ⚠️ Lleva **`key` por productor**: al cambiar de
+organización hay que volver a pedir el descriptor —los catálogos dependen de sus ubicaciones— y
+sin ella React reutilizaría la instancia con las respuestas de la anterior dentro, que es el
+mismo fallo que ya costó una vez en `PerfilOrganitzacio` (§6ter).
+
+✅ **La fase 4 enseña el convenio de CADA receptora, y lo resuelve ahí mismo** (21-09-2026).
+`aprovar_resposta()` exige convenio vigente desde la fecha de corte (`42501 sense_conveni`), y
+la pantalla decía «prepara i fes signar el seu conveni» mandando a otra: el interés se aprobaba
+a ciegas y se chocaba contra la base. Ahora cada interés pendiente lleva el badge de su convenio
+y los botones que lo arreglan —preparar, firma asistida, contrafirmar—, y «Aprova i canalitza»
+está apagado hasta que sea `vigent`. El **tipo** de convenio se deriva de la modalidad del lote
+(`conveniQueCalRebre`, la fila `parte = 'recibe'` de `convenios_exigidos`) en vez de preguntarlo:
+la RPC ya devuelve el convenio de cada entidad, y lo único que faltaba para poder crearlo era su
+tipo. ⚠️ Si algún día esa matriz deja de ser función de la modalidad, esto ya no se puede derivar.
+
+✅ **Y un bloqueo lleva a donde se arregla.** El motivo `canal.bl_sense_conveni_gen` se nombraba
+y ahí acababa: había que adivinar que se resuelve una tarjeta más arriba. Ahora el aviso trae el
+botón que **abre la fase 1 y baja hasta ella** (`id="fase-<clau>"` + `scroll-mt-20` en cada
+tarjeta). Decir el motivo sin decir dónde se resuelve es la mitad del trabajo.
 
 **Y los dos actos asistidos están TAMBIÉN donde ya se trabajaba**, no solo en la pantalla
 guiada: `AlbaraDetall` lleva «Confirmació assistida» cuando el albarán está `entregado`, y

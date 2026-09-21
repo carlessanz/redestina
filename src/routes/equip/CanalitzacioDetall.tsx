@@ -36,6 +36,7 @@ import {
   dadesFiscalsProvisionals, estatCanalitzacio, interesAssistit,
 } from '../../lib/canalitzacio'
 import { contrafirmarConveni, prepararConveni } from '../../lib/convenis'
+import type { ConvenioTipo } from '../../types'
 import { marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
@@ -54,9 +55,31 @@ import { Label } from '@/components/ui/label'
 interface Extra {
   oferta: { id: string; id_excedente: string | null; modalitat: string | null; producto: string | null }
   productor: { id: string; nom: string | null } | null
-  respostes: { id: string; entidad_id: string | null; entitat: string; estado: string; aprovacio: string; kg_solicitados: number | null }[]
+  respostes: {
+    id: string; entidad_id: string | null; entitat: string
+    estado: string; aprovacio: string; kg_solicitados: number | null
+    /** El convenio que ESTA receptora necesita para esta modalidad, si lo tiene. */
+    conveni_rec: { id: string; estado: string; numero: string | null } | null
+  }[]
   albarans: { id: string; tipo: string; estado: string; numero: string | null }[]
   conveni_gen: { id: string } | null
+}
+
+/**
+ * Qué convenio le exige a la RECEPTORA la modalidad de esta oferta.
+ *
+ * Es la fila `parte = 'recibe'` de `convenios_exigidos`: donación pide `don_rec`, y venta y
+ * maquila piden el comercial. Se deriva aquí, y no se pregunta, porque la RPC del ciclo ya
+ * devuelve el convenio que le toca a cada entidad: lo único que falta para poder prepararlo
+ * desde esta pantalla es su TIPO, y la modalidad del lote lo determina sin ambigüedad.
+ *
+ * ⚠️ Si algún día la matriz deja de ser una función de la modalidad —dos convenios para una
+ *    misma—, esto deja de poder derivarse y hay que pedirlo a la base.
+ */
+function conveniQueCalRebre(modalitat: string | null): ConvenioTipo | null {
+  if (modalitat === 'donacio') return 'don_rec'
+  if (modalitat === 'venda' || modalitat === 'maquila') return 'com'
+  return null
 }
 
 const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
@@ -205,7 +228,7 @@ export default function CanalitzacioDetall() {
             open={obert}
             onOpenChange={(v) => setObertes((o) => ({ ...o, [i]: v }))}
           >
-            <div className="rounded-xl border bg-card shadow-sm">
+            <div id={`fase-${fase.clau}`} className="scroll-mt-20 rounded-xl border bg-card shadow-sm">
               <CollapsibleTrigger className="flex w-full items-center justify-between gap-2 p-4 text-left">
                 <span className="font-titulos text-base font-semibold">
                   {i + 1}. {t(`fase.${fase.clau}_t`)}
@@ -235,12 +258,30 @@ export default function CanalitzacioDetall() {
                       {/* Un paso bloqueado dice POR QUÉ, y lo dice VISIBLE: en táctil no hay
                           hover, así que un tooltip no cuenta como haberlo dicho. */}
                       {p.motiuKey && (
-                        <p className={cn(
+                        <div className={cn(
                           'mt-2 rounded-md p-2 text-sm',
                           p.estat === 'bloquejat' ? 'bg-error-fondo text-error' : 'bg-secondary text-secondary-foreground',
                         )}>
-                          {t(p.motiuKey)}
-                        </p>
+                          <p>{t(p.motiuKey)}</p>
+                          {/* Un bloqueo que solo se nombra obliga a buscar dónde se arregla.
+                              El del convenio del generador se arregla UNA fila más arriba, en
+                              la fase 1, así que el aviso la abre y lleva hasta ella. */}
+                          {p.motiuKey === 'canal.bl_sense_conveni_gen' && (
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="mt-2 h-11 whitespace-normal md:h-8"
+                              onClick={() => {
+                                setObertes((o) => ({ ...o, 0: true }))
+                                document.getElementById('fase-conveni')?.scrollIntoView({
+                                  behavior: 'smooth', block: 'start',
+                                })
+                              }}
+                            >
+                              {t('canalz.b_ves_conveni')}
+                            </Button>
+                          )}
+                        </div>
                       )}
                       {p.estat === 'ara' && !p.motiuKey && (
                         <p className="mt-2 rounded-md bg-aviso-fondo p-2 text-sm text-aviso">
@@ -381,27 +422,99 @@ export default function CanalitzacioDetall() {
                         {t('canalz.b_interes_assistit')}
                       </Button>
 
-                      {/* Los intereses que esperan decisión, aprobables desde aquí. */}
+                      {/* Los intereses que esperan decisión, aprobables desde aquí.
+                          Y con EL CONVENIO DE CADA UNA al lado: `aprovar_resposta()` lo exige
+                          desde la fecha de corte (42501 `sense_conveni`), así que un botón de
+                          aprobar sin decir que falta el convenio manda a chocar contra la
+                          base. Los botones que lo resuelven viven aquí, en la misma fila:
+                          mandar a otra pantalla es perder el hilo del lote. */}
                       {extra.respostes
                         .filter((r) => r.estado === 'acceptada' && r.aprovacio === 'pendent')
-                        .map((r) => (
-                          <div key={r.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
-                            <span className="text-sm">
-                              {r.entitat}
-                              {r.kg_solicitados != null && (
-                                <span className="tabular-nums"> · {r.kg_solicitados} kg</span>
+                        .map((r) => {
+                          const cv = r.conveni_rec
+                          const vigent = cv?.estado === 'vigent'
+                          const tipusCal = conveniQueCalRebre(extra.oferta.modalitat)
+                          return (
+                            <div key={r.id} className="rounded-md border p-2">
+                              <div className="flex flex-wrap items-center justify-between gap-2">
+                                <span className="text-sm">
+                                  {r.entitat}
+                                  {r.kg_solicitados != null && (
+                                    <span className="tabular-nums"> · {r.kg_solicitados} kg</span>
+                                  )}
+                                </span>
+                                <span className="flex flex-wrap items-center gap-2">
+                                  <Badge className={vigent ? 'bg-exito-fondo text-exito' : 'bg-aviso-fondo text-aviso'}>
+                                    {cv ? t(`conv.st_${cv.estado}`) : t('canalz.rec_sense_conveni')}
+                                  </Badge>
+                                  <Button
+                                    size="sm"
+                                    className="h-11 whitespace-normal md:h-8"
+                                    disabled={ocupat || r.kg_solicitados == null || !vigent}
+                                    onClick={() => void aprovaInteres(r.id, r.entidad_id, Number(r.kg_solicitados ?? 0))}
+                                  >
+                                    {t('canalz.b_aprova')}
+                                  </Button>
+                                </span>
+                              </div>
+
+                              {/* Sin convenio vigente: qué falta y el botón que lo resuelve. */}
+                              {!vigent && (
+                                <div className="mt-2 rounded-md bg-aviso-fondo p-2">
+                                  <p className="text-sm text-aviso">{t('canalz.rec_conveni_cal')}</p>
+                                  <div className="mt-2 flex flex-wrap gap-2">
+                                    {!cv && r.entidad_id && tipusCal && (
+                                      <Button
+                                        size="sm"
+                                        className="h-11 whitespace-normal md:h-8"
+                                        disabled={ocupat}
+                                        onClick={() => void fes(
+                                          async () => {
+                                            const res = await prepararConveni('entidad', r.entidad_id!, tipusCal)
+                                            return res.ok ? { ok: true } : { ok: false, missatge: res.missatge }
+                                          },
+                                          'canalz.ok_preparat',
+                                        )}
+                                      >
+                                        {t('canalz.b_preparar')}
+                                      </Button>
+                                    )}
+                                    {cv && cv.estado !== 'firmat' && (
+                                      <Button
+                                        size="sm"
+                                        className="h-11 whitespace-normal md:h-8"
+                                        onClick={() => setDlgFirma(cv.id)}
+                                      >
+                                        {t('canalz.b_firma_assistida')}
+                                      </Button>
+                                    )}
+                                    {cv?.estado === 'firmat' && (
+                                      <Button
+                                        size="sm"
+                                        className="h-11 whitespace-normal md:h-8"
+                                        disabled={ocupat}
+                                        onClick={() => void fes(
+                                          async () => {
+                                            const res = await contrafirmarConveni(cv.id)
+                                            return res.ok ? { ok: true } : { ok: false, missatge: res.missatge }
+                                          },
+                                          'canalz.ok_contrasignat',
+                                        )}
+                                      >
+                                        {t('canalz.b_contrasignar')}
+                                      </Button>
+                                    )}
+                                    {cv && (
+                                      <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
+                                        <Link to={`/equip/convenis/${cv.id}`}>{t('canalz.b_veure_conveni')}</Link>
+                                      </Button>
+                                    )}
+                                  </div>
+                                </div>
                               )}
-                            </span>
-                            <Button
-                              size="sm"
-                              className="h-11 whitespace-normal md:h-8"
-                              disabled={ocupat || r.kg_solicitados == null}
-                              onClick={() => void aprovaInteres(r.id, r.entidad_id, Number(r.kg_solicitados ?? 0))}
-                            >
-                              {t('canalz.b_aprova')}
-                            </Button>
-                          </div>
-                        ))}
+                            </div>
+                          )
+                        })}
                     </div>
                   )}
 

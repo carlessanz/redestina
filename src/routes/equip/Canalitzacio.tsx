@@ -15,7 +15,7 @@
 //    pintar una tabla.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { lotsActius } from '../../lib/canalitzacio'
@@ -25,6 +25,7 @@ import type { FetsCanal } from '../../lib/passosCanalitzacio'
 import type { ConvenioEstado, EstadoAlbaran, EstadoExcedente } from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import DialegNovaOfertaAssistida from '../../components/equip/DialegNovaOfertaAssistida'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import {
@@ -68,6 +69,8 @@ export default function Canalitzacio() {
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cerca, setCerca] = useState('')
+  const [dlgNova, setDlgNova] = useState(false)
+  const navega = useNavigate()
 
   const carrega = useCallback(async () => {
     setCarregant(true)
@@ -89,9 +92,16 @@ export default function Canalitzacio() {
 
   return (
     <div className="space-y-4">
-      <div>
-        <h1 className="text-2xl font-bold">{t('canalz.title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('canalz.intro')}</p>
+      <div className="flex flex-wrap items-start justify-between gap-2">
+        <div>
+          <h1 className="text-2xl font-bold">{t('canalz.title')}</h1>
+          <p className="mt-1 text-sm text-muted-foreground">{t('canalz.intro')}</p>
+        </div>
+        {/* Empezar un lote, que es lo que faltaba: hasta ahora solo se podían continuar los
+            que ya existían, porque el alta asistida vivía DENTRO del ciclo. */}
+        <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgNova(true)}>
+          {t('canalz.nova_oferta')}
+        </Button>
       </div>
 
       <Card>
@@ -172,6 +182,12 @@ export default function Canalitzacio() {
           )}
         </CardContent>
       </Card>
+
+      <DialegNovaOfertaAssistida
+        obert={dlgNova}
+        onTancar={() => setDlgNova(false)}
+        onCreada={(r) => { setDlgNova(false); navega(`/equip/canalitzacio/${r.id}`) }}
+      />
     </div>
   )
 }
