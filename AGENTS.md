@@ -3910,8 +3910,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 21-09-2026: **38 entradas vivas** (6 parciales 🟡 y 32 abiertas) y **69 cerradas**,
-sobre 107 numeradas.
+Estado al 21-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **69 cerradas**,
+sobre 108 numeradas.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4252,9 +4252,20 @@ sobre 107 numeradas.
      cifra decorativa. El día que se quiera la columna coherente, es `conciliar_albaran()` quien
      debería escribirla.
 
+109. 🔴 **La pantalla guiada es una CONVENCIÓN, no una imposición.** `/equip/canalitzacio`
+     (§6ter) llama a las RPC reales del circuito, así que salen exactamente los mismos
+     documentos y correos que si lo hubiera hecho la organización — **cuando se usa**. Pero
+     `authenticated` conserva `insert`/`update`/`delete` sobre `oferta_respuestas` y escritura
+     directa sobre `canalizaciones`, así que los atajos de `OfferDetail.tsx:273-288`, `:291-297`
+     y `:492-518` siguen existiendo y siguen produciendo lotes **sin `canal`, sin compatibilidad
+     de modalidad comprobada y sin precio mínimo**, indistinguibles en el listado de los que
+     pasaron por el circuito. Cerrarlo es revocar esos GRANT y reescribir `OfferDetail` y
+     `Aprovacions` para que pasen por RPC: ~2 días. ⚠️ Mientras tanto, «se generan los mismos
+     documentos» es una frase con condición, y así hay que decirla.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **32 de las 38**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **33 de las 39**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -4283,6 +4294,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
 | 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
 | 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
+| 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
 
 ### Espera material de la fase 0 o de un tercero
 
@@ -4314,7 +4326,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 109.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 110.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
