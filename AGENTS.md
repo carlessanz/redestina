@@ -49,16 +49,22 @@ de consultoría); su resumen y la correspondencia objetivo↔construido están e
 la tabla sigue siendo `excedentes` y los textos dicen «excedent»: el rename de vocabulario es brecha
 pendiente (ver el adaptado, §0).
 
-`docs/` guarda además seis documentos operativos (también fuera de git): **`Guía producción
+`docs/` guarda además siete documentos operativos (también fuera de git): **`Guía producción
 WhatsApp — Redestina.md`** (los pasos en Meta del checkpoint §12.2 —número de producción, verificación,
 pago, plantillas— con el estado de preparación verificado el 24-07-2026, y su versión visual
 `WhatsApp producción (visual).html`), **`Costes de WhatsApp — Redestina.md`** (modelo de costes: la
 ventana de 24 h es gratis, la plantilla se paga), **`Flujo de la aplicación Redestina.md`** (el flujo
-end-to-end con diagramas Mermaid y los textos literales que se envían), **`Usuarios y accesos —
+end-to-end con diagramas Mermaid y los textos literales que se envían), **`Guía de prueba — ciclo
+completo asistido.md`** (21-09-2026: el recorrido paso a paso del ciclo entero desde `/equip/canalitzacio`
+—qué cuenta, qué botón, qué comprobar en pantalla y en el correo— y la tabla que contrasta el camino
+propio con el asistido, que es lo que demuestra que producen el mismo documento; §6ter),
+**`Usuarios y accesos —
 Redestina.md`** (las 3 cuentas reales del equipo con su rol y las **12 de prueba con su contraseña**, más
 cómo reenviar un acceso, cortar uno y recrear las cuentas) y **`usuarios-test.md`** (la tabla escueta
 de esas 12 cuentas, para tenerla a mano al probar). Los dos últimos **llevan credenciales en claro**:
 que estén fuera de git no es un detalle, es el motivo de que existan ahí.
+⚠️ La guía de prueba **no las repite**: cita las cuentas por su correo y manda a `usuarios-test.md`
+para la contraseña, que es lo que permite enseñarla sin repartir credenciales.
 
 **Dos documentos vigentes no tienen copia en `docs/` y viven solo en la raíz de la carpeta del
 proyecto de consultoría** (§ abajo), así que no se encuentran buscando en el repo: **`Definición de
@@ -2030,6 +2036,15 @@ con cualquier prueba de albarán. El guion de la demo —`Horta de Prova SL` com
 `pendent_firma` a propósito (§9)— está listo para cuando se decida pagar ese precio. **No usar
 `Mas de Prova SCP`**: su `don_gen` ya está `vigent` y la fase 1 saldría resuelta.
 
+✅ **Y ese guion ya está escrito paso a paso**, para que quien lo recorra no tenga que
+reconstruirlo de este documento: **`docs/Guía de prueba — ciclo completo asistido.md`**
+(21-09-2026, fuera de git como todo `docs/`). Lleva las seis fases con la cuenta, la pantalla y
+el texto literal de cada botón, qué comprobar en pantalla y en el correo, y **la tabla que
+contrasta el camino propio con el asistido** —firma, interés, confirmación y factura— que es la
+única forma de demostrar la afirmación de esta sección: que los dos producen el mismo documento
+y solo cambia la vía impresa en la página de evidencias. El certificado final aparece ahí
+**bloqueado y explicado**, y la guía dice que ese es el resultado correcto, no una avería.
+
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
 Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo
@@ -2534,8 +2549,9 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   documento) los toca solo la sesión que orquesta. Todos en **Opus 5 a esfuerzo alto**.
 - **`docs/` y `scripts/data/` nunca entran en git.** El primero es material de trabajo —incluye el
   **funcional de negocio** (`Documento funcional Redestina 2026.md` y `Documento funcional Redestina 2026 —
-  adaptado.md`, resumidos en §1bis), `nuevas-funcionalidades/` y los seis documentos operativos
-  de §1 (guía de producción de WhatsApp + su HTML visual, costes, flujo de la aplicación y los dos
+  adaptado.md`, resumidos en §1bis), `nuevas-funcionalidades/` y los siete documentos operativos
+  de §1 (guía de producción de WhatsApp + su HTML visual, costes, flujo de la aplicación, la guía
+  de prueba del ciclo y los dos
   de **usuarios, con contraseñas en claro**)—; el segundo son datos personales
   (teléfonos, emails y NIF de ~450 personas y entidades). `.env.local.example` sí se versiona: es la
   plantilla, sin valores.
