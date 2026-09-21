@@ -81,6 +81,21 @@ export default function QueTocaAra({
           </Link>
         </Button>
       )}
+
+      {/* La nota al margen (hoy, el «producte al camp» de F3). Va en `secondary`, no en
+          `aviso`: no es nada que le toque hacer a quien mira —si lo fuera, iría arriba, en
+          `toca`—, y gastar el ámbar en información neutra rompería la única señal que
+          tenemos para «te toca a ti». */}
+      {punt.notaClau && (
+        <div className="mt-3 rounded-lg bg-secondary p-3 text-sm text-secondary-foreground">
+          <p>{t(punt.notaClau)}</p>
+          {punt.notaEnllac && (
+            <Button asChild size="sm" variant="outline" className="mt-2 h-11 whitespace-normal md:h-8">
+              <Link to={punt.notaEnllac}>{t('proc.a_nota')}</Link>
+            </Button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

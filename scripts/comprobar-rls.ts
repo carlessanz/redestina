@@ -651,6 +651,20 @@ const DOCUMENTAL_EXTERN: Check[] = [
     args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" },
     descripcion: "NO consulta els bloquejos d'esborrat d'una fitxa",
   },
+  // Crear una espigolada es del EQUIPO, y desde la F3 (20260921221806) además CONVIERTE
+  // una oferta: la saca del mercado, le cambia el origen y le monta un REC. Si un externo
+  // pudiera llamarla, podría convertir la oferta de otra organización y quedarse con la
+  // entrada de producto. Hasta esta fase la RPC no la miraba nadie en el arnés.
+  {
+    tabla: "crear_espigolada",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_productor: "00000000-0000-0000-0000-000000000000",
+      p_excedente: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO crea ni converteix cap espigolada (nomes l'equip)",
+  },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -846,8 +860,27 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "espigoladas",
       op: "leer",
       esperado: "permitir",
-      descripcion: "ve las espigoladas",
+      columnas: "id, fecha, estado, oferta_origen_id",
+      descripcion: "ve las espigoladas, y de qué oferta nació cada una",
       requiereFixture: "la espigolada de prueba (scripts/crear-datos-documentales-prueba.ts)",
+    },
+    // La guarda de ROL de la conversión (F3). Va contra un uuid de ceros a propósito: lo
+    // que se mide es que `es_intern()` la deja pasar, no lo que contesta —contesta
+    // `22023 oferta_inexistent`, que es error de NEGOCIO y por tanto cuenta como
+    // ejecutada (ERRORES_DE_NEGOCIO)—.
+    //
+    // ⚠️ En positivo no se prueba NUNCA: convertir una oferta de verdad la sacaría del
+    //    mercado, le cambiaría el origen y le montaría un REC, contra producción. Mismo
+    //    criterio que `borrar_ficha_completa()` y que §12.97 con `acunar_enllac_propi`.
+    {
+      tabla: "crear_espigolada",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+      p_productor: "00000000-0000-0000-0000-000000000000",
+      p_excedente: "00000000-0000-0000-0000-000000000000",
+    },
+      descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
     },
     {
       tabla: "costes_producto",
@@ -1049,6 +1082,20 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // La guarda de rol de la conversión de una oferta en jornada (F3, 20260921221806).
+    // Mismo criterio que en `equip`: uuid de ceros, porque en positivo no se prueba nunca
+    // —convertiría una oferta real contra producción—. Devuelve `22023 oferta_inexistent`,
+    // que es error de negocio y cuenta como ejecutada.
+    {
+      tabla: "crear_espigolada",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_productor: "00000000-0000-0000-0000-000000000000",
+        p_excedente: "00000000-0000-0000-0000-000000000000",
+      },
+      descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
+    },
     // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -1325,6 +1372,23 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "productos", op: "leer", esperado: "permitir", descripcion: "lee el catálogo (lo necesita el alta de oferta)" },
     { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano (van por la Edge Function)" },
+    {
+      tabla: "excedentes",
+      op: "leer",
+      esperado: "permitir",
+      columnas: "id, estado, producte_al_camp",
+      descripcion: "veu si la SEVA oferta declara producte al camp",
+      requiereFixture: "alguna oferta de TEST-PROD-1",
+    },
+    // `producte_al_camp` decide un flujo: si la oferta sale en la cola del equipo y si se
+    // puede convertir en jornada. La única política de UPDATE de `excedentes` es
+    // `es_intern()` (20260730096000:39), así que un externo no la mueve.
+    //
+    // ⚠️ Un UPDATE denegado por RLS NO da error: PostgREST no encuentra filas que cumplan
+    //    el `using` y devuelve éxito con cero afectadas. Por eso la rama `actualizar` pide
+    //    las filas afectadas y trata «cero sobre una fila que sé que existe» como
+    //    denegación (§4bis).
+    { tabla: "excedentes", op: "actualizar", esperado: "denegar", descripcion: "NO marca la seva oferta com a «producte al camp»" },
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca su propia membresía (ningún externo se auto-activa)" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros (lo corta pot_aprovar)" },

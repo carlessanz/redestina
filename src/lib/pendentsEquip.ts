@@ -8,7 +8,7 @@
 // quedaba repartido en ocho sitios sin conexión (§12.5, y la auditoría de UX).
 //
 // AHORA HAY UNA FUENTE: la RPC `pendents_equip()` (`20270323100000`), que devuelve siempre
-// las doce colas con su cifra, y ESTE módulo la guarda en un store de módulo del que
+// las trece colas con su cifra, y ESTE módulo la guarda en un store de módulo del que
 // leen los dos consumidores —los badges del menú y la tarjeta «Pendent de l'equip» del
 // tablero— con `useSyncExternalStore` (el mismo patrón que `useInstalacio`). Así las dos
 // cifras no pueden discrepar, porque son la misma.
@@ -28,12 +28,22 @@ import { supabase } from './supabase'
 import type { ResultatRpc } from './albarans'
 import type { Comptador } from './nav'
 
-/** Las doce colas que devuelve `pendents_equip()`, en su orden de proceso. */
+/**
+ * Las trece colas que devuelve `pendents_equip()`, en su orden de proceso.
+ *
+ * ⚠️ ESTA UNIÓN ES UN FILTRO, no una etiqueta. `comptadorsDePendents()` y la tarjeta del
+ *    tablero buscan por `cua`, así que una cola que la base devuelva y que no esté aquí no
+ *    da ningún error de tipos —la fila llega igual dentro del array— pero **no la enseña
+ *    nadie**: es una cifra que se descarta en silencio. Al añadir una cola en SQL hay que
+ *    añadirla también aquí.
+ */
 export type CuaEquip =
   | 'registres' | 'convenis_contrasignar' | 'respostes' | 'missatges'
   | 'ofertes_sense_enviar' | 'ofertes_vencudes'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
+  // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
+  | 'espigolades_per_convertir'
 
 export interface PendentEquip {
   cua: CuaEquip
@@ -96,7 +106,7 @@ export function buidaComptadors(): void {
 }
 
 /**
- * De las doce colas a los cinco badges del menú. Es una función pura y está aquí, no en
+ * De las trece colas a los cinco badges del menú. Es una función pura y está aquí, no en
  * `AppShell`, para que el tablero pueda enseñar la misma cifra que el badge sin recalcular.
  */
 export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptador, number>> {

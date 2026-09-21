@@ -137,6 +137,14 @@ export default function OffersList({ onOpen }: Props) {
                     <span className={cn('inline-block rounded-full px-2 py-0.5 text-xs font-medium', est.clase)}>
                       {t(est.key)}
                     </span>
+                    {/* F3. El listado es a donde manda la cola `espigolades_per_convertir`
+                        del tablero, así que tiene que poder decir CUÁLES son: una oferta
+                        con producto sin cosechar y sin jornada todavía. */}
+                    {o.producte_al_camp && !o.espigolada_id && (
+                      <span className="ml-1 inline-block rounded-full bg-aviso-fondo px-2 py-0.5 text-xs font-medium text-aviso">
+                        {t('conv_esp.tag')}
+                      </span>
+                    )}
                   </TableCell>
                   <TableCell className="text-right">
                     <Button size="sm" onClick={() => onOpen(o)}>{t('off.open')}</Button>

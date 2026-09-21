@@ -138,6 +138,11 @@ export default function ProductorOfertaDetall() {
     motiu: oferta.motivo_no_colocada ?? null,
     vencuda,
     pendentDeMi,
+    // F3. Aquí NO hay ningún botón, y no es un olvido: quien avisa de que tiene un campo
+    // sin cosechar no decide qué se hace con él —el destino lo elige el equipo (§6ter)—,
+    // así que lo único que le toca es saberlo. `puntOferta` lo dice con una nota.
+    producteAlCamp: oferta.producte_al_camp,
+    espigoladaId: oferta.espigolada_id,
   }, 'productor')
 
   return (

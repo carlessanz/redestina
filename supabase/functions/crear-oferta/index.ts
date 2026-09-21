@@ -1,6 +1,6 @@
 // Alta de una oferta desde el panel del productor.
 //
-//   GET  /crear-oferta/campos?productor=<uuid>  -> los 14 pasos, sus secciones y catálogos
+//   GET  /crear-oferta/campos?productor=<uuid>  -> los 15 pasos, sus secciones y catálogos
 //   POST /crear-oferta  { productor_id, datos } -> crea el excedente
 //
 // Por qué una Edge Function y no un insert desde el navegador:
@@ -93,7 +93,7 @@ Deno.serve(async (req) => {
 
     return responder({
       campos: CAMPOS,
-      // Las secciones viajan con los campos y no se escriben en la pantalla: agrupar los 14
+      // Las secciones viajan con los campos y no se escriben en la pantalla: agrupar los 15
       // pasos es parte del cuestionario, no de una interfaz concreta, y `campos[].seccion`
       // no se puede pintar sin saber en qué orden van los bloques ni cómo se titulan.
       secciones: SECCIONES,

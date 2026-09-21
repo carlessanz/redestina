@@ -36,7 +36,7 @@ import {
   dadesFiscalsProvisionals, estatCanalitzacio, interesAssistit,
 } from '../../lib/canalitzacio'
 import { contrafirmarConveni, prepararConveni } from '../../lib/convenis'
-import type { ConvenioTipo } from '../../types'
+import type { ConvenioTipo, Excedente } from '../../types'
 import { marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
@@ -44,6 +44,8 @@ import { supabase } from '../../lib/supabase'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import DialegAssistit from '../../components/equip/DialegAssistit'
+import DialegEspigolada from '../../components/equip/DialegEspigolada'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import DialegFirmaAssistida from '../../components/equip/DialegFirmaAssistida'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -95,6 +97,13 @@ export default function CanalitzacioDetall() {
 
   const [fets, setFets] = useState<FetsCanal | null>(null)
   const [extra, setExtra] = useState<Extra | null>(null)
+  /**
+   * La fila entera de la oferta (F3). `canalitzacio_assistida()` devuelve de ella cuatro
+   * campos, y la conversión en espigolada necesita más —`producte_al_camp`,
+   * `espigolada_id`, la finca y lo que declaró— así que se pide aparte en vez de ensanchar
+   * una RPC del circuito para una pantalla.
+   */
+  const [oferta, setOferta] = useState<Excedente | null>(null)
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
@@ -103,6 +112,7 @@ export default function CanalitzacioDetall() {
   // Los tres actos asistidos, cada uno con su diálogo.
   const [dlgFirma, setDlgFirma] = useState<string | null>(null)
   const [dlgAlbara, setDlgAlbara] = useState<string | null>(null)
+  const [dlgEspigolada, setDlgEspigolada] = useState(false)
 
   // El interés asistido: entidad y kilos, que es lo mínimo que la RPC necesita.
   const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
@@ -112,10 +122,13 @@ export default function CanalitzacioDetall() {
   const carrega = useCallback(async () => {
     if (!id) return
     setCarregant(true)
-    const [r, provisionals] = await Promise.all([
+    const [r, provisionals, exc] = await Promise.all([
       estatCanalitzacio(id),
       dadesFiscalsProvisionals(),
+      // `:id` de esta ruta ES el excedente (la clave natural del ciclo, §6ter).
+      supabase.from('excedentes').select('*').eq('id', id).maybeSingle(),
     ])
+    setOferta((exc.data as Excedente | null) ?? null)
     if (!r.ok) {
       setError(r.missatge === 'canalz.err_generic' ? t('c.error') : r.missatge)
       setCarregant(false)
@@ -172,6 +185,18 @@ export default function CanalitzacioDetall() {
 
   const escala = escalaCanal(fets)
   const punt = puntCanal(fets)
+
+  /**
+   * Por qué NO se puede convertir en espigolada (F3). Las mismas dos razones que anticipa
+   * `OfferDetail`, y por lo mismo: la oferta ya tiene una entrada, así que la jornada
+   * crearía un segundo REC con los mismos kilos. **La autoridad sigue siendo la RPC**
+   * (`ja_te_canalitzacions` / `ja_te_albarans`, 22023); esto solo evita el choque.
+   */
+  const motiuNoConvertible = fets.canalitzacions.length > 0
+    ? t('conv_esp.no_canalitzacions')
+    : fets.albarans.some((a) => a.estado !== 'anulado')
+      ? t('conv_esp.no_albarans')
+      : null
   const perFase = FASES_EQUIP.map((_, i) => escala.filter((p) => p.fase === i))
 
   /** Un paso concreto, para decidir si su botón está vivo. */
@@ -291,6 +316,20 @@ export default function CanalitzacioDetall() {
                     </div>
                   ))}
 
+                  {/* El «producte al camp» cambia lo que significa la fase 2, así que se
+                      dice antes de enseñar el botón: la entrada de este lote la produce una
+                      jornada de campo, no un albarán tecleado. */}
+                  {i === 1 && oferta?.producte_al_camp && (
+                    <div className="rounded-md bg-secondary p-2 text-sm text-secondary-foreground">
+                      <p>{t(oferta.espigolada_id ? 'conv_esp.done_hint' : 'conv_esp.banner')}</p>
+                      {/* En táctil no hay hover, así que el tooltip del botón gris no
+                          existe para media aplicación: el motivo va también escrito. */}
+                      {!oferta.espigolada_id && motiuNoConvertible && (
+                        <p className="mt-1">{motiuNoConvertible}</p>
+                      )}
+                    </div>
+                  )}
+
                   {/* ── Las acciones de cada fase ── */}
                   <div className="flex flex-wrap gap-2">
                     {i === 0 && (
@@ -345,6 +384,27 @@ export default function CanalitzacioDetall() {
                       <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
                         <Link to={`/equip/ofertes/${extra.oferta.id}`}>{t('canalz.b_obre_oferta')}</Link>
                       </Button>
+                    )}
+
+                    {/* F3, fase 2 (l'entrada): si el lote declara producto SIN COSECHAR,
+                        la entrada no es un albarán que alguien teclea, es una jornada de
+                        campo. Y si ya lo es, se enlaza a ella. */}
+                    {i === 1 && oferta?.espigolada_id && (
+                      <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+                        <Link to={`/equip/espigolades/${oferta.espigolada_id}`}>
+                          {t('conv_esp.open')}
+                        </Link>
+                      </Button>
+                    )}
+                    {i === 1 && oferta?.producte_al_camp && !oferta.espigolada_id && (
+                      <BotoAmbMotiu
+                        className="h-11 whitespace-normal md:h-9"
+                        disabled={Boolean(motiuNoConvertible)}
+                        motiu={motiuNoConvertible ?? undefined}
+                        onClick={() => setDlgEspigolada(true)}
+                      >
+                        {t('conv_esp.cta')}
+                      </BotoAmbMotiu>
                     )}
 
                     {i === 3 && (
@@ -571,6 +631,15 @@ export default function CanalitzacioDetall() {
           conveniId={dlgFirma}
           onTancar={() => setDlgFirma(null)}
           onFirmat={() => { setDlgFirma(null); void carrega() }}
+        />
+      )}
+      {oferta && (
+        <DialegEspigolada
+          obert={dlgEspigolada}
+          oferta={oferta}
+          productorNom={extra.productor?.nom ?? null}
+          onTancar={() => setDlgEspigolada(false)}
+          onCreada={() => { setDlgEspigolada(false); void refrescaComptadors(); void carrega() }}
         />
       )}
       {dlgAlbara && (

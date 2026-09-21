@@ -21,6 +21,7 @@ import {
   parseDisponibleFins,
   siglas,
   componerTextoOferta,
+  esProducteAlCamp,
 } from '../supabase/functions/_shared/oferta.ts'
 
 /** Campos mínimos de una oferta, para variar solo lo que cada prueba mira. */
@@ -273,5 +274,79 @@ describe('componerTextoOferta', () => {
     const t = componerTextoOferta(campos({ producte: 'Tomàquet de penjar', municipi: 'Gavà' }))
     expect(t).toContain('🌿 PRODUCTE: Tomàquet de penjar')
     expect(t).toContain('📍 MUNICIPI: Gavà')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Producte al camp: lo que la entidad tiene que saber antes de decir que sí
+// ---------------------------------------------------------------------------
+// `excedentes.producte_al_camp` (20260921221806) declara que lo ofrecido TODAVÍA NO ESTÁ
+// RECOGIDO. Decide dos cosas: que el equipo pueda convertir la oferta en una jornada de
+// espigueo sin duplicar la entrada, y qué se está comprometiendo a hacer quien la acepta
+// —ir a una finca a collir no es pasar a recoger unos palots—.
+
+describe('esProducteAlCamp: traducir la respuesta a un boolean', () => {
+  // El intake guarda el `id` de la fila pulsada; el panel, el `value` del desplegable. Los
+  // dos son la misma cadena hoy, y aun así el traductor existe porque el error de leerlo
+  // mal no da ningún fallo: publica una oferta que afirma algo que nadie ha dicho.
+  it('reconoce el id que mandan los dos canales', () => {
+    expect(esProducteAlCamp('si')).toBe(true)
+    expect(esProducteAlCamp('no')).toBe(false)
+  })
+
+  it('tolera el acento, las mayúsculas y los espacios', () => {
+    expect(esProducteAlCamp('Sí')).toBe(true)
+    expect(esProducteAlCamp(' SÍ ')).toBe(true)
+    expect(esProducteAlCamp('No')).toBe(false)
+  })
+
+  it('acepta el boolean por si algún día la pantalla es una casilla', () => {
+    expect(esProducteAlCamp(true)).toBe(true)
+    expect(esProducteAlCamp(false)).toBe(false)
+    expect(esProducteAlCamp('true')).toBe(true)
+  })
+
+  // Lo importante: ante la duda, false. Es el default de la columna y el estado de todas
+  // las ofertas anteriores; un `true` inventado metería la oferta en la cola de
+  // espigolades del equipo y se lo diría a la entidad en el texto publicado.
+  it('cualquier otra cosa es false, que es el lado seguro', () => {
+    expect(esProducteAlCamp(undefined)).toBe(false)
+    expect(esProducteAlCamp(null)).toBe(false)
+    expect(esProducteAlCamp('')).toBe(false)
+    expect(esProducteAlCamp('potser')).toBe(false)
+    expect(esProducteAlCamp(0)).toBe(false)
+  })
+})
+
+describe('componerTextoOferta · producte al camp', () => {
+  it('no dice nada cuando el producto ya está collit', () => {
+    expect(componerTextoOferta(campos())).not.toContain('PRODUCTE AL CAMP')
+    expect(componerTextoOferta(campos({ producteAlCamp: false }))).not.toContain('PRODUCTE AL CAMP')
+  })
+
+  it('lo avisa cuando todavía hay que collir-ho', () => {
+    expect(componerTextoOferta(campos({ producteAlCamp: true })))
+      .toContain("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)")
+  })
+
+  // Va pegada al producto y no al final: la entidad decide leyendo las primeras líneas, y
+  // esto cambia lo que significa aceptar. Enterrada entre las observaciones no la ve nadie.
+  it('sale justo después del producte, antes que el productor', () => {
+    const t = componerTextoOferta(campos({ producteAlCamp: true }))
+    const lineas = t.split('\n')
+    const i = lineas.findIndex((l) => l.includes('PRODUCTE:'))
+    expect(lineas[i + 1]).toContain('PRODUCTE AL CAMP:')
+    expect(lineas[i + 2]).toContain('PRODUCTOR:')
+  })
+
+  it('el resto del mensaje sigue entero, con su cierre de SÍ/NO', () => {
+    const t = componerTextoOferta(campos({ producteAlCamp: true, preu: '0.8 €/kg' }))
+    for (const etiqueta of ['MUNICIPI:', 'QUANTITAT:', 'MODALITAT:', 'PREU MÍNIM:', 'CAUSA:',
+      'ENVASOS:', 'RESPONSABLE:', 'OBSERVACIONS:']) {
+      expect(t, `falta ${etiqueta}`).toContain(etiqueta)
+    }
+    expect(t.trimEnd().endsWith(
+      '✅ Per acceptar aquesta oferta respon *SÍ* (o *NO* per descartar-la).',
+    )).toBe(true)
   })
 })

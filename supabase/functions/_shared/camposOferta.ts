@@ -19,6 +19,7 @@ export const PASOS = [
   "familia",
   "producte",
   "varietat",
+  "producte_al_camp",
   "kg",
   "caixes",
   "tipus_caixa",
@@ -71,6 +72,33 @@ export const TIPOS_CAIXA = [
 ];
 
 export const OPCIONES_RETORN = ["Sí", "No", "Caixes pròpies"];
+
+// «Producte al camp»: lo ofrecido TODAVÍA NO ESTÁ RECOGIDO y hay que ir a cosecharlo.
+//
+// No es un matiz descriptivo, decide un flujo (20260921221806): esa oferta la puede
+// convertir el equipo en una jornada de espigueo con `crear_espigolada(p_excedente => …)`,
+// reutilizando el excedente en vez de crear una segunda entrada del mismo producto. Y la
+// entidad que la recibe tiene derecho a saberlo ANTES de mostrar interés: comprometerse a
+// recoger 300 kg de un palot no es lo mismo que ir a un campo a cogerlos.
+//
+// ⚠️ Los `id` son `si`/`no` y no el título, al revés que `TIPOS_CAIXA` y `OPCIONES_RETORN`:
+//    lo que se guarda es un boolean, así que el valor que viaja tiene que ser estable
+//    aunque el título se reescriba. Lo traduce `esProducteAlCamp()` en `oferta.ts`, que es
+//    el único sitio que decide qué es «sí».
+//
+// ⚠️ Mismo tope de 72 caracteres que `MODALITATS`: el intake lo pregunta con lista.
+export const OPCIONS_AL_CAMP = [
+  {
+    id: "si",
+    titulo: "Sí, és a la planta",
+    descripcion: "Cal collir-ho. Es pot organitzar com a espigolada.",
+  },
+  {
+    id: "no",
+    titulo: "No, ja està collit",
+    descripcion: "Ja està collit i a punt per recollir.",
+  },
+];
 
 // La `descripcion` de estas tres no es adorno: la modalidad decide qué entidades pueden
 // recibir la oferta (`modalitat_receptor_compat`) y qué documento se acaba emitiendo.
@@ -137,7 +165,7 @@ export interface CampoOferta {
   condicion?: { campo: Paso; en: string[] };
 }
 
-/** Descriptor de los 14 pasos, con las mismas preguntas que hace el bot. */
+/** Descriptor de los 15 pasos, con las mismas preguntas que hace el bot. */
 export const CAMPOS: CampoOferta[] = [
   {
     clave: "familia",
@@ -162,6 +190,17 @@ export const CAMPOS: CampoOferta[] = [
     ayuda: "Deixa-ho buit si no aplica",
     seccion: "producte",
     obligatorio: false,
+  },
+  {
+    clave: "producte_al_camp",
+    tipo: "opcions",
+    etiqueta: "El producte encara és al camp?",
+    // Lo que separa las dos respuestas no es el estado del producto, es el trabajo que
+    // implica: por eso la ayuda habla de collir y no de «sense recollir».
+    ayuda: "«Sí» vol dir que encara s'ha de collir, no que estigui pendent de recollida.",
+    seccion: "producte",
+    obligatorio: true,
+    opciones: OPCIONS_AL_CAMP,
   },
   {
     clave: "kg",

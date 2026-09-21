@@ -120,8 +120,14 @@ export interface ResultatRepartiment {
 export interface ResultatEspigolada {
   espigolada_id: string
   albara_rec: string
+  /** La oferta que se ha convertido, si la jornada ha nacido de una (F3). */
+  oferta_origen_id?: string | null
   registres: { excedente_id: string; producte: string | null; kg: number }[]
 }
+
+// Los rechazos de la CONVERSIÓN de una oferta en jornada (F3) se traducen por su código
+// en `conversioEspigolada.ts`, que es puro y por tanto se puede probar desde Vitest —este
+// módulo importa el cliente de Supabase y no se puede importar desde una prueba—.
 
 /**
  * Envoltorio único de `supabase.rpc`.
@@ -214,6 +220,13 @@ export function crearEspigolada(camps: {
   notes: string | null
   linies: LiniaEntrada[]
   refExterna: string | null
+  /**
+   * CONVERTIR una oferta «producte al camp» en jornada (F3), en vez de crear registros
+   * nuevos: la RPC reutiliza ese excedente y la jornada guarda `oferta_origen_id`. Con
+   * `p_excedente` solo se admite UNA línea, la del pesaje real; omitirla toma lo que la
+   * oferta declaraba. Sin él, el comportamiento es exactamente el de siempre.
+   */
+  excedent?: string | null
 }): Promise<ResultatRpc<ResultatEspigolada>> {
   return crida('crear_espigolada', {
     p_productor: camps.productor,
@@ -223,6 +236,7 @@ export function crearEspigolada(camps: {
     p_notas: camps.notes,
     p_lineas: camps.linies,
     p_ref_externa: camps.refExterna,
+    p_excedente: camps.excedent ?? null,
   }, 'esp.err_generic')
 }
 

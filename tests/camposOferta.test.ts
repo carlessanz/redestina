@@ -1,4 +1,4 @@
-// El cuestionario de la oferta: los 14 pasos, cuáles son obligatorios y cuál se salta.
+// El cuestionario de la oferta: los 15 pasos, cuáles son obligatorios y cuál se salta.
 //
 // Por qué importa: este módulo es la ÚNICA definición del cuestionario, y la comparten dos
 // interfaces que no se parecen en nada —el intake conversacional de WhatsApp (`intake.ts`,
@@ -16,6 +16,7 @@ import {
   PASOS,
   CAMPOS,
   MODALITATS,
+  OPCIONS_AL_CAMP,
   MAX_DESC_FILA_LISTA,
   MAX_TITULO_FILA_LISTA,
   SECCIONES,
@@ -38,6 +39,7 @@ function donacionCompleta(): Record<string, unknown> {
     familia: 'Horta Fulla',
     producte: 'Enciam',
     varietat: '',
+    producte_al_camp: 'no',
     kg: 300,
     caixes: 12,
     tipus_caixa: 'Palot',
@@ -58,8 +60,8 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
     expect(CAMPOS.map((c) => c.clave)).toEqual([...PASOS])
   })
 
-  it('son 14 pasos: 13 fijos más el condicional', () => {
-    expect(PASOS).toHaveLength(14)
+  it('son 15 pasos: 14 fijos más el condicional', () => {
+    expect(PASOS).toHaveLength(15)
     expect(CAMPOS.filter((c) => c.condicion)).toHaveLength(1)
   })
 
@@ -84,6 +86,7 @@ describe('qué es obligatorio', () => {
     expect(obligatorios).toEqual([
       'familia',
       'producte',
+      'producte_al_camp',
       'kg',
       'disponible_fins',
       'modalitat',
@@ -105,6 +108,42 @@ describe('qué es obligatorio', () => {
   it('tipus_caixa y retorn son opcionales en el descriptor (el intake los exige igual)', () => {
     expect(campo('tipus_caixa').obligatorio).toBe(false)
     expect(campo('retorn').obligatorio).toBe(false)
+  })
+})
+
+describe('producte al camp: la oferta dice si hay que ir a collir', () => {
+  // No es un matiz descriptivo: decide si el equipo puede convertir la oferta en una
+  // espigolada (`crear_espigolada(p_excedente => …)`, 20260921221806) y es lo que la
+  // entidad necesita saber antes de comprometerse a recoger algo que aún está en la planta.
+  it('es obligatorio: no se puede publicar sin decirlo', () => {
+    expect(campo('producte_al_camp').obligatorio).toBe(true)
+    const d = donacionCompleta()
+    delete d.producte_al_camp
+    expect(faltantes(d)).toEqual(['producte_al_camp'])
+  })
+
+  // ⚠️ Los ids son el VALOR que viaja al servidor, no el título. `esProducteAlCamp()` los
+  // traduce a boolean, así que renombrarlos aquí convertiría en «ja collit» todo lo que se
+  // publique —sin ningún error— hasta que alguien mirara una oferta.
+  it('los ids son «si» y «no», estables aunque cambie el título', () => {
+    expect(OPCIONS_AL_CAMP.map((o) => o.id)).toEqual(['si', 'no'])
+    expect(campo('producte_al_camp').opciones).toBe(OPCIONS_AL_CAMP)
+  })
+
+  it('las dos opciones explican qué implica elegirlas', () => {
+    for (const o of OPCIONS_AL_CAMP) {
+      expect(o.descripcion, `la opción "${o.id}" no se explica`).toBeDefined()
+      expect(o.descripcion!.trim()).not.toBe('')
+    }
+    expect(OPCIONS_AL_CAMP.find((o) => o.id === 'si')!.descripcion).toContain('espigolada')
+  })
+
+  // Va en la sección del producto y ANTES de los kg, que es el orden en que se piensa: lo
+  // que hay, y solo después cuánto hay. Si se moviera detrás de `kg`, el productor
+  // estimaría kilos sin haber dicho todavía que no los ha pesado nadie.
+  it('se pregunta después de la varietat y antes dels kg', () => {
+    expect(PASOS.indexOf('producte_al_camp')).toBeGreaterThan(PASOS.indexOf('varietat'))
+    expect(PASOS.indexOf('producte_al_camp')).toBeLessThan(PASOS.indexOf('kg'))
   })
 })
 
@@ -162,6 +201,7 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
     expect(faltantes({})).toEqual([
       'familia',
       'producte',
+      'producte_al_camp',
       'kg',
       'disponible_fins',
       'modalitat',
@@ -210,7 +250,7 @@ describe('el cuestionario se explica a sí mismo', () => {
   // contesta al bot. Un campo sin `ayuda` es una pregunta que solo entiende quien ya sabe
   // la respuesta —pasaba con `modalitat`, que ofrecía tres palabras sin decir que deciden
   // qué entidades pueden recibir la oferta y qué documento se acaba emitiendo—.
-  it('los 14 campos tienen ayuda, y no vacía', () => {
+  it('los 15 campos tienen ayuda, y no vacía', () => {
     for (const c of CAMPOS) {
       expect(c.ayuda, `${c.clave} no tiene ayuda`).toBeDefined()
       expect(c.ayuda!.trim(), `la ayuda de ${c.clave} está vacía`).not.toBe('')
@@ -327,7 +367,9 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
 
   it('el reparto es el que espera el panel', () => {
     const porSeccion = (s: string) => CAMPOS.filter((c) => c.seccion === s).map((c) => c.clave)
-    expect(porSeccion('producte')).toEqual(['familia', 'producte', 'varietat'])
+    expect(porSeccion('producte')).toEqual([
+      'familia', 'producte', 'varietat', 'producte_al_camp',
+    ])
     expect(porSeccion('quantitat')).toEqual(['kg', 'caixes', 'tipus_caixa', 'retorn'])
     expect(porSeccion('recollida')).toEqual(['ubicacio', 'disponible_fins', 'horari'])
     expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim'])

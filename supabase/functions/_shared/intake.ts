@@ -7,16 +7,16 @@
 // Todo ocurre dentro de la ventana de servicio de 24 h —la abre el propio
 // productor al escribir—, así que no hacen falta plantillas ni opt-in.
 //
-// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son trece pasos con
-// paginación, reintentos y caducidad, y embutirlos en el bucle del webhook lo
-// haría inmanejable.
+// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son quince pasos —catorce
+// fijos más el `preu_minim`, que solo existe en venda y maquila— con paginación,
+// reintentos y caducidad, y embutirlos en el bucle del webhook lo haría inmanejable.
 
 import { sendBotones, sendLista, sendText } from "./whatsapp.ts";
 import type { FilaLista } from "./whatsapp.ts";
 import { crearExcedenteDesdeSesion } from "./oferta.ts";
 // Los pasos y los vocabularios cerrados viven en camposOferta.ts, compartidos con el
 // formulario del panel del productor: una sola lista, dos interfaces.
-import { MODALITATS, PASOS, TIPOS_CAIXA } from "./camposOferta.ts";
+import { MODALITATS, OPCIONS_AL_CAMP, PASOS, TIPOS_CAIXA } from "./camposOferta.ts";
 import type { Paso } from "./camposOferta.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
@@ -158,6 +158,20 @@ async function preguntar(
     }
     case "varietat":
       return (await sendText(supabase, to, "Quina varietat és? (escriu '-' si no aplica)")).ok;
+    case "producte_al_camp":
+      // Lista y no botones, por lo mismo que `modalitat` (deuda §12.105): un botón solo
+      // lleva título, y aquí el título solo dice «sí» o «no» a una pregunta que decide un
+      // flujo entero —si el equipo puede convertir la oferta en una espigolada, y si la
+      // entidad se está comprometiendo a ir a collir—. La `description` es la que lo
+      // explica, y es la misma que lee el panel bajo el desplegable.
+      return (await sendLista(
+        supabase, to, "El producte encara és al camp?", "Tria una opció",
+        OPCIONS_AL_CAMP.map((o) => ({
+          id: `producte_al_camp:${o.id}`,
+          titulo: o.titulo,
+          descripcion: o.descripcion,
+        })),
+      )).ok;
     case "kg":
       return (await sendText(
         supabase, to,
@@ -255,8 +269,12 @@ async function interpretar(
   id: string | null,
 ): Promise<unknown | null> {
   // Los pasos con opciones exigen pulsación: el id lleva el valor.
+  // ⚠️ `producte_al_camp` NO colisiona con `producte` aunque lo tenga de prefijo: el
+  //    guardia compara contra `producte:` con los dos puntos, y `producte_al_camp:si`
+  //    empieza por `producte_`. Conviene saberlo antes de añadir otro paso con el mismo
+  //    principio.
   const conOpciones: Paso[] = [
-    "familia", "producte", "tipus_caixa", "retorn", "modalitat", "causa",
+    "familia", "producte", "producte_al_camp", "tipus_caixa", "retorn", "modalitat", "causa",
   ];
   if (conOpciones.includes(paso)) {
     if (!id?.startsWith(`${paso}:`)) return null;

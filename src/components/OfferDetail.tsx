@@ -19,6 +19,8 @@ import { refrescaComptadors } from '../lib/pendentsEquip'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
+import DialegEspigolada from './equip/DialegEspigolada'
+import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
 import { Button } from '@/components/ui/button'
@@ -120,6 +122,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // porque el de rechazo lo abre la fila de una respuesta concreta, no un botón suelto.
   const [rebutjant, setRebutjant] = useState<RespuestaConEntidad | null>(null)
   const [noColocada, setNoColocada] = useState(false)
+  // F3: el diálogo que convierte esta oferta en jornada de espigueo.
+  const [convertint, setConvertint] = useState(false)
   // Productor y municipi para las variables de la plantilla oferta_excedent.
   const [datosOferta, setDatosOferta] = useState<{ productor: string | null; municipi: string | null }>(
     { productor: null, municipi: null },
@@ -583,9 +587,26 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       : null,
     motiu: exc.motivo_no_colocada,
     vencuda: vencida,
+    producteAlCamp: exc.producte_al_camp,
+    espigoladaId: exc.espigolada_id,
   }, 'equip')
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)
+
+  /**
+   * Por qué NO se puede convertir en espigolada, si no se puede (F3).
+   *
+   * Las dos razones las impone `crear_espigolada()` con `22023` —`ja_te_canalitzacions` y
+   * `ja_te_albarans`— y el motivo es el mismo en las dos: la oferta ya tiene una entrada,
+   * y la jornada crearía un segundo REC con los mismos kilos, que la conciliación contaría
+   * dos veces. Se anticipa aquí para no mandar a nadie a chocar contra la base, pero **la
+   * autoridad sigue siendo la RPC**: esto es un aviso, no la regla.
+   */
+  const motiuNoConvertible = canalizaciones.length > 0
+    ? t('conv_esp.no_canalitzacions')
+    : albarans.some((a) => a.estado !== 'anulado')
+      ? t('conv_esp.no_albarans')
+      : null
 
   return (
     <div className="space-y-4">
@@ -634,6 +655,29 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             destructiva={punt.etapa === 'cancellada'}
           />
           <QueTocaAra punt={punt} />
+
+          {/* ── F3: convertir en espigolada ──
+              Solo cuando la oferta declara producto SIN COSECHAR y todavía no es una
+              jornada. Si ya lo es, lo dice la nota de `QueTocaAra` con su enlace, que sale
+              del mismo `punt`: dos sitios contando lo mismo acabarían discrepando. */}
+          {exc.producte_al_camp && !exc.espigolada_id && (
+            <div className="rounded-lg border border-aviso/30 bg-aviso-fondo p-3">
+              <p className="text-sm font-medium text-aviso">{t('conv_esp.banner')}</p>
+              {/* El motivo del gris va TAMBIÉN visible: en táctil no hay hover, así que el
+                  tooltip de `BotoAmbMotiu` no existe para media aplicación (§6ter). */}
+              {motiuNoConvertible && (
+                <p className="mt-1 text-sm text-aviso">{motiuNoConvertible}</p>
+              )}
+              <BotoAmbMotiu
+                className="mt-2 h-11 whitespace-normal md:h-9"
+                disabled={Boolean(motiuNoConvertible)}
+                motiu={motiuNoConvertible ?? undefined}
+                onClick={() => setConvertint(true)}
+              >
+                {t('conv_esp.cta')}
+              </BotoAmbMotiu>
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -874,6 +918,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           </CardContent>
         </Card>
       )}
+
+      {/* Al crear la jornada se recarga: `exc.espigolada_id` pasa a tener valor, el bloque
+          de arriba desaparece y la nota de `QueTocaAra` enseña el enlace a la jornada. */}
+      <DialegEspigolada
+        obert={convertint}
+        oferta={exc}
+        productorNom={datosOferta.productor}
+        onTancar={() => setConvertint(false)}
+        onCreada={() => { setConvertint(false); void recargar(); void refrescaComptadors() }}
+      />
 
       <DialegMotiu
         obert={rebutjant !== null}

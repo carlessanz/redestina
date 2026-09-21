@@ -164,7 +164,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
 | `diagnostico`/`plan_prevencion`/`plan_revision` | `planes_prevencion` con su PDF. **Falta el cuestionario** (anexo B, fase 0) | 🟡 |
-| `derivacion_espigueo` | `espigoladas` con alta manual y reparto en lotes | 🟡 |
+| `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
 | catálogos (categorías/unidades/motivos/destinos) | `productos`/`causas`/`factores_conversion` | 🟡 |
@@ -497,6 +497,10 @@ src/
                                se componen (cobertura.test.ts no las ve)
     pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
                                de módulo; alimenta los badges del menú Y el tablero (§6ter)
+    conversioEspigolada.ts     Los siete rechazos de la conversión, traducidos POR SU CÓDIGO.
+                               Módulo aparte de albarans.ts a propósito: aquel importa el
+                               cliente de Supabase, y un fichero que lo importe no se puede
+                               cargar desde Vitest — sin separarlo, estas claves no tendrían red
     progresOfertes.ts          progres_meves_ofertes(): cuántas entidades interesadas por oferta,
                                SIN nombres, para el panel del productor (§6ter)
     aprovarResposta.ts         comprovaConvenis() + aprovarResposta() + rebutjarResposta(): la
@@ -526,7 +530,8 @@ src/
                                (los seis pasos de FASES_EQUIP, enlazados) y los TRES diálogos
                                asistidos: DialegAssistit (albarà y factura),
                                DialegFirmaAssistida (conveni) y DialegNovaOfertaAssistida
-                               (l'alta, des de l'índex del cicle) (§6ter)
+                               (l'alta, des de l'índex del cicle) (§6ter). Y DialegEspigolada:
+                               convertir una oferta «producte al camp» en jornada (§6ter)
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     equip/DadesFundacio.tsx    Los datos fiscales de la Fundación, en Configuració: es lo que
                                desbloquea el certificado REAL (§12.10). Solo super_admin
@@ -715,6 +720,18 @@ de prueba que habilita el envío a la entidad (§8).
 `20260722130100_estado_cancelada.sql`). `modalitat` ∈ `donacio` · `venda` · `maquila`. **`preu_minim`**
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
 solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al aceptar (§5).
+
+**`producte_al_camp`** (bool, default false, `20260921221806`) — la oferta declara producto **sin
+cosechar**: hay que ir a recogerlo. Es lo que la hace **convertible en espigolada** (§6ter) y lo que
+la mete en la cola 13 del equipo. Se pregunta por los dos canales (§6bis) y sale en `texto_oferta`
+**solo cuando es cierto**, con la misma asimetría que el `preu_minim`: un «PRODUCTE AL CAMP: no» en
+el caso normal es ruido en un mensaje que se lee en el móvil.
+⚠️ **Columna propia y no un campo en jsonb** a propósito: decide un flujo —quién crea el REC, si
+sale en la cola, si se puede convertir— y un campo que decide un flujo no puede vivir en texto libre
+donde una errata no la detecta nadie. `excedentes` tiene GRANT **de tabla**, así que la columna nace
+legible sin tocar nada; eso **no** valdría en una tabla con GRANT por columnas (§4, `documentos`).
+⚠️ La escribe **solo el equipo**: la única política de UPDATE de `excedentes` es `es_intern()`, y el
+generador la fija al publicar pero **por el servidor** (`authenticated` no tiene INSERT).
 
 **`canalizaciones`** — detalle por entidad: `kg_confirmados`, `kg_reales`, cajas, albaranes,
 firmas. Relación **`excedentes` 1—N `canalizaciones`** (una oferta, varias entidades).
@@ -1031,7 +1048,13 @@ para registros de espigolada —la jornada ya tiene el suyo—: sin esa excepci�
 la entrada y la conciliación contaba dos veces.
 
 **`espigoladas`** agrupa una jornada de espigueo: sus registros son `excedentes` con
-`origen='espigolament'` y su REC cuelga de `espigolada_id`. `documentos_externos` (polimórfica,
+`origen='espigolament'` y su REC cuelga de `espigolada_id`. Desde `20260921221806` guarda además
+**`oferta_origen_id`**: de qué oferta «producte al camp» nació, cuando nació de una.
+🔴 **Con `on delete set null`, y no es estilo**: `borrar_ficha_completa()` borra `excedentes`
+**antes** que `espigoladas`, así que con el `no action` por defecto la **única puerta de borrado de
+una ficha** (§7) habría quedado rota con `23503` para cualquier productor con una oferta convertida
+— y no se puede arreglar reordenando aquella función, porque editar una migración aplicada está
+prohibido. El enlace es trazabilidad, no evidencia fiscal: lo que certifica es el REC. `documentos_externos` (polimórfica,
 `albaran`/`cierre_donante`) guarda lo que aportan terceros: el albarán del productor, la factura del
 donante, fotos de incidencias.
 
@@ -1513,7 +1536,7 @@ funciones, no políticas:
 | `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
 | `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo |
 | `anular_albaran` / `rectificar_albaran` | `pot_aprovar()`. El rectificativo usa serie `R-<tipo>` y deja el original en `rectificado` |
-| `crear_espigolada` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()` |
+| `crear_espigolada(productor, ubicacion, fecha, voluntarios, notas, lineas, ref_externa, excedente)` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()`. ⚠️ **Con `p_excedente` CONVIERTE una oferta** (`20260921221806`, §6ter): no crea ningún excedente, **reutiliza ese** —`origen` a `espigolament`, `espigolada_id` a la jornada, `estado` a `borrador` hasta el reparto— y crea el REC con su línea. Se niega con `22023` y un código legible en `oferta_inexistent` · `productor_no_coincideix` · `sense_producte_al_camp` · `ja_es_espigolada` · `ja_te_canalitzacions` · `ja_te_albarans` · `massa_linies`. Toma `for update` sobre la oferta **antes de insertar nada**: sin ese bloqueo, dos conversiones simultáneas pasarían las guardas a la vez y crearían dos jornadas del mismo producto, que es la duplicación que esta fase existe para impedir. ⚠️ **La firma de siete argumentos se retiró en la misma migración**: `create or replace` no puede cambiar el número de argumentos, así que habrían convivido dos y cualquier llamada de siete sería **ambigua (42725)** |
 | `fijar_coste_producto` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto` (`es_super_admin()`) | El valor fiscal y las taras. Borrar existe porque un coste fijado en el ejercicio equivocado no tenía vuelta atrás |
 | `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
 | `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
@@ -1542,7 +1565,7 @@ funciones, no políticas:
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
-| `pendents_equip()` (`20270323100000`) | **La cola de trabajo del equipo en una sola llamada**: doce filas `(cua, n, ref, detall)`, **siempre las doce** aunque `n` valga 0. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
+| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **trece** filas `(cua, n, ref, detall)`, **siempre las trece** aunque `n` valga 0. La 13 es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
 | `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20270329100000`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
 | `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20270330100000`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
@@ -1842,11 +1865,22 @@ Peculiaridades verificadas de los datos, todas manejadas por el script:
 
 ## 6bis. El intake conversacional
 
-Catorce pasos (13 fijos + 1 condicional; `PASOS`/`CAMPOS` en `_shared/camposOferta.ts` —el comentario
-de `intake.ts` que dice «trece» es engañoso): `familia` → `producte` → `varietat` → `kg` → `caixes` →
+Quince pasos (14 fijos + 1 condicional; `PASOS`/`CAMPOS` en `_shared/camposOferta.ts`):
+`familia` → `producte` → `varietat` → **`producte_al_camp`** → `kg` → `caixes` →
 `tipus_caixa` → `retorn` → `ubicacio` → `disponible_fins` → `horari` → `modalitat` →
 **`preu_minim`** (solo si `modalitat` es `venda`/`maquila`; en `donació` se salta) → `causa` →
-`observacions`. Las opciones salen **siempre de las tablas** (`productos`, `causas`), nunca
+`observacions`.
+
+⚠️ **`producte_al_camp` va como LISTA, no como botones**, aunque sean dos opciones, por lo mismo que
+`modalitat` (§12.105): un botón solo tiene título de 20 caracteres y una fila de lista tiene
+`description` de 72, y aquí la diferencia entre «encara s'ha de collir» y «pendent de recollida» es
+justo lo que hay que explicar. Textos: «El producte encara és al camp?» con *Sí, és a la planta* /
+*No, ja està collit*.
+⚠️ **El valor que viaja es `si`/`no`, NO el título**, al revés que `TIPOS_CAIXA` y `OPCIONES_RETORN`:
+lo que se persiste es un boolean, así que tiene que sobrevivir a que alguien reescriba el título.
+Lo decide `esProducteAlCamp()` (`_shared/oferta.ts`) en un solo sitio, con **fail-safe a `false`** —
+un `Boolean(d.producte_al_camp)` habría dicho que `"no"` es cierto, y eso marcaría «hay que ir a
+cosechar» sobre producto ya envasado. Las opciones salen **siempre de las tablas** (`productos`, `causas`), nunca
 escritas a mano. El `preu_minim` (€/kg) queda en `excedentes` y aparece en la oferta (§5/§6ter).
 
 **`disponible_fins` → `disponible_hasta` (parseo).** La respuesta libre al paso `disponible_fins`
@@ -2138,6 +2172,43 @@ contrasta el camino propio con el asistido** —firma, interés, confirmación y
 única forma de demostrar la afirmación de esta sección: que los dos producen el mismo documento
 y solo cambia la vía impresa en la página de evidencias. El certificado final aparece ahí
 **bloqueado y explicado**, y la guía dice que ese es el resultado correcto, no una avería.
+
+### «Producte al camp»: convertir una oferta en espigolada (22-09-2026)
+
+**El caso real más común del espigueo es el intermedio**, y hasta hoy no tenía camino: un generador
+avisa de que tiene un campo **sin cosechar**, eso se publica como oferta para ver quién la quiere,
+y **después** se monta la jornada. Sin esto, el equipo tenía dos salidas y las dos eran malas:
+repartir la oferta como si el producto estuviera recogido —y entonces el REC que nace del trigger
+de `canalizaciones` declara una entrada que **nadie ha pesado**—, o crear la espigolada aparte, con
+lo que quedaban **dos entradas del mismo producto** y la conciliación contaba los kilos dos veces.
+
+Lo que se añade es mínimo a propósito: una marca en la oferta (`producte_al_camp`, §4), un enlace
+en la jornada (`oferta_origen_id`) y una rama en `crear_espigolada()` que **reutiliza** la oferta en
+vez de crear otra (§4bis).
+
+| Dónde | Qué |
+| --- | --- |
+| Alta de oferta (panel **y** WhatsApp) | El paso `producte_al_camp`, con el mismo texto por los dos canales (§6bis) |
+| `OffersList` | Chip «Producte al camp» en las convertibles, para que el destino del tablero sea honesto |
+| `OfferDetail` y fase 2 del ciclo guiado | Botón **«Converteix en espigolada»**, solo si `producte_al_camp` y sin `espigolada_id`; abre `DialegEspigolada` (80 vw × 88 vh, sin cerrarse al pinchar fuera) con productora, finca y la línea de producto **prellenadas** |
+| `Espigolades` | Badge «Ve d'una oferta» y enlace inverso a la oferta de origen |
+| Tablero | La cola 13, `espigolades_per_convertir`, que va al listado de ofertas: la jornada **todavía no existe** |
+
+⚠️ **El generador nunca decide el destino.** En su panel la oferta enseña el `PasosProces` de
+siempre más una nota —«L'equip decidirà si organitza una espigolada»—, que es una **variante de
+texto en `procesOferta.ts`, sin etapa nueva**. Y esa nota se pinta en `bg-secondary`, **nunca en
+`aviso`**: no es nada que le toque hacer a quien mira, y gastar el ámbar ahí rompería la única
+señal de «te toca a ti» (§2bis).
+
+⚠️ **Los siete rechazos se traducen por su CÓDIGO**, no por el mensaje crudo de Postgres
+(`src/lib/conversioEspigolada.ts`, puro y con test). El panel además **anticipa** dos de ellos
+—`ja_te_canalitzacions` y `ja_te_albarans`— con el motivo visible, pero eso es un aviso: **la
+autoridad sigue siendo la RPC**, y si el panel se quedara corto el diálogo enseña el rechazo.
+
+⚠️ **Y una oferta convertida admite UNA sola línea.** Más de una obligaría a decidir en silencio
+qué se hace con las demás —¿excedentes nuevos? ¿se descartan?—, y eso no se decide dentro de un
+bucle: la base se niega con `massa_linies`. Si algún día una jornada tiene que recoger varios
+productos partiendo de una oferta, se añade explícito.
 
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
@@ -4654,7 +4725,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **841 pruebas en 26 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **881 pruebas en 27 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4662,8 +4733,18 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 732/732 correctas y 13 saltadas, «Sin fallos de permisos»**
-   (21-09-2026, tras aplicar `20260921211329` y `20260921211356`). Son las 723 anteriores
+   ✅ **Referencia HOY: 745/745 correctas y 13 saltadas, «Sin fallos de permisos»**
+   (22-09-2026, tras aplicar `20260921221806`). Son las 732 anteriores más **13** de la
+   conversión de ofertas en espigolada: `crear_espigolada` **denegar** en `DOCUMENTAL_EXTERN`
+   —siete cuentas externas, más `sense_rol` y `pendent`, de ahí 9— y **permitir** en `tecnic` y
+   en `super_admin`, más la columna `oferta_origen_id` en el `leer` de `espigoladas` del equipo
+   y los dos del productor (ve `producte_al_camp` de su oferta, **no la escribe**).
+   ⚠️ Los dos «permitir» van contra un **uuid de ceros**: lo que miden es que la guarda de ROL
+   deja pasar, no que la conversión funcione. En positivo **no se prueba nunca** — convertir una
+   oferta real la sacaría del mercado y le montaría un REC, contra producción—, el mismo criterio
+   que `borrar_ficha_completa()`.
+   La referencia anterior era **732/732 + 13**
+   (21-09-2026, tras aplicar `20260921211329` y `20260921211356`). Eran las 723 anteriores
    más **9** de la tanda de certificados sin factura: `emitir_certificados_cierre` con un
    check en `DOCUMENTAL_EXTERN` —que recorre siete cuentas externas, de ahí 7— más uno en
    `tecnic` y otro en `super_admin`. ⚠️ Los tres son `rpc` sobre un **uuid de ceros**: lo

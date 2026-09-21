@@ -62,6 +62,10 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'vençuda parcial', fets: { ...base, estado: 'parcial', vencuda: true, kgCanalitzats: 30 } },
     { nom: 'no col·locada', fets: { ...base, estado: 'no_colocada', motiu: 'Cap entitat' } },
     { nom: 'cancel·lada', fets: { ...base, estado: 'cancelada', motiu: 'Pluja' } },
+    // F3: producto todavía al campo, y ya convertido en jornada.
+    { nom: 'al camp', fets: { ...base, producteAlCamp: true } },
+    { nom: 'al camp + interès', fets: { ...base, producteAlCamp: true, nEnviades: 2, nInteressades: 1 } },
+    { nom: 'ja és espigolada', fets: { ...base, estado: 'borrador', producteAlCamp: true, espigoladaId: 'e1' } },
   ]
   for (const rol of rols) {
     for (const c of combinacions) fora.push({ nom: `${rol}/${c.nom}`, punt: puntOferta(c.fets, rol) })
@@ -262,6 +266,70 @@ describe('todas las claves compuestas existen en ca y en es', () => {
       expect(DICTS.es[it.descKey], `falta ${it.descKey} en es`).toBeTruthy()
       expect(it.clase).toMatch(/^bg-/)
     }
+  })
+})
+
+describe('la nota del «producte al camp» (F3)', () => {
+  // NO es una etapa: un lote sin cosechar recorre las cinco de siempre. Si le diéramos
+  // una propia, el indicador de progreso de TODAS las ofertas tendría un paso más para
+  // contar algo que solo le pasa a esta.
+  it('no cambia la etapa ni el índice', () => {
+    const sense = puntOferta({ ...base }, 'equip')
+    const amb = puntOferta({ ...base, producteAlCamp: true }, 'equip')
+    expect([amb.etapa, amb.index, amb.variant]).toEqual([sense.etapa, sense.index, sense.variant])
+  })
+
+  it('los dos roles tienen su texto, y el generador NO recibe enlace', () => {
+    const p = puntOferta({ ...base, producteAlCamp: true }, 'productor')
+    expect(p.notaClau).toBe('proc.p_nota_camp')
+    expect(p.notaEnllac).toBeUndefined()
+    expect(puntOferta({ ...base, producteAlCamp: true }, 'equip').notaClau).toBe('proc.e_nota_camp')
+  })
+
+  // El enlace va a `/equip/espigolades/:id`, que está bajo `RoleGuard rol="intern"`:
+  // dárselo al generador sería mandarlo a «sense accés».
+  it('ya convertida, solo el equipo recibe el enlace a la jornada', () => {
+    const fets: FetsOferta = { ...base, producteAlCamp: true, espigoladaId: 'jornada-1' }
+    const e = puntOferta(fets, 'equip')
+    expect(e.notaClau).toBe('proc.e_nota_espigolada')
+    expect(e.notaEnllac).toBe('/equip/espigolades/jornada-1')
+    const pr = puntOferta(fets, 'productor')
+    expect(pr.notaClau).toBe('proc.p_nota_espigolada')
+    expect(pr.notaEnllac).toBeUndefined()
+  })
+
+  // Una vez recogido, la pregunta ya está contestada de hecho: seguir diciendo «falta
+  // decidir si se organiza una jornada» sería falso.
+  it('deja de avisar a partir de la recogida, pero la jornada se sigue diciendo', () => {
+    const recollit: FetsOferta = { ...base, producteAlCamp: true, albaraRec: rec('emitido') }
+    expect(puntOferta(recollit, 'equip').notaClau).toBeUndefined()
+    expect(puntOferta({ ...recollit, espigoladaId: 'j' }, 'equip').notaClau)
+      .toBe('proc.e_nota_espigolada')
+  })
+
+  // Cancelada o sin destino, la jornada ya no es la historia de este lote.
+  it('las salidas no llevan nota', () => {
+    for (const estado of ['cancelada', 'no_colocada'] as EstadoExcedente[]) {
+      const p = puntOferta({ ...base, estado, producteAlCamp: true, espigoladaId: 'j' }, 'equip')
+      expect(p.notaClau, estado).toBeUndefined()
+    }
+  })
+
+  // Las cuatro se componen, así que `cobertura.test.ts` no ve ninguna. Y no llevan
+  // marcadores a propósito: `QueTocaAra` las pinta SIN pasar `vars`.
+  it('las cuatro claves existen en ca y es, y no piden ningún dato', () => {
+    for (const clau of [
+      'proc.p_nota_camp', 'proc.e_nota_camp',
+      'proc.p_nota_espigolada', 'proc.e_nota_espigolada',
+    ]) {
+      expect(DICTS.ca[clau], `falta ${clau} en ca`).toBeTruthy()
+      expect(DICTS.es[clau], `falta ${clau} en es`).toBeTruthy()
+      expect(marcadores(DICTS.ca[clau]), clau).toEqual([])
+      expect(marcadores(DICTS.es[clau]), clau).toEqual([])
+    }
+    // El botón de la nota.
+    expect(DICTS.ca['proc.a_nota']).toBeTruthy()
+    expect(DICTS.es['proc.a_nota']).toBeTruthy()
   })
 })
 

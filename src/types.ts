@@ -202,6 +202,12 @@ export interface Excedente {
   espigolada_id: string | null
   /** Previsión para el futuro módulo de espigolament: evita duplicar kilos */
   ref_externa: string | null
+  /**
+   * La oferta declara producto SIN COSECHAR: hay que ir a recogerlo (F3).
+   * Es lo que la hace convertible en espigolada, y lo que la mete en la cola
+   * `espigolades_per_convertir` del equipo.
+   */
+  producte_al_camp: boolean
 
 }
 
@@ -602,6 +608,8 @@ export interface Espigolada {
   num_voluntarios: number | null
   notas: string | null
   ref_externa: string | null
+  /** Oferta «producte al camp» de la que nació esta jornada, si nació de una (F3) */
+  oferta_origen_id: string | null
   estado: 'oberta' | 'tancada'
   creada_por: string | null
   created_at: string

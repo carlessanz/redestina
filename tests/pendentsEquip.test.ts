@@ -17,15 +17,19 @@ const bloque = FUENTE.match(/export type CuaEquip =([\s\S]*?)\n\n/)?.[1] ?? ''
 const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 
 // Las colas cuya fila del tablero lleva segunda línea (`pe.<cua>_sub`).
-const AMB_SUB = ['registres', 'convenis_contrasignar', 'respostes', 'ofertes_vencudes', 'costos', 'albarans_conciliar']
+const AMB_SUB = ['registres', 'convenis_contrasignar', 'respostes', 'ofertes_vencudes', 'costos',
+  'albarans_conciliar', 'espigolades_per_convertir']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
 // equipo) y se enseña como segunda línea de `albarans_conciliar`. Sin clave propia, a propósito.
 const SENSE_FILA = ['albarans_esperant']
 
 describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () => {
-  it('lee las doce colas del union CuaEquip', () => {
-    expect(CUES).toHaveLength(12)
+  it('lee las trece colas del union CuaEquip', () => {
+    expect(CUES).toHaveLength(13)
     expect(CUES).toContain('tancament')
+    // F3. Es la que más fácil se queda fuera: la base la devuelve igual, y una cola que no
+    // esté en el union no da ningún error — simplemente no la enseña nadie.
+    expect(CUES).toContain('espigolades_per_convertir')
   })
 
   for (const idioma of ['ca', 'es'] as const) {

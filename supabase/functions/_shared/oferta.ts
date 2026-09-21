@@ -20,6 +20,29 @@ const ETIQUETA_MODALITAT: Record<string, string> = {
   maquila: "maquila",
 };
 
+/**
+ * ¿La oferta declara producto SIN COSECHAR? (`excedentes.producte_al_camp`, 20260921221806)
+ *
+ * Existe porque la respuesta llega de dos sitios con formas distintas y no se puede
+ * confiar en ninguna: el intake guarda el `id` de la opción pulsada (`"si"` / `"no"`) y el
+ * panel manda lo que el desplegable tenga seleccionado, que es ese mismo id pero podría
+ * ser un boolean el día que la pantalla lo pinte como casilla. Un `Boolean(d.x)` a secas
+ * diría que `"no"` es cierto, que es el error caro: marcaría como «hay que ir a collir»
+ * una oferta de producto ya envasado.
+ *
+ * ⚠️ Ante cualquier otra cosa —ausente, vacío, un id que no reconoce— devuelve **false**,
+ *    que es el default de la columna y lo que son todas las ofertas anteriores. Es el lado
+ *    seguro por el mismo motivo: `false` deja el circuito como estaba; `true` inventado
+ *    metería la oferta en la cola de espigolades del equipo y afirmaría al receptor algo
+ *    que nadie ha dicho.
+ */
+export function esProducteAlCamp(valor: unknown): boolean {
+  if (typeof valor === "boolean") return valor;
+  const v = String(valor ?? "").trim().toLowerCase()
+    .normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+  return v === "si" || v === "true" || v === "1";
+}
+
 /** Tres letras en mayúsculas, sin acentos ni espacios, para el identificador. */
 export function siglas(texto: string): string {
   return texto
@@ -123,6 +146,8 @@ export async function generarId(
  */
 export function componerTextoOferta(campos: {
   producte: string;
+  /** Solo cuando es cierto se imprime la línea: el silencio significa «ja està collit». */
+  producteAlCamp?: boolean;
   productor: string;
   municipi: string;
   ubicacio: string;
@@ -140,6 +165,20 @@ export function componerTextoOferta(campos: {
     "📢 *OFERTA DISPONIBLE*",
     "",
     `🌿 PRODUCTE: ${campos.producte}`,
+  ];
+  // Va pegada al producto, y no al final con las observaciones, porque califica QUÉ se
+  // ofrece: la entidad tiene que saber que todavía no está collit **antes** de decir que
+  // le interesa, no cuando llegue a la finca.
+  //
+  // ⚠️ Solo se imprime cuando es cierto, igual que el `preu mínim` de más abajo. Una línea
+  //    «PRODUCTE AL CAMP: no» en el caso normal —que es la inmensa mayoría de las ofertas—
+  //    sería ruido en un mensaje que se lee en un móvil, y esa asimetría es deliberada: el
+  //    silencio significa «ja està collit», que es lo que la oferta ya daba a entender
+  //    antes de que este campo existiera.
+  if (campos.producteAlCamp) {
+    lineas.push("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)");
+  }
+  lineas.push(
     `👩‍🌾 PRODUCTOR: ${campos.productor}`,
     `📍 MUNICIPI: ${campos.municipi}`,
     `🗺️ UBICACIÓ:`,
@@ -148,7 +187,7 @@ export function componerTextoOferta(campos: {
     `📅 DISPONIBLE: ${campos.disponible}`,
     `⏰ HORARI RECOLLIDA: ${campos.horari}`,
     `💰 MODALITAT: ${campos.modalitat}`,
-  ];
+  );
   // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
   if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
   lineas.push(
@@ -211,11 +250,16 @@ export async function crearExcedente(
 
   const kg = Number(d.kg ?? 0);
   const preuMinim = d.preu_minim != null ? Number(d.preu_minim) : null;
+  // Se resuelve UNA vez. El texto que circula y la columna que decide el flujo tienen que
+  // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
+  // cuanto alguien cambie una de las dos.
+  const alCamp = esProducteAlCamp(d.producte_al_camp);
   const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
   let idExcedente = await generarId(supabase, productor.name, producto);
 
   const textoOferta = componerTextoOferta({
     producte: producto,
+    producteAlCamp: alCamp,
     productor: fichaProductor?.empresa || productor.name,
     municipi: municipio,
     ubicacio: ubicacion?.gmaps_url ?? "-",
@@ -256,6 +300,7 @@ export async function crearExcedente(
       familia: prod?.familia ?? d.familia ?? null,
       producto,
       variedad: d.varietat ?? null,
+      producte_al_camp: alCamp,
       kg_total: kg || null,
       num_caixes: d.caixes ?? null,
       tipo_caixa: d.tipus_caixa ?? null,

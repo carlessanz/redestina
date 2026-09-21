@@ -40,7 +40,7 @@ interface FilaCua {
 }
 
 /**
- * Las once colas accionables, en orden de proceso (el mismo de `pendents_equip()`).
+ * Las doce colas accionables, en orden de proceso (el mismo de `pendents_equip()`).
  *
  * `albarans_esperant` no está: no es una fila, es el subtítulo de `albarans_conciliar`.
  * Un albarán entregado espera a la OTRA parte, así que ponerlo como tarea del equipo
@@ -53,6 +53,10 @@ const FILES: readonly FilaCua[] = [
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_vencudes', desti: '/equip/ofertes' },
+  // F3. Va al listado de ofertas y NO a `/equip/espigolades`: la jornada todavía no
+  // existe —crearla es justamente lo que falta—, y se crea desde la oferta, que es donde
+  // están la productora, la finca y los kilos previstos. El listado marca cuáles son.
+  { cua: 'espigolades_per_convertir', desti: '/equip/ofertes' },
   // `?tab=` son los nombres reales de las pestañas de `Albarans.tsx`.
   { cua: 'albarans_esborrany', desti: '/equip/albarans?tab=esborranys' },
   { cua: 'albarans_conciliar', desti: '/equip/albarans?tab=conciliar' },
@@ -64,6 +68,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'respostes', 'ofertes_vencudes', 'costos',
+  'espigolades_per_convertir',
 ]
 
 export default function PendentsEquip() {
@@ -78,7 +83,7 @@ export default function PendentsEquip() {
 
   // ⚠️ `carregat` sin una sola fila NO es «no hay nada pendiente»: es que la RPC falló o
   // todavía no está desplegada (§11: la base va antes que el frontend, pero entre las dos
-  // publicaciones hay una ventana). `pendents_equip()` devuelve SIEMPRE las doce colas,
+  // publicaciones hay una ventana). `pendents_equip()` devuelve SIEMPRE las trece colas,
   // aunque valgan 0, así que una lista vacía solo puede significar que no se pudo leer — y
   // afirmar «res pendent» en ese caso sería exactamente la mentira que más cuesta detectar.
   if (!carregat || pendents.length === 0) return null

@@ -82,6 +82,19 @@ export interface PuntProces {
   emToca: boolean
   /** Ruta interna de la acción, si la hay. */
   enllac?: string
+  /**
+   * Una nota al margen del camino: no cambia la etapa ni lo que toca, solo dice algo que
+   * hace falta saber de ESTE lote. Hoy la usa una sola cosa, el «producte al camp» (F3):
+   * un lote sin cosechar recorre exactamente las mismas cinco etapas, así que inventarle
+   * una etapa propia falsearía el indicador de progreso —y, en el panel del generador,
+   * insinuaría que decide él si se organiza una jornada, que no la decide (§6ter)—.
+   *
+   * ⚠️ Va FUERA de `claus`: aquella es la cuarteta que `QueTocaAra` pinta siempre y cuyos
+   *    marcadores `tests/procesOferta.test.ts` casa con `vars`. La nota no lleva ninguno.
+   */
+  notaClau?: string
+  /** A dónde lleva la nota, si a algún sitio. Solo quien pueda abrirlo lo recibe. */
+  notaEnllac?: string
 }
 
 export interface FetsOferta {
@@ -98,6 +111,10 @@ export interface FetsOferta {
   vencuda?: boolean
   /** Solo productor: hay un pendiente de confirmación suyo para el REC (de `pendents_meus`). */
   pendentDeMi?: boolean
+  /** `excedentes.producte_al_camp` (F3): lo ofrecido todavía está sin cosechar. */
+  producteAlCamp?: boolean
+  /** `excedentes.espigolada_id`: la jornada de la que este lote ya forma parte, si forma. */
+  espigoladaId?: string | null
 }
 
 export interface FetsInteres {
@@ -169,7 +186,39 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
     vars,
     emToca,
     enllac,
+    ...nota(index),
   })
+
+  /**
+   * La nota del «producte al camp» (F3). NO es una etapa: un lote sin cosechar recorre las
+   * cinco de siempre, y darle una propia movería el indicador de progreso de todas las
+   * demás ofertas para contar algo que solo le pasa a esta.
+   *
+   * Dos casos y en este orden, porque el segundo deja de ser cierto en cuanto ocurre el
+   * primero: si ya hay jornada, lo que hay que decir es cuál; si no la hay, que la decisión
+   * de organizarla es del equipo.
+   *
+   * ⚠️ QUIÉN DECIDE, dicho en el texto: el generador avisa de que tiene un campo, pero el
+   *    destino lo elige Redestina (§6ter). Por eso el texto del panel del generador no le
+   *    ofrece nada que pulsar — no hay nada que él pueda decidir aquí.
+   *
+   * ⚠️ El enlace a la jornada SOLO lo recibe el equipo: `/equip/espigolades/:id` está bajo
+   *    `RoleGuard rol="intern"`, así que dárselo al generador sería mandarlo a «sense accés».
+   */
+  function nota(index: number): { notaClau?: string; notaEnllac?: string } {
+    // Cancelada o sin destino: la jornada ya no es la historia de este lote.
+    if (index < 0) return {}
+    if (fets.espigoladaId) {
+      return {
+        notaClau: `proc.${p}_nota_espigolada`,
+        notaEnllac: rol === 'equip' ? `/equip/espigolades/${fets.espigoladaId}` : undefined,
+      }
+    }
+    // Una vez recogido (index ≥ 2) la pregunta ya está contestada de hecho, así que
+    // seguir diciendo «falta decidir si se organiza» sería falso.
+    if (fets.producteAlCamp && index <= 1) return { notaClau: `proc.${p}_nota_camp` }
+    return {}
+  }
 
   // 1. Las salidas ganan a todo.
   if (fets.estado === 'cancelada') return fes('cancellada', null, -1, { motiu }, false)

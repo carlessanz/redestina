@@ -93,7 +93,7 @@ export function Espigolades() {
       // ⚠️ Cada lista de columnas en UN literal (§7, deuda 46).
       const { data, error: err } = await supabase
         .from('espigoladas')
-        .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, estado, creada_por, created_at')
+        .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, oferta_origen_id, estado, creada_por, created_at')
         .order('fecha', { ascending: false })
         .order('created_at', { ascending: false })
       if (!viu) return
@@ -204,7 +204,15 @@ export function Espigolades() {
                       {dataCurta(f.esp.fecha)}
                     </TableCell>
                     <TableCell className="max-w-56 truncate">{f.productor}</TableCell>
-                    <TableCell className="text-muted-foreground">{f.esp.ref_externa ?? '—'}</TableCell>
+                    <TableCell className="text-muted-foreground">
+                      {f.esp.ref_externa ?? '—'}
+                      {/* De dónde salió la jornada (F3). Una espigolada nacida de una oferta
+                          no se comporta distinto, pero saber que existe esa oferta evita
+                          buscar dos veces la misma entrada. */}
+                      {f.esp.oferta_origen_id && (
+                        <Badge variant="outline" className="ml-2">{t('conv_esp.badge')}</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="text-right tabular-nums">{f.registres}</TableCell>
                     <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(f.kgTotal)}</TableCell>
                     <TableCell>
@@ -495,7 +503,7 @@ export function EspigoladaDetall() {
   const carrega = useCallback(async () => {
     if (!id) return
     const { data: e, error: errE } = await supabase.from('espigoladas')
-      .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, estado, creada_por, created_at')
+      .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, oferta_origen_id, estado, creada_por, created_at')
       .eq('id', id).maybeSingle()
     if (errE) { setError(errE.message); setCarregant(false); return }
     if (!e) { setError(t('esp.not_found')); setCarregant(false); return }
@@ -594,6 +602,19 @@ export function EspigoladaDetall() {
           <p>{t('esp.volunteers')}: <span className="tabular-nums">{espigolada.num_voluntarios ?? '—'}</span></p>
           <p>{t('esp.ref')}: {espigolada.ref_externa ?? '—'}</p>
           {espigolada.notas && <p className="sm:col-span-2 text-muted-foreground">{espigolada.notas}</p>}
+          {/* El enlace inverso a la oferta de la que nació (F3, `oferta_origen_id`). La
+              referencia sale de los registros que ya están cargados —la oferta convertida
+              ES uno de ellos, porque su `espigolada_id` apunta aquí—, así que enseñarla no
+              cuesta ninguna consulta más. */}
+          {espigolada.oferta_origen_id && (
+            <p className="sm:col-span-2">
+              {t('conv_esp.from_offer')}:{' '}
+              <Link className="underline" to={`/equip/ofertes/${espigolada.oferta_origen_id}`}>
+                {registres.find((r) => r.id === espigolada.oferta_origen_id)?.id_excedente
+                  ?? t('conv_esp.open')}
+              </Link>
+            </p>
+          )}
           {rec && (
             <p className="sm:col-span-2">
               {t('esp.reception')}:{' '}
