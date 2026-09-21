@@ -665,6 +665,23 @@ const DOCUMENTAL_EXTERN: Check[] = [
     },
     descripcion: "NO crea ni converteix cap espigolada (nomes l'equip)",
   },
+  // --- Certificat de recepcio (CR, 20260921223245 / 223246) ---
+  // Nada de este circuito es de un externo: ni la tabla —que no tiene GRANT de escritura
+  // para nadie— ni ninguna de sus acciones, todas de `pot_aprovar()`. Que la RECEPTORA vea
+  // EL SUYO se comprueba en el bloque `receptor`, que es donde esa afirmación significa algo.
+  { tabla: "cierres_receptor", op: "insertar", esperado: "denegar", descripcion: "NO escriu al certificat de recepcio (no hi ha GRANT)" },
+  { tabla: "calcular_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_entidad: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula cap certificat de recepcio" },
+  { tabla: "emetre_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap certificat de recepcio" },
+  { tabla: "rectificar_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO rectifica cap certificat de recepcio" },
+  { tabla: "marcar_enviat_recepcio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat de recepcio" },
+  { tabla: "reiniciar_recepcions_prova", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO reinicia els certificats de recepcio de prova" },
+  // 🔴 La base de cálculo. Es `security definer` y cruza canalizaciones, excedentes,
+  //    albaranes y productores sin que ninguna RLS vuelva a filtrar: sin su guarda, una
+  //    entidad podría pedir por PostgREST lo que ha recibido TODO EL MUNDO, con el nombre
+  //    de cada generador. Es exactamente el agujero que 20270303100500 encontró en
+  //    `cierre_base()`, y por eso se vigila desde el primer día.
+  { tabla: "cierre_base_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul d'un certificat de recepcio" },
+  { tabla: "cierre_pendents_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "NO llegeix els lliuraments pendents de conciliar" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -882,6 +899,39 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
       descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
     },
+    // --- Certificat de recepcio (CR): el equipo LEE, y escribir es de `pot_aprovar()` ---
+    {
+      tabla: "cierres_receptor",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve els certificats de recepcio",
+      requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)",
+    },
+    {
+      tabla: "cierre_receptor_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el detall dels certificats de recepcio",
+      requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)",
+    },
+    { tabla: "cierres_receptor", op: "insertar", esperado: "denegar", descripcion: "NO crea certificats de recepcio a ma (van per RPC)" },
+    { tabla: "calcular_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_entidad: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula un certificat de recepcio (es de pot_aprovar)" },
+    { tabla: "emetre_certificat_recepcio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet un certificat de recepcio (es de pot_aprovar)" },
+    // Las LECTURAS sí son del equipo: son lo que hace auditable la cifra del certificado.
+    { tabla: "cierre_base_recepcio", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot llegir la base de calcul d'un certificat de recepcio" },
+    { tabla: "cierre_pendents_recepcio", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "pot llegir els lliuraments pendents de conciliar" },
+    { tabla: "kg_rebuts_exercici", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu els quilos rebuts (security invoker: ho veu tot)", requiereFixture: "alguna canalización conciliada del ejercicio en curso" },
+    // 🔴 LA AUSENCIA que hay que vigilar: un certificado de recepción NO lleva importes. Si
+    //    algún día apareciera una columna de dinero aquí, esto se pondría rojo ANTES de que
+    //    llegara a imprimirse en un PDF. Mismo mecanismo que `albaran_lineas.coste_kg`.
+    {
+      tabla: "cierres_receptor",
+      op: "leer",
+      esperado: "denegar",
+      columnas: "id, valor_total",
+      columnaAusente: true,
+      descripcion: "un certificat de recepcio NO te imports (la columna no existeix)",
+    },
     {
       tabla: "costes_producto",
       op: "leer",
@@ -1096,6 +1146,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       },
       descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
     },
+    // --- Certificat de recepcio (CR). Todos contra un uuid inexistente o el ejercicio
+    //     1999: miden la guarda de ROL y no dejan rastro. Emitir uno de verdad consumiría
+    //     un número de la serie CR y mandaría un correo, que es exactamente lo que un
+    //     arnés que corre contra producción no debe hacer.
+    { tabla: "calcular_certificat_recepcio", op: "rpc", esperado: "permitir", args: { p_entidad: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot calcular un certificat de recepcio (autoritza; l'entitat no existeix)" },
+    { tabla: "emetre_certificat_recepcio", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot emetre un certificat de recepcio (autoritza; el periode no existeix)" },
+    { tabla: "rectificar_certificat_recepcio", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "Comprovacio de l'arnes de RLS" }, descripcion: "pot rectificar un certificat de recepcio (autoritza; el periode no existeix)" },
+    { tabla: "marcar_enviat_recepcio", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot marcar com a enviat (autoritza; el periode no existeix)" },
+    { tabla: "reiniciar_recepcions_prova", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999 }, descripcion: "pot reiniciar els certificats de recepcio de prova (1999: no hi ha res)" },
+    { tabla: "cierres_receptor", op: "leer", esperado: "permitir", descripcion: "ve els certificats de recepcio", requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)" },
+    { tabla: "kg_rebuts_exercici", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu els quilos rebuts", requiereFixture: "alguna canalización conciliada del ejercicio en curso" },
     // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -1389,6 +1450,32 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     //    las filas afectadas y trata «cero sobre una fila que sé que existe» como
     //    denegación (§4bis).
     { tabla: "excedentes", op: "actualizar", esperado: "denegar", descripcion: "NO marca la seva oferta com a «producte al camp»" },
+    // El certificado de recepción es de la ENTIDAD, no del generador. Ni siquiera el del
+    // que le entregó lo suyo: lo que acredita es lo que recibió ELLA.
+    { tabla: "cierres_receptor", op: "leer", esperado: "denegar", descripcion: "NO veu cap certificat de recepcio" },
+    { tabla: "cierre_receptor_lineas", op: "leer", esperado: "denegar", descripcion: "NO veu les linies de cap certificat de recepcio" },
+    // ⚠️ `kg_rebuts_exercici()` SÍ le devuelve filas a un generador, y NO es una fuga: es
+    //    `security invoker`, así que agrega exactamente lo que su RLS ya le deja leer, y un
+    //    productor ve las `canalizaciones` de SUS PROPIAS ofertas (§4: es la rama que hace
+    //    que no quede a ciegas cuando nace una entrega que coordinar).
+    //
+    //    Medido contra producción el 22-09-2026 con la sesión de `prodowner-masprova`: la
+    //    RPC devuelve 590 / 195 / 400 kg por entidad, y sus `canalizaciones` visibles suman
+    //    390+200 / 195 / 400. Cuadra al kilo, o sea que el agregado NO añade ni un dato que
+    //    no tuviera ya — lo único que hace es sumárselo.
+    //
+    //    Lo que hay que seguir vigilando es lo de al lado: que **no vea entidades ajenas**.
+    //    Eso lo sostiene la RLS de `canalizaciones`, no esta función, y si alguna vez se
+    //    relajara esto seguiría en verde. El check que lo cubre de verdad es el de
+    //    `oferta_respuestas` en este mismo bloque.
+    {
+      tabla: "kg_rebuts_exercici",
+      op: "rpc",
+      esperado: "permitir",
+      args: {},
+      descripcion: "veu els quilos de les SEVES entregues agregats per entitat (res nou)",
+      requiereFixture: "alguna canalización conciliada de una oferta suya en el ejercicio en curso",
+    },
     { tabla: "canalizaciones", op: "insertar", esperado: "denegar", descripcion: "NO se canaliza a sí mismo" },
     { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca su propia membresía (ningún externo se auto-activa)" },
     { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros (lo corta pot_aprovar)" },
@@ -1549,6 +1636,30 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // propiedad en sí no queda sin cubrir mientras haya otra cuenta receptora que sí
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
+    // --- Certificat de recepcio (CR): ve EL SEU. Mismo puente y misma regla que el del
+    //     donante (`cierres_receptor_meus()`: los de prueba, solo si la ficha es es_test).
+    {
+      tabla: "cierres_receptor",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve EL SEU certificat de recepcio (nomes el seu)",
+      requiereFixture: "un certificado de recepción calculado con su ficha (calcular_certificat_recepcio en modo prueba)",
+    },
+    {
+      tabla: "cierre_receptor_lineas",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve el detall del SEU certificat de recepcio",
+      requiereFixture: "un certificado de recepción calculado con su ficha (calcular_certificat_recepcio en modo prueba)",
+    },
+    {
+      tabla: "kg_rebuts_exercici",
+      op: "rpc",
+      esperado: "permitir",
+      args: {},
+      descripcion: "veu ELS SEUS quilos rebuts de l'any",
+      requiereFixture: "alguna canalización conciliada de su entidad en el ejercicio en curso",
+    },
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "NO ve las fichas de productor" },
     { tabla: "entidades", op: "leer", esperado: "permitir", descripcion: "ve SU entidad (solo la suya)" },
     {
@@ -1660,6 +1771,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
   sense_rol: [
+    { tabla: "cierres_receptor", op: "leer", esperado: "denegar", descripcion: "no ve ningun certificat de recepcio" },
+    { tabla: "cierre_receptor_lineas", op: "leer", esperado: "denegar", descripcion: "no ve el detall de cap certificat de recepcio" },
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "entidades", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
@@ -1680,6 +1793,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // política «membresias: meves» no filtra por activo, y esa fila es lo único que la
   // pantalla «pendent de validació» necesita para saber que está esperando.
   pendent: [
+    { tabla: "cierres_receptor", op: "leer", esperado: "denegar", descripcion: "no ve ningun certificat de recepcio" },
+    { tabla: "cierre_receptor_lineas", op: "leer", esperado: "denegar", descripcion: "no ve el detall de cap certificat de recepcio" },
     { tabla: "productores", op: "leer", esperado: "denegar", descripcion: "NO ve ninguna ficha, ni la de su organización" },
     { tabla: "entidades", op: "leer", esperado: "denegar", descripcion: "no ve nada" },
     { tabla: "excedentes", op: "leer", esperado: "denegar", descripcion: "NO ve ninguna oferta" },
@@ -1719,6 +1834,16 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // cortaría sería ese check y no el permiso.
   cierres_periodo: {
     productor_id: "00000000-0000-0000-0000-000000000000",
+    periodo_desde: "1999-01-01",
+    periodo_hasta: "1999-12-31",
+    ejercicio: 1999,
+  },
+  // Igual que `cierres_periodo`: `cierres_receptor` no tiene GRANT de escritura para nadie.
+  // La ventana y el ejercicio tienen que cuadrar entre sí (check `any_natural`), o lo que
+  // cortaría el insert sería ESE check y no el permiso — y el arnés estaría midiendo otra
+  // cosa sin decirlo.
+  cierres_receptor: {
+    entidad_id: "00000000-0000-0000-0000-000000000000",
     periodo_desde: "1999-01-01",
     periodo_hasta: "1999-12-31",
     ejercicio: 1999,

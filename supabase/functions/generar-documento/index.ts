@@ -40,6 +40,7 @@ import type { DatosCierre } from "../_shared/pdf/render/cierre.ts";
 import { renderRes } from "../_shared/pdf/render/res.ts";
 import { renderCd } from "../_shared/pdf/render/cd.ts";
 import { renderCt } from "../_shared/pdf/render/ct.ts";
+import { renderCr } from "../_shared/pdf/render/cr.ts";
 import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
@@ -383,11 +384,14 @@ async function renderizar(
     return await renderOpe(activos, op);
   }
 
-  // El cierre anual: resumen, certificado de donación y certificado de transacción.
-  // Comparten snapshot y esqueleto (`cierre.ts`). ⚠️ De los tres, solo RES y CD imprimen
-  // euros: el CT no lleva ninguno, y no porque aquí se filtre nada, sino porque su
-  // snapshot no trae ni una cifra en euros (§ct.ts).
-  if (doc.tipo === "RES" || doc.tipo === "CD" || doc.tipo === "CT") {
+  // La familia del cierre: resumen, certificado de donación, certificado de transacción y
+  // —desde la F4— certificado de RECEPCIÓN. Comparten snapshot y esqueleto (`cierre.ts`).
+  // ⚠️ De los cuatro, solo RES y CD imprimen euros. El CT y el CR no llevan ninguno, y no
+  //    porque aquí se filtre nada: sus snapshots no traen ni una cifra en euros (§ct.ts,
+  //    §cr.ts). El CR además NO es un documento fiscal y su propio papel lo dice.
+  // ⚠️ El CR es el único de la familia cuyo sujeto es una ENTIDAD RECEPTORA, así que su
+  //    fichero se archiva en `entitats/…/CR/` (lo decide `ruta_documento()`, no esto).
+  if (doc.tipo === "RES" || doc.tipo === "CD" || doc.tipo === "CT" || doc.tipo === "CR") {
     const base = {
       datos: datos as DatosCierre,
       sha256Datos: doc.sha256_datos,
@@ -402,8 +406,8 @@ async function renderizar(
         enlaceDias: 60,
       }, doc.idioma);
     }
-    // Los dos certificados los firma la misma apoderada, con el mismo PNG y el mismo DNI
-    // que `documentos.datos` no lleva: la descarga es la misma para CD y para CT.
+    // Los TRES certificados los firma la misma apoderada, con el mismo PNG y el mismo DNI
+    // que `documentos.datos` no lleva: la descarga es la misma para CD, CT y CR.
     const firma = await activosFirma(supabase);
     if (firma.msDescarga > 1) {
       console.log(JSON.stringify({
@@ -413,6 +417,19 @@ async function renderizar(
         firma: firma.firmaPng !== null,
         segell: firma.selloPng !== null,
       }));
+    }
+    if (doc.tipo === "CR") {
+      return await renderCr(activos, {
+        ...base,
+        apoderadaDni: firma.apoderadaDni,
+        firmaPng: firma.firmaPng,
+        selloPng: firma.selloPng,
+        // ⚠️ Como el CD: un CR rectificado NO cambia de tipo (no hay `R-CR`).
+        //    `rectificar_certificat_recepcio()` emite otra versión del mismo CR con el
+        //    mismo número y añade `motiu_rectificacio` al snapshot. Eso es lo que se mira.
+        rectificativo: typeof (datos as DatosCierre).motiu_rectificacio === "string" &&
+          (datos as DatosCierre).motiu_rectificacio !== "",
+      }, doc.idioma);
     }
     if (doc.tipo === "CT") {
       // Sin `rectificativo`: no existe el CT rectificativo (no hay `R-CT` ni

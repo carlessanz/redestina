@@ -32,6 +32,7 @@ import Canalitzacio from '../routes/equip/Canalitzacio'
 import CanalitzacioDetall from '../routes/equip/CanalitzacioDetall'
 import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/Espigolades'
 import Confirmar from '../routes/public/Confirmar'
+import Verificar from '../routes/public/Verificar'
 import Signar from '../routes/public/Signar'
 import Tancament from '../routes/equip/Tancament'
 import TancamentDetall from '../routes/equip/TancamentDetall'
@@ -62,6 +63,11 @@ export const router = createBrowserRouter([
       { path: '/confirmar/:token', element: <Confirmar /> },
       { path: '/factura/:token', element: <Factura /> },
       { path: '/signar/:token', element: <Signar /> },
+      // Verificación de un certificado (F4). Pública sin matices: quien llega es un
+      // tercero sin cuenta —un ayuntamiento, quien revisa una subvención— que ha
+      // escaneado el código del PDF o ha pulsado el sello de una web. Lo único que
+      // «autoriza» es conocer el código, igual que en `/confirmar` lo hace el token.
+      { path: '/verificar/:codi', element: <Verificar /> },
       { path: '/restablir', element: <RestablirClau /> },
 
       // ── Privada ──

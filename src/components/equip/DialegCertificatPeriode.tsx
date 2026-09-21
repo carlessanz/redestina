@@ -1,21 +1,29 @@
-// Certificado de donación A DEMANDA: «lo que este donante lleva donado a fecha de hoy».
+// El certificado de UNA VENTANA DE FECHAS. Un diálogo, dos documentos:
 //
-// POR QUÉ EXISTE. El backend está entero desde la fase 5 —`cierres_periodo`, seis RPC, la
-// plantilla `CD/parcial`, el renderizador— y hasta hoy **no lo llamaba nadie**: no había
-// ninguna pantalla, así que la única forma de emitir uno era SQL a mano. El equipo lo pedía
-// para poder dar a una organización su certificado sin esperar al cierre de diciembre.
+//   · **entidad productora** → certificado de DONACIÓN a demanda (`CDP`, `cierres_periodo`):
+//     «lo que este donante lleva donado a fecha de hoy», con su importe.
+//   · **entidad receptora**  → certificado de RECEPCIÓN (`CR`, `cierres_receptor`, fase F4):
+//     los kilos que le han entrado, donación y compra desglosadas, **y ni un importe**.
 //
-// ⚠️ **CALCULAR YA ESCRIBE.** `calcular_certificado_periodo()` inserta la fila de
-//    `cierres_periodo` antes de que nadie decida emitir: es lo que permite enseñar kilos,
-//    importe y bloqueos *antes* de quemar un número de serie. El precio es que probar tres
-//    ventanas deja tres borradores sin número (deuda §12.112), y por eso el botón de emitir
-//    exige haber calculado: sin ese paso no hay nada que emitir.
+// POR QUÉ EXISTE. El backend del `CDP` estaba entero desde la fase 5 y **no lo llamaba
+// nadie**: la única forma de emitir uno era SQL a mano. Al `CR` le habría pasado lo mismo.
+//
+// POR QUÉ NO SON DOS DIÁLOGOS. El gesto es exactamente el mismo —elige ventana, calcula,
+// mira los bloqueos, emite— y lo que cambia son dos RPC y una línea de resumen. Duplicarlo
+// significaría mantener dos veces las guardas que impiden emitir: la de los datos
+// provisionales, la de los bloqueos rojos y la de los cero kilos. Y una guarda que falta no
+// se nota fallando: se nota emitiendo.
+//
+// ⚠️ **CALCULAR YA ESCRIBE.** Las dos RPC insertan su fila antes de que nadie decida
+//    emitir: es lo que permite enseñar kilos y bloqueos *antes* de quemar un número de
+//    serie. El precio es que probar tres ventanas deja tres borradores sin número (deuda
+//    §12.112), y por eso el botón de emitir exige haber calculado.
 //
 // ⚠️ **El modo NO se elige aquí**, se deduce de `es_test` de la ficha. Un desplegable de
-//    prueba/real en esta pantalla sería una forma de mandarle a un donante real un
-//    certificado con marca de agua, o al revés: uno con efecto fiscal a una ficha de prueba.
+//    prueba/real en esta pantalla sería una forma de mandarle a una organización real un
+//    certificado con marca de agua, o al revés: uno de verdad a una ficha de prueba.
 //
-// ⚠️ Los errores de la base se enseñan **tal cual**. Los tres que salen de verdad —la ventana
+// ⚠️ Los errores de la base se enseñan **tal cual**. Los que salen de verdad —la ventana
 //    cruza dos ejercicios, termina en el futuro, esa ventana ya tiene certificado— vienen
 //    redactados y con las fechas dentro; cualquier texto nuestro diría menos.
 
@@ -23,12 +31,13 @@ import { useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { calcularCertificatPeriode, emetreCertificatPeriode, bloqueja, euros } from '../../lib/tancament'
+import { calcularCertificatRecepcio, emetreCertificatRecepcio } from '../../lib/certificatRecepcio'
 import { kg } from '../../lib/albarans'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import Bloquejos from './Bloquejos'
 import { bloquejaProvisionals } from '../../lib/canalitzacio'
-import type { CierrePeriodo } from '../../types'
+import type { BloqueigCierre } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -41,26 +50,65 @@ function avui(): string {
   return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' })
 }
 
+/**
+ * Lo que las dos pantallas necesitan del cálculo.
+ *
+ * `CierrePeriodo` y `CierreReceptor` son dos tablas distintas y comparten solo esto: el id,
+ * los kilos y los bloqueos. Lo demás se lee por su nombre en la rama que corresponde, y
+ * `valor_total` **no está aquí a propósito** — el certificado de recepción no tiene esa
+ * columna, y no es que no se imprima: es que no existe (§4).
+ */
+interface Calcul {
+  id: string
+  kg_total: number
+  bloqueos: BloqueigCierre[]
+  /** Solo en la donación a demanda. En recepción es siempre `undefined`. */
+  valor_total?: number
+  /** Solo en recepción: el desglose que da sentido a sumar donación y compra en un papel. */
+  kg_donacio?: number
+  kg_compra?: number
+}
+
+const PERFIL = {
+  productor: {
+    serie: 'CDP',
+    titolKey: 'cdp.title',
+    descKey: 'cdp.desc',
+    accioKey: 'cdp.a_emit',
+    buitKey: 'cdp.no_kg',
+  },
+  entidad: {
+    serie: 'CR',
+    titolKey: 'crec.title',
+    descKey: 'crec.desc',
+    accioKey: 'crec.a_emit',
+    buitKey: 'crec.no_kg',
+  },
+} as const
+
 interface Props {
   obert: boolean
   onTancar: () => void
-  productorId: string
+  tipus: 'productor' | 'entidad'
+  /** El id de la FICHA: `productores.id` o `entidades.id`. */
+  orgId: string
   /** Deducido de `es_test`: decide la serie, la marca de agua y a quién se escribe. */
   modo: 'prueba' | 'real'
-  /** Con datos fiscales provisionales la base se niega (42501): mejor decirlo antes. */
+  /** Con datos fiscales provisionales la base se niega en modo real (42501): mejor decirlo antes. */
   provisionals: boolean
   onEmes: () => void
 }
 
 export default function DialegCertificatPeriode(
-  { obert, onTancar, productorId, modo, provisionals, onEmes }: Props,
+  { obert, onTancar, tipus, orgId, modo, provisionals, onEmes }: Props,
 ) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
+  const perfil = PERFIL[tipus]
   const hoy = avui()
   const [desde, setDesde] = useState(`${hoy.slice(0, 4)}-01-01`)
   const [hasta, setHasta] = useState(hoy)
-  const [calcul, setCalcul] = useState<CierrePeriodo | null>(null)
+  const [calcul, setCalcul] = useState<Calcul | null>(null)
   const [ocupat, setOcupat] = useState(false)
 
   // Cambiar una fecha invalida el cálculo: si no, se emitiría una ventana distinta de la
@@ -72,25 +120,31 @@ export default function DialegCertificatPeriode(
 
   async function calcula() {
     setOcupat(true)
-    const res = await calcularCertificatPeriode({ productor: productorId, desde, hasta, modo })
+    const res = tipus === 'productor'
+      ? await calcularCertificatPeriode({ productor: orgId, desde, hasta, modo })
+      : await calcularCertificatRecepcio({ entitat: orgId, desde, hasta, modo })
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
-    setCalcul(res.data)
+    setCalcul(res.data as Calcul)
   }
 
   async function emet() {
     if (!calcul) return
+    // En modo real se pregunta: consume numeración legal y no se deshace. En prueba no,
+    // porque el ensayo se repite y una confirmación por gesto deja de leerse.
     if (modo === 'real') {
       const ok = await confirma({
         titol: t('cdp.confirm_t', { desde, fins: hasta }),
-        descripcio: t('cdp.confirm', { serie: 'CDP' }),
-        confirmar: t('cdp.a_emit'),
+        descripcio: t('cdp.confirm', { serie: perfil.serie }),
+        confirmar: t(perfil.accioKey),
         destructiu: true,
       })
       if (!ok) return
     }
     setOcupat(true)
-    const res = await emetreCertificatPeriode(calcul.id)
+    const res = tipus === 'productor'
+      ? await emetreCertificatPeriode(calcul.id)
+      : await emetreCertificatRecepcio(calcul.id)
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('cdp.done', { n: res.data.numero ?? '' }))
@@ -114,8 +168,8 @@ export default function DialegCertificatPeriode(
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
       <DialogContent className="max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle>{t('cdp.title')}</DialogTitle>
-          <DialogDescription>{t('cdp.desc')}</DialogDescription>
+          <DialogTitle>{t(perfil.titolKey)}</DialogTitle>
+          <DialogDescription>{t(perfil.descKey)}</DialogDescription>
         </DialogHeader>
 
         <div className="grid gap-3 sm:grid-cols-2">
@@ -156,7 +210,7 @@ export default function DialegCertificatPeriode(
             motiu={motiuEmetre}
             onClick={() => void emet()}
           >
-            {t('cdp.a_emit')}
+            {t(perfil.accioKey)}
           </BotoAmbMotiu>
         </div>
 
@@ -168,8 +222,14 @@ export default function DialegCertificatPeriode(
           <div className="space-y-2 rounded-md border p-3">
             <p className="text-sm">
               {senseKg
-                ? t('cdp.no_kg')
-                : t('cdp.calculated', { kg: kg(calcul.kg_total), v: euros(calcul.valor_total) })}
+                ? t(perfil.buitKey)
+                : tipus === 'productor'
+                  ? t('cdp.calculated', { kg: kg(calcul.kg_total), v: euros(calcul.valor_total) })
+                  : t('crec.calculated', {
+                    kg: kg(calcul.kg_total),
+                    d: kg(calcul.kg_donacio),
+                    c: kg(calcul.kg_compra),
+                  })}
             </p>
             <Bloquejos llista={calcul.bloqueos} />
           </div>

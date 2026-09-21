@@ -321,10 +321,11 @@ export interface FactorConversion {
 export type DocumentoTipo =
   | 'REC' | 'ENT' | 'OPE'
   | 'R-REC' | 'R-ENT' | 'R-OPE'
-  | 'CONV' | 'RES' | 'CD' | 'CT' | 'PLA' | 'PROVA'
+  | 'CONV' | 'RES' | 'CD' | 'CT' | 'CR' | 'PLA' | 'PROVA'
 
 export type DocumentoObjetoTipo =
-  | 'albaran' | 'convenio' | 'cierre_donante' | 'cierre_periodo' | 'espigolada' | 'plan' | 'prova'
+  | 'albaran' | 'convenio' | 'cierre_donante' | 'cierre_periodo' | 'cierre_receptor'
+  | 'espigolada' | 'plan' | 'prova'
 
 export type DocumentoEstado = 'pendiente_fichero' | 'emitido' | 'error'
 
@@ -875,4 +876,84 @@ export interface PlanPrevencion {
   sustituido_por: string | null
   created_at: string
   updated_at: string
+}
+
+// --- Certificado de recepción (CR, migraciones 20260921223245 / 223246) ---
+//
+// El espejo del certificado del donante, para la entidad que RECIBE: los kilos que le han
+// entrado en una ventana de fechas, donación y compra juntas. No cuelga de ningún
+// `cierres_ejercicio` —es siempre a demanda— y por eso lleva su propio `modo`.
+//
+// 🔴 NO TIENE NI UNA CIFRA DE EUROS, y no es que no se muestren: las columnas NO EXISTEN
+//    (el arnés lo comprueba esperando `42703`, igual que con `albaran_lineas.coste_kg`).
+//    No es un documento fiscal, no va al 182 y no acredita ninguna donación deducible.
+
+export type EstatCierreReceptor =
+  | 'calculat' | 'certificat_emes' | 'enviat' | 'substituit'
+
+export interface CierreReceptor {
+  id: string
+  entidad_id: string
+  /** Ventana certificada, cerrada por los dos lados y dentro de un solo año natural */
+  periodo_desde: string
+  periodo_hasta: string
+  ejercicio: number
+  /** `prueba` → serie P-CR, marca de agua y destinatario forzado */
+  modo: 'prueba' | 'real'
+  datos_fiscales: Record<string, string | null> | null
+  /** `kg_donacio + kg_compra = kg_total` siempre */
+  kg_total: number
+  kg_donacio: number
+  kg_compra: number
+  estado: EstatCierreReceptor
+  /** `sense_conciliar` y `periode_encavalcat` bloquean; el resto solo avisa */
+  bloqueos: BloqueigCierre[]
+  /** Serie propia `CR-2026-0001`, nunca la del certificado del donante */
+  certificado_numero: string | null
+  certificado_at: string | null
+  rectificaciones: number
+  /** El certificado POSTERIOR que contiene esta ventana y la sustituye */
+  sustituido_por: string | null
+  sustituido_at: string | null
+  /** Nota INTERNA del motivo de emisión. No se imprime en el documento */
+  notas: string | null
+  calculado_at: string | null
+  enviado_at: string | null
+  creado_por: string | null
+  created_at: string
+}
+
+export interface CierreReceptorLinea {
+  id: string
+  cierre_receptor_id: string
+  canalizacion_id: string
+  /** ENT en donación, OPE en venta/maquila: los dos cuelgan 1:1 de la canalización */
+  albaran_id: string | null
+  albaran_tipo: 'ENT' | 'OPE' | null
+  valorizacion: 'donacio' | 'venda' | 'maquila'
+  producto: string | null
+  mes: number | null
+  kg_neto: number
+  /** El origen que permite D3. Van siempre, en los dos casos */
+  municipio: string | null
+  comarca: string | null
+  /** 🔴 SOLO en venta y maquila. En donación son null POR CHECK: D3 (§4) */
+  productor_id: string | null
+  productor_nom: string | null
+  productor_nif: string | null
+  retroactiva: boolean
+  created_at: string
+}
+
+/** Lo que devuelve `kg_rebuts_exercici()`: el acumulado del año del panel de la receptora */
+export interface KgRebutsExercici {
+  entidad_id: string
+  ejercicio: number
+  kg_donacio: number
+  kg_compra: number
+  kg_total: number
+  operacions: number
+  /** Entregas de ese año aún SIN conciliar: no cuentan como oficiales (D13) */
+  kg_pendents: number
+  operacions_pendents: number
 }

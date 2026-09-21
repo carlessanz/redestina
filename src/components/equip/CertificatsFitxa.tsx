@@ -1,16 +1,26 @@
-// Los certificados de donación de UNA entidad productora, desde su propia ficha.
+// Los certificados de UNA organización, desde su propia ficha. Un componente, dos usos:
+//
+//   · ficha de **entidad productora** → certificados de DONACIÓN (`CD`): el anual, que sale
+//     del cierre, y los de a demanda (`cierres_periodo`).
+//   · ficha de **entidad receptora**  → certificados de RECEPCIÓN (`CR`, fase F4): los
+//     kilos que le han entrado en una ventana de fechas (`cierres_receptor`).
 //
 // POR QUÉ EXISTE. Hasta hoy, para saber si una organización tenía su certificado había que
 // salir de su ficha, entrar en «Tancament d'exercici», abrir el cierre del año y buscar su
-// fila entre las demás. Y el certificado **a demanda** —el de «lo que lleva donado este
-// año»— no se podía emitir desde ninguna pantalla: existía en la base y nada lo llamaba.
+// fila entre las demás. Y el certificado **a demanda** no se podía emitir desde ninguna
+// pantalla: existía en la base y nada lo llamaba. Las dos cosas se resuelven donde se
+// preguntan: en la ficha.
 //
-// Las dos cosas se resuelven donde se preguntan: en la ficha.
+// POR QUÉ ESTÁ PARAMETRIZADO Y NO DUPLICADO. Lo que cambia entre los dos papeles es de
+// dónde salen las filas y cómo se llama el documento; el resto —quién puede emitir, la
+// barrera de los datos provisionales, el modo deducido de `es_test`, ver y descargar el
+// PDF— es idéntico. Dos copias serían dos sitios donde esa barrera puede quedar puesta en
+// uno y no en el otro, y eso no falla: emite.
 //
 // ⚠️ **El modo sale de `es_test`, no se elige** (ver `DialegCertificatPeriode`).
-// ⚠️ Con `datos_provisionales` a `true` la base se niega a emitir, así que el botón se apaga
-//    **con su motivo visible**. Es material de la fase 0 lo que falta (§12.10), no software,
-//    y esconder el botón haría parecer que la función no existe.
+// ⚠️ Con `datos_provisionales` a `true` la base se niega a emitir en modo REAL, así que el
+//    botón se apaga **con su motivo visible**. Es material de la fase 0 lo que falta
+//    (§12.10), no software, y esconder el botón haría parecer que la función no existe.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link } from 'react-router'
@@ -48,14 +58,48 @@ interface Doc {
   estado: string
 }
 
+/** Lo que se pinta en la lista, venga de donde venga. */
+interface Emes {
+  id: string
+  numero: string
+  estat: string
+  /** «01/01/2026 → 30/06/2026», o null si es el anual (que no tiene ventana). */
+  periode: string | null
+  /** El cierre al que pertenece, para enlazarlo. Solo el certificado anual tiene uno. */
+  cierre: string | null
+}
+
+/** Los textos y las tablas de cada papel, en un solo sitio: el resto del componente no los mira. */
+const PERFIL = {
+  productor: {
+    tipusDoc: 'CD',
+    titolKey: 'fit.cert_title',
+    hintKey: 'fit.cert_hint',
+    buitKey: 'fit.cert_none',
+    accioKey: 'fit.cert_generate',
+  },
+  entidad: {
+    tipusDoc: 'CR',
+    titolKey: 'fit.certr_title',
+    hintKey: 'fit.certr_hint',
+    buitKey: 'fit.certr_none',
+    accioKey: 'fit.certr_generate',
+  },
+} as const
+
 export default function CertificatsFitxa(
-  { productorId, esTest }: { productorId: string; esTest: boolean },
+  { tipus, orgId, esTest }: {
+    tipus: 'productor' | 'entidad'
+    /** El id de la FICHA (`productores.id` o `entidades.id`), no el de la organización. */
+    orgId: string
+    esTest: boolean
+  },
 ) {
   const { t } = useT()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
-  const [periodes, setPeriodes] = useState<FilaPeriode[]>([])
-  const [anuals, setAnuals] = useState<FilaAnual[]>([])
+  const perfil = PERFIL[tipus]
+  const [emesos, setEmesos] = useState<Emes[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
   const [provisionals, setProvisionals] = useState(true)
   const [obert, setObert] = useState(false)
@@ -63,27 +107,54 @@ export default function CertificatsFitxa(
   const carrega = useCallback(async () => {
     // ⚠️ Columnas EXPLÍCITAS en `documentos`: un `select('*')` lo corta el GRANT por
     // columnas antes de evaluar ninguna política (§4), y `envio` está fuera.
-    const [per, anu] = await Promise.all([
-      supabase.from('cierres_periodo')
-        .select('id, periodo_desde, periodo_hasta, estado, certificado_numero')
-        .eq('productor_id', productorId)
-        .order('periodo_hasta', { ascending: false }),
-      supabase.from('cierres_donante')
-        .select('id, cierre_id, estado, certificado_numero')
-        .eq('productor_id', productorId).eq('tipo', 'donacio'),
-    ])
-    const fp = (per.data as FilaPeriode[] | null) ?? []
-    const fa = (anu.data as FilaAnual[] | null) ?? []
-    setPeriodes(fp)
-    setAnuals(fa)
+    // ⚠️ Y cada lista de columnas, en UN literal (§7, deuda 46).
+    let files: Emes[]
 
-    const ids = [...fp.map((x) => x.id), ...fa.map((x) => x.id)]
-    if (ids.length === 0) { setDocs([]); return }
+    if (tipus === 'productor') {
+      const [per, anu] = await Promise.all([
+        supabase.from('cierres_periodo')
+          .select('id, periodo_desde, periodo_hasta, estado, certificado_numero')
+          .eq('productor_id', orgId)
+          .order('periodo_hasta', { ascending: false }),
+        supabase.from('cierres_donante')
+          .select('id, cierre_id, estado, certificado_numero')
+          .eq('productor_id', orgId).eq('tipo', 'donacio'),
+      ])
+      const fp = (per.data as FilaPeriode[] | null) ?? []
+      const fa = (anu.data as FilaAnual[] | null) ?? []
+      files = [
+        ...fa.filter((a) => a.certificado_numero).map((a) => ({
+          id: a.id, numero: a.certificado_numero!, estat: a.estado,
+          periode: null, cierre: a.cierre_id,
+        })),
+        ...fp.filter((p) => p.certificado_numero).map((p) => ({
+          id: p.id, numero: p.certificado_numero!, estat: p.estado,
+          periode: `${p.periodo_desde} → ${p.periodo_hasta}`, cierre: null,
+        })),
+      ]
+    } else {
+      // El certificado de recepción es SIEMPRE a demanda: no cuelga de ningún cierre, así
+      // que aquí no hay un «anual» que enseñar aparte ni ningún enlace al que ir.
+      const { data } = await supabase.from('cierres_receptor')
+        .select('id, periodo_desde, periodo_hasta, estado, certificado_numero')
+        .eq('entidad_id', orgId)
+        .order('periodo_hasta', { ascending: false })
+      files = ((data as FilaPeriode[] | null) ?? [])
+        .filter((p) => p.certificado_numero)
+        .map((p) => ({
+          id: p.id, numero: p.certificado_numero!, estat: p.estado,
+          periode: `${p.periodo_desde} → ${p.periodo_hasta}`, cierre: null,
+        }))
+    }
+
+    setEmesos(files)
+    if (files.length === 0) { setDocs([]); return }
     const { data } = await supabase.from('documentos')
       .select('id, objeto_id, numero_completo, estado')
-      .eq('tipo', 'CD').eq('vigente', true).in('objeto_id', ids)
+      .eq('tipo', perfil.tipusDoc).eq('vigente', true)
+      .in('objeto_id', files.map((f) => f.id))
     setDocs((data as Doc[] | null) ?? [])
-  }, [productorId])
+  }, [orgId, tipus, perfil.tipusDoc])
 
   useEffect(() => { void carrega() }, [carrega])
   useEffect(() => {
@@ -93,22 +164,6 @@ export default function CertificatsFitxa(
   }, [])
 
   const descarregador = useDescarregaDocument(carrega)
-  const emesos = [
-    ...anuals.filter((a) => a.certificado_numero).map((a) => ({
-      id: a.id,
-      numero: a.certificado_numero!,
-      estat: a.estado,
-      periode: null as string | null,
-      cierre: a.cierre_id,
-    })),
-    ...periodes.filter((p) => p.certificado_numero).map((p) => ({
-      id: p.id,
-      numero: p.certificado_numero!,
-      estat: p.estado,
-      periode: `${p.periodo_desde} → ${p.periodo_hasta}`,
-      cierre: null as string | null,
-    })),
-  ]
 
   const motiu = !potAprovar
     ? t('fit.cert_readonly')
@@ -118,8 +173,8 @@ export default function CertificatsFitxa(
     <div className="rounded-md border bg-card p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <div>
-          <p className="font-titulos text-sm font-semibold">{t('fit.cert_title')}</p>
-          <p className="text-xs text-muted-foreground">{t('fit.cert_hint')}</p>
+          <p className="font-titulos text-sm font-semibold">{t(perfil.titolKey)}</p>
+          <p className="text-xs text-muted-foreground">{t(perfil.hintKey)}</p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {esTest && <BadgeMode mode="prueba" />}
@@ -130,7 +185,7 @@ export default function CertificatsFitxa(
             motiu={motiu}
             onClick={() => setObert(true)}
           >
-            {t('fit.cert_generate')}
+            {t(perfil.accioKey)}
           </BotoAmbMotiu>
         </div>
       </div>
@@ -139,7 +194,7 @@ export default function CertificatsFitxa(
       {motiu && <p className="mt-2 text-xs text-muted-foreground">{motiu}</p>}
 
       {emesos.length === 0
-        ? <p className="mt-2 text-sm text-muted-foreground">{t('fit.cert_none')}</p>
+        ? <p className="mt-2 text-sm text-muted-foreground">{t(perfil.buitKey)}</p>
         : (
           <ul className="mt-2 space-y-1">
             {emesos.map((c) => {
@@ -189,7 +244,8 @@ export default function CertificatsFitxa(
       <DialegCertificatPeriode
         obert={obert}
         onTancar={() => setObert(false)}
-        productorId={productorId}
+        tipus={tipus}
+        orgId={orgId}
         modo={esTest ? 'prueba' : 'real'}
         provisionals={provisionals}
         onEmes={() => void carrega()}

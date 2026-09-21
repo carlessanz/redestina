@@ -173,6 +173,18 @@ verify_jwt = true
 import_map = "./functions/subir-documento-externo/deno.json"
 entrypoint = "./functions/subir-documento-externo/index.ts"
 
+# Verificación pública de un certificado de recepción (F4). Sin JWT: quien comprueba un
+# certificado es un tercero —un ayuntamiento, una financiadora, un auditor— que no tiene
+# cuenta. Lo que autoriza es conocer el código impreso (16 hex del sha256 del snapshot, o
+# sea 64 bits). Es de SOLO LECTURA y devuelve ocho campos y nada más: ni el PDF, ni el
+# detalle por producto, ni ninguna de las dos listas de procedencia —que nombran a
+# generadores y municipios de terceros—. Anti-abuso propio dentro (límite por IP).
+[functions.verificar-certificat]
+enabled = true
+verify_jwt = false
+import_map = "./functions/verificar-certificat/deno.json"
+entrypoint = "./functions/verificar-certificat/index.ts"
+
 # Limpieza de los PDF huérfanos de los ciclos de prueba (§12.51, §12.88). La otra mitad de
 # `reiniciar_documentos_prova()`: SQL borra las filas y esto los objetos del bucket, que SQL no
 # puede tocar. Con JWT porque quien la lanza es una persona desde el panel, y dentro exige

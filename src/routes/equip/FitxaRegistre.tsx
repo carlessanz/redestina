@@ -70,11 +70,17 @@ export default function FitxaRegistre({ tabla }: Props) {
           {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
               aquí, semanas después, y no solo en la cola de registros pendientes. */}
           <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null} />
-          {/* Sus certificados de donación, y el botón para emitir el de «lo que lleva
-              donado este año». Solo en entidades productoras y solo sobre una ficha que ya
-              existe: en el alta (`/nou`) no hay `id` al que colgar nada todavía. */}
-          {esProductor && id && (
-            <CertificatsFitxa productorId={id} esTest={Boolean(registre?.es_test)} />
+          {/* Sus certificados. En una entidad PRODUCTORA son los de donación (el anual y
+              los de a demanda); en una RECEPTORA, los de recepción (`CR`, fase F4): los
+              kilos que ha recibido en una ventana de fechas.
+              Solo sobre una ficha que ya existe: en el alta (`/nou`) no hay `id` al que
+              colgar nada todavía. */}
+          {id && (
+            <CertificatsFitxa
+              tipus={esProductor ? 'productor' : 'entidad'}
+              orgId={id}
+              esTest={Boolean(registre?.es_test)}
+            />
           )}
         </>
       )}

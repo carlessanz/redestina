@@ -50,12 +50,60 @@ export interface LineaDetalle {
   valor?: number | string | null;
   /** Solo CT: cuántas operaciones de venta o maquila suman esos kilos. */
   operacions?: number | string | null;
+  /**
+   * Solo CR: el mismo producto le llega a la receptora por dos vías —donado y comprado—
+   * y el certificado las separa, porque para quien lee el papel son dos cosas distintas.
+   * `kg_donacio + kg_compra = kg` siempre (`recepcio_datos_certificat()` lo garantiza:
+   * una canalización sin `valorizacion` cuenta como donación, no se cae de los sumandos).
+   */
+  kg_donacio?: number | string | null;
+  kg_compra?: number | string | null;
 }
 
 export interface Bloqueo {
   codigo?: string | null;
   detall?: string | null;
   bloqueja?: boolean | null;
+}
+
+// ---------------------------------------------------------------------------
+// La procedencia del CR: DOS formas, y la diferencia es D3
+// ---------------------------------------------------------------------------
+// 🔴 Son dos interfaces y no una con un campo `tipus`, por lo mismo que en la base son
+//    dos listas y no una columna (20260921223245): **la de donación no tiene dónde
+//    guardar un nombre**. Si algún día alguien intenta imprimir el generador en el bloque
+//    de las donaciones, no se encuentra un campo vacío — no compila. Es el espejo en
+//    TypeScript del `check` que en SQL hace NULL obligatorio a `productor_nom` en las
+//    líneas de donación.
+//
+//    Unificarlas «porque la tabla es casi igual» es exactamente el cambio que hay que no
+//    hacer: la tabla se parece, lo que se puede decir en cada una no.
+
+/**
+ * De dónde viene lo DONADO: municipio y comarca, y nada más (D3). El donante no se
+ * nombra nunca — no hay ninguna clave capaz de llevar su nombre.
+ */
+export interface ProcedenciaDonacio {
+  municipi?: string | null;
+  comarca?: string | null;
+  kg?: number | string | null;
+  operacions?: number | string | null;
+}
+
+/**
+ * De dónde viene lo COMPRADO (venta y maquila). Aquí el generador SÍ se nombra: son dos
+ * partes que ya han contratado entre ellas, y ocultarlo no protegería a nadie. Es la
+ * misma regla que ya aplica el albarán OPE.
+ */
+export interface ProcedenciaCompra {
+  generador?: string | null;
+  nif?: string | null;
+  municipi?: string | null;
+  comarca?: string | null;
+  /** `venda` | `maquila`. Se llama `tipus` y no `valoritzacio` a propósito (ver SQL). */
+  tipus?: string | null;
+  kg?: number | string | null;
+  operacions?: number | string | null;
 }
 
 export interface DatosCierre {
@@ -99,10 +147,22 @@ export interface DatosCierre {
   // La contraparte del CT es el GENERADOR, no un donante: son la misma forma con otro
   // nombre, y el nombre importa porque el papel dice quién es quien vende o encarga.
   generador?: OrganizacionCierre | null;
-  /** `true` en el CT: el snapshot no trae ni un euro, y el papel lo dice. */
+  /** `true` en el CT y en el CR: el snapshot no trae ni un euro, y el papel lo dice. */
   sense_imports?: boolean | null;
   /** La frase que explica por qué no hay importes. La escribe SQL, no el renderizador. */
   nota?: string | null;
+
+  // --- certificado de recepción (CR)
+  // La contraparte es quien RECIBIÓ. No se lee `donant` ni `generador` como respaldo: si
+  // llegara vacío, el papel tiene que enseñar el hueco y no rellenarlo con la clave de
+  // otro documento (mismo criterio que el CT con `generador`).
+  receptora?: OrganizacionCierre | null;
+  /** `periode` en el CR; se conserva por si algún día hubiera un CR de ejercicio entero. */
+  abast?: string | null;
+  kg_donacio?: number | null;
+  kg_compra?: number | null;
+  procedencies_donacio?: ProcedenciaDonacio[] | null;
+  procedencies_compra?: ProcedenciaCompra[] | null;
 }
 
 export interface OpcionesCierre {
@@ -155,13 +215,30 @@ export interface DiccionarioCierre {
   cd_sub: string;
   ct: string;
   ct_sub: string;
+  cr: string;
+  cr_sub: string;
+  receptora: string;
   generador: string;
   certifica_ct: string;
+  certifica_cr: string;
   sense_imports_titol: string;
   sense_imports_text: string;
+  sense_imports_cr: string;
   detall_ct: string;
+  detall_cr: string;
   destinacions_ct: string;
   quilos_ct: string;
+  quilos_cr: string;
+  quilos_cr_desglos: (donacio: string, compra: string) => string;
+  procedencia_donacio: string;
+  procedencia_donacio_text: string;
+  procedencia_compra: string;
+  procedencia_compra_text: string;
+  sense_procedencia_donacio: string;
+  sense_procedencia_compra: string;
+  no_fiscal_titol: string;
+  no_fiscal_text: string;
+  via: Record<string, string>;
   rectificatiu: string;
   motiu_rectificacio: string;
   numero: string;
@@ -230,17 +307,42 @@ const CA: DiccionarioCierre = {
   cd_sub: "Article 16 de la Llei 49/2002, de règim fiscal de les entitats sense fins lucratius",
   ct: "Certificat de transacció",
   ct_sub: "Operacions de venda i de maquila conciliades durant l'exercici",
+  cr: "Certificat de recepció",
+  cr_sub: "Aliments locals fora del circuit de venda habitual rebuts durant el període",
+  receptora: "Entitat receptora",
   generador: "Generador",
   certifica_ct: "Certifica",
+  certifica_cr: "Certifica",
   sense_imports_titol: "Aquest certificat no recull imports",
   sense_imports_text:
     "Aquest certificat acredita les operacions realitzades amb els quilos conciliats. No hi consta cap import: el pagament es tramita fora de la plataforma, entre les parts.",
+  sense_imports_cr:
+    "Aquest certificat acredita els quilos rebuts dins del període indicat. No hi consta cap import: les quantitats econòmiques queden registrades internament.",
   detall_ct: "Detall per producte",
+  detall_cr: "Detall per producte",
   destinacions_ct: "Qui ha rebut el producte",
   // ⚠️ NO se reutiliza `quilos` («Quilos donats»): en un CT no se ha donado nada, se ha
   // vendido o se ha encargado una maquila. La misma palabra en los dos papeles borraría
   // justo la diferencia que separa el CD del CT.
   quilos_ct: "Quilos acreditats",
+  quilos_cr: "Quilos rebuts",
+  quilos_cr_desglos: (donacio, compra) =>
+    `Donació: ${donacio} kg · Compra o maquila: ${compra} kg`,
+  // ⚠️ Los dos rótulos de procedencia NO comparten texto a propósito: el de donación dice
+  //    de dónde viene el producto, el de compra dice de QUIÉN. Un rótulo común invitaría a
+  //    una tabla común, que es justo lo que D3 impide.
+  procedencia_donacio: "Procedència dels aliments donats",
+  procedencia_donacio_text:
+    "Dels lliuraments en concepte de donació se n'indica el municipi i la comarca d'origen. No s'hi identifica l'organització donant, d'acord amb el compromís de confidencialitat que la Fundació manté amb les persones i empreses donants.",
+  procedencia_compra: "Procedència dels aliments comprats",
+  procedencia_compra_text:
+    "En les operacions de compra o de maquila hi consta l'organització generadora, atès que és part contractant de l'operació.",
+  sense_procedencia_donacio: "No hi ha cap lliurament en concepte de donació en aquest període.",
+  sense_procedencia_compra: "No hi ha cap operació de compra ni de maquila en aquest període.",
+  no_fiscal_titol: "Abast d'aquest certificat",
+  no_fiscal_text:
+    "Aquest certificat acredita els quilos rebuts. NO és un certificat de donació als efectes de la Llei 49/2002, no forma part de cap declaració informativa tributària i no substitueix cap document fiscal.",
+  via: { donacio: "Donació", venda: "Venda", maquila: "Maquila" },
   rectificatiu: "Rectificatiu",
   motiu_rectificacio: "Motiu de la rectificació",
   numero: "Número",
@@ -314,6 +416,12 @@ const CA: DiccionarioCierre = {
     valor: "Valor",
     entitat: "Entitat receptora",
     operacions: "Operacions",
+    municipi: "Municipi",
+    comarca: "Comarca",
+    generador: "Generador",
+    via: "Operació",
+    kg_donacio: "Donats",
+    kg_compra: "Comprats",
   },
 };
 
@@ -325,14 +433,36 @@ const ES: DiccionarioCierre = {
   cd_sub: "Artículo 16 de la Ley 49/2002, de régimen fiscal de las entidades sin fines lucrativos",
   ct: "Certificado de transacción",
   ct_sub: "Operaciones de venta y de maquila conciliadas durante el ejercicio",
+  cr: "Certificado de recepción",
+  cr_sub: "Alimentos locales fuera del circuito de venta habitual recibidos durante el periodo",
+  receptora: "Entidad receptora",
   generador: "Generador",
   certifica_ct: "Certifica",
+  certifica_cr: "Certifica",
   sense_imports_titol: "Este certificado no recoge importes",
   sense_imports_text:
     "Este certificado acredita las operaciones realizadas con los kilos conciliados. No consta ningún importe: el pago se tramita fuera de la plataforma, entre las partes.",
+  sense_imports_cr:
+    "Este certificado acredita los kilos recibidos dentro del periodo indicado. No consta ningún importe: las cantidades económicas quedan registradas internamente.",
   detall_ct: "Detalle por producto",
+  detall_cr: "Detalle por producto",
   destinacions_ct: "Quién ha recibido el producto",
   quilos_ct: "Kilos acreditados",
+  quilos_cr: "Kilos recibidos",
+  quilos_cr_desglos: (donacio, compra) =>
+    `Donación: ${donacio} kg · Compra o maquila: ${compra} kg`,
+  procedencia_donacio: "Procedencia de los alimentos donados",
+  procedencia_donacio_text:
+    "De las entregas en concepto de donación se indica el municipio y la comarca de origen. No se identifica en ellas a la organización donante, de acuerdo con el compromiso de confidencialidad que la Fundación mantiene con las personas y empresas donantes.",
+  procedencia_compra: "Procedencia de los alimentos comprados",
+  procedencia_compra_text:
+    "En las operaciones de compra o de maquila consta la organización generadora, por ser parte contratante de la operación.",
+  sense_procedencia_donacio: "No hay ninguna entrega en concepto de donación en este periodo.",
+  sense_procedencia_compra: "No hay ninguna operación de compra ni de maquila en este periodo.",
+  no_fiscal_titol: "Alcance de este certificado",
+  no_fiscal_text:
+    "Este certificado acredita los kilos recibidos. NO es un certificado de donación a efectos de la Ley 49/2002, no forma parte de ninguna declaración informativa tributaria y no sustituye a ningún documento fiscal.",
+  via: { donacio: "Donación", venda: "Venta", maquila: "Maquila" },
   rectificatiu: "Rectificativo",
   motiu_rectificacio: "Motivo de la rectificación",
   numero: "Número",
@@ -406,6 +536,12 @@ const ES: DiccionarioCierre = {
     valor: "Valor",
     entitat: "Entidad receptora",
     operacions: "Operaciones",
+    municipi: "Municipio",
+    comarca: "Comarca",
+    generador: "Generador",
+    via: "Operación",
+    kg_donacio: "Donados",
+    kg_compra: "Comprados",
   },
 };
 

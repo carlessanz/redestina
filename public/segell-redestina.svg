@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  Sello de Redestina, para que una entidad receptora lo pegue en su web enlazando a
+  /verificar/<codi>. Derivado de `isotipo-redestina.svg` (la hoja): mismos trazados, mismos
+  colores de `design/tokens.json` (verde #4e6b45, verde-oscuro #3e5139, crema #f5f1ea).
+
+  ⚠️ SIN NINGUNA PALABRA DENTRO, y son dos motivos que no se arreglan «añadiendo el texto»:
+    1. Esto se sirve desde una web ajena, donde Sora no está cargada. El logo tiene las
+       letras en TRAZADOS justamente por eso; aquí no se pueden componer, y un <text> con
+       una fuente de sistema saldría con otra letra y otro ancho en cada visitante.
+    2. La aplicación es bilingüe. Un sello que dijera «Certificat de recepció» quedaría en
+       catalán para siempre en la web de quien lo pegó, también en castellano.
+  Lo que dice el sello va en el `alt` del <img> y en el <title> de aquí, que es lo que lee
+  un lector de pantalla y lo que se puede traducir sin volver a generar el fichero.
+
+  ⚠️ Nada de filtros sobre el logo (§2bis): para fondo oscuro se usa la variante
+     `segell-redestina-mono.svg`, que hereda `currentColor`.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120"
+     role="img" aria-label="Redestina">
+  <title>Redestina</title>
+
+  <!-- Disco crema y anillo verde: el anillo es lo que lo hace leer como sello y no como
+       un logotipo suelto. -->
+  <circle cx="60" cy="60" r="55" fill="#f5f1ea" stroke="#4e6b45" stroke-width="6" />
+  <circle cx="60" cy="60" r="46" fill="none" stroke="#7d9775" stroke-width="1.5" />
+
+  <!-- La hoja, tal cual está en el isotipo: mismos dos trazados, solo escalada y centrada.
+       El centro del recuadro del isotipo es (17.31, 14.69). -->
+  <g transform="translate(60 58) scale(1.42) translate(-17.31 -14.69)">
+    <path fill="none" stroke-width="2.942" stroke-linecap="square" stroke-linejoin="miter" stroke="#4e6b45" d="M -0.0002875 0.0002875 C -5.527631 -0.0309625 -12.523725 -0.737994 -16.41435 6.746381 C -19.340131 12.367475 -18.10185 18.10185 -18.10185 18.10185 C -18.10185 18.10185 -3.246381 14.922162 -6.894819 0.336225 C -10.242475 -13.034869 -31.156538 -10.034869 -31.304975 9.054975 " transform="matrix(1, 0, 0, -1, 33.0081, 19.9456)"/>
+    <path fill-rule="nonzero" fill="#3e5139" stroke-width="1.961" stroke-linecap="butt" stroke-linejoin="miter" stroke="#4e6b45" d="M 0.0006 0.000875 C 0.0006 0.000875 0.28185 -1.546 1.742787 -3.823344 C 3.192006 -6.081156 5.789662 -7.9835 5.789662 -7.9835 " transform="matrix(1, 0, 0, -1, 20.1244, 10.079)"/>
+  </g>
+
+  <!-- Tres puntos: separan el anillo de la hoja y dan el aire de contraseña de un sello. -->
+  <circle cx="52" cy="98" r="2.2" fill="#ef7d77" />
+  <circle cx="60" cy="100" r="2.2" fill="#4e6b45" />
+  <circle cx="68" cy="98" r="2.2" fill="#ef7d77" />
+</svg>

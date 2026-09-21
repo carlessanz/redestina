@@ -388,7 +388,13 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   fondos oscuros**: sidebar, pie de la landing, pantallas de acceso; la barra superior de la
   landing es clara y lleva el logo en color),
   `logo-redestina-mono.svg` (un color, `currentColor`), `isotipo-redestina.svg` (solo la hoja:
-  favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. **`logo-email.png` es el logo EN
+  favicon, iconos PWA, avatares) e `isotipo-redestina-mono.svg`. Y **`segell-redestina.svg`** (+
+  `-mono`), el sello del certificado de recepción, que reutiliza los dos trazados exactos del
+  isotipo dentro de un doble anillo. 🔴 **Va SIN una sola palabra dentro, a propósito**: se sirve
+  desde la web de un tercero, donde Sora no está cargada —por eso el logo lleva las letras en
+  trazados— y la aplicación es bilingüe, así que un «Certificat de recepció» grabado dentro se
+  quedaría en catalán para siempre en la web de quien lo pegó. El texto va en el `alt`, que sí se
+  traduce. **`logo-email.png` es el logo EN
   COLOR** —el principal— rasterizado a 410×120 con transparencia, y por eso **la cabecera de los
   correos es clara** (§9bis). Nada de `brightness-0 invert` ni
   filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
@@ -481,6 +487,12 @@ src/
                                confirmar, i l'enllaç propi per fer-ho (§6ter)
     documentsPanell.ts         Helpers purs de les pantalles de documents (agrupar per
                                exercici, quin PDF val, l'ordre del conveni)
+    certificatRecepcio.ts      Cliente de las 5 RPC del certificado de recepción; nunca lanza
+    codiVerificacio.ts         PURO: el código impreso y la URL de verificación. Aparte de
+                               verificacio.ts por el precedente campsFundacio/parametresFundacio:
+                               aquel importa el cliente de Supabase, que lanza al cargarse, así
+                               que un fichero que lo importe no se puede probar desde Vitest
+    verificacio.ts             La mitad con red: pregunta a verificar-certificat, SIN sesión
     campsFundacio.ts           Els camps de `parametros_documentales` i `campsPendents()`:
                                QUÈ falta per poder desmarcar `datos_provisionales`. Pur,
                                amb test (§12.10)
@@ -1196,6 +1208,54 @@ asesoría**, marcado como borrador en tres sitios igual que los convenios), y po
 `emitir_certificado_periodo()` se niega si esa plantilla no está vigente: sin ella el PDF saldría con
 el cuerpo del certificado anual y afirmaría algo que no es cierto.
 
+**Certificado de recepción (`20260921223245` / `…223246`)** — `cierres_receptor` y
+`cierre_receptor_lineas`: los kilos que una **entidad receptora** ha recibido en una ventana de
+fechas, **donación y compra juntas**. Sirve para acreditar sostenibilidad ante terceros; **no es un
+documento fiscal**, no va al 182 y **no tiene ni una columna de importe** —igual que
+`albaran_lineas`, y el arnés lo comprueba esperando `42703`, que es la única forma de verificar una
+ausencia—. Tabla propia y no un `tipo` más de `cierres_donante` porque el eje es `entidad_id` y
+porque **no abre cierre**. Serie propia **`CR`** (+`P-CR`) y `objeto_tipo = 'cierre_receptor'`, el
+**octavo**. Se archiva en `entitats/<entidad_id>/<ejercicio>/CR/`. `documents_meus()` gana su rama;
+`puede_ver_documento()` no se toca porque delega en ella.
+
+⚠️ **Los kilos salen del ENT (donación) o del OPE (venta/maquila), que cuelgan 1:1 de la
+canalización**, así que aquí **no hay reparto proporcional** y por tanto tampoco el bloqueo
+`periode_parteix_excedent` que sí necesita el certificado del donante. Lo que sí hereda es
+`periode_encavalcat`: dos certificados de la misma entidad que se solapen a medias acreditarían los
+mismos kilos dos veces ante dos terceros distintos.
+
+🔴 **Las dos mitades del papel NO se imprimen igual, y es decisión del cliente.** En **compra**
+(venta y maquila) **sí se nombra al generador**: hay dos partes que ya han contratado entre ellas,
+como en el albarán `OPE`. En **donación** rige D3 con todo su rigor —municipio y comarca, nunca la
+organización— y eso **no lo sostiene un comentario, lo sostienen dos cosas**: el check
+`cierre_receptor_lineas_d3_check`, que hace imposible guardar `productor_id`, `productor_nom` o
+`productor_nif` en una línea de donación, y el tipo `ProcedenciaDonacio` de `render/cr.ts`, que **no
+declara ninguna clave capaz de llevar un nombre** — así que imprimir al donante ahí no compila.
+El check importa porque la entidad lee sus propias líneas por RLS (`cierres_receptor_meus()`): un
+descuido no se quedaría en el PDF, **se serviría por la API**. Y las tablas **no guardan
+`id_excedente` ni `excedente_id`** —ese formato filtra las tres primeras letras del productor (§9)—
+ni `recogida.lugar` ni `responsable_origen`.
+⚠️ Lo que esto **no** arregla: un municipio con un solo generador sigue siendo identificable, el
+mismo límite que ya tiene el `ENT` desde la fase 3.
+
+**Ninguna de las dos tiene GRANT de escritura**: todo por RPC. RLS `es_intern()` y el puente
+`cierres_receptor_meus()` —los de **prueba** solo si la ficha es `es_test`, como
+`cierres_donante_meus()`—. `reiniciar_recepcions_prova()` devuelve `P-CR` a 0 **sin tocar
+canalizaciones ni albaranes** (comprobado al ejercitarlo: los 13 albaranes y las 8 canalizaciones
+siguen ahí; las cifras que devuelve son lo revisado, no lo borrado).
+
+⚠️ **El texto de la plantilla `CR` NO está validado por la asesoría** (ca+es, marcado como borrador
+en tres sitios), igual que los convenios y el `CD/parcial`. Y `recepcio_emet_document()` pide la
+plantilla con **`variante is null` y `order by version desc`**, no con un `limit 1` a secas: hoy solo
+hay un modelo, pero ese `limit 1` es exactamente lo que en el `CD` podía imprimir el texto del
+parcial en el certificado anual sin dar ningún error.
+
+✅ **Ejercitado de punta a punta en modo prueba el 22-09-2026**: `calcular_certificat_recepcio` sobre
+una entidad con entregas conciliadas devuelve sus kilos y sus bloqueos; con `sense_conciliar` puesto,
+emitir **se niega** con `22023` y el motivo legible; sin bloqueos emite `P-CR-2026-0001` con su PDF
+(3 páginas, 114 KB) en `entitats/<id>/proves/2026/CR/`. Limpiado después con
+`reiniciar_recepcions_prova(2026)` y `limpiar-documentos-prueba`.
+
 ⚠️ **El reparto del neto del REC se calcula por `(coalesce(albaran_rec_id, excedente_id),
 producto)`**, y esa clave es la invariante que hay que conservar si alguna vez se toca
 (`20270320100000`): **por cada `(albaran_rec_id, producto)`, la suma de los `kg_neto` repartidos
@@ -1550,6 +1610,11 @@ funciones, no políticas:
 | `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20260921211329` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
 | `emitir_certificados_cierre(cierre)` (`20260921211356`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y —**solo si el cierre es REAL** (`20260921214526`)— que `datos_provisionales` sea falso; esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
 | `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
+| `cierre_base_recepcio(desde, hasta, modo)` · `cierre_pendents_recepcio(desde, hasta)` | La base de cálculo del **certificado de recepción**. **Solo equipo** (`42501`), con el idioma de `20270303100500`: cruzan canalizaciones, excedentes, albaranes y productores **sin que ninguna RLS vuelva a filtrar**, así que sin la guarda una entidad podría pedir por PostgREST lo que ha recibido todo el mundo, con el nombre de cada generador — el agujero exacto que aquella migración encontró en `cierre_base()` |
+| `kg_rebuts_exercici(ejercicio, entidad)` | El acumulado del año del panel de la receptora, **leído en SQL y no sumado en cliente**. `security invoker`, como `pendents_equip()`: agrega solo lo que quien pregunta ya puede leer, así que no lleva guarda propia. ⚠️ **Corolario que sorprende y no es una fuga**: a un *generador* le devuelve filas —los kilos de SUS entregas agregados por entidad—, porque su RLS ya le deja leer las `canalizaciones` de sus propias ofertas. Medido el 22-09-2026: la RPC y sus canalizaciones visibles cuadran al kilo, o sea que el agregado no le da ni un dato nuevo |
+| `calcular_certificat_recepcio(entidad, desde, hasta, modo)` | El borrador y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, acaba en el futuro o ya tiene certificado. ⚠️ **Calcular ya ESCRIBE**, como su hermana de periodo (§12.112) |
+| `emetre_certificat_recepcio(id, motiu)` | Emite el `CR`. Las guardas del certificado a demanda **tras F1**: no exige factura (no existe el concepto aquí) y `datos_provisionales` **solo bloquea el modo real**. ⚠️ `p_motiu` **no es la D4 retirada ni un parámetro que se ignore**: es una nota interna que se guarda en `notas` y **no se imprime** |
+| `rectificar_certificat_recepcio(id, motiu)` · `marcar_enviat_recepcio(id)` · `reiniciar_recepcions_prova(ejercicio)` | El resto del ciclo. Sin serie `R-CR`: rectificar no consume número, es la versión siguiente |
 | `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
 | `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
@@ -2222,6 +2287,8 @@ mismo salvo los importes, y comparten los cuatro componentes de `src/components/
 | Acumulado del año, factura y certificado | ✅ **con importe** | ❌ **por diseño** |
 | Albarans (`TaulaAlbarans`) | REC | ENT y R-ENT |
 | Certificats a demanda (`cierre_periodo`) | ✅ | ❌ |
+| **Quilos rebuts de l'exercici** (`kg_rebuts_exercici()`) | ❌ | ✅ **leído en SQL**, no sumado en cliente |
+| **Certificats de recepció** (`cierre_receptor`) | ❌ | ✅ |
 | Pla de prevenció | ✅ | ✅ |
 
 ⚠️ **Listar no necesitaba nada de base**: `documents_meus()` ya devolvía convenios, planes y
@@ -2239,6 +2306,28 @@ autoriza es el token—. Con sesión enseñan además «Torna al panell».
 porque quien acuña es esa misma persona y lo usa al momento; si lo pierde, el panel le da
 otro. El corolario es que **no hay check del arnés que lo ejercite en positivo**: correría
 también contra producción y le rompería el enlace a alguien real.
+
+**El acumulado del año de la receptora sale de `kg_rebuts_exercici()`, no de una suma en
+cliente**, y eso no es una preferencia: si se sumara en la pantalla, esa cifra y la del
+certificado acabarían discrepando sobre lo mismo. Los **pendientes de conciliar** van en banda
+ámbar aparte, diciendo que **no cuentan como oficiales ni entran en ningún certificado** (D13) —
+ámbar y no rojo, porque no está roto, está a medias.
+
+⚠️ **Solo se listan los certificados EMITIDOS** (`certificado_numero not null`): un borrador es el
+equipo probando una ventana, no un papel (§12.112).
+
+**El sello y su verificación.** El panel de la receptora ofrece un fragmento copiable —un `<a>`
+envolviendo al `<img>`, con **URL absoluta**: lo que acredita no es la imagen, que se copia, sino
+el enlace; un `/verificar/…` relativo pegado en otra web apuntaría al dominio de esa web—. La
+página pública tiene **cuatro finales, no tres**: válido y vigente (verde), **sustituido** (ámbar:
+es auténtico, pero hay uno posterior que ya incluye esos kilos), no consta (rojo) y **«no lo
+sabemos»** (neutro) cuando la consulta falla. El cuarto no se puede omitir: pintar un fallo de red
+como «no consta» **acusa de falsificador** a quien enseña un certificado bueno.
+
+⚠️ **`codiVerificacio()` es la SEGUNDA implementación del mismo formato** —la primera es
+`codigoVerificacion()` en `_shared/pdf/render/`, que es la que imprime—. Están duplicadas a la
+fuerza, porque aquella es Deno y arrastra el motor de PDF, y **divergir no fallaría**: el sello
+enlazaría a un código que no es el del papel. Por eso tiene prueba propia.
 
 ⚠️ **Lo pendiente lo decide el estado del OBJETO, no el del enlace.** Un convenio en
 `pendent_firma` está pendiente aunque su enlace haya caducado, y como el botón acuña uno
@@ -2519,6 +2608,7 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
 | `/signar/:token` | **Firma del convenio sin sesión** (fase 2). Mismo criterio |
+| `/verificar/:codi` | **Comprobar un certificado de recepción**, sin sesión y sin token: lo que se enseña es el código impreso en el papel. Responde la Edge Function `verificar-certificat` (pública, solo lectura) con **ocho campos y ni uno más** — ni el PDF, ni `datos`, ni el detalle, ni ninguna procedencia, que nombraría a terceros que no han pedido salir en una página pública. ⚠️ Un código **inventado y uno mal formado responden lo mismo**: distinguirlos diría si un número de certificado existe |
 | `/panell` | Lo que antes era `/`: manda a cada cual a su panel |
 
 🔴 **Y desde el 16-09-2026 EL CONVENIO YA NO SE FIRMA SALIENDO DE LA APLICACIÓN.** Con
@@ -3895,6 +3985,7 @@ supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama
 supabase functions deploy enlace-publico --no-verify-jwt        # confirmación pública (§9)
 supabase functions deploy subir-documento-externo               # con verify_jwt (multipart, 10 MB)
 supabase functions deploy limpiar-documentos-prueba            # con verify_jwt (super_admin; §12.51)
+supabase functions deploy verificar-certificat --no-verify-jwt   # pública: comprobar un certificado (§9)
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -4186,8 +4277,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 21-09-2026: **42 entradas vivas** (6 parciales 🟡 y 36 abiertas) y **69 cerradas**,
-sobre 111 numeradas.
+Estado al 22-09-2026: **44 entradas vivas** (6 parciales 🟡 y 38 abiertas) y **69 cerradas**,
+sobre 113 numeradas. Las dos últimas (113 y 114) son del certificado de recepción, y las dos
+nacen catalogadas en §12bis como decisiones con su precio.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4567,6 +4659,23 @@ sobre 111 numeradas.
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
+113. **Una línea del certificado de recepción es una canalización entera, con un solo
+     producto.** `cierre_receptor_lineas` tiene `unique (cierre_receptor_id, canalizacion_id)` y
+     toma el `producto` del excedente, así que un ENT con varias líneas de producto —una
+     espigolada repartida— suma todos sus kilos bajo un único nombre en la tabla de procedencias.
+     Es la misma simplificación que ya tienen `cierre_donante_lineas` y `cierre_periodo_lineas`, y
+     se conserva **a propósito**: la alternativa es romper esa clave única y con ella el modelo
+     mental que el equipo ya tiene de las tres tablas. El **total de kilos es exacto**; lo que se
+     reparte mal es su atribución por producto.
+114. **`cierre_base_recepcio()` cuenta una canalización sin `valorizacion` como donación;
+     `cierre_base()` y `cierre_base_transaccion()` la dejan caer.** Las tres son anteriores al
+     trigger de `20261012100100`, así que solo afecta a filas viejas, pero la divergencia es real:
+     un kilo que el certificado de la receptora incluye puede no estar en el del donante. Se
+     eligió así porque en el lado del receptor el fallo contrario es peor —negarle un kilo que
+     recibió— y porque es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre.
+     La misma expresión está **duplicada a propósito** en `kg_rebuts_exercici()`: si divergieran,
+     el acumulado del panel y el del certificado dirían cifras distintas sobre lo mismo.
+
 112. **Cada ventana que se calcula en el diálogo del certificado a demanda deja un borrador
      en `cierres_periodo`.** `calcular_certificado_periodo()` inserta la fila antes de que
      nadie decida emitir, así que probar tres ventanas para ver cuál cuadra deja tres filas
@@ -4608,6 +4717,8 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
 | 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
+| 113 | Una línea del CR = una canalización, con un solo producto | El **total es exacto**; lo que se reparte mal es la atribución por producto. La alternativa rompe la clave única que comparten las tres tablas de cierre |
+| 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
 
 ### Espera material de la fase 0 o de un tercero
@@ -4615,7 +4726,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | # | Qué falta | De quién depende |
 |---|---|---|
 | 17 | Las dos whitelists de test conviven con `es_test`, y el Dashboard mide por las de Meta | **Meta**: se revisa al pasar su número a producción |
-| 71 · 77 · 84 | Los textos legales de RES, CD, CT, PLA y los seis convenios | **La asesoría** |
+| 71 · 77 · 84 | Los textos legales de RES, CD, CT, **CR**, PLA y los seis convenios | **La asesoría** |
 | 85 | Prueba end-to-end del CT | 🟡 **Ya no está bloqueada**: desde `20260921214526` el CT se emite en modo prueba (`P-CT`). Queda ejercitarlo, que es trabajo, no espera |
 | 99 | El plan de prevención se lista desde `documentos` y no desde `planes_prevencion` | **La fase 0**: sin el cuestionario (anexo B) no hay pantalla de planes, así que del plan solo existe su PDF |
 
@@ -4640,7 +4751,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 113.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 115.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -4725,7 +4836,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **881 pruebas en 27 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **887 pruebas en 28 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4733,8 +4844,19 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 745/745 correctas y 13 saltadas, «Sin fallos de permisos»**
-   (22-09-2026, tras aplicar `20260921221806`). Son las 732 anteriores más **13** de la
+   ✅ **Referencia HOY: 827/827 correctas y 22 saltadas, «Sin fallos de permisos»**
+   (22-09-2026, tras aplicar `20260921223245` y `…223246`). Son las 745 anteriores más **82**
+   del certificado de recepción: ocho checks en `DOCUMENTAL_EXTERN` —nada de ese circuito es
+   de un externo—, nueve en `equip` (incluido el `42703` que vigila que **no aparezca nunca**
+   una columna de importe), siete en `super_admin`, tres por cuenta de productor y de
+   receptor, y dos en `sense_rol` y `pendent`.
+   ⚠️ **Dos de ellos salieron en rojo la primera vez y el error estaba en el CHECK, no en la
+   base**: dimos por hecho que `kg_rebuts_exercici()` no devolvería ni una fila a un
+   generador, y sí lo hace — es `security invoker` y un productor ve las `canalizaciones` de
+   sus propias ofertas (§4). Medido antes de tocar nada: la RPC y sus canalizaciones
+   visibles **cuadran al kilo**, o sea que el agregado no le da ningún dato nuevo. El check
+   pasó a `permitir` con la medición escrita al lado.
+   La referencia anterior era **745/745 + 13** (22-09-2026, tras aplicar `20260921221806`). Son las 732 anteriores más **13** de la
    conversión de ofertas en espigolada: `crear_espigolada` **denegar** en `DOCUMENTAL_EXTERN`
    —siete cuentas externas, más `sense_rol` y `pendent`, de ahí 9— y **permitir** en `tecnic` y
    en `super_admin`, más la columna `oferta_origen_id` en el `leer` de `espigoladas` del equipo

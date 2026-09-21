@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  El sello a un solo color, que hereda `currentColor`: para un fondo oscuro, para una
+  impresión en blanco y negro, o para una web cuya paleta no admite el verde de marca.
+
+  Es la variante que se ELIGE cuando el sello en color no encaja. Nunca se consigue lo
+  mismo con `brightness-0 invert` ni con ningún filtro sobre `segell-redestina.svg` (§2bis).
+
+  Sin ninguna palabra dentro, por los mismos dos motivos que el sello en color: la fuente
+  de marca no está cargada en una web ajena y la aplicación es bilingüe. Ver el comentario
+  de `segell-redestina.svg`.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 120 120" width="120" height="120"
+     role="img" aria-label="Redestina">
+  <title>Redestina</title>
+
+  <circle cx="60" cy="60" r="55" fill="none" stroke="currentColor" stroke-width="6" />
+  <circle cx="60" cy="60" r="46" fill="none" stroke="currentColor" stroke-width="1.5" opacity="0.5" />
+
+  <g transform="translate(60 58) scale(1.42) translate(-17.31 -14.69)">
+    <path fill="none" stroke-width="2.942" stroke-linecap="square" stroke-linejoin="miter" stroke="currentColor" d="M -0.0002875 0.0002875 C -5.527631 -0.0309625 -12.523725 -0.737994 -16.41435 6.746381 C -19.340131 12.367475 -18.10185 18.10185 -18.10185 18.10185 C -18.10185 18.10185 -3.246381 14.922162 -6.894819 0.336225 C -10.242475 -13.034869 -31.156538 -10.034869 -31.304975 9.054975 " transform="matrix(1, 0, 0, -1, 33.0081, 19.9456)"/>
+    <path fill-rule="nonzero" fill="currentColor" stroke-width="1.961" stroke-linecap="butt" stroke-linejoin="miter" stroke="currentColor" d="M 0.0006 0.000875 C 0.0006 0.000875 0.28185 -1.546 1.742787 -3.823344 C 3.192006 -6.081156 5.789662 -7.9835 5.789662 -7.9835 " transform="matrix(1, 0, 0, -1, 20.1244, 10.079)"/>
+  </g>
+
+  <circle cx="52" cy="98" r="2.2" fill="currentColor" opacity="0.5" />
+  <circle cx="60" cy="100" r="2.2" fill="currentColor" />
+  <circle cx="68" cy="98" r="2.2" fill="currentColor" opacity="0.5" />
+</svg>
