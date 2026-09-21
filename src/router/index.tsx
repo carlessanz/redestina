@@ -28,6 +28,8 @@ import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
 import Albarans from '../routes/equip/Albarans'
 import AlbaraDetall from '../routes/equip/AlbaraDetall'
+import Canalitzacio from '../routes/equip/Canalitzacio'
+import CanalitzacioDetall from '../routes/equip/CanalitzacioDetall'
 import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/Espigolades'
 import Confirmar from '../routes/public/Confirmar'
 import Signar from '../routes/public/Signar'
@@ -84,6 +86,10 @@ export const router = createBrowserRouter([
                 children: [
                   { index: true, element: <Navigate to="/equip/tauler" replace /> },
                   { path: 'tauler', element: <Dashboard />, handle: { titleKey: 'nav.dashboard' } },
+                  // El ciclo guiado va ANTES de Ofertes, como en el menú: es el camino
+                  // entero, y las demás pantallas son sus paradas.
+                  { path: 'canalitzacio', element: <Canalitzacio />, handle: { titleKey: 'nav.canalitzacio', ample: true } },
+                  { path: 'canalitzacio/:id', element: <CanalitzacioDetall />, handle: { titleKey: 'nav.canalitzacio' } },
                   { path: 'ofertes', element: <Ofertes />, handle: { titleKey: 'nav.offers', ample: true } },
                   { path: 'ofertes/:id', element: <OfertaDetall />, handle: { titleKey: 'nav.offers' } },
                   { path: 'aprovacions', element: <Aprovacions />, handle: { titleKey: 'nav.approvals' } },

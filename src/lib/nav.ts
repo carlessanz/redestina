@@ -13,7 +13,7 @@
 import {
   Building2, Calculator, ClipboardCheck, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, LayoutDashboard, Leaf, Receipt,
-  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users,
+  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users, Workflow,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
@@ -71,6 +71,10 @@ const EQUIP: NavGrup[] = [
   {
     titolKey: 'nav.grp_operacio',
     items: [
+      // Primero el camino entero: la pantalla guiada lleva un lote de punta a punta
+      // (modelo asistido, §1bis). Las de debajo son sus paradas sueltas.
+      // `barra: false` — el equipo tiene siete secciones y la barra de móvil admite cuatro.
+      { to: '/equip/canalitzacio', labelKey: 'nav.canalitzacio', icon: Workflow, barra: false },
       { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package },
       // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
       { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },

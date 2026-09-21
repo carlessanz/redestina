@@ -448,7 +448,8 @@ src/
                                Registre (/registre), RestablirClau (/restablir) y
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia, escrita por RPC con lista blanca
-  routes/equip/                Envoltorios de las pantallas que ya existían + Aprovacions
+  routes/equip/                Canalitzacio[Detall] (el ciclo guiado, §6ter) +
+                               envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
                                + Albarans/AlbaraDetall/Espigolades (fase 3)
   routes/productor/            Inicio, listado, alta de oferta, detalle y Documents
@@ -478,6 +479,7 @@ src/
                                «etapa + què passa + què toca + qui», por rol. Puro, con test
     seguentPas.ts              Lo mismo para las fichas largas del equipo: albarà, conveni,
                                exercici, donant
+    canalitzacio.ts            Cliente de la pantalla guiada; nunca lanza, como albarans.ts
     passosCanalitzacio.ts      EL CICLO ENTERO de una canalización para la pantalla guiada
                                del equipo: 19 pasos sobre las seis fases de FASES_EQUIP, con
                                qué los bloquea. Puro, y con su propio test porque sus claves
@@ -506,8 +508,10 @@ src/
     proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
                                BotoAmbMotiu (§6ter)
-    equip/                     PendentsEquip (la cola de trabajo del tablero) y ComFunciona
-                               (los seis pasos de FASES_EQUIP, enlazados) (§6ter)
+    equip/                     PendentsEquip (la cola de trabajo del tablero), ComFunciona
+                               (los seis pasos de FASES_EQUIP, enlazados) y los dos diálogos
+                               asistidos: DialegAssistit (albarà y factura) y
+                               DialegFirmaAssistida (conveni) (§6ter)
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
@@ -1914,6 +1918,74 @@ refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción.
 **Vocabulario fijado**: «oferta» (no «excedent») en la interfaz operativa; «Coberta» en vez de
 «Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
 que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
+
+### La canalización asistida: el ciclo entero en una pantalla (21-09-2026)
+
+`/equip/canalitzacio` (índice) y `/equip/canalitzacio/:id` (el ciclo), primera entrada del
+grupo **Operació**, antes de Ofertes: ese grupo sigue «el camino de una oferta» y esto es ese
+camino entero. `:id` es `excedentes.id` —la clave natural: el convenio cuelga de su productor,
+las respuestas y canalizaciones del excedente, los albaranes de las canalizaciones—.
+`barra: false`: el equipo tiene siete secciones y la barra de móvil admite cuatro (§2).
+
+**POR QUÉ EXISTE.** El panel del equipo ya tenía todas las piezas del circuito, pero repartidas
+en siete pantallas, y **tres actos del ciclo solo los podía hacer un usuario externo**: firmar
+el convenio, confirmar un albarán y subir la factura. Cuando el equipo intentaba cubrir esos
+huecos lo hacía por atajos que **se saltan el circuito documental** — `update` directo a
+`oferta_respuestas`, `insert` directo en `canalizaciones`—, y eso produce lotes que se ven
+idénticos en el listado y llegan al certificado sin haber pasado por la compatibilidad de
+modalidad, el precio mínimo ni la comprobación de convenio.
+
+🔴 **Los documentos y los correos NO se construyen aquí, y ese es el hallazgo que ordena todo.**
+Cada RPC del circuito llama ya a su `*_emet_document(...)` con su `envio` jsonb; el trigger
+`documentos_encola_generacion` llama a `generar-documento`, que manda el correo por Resend. O
+sea que **si el equipo ejecuta las RPC reales, todo sale igual**. El trabajo era otro: dar una
+puerta a los tres actos que no la tenían, que quedaran registrados como **asistidos** y no como
+otra cosa, y orquestarlo para que el atajo deje de ser el camino cómodo.
+
+**Seis fases, 19 pasos.** La escalera reutiliza `FASES_EQUIP` (`procesOferta.ts`) —`conveni ·
+entrada · distribucio · aprovacio · lliurament · tancament`— en vez de inventar un segundo
+vocabulario para el mismo proceso. Los pasos y lo que los bloquea viven en
+`src/lib/passosCanalitzacio.ts`, puro y con su propio test (§3).
+
+| Fase | Qué se hace desde aquí |
+| --- | --- |
+| **1 · conveni** | `preparar_convenio` · **firma asistida** (diálogo) · `contrafirmar_convenio` |
+| **2 · entrada** | La oferta ya existe; se enlaza a su detalle. El alta asistida usa `FormulariNovaOferta` |
+| **3 · distribucio** | Se enlaza al detalle de la oferta, donde viven priorizar y enviar |
+| **4 · aprovacio** | **`manifestar_interes_assistit`** (lo que la entidad dice por teléfono) y `aprovar_resposta`, con el mismo aviso previo de convenio que `Aprovacions` |
+| **5 · lliurament** | `marcar_entregado` y la **confirmación asistida** (diálogo). Emitir y conciliar enlazan a `AlbaraDetall` |
+| **6 · tancament** | Enlaces a Costos y Tancament, y el certificado **explicado como bloqueado** |
+
+⚠️ **Lo que NO se hace aquí es deliberado.** Emitir un albarán con sus líneas, conciliar y el
+cierre anual tienen sus pantallas con sus editores; esta enlaza a ellas. Un segundo editor de
+líneas es un segundo sitio donde el número de kilos puede acabar siendo otro.
+
+⚠️ **El certificado está bloqueado y no por código.** `emitir_certificado()` se niega mientras
+`parametros_documentales.datos_provisionales` sea `true`, y hoy lo es. La pantalla lo enseña
+como el último escalón, visible y con su motivo, en vez de esconder el botón: es material de la
+fase 0 lo que falta (§12.10), no software. `dadesFiscalsProvisionals()` responde `true` ante
+cualquier duda — decir «ya puedes certificar» cuando no se puede es el único error caro.
+
+⚠️ **Una espigolada no recorre las seis fases**: entra por la 5 con su REC ya creado
+(`crear_espigolada`). Sus fases 2-4 salen `fet` **con su motivo**, nunca `pendent`.
+
+⚠️ **La fase del ÍNDICE es una aproximación honesta.** `canalitzacions_actives()` devuelve un
+resumen —no las respuestas ni los albaranes uno a uno—, así que la fila afirma solo lo que ese
+resumen permite afirmar y lo que no viene se deja **vacío**, nunca inventado. El detalle manda.
+
+🔴 **Y la pantalla es una CONVENCIÓN, NO UNA IMPOSICIÓN** (deuda §12.109). `authenticated`
+conserva escritura directa sobre `oferta_respuestas` y `canalizaciones`, así que los atajos de
+`OfferDetail` siguen ahí. «Salen los mismos documentos y los mismos correos» es cierto **cuando
+se usa esta pantalla**, y no se puede afirmar que siempre se use mientras los atajos estén
+abiertos.
+
+**Los dos diálogos asistidos** (`components/equip/`) clonan `DialegFirmaConveni`: 80 vw × 88 vh,
+no se cierran al pinchar fuera —con los kilos tecleados y a media llamada, un clic despistado
+sería caro— y **acuñan el enlace AL ABRIR, no al montar**: `acunar_enllac_assistit()` revoca el
+enlace anterior de ese objeto, así que acuñarlo de más le rompería a esa persona el enlace que
+tiene en el correo (§12.97). `DialegAssistit` sirve para el albarán **y** para la factura —es el
+mismo gesto y solo cambia el propósito—; `DialegFirmaAssistida` se queda aparte porque su enlace
+lo acuña otra RPC y lleva segundo factor.
 
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
