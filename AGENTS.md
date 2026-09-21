@@ -2918,6 +2918,16 @@ mandamos el día X» y cambiarlo es otro trabajo con su propia verificación.
 enlace es `asistido`**, y leyéndolo de `enlaces_token.creado_por`, nunca del cuerpo de la petición:
 quien confirma no tiene sesión y podría mandar cualquier uuid.
 
+🔴 **Y el PDF del albarán imprimía la vía de confirmación de forma BINARIA, así que ya afirmaba
+algo falso antes de existir la vía asistida.** `_shared/pdf/render/comu.ts` decía
+`canal === 'asistido' ? assistit : enllac`, o sea que una confirmación hecha **desde el panel** con
+sesión —que existe desde `20270318100000`— se imprimía como «Confirmat des de l'enllaç». Desde el
+21-09-2026 son **tres vías**, el mismo criterio que el convenio ya aplicaba en `render/conv.ts`:
+`confirmat_enllac`, `confirmat_assistit` y **`confirmat_panell`**. No es cosmético: esa línea ocupa
+el sitio de la firma manuscrita y es lo que un tercero lee para saber cómo se acreditó la entrega.
+⚠️ Toca **`_shared/pdf/`**, que solo importan tres funciones —`generar-documento`, `enlace-publico`
+y `recordatorios-documentales`—, así que no hay que redesplegar las quince.
+
 `registro` acepta los datos del convenio y crea el borrador con su enlace: devuelve el token **solo**
 si firma quien registra (misma sesión, misma persona); si firma otra, el enlace queda esperando y lo
 envía el equipo, porque `registro` sigue sin mandar ningún correo (§8).

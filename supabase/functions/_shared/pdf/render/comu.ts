@@ -174,7 +174,7 @@ export interface ConfirmacionAlbaran {
   cargo?: string | null;
   /** `evidencias.created_at`. */
   at?: string | null;
-  /** `enlaces_token.canal`: `email` (enlace) o `asistido`. */
+  /** `enlaces_token.canal`: `email` (enlace), `asistido` o `panel`. Las tres se imprimen distinto. */
   canal?: string | null;
   /**
    * `enlaces_token.rol_parte`. **Nullable a propósito**: los enlaces anteriores a
@@ -263,6 +263,7 @@ export interface Diccionario {
   signatura: string;
   confirmat_enllac: string;
   confirmat_assistit: string;
+  confirmat_panell: string;
   confirmacions: string;
   referencia: string;
   pendent_signatura: string;
@@ -338,6 +339,7 @@ const CA: Diccionario = {
   signatura: "Signatura",
   confirmat_enllac: "Confirmat des de l'enllaç",
   confirmat_assistit: "Confirmat amb acompanyament de l'equip",
+  confirmat_panell: "Confirmat des del panell, amb sessió iniciada",
   confirmacions: "Confirmacions registrades",
   referencia: "Referència",
   pendent_signatura: "Pendent de signatura",
@@ -429,6 +431,7 @@ const ES: Diccionario = {
   signatura: "Firma",
   confirmat_enllac: "Confirmado desde el enlace",
   confirmat_assistit: "Confirmado con acompañamiento del equipo",
+  confirmat_panell: "Confirmado desde el panel, con sesión iniciada",
   confirmacions: "Confirmaciones registradas",
   referencia: "Referencia",
   pendent_signatura: "Pendiente de firma",
@@ -975,7 +978,12 @@ export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
  * electrónica simple no deja trazo que dibujar, lo que la acredita es la evidencia.
  */
 function lineasConfirmacion(t: Diccionario, c: ConfirmacionAlbaran): [string, string][] {
-  const via = c.canal === "asistido" ? t.confirmat_assistit : t.confirmat_enllac;
+  // Tres vías, no dos: el mismo criterio que el convenio (`render/conv.ts`). Hasta hoy
+  // esta línea era binaria, así que una confirmación hecha desde el panel con sesión se
+  // imprimía como «des de l'enllaç» —que es falso— en un documento legal.
+  const via = c.canal === "asistido"
+    ? t.confirmat_assistit
+    : c.canal === "panel" ? t.confirmat_panell : t.confirmat_enllac;
   const referencia = c.referencia ? ` · ${t.referencia} ${c.referencia}` : "";
   return [
     [t.nom_cognoms, (c.nombre ?? "").trim()],
