@@ -550,6 +550,15 @@ scripts/
                                (aprobada y canalizada, pendiente de aprobar, rechazada). Usa las
                                SESIONES de las cuentas de prueba, no la service key, para pasar
                                por manifestar_interes() y aprovar_resposta()
+  escenari-demo.ts             El escenario de demostración (21-09-2026, §9): limpia las ofertas
+                               sin rastro documental, deja cada cuenta de test con un solo papel,
+                               firma los convenios que hacen falta por el camino real (RPC +
+                               enlace público) y crea nueve ofertas `E-DEMO-*` con un estado del
+                               circuito cada una — publicada sin enviar, con interés esperando,
+                               con precio rechazado, cubierta, cancelada, sin destino… Horta de
+                               Prova SL se queda A PROPÓSITO sin ninguna: es el generador del
+                               ciclo guiado (§6ter) y su lote se monta desde el panel. Idempotente
+                               en lo que puede serlo; consume numeración legal de convenios
   prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
@@ -3335,10 +3344,20 @@ por membresía a esas mismas fichas. **Nunca crea ni modifica una ficha**: solo 
 correo, y si una no existe avisa y no la inventa — es lo que lo distingue del fixture, que sí crea
 organizaciones ficticias, y por eso es un script aparte.
 
-**Cuatro de las cinco quedan con doble rol real** (ficha de productor **y** de entidad), que es lo
-que ejercita el menú con los dos paneles (§6ter) y también la desambiguación del webhook (§12.16).
-Laura Masdeu no tiene teléfono ni está en la whitelist de Meta: su cuenta sirve para recorrer el
-panel, no para el canal.
+~~**Cuatro de las cinco quedan con doble rol real**~~ — **cierto hasta el 21-09-2026**. Las
+cinco fichas siguen existiendo con sus dos papeles (productor y entidad) tal cual las dejó este
+script: el doble rol es un HECHO del negocio, no algo que dependa de qué cuenta lo use. Lo que
+cambió es el **acceso**: `scripts/escenari-demo.ts` («una cuenta, un papel», §1bis) dejó cada
+cuenta con una sola membresía activa —Sebas y Raquel como productores, Laura y Carles como
+receptores—, desactivando la del otro papel. La ficha que se queda sin cuenta la sigue operando
+el equipo, que es el modelo asistido. Laura Masdeu no tiene teléfono ni está en la whitelist de
+Meta: su cuenta sirve para recorrer el panel, no para el canal.
+
+🔴 **Y eso cerró la última cuenta que ejercitaba el doble rol del panel (§6ter) y el arnés
+(bloque `doble_rol`, §13).** No queda ninguna cuenta de prueba con dos papeles activos. Si algún
+día hace falta volver a comprobar «ver dos paneles a la vez no es ver dos veces la base», hay que
+dar de alta una cuenta interna DEDICADA para eso —nunca mostrada en ninguna demo—, con el mismo
+criterio que ya se usó para los bloques `pendent` y `sense_rol`.
 
 ⚠️ Es idempotente pero **no cambia la contraseña de una cuenta que ya exista**: si se pierden, hay
 que resetearlas por la Admin API. Y el aislamiento depende de que `roles_activos` esté encendido
@@ -3761,6 +3780,13 @@ deno run -A scripts/crear-datos-documentales-prueba.ts   # espigolada, lotes, al
 deno run -A scripts/crear-respuestas-prueba.ts --dry-run
 deno run -A scripts/crear-respuestas-prueba.ts           # respuestas: aprobada, pendiente y rechazada
 
+# El escenario de demostración (§9, §3): limpia, reparte papeles, firma convenios y crea
+# las ofertas E-DEMO-*. Consume numeración legal de convenios; no hay --dry-run para todo
+# el script porque cada bloque ya avisa de lo que HARÍA sin escribir cuando se pasa el flag.
+set -a; . ./.env.local; . ./.secrets.env; set +a
+SUPABASE_URL="$VITE_SUPABASE_URL" deno run -A scripts/escenari-demo.ts --dry-run
+SUPABASE_URL="$VITE_SUPABASE_URL" deno run -A scripts/escenari-demo.ts
+
 # ⚠️ Una tanda con huecos necesita --include-all. Pasó con la fase 1 documental: el spike
 # aplicó 20260928100600 y ...100800 dejando huecos por debajo, así que las seis migraciones
 # de la segunda mitad son «anteriores a la última aplicada» y el CLI las rechaza con
@@ -3935,8 +3961,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 21-09-2026: **39 entradas vivas** (6 parciales 🟡 y 33 abiertas) y **69 cerradas**,
-sobre 108 numeradas.
+Estado al 21-09-2026: **40 entradas vivas** (6 parciales 🟡 y 34 abiertas) y **69 cerradas**,
+sobre 109 numeradas.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4288,9 +4314,21 @@ sobre 108 numeradas.
      `Aprovacions` para que pasen por RPC: ~2 días. ⚠️ Mientras tanto, «se generan los mismos
      documentos» es una frase con condición, y así hay que decirla.
 
+110. **El arnés se quedó sin ninguna cuenta que ejercite el aislamiento del doble rol**
+     (21-09-2026, `scripts/escenari-demo.ts`, §9). Decisión de producto: cada cuenta de
+     prueba pasa a tener un solo papel activo, y la última que tenía dos
+     (`hola+wa-carles@`) se quedó con uno. El bloque `doble_rol` del arnés se retiró
+     porque un bloque de checks sin ninguna cuenta real que lo cumpla es un fantasma: hoy
+     nada comprueba que ver dos paneles a la vez —productor y receptor— no es ver dos
+     veces la base. Se recupera dando de alta una cuenta interna dedicada solo al arnés,
+     nunca mostrada en ninguna demo, con el mismo criterio que ya sostiene los bloques
+     `pendent` y `sense_rol`. Las fichas con doble rol de negocio (Carles Sanz, Sebas
+     Sale, Raquel Diaz, Laura Masdeu) siguen existiendo tal cual: lo que falta es la
+     cuenta de prueba que lo mire.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **33 de las 39**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **34 de las 40**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -4320,6 +4358,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
 | 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
 | 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
+| 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
 
 ### Espera material de la fase 0 o de un tercero
 
@@ -4351,7 +4390,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 110.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 111.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -4444,8 +4483,16 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 713/713 correctas y 14 saltadas, «Sin fallos de permisos»**
-   (21-09-2026). Son las 686 anteriores más **27**, de la vía asistida
+   ✅ **Referencia HOY: 723/723 correctas y 13 saltadas, «Sin fallos de permisos»**
+   (21-09-2026, tras `scripts/escenari-demo.ts`). El número sube **y a la vez se pierde
+   cobertura**, y las dos cosas a la vez merecen leerse despacio: se retiró el bloque
+   `doble_rol` (~15 checks propios, más los compartidos de `DOCUMENTAL_EXTERN`) porque ya
+   no queda ninguna cuenta de prueba con dos papeles activos (§9), y la única cuenta que lo
+   ejercitaba (`hola+wa-carles@`) pasó a evaluarse contra el bloque `receptor` completo, que
+   tiene más filas. El total sube por eso, no porque se haya ganado nada: la garantía real
+   que se pierde —«ver dos paneles a la vez no es ver dos veces la base»— hoy no la comprueba
+   nadie, y se anota como tal en la cabecera de `scripts/comprobar-rls.ts`.
+   Antes de eso eran 713/713 + 14: las 686 anteriores más **27**, de la vía asistida
    (`20270329100000`…`20270401100000`): tres checks en `DOCUMENTAL_EXTERN` —que recorre
    **siete** cuentas externas, de ahí 21— y los mismos tres en los dos bloques de equipo.
    ⚠️ Los tres «permitir» se llaman con un uuid **inexistente** a propósito: lo que afirman

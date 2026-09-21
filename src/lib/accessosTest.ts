@@ -38,22 +38,24 @@ export interface GrupAccessos {
 export const GRUPS_ACCESSOS: GrupAccessos[] = [
   {
     // Primero porque es el grupo con el que de verdad se prueba el producto entero: son
-    // las únicas fichas con móvil verificado en Meta, y cuatro de las cinco tienen ficha
-    // de productor Y de entidad. No son las cuentas de equipo de esas personas —esas
-    // siguen entrando por /admin—, sino cuentas externas creadas aparte
+    // las únicas fichas con móvil verificado en Meta. No son las cuentas de equipo de esas
+    // personas —esas siguen entrando por /admin—, sino cuentas externas creadas aparte
     // (`scripts/crear-usuarios-whatsapp.ts`), así que cada una ve solo su propia ficha.
     //
-    // El título no dice ni «doble rol» ni «WhatsApp» a secas porque ninguna de las dos
-    // cosas es cierta para las cinco: Anna Garreta solo tiene ficha de entidad, y Laura
-    // Masdeu no tiene teléfono. Lo que sí comparten es ser fichas reales del equipo; la
-    // excepción de cada una va en su propia etiqueta.
+    // ⚠️ **Hasta el 21-09-2026 cuatro de las cinco tenían ficha de productor Y de entidad**
+    //    (`scripts/escenari-demo.ts`, «una cuenta, un papel»): tenerlo en cuatro de once
+    //    cuentas de prueba hacía imposible enseñar el panel de un productor sin que saliera
+    //    también el de receptor. Las FICHAS del papel retirado siguen existiendo —no se
+    //    borra ninguna organización—, solo se desactivó la membresía; las opera el equipo,
+    //    que es el modelo asistido (§1bis). El reparto: Sebas y Raquel se quedan como
+    //    productores; Carles y Laura, como receptores.
     titolKey: 'test.grp_wa',
     comptes: [
-      { organitzacio: 'Carles Sanz', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
-      { organitzacio: 'Sebas Sale', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-sebas@carlessanz.com', password: '4MQGu-aUxNb-6rV5s' },
-      { organitzacio: 'Raquel Diaz', tipus: 'Entitat productora + Receptora (social)', email: 'hola+wa-raquel@carlessanz.com', password: 'uavod-gDiVJ-VqKT5' },
+      { organitzacio: 'Carles Sanz', tipus: 'Només Receptora (social)', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
+      { organitzacio: 'Sebas Sale', tipus: 'Només Entitat productora', email: 'hola+wa-sebas@carlessanz.com', password: '4MQGu-aUxNb-6rV5s' },
+      { organitzacio: 'Raquel Diaz', tipus: 'Només Entitat productora', email: 'hola+wa-raquel@carlessanz.com', password: 'uavod-gDiVJ-VqKT5' },
       { organitzacio: 'Anna Garreta', tipus: 'Només Receptora (social)', email: 'hola+wa-anna@carlessanz.com', password: 'EYFOH-HT0qK-neQbS' },
-      { organitzacio: 'Laura Masdeu', tipus: 'Entitat productora + Receptora (social) · SENSE WhatsApp', email: 'hola+wa-laura@carlessanz.com', password: 'zTfJ0-Yo9aG-doIjq' },
+      { organitzacio: 'Laura Masdeu', tipus: 'Només Receptora (social) · SENSE WhatsApp', email: 'hola+wa-laura@carlessanz.com', password: 'zTfJ0-Yo9aG-doIjq' },
     ],
   },
   // Un solo usuario por organización: el producto no tiene cargos dentro de la empresa,

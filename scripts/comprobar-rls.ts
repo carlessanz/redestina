@@ -18,10 +18,12 @@
 //   [{ "etiqueta": "equip", "email": "...", "password": "...", "rol": "equip" }]
 //
 // El `rol` elige el bloque de la matriz que se le aplica; hay uno por caso del modelo:
-// equip · super_admin · productor · receptor · sense_rol · pendent · doble_rol. El
-// último es una cuenta con ficha de productor Y de entidad (las crea
-// scripts/crear-usuarios-whatsapp.ts), que es lo que la interfaz enseña con los dos
-// menús a la vez: aquí se comprueba que ver dos paneles no es ver dos veces la base.
+// equip · super_admin · productor · receptor · sense_rol · pendent.
+//
+// ⚠️ **Hasta el 21-09-2026 había un séptimo, `doble_rol`**: una cuenta con ficha de
+//    productor Y de entidad a la vez. Se retiró al repartir cada cuenta de test a un solo
+//    papel (§ ver la nota grande más abajo, junto a la matriz); el hueco de cobertura que
+//    deja está documentado ahí, no escondido.
 //
 // ⚠️ Desde el 31-07-2026 NO HAY CUENTA para `sense_rol` ni para `pendent`: se retiraron
 // del juego de prueba junto con el grupo «Control» del login. Sus bloques se quedan aquí
@@ -177,9 +179,21 @@
 //        significa 0 filas: RLS filtra sin dar error.)
 //      · `receptor`  → **permitir**. La otra cara: al estrechar había que no llevarse por
 //        delante la rama `mis_entidades()`, que es la que sostiene `Mercat` e `Interessos`.
-//      · `doble_rol` → **permitir**, y aquí NO cabía un «denegar»: esa cuenta tiene las dos
-//        fichas y sigue viendo, como receptora, lo que ella misma ha contestado. El arnés
-//        cuenta filas, no su procedencia.
+//
+// 🔴 **El bloque `doble_rol` se retiró el 21-09-2026**, y no por descuido: la última cuenta
+//    con dos papeles (`hola+wa-carles@`, productor Y entidad) pasó a tener uno solo —
+//    decisión de producto, «cada cuenta de test es o productora o receptora»—. Un bloque
+//    de checks etiquetado `doble_rol` sin ninguna cuenta real que lo cumpla sería un
+//    fantasma: saldría SALTADO o, peor, alguien podría reasignarlo a una cuenta que no lo
+//    es y el arnés mentiría en verde. Se quita.
+//
+// ⚠️ **Lo que se pierde, dicho sin rodeos**: la garantía de que ver DOS paneles a la vez
+//    (productor y receptor) no es ver dos veces la base —que una cuenta con ambos papeles
+//    solo ve SU productor y SU entidad, nunca las de otro—. Hoy nada la comprueba. Se
+//    recupera dando de alta una cuenta interna dedicada solo al arnés (nunca mostrada en
+//    ninguna demo) con las dos membresías, el mismo camino que ya se usó para los bloques
+//    `pendent` y `sense_rol` (§9): son cuentas que existen únicamente para que el arnés
+//    tenga qué medir.
 
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
@@ -209,7 +223,7 @@ interface Cuenta {
   email: string;
   password: string;
   /** Perfil esperado: decide qué bloque de la matriz se le aplica. */
-  rol: "equip" | "super_admin" | "productor" | "receptor" | "sense_rol" | "pendent" | "doble_rol";
+  rol: "equip" | "super_admin" | "productor" | "receptor" | "sense_rol" | "pendent";
 }
 
 async function leerCuentas(): Promise<Cuenta[]> {
@@ -1598,72 +1612,6 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
-  ],
-  // Doble rol: una misma cuenta con ficha de productor Y de entidad. Es el caso que la
-  // interfaz enseña con los dos menús a la vez, y aquí lo que se comprueba es que ver dos
-  // paneles no es ver dos veces la base: sigue viendo SU productor y SU entidad y nada
-  // más. Sin esta fila, un fallo de aislamiento en el doble rol pasaría desapercibido.
-  doble_rol: [
-    { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU productor" },
-    { tabla: "entidades", op: "leer", esperado: "permitir", descripcion: "ve SU entidad" },
-    { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
-    { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
-    { tabla: "membresias", op: "actualizar", esperado: "denegar", descripcion: "NO toca sus membresías" },
-    { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano" },
-    { tabla: "aprovar_registre", op: "rpc", esperado: "denegar", args: { p_membresia: "@meva_membresia" }, descripcion: "NO valida registros" },
-    { tabla: "series_documentales", op: "leer", esperado: "denegar", descripcion: "NO ve los contadores de serie" },
-    { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
-    { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
-    // ⚠️ AQUÍ NO CABE UN «denegar», aunque 20270324100000 le retire la rama de productor:
-    //    esta cuenta tiene TAMBIÉN ficha de entidad, y por `mis_entidades()` sigue viendo
-    //    las respuestas que ha dado ELLA. Medido el 14-09-2026: su entidad tiene 2
-    //    respuestas y sus ofertas tienen otras 2; después de la migración ve las 2
-    //    primeras y ninguna de las segundas. El arnés no sabe distinguir las dos
-    //    procedencias —cuenta filas, no su origen—, así que lo que aquí se afirma es que
-    //    la rama de receptor SIGUE viva; que la de productor ha muerto lo afirman los dos
-    //    checks del bloque `productor`, donde sí es decisivo (esas cuentas no tienen
-    //    ficha de entidad y por tanto el resultado limpio es cero).
-    {
-      tabla: "oferta_respuestas",
-      op: "leer",
-      esperado: "permitir",
-      descripcion: "veu les respostes de la seva ENTITAT (no les de les seves ofertes)",
-      requiereFixture: "alguna resposta de la ficha de entidad de esta cuenta (scripts/crear-respuestas-prueba.ts)",
-    },
-    // Ve el embudo de las ofertas de su ficha de PRODUCTOR, y solo de esa: tener además
-    // ficha de entidad no le añade ninguna oferta. Con `requiereFixture` porque esa ficha
-    // es real y puede no tener ninguna oferta activa.
-    {
-      tabla: "progres_meves_ofertes",
-      op: "rpc",
-      esperado: "permitir",
-      descripcion: "veu el progrés de les ofertes de la SEVA fitxa de productor",
-      requiereFixture: "alguna oferta activa de la ficha de productor de esta cuenta",
-    },
-    ...DOCUMENTAL_EXTERN,
-    // Su ficha de productor y su ficha de entidad no le dan más albaranes que los de esas
-    // dos organizaciones. Hoy las cuentas de doble rol cuelgan de fichas reales, que no
-    // tienen ninguno: sale SALTADA, y eso es lo correcto —si apareciera alguno sin fixture,
-    // sería un escape—.
-    {
-      tabla: "albaranes",
-      op: "leer",
-      esperado: "permitir",
-      descripcion: "ve los albaranes de SUS dos organizaciones",
-      requiereFixture: "un albarán de la ficha de productor o de entidad de esta cuenta",
-    },
-    // Su ficha de productor es REAL y no es `es_test`, así que no ve ningún cierre de
-    // prueba —tampoco el suyo, si lo tuviera—. Es una política, no falta de datos: el
-    // fixture crea el cierre y el equipo lo ve.
-    { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO veu cap acumulat anual (fitxa real, cap tancament real)" },
-    {
-      tabla: "convenios",
-      op: "leer",
-      esperado: "permitir",
-      descripcion: "ve els convenis de les SEVES dues organitzacions",
-      requiereFixture: "un convenio de la ficha de productor o de entidad de esta cuenta",
-    },
-    { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
   ],
 };
 
