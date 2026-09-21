@@ -1125,7 +1125,7 @@ donante puede pedir varios. Serie propia **`CDP`** (+`P-CDP`), nunca la del anua
 renderizador se elige por `tipo`, y `cd.ts` ya imprimía un periodo—, así que lo que lo distingue es
 la serie y `objeto_tipo = 'cierre_periodo'`, el séptimo. Se archiva en la carpeta `CD/` del donante.
 
-🔴 **LA FACTURA YA NO CONDICIONA EL CERTIFICADO** (`20270403100000`, decisión del cliente del
+🔴 **LA FACTURA YA NO CONDICIONA EL CERTIFICADO** (`20260921211329`, decisión del cliente del
 21-09-2026). Hasta esa fecha `emitir_certificado()` exigía una factura del donante que cuadrase
 **al céntimo** con el valor calculado, o la **excepción de D4**: `es_super_admin()` más un motivo
 que se imprimía en el PDF. Ahora se emite sin ella. La factura se sigue registrando si llega, y
@@ -1145,7 +1145,7 @@ su rama en `render/cd.ts` **se quedan para los documentos históricos**: `docume
 y los que se emitieron así tienen que seguir imprimiéndose como lo que son. Queda anotado como
 decisión con su precio en §12.111.
 
-✅ **Y aparece la emisión en bloque**: `emitir_certificados_cierre(cierre)` (`20270403100100`)
+✅ **Y aparece la emisión en bloque**: `emitir_certificados_cierre(cierre)` (`20260921211356`)
 recorre los donantes de un cierre **`tancat`** y emite uno a uno, cada uno en su subbloque
 `begin/exception`, devolviendo `{emesos, ja_tenien, saltats[{cd, donant, codi, motiu}]}`. **No la
 llama `cerrar_cierre()` ni el job de `pg_cron` de fin de año, a propósito**: cerrar ya es el acto
@@ -1517,8 +1517,8 @@ funciones, no políticas:
 | `cierre_base_periodo(desde, hasta, modo)` · `cierre_pendents_periodo(desde, hasta)` | La base de cálculo de una ventana. `cierre_base`/`cierre_pendents` son envoltorios suyos. **Solo equipo** (`42501`): antes no lo eran, y era una fuga |
 | `calcular_certificado_periodo(productor, desde, hasta, modo)` | El borrador del certificado a demanda y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, si acaba en el futuro o si esa ventana ya tiene certificado |
 | `registrar_factura_periodo(periodo, numero, fecha, importe, doc_externo)` | La factura del periodo. Existe para que el camino normal del certificado a demanda sea el mismo del anual y la excepción de D4 siga siendo una excepción |
-| `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20270403100000` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
-| `emitir_certificados_cierre(cierre)` (`20270403100100`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y que `datos_provisionales` sea falso —esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo—. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
+| `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20260921211329` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
+| `emitir_certificados_cierre(cierre)` (`20260921211356`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y que `datos_provisionales` sea falso —esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo—. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
 | `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
 | `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
@@ -2680,6 +2680,26 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   `20270328…`), así que el nombre local y la versión remota **discreparán** si no se corrige a
   mano: hay que renombrar el fichero local a la versión que devolvió el MCP en cuanto se aplica,
   o el repo y la base dejan de cuadrar (§ nota de memoria «acceso-supabase-por-mcp-no-por-cli»).
+  ✅ **Y el CLI NO está roto: lo que le faltaba era un `HOME` escribible** (21-09-2026). Dentro
+  del sandbox de una sesión de Claude Code, `supabase` muere con
+  `EPERM … /Users/<tu>/.supabase/telemetry.json.tmp` **antes de hacer nada**, y eso se leyó
+  durante días como «el CLI está bloqueado, hay que ir por el MCP». No lo está: el fallo es que
+  no puede escribir su fichero de telemetría. Con un HOME temporal y el token del llavero
+  funciona entero —`functions list`, `functions deploy`, `migration list`—:
+  ```bash
+  mkdir -p "$TMPDIR/sbhome"
+  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+  HOME="$TMPDIR/sbhome" SUPABASE_ACCESS_TOKEN="$TOKEN" supabase functions deploy <funcio>
+  ```
+  ⚠️ Hace falta además **declarar `api.supabase.com` en los dominios permitidos** del comando:
+  el sandbox filtra la salida de red y la denegación se lee como `403 Connection blocked by
+  network allowlist`, que parece un problema de permisos de la cuenta y no lo es.
+  ⚠️ El token va por `SUPABASE_ACCESS_TOKEN` porque el login del CLI vive en `~/.supabase`, que
+  es justo lo que el HOME nuevo deja de ver; el llavero **sí** sigue accesible, porque es por
+  usuario y no depende de HOME. **Esto importa para las Edge Functions**: son la única capa que
+  el MCP no puede publicar cómodamente —habría que pasarle a mano cada fichero de `_shared/`,
+  incluido el `activos/incrustats.ts` con las fuentes en base64—, así que sin este rodeo no hay
+  forma de desplegarlas desde una sesión con sandbox.
 - **Una sola rama en Supabase, siempre `main` (norma del 14-09-2026).** No se crean ramas en
   el proyecto remoto: ni de preview, ni persistentes, ni para probar una migración. Todo el
   esquema vive en la base de producción y se llega a ella por `db push`, igual que el código
@@ -4412,7 +4432,7 @@ sobre 111 numeradas.
      cuenta de prueba que lo mire.
 
 111. **La excepción D4 se retira como camino, y sus columnas se quedan como histórico**
-     (21-09-2026, `20270403100000`). Decisión del cliente: el certificado deja de exigir
+     (21-09-2026, `20260921211329`). Decisión del cliente: el certificado deja de exigir
      factura. Con la factura fuera de la condición, «excepción sin factura» o se marcaría
      en **todos** los certificados —y el PDF imprimiría la caja de excepción en todos, lo
      cual es falso— o sería un camino muerto. Así que `p_motivo_excepcion` se conserva en
@@ -4589,16 +4609,22 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ⏳ **Pendiente de ejecutar tras `20270403*`**: la tanda de los certificados sin factura
-   añade **9 comprobaciones** (`emitir_certificados_cierre`: una en `DOCUMENTAL_EXTERN`, que
-   recorre siete cuentas externas, más una en `tecnic` y otra en `super_admin`), así que la
-   referencia esperada es **732/732 y 13 saltadas**. ⚠️ Las tres son `rpc` sobre un uuid de
-   ceros: lo que afirman es que la guarda de ROL decide bien, no que la tanda se complete. En
+   ✅ **Referencia HOY: 732/732 correctas y 13 saltadas, «Sin fallos de permisos»**
+   (21-09-2026, tras aplicar `20260921211329` y `20260921211356`). Son las 723 anteriores
+   más **9** de la tanda de certificados sin factura: `emitir_certificados_cierre` con un
+   check en `DOCUMENTAL_EXTERN` —que recorre siete cuentas externas, de ahí 7— más uno en
+   `tecnic` y otro en `super_admin`. ⚠️ Los tres son `rpc` sobre un **uuid de ceros**: lo
+   que afirman es que la guarda de ROL decide bien, no que la tanda se complete. En
    positivo **no se prueba nunca**, porque una sola llamada buena quemaría N números de la
    serie `CD` y mandaría N correos — el mismo criterio que `borrar_ficha_completa()`.
-   ✅ **Referencia HOY: 723/723 correctas y 13 saltadas, «Sin fallos de permisos»**
-   (21-09-2026, tras `scripts/escenari-demo.ts`). El número sube **y a la vez se pierde
-   cobertura**, y las dos cosas a la vez merecen leerse despacio: se retiró el bloque
+   ⚠️ **Lo que SÍ se ejercitó, y fuera del arnés**: la tanda entera sobre el cierre de
+   prueba, en una transacción revertida y con `datos_provisionales` desmarcado dentro de
+   ella (1 emitido, 1 saltado por `bloquejat`, snapshot con `factura` a null, series
+   devueltas a 0 y **cero peticiones en la cola de `pg_net`**, o sea ningún correo). Es la
+   única forma de comprobar el camino bueno sin consumir numeración legal.
+   Antes de esto eran **723/723 + 13** (21-09-2026, tras `scripts/escenari-demo.ts`). Ahí
+   el número subió **a la vez que se perdía cobertura**, y las dos cosas juntas merecen
+   leerse despacio: se retiró el bloque
    `doble_rol` (~15 checks propios, más los compartidos de `DOCUMENTAL_EXTERN`) porque ya
    no queda ninguna cuenta de prueba con dos papeles activos (§9), y la única cuenta que lo
    ejercitaba (`hola+wa-carles@`) pasó a evaluarse contra el bloque `receptor` completo, que

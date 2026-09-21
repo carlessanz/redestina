@@ -512,7 +512,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "reiniciar_cierre_prueba", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO reinicia un cierre de prueba" },
   { tabla: "datos_182", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta los datos del 182" },
   { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca cap exercici" },
-  // Emitir TODOS los certificados de un cierre de golpe (20270403100100). Es la acción
+  // Emitir TODOS los certificados de un cierre de golpe (20260921211356). Es la acción
   // más destructiva del circuito fiscal —N documentos con número legal y N correos a N
   // donantes— así que es la primera que tiene que cortar para cualquier cuenta externa.
   { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament" },
@@ -1190,7 +1190,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
       descripcion: "pot rectificar un certificat de transaccio (autoritza; l'acumulat no existeix)",
     },
-    // Emitir en bloque los certificados de un cierre (20270403100100). Sobre un uuid
+    // Emitir en bloque los certificados de un cierre (20260921211356). Sobre un uuid
     // inventado la guarda de rol pasa y la función cae con 22023 («aquest tancament no
     // existeix») sin dejar rastro. **El bloque real no se prueba nunca en positivo**: una
     // sola llamada buena consumiría N números de la serie CD y mandaría N correos, y eso

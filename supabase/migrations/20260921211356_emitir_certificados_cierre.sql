@@ -1,6 +1,6 @@
 -- Emitir de golpe todos los certificados de donación de un cierre (21-09-2026).
 --
--- QUÉ ES. Retirada la exigencia de factura (20270403100000), emitir los certificados de un
+-- QUÉ ES. Retirada la exigencia de factura (20260921211329), emitir los certificados de un
 -- ejercicio pasa a ser una tanda: el equipo ya no tiene que esperar a que cada donante
 -- mande su papel. Esto es el botón «emet-los tots» pedido por el cliente, en una sola
 -- transacción y con un informe de qué se emitió y qué se saltó y por qué.
@@ -115,7 +115,7 @@ begin
     -- (c) El resto lo decide `emitir_certificado()`, que es la única definición de «cómo
     --     se emite un certificado». Aquí no se duplica ni una guarda suya: si añade una
     --     mañana, esta tanda la respeta sola. `null` en el motivo porque desde el
-    --     21-09-2026 ese parámetro se ignora (20270403100000).
+    --     21-09-2026 ese parámetro se ignora (20260921211329).
     begin
       perform public.emitir_certificado(cd.id, null);
       v_emesos := v_emesos + 1;
