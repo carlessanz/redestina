@@ -149,6 +149,13 @@ export interface FetsExercici {
   calculat: boolean
   /** Donantes con algún bloqueo que impide emitir. */
   bloquejats: number
+  /**
+   * Donantes que ya pueden recibir su certificado y todavía no lo tienen: sin bloqueo, con
+   * kilos y sin número emitido. **Desde 2027-04 la factura NO entra en esta cuenta** (el
+   * cliente la retiró como condición el 21-09-2026), así que «cerrado» deja de ser el final
+   * del camino: quedan N certificados por emitir y el equipo tiene que saberlo.
+   */
+  certificatsPendents?: number
 }
 
 /**
@@ -174,6 +181,14 @@ export function seguentPasExercici(e: FetsExercici): PuntProces {
     return punt('provisional', index, titol, 'tan.ex_next_provisional', {}, true)
   }
   if (e.estado === 'tancat') {
+    // Mismo desdoblamiento que `obert`, y por el mismo motivo: el estado no distingue
+    // «cerrado y con certificados pendientes» de «cerrado y ya emitidos», y son dos
+    // botones distintos. Se separa aquí y no en la pantalla para que no haya dos
+    // definiciones de qué toca.
+    const pendents = e.certificatsPendents ?? 0
+    if (pendents > 0) {
+      return punt('tancat_certs', index, titol, 'tan.ex_next_tancat_certs', { n: pendents }, true)
+    }
     return punt('tancat', index, titol, 'tan.ex_next_tancat', {}, true)
   }
   return punt('declarat', index, titol, 'tan.ex_next_declarat')

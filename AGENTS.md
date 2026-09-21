@@ -1112,6 +1112,34 @@ donante puede pedir varios. Serie propia **`CDP`** (+`P-CDP`), nunca la del anua
 renderizador se elige por `tipo`, y `cd.ts` ya imprimía un periodo—, así que lo que lo distingue es
 la serie y `objeto_tipo = 'cierre_periodo'`, el séptimo. Se archiva en la carpeta `CD/` del donante.
 
+🔴 **LA FACTURA YA NO CONDICIONA EL CERTIFICADO** (`20270403100000`, decisión del cliente del
+21-09-2026). Hasta esa fecha `emitir_certificado()` exigía una factura del donante que cuadrase
+**al céntimo** con el valor calculado, o la **excepción de D4**: `es_super_admin()` más un motivo
+que se imprimía en el PDF. Ahora se emite sin ella. La factura se sigue registrando si llega, y
+`discrepancia` pasa de bloqueo a **aviso** — en el panel es ámbar, no rojo.
+
+⚠️ **Lo que NO se relajó, y es lo que impide que esto sea un agujero**: el certificado solo
+**cita** la factura cuando `round(factura_importe, 2) = round(valor_total, 2)`. Si no cuadra, el
+PDF imprime «Certificat emès sense factura del donant» y no la nombra. Un certificado que dijera
+12.340,00 € citando una factura de 11.900 € afirmaría dos cifras incompatibles en un papel con
+efecto fiscal, que es justo lo que la regla vieja evitaba; lo que se ha retirado es el **bloqueo**,
+no la coherencia.
+
+⚠️ **`p_motivo_excepcion` sigue en la firma de las dos RPC y SE IGNORA.** Se conserva porque
+`src/lib/tancament.ts` y el arnés la llaman, y cambiar la firma rompería a quien ya la usa; pero
+`excepcion_sin_factura` no se vuelve a escribir desde ninguna parte. Las columnas `excepcion_*` y
+su rama en `render/cd.ts` **se quedan para los documentos históricos**: `documentos` es inmutable
+y los que se emitieron así tienen que seguir imprimiéndose como lo que son. Queda anotado como
+decisión con su precio en §12.111.
+
+✅ **Y aparece la emisión en bloque**: `emitir_certificados_cierre(cierre)` (`20270403100100`)
+recorre los donantes de un cierre **`tancat`** y emite uno a uno, cada uno en su subbloque
+`begin/exception`, devolviendo `{emesos, ja_tenien, saltats[{cd, donant, codi, motiu}]}`. **No la
+llama `cerrar_cierre()` ni el job de `pg_cron` de fin de año, a propósito**: cerrar ya es el acto
+irreversible, encadenarle la emisión quitaría el momento de revisar la lista, y el job corre a las
+23:59 del 31 de diciembre **sin sesión**, así que emitiría N documentos legales con la autoría en
+blanco y nadie mirando.
+
 **El anual manda.** `emitir_certificado()` deja los parciales del mismo donante y ejercicio en
 `substituit`, con su documento `vigente = false` y `sustituido_por` apuntando al anual; y
 **`datos_182()` sigue leyendo solo el cierre anual**, o la gestoría recibiría filas duplicadas. Entre
@@ -1476,7 +1504,8 @@ funciones, no políticas:
 | `cierre_base_periodo(desde, hasta, modo)` · `cierre_pendents_periodo(desde, hasta)` | La base de cálculo de una ventana. `cierre_base`/`cierre_pendents` son envoltorios suyos. **Solo equipo** (`42501`): antes no lo eran, y era una fuga |
 | `calcular_certificado_periodo(productor, desde, hasta, modo)` | El borrador del certificado a demanda y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, si acaba en el futuro o si esa ventana ya tiene certificado |
 | `registrar_factura_periodo(periodo, numero, fecha, importe, doc_externo)` | La factura del periodo. Existe para que el camino normal del certificado a demanda sea el mismo del anual y la excepción de D4 siga siendo una excepción |
-| `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos, factura coincidente o D4 con `es_super_admin()`— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos |
+| `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20270403100000` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
+| `emitir_certificados_cierre(cierre)` (`20270403100100`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y que `datos_provisionales` sea falso —esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo—. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
 | `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
 | `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
@@ -4004,8 +4033,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 21-09-2026: **40 entradas vivas** (6 parciales 🟡 y 34 abiertas) y **69 cerradas**,
-sobre 109 numeradas.
+Estado al 21-09-2026: **42 entradas vivas** (6 parciales 🟡 y 36 abiertas) y **69 cerradas**,
+sobre 111 numeradas.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4369,9 +4398,29 @@ sobre 109 numeradas.
      Sale, Raquel Diaz, Laura Masdeu) siguen existiendo tal cual: lo que falta es la
      cuenta de prueba que lo mire.
 
+111. **La excepción D4 se retira como camino, y sus columnas se quedan como histórico**
+     (21-09-2026, `20270403100000`). Decisión del cliente: el certificado deja de exigir
+     factura. Con la factura fuera de la condición, «excepción sin factura» o se marcaría
+     en **todos** los certificados —y el PDF imprimiría la caja de excepción en todos, lo
+     cual es falso— o sería un camino muerto. Así que `p_motivo_excepcion` se conserva en
+     la firma de `emitir_certificado()` y `emitir_certificado_periodo()` **y se ignora**, y
+     `excepcion_sin_factura` no se vuelve a escribir. Las columnas `excepcion_*`, su rama en
+     `render/cd.ts` y el badge del panel **se quedan**: `documentos` es inmutable y los
+     certificados que se emitieron por excepción tienen que seguir imprimiéndose como tales.
+     El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
+     `discrepancia`, que alguien tiene que mirar. Ver §12bis.
+
+112. **Cada ventana que se calcula en el diálogo del certificado a demanda deja un borrador
+     en `cierres_periodo`.** `calcular_certificado_periodo()` inserta la fila antes de que
+     nadie decida emitir, así que probar tres ventanas para ver cuál cuadra deja tres filas
+     con `certificado_numero is null`. No ensucian nada visible —el panel del donante solo
+     lista lo emitido, y `documents_meus()` filtra por documento— pero se acumulan y no hay
+     ninguna limpieza. El día que estorben, la salida es una RPC que borre los borradores
+     sin número, que es lo único que se puede borrar de esa tabla sin tocar evidencia.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **34 de las 40**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **35 de las 42**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -4402,6 +4451,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
 | 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
+| 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
 
 ### Espera material de la fase 0 o de un tercero
 
@@ -4433,7 +4483,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 111.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 113.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -4518,7 +4568,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **826 pruebas en 25 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **828 pruebas en 25 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4526,6 +4576,13 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
+   ⏳ **Pendiente de ejecutar tras `20270403*`**: la tanda de los certificados sin factura
+   añade **9 comprobaciones** (`emitir_certificados_cierre`: una en `DOCUMENTAL_EXTERN`, que
+   recorre siete cuentas externas, más una en `tecnic` y otra en `super_admin`), así que la
+   referencia esperada es **732/732 y 13 saltadas**. ⚠️ Las tres son `rpc` sobre un uuid de
+   ceros: lo que afirman es que la guarda de ROL decide bien, no que la tanda se complete. En
+   positivo **no se prueba nunca**, porque una sola llamada buena quemaría N números de la
+   serie `CD` y mandaría N correos — el mismo criterio que `borrar_ficha_completa()`.
    ✅ **Referencia HOY: 723/723 correctas y 13 saltadas, «Sin fallos de permisos»**
    (21-09-2026, tras `scripts/escenari-demo.ts`). El número sube **y a la vez se pierde
    cobertura**, y las dos cosas a la vez merecen leerse despacio: se retiró el bloque

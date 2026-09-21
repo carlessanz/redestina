@@ -131,6 +131,31 @@ describe('seguentPasExercici: «obert» son tres situaciones, no una', () => {
     expect(b.vars.n).toBe(3)
   })
 
+  // Desde que la factura dejó de condicionar el certificado (21-09-2026), cerrar el
+  // ejercicio ya no es el final: quedan N certificados por emitir. Si esta prueba cae,
+  // el equipo vuelve a leer «Tancat» en una pantalla con trabajo pendiente detrás.
+  it('«tancat» se desdobla cuando quedan certificados por emitir', () => {
+    const conPendientes = seguentPasExercici({
+      estado: 'tancat', calculat: true, bloquejats: 0, certificatsPendents: 4,
+    })
+    const sinPendientes = seguentPasExercici({
+      estado: 'tancat', calculat: true, bloquejats: 0, certificatsPendents: 0,
+    })
+    expect([conPendientes.etapa, sinPendientes.etapa]).toEqual(['tancat_certs', 'tancat'])
+    expect(conPendientes.vars.n).toBe(4)
+    expect(conPendientes.claus.toca).not.toBe(sinPendientes.claus.toca)
+    expect(conPendientes.emToca).toBe(true)
+    // Los dos son el MISMO paso del cierre: lo que cambia es qué botón toca.
+    expect(conPendientes.index).toBe(sinPendientes.index)
+  })
+
+  // El campo es opcional a propósito: las pantallas que aún no lo pasan no pueden
+  // empezar a decir que hay certificados pendientes sin haberlos contado.
+  it('sin el dato, «tancat» se comporta como siempre', () => {
+    const p = seguentPasExercici({ estado: 'tancat', calculat: true, bloquejats: 0 })
+    expect(p.etapa).toBe('tancat')
+  })
+
   it('los otros tres estados van uno a uno, y `declarat` no pide nada', () => {
     for (const estado of ['provisional', 'tancat', 'declarat'] as EstatExercici[]) {
       const p = seguentPasExercici({ estado, calculat: true, bloquejats: 0 })
@@ -192,7 +217,10 @@ describe('todas las claves existen en ca y en es', () => {
     const motius = [
       'alb.why_emit_first', 'alb.why_deliver_first', 'alb.why_only_rec',
       'alb.why_no_cancel', 'alb.why_only_emitted',
-      'tan.why_blocked', 'tan.why_no_invoice', 'tan.why_close_first',
+      // `tan.why_no_invoice` se retiró el 21-09-2026: la factura dejó de condicionar el
+      // certificado, así que ese motivo habría pasado a ser falso.
+      'tan.why_blocked', 'tan.why_close_first', 'tan.why_no_kg',
+      'tan.why_provisional', 'tan.why_no_cert_candidates',
     ]
     for (const clau of motius) {
       expect(DICTS.ca[clau], `falta ${clau} en ca`).toBeTruthy()

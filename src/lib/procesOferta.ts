@@ -37,9 +37,18 @@ export type EtapaInteres =
 /** Los tres finales de un interés que no acaba en entrega. */
 export type SortidaInteres = 'no_assignada' | 'retirada' | 'declinada'
 
-/** Los casos del cierre de un ejercicio: el estado solo no basta (`obert` son tres). */
+/**
+ * Los casos del cierre de un ejercicio: el estado solo no basta.
+ *
+ * `obert` son TRES —sin calcular, con bloqueos, limpio— y desde 2027-04 `tancat` son DOS:
+ * con certificados pendientes de emitir y sin ellos. Lo segundo apareció al retirar la
+ * factura como condición del certificado (decisión del cliente, 21-09-2026): antes,
+ * cerrar el ejercicio era casi el final; ahora quedan N certificados por emitir y son dos
+ * botones distintos.
+ */
 export type CasExercici =
-  'obert_sense_calcul' | 'obert_bloquejats' | 'obert_net' | 'provisional' | 'tancat' | 'declarat'
+  'obert_sense_calcul' | 'obert_bloquejats' | 'obert_net' | 'provisional'
+  | 'tancat' | 'tancat_certs' | 'declarat'
 
 /**
  * Cualquier punto de cualquiera de las máquinas de estados que este módulo y `seguentPas.ts`

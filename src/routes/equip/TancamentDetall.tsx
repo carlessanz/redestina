@@ -27,11 +27,12 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
 import {
   bloqueja, calcularTancament, compararTancamentProva, tancarTancament, csv182, dades182,
-  dataTancament, descarregarText, emetreCertificat, emetreResum, estilEstatDonant,
+  dataTancament, descarregarText, emetreCertificat, emetreCertificatsTancament, emetreResum,
+  estilEstatDonant,
   estilEstatTancament, euros, marcarDeclarat, marcarEnviat, rectificarCertificat,
   registrarFactura, reiniciarTancamentProva, simularFactura,
 } from '../../lib/tancament'
-import type { FilaComparacio } from '../../lib/tancament'
+import type { FilaComparacio, ResultatCertificatsMassius } from '../../lib/tancament'
 import {
   PASSOS_EXERCICI_CLAUS, seguentPasDonant, seguentPasExercici,
 } from '../../lib/seguentPas'
@@ -40,9 +41,11 @@ import type {
   BloqueigCierre, CierreDonante, CierreEjercicio, Documento, EstatCierreDonante,
 } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
+import { dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { BadgeMode } from './Tancament'
 import DialegAssistit from '../../components/equip/DialegAssistit'
 import { Badge } from '@/components/ui/badge'
@@ -233,7 +236,6 @@ export default function TancamentDetall() {
   const { id = '' } = useParams()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
-  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const [cap, setCap] = useState<Capcalera | null>(null)
   const [donants, setDonants] = useState<Donant[]>([])
@@ -248,7 +250,6 @@ export default function TancamentDetall() {
   // equipo sube el PDF que le acaba de mandar. Queda como asistida, con su nombre.
   const [facturaAssistida, setFacturaAssistida] = useState<Donant | null>(null)
   const [simula, setSimula] = useState<Donant | null>(null)
-  const [excepcio, setExcepcio] = useState<Donant | null>(null)
   const [rectifica, setRectifica] = useState<Donant | null>(null)
   const [reinici, setReinici] = useState(false)
 
@@ -332,14 +333,38 @@ export default function TancamentDetall() {
     return mapa
   }, [docs])
 
+  /**
+   * ¿Siguen siendo provisionales los datos fiscales de Espigoladors?
+   *
+   * `emitir_certificado()` se niega mientras lo sean, uno a uno y en bloque (42501). Se lee
+   * aquí para poder APAGAR el botón con su motivo en vez de dejar que la base lo rechace N
+   * veces: el equipo vería una lista de saltados con el mismo texto repetido y ningún
+   * camino. Ante la duda vale `true` — decir «ya puedes certificar» cuando no se puede es
+   * el único error caro.
+   */
+  const [provisionals, setProvisionals] = useState(true)
+  const [resultatMassiu, setResultatMassiu] = useState<ResultatCertificatsMassius | null>(null)
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
+
+  useEffect(() => {
+    let viu = true
+    void dadesFiscalsProvisionals().then((v) => { if (viu) setProvisionals(v) })
+    return () => { viu = false }
+  }, [])
+
   const totals = useMemo(() => donants.reduce(
     (acc, d) => ({
       kg: acc.kg + Number(d.kg_total ?? 0),
       valor: acc.valor + Number(d.valor_total ?? 0),
       bloquejats: acc.bloquejats + (bloqueja(d.bloqueos) ? 1 : 0),
       certificats: acc.certificats + (d.certificado_numero ? 1 : 0),
+      // Quién puede recibir certificado y aún no lo tiene. La factura NO entra: dejó de
+      // ser condición el 21-09-2026. Es el mismo criterio que aplica la base en
+      // `emitir_certificados_cierre()`, y por eso la cifra del botón cuadra con lo emitido.
+      pendentsCert: acc.pendentsCert
+        + (!d.certificado_numero && !bloqueja(d.bloqueos) && Number(d.kg_total ?? 0) > 0 ? 1 : 0),
     }),
-    { kg: 0, valor: 0, bloquejats: 0, certificats: 0 },
+    { kg: 0, valor: 0, bloquejats: 0, certificats: 0, pendentsCert: 0 },
   ), [donants])
 
   const esProva = cap?.modo === 'prueba'
@@ -359,17 +384,32 @@ export default function TancamentDetall() {
     estado: cap?.estado ?? 'obert',
     calculat: cap?.calculado_at != null,
     bloquejats: totals.bloquejats,
-  }), [cap?.estado, cap?.calculado_at, totals.bloquejats])
+    certificatsPendents: totals.pendentsCert,
+  }), [cap?.estado, cap?.calculado_at, totals.bloquejats, totals.pendentsCert])
 
   // Cuál de los cuatro botones globales es «el siguiente». Sale del mismo punto que la
   // frase de arriba, para que el botón resaltado y el texto no puedan decir cosas distintas.
   const accioSeguent = puntExercici.etapa === 'obert_net' ? 'resum'
     : puntExercici.etapa === 'provisional' ? 'tanca'
-      : puntExercici.etapa === 'tancat' ? 'declara'
-        : puntExercici.etapa === 'declarat' ? null
-          : 'calcula'   // obert_sense_calcul y obert_bloquejats: recalcular
+      : puntExercici.etapa === 'tancat_certs' ? 'certificats'
+        : puntExercici.etapa === 'tancat' ? 'declara'
+          : puntExercici.etapa === 'declarat' ? null
+            : 'calcula'   // obert_sense_calcul y obert_bloquejats: recalcular
 
   const motiuTancat = editable ? undefined : t('tan.why_closed')
+
+  /**
+   * Por qué no se puede emitir en bloque, EN ESTE ORDEN.
+   *
+   * El orden importa: es el mismo que aplica la base, así que el motivo que lee el equipo es
+   * el que de verdad le va a frenar. Primero hay que cerrar el ejercicio, después hacen falta
+   * los datos fiscales reales, y solo entonces tiene sentido decir que no queda nadie.
+   */
+  const motiuCertificatsTots = cap?.estado !== 'tancat'
+    ? t('tan.why_close_first')
+    : provisionals
+      ? t('tan.why_provisional')
+      : totals.pendentsCert === 0 ? t('tan.why_no_cert_candidates') : undefined
   // 🔴 «Marca com a declarat» estaba habilitado con el ejercicio abierto: se podía dar por
   // presentado ante Hacienda un cierre que ni siquiera se había calculado. La base lo
   // rechazaba, pero el botón no lo decía. Declarar es lo último del circuito, después de
@@ -567,11 +607,42 @@ export default function TancamentDetall() {
     await refresca()
   }
 
-  async function certificat(d: Donant, motiuExcepcio: string | null) {
+  /**
+   * Todos los certificados del cierre, de una vez.
+   *
+   * ⚠️ **Es un botón APARTE de «Tanca l'exercici», a propósito.** Cerrar ya es el acto
+   * irreversible; encadenarle la emisión quitaría el momento de revisar la lista antes de
+   * quemar N números de serie legal. La base tampoco lo encadena: `cerrar_cierre()` y el
+   * job del 31 de diciembre siguen emitiendo solo resúmenes.
+   *
+   * Los saltados NO son un fallo: son donantes que la base ha dejado fuera por bloqueo o
+   * por no tener kilos, y vienen con su motivo para poder enseñarlos uno a uno.
+   */
+  async function certificatsTots() {
+    if (!id) return
+    const ok = await confirma({
+      titol: t('tan.certs_confirm_t', { n: totals.pendentsCert }),
+      descripcio: t('tan.certs_confirm', { serie: esProva ? 'P-CD' : 'CD' }),
+      confirmar: t('tan.a_certificates_all'),
+      destructiu: !esProva,
+    })
+    if (!ok) return
     setOcupat(true)
-    const res = await emetreCertificat(d.id, motiuExcepcio)
+    const res = await emetreCertificatsTancament(id)
     setOcupat(false)
-    setExcepcio(null)
+    if (!res.ok) { toast.error(res.missatge); return }
+    setResultatMassiu(res.data)
+    toast.success(t('tan.certs_done', {
+      n: res.data.emesos, m: res.data.saltats.length,
+    }))
+    void refrescaComptadors()
+    await refresca()
+  }
+
+  async function certificat(d: Donant) {
+    setOcupat(true)
+    const res = await emetreCertificat(d.id)
+    setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('tan.cert_done', { n: res.data.numero ?? '' }))
     void refrescaComptadors()
@@ -631,6 +702,45 @@ export default function TancamentDetall() {
           <PasosProces etapes={PASSOS_EXERCICI_CLAUS} actual={puntExercici.index} />
           <QueTocaAra punt={puntExercici} compacte />
 
+          {/* El resultado de la última emisión en bloque.
+              Se enseña ENTERO —emitidos, los que ya lo tenían y cada saltado con su
+              motivo— porque un «3 emesos» a secas deja sin saber qué pasó con los otros
+              dos, y esos dos son justo los que necesitan una decisión. */}
+          {resultatMassiu && (
+            <div className="rounded-md border bg-card p-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <p className="font-titulos text-sm font-semibold">{t('tan.certs_result')}</p>
+                <Button
+                  size="sm" variant="ghost" className="h-11 whitespace-normal md:h-8"
+                  onClick={() => setResultatMassiu(null)}
+                >
+                  {t('c.close')}
+                </Button>
+              </div>
+              <p className="mt-1 text-sm text-exito">
+                {t('tan.certs_done', {
+                  n: resultatMassiu.emesos, m: resultatMassiu.saltats.length,
+                })}
+              </p>
+              {resultatMassiu.ja_tenien > 0 && (
+                <p className="text-sm text-muted-foreground">
+                  {t('tan.certs_had', { n: resultatMassiu.ja_tenien })}
+                </p>
+              )}
+              {resultatMassiu.saltats.length > 0 && (
+                <ul className="mt-2 space-y-1">
+                  {resultatMassiu.saltats.map((x) => (
+                    <li key={x.cd} className="rounded-md bg-aviso-fondo p-2 text-sm text-aviso">
+                      <span className="font-medium">{x.donant ?? '—'}</span>
+                      {' · '}{t(`tan.skip_${x.codi}`)}
+                      {x.motiu ? ` · ${x.motiu}` : ''}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
+
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Dada etiqueta={t('tan.c_donors')} valor={String(donants.length)} />
             <Dada etiqueta={t('tan.c_kg')} valor={kg(totals.kg)} />
@@ -673,6 +783,16 @@ export default function TancamentDetall() {
                   onClick={() => void tanca()}
                 >
                   {t('tan.a_close')}
+                </BotoAmbMotiu>
+                <BotoAmbMotiu
+                  variant={accioSeguent === 'certificats' ? 'default' : 'outline'}
+                  className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || cap?.estado !== 'tancat' || provisionals
+                    || totals.pendentsCert === 0}
+                  motiu={motiuCertificatsTots}
+                  onClick={() => void certificatsTots()}
+                >
+                  {t('tan.a_certificates_all')}
                 </BotoAmbMotiu>
                 <BotoAmbMotiu
                   variant={accioSeguent === 'declara' ? 'default' : 'outline'}
@@ -745,8 +865,8 @@ export default function TancamentDetall() {
                       d={d}
                       docs={perDonant[d.id] ?? []}
                       esProva={esProva}
+                      provisionals={provisionals}
                       potAprovar={potAprovar}
-                      esSuperAdmin={esSuperAdmin}
                       ocupat={ocupat}
                       descarregant={descarregador.ocupat}
                       generant={descarregador.generant}
@@ -756,8 +876,7 @@ export default function TancamentDetall() {
                       onFactura={() => setFactura(d)}
                       onFacturaAssistida={() => setFacturaAssistida(d)}
                       onSimula={() => setSimula(d)}
-                      onCertificat={() => void certificat(d, null)}
-                      onExcepcio={() => setExcepcio(d)}
+                      onCertificat={() => void certificat(d)}
                       onRectifica={() => setRectifica(d)}
                       onEnviat={() => void enviat(d)}
                     />
@@ -871,18 +990,6 @@ export default function TancamentDetall() {
       />
 
       <DialegMotiu
-        obert={excepcio !== null}
-        onObert={(v) => { if (!v) setExcepcio(null) }}
-        titol={t('tan.exc_title')}
-        descripcio={t('tan.exc_desc')}
-        etiqueta={t('tan.f_exc_reason')}
-        confirmar={t('tan.exc_do')}
-        destructiu
-        ocupat={ocupat}
-        onConfirma={(motiu) => { if (excepcio) void certificat(excepcio, motiu) }}
-      />
-
-      <DialegMotiu
         obert={rectifica !== null}
         onObert={(v) => { if (!v) setRectifica(null) }}
         titol={t('tan.rect_title')}
@@ -904,6 +1011,9 @@ export default function TancamentDetall() {
         ocupat={ocupat}
         onConfirma={(motiu) => void reinicia(motiu)}
       />
+
+      {/* Confirmación de la emisión en bloque: consume N números de serie legal. */}
+      {dialegConfirma}
 
       {/* El visor de PDF. Una sola vez por pantalla. */}
       {descarregador.visor}
@@ -941,15 +1051,16 @@ function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
 }
 
 function FilaDonant({
-  d, docs, esProva, potAprovar, esSuperAdmin, ocupat, descarregant, generant,
-  onDescarrega, onMostra, onResum, onFactura, onFacturaAssistida, onSimula, onCertificat, onExcepcio, onRectifica,
+  d, docs, esProva, provisionals, potAprovar, ocupat, descarregant, generant,
+  onDescarrega, onMostra, onResum, onFactura, onFacturaAssistida, onSimula, onCertificat, onRectifica,
   onEnviat,
 }: {
   d: Donant
   docs: DocFila[]
   esProva: boolean
+  /** Sin datos fiscales reales, `emitir_certificado()` se niega: mejor decirlo antes. */
+  provisionals: boolean
   potAprovar: boolean
-  esSuperAdmin: boolean
   ocupat: boolean
   descarregant: string | null
   generant: string | null
@@ -961,13 +1072,11 @@ function FilaDonant({
   onFacturaAssistida: () => void
   onSimula: () => void
   onCertificat: () => void
-  onExcepcio: () => void
   onRectifica: () => void
   onEnviat: () => void
 }) {
   const { t } = useT()
   const bloquejat = bloqueja(d.bloqueos)
-  const coincident = d.estado === 'coincident'
   const teCertificat = d.certificado_numero !== null
 
   // Qué toca con ESTE donante. La frase va junto al badge, no en un tooltip: son nueve
@@ -977,13 +1086,15 @@ function FilaDonant({
   /** Cuál de los botones de la fila es el siguiente. El resto van en `outline`. */
   const seguent: Record<EstatCierreDonante, 'resum' | 'factura' | 'certificat' | 'enviat' | null> = {
     calculat: 'resum',
-    resum_enviat: 'factura',
-    factura_pendent: 'factura',
-    factura_rebuda: 'factura',
+    // Desde el 21-09-2026 la factura dejó de condicionar el certificado, así que en cuanto
+    // el resumen ha salido el siguiente paso ya es certificar. La factura sigue
+    // registrándose —y su botón sigue ahí— pero deja de ser lo que toca.
+    resum_enviat: 'certificat',
+    factura_pendent: 'certificat',
+    factura_rebuda: 'certificat',
     coincident: 'certificat',
-    // La discrepancia se resuelve corrigiendo la factura; la excepción de D4 es la salida
-    // rara y no se resalta nunca, para que no parezca el camino normal.
-    discrepancia: 'factura',
+    // La discrepancia se habla con el donante, pero tampoco frena el certificado.
+    discrepancia: 'certificat',
     certificat_emes: 'enviat',
     enviat: null,
     declarat: null,
@@ -993,9 +1104,18 @@ function FilaDonant({
   const motiuResum = bloquejat
     ? t('tan.why_blocked')
     : Number(d.kg_total) <= 0 ? t('tan.why_no_kg') : undefined
+  /**
+   * Qué frena el certificado de ESTE donante, en el orden en que lo frena la base.
+   *
+   * ⚠️ La factura ya NO está en esta lista (21-09-2026). Antes el motivo era «falta la
+   * factura» y era cierto; hoy sería mentira, y un botón gris con un motivo falso es peor
+   * que un botón gris sin motivo.
+   */
   const motiuCertificat = bloquejat
     ? t('tan.why_blocked')
-    : !coincident ? t('tan.why_no_invoice') : undefined
+    : Number(d.kg_total) <= 0
+      ? t('tan.why_no_kg')
+      : provisionals ? t('tan.why_provisional') : undefined
 
   return (
     <TableRow>
@@ -1123,25 +1243,12 @@ function FilaDonant({
                   size="sm"
                   variant={ara === 'certificat' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat || bloquejat || !coincident}
+                  disabled={ocupat || bloquejat || Number(d.kg_total) <= 0 || provisionals}
                   motiu={motiuCertificat}
                   onClick={onCertificat}
                 >
                   {t('tan.a_certificate')}
                 </BotoAmbMotiu>
-              )}
-              {/* La excepción de D4: sin factura coincidente, solo el super_admin y con
-                  motivo. Se enseña únicamente cuando de verdad hace falta —hay bloqueo de
-                  factura pero ningún bloqueo bloqueante— para que no parezca un atajo. */}
-              {!teCertificat && !coincident && !bloquejat && esSuperAdmin && (
-                <Button
-                  size="sm" variant="destructive"
-                  className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat}
-                  onClick={onExcepcio}
-                >
-                  {t('tan.a_exception')}
-                </Button>
               )}
               {teCertificat && (
                 <>

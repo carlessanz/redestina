@@ -7,10 +7,16 @@
 //   1. **Lleva el importe, y dos veces**: en cifras y en letras (`_shared/pdf/lletres.ts`).
 //      Es la garantía clásica contra un dígito cambiado a mano, y las dos formas salen del
 //      mismo número para que no puedan discrepar.
-//   2. **Cita la factura del donante**, que tiene que coincidir con ese importe a dos
-//      decimales. `emitir_certificado()` no deja emitirlo si no coincide, salvo excepción
-//      del super_admin con motivo (D4) — y entonces la excepción se imprime, porque un
-//      certificado que se emitió por excepción no puede parecer uno normal.
+//   2. **Cita la factura del donante SOLO si la hay y coincide** con ese importe a dos
+//      decimales. Hasta 2027-04 la factura era condición para emitir; el cliente la retiró
+//      el 21-09-2026, así que «sin factura» pasó de ser la excepción a ser el caso normal
+//      y las tres ramas de abajo cambian de peso. Lo que NO cambia es la regla de fondo:
+//      un certificado que dijera 12.340,00 € citando una factura de 11.900 € afirmaría dos
+//      cifras incompatibles en un papel con efecto fiscal, así que el snapshot trae la
+//      factura únicamente cuando cuadra y, si no, se imprime que se emitió sin ella.
+//      ⚠️ La rama de la excepción D4 se queda **para los documentos históricos**: ninguna
+//      RPC vuelve a escribir `excepcio_sense_factura`, pero `documentos` es inmutable y los
+//      que se emitieron así siguen teniendo que imprimirse como lo que son.
 //   3. **Lo firma una persona**: nombre, cargo y DNI de la apoderada, con su firma y el
 //      sello estampados. El DNI **no está en `documentos.datos`** a propósito (ese jsonb lo
 //      lee el propio donante): lo lee `generar-documento` con `service_role` de

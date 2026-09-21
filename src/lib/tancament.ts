@@ -181,15 +181,54 @@ export function simularFactura(
   }, 'tan.err_generic')
 }
 
-/** El certificado. Sin factura coincidente lo exige la base: super_admin **y** motivo. */
-export function emetreCertificat(
-  cd: string,
-  motiuExcepcio: string | null,
-): Promise<ResultatRpc<ResultatCertificat>> {
+/**
+ * El certificado de un donante.
+ *
+ * ⚠️ **La factura ya no lo condiciona** (decisión del cliente, 21-09-2026): antes la base
+ * exigía una factura que cuadrase al céntimo, o la excepción D4 del super_admin con motivo.
+ * Hoy se emite sin ella; la factura se registra si llega y la discrepancia solo avisa.
+ * `p_motivo_excepcion` **se conserva en la firma y se ignora** —cambiarla rompería a quien
+ * ya la llama— así que este envoltorio manda siempre `null` y no lo recibe por parámetro.
+ */
+export function emetreCertificat(cd: string): Promise<ResultatRpc<ResultatCertificat>> {
   return crida('emitir_certificado', {
     p_cd: cd,
-    p_motivo_excepcion: motiuExcepcio,
+    p_motivo_excepcion: null,
   }, 'tan.err_generic')
+}
+
+/** Un donante saltado por la emisión en bloque, con el motivo que dio la base. */
+export interface DonantSaltat {
+  cd: string
+  donant: string | null
+  codi: 'bloquejat' | 'sense_kg' | 'error'
+  motiu: string
+}
+
+export interface ResultatCertificatsMassius {
+  tancament: string
+  exercici: number
+  mode: 'prueba' | 'real'
+  emesos: number
+  ja_tenien: number
+  saltats: DonantSaltat[]
+}
+
+/**
+ * Todos los certificados de un cierre, de una vez.
+ *
+ * Es un botón APARTE de «Tanca l'exercici», y eso es deliberado: cerrar ya es el acto
+ * irreversible, y encadenarle la emisión quitaría el momento de revisar la lista. Lo mismo
+ * vale para el job del 31 de diciembre, que corre sin sesión: emitiría N documentos legales
+ * con la autoría en blanco y nadie mirando.
+ *
+ * Nunca lanza: los saltados vienen dentro del resultado, con su motivo, para poder
+ * enseñarlos uno a uno en vez de un «han fallado 3».
+ */
+export function emetreCertificatsTancament(
+  cierre: string,
+): Promise<ResultatRpc<ResultatCertificatsMassius>> {
+  return crida('emitir_certificados_cierre', { p_cierre: cierre }, 'tan.err_generic')
 }
 
 /** Versión siguiente del mismo CD; no consume número nuevo. */
@@ -275,12 +314,17 @@ export function estilEstatDonant(estat: string): string {
     case 'certificat_emes':
     case 'coincident':
       return 'bg-exito-fondo text-exito'
+    // Ámbar y no rojo desde el 21-09-2026: una factura que no cuadra es algo que hay que
+    // hablar con el donante, pero ya no impide el certificado. Pintarlo de rojo diría que
+    // el circuito está parado cuando no lo está.
     case 'discrepancia':
-      return 'bg-error-fondo text-error'
     case 'resum_enviat':
     case 'factura_pendent':
     case 'factura_rebuda':
       return 'bg-aviso-fondo text-aviso'
+    // Un certificado a demanda al que el anual dejó atrás: ni pendiente ni un problema.
+    case 'substituit':
+      return 'bg-muted text-muted-foreground'
     default:
       return 'bg-secondary text-secondary-foreground'
   }

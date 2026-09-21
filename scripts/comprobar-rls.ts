@@ -512,6 +512,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "reiniciar_cierre_prueba", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO reinicia un cierre de prueba" },
   { tabla: "datos_182", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta los datos del 182" },
   { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca cap exercici" },
+  // Emitir TODOS los certificados de un cierre de golpe (20270403100100). Es la acción
+  // más destructiva del circuito fiscal —N documentos con número legal y N correos a N
+  // donantes— así que es la primera que tiene que cortar para cualquier cuenta externa.
+  { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament" },
   // El puente que usa `subir-documento-externo` para decidir si alguien puede adjuntar un
   // fichero a un albarán o a un cierre. Dos afirmaciones distintas:
   //   - preguntar por OTRA persona se corta con 42501, aunque la respuesta fuera «no».
@@ -912,6 +916,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // definitivos y congela el cálculo. Mismo `pot_aprovar()` que calcular.
     { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca un exercici (és de pot_aprovar)" },
     { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats (és de pot_aprovar)" },
+    // Emitir en bloque tampoco: es `pot_aprovar()`, la misma guarda que emitir uno a uno.
+    // Si algún día la de la tanda se relajara sin tocar la individual, este check es el
+    // único sitio donde se vería —desde el panel las dos se ven igual de grises—.
+    { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament (és de pot_aprovar)" },
     { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
     // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
     { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
@@ -1181,6 +1189,18 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
       descripcion: "pot rectificar un certificat de transaccio (autoritza; l'acumulat no existeix)",
+    },
+    // Emitir en bloque los certificados de un cierre (20270403100100). Sobre un uuid
+    // inventado la guarda de rol pasa y la función cae con 22023 («aquest tancament no
+    // existeix») sin dejar rastro. **El bloque real no se prueba nunca en positivo**: una
+    // sola llamada buena consumiría N números de la serie CD y mandaría N correos, y eso
+    // es exactamente lo que un arnés que corre contra producción no puede hacer.
+    {
+      tabla: "emitir_certificados_cierre",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot emetre en bloc els certificats (autoritza; el tancament no existeix)",
     },
     // Certificado de donación a demanda (CDP). Todas sobre un uuid inventado o sobre el
     // ejercicio **1999**: la autorización pasa y la función falla después con 22023, sin
