@@ -271,6 +271,11 @@ interface Check {
    */
   vacioEsDenegar?: boolean;
   /**
+   * SQLSTATE adicionales que, en un check `permitir`, cuentan como «autorizó y falló
+   * después». Casi nunca hace falta: lo normal ya lo cubre `ERRORES_DE_NEGOCIO`.
+   */
+  erroresEsperados?: string[];
+  /**
    * Solo para `rpc`: argumentos. Dos valores literales se sustituyen en tiempo de
    * ejecución, para que la comprobación mida la AUTORIZACIÓN y no un "esa fila no existe"
    * que llegaría igual con permisos de sobra:
@@ -1758,6 +1763,33 @@ interface Resultado {
 }
 
 /** ¿El error es un rechazo de permisos? (42501 = insufficient_privilege / RLS) */
+/**
+ * Los SQLSTATE que significan «la función se EJECUTÓ y rechazó el DATO».
+ *
+ * 🔴 **Esta distinción es la que faltaba, y costó una función inservible en producción.**
+ *    Muchos checks de `permitir` se llaman a propósito con un uuid inexistente —el arnés
+ *    corre contra producción y no puede escribir—, así que se espera un error: lo que se
+ *    comprueba es que la guarda de ROL deja pasar. Hasta el 21-09-2026 la rama `rpc` daba
+ *    por bueno **cualquier** error en ese caso, y eso incluía los errores de PROGRAMACIÓN:
+ *    `canalitzacions_actives` respondía `42702 column reference "excedente_id" is
+ *    ambiguous` desde que se creó —no devolvió una fila ni una vez— y el arnés la contaba
+ *    en verde. Lo destapó ejecutarla de verdad desde la pantalla, no el arnés.
+ *
+ * Un error de negocio prueba que se autorizó. Uno de programación no prueba nada: la clase
+ * `42` (columna, tabla o función que no existe, referencia ambigua) y un cast inválido
+ * (`22P02`) significan que la función está rota, y eso es FALLA aunque el check sea de
+ * `permitir`.
+ */
+const ERRORES_DE_NEGOCIO = [
+  "PT404", "PT409", "PT410", "PT403", // los del circuito documental
+  "22023",                            // invalid_parameter_value: la regla de negocio
+  "23502", "23503", "23505",          // restricciones de la propia base
+];
+
+function esErrorDeNegocio(codigo: string, extras: string[] = []): boolean {
+  return ERRORES_DE_NEGOCIO.includes(codigo) || extras.includes(codigo);
+}
+
 function esRechazo(error: { code?: string; message?: string } | null): boolean {
   if (!error) return false;
   const codigo = error.code ?? "";
@@ -1930,9 +1962,22 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       // La función no existe: la migración no está aplicada. No demuestra nada, pero
       // tampoco puede darse por bueno.
       if (error.code === "PGRST202") return { ok: false, detalle: "no existe (¿falta la migración?)" };
-      // Cualquier otro error significa que la autorización SÍ dejó pasar y falló algo
-      // posterior: para un "denegar" eso es exactamente lo que no debe ocurrir.
-      return { ok: check.esperado === "permitir", detalle: `error: ${error.message.slice(0, 60)}` };
+      // Un error que no es rechazo significa que la autorización SÍ dejó pasar y falló
+      // algo posterior. Para un "denegar" eso es exactamente lo que no debe ocurrir; para
+      // un "permitir" solo vale si ESE error es el que se esperaba —un `PT404` porque se
+      // llama con un uuid inexistente a propósito—. Cualquier otro es un fallo de la
+      // función, no una prueba de nada: ver la nota de `erroresEsperados`.
+      const codigo = String(error.code ?? "");
+      if (check.esperado === "denegar") {
+        return { ok: false, detalle: `error: ${error.message.slice(0, 60)}` };
+      }
+      const esperado = esErrorDeNegocio(codigo, check.erroresEsperados ?? []);
+      return {
+        ok: esperado,
+        detalle: esperado
+          ? `autoritza (${codigo} esperat)`
+          : `ERROR NO ESPERADO ${codigo}: ${error.message.slice(0, 50)}`,
+      };
     }
     // La RPC ha hecho su trabajo: si deja rastro, se limpia ahora mismo. El arnés no
     // puede añadir filas a la base que audita.

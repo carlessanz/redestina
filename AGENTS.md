@@ -1588,6 +1588,17 @@ Dos mecanismos que conviene conocer antes de tocarlo:
   *antes* de evaluar ninguna política, así que un check «denegar» saldría verde **sin haber probado
   la RLS**. Con la lista explícita, lo que devuelve 0 filas es la política; la columna sensible se
   comprueba aparte, con su propio check que sí espera `permission denied for column`.
+- 🔴 **Un error que no es un rechazo NO demuestra que la autorización dejó pasar** (21-09-2026).
+  Muchos checks de `permitir` se llaman a propósito con un **uuid inexistente** —el arnés corre
+  contra producción y no puede escribir—, así que se espera un error y lo que se mide es la
+  guarda de ROL. La rama `rpc` daba por bueno **cualquier** error en ese caso, y eso incluía los
+  de programación: **`canalitzacions_actives` respondía `42702 column reference is ambiguous`
+  desde que se creó —no devolvió una fila ni una vez— y el arnés la contaba en verde**. Ahora
+  solo cuentan los **errores de negocio** (`ERRORES_DE_NEGOCIO`: los `PT4xx` del circuito,
+  `22023` y las restricciones `235xx`); la clase `42` y `22P02` significan que la función está
+  rota y son FALLA aunque el check sea de `permitir`. ⚠️ Lo destapó **ejecutar la función desde
+  la pantalla**, no el arnés: el SQL de una migración es una cadena para `deno check`, así que
+  lo único que encuentra esto es llamarla.
 - **Un `UPDATE` denegado por RLS no da error.** PostgREST no encuentra filas que cumplan el `using`
   y devuelve éxito con cero afectadas, así que un rechazo era indistinguible de un acierto. La rama
   de `actualizar` pide ahora las filas afectadas (`.select('id')`) y trata «cero filas sobre una
