@@ -415,6 +415,8 @@ tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO 
 tests/                         Pruebas unitarias (Vitest). Módulos de negocio, no pantallas
   deno.d.ts                    El global `Deno` declarado al mínimo, para que tsc compruebe
   cobertura.test.ts            Que el menú, las rutas y las claves i18n apunten a algo real
+  passosCanalitzacio.test.ts   Las claves COMPUESTAS del ciclo guiado (`canal.<pas>_t`) en ca
+                               y es, y que el orden de las comprobaciones no se mueva
 design/                        Sistema de diseño (§2bis): tokens.json, DESIGN.md, preview.html, PLAN.md
 .github/workflows/             CI: tipos + vitest + deno check + build en cada push y PR (§12.1).
                                El arnés de RLS NO está aquí: necesita credenciales de producción
@@ -476,6 +478,10 @@ src/
                                «etapa + què passa + què toca + qui», por rol. Puro, con test
     seguentPas.ts              Lo mismo para las fichas largas del equipo: albarà, conveni,
                                exercici, donant
+    passosCanalitzacio.ts      EL CICLO ENTERO de una canalización para la pantalla guiada
+                               del equipo: 19 pasos sobre las seis fases de FASES_EQUIP, con
+                               qué los bloquea. Puro, y con su propio test porque sus claves
+                               se componen (cobertura.test.ts no las ve)
     pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
                                de módulo; alimenta los badges del menú Y el tablero (§6ter)
     progresOfertes.ts          progres_meves_ofertes(): cuántas entidades interesadas por oferta,
@@ -4312,7 +4318,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **793 pruebas en 23 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **826 pruebas en 25 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
