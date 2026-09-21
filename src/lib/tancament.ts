@@ -13,7 +13,7 @@
 
 import { supabase } from './supabase'
 import type { ResultatRpc } from './albarans'
-import type { BloqueigCierre, CierreDonante } from '../types'
+import type { BloqueigCierre, CierreDonante, CierrePeriodo } from '../types'
 
 /** Fila de `datos_182()`. Es el retorno de una función, no una tabla: vive aquí. */
 export interface Fila182 {
@@ -193,6 +193,63 @@ export function simularFactura(
 export function emetreCertificat(cd: string): Promise<ResultatRpc<ResultatCertificat>> {
   return crida('emitir_certificado', {
     p_cd: cd,
+    p_motivo_excepcion: null,
+  }, 'tan.err_generic')
+}
+
+// --- Certificado a demanda -------------------------------------------------
+//
+// El mismo acumulado de un donante, pero de una VENTANA de fechas dentro de un ejercicio:
+// «lo que llevo donado este año, a fecha de hoy». Vive en `cierres_periodo`, con serie
+// propia (`CDP`), y **no abre ningún cierre**: por eso se puede pedir cualquier día sin
+// tocar la contabilidad del año.
+//
+// ⚠️ El backend existe desde la fase 5 y hasta hoy no lo llamaba NADIE: el equipo no tenía
+//    forma de emitir uno. Estas dos funciones son esa puerta.
+
+export interface ResultatCertificatPeriode {
+  document: string
+  numero: string | null
+  /** Cuántos certificados parciales anteriores quedan sustituidos por este. */
+  substitueix?: number
+}
+
+/**
+ * El borrador de un certificado a demanda, con sus kilos y sus bloqueos.
+ *
+ * ⚠️ **Escribe**: inserta la fila de `cierres_periodo` aunque después no se emita nada. Es
+ * lo que permite enseñar kilos y bloqueos antes de decidir, y el precio es que probar tres
+ * ventanas deja tres borradores sin número (deuda §12.112).
+ *
+ * La base rechaza con `22023` y un mensaje útil si la ventana cruza dos ejercicios, si
+ * termina en el futuro o si esa misma ventana ya tiene certificado: se enseña tal cual, que
+ * explica mejor que cualquier texto nuestro.
+ */
+export function calcularCertificatPeriode(c: {
+  productor: string
+  desde: string
+  hasta: string
+  modo: 'prueba' | 'real'
+}): Promise<ResultatRpc<CierrePeriodo>> {
+  return crida('calcular_certificado_periodo', {
+    p_productor: c.productor,
+    p_desde: c.desde,
+    p_hasta: c.hasta,
+    p_modo: c.modo,
+  }, 'tan.err_generic')
+}
+
+/**
+ * Emitirlo. Consume un número de la serie `CDP` y no se puede deshacer: solo rectificar.
+ *
+ * `p_motivo_excepcion` va siempre `null` por lo mismo que en el anual: la factura dejó de
+ * condicionar el certificado el 21-09-2026 y el parámetro se conserva pero se ignora.
+ */
+export function emetreCertificatPeriode(
+  periode: string,
+): Promise<ResultatRpc<ResultatCertificatPeriode>> {
+  return crida('emitir_certificado_periodo', {
+    p_periodo: periode,
     p_motivo_excepcion: null,
   }, 'tan.err_generic')
 }

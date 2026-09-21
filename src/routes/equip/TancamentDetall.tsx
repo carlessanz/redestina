@@ -38,7 +38,7 @@ import {
 } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type {
-  BloqueigCierre, CierreDonante, CierreEjercicio, Documento, EstatCierreDonante,
+  CierreDonante, CierreEjercicio, Documento, EstatCierreDonante,
 } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
@@ -48,6 +48,7 @@ import QueTocaAra from '../../components/proces/QueTocaAra'
 import { dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { BadgeMode } from './Tancament'
 import DialegAssistit from '../../components/equip/DialegAssistit'
+import Bloquejos from '../../components/equip/Bloquejos'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -1031,25 +1032,6 @@ function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 }
 
 /** Los bloqueos de un donante, cada uno con su color según si impide o solo avisa. */
-function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
-  const { t } = useT()
-  if (llista.length === 0) return <span className="text-sm text-muted-foreground">—</span>
-  return (
-    <ul className="space-y-1">
-      {llista.map((b, i) => (
-        <li key={`${b.codigo}-${i}`} className="max-w-72">
-          <Badge className={b.bloqueja ? 'bg-error-fondo text-error' : 'bg-aviso-fondo text-aviso'}>
-            {t(`tan.bl_${b.codigo}`)}
-          </Badge>
-          {/* El detalle lo escribe la base y ya viene en catalán con las cifras: se enseña
-              tal cual, como los mensajes de error de las RPC (§ albarans.ts). */}
-          <p className="mt-0.5 text-xs text-muted-foreground">{b.detall}</p>
-        </li>
-      ))}
-    </ul>
-  )
-}
-
 function FilaDonant({
   d, docs, esProva, provisionals, potAprovar, ocupat, descarregant, generant,
   onDescarrega, onMostra, onResum, onFactura, onFacturaAssistida, onSimula, onCertificat, onRectifica,

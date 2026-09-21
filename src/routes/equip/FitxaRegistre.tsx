@@ -11,6 +11,7 @@ import { assegurarContacte } from '../../lib/contactes'
 import { ENTIDAD_CAMPOS, PRODUCTOR_CAMPOS } from '../../lib/crudCampos'
 import RecordDetail from '../../components/RecordDetail'
 import BadgeConveni from '../../components/BadgeConveni'
+import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 
 type Registre = Record<string, unknown> & { id: string }
@@ -69,6 +70,12 @@ export default function FitxaRegistre({ tabla }: Props) {
           {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
               aquí, semanas después, y no solo en la cola de registros pendientes. */}
           <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null} />
+          {/* Sus certificados de donación, y el botón para emitir el de «lo que lleva
+              donado este año». Solo en entidades productoras y solo sobre una ficha que ya
+              existe: en el alta (`/nou`) no hay `id` al que colgar nada todavía. */}
+          {esProductor && id && (
+            <CertificatsFitxa productorId={id} esTest={Boolean(registre?.es_test)} />
+          )}
         </>
       )}
       onSendMessage={(phone, name) => {

@@ -514,7 +514,10 @@ src/
     proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
                                BotoAmbMotiu (§6ter)
-    equip/                     PendentsEquip (la cola de trabajo del tablero), ComFunciona
+    equip/                     CertificatsFitxa (els certificats d'una productora, des de la
+                               seva fitxa) + DialegCertificatPeriode (el de «a demanda») +
+                               Bloquejos (extret de TancamentDetall: el comparteixen les dues
+                               pantalles), PendentsEquip (la cola de trabajo del tablero), ComFunciona
                                (los seis pasos de FASES_EQUIP, enlazados) y los TRES diálogos
                                asistidos: DialegAssistit (albarà y factura),
                                DialegFirmaAssistida (conveni) y DialegNovaOfertaAssistida
@@ -1101,6 +1104,16 @@ canalizaciones ni albaranes**.
 
 Job `congelar-ejercicio` en `pg_cron` a `59 22 31 12 *` **UTC**, que son las 23:59 de Madrid en
 horario de invierno.
+
+✅ **Y desde el 21-09-2026 el certificado a demanda TIENE PANTALLA**, que es lo que le
+faltaba: `CertificatsFitxa` vive en el slot `avisos` de la ficha de la entidad productora
+—junto a `BadgeConveni`— y desde ahí se emite con `DialegCertificatPeriode`. Antes el
+backend estaba entero y **no lo llamaba nadie**: la única forma de emitir uno era SQL a
+mano. ⚠️ **Calcular ya ESCRIBE**: `calcular_certificado_periodo()` inserta la fila antes de
+que nadie decida emitir, que es lo que permite enseñar kilos y bloqueos primero; el precio
+es que probar tres ventanas deja tres borradores sin número (§12.112). ⚠️ **El modo no se
+elige, se deduce de `es_test`**: un desplegable prueba/real ahí sería la forma de mandarle a
+un donante real un certificado con marca de agua, o al revés.
 
 **Certificado a demanda (`20270303*`)** — `cierres_periodo` y `cierre_periodo_lineas`: el mismo
 acumulado de un donante, pero de una **ventana de fechas** dentro de un ejercicio. Tabla hermana y
