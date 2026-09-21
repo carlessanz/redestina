@@ -48,6 +48,9 @@ import { ProductorInici, ProductorOfertes } from '../routes/productor/Ofertes'
 import NovaOferta from '../routes/productor/NovaOferta'
 import ProductorOfertaDetall from '../routes/productor/OfertaDetall'
 import LaMevaOrganitzacio from '../routes/LaMevaOrganitzacio'
+import Diagnostic from '../routes/Diagnostic'
+import Diagnostics from '../routes/equip/Diagnostics'
+import DiagnosticDetall from '../routes/equip/DiagnosticDetall'
 import Mercat from '../routes/receptor/Mercat'
 import { Historic, Interessos } from '../routes/receptor/Interessos'
 
@@ -86,6 +89,14 @@ export const router = createBrowserRouter([
                 element: <LaMevaOrganitzacio />,
                 handle: { titleKey: 'nav.my_org' },
               },
+              // El diagnóstico de prevención (F2). Cuelga de `/organitzacio` y no de un
+              // panel por lo mismo que la ficha: con doble rol son dos diagnósticos, pero
+              // se entra por un solo sitio.
+              {
+                path: '/organitzacio/diagnostic',
+                element: <Diagnostic />,
+                handle: { titleKey: 'nav.my_diagnostic' },
+              },
               {
                 path: '/equip',
                 element: <RoleGuard rol="intern" />,
@@ -118,6 +129,11 @@ export const router = createBrowserRouter([
                   { path: 'convenis', element: <Convenis />, handle: { titleKey: 'nav.convenis', ample: true } },
                   { path: 'convenis/campanya', element: <CampanyaConvenis />, handle: { titleKey: 'nav.convenis', ample: true } },
                   { path: 'convenis/:id', element: <ConveniDetall />, handle: { titleKey: 'nav.convenis' } },
+                  { path: 'diagnostics', element: <Diagnostics />, handle: { titleKey: 'nav.diagnostics', ample: true } },
+                  // `:tipus` decide el cuestionario y la tabla de la ficha; la pantalla lo
+                  // valida antes de llamar a nada, para que una URL a mano no acabe en un
+                  // `22023` de la RPC.
+                  { path: 'diagnostics/:tipus/:id', element: <DiagnosticDetall />, handle: { titleKey: 'nav.diagnostics' } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],

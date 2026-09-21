@@ -852,16 +852,23 @@ export interface PlanPrevencion {
   entidad_id: string | null
   nivel: 'basic' | 'personalitzat'
   /**
-   * ⚠️ El cuestionario real NO existe todavía (anexo B del funcional, material de la fase 0):
-   * la base solo impone la forma del sobre. `versio_questionari = 0` marca las filas hechas
-   * antes de que ese anexo exista.
+   * El sobre del diagnóstico, AUTOCONTENIDO (ver `SobreDiagnostic`). La unión cubre los
+   * planes anteriores a la F2, que no tienen cuestionario detrás y cuyo `pregunta` era una
+   * cadena suelta.
+   *
+   * ⚠️ El cuestionario que hay sembrado es PROVISIONAL: texto de trabajo hasta que la
+   * Fundación cierre el anexo B. La versión 1 será la suya.
    */
-  respuestas: {
+  respuestas: SobreDiagnostic | {
     questionari?: string
     versio_questionari?: number
     respostes?: { id: string; pregunta?: string; valor?: unknown }[]
     notes?: string
   }
+  /** Con qué versión del cuestionario se hizo. NULL en los planes anteriores a la F2 */
+  questionari_id: string | null
+  /** Las medidas propuestas, COPIADAS con su texto ya resuelto (ver `MesuresPla`) */
+  mesures: MesuresPla
   version: number
   vigente: boolean
   estado: 'esborrany' | 'emes' | 'substituit'
@@ -956,4 +963,194 @@ export interface KgRebutsExercici {
   /** Entregas de ese año aún SIN conciliar: no cuentan como oficiales (D13) */
   kg_pendents: number
   operacions_pendents: number
+}
+
+// --- Diagnóstico de prevención (F2, migraciones 20260921231946…231950) ---
+//
+// ⚠️ El cuestionario sembrado es PROVISIONAL (`versio 0`, `provisional: true`): es texto de
+//    trabajo hasta que la Fundación cierre el anexo B. La versión 1 será la suya. Un plan
+//    emitido con un cuestionario provisional lo dice IMPRESO.
+
+export type TipusPregunta = 'opcio' | 'multi' | 'boolea' | 'numero' | 'text'
+export type OperadorRegla = 'sempre' | '=' | '!=' | 'in' | 'conte' | '>=' | '<=' | 'buit'
+export type BlocMesura =
+  | 'planificacio' | 'collita' | 'conservacio' | 'canalitzacio' | 'seguiment'
+
+/**
+ * Texto en las dos lenguas. Las DOS son obligatorias: el plan se emite en el idioma de la
+ * organización, y una etiqueta que solo existe en catalán produce un PDF en castellano con
+ * una frase en catalán dentro.
+ */
+export interface TextBilingue { ca: string; es: string }
+
+export interface OpcioPregunta {
+  valor: string
+  etiqueta: TextBilingue
+}
+
+export interface CondicioPregunta {
+  pregunta: string
+  operador?: OperadorRegla
+  valor?: unknown
+}
+
+export interface PreguntaDiagnostic {
+  id: string
+  tipus: TipusPregunta
+  seccio: string
+  etiqueta: TextBilingue
+  ajuda?: TextBilingue | null
+  obligatoria: boolean
+  /** Solo en `opcio` y `multi`, y ahí obligatorio */
+  opcions?: OpcioPregunta[] | null
+  /** Pregunta condicional. Misma gramática que `regles_pla` */
+  aplica_a?: CondicioPregunta | null
+  /**
+   * PISTA para la pantalla (`<taula>.<columna>`). ⚠️ El servidor NO la lee nunca: si la
+   * leyera, el diagnóstico contendría algo que la persona no ha dicho.
+   */
+  prefill?: string | null
+}
+
+export interface QuestionariDiagnostic {
+  id: string
+  tipo_org: 'productor' | 'entidad'
+  versio: number
+  /** true = texto de trabajo sin validar por la Fundación. Se imprime en el plan */
+  provisional: boolean
+  vigente: boolean
+  valida_desde: string
+  titol: TextBilingue
+  preguntes: PreguntaDiagnostic[]
+  created_by: string | null
+  created_at: string
+}
+
+export interface MesuraPrevencio {
+  codi: string
+  tipo_org: 'productor' | 'entidad'
+  bloc: BlocMesura
+  titol: TextBilingue
+  descripcio: TextBilingue
+  /** Hoy solo las de registro (decisión del 22-09-2026) */
+  obligatoria_per_defecte: boolean
+  ordre: number
+  activa: boolean
+  provisional: boolean
+  created_at: string
+}
+
+export interface ReglaPla {
+  id: string
+  tipo_org: 'productor' | 'entidad'
+  /** null solo con `sempre`. Sin FK: las preguntas viven en jsonb */
+  pregunta_id: string | null
+  operador: OperadorRegla
+  valor: unknown | null
+  mesura_codi: string
+  /** Escala la medida a obligatoria en este caso. Nunca la rebaja */
+  obligatoria: boolean
+  prioritat: number
+  activa: boolean
+  motiu: string | null
+  created_at: string
+}
+
+/**
+ * Una medida dentro del plan. 🔴 `titol` y `descripcio` van COPIADOS y ya resueltos al idioma
+ * del plan: un plan de hace cinco años no puede depender de que el catálogo siga vivo, ni de
+ * que quien lo lee pueda leer `mesures_prevencio` — que es del equipo.
+ */
+export interface MesuraPla {
+  codi: string
+  bloc: BlocMesura
+  titol: string
+  descripcio: string
+  obligatoria: boolean
+  origen: 'regla' | 'manual'
+}
+
+export interface MesuresPla {
+  generat_at?: string
+  /** TODAS las reglas que dispararon, antes de desduplicar por `codi` */
+  regles_aplicades?: string[]
+  /** true en cuanto alguien pasa por `desar_mesures_pla()`: regenerar exige `forcar` */
+  editat?: boolean
+  observacions?: string | null
+  llista?: MesuraPla[]
+}
+
+/**
+ * Una respuesta, AUTOCONTENIDA. ⚠️ `pregunta` es un objeto `{ca, es}` y no una cadena: el
+ * sobre tiene que poder imprimirse sin el cuestionario delante.
+ */
+export interface RespostaDiagnostic {
+  id: string
+  tipus: TipusPregunta
+  seccio: string
+  pregunta: TextBilingue
+  valor: unknown
+  /** `opcio` y `boolea` */
+  etiqueta?: TextBilingue | null
+  /** `multi` */
+  etiquetes?: TextBilingue[]
+}
+
+export interface SobreDiagnostic {
+  questionari: string
+  questionari_id?: string | null
+  versio_questionari: number
+  questionari_provisional?: boolean
+  titol?: TextBilingue
+  respostes: RespostaDiagnostic[]
+  /**
+   * Lo que se tecleó, tal cual: permite reabrir el formulario exacto, y es sobre esto —el
+   * valor, nunca su etiqueta— sobre lo que se evalúan las reglas.
+   */
+  respostes_crues?: Record<string, unknown>
+  notes?: string | null
+  desat_at?: string
+}
+
+export type EstatDiagnostic =
+  | 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'a_punt' | 'emes'
+
+export interface DiagnosticEstat {
+  estat: EstatDiagnostic
+  pla_esborrany: string | null
+  pla_vigent: string | null
+  numero: string | null
+  versio: number | null
+  emes_at: string | null
+  nivell: 'basic' | 'personalitzat' | null
+  idioma: 'ca' | 'es' | null
+  /** Ids de las obligatorias que aplican y siguen sin contestar */
+  falten: string[]
+  te_mesures: boolean
+  mesures_n: number
+  mesures_editades: boolean
+  questionari_id: string | null
+  versio_questionari: number | null
+  /**
+   * Ante la duda, `true`: decir que un documento está validado cuando no lo está es el único
+   * error caro.
+   */
+  provisional: boolean
+}
+
+export interface DiagnosticEquip {
+  tipo_org: 'productor' | 'entidad'
+  org_id: string
+  nom: string
+  es_test: boolean
+  estat: EstatDiagnostic
+  falten_n: number
+  mesures_n: number
+  pla_esborrany: string | null
+  pla_vigent: string | null
+  numero: string | null
+  versio: number | null
+  emes_at: string | null
+  versio_questionari: number | null
+  provisional: boolean
 }

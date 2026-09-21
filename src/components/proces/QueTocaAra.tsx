@@ -17,11 +17,23 @@ import type { PuntProces } from '../../lib/procesOferta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 
+/**
+ * Lo que este componente lee DE VERDAD de un punto del proceso.
+ *
+ * `etapa` e `index` no se miran nunca aquí —los usa `PasosProces`, que recibe la escalera
+ * aparte—, así que la prop se declara sin `etapa`. Eso deja pintar también los puntos de
+ * las máquinas de estado que traen su propio vocabulario (el diagnóstico, F2) sin tener que
+ * ampliar `EtapaProces`, que es una unión CERRADA a propósito: si mañana se añade un estado
+ * a una tabla de la oferta, el compilador tiene que seguir obligando a decidir qué se
+ * cuenta de él (§procesOferta).
+ */
+export type PuntPintable = Omit<PuntProces, 'etapa'>
+
 export default function QueTocaAra({
   punt,
   compacte = false,
 }: {
-  punt: PuntProces
+  punt: PuntPintable
   /** Dentro de otra tarjeta: menos aire, sin el badge de quién. */
   compacte?: boolean
 }) {

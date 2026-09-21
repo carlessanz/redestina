@@ -12,7 +12,7 @@
 // nombre de la organización arriba—, que es el caso del 99% de las cuentas.
 
 import { NavLink, useLocation } from 'react-router'
-import { AlertTriangle, Building2, LogOut, Tractor, Users } from 'lucide-react'
+import { AlertTriangle, Building2, Dot, LogOut, Tractor, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
@@ -37,6 +37,14 @@ interface Props {
    * lo que se pinta es una alerta, no un contador (ver el comentario del badge).
    */
   fitxaIncompleta?: boolean
+  /**
+   * ¿Queda diagnóstico por hacer? También booleano, y por el mismo motivo — pero **la marca
+   * es distinta**: la ficha incompleta pinta un triángulo de alerta porque impide operar (con
+   * un paso de por medio: sin NIF no se firma el convenio, y sin convenio no se publica); el
+   * diagnóstico no bloquea nada, así que su marca es un punto. Usar el triángulo aquí diría
+   * «esto está mal», y no lo está: solo está sin hacer.
+   */
+  diagnosticPendent?: boolean
 }
 
 /** Cabecera de cada panel cuando hay más de uno. */
@@ -46,7 +54,9 @@ const PANELL: Record<Rol, { clau: string; icona: LucideIcon }> = {
   receptor: { clau: 'panel.receiver', icona: Building2 },
 }
 
-export default function AppSidebar({ comptadors, fitxaIncompleta = false }: Props) {
+export default function AppSidebar({
+  comptadors, fitxaIncompleta = false, diagnosticPendent = false,
+}: Props) {
   const { t } = useT()
   const { ctx, rolActiu, organitzacio } = useAppContext()
   const { setOpenMobile, isMobile } = useSidebar()
@@ -162,7 +172,12 @@ export default function AppSidebar({ comptadors, fitxaIncompleta = false }: Prop
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       asChild
-                      isActive={location.pathname.startsWith(item.to)}
+                      // `end` desde que este grupo tiene dos entradas: sin él,
+                      // `/organitzacio/diagnostic` marcaría las DOS como activas, porque la
+                      // primera es prefijo de la segunda.
+                      isActive={item.end
+                        ? location.pathname === item.to
+                        : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)}
                       tooltip={t(item.labelKey)}
                     >
                       <NavLink to={item.to} onClick={alNavegar}>
@@ -179,10 +194,21 @@ export default function AppSidebar({ comptadors, fitxaIncompleta = false }: Prop
                            campos». El número era información de más pagada con un
                            significado equivocado; lo que hace falta es «esto está a medias».
                            El detalle de QUÉ falta ya lo da la banda roja y la propia ficha. */}
-                    {fitxaIncompleta && (
+                    {item.to === '/organitzacio' && fitxaIncompleta && (
                       <SidebarMenuBadge>
                         <AlertTriangle className="size-3.5" aria-hidden />
                         <span className="sr-only">{t('reg_inc.badge')}</span>
+                      </SidebarMenuBadge>
+                    )}
+                    {/* Y el diagnóstico, en su propia entrada. La marca es un PUNTO y no el
+                        triángulo de arriba: aquello avisa de algo que impide operar, esto
+                        solo de algo que está sin hacer. Tampoco es una cifra —«12 preguntes»
+                        no es lo que hay que decir en 20 px— y las cifras de este menú
+                        significan «tienes N cosas que mirar» (design/DESIGN.md §6quater). */}
+                    {item.to === '/organitzacio/diagnostic' && diagnosticPendent && (
+                      <SidebarMenuBadge>
+                        <Dot className="size-5" aria-hidden />
+                        <span className="sr-only">{t('diag.badge')}</span>
                       </SidebarMenuBadge>
                     )}
                   </SidebarMenuItem>

@@ -682,6 +682,31 @@ const DOCUMENTAL_EXTERN: Check[] = [
   //    `cierre_base()`, y por eso se vigila desde el primer día.
   { tabla: "cierre_base_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul d'un certificat de recepcio" },
   { tabla: "cierre_pendents_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "NO llegeix els lliuraments pendents de conciliar" },
+  // --- Diagnòstic i pla de prevenció (F2, 20260921231946…231950) ---
+  // El CUESTIONARIO sí lo ve cualquier cuenta con sesión: es el formulario que tiene que
+  // contestar, y la política es `vigente or es_intern()`. Lo que NO ve es la maquinaria que
+  // decide qué medidas le tocan —el catálogo y las reglas—, que es configuración del
+  // servicio: su plan lleva el título y la descripción de cada medida COPIADOS dentro, así
+  // que cerrarlas no le quita nada que necesite para leer su propio plan.
+  { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "veu el questionari vigent que ha de contestar", requiereFixture: "el questionari sembrat (migració 20260921231949)" },
+  { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari (no hi ha GRANT per a ningu)" },
+  { tabla: "mesures_prevencio", op: "leer", esperado: "denegar", descripcion: "NO veu el cataleg de mesures de prevencio" },
+  { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura" },
+  { tabla: "regles_pla", op: "leer", esperado: "denegar", descripcion: "NO veu les regles que generen el pla" },
+  { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla" },
+  { tabla: "questionari_vigent", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor" }, descripcion: "pot demanar el questionari vigent", requiereFixture: "el questionari sembrat (migració 20260921231949)" },
+  // Publicar una versión del cuestionario es `pot_aprovar()`: decidir qué se le pregunta a
+  // una organización es una decisión, no una edición. Las preguntas van VACÍAS a propósito —
+  // el 42501 llega antes de validarlas, así que esto no escribe nada ni siendo del equipo.
+  { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
+  // Las tres que reciben (tipo_org, org): su guarda `puc_gestionar_pla()` va ANTES de buscar
+  // ninguna fila, así que el 42501 llega sin que la función mire si la organización existe —
+  // que es lo que hace inofensivo apuntar a un uuid inventado.
+  { tabla: "desar_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "NO contesta el diagnostic d'una altra organitzacio" },
+  { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla d'una altra organitzacio" },
+  { tabla: "diagnostic_estat", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta el diagnostic d'una altra organitzacio" },
+  // La bandeja de diagnósticos de TODA la base es del equipo, como `pendents_equip()`.
+  { tabla: "diagnostics_equip", op: "rpc", esperado: "denegar", descripcion: "NO veu els diagnostics de tota la base" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -932,6 +957,22 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       columnaAusente: true,
       descripcion: "un certificat de recepcio NO te imports (la columna no existeix)",
     },
+    // --- Diagnostic i pla de prevencio (F2) ---
+    // El técnico LEE las tres tablas del servicio y no escribe ninguna: declarar obligatoria
+    // una medida o cambiar el cuestionario es `pot_aprovar()`, igual que publicar el texto de
+    // una plantilla documental.
+    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20260921231949)" },
+    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20260921231949)" },
+    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20260921231949)" },
+    { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura (nomes pot_aprovar)" },
+    { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla (nomes pot_aprovar)" },
+    { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
+    { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
+    { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
+    // ⚠️ Con un uuid INEXISTENTE a propósito: la guarda de rol deja pasar (es del equipo, y
+    //    el modelo es asistido), la RPC llega hasta el insert y la FK lo rechaza con `23503`.
+    //    O sea que mide la autorizacion y **no escribe nada**.
+    { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
     {
       tabla: "costes_producto",
       op: "leer",
@@ -1157,6 +1198,22 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "reiniciar_recepcions_prova", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999 }, descripcion: "pot reiniciar els certificats de recepcio de prova (1999: no hi ha res)" },
     { tabla: "cierres_receptor", op: "leer", esperado: "permitir", descripcion: "ve els certificats de recepcio", requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)" },
     { tabla: "kg_rebuts_exercici", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu els quilos rebuts", requiereFixture: "alguna canalización conciliada del ejercicio en curso" },
+    // --- Diagnostic i pla de prevencio (F2) ---
+    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20260921231949)" },
+    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20260921231949)" },
+    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20260921231949)" },
+    // Ni el super_admin escribe la tabla a mano: publicar retira la version anterior y publica
+    // la nueva en una transaccion, y eso no se hace con dos `update` desde el navegador.
+    { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
+    // 🔴 `p_preguntes: []` NO es pereza: la guarda de rol deja pasar y entonces la validacion
+    //    levanta `22023` ANTES del insert. Asi se comprueba que el super_admin autoriza **sin
+    //    publicar una version de verdad**, que retiraria la vigente EN PRODUCCION. Mismo
+    //    criterio que `borrar_ficha_completa()`.
+    { tabla: "publicar_questionari", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "pot publicar un questionari (autoritza; 22023 per les preguntes buides)" },
+    { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
+    { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
+    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot generar el pla en nom d'una organitzacio (22023 sense_esborrany)" },
+    { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },
     // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -1847,6 +1904,30 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     periodo_desde: "1999-01-01",
     periodo_hasta: "1999-12-31",
     ejercicio: 1999,
+  },
+  // Diagnóstico (F2, 20260921231946…231950). Se rellenan ENTERAS por el mismo motivo que las
+  // del cierre: lo que tiene que cortar es el permiso, no un `not null` ni un check de forma
+  // sobre el jsonb — y las tres tienen checks de forma que saltarían antes.
+  questionaris_diagnostic: {
+    tipo_org: "productor",
+    versio: 9999,
+    vigente: false,
+    titol: { ca: "TEST-RLS", es: "TEST-RLS" },
+    preguntes: [{
+      id: "test_rls", tipus: "text", seccio: "seguiment", obligatoria: false,
+      etiqueta: { ca: "TEST-RLS", es: "TEST-RLS" },
+    }],
+  },
+  mesures_prevencio: {
+    codi: "test_rls_mesura", tipo_org: "productor", bloc: "seguiment",
+    titol: { ca: "TEST-RLS", es: "TEST-RLS" },
+    descripcio: { ca: "TEST-RLS", es: "TEST-RLS" },
+  },
+  // `operador: 'sempre'` con pregunta y valor nulos cumple los tres checks, y la pareja
+  // (mesura_codi, tipo_org) existe en el seed: la FK compuesta no puede ser la que corte.
+  regles_pla: {
+    tipo_org: "productor", operador: "sempre",
+    mesura_codi: "registre_quantitats", obligatoria: false,
   },
   espigoladas: { fecha: "1999-01-01" },
   // `convenios` no tiene GRANT de escritura para nadie: la fila se rellena lo justo para

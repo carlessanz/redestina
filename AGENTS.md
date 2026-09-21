@@ -493,6 +493,12 @@ src/
                                aquel importa el cliente de Supabase, que lanza al cargarse, así
                                que un fichero que lo importe no se puede probar desde Vitest
     verificacio.ts             La mitad con red: pregunta a verificar-certificat, SIN sesión
+    diagnostic.ts              PURO: la gramática de condiciones (espejo de avaluar_regla),
+                               qué pregunta aplica, qué obligatorias faltan, el prefill y el
+                               punto del proceso. ⚠️ Divergir de SQL NO fallaría: una pregunta
+                               que la pantalla oculta contaría como obligatoria en el servidor,
+                               así que el test la cubre operador por operador
+    diagnosticApi.ts           Envoltorios de las RPC del diagnóstico; nunca lanzan
     campsFundacio.ts           Els camps de `parametros_documentales` i `campsPendents()`:
                                QUÈ falta per poder desmarcar `datos_provisionales`. Pur,
                                amb test (§12.10)
@@ -547,6 +553,12 @@ src/
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     equip/DadesFundacio.tsx    Los datos fiscales de la Fundación, en Configuració: es lo que
                                desbloquea el certificado REAL (§12.10). Solo super_admin
+    FormulariDiagnostic.tsx    EL cuestionario, uno para los tres sitios (propio, asistido y
+                               ficha del equipo): el patrón de FirmaConveni
+    PlaPrevencio.tsx           Las medidas por bloque, la edición del equipo y la emisión
+    TargetaDiagnostic.tsx      El estado y el botón, en la ficha y en el panel externo
+    AvisDiagnostic.tsx         La banda, en tono aviso: el diagnóstico NO bloquea operar
+    equip/EditorDiagnostic.tsx El cuestionario, las medidas y las reglas, desde Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
                                Solo del equipo: lee la otra tabla de fichas (§12.28)
     FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
@@ -1090,6 +1102,57 @@ anexo B del funcional, material de la fase 0—, así que `respuestas` es un sob
 `versio_questionari = 0` marca las filas hechas antes de que ese anexo exista. El plan se descarga
 **al momento**: `documentos.envio` va `null` y quien lo pide hace polling.
 
+**Diagnóstico y plan de prevención (F2, `20260921231946`…`231950`)** — **el cuestionario por fin
+existe**. `questionaris_diagnostic` (`tipo_org`, `versio`, `provisional`, `vigente`, `titol jsonb`,
+`preguntes jsonb`) guarda el catálogo de preguntas, versionado y validado por `questionari_valid()`
+desde un CHECK; único parcial `(tipo_org) where vigente`, trigger de inmutabilidad en cuanto un plan
+lo referencia, y **sin GRANT de escritura para nadie**: se publica con `publicar_questionari()`, que
+retira la versión anterior en la misma transacción. RLS `vigente or es_intern()` — la organización
+tiene que poder leer lo que va a contestar.
+
+`mesures_prevencio` (catálogo, `codi` PK) y `regles_pla` (`pregunta → mesura`, con la gramática
+`sempre|=|!=|in|conte|>=|<=|buit`) son la regla de negocio **en tabla**, como `convenios_exigidos`:
+cambiarla es un `insert`. Lectura `es_intern()`, escritura `pot_aprovar()`, **sin delete** — una
+medida se retira con `activa = false`, porque un plan emitido cita su código. La FK de `regles_pla`
+es **compuesta** `(mesura_codi, tipo_org)`: una regla de productor no puede apuntar a una medida de
+entidad. `planes_prevencion` gana `questionari_id` y **`mesures jsonb`**, las dos dentro de la lista
+congelada de su trigger de control.
+
+🔴 **Las respuestas y las medidas se guardan AUTOCONTENIDAS**: el sobre lleva el texto de cada
+pregunta y de cada opción en ca y es, y cada medida su título y su descripción **ya resueltos al
+idioma del plan**. Es el principio de `documentos.datos`: un plan de hace cinco años no puede
+depender de que su cuestionario siga vigente, ni de que quien lo lee pueda leer `mesures_prevencio`,
+que es del equipo.
+
+🔴 **La generación del plan va en SQL, no en TypeScript.** Las reglas viven en tabla, la evaluación
+es un join más un `jsonb_agg`, y —lo que lo decide— guardar el diagnóstico y generar su plan son **la
+misma transacción**. Calculándolo fuera existiría un instante con un diagnóstico contestado y un plan
+que dice otra cosa, y si la segunda llamada falla ese instante se queda para siempre.
+
+🔴 **Solo las medidas de REGISTRO nacen obligatorias** (`registre_quantitats` en el generador;
+`registre_entrades` y `registre_destinacions` en el receptor — verificado en la base: 3 de 20). Es lo
+único que Redestina puede pedir con cara seria mientras el cuestionario sea provisional, y lo único
+que el servicio necesita de verdad para medir. Todo lo demás se recomienda. **Lo sostiene el seed, no
+un check**: el día que la fase 0 entregue el anexo B, la Fundación podrá declarar obligatoria otra
+medida sin una migración — que es para lo que existe esta tabla.
+
+⚠️ **El cuestionario sembrado es PROVISIONAL** (12 preguntas por tipo, 20 medidas, 32 reglas,
+`versio 0`, `provisional = true`), con el mismo criterio que los seis convenios: texto de trabajo
+marcado como tal para poder recorrer el circuito antes de que llegue el anexo B. Se sustituye
+**publicando la versión 1**, no editando la 0: editar un cuestionario que ya ha generado
+diagnósticos está prohibido por trigger. `plan_datos()` lleva `questionari_provisional` para que el
+PDF lo diga impreso.
+⚠️ **Y ese marcador NO es `versio_questionari === 0`**, que es lo que miraba el renderizador hasta
+la F2: el seed **es** la versión 0 y **sí** tiene preguntas, así que el texto «el qüestionari encara
+no està definit» pasaría a ser falso. Lo que hay que decir es que el cuestionario es texto de
+trabajo sin validar, no que no exista.
+
+⚠️ **`emitir_plan_basico()` exige ahora un diagnóstico completo** —ninguna obligatoria que aplique
+sin contestar, y al menos una medida— **solo cuando el plan tiene `questionari_id`**. Los planes
+anteriores a la F2 y los que entran por `guardar_plan_basico()` no lo tienen, y exigirles las
+obligatorias de un cuestionario que nunca contestaron los dejaría sin poder emitirse jamás. Mismo
+criterio que `20260921214526` con los datos provisionales.
+
 **`cierres_donante.tipo`** — `donacio` (el CD, con importes y factura) · `transaccio` (el **CT**, de
 venta y maquila, **sin importes**). Default `donacio`, que es lo que mantiene válidas las filas
 anteriores. La clave pasa a `(cierre_id, productor_id, tipo)`: una organización puede donar **y**
@@ -1626,6 +1689,14 @@ funciones, no políticas:
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
 | `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
+| `questionari_vigent(tipo_org)` | El cuestionario que toca contestar. **`security invoker`**: la política de la tabla (`vigente or es_intern()`) ya dice lo que hay que decir, y una `definer` solo podría ampliar el alcance |
+| `publicar_questionari(tipo_org, titol, preguntes, provisional, vigent)` | La versión siguiente, retirando la anterior **en la misma transacción**. `pot_aprovar()`. Devuelve **`regles_orfes`**: las reglas que apuntan a una pregunta que ya no existe. **No bloquea** —una regla huérfana no dispara— pero quien publica tiene que verlo, o el plan siguiente saldría con menos medidas y nadie sabría por qué |
+| `desar_diagnostic(tipo_org, org, respostes, notes, idioma)` | Guarda **siempre**, completo o no —un cuestionario de doce preguntas no se contesta de una sentada—, compone el sobre autocontenido y, si no falta ninguna obligatoria, genera el plan. ⚠️ `p_respostes` es el mapa plano `{pregunta_id: valor}`: **el array con los textos lo compone el servidor**, porque si lo compusiera el cliente el texto congelado sería el que el navegador dijo haber enseñado (mismo criterio que `sha256_texto` en la firma de un convenio) |
+| `generar_pla_des_de_diagnostic(tipo_org, org, forcar)` | Evalúa `regles_pla` y escribe `mesures`. **Desduplica por `codi`** ganando la que la deja obligatoria y, a igualdad, la de `prioritat` menor. `22023 mesures_editades` si alguien ya ajustó la lista a mano: regenerar en silencio se llevaría por delante el criterio del técnico que estuvo delante de la persona |
+| `desar_mesures_pla(plan, mesures, observacions)` | El ajuste manual. Dos invariantes: **el texto de una medida del catálogo se relee del catálogo** —nadie reescribe el contenido de una medida en un documento con el sello de la Fundación— y **una obligatoria que produjeron las reglas no se puede quitar** (`22023 falten_obligatories`) |
+| `fixar_nivell_pla(plan, nivel)` | Subir a `personalitzat` exige `pot_aprovar()`; bajar a `basic`, no. El plan personalizado es un **servicio técnico**, no una casilla: si una organización pudiera declararlo desde su panel, estaría contratándose a sí misma algo que nadie ha prestado |
+| `diagnostic_estat(tipo_org, org)` · `diagnostics_equip()` | En qué punto está, en una llamada (`sense_questionari · sense_comencar · incomplet · a_punt · emes`, con `falten[]`), y la misma pregunta para toda la base. La segunda es `security invoker` con guarda de equipo, como `pendents_equip()` |
+| `avaluar_regla` · `pregunta_aplica` · `diagnostic_falten` · `compondre_respostes` · `questionari_valid`… | Los helpers puros (`immutable`, sin tocar ninguna tabla). ⚠️ `avaluar_regla` es **la única** gramática de condiciones: la comparten `regles_pla` y el `aplica_a` de una pregunta condicional, porque dos implementaciones de «¿se cumple esto?» acabarían divergiendo — y entonces **una pregunta que la pantalla oculta contaría como obligatoria en el servidor** |
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true` — solo en modo real** (`20260921214526`); en prueba usa la serie `P-CT` |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
@@ -2275,6 +2346,41 @@ qué se hace con las demás —¿excedentes nuevos? ¿se descartan?—, y eso no
 bucle: la base se niega con `massa_linies`. Si algún día una jornada tiene que recoger varios
 productos partiendo de una oferta, se añade explícito.
 
+### Diagnòstic i pla de prevenció: la banda, la marca y la tarjeta (22-09-2026)
+
+**El diagnóstico se pide en el panel TRAS validar el alta**, no en `/registre`: un formulario de
+doce preguntas en la puerta no lo termina nadie. Y **el equipo puede rellenarlo en nombre de la
+organización** desde su ficha, antes o después de aprobar — es el modelo asistido (§1bis).
+
+Un solo `FormulariDiagnostic` para los tres sitios, que es el patrón de `FirmaConveni`. Dos
+botones, porque **la base guarda siempre, completo o no**: «Desa i genera el pla» y «Desa i
+continua més tard».
+
+⚠️ **Un booleano se pinta con DOS casillas (Sí / No), no con una.** Una casilla sola tiene dos
+estados y aquí hacen falta tres: sí, no y **«todavía no lo he dicho»** — que es justo lo que mide
+`diagnostic_falten()`. Con una sola, «responder que no» y «no responder» serían el mismo píxel, y
+una obligatoria contestada con «no» quedaría pendiente para siempre.
+
+⚠️ **La banda va en tono `aviso`, no en rojo**, al revés que la del convenio: el diagnóstico **no
+bloquea operar**. Y se calcula **una sola vez en `AppShell`** y se reparte a la banda y a la marca
+del menú — calculadas por separado, el contador y la banda podrían decir cosas distintas (§6ter).
+
+⚠️ **El prefill solo propone lo que la pregunta puede aceptar**, y hoy eso es **uno de los cinco
+sembrados**: `productos_habituales` son nombres de producto contra opciones que son familias, y
+dos booleanos de la ficha apuntan a preguntas de selección múltiple. Donde no encaja **no se
+propone nada**, y lo que sí se propone se marca como propuesto hasta que alguien lo toca: un valor
+sugerido que se queda sin revisar acaba siendo una respuesta que la persona no ha dado.
+
+⚠️ **Regenerar el plan se intenta SIN forzar**, y solo se pregunta cuando la base contesta
+`22023 mesures_editades`. Y **las obligatorias no llevan casilla de quitar**: la base rechaza la
+lista que las pierda, y ofrecer un control que va a fallar es peor que no ofrecerlo.
+
+✅ **Ejercitado contra producción el 22-09-2026** con `Mas de Prova SCP`: un diagnóstico incompleto
+guarda y devuelve las ocho obligatorias que faltan sin generar nada; completo, **9 reglas disparan
+→ 6 medidas tras desduplicar, 1 obligatoria** (la de registro), y las seis son coherentes con lo
+respondido — calibre y estético → segunda categoría y revisión de criterios; sin frío → cadena de
+frío mínima. Queda ese plan en borrador, que además da fixture a los checks que §12.116 no cubre.
+
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
 Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo
@@ -2608,6 +2714,7 @@ vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
 | `/signar/:token` | **Firma del convenio sin sesión** (fase 2). Mismo criterio |
+| `/organitzacio/diagnostic` · `/equip/diagnostics[/:tipus/:id]` | El diagnóstico y su plan (§4). Las dos entradas de menú van **`barra: false`** y **ninguna entra en `navPerRol`**, así que la barra inferior de móvil sigue con cuatro (§2) |
 | `/verificar/:codi` | **Comprobar un certificado de recepción**, sin sesión y sin token: lo que se enseña es el código impreso en el papel. Responde la Edge Function `verificar-certificat` (pública, solo lectura) con **ocho campos y ni uno más** — ni el PDF, ni `datos`, ni el detalle, ni ninguna procedencia, que nombraría a terceros que no han pedido salir en una página pública. ⚠️ Un código **inventado y uno mal formado responden lo mismo**: distinguirlos diría si un número de certificado existe |
 | `/panell` | Lo que antes era `/`: manda a cada cual a su panel |
 
@@ -4277,9 +4384,10 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **44 entradas vivas** (6 parciales 🟡 y 38 abiertas) y **69 cerradas**,
-sobre 113 numeradas. Las dos últimas (113 y 114) son del certificado de recepción, y las dos
-nacen catalogadas en §12bis como decisiones con su precio.
+Estado al 22-09-2026: **46 entradas vivas** (6 parciales 🟡 y 40 abiertas) y **69 cerradas**,
+sobre 115 numeradas. Las cuatro últimas son de esta tanda —113 y 114 del certificado de
+recepción, 115 y 116 del diagnóstico— y las cuatro nacen catalogadas en §12bis: dos como
+decisiones con su precio y dos como espera de material de la fase 0.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4659,6 +4767,17 @@ nacen catalogadas en §12bis como decisiones con su precio.
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
+115. **El cuestionario de diagnóstico, las 20 medidas y las 32 reglas son texto de trabajo
+     SIN validar por la Fundació.** Es la misma decisión que los seis convenios
+     (`20270111100200`) y el mismo precio: se emite con `provisional = true`, **sale impreso en
+     el PDF**, y se sustituye publicando la versión 1 desde la pantalla, nunca editando la 0.
+     Espera material de la fase 0 (anexo B).
+116. **`desar_mesures_pla()` y `fixar_nivell_pla()` no tienen check en el arnés.** Su guarda
+     depende del plan, así que va **después** de buscarlo: con un uuid inventado responden
+     `22023 «no existe»` y no el `42501`, así que un `denegar` ahí **saldría verde por el motivo
+     equivocado**, que es peor que no tenerlo. Se cubren el día que el fixture documental deje
+     un plan con borrador.
+
 113. **Una línea del certificado de recepción es una canalización entera, con un solo
      producto.** `cierre_receptor_lineas` tiene `unique (cierre_receptor_id, canalizacion_id)` y
      toma el `producto` del excedente, así que un ENT con varias líneas de producto —una
@@ -4718,6 +4837,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
 | 113 | Una línea del CR = una canalización, con un solo producto | El **total es exacto**; lo que se reparte mal es la atribución por producto. La alternativa rompe la clave única que comparten las tres tablas de cierre |
+| 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
 | 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
 
@@ -4727,6 +4847,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 |---|---|---|
 | 17 | Las dos whitelists de test conviven con `es_test`, y el Dashboard mide por las de Meta | **Meta**: se revisa al pasar su número a producción |
 | 71 · 77 · 84 | Los textos legales de RES, CD, CT, **CR**, PLA y los seis convenios | **La asesoría** |
+| **115** | El cuestionario de diagnóstico, sus 20 medidas y sus 32 reglas | **La fase 0** (anexo B). Mientras tanto se emite marcado como provisional, y el PDF lo dice |
 | 85 | Prueba end-to-end del CT | 🟡 **Ya no está bloqueada**: desde `20260921214526` el CT se emite en modo prueba (`P-CT`). Queda ejercitarlo, que es trabajo, no espera |
 | 99 | El plan de prevención se lista desde `documentos` y no desde `planes_prevencion` | **La fase 0**: sin el cuestionario (anexo B) no hay pantalla de planes, así que del plan solo existe su PDF |
 
@@ -4751,7 +4872,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 115.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 117.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
@@ -4836,7 +4957,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **887 pruebas en 28 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **936 pruebas en 29 ficheros**, todas correctas y ninguna pendiente.
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -4844,7 +4965,17 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 827/827 correctas y 22 saltadas, «Sin fallos de permisos»**
+   ✅ **Referencia HOY: 929/929 correctas y 22 saltadas, «Sin fallos de permisos»**
+   (22-09-2026, tras aplicar las cinco migraciones del diagnóstico,
+   `20260921231946`…`231950`). Son las 827 anteriores más **102**: doce checks en
+   `DOCUMENTAL_EXTERN` ×7 cuentas —el cuestionario **sí** lo ve cualquiera con sesión, porque
+   es lo que tiene que contestar; el catálogo de medidas y las reglas, no— más nueve en
+   `equip` y nueve en `super_admin`.
+   ⚠️ Dos de los «permitir» van con **las preguntas vacías a propósito**: la guarda de rol deja
+   pasar y entonces la validación levanta `22023` antes del insert, así que se comprueba que el
+   super_admin autoriza **sin publicar una versión de verdad** — que retiraría la vigente en
+   producción. Mismo criterio que `borrar_ficha_completa()`.
+   La referencia anterior era **827/827 + 22**
    (22-09-2026, tras aplicar `20260921223245` y `…223246`). Son las 745 anteriores más **82**
    del certificado de recepción: ocho checks en `DOCUMENTAL_EXTERN` —nada de ese circuito es
    de un externo—, nueve en `equip` (incluido el `42703` que vigila que **no aparezca nunca**

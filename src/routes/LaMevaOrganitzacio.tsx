@@ -29,6 +29,7 @@ import { Building2, UserCircle } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import PerfilOrganitzacio from './PerfilOrganitzacio'
+import TargetaDiagnostic from '../components/TargetaDiagnostic'
 import { cn } from '../lib/utils'
 
 type Tipus = 'productor' | 'entidad'
@@ -49,7 +50,12 @@ export default function LaMevaOrganitzacio() {
   }
 
   if (te.length === 1) {
-    return <PerfilOrganitzacio key={te[0]} tipus={te[0]} />
+    return (
+      <div className="space-y-4">
+        <Diagnostic tipus={te[0]} />
+        <PerfilOrganitzacio key={te[0]} tipus={te[0]} />
+      </div>
+    )
   }
 
   const actiu = tria ?? te[0]
@@ -80,11 +86,22 @@ export default function LaMevaOrganitzacio() {
           )
         })}
       </div>
+      {/* El diagnóstico va ARRIBA: es lo que hay que hacer con esta organización, y la
+          ficha es lo que ya está hecho. Es una tarjeta de estado con su enlace, no un
+          formulario más: quien entra aquí a corregir el NIF no tiene que perderlo. */}
+      <Diagnostic key={`diag-${actiu}`} tipus={actiu} />
       {/* `key` por pestaña: ver la nota de la cabecera. Es lo que impide guardar una ficha
           con los datos de la otra. */}
       <PerfilOrganitzacio key={actiu} tipus={actiu} />
     </div>
   )
+}
+
+/** La tarjeta del diagnóstico de UN papel, con su organización resuelta desde el contexto. */
+function Diagnostic({ tipus }: { tipus: Tipus }) {
+  const { ctx } = useAppContext()
+  const org = ctx?.organitzacions.find((o) => o.tipo === tipus) ?? null
+  return <TargetaDiagnostic tipusOrg={tipus} orgId={org?.id ?? null} mode="extern" />
 }
 
 /** `useT` y el contexto en una línea, que es lo único que esta pantalla necesita de fuera. */

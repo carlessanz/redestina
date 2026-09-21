@@ -1,21 +1,30 @@
 // Plan de prevención básico (PLA) — línea 5 del funcional, diagnóstico y prevención.
 //
-// ⚠️ EL CUESTIONARIO NO EXISTE TODAVÍA. Es el **anexo B del funcional**, material de la
-//    fase 0 que la Fundación aún no ha cerrado, exactamente igual que los textos legales
-//    de los albaranes y de los certificados. Por eso este renderizador **no sabe ni una
-//    sola pregunta**: pinta lo que venga en `questionari.respostes[]` en forma de
-//    pregunta → respuesta, en el orden en que llegue, y no interpreta nada.
+// ⚠️ ESTE RENDERIZADOR NO SABE NI UNA SOLA PREGUNTA, Y SIGUE SIN SABERLA. El cuestionario
+//    ya existe (F2: `questionaris_diagnostic`, 12 preguntas por tipo de organización) pero
+//    vive en la base, versionado, y viaja **autocontenido** dentro del snapshot: cada
+//    respuesta trae el texto de su pregunta y el de la opción elegida, en ca y es. Aquí se
+//    pinta lo que venga, en el orden en que venga, y no se interpreta nada.
 //
 //    Inventarse aquí unas preguntas de negocio sería peor que no tener ninguna: quedarían
 //    sembradas en el código, alguien las daría por válidas y el día que llegue el anexo B
-//    habría que migrar respuestas reales. La base tomó la misma decisión —`respuestas` es
-//    un sobre sin vocabulario de preguntas (20270301100000)— y aquí se obedece.
+//    habría que migrar respuestas reales. El mismo argumento vale para las medidas, que
+//    llegan **ya resueltas al idioma del plan** desde `plan_datos()`: el catálogo puede
+//    cambiar mañana y un plan emitido tiene que seguir imprimiéndose como se emitió.
 //
-//    Y como el papel sí sale de la impresora, el documento **dice que está incompleto**:
-//    la caja «Contingut pendent de definir» es obligatoria mientras `versio_questionari`
-//    valga 0. Un plan de prevención con aspecto de plan de prevención y sin medidas de
-//    prevención, si no avisara, sería lo único indefendible de todo esto —el mismo
-//    criterio que la caja de «text provisional» de los albaranes—.
+// 🔴 `pregunta` ES `{ca, es}`, NO UNA CADENA (F2). Hasta la fase anterior era texto plano;
+//    desde que `compondre_respostes()` la compone, es un objeto bilingüe. Cualquier cosa
+//    que la imprima sin pasar por `textoIdioma()` escribe `[object Object]` en un papel con
+//    el sello de la Fundación, y no falla ni avisa. Los planes emitidos ANTES de F2 la
+//    siguen trayendo como cadena, así que se admiten las dos formas.
+//
+// 🔴 Y LA CAJA DE AVISO YA NO SE DECIDE CON `versio_questionari === 0`. El cuestionario
+//    sembrado ES la versión 0 y SÍ tiene preguntas, así que decir «el qüestionari encara no
+//    està definit» pasó a ser falso el día que se aplicó el seed. El marcador correcto es
+//    `questionari_provisional`, que viene del sobre congelado, y lo que el papel dice ahora
+//    es lo que es cierto: que ese cuestionario es texto de trabajo que la Fundació y su
+//    asesoría todavía no han validado. Mismo criterio que los convenios (§12.77) y que la
+//    plantilla del certificado de recepción.
 //
 // POR QUÉ NO CUELGA DE `cierre.ts`. Un plan no es un acumulado anual de dos partes: no
 // hay donante ni generador, no hay período, no hay firma de la apoderada y no hay ni un
@@ -45,18 +54,65 @@ import {
 // ---------------------------------------------------------------------------
 // Todo opcional, y con las claves TAL COMO las escribe SQL, acento incluido (§cierre.ts).
 
-/** Una respuesta del cuestionario. `valor` es deliberadamente `unknown`: ver cabecera. */
+/**
+ * Texto bilingüe tal como lo guardan las tablas del diagnóstico: `{ca, es}`. Se imprime
+ * con `textoIdioma()`, nunca directamente (ver cabecera).
+ */
+export interface TextoBilingue {
+  ca?: string | null;
+  es?: string | null;
+}
+
+/**
+ * Una respuesta del cuestionario, autocontenida (`compondre_respostes()`).
+ *
+ * `valor` sigue siendo `unknown` a propósito: es lo que tecleó la persona, y su forma
+ * depende del `tipus` de la pregunta. Lo que se imprime, cuando existe, es `etiqueta`
+ * (opción única y sí/no) o `etiquetes` (selección múltiple) —el texto de verdad—; `valor`
+ * es el respaldo para los tipos que no tienen opciones (`text`, `numero`) y para los
+ * planes anteriores a F2, que no traían ninguna etiqueta.
+ */
 export interface RespuestaPlan {
   id?: string | null;
-  pregunta?: string | null;
+  /** `opcio` · `multi` · `boolea` · `numero` · `text`. Informativo: aquí no se interpreta. */
+  tipus?: string | null;
+  /** Bloque del cuestionario, mismo vocabulario que `mesures_prevencio.bloc`. */
+  seccio?: string | null;
+  /** Desde F2, `{ca, es}`. Los planes anteriores la traen como cadena. */
+  pregunta?: string | TextoBilingue | null;
   valor?: unknown;
+  /** El texto de la opción elegida (`opcio`, `boolea`). */
+  etiqueta?: string | TextoBilingue | null;
+  /** Los textos de las opciones marcadas (`multi`). */
+  etiquetes?: (string | TextoBilingue | null)[] | null;
 }
 
 export interface CuestionarioPlan {
+  /** El código interno del cuestionario (`diagnostic_productor`). No es su título. */
   questionari?: string | null;
+  questionari_id?: string | null;
   versio_questionari?: number | string | null;
+  questionari_provisional?: boolean | null;
+  /** El título que lee una persona. Bilingüe desde F2. */
+  titol?: string | TextoBilingue | null;
   respostes?: RespuestaPlan[] | null;
   notes?: string | null;
+}
+
+/**
+ * Una medida del plan. `titol` y `descripcio` llegan **ya resueltos al idioma del plan**
+ * (`generar_pla_des_de_diagnostic()` las copia con el `->> pl.idioma` dentro), así que aquí
+ * son cadenas; se aceptan igualmente bilingües por si algún día dejaran de serlo.
+ */
+export interface MesuraPlan {
+  codi?: string | null;
+  /** `planificacio` · `collita` · `conservacio` · `canalitzacio` · `seguiment`. */
+  bloc?: string | null;
+  titol?: string | TextoBilingue | null;
+  descripcio?: string | TextoBilingue | null;
+  obligatoria?: boolean | null;
+  /** `regla` (la produjo el motor) o `manual` (la añadió el equipo). */
+  origen?: string | null;
 }
 
 export interface OrganizacionPlan {
@@ -80,6 +136,13 @@ export interface DatosPlan {
   fundacio?: OrganizacionCierre | null;
   organitzacio?: OrganizacionPlan | null;
   questionari?: CuestionarioPlan | null;
+  questionari_id?: string | null;
+  questionari_versio?: number | string | null;
+  /** Lo que decide la caja de aviso. Ausente = se asume `true` (ver cabecera). */
+  questionari_provisional?: boolean | null;
+  /** El contenido del plan. Vacío en los planes anteriores a F2. */
+  mesures?: MesuraPlan[] | null;
+  mesures_observacions?: string | null;
 }
 
 export interface OpcionesPlan {
@@ -119,12 +182,22 @@ interface DiccionarioPlan {
   cif: string;
   domicili: string;
   inscripcio: string;
-  pendent_titol: string;
-  pendent_text: string;
+  provisional_q_titol: string;
+  provisional_q_text: string;
+  mesures_titol: string;
+  mesures_intro: string;
+  mesures_resum: (obligatories: number, recomanades: number) => string;
+  sense_mesures: string;
+  obligatoria: string;
+  recomanada: string;
+  observacions_titol: string;
   questionari_titol: string;
   questionari_meta: (nom: string, versio: string) => string;
   sense_respostes: string;
   notes_titol: string;
+  /** Los cinco bloques, que el cuestionario y el catálogo de medidas comparten. */
+  blocs: Record<string, string>;
+  bloc_altres: string;
   legal: string;
   provisional_titol: string;
   provisional_avis: string;
@@ -161,10 +234,20 @@ const CA: DiccionarioPlan = {
   cif: "CIF",
   domicili: "Domicili",
   inscripcio: "Inscripció",
-  pendent_titol: "Contingut pendent de definir",
-  pendent_text:
-    "El qüestionari de diagnòstic i les mesures de prevenció que se'n deriven encara no estan definits per la Fundació Espigoladors (annex B del document funcional). Aquest document recull, tal com es van registrar, les respostes que consten al sistema; no conté encara ni la valoració del diagnòstic ni el pla de mesures. Quan el qüestionari estigui definit, aquesta organització rebrà un pla nou que substituirà aquest.",
-  questionari_titol: "Respostes registrades",
+  provisional_q_titol: "Qüestionari i mesures pendents de validació",
+  provisional_q_text:
+    "El qüestionari amb què s'ha fet aquest diagnòstic és text de treball: encara no l'han validat la Fundació Espigoladors ni l'assessoria (annex B del document funcional). Les mesures que se'n deriven són, per tant, una proposta inicial i no acrediten el compliment de cap obligació. El contingut és el que consta al sistema i serveix per començar a treballar; quan hi hagi la versió validada, aquesta organització rebrà un pla nou que substituirà aquest.",
+  mesures_titol: "Pla de mesures",
+  mesures_intro:
+    "Les mesures surten de les respostes del diagnòstic. Les obligatòries són les que la Fundació demana per poder mesurar; la resta són recomanacions.",
+  mesures_resum: (obligatories, recomanades) =>
+    `Obligatòries: ${obligatories} · Recomanades: ${recomanades}`,
+  sense_mesures:
+    "Aquest pla no porta cap mesura: es va emetre abans que el diagnòstic les generés.",
+  obligatoria: "OBLIGATÒRIA",
+  recomanada: "RECOMANADA",
+  observacions_titol: "Observacions",
+  questionari_titol: "Respostes del diagnòstic",
   questionari_meta: (nom, versio) => `Qüestionari: ${nom} · versió ${versio}`,
   sense_respostes: "Encara no hi ha cap resposta registrada.",
   notes_titol: "Notes",
@@ -179,6 +262,14 @@ const CA: DiccionarioPlan = {
   peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pàg. ${n} de ${total}`,
   col: { pregunta: "Pregunta", resposta: "Resposta" },
+  blocs: {
+    planificacio: "Planificació",
+    collita: "Collita",
+    conservacio: "Conservació",
+    canalitzacio: "Canalització",
+    seguiment: "Seguiment i registre",
+  },
+  bloc_altres: "Altres",
 };
 
 const ES: DiccionarioPlan = {
@@ -205,10 +296,20 @@ const ES: DiccionarioPlan = {
   cif: "CIF",
   domicili: "Domicilio",
   inscripcio: "Inscripción",
-  pendent_titol: "Contenido pendiente de definir",
-  pendent_text:
-    "El cuestionario de diagnóstico y las medidas de prevención que se derivan de él todavía no están definidos por la Fundació Espigoladors (anexo B del documento funcional). Este documento recoge, tal como se registraron, las respuestas que constan en el sistema; todavía no contiene ni la valoración del diagnóstico ni el plan de medidas. Cuando el cuestionario esté definido, esta organización recibirá un plan nuevo que sustituirá a este.",
-  questionari_titol: "Respuestas registradas",
+  provisional_q_titol: "Cuestionario y medidas pendientes de validación",
+  provisional_q_text:
+    "El cuestionario con el que se ha hecho este diagnóstico es texto de trabajo: todavía no lo han validado la Fundació Espigoladors ni la asesoría (anexo B del documento funcional). Las medidas que se derivan de él son, por tanto, una propuesta inicial y no acreditan el cumplimiento de ninguna obligación. El contenido es el que consta en el sistema y sirve para empezar a trabajar; cuando exista la versión validada, esta organización recibirá un plan nuevo que sustituirá a este.",
+  mesures_titol: "Plan de medidas",
+  mesures_intro:
+    "Las medidas salen de las respuestas del diagnóstico. Las obligatorias son las que la Fundación pide para poder medir; el resto son recomendaciones.",
+  mesures_resum: (obligatories, recomanades) =>
+    `Obligatorias: ${obligatories} · Recomendadas: ${recomanades}`,
+  sense_mesures:
+    "Este plan no lleva ninguna medida: se emitió antes de que el diagnóstico las generara.",
+  obligatoria: "OBLIGATORIA",
+  recomanada: "RECOMENDADA",
+  observacions_titol: "Observaciones",
+  questionari_titol: "Respuestas del diagnóstico",
   questionari_meta: (nom, versio) => `Cuestionario: ${nom} · versión ${versio}`,
   sense_respostes: "Todavía no hay ninguna respuesta registrada.",
   notes_titol: "Notas",
@@ -223,6 +324,14 @@ const ES: DiccionarioPlan = {
   peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pág. ${n} de ${total}`,
   col: { pregunta: "Pregunta", resposta: "Respuesta" },
+  blocs: {
+    planificacio: "Planificación",
+    collita: "Recolección",
+    conservacio: "Conservación",
+    canalitzacio: "Canalización",
+    seguiment: "Seguimiento y registro",
+  },
+  bloc_altres: "Otros",
 };
 
 /**
@@ -287,9 +396,10 @@ const MESES: Record<"ca" | "es", string[]> = {
 // ---------------------------------------------------------------------------
 
 /**
- * `valor` es `unknown` a propósito (ver cabecera): el anexo B decidirá si una respuesta es
- * un sí/no, un número, un texto o una lista, y hasta entonces puede ser cualquiera de las
- * cuatro. Esto lo convierte en algo legible **sin interpretarlo**:
+ * `valor` es `unknown` a propósito (ver cabecera): su forma la decide el `tipus` de la
+ * pregunta —sí/no, número, texto o lista— y este módulo no conoce ninguna pregunta. Esto
+ * lo convierte en algo legible **sin interpretarlo**, y es el respaldo de
+ * `respuestaLegible()` para los tipos que no traen etiqueta:
  *
  *   · `null`/vacío → «—», nunca un 0 ni un «No»: no contestado no es contestado que no.
  *   · booleano → Sí/No en el idioma del documento.
@@ -316,6 +426,88 @@ export function valorLegible(valor: unknown, t: DiccionarioPlan): string {
     return partes.length === 0 ? t.buit : partes.join(" · ");
   }
   return String(valor);
+}
+
+/**
+ * 🔴 EL ANTÍDOTO CONTRA `[object Object]`. Todo lo que viene del diagnóstico —preguntas,
+ * etiquetas de opción, títulos— es `{ca, es}` desde F2, y era una cadena antes. Las dos
+ * formas entran por aquí y salen como texto.
+ *
+ * El respaldo NO es el idioma del documento: si falta la lengua pedida se usa la otra,
+ * porque un texto en el idioma equivocado sigue diciendo lo que dice, y un hueco no.
+ */
+export function textoIdioma(valor: unknown, lengua: "ca" | "es"): string {
+  if (valor === null || valor === undefined) return "";
+  if (typeof valor === "string") return valor.trim();
+  if (typeof valor === "object") {
+    const o = valor as Record<string, unknown>;
+    for (const clave of [lengua, "ca", "es"]) {
+      const v = o[clave];
+      if (typeof v === "string" && v.trim() !== "") return v.trim();
+    }
+    return "";
+  }
+  return String(valor).trim();
+}
+
+/**
+ * Lo que se imprime en la columna «Resposta».
+ *
+ * Primero las etiquetas, que son el texto que la persona vio y eligió; `valor` solo cuando
+ * no hay ninguna —un número, un texto libre, o un plan anterior a F2—. Imprimir `valor`
+ * habiendo etiqueta pondría el código interno (`mes_20000`) en el papel.
+ */
+function respuestaLegible(r: RespuestaPlan, t: DiccionarioPlan, lengua: "ca" | "es"): string {
+  if (Array.isArray(r.etiquetes)) {
+    const partes = r.etiquetes.map((e) => textoIdioma(e, lengua)).filter((x) => x !== "");
+    if (partes.length > 0) return partes.join(", ");
+  }
+  const etiqueta = textoIdioma(r.etiqueta, lengua);
+  if (etiqueta !== "") return etiqueta;
+  return valorLegible(r.valor, t);
+}
+
+/** El orden de los bloques es el del proceso, no el alfabético. */
+const ORDEN_BLOQUES = [
+  "planificacio",
+  "collita",
+  "conservacio",
+  "canalitzacio",
+  "seguiment",
+] as const;
+
+interface GrupoBloque<T> {
+  bloc: string;
+  items: T[];
+}
+
+/**
+ * Agrupa por bloque respetando `ORDEN_BLOQUES` y dejando al final lo que no reconozca
+ * —incluido el bloque vacío de los planes anteriores a F2, que no traían `seccio`—. Un
+ * bloque desconocido se imprime con su código: inventarle un nombre sería peor.
+ */
+function agruparPorBloque<T>(items: T[], bloque: (x: T) => string): GrupoBloque<T>[] {
+  const mapa = new Map<string, T[]>();
+  for (const item of items) {
+    const clave = bloque(item);
+    const lista = mapa.get(clave);
+    if (lista) lista.push(item);
+    else mapa.set(clave, [item]);
+  }
+  const salida: GrupoBloque<T>[] = [];
+  for (const bloc of ORDEN_BLOQUES) {
+    const lista = mapa.get(bloc);
+    if (lista) {
+      salida.push({ bloc, items: lista });
+      mapa.delete(bloc);
+    }
+  }
+  for (const [bloc, items2] of mapa) salida.push({ bloc, items: items2 });
+  return salida;
+}
+
+function etiquetaBloque(t: DiccionarioPlan, bloc: string): string {
+  return t.blocs[bloc] ?? (bloc !== "" ? bloc : t.bloc_altres);
 }
 
 // ---------------------------------------------------------------------------
@@ -380,23 +572,49 @@ export async function renderPla(
   pintarFundacion(m, t, datos.fundacio);
 
   // ------------------------------------------------- el aviso que hace honesto el papel
-  // Va ARRIBA, antes de las respuestas: quien abra el PDF tiene que leer que esto todavía
-  // no es un plan de medidas antes de leer nada que lo parezca. Y en coral, que en el
-  // sistema de diseño no significa error sino atención (§AGENTS.md 2bis).
+  // Va ARRIBA, antes del plan: quien abra el PDF tiene que leer con qué se ha hecho antes
+  // de leer lo que dice. En coral, que en el sistema de diseño no significa error sino
+  // atención (§AGENTS.md 2bis).
+  //
+  // ⚠️ El marcador es `questionari_provisional` y se compara con `!== false`, no con
+  //    `=== true`: los planes emitidos antes de F2 no traen la clave, y ante la duda el
+  //    aviso se imprime. Decir que un documento está validado cuando no lo está es el
+  //    único error caro de los dos. (Para aquellos planes la frase también es cierta: se
+  //    hicieron sin ningún cuestionario validado.)
   const cuestionario = datos.questionari ?? {};
-  const versionCuestionario = Number(cuestionario.versio_questionari ?? 0);
-  if (!isFinite(versionCuestionario) || versionCuestionario < 1) {
+  const versionCuestionario = String(
+    datos.questionari_versio ?? cuestionario.versio_questionari ?? 0,
+  );
+  const provisional = datos.questionari_provisional !== false &&
+    cuestionario.questionari_provisional !== false;
+  if (provisional) {
     m.espacio(8);
-    m.caja(t.pendent_text, { titulo: t.pendent_titol, fondo: COLORES.crema, barra: COLORES.coral });
+    m.caja(t.provisional_q_text, {
+      titulo: t.provisional_q_titol,
+      fondo: COLORES.crema,
+      barra: COLORES.coral,
+    });
   }
+
+  // ------------------------------------------------------------ el plan de medidas
+  // Antes de las respuestas: quien abre un «Pla de prevenció» busca qué tiene que hacer.
+  // Las respuestas son el diagnóstico que lo justifica, y van después.
+  pintarMesures(
+    m,
+    t,
+    lengua,
+    Array.isArray(datos.mesures) ? datos.mesures : [],
+    (datos.mesures_observacions ?? "").trim(),
+  );
 
   // ----------------------------------------------------------------- respuestas
   m.espacio(10);
   m.titulo(t.questionari_titol, 2);
   m.parrafo(
     t.questionari_meta(
-      (cuestionario.questionari ?? "").trim() || t.buit,
-      String(cuestionario.versio_questionari ?? 0),
+      textoIdioma(cuestionario.titol, lengua) || (cuestionario.questionari ?? "").trim() ||
+        t.buit,
+      versionCuestionario,
     ),
     { color: COLORES.verdeGris, tamano: 9, despues: 6 },
   );
@@ -407,21 +625,30 @@ export async function renderPla(
     m.parrafo(t.sense_respostes, { color: COLORES.verdeGris, tamano: 10, despues: 6 });
   } else {
     // Tabla y no `campos()`: una respuesta puede ser larga y la tabla parte las celdas y
-    // repite la cabecera al cambiar de página. La pregunta se imprime tal cual llega; si
-    // no la hay, el `id`, que es lo único que identifica esa fila.
+    // repite la cabecera al cambiar de página. Una tabla POR SECCIÓN, porque el
+    // cuestionario viene agrupado y doce filas seguidas no se leen; si ninguna respuesta
+    // trae `seccio` —los planes anteriores a F2— sale una sola tabla sin rótulo, que es
+    // exactamente lo que se imprimía antes.
     const columnas: Columna[] = [
       { titulo: t.col.pregunta, ancho: 55 },
       { titulo: t.col.resposta, ancho: 45 },
     ];
-    m.tabla({
-      columnas,
-      filas: respuestas.map((r) => [
-        (r.pregunta ?? "").trim() || String(r.id ?? ""),
-        valorLegible(r.valor, t),
-      ]),
-      cebra: true,
-      despues: 6,
-    });
+    const grupos = agruparPorBloque(respuestas, (r) => (r.seccio ?? "").trim());
+    const sinSeccion = grupos.length === 1 && grupos[0].bloc === "";
+    for (const grupo of grupos) {
+      if (!sinSeccion) m.titulo(etiquetaBloque(t, grupo.bloc), 3);
+      m.tabla({
+        columnas,
+        filas: grupo.items.map((r) => [
+          // 🔴 `textoIdioma`, no `r.pregunta` a secas: desde F2 es `{ca, es}` y un
+          //    `String()` implícito imprimiría `[object Object]`.
+          textoIdioma(r.pregunta, lengua) || String(r.id ?? ""),
+          respuestaLegible(r, t, lengua),
+        ]),
+        cebra: true,
+        despues: 6,
+      });
+    }
   }
 
   // --------------------------------------------------------------------- notas
@@ -511,6 +738,135 @@ function pintarFundacion(
     ]),
     { anchoEtiqueta: 150, tamano: 9.5, despues: 4 },
   );
+}
+
+/**
+ * El contenido del plan: las medidas, agrupadas por bloque y en el orden del proceso.
+ *
+ * ⚠️ LA PROPORCIÓN TIENE QUE LEERSE. Hoy solo las medidas de registro nacen obligatorias
+ *    (decisión del 22-09-2026), así que el plan normal es **una obligatoria y varias
+ *    recomendadas**. Si las dos clases se imprimieran igual, la organización leería una
+ *    lista de diez deberes y no haría ninguno; por eso cada medida lleva su distintivo y
+ *    la sección abre con el recuento.
+ */
+function pintarMesures(
+  m: Maquetador,
+  t: DiccionarioPlan,
+  lengua: "ca" | "es",
+  mesures: MesuraPlan[],
+  observacions: string,
+): void {
+  m.espacio(8);
+  m.titulo(t.mesures_titol, 2);
+
+  if (mesures.length === 0) {
+    // Solo alcanzable en planes anteriores a F2: desde entonces `emitir_plan_basico()` se
+    // niega a emitir un plan sin ninguna medida (`22023 sense_mesures`). Se dice lo que
+    // pasa en vez de dejar un hueco.
+    m.parrafo(t.sense_mesures, { color: COLORES.verdeGris, tamano: 10, despues: 6 });
+    return;
+  }
+
+  const obligatories = mesures.filter((x) => x.obligatoria === true).length;
+  m.parrafo(t.mesures_intro, { tamano: 9.5, despues: 4 });
+  m.parrafo(t.mesures_resum(obligatories, mesures.length - obligatories), {
+    color: COLORES.verdeGris,
+    tamano: 9,
+    despues: 6,
+  });
+
+  for (const grupo of agruparPorBloque(mesures, (x) => (x.bloc ?? "").trim())) {
+    m.titulo(etiquetaBloque(t, grupo.bloc), 3);
+    for (const mesura of grupo.items) pintarMesura(m, t, lengua, mesura);
+  }
+
+  if (observacions) {
+    m.espacio(2);
+    m.titulo(t.observacions_titol, 3);
+    m.parrafo(observacions, { tamano: 9.5, despues: 6 });
+  }
+}
+
+/**
+ * Una medida: el distintivo, el título en su línea y la descripción debajo, sangrada a la
+ * altura del título.
+ *
+ * ⚠️ El distintivo se dibuja a mano porque el maquetador no tiene esa primitiva, y NO se
+ *    le añade una: ese módulo lo importan los nueve renderizadores y tocarlo obligaría a
+ *    revisarlos todos por una etiqueta que hoy usa uno.
+ * ⚠️ Los colores salen de `COLORES`, que son los tokens: coral con texto NEGRO —coral solo
+ *    da 2,67:1 sobre blanco, así que encima nunca va texto claro (§2bis)— y verde suave con
+ *    verde oscuro para lo recomendado. El coral aquí no significa error, significa atención.
+ * ⚠️ `asegurar()` reserva el título y dos líneas de descripción ANTES de leer `m.y`: si
+ *    saltara de página entremedias, el distintivo se quedaría en una hoja y su título en la
+ *    siguiente.
+ */
+function pintarMesura(
+  m: Maquetador,
+  t: DiccionarioPlan,
+  lengua: "ca" | "es",
+  mesura: MesuraPlan,
+): void {
+  const tamano = 10;
+  const altoLinea = tamano * 1.35;
+  const obligatoria = mesura.obligatoria === true;
+  const distintivo = obligatoria ? t.obligatoria : t.recomanada;
+
+  const tamanoDistintivo = 7.5;
+  const relleno = 5;
+  const anchoDistintivo = m.medir(distintivo, m.fuentes.cuerpoFuerte, tamanoDistintivo) +
+    relleno * 2;
+  const sangria = anchoDistintivo + 8;
+
+  const titulo = textoIdioma(mesura.titol, lengua) || (mesura.codi ?? "").trim() || t.buit;
+  const lineas = m.cortar(titulo, m.fuentes.cuerpoFuerte, tamano, m.anchoUtil - sangria);
+  m.asegurar(lineas.length * altoLinea + 9.5 * 1.35 * 2);
+
+  const y = m.y;
+  m.paginaActual.drawRectangle({
+    x: m.x,
+    y: y - altoLinea,
+    width: anchoDistintivo,
+    height: altoLinea,
+    color: obligatoria ? COLORES.coral : COLORES.verdeSuave,
+  });
+  m.paginaActual.drawText(distintivo, {
+    x: m.x + relleno,
+    // Misma línea base que el título: los dos se leen como una sola línea.
+    y: y - tamano,
+    size: tamanoDistintivo,
+    font: m.fuentes.cuerpoFuerte,
+    color: obligatoria ? COLORES.negro : COLORES.verdeOscuro,
+  });
+
+  let cursor = y;
+  for (const linea of lineas) {
+    if (linea) {
+      m.paginaActual.drawText(linea, {
+        x: m.x + sangria,
+        y: cursor - tamano,
+        size: tamano,
+        font: m.fuentes.cuerpoFuerte,
+        color: COLORES.negro,
+      });
+    }
+    cursor -= altoLinea;
+  }
+  // El cursor del maquetador es privado: se consume lo dibujado con `espacio()`, que
+  // además comprueba el límite inferior como lo haría `parrafo()`.
+  m.espacio(lineas.length * altoLinea);
+
+  const descripcion = textoIdioma(mesura.descripcio, lengua);
+  if (descripcion) {
+    m.parrafo(descripcion, {
+      tamano: 9.5,
+      color: COLORES.verdeGris,
+      sangria,
+      despues: 7,
+    });
+  } else {
+    m.espacio(7);
+  }
 }
 
 /**

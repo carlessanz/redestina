@@ -12,6 +12,7 @@ import { ENTIDAD_CAMPOS, PRODUCTOR_CAMPOS } from '../../lib/crudCampos'
 import RecordDetail from '../../components/RecordDetail'
 import BadgeConveni from '../../components/BadgeConveni'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
+import TargetaDiagnostic from '../../components/TargetaDiagnostic'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 
 type Registre = Record<string, unknown> & { id: string }
@@ -70,6 +71,14 @@ export default function FitxaRegistre({ tabla }: Props) {
           {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
               aquí, semanas después, y no solo en la cola de registros pendientes. */}
           <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null} />
+          {/* En qué punto está su diagnóstico de prevención, y el camino para hacerlo con
+              ella delante (modelo asistido). Como `BadgeConveni`, no carga nada en el alta:
+              sin `id` no hay a qué colgar un diagnóstico. */}
+          <TargetaDiagnostic
+            tipusOrg={esProductor ? 'productor' : 'entidad'}
+            orgId={id ?? null}
+            mode="equip"
+          />
           {/* Sus certificados. En una entidad PRODUCTORA son los de donación (el anual y
               los de a demanda); en una RECEPTORA, los de recepción (`CR`, fase F4): los
               kilos que ha recibido en una ventana de fechas.

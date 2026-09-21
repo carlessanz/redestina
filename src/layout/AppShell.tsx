@@ -24,7 +24,9 @@ import UserMenu from './UserMenu'
 import AvisInstallacio from '../components/AvisInstallacio'
 import AvisConveni from '../components/AvisConveni'
 import AvisRegistreIncomplet from '../components/AvisRegistreIncomplet'
+import AvisDiagnostic from '../components/AvisDiagnostic'
 import { useFitxaIncompleta } from '../hooks/useFitxaIncompleta'
+import { useDiagnosticPendent } from '../hooks/useDiagnosticPendent'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 /** Metadatos que cada ruta puede declarar en su `handle`. */
@@ -82,6 +84,10 @@ export default function AppShell() {
   // Una sola vez, aquí: lo miran la banda de aviso Y el badge del menú, y calculado por
   // separado podrían decir cosas distintas (§6ter, misma razón que `pendents_equip()`).
   const { falten } = useFitxaIncompleta()
+  // Lo mismo con el diagnóstico: una sola llamada aquí, repartida a la banda y a la marca
+  // del menú. Si cada uno lo pidiera por su cuenta podrían decir cosas distintas del mismo
+  // diagnóstico, que es el clásico contador que marca 1 y una pantalla que enseña 0.
+  const { estat: estatDiagnostic } = useDiagnosticPendent()
 
   // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
   // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
@@ -105,7 +111,11 @@ export default function AppShell() {
 
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
-      <AppSidebar comptadors={comptadors} fitxaIncompleta={falten.length > 0} />
+      <AppSidebar
+        comptadors={comptadors}
+        fitxaIncompleta={falten.length > 0}
+        diagnosticPendent={estatDiagnostic !== null}
+      />
       <SidebarInset className="flex h-dvh min-h-0 flex-col overflow-hidden">
         {/* El `env(safe-area-inset-*)` lateral solo hace algo en iPhone con muesca EN
             HORIZONTAL, donde el recorte se come ~44px por cada lado y el `px-3` no
@@ -167,6 +177,12 @@ export default function AppShell() {
                     completar la ficha es lo que hace que firmar salga bien. Ese es el
                     orden en que importan. */}
                 {rolActiu !== 'intern' && <AvisRegistreIncomplet falten={falten} />}
+                {/* Y el diagnóstico, el último de los tres. Ese es el orden en que importan:
+                    firmar desbloquea operar, completar la ficha hace que firmar salga bien,
+                    y el diagnóstico es lo que aporta valor cuando lo demás ya está. Va en
+                    `aviso` y no en rojo porque, al revés que los dos de arriba, NO impide
+                    trabajar (ver `AvisDiagnostic`). */}
+                {rolActiu !== 'intern' && <AvisDiagnostic estat={estatDiagnostic} />}
                 <Outlet />
               </div>
             )}

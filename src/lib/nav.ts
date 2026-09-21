@@ -11,7 +11,7 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, Calculator, ClipboardCheck, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
+  Building2, Calculator, ClipboardCheck, ClipboardList, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users, Workflow,
 } from 'lucide-react'
@@ -99,6 +99,11 @@ const EQUIP: NavGrup[] = [
       // Papeleo POR ORGANIZACIÓN (la campaña va por fichas), no una etapa de la oferta.
       // Sin badge: los «per contrasignar» ya suman en Aprovacions.
       { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },
+      // El diagnóstico va aquí y no en «Operació»: no es una parada del camino de una
+      // oferta —no la bloquea ni la desbloquea—, es algo que se sabe de una organización,
+      // como su convenio. `barra: false` por el mismo motivo que el resto del equipo: son
+      // ocho secciones y la barra de móvil admite cuatro (§2).
+      { to: '/equip/diagnostics', labelKey: 'nav.diagnostics', icon: ClipboardList, barra: false },
     ],
   },
   {
@@ -149,7 +154,13 @@ const RECEPTOR: NavGrup[] = [
 export const ORGANITZACIO: NavGrup[] = [
   {
     items: [
-      { to: '/organitzacio', labelKey: 'nav.my_org', icon: Building2, barra: false },
+      // `end: true` desde que hay una segunda entrada debajo: sin él, estar en
+      // `/organitzacio/diagnostic` marcaría las DOS como activas.
+      { to: '/organitzacio', labelKey: 'nav.my_org', icon: Building2, end: true, barra: false },
+      // El diagnóstico de prevención (F2). Cuelga de la organización y no de un panel por
+      // lo mismo que la ficha: una organización es una, y sus papeles son un detalle suyo
+      // — con doble rol son dos diagnósticos, pero se entra por un solo sitio.
+      { to: '/organitzacio/diagnostic', labelKey: 'nav.my_diagnostic', icon: ClipboardList, barra: false },
     ],
   },
 ]
