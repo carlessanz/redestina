@@ -3112,6 +3112,46 @@ productores del equipo y en la cola de «Registres pendents», donde se queda pa
 precio de tener esa cobertura, y está aceptado. Sus credenciales viven en
 `scripts/data/cuentas-prueba.json`, fuera de git.
 
+### La cuenta de los accesos de prueba de Carles Sanz, reenlazada (21-09-2026)
+
+🔴 **El botón «Carles Sanz» de `/login` llevaba cinco días sin abrir nada.** El borrado con doble
+rol del 16-09-2026 (§6) se llevó las fichas a las que colgaba `hola+wa-carles@carlessanz.com`, y
+la cuenta se quedó **en Auth pero sin ninguna membresía**: quien pulsaba el botón aterrizaba en
+«Compte pendent de validació». El mismo día se registraron desde `/registre` las fichas nuevas
+—`Carles Sanz Cardelus` (productor) y `Organització Carles Sanz` (entidad), bajo una sola
+`organizaciones`— pero colgando de **otra** cuenta, `hola+productor-receptor@carlessanz.com`, que
+**no está en `accessosTest.ts`** y a la que solo se entra escribiendo correo y contraseña.
+
+Se ha reparado **enlazando**, no recreando: dos membresías `titular` aprobadas y activas de
+`wa-carles` a esas dos fichas, que es exactamente lo que hace `scripts/crear-usuarios-whatsapp.ts`.
+El botón vuelve a funcionar sin tocar código ni contraseñas, y su etiqueta («Entitat productora +
+Receptora (social)») vuelve a ser cierta.
+
+⚠️ **Las dos fichas tienen ahora DOS cuentas titulares**, `wa-carles` y `productor-receptor`. No
+es un problema —`membresias` admite varios usuarios por ficha y el producto no distingue cargos
+(§9)— pero conviene saberlo al leer un listado: son dos accesos a **una** organización, no dos
+organizaciones.
+
+**Y se completó lo que el registro no pregunta**, para que la organización pudiera operar de
+verdad: NIF, domicilio, CP y población en las dos fichas (Barcelona / Barcelonès, valores de
+prueba), y en la entidad además `tipo_receptor` de `comercial` a **`social`** —con `comercial` no
+veía ni una oferta de donación (`modalitat_receptor_compat`, §4bis)—, `estat = 'Signat'`,
+`prioritat = 1`, `modalitat = 'Donació'`, `opt_in` y las capacidades. Sin `estat`, la entidad
+**quedaba fuera del ranking** (`priorizacion.ts` excluye estado vacío), así que no era candidata
+de ningún excedente.
+
+**Sus dos convenios están vigentes** desde el 21-09-2026, `CONV-DON-GEN-2026-0002` y
+`CONV-DON-REC-2026-0001`, firmados y contrafirmados desde la base con el mismo camino que usa la
+aplicación (`convenio_datos_org` → `firmat` con número → `contrafirmar_convenio()`). Era necesario:
+con `fecha_corte_convenios` encendida (§4bis) la única organización que podía operar era
+`Mas de Prova SCP`, y **ninguna entidad podía pulsar «M'interessa»**.
+⚠️ `Menjador Social de Prova` se deja a propósito en `pendent_firma`: es la única que queda para
+enseñar la firma en directo desde el panel y la contrafirma desde la cola.
+
+⚠️ **`hola+pendent-arnes@` sigue aprobada** (lo estaba ya el 21-09-2026, ver el apartado anterior).
+La cola de «Registres pendents» marca 0 y el bloque `pendent` del arnés sigue sin recorrerse.
+Restaurarla antes de la próxima tanda del arnés.
+
 ### Lo que sigue pendiente
 
 - ~~El modelo de roles existe pero está apagado~~ — **`roles_activos` está ENCENDIDO** desde el
