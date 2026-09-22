@@ -4807,6 +4807,20 @@ decisiones con su precio y dos como espera de material de la fase 0.
      Configuració, la celda de `OffersList` con dos badges, la marca del menú sobre el verde del
      sidebar y `/verificar/:codi`. Se hace desde una sesión **sin sandbox**, con Playwright, y
      mirando `nav ul` (`scrollWidth` vs `clientWidth`), no solo `document.documentElement`.
+     ⚠️ **No es solo `listen`: Chrome no arranca aquí bajo NINGUNA forma** (comprobado el
+     22-09-2026 con un agente en aislamiento `remote`, que resultó caer a un *worktree* local —
+     misma máquina, mismo Seatbelt—). `chrome-headless-shell` muere con el mismo
+     `bootstrap_check_in … Permission denied (1100)`; el Chrome completo pasa ese error pero
+     falla después al escribir en `~/Library/Application Support/Google/Chrome for
+     Testing/Crashpad/…` y en el `ProcessSingleton` de su perfil. **Ningún flag de Playwright lo
+     esquiva**: `--user-data-dir`, `HOME` reescrito dentro del proceso, `--crash-dumps-dir`…
+     nada sirve, porque Chrome en macOS resuelve esas rutas por API de Cocoa
+     (`NSHomeDirectory()`), no por variables de entorno. Y `dangerouslyDisableSandbox` está
+     desactivado a nivel de configuración de la sesión, así que tampoco hay parámetro que lo
+     saque del sandbox. La medición solo se puede hacer de verdad fuera de una sesión de Claude
+     Code sandboxeada — un terminal normal, o un job de CI (Linux, sin Seatbelt). El script ya
+     está escrito, listo para copiar a cualquiera de los dos: las 5 rutas, los 3 anchos, la
+     medición de página y de `nav ul`, y captura `fullPage`.
 118. **Cinco migraciones están registradas DOS VECES en el historial remoto.**
      `confirmacio_assistida`, `interes_assistit`, `canalitzacio_assistida_lectura`,
      `firma_assistida_sense_codi` y `canalitzacions_actives_ambigua` aparecen con su fecha real
