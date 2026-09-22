@@ -40,11 +40,25 @@ interface Props {
    * es genérico: si supiera de convenios dejaría de servir para la siguiente tabla.
    */
   avisos?: ReactNode
+  /**
+   * Apartados de trabajo que van DEBAJO de la ficha, cada uno con su propia tarjeta: hoy,
+   * la documentación de la organización (lo que se sube y lo que se descarga).
+   *
+   * ⚠️ NO ES LO MISMO QUE `avisos`, y la diferencia decide dónde va cada cosa. `avisos` es
+   * lo que hay que saber **antes de tocar** la ficha, así que se pinta dentro de la tarjeta
+   * y encima de los campos; esto es trabajo aparte, que no condiciona la edición y que no
+   * cabe en una banda. Un apartado metido en `avisos` empujaría los campos hacia abajo y
+   * convertiría la cabecera en una pantalla entera.
+   *
+   * Como `avisos`, entra por prop: `RecordDetail` es genérico y no sabe —ni debe saber— de
+   * convenios ni de documentos; si lo supiera dejaría de servir para la siguiente tabla.
+   */
+  seccions?: ReactNode
 }
 
 export default function RecordDetail({
   tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, emailKey, onBack, onSaved,
-  onSendMessage, avisos,
+  onSendMessage, avisos, seccions,
 }: Props) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
@@ -325,6 +339,9 @@ export default function RecordDetail({
           )}
         </CardContent>
       </Card>
+
+      {seccions}
+
       <DialegCorreu
         obert={correuObert}
         onObert={setCorreuObert}

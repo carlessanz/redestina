@@ -24,6 +24,7 @@ import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
+import DocumentsDeLEquip from '../../components/documents/DocumentsDeLEquip'
 import SegellRedestina from '../../components/documents/SegellRedestina'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -253,6 +254,11 @@ export default function ReceptorDocuments() {
         titolKey="mydoc.pla_title"
         buitKey="mydoc.pla_empty"
       />
+
+      {/* Lo que la Fundación guarda de esta organización y llegó de fuera: convenios
+          firmados en papel, certificados de ejercicios anteriores, planes previos. Lo sube
+          el equipo; aquí solo se lee y se descarga. Se calla si no hay ninguno. */}
+      <DocumentsDeLEquip tipusOrg="entidad" orgId={org?.id ?? null} />
 
       {/* El visor de PDF. Una sola vez por pantalla: el hook es uno y el modal también. */}
       {descarregador.visor}

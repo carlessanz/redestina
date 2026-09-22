@@ -157,7 +157,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `organizacion` multirol única | `productores` + `entidades` (2 tablas) con `organizaciones` como identidad común (§4): doble rol se detecta por `organizacion_id`, no por teléfono; registro deduplica antes de crear (§12.28, cerrada). Falta el resto: `usuario`/`rol_organizacion` propios y una organización con campos suyos más allá de `canal_preferido` | 🟡 |
 | `usuario` de organización | `perfiles` + `membresias` (vincula la cuenta con su ficha; §4bis) | ✅ |
 | `rol_organizacion` | `membresias.rol_org` (titular/operador) + `usuario_roles` de plataforma | 🟡 |
-| `convenio` de colaboración | `convenios` + `convenios_exigidos`, con firma por enlace, contrafirma y campaña (§4) | ✅ |
+| `convenio` de colaboración | `convenios` + `convenios_exigidos`, con firma por enlace, contrafirma, campaña y —desde el 22-09-2026— **registro del que se firmó en papel** antes de Redestina (§4) | ✅ |
 | `excedente` | `excedentes` | ✅ |
 | `demanda` | — | ⬜ |
 | `interes` (solicitud de receptor) | `oferta_respuestas` (aceptación con kg/preu + aprobación del superadmin → canalización) | 🟡 |
@@ -334,9 +334,10 @@ la pantalla y, al elegir un contacto, la conversación pasa a pantalla completa 
 escribe `h-dvh` propio** (era texto residual de la arquitectura anterior, contradecía el contrato de
 alturas de arriba): su alto lo aporta el shell porque su ruta va marcada `fullBleed` (§6ter).
 
-**Cuatro reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
+**Cinco reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
 Playwright a 320/360/390 px sobre las 11 rutas, públicas y privadas — **0 px de desbordamiento
-horizontal en todas**, que es la referencia a mantener):
+horizontal en todas**, que es la referencia a mantener; las reglas 4 y 5 salieron después, y las
+dos con la página en esos mismos 0 px):
 
 1. ⚠️ **Ningún control de formulario por debajo de 16 px en móvil.** iOS Safari amplía la página al
    enfocar un campo con `font-size < 16px` y, como el viewport renuncia a `maximum-scale` a propósito
@@ -347,6 +348,15 @@ horizontal en todas**, que es la referencia a mantener):
 2. **`whitespace-nowrap` viene de serie en `Button`.** Una etiqueta larga dentro de un botón fija un
    ancho mínimo que se **propaga hacia arriba por los grids** y termina desplazando la página entera
    (pasó en `/login`: 47 px a 320 px de ancho). Si el texto de un botón puede crecer, `whitespace-normal`.
+   🔴 **Y `shrink-0` TAMBIÉN viene de serie** (`ui/button.tsx:8`), así que
+   **`whitespace-normal` solo NO BASTA**: el botón conserva su ancho preferido
+   (`max-content`) y no se deja encoger, aunque el texto ya pueda partirse. Medido el
+   22-09-2026 en `DocumentacioOrganitzacio`: «Registra un conveni signat en paper» pedía
+   **264 px dentro de un contenedor de 238** y se salía de la tarjeta **con la página a 0 px
+   de desbordamiento**. Lo que lo arregla es un **ancho explícito**, que sí manda sobre el
+   preferido: `w-full sm:w-auto`. Es el mismo mecanismo de la regla 4 visto por el otro
+   lado —allí `shrink-0` aplasta al texto vecino, aquí se sale el botón—, y la lección
+   común es que **`scrollWidth` de la página no lo ve ninguno de los dos**.
 3. **`env(safe-area-inset-left/right)` importa en horizontal.** `viewport-fit=cover` lleva el
    contenido hasta el borde físico; sin el `env()` lateral, en iPhone con muesca el contenido queda
    bajo el recorte. Se aplica con `max(padding, env(...))` en `AppShell` y `LayoutAcces`; la barra
@@ -370,6 +380,19 @@ horizontal en todas**, que es la referencia a mantener):
    a 320 px: 226 px y 4 líneas en el convenio, 198 px y 4 en el diagnóstico.
    ⚠️ **Corolario**: una fila con texto y botón **no se audita con `scrollWidth`**. Hay que mirar
    el ancho que le queda al párrafo, o mirarla.
+5. 🔴 **`grid ... sm:grid-cols-2` SIN `grid-cols-1` deja la columna de móvil en `auto`, y la
+   dimensiona el contenido más ancho** (22-09-2026). Sin el breakpoint, `grid` a secas no
+   declara ninguna plantilla de columnas, así que la única columna es `auto` —o sea
+   `max-content`— y basta un control con ancho intrínseco grande para llevarse toda la
+   rejilla por delante. El que lo dispara en este proyecto es **`input[type=file]`**, por el
+   botón que pinta el navegador: medido en `DialegConveniPaper` a 320 px, **las siete celdas
+   pedían 254 px dentro de 202** y el formulario se salía del diálogo. `grid-cols-1` genera
+   `repeat(1, minmax(0, 1fr))`, que sí se deja encoger, y por eso va **explícito** aunque
+   parezca redundante. Vale para cualquier rejilla de formulario, no solo para las que
+   llevan un fichero: el día que a una celda le entre un texto largo, pasa lo mismo.
+   ⚠️ **Otra vez con la página a 0 px de desbordamiento.** Es el tercer defecto seguido que
+   `scrollWidth` del documento no ve: lo que hay que mirar es `scrollWidth > clientWidth`
+   **en los hijos**, que es la comprobación que encontró los tres.
 
 ## 2bis. Sistema de diseño (10-09-2026)
 
@@ -1156,9 +1179,23 @@ la entrada y la conciliación contaba dos veces.
 **antes** que `espigoladas`, así que con el `no action` por defecto la **única puerta de borrado de
 una ficha** (§7) habría quedado rota con `23503` para cualquier productor con una oferta convertida
 — y no se puede arreglar reordenando aquella función, porque editar una migración aplicada está
-prohibido. El enlace es trazabilidad, no evidencia fiscal: lo que certifica es el REC. `documentos_externos` (polimórfica,
-`albaran`/`cierre_donante`) guarda lo que aportan terceros: el albarán del productor, la factura del
-donante, fotos de incidencias.
+prohibido. El enlace es trazabilidad, no evidencia fiscal: lo que certifica es el REC. `documentos_externos` (polimórfica) guarda lo que
+aportan terceros: el albarán del productor, la factura del donante, fotos de incidencias. Desde
+`20270329100000` cuelga además de un **`convenio`** y de la **ficha misma** (`productor`/`entidad`),
+con tres tipos nuevos —`conveni_signat`, `certificat_previ`, `pla_previ`—: es el archivo anterior a
+Redestina, que la Fundació ya tenía en papel.
+⚠️ La rama `convenio` llevaba **meses medio puesta y rota**: `puc_pujar_document_extern()` y la
+política de lectura la admitían desde `20270111100100`, pero el CHECK de la columna no, así que un
+insert moría con `23514`. Lo cierra esa misma migración.
+🔴 **Sobre una FICHA sube SOLO el equipo, y la lee también la organización.** Es la única rama con
+esa asimetría —en albarán, cierre y convenio sube el titular—, y es deliberada: esto no es algo que
+la organización aporte, es archivo que la Fundació guarda **sobre** ella. La decide
+`puc_pujar_document_extern()`, no la Edge Function.
+⚠️ **Y desde el 22-09-2026 un externo por fin se puede volver a ABRIR**: `descargar-documento`
+acepta `{documento_extern_id}` y autoriza con **`puc_veure_document_extern()`** (§4bis). Hasta ese
+día un externo se subía, se listaba y no lo descargaba nadie —esa función solo servía `documentos`—,
+y `AlbaraDetall` los pintaba como texto sin botón. Guardar un certificado para que el productor lo
+tenga no significa nada si no se puede bajar.
 
 **`tipos_caja`** (con `tara_kg`) y **`costes_producto`** (+`costes_producto_hist`, con motivo
 obligatorio en cada cambio). `costes_producto` es el **único origen del valor fiscal**: al crear una
@@ -1251,6 +1288,26 @@ borrador descartado no deja hueco. `datos_org` es la copia congelada de la ficha
 firmó: ⚠️ **ninguno de los dos lleva DNI** —el documento de identidad vive solo en
 `evidencias.documento_identidad`, fuera del GRANT (§4)—. Sin GRANT de escritura para nadie. Triggers
 `convenios_control` (inmutabilidad desde `firmat` y transiciones válidas) y `convenios_no_esborrar`.
+
+🔴 **`origen`** (`plataforma`/`paper`) y **`referencia_paper`** (`20270329100100`…`100300`) — el
+convenio **firmado fuera de la plataforma**, que el super_admin registra desde la ficha y que **vale
+igual para operar**: `convenio_vigente()` y `exigir_convenio()` no se tocan, porque miran
+`estado = 'vigent'` y nada más. Existe porque desde el 16-09-2026 la fecha de corte está encendida y
+una organización con su convenio firmado en papel **no podía operar**: la única salida era volver a
+firmarlo electrónicamente una por una.
+⚠️ **NO consume número de serie**, por decisión del 22-09-2026: las series numeran lo que Redestina
+emite, correlativo y por ejercicio, y un papel de 2023 con número de 2026 rompería lo que esa
+correlatividad significa. Por eso el check `convenios_numero_segons_estat` se recreó eximiendo al
+papel y exigiéndole a cambio `referencia_paper` y `firmado_at`.
+⚠️ **Una transición nueva y solo una**: `esborrany → vigent`, **solo si `origen = 'paper'`**. No pasa
+por `pendent_firma` ni por `firmat` porque esos estados significan «hay un enlace vivo» y «alguien ha
+firmado aquí», y ninguna de las dos cosas es cierta; fingir el recorrido dejaría un rastro de estados
+que nunca ocurrieron. `origen` y `referencia_paper` entran además en la lista congelada del trigger.
+🔴 **No se emite ningún `documentos`.** El PDF que compone Redestina lleva su página de evidencias
+—huella del texto aceptado, IP, trazo de la firma— y aquí no hubo ninguna: emitirlo sería imprimir
+una afirmación falsa. Lo que acredita es el escaneado, que va a `documentos_externos` con
+`tipo = 'conveni_signat'`, y la RPC **se niega si no está subido ya** (`falta_escanejat`): un
+convenio no puede quedar vigente con el papel «pendiente de adjuntar».
 
 **`convenios_exigidos`** — matriz oferta↔convenio **en tabla**, como `modalitat_receptor_compat`:
 `(valorizacion, parte, tipo_convenio)`. La donación exige `don_gen` a quien entrega y `don_rec` a
@@ -1764,7 +1821,9 @@ funciones, no políticas:
 | `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
 | `excedents_de_les_meves_canalitzacions()` (`20260922124240`) | La **quinta rama** de esa misma política: los excedentes de los que alguna de mis entidades ha recibido una canalización. Sin ella, una entrega que **no nació de un interés registrado** —el reparto de una espigolada, o el alta directa del equipo por los atajos de la deuda 109— dejaba a la receptora leyendo «—» en el producto y la referencia de lo que ella misma había recibido: `v_albaranes_bandeja` es `security_invoker`, así que su join con `excedentes` se evalúa con la RLS de quien pregunta y el producto salía `null`. Medido en producción el 22-09-2026: 3 de las 4 entregas del Menjador Social. ⚠️ **No relaja D3**: abre la misma fila que ya abren la rama del interés y la del mercado; el rigor de no nombrar al donante vive en el renderizador del `ENT` y en el CHECK de `cierre_receptor_lineas` (§4), que no se tocan. ⚠️ El arnés no lo cazaba porque no es un permiso mal puesto, es una fila que no existe para esa sesión |
 | `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
-| `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
+| `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, `convenio` → `convenios_meus`, y el equipo siempre. **`productor`/`entidad` caen al `false` final a propósito**: el equipo ya ha salido arriba, y a una ficha no sube nadie más (§4). Lo usa `subir-documento-externo` |
+| `puc_veure_document_extern(id, user default null)` (`20270329100000`) | Autoriza la **descarga de un externo**. Espejo de `puede_ver_documento()`: guarda anti-suplantación, equipo por rol, fail-open del interruptor, y si no, la misma condición que la política de lectura. ⚠️ `documentos_externos` **no tiene columna `modo`**, así que el modo prueba se reconoce **por la ruta** (`…/proves/…`), como ya hace `limpiar-documentos-prueba`. ⚠️ Para `productor`/`entidad` consulta `membresias` **inline** y no `mis_productores()`: aquellas leen `auth.uid()` y con `service_role` —que es como la llama la Edge Function— devolverían vacío, o sea que un externo propio se vería como ajeno |
+| `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
 | `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
@@ -2482,6 +2541,53 @@ guarda y devuelve las ocho obligatorias que faltan sin generar nada; completo, *
 respondido — calibre y estético → segunda categoría y revisión de criterios; sin frío → cadena de
 frío mínima. Queda ese plan en borrador, que además da fixture a los checks que §12.116 no cubre.
 
+### Documentació de l'organització: el archivo de antes de Redestina (22-09-2026)
+
+**`RecordDetail` gana un segundo slot, `seccions`**, que se pinta **fuera** del `<Card>`. El de
+siempre, `avisos`, es «lo que hay que saber antes de tocar la ficha» —convenio, organización
+enlazada, diagnóstico, certificados—; esto es un **apartado de trabajo** con tarjeta propia. El
+componente genérico sigue sin saber de convenios ni de documentos: los dos slots reciben nodos.
+
+`components/equip/DocumentacioOrganitzacio` (en ese slot, solo con `id`) hace tres cosas:
+
+| | |
+| --- | --- |
+| **Lista** | Los externos de la ficha **y los de sus convenios**, agrupados por ejercicio —manda la fecha del papel, no la de subida— y cada uno con su botón de **descarga** (§4) |
+| **Puja documentació** | Formulario en línea: tipo (`certificat_previ` · `pla_previ` · `altre`), ejercicio, número y fecha del documento ajeno, y el fichero |
+| **Registra un conveni signat en paper** | Abre `DialegConveniPaper`. Con `BotoAmbMotiu`: a quien no es super_admin se le deja gris **con el motivo**, no se le esconde |
+
+⚠️ **El ejercicio se teclea, y es el único objeto donde pasa.** Un albarán, un cierre o un
+convenio tienen el suyo en la base; una ficha no tiene ninguno, y lo que se archiva ahí es papel
+viejo: sin ese campo, un certificado de 2023 iría a la carpeta del año en que alguien lo escanea.
+
+🔴 **Un plan previo en PDF NO marca el diagnóstico como hecho**, y el formulario lo dice en cuanto
+se elige ese tipo, con el enlace a `/equip/diagnostics/:tipus/:id` al lado. El diagnóstico se
+contesta —hay cuestionario, reglas y plan generado (§4)—; un PDF antiguo es contexto, no respuesta.
+
+**`DialegConveniPaper`** clona `DialegFirmaAssistida` (80 vw × 88 vh, no se cierra al pinchar
+fuera) y ejecuta los tres pasos **en orden**: `preparar_conveni_en_paper` → subir el escaneado →
+`registrar_conveni_en_paper`. Si falla el tercero, el convenio se queda en `esborrany` —inocuo, y
+el siguiente intento lo reutiliza— con su PDF ya colgado. Los rechazos se traducen **por su
+código** (`motiuConveniPaper`), nunca por el texto de Postgres, como en `conversioEspigolada.ts`.
+
+⚠️ **`BadgeConveni` pinta el papel VERDE**, igual que cualquier vigente, con el texto «signat en
+paper» y su referencia. No es un matiz estético: es vigente de verdad, y pintarlo en otro tono
+diría que vale menos. El badge histórico heredado del Excel no cambia y sigue siendo lo que era.
+
+**Y en el panel externo**, `components/documents/DocumentsDeLEquip` —la quinta pieza compartida por
+los dos paneles— lista lo mismo bajo «Documentació aportada per l'equip», solo lectura y con
+descarga. **Se calla si no hay ninguno**: una tarjeta vacía más en un panel que ya tiene seis no
+informa de nada.
+
+✅ **Ejercitado de punta a punta contra producción el 22-09-2026**: un certificado de 2023 subido a
+la ficha de `Horta de Prova SL` cae en `productors/<id>/2023/externs/` y **se descarga** (610 B,
+`%PDF-1.4`, nombre `certificat_previ-CERT-2023-007.pdf`); un ejercicio de 1874 responde 400 y una
+ficha inventada, 404. Y el convenio `com` de `Obrador de Prova`: sin escaneado se niega con
+`falta_escanejat`, con fecha futura con `data_futura`, y con el papel subido queda **`vigent`,
+`origen='paper'`, `serie` y `numero_completo` NULL** y `referencia_paper = CONV-OBR-2024-003`.
+`convenio_vigente(...,'venda','recibe')` pasa a `true` y `exigir_convenio()` devuelve `null`: la
+organización puede operar, por el camino de siempre y sin haber tocado esas dos funciones.
+
 ### Els meus documents: lo pendiente y el archivo (14-09-2026)
 
 Las dos pantallas de documentos (`/productor/documents`, `/receptor/documents`) enseñan lo
@@ -3117,6 +3223,18 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   arrastra la FK `20260928100250` (§4). **Lo que evita el dilema es no llegar a él**: al aplicar
   por MCP, renombrar **en el acto**, cuando la migración todavía es la última y su fecha real
   sigue siendo mayor que todo lo demás.
+  ✅ **Y hay una segunda salida, que es la que se usó el 22-09-2026 y funciona mejor**: dejar el
+  fichero local con su fecha de proyecto y **corregir la versión registrada en remoto** con un
+  `update supabase_migrations.schema_migrations set version = '<la del fichero>'`. Es metadata
+  del historial, no esquema —la migración ya está aplicada y su DDL no se toca—, y ya se había
+  tocado esa tabla al cerrar la deuda §12.118. Lo que compra es el orden: las cuatro de
+  `20270329…` usan `convenios` (`20270111100000`) y `documentos_externos` (`20261012100400`), así
+  que con su fecha real (`20260922…`) habrían quedado **por debajo de las tablas que necesitan** y
+  una recreación desde cero fallaría. Al renombrar hacia adelante, no.
+  ⚠️ **El fichero local y el historial remoto tienen que casar 1:1.** Si una migración se aplica
+  partida en varias llamadas —como pasó ese día, porque el clasificador de permisos cortó la que
+  llevaba `drop constraint` y hubo que trocearla— el fichero local **se parte igual**, con el
+  mismo número de trozos y el mismo orden.
   ✅ **Y el CLI NO está roto: lo que le faltaba era un `HOME` escribible** (21-09-2026). Dentro
   del sandbox de una sesión de Claude Code, `supabase` muere con
   `EPERM … /Users/<tu>/.supabase/telemetry.json.tmp` **antes de hacer nada**, y eso se leyó
@@ -4234,6 +4352,9 @@ supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 6
 supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama pg_cron
 supabase functions deploy enlace-publico --no-verify-jwt        # confirmación pública (§9)
 supabase functions deploy subir-documento-externo               # con verify_jwt (multipart, 10 MB)
+# ⚠️ `subir-documento-externo` y `descargar-documento` cambiaron el 22-09-2026 (documentación
+#    de la organización y descarga de externos, §4): hay que redesplegar LAS DOS. La segunda
+#    acepta ahora `{documento_extern_id}` además de `{documento_id}`.
 supabase functions deploy limpiar-documentos-prueba            # con verify_jwt (super_admin; §12.51)
 supabase functions deploy verificar-certificat --no-verify-jwt   # pública: comprobar un certificado (§9)
 supabase secrets set --env-file .secrets.env
@@ -5043,6 +5164,19 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      cuatro comentarios de `comprobar-rls.ts` que citaban esa migración hablando del **borrado de
      ficha**, que es `20260921153439`.
 
+126. **`documentos_objeto_existe` no conoce `cierre_periodo` ni el archivo de una ficha.** El
+     `case` del trigger (`20260928100200:270-276`) resuelve `albaran`, `convenio`,
+     `cierre_donante`, `espigolada` y `plan`; `cierre_periodo` **sí está** en el CHECK de
+     `documentos.objeto_tipo` (`20270303100100:239`) y **no** en ese `case`, así que `v_tabla`
+     queda null, `to_regclass('public.')` también y el insert muere con un `0A000` que dice
+     «falta la tabla» cuando lo que falta es una rama. Hoy no es alcanzable —nadie emite un
+     `documentos` de `cierre_periodo` sin pasar por `periodo_emet_document()`, que ya existe y
+     funciona— pero el mensaje mentiría el día que alguien lo toque.
+     ⚠️ Esto **no afecta** a la documentación de una organización (§4): eso vive en
+     `documentos_externos`, que es polimórfica **sin** trigger de existencia. Ahí quien comprueba
+     que la ficha existe es `ruta_documento()`, que devuelve `0A000` si no la encuentra —y por eso
+     su `select` sobre `productores`/`entidades` no es decorativo—.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **42 de las 49**. Se quedan
@@ -5218,9 +5352,10 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **939 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 936
-   el 22-09-2026: dos casos del vocabulario «de acuerdo» al cerrar la deuda §12.14, y uno del
-   bloque de claves compuestas que vigila `od.ch_*` contra el CHECK de la base, §7).
+   Referencia: **944 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 939
+   el 22-09-2026: el bloque de claves compuestas pasa a vigilar también `orgdoc.t_*` contra el
+   CHECK de `documentos_externos.tipo`, que `20270329100000` amplió — es justo el caso del que
+   avisa §7: la lista de valores vive en Postgres y `cobertura.test.ts` no ve un `t(\`…${tipo}\`)`).
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -5228,9 +5363,24 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 925/925 correctas y 26 saltadas, «Sin fallos de permisos»**
+   ✅ **Referencia HOY: 945/945 correctas y 26 saltadas, «Sin fallos de permisos»**
+   (22-09-2026, tras `20270329100000`…`100300`: la documentación de la organización y el
+   convenio en papel). Son las 925 anteriores más **20**: `preparar_conveni_en_paper` y
+   `registrar_conveni_en_paper` en `DOCUMENTAL_EXTERN` —que recorre **siete** cuentas
+   externas, de ahí 14—, las mismas dos en `equip` (denegar: son de `es_super_admin()`, no de
+   `es_intern()` ni de `pot_aprovar()`) y en `super_admin` (permitir), más la lectura de
+   `documentos_externos` por el propio productor.
+   ⚠️ Los dos «permitir» del super_admin van con **uuid de ceros**, y en positivo no se
+   prueban nunca: `preparar_conveni_en_paper` CREA un borrador de convenio sobre una
+   organización real, y `registrar_conveni_en_paper` la dejaría **operando sin haber firmado
+   nada** contra producción. Cortan con `23503` y `22023`, que son errores de negocio y
+   prueban que la guarda autorizó. Mismo criterio que `borrar_ficha_completa()`.
+   ⚠️ **Las saltadas siguen siendo 26 y una de ellas es nueva**: la lectura de
+   `documentos_externos` del productor no tiene fixture —hace falta un externo subido a SU
+   ficha—, así que 0 filas es indistinguible de un rechazo y sale SALTADA, no verde.
+   La referencia anterior era **925/925 + 26**
    (22-09-2026, tras `20260922124240`, la quinta rama de la RLS de `excedentes`).
-   ⚠️ **El total sigue siendo 951 y no hay ninguna FALLA**: lo que cambió respecto de la
+   ⚠️ **El total era entonces 951 y no había ninguna FALLA**: lo que cambió respecto de la
    referencia anterior no son permisos sino **datos** —cuatro checks pasaron de correctos a
    «sin fila que probar» al cancelarse la oferta de prueba que se creó ese mismo día para
    revisar el ciclo—. Es exactamente el caso del que avisa el párrafo de más abajo: antes de

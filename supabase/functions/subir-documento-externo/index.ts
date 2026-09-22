@@ -1,13 +1,23 @@
-// Subida de un documento que aporta otro (albarán del productor, factura, foto).
+// Subida de un documento que aporta otro (albarán del productor, factura, foto), y el
+// archivo que la Fundació guarda de una organización (convenio en papel, certificado o
+// plan anteriores a Redestina).
 //
 //   POST /subir-documento-externo   multipart/form-data   (JWT de la sesión)
 //     fitxer       (File)   pdf, jpg o png, hasta 10 MB
-//     objeto_tipo  'albaran' | 'cierre_donante'
+//     objeto_tipo  'albaran' | 'cierre_donante' | 'convenio' | 'productor' | 'entidad'
 //     objeto_id    uuid
-//     tipo         'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+//     tipo         'albaran_productor' | 'factura' | 'foto_incidencia'
+//                  | 'conveni_signat' | 'certificat_previ' | 'pla_previ' | 'altre'
 //     numero?      número del documento AJENO, tal como viene impreso
 //     fecha?       AAAA-MM-DD del documento ajeno
+//     ejercici?    AAAA — en qué carpeta de año se archiva, solo para 'productor'/'entidad'
 //   -> { id, ruta, sha256, bytes, mime, nombre }
+//
+// POR QUÉ `ejercici` ENTRA POR EL FORMULARIO Y SOLO AHÍ. Un albarán, un cierre y un
+// convenio tienen su ejercicio en la base, y tomarlo de otro sitio dejaría el fichero en
+// un año distinto del acto que documenta. Una ficha no tiene ejercicio ninguno, y lo que
+// se archiva bajo ella es precisamente papel viejo: un certificado de 2023 tiene que caer
+// en `2023/`, no en el año en que a alguien le tocó escanearlo.
 //
 // POR QUÉ ESTA FUNCIÓN Y NO UNA POLÍTICA DE STORAGE. `20260928100600` deja los dos
 // buckets **sin una sola política sobre `storage.objects`**, y es deliberado: dejar que
@@ -31,9 +41,13 @@
 //
 // QUIÉN PUEDE SUBIR: el equipo, o el titular del objeto. Se pregunta con **una sola
 // llamada**, `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` (20261109100400),
-// que responde sí/no y sabe de los dos tipos de objeto —y sabrá de `convenio` y `plan` sin
-// que esta función se entere—. No se reimplementa la regla aquí: se consulta, y se consulta
-// al mismo sitio del que sale lo que se puede leer, para que subir y ver no discrepen.
+// que responde sí/no y sabe de cada tipo de objeto —y sabrá de los que vengan sin que esta
+// función se entere—. No se reimplementa la regla aquí: se consulta, y se consulta al mismo
+// sitio del que sale lo que se puede leer, para que subir y ver no discrepen.
+//
+// ⚠️ La asimetría de `productor`/`entidad` la decide esa misma función, no esta: ahí solo
+//    sube el equipo —es archivo que la Fundació guarda SOBRE la organización— y la
+//    organización lo lee. Aquí no hay ninguna rama que lo repita.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
@@ -53,10 +67,37 @@ const MIMES: Record<string, string> = {
   "image/png": "png",
 };
 
-const OBJETOS = ["albaran", "cierre_donante"];
-const TIPOS = ["albaran_productor", "factura", "foto_incidencia", "altre"];
+// El mismo vocabulario que el CHECK de `documentos_externos` (20270329100000). Se valida
+// aquí para poder responder un 400 con el campo señalado, no un 23514 crudo de Postgres;
+// la autoridad sigue siendo la base.
+const OBJETOS = ["albaran", "cierre_donante", "convenio", "productor", "entidad"];
+const TIPOS = [
+  "albaran_productor",
+  "factura",
+  "foto_incidencia",
+  "conveni_signat",
+  "certificat_previ",
+  "pla_previ",
+  "altre",
+];
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** El año más lejano que tiene sentido archivar. Por debajo es una errata, no un ejercicio. */
+const EJERCICIO_MIN = 2000;
+
+/**
+ * Por qué se rechaza, dicho por objeto. Un «aquest tancament no és teu» delante de quien
+ * intenta adjuntar papel a una ficha manda a buscar un tancament que no existe: en esas dos
+ * ramas el motivo nunca es de quién es la ficha, es que ahí solo escribe el equipo.
+ */
+const MOTIU_FORBIDDEN: Record<string, string> = {
+  albaran: "Aquest albarà no és teu",
+  cierre_donante: "Aquest tancament no és teu",
+  convenio: "Aquest conveni no és teu",
+  productor: "Només l'equip pot arxivar documentació d'una fitxa",
+  entidad: "Només l'equip pot arxivar documentació d'una fitxa",
+};
 
 function textNet(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
@@ -138,6 +179,7 @@ Deno.serve(async (req) => {
   const tipo = textNet(form.get("tipo"));
   const numero = textNet(form.get("numero")).slice(0, 80) || null;
   const fecha = textNet(form.get("fecha")) || null;
+  const ejerciciTexto = textNet(form.get("ejercici"));
 
   if (!OBJETOS.includes(objetoTipo)) {
     return responder({ error: "Objecte no vàlid", code: "dades_invalides", camp: "objeto_tipo" }, 400);
@@ -150,6 +192,26 @@ Deno.serve(async (req) => {
   }
   if (fecha && !/^\d{4}-\d{2}-\d{2}$/.test(fecha)) {
     return responder({ error: "La data no és vàlida", code: "dades_invalides", camp: "fecha" }, 400);
+  }
+
+  // El año acaba siendo una CARPETA, así que se acota a un rango con sentido: un `20260`
+  // o un `1` no darían ningún error más adelante, solo un directorio absurdo del que nadie
+  // se enteraría hasta ir a buscar el fichero. El tope es el año que viene, no el actual:
+  // un documento fechado ya en el ejercicio siguiente es normal a final de diciembre.
+  let ejerciciDemanat: number | null = null;
+  if (ejerciciTexto) {
+    const n = Number(ejerciciTexto);
+    if (
+      !/^\d{4}$/.test(ejerciciTexto) ||
+      n < EJERCICIO_MIN ||
+      n > new Date().getFullYear() + 1
+    ) {
+      return responder(
+        { error: "L'exercici no és vàlid", code: "dades_invalides", camp: "ejercici" },
+        400,
+      );
+    }
+    ejerciciDemanat = n;
   }
 
   const fichero = form.get("fitxer") ?? form.get("fichero") ?? form.get("file");
@@ -191,21 +253,15 @@ Deno.serve(async (req) => {
       return responder({ error: "Error comprovant permisos", code: "error_bd" }, 500);
     }
     if (data !== true) {
-      return responder(
-        {
-          error: objetoTipo === "albaran"
-            ? "Aquest albarà no és teu"
-            : "Aquest tancament no és teu",
-          code: "forbidden",
-        },
-        403,
-      );
+      return responder({ error: MOTIU_FORBIDDEN[objetoTipo], code: "forbidden" }, 403);
     }
   }
 
   // El ejercicio decide la subcarpeta del año, y el MODO decide si cuelga de `proves/`.
   // Los dos se toman del acto documentado —no de hoy— y solo se cae al año actual si el
-  // objeto todavía no lo tiene.
+  // objeto todavía no lo tiene. `ejercici` del formulario solo manda donde no hay acto del
+  // que leerlo, que son las dos ramas de ficha; en las demás se ignora a propósito, porque
+  // separar el fichero del ejercicio de su albarán o de su cierre lo deja sin trazabilidad.
   //
   // ⚠️ El modo importa en el cierre y no en el albarán: una factura de un cierre de prueba
   //    tiene que archivarse bajo `proves/`, que es lo único que `reiniciar_cierre_prueba()`
@@ -244,6 +300,51 @@ Deno.serve(async (req) => {
     }
     if (!alb) return responder({ error: "Aquest albarà no existeix", code: "no_existeix" }, 404);
     if (alb.ejercicio) ejercicio = alb.ejercicio as number;
+  }
+  if (objetoTipo === "convenio") {
+    // Un convenio solo tiene `ejercicio` desde que se firma (lo pide el número, §4), así
+    // que en un borrador se cae al año de la firma —que tampoco existe— y de ahí al actual.
+    //
+    // ⚠️ Y EN EL CONVENIO EN PAPEL ESE CASO ES EL NORMAL, no la excepción: el escaneado se
+    //    sube ANTES de registrarlo —es lo que `registrar_conveni_en_paper()` exige para
+    //    darlo por vigente (§4)—, así que en ese momento el convenio no tiene ni ejercicio
+    //    ni fecha de firma, y sin `ejercici` un papel de 2024 se archivaría bajo el año en
+    //    que alguien lo escanea. Por eso aquí SÍ se acepta, pero solo cuando la fila no
+    //    dice nada: en cuanto el convenio tiene su propio año, manda el suyo. Medido el
+    //    22-09-2026: sin esto, `CONV-OBR-2024-003` cayó en `2026/externs/`.
+    const { data: conv, error: errConv } = await supabase
+      .from("convenios")
+      .select("id, ejercicio, firmado_at, estado")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errConv) {
+      console.error("subir-documento-externo: convenios:", errConv.message);
+      return responder({ error: "Error consultant el conveni", code: "error_bd" }, 500);
+    }
+    if (!conv) return responder({ error: "Aquest conveni no existeix", code: "no_existeix" }, 404);
+    if (conv.ejercicio) ejercicio = conv.ejercicio as number;
+    else if (conv.firmado_at) ejercicio = new Date(conv.firmado_at as string).getFullYear();
+    else if (ejerciciDemanat) ejercicio = ejerciciDemanat;
+  }
+  if (objetoTipo === "productor" || objetoTipo === "entidad") {
+    // `documentos_externos` es polimórfica y no tiene FK, así que sin este `select` un
+    // uuid inventado se archivaría en una carpeta que no es de nadie. `ruta_documento()`
+    // también lo comprueba; esto es lo que permite decirlo como un 404 y no como un 409.
+    const tabla = objetoTipo === "productor" ? "productores" : "entidades";
+    const { data: ficha, error: errFicha } = await supabase
+      .from(tabla)
+      .select("id")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errFicha) {
+      console.error("subir-documento-externo: fitxa:", errFicha.message);
+      return responder({ error: "Error consultant la fitxa", code: "error_bd" }, 500);
+    }
+    if (!ficha) return responder({ error: "Aquesta fitxa no existeix", code: "no_existeix" }, 404);
+    // El único caso en que el año lo dice quien sube: la ficha no tiene ninguno propio.
+    if (ejerciciDemanat) ejercicio = ejerciciDemanat;
+    // `modo` se queda en 'real' a propósito: una ficha no tiene ensayo del que colgar, y
+    // archivarla bajo `proves/` la pondría donde `reiniciar_cierre_prueba()` borra.
   }
 
   // ------------------------------------------------------------------ subida

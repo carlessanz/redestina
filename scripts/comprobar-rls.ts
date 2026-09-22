@@ -390,6 +390,29 @@ const DOCUMENTAL_EXTERN: Check[] = [
     esperado: "denegar",
     descripcion: "NO pot llistar les canalitzacions de tothom",
   },
+  // --- El conveni signat EN PAPER (20270329100300) ---
+  // Es la puerta que decide si una organización puede operar sin haber firmado aquí, así
+  // que su guarda es `es_super_admin()` y no `pot_aprovar()`. Un externo que pudiera
+  // llamarla se daría por vigente a sí mismo y se saltaría la fecha de corte entera.
+  {
+    tabla: "preparar_conveni_en_paper",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" },
+    descripcion: "NO prepara cap conveni en paper",
+  },
+  {
+    tabla: "registrar_conveni_en_paper",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_conveni: "00000000-0000-0000-0000-000000000000",
+      p_data_firma: "2020-01-01",
+      p_referencia: "arnes",
+      p_signant_nom: "arnes",
+    },
+    descripcion: "NO dona per vigent cap conveni signat fora de la plataforma",
+  },
   { tabla: "plantillas_documento", op: "leer", esperado: "denegar", descripcion: "NO ve las plantillas de documento" },
   {
     tabla: "parametros_documentales",
@@ -981,6 +1004,28 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "algún coste fijado (scripts/crear-datos-documentales-prueba.ts)",
     },
     { tabla: "tipos_caja", op: "leer", esperado: "permitir", descripcion: "ve el catálogo de envases" },
+    // El conveni en paper (20270329100300) es `es_super_admin()`, no `es_intern()` ni
+    // `pot_aprovar()`: declarar vigente un convenio que la plataforma no ha visto firmar
+    // decide si una organización puede operar, y eso no se amplía en silencio al equipo.
+    {
+      tabla: "preparar_conveni_en_paper",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" },
+      descripcion: "NO prepara un conveni en paper (només super_admin)",
+    },
+    {
+      tabla: "registrar_conveni_en_paper",
+      op: "rpc",
+      esperado: "denegar",
+      args: {
+        p_conveni: "00000000-0000-0000-0000-000000000000",
+        p_data_firma: "2020-01-01",
+        p_referencia: "arnes",
+        p_signant_nom: "arnes",
+      },
+      descripcion: "NO dona per vigent un conveni signat en paper (només super_admin)",
+    },
     {
       tabla: "documentos_externos",
       op: "leer",
@@ -1173,6 +1218,33 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // --- El conveni signat EN PAPER (20270329100300) ---
+    // Los dos con uuid de ceros, por el mismo motivo que `crear_espigolada` aquí abajo: lo
+    // que se afirma es que la guarda de ROL deja pasar, no que la operación se complete.
+    // En positivo no se prueban nunca — `preparar_conveni_en_paper` CREA un borrador de
+    // convenio sobre una organización real, y `registrar_conveni_en_paper` la dejaría
+    // operando sin haber firmado nada. La organización inventada corta con `23503`
+    // (violación de FK) y el convenio inventado con `22023 conveni_inexistent`, los dos
+    // errores de negocio: prueban que se autorizó.
+    {
+      tabla: "preparar_conveni_en_paper",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" },
+      descripcion: "pot preparar un conveni signat en paper (la guarda el deixa passar)",
+    },
+    {
+      tabla: "registrar_conveni_en_paper",
+      op: "rpc",
+      esperado: "permitir",
+      args: {
+        p_conveni: "00000000-0000-0000-0000-000000000000",
+        p_data_firma: "2020-01-01",
+        p_referencia: "arnes",
+        p_signant_nom: "arnes",
+      },
+      descripcion: "pot donar per vigent un conveni signat en paper (la guarda el deixa passar)",
+    },
     // La guarda de rol de la conversión de una oferta en jornada (F3, 20260921221806).
     // Mismo criterio que en `equip`: uuid de ceros, porque en positivo no se prueba nunca
     // —convertiría una oferta real contra producción—. Devuelve `22023 oferta_inexistent`,
@@ -1483,6 +1555,20 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   ],
   productor: [
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
+    // El archivo que el equipo guarda de SU organización (20270329100000): convenios
+    // firmados en papel, certificados de ejercicios anteriores, planes previos. La
+    // asimetría es el punto de esas dos ramas de la política: el equipo escribe y la
+    // organización lee, al revés que en albaranes y cierres, donde sube el titular.
+    //
+    // ⚠️ Sale SALTADA mientras no haya ningún externo subido, y eso NO es lo mismo que
+    //    «la política funciona»: sin fixture, 0 filas es indistinguible de un rechazo.
+    {
+      tabla: "documentos_externos",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "ve la documentació que l'equip li ha guardat",
+      requiereFixture: "algún externo de su ficha (pujarDocumentExtern con objecteTipus 'productor')",
+    },
     { tabla: "entidades", op: "leer", esperado: "denegar", descripcion: "NO ve las entidades" },
     { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
     { tabla: "wa_contacts", op: "leer", esperado: "denegar", descripcion: "NO ve los contactos" },

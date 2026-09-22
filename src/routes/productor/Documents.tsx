@@ -37,6 +37,7 @@ import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
+import DocumentsDeLEquip from '../../components/documents/DocumentsDeLEquip'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -394,6 +395,11 @@ export default function ProductorDocuments() {
         titolKey="mydoc.pla_title"
         buitKey="mydoc.pla_empty"
       />
+
+      {/* Lo que la Fundación guarda de esta organización y llegó de fuera: convenios
+          firmados en papel, certificados de ejercicios anteriores, planes previos. Lo sube
+          el equipo; aquí solo se lee y se descarga. Se calla si no hay ninguno. */}
+      <DocumentsDeLEquip tipusOrg="productor" orgId={org?.id ?? null} />
 
       {/* El visor de PDF. Una sola vez por pantalla: el hook es uno y el modal también. */}
       {descarregador.visor}

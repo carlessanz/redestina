@@ -11,6 +11,7 @@
 // una clave i18n con el motivo, para que la pantalla decida cómo lo cuenta.
 
 import { supabase, supabaseUrl } from './supabase'
+import type { DocumentExternObjecte, DocumentExternTipus } from '../types'
 import type { DocumentoEstado } from '../types'
 
 /** Códigos que devuelve `descargar-documento`, más los que solo ocurren en el cliente. */
@@ -71,6 +72,29 @@ function codiDeResposta(status: number, code: unknown): CodiDescarrega {
  * lo que hace que un iframe no pinte nada**, así que no se añade «por si acaso».
  */
 export async function urlDocument(documentoId: string): Promise<ResultatDescarrega> {
+  return demanaUrl({ documento_id: documentoId }, `${documentoId}.pdf`)
+}
+
+/**
+ * Lo mismo para un documento EXTERNO —el que aporta otro: el albarán del productor, la
+ * factura, un convenio firmado en papel, un certificado de un ejercicio anterior—.
+ *
+ * 🔴 Hasta el 22-09-2026 esto NO EXISTÍA: un externo se subía, se listaba y **no se podía
+ * volver a abrir**, porque `descargar-documento` solo servía `documentos`. Guardar un
+ * certificado para que el productor lo tenga no significa nada si nadie puede descargarlo.
+ *
+ * ⚠️ Un externo **no tiene por qué ser un PDF** (el bucket acepta también JPG y PNG), así
+ * que el nombre de respaldo no lleva extensión inventada: la pone el servidor, que es quien
+ * conoce el `mime` de la fila.
+ */
+export async function urlDocumentExtern(externId: string): Promise<ResultatDescarrega> {
+  return demanaUrl({ documento_extern_id: externId }, externId)
+}
+
+async function demanaUrl(
+  cos: { documento_id: string } | { documento_extern_id: string },
+  nomPerDefecte: string,
+): Promise<ResultatDescarrega> {
   let dades: Descarrega
   try {
     const { data } = await supabase.auth.getSession()
@@ -80,7 +104,7 @@ export async function urlDocument(documentoId: string): Promise<ResultatDescarre
     const res = await fetch(`${supabaseUrl}/functions/v1/descargar-documento`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documento_id: documentoId }),
+      body: JSON.stringify(cos),
     })
     const body = (await res.json().catch(() => null)) as
       | (Partial<Descarrega> & { code?: string })
@@ -90,7 +114,7 @@ export async function urlDocument(documentoId: string): Promise<ResultatDescarre
 
     dades = {
       url: body.url,
-      nombre: body.nombre ?? `${documentoId}.pdf`,
+      nombre: body.nombre ?? nomPerDefecte,
       sha256_fichero: body.sha256_fichero ?? null,
       bytes: body.bytes ?? null,
       paginas: body.paginas ?? null,
@@ -111,7 +135,15 @@ export async function urlDocument(documentoId: string): Promise<ResultatDescarre
  * `window.open` se cierra sola en cuanto empieza la descarga.
  */
 export async function descarregarDocument(documentoId: string): Promise<ResultatDescarrega> {
-  const res = await urlDocument(documentoId)
+  return obre(await urlDocument(documentoId))
+}
+
+/** Lo mismo para un externo. Mismo `?download=` y mismo aviso de ventana bloqueada. */
+export async function descarregarDocumentExtern(externId: string): Promise<ResultatDescarrega> {
+  return obre(await urlDocumentExtern(externId))
+}
+
+function obre(res: ResultatDescarrega): ResultatDescarrega {
   if (!res.ok) return res
 
   const separador = res.data.url.includes('?') ? '&' : '?'
@@ -189,10 +221,13 @@ export async function esperarGeneracio(
 // además tres reglas que una política de Storage no sabría decir —qué MIME se acepta,
 // cuánto puede pesar y en qué carpeta va— y que la función sí dice.
 //
-// ⚠️ Hoy la función **solo deja subir a un albarán** si quien sube no es del equipo: la
-// rama de `cierre_donante` para el titular todavía no está abierta y responde `403`. Por
-// eso `forbidden` tiene su propia frase, que manda al enlace del correo del resumen en
-// vez de decir «no tienes permiso», que sería verdad pero no ayudaría a nadie.
+// QUIÉN PUEDE SUBIR QUÉ, y no es lo mismo para todos los objetos. Un titular sube a su
+// albarán (`albarans_de_les_meves_orgs`), a su cierre (`cierres_donante_meus`, abierto
+// desde 20261109100400 — este comentario afirmó lo contrario hasta el 22-09-2026) y a su
+// convenio; a una FICHA (`productor`/`entidad`) solo sube el equipo, porque eso no es algo
+// que aporte la organización sino archivo que la Fundación guarda sobre ella. Por eso
+// `forbidden` tiene su propia frase, que manda al enlace del correo del resumen en vez de
+// decir «no tienes permiso», que sería verdad pero no ayudaría a nadie.
 
 export type CodiPujada =
   | 'unauthorized' | 'forbidden' | 'no_existeix' | 'cos_invalid' | 'dades_invalides'
@@ -231,11 +266,17 @@ export type ResultatPujada =
 /** Sube un fichero (PDF, JPG o PNG, hasta 10 MB) y lo enlaza con un objeto del circuito. */
 export async function pujarDocumentExtern(camps: {
   fitxer: File
-  objecteTipus: 'albaran' | 'cierre_donante'
+  objecteTipus: DocumentExternObjecte
   objecteId: string
-  tipus: 'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+  tipus: DocumentExternTipus
   numero?: string | null
   data?: string | null
+  /**
+   * En qué carpeta de ejercicio se archiva. Solo lo usan `productor` y `entidad`: un
+   * certificado de 2023 va a `2023/`, no al año en que alguien lo sube. En los demás
+   * objetos el ejercicio sale de la propia fila y esto se ignora.
+   */
+  exercici?: number | null
 }): Promise<ResultatPujada> {
   try {
     const { data } = await supabase.auth.getSession()
@@ -249,6 +290,7 @@ export async function pujarDocumentExtern(camps: {
     form.append('tipo', camps.tipus)
     if (camps.numero) form.append('numero', camps.numero)
     if (camps.data) form.append('fecha', camps.data)
+    if (camps.exercici) form.append('ejercici', String(camps.exercici))
 
     // Sin `Content-Type` a mano: el navegador tiene que poner el `boundary` del multipart.
     const res = await fetch(`${supabaseUrl}/functions/v1/subir-documento-externo`, {

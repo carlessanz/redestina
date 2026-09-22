@@ -157,6 +157,17 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       prefijo: 'od.ch_',
       valores: ['whatsapp', 'email', 'panel', 'asistido'],
     },
+    {
+      // CHECK de `documentos_externos.tipo` (ampliado en `20270329100000`). Se compone en
+      // `DocumentacioOrganitzacio.tsx` y `DocumentsDeLEquip.tsx`, que listan lo que llega
+      // de fuera sin saber de antemano qué tipo trae cada fila.
+      que: 'documentos_externos.tipo',
+      prefijo: 'orgdoc.t_',
+      valores: [
+        'albaran_productor', 'factura', 'foto_incidencia',
+        'conveni_signat', 'certificat_previ', 'pla_previ', 'altre',
+      ],
+    },
   ]
 
   for (const { que, prefijo, valores } of COMPUESTAS) {

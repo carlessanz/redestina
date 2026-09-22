@@ -14,6 +14,7 @@ import BadgeConveni from '../../components/BadgeConveni'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import TargetaDiagnostic from '../../components/TargetaDiagnostic'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
+import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
 
 type Registre = Record<string, unknown> & { id: string }
 
@@ -93,6 +94,18 @@ export default function FitxaRegistre({ tabla }: Props) {
           )}
         </>
       )}
+      seccions={id ? (
+        /* El archivo documental de la organización: lo que llega de fuera (convenios en
+           papel, certificados de ejercicios anteriores, planes previos). Va en `seccions`
+           y no en `avisos` porque es un apartado de trabajo con su propia tarjeta, no algo
+           que haya que saber antes de tocar los campos. Como el resto, solo sobre una ficha
+           que ya existe: en el alta no hay `id` del que colgar nada. */
+        <DocumentacioOrganitzacio
+          tipusOrg={esProductor ? 'productor' : 'entidad'}
+          orgId={id}
+          nom={(registre?.[esProductor ? 'name' : 'nombre'] as string | null) ?? null}
+        />
+      ) : null}
       onSendMessage={(phone, name) => {
         void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))
       }}

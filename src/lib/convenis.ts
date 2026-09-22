@@ -157,6 +157,88 @@ export function resoldreConveni(
   }, 'conv.err_generic')
 }
 
+// ---------------------------------------------------------------------------
+// El convenio firmado EN PAPEL
+// ---------------------------------------------------------------------------
+// SON DOS LLAMADAS Y EL ORDEN ES LA GARANTÍA. Primero el borrador —para tener el `id` del
+// que colgará el escaneado—, después el PDF, y solo entonces la validación, que se niega
+// con `falta_escanejat` si el papel no está. Al revés, «registrar el convenio en papel»
+// sería declararlo vigente de palabra, y lo único que lo acredita es el papel.
+//
+// ⚠️ NO pasa por `prepararConveni`: aquella es idempotente y devuelve cualquier convenio en
+//    marcha, así que sobre un borrador que ya existiera el origen se quedaría en
+//    `plataforma` sin que nada lo dijera. `preparar_conveni_en_paper` lo marca y comprueba
+//    el estado.
+
+/** Códigos que devuelven las dos RPC. Se traducen POR SU CÓDIGO, nunca por el texto. */
+export type CodiConveniPaper =
+  | 'ja_en_curs' | 'no_es_paper' | 'conveni_inexistent'
+  | 'falta_referencia' | 'falta_signant' | 'falta_data' | 'data_futura'
+  | 'falta_escanejat' | 'no_autoritzat' | 'desconegut'
+
+const MOTIU_PAPER: Record<CodiConveniPaper, string> = {
+  ja_en_curs: 'conv.paper_err_en_curs',
+  no_es_paper: 'conv.paper_err_no_es_paper',
+  conveni_inexistent: 'conv.paper_err_inexistent',
+  falta_referencia: 'conv.paper_err_referencia',
+  falta_signant: 'conv.paper_err_signant',
+  falta_data: 'conv.paper_err_data',
+  data_futura: 'conv.paper_err_data_futura',
+  falta_escanejat: 'conv.paper_err_escanejat',
+  no_autoritzat: 'conv.paper_err_permis',
+  desconegut: 'conv.err_generic',
+}
+
+/**
+ * La clave i18n de un rechazo. Los mensajes de la base empiezan por el código y siguen con
+ * el detalle (`ja_en_curs: aquesta organitzacio ja te...`), así que se busca el prefijo; un
+ * `42501` es siempre falta de permiso, venga con el texto que venga.
+ */
+export function motiuConveniPaper(res: { missatge: string | null; codi: string | null }): string {
+  if (res.codi === '42501') return MOTIU_PAPER.no_autoritzat
+  const text = res.missatge ?? ''
+  for (const codi of Object.keys(MOTIU_PAPER) as CodiConveniPaper[]) {
+    if (text.startsWith(codi)) return MOTIU_PAPER[codi]
+  }
+  return MOTIU_PAPER.desconegut
+}
+
+/** Paso 1: el borrador marcado como `paper`, al que colgar el escaneado. Solo super_admin. */
+export function prepararConveniEnPaper(
+  tipusOrg: 'productor' | 'entidad',
+  org: string,
+  tipus: ConvenioTipo,
+): Promise<ResultatRpc<Convenio>> {
+  return crida('preparar_conveni_en_paper', {
+    p_tipo_org: tipusOrg,
+    p_org: org,
+    p_tipo: tipus,
+  }, 'conv.err_generic')
+}
+
+/**
+ * Paso 3: lo da por vigente. Habilita a operar igual que uno firmado aquí, pero **no
+ * consume número de serie** —guarda la referencia que trae el papel— y **no emite ningún
+ * PDF de Redestina**: el nuestro llevaría una página de evidencias que aquí no existen.
+ */
+export function registrarConveniEnPaper(camps: {
+  conveni: string
+  dataFirma: string
+  referencia: string
+  signantNom: string
+  signantCarrec?: string | null
+  notes?: string | null
+}): Promise<ResultatRpc<Convenio>> {
+  return crida('registrar_conveni_en_paper', {
+    p_conveni: camps.conveni,
+    p_data_firma: camps.dataFirma,
+    p_referencia: camps.referencia,
+    p_signant_nom: camps.signantNom,
+    p_signant_carrec: camps.signantCarrec ?? null,
+    p_notes: camps.notes ?? null,
+  }, 'conv.err_generic')
+}
+
 /** El enlace que no se manda: lo abre el dinamizador con el firmante delante (§3.2.5). */
 export function iniciarFirmaAssistida(id: string): Promise<ResultatRpc<ResultatFirmaAssistida>> {
   return crida('iniciar_firma_asistida', { p_id: id }, 'conv.err_generic')

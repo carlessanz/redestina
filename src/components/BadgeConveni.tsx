@@ -17,15 +17,24 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { estilEstatConveni } from '../lib/convenis'
 import { ORDRE_CONVENI as ORDRE } from '../lib/documentsPanell'
-import type { ConvenioEstado, ConvenioTipo } from '../types'
+import type { Convenio, ConvenioEstado, ConvenioTipo } from '../types'
 import { Badge } from '@/components/ui/badge'
 
 interface Fila {
   id: string
   tipo: ConvenioTipo
   estado: ConvenioEstado
+  /** `paper` = se firmó fuera y lo registró el super_admin (20270329100300) */
+  origen: Convenio['origen']
+  /** La referencia del papel. Sustituye al número: un convenio en papel no gasta serie */
+  referencia_paper: string | null
 }
 
+
+/** Vigente Y firmado en papel: es lo único que cambia el texto de la insignia. */
+function esPaperVigent(f: Fila): boolean {
+  return f.estado === 'vigent' && f.origen === 'paper'
+}
 
 export default function BadgeConveni({
   tipusOrg,
@@ -47,7 +56,7 @@ export default function BadgeConveni({
     const columna = tipusOrg === 'productor' ? 'productor_id' : 'entidad_id'
     void supabase
       .from('convenios')
-      .select('id, tipo, estado')
+      .select('id, tipo, estado, origen, referencia_paper')
       .eq(columna, orgId)
       .then(({ data }) => {
         if (!viu) return
@@ -75,8 +84,17 @@ export default function BadgeConveni({
     <div className="flex flex-wrap items-center gap-2">
       {vius.map((f) => (
         <Link key={f.id} to={`/equip/convenis/${f.id}`}>
+          {/* Un `vigent` firmado en papel se pinta VERDE igual que cualquier otro: habilita
+              a operar exactamente lo mismo, y pintarlo en otro tono diría que vale menos.
+              Lo que cambia es el texto —de dónde viene y con qué referencia—, porque el
+              número de serie que llevan los demás aquí no existe. */}
           <Badge className={estilEstatConveni(f.estado)}>
-            {t(`sig.model_${f.tipo}`)} · {t(`conv.st_${f.estado}`)}
+            {t(`sig.model_${f.tipo}`)} · {esPaperVigent(f)
+              ? t('conv.paper_badge_ok')
+              : t(`conv.st_${f.estado}`)}
+            {esPaperVigent(f) && f.referencia_paper
+              ? ` · ${t('conv.paper_ref_short', { num: f.referencia_paper })}`
+              : ''}
           </Badge>
         </Link>
       ))}

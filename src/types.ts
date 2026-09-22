@@ -636,11 +636,27 @@ export interface CosteProducto {
   updated_at: string
 }
 
+/** El vocabulario lo fija el CHECK de la tabla (20270329100000), no este tipo. */
+export type DocumentExternObjecte =
+  | 'albaran' | 'cierre_donante' | 'convenio'
+  /** Archivo de la organización: cuelga de la FICHA, no de una operación */
+  | 'productor' | 'entidad'
+
+export type DocumentExternTipus =
+  | 'albaran_productor' | 'factura' | 'foto_incidencia'
+  /** El convenio firmado EN PAPEL, escaneado: es lo que lo acredita (20270329100300) */
+  | 'conveni_signat'
+  /** Certificado fiscal de un ejercicio anterior a Redestina */
+  | 'certificat_previ'
+  /** Plan de prevención hecho fuera de la plataforma */
+  | 'pla_previ'
+  | 'altre'
+
 export interface DocumentoExterno {
   id: string
-  objeto_tipo: 'albaran' | 'cierre_donante'
+  objeto_tipo: DocumentExternObjecte
   objeto_id: string
-  tipo: 'albaran_productor' | 'factura' | 'foto_incidencia' | 'altre'
+  tipo: DocumentExternTipus
   numero: string | null
   fecha: string | null
   ruta: string
@@ -814,6 +830,14 @@ export interface Convenio {
   numero: number | null
   /** Se pide al FIRMAR, no al preparar: un borrador descartado no deja hueco en la serie */
   numero_completo: string | null
+  /**
+   * De dónde viene la firma. `paper` = se firmó fuera y lo registró el super_admin
+   * (20270329100300): vale igual para operar, pero **no consume número de serie** —las
+   * series numeran lo que Redestina emite— y por eso lleva `referencia_paper` en su lugar.
+   */
+  origen: 'plataforma' | 'paper'
+  /** La referencia impresa en el papel. Solo en `origen = 'paper'`, donde sustituye al número */
+  referencia_paper: string | null
   estado: ConvenioEstado
   roles_com: ('venedora' | 'compradora' | 'obrador')[]
   /** Copia congelada de la ficha en el momento de firmar */
