@@ -607,6 +607,11 @@ const ca: Dict = {
   'org.unlink_desc': 'La fitxa deixarà de ser la mateixa organització que «{nom}» i passarà a ser-ne una a part, amb els seus convenis.',
   'org.unlink_warn': 'Fes-ho si es van enllaçar per error. Deixaran de compartir convenis: un conveni signat per l’altra fitxa ja no cobrirà aquesta. Els documents ja emesos no canvien.',
   'org.unlink_ok': 'Fitxa separada: ja té organització pròpia',
+  // Avís de nom/NIF divergent entre les dues fitxes de la mateixa organització (22-09-2026,
+  // pla `2026-09-22-plan-organizacion-unificada.md` D1). No corregeix res: només ho diu, perquè
+  // l'equip decideixi quin és el bo — un nom triat per heurística seria l'error que això evita.
+  'org.nom_divergeix': 'El nom no coincideix amb l’altra fitxa: aquí «{propi}», a l’altra «{altre}».',
+  'org.nif_divergeix': 'El NIF no coincideix amb l’altra fitxa: aquí «{propi}», a l’altra «{altre}».',
   'appr.reg_role_titular': 'Titular', 'appr.reg_role_operador': 'Operador',
   'appr.reg_since': 'Alta {date}',
   'appr.reg_view': 'Veure la fitxa', 'appr.reg_approve': 'Aprovar', 'appr.reg_reject': 'Rebutjar',
@@ -2482,6 +2487,8 @@ const es: Dict = {
   'org.unlink_desc': 'La ficha dejará de ser la misma organización que «{nom}» y pasará a ser una aparte, con sus convenios.',
   'org.unlink_warn': 'Hazlo si se enlazaron por error. Dejarán de compartir convenios: un convenio firmado por la otra ficha ya no cubrirá a esta. Los documentos ya emitidos no cambian.',
   'org.unlink_ok': 'Ficha separada: ya tiene organización propia',
+  'org.nom_divergeix': 'El nombre no coincide con la otra ficha: aquí «{propi}», en la otra «{altre}».',
+  'org.nif_divergeix': 'El NIF no coincide con la otra ficha: aquí «{propi}», en la otra «{altre}».',
   'appr.reg_role_titular': 'Titular', 'appr.reg_role_operador': 'Operador',
   'appr.reg_since': 'Alta {date}',
   'appr.reg_view': 'Ver la ficha', 'appr.reg_approve': 'Aprobar', 'appr.reg_reject': 'Rechazar',

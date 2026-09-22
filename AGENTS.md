@@ -612,8 +612,10 @@ src/
     TargetaDiagnostic.tsx      El estado y el botón, en la ficha y en el panel externo
     AvisDiagnostic.tsx         La banda, en tono aviso: el diagnóstico NO bloquea operar
     equip/EditorDiagnostic.tsx El cuestionario, las medidas y las reglas, desde Configuració
-    EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, y el botón de separarla.
-                               Solo del equipo: lee la otra tabla de fichas (§12.28)
+    EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, el botón de separarla y
+                               el aviso si el nombre o el NIF no coinciden entre las dos (D1 del
+                               plan de organización unificada, 22-09-2026). Solo del equipo: lee
+                               la otra tabla de fichas (§12.28)
     FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
                                pública y para el diálogo; `ample` decide el reparto (§6quater)
     DialegFirmaConveni.tsx     Firmar sin salir del panel: 80vw × 88vh, acuña el enlace al abrir
