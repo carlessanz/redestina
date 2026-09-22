@@ -246,12 +246,29 @@ describe('casos límite (comportamiento medido, deuda §12.14)', () => {
     expect(clasificar('si gracies')).toBe('acceptada')
   })
 
-  // Hueco de vocabulario: el castellano «de acuerdo» no está en la lista (sí está el
-  // catalán «d'acord»), así que un receptor castellanohablante que conteste así no se
-  // clasifica. Es el fallo barato: cae al intake y no cierra nada.
-  it('«de acuerdo» (castellano) no está en la lista y no se clasifica', () => {
-    expect(clasificar('de acuerdo')).toBeNull()
-    expect(clasificar('estamos de acuerdo')).toBeNull()
+  // Hueco de vocabulario CERRADO: el castellano «de acuerdo» no estaba en la lista (sí el
+  // catalán «d'acord»), así que un receptor castellanohablante que contestara así no se
+  // clasificaba. Era el fallo barato —caía al intake y no cerraba nada— pero era un hueco
+  // de IDIOMA, no de método: la lista ya tenía las dos lenguas en todo lo demás.
+  it('«de acuerdo» (castellano) es una aceptación, como «d\'acord»', () => {
+    expect(clasificar('de acuerdo')).toBe('acceptada')
+    expect(clasificar('estoy de acuerdo')).toBe('acceptada')
+    expect(clasificar('estamos de acuerdo')).toBe('acceptada')
+  })
+
+  // ⚠️ Lo que NO se ha cerrado, y es deliberado: el umbral de 5 palabras sigue igual. Una
+  // frase larga solo casa por coincidencia EXACTA, así que «de acuerdo» en medio de un
+  // párrafo no clasifica nada. Ampliar vocabulario es añadir palabras a una lista; mover el
+  // umbral es aceptar falsos positivos en mensajes largos, donde un «de acuerdo» puede
+  // referirse a otra cosa y comprometería kilos que nadie pidió. Se queda como decisión.
+  it('el umbral de 5 palabras sigue mandando: «de acuerdo» en una frase larga no clasifica', () => {
+    expect(clasificar('estamos de acuerdo pero lo tenemos que mirar con calma')).toBeNull()
+  })
+
+  // Y la negación sigue ganando, que es lo que el vocabulario nuevo podría haberse llevado
+  // por delante: «no estoy de acuerdo» termina en una frase afirmativa de la lista.
+  it('«no estoy de acuerdo» sigue siendo un rechazo', () => {
+    expect(clasificar('no estoy de acuerdo')).toBe('rebutjada')
   })
 
   // Un «no» pegado a otra palabra sin espacio no casa: la comprobación es por palabra.

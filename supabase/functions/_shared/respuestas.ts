@@ -158,6 +158,8 @@ const AFIRMATIVOS = [
   "si", "ok", "okay", "vale", "d acord", "dacord", "accepto", "acceptu",
   "la vull", "ho vull", "vull", "correcte", "perfecte", "endavant", "si la vull",
   "si gracies", "em va be",
+  // El castellano «de acuerdo», que faltaba mientras el catalán «d'acord» sí estaba.
+  "de acuerdo", "estoy de acuerdo", "estamos de acuerdo",
 ];
 const NEGATIVOS = [
   "no", "no puc", "no la vull", "no ho vull", "no em va be", "rebutjo",

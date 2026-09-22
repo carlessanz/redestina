@@ -880,10 +880,18 @@ para el canal **email** (Resend): si tiene filas, `enviar-email` solo manda a es
 vacía = sin límite. RLS: `authenticated` select/insert/delete. La gestiona `src/lib/emailTest.ts`
 desde el Dashboard. **Ojo**: Resend sin dominio verificado solo entrega al correo propietario de
 la cuenta, así que esta lista es la segunda barrera, no la única.
-⚠️ **Guarda un correo suelto, sin FK**: borrar una organización **no** la quita de aquí. El
-31-07-2026 quedaron dos filas huérfanas (`TEST-ENT-ANIMAL`, `TEST-PROD-PENDENT`) apuntando a
-organizaciones que ya no existían. Es inocuo —la whitelist solo *permite*, no envía— pero la lista
-deja de describir quién existe; al borrar una organización de prueba, borrar también su fila.
+⚠️ **Guarda un correo suelto, sin FK**: por eso conserva `tecnologia@espigoladors.com` sin ficha
+detrás a propósito (arriba en este §, es el correo propietario de la cuenta de Resend). El
+31-07-2026 quedaron dos filas huérfanas (`TEST-ENT-ANIMAL`, `TEST-PROD-PENDENT`) y volvió a pasar
+el 16-09-2026 con el borrado de doble rol de Carles Sanz (deuda §12.33) — dos veces la misma
+disciplina manual fallando.
+✅ **Ya no puede volver a pasar** (22-09-2026, `20260922025820_borrar_fitxa_purga_whitelist.sql`):
+`borrar_una_fitxa()` captura el correo de la ficha antes de borrarla y purga, en la MISMA
+transacción, la fila de `email_test_recipients` que coincida EXACTO — nunca toca
+`tecnologia@espigoladors.com`, que no cuelga de ninguna ficha desde el origen. Lo que sigue siendo
+disciplina manual es un `insert`/`update` directo en la whitelist fuera de
+`borrar_ficha_completa()`, que no lleva ninguna validación — pero ese no es el caso que producía
+huérfanos.
 
 **`app_config`** — `key` PK, `value`, `updated_at` (`20260722130000_intake_recordatorios.sql`).
 Clave/valor para secretos que un **job** necesita y que no pueden ir en git. Hoy guarda
@@ -1466,10 +1474,12 @@ pasan a ser la **última red** —si algún día la función se dejara un camino
 en vez de dejar un hueco—. Lo que cambia es que ahora hay una sola puerta, que comprueba
 antes y **dice el motivo**.
 
-⚠️ **Dos cosas se quedan fuera a propósito**: `wa_contacts`/`wa_messages` (no tienen FK a la
+⚠️ **Una cosa se queda fuera a propósito**: `wa_contacts`/`wa_messages` (no tienen FK a la
 ficha, solo comparten teléfono —§ «Integridad»—, y el hilo documenta por qué se retiró;
-se borra desde la papelera de Mensajería) y `email_test_recipients`, que sigue siendo
-disciplina manual (§12.33). Y lo que SQL no puede hacer: **retirar los ficheros de
+se borra desde la papelera de Mensajería). `email_test_recipients` **ya no** se queda fuera:
+desde el 22-09-2026 se purga en el mismo paso, sin llevarse nunca
+`tecnologia@espigoladors.com` (deuda §12.33, cerrada; detalle arriba en «Modelo de datos»).
+Y lo que SQL no puede hacer: **retirar los ficheros de
 Storage**. Sus rutas salen en `fitxers_orfes` del resultado, para que lo haga quien llama.
 
 🔴 **Exige `es_super_admin()`, no `pot_aprovar()`**, y conviene saber por qué: borrar una
@@ -1743,6 +1753,7 @@ funciones, no políticas:
 | `emitir_certificado_periodo(periodo, motivo)` | Las guardas del anual, literalmente —`datos_provisionales` → `42501`, ningún `bloqueja`, kg y valor positivos— más la plantilla `CD/parcial` vigente. Sustituye los parciales contenidos. ⚠️ **Desde `20260921211329` ya NO exige factura coincidente ni D4**; `p_motivo_excepcion` se conserva en la firma y se ignora |
 | `emitir_certificados_cierre(cierre)` (`20260921211356`) | **Todos los certificados de un cierre, de una vez.** Exige `pot_aprovar()`, que el cierre exista (`for update`), que esté **`tancat`**, que esté calculado y —**solo si el cierre es REAL** (`20260921214526`)— que `datos_provisionales` sea falso; esto último **fuera del bucle**, o el resultado serían N saltados con el mismo motivo. Recorre los `cierres_donante` de tipo `donacio` sin número, salta los bloqueados y los de 0 kg **con su código**, y emite el resto en subbloques `begin/exception` para que un fallo no tumbe la tanda. Devuelve `{emesos, ja_tenien, saltats}`. 🔴 **No la llama `cerrar_cierre()` ni `congelar_*`**: ver §4 |
 | `rectificar_certificado_periodo(periodo, motivo)` · `marcar_enviado_periodo(periodo)` · `reiniciar_periodes_prova(ejercicio)` | El resto del ciclo. Rectificar no consume número: es la versión siguiente |
+| `limpiar_periodes_borrador()` (`20260922025838`, deuda §12.112, cerrada) | Borra los borradores de `cierres_periodo` (+líneas, en cascada) sin `certificado_numero` — de CUALQUIER modo, a diferencia de `reiniciar_periodes_prova()`, que solo alcanza `modo='prueba'`. Nunca toca una fila numerada. `es_super_admin()` |
 | `cierre_base_recepcio(desde, hasta, modo)` · `cierre_pendents_recepcio(desde, hasta)` | La base de cálculo del **certificado de recepción**. **Solo equipo** (`42501`), con el idioma de `20270303100500`: cruzan canalizaciones, excedentes, albaranes y productores **sin que ninguna RLS vuelva a filtrar**, así que sin la guarda una entidad podría pedir por PostgREST lo que ha recibido todo el mundo, con el nombre de cada generador — el agujero exacto que aquella migración encontró en `cierre_base()` |
 | `kg_rebuts_exercici(ejercicio, entidad)` | El acumulado del año del panel de la receptora, **leído en SQL y no sumado en cliente**. `security invoker`, como `pendents_equip()`: agrega solo lo que quien pregunta ya puede leer, así que no lleva guarda propia. ⚠️ **Corolario que sorprende y no es una fuga**: a un *generador* le devuelve filas —los kilos de SUS entregas agregados por entidad—, porque su RLS ya le deja leer las `canalizaciones` de sus propias ofertas. Medido el 22-09-2026: la RPC y sus canalizaciones visibles cuadran al kilo, o sea que el agregado no le da ni un dato nuevo |
 | `calcular_certificat_recepcio(entidad, desde, hasta, modo)` | El borrador y sus bloqueos. `pot_aprovar()`. `22023` si la ventana cruza dos ejercicios, acaba en el futuro o ya tiene certificado. ⚠️ **Calcular ya ESCRIBE**, como su hermana de periodo (§12.112) |
@@ -4459,9 +4470,9 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 46 vivas, **38 están catalogadas** allí como decisión con su
-precio anotado, espera de material de un tercero o interruptor de producción. §12bis separa **lo que
-es un defecto** de **lo que no lo es**.
+lista se vuelva ruido otra vez: de las 42 vivas, **41 están catalogadas** allí como decisión con su
+precio anotado, espera de material de un tercero, interruptor de producción o decisión de negocio
+pendiente. §12bis separa **lo que es un defecto** de **lo que no lo es**.
 ⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
 decía «39 vivas, 32 catalogadas» mientras el cuerpo real ya tenía 47 y §12bis catalogaba 39 —dos
 huecos de conteo distintos, uno por cada número—. Se descubrió el 22-09-2026 al cerrar la entrada
@@ -4469,20 +4480,30 @@ huecos de conteo distintos, uno por cada número—. Se descubrió el 22-09-2026
 recuento no se corrige a ojo al cerrar una entrada, se recuenta con `grep`/`comm` contra el
 fichero**, porque sumar y restar de memoria es exactamente cómo se llegó a este desajuste.
 
-**Las 8 que NO están catalogadas son las que describen trabajo pendiente de verdad**: las seis
-parciales (5, 14, 21, 33, 55, 69) —de cada una, la mitad hecha está contada dentro; lo que queda
-se explica ahí mismo— más **112** (los borradores sin número de `cierres_periodo` se acumulan sin
-limpieza) y **118** (cinco migraciones duplicadas en el historial remoto, inocuo pero sin
-limpiar). Las dos últimas no tenían por qué faltar en esta lista —son tan benignas como varias de
-las catalogadas en §12bis— y se quedaron fuera solo porque nadie las volvió a mirar; quien las
-cierre o las catalogue, que actualice esta línea a mano.
-✅ **Auditada la lista entera contra el código y la base reales el 22-09-2026** (tres agentes en
-paralelo, uno por tercio, más verificación directa de los hallazgos con más peso): estas 8 siguen
-siendo exactamente las que faltan por catalogar, ninguna se cerró del todo, pero **12 de las 46
-vivas tenían texto que ya no describía el código de hoy** (cifras, alcance o comportamiento) y se
-corrigieron una por una en su propio cuerpo — números 12, 17, 27, 33, 34, 37, 67, 71, 84, 95, 99 y
-109. La 82 sí se cerró del todo: su salvaguarda (`tests/cobertura.test.ts`) está completa y
-verificada, mismo patrón que cerró la 16 y la 117 antes ese mismo día.
+✅ **Y por la tarde del mismo 22-09-2026 se resolvió todo lo que quedaba por catalogar,
+salvo una.** De las 8 sin catalogar, **4 se cerraron de verdad con código**: 14 (el hueco de
+vocabulario castellano del clasificador sí/no, cerrado en `respuestas.ts`), 33 (la purga de
+`email_test_recipients` se automatizó dentro de `borrar_una_fitxa()`, y las dos filas huérfanas
+que había se limpiaron), 112 (nueva RPC `limpiar_periodes_borrador()`, y el único borrador que
+había en producción, limpiado) y 118 (las 5 filas de metadata duplicada, borradas de
+`supabase_migrations.schema_migrations`). **2 más se reclasificaron** de "trabajo pendiente" a
+"decisión ya tomada" y pasaron a catalogarse en §12bis: 21 (lo que quedaba abierto no tiene
+equivalente posible o es diseño deliberado) y 55 (la vigilancia ya está completa 5/5; la causa de
+fondo es de la plataforma, no del repo). Y **69 se reclasificó** como "requiere decisión de
+negocio" —no de un tercero externo, sino del propio equipo/Fundación sobre si vale la pena un
+backfill fiscal— y se cataloga también en §12bis. **Solo queda sin catalogar la #5**, con su
+alcance ya reducido: la recarga en ráfaga de `OffersList` y el `select` completo de `entidades`
+del Dashboard se cerraron; lo que sigue abierto (el filtrado en cliente de los tres listados, y
+dos consultas del Dashboard que agregan por fila) es una decisión de alcance explícita dado el
+volumen de datos actual, no una tarea pendiente sin dueño.
+✅ **Auditada la lista entera contra el código y la base reales el 22-09-2026, por la mañana**
+(tres agentes en paralelo, uno por tercio, más verificación directa de los hallazgos con más
+peso): esas 8 seguían siendo exactamente las que faltaban por catalogar en ese momento, ninguna se
+había cerrado todavía, pero **12 de las 46 vivas tenían texto que ya no describía el código de
+hoy** (cifras, alcance o comportamiento) y se corrigieron una por una en su propio cuerpo —
+números 12, 17, 27, 33, 34, 37, 67, 71, 84, 95, 99 y 109. La 82 sí se cerró del todo esa mañana:
+su salvaguarda (`tests/cobertura.test.ts`) está completa y verificada, mismo patrón que cerró la
+16 y la 117 antes ese mismo día.
 ⚠️ La 16 —que hasta el 22-09-2026 figuraba aquí como «la brecha 2 de §1bis vista desde el
 código»— se cerró ese día: su propio cuerpo solo describía arreglos ya hechos (11-09-2026), y lo
 que de verdad queda de la brecha 2 —`usuario`/`rol_organizacion` propios, deduplicación sin
@@ -4495,9 +4516,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **46 entradas vivas** (7 parciales 🟡 y 39 abiertas) y **72 cerradas**,
-sobre 118 numeradas — recontado con `grep`/`comm` contra el fichero, no a mano; **85** es la
-séptima parcial, y se había quedado fuera de la cuenta desde siempre. Cuatro son de la tanda de
+Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
+21, 55 y 69): **42 entradas vivas** (3 parciales 🟡 — 5, 69, 85 — y 39 abiertas) y **76 cerradas**,
+sobre 118 numerados — recontado con `grep`/`comm` contra el fichero, no a mano. Cuatro son de la tanda de
 F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro nacen
 catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de la fase
 0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce rutas que
@@ -4539,11 +4560,28 @@ panel del equipo y en el externo).
    manejador contra los ids de mis ofertas. ⚠️ **El DELETE se queda sin guarda a propósito**: con
    la replica identity por defecto solo viaja la clave primaria (§12.24), así que no hay
    `excedente_id` con el que decidir.
-   ⚠️ **Sigue abierto** lo demás, y no es poco: `OffersList` recarga entero ante cualquier evento
-   de Realtime; el `Dashboard` agregaba **ocho** tablas al entrar —no seis, como decía esta
-   entrada— y aún agrega cuatro; y los buscadores de
-   `ProducersList`/`OffersList` filtran **en cliente** sobre lo ya cargado, así que la paginación
-   de esos listados exige rehacer búsqueda, orden y el reparto test/resto en servidor.
+   ✅ **Y la recarga en ráfaga de `OffersList` y el `select` completo de `entidades` del
+   Dashboard, cerrados (22-09-2026)**. `OffersList` recargaba entero ante CADA evento de
+   Realtime en `excedentes`/`canalizaciones` (`event: '*'`), y una sola acción del equipo —
+   aprobar un interés, repartir una espigolada— escribe varias filas seguidas: una ráfaga de
+   eventos disparaba otras tantas recargas completas redundantes. Ahora se coalescen con un
+   debounce de 400 ms (`ESPERA_RECARREGA_MS`, `OffersList.tsx`): una ráfaga entera produce UNA
+   sola recarga, la de después del último evento; la carga inicial al montar sigue siendo
+   inmediata. Y el `Dashboard` traía la tabla `entidades` entera (`select('email, opt_in')`)
+   solo para dos recuentos: pasa a tres `count: 'exact', head: true` en paralelo (total,
+   `opt_in = true`, `email` no vacío), con el mismo patrón que ya usaban `wa_messages` e
+   `intake_sessions` en la misma función. Las tres cifras que salen en pantalla no cambian.
+   ⚠️ **Sigue abierto, y es DECISIÓN de alcance, no olvido**: `productores.select('phone')` del
+   Dashboard sigue trayendo filas —`conMovil` mira la FORMA del teléfono (≥9 cifras tras
+   quitar separadores), no su existencia, y la columna es texto libre (§6); un `not null`
+   contaría un «Truca al fix» como móvil, y expresar la misma regex en SQL la duplicaría con
+   la de TypeScript, que es justo el patrón que ya se evitó en otros sitios (§12.91)—;
+   `excedentes`/`canalizaciones` del Dashboard siguen trayendo filas porque agregan **por
+   oferta**, no admiten `count`; y los buscadores de `ProducersList`/`EntitiesList`/`OffersList`
+   siguen filtrando **en cliente**. Esto último se acepta explícitamente dado el volumen actual
+   (7 productores, 8 entidades en producción, tras el borrado del 16-09-2026, §6): paginar
+   servidor-side hoy sería sobre-ingeniería. Revisar si el catálogo vuelve a crecer (al
+   reimportar los CSV de ARA, §6, volverían a ser ~345 productores y ~111 entidades).
 
 10. Hay migraciones que **borran datos** (`truncate wa_messages`) mezcladas con DDL. Son **dos**, y
     solo una mezcla: `20260717080924_productores_y_limpieza.sql:3-4` (el `truncate` y un `delete`, en
@@ -4558,24 +4596,6 @@ panel del equipo y en el externo).
     de fondo —el campo aporta poco al ranking— sigue sin poder medirse hasta reimportar datos
     reales.
 
-14. 🟡 **La clasificación sí/no sigue siendo una heurística por lista de palabras**, pero ya
-    está **medida** y tres errores reales están corregidos (11-09-2026, `tests/respuestas.test.ts`,
-    67 pruebas). Los tres cerraban una oferta al revés **sin que nadie lo revisara** —la fila
-    queda resuelta y se contesta «gràcies per contestar»—:
-    · «**si no ens va be**» («sí, pero no nos va bien») se leía **acceptada**: el «no» va en medio
-      y no casaba por empieza/termina, pero el «si » inicial sí. El caro: comprometía kilos que
-      nadie había pedido.
-    · «**no hi ha problema**» se leía **rebutjada**, siendo una aceptación.
-    · «**si us plau**» se leía **acceptada**, siendo una cortesía — `normalizar()` quita los
-      acentos antes de comparar (hace falta para que «SI» funcione), así que el `si` átono y el
-      `sí` tónico son indistinguibles.
-    La regla que los cubre sin fingir comprensión del lenguaje: **ante señales de los dos signos,
-    no se decide**. Un `null` deja el mensaje en la consola para una persona, que es el resultado
-    correcto cuando la máquina no sabe; una fila pendiente es preferible a una resuelta al revés.
-    ⚠️ Lo que **sigue abierto**: es una lista de palabras, y hay huecos de vocabulario conocidos
-    —el castellano «de acuerdo» no está (sí el catalán `d'acord`)— y una frontera arbitraria en
-    las 5 palabras: «no ens va bé això» se clasifica y «no ens va gens bé això» no.
-
 17. Coexisten dos gates: **`es_test`** (fuente de verdad de la app, §8) y las whitelists
     `meta_test_recipients`/`email_test_recipients` (requisito técnico de Meta en test). En test un
     destinatario debe cumplir **ambos**; se inicializaron alineados. Desde el 15-09-2026 el Dashboard
@@ -4589,16 +4609,18 @@ panel del equipo y en el externo).
     pertenencia a ninguna whitelist. Lo que sigue vigente es solo la primera mitad: los dos gates
     coexisten y hoy están alineados, a revisar el día que el número pase a producción.
 
-21. 🟡 **El canal preferente (§8bis) no llega a todos los envíos** — *la mayor parte, cubierta
-    (14-09-2026)*. Con el interruptor global (§8) el correo ya cubre los momentos que eran solo de
+21. **El canal preferente (§8bis) no llega a todos los envíos** — *cubierto lo que se podía cubrir
+    (14-09-2026), y lo que queda es decisión, no deuda (reclasificado 22-09-2026, ver §12bis)*.
+    Con el interruptor global (§8) el correo ya cubre los momentos que eran solo de
     WhatsApp: la **confirmación de oferta registrada** (`crear-oferta`), la **respuesta de la
     entidad** (botón «Mostra interès» al panel, donde `manifestar_interes()` cae en la misma cola) y
     la **mensajería manual** del equipo (`DialegCorreu`).
-    Lo que **sigue abierto**: el **intake conversacional** y su **recordatorio** no tienen —ni pueden
-    tener— equivalente por correo (no hay sesión de intake sin WhatsApp); la vía para publicar sin
-    WhatsApp es el panel (§6ter). El **ALTA/BAJA** solo significa algo dentro de WhatsApp. Y sigue sin
-    haber **fallback a correo dentro de `whatsapp-send`**: lo orquesta el llamante, que es quien sabe
-    qué texto tiene sentido por correo.
+    Lo que queda **no es código pendiente**: el **intake conversacional** y su **recordatorio** no
+    tienen —ni pueden tener— equivalente por correo (no hay sesión de intake sin WhatsApp); la vía
+    para publicar sin WhatsApp es el panel (§6ter). El **ALTA/BAJA** solo significa algo dentro de
+    WhatsApp. Y el **fallback a correo dentro de `whatsapp-send`** se deja a propósito fuera: lo
+    orquesta el llamante, que es quien sabe qué texto tiene sentido por correo — meterlo dentro de
+    la función acoplaría el texto de cada caso de uso a una función genérica de envío.
 
 24. **Los eventos DELETE de Realtime se entregan sin evaluar RLS** (`realtime.apply_rls` los reparte
     a todos los suscriptores porque, con la replica identity por defecto, el WAL solo lleva la
@@ -4634,19 +4656,6 @@ panel del equipo y en el externo).
     —nombre, correo de trabajo y móvil—. Nunca cuentas con rol de plataforma, eso sigue vetado.
     Apagarlo al dejar de ser una demo.
 
-33. 🟡 **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK:
-    la tabla guarda un correo suelto (§4). Pasó dos veces el 31-07-2026 y se limpió a mano.
-    ⚠️ **Y volvió a pasar** — recontado el 22-09-2026 contra producción, no de memoria: la tabla
-    tiene hoy **13** filas, no 11, y **3** están huérfanas, no 1: el deliberado
-    `tecnologia@espigoladors.com` («Owner Resend (test)», el correo propietario de la cuenta de
-    Resend) más **dos nuevas**, `hola@carlessanz.com` («Carles Sanz») y
-    `hola+wa-carles@carlessanz.com` («Carles Sanz (registre nou)») — del borrado con doble rol del
-    16-09-2026 (§6ter): esa cuenta se quedó sin fichas y la organización se reenlazó bajo un correo
-    distinto (`hola+productor-receptor@carlessanz.com`, que sí tiene las dos), dejando atrás estas
-    dos filas apuntando a nadie. Es exactamente el caso que esta entrada ya avisaba que podía
-    volver a pasar.
-    ⚠️ Y por eso no se puede automatizar con «borra lo que no tenga ficha»: esa regla se llevaría
-    por delante justamente la fila que tiene que estar. Sigue siendo disciplina al borrar.
 34. **Áreas táctiles: se subieron las cuatro que importan, no todas.** «M'interessa» (44 px en móvil),
     el `SidebarTrigger` (36), el ojo de la contraseña (de 16×16 a 32×32) y el «atrás» del detalle de
     oferta. El resto de la interfaz sigue en `h-9` (36 px), por debajo de los 44 px que recomiendan
@@ -4681,8 +4690,10 @@ panel del equipo y en el externo).
     fail-open deliberado de §4bis, no una regresión: hay que encender el interruptor antes de
     juzgar el resultado. Está escrito en la cabecera del script.
 
-55. 🟡 **Los campos sensibles los protege un GRANT, no una política, y eso se puede deshacer sin
-    querer** — *la vigilancia, resuelta el 14-09-2026; la causa de fondo, no*. `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
+55. **Los campos sensibles los protege un GRANT, no una política, y eso se puede deshacer sin
+    querer** — *la vigilancia, completa desde el 14-09-2026; la causa de fondo es estructural de
+    Supabase y no se puede cerrar por código (reclasificada 22-09-2026, ver §12bis)*.
+    `enlaces_token.token_hash`, `enlaces_token.codigo_hash`,
     `evidencias.documento_identidad` y `parametros_documentales.apoderada_dni` están fuera del
     GRANT de SELECT (§4). Un `grant select on all tables in schema public to authenticated`
     —exactamente la línea que ya existe en `20260721160000`— los volvería a abrir **sin que
@@ -4715,7 +4726,8 @@ panel del equipo y en el externo).
     sigue describiendo la experiencia real del equipo, solo que el sitio donde vive la restricción
     es otro.
 
-69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
+69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega — requiere decisión de
+    negocio, no código (reclasificada 22-09-2026, ver §12bis).** `emitir_albaran()` rellena
     `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
     no dependen del respaldo `coalesce(data_hora_recollida, conciliada_at, created_at)`, que puede
     caer semanas después.
@@ -4921,17 +4933,6 @@ panel del equipo y en el externo).
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
-118. **Cinco migraciones están registradas DOS VECES en el historial remoto.**
-     `confirmacio_assistida`, `interes_assistit`, `canalitzacio_assistida_lectura`,
-     `firma_assistida_sense_codi` y `canalitzacions_actives_ambigua` aparecen con su fecha real
-     (`20260921160536`…`20260921171041`) **y** con su fecha de proyecto
-     (`20270329100000`…`20270402100000`). Viene de una sesión del 21-09 que las aplicó por MCP y
-     además las registró con el nombre del fichero (§7). **Es inocuo** —el SQL de las cinco es
-     `create or replace`, así que aplicarlo dos veces da el mismo resultado— pero el historial
-     afirma que se aplicaron diez migraciones donde hubo cinco. Se limpia borrando las cinco
-     filas duplicadas de `supabase_migrations.schema_migrations`, y no se ha hecho porque tocar
-     ese historial sin necesidad es peor que la incoherencia que arregla.
-
 115. **El cuestionario de diagnóstico, las 20 medidas y las 32 reglas son texto de trabajo
      SIN validar por la Fundació.** Es la misma decisión que los seis convenios
      (`20270111100200`) y el mismo precio: se emite con `provisional = true`, **sale impreso en
@@ -4959,14 +4960,6 @@ panel del equipo y en el externo).
      recibió— y porque es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre.
      La misma expresión está **duplicada a propósito** en `kg_rebuts_exercici()`: si divergieran,
      el acumulado del panel y el del certificado dirían cifras distintas sobre lo mismo.
-
-112. **Cada ventana que se calcula en el diálogo del certificado a demanda deja un borrador
-     en `cierres_periodo`.** `calcular_certificado_periodo()` inserta la fila antes de que
-     nadie decida emitir, así que probar tres ventanas para ver cuál cuadra deja tres filas
-     con `certificado_numero is null`. No ensucian nada visible —el panel del donante solo
-     lista lo emitido, y `documents_meus()` filtra por documento— pero se acumulan y no hay
-     ninguna limpieza. El día que estorben, la salida es una RPC que borre los borradores
-     sin número, que es lo único que se puede borrar de esa tabla sin tocar evidencia.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
@@ -5004,6 +4997,8 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
 | 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
+| 21 | Sin fallback a correo dentro de `whatsapp-send`; el intake no tiene equivalente por correo | El primero es diseño (lo orquesta el llamante, que sabe qué texto tiene sentido); el segundo no puede tenerlo: no hay sesión de intake sin WhatsApp. La vía sin WhatsApp es el panel (§6ter) |
+| 55 | El GRANT de columna se puede reabrir con un `grant select on all tables` masivo | Ya son 5 de 5 columnas sensibles con check dedicado en el arnés (14-09-2026). La causa de fondo —`alter default privileges` de Supabase concede SELECT a tabla nueva salvo `revoke` explícito— es de la plataforma, no del repo: la vigilancia es la única defensa posible |
 
 ### Espera material de la fase 0 o de un tercero
 
@@ -5027,9 +5022,15 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 97 | Acuñar desde el panel revoca el enlace del correo, y por eso no se prueba en positivo |
 | 72 | `abrir_cierre` no se prueba como «permitir» porque dejaría una cabecera sin forma de borrarla |
 
+### Requieren una decisión de negocio (no de código, ni de un tercero externo)
+
+| # | Qué decisión falta | Por qué no se toma sola |
+|---|---|---|
+| 69 | Si se hace un backfill de `data_hora_recollida` en las donaciones antiguas (solo ENT/OPE la escriben hoy, el REC no) | Un backfill cambiaría el ejercicio fiscal de datos que ya pueden estar certificados. Se dijo explícitamente que no se toca sin el equipo/la Fundación delante — no es una tarea de ingeniería, es una decisión sobre datos fiscales reales |
+
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **72** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **76** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -5119,12 +5120,17 @@ se va solo **cómo se llegó hasta aquí**.
 | 107 | Un interactivo saliente no registraba las opciones ofrecidas | 15-09-2026 |
 | 108 | Borrar una ficha no borraba lo suyo: tres comportamientos y uno dejaba huérfanos | `20260921153439` |
 | 117 | Nada de lo publicado el 22-09-2026 se había medido en un navegador | 22-09-2026 |
+| 14 | La heurística sí/no tenía un hueco de vocabulario: «de acuerdo» (castellano) no clasificaba aunque «d'acord» (catalán) sí | 22-09-2026 |
+| 33 | Borrar una ficha dejaba rastro en `email_test_recipients`, sin FK y sin purga automática | `20260922025820` |
+| 112 | Los borradores sin número de `cierres_periodo` se acumulaban sin limpieza | `20260922025838` |
+| 118 | 5 migraciones registradas dos veces en `supabase_migrations.schema_migrations` (metadata, no esquema) | 22-09-2026 |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **936 pruebas en 29 ficheros**, todas correctas y ninguna pendiente.
+   Referencia: **938 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 936
+   el 22-09-2026 al cerrar la deuda §12.14: dos casos nuevos para el vocabulario «de acuerdo»).
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado

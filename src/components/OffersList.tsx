@@ -45,6 +45,20 @@ const TANCADES = ['cerrada', 'no_colocada', 'cancelada']
  */
 const TOPE_TANCADES = 200
 
+/**
+ * Cuánto se espera antes de recargar por un evento de Realtime (§12.5).
+ *
+ * Una sola acción del equipo escribe VARIAS filas seguidas —aprobar un interés toca
+ * `canalizaciones` y `excedentes` en la misma transacción, y repartir una espigolada
+ * inserta una canalización por lote—, así que con una recarga por evento la pantalla
+ * pedía tres consultas completas por cada fila que cambiaba. Se coalescen: solo se
+ * recarga una vez, tras el último evento de la ráfaga.
+ *
+ * ⚠️ No afecta a la carga inicial, que sigue siendo inmediata: el debounce vive solo en
+ * el manejador de la suscripción.
+ */
+const ESPERA_RECARREGA_MS = 400
+
 export default function OffersList({ onOpen }: Props) {
   const { t } = useT()
   const [actives, setActives] = useState<Excedente[]>([])
@@ -77,12 +91,23 @@ export default function OffersList({ onOpen }: Props) {
 
   useEffect(() => {
     void load()
+    // Una ráfaga de eventos = una sola recarga, la de después del último (ESPERA_RECARREGA_MS).
+    let temporitzador: ReturnType<typeof setTimeout> | undefined
+    const recarrega = () => {
+      if (temporitzador !== undefined) clearTimeout(temporitzador)
+      temporitzador = setTimeout(() => { void load() }, ESPERA_RECARREGA_MS)
+    }
     const channel = supabase
       .channel('redestina-ofertas')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'excedentes' }, () => void load())
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'canalizaciones' }, () => void load())
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'excedentes' }, recarrega)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'canalizaciones' }, recarrega)
       .subscribe()
-    return () => { void supabase.removeChannel(channel) }
+    return () => {
+      // El timeout también se limpia al desmontar: si no, una recarga pendiente llamaría a
+      // `load()` con el componente fuera y dejaría estado escrito sobre nada.
+      if (temporitzador !== undefined) clearTimeout(temporitzador)
+      void supabase.removeChannel(channel)
+    }
   }, [load])
 
   const filtra = useCallback((files: Excedente[]) => {

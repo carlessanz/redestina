@@ -63,7 +63,9 @@ function Kpi({ titulo, valor, sub, detalle, to }: {
 export default function Dashboard() {
   const { t } = useT()
   const [prodPhones, setProdPhones] = useState<(string | null)[]>([])
-  const [entidades, setEntidades] = useState<{ email: string | null; opt_in: boolean | null }[]>([])
+  const [entitatsTotal, setEntitatsTotal] = useState(0)
+  const [entitatsOptIn, setEntitatsOptIn] = useState(0)
+  const [entitatsEmail, setEntitatsEmail] = useState(0)
   const [excedentes, setExcedentes] = useState<ExcRow[]>([])
   const [canalKg, setCanalKg] = useState<Record<string, number>>({})
   const [kgConfirmadosTotal, setKgConfirmadosTotal] = useState(0)
@@ -79,11 +81,21 @@ export default function Dashboard() {
     // base con `head: true`: la fila no viaja. Lo que sigue pidiendo filas es porque una KPI
     // las necesita de verdad, y se dice cuál —una cifra rota para ahorrar una consulta sería
     // un mal cambio—. Las dos consultas a las whitelists se fueron con ellas a Configuració.
-    const [prod, ent, exc, canal, rebuts, pendents, intake, test] = await Promise.all([
-      // Filas: `conMovil` mira la forma del teléfono, no su existencia.
+    const [prod, ent, entOptIn, entEmail, exc, canal, rebuts, pendents, intake, test] = await Promise.all([
+      // Filas: `conMovil` mira la FORMA del teléfono (≥9 cifras tras quitar separadores), no
+      // su existencia. La columna es texto libre —el import de ARA conserva en crudo lo que no
+      // supo parsear (§6)—, así que un `not null` contaría como móvil un «Truca al fix». La
+      // única forma de contarlo en la base sería una expresión regular copiada de
+      // `soloDigitos()`, y dos implementaciones de la misma regla acaban divergiendo.
       supabase.from('productores').select('phone'),
-      // Filas: `opt_in` y `email` son dos recuentos sobre la misma lista.
-      supabase.from('entidades').select('email, opt_in'),
+      // Tres recuentos, cero filas: son tres condiciones simples sobre la misma tabla, y
+      // ninguna KPI necesita el contenido de `email` ni de `opt_in`, solo cuántas lo cumplen.
+      supabase.from('entidades').select('id', { count: 'exact', head: true }),
+      supabase.from('entidades').select('id', { count: 'exact', head: true }).is('opt_in', true),
+      // `.neq('')` porque el recuento anterior contaba por verdad de JavaScript: la cadena
+      // vacía no era un correo, y un `not null` a secas sí la contaría.
+      supabase.from('entidades').select('id', { count: 'exact', head: true })
+        .not('email', 'is', null).neq('email', ''),
       // Filas: los kg pendientes son `kg_total − canalizado` **por oferta**, así que hace
       // falta la pareja (id, kg_total) y no un recuento por estado.
       supabase.from('excedentes').select('id, estado, kg_total'),
@@ -96,7 +108,9 @@ export default function Dashboard() {
       getTestMode(),
     ])
     setProdPhones((prod.data ?? []).map((p) => p.phone))
-    setEntidades(ent.data ?? [])
+    setEntitatsTotal(ent.count ?? 0)
+    setEntitatsOptIn(entOptIn.count ?? 0)
+    setEntitatsEmail(entEmail.count ?? 0)
     setExcedentes((exc.data ?? []) as ExcRow[])
     const porExc: Record<string, number> = {}
     let totalKg = 0
@@ -128,15 +142,14 @@ export default function Dashboard() {
       if (ACTIVOS.includes(e.estado)) pendientes += Math.max(0, Number(e.kg_total ?? 0) - (canalKg[e.id] ?? 0))
     }
     const conMovil = prodPhones.filter((p) => p && soloDigitos(p).length >= 9).length
-    const entConOptIn = entidades.filter((e) => e.opt_in).length
-    const entConEmail = entidades.filter((e) => e.email).length
     return {
       ofertas, kg: { canalizados: kgConfirmadosTotal, pendientes },
       productores: { total: prodPhones.length, conMovil },
-      entidades: { total: entidades.length, conOptIn: entConOptIn, conEmail: entConEmail },
+      entidades: { total: entitatsTotal, conOptIn: entitatsOptIn, conEmail: entitatsEmail },
       mensajes: { recibidos: missatgesRebuts, sinContestar: missatgesPendents, intakeActivas },
     }
-  }, [excedentes, canalKg, kgConfirmadosTotal, prodPhones, entidades,
+  }, [excedentes, canalKg, kgConfirmadosTotal, prodPhones,
+      entitatsTotal, entitatsOptIn, entitatsEmail,
       missatgesRebuts, missatgesPendents, intakeActivas])
 
   return (
