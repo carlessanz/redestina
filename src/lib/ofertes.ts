@@ -96,7 +96,19 @@ export type ConfirmacioEmail = 'enviat' | 'simulat' | 'omes' | 'error'
 export async function creaOferta(
   productorId: string,
   datos: Record<string, unknown>,
-): Promise<Resultat<{ id: string; id_excedente: string; confirmacio_email?: ConfirmacioEmail }>> {
+): Promise<
+  Resultat<{ id: string; id_excedente: string; confirmacio_email?: ConfirmacioEmail }> & {
+    /**
+     * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es
+     * `code: 'campos_faltantes'`. El cliente ya valida esto ANTES de llamar (§12.123), así
+     * que en el camino normal no se llega aquí con la lista vacía; esto es la red para
+     * cuando el descriptor cambió entre que se cargó el formulario y que se envió —la
+     * función se despliega antes que este fichero (§11)— y el servidor sabe algo que el
+     * cliente no sabía todavía.
+     */
+    faltan?: string[]
+  }
+> {
   try {
     const t = await token()
     if (!t) return { ok: false, error: 'unauthorized' }
@@ -106,7 +118,10 @@ export async function creaOferta(
       body: JSON.stringify({ productor_id: productorId, datos }),
     })
     const body = await res.json().catch(() => null)
-    if (!res.ok) return { ok: false, error: (body as { error?: string })?.error ?? 'error' }
+    if (!res.ok) {
+      const b = body as { error?: string; faltan?: string[] } | null
+      return { ok: false, error: b?.error ?? 'error', faltan: b?.faltan }
+    }
     return { ok: true, data: body }
   } catch (err) {
     return { ok: false, error: err instanceof Error ? err.message : String(err) }

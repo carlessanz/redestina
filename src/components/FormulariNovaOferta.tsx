@@ -124,6 +124,9 @@ export default function FormulariNovaOferta(
   const [enviant, setEnviant] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [procesObert, setProcesObert] = useState(() => !procesJaVist())
+  // Qué claves faltan por rellenar, para marcarlas en rojo y decir cuáles son. Vacío = no
+  // se ha intentado publicar todavía, o ya está todo (§12.123).
+  const [campsFaltants, setCampsFaltants] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!productorId) { setCarregant(false); return }
@@ -154,15 +157,66 @@ export default function FormulariNovaOferta(
       if (clave === 'familia') delete nou.producte
       return nou
     })
+    // En cuanto se toca un campo marcado, deja de estarlo: el rojo es «esto faltaba», no
+    // «esto está mal», así que no tiene sentido que sobreviva a la primera letra escrita.
+    if (campsFaltants.has(clave)) {
+      setCampsFaltants((s) => {
+        const n = new Set(s)
+        n.delete(clave)
+        return n
+      })
+    }
+  }
+
+  // Mismo criterio que `faltantes()` en `_shared/camposOferta.ts` (obligatorio, aplica
+  // según la condición, y vacío tras quitar espacios): DUPLICADO A PROPÓSITO, no importado,
+  // porque aquel fichero es Deno y este es el bundle del navegador. Divergir no fallaría
+  // —el servidor sigue siendo la autoridad, y su rechazo real lo recoge `r.faltan` más
+  // abajo—, pero dejaría que el aviso en pantalla diga «todo bien» cuando no lo está.
+  function faltantsObligatoris(): CampoOferta[] {
+    return campos
+      .filter((c) => c.obligatorio && aplica(c, datos))
+      .filter((c) => {
+        const v = datos[c.clave]
+        return v === undefined || v === null || String(v).trim() === ''
+      })
+  }
+
+  function marcaIVeAlPrimer(claus: string[]) {
+    setCampsFaltants(new Set(claus))
+    if (claus[0]) {
+      document.getElementById(idDe(claus[0]))
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
   }
 
   async function enviar() {
     if (!productorId) return
+    // Antes de llamar al servidor: decir QUÉ falta, no esperar a que conteste con un
+    // «Falten camps obligatoris» genérico que obliga a repasar los 14 campos uno a uno.
+    const faltants = faltantsObligatoris()
+    if (faltants.length > 0) {
+      marcaIVeAlPrimer(faltants.map((c) => c.clave))
+      setError(t('po.missing_fields', { camps: faltants.map((c) => c.etiqueta).join(', ') }))
+      return
+    }
+    setCampsFaltants(new Set())
     setEnviant(true)
     setError(null)
     const r = await creaOferta(productorId, datos)
     setEnviant(false)
     if (!r.ok || !r.data) {
+      // El servidor puede saber de un campo que el cliente no vio a tiempo —el descriptor
+      // cambia entre que se cargó el formulario y que se envió, porque la función se
+      // despliega antes que este fichero (§11)—. Si trae `faltan`, se trata igual que la
+      // validación de arriba: se marca y se dice cuál es, no el genérico crudo.
+      if (r.faltan && r.faltan.length > 0) {
+        const porClave = new Map(campos.map((c) => [c.clave, c]))
+        const etiquetas = r.faltan.map((clave) => porClave.get(clave)?.etiqueta ?? clave)
+        marcaIVeAlPrimer(r.faltan)
+        setError(t('po.missing_fields', { camps: etiquetas.join(', ') }))
+        return
+      }
       setError(r.error ?? t('c.error'))
       toast.error(r.error ?? t('c.error'))
       return
@@ -183,8 +237,20 @@ export default function FormulariNovaOferta(
   if (!productorId) return null
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
 
+  // El id de cada control: `campo.clave` ya es único dentro del formulario (es la clave
+  // que el servidor usa para guardar la respuesta), así que basta prefijarlo para que no
+  // choque con nada más de la página. Es lo que permite que la `<Label>` de arriba lleve
+  // `htmlFor` de verdad: hasta hoy ningún control de este formulario tenía `id` ni `name`,
+  // así que un lector de pantalla no anunciaba qué campo era y pulsar la etiqueta no
+  // enfocaba nada (deuda §12.121, medido en el navegador el 22-09-2026).
+  function idDe(clave: string): string {
+    return `of-${clave}`
+  }
+
   function control(campo: CampoOferta) {
     const valor = datos[campo.clave]
+    const id = idDe(campo.clave)
+    const invalid = campsFaltants.has(campo.clave)
     // ⚠️ `text-base md:text-sm` NO es cosmético: iOS Safari amplía la página al enfocar
     // cualquier control por debajo de 16px, y como el viewport renuncia a propósito a
     // `maximum-scale` (accesibilidad), NO deshace el zoom al salir del campo. Con
@@ -192,12 +258,15 @@ export default function FormulariNovaOferta(
     // campos— ampliado y desplazándose en horizontal. Es el mismo patrón que ya usa
     // `components/ui/input.tsx`, y por eso los <input> nunca tuvieron el problema.
     // La altura pasa de h-10 a h-9 para que dejen de alternar con los Input.
-    const comuns = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm'
+    // El `<select>` nativo no trae de serie la variante `aria-invalid:` que sí llevan
+    // `Input`/`Textarea` de shadcn (`ui/input.tsx`): hay que repetirla aquí, igual que ya
+    // hay que repetir `text-base md:text-sm` (§2bis).
+    const comuns = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm aria-invalid:border-destructive aria-invalid:ring-destructive/20'
 
     switch (campo.tipo) {
       case 'familia':
         return (
-          <select className={comuns}
+          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
             value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
             <option value="">—</option>
             {(catalogos?.familias ?? []).map((f) => <option key={f} value={f}>{f}</option>)}
@@ -205,7 +274,7 @@ export default function FormulariNovaOferta(
         )
       case 'producte':
         return (
-          <select className={comuns}
+          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
             value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}
             disabled={!datos.familia}>
             <option value="">—</option>
@@ -214,7 +283,7 @@ export default function FormulariNovaOferta(
         )
       case 'causa':
         return (
-          <select className={comuns}
+          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
             value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
             <option value="">—</option>
             {(catalogos?.causas ?? []).map((c) => (
@@ -224,7 +293,7 @@ export default function FormulariNovaOferta(
         )
       case 'ubicacio':
         return (catalogos?.ubicaciones ?? []).length > 0 ? (
-          <select className={comuns}
+          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
             value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
             <option value="">—</option>
             {(catalogos?.ubicaciones ?? []).map((u) => (
@@ -241,7 +310,7 @@ export default function FormulariNovaOferta(
         const triada = (campo.opciones ?? []).find((o) => o.id === String(valor ?? ''))
         return (
           <>
-            <select className={comuns}
+            <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
               value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
               <option value="">—</option>
               {(campo.opciones ?? []).map((o) => <option key={o.id} value={o.id}>{o.titulo}</option>)}
@@ -254,13 +323,14 @@ export default function FormulariNovaOferta(
       }
       case 'numero':
         return (
-          <Input type="number" step="0.01" min="0" value={valor == null ? '' : String(valor)}
+          <Input id={id} name={campo.clave} type="number" step="0.01" min="0" aria-invalid={invalid}
+            value={valor == null ? '' : String(valor)}
             onChange={(e) => set(campo.clave, e.target.value === '' ? null : Number(e.target.value))} />
         )
       default:
         return campo.clave === 'observacions'
-          ? <Textarea rows={3} value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
-          : <Input type="text" value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
+          ? <Textarea id={id} name={campo.clave} rows={3} aria-invalid={invalid} value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
+          : <Input id={id} name={campo.clave} type="text" aria-invalid={invalid} value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
     }
   }
 
@@ -319,7 +389,7 @@ export default function FormulariNovaOferta(
                 {/* Sin asterisco: el formulario es mínimo y todo lo que aparece hace
                     falta, así que lo que se marca es lo que se puede dejar en blanco
                     (design/DESIGN.md §6). */}
-                <Label className="mb-1.5 block text-xs text-muted-foreground">
+                <Label htmlFor={idDe(campo.clave)} className="mb-1.5 block text-xs text-muted-foreground">
                   {campo.etiqueta}
                   {!campo.obligatorio && <span className="ml-1">{t('po.optional')}</span>}
                 </Label>

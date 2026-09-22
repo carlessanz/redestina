@@ -22,6 +22,7 @@ import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import { manifestaInteres } from '../../lib/ofertes'
 import { puntInteres } from '../../lib/procesOferta'
+import { dataCurta } from '../../lib/albarans'
 import { classeEtapaInteres } from './Interessos'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import CarregantSeccio from '../../components/CarregantSeccio'
@@ -131,7 +132,7 @@ export default function Mercat() {
                   {o.kg_total ?? '—'} kg
                   {o.modalitat ? ` · ${t(`od.mod_${o.modalitat}`)}` : ''}
                   {esVenda && o.preu_minim != null ? ` · ${o.preu_minim} €/kg` : ''}
-                  {o.disponible_hasta ? ` · ${t('mk.until', { date: o.disponible_hasta })}` : ''}
+                  {o.disponible_hasta ? ` · ${t('mk.until', { date: dataCurta(o.disponible_hasta) })}` : ''}
                 </div>
               </div>
               {punt ? (
@@ -175,15 +176,15 @@ export default function Mercat() {
                     )}
                     <div className="grid gap-3 sm:grid-cols-2">
                       <div>
-                        <Label className="mb-1.5 block text-xs text-muted-foreground">{t('mk.kg')}</Label>
-                        <Input type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} />
+                        <Label htmlFor="mk-kg" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.kg')}</Label>
+                        <Input id="mk-kg" name="kg" type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} />
                       </div>
                       {esVenda && (
                         <div>
-                          <Label className="mb-1.5 block text-xs text-muted-foreground">
+                          <Label htmlFor="mk-preu" className="mb-1.5 block text-xs text-muted-foreground">
                             {t('mk.price', { min: o.preu_minim ?? 0 })}
                           </Label>
-                          <Input type="number" step="0.01" value={preu}
+                          <Input id="mk-preu" name="preu" type="number" step="0.01" value={preu}
                             onChange={(e) => setPreu(e.target.value)} />
                         </div>
                       )}

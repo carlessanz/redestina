@@ -14,10 +14,13 @@ interface SesionCompleta {
 }
 
 // El texto que se publica usa las etiquetas de siempre, no los valores internos.
+// Con mayúscula inicial: todos los demás valores del mensaje la llevan —PRODUCTE,
+// PRODUCTOR, CAUSA— porque salen tal cual de la base o de lo que ha escrito la persona;
+// esta era la única en minúscula, por venir de un mapa escrito a mano (deuda §12.122).
 const ETIQUETA_MODALITAT: Record<string, string> = {
-  donacio: "donació",
-  venda: "venda",
-  maquila: "maquila",
+  donacio: "Donació",
+  venda: "Venda",
+  maquila: "Maquila",
 };
 
 /**
@@ -150,14 +153,25 @@ export function componerTextoOferta(campos: {
   producteAlCamp?: boolean;
   productor: string;
   municipi: string;
-  ubicacio: string;
+  /** Sin enlace de Maps no se imprime el bloque entero (ver más abajo). */
+  ubicacio?: string;
   quantitat: string;
   disponible: string;
-  horari: string;
+  /** Campo libre y opcional del panel: sin respuesta, no se imprime la línea. */
+  horari?: string;
   modalitat: string;
   preu?: string;
   causa: string;
-  envasos: string;
+  /** Opcional en el panel (obligatorio en el intake, §6bis): sin respuesta, no se imprime. */
+  envasos?: string;
+  /**
+   * `responsable` y `observacions` SIEMPRE se imprimen, aunque estén vacías —al revés que
+   * `ubicacio`/`horari`/`envasos` de aquí arriba—, y es una decisión distinta y ya tomada
+   * (`tests/oferta.test.ts`, «un campo vacío deja su etiqueta, no borra la línea»): son
+   * texto libre que alguien podría haber escrito, y una etiqueta vacía se lee como «no hi
+   * ha», mientras que una línea que desaparece se lee como un fallo. No tocar sin revisar
+   * ese test.
+   */
   responsable: string;
   observacions: string;
 }): string {
@@ -181,18 +195,21 @@ export function componerTextoOferta(campos: {
   lineas.push(
     `👩‍🌾 PRODUCTOR: ${campos.productor}`,
     `📍 MUNICIPI: ${campos.municipi}`,
-    `🗺️ UBICACIÓ:`,
-    campos.ubicacio,
-    `📦 QUANTITAT: ${campos.quantitat}`,
-    `📅 DISPONIBLE: ${campos.disponible}`,
-    `⏰ HORARI RECOLLIDA: ${campos.horari}`,
-    `💰 MODALITAT: ${campos.modalitat}`,
   );
+  // Sin enlace de Maps no hay nada que poner bajo la etiqueta: un guion suelto en su
+  // propia línea no dice nada y ocupa sitio en un mensaje que se lee en el móvil (mismo
+  // criterio que `producte_al_camp`/`preu_minim`, deuda §12.122).
+  if (campos.ubicacio) {
+    lineas.push(`🗺️ UBICACIÓ:`, campos.ubicacio);
+  }
+  lineas.push(`📦 QUANTITAT: ${campos.quantitat}`, `📅 DISPONIBLE: ${campos.disponible}`);
+  if (campos.horari) lineas.push(`⏰ HORARI RECOLLIDA: ${campos.horari}`);
+  lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
   // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
   if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
+  lineas.push(`🔴 CAUSA: ${campos.causa}`);
+  if (campos.envasos) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
   lineas.push(
-    `🔴 CAUSA: ${campos.causa}`,
-    `♻️ ENVASOS: ${campos.envasos}`,
     `👥 RESPONSABLE: ${campos.responsable}`,
     `📝 OBSERVACIONS: ${campos.observacions}`,
     "",
@@ -262,14 +279,14 @@ export async function crearExcedente(
     producteAlCamp: alCamp,
     productor: fichaProductor?.empresa || productor.name,
     municipi: municipio,
-    ubicacio: ubicacion?.gmaps_url ?? "-",
+    ubicacio: ubicacion?.gmaps_url || undefined,
     quantitat: `${kg}kg aprox${d.caixes ? ` · ${d.caixes} caixes` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
-    horari: String(d.horari ?? ""),
+    horari: String(d.horari ?? "") || undefined,
     modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
     preu: preuMinim != null ? `${preuMinim} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
-    envasos: String(d.retorn ?? ""),
+    envasos: String(d.retorn ?? "") || undefined,
     // Se asigna en el panel; el productor no lo elige.
     responsable: "",
     observacions: String(d.observacions ?? ""),

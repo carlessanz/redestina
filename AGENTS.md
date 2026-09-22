@@ -4513,7 +4513,7 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 49 vivas, **42 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 43 vivas, **42 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero, interruptor de producción o decisión de negocio
 pendiente. §12bis separa **lo que es un defecto** de **lo que no lo es**.
 ⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
@@ -4534,9 +4534,7 @@ había en producción, limpiado) y 118 (las 5 filas de metadata duplicada, borra
 equivalente posible o es diseño deliberado) y 55 (la vigilancia ya está completa 5/5; la causa de
 fondo es de la plataforma, no del repo). Y **69 se reclasificó** como "requiere decisión de
 negocio" —no de un tercero externo, sino del propio equipo/Fundación sobre si vale la pena un
-backfill fiscal— y se cataloga también en §12bis. **Sin catalogar quedan la #5 y las seis de la revisión en navegador**
-(119-124), que llegaron esa misma tarde y son defectos con su sitio exacto localizado y ninguna
-decisión detrás. La #5 conserva su
+backfill fiscal— y se cataloga también en §12bis. **Solo queda sin catalogar la #5**, con su
 alcance ya reducido: la recarga en ráfaga de `OffersList` y el `select` completo de `entidades`
 del Dashboard se cerraron; lo que sigue abierto (el filtrado en cliente de los tres listados, y
 dos consultas del Dashboard que agregan por fila) es una decisión de alcance explícita dado el
@@ -4562,14 +4560,14 @@ conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
-21, 55 y 69) y la revisión funcional en navegador (abre 119-124, más la 125 del renombrado
-de migraciones): **49 entradas vivas**
-(3 parciales 🟡 — 5, 69, 85 — y 46 abiertas) y **76 cerradas**, sobre 125 numerados — recontado
-con `grep`/`comm` contra el fichero, no a mano. Esa revisión dejó además **cuatro arreglos sin
-número, porque se hicieron en el mismo cambio**: la clave i18n compuesta `od.ch_asistido`, la
-RLS que dejaba a la receptora sin ver el producto de sus entregas, el desmontaje de la pantalla
-en cada recarga del contexto y el `sense_conveni` que el servidor mandaba y la pantalla tiraba.
-Cuatro son de la tanda de
+21, 55 y 69), la revisión funcional en navegador de esa misma tarde (abre 119-124, más la 125
+del renombrado de migraciones) y su arreglo por la noche (cierra 119-124): **43 entradas vivas**
+(3 parciales 🟡 — 5, 69, 85 — y 40 abiertas) y **82 cerradas**, sobre 125 numerados — recontado
+con `grep`/`comm` contra el fichero, no a mano. La revisión en navegador dejó además **cuatro
+arreglos sin número, porque se hicieron en el mismo cambio que las diez encontradas**: la clave
+i18n compuesta `od.ch_asistido`, la RLS que dejaba a la receptora sin ver el producto de sus
+entregas, el desmontaje de la pantalla en cada recarga del contexto y el `sense_conveni` que el
+servidor mandaba y la pantalla tiraba. Cuatro son de la tanda de
 F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro nacen
 catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de la fase
 0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce rutas que
@@ -5012,52 +5010,14 @@ panel del equipo y en el externo).
      La misma expresión está **duplicada a propósito** en `kg_rebuts_exercici()`: si divergieran,
      el acumulado del panel y el del certificado dirían cifras distintas sobre lo mismo.
 
-> Las seis siguientes salieron de la **revisión funcional en navegador del 22-09-2026** (el
-> informe completo, con la evidencia de cada una, está en `3. Claude Code/`). Los cuatro
-> hallazgos mayores de esa revisión se arreglaron en el mismo cambio y por eso no tienen
-> número: la clave `od.ch_asistido` (§7, y `tests/i18n.test.ts` la vigila ahora), la RLS que
-> dejaba a la receptora sin ver el producto de sus entregas (§4bis, `20260922124240`), el
-> desmontaje de la pantalla en cada recarga del contexto (§6quater) y el `sense_conveni` que
-> el servidor mandaba y la pantalla tiraba (§4bis). Estas seis se quedan abiertas.
-
-119. **Los textos de la pantalla guiada se imprimen en cualquier estado del paso, y por eso
-     afirman cosas falsas.** `CanalitzacioDetall.tsx:281` pinta `t(\`canal.${p.pas}_passa\`)`
-     **siempre**, esté el paso `fet`, `ara`, `pendent` o `bloquejat`, y esos textos están
-     redactados como si estuviera en curso. Dos casos vistos en la misma tarjeta de un lote
-     sin canalizaciones: «Emet l'albarà d'entrada (REC)» · *Pendent* dice «**Ja hi ha
-     canalització**, però encara no hi ha el document…» —no la hay, y cuatro filas más abajo
-     la propia pantalla dice lo contrario—, y «Fixa el cost per quilo» · *Fet* dice «**Algun
-     producte d'aquest lot no té cost**», que es justo lo que el badge niega. Es reproducible
-     en cualquier lote: no depende de los datos, sino de que el texto no mire el estado. El
-     arreglo pide una variante por estado o no pintar `_passa` cuando está `fet`.
-120. **Dos pantallas del receptor enseñan la fecha en ISO crudo.** `Mercat.tsx:134` pasa
-     `o.disponible_hasta` tal cual («fins 2026-09-30») e `Interessos.tsx:230` hace
-     `.slice(0, 10)` («· 2026-09-14»). El resto de la aplicación usa `dataCurta()`
-     (`src/lib/albarans.ts:265`), que da `30/09/2026` y la consumen más de diez ficheros:
-     son las dos únicas pantallas que enseñan una fecha así a un usuario final.
-121. **Seis pantallas tienen las etiquetas sin asociar a su campo.** Medido en el navegador:
-     en el alta de oferta ninguno de los 14 controles tiene `id`, `name` ni `label`
-     (`element.labels` vacío); igual en la ficha de organización. Un lector de pantalla no
-     anuncia qué campo es y pulsar la etiqueta no enfoca el campo. Es una **excepción**, no la
-     norma —hay 110 `htmlFor` para 117 `<Label>`— y los ficheros son `FormulariNovaOferta`,
-     `RecordDetail` (el CRUD de fichas del equipo), `DialegNovaOfertaAssistida`, `Mercat`,
-     `CanalitzacioDetall` y `PerfilOrganitzacio`. Son pantallas centrales.
-122. **El texto que se manda por WhatsApp imprime etiquetas sin valor.** Una oferta normal
-     sale con `🗺️ UBICACIÓ:` seguido de un guion suelto y con `HORARI RECOLLIDA:`, `ENVASOS:`
-     y `RESPONSABLE:` vacías (`_shared/oferta.ts:184-196`). Contradice el criterio que ese
-     mismo fichero aplica —y documenta— a `producte_al_camp` y `preu_minim`, que solo se
-     imprimen cuando dicen algo porque «sería ruido en un mensaje que se lee en un móvil».
-     De paso, `MODALITAT: donació` sale en minúscula (es el valor interno mapeado) mientras
-     `CAUSA: Excedent` va con mayúscula; la cabecera del ciclo guiado enseña «donacio», sin
-     acento siquiera.
-123. **El alta de oferta valida solo en el servidor y con un mensaje genérico.**
-     `FormulariNovaOferta.enviar()` llama a la Edge Function y pinta lo que responda, así que
-     publicar en vacío da «Falten camps obligatoris» sin marcar ningún campo ni llevar al
-     primero que falta — en un formulario de 14 campos repartidos en cinco bloques con scroll
-     largo.
-124. **Los dos botones del diálogo de cancelar una oferta empiezan igual.** «Cancel·lar»
-     descarta el diálogo y «Cancel·lar oferta» ejecuta la anulación: uno deshace y el otro es
-     la acción destructiva, y se leen casi igual.
+✅ **Las seis siguientes de la revisión funcional en navegador del 22-09-2026 se cerraron
+todas el mismo día, en un segundo cambio** (el informe completo, con la evidencia de cada
+una, está en `3. Claude Code/`). Los cuatro hallazgos mayores de esa revisión ya se habían
+arreglado en el primer cambio y por eso no tienen número: la clave `od.ch_asistido` (§7, y
+`tests/i18n.test.ts` la vigila ahora), la RLS que dejaba a la receptora sin ver el producto
+de sus entregas (§4bis, `20260922124240`), el desmontaje de la pantalla en cada recarga del
+contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla tiraba
+(§4bis). Las seis numeradas (119-124) están en §12ter.
 
 125. 🔴 **Las cinco migraciones de la vía asistida están ahora ANTES de las tablas que usan.**
      Se renombraron el 22-09-2026 de su fecha de proyecto (`20270329100000`…`20270402100000`) a
@@ -5247,6 +5207,12 @@ se va solo **cómo se llegó hasta aquí**.
 | 33 | Borrar una ficha dejaba rastro en `email_test_recipients`, sin FK y sin purga automática | `20260922025820` |
 | 112 | Los borradores sin número de `cierres_periodo` se acumulaban sin limpieza | `20260922025838` |
 | 118 | 5 migraciones registradas dos veces en `supabase_migrations.schema_migrations` (metadata, no esquema) | 22-09-2026 |
+| 119 | Los textos `canal.*_passa` de la pantalla guiada se imprimían en cualquier estado del paso, así que en `fet` afirmaban lo contrario de lo que decía el badge | 22-09-2026 |
+| 120 | `Mercat.tsx` e `Interessos.tsx` enseñaban la fecha en ISO crudo en vez de con `dataCurta()` | 22-09-2026 |
+| 121 | Seis pantallas tenían las etiquetas sin `htmlFor`/`id`: `FormulariNovaOferta`, `RecordDetail`, `DialegNovaOfertaAssistida`, `Mercat`, `CanalitzacioDetall`, `PerfilOrganitzacio` | 22-09-2026 |
+| 122 | El texto de WhatsApp imprimía `UBICACIÓ`/`HORARI RECOLLIDA`/`ENVASOS` vacíos y `MODALITAT` en minúscula | 22-09-2026 |
+| 123 | El alta de oferta solo validaba en el servidor, con un mensaje genérico sin decir qué campo faltaba | 22-09-2026 |
+| 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
 
 ## 13. Al terminar cualquier cambio
 

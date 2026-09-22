@@ -231,7 +231,10 @@ export default function CanalitzacioDetall() {
           <p className="mt-1 text-sm text-muted-foreground">
             {extra.productor?.nom ?? '—'}
             {extra.oferta.producto ? ` · ${extra.oferta.producto}` : ''}
-            {extra.oferta.modalitat ? ` · ${extra.oferta.modalitat}` : ''}
+            {/* Traducida, no el valor interno: hasta hoy salía «donacio» tal cual,
+                sin acento, cuando el resto de la interfaz ya tiene esta clave
+                (`Mercat.tsx`) para lo mismo (deuda §12.122). */}
+            {extra.oferta.modalitat ? ` · ${t(`od.mod_${extra.oferta.modalitat}`)}` : ''}
           </p>
         </div>
         <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
@@ -277,9 +280,18 @@ export default function CanalitzacioDetall() {
                         <span className="text-sm font-medium">{t(`canal.${p.pas}_t`)}</span>
                         <Badge className={COLOR_ESTAT[p.estat]}>{t(`canalz.est_${p.estat}`)}</Badge>
                       </div>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {t(`canal.${p.pas}_passa`)}
-                      </p>
+                      {/* `_passa` está redactado como «todavía falta esto», así que en
+                          cuanto el paso está `fet` se vuelve una afirmación FALSA: «Ja hi ha
+                          canalització, però encara no hi ha el document» con el REC ya
+                          emitido, o «Algun producte no té cost» con el coste ya fijado
+                          (deuda §12.119, medido en el navegador el 22-09-2026). El badge
+                          verde de arriba ya dice que está hecho; el texto narrativo solo
+                          tiene sentido mientras describe lo que falta. */}
+                      {p.estat !== 'fet' && (
+                        <p className="mt-1 text-sm text-muted-foreground">
+                          {t(`canal.${p.pas}_passa`)}
+                        </p>
+                      )}
                       {/* Un paso bloqueado dice POR QUÉ, y lo dice VISIBLE: en táctil no hay
                           hover, así que un tooltip no cuenta como haberlo dicho. */}
                       {p.motiuKey && (
@@ -442,10 +454,12 @@ export default function CanalitzacioDetall() {
                       <p className="text-xs text-muted-foreground">{t('canalz.interes_hint')}</p>
                       <div className="grid gap-2 sm:grid-cols-3">
                         <div className="sm:col-span-2">
-                          <Label className="mb-1 block text-xs text-muted-foreground">
+                          <Label htmlFor="cd-interes-entitat" className="mb-1 block text-xs text-muted-foreground">
                             {t('canalz.interes_entitat')}
                           </Label>
                           <select
+                            id="cd-interes-entitat"
+                            name="entitat"
                             className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                             value={entitatTriada}
                             onChange={(e) => setEntitatTriada(e.target.value)}
@@ -455,10 +469,12 @@ export default function CanalitzacioDetall() {
                           </select>
                         </div>
                         <div>
-                          <Label className="mb-1 block text-xs text-muted-foreground">
+                          <Label htmlFor="cd-interes-kg" className="mb-1 block text-xs text-muted-foreground">
                             {t('canalz.interes_kg')}
                           </Label>
                           <Input
+                            id="cd-interes-kg"
+                            name="kg"
                             type="number" min="0" step="0.01"
                             value={kgInteres}
                             onChange={(e) => setKgInteres(e.target.value)}

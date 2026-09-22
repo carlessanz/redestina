@@ -236,6 +236,11 @@ const ca: Dict = {
   'od.mark_uncoll': 'Marcar com a no col·locada', 'od.cancel_offer': 'Cancel·lar oferta',
   'od.confirm_cancel_t': 'Cancel·lar aquesta oferta?',
   'od.confirm_cancel': 'Quedarà marcada com a cancel·lada.',
+  // El botó que DESCARTA el diàleg diu «Cancel·lar» (`c.cancel`, compartit per tots els
+  // diàlegs de confirmació): amb el que EXECUTA l'anul·lació dient «Cancel·lar oferta», els
+  // dos es llegien gairebé igual (deuda §12.124). Aquest és NOMÉS per al botó del diàleg;
+  // el que obre el diàleg des de la pantalla segueix dient «Cancel·lar oferta».
+  'od.cancel_offer_confirm': 'Sí, cancel·la-la',
   'od.prompt_uncoll': 'Motiu pel qual no s’ha col·locat:',
       'od.uncoll_desc': 'L’oferta es tanca sense destí. El motiu queda registrat.',
   'od.no_text': 'L’oferta no té text generat.', 'od.sent_wa': 'Oferta enviada a {name} per WhatsApp.',
@@ -641,12 +646,21 @@ const ca: Dict = {
   'po.list_title': 'Les meves ofertes', 'po.list_subtitle': 'Totes les que has publicat.',
   'po.new_title': 'Nova oferta', 'po.new_subtitle': 'Les mateixes preguntes que et faria el bot per WhatsApp.',
   'po.publish': 'Publicar oferta',
+  // Antes de publicar en buit el formulari només deia «Falten camps obligatoris», sense dir
+  // QUINS: en un formulari de 14 camps repartits en cinc blocs amb scroll llarg, obligava a
+  // repassar-los tots un per un (deuda §12.123). Ara diu quins falten i s'hi va directe.
+  'po.missing_fields': 'Falten camps per omplir: {camps}.',
 
   'po.no_org': 'El teu compte no està vinculat a cap organització.',
   'po.no_locations': "No tens cap ubicació donada d'alta. L'equip te la pot afegir.",
   'po.cancel_reason': 'Per què la cancel·les?', 'po.cancelled': 'Oferta cancel·lada',
   'po.cancel_desc': "L'oferta deixarà d'estar disponible. El text que ja va circular no es pot retirar.",
   'po.cancel_offer': 'Cancel·lar oferta',
+  // Igual que `od.cancel_offer_confirm`: el botó del diàleg que EXECUTA no pot repetir el
+  // text del que el descarta (`c.cancel`, «Cancel·lar»). Aquí es fa servir a
+  // `DialegMotiu` de `OfertaDetall.tsx`, on el títol i el botó del disparador segueixen
+  // dient «Cancel·lar oferta» (deuda §12.124).
+  'po.cancel_offer_confirm': 'Sí, cancel·la-la',
   'po.no_channelings': 'Encara no hi ha cap canalització.',
   'po.channeled_kg': '{n} kg canalitzats', 'po.real_kg': '{n} kg reals',
   // fitxa de la pròpia organització
@@ -2140,6 +2154,7 @@ const es: Dict = {
   'od.mark_uncoll': 'Marcar como no colocada', 'od.cancel_offer': 'Cancelar oferta',
   'od.confirm_cancel_t': '¿Cancelar esta oferta?',
   'od.confirm_cancel': 'Quedará marcada como cancelada.',
+  'od.cancel_offer_confirm': 'Sí, cancélala',
   'od.prompt_uncoll': 'Motivo por el que no se ha colocado:',
       'od.uncoll_desc': 'La oferta se cierra sin destino. El motivo queda registrado.',
   'od.no_text': 'La oferta no tiene texto generado.', 'od.sent_wa': 'Oferta enviada a {name} por WhatsApp.',
@@ -2521,12 +2536,14 @@ const es: Dict = {
   'po.list_title': 'Mis ofertas', 'po.list_subtitle': 'Todas las que has publicado.',
   'po.new_title': 'Nueva oferta', 'po.new_subtitle': 'Las mismas preguntas que te haría el bot por WhatsApp.',
   'po.publish': 'Publicar oferta',
+  'po.missing_fields': 'Faltan campos por rellenar: {camps}.',
 
   'po.no_org': 'Tu cuenta no está vinculada a ninguna organización.',
   'po.no_locations': 'No tienes ninguna ubicación dada de alta. El equipo puede añadírtela.',
   'po.cancel_reason': '¿Por qué la cancelas?', 'po.cancelled': 'Oferta cancelada',
   'po.cancel_desc': 'La oferta dejará de estar disponible. El texto que ya circuló no se puede retirar.',
   'po.cancel_offer': 'Cancelar oferta',
+  'po.cancel_offer_confirm': 'Sí, cancélala',
   'po.no_channelings': 'Todavía no hay ninguna canalización.',
   'po.channeled_kg': '{n} kg canalizados', 'po.real_kg': '{n} kg reales',
   // ficha de la propia organización

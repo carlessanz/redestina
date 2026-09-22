@@ -18,6 +18,7 @@ import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { puntInteres, ETAPES_INTERES } from '../../lib/procesOferta'
 import type { EtapaProces } from '../../lib/procesOferta'
+import { dataCurta } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
@@ -227,7 +228,7 @@ export function Historic() {
               <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
               <div className="text-xs text-muted-foreground">
                 <code>{f.excedentes?.id_excedente ?? '—'}</code>
-                {f.data_hora_recollida ? ` · ${f.data_hora_recollida.slice(0, 10)}` : ''}
+                {f.data_hora_recollida ? ` · ${dataCurta(f.data_hora_recollida)}` : ''}
               </div>
             </div>
             {/* Claves propias y no las del productor: aquí los kilos se RECIBEN, y

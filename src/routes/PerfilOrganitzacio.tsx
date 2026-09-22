@@ -205,8 +205,10 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         <div className="grid gap-4 sm:grid-cols-2">
           {camps.map((c) => (
             <div key={c.clave}>
-              <Label className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>
+              <Label htmlFor={`po-${tipus}-${c.clave}`} className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>
               <Input
+                id={`po-${tipus}-${c.clave}`}
+                name={c.clave}
                 value={String(fila?.[c.clave] ?? '')}
                 disabled={!potEditar}
                 inputMode={c.clave === 'codigo_postal' ? 'numeric' : undefined}

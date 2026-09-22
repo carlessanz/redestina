@@ -213,18 +213,26 @@ export default function RecordDetail({
   const telValor = telefonoKey ? String(form[telefonoKey] ?? '').replace(/\D/g, '') : ''
   const emailValor = emailKey ? String(form[emailKey] ?? '').trim() : ''
 
+  // Prefijado con la tabla: la ficha de productor y la de entidad comparten `crudCampos`
+  // (mismas claves, `nombre`/`email`…), y las dos pueden convivir en la misma pestaña con
+  // doble rol (`PerfilOrganitzacio`, §6ter), así que sin el prefijo colisionarían.
+  function idDe(c: CampoDef): string {
+    return `rd-${tabla}-${c.key}`
+  }
+
   function control(c: CampoDef) {
     const tp = c.tipo ?? 'text'
     const v = form[c.key]
-    if (tp === 'textarea') return <Textarea rows={3} value={(v as string) ?? ''} onChange={(e) => set(c.key, e.target.value)} />
+    const id = idDe(c)
+    if (tp === 'textarea') return <Textarea id={id} name={c.key} rows={3} value={(v as string) ?? ''} onChange={(e) => set(c.key, e.target.value)} />
     if (tp === 'number') {
-      return <Input type="number" value={v == null || v === '' ? '' : String(v)}
+      return <Input id={id} name={c.key} type="number" value={v == null || v === '' ? '' : String(v)}
         onChange={(e) => set(c.key, e.target.value === '' ? null : Number(e.target.value))} />
     }
     if (tp === 'bool') {
       return (
         <Select value={v ? 'si' : 'no'} onValueChange={(val) => set(c.key, val === 'si')}>
-          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
+          <SelectTrigger id={id} className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="si">{t('c.yes')}</SelectItem>
             <SelectItem value="no">{t('c.no')}</SelectItem>
@@ -236,7 +244,7 @@ export default function RecordDetail({
       return (
         <Select value={v == null ? 'null' : v ? 'si' : 'no'}
           onValueChange={(val) => set(c.key, val === 'null' ? null : val === 'si')}>
-          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
+          <SelectTrigger id={id} className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="null">—</SelectItem>
             <SelectItem value="si">{t('c.yes')}</SelectItem>
@@ -249,7 +257,7 @@ export default function RecordDetail({
       const val = (v as string) ?? ''
       return (
         <Select value={val === '' ? '__none' : val} onValueChange={(nv) => set(c.key, nv === '__none' ? null : nv)}>
-          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectTrigger id={id} className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none">—</SelectItem>
             {(c.opciones ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
@@ -259,9 +267,9 @@ export default function RecordDetail({
     }
     if (tp === 'list') {
       const texto = Array.isArray(v) ? (v as string[]).join(', ') : ((v as string) ?? '')
-      return <Input type="text" value={texto} onChange={(e) => set(c.key, e.target.value)} />
+      return <Input id={id} name={c.key} type="text" value={texto} onChange={(e) => set(c.key, e.target.value)} />
     }
-    return <Input type={tp === 'email' ? 'email' : 'text'} value={(v as string) ?? ''} onChange={(e) => set(c.key, e.target.value)} />
+    return <Input id={id} name={c.key} type={tp === 'email' ? 'email' : 'text'} value={(v as string) ?? ''} onChange={(e) => set(c.key, e.target.value)} />
   }
 
   return (
@@ -303,7 +311,7 @@ export default function RecordDetail({
           <div className="grid gap-4 sm:grid-cols-2">
             {campos.map((c) => (
               <div key={c.key} className={c.ancho === 'full' ? 'sm:col-span-2' : undefined}>
-                <Label className="mb-1.5 block text-xs text-muted-foreground">{t(c.label)}</Label>
+                <Label htmlFor={idDe(c)} className="mb-1.5 block text-xs text-muted-foreground">{t(c.label)}</Label>
                 {control(c)}
               </div>
             ))}

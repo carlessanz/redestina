@@ -537,10 +537,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }
 
   async function cancelarOferta() {
+    // ⚠️ El botón de confirmar NO repite «Cancel·lar oferta»: el que descarta el diálogo ya
+    // dice «Cancel·lar» (`c.cancel`, compartido por todos los diálogos de `useConfirma`), y
+    // los dos se leían casi igual (deuda §12.124). `od.cancel_offer_confirm` es una clave
+    // aparte solo para este botón; el que ABRE el diálogo sigue diciendo «Cancel·lar oferta».
     if (!(await confirma({
       titol: t('od.confirm_cancel_t'),
       descripcio: t('od.confirm_cancel'),
-      confirmar: t('od.cancel_offer'),
+      confirmar: t('od.cancel_offer_confirm'),
       destructiu: true,
     }))) return
     await supabase.from('excedentes').update({ estado: 'cancelada' }).eq('id', excedente.id)

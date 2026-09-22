@@ -262,8 +262,11 @@ describe('componerTextoOferta', () => {
     expect(t.indexOf('PREU MÍNIM:')).toBeLessThan(t.indexOf('CAUSA:'))
   })
 
-  // Un campo vacío deja la etiqueta sin nada detrás y eso es deliberado: el mensaje lo
-  // acaba de leer una persona, y una etiqueta vacía se ve; una línea que desaparece, no.
+  // Un campo vacío deja la etiqueta sin nada detrás y eso es deliberado, PERO SOLO PARA
+  // `observacions`/`responsable`: son texto libre que alguien podría haber escrito, y una
+  // etiqueta vacía se lee como «no hi ha», mientras que una línea que desaparece se lee
+  // como un fallo. `ubicacio`/`horari`/`envasos` NO comparten esta regla: ver el bloque de
+  // abajo.
   it('un campo vacío deja su etiqueta, no borra la línea', () => {
     const t = componerTextoOferta(campos({ observacions: '', responsable: '' }))
     expect(t).toContain('📝 OBSERVACIONS: ')
@@ -274,6 +277,39 @@ describe('componerTextoOferta', () => {
     const t = componerTextoOferta(campos({ producte: 'Tomàquet de penjar', municipi: 'Gavà' }))
     expect(t).toContain('🌿 PRODUCTE: Tomàquet de penjar')
     expect(t).toContain('📍 MUNICIPI: Gavà')
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Etiquetas sin valor: `ubicacio`, `horari` y `envasos` SÍ desaparecen si están vacíos
+// ---------------------------------------------------------------------------
+// Al revés que `observacions`/`responsable` (arriba): son campos opcionales del panel sin
+// respuesta, no texto que alguien haya escrito y esté vacío por decisión. Hasta el
+// 22-09-2026 se imprimían igual, y el mensaje salía con «🗺️ UBICACIÓ:» seguido de un guion
+// suelto y con «HORARI RECOLLIDA:»/«ENVASOS:» sin nada detrás — ruido en un mensaje que se
+// lee en el móvil, el mismo criterio que ya se aplicaba a `producte_al_camp`/`preu_minim`
+// (deuda §12.122).
+describe('componerTextoOferta · etiquetas que desaparecen si no hay nada que decir', () => {
+  it('sin enlace de ubicació no sale ni la etiqueta ni la línea', () => {
+    const t = componerTextoOferta(campos({ ubicacio: undefined }))
+    expect(t).not.toContain('UBICACIÓ')
+  })
+
+  it('sin horari no sale la línea', () => {
+    const t = componerTextoOferta(campos({ horari: '' }))
+    expect(t).not.toContain('HORARI RECOLLIDA')
+  })
+
+  it('sin envasos no sale la línea', () => {
+    const t = componerTextoOferta(campos({ envasos: '' }))
+    expect(t).not.toContain('ENVASOS')
+  })
+
+  it('con los tres presentes, se imprimen los tres', () => {
+    const t = componerTextoOferta(campos())
+    expect(t).toContain('🗺️ UBICACIÓ:')
+    expect(t).toContain('⏰ HORARI RECOLLIDA: matí')
+    expect(t).toContain('♻️ ENVASOS: No')
   })
 })
 

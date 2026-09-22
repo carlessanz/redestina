@@ -88,20 +88,24 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
               de `crear-oferta/campos` dependen de sus ubicaciones. */}
           <div className="grid gap-3 sm:grid-cols-2">
             <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">
+              <Label htmlFor="dnoa-cerca" className="mb-1 block text-xs text-muted-foreground">
                 {t('canalz.nova_cerca')}
               </Label>
               <Input
+                id="dnoa-cerca"
+                name="cerca"
                 value={cerca}
                 onChange={(e) => setCerca(e.target.value)}
                 placeholder={t('canalz.nova_cerca')}
               />
             </div>
             <div>
-              <Label className="mb-1 block text-xs text-muted-foreground">
+              <Label htmlFor="dnoa-productor" className="mb-1 block text-xs text-muted-foreground">
                 {t('canalz.c_productor')}
               </Label>
               <select
+                id="dnoa-productor"
+                name="productor"
                 className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                 value={triat}
                 onChange={(e) => setTriat(e.target.value)}

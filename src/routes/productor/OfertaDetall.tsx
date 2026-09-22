@@ -240,13 +240,17 @@ export default function ProductorOfertaDetall() {
         </Button>
       )}
 
+      {/* ⚠️ El botón de confirmar no repite «Cancel·lar oferta»: el de descartar de
+          `DialegMotiu` ya dice «Cancel·lar» (`c.cancel`), y los dos se leían casi igual
+          (deuda §12.124). `po.cancel_offer_confirm` es solo para este botón; el título del
+          diálogo y el botón que lo abre siguen diciendo «Cancel·lar oferta». */}
       <DialegMotiu
         obert={cancelant}
         onObert={setCancelant}
         titol={t('po.cancel_offer')}
         descripcio={t('po.cancel_desc')}
         etiqueta={t('po.cancel_reason')}
-        confirmar={t('po.cancel_offer')}
+        confirmar={t('po.cancel_offer_confirm')}
         destructiu
         ocupat={ocupatCancel}
         onConfirma={(m) => void cancelar(m)}
