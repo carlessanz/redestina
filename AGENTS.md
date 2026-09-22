@@ -4459,7 +4459,7 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 47 vivas, **39 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 46 vivas, **38 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero o interruptor de producción. §12bis separa **lo que
 es un defecto** de **lo que no lo es**.
 ⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
@@ -4476,6 +4476,13 @@ limpieza) y **118** (cinco migraciones duplicadas en el historial remoto, inocuo
 limpiar). Las dos últimas no tenían por qué faltar en esta lista —son tan benignas como varias de
 las catalogadas en §12bis— y se quedaron fuera solo porque nadie las volvió a mirar; quien las
 cierre o las catalogue, que actualice esta línea a mano.
+✅ **Auditada la lista entera contra el código y la base reales el 22-09-2026** (tres agentes en
+paralelo, uno por tercio, más verificación directa de los hallazgos con más peso): estas 8 siguen
+siendo exactamente las que faltan por catalogar, ninguna se cerró del todo, pero **12 de las 46
+vivas tenían texto que ya no describía el código de hoy** (cifras, alcance o comportamiento) y se
+corrigieron una por una en su propio cuerpo — números 12, 17, 27, 33, 34, 37, 67, 71, 84, 95, 99 y
+109. La 82 sí se cerró del todo: su salvaguarda (`tests/cobertura.test.ts`) está completa y
+verificada, mismo patrón que cerró la 16 y la 117 antes ese mismo día.
 ⚠️ La 16 —que hasta el 22-09-2026 figuraba aquí como «la brecha 2 de §1bis vista desde el
 código»— se cerró ese día: su propio cuerpo solo describía arreglos ya hechos (11-09-2026), y lo
 que de verdad queda de la brecha 2 —`usuario`/`rol_organizacion` propios, deduplicación sin
@@ -4488,16 +4495,24 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **47 entradas vivas** (7 parciales 🟡 y 40 abiertas) y **71 cerradas**,
-sobre 118 numeradas — recontado a mano el mismo día tras encontrar el desajuste de arriba; **85**
-es la séptima parcial, y se había quedado fuera de la cuenta desde siempre. Cuatro son de la
-tanda de F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro
-nacen catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de
-la fase 0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce
-rutas que pedía —el navegador integrado de la aplicación de Claude, no Playwright: §2 (regla 4) y
-§6ter (`AvisDiagnostic`) cuentan los dos defectos que salieron, arreglados en el mismo cambio—.
-Y la **16 se cerró horas después**, al auditar qué quedaba de verdad de la brecha 2 (§1bis):
-llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
+Estado al 22-09-2026: **46 entradas vivas** (7 parciales 🟡 y 39 abiertas) y **72 cerradas**,
+sobre 118 numeradas — recontado con `grep`/`comm` contra el fichero, no a mano; **85** es la
+séptima parcial, y se había quedado fuera de la cuenta desde siempre. Cuatro son de la tanda de
+F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro nacen
+catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de la fase
+0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce rutas que
+pedía —el navegador integrado de la aplicación de Claude, no Playwright: §2 (regla 4) y §6ter
+(`AvisDiagnostic`) cuentan los dos defectos que salieron, arreglados en el mismo cambio—. Y la
+**16 se cerró horas después**, al auditar qué quedaba de verdad de la brecha 2 (§1bis): llevaba
+desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
+Y la **82 se cerró esa misma tarde**, en la auditoría completa de las 47 entradas que quedaban:
+tres agentes en paralelo comprobaron cada una contra el código y la base reales (§ arriba). Ninguna
+resultó estar resuelta del todo salvo la 82, pero **12 tenían texto desactualizado** —cifras que ya
+no describían la base de hoy, comportamiento que había cambiado sin que nadie lo anotara aquí, o
+líneas de código que se habían movido— y se corrigieron sin cerrarlas: siguen siendo trabajo
+pendiente, solo que descrito con precisión. El hallazgo más señalado: la 99 daba por hecho que no
+existía ninguna pantalla de planes de prevención, y hoy existen dos (`PlaPrevencio.tsx`, en el
+panel del equipo y en el externo).
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4536,7 +4551,12 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     fichero de limpieza de una sola línea. Las demás apariciones de «truncate» en el repo son la
     revocación de `20270309100000`, no borrado.
 
-12. `prioritat` casi no discrimina (97 de 111 entidades son prioridad 1): aporta poco al ranking.
+12. `prioritat` casi no discrimina. ⚠️ La cifra que llevaba esta entrada («97 de 111 entidades son
+    prioridad 1») describía los datos reales, borrados el 16-09-2026 (§6): hoy solo hay **8
+    entidades de prueba**, 5 con `prioritat = 1` y 3 sin prioridad. El código que pondera el campo
+    (`_shared/priorizacion.ts`) no ha cambiado; lo que cambió fue el dato, así que el diagnóstico
+    de fondo —el campo aporta poco al ranking— sigue sin poder medirse hasta reimportar datos
+    reales.
 
 14. 🟡 **La clasificación sí/no sigue siendo una heurística por lista de palabras**, pero ya
     está **medida** y tres errores reales están corregidos (11-09-2026, `tests/respuestas.test.ts`,
@@ -4559,11 +4579,15 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
 17. Coexisten dos gates: **`es_test`** (fuente de verdad de la app, §8) y las whitelists
     `meta_test_recipients`/`email_test_recipients` (requisito técnico de Meta en test). En test un
     destinatario debe cumplir **ambos**; se inicializaron alineados. Desde el 15-09-2026 el Dashboard
-    ya **no las gestiona** —el gestor se fue a Configuració con el resto de interruptores (§6ter)—
-    pero su KPI **sigue midiendo por la lista de Meta y no por `es_test`**, que es la fuente de
-    verdad del envío (§8): coherente hoy porque coinciden, a revisar al pasar el número a producción
-    —ese día la lista se vacía y la KPI diría que puede recibir todo el mundo— o si se marca
-    `es_test` a alguien que no esté en ella.
+    ya **no las gestiona** —el gestor se fue a Configuració con el resto de interruptores (§6ter)—.
+    ✅ **Y el KPI que medía por la lista de Meta ya no existe** —corregido el 22-09-2026, al
+    comprobar el código en vez de repetir lo que decía esta entrada—: se retiró del Dashboard en
+    el mismo refactor del 14-09-2026 que cerró la mitad de la deuda 5, y `cargarNumerosTest()`
+    (`src/lib/metaTest.ts:17`) se quedó sin un solo llamador en todo `src/` (verificado por grep:
+    un único resultado, su propia definición) — código muerto, no un riesgo activo. Lo único que
+    sigue en el Dashboard sobre teléfonos es `conMovil`, que mide la **forma** del número, no su
+    pertenencia a ninguna whitelist. Lo que sigue vigente es solo la primera mitad: los dos gates
+    coexisten y hoy están alineados, a revisar el día que el número pase a producción.
 
 21. 🟡 **El canal preferente (§8bis) no llega a todos los envíos** — *la mayor parte, cubierta
     (14-09-2026)*. Con el interruptor global (§8) el correo ya cubre los momentos que eran solo de
@@ -4585,17 +4609,23 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     cada arranque en frío del isolate y no se comparte entre instancias. Lo que de verdad frena un
     abuso masivo es el tope de 20 pendientes por hora. Turnstile queda pendiente; hoy no compensa,
     porque el coste de un alta basura es una fila que el equipo rechaza con un clic.
-27. **Ni el registro ni la aprobación envían correo** — y es **decisión, no descuido** (reclasificada
-    el 14-09-2026, §12bis). El propio código lo explica en `registro/index.ts:33-38`: con el modo
-    test activo la cuenta recién creada no pasaría `esCuentaPermitida`, así que el correo se
-    descartaría en silencio. Medido: la bloquearían **tres** condiciones independientes, no una —sin
-    fila en `usuario_roles`, membresía `activo = false` hasta que alguien apruebe, y ficha
+27. **El registro no envía correo** — y es **decisión, no descuido** (reclasificada el 14-09-2026,
+    §12bis). El propio código lo explica en `registro/index.ts:33-38`: con el modo test activo la
+    cuenta recién creada no pasaría `esCuentaPermitida`, así que el correo se descartaría en
+    silencio. Medido: la bloquearían **tres** condiciones independientes, no una —sin fila en
+    `usuario_roles`, membresía `activo = false` hasta que alguien apruebe, y ficha
     `es_test = false`—. Lo que queda como deuda de verdad es la consecuencia, no la causa:
-    `email_confirm: true` da el correo por
-    verificado sin comprobarlo, así que **un error tipográfico en el correo deja la cuenta sin
-    ningún canal** (y con el modo test encendido tampoco podría recuperar la contraseña, §8). Y quien
-    espera validación se entera de que se la han aprobado entrando a mirar. Falta una notificación
-    —que dependerá de la tabla `notificacion` con *fallback* de canal del funcional (§1bis)—.
+    `email_confirm: true` da el correo por verificado sin comprobarlo, así que **un error
+    tipográfico en el correo deja la cuenta sin ningún canal** (y con el modo test encendido
+    tampoco podría recuperar la contraseña, §8). Falta una notificación de ese caso concreto —que
+    dependerá de la tabla `notificacion` con *fallback* de canal del funcional (§1bis)—.
+    ✅ **Esta entrada decía «ni el registro ni la aprobación», y la segunda mitad caducó sin que
+    nadie la corrigiera aquí** (corregido el 22-09-2026): desde el 16-09-2026 **aprobar sí envía
+    correo** — `aprovarRegistre()` en `Aprovacions.tsx:364` llama a `enviarAcces()` con el enlace
+    mágico al panel, tal como documenta §9 con detalle (la casilla «de prova» que hay que marcar
+    antes de aprobar, y los tres avisos distintos si el correo no sale). Con eso, «quien espera
+    validación se entera entrando a mirar» tampoco es ya cierto en general: si el envío sale bien,
+    se entera por correo.
 
 30. **Las contraseñas de las cuentas de prueba viajan en el bundle** con `VITE_ACCESSOS_TEST=true`
     (§6quater, §10). Está acotado y se apaga con la variable, pero mientras esté encendido cualquiera
@@ -4606,10 +4636,15 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
 
 33. 🟡 **Borrar una organización de prueba deja rastro en `email_test_recipients`.** No hay FK:
     la tabla guarda un correo suelto (§4). Pasó dos veces el 31-07-2026 y se limpió a mano.
-    **Estado comprobado el 11-09-2026**: de las 11 filas de producción, **10 tienen ficha detrás**
-    y la única que no —`tecnologia@espigoladors.com`, «Owner Resend (test)»— es deliberada: es el
-    correo propietario de la cuenta de Resend, el único al que se entregaba antes de verificar el
-    dominio. O sea que **hoy no hay ningún huérfano**.
+    ⚠️ **Y volvió a pasar** — recontado el 22-09-2026 contra producción, no de memoria: la tabla
+    tiene hoy **13** filas, no 11, y **3** están huérfanas, no 1: el deliberado
+    `tecnologia@espigoladors.com` («Owner Resend (test)», el correo propietario de la cuenta de
+    Resend) más **dos nuevas**, `hola@carlessanz.com` («Carles Sanz») y
+    `hola+wa-carles@carlessanz.com` («Carles Sanz (registre nou)») — del borrado con doble rol del
+    16-09-2026 (§6ter): esa cuenta se quedó sin fichas y la organización se reenlazó bajo un correo
+    distinto (`hola+productor-receptor@carlessanz.com`, que sí tiene las dos), dejando atrás estas
+    dos filas apuntando a nadie. Es exactamente el caso que esta entrada ya avisaba que podía
+    volver a pasar.
     ⚠️ Y por eso no se puede automatizar con «borra lo que no tenga ficha»: esa regla se llevaría
     por delante justamente la fila que tiene que estar. Sigue siendo disciplina al borrar.
 34. **Áreas táctiles: se subieron las cuatro que importan, no todas.** «M'interessa» (44 px en móvil),
@@ -4623,11 +4658,22 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     variantes base de `ui/button.tsx:24-30`, `ui/input.tsx:11` y `ui/select.tsx:40` están todas por
     debajo de 44 px, y son ~250 controles—, pero la interfaz ya no es uniforme: quien mida esto otra
     vez debe contar `h-11` antes de concluir.
+    ⚠️ **Y ya ha vuelto a subir** (recontado el 22-09-2026, tal como pedía la frase de arriba): son
+    **57** botones con `h-11 md:h-8` en 23 ficheros, más una variante nueva —`h-11 ... sm:h-8`,
+    breakpoint `sm` en vez de `md`— en `AvisConveni.tsx:84` y `AvisDiagnostic.tsx:92`, introducida
+    ese mismo día (§2, regla 4). La cifra sube con cada pantalla que se toca, así que no vale citar
+    ningún número como si fuera fijo: `grep -rlE "h-11.*(md|sm):h-8" src/ --include="*.tsx"` da la
+    cuenta de hoy.
 
 37. **El aviso de instalación no se puede probar de verdad en automático.** `beforeinstallprompt` no lo
-    dispara ningún navegador de escritorio ni Playwright, así que las pruebas lanzan un evento
-    sintético: se verifica que **el banner reacciona**, no que Chrome lo emita. La instalación real
-    solo se comprueba en un móvil.
+    dispara ningún navegador de escritorio ni Playwright. La instalación real solo se comprueba en
+    un móvil.
+    ⚠️ **Y no era «las pruebas lanzan un evento sintético»: no hay ninguna prueba, de ningún tipo**
+    (corregido el 22-09-2026, comprobado por grep sobre todo `tests/`: cero resultados para
+    `AvisInstallacio`, `useInstalacio` o `beforeinstallprompt`). La limitación de plataforma sigue
+    siendo cierta —es la razón de fondo por la que no hay ni habrá una prueba automática completa—,
+    pero hoy no hay ni el sustituto sintético que esta entrada daba por hecho. Si alguna vez existió,
+    se perdió sin dejar rastro en el histórico de `tests/`.
 
 54. **Dos checks nuevos dependen de `roles_activos`.** Con el interruptor apagado —como nace
     cualquier entorno recreado desde las migraciones— `es_super_admin()` devuelve `true` para
@@ -4661,6 +4707,13 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     `propuesta_conciliacion()` cruzando el REC con todos sus ENT, y eso sería una llamada por fila.
 67. **Rectificar solo permite corregir `kg_neto` por línea**, no el producto ni las cajas. Es lo que
     se rectifica en la práctica, y evita meter un segundo editor completo dentro de un diálogo.
+    ⚠️ **La limitación es de la pantalla, no de la RPC** —matiz añadido el 22-09-2026—:
+    `rectificar_albaran()` (`20261012100500_rpc_albaranes.sql:1043-1088`) delega en
+    `emitir_albaran(nueva.id, a.recogida, p_lineas, ...)`, que sí aceptaría reemplazar producto y
+    cajas si le llegaran. Es `DialegRectificar`, dentro de `AlbaraDetall.tsx`, quien solo renderiza
+    un campo editable de `kg_neto` por línea y deja el producto como etiqueta fija. La entrada
+    sigue describiendo la experiencia real del equipo, solo que el sitio donde vive la restricción
+    es otro.
 
 69. 🟡 **La fecha del cierre ya se escribe, pero solo la de la entrega.** `emitir_albaran()` rellena
     `data_hora_recollida` cuando está vacía (`20270304100300`), así que las canalizaciones nuevas ya
@@ -4679,8 +4732,14 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     llegó el producto: el neto se reparte proporcionalmente a `kg_conciliados`, con el residuo del
     redondeo a la línea mayor. Con un rechazo grande en un solo lote, ese lote absorbe parte de la
     merma. **El total del donante —lo único que sale en el certificado y en el 182— es exacto.**
-71. **No hay plantillas `RES` ni `CD` sembradas** (el texto es material de la fase 0), así que
-    `documentos.plantilla_id` sale `null` en los dos, igual que en REC/ENT/OPE.
+71. **No hay plantilla `RES` sembrada**, así que `documentos.plantilla_id` sale `null` ahí, igual
+    que en REC/ENT/OPE. ⚠️ **Y la parte de `CD` hay que decirla con más cuidado** (corregido el
+    22-09-2026, verificado con `select tipo, variante from plantillas_documento`): existe una
+    plantilla `CD`, pero es la variante **`parcial`** del certificado a demanda (§4,
+    `20270303100200`), sembrada aparte por una razón legal concreta —sin ella,
+    `emitir_certificado_periodo()` se niega—. La `CD` **base, la del certificado anual**
+    (`variante` null) sigue sin sembrar, así que `documentos.plantilla_id` sigue saliendo `null`
+    en cualquier certificado de donación anual que se emita.
 72. **`abrir_cierre` no se puede probar como «permitir» en el arnés**: dejaría una cabecera de
     cierre y no hay RPC que la borre. Se cubre por el lado del «denegar», y con
     `reiniciar_cierre_prueba`/`conciliacion_retroactiva` sobre un uuid inventado.
@@ -4709,28 +4768,17 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     `convenio_vigente()` 111 veces por oferta, lee `convenios_exigidos` y los convenios vigentes y
     calcula la diferencia en TypeScript. La regla sigue en la tabla y la autoridad sigue siendo la
     RPC (`exigir_convenio`): una divergencia solo produce un aviso de más o de menos en el panel.
-82. ⚠️ **Un agente NO debe hacer `git checkout` de un fichero compartido para restaurar su entorno
-    de pruebas.** *(Y desde el 11-09-2026 hay red: `tests/cobertura.test.ts` comprueba que cada
-    entrada del menú tiene ruta, que cada ruta resuelve a un fichero y que **toda clave i18n usada
-    existe en los dos idiomas**. Se ganó el sueldo el primer día: cazó 17 claves que dos pantallas
-    nuevas usaban sin definir, con nombre y fichero, en vez de que salieran en producción como
-    identificadores crudos en el menú. La obligación de «auditar antes de cada commit» dependía de
-    que alguien se acordara; ahora la ejecuta `npm run check`.)* Pasó el 10-09-2026 y costó trabajo: un agente montó rutas e i18n temporales para
-    poder medir, y al terminar restauró `src/router/index.tsx` y `src/lib/i18n.tsx` con
-    `git checkout` — llevándose por delante la integración de la fase 4 que estaba en el árbol sin
-    commitear. **El build no lo detecta**: unas rutas que no existen y unas claves que faltan
-    compilan igual, así que se commiteó una fase entera con sus pantallas inalcanzables. Lo cazó el
-    intento de integrar la fase siguiente. Regla: quien toque un fichero compartido guarda **copia
-    del contenido** y restaura esa copia, nunca la versión de git; y el orquestador **audita
-    cobertura de rutas y de claves** antes de cada commit, no solo el build. Es la tercera cara de
-    la deuda 63: las herramientas locales asumen un único operador.
-
 83. **`cierre_donante_lineas.albaran_rec_id` guarda el OPE en las líneas de transacción.** El
     nombre se queda corto desde que el CT reutiliza el motor del cierre; renombrarlo obligaría a
     reescribir también el circuito de donaciones, así que se deja anotado.
 84. **No hay plantillas `CT` ni `PLA`** en `plantillas_documento`, como tampoco las hay de REC, ENT,
-    OPE, CONV, RES ni CD: los textos son material de la fase 0. `documentos.plantilla_id` queda
-    `null` y el renderizador imprime su texto de trabajo con el aviso.
+    OPE ni RES: los textos son material de la fase 0. `documentos.plantilla_id` queda `null` y el
+    renderizador imprime su texto de trabajo con el aviso.
+    ⚠️ **La lista de acompañantes tenía dos de más, corregido el 22-09-2026**: `CONV` **sí** tiene
+    plantilla desde hace tiempo —6 filas, las 3 variantes en los 2 idiomas, todas vigentes y
+    marcadas `[ESBORRANY]`/`[BORRADOR]` en el título (§4, deuda §12.77)— y `CD` la tiene **para el
+    certificado a demanda** (variante `parcial`), aunque no para el certificado anual (ver §12.71).
+    `CT` y `PLA` sí siguen sin ninguna, tal como dice la entrada.
 
 85. 🟡 **El certificado de transacción no tenía prueba end-to-end, y ya la puede tener**
     (21-09-2026). Lo que lo bloqueaba —`datos_provisionales = true` en el fixture— dejó de
@@ -4794,9 +4842,17 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
 95. **La generación del token está copiada en tres migraciones aplicadas.**
     `marcar_entregado()`, `enviar_convenio()` e `iniciar_firma_asistida()` llevan cada una su
     copia del cálculo (dos `gen_random_uuid()` + reloj → sha256 → base64url). Desde
-    `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa, pero las tres viejas se
-    quedan como están: **editar una migración aplicada está prohibido** (§7). Se unifican el día
-    que alguna se recree por otro motivo.
+    `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa —`acunar_enllac_propi()`
+    en esa misma migración, `signar_conveni_propi()` (`20270326100000`) y
+    `acunar_enllac_assistit()` (`20270329100000`)—, pero las tres viejas se quedan como están:
+    **editar una migración aplicada está prohibido** (§7). Se unifican el día que alguna se recree
+    por otro motivo.
+    ⚠️ **Y una de las tres SÍ se recreó por otro motivo, y siguió sin usarla** (verificado el
+    22-09-2026): `iniciar_firma_asistida()` se reescribió el `20270401100000`
+    (`firma_assistida_sense_codi.sql:59`) —después de que `generar_token_enlace()` ya existiera—
+    y mantuvo su generación inline en vez de adoptarla. No es solo que tres migraciones antiguas
+    quedaran quietas: una se tocó más tarde con `generar_token_enlace()` ya disponible y decidió
+    no usarla, así que la próxima vez que alguien la toque no hay excusa de «no existía todavía».
 
 97. **Acuñar un enlace desde el panel revoca el que la persona tenga en el correo.** Es la
     misma regla que `enviar_convenio()` —dos enlaces vivos son dos firmas posibles y la segunda
@@ -4808,11 +4864,18 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
     plegado— y no se repiten: son claves distintas. Lo que coincide es el TEXTO, y solo se vería
     en una cuenta que tuviera a la vez panel de equipo y de receptor, que hoy no existe (las de
     doble rol son productor+receptor).
-99. **El plan de prevención se lista desde `documentos`, no desde `planes_prevencion`.** Es lo
-    único que se puede hacer hoy: la tabla y sus RPC existen desde la fase 5 y **no hay ninguna
-    pantalla de planes**, ni de equipo ni externa, así que del plan solo existe su PDF. El día
-    que se construya el cuestionario (anexo B, fase 0), esta sección debería leer el plan y no
-    su documento.
+99. ✅ **Ya existe una pantalla de planes** — corregido el 22-09-2026, cuando el cuestionario de
+    diagnóstico llegó (F2, §1bis) y con él `src/components/PlaPrevencio.tsx`, que lee
+    `planes_prevencion` directamente vía `plaPerId()` (`src/lib/diagnosticApi.ts:99,116`). Se
+    monta en `src/routes/Diagnostic.tsx` (panel externo, `/organitzacio/diagnostic`) y en
+    `src/routes/equip/DiagnosticDetall.tsx` (equipo) — justo lo que esta entrada decía que no
+    existía «ni de equipo ni externa».
+    ⚠️ **Lo que sigue siendo cierto tal cual, y en los DOS paneles externos**:
+    `productor/Documents.tsx:388-396` y `receptor/Documents.tsx:248-249` siguen listando el plan
+    como una entrada de `documentos` (su PDF), con el mismo comentario literal —"no hay pantalla de
+    planes"— que ya no describe la realidad. Ninguno de los dos enlaza a la pantalla nueva. Queda
+    como deuda real, pero mucho más acotada de lo que decía el texto original: no falta la
+    pantalla, falta que estos dos listados enlacen a ella en vez de (o además de) mostrar el PDF.
 
 106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
      la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
@@ -4826,10 +4889,11 @@ llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
      (§6ter) llama a las RPC reales del circuito, así que salen exactamente los mismos
      documentos y correos que si lo hubiera hecho la organización — **cuando se usa**. Pero
      `authenticated` conserva `insert`/`update`/`delete` sobre `oferta_respuestas` y escritura
-     directa sobre `canalizaciones`, así que los atajos de `OfferDetail.tsx:273-288`, `:291-297`
-     y `:492-518` siguen existiendo y siguen produciendo lotes **sin `canal`, sin compatibilidad
-     de modalidad comprobada y sin precio mínimo**, indistinguibles en el listado de los que
-     pasaron por el circuito. Cerrarlo es revocar esos GRANT y reescribir `OfferDetail` y
+     directa sobre `canalizaciones`, así que los atajos de `OfferDetail.tsx:278` (`registrarEnvio`),
+     `:299` (`marcarRespuesta`) y `:507`/`:525` (alta y `guardarKgReales`) —renumerados el
+     22-09-2026, el fondo no cambió— siguen existiendo y siguen produciendo lotes **sin `canal`,
+     sin compatibilidad de modalidad comprobada y sin precio mínimo**, indistinguibles en el
+     listado de los que pasaron por el circuito. Cerrarlo es revocar esos GRANT y reescribir `OfferDetail` y
      `Aprovacions` para que pasen por RPC: ~2 días. ⚠️ Mientras tanto, «se generan los mismos
      documentos» es una frase con condición, y así hay que decirla.
 
@@ -4931,7 +4995,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 80 | El DNI del firmante fuera de `documentos.datos` | `sha256_datos` no lo cubre; lo prueba la fila de `evidencias` |
 | 81 | `sense_conveni` replica la resta, no la regla | Evita 111 llamadas por oferta. La autoridad sigue siendo la RPC |
 | 91 | Las «últimas 9 cifras» están triplicadas (TS + dos migraciones) | SQL no puede importar TypeScript. Unificarlo exigiría una RPC, y entonces `coincidencies.ts` dejaría de ser probable desde Vitest. Con ~450 fichas no hay problema de rendimiento |
-| 82 | Regla de trabajo, no deuda | Un agente no hace `git checkout` de un fichero compartido |
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
 | 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
 | 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
@@ -4966,7 +5029,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **71** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **72** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -5039,6 +5102,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 75 | `documentos.envio` guarda el token en claro y `GRANT select on documentos` es por tabla | `20270320100300` |
 | 78 | `aprovar_resposta()` no puede devolver el aviso de convenio | 11-09-2026 |
 | 79 | Una organización con doble rol necesita dos convenios | `20270312100000` |
+| 82 | Un agente hizo `git checkout` de un fichero compartido y se llevó por delante una fase entera | Cubierta desde el 11-09-2026 por `tests/cobertura.test.ts`: rutas del menú, imports del router, claves i18n usadas y etiquetas de menú sin repetir. Cerrada del todo el 22-09-2026 al comprobar que la salvaguarda sigue completa |
 | 86 | No hay rectificativo del CT | 11-09-2026 |
 | 87 | El CPU real de `generar-documento` sigue sin medirse con precisión | 11-09-2026 |
 | 88 | Los tres PDF de la prueba de publicación quedan huérfanos en `proves/2026/PROVA/` | 11-09-2026 |
