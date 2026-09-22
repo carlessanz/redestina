@@ -139,7 +139,12 @@ export default function Convenis() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* A 360 px los cuatro controles van uno debajo de otro; desde `sm`, en dos
-            columnas. Ningún `<select>` a mano: los de shadcn ya traen `text-base md:text-sm`. */}
+            columnas. Ningún `<select>` a mano.
+            ⚠️ Pero `SelectTrigger` de shadcn NO trae `text-base md:text-sm` —solo `Input` y
+               `Textarea` lo traen (`ui/select.tsx:40` es `text-sm` a secas)—, así que hay
+               que repetirlo aquí, igual que en un `<select>` nativo (§2, regla 1). Y
+               `w-full` porque el trigger nace `w-fit` con `whitespace-nowrap`: dentro de una
+               celda de rejilla eso puede crecer más que la celda y empujar la página. */}
         <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label htmlFor="conv-cerca">{t('c.search')}</Label>
@@ -149,7 +154,7 @@ export default function Convenis() {
           <div className="space-y-1.5">
             <Label htmlFor="conv-estat">{t('conv.f_status')}</Label>
             <Select value={estat} onValueChange={setEstat}>
-              <SelectTrigger id="conv-estat"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="conv-estat" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
                 {ESTATS_CONVENI.map((e) => (
@@ -161,7 +166,7 @@ export default function Convenis() {
           <div className="space-y-1.5">
             <Label htmlFor="conv-tipus">{t('conv.f_model')}</Label>
             <Select value={tipus} onValueChange={setTipus}>
-              <SelectTrigger id="conv-tipus"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="conv-tipus" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
                 {TIPUS_CONVENI.map((x) => (
@@ -173,7 +178,7 @@ export default function Convenis() {
           <div className="space-y-1.5">
             <Label htmlFor="conv-comarca">{t('conv.f_region')}</Label>
             <Select value={comarca} onValueChange={setComarca}>
-              <SelectTrigger id="conv-comarca"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="conv-comarca" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
                 {comarques.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}

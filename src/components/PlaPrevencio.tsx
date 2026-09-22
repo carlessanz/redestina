@@ -200,6 +200,16 @@ export default function PlaPrevencio({
               {t('pla.view_pdf')}
             </Button>
           </CardHeader>
+          {/* El botón gris tenía que decir por qué. Pasa de verdad: el PDF lo genera una
+              Edge Function que el trigger acaba de encolar, así que en los primeros segundos
+              tras emitir —y si la generación falla— no hay documento que enseñar, y sin esta
+              línea el botón estaba apagado sin ninguna explicación (§6ter: el tooltip no
+              cuenta, en táctil no hay hover). */}
+          {!docVigent && (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">{t('doc.generating_wait')}</p>
+            </CardContent>
+          )}
         </Card>
       )}
 

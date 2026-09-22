@@ -399,6 +399,22 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   correos es clara** (§9bis). Nada de `brightness-0 invert` ni
   filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
   `design/DESIGN.md §4`.
+- 🔴 **El `SelectTrigger` de shadcn NO trae `text-base md:text-sm`, y un comentario del repo
+  afirmaba que sí** (22-09-2026). Solo lo traen `Input` y `Textarea`: `ui/select.tsx` es
+  `text-sm` a secas. Ese comentario —en `Convenis.tsx`— es la razón de que una pantalla nueva
+  copiara el patrón desnudo, así que **cualquier `SelectTrigger` fuera de `ui/` tiene que
+  repetirlo**, igual que un `<select>` nativo (si no, iOS amplía la página al enfocarlo y no la
+  devuelve).
+  ⚠️ **Y nace `w-fit` con `whitespace-nowrap`**, así que dentro de una celda de rejilla puede
+  crecer más que la celda: en `/registre` el desplegable salía del ancho de un `option` mientras
+  los campos vecinos eran full-width. Los once de fuera de `ui/` llevan ya `w-full`, que **no
+  puede desbordar su celda**.
+- 🔴 **`{n}` está reservado para CONTADORES** (22-09-2026). Es el parámetro que dispara la
+  variante `<clau>_1` del singular (§7), así que usarlo para un número de documento —
+  `t('seg.alt_num', { n: 'CR-2026-0001' })`— hace que cualquiera que audite singulares vea esa
+  clave como «le falta el `_1`». Para lo que no se cuenta, `{num}`. No era alcanzable
+  (`Number('CR-2026-0001')` es `NaN`), pero ahora `n` significa **una sola cosa** en todo el
+  diccionario, y `tests/i18n.test.ts` protege la paridad de marcadores.
 - 🔴 **Ningún control de formulario se estila a mano** (16-09-2026). Casilla →
   `components/Casella` (`Casella` suelta, `FilaCasella` con etiqueta y 44 px de fila);
   campo → `ui/input`; desplegable → `ui/select` o un `<select>` con `text-base md:text-sm`.
@@ -533,6 +549,10 @@ src/
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
+    TriaPaper.tsx              El conmutador «productora / receptora» del doble rol. Estaba
+                               copiado TRES veces y una copia ya había divergido (sin icono y
+                               sin reparto a partes iguales): dos botones distintos para la
+                               misma elección en dos pantallas seguidas
     DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
                                mensajería cuando WhatsApp está apagado (§8)
     documents/                 Las cuatro piezas que comparten los dos paneles externos:
@@ -2362,7 +2382,13 @@ estados y aquí hacen falta tres: sí, no y **«todavía no lo he dicho»** — 
 una obligatoria contestada con «no» quedaría pendiente para siempre.
 
 ⚠️ **La banda va en tono `aviso`, no en rojo**, al revés que la del convenio: el diagnóstico **no
-bloquea operar**. Y se calcula **una sola vez en `AppShell`** y se reparte a la banda y a la marca
+bloquea operar**. Y **se puede descartar 30 días**, con el mecanismo exacto de `AvisInstallacio`
+—la **fecha** en `localStorage`, no un booleano, porque un booleano no sabe expresar eso—: es la
+tercera banda que se pinta encima de `AvisConveni` y `AvisRegistreIncomplet`, y las dos rojas se
+van solas al hacer lo que piden mientras que el diagnóstico es opcional y la mayoría no lo va a
+tener nunca. Es el mismo argumento por el que **no** se le dio cola en `pendents_equip()`, y sería
+incoherente aplicarlo en un lado y no en el otro.
+⚠️ **La marca del menú lateral NO se descarta**: descartar no es haberlo hecho. Y se calcula **una sola vez en `AppShell`** y se reparte a la banda y a la marca
 del menú — calculadas por separado, el contador y la banda podrían decir cosas distintas (§6ter).
 
 ⚠️ **El prefill solo propone lo que la pregunta puede aceptar**, y hoy eso es **uno de los cinco

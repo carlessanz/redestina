@@ -25,14 +25,14 @@
 //    otra (§6ter). Aquí conviven en la misma pantalla, así que el riesgo es mayor, no menor.
 
 import { useState } from 'react'
-import { Building2, UserCircle } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import PerfilOrganitzacio from './PerfilOrganitzacio'
 import TargetaDiagnostic from '../components/TargetaDiagnostic'
-import { cn } from '../lib/utils'
+import TriaPaper, { type Paper } from '../components/TriaPaper'
 
-type Tipus = 'productor' | 'entidad'
+/** El mismo vocabulario de `TriaPaper`; se conserva el alias local por legibilidad. */
+type Tipus = Paper
 
 export default function LaMevaOrganitzacio() {
   const { t, ctx } = useTContext()
@@ -65,27 +65,7 @@ export default function LaMevaOrganitzacio() {
       {/* Dos papeles, dos juegos de campos, una sola organización. Se reparten en pestañas
           y no uno debajo del otro: son formularios con su propio «Desar», y verlos a la vez
           invita a rellenar los dos y guardar solo uno. */}
-      <div role="tablist" className="flex gap-2">
-        {te.map((tipus) => {
-          const sel = tipus === actiu
-          const Icona = tipus === 'productor' ? UserCircle : Building2
-          return (
-            <button
-              key={tipus}
-              role="tab"
-              aria-selected={sel}
-              onClick={() => setTria(tipus)}
-              className={cn(
-                'flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-sm whitespace-normal transition-colors md:min-h-9 md:flex-none',
-                sel ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background hover:bg-accent',
-              )}
-            >
-              <Icona className="size-4 shrink-0" aria-hidden />
-              {t(tipus === 'productor' ? 'org.paper_productor' : 'org.paper_receptor')}
-            </button>
-          )
-        })}
-      </div>
+      <TriaPaper opcions={te} actiu={actiu} onTria={setTria} />
       {/* El diagnóstico va ARRIBA: es lo que hay que hacer con esta organización, y la
           ficha es lo que ya está hecho. Es una tarjeta de estado con su enlace, no un
           formulario más: quien entra aquí a corregir el NIF no tiene que perderlo. */}

@@ -279,7 +279,7 @@ export default function CampanyaConvenis() {
             <div className="space-y-1.5">
               <Label htmlFor="camp-vista">{t('camp.f_view')}</Label>
               <Select value={vista} onValueChange={(v) => setVista(v as Vista)}>
-                <SelectTrigger id="camp-vista"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="camp-vista" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value="llestes">{t('camp.v_ready')}</SelectItem>
                   <SelectItem value="incompletes">{t('camp.v_incomplete')}</SelectItem>
@@ -291,7 +291,7 @@ export default function CampanyaConvenis() {
             <div className="space-y-1.5">
               <Label htmlFor="camp-comarca">{t('conv.f_region')}</Label>
               <Select value={comarca} onValueChange={setComarca}>
-                <SelectTrigger id="camp-comarca"><SelectValue /></SelectTrigger>
+                <SelectTrigger id="camp-comarca" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
                 <SelectContent>
                   <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
                   {comarques.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}

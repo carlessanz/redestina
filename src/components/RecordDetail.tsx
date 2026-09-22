@@ -224,7 +224,7 @@ export default function RecordDetail({
     if (tp === 'bool') {
       return (
         <Select value={v ? 'si' : 'no'} onValueChange={(val) => set(c.key, val === 'si')}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="si">{t('c.yes')}</SelectItem>
             <SelectItem value="no">{t('c.no')}</SelectItem>
@@ -236,7 +236,7 @@ export default function RecordDetail({
       return (
         <Select value={v == null ? 'null' : v ? 'si' : 'no'}
           onValueChange={(val) => set(c.key, val === 'null' ? null : val === 'si')}>
-          <SelectTrigger><SelectValue /></SelectTrigger>
+          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
           <SelectContent>
             <SelectItem value="null">—</SelectItem>
             <SelectItem value="si">{t('c.yes')}</SelectItem>
@@ -249,7 +249,7 @@ export default function RecordDetail({
       const val = (v as string) ?? ''
       return (
         <Select value={val === '' ? '__none' : val} onValueChange={(nv) => set(c.key, nv === '__none' ? null : nv)}>
-          <SelectTrigger><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectTrigger className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none">—</SelectItem>
             {(c.opciones ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}

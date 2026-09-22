@@ -16,12 +16,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../lib/supabase'
-import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -134,16 +134,16 @@ export default function OffersList({ onOpen }: Props) {
                     </span>
                   </TableCell>
                   <TableCell>
-                    <span className={cn('inline-block rounded-full px-2 py-0.5 text-xs font-medium', est.clase)}>
-                      {t(est.key)}
-                    </span>
+                    {/* `Badge` y no un `span` a mano: las clases eran exactamente las suyas
+                        —`rounded-full px-2 py-0.5 text-xs font-medium`— copiadas, y una
+                        tercera forma de pintar un badge es un sitio más donde el radio o el
+                        tamaño pueden dejar de coincidir con el resto (§2bis). */}
+                    <Badge className={est.clase}>{t(est.key)}</Badge>
                     {/* F3. El listado es a donde manda la cola `espigolades_per_convertir`
                         del tablero, así que tiene que poder decir CUÁLES son: una oferta
                         con producto sin cosechar y sin jornada todavía. */}
                     {o.producte_al_camp && !o.espigolada_id && (
-                      <span className="ml-1 inline-block rounded-full bg-aviso-fondo px-2 py-0.5 text-xs font-medium text-aviso">
-                        {t('conv_esp.tag')}
-                      </span>
+                      <Badge className="ml-1 bg-aviso-fondo text-aviso">{t('conv_esp.tag')}</Badge>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

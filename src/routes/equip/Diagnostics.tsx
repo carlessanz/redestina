@@ -90,7 +90,7 @@ export default function Diagnostics() {
           <div className="space-y-1.5">
             <Label htmlFor="diagl-estat">{t('diagl.f_status')}</Label>
             <Select value={estat} onValueChange={setEstat}>
-              <SelectTrigger id="diagl-estat"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="diagl-estat" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={TOTS}>{t('diagl.all')}</SelectItem>
                 {ESTATS_DIAGNOSTIC.map((e) => (
@@ -102,7 +102,7 @@ export default function Diagnostics() {
           <div className="space-y-1.5">
             <Label htmlFor="diagl-paper">{t('diagl.f_role')}</Label>
             <Select value={paper} onValueChange={setPaper}>
-              <SelectTrigger id="diagl-paper"><SelectValue /></SelectTrigger>
+              <SelectTrigger id="diagl-paper" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
               <SelectContent>
                 <SelectItem value={TOTS}>{t('diagl.all')}</SelectItem>
                 <SelectItem value="productor">{t('org.paper_productor')}</SelectItem>

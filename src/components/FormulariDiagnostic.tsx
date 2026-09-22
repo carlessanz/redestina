@@ -299,10 +299,23 @@ function Pregunta({
   const ajuda = textBilingue(pregunta.ajuda, lang)
   const id = `diag-${pregunta.id}`
 
+  // ⚠️ `htmlFor` SOLO cuando existe ese `id` en el DOM. `Control` se lo pone al `Select`, al
+  //    `Input` y al `Textarea`, pero un booleano y un `multi` se pintan con VARIAS casillas,
+  //    cada una con su propia etiqueta: ahí no hay ningún control que se llame así. Un
+  //    `htmlFor` colgando no falla el build ni se ve, pero deja la pregunta sin etiqueta
+  //    para un lector de pantalla y hace que pulsar el enunciado no haga nada. Lo que
+  //    corresponde entonces es un grupo con `aria-labelledby`.
+  const unSolControl = pregunta.tipus === 'opcio' || pregunta.tipus === 'numero'
+    || pregunta.tipus === 'text'
+
   return (
     <div className={cn('space-y-2', falta && 'rounded-lg border border-aviso/40 bg-aviso-fondo/40 p-3')}>
       <div>
-        <Label htmlFor={id} className="block text-sm leading-snug font-medium whitespace-normal">
+        <Label
+          id={`${id}-etiqueta`}
+          htmlFor={unSolControl ? id : undefined}
+          className="block text-sm leading-snug font-medium whitespace-normal"
+        >
           {etiqueta}
           {/* Lo opcional se marca; lo obligatorio no lleva asterisco (design/DESIGN.md §6). */}
           {!pregunta.obligatoria && (
@@ -312,7 +325,13 @@ function Pregunta({
         {ajuda && <p className="mt-1 text-xs text-muted-foreground">{ajuda}</p>}
       </div>
 
-      <Control pregunta={pregunta} valor={valor} id={id} onCanvi={onCanvi} />
+      {unSolControl
+        ? <Control pregunta={pregunta} valor={valor} id={id} onCanvi={onCanvi} />
+        : (
+          <div role="group" aria-labelledby={`${id}-etiqueta`}>
+            <Control pregunta={pregunta} valor={valor} id={id} onCanvi={onCanvi} />
+          </div>
+        )}
 
       {proposat && <p className="text-xs text-muted-foreground">{t('diag.prefilled')}</p>}
     </div>

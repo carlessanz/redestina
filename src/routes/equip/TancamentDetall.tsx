@@ -579,7 +579,7 @@ export default function TancamentDetall() {
     const res = await emetreResum(d.id, provisional)
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
-    toast.success(t('tan.summary_done', { n: res.data.numero ?? '' }))
+    toast.success(t('tan.summary_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
   }
@@ -645,7 +645,7 @@ export default function TancamentDetall() {
     const res = await emetreCertificat(d.id)
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
-    toast.success(t('tan.cert_done', { n: res.data.numero ?? '' }))
+    toast.success(t('tan.cert_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
   }
@@ -657,7 +657,7 @@ export default function TancamentDetall() {
     setOcupat(false)
     setRectifica(null)
     if (!res.ok) { toast.error(res.missatge); return }
-    toast.success(t('tan.cert_rectified', { n: res.data.numero ?? '' }))
+    toast.success(t('tan.cert_rectified', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
   }

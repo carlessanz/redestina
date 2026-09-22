@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { Casella } from '../Casella'
+import TriaPaper from '../TriaPaper'
 import { textBilingue } from '../../lib/diagnostic'
 import {
   activarMesura, activarRegla, mesuresCataleg, problemesQuestionari,
@@ -45,6 +46,9 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
+
+/** Los dos cuestionarios. Fuera del render: un array nuevo en cada pasada remontaría el conmutador. */
+const PAPERS: readonly TipusOrg[] = ['productor', 'entidad']
 
 export default function EditorDiagnostic() {
   const { t, lang } = useT()
@@ -155,24 +159,7 @@ export default function EditorDiagnostic() {
       <CardContent className={cn('space-y-6', !potEditar && 'opacity-60')}>
         {/* Los dos cuestionarios son distintos de verdad: lo que se le pregunta a quien
             genera producto y a quien lo recibe no se parece en nada. */}
-        <div role="tablist" className="flex gap-2">
-          {(['productor', 'entidad'] as TipusOrg[]).map((x) => (
-            <button
-              key={x}
-              role="tab"
-              aria-selected={x === tipus}
-              onClick={() => setTipus(x)}
-              className={cn(
-                'min-h-11 rounded-md border px-3 text-sm whitespace-normal transition-colors md:min-h-9',
-                x === tipus
-                  ? 'border-primary bg-primary text-primary-foreground'
-                  : 'border-input bg-background hover:bg-accent',
-              )}
-            >
-              {t(x === 'productor' ? 'org.paper_productor' : 'org.paper_receptor')}
-            </button>
-          ))}
-        </div>
+        <TriaPaper opcions={PAPERS} actiu={tipus} onTria={setTipus} />
 
         {carregant ? (
           <p className="text-sm text-muted-foreground">{t('c.loading')}</p>

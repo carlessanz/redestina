@@ -33,7 +33,7 @@ export default function SegellRedestina({ codi, numero }: {
 
   const origen = typeof window !== 'undefined' ? window.location.origin : ''
   const enllac = urlVerificacio(origen, codi)
-  const alt = numero ? t('seg.alt_num', { n: numero }) : t('seg.alt')
+  const alt = numero ? t('seg.alt_num', { num: numero }) : t('seg.alt')
   const fragment = `<a href="${enllac}" target="_blank" rel="noopener">`
     + `<img src="${origen}/segell-redestina.svg" alt="${alt}" width="120" height="120">`
     + `</a>`

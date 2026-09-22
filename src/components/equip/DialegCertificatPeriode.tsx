@@ -32,7 +32,7 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { calcularCertificatPeriode, emetreCertificatPeriode, bloqueja, euros } from '../../lib/tancament'
 import { calcularCertificatRecepcio, emetreCertificatRecepcio } from '../../lib/certificatRecepcio'
-import { kg } from '../../lib/albarans'
+import { dataCurta, kg } from '../../lib/albarans'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import Bloquejos from './Bloquejos'
@@ -134,7 +134,11 @@ export default function DialegCertificatPeriode(
     // porque el ensayo se repite y una confirmación por gesto deja de leerse.
     if (modo === 'real') {
       const ok = await confirma({
-        titol: t('cdp.confirm_t', { desde, fins: hasta }),
+        // ⚠️ Las fechas, FORMATEADAS. Salen de dos `<input type="date">`, o sea en ISO, y
+        //    esta es la última pantalla antes de quemar un número de serie legal: leer
+        //    «del 2026-01-01 al 2026-09-22» en el sitio donde hay que decir que sí no es
+        //    lo mismo que leer la ventana en el formato del resto de la aplicación.
+        titol: t('cdp.confirm_t', { desde: dataCurta(desde), fins: dataCurta(hasta) }),
         descripcio: t('cdp.confirm', { serie: perfil.serie }),
         confirmar: t(perfil.accioKey),
         destructiu: true,
@@ -147,7 +151,7 @@ export default function DialegCertificatPeriode(
       : await emetreCertificatRecepcio(calcul.id)
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
-    toast.success(t('cdp.done', { n: res.data.numero ?? '' }))
+    toast.success(t('cdp.done', { num: res.data.numero ?? '' }))
     if ((res.data.substitueix ?? 0) > 0) {
       toast.info(t('cdp.done_subst', { m: res.data.substitueix ?? 0 }))
     }

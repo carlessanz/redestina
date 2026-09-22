@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { ChevronDown } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { cn } from '../../lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 export interface ItemLlegenda {
@@ -37,14 +38,11 @@ export default function LlegendaEstats({ items }: { items: ItemLlegenda[] }) {
         <ul className="mt-2 space-y-2 rounded-xl border bg-card p-3">
           {items.map((it) => (
             <li key={it.key} className="flex flex-col gap-1 sm:flex-row sm:items-baseline sm:gap-3">
-              <span
-                className={cn(
-                  'w-fit shrink-0 rounded-full px-2 py-0.5 text-xs font-medium',
-                  it.clase,
-                )}
-              >
-                {t(it.key)}
-              </span>
+              {/* El MISMO componente que pinta el estado en el listado. Era un `span` con
+                  las clases de `Badge` copiadas a mano, y esta leyenda existe justamente
+                  para que quien la lee reconozca la píldora de la tabla: si las dos se
+                  pintan por caminos distintos, el día que una cambie dejarán de parecerse. */}
+              <Badge className={it.clase}>{t(it.key)}</Badge>
               <span className="text-sm text-muted-foreground">{t(it.descKey)}</span>
             </li>
           ))}

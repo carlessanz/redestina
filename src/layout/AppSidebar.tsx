@@ -12,7 +12,7 @@
 // nombre de la organización arriba—, que es el caso del 99% de las cuentas.
 
 import { NavLink, useLocation } from 'react-router'
-import { AlertTriangle, Building2, Dot, LogOut, Tractor, Users } from 'lucide-react'
+import { AlertTriangle, Building2, LogOut, Tractor, Users } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
@@ -207,7 +207,14 @@ export default function AppSidebar({
                         significan «tienes N cosas que mirar» (design/DESIGN.md §6quater). */}
                     {item.to === '/organitzacio/diagnostic' && diagnosticPendent && (
                       <SidebarMenuBadge>
-                        <Dot className="size-5" aria-hidden />
+                        {/* Un `span` redondo y no el icono `Dot` de lucide: aquel dibuja un
+                            círculo de radio 1 sobre una caja de 24, o sea ~3 px dentro de un
+                            chip de 20 —casi invisible, que es lo contrario de una marca—. Y
+                            además es la MISMA forma de decir «aquí dentro hay algo» que ya
+                            usa la barra inferior de móvil (`BottomNav`): una sola manera de
+                            pintar la misma señal. El color es `coral-texto` como el resto del
+                            chip: sobre blanco, el coral de marca solo da 2.67:1 (§2bis). */}
+                        <span className="size-2 rounded-full bg-coral-texto" aria-hidden />
                         <span className="sr-only">{t('diag.badge')}</span>
                       </SidebarMenuBadge>
                     )}

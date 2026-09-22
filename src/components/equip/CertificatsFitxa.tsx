@@ -28,6 +28,7 @@ import { useT } from '../../lib/i18n'
 import { supabase } from '../../lib/supabase'
 import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { estilEstatDonant } from '../../lib/tancament'
+import { dataCurta } from '../../lib/albarans'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { useAppContext } from '../../hooks/useAppContext'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
@@ -87,6 +88,24 @@ const PERFIL = {
   },
 } as const
 
+/**
+ * La ventana de fechas, con el MISMO formato que el resto de la aplicación.
+ *
+ * ⚠️ No se componía: se pintaba `2026-01-01 → 2026-06-30`, tal cual sale de la base, en la
+ *    única pantalla donde esto se lee. Las otras tres que enseñan el mismo periodo —el panel
+ *    del productor, el del receptor y `/verificar/:codi`— ya usaban `mydoc.cdp_period` con
+ *    `dataCurta()`. Un mismo dato con dos caras es lo que hace dudar de si son dos cosas.
+ */
+function periode(
+  t: (clau: string, params?: Record<string, string | number>) => string,
+  p: { periodo_desde: string; periodo_hasta: string },
+): string {
+  return t('mydoc.cdp_period', {
+    desde: dataCurta(p.periodo_desde),
+    fins: dataCurta(p.periodo_hasta),
+  })
+}
+
 export default function CertificatsFitxa(
   { tipus, orgId, esTest }: {
     tipus: 'productor' | 'entidad'
@@ -129,7 +148,7 @@ export default function CertificatsFitxa(
         })),
         ...fp.filter((p) => p.certificado_numero).map((p) => ({
           id: p.id, numero: p.certificado_numero!, estat: p.estado,
-          periode: `${p.periodo_desde} → ${p.periodo_hasta}`, cierre: null,
+          periode: periode(t, p), cierre: null,
         })),
       ]
     } else {
@@ -143,7 +162,7 @@ export default function CertificatsFitxa(
         .filter((p) => p.certificado_numero)
         .map((p) => ({
           id: p.id, numero: p.certificado_numero!, estat: p.estado,
-          periode: `${p.periodo_desde} → ${p.periodo_hasta}`, cierre: null,
+          periode: periode(t, p), cierre: null,
         }))
     }
 
@@ -154,7 +173,7 @@ export default function CertificatsFitxa(
       .eq('tipo', perfil.tipusDoc).eq('vigente', true)
       .in('objeto_id', files.map((f) => f.id))
     setDocs((data as Doc[] | null) ?? [])
-  }, [orgId, tipus, perfil.tipusDoc])
+  }, [orgId, tipus, perfil.tipusDoc, t])
 
   useEffect(() => { void carrega() }, [carrega])
   useEffect(() => {

@@ -18,16 +18,15 @@
 //    nada fallara. Ninguna de las dos tablas tiene GRANT por columnas (§4).
 
 import { useEffect, useState } from 'react'
-import { Building2, UserCircle } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import FormulariDiagnostic from '../components/FormulariDiagnostic'
 import PlaPrevencio from '../components/PlaPrevencio'
 import CarregantSeccio from '../components/CarregantSeccio'
+import TriaPaper from '../components/TriaPaper'
 import { diagnosticEstat } from '../lib/diagnosticApi'
 import type { TipusOrg } from '../lib/diagnosticApi'
-import { cn } from '../lib/utils'
 
 export default function Diagnostic() {
   const { t } = useT()
@@ -54,29 +53,7 @@ export default function Diagnostic() {
       {te.length > 1 && (
         <>
           <p className="text-sm text-muted-foreground">{t('diag.two_roles')}</p>
-          <div role="tablist" className="flex gap-2">
-            {te.map((tipus) => {
-              const sel = tipus === actiu
-              const Icona = tipus === 'productor' ? UserCircle : Building2
-              return (
-                <button
-                  key={tipus}
-                  role="tab"
-                  aria-selected={sel}
-                  onClick={() => setTria(tipus)}
-                  className={cn(
-                    'flex min-h-11 min-w-0 flex-1 items-center justify-center gap-2 rounded-md border px-3 text-sm whitespace-normal transition-colors md:min-h-9 md:flex-none',
-                    sel
-                      ? 'border-primary bg-primary text-primary-foreground'
-                      : 'border-input bg-background hover:bg-accent',
-                  )}
-                >
-                  <Icona className="size-4 shrink-0" aria-hidden />
-                  {t(tipus === 'productor' ? 'org.paper_productor' : 'org.paper_receptor')}
-                </button>
-              )
-            })}
-          </div>
+          <TriaPaper opcions={te} actiu={actiu} onTria={setTria} />
         </>
       )}
 

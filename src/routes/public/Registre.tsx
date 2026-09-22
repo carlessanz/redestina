@@ -233,7 +233,7 @@ export default function Registre() {
               <div className="grid gap-2">
                 <Label htmlFor="tr">{t('reg.tipus_label')}</Label>
                 <Select value={tipusReceptor} onValueChange={(v) => { setTipusReceptor(v as TipusReceptor); setError(null) }}>
-                  <SelectTrigger id="tr"><SelectValue placeholder={t('reg.tipus_ph')} /></SelectTrigger>
+                  <SelectTrigger id="tr" className="w-full text-base md:text-sm"><SelectValue placeholder={t('reg.tipus_ph')} /></SelectTrigger>
                   <SelectContent>
                     {TIPUS.map((tp) => (
                       <SelectItem key={tp.valor} value={tp.valor}>{t(tp.clau)}</SelectItem>
