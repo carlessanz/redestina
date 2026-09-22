@@ -6,7 +6,7 @@
 // `canal = 'asistido'` con `asistido_por` = la cuenta del dinamizador. Eso es lo que
 // después distingue las tres vías en la página de evidencias del PDF.
 //
-// ⚠️ **AQUÍ NO SE ENSEÑA NINGÚN CÓDIGO, y ese es el cambio de `20270401100000`.** La RPC
+// ⚠️ **AQUÍ NO SE ENSEÑA NINGÚN CÓDIGO, y ese es el cambio de `20260921161008`.** La RPC
 //    generaba el segundo factor y se lo devolvía a quien conduce la firma, que ya tiene el
 //    enlace: dos factores en la misma mano no son dos factores. El único código que existe
 //    ahora es el que la persona pide **desde su propia pantalla**, dentro del formulario, y

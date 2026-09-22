@@ -93,7 +93,7 @@ export interface PasEscala {
 
 // --- Los hechos ------------------------------------------------------------------------
 //
-// Son exactamente lo que devuelve la RPC `canalitzacio_assistida(uuid)` (`20270331100000`),
+// Son exactamente lo que devuelve la RPC `canalitzacio_assistida(uuid)` (`20260921160920`),
 // más dos cosas que esa función no puede saber. La RPC devuelve HECHOS, no el paso: el paso
 // se calcula aquí, y tenerlo en dos sitios garantiza que diverjan.
 

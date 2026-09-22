@@ -41,7 +41,7 @@ export interface ResultatFirmaAssistida {
   conveni: Convenio
   enllac: EnllacFirma
   /**
-   * 🔴 **Siempre `null` desde `20270401100000`, y la clave se conserva solo para no romper
+   * 🔴 **Siempre `null` desde `20260921161008`, y la clave se conserva solo para no romper
    * a quien la leyera.** La RPC generaba el código y se lo devolvía **a quien conduce la
    * firma**, que ya tiene el enlace: dos factores en la misma mano no son dos factores. Y
    * nada lo enviaba por correo, aunque el texto de la pantalla lo afirmara. Ahora el único

@@ -296,7 +296,7 @@ interface Check {
    *
    *   · `@meva_membresia`      → el id de la propia membresía (uuid nulo si no ve ninguna)
    *   · `@fitxa_amb_documents` → un productor con algún albarán fuera de borrador, o sea
-   *                              una ficha que NO se puede borrar (20270329100000). Uuid
+   *                              una ficha que NO se puede borrar (20260921160536). Uuid
    *                              nulo si el fixture documental no está puesto.
    */
   args?: Record<string, unknown>;
@@ -625,7 +625,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat a demanda" },
   { tabla: "marcar_enviado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat a demanda" },
   { tabla: "reiniciar_periodes_prova", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO reinicia els certificats a demanda de prova" },
-  // Borrado de una ficha (20270329100000, deuda §12.108). Las dos funciones nuevas están
+  // Borrado de una ficha (20260921153439, deuda §12.108). Las dos funciones nuevas están
   // cerradas a cualquiera que no sea del equipo, y la destructiva además al que no sea
   // super_admin. El uuid es el nulo a propósito: la guarda va ANTES de buscar la ficha, así
   // que un externo se lleva el `42501` sin que la función llegue a mirar ninguna fila —que
@@ -713,7 +713,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
 // si alguien relaja una política sin querer, aquí sale en rojo.
 const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   equip: [
-    // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
+    // --- La via assistida (20260921160536 / 20260921160749 / 20260921160920) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
     //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
@@ -1148,7 +1148,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
     { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
-    // Borrado de una ficha (20270329100000, deuda §12.108). El técnico SÍ puede preguntar
+    // Borrado de una ficha (20260921153439, deuda §12.108). El técnico SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
     // super_admin, igual que las políticas `productores: baixa super_admin` y
@@ -1214,7 +1214,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
     { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot generar el pla en nom d'una organitzacio (22023 sense_esborrany)" },
     { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },
-    // --- La via assistida (20270329100000 / 20270330100000 / 20270331100000) ---
+    // --- La via assistida (20260921160536 / 20260921160749 / 20260921160920) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
     //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
@@ -1446,7 +1446,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve tots els convenis",
       requiereFixture: "algún convenio (scripts/crear-datos-documentales-prueba.ts)",
     },
-    // ── Borrado de una ficha (20270329100000, deuda §12.108) ───────────────────
+    // ── Borrado de una ficha (20260921153439, deuda §12.108) ───────────────────
     //
     // La contraparte del «denegar» del técnico: el super_admin SÍ pasa la guarda. Sobre el
     // uuid nulo la autorización pasa y la función falla después con `22023
@@ -2051,7 +2051,7 @@ async function resolverArgs(
       salida[clave] = data?.id ?? UUID_NULO;
     } else if (valor === "@fitxa_amb_documents") {
       // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
-      // se puede borrar (20270329100000). Se busca en vez de codificar `TEST-PROD-1` para
+      // se puede borrar (20260921160536). Se busca en vez de codificar `TEST-PROD-1` para
       // que el check siga midiendo algo si el fixture cambia de nombre; si no hay ninguno,
       // cae al uuid nulo y el `requiereFixture` del check lo marca como saltado.
       const { data } = await cliente.from("v_albaranes_bandeja")

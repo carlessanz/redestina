@@ -142,7 +142,7 @@ describe('la convención de singular', () => {
 // sino en un CHECK de Postgres: el día que una migración añade un valor, la pantalla
 // empieza a pintar el identificador crudo y el build sigue en verde.
 //
-// Pasó de verdad: `oferta_respuestas.canal` ganó `asistido` en `20270330100000` y durante
+// Pasó de verdad: `oferta_respuestas.canal` ganó `asistido` en `20260921160749` y durante
 // meses la cola de aprobaciones enseñó `od.ch_asistido` en las dos lenguas, que además es
 // el canal MÁS frecuente porque el modelo de la fase inicial es asistido (§1bis).
 //

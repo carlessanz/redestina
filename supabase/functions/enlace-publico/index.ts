@@ -849,7 +849,7 @@ async function manejarPost(
   //                  La cuenta va en `payload.panell`, NUNCA en `asistido_por`: esa
   //                  columna significa «alguien del equipo condujo el acto», y decir eso
   //                  de una confirmación propia sería falso en un documento legal.
-  //   · `asistido` — el dinamizador la conduce con la persona delante (20270329100000).
+  //   · `asistido` — el dinamizador la conduce con la persona delante (20260921160536).
   //                  Aquí NO se compone nada: `registrar_confirmacion()` escribe
   //                  `asistido_por` leyéndolo de `enlaces_token.creado_por` dentro de
   //                  SQL, y solo cuando el canal es ese. Que lo imponga la base y no
@@ -869,7 +869,7 @@ async function manejarPost(
 
   // `p_payload` es LO RESPONDIDO por la persona; `p_evidencia.payload`, lo que el
   // servidor constata sobre el acto. `registrar_confirmacion()` los funde con el segundo
-  // encima (20270329100000), igual que `firmar_convenio_por_enlace` (20270320100200).
+  // encima (20260921160536), igual que `firmar_convenio_por_enlace` (20270320100200).
   // `panell` cambia de sitio por eso: no es una respuesta, es una constatación.
   const payload = {
     kg_confirmados: kgConfirmados,

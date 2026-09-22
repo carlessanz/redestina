@@ -390,7 +390,7 @@ export default function ConveniDetall() {
             <p className="text-sm text-muted-foreground">{t('conv.link_new_hint')}</p>
             <Input readOnly value={urlSignatura(enllacNou.token)}
               onFocus={(e) => e.currentTarget.select()} />
-            {/* 🔴 Aquí NO se enseña ningún código, y ese es el cambio de `20270401100000`.
+            {/* 🔴 Aquí NO se enseña ningún código, y ese es el cambio de `20260921161008`.
                 Antes la RPC lo generaba y se lo devolvía a quien conduce la firma, que ya
                 tiene el enlace: dos factores en la misma mano no son dos factores. El
                 único código que existe ahora es el que la persona pide desde SU pantalla,

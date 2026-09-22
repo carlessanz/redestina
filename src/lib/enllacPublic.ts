@@ -113,7 +113,7 @@ export interface DadesEnllac {
   pdf_url: string | null
   /**
    * El enlace lo acuñó el equipo para conducir la confirmación con la persona delante
-   * (`canal = 'asistido'`, `20270329100000`). La pantalla lo dice antes de confirmar:
+   * (`canal = 'asistido'`, `20260921160536`). La pantalla lo dice antes de confirmar:
    * el acto queda etiquetado así en la evidencia y en el PDF, y quien firma tiene que
    * saberlo. `false` para los enlaces por correo y para los del propio panel.
    */
@@ -317,7 +317,7 @@ export interface DadesFactura {
   pdf_url: string | null
   /**
    * El enlace lo acuñó el equipo para conducir la subida de la factura con la persona delante
-   * (`canal = 'asistido'`, `20270329100000`). La pantalla lo dice antes de confirmar:
+   * (`canal = 'asistido'`, `20260921160536`). La pantalla lo dice antes de confirmar:
    * el acto queda etiquetado así en la evidencia y en el PDF, y quien la sube tiene que
    * saberlo. `false` para los enlaces por correo y para los del propio panel.
    */

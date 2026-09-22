@@ -1785,9 +1785,9 @@ funciones, no políticas:
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
 | `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **trece** filas `(cua, n, ref, detall)`, **siempre las trece** aunque `n` valga 0. La 13 es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
-| `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20270329100000`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
-| `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20270330100000`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
-| `canalitzacio_assistida(excedente)` · `canalitzacions_actives(limit)` (`20270331100000`) | Las lecturas de la pantalla guiada. ⚠️ Son `security definer`, así que **podrían** devolver lo que el GRANT por columnas protege: por eso **no leen `enlaces_token` en absoluto** —lo pendiente lo dice el estado del OBJETO (§6ter)—. Y devuelven **hechos, no el paso**: qué toca lo calcula `passosCanalitzacio.ts`, y calcularlo dos veces garantiza que diverjan |
+| `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20260921160536`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
+| `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20260921160749`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
+| `canalitzacio_assistida(excedente)` · `canalitzacions_actives(limit)` (`20260921160920`) | Las lecturas de la pantalla guiada. ⚠️ Son `security definer`, así que **podrían** devolver lo que el GRANT por columnas protege: por eso **no leen `enlaces_token` en absoluto** —lo pendiente lo dice el estado del OBJETO (§6ter)—. Y devuelven **hechos, no el paso**: qué toca lo calcula `passosCanalitzacio.ts`, y calcularlo dos veces garantiza que diverjan |
 
 > 🔴 **EL CORTE ESTÁ ENCENDIDO desde el 16-09-2026**: `fecha_corte_convenios = 2026-09-16`,
 > a petición del cliente («bloquear hasta que no se haya firmado»). Ya no es un aviso: sin
@@ -3009,7 +3009,7 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   que no ve un `t(\`od.ch_${fila.canal}\`)`, y ahí el diccionario se queda corto **en silencio**:
   la lista de valores no vive en el código sino en un CHECK de Postgres, o sea que el día que
   una migración añade uno, la pantalla pinta el identificador crudo y el build sigue en verde.
-  Pasó: `oferta_respuestas.canal` ganó `asistido` en `20270330100000` y la cola de aprobaciones
+  Pasó: `oferta_respuestas.canal` ganó `asistido` en `20260921160749` y la cola de aprobaciones
   estuvo enseñando **`od.ch_asistido`** en las dos lenguas —siendo además el canal más
   frecuente, porque el modelo de la fase inicial es asistido—. El bloque «las claves compuestas
   cubren todo el vocabulario de la base» es el único sitio donde el diccionario y el dominio se
@@ -3107,6 +3107,16 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   `20270328…`), así que el nombre local y la versión remota **discreparán** si no se corrige a
   mano: hay que renombrar el fichero local a la versión que devolvió el MCP en cuanto se aplica,
   o el repo y la base dejan de cuadrar (§ nota de memoria «acceso-supabase-por-mcp-no-por-cli»).
+  🔴 **Y ese renombrado TIENE UN PRECIO, porque el timestamp no es solo un nombre: es el orden
+  de aplicación.** Al traer una migración de una fecha de proyecto (`20270329…`) a su fecha real
+  (`20260921…`) se la mueve **hacia atrás**, y puede quedar por delante de las tablas que usa.
+  Pasó al renombrar las cinco de la vía asistida el 22-09-2026 (deuda 125): usan `enlaces_token`,
+  `albaranes`, `convenios` y `cierres_donante`, creadas en `20260928…`-`20270111…`, así que en un
+  entorno recreado desde cero se aplicarían antes de que existan. **Contra el remoto de hoy no
+  pasa nada** —ya están aplicadas y `db push` las ve al día—, y es el mismo fallo latente que
+  arrastra la FK `20260928100250` (§4). **Lo que evita el dilema es no llegar a él**: al aplicar
+  por MCP, renombrar **en el acto**, cuando la migración todavía es la última y su fecha real
+  sigue siendo mayor que todo lo demás.
   ✅ **Y el CLI NO está roto: lo que le faltaba era un `HOME` escribible** (21-09-2026). Dentro
   del sandbox de una sesión de Claude Code, `supabase` muere con
   `EPERM … /Users/<tu>/.supabase/telemetry.json.tmp` **antes de hacer nada**, y eso se leyó
@@ -3581,7 +3591,7 @@ El segundo factor (6 cifras, 10 min) es **solo** de la firma asistida. `enviar_c
 correo antes de escribir `codigo_hash`**: al revés, un fallo de correo dejaría el enlace exigiendo un
 código que nadie tiene. En un enlace por correo responde `409 no_cal_codi`.
 
-🔴 **Y desde el 21-09-2026 `iniciar_firma_asistida()` NO genera ese código** (`20270401100000`), que
+🔴 **Y desde el 21-09-2026 `iniciar_firma_asistida()` NO genera ese código** (`20260921161008`), que
 es lo que lo convierte en un segundo factor de verdad. Antes lo generaba y **se lo devolvía a quien
 conduce la firma**, que ya tiene el enlace: dos factores en la misma mano no son dos factores, son un
 actor con dos cosas. Y la interfaz lo empeoraba afirmando que «también se ha enviado por correo»
@@ -3601,7 +3611,7 @@ enviado por correo. `enviado_at = now()` se queda como estaba aunque aquí no se
 es incoherente con `acunar_enllac_propi()`, pero hay pantallas que leen esa fecha para decir «te lo
 mandamos el día X» y cambiarlo es otro trabajo con su propia verificación.
 
-**La confirmación de un albarán también tiene vía asistida** (`20270329100000`,
+**La confirmación de un albarán también tiene vía asistida** (`20260921160536`,
 `acunar_enllac_assistit` en §4bis). Hasta entonces no la tenía, y la consecuencia no era cosmética:
 `marcar_entregado()` inserta sin `canal` —o sea `'email'`— y `registrar_confirmacion()` nunca escribía
 `asistido_por`, así que **una confirmación conducida por teléfono quedaba documentada en el PDF como
@@ -3637,7 +3647,7 @@ dos mitades: solo con `canal='asistido'`, y leyendo la cuenta de la fila.
 
 ⚠️ **Y `panell` cambió de sitio**: iba en `p_payload` —«lo que respondió la persona»— y ahora va en
 `p_evidencia.payload`, que es lo que el servidor **constata** sobre el acto. Los funde
-`registrar_confirmacion()` con el segundo encima (`20270329100000`), igual que
+`registrar_confirmacion()` con el segundo encima (`20260921160536`), igual que
 `firmar_convenio_por_enlace` (`20270320100200`). Mezclar declarado y constatado en un mismo objeto es
 lo que hace que después nadie sepa cuál de los dos es.
 
@@ -4503,7 +4513,7 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 48 vivas, **41 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 49 vivas, **42 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero, interruptor de producción o decisión de negocio
 pendiente. §12bis separa **lo que es un defecto** de **lo que no lo es**.
 ⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
@@ -4552,8 +4562,9 @@ conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
-21, 55 y 69) y la revisión funcional en navegador (abre 119-124): **48 entradas vivas**
-(3 parciales 🟡 — 5, 69, 85 — y 45 abiertas) y **76 cerradas**, sobre 124 numerados — recontado
+21, 55 y 69) y la revisión funcional en navegador (abre 119-124, más la 125 del renombrado
+de migraciones): **49 entradas vivas**
+(3 parciales 🟡 — 5, 69, 85 — y 46 abiertas) y **76 cerradas**, sobre 125 numerados — recontado
 con `grep`/`comm` contra el fichero, no a mano. Esa revisión dejó además **cuatro arreglos sin
 número, porque se hicieron en el mismo cambio**: la clave i18n compuesta `od.ch_asistido`, la
 RLS que dejaba a la receptora sin ver el producto de sus entregas, el desmontaje de la pantalla
@@ -4896,11 +4907,11 @@ panel del equipo y en el externo).
     copia del cálculo (dos `gen_random_uuid()` + reloj → sha256 → base64url). Desde
     `20270318100000` existe `generar_token_enlace()` y lo nuevo la usa —`acunar_enllac_propi()`
     en esa misma migración, `signar_conveni_propi()` (`20270326100000`) y
-    `acunar_enllac_assistit()` (`20270329100000`)—, pero las tres viejas se quedan como están:
+    `acunar_enllac_assistit()` (`20260921160536`)—, pero las tres viejas se quedan como están:
     **editar una migración aplicada está prohibido** (§7). Se unifican el día que alguna se recree
     por otro motivo.
     ⚠️ **Y una de las tres SÍ se recreó por otro motivo, y siguió sin usarla** (verificado el
-    22-09-2026): `iniciar_firma_asistida()` se reescribió el `20270401100000`
+    22-09-2026): `iniciar_firma_asistida()` se reescribió el `20260921161008`
     (`firma_assistida_sense_codi.sql:59`) —después de que `generar_token_enlace()` ya existiera—
     y mantuvo su generación inline en vez de adoptarla. No es solo que tres migraciones antiguas
     quedaran quietas: una se tocó más tarde con `generar_token_enlace()` ya disponible y decidió
@@ -5048,9 +5059,33 @@ panel del equipo y en el externo).
      descarta el diálogo y «Cancel·lar oferta» ejecuta la anulación: uno deshace y el otro es
      la acción destructiva, y se leen casi igual.
 
+125. 🔴 **Las cinco migraciones de la vía asistida están ahora ANTES de las tablas que usan.**
+     Se renombraron el 22-09-2026 de su fecha de proyecto (`20270329100000`…`20270402100000`) a
+     la fecha real con la que quedaron registradas al aplicarlas por MCP
+     (`20260921160536`…`20260921171041`), que es lo que pide §7 y lo que hace que `db push` vea
+     cero pendientes en vez de cinco. **El precio, decidido con el cliente sabiendo cuál era**:
+     cuatro de las cinco usan `enlaces_token`/`evidencias` (`20260928100300`), `albaranes` y
+     `espigoladas` (`20261012100*`), `cierres_donante` (`20261109100000`) y `convenios`
+     (`20270111100000`), todas con timestamp **mayor**, así que en un entorno recreado desde
+     cero se aplicarían antes de que esas tablas existan y fallarían.
+     ⚠️ **Contra el remoto de hoy no cambia nada**: las cinco están aplicadas y el historial
+     cuadra. Es un fallo **latente**, igual que el de la FK `20260928100250` (§4), y con el
+     mismo destapador: el día que alguien monte un proyecto nuevo desde las migraciones. Sin
+     stack local (§7) no hay forma barata de comprobarlo.
+     ⚠️ La alternativa que lo habría evitado era la contraria —corregir el historial remoto para
+     que llevara las versiones de proyecto, dejando los ficheros donde estaban— y se descartó
+     explícitamente: tocar `schema_migrations` por algo que no rompe nada hoy se consideró peor.
+     Si algún día hay que recrear desde cero, la salida es renumerar las cinco por encima de
+     `20270111100000` y arreglar el historial remoto en la misma operación.
+     ⚠️ Y queda **una referencia que no se pudo actualizar**: `20260921231950_rpc_diagnostic.sql`
+     cita `20270402100000` en un comentario, y es una migración aplicada — editarla está
+     prohibido (§7). Las demás referencias del repo sí se actualizaron; de paso se corrigieron
+     cuatro comentarios de `comprobar-rls.ts` que citaban esa migración hablando del **borrado de
+     ficha**, que es `20260921153439`.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **35 de las 42**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **42 de las 49**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -5084,6 +5119,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
 | 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
+| 125 | Las cinco migraciones de la vía asistida llevan su fecha real, no la de proyecto | Repo y base cuadran y `db push` ve cero pendientes, pero cuatro de ellas quedan por delante de las tablas que usan: una recreación **desde cero** fallaría. Hoy no cambia nada —están aplicadas— y la alternativa (tocar `schema_migrations`) se descartó explícitamente |
 | 21 | Sin fallback a correo dentro de `whatsapp-send`; el intake no tiene equivalente por correo | El primero es diseño (lo orquesta el llamante, que sabe qué texto tiene sentido); el segundo no puede tenerlo: no hay sesión de intake sin WhatsApp. La vía sin WhatsApp es el panel (§6ter) |
 | 55 | El GRANT de columna se puede reabrir con un `grant select on all tables` masivo | Ya son 5 de 5 columnas sensibles con check dedicado en el arnés (14-09-2026). La causa de fondo —`alter default privileges` de Supabase concede SELECT a tabla nueva salvo `revoke` explícito— es de la plataforma, no del repo: la vigilancia es la única defensa posible |
 
@@ -5289,7 +5325,7 @@ se va solo **cómo se llegó hasta aquí**.
    que se pierde —«ver dos paneles a la vez no es ver dos veces la base»— hoy no la comprueba
    nadie, y se anota como tal en la cabecera de `scripts/comprobar-rls.ts`.
    Antes de eso eran 713/713 + 14: las 686 anteriores más **27**, de la vía asistida
-   (`20270329100000`…`20270401100000`): tres checks en `DOCUMENTAL_EXTERN` —que recorre
+   (`20260921160536`…`20260921161008`): tres checks en `DOCUMENTAL_EXTERN` —que recorre
    **siete** cuentas externas, de ahí 21— y los mismos tres en los dos bloques de equipo.
    ⚠️ Los tres «permitir» se llaman con un uuid **inexistente** a propósito: lo que afirman
    es que la guarda de ROL deja pasar, no que la operación se complete.
