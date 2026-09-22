@@ -107,9 +107,13 @@ type Registre = Pick<Membresia, 'id' | 'user_id' | 'tipo' | 'rol_org' | 'created
 
 /**
  * Una organización que ya consta y que podría ser la misma que la de esta ficha.
- * La calcula `organitzacions_candidates()` al vuelo (correo o teléfono exactos, nunca el
- * nombre); `enllacable` es false cuando esa organización YA tiene ficha de este tipo, que
- * es un duplicado y no un papel nuevo.
+ * La calcula `organitzacions_candidates()` al vuelo: correo, teléfono o NIF exactos, o nombre
+ * con similitud alta (D3 del plan de organización unificada, 22-09-2026). `enllacable` es false
+ * cuando esa organización YA tiene ficha de este tipo, que es un duplicado y no un papel nuevo.
+ *
+ * `motius` es un array, no un único valor: con tres señales fuertes (correo, teléfono, NIF) más
+ * el nombre, enumerar cada combinación a mano habría sido ocho frases distintas. El frontend une
+ * las etiquetas de cada motivo con comas.
  */
 interface Candidat {
   organitzacio: string
@@ -120,7 +124,9 @@ interface Candidat {
   poblacio: string | null
   es_generadora: boolean
   es_receptora: boolean
-  motiu: 'email' | 'telefon' | 'email_i_telefon'
+  motius: ('email' | 'telefon' | 'nif' | 'nom_semblant')[]
+  /** Solo viaja cuando `nom_semblant` está entre los motivos; el resto no se miden en escala. */
+  similitud: number | null
   enllacable: boolean
 }
 
@@ -557,7 +563,11 @@ export default function Aprovacions() {
                           {(candidats[r.id] ?? []).map((c) => (
                             <li key={c.organitzacio} className="flex flex-wrap items-center gap-x-2 gap-y-1">
                               <span className="font-medium">{c.nom || '—'}</span>
-                              <span>· {t(`appr.link_why_${c.motiu}`)}</span>
+                              <span>
+                                · {c.motius.map((m) => t(`appr.link_why_${m}`)).join(', ')}
+                                {/* Solo el nombre se mide en escala: el resto son sí/no. */}
+                                {c.similitud != null && ` (${Math.round(c.similitud * 100)}%)`}
+                              </span>
                               {c.enllacable ? (
                                 <Button size="sm" variant="outline" className="h-8 whitespace-normal"
                                   disabled={!potAprovar || ocupat === r.id}

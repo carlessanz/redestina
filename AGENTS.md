@@ -771,6 +771,11 @@ una fusión con riesgo de juntar lo que no va junto.
 ⚠️ **El criterio de enganche es correo o teléfono, nunca el parecido del nombre.** Juntar dos
 organizaciones distintas significa mezclar los kilos y el certificado fiscal de dos donantes: se
 prefiere dejar dos filas separadas —el estado de hoy, que funciona— a arriesgar una fusión mala.
+**Sigue valiendo tal cual para el relleno inicial y para `registro`** (el alta self-service, que
+no cambió); no vale ya para `organitzacions_candidates()`, que desde el 22-09-2026 añade NIF
+exacto y nombre por similitud calibrada (D3, ver más abajo) — y aun así **nunca fusiona sola**:
+solo sugiere, al equipo, que decide con `enllacar_organitzacio()`. La frase de arriba sigue
+siendo la razón de fondo por la que el nombre no se usó a la ligera: se calibró primero.
 
 ⚠️ **El relleno inicial no basta, y esto casi se escapa.** `20270310100000` rellenó las 464
 fichas que había **en ese momento** y ahí se acababa: cualquier ficha creada después —un alta desde
@@ -1703,7 +1708,7 @@ funciones, no políticas:
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
 | `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló |
-| `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo** con el criterio de siempre —correo o teléfono exactos, nunca el nombre—. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
+| `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo**: correo, teléfono o **NIF** exactos, o **nombre con similitud ≥ 0,65** (`pg_trgm`, D3 del plan de organización unificada, 22-09-2026). Devuelve `motius text[]` —no un único valor: con cuatro señales, nombrar cada combinación a mano habría sido dieciséis frases— y `similitud numeric`, que solo lleva valor cuando `nom_semblant` cuenta. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
 | `enllacar_organitzacio(tipo, ficha, organitzacio)` | **Fusiona**: mueve la ficha —y sus convenios, solo los suyos— a esa organización y retira la que deja vacía. `pot_aprovar()`. Se niega con el motivo si el destino ya tiene ficha de ese tipo o si las dos traen convenio vigente del mismo tipo. Con `organitzacio` NULL **separa** la ficha en una organización nueva, que es el deshacer |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
 | `borrar_ficha_completa(tipo, ficha, tambe_germana default false)` (`20260921153439`) | **EL** camino de borrado de una ficha (§4 «Borrado de una ficha»). Se niega con el motivo si hay documentos, albaranes o cierres (`22023 bloqueig_esborrat: <codis>`, con el texto legible en `details`); si no, arrastra lo operativo, borra la ficha y **retira la organización si queda vacía**. Con `tambe_germana`, las dos fichas del doble rol en la **misma transacción** — que es lo que hoy no garantiza el panel con sus dos `.delete()` sueltos. **`es_super_admin()`**, como las políticas de `delete` que sustituye; `42501 no_autoritzat` si no. Devuelve `jsonb` con lo borrado y `fitxers_orfes`, las rutas de Storage que SQL no puede retirar |
