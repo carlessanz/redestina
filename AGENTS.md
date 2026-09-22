@@ -4410,8 +4410,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **46 entradas vivas** (6 parciales 🟡 y 40 abiertas) y **69 cerradas**,
-sobre 115 numeradas. Las cuatro últimas son de esta tanda —113 y 114 del certificado de
+Estado al 22-09-2026: **48 entradas vivas** (6 parciales 🟡 y 42 abiertas) y **69 cerradas**,
+sobre 117 numeradas. Las cuatro últimas son de esta tanda —113 y 114 del certificado de
 recepción, 115 y 116 del diagnóstico— y las cuatro nacen catalogadas en §12bis: dos como
 decisiones con su precio y dos como espera de material de la fase 0.
 
@@ -4793,6 +4793,31 @@ decisiones con su precio y dos como espera de material de la fase 0.
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
+117. 🔴 **Nada de lo publicado el 22-09-2026 se ha medido en un navegador.** Las pantallas de
+     F2, F3, F4 y F5 se revisaron **de forma estática**: ni los agentes ni la sesión que
+     orquestó tenían navegador, porque el sandbox de Claude Code **bloquea `listen` con
+     `EPERM`** (no arrancan `npm run dev`, `vite` ni `preview`) y **mata Chromium al lanzarlo**
+     (`bootstrap_check_in … Permission denied (1100)`, el Mach port que necesita). O sea que la
+     referencia de §2 —«0 px de desbordamiento a 320/360/390 en todas las rutas»— **no está
+     comprobada para lo nuevo**. Importa porque esto ya mordió una vez: la barra inferior pedía
+     347 px a 320 y no lo vio nadie durante meses, porque la auditoría de entonces midió el
+     desbordamiento de la PÁGINA y no el del `nav ul` (§2). Lo que hay que medir, en orden:
+     `AvisDiagnostic` con su botón de descarte (cuatro elementos en una fila), los once
+     `SelectTrigger` que pasaron a `w-full`, `FormulariDiagnostic` entero, `TriaPaper` en
+     Configuració, la celda de `OffersList` con dos badges, la marca del menú sobre el verde del
+     sidebar y `/verificar/:codi`. Se hace desde una sesión **sin sandbox**, con Playwright, y
+     mirando `nav ul` (`scrollWidth` vs `clientWidth`), no solo `document.documentElement`.
+118. **Cinco migraciones están registradas DOS VECES en el historial remoto.**
+     `confirmacio_assistida`, `interes_assistit`, `canalitzacio_assistida_lectura`,
+     `firma_assistida_sense_codi` y `canalitzacions_actives_ambigua` aparecen con su fecha real
+     (`20260921160536`…`20260921171041`) **y** con su fecha de proyecto
+     (`20270329100000`…`20270402100000`). Viene de una sesión del 21-09 que las aplicó por MCP y
+     además las registró con el nombre del fichero (§7). **Es inocuo** —el SQL de las cinco es
+     `create or replace`, así que aplicarlo dos veces da el mismo resultado— pero el historial
+     afirma que se aplicaron diez migraciones donde hubo cinco. Se limpia borrando las cinco
+     filas duplicadas de `supabase_migrations.schema_migrations`, y no se ha hecho porque tocar
+     ese historial sin necesidad es peor que la incoherencia que arregla.
+
 115. **El cuestionario de diagnóstico, las 20 medidas y las 32 reglas son texto de trabajo
      SIN validar por la Fundació.** Es la misma decisión que los seis convenios
      (`20270111100200`) y el mismo precio: se emite con `provisional = true`, **sale impreso en
@@ -4898,7 +4923,7 @@ lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 código** —comentarios en `src/`, `scripts/`, Edge Functions y migraciones **ya aplicadas, que no se
 pueden editar** (§7)—. Un `(deuda 51)` en `limpiar-documentos-prueba/index.ts` tiene que poder
 resolverse a algo; sin esta tabla apuntaría a la nada. Y sirve para lo segundo: **un número
-retirado no se reutiliza**, así que la siguiente entrada nueva es la 117.
+retirado no se reutiliza**, así que la siguiente entrada nueva es la 119.
 
 ⚠️ **Lo que una entrada cerrada enseñaba y sigue siendo cierto NO está aquí: se movió a su
 sección.** Al retirarlas se rescataron tres cosas que solo vivían dentro de la lista — las dos
