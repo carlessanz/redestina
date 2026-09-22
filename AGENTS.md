@@ -85,6 +85,13 @@ migraciones, funciones, pantallas, arnés y aceptación, y el modelo de trabajo 
 `.claude/agents/`— está en `3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md` (aprobado
 el 10-09-2026; el código arranca con el spike del 21/09).
 
+⚠️ Y en `3. Claude Code/2026-09-22-plan-organizacion-unificada.md` está el plan de la otra brecha
+mayor todavía viva, la **organización unificada multirol** de §1bis: siete de sus ocho sub-deudas
+originales (11, 20, 22, 27, 28, 31, 79) ya están cerradas y la octava (16) también, así que lo que
+queda no es una lista de bugs sino una decisión de modelo de datos —`usuario`/`rol_organizacion`
+propios, una organización con campos suyos, deduplicación que no dependa de correo/teléfono
+exactos—. Análisis del estado real por consumidor y fases propuestas, sin código todavía.
+
 La **documentación generada para la consultoría** (informes, análisis, propuestas) no va a `docs/`
 sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/`
 (acceso por `additionalDirectories` en `.claude/settings.local.json`; reglas en `CLAUDE.md`,
@@ -147,7 +154,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 
 | Objetivo (funcional) | Hoy (repo) | Estado |
 | --- | --- | --- |
-| `organizacion` multirol única | `productores` + `entidades` (2 tablas, sin multirol; doble rol por teléfono + prioridad del webhook) | 🟡 |
+| `organizacion` multirol única | `productores` + `entidades` (2 tablas) con `organizaciones` como identidad común (§4): doble rol se detecta por `organizacion_id`, no por teléfono; registro deduplica antes de crear (§12.28, cerrada). Falta el resto: `usuario`/`rol_organizacion` propios y una organización con campos suyos más allá de `canal_preferido` | 🟡 |
 | `usuario` de organización | `perfiles` + `membresias` (vincula la cuenta con su ficha; §4bis) | ✅ |
 | `rol_organizacion` | `membresias.rol_org` (titular/operador) + `usuario_roles` de plataforma | 🟡 |
 | `convenio` de colaboración | `convenios` + `convenios_exigidos`, con firma por enlace, contrafirma y campaña (§4) | ✅ |
@@ -180,11 +187,18 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
 
 **Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
-**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **en curso**:
-la identidad existe y cada ficha cuelga de la suya (`organizaciones` + `v_organizaciones`, §4), con
-el trigger que garantiza que las nuevas también (`20270313100000`); los **convenios** ya son de la
-organización y no de la ficha (§12.79), y una cuenta tiene **una ficha de cada tipo** (§12.31).
-Faltan los consumidores de WhatsApp y del registro (§12.16, §12.28) → ~~(3) back office~~ y
+**resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **en curso, y más
+avanzada de lo que este párrafo llegó a decir**: la identidad existe y cada ficha cuelga de la
+suya (`organizaciones` + `v_organizaciones`, §4), con el trigger que garantiza que las nuevas
+también (`20270313100000`); los **convenios** ya son de la organización y no de la ficha
+(§12.79); una cuenta tiene **una ficha de cada tipo** (§12.31); **el registro ya deduplica**
+antes de crear (§12.28, cerrada `20270315100000` — hasta el 22-09-2026 este párrafo seguía
+diciendo que faltaba); y **WhatsApp ya distingue las dos fichas por `organizacion_id`**, no por
+teléfono (§12.16, cerrada). Lo que queda no es ningún consumidor concreto: es el resto del
+modelo objetivo —`usuario`/`rol_organizacion` propios, una organización con campos suyos más
+allá de `canal_preferido`, deduplicación que no dependa de correo/teléfono exactos—, sin
+desglosar en deudas numeradas. Su plan vive en
+`3. Claude Code/2026-09-22-plan-organizacion-unificada.md` (§1) → ~~(3) back office~~ y
 ~~(4) onboarding~~ **resueltas** (cola de aprobaciones con tres colas, alta self-service y convenio
 en el registro) → (5) demandas → ~~(6) albaranes/conciliación real y certificados~~ **resueltos**
 (fases 3, 4 y 5 del sistema documental: §4) → (7) notificaciones + encuestas → (8) adjuntos de
@@ -196,10 +210,10 @@ WhatsApp → ~~(9) diagnóstico/planes~~ 🟡 (la estructura está; **falta el c
 la asesoría (los ocho tipos de documento y los tres convenios), los datos fiscales reales de
 Espigoladors con la firma y el sello de la apoderada, las taras por tipo de caja, los costes por kilo
 del ejercicio y el cuestionario de diagnóstico. Todo el circuito funciona con valores provisionales
-**marcados como tales**, y el certificado se niega a emitirse mientras lo sean. La más urgente ahora sigue siendo la **organización unificada multirol**, ya con
-su etapa 1 hecha: la clave común existe (`organizaciones`, §4), y lo que falta es que los
-consumidores la usen — empezando por el registro público, que es quien no podía detectar que una
-organización ya existe (deuda §12.28).
+**marcados como tales**, y el certificado se niega a emitirse mientras lo sean. Aparte de eso, la
+brecha con más trabajo real por delante sigue siendo la **organización unificada multirol** — no
+porque falte poco, sino porque lo que falta es una decisión de modelo de datos, no un consumidor
+suelto (ver el plan citado arriba).
 
 ## 2. Stack
 
@@ -764,9 +778,19 @@ Lo que mantiene la invariante es el trigger `*_estrena_organizacion` (`202703131
 `not null`: el primero la rellena, el segundo hace que no se pueda saltar. **Migrar los datos y
 mantener la invariante son dos cosas distintas**, y un `update` de relleno solo hace la primera.
 
-🟡 **La etapa 1 no cerraba ninguna deuda por sí sola**: desbloqueaba las ocho de la brecha 2
-(11, 16, 20, 22, 27, 28, 31, 79). Cerradas ya **31** (una ficha por tipo, `20270311100000`) y **79**
-(convenios por organización, `20270312100000`); las otras seis siguen necesitando su trabajo encima.
+✅ **La etapa 1 no cerraba ninguna deuda por sí sola, y hoy ya las cerró todas** — corregido
+el 22-09-2026: este párrafo llegó a decir «las otras seis siguen necesitando su trabajo encima»
+mucho después de que dejara de ser cierto. Desbloqueaba las ocho de la brecha 2 (11, 16, 20, 22,
+27, 28, 31, 79) y las ocho están resueltas: **31** (una ficha por tipo, `20270311100000`), **79**
+(convenios por organización, `20270312100000`), **11** (FK `wa_messages`↔contacto,
+`20270321100000`), **20** (rol único por usuario, `20270311100000`), **22** (preferencia de canal,
+11-09-2026), **28** (el registro deduplica, `20270315100000`) y **16** (WhatsApp distingue las dos
+fichas por `organizacion_id`, 11-09-2026); **27** se reclasificó como decisión deliberada, no
+defecto (§12bis). ⚠️ **Que las ocho sub-deudas estén cerradas no cierra la brecha 2**: lo que
+queda —`usuario`/`rol_organizacion` propios, una organización con campos suyos, y que TODOS los
+consumidores (no solo el registro) traten `organizaciones` como la identidad— es trabajo de
+arquitectura sin desglosar en números, no un bug con ficha propia. Su plan vive en
+`3. Claude Code/2026-09-22-plan-organizacion-unificada.md` (§1).
 
 **`entidades`** — entidades sociales receptoras (25 columnas del Excel SDA). Los tres campos
 de capacidad (`productes_frescos`, `transport_plataforma`, `descarrega_toro`) vienen como
@@ -4428,13 +4452,28 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 39 vivas, **32 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 47 vivas, **39 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero o interruptor de producción. §12bis separa **lo que
 es un defecto** de **lo que no lo es**.
+⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
+decía «39 vivas, 32 catalogadas» mientras el cuerpo real ya tenía 47 y §12bis catalogaba 39 —dos
+huecos de conteo distintos, uno por cada número—. Se descubrió el 22-09-2026 al cerrar la entrada
+16 y comprobar la cuenta a mano en vez de aritmética heredada. La lección: **una cifra de
+recuento no se corrige a ojo al cerrar una entrada, se recuenta con `grep`/`comm` contra el
+fichero**, porque sumar y restar de memoria es exactamente cómo se llegó a este desajuste.
 
-**Las 7 que NO están catalogadas son las únicas que describen trabajo pendiente**: las seis
-parciales (5, 14, 21, 33, 55, 69) y la 16, que es la brecha 2 de §1bis vista desde el código. De
-cada una, la mitad hecha está contada dentro; lo que queda se explica ahí mismo.
+**Las 8 que NO están catalogadas son las que describen trabajo pendiente de verdad**: las seis
+parciales (5, 14, 21, 33, 55, 69) —de cada una, la mitad hecha está contada dentro; lo que queda
+se explica ahí mismo— más **112** (los borradores sin número de `cierres_periodo` se acumulan sin
+limpieza) y **118** (cinco migraciones duplicadas en el historial remoto, inocuo pero sin
+limpiar). Las dos últimas no tenían por qué faltar en esta lista —son tan benignas como varias de
+las catalogadas en §12bis— y se quedaron fuera solo porque nadie las volvió a mirar; quien las
+cierre o las catalogue, que actualice esta línea a mano.
+⚠️ La 16 —que hasta el 22-09-2026 figuraba aquí como «la brecha 2 de §1bis vista desde el
+código»— se cerró ese día: su propio cuerpo solo describía arreglos ya hechos (11-09-2026), y lo
+que de verdad queda de la brecha 2 —`usuario`/`rol_organizacion` propios, deduplicación sin
+depender de correo/teléfono exactos— es arquitectura sin desglosar en un número, no un bug con
+ficha propia. Su plan vive en `3. Claude Code/2026-09-22-plan-organizacion-unificada.md` (§1).
 
 🔴 **Los números no se renumeran NUNCA, y borrar tampoco los libera.** Hay comentarios en `src/`,
 `supabase/functions/`, `scripts/` y `tests/` que citan **69** de ellos —48 apuntan a entradas ya
@@ -4442,13 +4481,16 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **47 entradas vivas** (6 parciales 🟡 y 41 abiertas) y **70 cerradas**,
-sobre 118 numeradas. Cuatro son de la tanda de F2-F5 —113 y 114 del certificado de recepción,
-115 y 116 del diagnóstico— y las cuatro nacen catalogadas en §12bis: dos como decisiones con su
-precio y dos como espera de material de la fase 0. La **117 se cerró ese mismo día**, midiendo
-en un navegador de verdad las catorce rutas que pedía —el navegador integrado de la aplicación
-de Claude, no Playwright: §2 (regla 4) y §6ter (`AvisDiagnostic`) cuentan los dos defectos que
-salieron, arreglados en el mismo cambio—.
+Estado al 22-09-2026: **47 entradas vivas** (7 parciales 🟡 y 40 abiertas) y **71 cerradas**,
+sobre 118 numeradas — recontado a mano el mismo día tras encontrar el desajuste de arriba; **85**
+es la séptima parcial, y se había quedado fuera de la cuenta desde siempre. Cuatro son de la
+tanda de F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro
+nacen catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de
+la fase 0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce
+rutas que pedía —el navegador integrado de la aplicación de Claude, no Playwright: §2 (regla 4) y
+§6ter (`AvisDiagnostic`) cuentan los dos defectos que salieron, arreglados en el mismo cambio—.
+Y la **16 se cerró horas después**, al auditar qué quedaba de verdad de la brecha 2 (§1bis):
+llevaba desde el 11-09-2026 con su trabajo hecho y sin nadie que lo marcara.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4507,26 +4549,6 @@ salieron, arreglados en el mismo cambio—.
     —el castellano «de acuerdo» no está (sí el catalán `d'acord`)— y una frontera arbitraria en
     las 5 palabras: «no ens va bé això» se clasifica y «no ens va gens bé això» no.
 
-16. **Doble rol** productor+entidad (Carles Sanz, Sebas Sale, Raquel Diaz, Laura Masdeu): tablas
-    separadas sin FK, un teléfono puede estar en ambas. En el **panel** está resuelto (§6ter), y
-    desde la etapa 1 de `organizaciones` el sistema **sabe** que las dos fichas son la misma
-    organización (comparando `organizacion_id`) en vez de deducirlo de que compartan teléfono.
-    En **WhatsApp** manda desde el 11-09-2026 la regla «**un mensaje contesta a la última pregunta
-    que le hicimos**» (`atendreElDialeg()`, pura, en `_shared/respuestas.ts`): la oferta pendiente
-    sigue teniendo prioridad sobre el intake —es una pregunta concreta y ya hecha—, **salvo que el
-    intake haya hablado después** de enviarse la oferta (`intake_sessions.updated_at` >
-    `oferta_respuestas.enviado_at`).
-    ⚠️ **Lo que arregló, medido**: de 17 respuestas plausibles a preguntas del intake, `clasificar()`
-    resuelve **7** como sí/no («no ho sé» a la varietat, «No» a les observacions, «Sí» escrit a
-    `retorn`, «ok matins» a l'horari…), y cada una cerraba la oferta con una respuesta dirigida a
-    otra pregunta. La que aceptaba abría el paso `kg`, que consume **todos** los mensajes siguientes
-    y **no caducaba nunca**, así que dejaba el número **secuestrado de forma permanente**: ese
-    productor no podía volver a publicar nada por WhatsApp. Ahora el diálogo caduca a las 12 h como
-    el intake (marca en `dialeg_dades.darrer_missatge_at`, jsonb que ya existía); caducar **no
-    resuelve la fila** —sigue `pendent` para el panel—, solo libera el número.
-    La organización **no decide nada aquí** —la elección depende de qué se preguntó el último— pero
-    sí se **registra** en el log a quién se está atendiendo y si las dos fichas son la misma
-    organización, que antes era indistinguible de dos organizaciones con el mismo teléfono.
 17. Coexisten dos gates: **`es_test`** (fuente de verdad de la app, §8) y las whitelists
     `meta_test_recipients`/`email_test_recipients` (requisito técnico de Meta en test). En test un
     destinatario debe cumplir **ambos**; se inicializaron alineados. Desde el 15-09-2026 el Dashboard
@@ -4937,7 +4959,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **70** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **71** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -4965,6 +4987,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 11 | Sin FK entre `productores`, `wa_contacts` y `wa_messages` | `20270321100000` |
 | 13 | `oferta_respuestas` se registra desde el cliente | 14-09-2026 |
 | 15 | La selección de plantilla de primer contacto por rol no se ejercita en test | 11-09-2026 |
+| 16 | Doble rol productor+entidad: WhatsApp no distinguía las dos fichas, un secuestro de número | 11-09-2026 |
 | 18 | Aprobación sin roles | 30-07-2026 |
 | 19 | `OfferDetail` aprueba a mano, con llamadas sueltas en vez de `aprovar_resposta()` | 11-09-2026 |
 | 20 | Rol único por usuario | `20270311100000` |
