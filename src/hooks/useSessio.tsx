@@ -39,7 +39,16 @@ export function SessioProvider({ children }: { children: ReactNode }) {
     })
     const { data: sub } = supabase.auth.onAuthStateChange((evento, nova) => {
       if (evento === 'PASSWORD_RECOVERY') setEsRecovery(true)
-      setSession(nova)
+      // Se conserva el objeto anterior cuando la sesión es LA MISMA. supabase-js emite
+      // varios eventos por token (INITIAL_SESSION, SIGNED_IN al volver a la pestaña,
+      // TOKEN_REFRESHED) y cada uno trae un objeto nuevo: guardarlo tal cual cambiaba la
+      // identidad del contexto y re-renderizaba la aplicación entera —este provider
+      // envuelve la parte pública y la privada— sin que nada hubiera cambiado de verdad.
+      // Devolver `prev` hace que React no re-renderice nada.
+      setSession((prev) =>
+        prev?.access_token === nova?.access_token && prev?.user?.id === nova?.user?.id
+          ? prev
+          : nova)
     })
     return () => sub.subscription.unsubscribe()
   }, [])

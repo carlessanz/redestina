@@ -52,13 +52,34 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   // arranca mientras esta espera, la vieja no pisa el contexto al terminar.
   const darrera = useRef(0)
 
+  // 🔴 SOLO LA PRIMERA CARGA PUEDE ENCENDER `carregant`, y no es un detalle de eficiencia.
+  //
+  // `RoleGuard` y `ArrelPerRol` hacen `if (carregant) return <Carregant />`, así que
+  // mientras vale `true` el `<Outlet/>` NO está montado: la pantalla entera se desmonta y
+  // se vuelve a montar con estado nuevo. Cada recarga del contexto costaba, por tanto, un
+  // ciclo completo de peticiones de la pantalla que estuvieras mirando —medido en
+  // producción el 22-09-2026: **50 peticiones** para abrir el detalle de una oferta, con
+  // `excedentes` 13 veces y la Edge Function `priorizar-entidades` 5, a ~1,4 s cada una—.
+  // Y se llevaba por delante cualquier diálogo abierto, porque su `open` es estado local.
+  //
+  // Una recarga posterior no necesita bloquear nada: ya hay un contexto servido y lo único
+  // que puede pasar es que se sustituya por otro. Quien sí lo necesita es la primera, que
+  // no tiene qué enseñar todavía.
+  const primera = useRef(true)
+
+  // Con qué cuenta se cargó el contexto que hay puesto. Es lo que distingue «han cambiado
+  // de usuario» de «supabase-js ha vuelto a emitir SIGNED_IN por lo suyo».
+  const usuariCarregat = useRef<string | null>(null)
+
   const carrega = useCallback(async () => {
     const n = ++darrera.current
-    setCarregant(true)
+    if (primera.current) setCarregant(true)
     const { data: sessio } = await supabase.auth.getSession()
     const usuari = sessio.session?.user
     if (n !== darrera.current) return
     if (!usuari) {
+      usuariCarregat.current = null
+      primera.current = false
       setCtx(null)
       setCarregant(false)
       return
@@ -75,6 +96,8 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     }
 
     if (n !== darrera.current) return
+    usuariCarregat.current = usuari.id
+    primera.current = false
     setCtx(nou)
     setCarregant(false)
   }, [])
@@ -82,8 +105,18 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     void carrega()
     // Al cambiar de cuenta hay que recargar el contexto entero, no solo la sesión.
-    const { data: sub } = supabase.auth.onAuthStateChange((evento) => {
-      if (evento === 'SIGNED_IN' || evento === 'SIGNED_OUT') void carrega()
+    //
+    // ⚠️ `SIGNED_IN` NO significa «alguien acaba de entrar». supabase-js lo emite también
+    // al recuperar la sesión del almacenamiento y al volver a la pestaña, así que tratarlo
+    // como un cambio de cuenta hacía recargar el contexto una y otra vez sobre el mismo
+    // usuario. Con el desmontaje de arriba, cada una de esas emisiones recargaba la
+    // pantalla entera. Lo que de verdad hay que mirar es si el usuario es OTRO.
+    const { data: sub } = supabase.auth.onAuthStateChange((evento, sessio) => {
+      if (evento === 'SIGNED_OUT') { void carrega(); return }
+      if (evento !== 'SIGNED_IN') return
+      const id = sessio?.user?.id ?? null
+      if (id !== null && id === usuariCarregat.current) return
+      void carrega()
     })
     return () => sub.subscription.unsubscribe()
   }, [carrega])

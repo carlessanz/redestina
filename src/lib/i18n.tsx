@@ -276,7 +276,13 @@ const ca: Dict = {
   'od.responses': 'Interès de les entitats',
   'od.resp_none': 'Encara no s’ha enviat cap oferta a cap entitat.',
   'od.rs_pendent': 'Sense resposta', 'od.rs_acceptada': 'Interessada', 'od.rs_rebutjada': 'No interessada',
+  // Els QUATRE canals de `oferta_respuestas.canal`, no tres: `asistido` és el de
+  // `manifestar_interes_assistit()` i és el més freqüent, perquè el model de la fase
+  // inicial és assistit (§1bis). La clau es compon —`t(`od.ch_${canal}`)`— així que
+  // `tests/cobertura.test.ts` no la veu: qui la vigila és `tests/i18n.test.ts`.
   'od.ch_whatsapp': 'WhatsApp', 'od.ch_email': 'Correu', 'od.ch_panel': 'Panell',
+  'od.ch_asistido': 'Assistit',
+  'od.sense_conveni': 'Li falta el conveni per rebre aquesta oferta: es pot enviar, però aprovar-la fallarà fins que el signi.',
   'od.not_found': 'Aquesta oferta no existeix o no hi tens accés.',
   'od.rs_accept': 'Marcar acceptada', 'od.rs_reject': 'Marcar rebutjada',
   'od.rs_kg': 'kg sol·licitats', 'od.rs_preu': '€/kg',
@@ -2175,6 +2181,8 @@ const es: Dict = {
   'od.resp_none': 'Aún no se ha enviado ninguna oferta a ninguna entidad.',
   'od.rs_pendent': 'Sin respuesta', 'od.rs_acceptada': 'Interesada', 'od.rs_rebutjada': 'No interesada',
   'od.ch_whatsapp': 'WhatsApp', 'od.ch_email': 'Email', 'od.ch_panel': 'Panel',
+  'od.ch_asistido': 'Asistido',
+  'od.sense_conveni': 'Le falta el convenio para recibir esta oferta: se puede enviar, pero aprobarla fallará hasta que lo firme.',
   'od.not_found': 'Esta oferta no existe o no tienes acceso.',
   'od.rs_accept': 'Marcar aceptada', 'od.rs_reject': 'Marcar rechazada',
   'od.rs_kg': 'kg solicitados', 'od.rs_preu': '€/kg',

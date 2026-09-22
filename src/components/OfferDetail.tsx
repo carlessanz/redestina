@@ -731,6 +731,15 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                         <span className="text-aviso"> · {t('od.canal_pref_no', { canal: t(`od.canal_${ent.canal_preferit}`) })}</span>
                       )}
                     </div>
+                    {/* El servidor ya dice a quién le falta el papel para poder recibir
+                        ESTA oferta, y hasta hoy la pantalla lo tiraba: se enviaba igual y
+                        el rechazo (`42501 sense_conveni`) aparecía al aprobar, cuando ya
+                        se había gastado el envío y la respuesta de la entidad.
+                        Va en `aviso` y no en rojo: enviar no está prohibido —el convenio
+                        puede firmarse entremedias— lo que falla es aprobar. */}
+                    {ent.sense_conveni && (
+                      <div className="mt-1 text-xs text-aviso">{t('od.sense_conveni')}</div>
+                    )}
                   </div>
                 </div>
                 <div className="flex items-center gap-2">

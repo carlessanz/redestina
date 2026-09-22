@@ -132,3 +132,39 @@ describe('la convención de singular', () => {
     }
   })
 })
+
+// ---------------------------------------------------------------------------
+// Las claves que se COMPONEN a partir de un valor de la base
+// ---------------------------------------------------------------------------
+// `cobertura.test.ts` recorre los literales `t('…')` del código, así que no ve una clave
+// montada con una plantilla: `t(`od.ch_${fila.canal}`)`. Y ahí es justo donde el
+// diccionario se queda corto en silencio, porque la lista de valores no vive en el código
+// sino en un CHECK de Postgres: el día que una migración añade un valor, la pantalla
+// empieza a pintar el identificador crudo y el build sigue en verde.
+//
+// Pasó de verdad: `oferta_respuestas.canal` ganó `asistido` en `20270330100000` y durante
+// meses la cola de aprobaciones enseñó `od.ch_asistido` en las dos lenguas, que además es
+// el canal MÁS frecuente porque el modelo de la fase inicial es asistido (§1bis).
+//
+// Cada entrada de aquí es un vocabulario cerrado de la base. Al ampliar uno de esos CHECK
+// hay que ampliar también esta lista: es el único sitio donde el diccionario y el dominio
+// se comparan.
+describe('las claves compuestas cubren todo el vocabulario de la base', () => {
+  const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
+    {
+      // CHECK de `oferta_respuestas.canal`. Se compone en `Aprovacions.tsx` y `OfferDetail.tsx`.
+      que: 'oferta_respuestas.canal',
+      prefijo: 'od.ch_',
+      valores: ['whatsapp', 'email', 'panel', 'asistido'],
+    },
+  ]
+
+  for (const { que, prefijo, valores } of COMPUESTAS) {
+    it(`${que} → ${prefijo}* en los dos idiomas`, () => {
+      for (const v of valores) {
+        expect(ca[`${prefijo}${v}`], `falta ${prefijo}${v} en català`).toBeDefined()
+        expect(es[`${prefijo}${v}`], `falta ${prefijo}${v} en castellà`).toBeDefined()
+      }
+    })
+  }
+})

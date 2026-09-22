@@ -35,6 +35,19 @@ export interface EntidadPuntuada {
   canal_preferit: 'whatsapp' | 'email' | null
   /** false = se le ha cambiado el canal porque el pedido no era viable. */
   preferencia_respectada: boolean | null
+  /**
+   * A esta entidad le falta el convenio que esta oferta exige, así que aprobar su
+   * interés fallará con `42501 sense_conveni` desde la fecha de corte (§4bis).
+   *
+   * ⚠️ NO es «no tiene convenio»: es «no tiene EL de esta oferta». Depende de la
+   * modalidad (`convenios_exigidos`), así que una entidad con `com` vigente sale
+   * marcada en una donación, que necesita `don_rec`.
+   *
+   * Lo calcula `priorizar-entidades` (su `index.ts:186`) y llegaba a la pantalla sin
+   * que nadie lo declarara aquí, o sea que se descartaba en silencio: el equipo enviaba
+   * la oferta y el fallo aparecía al final, al aprobar. Mismo patrón que la deuda 38.
+   */
+  sense_conveni: boolean
 }
 
 export interface PriorizacionResult {

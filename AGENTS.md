@@ -1762,6 +1762,7 @@ funciones, no políticas:
 | `rectificar_certificado_transaccion(cd, motivo)` | **Ya existe** (cierra la deuda 86): un CT con un error no tenía ninguna salida. Sin serie `R-CT`, que no se finge |
 | `ruta_documento_externo(objeto_tipo, objeto_id, tipo, ejercicio, extension, modo)` | La ruta **entera** de un fichero que aporta otro: `<org>/<ejercicio>/externs/<uuid>-<tipo>.<ext>`. Solo `service_role`. Antes la carpeta la daba SQL y el nombre lo componía TypeScript, en dos funciones distintas (deuda 62) |
 | `modalitats_compatibles_meves()` | Puente **sin correlación** de la RLS de `excedentes`: qué modalidades puede recibir alguna de mis entidades. El EXECUTE a `authenticated` **no es opcional** — una política se evalúa con los privilegios de quien consulta |
+| `excedents_de_les_meves_canalitzacions()` (`20260922124240`) | La **quinta rama** de esa misma política: los excedentes de los que alguna de mis entidades ha recibido una canalización. Sin ella, una entrega que **no nació de un interés registrado** —el reparto de una espigolada, o el alta directa del equipo por los atajos de la deuda 109— dejaba a la receptora leyendo «—» en el producto y la referencia de lo que ella misma había recibido: `v_albaranes_bandeja` es `security_invoker`, así que su join con `excedentes` se evalúa con la RLS de quien pregunta y el producto salía `null`. Medido en producción el 22-09-2026: 3 de las 4 entregas del Menjador Social. ⚠️ **No relaja D3**: abre la misma fila que ya abren la rama del interés y la del mercado; el rigor de no nombrar al donante vive en el renderizador del `ENT` y en el CHECK de `cierre_receptor_lineas` (§4), que no se tocan. ⚠️ El arnés no lo cazaba porque no es un permiso mal puesto, es una fila que no existe para esa sesión |
 | `missatges_sense_contestar()` | Entrantes posteriores al último saliente, por teléfono. `security invoker`: agrega solo lo que quien pregunta ya podía leer (deuda 5) |
 | `puc_pujar_document_extern(objeto_tipo, objeto_id, user)` | Puente único de permiso para subir externos: `albaran` → `albarans_de_les_meves_orgs`, `cierre_donante` → `cierres_donante_meus`, y el equipo siempre. Lo usa `subir-documento-externo` |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
@@ -2805,6 +2806,28 @@ sesión falla. Ese fallback es correcto dentro de la aplicación y catastrófico
 sesión regalaría el panel del equipo a cualquiera que abriera la web. Por eso `AppContextProvider`
 vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
 
+🔴 **`carregant` DESMONTA LA PANTALLA, así que solo lo enciende la PRIMERA carga**
+(22-09-2026). `RoleGuard` y `ArrelPerRol` hacen `if (carregant) return <Carregant />`: mientras
+vale `true` el `<Outlet/>` no está montado, o sea que **cada recarga del contexto tiraba la
+pantalla entera y la volvía a montar con estado nuevo**. Medido en producción antes del arreglo:
+abrir el detalle de una oferta costaba **50 peticiones** —`excedentes` 13 veces, la Edge Function
+`priorizar-entidades` **5** a ~1,4 s cada una, y `canalizaciones`/`albaranes`/`oferta_respuestas`/
+`productores` 6 cada una—, con la pantalla tardando 8-12 s en estar completa. No era StrictMode:
+la cifra es del *bundle* de producción.
+⚠️ **Y no era solo lento**: el remontaje se llevaba por delante cualquier diálogo abierto (su
+`open` es estado local), y las referencias del DOM caducaban entre dos lecturas seguidas. Una
+recarga posterior no necesita bloquear nada —ya hay contexto servido— así que `primera` (un
+`useRef`) hace que `setCarregant(true)` solo ocurra una vez.
+
+🔴 **Y `SIGNED_IN` NO significa «alguien acaba de entrar».** supabase-js lo emite también al
+recuperar la sesión del almacenamiento y al volver a la pestaña, así que `carrega()` se
+disparaba una y otra vez sobre el **mismo** usuario (7 llamadas a `get_my_session_context` en
+una sola carga). Ahora se compara con `usuariCarregat` y solo se recarga si el usuario es
+**otro**; `SIGNED_OUT` sigue recargando siempre. Por lo mismo, `useSessio` **conserva el objeto
+anterior** cuando el `access_token` y el `user.id` no han cambiado: ese provider envuelve la
+parte pública y la privada, y guardar un objeto nuevo por cada evento re-renderizaba la
+aplicación entera sin que nada hubiera cambiado.
+
 | Ruta | Qué es |
 | --- | --- |
 | `/` | **Landing pública** (`routes/public/Landing.tsx`): hero, «Com funciona» (los 4 momentos, con copy propio `land.*`), «Per a qui» y pie. Con sesión redirige a `/panell` |
@@ -2981,6 +3004,16 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   entitats. Interès rebut: {m}.», donde `{m}` y `{k}` van tras dos puntos y no concuerdan con nada.
   Lo vigila `tests/i18n.test.ts`: la variante existe en los dos idiomas, su clave base existe, y no
   introduce ningún marcador que quien llama no pase.
+  🔴 **Y una clave que se COMPONE a partir de un valor de la base hay que declararla en
+  `tests/i18n.test.ts`** (22-09-2026). `cobertura.test.ts` recorre los literales `t('…')`, así
+  que no ve un `t(\`od.ch_${fila.canal}\`)`, y ahí el diccionario se queda corto **en silencio**:
+  la lista de valores no vive en el código sino en un CHECK de Postgres, o sea que el día que
+  una migración añade uno, la pantalla pinta el identificador crudo y el build sigue en verde.
+  Pasó: `oferta_respuestas.canal` ganó `asistido` en `20270330100000` y la cola de aprobaciones
+  estuvo enseñando **`od.ch_asistido`** en las dos lenguas —siendo además el canal más
+  frecuente, porque el modelo de la fase inicial es asistido—. El bloque «las claves compuestas
+  cubren todo el vocabulario de la base» es el único sitio donde el diccionario y el dominio se
+  comparan: **al ampliar uno de esos CHECK, ampliar también esa lista.**
 - 🔴 **BORRAR UNA FICHA ES BORRAR TODO LO SUYO, Y NUNCA DEJAR HUÉRFANOS** (regla del
   16-09-2026, a petición del cliente). Da igual por dónde se pida —el botón de
   `RecordDetail`, una RPC, o SQL a mano desde una sesión de Claude Code—: al retirar un
@@ -4470,7 +4503,7 @@ qué quedaba había que leerla entera y descartar dos de cada tres. El detalle d
 `git log` del fichero, que es donde le toca.
 
 ⚠️ **Léase con la clave de §12bis.** No todo lo que queda es arreglable, y confundirlo hace que la
-lista se vuelva ruido otra vez: de las 42 vivas, **41 están catalogadas** allí como decisión con su
+lista se vuelva ruido otra vez: de las 48 vivas, **41 están catalogadas** allí como decisión con su
 precio anotado, espera de material de un tercero, interruptor de producción o decisión de negocio
 pendiente. §12bis separa **lo que es un defecto** de **lo que no lo es**.
 ⚠️ **Y esta propia cifra estuvo mal, sin que nadie la hubiera recontado desde el 15-09-2026**:
@@ -4491,7 +4524,9 @@ había en producción, limpiado) y 118 (las 5 filas de metadata duplicada, borra
 equivalente posible o es diseño deliberado) y 55 (la vigilancia ya está completa 5/5; la causa de
 fondo es de la plataforma, no del repo). Y **69 se reclasificó** como "requiere decisión de
 negocio" —no de un tercero externo, sino del propio equipo/Fundación sobre si vale la pena un
-backfill fiscal— y se cataloga también en §12bis. **Solo queda sin catalogar la #5**, con su
+backfill fiscal— y se cataloga también en §12bis. **Sin catalogar quedan la #5 y las seis de la revisión en navegador**
+(119-124), que llegaron esa misma tarde y son defectos con su sitio exacto localizado y ninguna
+decisión detrás. La #5 conserva su
 alcance ya reducido: la recarga en ráfaga de `OffersList` y el `select` completo de `entidades`
 del Dashboard se cerraron; lo que sigue abierto (el filtrado en cliente de los tres listados, y
 dos consultas del Dashboard que agregan por fila) es una decisión de alcance explícita dado el
@@ -4517,8 +4552,13 @@ conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
-21, 55 y 69): **42 entradas vivas** (3 parciales 🟡 — 5, 69, 85 — y 39 abiertas) y **76 cerradas**,
-sobre 118 numerados — recontado con `grep`/`comm` contra el fichero, no a mano. Cuatro son de la tanda de
+21, 55 y 69) y la revisión funcional en navegador (abre 119-124): **48 entradas vivas**
+(3 parciales 🟡 — 5, 69, 85 — y 45 abiertas) y **76 cerradas**, sobre 124 numerados — recontado
+con `grep`/`comm` contra el fichero, no a mano. Esa revisión dejó además **cuatro arreglos sin
+número, porque se hicieron en el mismo cambio**: la clave i18n compuesta `od.ch_asistido`, la
+RLS que dejaba a la receptora sin ver el producto de sus entregas, el desmontaje de la pantalla
+en cada recarga del contexto y el `sense_conveni` que el servidor mandaba y la pantalla tiraba.
+Cuatro son de la tanda de
 F2-F5 —113 y 114 del certificado de recepción, 115 y 116 del diagnóstico— y las cuatro nacen
 catalogadas en §12bis: dos como decisiones con su precio y dos como espera de material de la fase
 0. La **117 se cerró ese mismo día**, midiendo en un navegador de verdad las catorce rutas que
@@ -4961,6 +5001,53 @@ panel del equipo y en el externo).
      La misma expresión está **duplicada a propósito** en `kg_rebuts_exercici()`: si divergieran,
      el acumulado del panel y el del certificado dirían cifras distintas sobre lo mismo.
 
+> Las seis siguientes salieron de la **revisión funcional en navegador del 22-09-2026** (el
+> informe completo, con la evidencia de cada una, está en `3. Claude Code/`). Los cuatro
+> hallazgos mayores de esa revisión se arreglaron en el mismo cambio y por eso no tienen
+> número: la clave `od.ch_asistido` (§7, y `tests/i18n.test.ts` la vigila ahora), la RLS que
+> dejaba a la receptora sin ver el producto de sus entregas (§4bis, `20260922124240`), el
+> desmontaje de la pantalla en cada recarga del contexto (§6quater) y el `sense_conveni` que
+> el servidor mandaba y la pantalla tiraba (§4bis). Estas seis se quedan abiertas.
+
+119. **Los textos de la pantalla guiada se imprimen en cualquier estado del paso, y por eso
+     afirman cosas falsas.** `CanalitzacioDetall.tsx:281` pinta `t(\`canal.${p.pas}_passa\`)`
+     **siempre**, esté el paso `fet`, `ara`, `pendent` o `bloquejat`, y esos textos están
+     redactados como si estuviera en curso. Dos casos vistos en la misma tarjeta de un lote
+     sin canalizaciones: «Emet l'albarà d'entrada (REC)» · *Pendent* dice «**Ja hi ha
+     canalització**, però encara no hi ha el document…» —no la hay, y cuatro filas más abajo
+     la propia pantalla dice lo contrario—, y «Fixa el cost per quilo» · *Fet* dice «**Algun
+     producte d'aquest lot no té cost**», que es justo lo que el badge niega. Es reproducible
+     en cualquier lote: no depende de los datos, sino de que el texto no mire el estado. El
+     arreglo pide una variante por estado o no pintar `_passa` cuando está `fet`.
+120. **Dos pantallas del receptor enseñan la fecha en ISO crudo.** `Mercat.tsx:134` pasa
+     `o.disponible_hasta` tal cual («fins 2026-09-30») e `Interessos.tsx:230` hace
+     `.slice(0, 10)` («· 2026-09-14»). El resto de la aplicación usa `dataCurta()`
+     (`src/lib/albarans.ts:265`), que da `30/09/2026` y la consumen más de diez ficheros:
+     son las dos únicas pantallas que enseñan una fecha así a un usuario final.
+121. **Seis pantallas tienen las etiquetas sin asociar a su campo.** Medido en el navegador:
+     en el alta de oferta ninguno de los 14 controles tiene `id`, `name` ni `label`
+     (`element.labels` vacío); igual en la ficha de organización. Un lector de pantalla no
+     anuncia qué campo es y pulsar la etiqueta no enfoca el campo. Es una **excepción**, no la
+     norma —hay 110 `htmlFor` para 117 `<Label>`— y los ficheros son `FormulariNovaOferta`,
+     `RecordDetail` (el CRUD de fichas del equipo), `DialegNovaOfertaAssistida`, `Mercat`,
+     `CanalitzacioDetall` y `PerfilOrganitzacio`. Son pantallas centrales.
+122. **El texto que se manda por WhatsApp imprime etiquetas sin valor.** Una oferta normal
+     sale con `🗺️ UBICACIÓ:` seguido de un guion suelto y con `HORARI RECOLLIDA:`, `ENVASOS:`
+     y `RESPONSABLE:` vacías (`_shared/oferta.ts:184-196`). Contradice el criterio que ese
+     mismo fichero aplica —y documenta— a `producte_al_camp` y `preu_minim`, que solo se
+     imprimen cuando dicen algo porque «sería ruido en un mensaje que se lee en un móvil».
+     De paso, `MODALITAT: donació` sale en minúscula (es el valor interno mapeado) mientras
+     `CAUSA: Excedent` va con mayúscula; la cabecera del ciclo guiado enseña «donacio», sin
+     acento siquiera.
+123. **El alta de oferta valida solo en el servidor y con un mensaje genérico.**
+     `FormulariNovaOferta.enviar()` llama a la Edge Function y pinta lo que responda, así que
+     publicar en vacío da «Falten camps obligatoris» sin marcar ningún campo ni llevar al
+     primero que falta — en un formulario de 14 campos repartidos en cinco bloques con scroll
+     largo.
+124. **Los dos botones del diálogo de cancelar una oferta empiezan igual.** «Cancel·lar»
+     descarta el diálogo y «Cancel·lar oferta» ejecuta la anulación: uno deshace y el otro es
+     la acción destructiva, y se leen casi igual.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **35 de las 42**. Se quedan
@@ -5129,8 +5216,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **938 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 936
-   el 22-09-2026 al cerrar la deuda §12.14: dos casos nuevos para el vocabulario «de acuerdo»).
+   Referencia: **939 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 936
+   el 22-09-2026: dos casos del vocabulario «de acuerdo» al cerrar la deuda §12.14, y uno del
+   bloque de claves compuestas que vigila `od.ch_*` contra el CHECK de la base, §7).
    ⚠️ Y desde el 14-09-2026 `check` corre además **`npm run lint`** (las dos reglas de
    `react-hooks`, línea base en cero, §12.1). Lo mismo corre el CI en cada push y PR.
    El hook de `.githooks/pre-commit` hace lo mismo antes de cada commit, si está instalado
@@ -5138,9 +5226,18 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 929/929 correctas y 22 saltadas, «Sin fallos de permisos»**
-   (22-09-2026, tras aplicar las cinco migraciones del diagnóstico,
-   `20260921231946`…`231950`). Son las 827 anteriores más **102**: doce checks en
+   ✅ **Referencia HOY: 925/925 correctas y 26 saltadas, «Sin fallos de permisos»**
+   (22-09-2026, tras `20260922124240`, la quinta rama de la RLS de `excedentes`).
+   ⚠️ **El total sigue siendo 951 y no hay ninguna FALLA**: lo que cambió respecto de la
+   referencia anterior no son permisos sino **datos** —cuatro checks pasaron de correctos a
+   «sin fila que probar» al cancelarse la oferta de prueba que se creó ese mismo día para
+   revisar el ciclo—. Es exactamente el caso del que avisa el párrafo de más abajo: antes de
+   buscar una regresión por un desfase de esta cifra, mirar si han aparecido o desaparecido
+   datos. La migración **no movió ni un check**, que es lo esperado: solo amplía lo que una
+   receptora ve de sus propias entregas, y el arnés no tenía ningún check sobre eso (por eso
+   el fallo pudo existir, §4bis).
+   La referencia inmediatamente anterior era **929/929 + 22** (22-09-2026, tras aplicar las
+   cinco migraciones del diagnóstico, `20260921231946`…`231950`). Eran las 827 anteriores más **102**: doce checks en
    `DOCUMENTAL_EXTERN` ×7 cuentas —el cuestionario **sí** lo ve cualquiera con sesión, porque
    es lo que tiene que contestar; el catálogo de medidas y las reglas, no— más nueve en
    `equip` y nueve en `super_admin`.
