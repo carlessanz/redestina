@@ -64,21 +64,24 @@ export default function AvisConveni() {
     <div
       role="status"
       className={cn(
-        'mb-4 flex items-start gap-3 rounded-lg border px-4 py-3 text-sm',
+        'mb-4 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border px-4 py-3 text-sm',
         bloqueja
           ? 'border-error bg-error-fondo text-error'
           : 'border-accent bg-accent/30 text-foreground',
       )}
     >
       <Icona className="mt-0.5 size-4 shrink-0" />
-      <p className="min-w-0">
+      <p className="min-w-0 flex-1">
         <span className="font-medium">{t(clau)}</span>{' '}
         <span className={bloqueja ? undefined : 'text-muted-foreground'}>{consequencia}</span>
       </p>
       {potSignar && (
+        // En móvil baja a su propia línea: `shrink-0` no deja encoger el botón, así que
+        // sin esto el párrafo quedaba en 120 px y 8 líneas a 320 px. Ver `AvisDiagnostic`,
+        // que lo sufría peor por llevar además el aspa de descarte.
         <Button
           size="sm"
-          className="ml-auto h-11 shrink-0 whitespace-normal md:h-8"
+          className="order-1 h-11 w-full shrink-0 whitespace-normal sm:order-none sm:ml-auto sm:h-8 sm:w-auto"
           onClick={() => setObert(true)}
         >
           {t('avis_conv.signa_ara')}

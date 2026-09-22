@@ -320,7 +320,7 @@ la pantalla y, al elegir un contacto, la conversación pasa a pantalla completa 
 escribe `h-dvh` propio** (era texto residual de la arquitectura anterior, contradecía el contrato de
 alturas de arriba): su alto lo aporta el shell porque su ruta va marcada `fullBleed` (§6ter).
 
-**Tres reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
+**Cuatro reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
 Playwright a 320/360/390 px sobre las 11 rutas, públicas y privadas — **0 px de desbordamiento
 horizontal en todas**, que es la referencia a mantener):
 
@@ -337,6 +337,25 @@ horizontal en todas**, que es la referencia a mantener):
    contenido hasta el borde físico; sin el `env()` lateral, en iPhone con muesca el contenido queda
    bajo el recorte. Se aplica con `max(padding, env(...))` en `AppShell` y `LayoutAcces`; la barra
    inferior ya cubría el `bottom`.
+4. 🔴 **`shrink-0` en un botón anula el `whitespace-normal` que tiene al lado, y eso NO desborda:
+   aplasta.** Medido el 22-09-2026 en el navegador (§12.117). `AvisDiagnostic` es una fila de cuatro
+   elementos —icono, texto, botón, aspa de descarte— y el botón llevaba `shrink-0` *y*
+   `whitespace-normal`: lo segundo no sirve de nada, porque `shrink-0` fija su **ancho preferido**
+   (`max-content`, 136 px) y no lo deja encoger, así que todo el recorte se lo comía el `min-w-0`
+   del párrafo. A 320 px al texto le quedaban **50 px y 16 líneas** —una palabra por línea—, a 360
+   px 90 px y 11 líneas, y a 390 px 120 px y 8 líneas; `AvisConveni`, con tres elementos, 120 px y
+   8 líneas a 320. **La página seguía en 0 px de desbordamiento**, que es exactamente por qué la
+   auditoría de 2026-08-01 no lo habría encontrado: medía `scrollWidth`, y esto no desborda, se
+   estrecha. Es el mismo mecanismo que el `li` de la barra inferior —donde `truncate` estaba
+   puesto y tampoco llegaba a actuar— visto por el otro lado.
+   **Lo que lo arregla**: que en móvil el botón ocupe su propia línea. Contenedor `flex-wrap` con
+   `gap-x-*` y `gap-y-*`, párrafo `min-w-0 flex-1`, y el botón
+   `order-1 w-full sm:order-none sm:ml-auto sm:w-auto` — `w-full` fuerza el salto, `order-1` lo
+   deja debajo del aspa (que se queda arriba a la derecha, donde se espera un descarte), y desde
+   `sm` todo vuelve a la fila de siempre, verificado sin cambio de anchos en escritorio. Resultado
+   a 320 px: 226 px y 4 líneas en el convenio, 198 px y 4 en el diagnóstico.
+   ⚠️ **Corolario**: una fila con texto y botón **no se audita con `scrollWidth`**. Hay que mirar
+   el ancho que le queda al párrafo, o mirarla.
 
 ## 2bis. Sistema de diseño (10-09-2026)
 
@@ -2391,6 +2410,19 @@ incoherente aplicarlo en un lado y no en el otro.
 ⚠️ **La marca del menú lateral NO se descarta**: descartar no es haberlo hecho. Y se calcula **una sola vez en `AppShell`** y se reparte a la banda y a la marca
 del menú — calculadas por separado, el contador y la banda podrían decir cosas distintas (§6ter).
 
+🔴 **Y una banda NO se pinta en la pantalla a la que manda** (22-09-2026, medido en el
+navegador, §12.117). `AvisDiagnostic` se montaba en `AppShell`, o sea encima de **todas** las
+pantallas del panel, y eso incluía `/organitzacio/diagnostic` —te invitaba a ir donde ya
+estabas— y `/organitzacio`, donde `TargetaDiagnostic` ya dice lo mismo con el mismo botón un
+palmo más abajo. No era cosmético: a 320×812, con `AvisConveni` y el aviso de cuestionario
+provisional encima, el **primer encabezado de contenido del cuestionario caía a 794 px de los
+812 de la ventana** — se abría el diagnóstico y no se veía ni una pregunta. La lista vive en
+`RUTES_MUDES`, dentro del propio componente y no en `AppShell`: la regla es de la banda, y
+quien añada mañana una pantalla que repita ese mensaje tiene que encontrarla donde la banda
+está. Con el arreglo, ese encabezado sube a **404 px**.
+⚠️ Esto **no** aplica a las dos bandas rojas: `AvisConveni` anuncia un bloqueo que afecta a
+cualquier pantalla, no una invitación a ir a un sitio.
+
 ⚠️ **El prefill solo propone lo que la pregunta puede aceptar**, y hoy eso es **uno de los cinco
 sembrados**: `productos_habituales` son nombres de producto contra opciones que son familias, y
 dos booleanos de la ficha apuntan a preguntas de selección múltiple. Donde no encaja **no se
@@ -4410,10 +4442,13 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-Estado al 22-09-2026: **48 entradas vivas** (6 parciales 🟡 y 42 abiertas) y **69 cerradas**,
-sobre 117 numeradas. Las cuatro últimas son de esta tanda —113 y 114 del certificado de
-recepción, 115 y 116 del diagnóstico— y las cuatro nacen catalogadas en §12bis: dos como
-decisiones con su precio y dos como espera de material de la fase 0.
+Estado al 22-09-2026: **47 entradas vivas** (6 parciales 🟡 y 41 abiertas) y **70 cerradas**,
+sobre 118 numeradas. Cuatro son de la tanda de F2-F5 —113 y 114 del certificado de recepción,
+115 y 116 del diagnóstico— y las cuatro nacen catalogadas en §12bis: dos como decisiones con su
+precio y dos como espera de material de la fase 0. La **117 se cerró ese mismo día**, midiendo
+en un navegador de verdad las catorce rutas que pedía —el navegador integrado de la aplicación
+de Claude, no Playwright: §2 (regla 4) y §6ter (`AvisDiagnostic`) cuentan los dos defectos que
+salieron, arreglados en el mismo cambio—.
 
 4. `disponible_hasta`: el intake ahora lo **parsea** de la respuesta libre (`parseDisponibleFins`,
    §6bis) y lo rellena cuando es una fecha reconocible; si no (texto no fechable) queda `null`, el
@@ -4793,34 +4828,6 @@ decisiones con su precio y dos como espera de material de la fase 0.
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
-117. 🔴 **Nada de lo publicado el 22-09-2026 se ha medido en un navegador.** Las pantallas de
-     F2, F3, F4 y F5 se revisaron **de forma estática**: ni los agentes ni la sesión que
-     orquestó tenían navegador, porque el sandbox de Claude Code **bloquea `listen` con
-     `EPERM`** (no arrancan `npm run dev`, `vite` ni `preview`) y **mata Chromium al lanzarlo**
-     (`bootstrap_check_in … Permission denied (1100)`, el Mach port que necesita). O sea que la
-     referencia de §2 —«0 px de desbordamiento a 320/360/390 en todas las rutas»— **no está
-     comprobada para lo nuevo**. Importa porque esto ya mordió una vez: la barra inferior pedía
-     347 px a 320 y no lo vio nadie durante meses, porque la auditoría de entonces midió el
-     desbordamiento de la PÁGINA y no el del `nav ul` (§2). Lo que hay que medir, en orden:
-     `AvisDiagnostic` con su botón de descarte (cuatro elementos en una fila), los once
-     `SelectTrigger` que pasaron a `w-full`, `FormulariDiagnostic` entero, `TriaPaper` en
-     Configuració, la celda de `OffersList` con dos badges, la marca del menú sobre el verde del
-     sidebar y `/verificar/:codi`. Se hace desde una sesión **sin sandbox**, con Playwright, y
-     mirando `nav ul` (`scrollWidth` vs `clientWidth`), no solo `document.documentElement`.
-     ⚠️ **No es solo `listen`: Chrome no arranca aquí bajo NINGUNA forma** (comprobado el
-     22-09-2026 con un agente en aislamiento `remote`, que resultó caer a un *worktree* local —
-     misma máquina, mismo Seatbelt—). `chrome-headless-shell` muere con el mismo
-     `bootstrap_check_in … Permission denied (1100)`; el Chrome completo pasa ese error pero
-     falla después al escribir en `~/Library/Application Support/Google/Chrome for
-     Testing/Crashpad/…` y en el `ProcessSingleton` de su perfil. **Ningún flag de Playwright lo
-     esquiva**: `--user-data-dir`, `HOME` reescrito dentro del proceso, `--crash-dumps-dir`…
-     nada sirve, porque Chrome en macOS resuelve esas rutas por API de Cocoa
-     (`NSHomeDirectory()`), no por variables de entorno. Y `dangerouslyDisableSandbox` está
-     desactivado a nivel de configuración de la sesión, así que tampoco hay parámetro que lo
-     saque del sandbox. La medición solo se puede hacer de verdad fuera de una sesión de Claude
-     Code sandboxeada — un terminal normal, o un job de CI (Linux, sin Seatbelt). El script ya
-     está escrito, listo para copiar a cualquiera de los dos: las 5 rutas, los 3 anchos, la
-     medición de página y de `nav ul`, y captura `fullPage`.
 118. **Cinco migraciones están registradas DOS VECES en el historial remoto.**
      `confirmacio_assistida`, `interes_assistit`, `canalitzacio_assistida_lectura`,
      `firma_assistida_sense_codi` y `canalitzacions_actives_ambigua` aparecen con su fecha real
@@ -4930,7 +4937,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **69** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **70** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -5017,6 +5024,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 105 | Las descripciones de la modalidad no llegan por WhatsApp | 15-09-2026 |
 | 107 | Un interactivo saliente no registraba las opciones ofrecidas | 15-09-2026 |
 | 108 | Borrar una ficha no borraba lo suyo: tres comportamientos y uno dejaba huérfanos | `20260921153439` |
+| 117 | Nada de lo publicado el 22-09-2026 se había medido en un navegador | 22-09-2026 |
 
 ## 13. Al terminar cualquier cambio
 

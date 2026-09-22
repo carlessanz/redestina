@@ -34,7 +34,7 @@
 // el diagnóstico es lo que aporta valor cuando lo demás ya está—.
 
 import { useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { ClipboardList, X } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import type { EstatDiagnostic } from '../types'
@@ -42,6 +42,14 @@ import { Button } from '@/components/ui/button'
 
 const CLAU_DESCARTAT = 'redestina-diagnostic-descartat'
 const DIES_ESPERA = 30
+
+// Dónde NO se pinta, aunque el diagnóstico siga pendiente. Son las dos pantallas en las
+// que la banda repetiría lo que ya tienes delante: la del propio diagnóstico —te invita a
+// ir donde ya estás— y la ficha de la organización, que monta `TargetaDiagnostic` con el
+// mismo estado y el mismo botón. Medido el 22-09-2026 a 320x812: con las tres bandas
+// apiladas, el primer encabezado de contenido de `/organitzacio/diagnostic` caía a 794 px
+// de los 812 de la ventana, así que se abría el cuestionario sin ver ni una pregunta.
+const RUTES_MUDES = ['/organitzacio/diagnostic', '/organitzacio']
 
 function descartatFaPoc(): boolean {
   try {
@@ -54,9 +62,10 @@ function descartatFaPoc(): boolean {
 
 export default function AvisDiagnostic({ estat }: { estat: EstatDiagnostic | null }) {
   const { t } = useT()
+  const { pathname } = useLocation()
   const [amagat, setAmagat] = useState(descartatFaPoc)
 
-  if (estat === null || amagat) return null
+  if (estat === null || amagat || RUTES_MUDES.includes(pathname)) return null
 
   function descarta() {
     try { localStorage.setItem(CLAU_DESCARTAT, String(Date.now())) } catch { /* ver arriba */ }
@@ -66,14 +75,21 @@ export default function AvisDiagnostic({ estat }: { estat: EstatDiagnostic | nul
   return (
     <div
       role="status"
-      className="mb-4 flex items-start gap-3 rounded-lg border border-aviso/30 bg-aviso-fondo px-4 py-3 text-sm text-aviso"
+      className="mb-4 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-aviso/30 bg-aviso-fondo px-4 py-3 text-sm text-aviso"
     >
       <ClipboardList className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <p className="min-w-0">
+      <p className="min-w-0 flex-1">
         <span className="font-medium">{t('diag.banner_t')}</span>{' '}
         <span>{t(`diag.banner_${estat}`)}</span>
       </p>
-      <Button asChild size="sm" className="ml-auto h-11 shrink-0 whitespace-normal md:h-8">
+      {/* 🔴 EN MÓVIL BAJA A SU PROPIA LÍNEA, y `whitespace-normal` no bastaba: `shrink-0`
+          fija el ancho preferido del botón y no lo deja encoger, así que el `min-w-0` del
+          párrafo se comía todo el recorte. Es el espejo exacto del `li` de la barra
+          inferior (§2), donde `truncate` estaba puesto y tampoco llegaba a actuar.
+          Medido a 320 px con la fila entera: al texto le quedaban 50 px y 16 líneas —una
+          palabra por línea—; a 390 px, 120 px y 8 líneas. Con `w-full` el botón fuerza el
+          salto, y desde `sm` vuelve a la derecha de la misma fila. */}
+      <Button asChild size="sm" className="order-1 h-11 w-full shrink-0 whitespace-normal sm:order-none sm:ml-auto sm:h-8 sm:w-auto">
         <Link to="/organitzacio/diagnostic">{t('diag.banner_go')}</Link>
       </Button>
       {/* 44 px de área táctil en móvil con `-m-2 p-2`, sin ocupar 44 px de ancho en la
