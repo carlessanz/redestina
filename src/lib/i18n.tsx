@@ -1891,6 +1891,8 @@ const ca: Dict = {
   'diag.sec_conservacio': 'Conservació',
   'diag.sec_canalitzacio': 'Canalització',
   'diag.sec_seguiment': 'Seguiment',
+  'diag.sec_produccio': 'A. Producció', 'diag.sec_generacio': 'B. Generació de l’excedent',
+  'diag.sec_gestio': 'C. Gestió actual', 'diag.sec_necessitats': 'D. Necessitats i oportunitats',
 
   // blocs de mesures (el mateix vocabulari, una altra columna)
   'diag.bloc_planificacio': 'Planificació',
@@ -3878,6 +3880,8 @@ const es: Dict = {
   'diag.sec_conservacio': 'Conservación',
   'diag.sec_canalitzacio': 'Canalización',
   'diag.sec_seguiment': 'Seguimiento',
+  'diag.sec_produccio': 'A. Producción', 'diag.sec_generacio': 'B. Generación del excedente',
+  'diag.sec_gestio': 'C. Gestión actual', 'diag.sec_necessitats': 'D. Necesidades y oportunidades',
 
   'diag.bloc_planificacio': 'Planificación',
   'diag.bloc_collita': 'Cosecha',

@@ -153,7 +153,10 @@ export function progresDiagnostic(
 // dejar un título ilegible en la pantalla.
 
 export const SECCIONS_CONEGUDES: readonly string[] = [
+  // Las de la versión 0 (siguen haciendo falta: los diagnósticos ya hechos las citan)…
   'planificacio', 'collita', 'conservacio', 'canalitzacio', 'seguiment',
+  // …y las cuatro de la versión 1 del productor (20270403100000), las de la revisión.
+  'produccio', 'generacio', 'gestio', 'necessitats',
 ] as const
 
 export const BLOCS_MESURA: readonly BlocMesura[] = [

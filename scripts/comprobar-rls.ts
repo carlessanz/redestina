@@ -526,6 +526,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "organitzacions_candidates", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu quines organitzacions coincideixen amb una fitxa" },
   { tabla: "enllacar_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000", p_organitzacio: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO enllaça cap fitxa amb una altra organitzacio" },
   { tabla: "actualizar_meu_canal", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000", p_canal: "email" }, descripcion: "NO canvia el canal preferit d'una altra organització" },
+  // La ficha de OTRA organización (20270402100000). Mismo criterio que el canal: la guarda es
+  // `soc_titular`, y con una ficha ajena corta con 42501 antes de mirar nada más.
+  { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_dades: { nif: "B00000000" } }, descripcion: "NO edita la fitxa d'un altre productor" },
+  { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_dades: { nif: "B00000000" } }, descripcion: "NO edita la fitxa d'una altra entitat" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },

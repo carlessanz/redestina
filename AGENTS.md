@@ -170,7 +170,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `plantilla_mensaje` (tabla) | plantillas en código (`plantillas-meta.md`, `plantillas.ts`) | 🟡 |
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
-| `diagnostico`/`plan_prevencion`/`plan_revision` | `planes_prevencion` con su PDF. **Falta el cuestionario** (anexo B, fase 0) | 🟡 |
+| `diagnostico`/`plan_prevencion`/`plan_revision` | `planes_prevencion` con su PDF y cuestionario con reglas. **Productor: versión 1** con el contenido de la revisión del 23-09 (aún provisional); **receptor: versión 0** de trabajo | 🟡 |
 | `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
@@ -1279,6 +1279,23 @@ que dice otra cosa, y si la segunda llamada falla ese instante se queda para sie
 que el servicio necesita de verdad para medir. Todo lo demás se recomienda. **Lo sostiene el seed, no
 un check**: el día que la fase 0 entregue el anexo B, la Fundación podrá declarar obligatoria otra
 medida sin una migración — que es para lo que existe esta tabla.
+
+✅ **Y el del PRODUCTOR ya tiene contenido real: versión 1** (`20270403100000`, 27-09-2026), con
+las preguntas de la revisión funcional del 23-09 en cuatro secciones —A. Producció, B. Generació
+de l'excedent, C. Gestió actual, D. Necessitats i oportunitats (`produccio`, `generacio`,
+`gestio`, `necessitats`, añadidas a `SECCIONS_CONEGUDES`)—: 15 preguntas, 7 obligatorias.
+Conserva los ids que ya existían donde la pregunta es la misma (`causes`, `canals_actuals`,
+`volum_anual_perdut`, `transport_propi`, `registre_quantitats`), así que sus reglas siguen
+valiendo; las 5 reglas de preguntas que desaparecen se **desactivan** (no se borran) y entran 7
+nuevas. Resultado: 20 reglas activas y **cero huérfanas**. Probado con Mas de Prova: un
+diagnóstico completo genera un plan de 8 medidas por 11 reglas, todas coherentes.
+⚠️ **Sigue provisional**, y el PDF lo dice: las categorías de «Quin suport necessiteu» son del
+Airtable de la Fundació y no las tenemos. Y **el motor obligó a cuatro adaptaciones** que hay que
+revisar con ellos: productos por **familia** (no los 90 del catálogo), «los principales» y «los que
+más excedente dan» como listas completas (no se construyen opciones a partir de otra respuesta),
+un único volumen anual en kg (no por producto) y la temporalidad como doce meses.
+⚠️ **El del receptor sigue en la versión 0**: la revisión dice que su diagnóstico va «solo cuando
+corresponda a prevención y gestión de excedentes», sin contenido.
 
 ⚠️ **El cuestionario sembrado es PROVISIONAL** (12 preguntas por tipo, 20 medidas, 32 reglas,
 `versio 0`, `provisional = true`), con el mismo criterio que los seis convenios: texto de trabajo
@@ -5260,6 +5277,9 @@ panel del equipo y en el externo).
      (`20270111100200`) y el mismo precio: se emite con `provisional = true`, **sale impreso en
      el PDF**, y se sustituye publicando la versión 1 desde la pantalla, nunca editando la 0.
      Espera material de la fase 0 (anexo B).
+     🟡 **Del productor ya hay versión 1** (27-09-2026) con el contenido de la revisión, todavía
+     provisional por la lista de «suport» y las cuatro adaptaciones del motor (§4). El receptor
+     sigue en la 0. Las 20 medidas del catálogo siguen siendo texto de trabajo.
 116. **`desar_mesures_pla()` y `fixar_nivell_pla()` no tienen check en el arnés.** Su guarda
      depende del plan, así que va **después** de buscarlo: con un uuid inventado responden
      `22023 «no existe»` y no el `42501`, así que un `denegar` ahí **saldría verde por el motivo
@@ -5525,7 +5545,10 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 943/943 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   ✅ **Referencia HOY: 957/957 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   tras el bloque B de la revisión: +14 de `actualitzar_fitxa_productor` y `_entitat` —dos checks
+   de «denegar» sobre una ficha ajena, en las siete cuentas externas—).
+   La referencia anterior del mismo día era **943/943 correctas y 28 saltadas** (27-09-2026,
    tras `20270330100000`). **El total no se movió (971)**: la migración solo amplía una matriz
    de catálogo, y dos comprobaciones pasaron de correctas a «sin datos» porque desapareció la
    fila de prueba que las alimentaba —las de «producte al camp» del productor, entre otras—,
