@@ -36,7 +36,8 @@ import Verificar from '../routes/public/Verificar'
 import Signar from '../routes/public/Signar'
 import Tancament from '../routes/equip/Tancament'
 import TancamentDetall from '../routes/equip/TancamentDetall'
-import Costos from '../routes/equip/Costos'
+import Productes from '../routes/equip/Productes'
+import ProducteDetall from '../routes/equip/ProducteDetall'
 import Convenis from '../routes/equip/Convenis'
 import ConveniDetall from '../routes/equip/ConveniDetall'
 import CampanyaConvenis from '../routes/equip/CampanyaConvenis'
@@ -125,7 +126,10 @@ export const router = createBrowserRouter([
                   { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'tancament', element: <Tancament />, handle: { titleKey: 'nav.tancament', ample: true } },
                   { path: 'tancament/:id', element: <TancamentDetall />, handle: { titleKey: 'nav.tancament', ample: true } },
-                  { path: 'costos', element: <Costos />, handle: { titleKey: 'nav.costos', ample: true } },
+                  { path: 'productes', element: <Productes />, handle: { titleKey: 'nav.productes', ample: true } },
+                  { path: 'productes/:nom', element: <ProducteDetall />, handle: { titleKey: 'nav.productes' } },
+                  // «Costos per quilo» se llamó así hasta el 27-09-2026: hay enlaces guardados.
+                  { path: 'costos', element: <Navigate to="/equip/productes" replace /> },
                   { path: 'convenis', element: <Convenis />, handle: { titleKey: 'nav.convenis', ample: true } },
                   { path: 'convenis/campanya', element: <CampanyaConvenis />, handle: { titleKey: 'nav.convenis', ample: true } },
                   { path: 'convenis/:id', element: <ConveniDetall />, handle: { titleKey: 'nav.convenis' } },

@@ -30,6 +30,7 @@ export const PASOS = [
   "horari",
   "modalitat",
   "preu_minim",
+  "cost_kg",
   "causa",
   "observacions",
 ] as const;
@@ -192,7 +193,7 @@ export interface CampoOferta {
   condicion?: CondicionCampo | CondicionCampo[];
 }
 
-/** Descriptor de los 16 pasos, con las mismas preguntas que hace el bot. */
+/** Descriptor de los 17 pasos, con las mismas preguntas que hace el bot. */
 export const CAMPOS: CampoOferta[] = [
   {
     clave: "familia",
@@ -323,6 +324,23 @@ export const CAMPOS: CampoOferta[] = [
     seccion: "modalitat",
     obligatorio: true,
     condicion: { campo: "modalitat", en: ["venda", "maquila"] },
+  },
+  {
+    // El COSTE POR KILO lo decide el productor (27-09-2026). El de la pantalla «Productes»
+    // es solo una REFERENCIA: el panel lo prellena y el bot lo ofrece con un botón
+    // «Mantenir», y el productor lo deja o pone otro. Es lo que valora la donación en el
+    // certificado, así que solo se pregunta en donació: venda y maquila ya tienen su
+    // `preu_minim`, y el certificado de transacción no lleva importes.
+    //
+    // No es obligatorio: sin él, la canalización toma la referencia vigente del producto
+    // (`trg_canalizaciones_valoriza`, 20270405100200).
+    clave: "cost_kg",
+    tipo: "numero",
+    etiqueta: "Quin és el cost per quilo (€/kg)?",
+    ayuda: "És el valor amb què es calcula la donació al certificat. Et proposem el de referència del producte; el pots canviar.",
+    seccion: "modalitat",
+    obligatorio: false,
+    condicion: { campo: "modalitat", en: ["donacio"] },
   },
   {
     clave: "causa",

@@ -23,7 +23,7 @@ import { manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import BadgeEstat from '../../components/proces/BadgeEstat'
-import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
+import { FotoOferta, FotoOfertaResolta, useFotosOfertes, useUrlsFotos } from '../../components/FotosOferta'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Button } from '@/components/ui/button'
@@ -100,12 +100,11 @@ export default function Mercat() {
     await carrega()
   }
 
-  // Las URLs firmadas de todas las fotos de la pantalla, en UN lote (antes de cualquier `return`: es un hook): la principal de cada
-  // tarjeta y las de la oferta abierta.
-  const urls = useUrlsFotos([
-    ...ofertes.map((o) => o.fotos?.[0]).filter((r): r is string => Boolean(r)),
-    ...(obert?.fotos ?? []),
-  ])
+  // Las URLs firmadas de todas las fotos de la pantalla, en lote (antes de cualquier
+  // `return`: son hooks). `foto()` resuelve la principal de cada oferta —la suya, la del
+  // producto o el icono— y `urls` firma las demás fotos de la oferta abierta.
+  const foto = useFotosOfertes(obert ? [...ofertes, obert] : ofertes)
+  const urls = useUrlsFotos(obert?.fotos ?? [])
 
   if (!entidadId) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
 
@@ -158,8 +157,7 @@ export default function Mercat() {
                 onClick={() => obre(o, 'detall')}
               >
                 {/* La foto primero: es lo primero que mira un receptor (revisión del 23-09). */}
-                <FotoOferta url={o.fotos?.[0] ? urls[o.fotos[0]] : null}
-                  alt={o.producto ?? ''} className="size-16" />
+                <FotoOfertaResolta foto={foto(o)} alt={o.producto ?? ''} className="size-16" />
                 <div className="min-w-0">
                 <div className="font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
@@ -199,12 +197,12 @@ export default function Mercat() {
                 {mode === 'detall' ? t('mk.detail_title') : t('mk.dialog_title')}
               </DialogTitle>
             </DialogHeader>
-            {/* Foto grande y, si hay más, las otras debajo para abrirlas en su tamaño. */}
-            {obert.fotos?.length > 0 && (
-              <div className="space-y-2">
-                <FotoOferta url={urls[obert.fotos[0]]} alt={obert.producto ?? ''}
-                  className="aspect-[4/3] w-full" />
-                {obert.fotos.length > 1 && (
+            {/* Foto grande y, si hay más, las otras debajo para abrirlas en su tamaño. Sin
+                fotos propias, la del producto con la etiqueta «orientativa», o el icono. */}
+            <div className="space-y-2">
+                <FotoOfertaResolta foto={foto(obert, true)} alt={obert.producto ?? ''}
+                  className="aspect-[4/3] w-full" etiqueta />
+                {(obert.fotos?.length ?? 0) > 1 && (
                   <div className="flex gap-2">
                     {obert.fotos.slice(1).map((r) => (
                       <a key={r} href={urls[r]} target="_blank" rel="noreferrer">
@@ -213,8 +211,7 @@ export default function Mercat() {
                     ))}
                   </div>
                 )}
-              </div>
-            )}
+            </div>
             <p className="font-titulos text-lg font-semibold">
               {obert.producto ?? '—'}{obert.variedad ? ` · ${obert.variedad}` : ''}
             </p>

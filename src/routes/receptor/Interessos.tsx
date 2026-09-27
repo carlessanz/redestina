@@ -22,12 +22,12 @@ import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
-import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
+import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type AmbOferta = OfertaRespuesta & {
-  excedentes: { id_excedente: string | null; producto: string | null; estado: EstadoExcedente; fotos: string[] | null } | null
+  excedentes: { id_excedente: string | null; producto: string | null; estado: EstadoExcedente; fotos: string[] | null; foto_producte: boolean | null } | null
 }
 
 /** Lo único que hace falta del albarán de entrega para contar la etapa. */
@@ -39,7 +39,7 @@ interface CanalAmbOferta {
   kg_reales: number | null
   data_hora_recollida: string | null
   created_at: string
-  excedentes: { id_excedente: string | null; producto: string | null; estado: string; fotos: string[] | null } | null
+  excedentes: { id_excedente: string | null; producto: string | null; estado: string; fotos: string[] | null; foto_producte: boolean | null } | null
 }
 
 /** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
@@ -72,7 +72,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('*, excedentes(id_excedente, producto, estado, fotos)')
+        .select('*, excedentes(id_excedente, producto, estado, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -113,7 +113,7 @@ export function Interessos() {
   // un vistazo —asignada, interés enviado, cerrada, no disponible— más los dos que solo
   // salen a veces. La etapa fina sigue viva en la frase de «qué toca» de cada fila.
   const llegenda = llegendaSimpleInteres()
-  const urls = useUrlsFotos(files.map((f) => f.excedentes?.fotos?.[0]).filter((r): r is string => Boolean(r)))
+  const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
   return (
     <Card>
@@ -152,7 +152,7 @@ export function Interessos() {
             <div key={f.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
-                  <FotoOferta url={f.excedentes?.fotos?.[0] ? urls[f.excedentes.fotos[0]] : null}
+                  <FotoOfertaResolta foto={foto(f.excedentes ?? { producto: null })}
                     alt={f.excedentes?.producto ?? ''} className="size-12" />
                   <div className="min-w-0">
                     {/* Sin el código interno (E-AAMMDD-…): es del ERP y a la entidad no le dice
@@ -193,7 +193,7 @@ export function Historic() {
     let viu = true
     void supabase
       .from('canalizaciones')
-      .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id_excedente, producto, estado, fotos)')
+      .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id_excedente, producto, estado, fotos, foto_producte)')
       .eq('entidad_id', entidadId)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -205,7 +205,7 @@ export function Historic() {
   }, [entidadId])
 
   const totalKg = files.reduce((s, f) => s + Number(f.kg_reales ?? f.kg_confirmados ?? 0), 0)
-  const urls = useUrlsFotos(files.map((f) => f.excedentes?.fotos?.[0]).filter((r): r is string => Boolean(r)))
+  const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
   return (
     <Card>
@@ -221,7 +221,7 @@ export function Historic() {
         {files.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
             <div className="flex min-w-0 items-center gap-3">
-              <FotoOferta url={f.excedentes?.fotos?.[0] ? urls[f.excedentes.fotos[0]] : null}
+              <FotoOfertaResolta foto={foto(f.excedentes ?? { producto: null })}
                 alt={f.excedentes?.producto ?? ''} className="size-12" />
               <div className="min-w-0">
               <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>

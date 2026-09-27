@@ -7,8 +7,8 @@
 // Todo ocurre dentro de la ventana de servicio de 24 h —la abre el propio
 // productor al escribir—, así que no hacen falta plantillas ni opt-in.
 //
-// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son quince pasos —catorce
-// fijos más el `preu_minim`, que solo existe en venda y maquila— con paginación,
+// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son diecisiete pasos —varios
+// condicionales, como el `preu_minim` (venda y maquila) o el `cost_kg` (donació)— con paginación,
 // reintentos y caducidad, y embutirlos en el bucle del webhook lo haría inmanejable.
 
 import { sendBotones, sendLista, sendText } from "./whatsapp.ts";
@@ -91,6 +91,19 @@ export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso 
     if (!campo || aplica(campo, datos)) return PASOS[j];
   }
   return null;
+}
+
+/** El coste de referencia de un producto (pantalla «Productes»), o null si no tiene. */
+async function referenciaCost(supabase: Cliente, producte: string): Promise<number | null> {
+  if (!producte) return null;
+  const { data } = await supabase
+    .from("costes_producto").select("coste_kg").eq("producto", producte).limit(1).maybeSingle();
+  return data?.coste_kg != null ? Number(data.coste_kg) : null;
+}
+
+/** «0,60 €/kg»: como se lee en català. */
+export function eurKg(n: number): string {
+  return `${n.toFixed(2).replace(".", ",")} €/kg`;
 }
 
 /** Trocea las opciones en páginas de 9 y añade "Més…" cuando queda resto. */
@@ -255,6 +268,28 @@ async function preguntar(
         supabase, to,
         "A quin preu mínim (€/kg) la vols oferir? Escriu un número (p. ex. 0.80).",
       )).ok;
+    case "cost_kg": {
+      // El coste lo decide el productor; la pantalla «Productes» solo da la REFERENCIA
+      // (27-09-2026). Con referencia, dos botones: quedársela o dar otro valor. Sin ella, se
+      // le pide el número directamente, y puede decir que no lo sabe.
+      const ref = await referenciaCost(supabase, String(datos.producte ?? ""));
+      if (ref !== null) {
+        return (await sendBotones(
+          supabase, to,
+          `Quin és el cost per quilo? És el valor amb què es calcula la donació al certificat.\n\n` +
+            `El valor de referència de ${datos.producte} és ${eurKg(ref)}.`,
+          [
+            { id: "cost_kg:ref", titulo: `Mantenir ${eurKg(ref)}`.slice(0, 20) },
+            { id: "cost_kg:altre", titulo: "Un altre valor" },
+          ],
+        )).ok;
+      }
+      return (await sendText(
+        supabase, to,
+        "Quin és el cost per quilo (€/kg)? És el valor amb què es calcula la donació al " +
+          "certificat. Escriu un número (p. ex. 0,60) o '-' si no el saps.",
+      )).ok;
+    }
     case "causa": {
       const { data } = await supabase.from("causas").select("codigo, nombre").order("nombre");
       const causas = (data ?? []) as Array<{ codigo: string; nombre: string }>;
@@ -321,6 +356,17 @@ async function interpretar(
         if (factor?.kg_por_unidad) kg = kg * Number(factor.kg_por_unidad);
       }
       return kg;
+    }
+    case "cost_kg": {
+      if (id === "cost_kg:ref") {
+        const ref = await referenciaCost(supabase, String(sesion.datos_parciales.producte ?? ""));
+        return ref ?? null_ok();
+      }
+      if (t === "-") return null_ok();
+      const num = t.match(/\d+([.,]\d+)?/);
+      if (!num) return null;
+      const n = Number(num[0].replace(",", "."));
+      return n > 0 ? n : null;
     }
     case "preu_minim": {
       // Preu mínim en €/kg: se queda con el primer número.
@@ -490,6 +536,12 @@ export async function procesarIntake(
   // quien tenía ubicaciones no podía añadir otra por aquí (§6bis). No cuenta como intento.
   if (paso === "ubicacio" && id === "ubicacio:nova") {
     await sendText(supabase, from, "Enganxa l'enllaç de Google Maps del lloc on s'ha de recollir.");
+    return true;
+  }
+
+  // «Un altre valor» del coste: tampoco es una respuesta, es pedir escribir el número.
+  if (paso === "cost_kg" && id === "cost_kg:altre") {
+    await sendText(supabase, from, "Escriu el cost per quilo en €/kg (p. ex. 0,60).");
     return true;
   }
 

@@ -393,7 +393,7 @@ export const FASES_EQUIP: readonly FaseEquip[] = [
   { clau: 'distribucio', rutes: ['/equip/ofertes'] },
   { clau: 'aprovacio', rutes: ['/equip/aprovacions'] },
   { clau: 'lliurament', rutes: ['/equip/albarans'] },
-  { clau: 'tancament', rutes: ['/equip/costos', '/equip/tancament'] },
+  { clau: 'tancament', rutes: ['/equip/productes', '/equip/tancament'] },
 ] as const
 
 // --- El estado SIMPLE, para los paneles externos ---------------------------------------

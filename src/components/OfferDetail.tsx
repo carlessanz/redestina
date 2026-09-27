@@ -23,7 +23,7 @@ import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
-import { SelectorFotos } from './FotosOferta'
+import { CasellaFotoProducte, SelectorFotos } from './FotosOferta'
 import { fixaFotos } from '../lib/fotos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -702,6 +702,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 setExc((e) => (e ? { ...e, fotos: rutes } : e))
               }}
             />
+            <CasellaFotoProducte excedenteId={exc.id} fotos={exc.fotos ?? []}
+              fotoProducte={exc.foto_producte !== false}
+              onCanvi={(v) => setExc((e) => (e ? { ...e, foto_producte: v } : e))} />
           </CardContent>
         </Card>
       )}

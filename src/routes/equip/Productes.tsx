@@ -1,27 +1,30 @@
-// Costes por kilo del ejercicio: la cifra de la que sale el valor de una donación.
+// «Productes» (antes «Costos per quilo», renombrada el 27-09-2026): el CATÁLOGO del equipo.
+// Cada producto con su foto —la que sale de respaldo en el Mercat cuando una oferta no trae
+// ninguna— y su COSTE DE REFERENCIA.
 //
-// POR QUÉ ESTA PANTALLA EXISTE. `costes_producto` nace **vacía** a propósito
-// (20261012100000): no se sembró con el 1 €/kg plano de `productos.eur_kg` porque entonces
-// el bloqueo del cierre no saltaría nunca y todos los certificados saldrían con un valor
-// inventado. Sin coste del ejercicio, `canalizaciones.coste_kg` queda `null` al conciliar y
-// el donante entero se bloquea. O sea: lo que se teclea aquí es lo único que separa un
-// cierre bloqueado de un certificado con efecto fiscal.
+// ⚠️ EL COSTE ES DE REFERENCIA, NO EL QUE VALORA LA DONACIÓN. Desde el 27-09-2026 el coste
+// de cada oferta lo declara el productor al publicarla (`excedentes.coste_kg`), y esta cifra
+// es la que se le PROPONE —por el panel y por WhatsApp— y la que se usa si no declara
+// ninguna. La canalización copia el coste al crearse y lo congela al conciliar: cambiarlo
+// aquí no toca nada ya conciliado.
 //
-// EL MOTIVO ES OBLIGATORIO y no es burocracia: `costes_producto_hist` guarda cada valor que
-// se sobrescribe con su motivo, y esa es la respuesta a «¿por qué el tomate valía 0,42 en
-// 2026?» tres años después, cuando quien lo tecleó ya no esté.
+// ⚠️ Y YA NO HAY EJERCICIO: un precio por producto, que se actualiza cuando hace falta
+// (20270405100200). El motivo sigue siendo obligatorio: `costes_producto_hist` guarda cada
+// valor sobrescrito con el suyo.
 //
-// El coste se guarda con 4 decimales: 0,32 y 0,3175 €/kg no son lo mismo cuando multiplican
-// 40 toneladas.
+// La FOTO se gestiona en el detalle (`/equip/productes/:nom`); aquí sale en miniatura.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
+import { Link } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
 import { dataCurta } from '../../lib/albarans'
 import type { CosteProducto } from '../../types'
+import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
+import { BUCKET_PRODUCTES } from '../../lib/fotosProducte'
 import DialegMotiu from '../../components/DialegMotiu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -32,13 +35,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 
-/** Clases de un `<select>` estilado a mano. `text-base md:text-sm` es obligatorio (§2). */
-const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm'
-
 interface Producte {
   nombre: string
   familia: string | null
+  foto_mini: string | null
 }
+
+/** La ruta del detalle de un producto: el nombre lleva acentos, espacios y «·». */
+export const rutaProducte = (nom: string) => `/equip/productes/${encodeURIComponent(nom)}`
 
 function num(v: string): number | null {
   const s = v.trim()
@@ -47,13 +51,11 @@ function num(v: string): number | null {
   return Number.isNaN(n) ? null : n
 }
 
-export default function Costos() {
+export default function Productes() {
   const { t } = useT()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
 
-  const anyActual = new Date().getFullYear()
-  const [exercici, setExercici] = useState(anyActual)
   const [productes, setProductes] = useState<Producte[]>([])
   const [costos, setCostos] = useState<CosteProducto[]>([])
   const [carregant, setCarregant] = useState(true)
@@ -75,7 +77,7 @@ export default function Costos() {
       // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
       const { data, error: err } = await supabase
         .from('productos')
-        .select('nombre, familia')
+        .select('nombre, familia, foto_mini')
         .order('familia', { ascending: true, nullsFirst: false })
         .order('nombre', { ascending: true })
       if (!viu) return
@@ -88,10 +90,9 @@ export default function Costos() {
   const carrega = useCallback(async () => {
     const { data, error: err } = await supabase
       .from('costes_producto')
-      .select('producto, ejercicio, coste_kg, motivo, fijado_por, updated_at')
-      .eq('ejercicio', exercici)
+      .select('producto, coste_kg, motivo, fijado_por, updated_at')
     return { llista: (data as CosteProducto[] | null) ?? [], err }
-  }, [exercici])
+  }, [])
 
   const refresca = useCallback(async () => {
     const { llista, err } = await carrega()
@@ -145,7 +146,7 @@ export default function Costos() {
     if (cost === null || cost <= 0) { toast.error(t('cost.bad_value')); return }
     if (motiu.trim() === '') { toast.error(t('cost.reason_required')); return }
     setOcupat(true)
-    const res = await fixarCostProducte({ producte, exercici, cost, motiu: motiu.trim() })
+    const res = await fixarCostProducte({ producte, cost, motiu: motiu.trim() })
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
     toast.success(t('cost.saved', { p: producte }))
@@ -155,7 +156,7 @@ export default function Costos() {
 
   async function esborra(producte: string, motiu: string) {
     setOcupat(true)
-    const res = await esborrarCostProducte(producte, exercici, motiu)
+    const res = await esborrarCostProducte(producte, motiu)
     setOcupat(false)
     setEsborrant(null)
     if (!res.ok) { toast.error(res.missatge); return }
@@ -163,9 +164,9 @@ export default function Costos() {
     await refresca()
   }
 
-  const anys = useMemo(
-    () => Array.from({ length: 6 }, (_, i) => anyActual - i),
-    [anyActual],
+  const urls = useUrlsFotos(
+    productes.map((p) => p.foto_mini).filter((r): r is string => Boolean(r)),
+    BUCKET_PRODUCTES,
   )
 
   return (
@@ -182,19 +183,8 @@ export default function Costos() {
             {t('cost.blocking_hint')}
           </div>
 
-          <div className="grid gap-4 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-4">
             <div className="space-y-1.5">
-              <Label htmlFor="cost-exercici">{t('cost.f_year')}</Label>
-              <select
-                id="cost-exercici"
-                className={SELECT}
-                value={exercici}
-                onChange={(e) => { setExercici(Number(e.target.value)); setEditant(null) }}
-              >
-                {anys.map((a) => <option key={a} value={a}>{a}</option>)}
-              </select>
-            </div>
-            <div className="space-y-1.5 sm:col-span-2">
               <Label htmlFor="cost-cerca">{t('c.search')}</Label>
               <Input
                 id="cost-cerca"
@@ -236,6 +226,7 @@ export default function Costos() {
               <Table>
                 <TableHeader>
                   <TableRow>
+                    <TableHead className="w-14"><span className="sr-only">{t('prod.c_photo')}</span></TableHead>
                     <TableHead>{t('cost.c_product')}</TableHead>
                     <TableHead>{t('cost.c_family')}</TableHead>
                     <TableHead className="text-right">{t('cost.c_cost')}</TableHead>
@@ -250,7 +241,15 @@ export default function Costos() {
                     const obert = editant === p.nombre
                     return (
                       <TableRow key={p.nombre}>
-                        <TableCell className="font-medium">{p.nombre}</TableCell>
+                        <TableCell>
+                          <Link to={rutaProducte(p.nombre)} aria-label={t('prod.open', { p: p.nombre })}>
+                            <FotoOferta url={p.foto_mini ? urls[p.foto_mini] : null} alt=""
+                              familia={p.familia} className="size-10" />
+                          </Link>
+                        </TableCell>
+                        <TableCell className="font-medium">
+                          <Link to={rutaProducte(p.nombre)} className="text-primary hover:underline">{p.nombre}</Link>
+                        </TableCell>
                         <TableCell className="text-muted-foreground">{p.familia ?? '—'}</TableCell>
                         <TableCell className="text-right tabular-nums whitespace-nowrap">
                           {c

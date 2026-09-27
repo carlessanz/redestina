@@ -313,17 +313,18 @@ export function compararTancamentProva(
   return crida('comparar_cierre_prueba', { p_cierre: cierre, p_reales: reals }, 'tan.err_generic')
 }
 
-// --- Costes por kilo ------------------------------------------------------
+// --- Costes por kilo de REFERENCIA ----------------------------------------
+//
+// Uno por producto, sin ejercicio (20270405100200). Es solo la referencia: el coste de cada
+// oferta lo declara el productor al publicarla (`excedentes.coste_kg`).
 
 export function fixarCostProducte(camps: {
   producte: string
-  exercici: number
   cost: number
   motiu: string
 }): Promise<ResultatRpc<Record<string, unknown>>> {
   return crida('fijar_coste_producto', {
     p_producto: camps.producte,
-    p_ejercicio: camps.exercici,
     p_coste: camps.cost,
     p_motivo: camps.motiu,
   }, 'cost.err_generic')
@@ -331,14 +332,12 @@ export function fixarCostProducte(camps: {
 
 export function esborrarCostProducte(
   producte: string,
-  exercici: number,
   motiu: string,
 ): Promise<ResultatRpc<Record<string, unknown>>> {
   // El motivo NO es opcional: la RPC responde 22023 si llega vacío. Borrar un coste es
   // tan trazable como cambiarlo, y queda en `costes_producto_hist` con prefijo [esborrat].
   return crida('borrar_coste_producto', {
     p_producto: producte,
-    p_ejercicio: exercici,
     p_motivo: motiu,
   }, 'cost.err_generic')
 }

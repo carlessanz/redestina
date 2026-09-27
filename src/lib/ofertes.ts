@@ -92,7 +92,8 @@ export async function creaUbicacio(args: {
 
 export interface CatalogosOferta {
   familias: string[]
-  productos: { nombre: string; familia: string | null }[]
+  /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
+  productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
   causas: { codigo: string; nombre: string | null }[]
   ubicaciones: { id: string; alias: string | null; municipio: string | null }[]
 }

@@ -1,43 +1,132 @@
-// Las fotos de una oferta: el hook que firma las URLs, la miniatura que las pinta y el
-// selector para subirlas (alta de oferta y detalle del productor).
+// Las fotos de una oferta: el hook que firma las URLs, la miniatura que las pinta, el icono
+// genérico cuando no hay ninguna, la resolución «foto propia → foto del producto → icono»
+// (27-09-2026, la regla en `lib/fotoOferta.ts`) y el selector para subirlas.
 
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { Camera, ImageOff, Loader2, X } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import {
+  Apple, Camera, Carrot, Cherry, Citrus, Banana, LeafyGreen, Loader2, Nut, Salad, Sprout, Wheat, X,
+} from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { cn } from '../lib/utils'
-import { MAX_FOTOS, esborraFoto, pujaFoto, urlsFotos } from '../lib/fotos'
+import { BUCKET_FOTOS, MAX_FOTOS, esborraFoto, fixaFotos, pujaFoto, urlsFotos } from '../lib/fotos'
+import { FilaCasella } from './Casella'
+import { BUCKET_PRODUCTES, carregaCataleg } from '../lib/fotosProducte'
+import type { ProducteCataleg } from '../lib/fotosProducte'
+import { classeIcona, fotoPrincipal } from '../lib/fotoOferta'
+import type { ClasseIcona, OfertaAmbFotos } from '../lib/fotoOferta'
 import { Button } from '@/components/ui/button'
 
-/** URLs firmadas de un conjunto de rutas, pedidas en UN lote. */
-export function useUrlsFotos(rutes: string[]): Record<string, string> {
+/** URLs firmadas de un conjunto de rutas de UN bucket, pedidas en UN lote. */
+export function useUrlsFotos(rutes: string[], bucket = BUCKET_FOTOS): Record<string, string> {
   const clau = useMemo(() => [...new Set(rutes)].sort().join('|'), [rutes])
   const [urls, setUrls] = useState<Record<string, string>>({})
   useEffect(() => {
     if (!clau) return
     let viu = true
-    void urlsFotos(clau.split('|')).then((u) => { if (viu) setUrls((a) => ({ ...a, ...u })) })
+    void urlsFotos(clau.split('|'), bucket).then((u) => { if (viu) setUrls((a) => ({ ...a, ...u })) })
     return () => { viu = false }
-  }, [clau])
+  }, [clau, bucket])
   return urls
 }
 
-/** Una foto, o un hueco neutro si no hay (o no se puede ver). */
+const ICONES: Record<ClasseIcona, LucideIcon> = {
+  citric: Citrus,
+  fruita: Apple,
+  vermella: Cherry,
+  seca: Nut,
+  exotica: Banana,
+  fulla: LeafyGreen,
+  arrel: Carrot,
+  horta: Salad,
+  gra: Wheat,
+  // La hoja de la marca: el hueco sin foto sigue siendo Redestina, no un «error de imagen».
+  generic: Sprout,
+}
+
+/** El hueco sin foto: un icono de la familia del producto, en verde sobre crema. */
+export function FotoGenerica({ familia, className }: { familia?: string | null; className?: string }) {
+  const Icona = ICONES[classeIcona(familia)]
+  return (
+    <div className={cn('flex shrink-0 items-center justify-center rounded-md bg-secondary text-primary', className)}
+      aria-hidden>
+      <Icona className="size-1/2 max-h-16 max-w-16" strokeWidth={1.5} />
+    </div>
+  )
+}
+
+/** Una foto, o el icono genérico si no hay (o no se puede ver). */
 export function FotoOferta({
-  url, alt, className,
-}: { url?: string | null; alt: string; className?: string }) {
+  url, alt, className, familia,
+}: { url?: string | null; alt: string; className?: string; familia?: string | null }) {
   const [trencada, setTrencada] = useState(false)
-  if (!url || trencada) {
-    return (
-      <div className={cn('flex shrink-0 items-center justify-center rounded-md bg-muted text-muted-foreground', className)}
-        aria-hidden>
-        <ImageOff className="size-5" />
-      </div>
-    )
-  }
+  if (!url || trencada) return <FotoGenerica familia={familia} className={className} />
   return (
     <img src={url} alt={alt} loading="lazy" onError={() => setTrencada(true)}
       className={cn('shrink-0 rounded-md bg-muted object-cover', className)} />
+  )
+}
+
+/** El catálogo con sus fotos, cargado una vez por sesión. */
+export function useCataleg(): Map<string, ProducteCataleg> {
+  const [cataleg, setCataleg] = useState<Map<string, ProducteCataleg>>(new Map())
+  useEffect(() => {
+    let viu = true
+    void carregaCataleg().then((c) => { if (viu) setCataleg(c) })
+    return () => { viu = false }
+  }, [])
+  return cataleg
+}
+
+export interface FotoResolta {
+  url: string | null
+  /** Es la foto del catálogo, no la del lote: quien la pinta en grande lo dice. */
+  deProducte: boolean
+  familia: string | null
+}
+
+/**
+ * La foto de cada oferta de una pantalla, firmada en lote en los dos buckets. Devuelve una
+ * función: `foto(oferta)` da la miniatura (listas y tarjetas) y `foto(oferta, true)` la
+ * grande. Las ofertas que no se pasan aquí no tienen URL firmada: hay que incluirlas todas.
+ */
+export function useFotosOfertes(
+  ofertes: OfertaAmbFotos[],
+): (o: OfertaAmbFotos, gran?: boolean) => FotoResolta {
+  const cataleg = useCataleg()
+  const resoltes = ofertes.map((o) => fotoPrincipal(o, cataleg))
+  const urlsOf = useUrlsFotos(resoltes.flatMap((f) => (f.tipus === 'oferta' ? [f.ruta] : [])))
+  const urlsProd = useUrlsFotos(
+    resoltes.flatMap((f) => (f.tipus === 'producte' ? [f.ruta, f.mini] : [])),
+    BUCKET_PRODUCTES,
+  )
+  return useCallback((o: OfertaAmbFotos, gran = false) => {
+    const f = fotoPrincipal(o, cataleg)
+    const familia = (o.producto ? cataleg.get(o.producto)?.familia : null) ?? null
+    if (f.tipus === 'oferta') return { url: urlsOf[f.ruta] ?? null, deProducte: false, familia }
+    if (f.tipus === 'producte') {
+      return { url: urlsProd[gran ? f.ruta : f.mini] ?? null, deProducte: true, familia }
+    }
+    return { url: null, deProducte: false, familia: f.familia }
+  }, [cataleg, urlsOf, urlsProd])
+}
+
+/** La foto de una oferta ya resuelta, con la etiqueta «orientativa» si es del catálogo. */
+export function FotoOfertaResolta({
+  foto, alt, className, etiqueta = false,
+}: { foto: FotoResolta; alt: string; className?: string; etiqueta?: boolean }) {
+  const { t } = useT()
+  if (!etiqueta || !foto.deProducte || !foto.url) {
+    return <FotoOferta url={foto.url} alt={alt} familia={foto.familia} className={className} />
+  }
+  return (
+    <div className="relative">
+      <FotoOferta url={foto.url} alt={alt} familia={foto.familia} className={className} />
+      <span className="absolute bottom-2 left-2 rounded bg-background/90 px-2 py-0.5 text-xs text-muted-foreground">
+        {t('foto.orientativa')}
+      </span>
+    </div>
   )
 }
 
@@ -109,6 +198,42 @@ export function SelectorFotos({
       <input ref={input} type="file" accept="image/*" multiple className="hidden"
         onChange={(e) => { const f = e.target.files; void tria(f); e.target.value = '' }} />
       <p className="text-xs text-muted-foreground">{t('foto.hint', { n: MAX_FOTOS })}</p>
+    </div>
+  )
+}
+
+/**
+ * «Si no hi ha fotos, mostra la del producte»: la preferencia de UNA oferta ya publicada
+ * (`excedentes.foto_producte`, 20270405100100). Solo se pinta mientras la oferta no tiene
+ * fotos propias: con fotos, la del catálogo no sale nunca. Se guarda al momento por RPC,
+ * sin tocar las fotos (`p_fotos = null`).
+ */
+export function CasellaFotoProducte({
+  excedenteId, fotos, fotoProducte, disabled, onCanvi,
+}: {
+  excedenteId: string
+  fotos: string[]
+  fotoProducte: boolean
+  disabled?: boolean
+  onCanvi: (valor: boolean) => void
+}) {
+  const { t } = useT()
+  const [desant, setDesant] = useState(false)
+  if (fotos.length > 0) return null
+  return (
+    <div>
+      <FilaCasella checked={fotoProducte} disabled={disabled || desant}
+        onChange={async (v) => {
+          setDesant(true)
+          const r = await fixaFotos(excedenteId, null, v)
+          setDesant(false)
+          if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+          onCanvi(v)
+          toast.success(t('foto.use_product_saved'))
+        }}>
+        {t('foto.use_product')}
+      </FilaCasella>
+      {!fotoProducte && <p className="text-xs text-muted-foreground">{t('foto.use_product_hint')}</p>}
     </div>
   )
 }

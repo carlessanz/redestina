@@ -183,7 +183,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | multiidioma `ca`/`es` | i18n propio (`src/lib/i18n.tsx`) | ✅ |
 | móvil primero / responsive | responsive `md`, mensajería lista↔conversación | ✅ |
 | módulo de comunicación WhatsApp | Fase 1 + intake/opt-in/gates/recordatorios | ✅/excede |
-| valor económico | `costes_producto` por producto y ejercicio, congelado en la canalización al conciliar; sin coste no hay cierre | ✅ |
+| valor económico | Coste por kilo que **declara el productor** en cada oferta (`excedentes.coste_kg`), partiendo del de **referencia** del producto (`costes_producto`, uno por producto, sin ejercicio, 27-09-2026); se congela en la canalización al conciliar; sin coste no hay cierre | ✅ |
 | vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
 
 **Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
@@ -536,6 +536,8 @@ src/
                                envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
                                + Albarans/AlbaraDetall/Espigolades (fase 3)
+                               + Productes/ProducteDetall: el catálogo con foto y coste de
+                               referencia (antes «Costos per quilo», 27-09-2026, §6ter)
   routes/productor/            Inicio, listado, alta de oferta, detalle y Documents
   routes/receptor/             Mercat, interessos, històric i Documents
   types.ts                     Tipos de todas las tablas
@@ -602,6 +604,11 @@ src/
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
     utils.ts                   cn() (shadcn)
     fotos.ts                   Recomprimir (sin EXIF), subir, borrar y firmar las fotos de las ofertas
+                               (`urlsFotos` firma en cualquiera de los dos buckets de fotos)
+    fotoOferta.ts              PURO, con test: QUÉ foto enseña una oferta —la suya, la del
+                               producto o el icono de su familia— (§6ter)
+    fotosProducte.ts           El catálogo con fotos (una vez por sesión) y subir/quitar la foto
+                               de un producto: recorte 1000×750 + miniatura 240×240 en el navegador
     validacio.ts               PURO: NIF/NIE/CIF con dígito de control, teléfono (normaliza a E.164
                                sin +), correo y CP. Devuelve claves i18n
     perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
@@ -658,8 +665,10 @@ src/
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
-    FotosOferta.tsx            Las fotos del producto: useUrlsFotos (firma en lote), FotoOferta
-                               (miniatura con hueco si no hay) y SelectorFotos (subir y quitar)
+    FotosOferta.tsx            Las fotos del producto: useUrlsFotos (firma en lote), FotoOferta,
+                               FotoGenerica (icono por familia), useFotosOfertes + FotoOfertaResolta
+                               (la regla de `fotoOferta.ts`, firmada en lote en los dos buckets),
+                               SelectorFotos (subir y quitar) y CasellaFotoProducte
     SelectorMunicipi.tsx       Elegir municipio de la lista oficial (INE), con búsqueda y comarca;
                                lo usan el alta de oferta y la ficha de la organización
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
@@ -699,6 +708,9 @@ scripts/
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   aplicar-migracion.ts         Aplica UNA migración por la API de gestión y la registra en
                                schema_migrations con el número del fichero (§11)
+  fotos-cataleg.ts (+ .json)   Las fotos del catálogo y de las ofertas desde un MANIFIESTO versionado
+                               (fuente, autor y licencia CC0/dominio público de cada una): descarga,
+                               recorta, WebP sin metadatos y sube. Los binarios no van a git (§11)
   incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
                                en base64, dentro del bundle (§11)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
@@ -859,6 +871,12 @@ productor de la oferta o el equipo; el permiso se comprueba ANTES que la existen
 (`20270404100100`)—. Se ven en el Mercat (tarjeta y detalle), en Interessos, en Històric, en el
 detalle del productor y en el del equipo. ⚠️ **Por WhatsApp no llegan**: el bot todavía no
 descarga imágenes (brecha 8).
+
+**`foto_producte`** (bool, default `true`) y **`coste_kg`** (numeric > 0, null) —`20270405100100`,
+27-09-2026—. La primera: si la oferta **no trae fotos propias**, se enseña la foto del producto del
+catálogo (§6ter); `false` deja el icono genérico. La segunda: el **coste por kilo que declara el
+productor** para esta oferta, partiendo de la referencia de `costes_producto` (§6bis); null = vale
+la referencia. `fixar_fotos_oferta()` gana `p_foto_producte` y con `p_fotos = null` no toca las fotos.
 
 **`format_entrega`** (`caixes`·`palet`·`envasos_propis`·`altres`, check) y **`transport_propi`**
 (bool; null = no se preguntó), `20270401100000` — §6bis. `tipo_caixa` se queda para las ofertas
@@ -1065,6 +1083,16 @@ posición GPS incluida: sin ese paso, una foto hecha en la finca publicaría dó
 ⚠️ Las imágenes van con `loading="lazy"`: en una pestaña oculta (el panel del navegador integrado
 cerrado) no cargan, y parece que la foto está rota. No lo está.
 
+✅ **Y el catálogo tiene su propio bucket, `fotos-productes`** (`20270405100000`, 27-09-2026),
+**separado a propósito** del de las ofertas: aquellas son del productor —se ven si se ve la oferta y
+pueden enseñar su finca— y estas son del catálogo, sin dueño. Privado, 2 MB, jpeg/webp. Políticas:
+**ver** cualquier `authenticated` (el receptor la necesita como respaldo en el Mercat); **subir y
+borrar solo `es_super_admin()`**, ni siquiera un admin; sin UPDATE. `productos` gana `foto` (grande,
+1000×750), `foto_mini` (240×240) —van juntas o ninguna, por check— y `foto_credit` (autor, licencia
+y fuente: aunque sea CC0 se guarda). Se escriben solo por **`fixar_foto_producte()`**, que comprueba
+el rol ANTES que la existencia y devuelve las rutas viejas para que el cliente retire los ficheros.
+Las fotos iniciales salen de `scripts/fotos-cataleg.json` (§11): **solo CC0 o dominio público**.
+
 **La carpeta ordena; la tabla autoriza.** `ruta_documento()` compone en SQL, al insertar:
 
 ```text
@@ -1256,10 +1284,20 @@ y `AlbaraDetall` los pintaba como texto sin botón. Guardar un certificado para 
 tenga no significa nada si no se puede bajar.
 
 **`tipos_caja`** (con `tara_kg`) y **`costes_producto`** (+`costes_producto_hist`, con motivo
-obligatorio en cada cambio). `costes_producto` es el **único origen del valor fiscal**: al crear una
-canalización se copia su `coste_kg` y se congela al conciliar; **si no hay coste del ejercicio queda
-`null` y eso bloquea el cierre**, que es justo lo que se quiere —con el 1 €/kg plano de
-`productos.eur_kg` el bloqueo no saltaría nunca—. `tipos_caja` nace **sembrada provisional y
+obligatorio en cada cambio).
+🔴 **Desde el 27-09-2026 (`20270405100200`) `costes_producto` es el coste de REFERENCIA, uno por
+producto y SIN ejercicio** (PK `producto`; el histórico conserva el año de las filas viejas). Quien
+decide el coste de cada oferta es el **productor**, al publicarla (`excedentes.coste_kg`, panel y
+WhatsApp, §6bis), partiendo de esta referencia. La canalización copia **al crearse** el de la oferta
+o, si no hay, la referencia vigente (`trg_canalizaciones_valoriza`), y lo congela al conciliar;
+`conciliar_albaran()` y `conciliacion_retroactiva()` hacen la misma cascada si llegan sin coste.
+**Cambiar la referencia afecta solo a lo que se cree después** (decisión del cliente). **Sin
+ninguno de los dos queda `null` y eso bloquea el cierre**, que es justo lo que se quiere —con el
+1 €/kg plano de `productos.eur_kg` el bloqueo no saltaría nunca—. Lo fiscal no se movió: el cierre
+y los certificados leen `canalizaciones.coste_kg`, nunca `costes_producto`.
+⚠️ Hasta ese día el arnés fijaba y borraba un coste de Tomàquet «en 1999» en cada pasada; con una
+fila por producto habría **sobrescrito y borrado el coste real**. Su check ahora autoriza sin
+escribir (coste 0 → `22023`), y las 79 filas de histórico que dejó se borraron en la migración. `tipos_caja` nace **sembrada provisional y
 desactivada** hasta que la Fundación dé la lista de taras.
 
 Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
@@ -1888,7 +1926,9 @@ funciones, no políticas:
 | `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo |
 | `anular_albaran` / `rectificar_albaran` | `pot_aprovar()`. El rectificativo usa serie `R-<tipo>` y deja el original en `rectificado` |
 | `crear_espigolada(productor, ubicacion, fecha, voluntarios, notas, lineas, ref_externa, excedente)` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()`. ⚠️ **Con `p_excedente` CONVIERTE una oferta** (`20260921221806`, §6ter): no crea ningún excedente, **reutiliza ese** —`origen` a `espigolament`, `espigolada_id` a la jornada, `estado` a `borrador` hasta el reparto— y crea el REC con su línea. Se niega con `22023` y un código legible en `oferta_inexistent` · `productor_no_coincideix` · `sense_producte_al_camp` · `ja_es_espigolada` · `ja_te_canalitzacions` · `ja_te_albarans` · `massa_linies`. Toma `for update` sobre la oferta **antes de insertar nada**: sin ese bloqueo, dos conversiones simultáneas pasarían las guardas a la vez y crearían dos jornadas del mismo producto, que es la duplicación que esta fase existe para impedir. ⚠️ **La firma de siete argumentos se retiró en la misma migración**: `create or replace` no puede cambiar el número de argumentos, así que habrían convivido dos y cualquier llamada de siete sería **ambigua (42725)** |
-| `fijar_coste_producto` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto` (`es_super_admin()`) | El valor fiscal y las taras. Borrar existe porque un coste fijado en el ejercicio equivocado no tenía vuelta atrás |
+| `fijar_coste_producto(producto, coste, motivo)` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto(producto, motivo)` (`es_super_admin()`) | El coste **de referencia** y las taras. **Sin ejercicio desde `20270405100200`** (drop de las firmas viejas con `p_ejercicio`): un coste por producto que se actualiza cuando hace falta |
+| `fixar_foto_producte(producto, foto, foto_mini, credit)` (`20270405100000`) | La foto del catálogo. **Solo `es_super_admin()`**, comprobado antes que la existencia. Las dos rutas a null = quitarla. Devuelve las rutas anteriores: los ficheros los retira el cliente |
+| `fixar_fotos_oferta(excedente, fotos, foto_producte default null)` | Las fotos de una oferta publicada y, desde `20270405100100`, la casilla «foto del producte». `p_fotos` null = no tocar las fotos. El productor de la oferta o el equipo |
 | `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
 | `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
 | `abrir_cierre` · `calcular_cierre` · `emitir_resumen` · `registrar_factura` · `simular_factura` · `emitir_certificado` · `marcar_enviado` · `marcar_declarado` · `rectificar_certificado` · `reiniciar_cierre_prueba` · `conciliacion_retroactiva` | El ciclo del cierre anual. `abrir_cierre` en modo real exige `es_super_admin()`; `simular_factura` solo existe en cierres de prueba |
@@ -2233,10 +2273,20 @@ Peculiaridades verificadas de los datos, todas manejadas por el script:
 
 ## 6bis. El intake conversacional
 
-Dieciséis pasos, seis de ellos condicionales (`PASOS`/`CAMPOS` en `_shared/camposOferta.ts`,
+Diecisiete pasos, siete de ellos condicionales (`PASOS`/`CAMPOS` en `_shared/camposOferta.ts`,
 desde el 27-09-2026): `familia` → `producte` → `varietat` → **`producte_al_camp`** → `kg` →
 **`format_entrega`** → `caixes` → `retorn` → **`transport`** → `ubicacio` → `disponible_fins` →
-`horari` → `modalitat` → **`preu_minim`** → `causa` → `observacions`.
+`horari` → `modalitat` → **`preu_minim`** → **`cost_kg`** → `causa` → `observacions`.
+
+**`cost_kg` (solo donació, opcional)**: el coste por kilo lo decide el productor. El panel lo
+prellena con la **referencia** del producto (`crear-oferta` la sirve pegada a cada producto del
+catálogo, `cost_referencia`, leyendo con `service_role`: `costes_producto` sigue siendo del equipo)
+y, si el productor lo toca, ya no lo pisa; un enlace «Fes servir la referència» la recupera. El bot
+envía «El valor de referència de X és 0,60 €/kg» con dos botones, **«Mantenir 0,60 €/kg»**
+(`cost_kg:ref`) y **«Un altre valor»** (`cost_kg:altre`, que pide el número sin contar intento);
+sin referencia, pide el número o «-». Se guarda en `excedentes.coste_kg`; en venda y maquila no se
+pregunta (tienen `preu_minim` y el CT no lleva importes). No sale en el texto de la oferta: es para
+el certificado del donante, no para la entidad.
 
 **Qué se salta y cuándo** (revisión funcional del 23-09-2026: «Com es farà l'entrega?» en vez de
 «Quin tipus de caixa?», y «no asumir que siempre interviene una entidad»):
@@ -2467,6 +2517,38 @@ refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción.
 **Vocabulario fijado**: «oferta» (no «excedent») en la interfaz operativa; «Coberta» en vez de
 «Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
 que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
+
+### «Productes»: el catálogo con foto, y qué foto enseña una oferta (27-09-2026)
+
+**`/equip/productes`** sustituye a «Costos per quilo» (`/equip/costos` redirige: había enlaces
+guardados). Misma posición en el menú —antes del Tancament— y mismo contador `costos`. La lista
+enseña la **miniatura** de cada producto (o el icono de su familia), el **coste de referencia** y ya
+**no tiene desplegable de ejercicio**. **`/equip/productes/:nom`** es el detalle: la foto grande con
+su procedencia, subir / cambiar / quitar (solo **super_admin**; al resto, gris con el motivo) y el
+coste de referencia con su histórico y el formulario para cambiarlo (`pot_aprovar()`).
+
+**La regla de la foto de una oferta** (`lib/fotoOferta.ts`, pura y con test; la aplican Mercat,
+Interessos, Històric y las dos listas del productor —la home también, desde este cambio—):
+
+1. Si la oferta tiene fotos propias, la primera.
+2. Si no, y `excedentes.foto_producte` no es `false`, la **foto del producto** del catálogo —la
+   miniatura en listas y tarjetas, la grande en el detalle del Mercat— con la etiqueta **«Foto
+   orientativa del producte»** en grande, para que la entidad no la tome por la del lote.
+3. Si no, el **icono genérico de su familia** (`FotoGenerica`: lucide en verde sobre crema —cítric,
+   fruita, baia, fruita seca, exòtica, fulla, arrel, horta, gra—; por defecto `Sprout`, la hoja de
+   la marca). Sustituye al `ImageOff` gris, que parecía una imagen rota.
+
+La casilla **«Si no hi ha fotos, mostra la foto genèrica del producte»** está en el alta (bajo el
+selector de fotos, con la miniatura del producto elegido) y en los dos detalles (productor y
+equipo, `CasellaFotoProducte`); solo se pinta mientras la oferta no tiene fotos propias.
+
+**Estado de las fotos (28-09-2026)**: **89 de 90 productos** con foto, todas **CC0** (Wikimedia
+Commons, WordPress Photo Directory, rawpixel, Flickr e iNaturalist), revisadas a ojo en los dos
+recortes y con su procedencia en `productos.foto_credit` y en `scripts/fotos-cataleg.json`.
+`RETORN` se queda **a propósito** con el icono: no es un producto, es la devolución de cajas. Tres
+se apartan un poco del producto exacto por falta de material libre: **Nyora** (guindillas secas),
+**Card** (la flor del cardo, no las pencas) y **Garrofa** (en el árbol, no seca). Las fotos de las
+ofertas llegan después, por el mismo script.
 
 ### Los estados SIMPLES de los paneles externos (27-09-2026)
 
@@ -4530,6 +4612,13 @@ npm run preview            # servir el build
 #   TOKEN=$(security find-generic-password -s "Supabase Redestina" -w)
 #   SUPABASE_ACCESS_TOKEN="$TOKEN" deno run -A scripts/aplicar-migracion.ts supabase/migrations/<f>.sql
 # Leer el token ANTES de cambiar HOME (el truco del CLI, §7): si no, `security` no encuentra el llavero.
+
+# Fotos del catálogo y de las ofertas (27-09-2026), desde scripts/fotos-cataleg.json. Primero en
+# local para REVISARLAS a ojo; luego a la base (salta lo que ya tiene foto, salvo --forcar).
+# Solo acepta CC0 / dominio público. Usa sips + cwebp (macOS) y curl con un User-Agent que dice
+# el proyecto: Flickr da 403 a uno con «Bot» y Wikimedia 429 a uno anónimo.
+deno run -A scripts/fotos-cataleg.ts --local /tmp/fotos [--manifest otro.json] [--nomes productes|ofertes]
+SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/fotos-cataleg.ts [--forcar] [--dry-run]
 supabase db push --dry-run                                # qué se aplicaría, sin aplicar nada
 supabase db push                                          # aplicar migraciones en el remoto
 supabase functions deploy whatsapp-send        # con verify_jwt
@@ -4874,8 +4963,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-⚠️ **27-09-2026: se abre la 127** (el correo del resumen anual sigue pidiendo la factura), así
-que son **44 vivas** y la siguiente entrada nueva es la 128. El párrafo de abajo es el recuento
+⚠️ **27-09-2026: se abren la 127** (el correo del resumen anual sigue pidiendo la factura) **y la
+128** (una canalización conciliada sin coste no se puede valorar después), así que son **45 vivas**
+y la siguiente entrada nueva es la 129. El párrafo de abajo es el recuento
 del 22-09-2026 y no se ha rehecho entero.
 
 Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
@@ -5385,6 +5475,13 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
 
+128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
+     análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
+     el albarán entregado o confirmado, y `conciliacion_retroactiva()` rechaza las ya conciliadas,
+     así que fijar después la referencia (o el coste de la oferta) no llega a esa canalización y su
+     bloqueo `sense_cost` del cierre no se levanta. Hoy no hay ninguna en ese estado que importe
+     (son fixtures); cuando la haya hará falta una RPC de «valorar a posteriori» con motivo.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **42 de las 49**. Se quedan
@@ -5560,7 +5657,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **971 pruebas en 30 ficheros**, todas correctas y ninguna pendiente (27-09-2026:
+   Referencia: **983 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (27-09-2026,
+   tarde: +12 de la foto de las ofertas y el coste que declara el productor —`fotoOferta.test.ts`—
+   y del paso `cost_kg`; antes 971. Y antes, el 27-09-2026:
    +11 de la ficha de la organización —validaciones y perfil del receptor— y +8 del cuestionario
    de entrega y transporte; antes 952, que subió de 944
    con las 8 de los estados simples de los paneles externos; antes, de 939
@@ -5574,7 +5673,11 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 964/964 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   ✅ **Referencia HOY: 974/974 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   tarde, tras `20270405100000`…`100200`: +10 —`fixar_foto_producte` denegada a las siete cuentas
+   externas y al técnico y permitida al super_admin, y `borrar_coste_producto` permitida—, todas
+   sobre un producto INEXISTENTE o con coste 0: el arnés ya no escribe ningún coste).
+   La anterior: **964/964 correctas y 28 saltadas** (27-09-2026,
    tras las fotos: +7 de `fixar_fotos_oferta` sobre una oferta ajena, en las siete cuentas
    externas). La anterior, del mismo día: **957/957 correctas y 28 saltadas** (27-09-2026,
    tras el bloque B de la revisión: +14 de `actualitzar_fitxa_productor` y `_entitat` —dos checks

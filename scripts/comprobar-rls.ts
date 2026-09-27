@@ -505,7 +505,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // con la que se valora toda la base.
   { tabla: "costes_producto", op: "leer", esperado: "denegar", descripcion: "NO ve los costes por kilo" },
   { tabla: "costes_producto_hist", op: "leer", esperado: "denegar", descripcion: "NO ve el histórico de costes" },
-  { tabla: "fijar_coste_producto", op: "rpc", esperado: "denegar", args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "arnes" }, descripcion: "NO fija costes por kilo" },
+  // Sobre un producto que NO existe: si la guarda fallara, la RPC respondería 22023 (y
+  // saldría en rojo) en vez de escribir la foto o el coste de un producto real.
+  { tabla: "fixar_foto_producte", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_foto: null, p_foto_mini: null }, descripcion: "NO canvia la foto d'un producte (només super_admin)" },
+  { tabla: "fijar_coste_producto", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" }, descripcion: "NO fija costes por kilo" },
   // Los envases sí: son catálogo, como `productos` y `municipios`, y los necesita el alta
   // de una oferta.
   { tabla: "tipos_caja", op: "leer", esperado: "permitir", descripcion: "lee el catálogo de envases" },
@@ -1049,8 +1052,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "fijar_coste_producto",
       op: "rpc",
       esperado: "denegar",
-      args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "arnes" },
+      args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" },
       descripcion: "NO fija el coste por kilo (es de pot_aprovar)",
+    },
+    // La foto del catálogo es SOLO del super_admin (20270405100000), ni siquiera de un admin.
+    {
+      tabla: "fixar_foto_producte",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_producto: "TEST-ARNES-INEXISTENT", p_foto: null, p_foto_mini: null },
+      descripcion: "NO canvia la foto d'un producte (només super_admin)",
     },
     {
       tabla: "fijar_tipo_caja",
@@ -1358,20 +1369,31 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       columnas: "id, caducidad_enlace_dias",
       descripcion: "puede tocar los parámetros documentales",
     },
-    // La contraparte del «denegar» del técnico. Se fija un coste en el ejercicio **1999**
-    // —imposible, ningún cierre lo mirará— y se borra acto seguido con
-    // `borrar_coste_producto`, que existe también para eso: un coste fijado en el año
-    // equivocado no tenía hasta ahora ninguna vuelta atrás.
+    // La contraparte del «denegar» del técnico, SIN ESCRIBIR NADA. Hasta el 27-09-2026 se
+    // fijaba un coste de Tomàquet en el «ejercicio 1999» y se borraba después; con un solo
+    // coste por producto (20270405100200) eso SOBRESCRIBIRÍA y BORRARÍA el coste real de
+    // Tomàquet. Ahora: un coste 0 pasa la guarda de rol y lo rechaza la validación (22023).
     {
       tabla: "fijar_coste_producto",
       op: "rpc",
       esperado: "permitir",
-      args: { p_producto: "Tomàquet", p_ejercicio: 1999, p_coste: 1, p_motivo: "Comprobación del arnés de RLS" },
-      limpiar: "borrar_coste_producto",
-      // `p_motivo` es obligatorio desde 20261109100500: borrar un coste deja fila en
-      // `costes_producto_hist` con el motivo, igual que sobrescribirlo.
-      limpiarArgs: { p_producto: "Tomàquet", p_ejercicio: 1999, p_motivo: "Limpieza del arnés de RLS" },
-      descripcion: "puede fijar el coste por kilo (y lo borra)",
+      args: { p_producto: "Tomàquet", p_coste: 0, p_motivo: "Comprobación del arnés de RLS" },
+      descripcion: "puede fijar el coste por kilo (autoriza; el coste 0 no se escribe)",
+    },
+    // Borrar un coste que no existe devuelve 0 sin tocar nada.
+    {
+      tabla: "borrar_coste_producto",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_producto: "TEST-ARNES-INEXISTENT", p_motivo: "Comprobación del arnés de RLS" },
+      descripcion: "puede borrar un coste por kilo (sobre un producto inexistente: no escribe)",
+    },
+    {
+      tabla: "fixar_foto_producte",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_producto: "TEST-ARNES-INEXISTENT", p_foto: null, p_foto_mini: null },
+      descripcion: "pot canviar la foto d'un producte (autoritza; el producte no existeix)",
     },
     // Cierre anual (fase 4). Sobre un uuid inventado: la autorización pasa y la función
     // falla después con 22023 («aquest tancament no existeix»), que es lo que el arnés lee
@@ -2030,7 +2052,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     tipo_org: "productor",
     productor_id: "00000000-0000-0000-0000-000000000000",
   },
-  costes_producto: { producto: "Tomàquet", ejercicio: 1999, coste_kg: 1, motivo: "TEST-RLS" },
+  costes_producto: { producto: "Tomàquet", coste_kg: 1, motivo: "TEST-RLS" },
   // `planes_prevencion` tampoco tiene GRANT de escritura para nadie. Mismo criterio que
   // `convenios`: lo justo para que lo que corte sea el permiso y no el check excluyente.
   planes_prevencion: {

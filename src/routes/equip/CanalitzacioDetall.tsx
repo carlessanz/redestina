@@ -434,7 +434,7 @@ export default function CanalitzacioDetall() {
                     {i === 5 && (
                       <>
                         <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                          <Link to="/equip/costos">{t('canalz.b_costos')}</Link>
+                          <Link to="/equip/productes">{t('canalz.b_costos')}</Link>
                         </Button>
                         <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
                           <Link to="/equip/tancament">{t('canalz.b_tancament')}</Link>

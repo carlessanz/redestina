@@ -216,6 +216,10 @@ export interface Excedente {
   transport_propi: boolean | null
   /** Rutas en el bucket `fotos-ofertes` (20270404100000), como mucho 3; la primera es la principal. */
   fotos: string[]
+  /** Sin fotos propias, enseñar la del producto del catálogo (20270405100100). */
+  foto_producte: boolean
+  /** Coste por kilo que declara el productor; null = el de referencia del producto. */
+  coste_kg: number | null
 }
 
 export interface Canalizacion {
@@ -311,6 +315,10 @@ export interface Producto {
   nombre: string
   familia: string | null
   eur_kg: number | null
+  /** Rutas en el bucket `fotos-productes` (20270405100000): grande 1000×750 y miniatura 240×240. */
+  foto: string | null
+  foto_mini: string | null
+  foto_credit: Record<string, string | null> | null
 }
 
 export interface Causa {
@@ -634,9 +642,9 @@ export interface TipoCaja {
   orden: number
 }
 
+/** El coste de REFERENCIA de un producto: uno, sin ejercicio (20270405100200). */
 export interface CosteProducto {
   producto: string
-  ejercicio: number
   coste_kg: number
   motivo: string
   fijado_por: string | null

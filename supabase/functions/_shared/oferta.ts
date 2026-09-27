@@ -39,6 +39,13 @@ const ETIQUETA_MODALITAT: Record<string, string> = {
  *    metería la oferta en la cola de espigolades del equipo y afirmaría al receptor algo
  *    que nadie ha dicho.
  */
+/** Un coste por kilo positivo, o null si no se dijo o no es un número (acepta la coma). */
+export function costDeclarat(v: unknown): number | null {
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export function esProducteAlCamp(valor: unknown): boolean {
   if (typeof valor === "boolean") return valor;
   const v = String(valor ?? "").trim().toLowerCase()
@@ -290,6 +297,9 @@ export async function crearExcedente(
 
   const kg = Number(d.kg ?? 0);
   const preuMinim = d.preu_minim != null ? Number(d.preu_minim) : null;
+  // El coste que declara el productor (27-09-2026). Solo se pregunta en donació; si no lo
+  // dice, null y la canalización toma la referencia del producto.
+  const costKg = d.modalitat === "donacio" ? costDeclarat(d.cost_kg) : null;
   // Se resuelve UNA vez. El texto que circula y la columna que decide el flujo tienen que
   // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
   // cuanto alguien cambie una de las dos.
@@ -354,8 +364,11 @@ export async function crearExcedente(
       // Solo llegan del panel (el bot no recibe imágenes todavía, brecha 8); `crear-oferta`
       // ya ha comprobado que son de la carpeta de este productor.
       fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
+      // Sin fotos propias, ¿se enseña la del catálogo? Solo un `false` explícito lo apaga.
+      foto_producte: d.foto_producte !== false,
       modalitat: d.modalitat ?? null,
       preu_minim: preuMinim,
+      coste_kg: costKg,
       causa: causa?.nombre ?? null,
       causa_codigo: d.causa ?? null,
       // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha

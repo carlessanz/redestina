@@ -11,7 +11,7 @@
 // se ve como tooltip, y dos «La meva organització» seguidos no distinguen nada.
 
 import {
-  Building2, Calculator, ClipboardCheck, ClipboardList, Coins, FileSignature, FileText, FolderOpen, Handshake, History,
+  Apple, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users, Workflow,
 } from 'lucide-react'
@@ -86,8 +86,9 @@ const EQUIP: NavGrup[] = [
   {
     titolKey: 'nav.grp_tancament',
     items: [
-      // ANTES del Tancament: es su prerrequisito (`cost.blocking_hint`).
-      { to: '/equip/costos', labelKey: 'nav.costos', icon: Coins, comptador: 'costos' },
+      // ANTES del Tancament: su coste de referencia es un prerrequisito (`cost.blocking_hint`).
+      // Se llamó «Costos per quilo» hasta el 27-09-2026; ahora es el catálogo, con foto.
+      { to: '/equip/productes', labelKey: 'nav.productes', icon: Apple, comptador: 'costos' },
       { to: '/equip/tancament', labelKey: 'nav.tancament', icon: Calculator },
     ],
   },

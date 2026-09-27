@@ -19,7 +19,8 @@ import {
 import type { PuntProces } from '../../lib/procesOferta'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
-import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
+import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
+import type { FotoResolta } from '../../components/FotosOferta'
 import type { EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -159,7 +160,7 @@ function fmtKg(n: number): string {
 
 function FilaOferta({
   o, canalitzats, punt, ambCodi, foto,
-}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: string }) {
+}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: FotoResolta }) {
   const { t } = useT()
   const total = Number(o.kg_total ?? 0)
   const falten = Math.max(0, total - canalitzats)
@@ -172,7 +173,7 @@ function FilaOferta({
       className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 hover:bg-muted/40"
     >
       <div className="flex min-w-0 items-center gap-3">
-        <FotoOferta url={foto} alt={o.producto ?? ''} className="size-12" />
+        {foto && <FotoOfertaResolta foto={foto} alt={o.producto ?? ''} className="size-12" />}
         <div className="min-w-0">
           <div className="font-medium">
             {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
@@ -317,6 +318,7 @@ export function ProductorInici() {
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
   const { ofertes, kg, destins, puntDe, carregant } = useMevesOfertes(productorId)
+  const foto = useFotosOfertes(ofertes)
 
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
   // marcha —pide atención o se está gestionando—, abajo lo que ya es historia. Antes las
@@ -386,7 +388,7 @@ export function ProductorInici() {
               </CardHeader>
               <CardContent className="space-y-2">
                 {historic.slice(0, 5).map((o) => (
-                  <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} />
+                  <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} foto={foto(o)} />
                 ))}
               </CardContent>
             </Card>
@@ -403,7 +405,7 @@ export function ProductorOfertes() {
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
   const { ofertes, kg, puntDe, carregant } = useMevesOfertes(productorId)
-  const urls = useUrlsFotos(ofertes.map((o) => o.fotos?.[0]).filter((r): r is string => Boolean(r)))
+  const foto = useFotosOfertes(ofertes)
 
   return (
     <Card>
@@ -427,7 +429,7 @@ export function ProductorOfertes() {
         {!carregant && ofertes.length === 0 && <CapOferta />}
         {ofertes.map((o) => (
           <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi
-            foto={o.fotos?.[0] ? urls[o.fotos[0]] : undefined} />
+            foto={foto(o)} />
         ))}
       </CardContent>
     </Card>

@@ -61,10 +61,10 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
     expect(CAMPOS.map((c) => c.clave)).toEqual([...PASOS])
   })
 
-  it('son 16 pasos, seis de ellos condicionales', () => {
-    expect(PASOS).toHaveLength(16)
+  it('son 17 pasos, siete de ellos condicionales', () => {
+    expect(PASOS).toHaveLength(17)
     expect(CAMPOS.filter((c) => c.condicion).map((c) => c.clave)).toEqual([
-      'format_entrega', 'caixes', 'retorn', 'transport', 'ubicacio', 'preu_minim',
+      'format_entrega', 'caixes', 'retorn', 'transport', 'ubicacio', 'preu_minim', 'cost_kg',
     ])
   })
 
@@ -156,6 +156,12 @@ describe('aplica: el preu mínim se salta en donació', () => {
   // que negociar, así que preguntarlo no es solo ruido, es contradecir la modalidad.
   it('en donació NO se pregunta el preu mínim', () => {
     expect(aplica(campo('preu_minim'), { modalitat: 'donacio' })).toBe(false)
+  })
+
+  it('el cost per quilo solo en donació, y no es obligatorio', () => {
+    expect(aplica(campo('cost_kg'), { modalitat: 'donacio' })).toBe(true)
+    expect(aplica(campo('cost_kg'), { modalitat: 'venda' })).toBe(false)
+    expect(campo('cost_kg').obligatorio).toBe(false)
   })
 
   it('en venda y en maquila SÍ se pregunta', () => {
@@ -401,7 +407,7 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
     ])
     expect(porSeccion('quantitat')).toEqual(['kg', 'format_entrega', 'caixes', 'retorn'])
     expect(porSeccion('recollida')).toEqual(['transport', 'ubicacio', 'disponible_fins', 'horari'])
-    expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim'])
+    expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim', 'cost_kg'])
     expect(porSeccion('causa')).toEqual(['causa', 'observacions'])
   })
 
@@ -428,9 +434,11 @@ import { siguientePaso } from '../supabase/functions/_shared/intake.ts'
 describe('siguientePaso: el recorrido del cuestionario', () => {
   it('cuando todo aplica, va en el orden de PASOS', () => {
     // Ya collit, en caixes, sense transport: se pregunta todo menos lo que depende de otra cosa.
+    // En venda: el coste por kilo (solo donació) es el único paso que no aplica.
     const datos = { producte_al_camp: 'no', format_entrega: 'caixes', transport: 'no', modalitat: 'venda' }
-    for (let i = 0; i < PASOS.length - 1; i++) {
-      expect(siguientePaso(PASOS[i], datos), `después de ${PASOS[i]}`).toBe(PASOS[i + 1])
+    const passos = PASOS.filter((p) => p !== 'cost_kg')
+    for (let i = 0; i < passos.length - 1; i++) {
+      expect(siguientePaso(passos[i], datos), `después de ${passos[i]}`).toBe(passos[i + 1])
     }
   })
 
@@ -447,8 +455,14 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
       .toBe('transport')
   })
 
-  it('en donació NO se pregunta el preu mínim', () => {
-    expect(siguientePaso('modalitat', { modalitat: 'donacio' })).toBe('causa')
+  it('en donació NO se pregunta el preu mínim, sino el cost per quilo', () => {
+    expect(siguientePaso('modalitat', { modalitat: 'donacio' })).toBe('cost_kg')
+    expect(siguientePaso('cost_kg', { modalitat: 'donacio' })).toBe('causa')
+  })
+
+  it('en venda y maquila, después del preu mínim no se pregunta el coste', () => {
+    expect(siguientePaso('preu_minim', { modalitat: 'venda' })).toBe('causa')
+    expect(siguientePaso('preu_minim', { modalitat: 'maquila' })).toBe('causa')
   })
 
   it('en venda y en maquila SÍ', () => {

@@ -83,7 +83,9 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
           <DialogDescription>{t('canalz.nova_hint')}</DialogDescription>
         </DialogHeader>
 
-        <div className="min-h-0 flex-1 overflow-y-auto">
+        {/* `overflow-x-hidden`: el pie fijo del formulario lleva `-mx-4` para ocupar el ancho
+            de la página, y aquí no hay ese margen, así que sobresalía 16 px (medido a 375). */}
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {/* Primero de quién es. Sin productor no hay descriptor que pedir: los catálogos
               de `crear-oferta/campos` dependen de sus ubicaciones. */}
           <div className="grid gap-3 sm:grid-cols-2">

@@ -76,14 +76,23 @@ Deno.serve(async (req) => {
     const url = new URL(req.url);
     const productorId = url.searchParams.get("productor");
 
-    const [productos, causas, ubicaciones] = await Promise.all([
-      supabase.from("productos").select("nombre, familia").order("nombre"),
+    // `costes_producto` es solo del equipo por RLS, pero el VALOR DE REFERENCIA se le
+    // propone al productor al publicar (27-09-2026): se lee aquí con `service_role` y viaja
+    // pegado a cada producto, sin abrir la tabla. `foto_mini` es para enseñar la foto del
+    // catálogo junto a la casilla «fes servir la foto del producte».
+    const [productos, causas, ubicaciones, costos] = await Promise.all([
+      supabase.from("productos").select("nombre, familia, foto_mini").order("nombre"),
       supabase.from("causas").select("codigo, nombre").order("nombre"),
       productorId && puedeOfertar(productorId)
         ? supabase.from("productor_ubicaciones")
           .select("id, alias, municipio").eq("productor_id", productorId)
         : Promise.resolve({ data: [] }),
+      supabase.from("costes_producto").select("producto, coste_kg"),
     ]);
+    const referencia = new Map(
+      ((costos.data ?? []) as { producto: string; coste_kg: number }[])
+        .map((c) => [c.producto, Number(c.coste_kg)]),
+    );
 
     const familias = [
       ...new Set((productos.data ?? [])
@@ -108,7 +117,8 @@ Deno.serve(async (req) => {
       secciones: SECCIONES,
       catalogos: {
         familias,
-        productos: productos.data ?? [],
+        productos: ((productos.data ?? []) as { nombre: string; familia: string | null; foto_mini: string | null }[])
+          .map((p) => ({ ...p, cost_referencia: referencia.get(p.nombre) ?? null })),
         causas: causas.data ?? [],
         ubicaciones: ubicaciones.data ?? [],
       },
@@ -163,6 +173,21 @@ Deno.serve(async (req) => {
           !fotos.every((f) => typeof f === "string" && f.startsWith(`${productorId}/`))) {
         return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
       }
+    }
+
+    // El coste que declara el productor (27-09-2026): un número positivo o nada. La base lo
+    // exige también (`excedentes_coste_kg_positiu`), pero así el error dice qué campo es.
+    const cost = (datos as Record<string, unknown>).cost_kg;
+    if (cost !== undefined && cost !== null && cost !== "") {
+      const n = Number(String(cost).replace(",", "."));
+      if (!Number.isFinite(n) || n <= 0) {
+        return responder({ error: "El cost per quilo ha de ser un número positiu", code: "cost_invalid" }, 400);
+      }
+    }
+    // `foto_producte` es un booleano o no viene (entonces, sí).
+    const fp = (datos as Record<string, unknown>).foto_producte;
+    if (fp !== undefined && fp !== null && typeof fp !== "boolean") {
+      return responder({ error: "foto_producte ha de ser booleà", code: "foto_producte_invalid" }, 400);
     }
 
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46).

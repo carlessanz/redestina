@@ -60,7 +60,7 @@ const FILES: readonly FilaCua[] = [
   // `?tab=` son los nombres reales de las pestañas de `Albarans.tsx`.
   { cua: 'albarans_esborrany', desti: '/equip/albarans?tab=esborranys' },
   { cua: 'albarans_conciliar', desti: '/equip/albarans?tab=conciliar' },
-  { cua: 'costos', desti: '/equip/costos' },
+  { cua: 'costos', desti: '/equip/productes' },
   { cua: 'tancament', desti: '/equip/tancament' },
   { cua: 'documents_error', desti: '/equip/documents' },
 ] as const

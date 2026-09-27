@@ -1,0 +1,717 @@
+{
+  "productes": {
+    "Taronja": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/47/Oranges_a_fruit.jpg/1920px-Oranges_a_fruit.jpg",
+      "titol": "Oranges a fruit.jpg",
+      "autor": "safaritravelplus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Oranges_a_fruit.jpg"
+    },
+    "Mandarina": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/cc/Fruits-oranges-tangerines_%2824029757950%29.jpg/1920px-Fruits-oranges-tangerines_%2824029757950%29.jpg",
+      "titol": "File:Fruits-oranges-tangerines (24029757950).jpg",
+      "autor": "www.Pixel.la Free Stock Photos",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=51440696"
+    },
+    "Llimona": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f1/Organic-Primofiore-Sicilia014.jpg/1280px-Organic-Primofiore-Sicilia014.jpg",
+      "titol": "Organic-Primofiore-Sicilia014.jpg",
+      "autor": "Memorato",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Organic-Primofiore-Sicilia014.jpg"
+    },
+    "Llima": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Limes_in_Nature_%28Unsplash%29.jpg/1920px-Limes_in_Nature_%28Unsplash%29.jpg",
+      "titol": "Limes in Nature (Unsplash).jpg",
+      "autor": "Dawn Armfield darmfield",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Limes_in_Nature_(Unsplash).jpg"
+    },
+    "Bolet": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/c/ca/Chanterelles_-_San_Francisco%2C_CA.jpg/1920px-Chanterelles_-_San_Francisco%2C_CA.jpg",
+      "titol": "Chanterelles - San Francisco, CA.jpg",
+      "autor": "Daderot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Chanterelles_-_San_Francisco,_CA.jpg"
+    },
+    "Xampinyó": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/da/WhiteMushroom.jpg/1920px-WhiteMushroom.jpg",
+      "titol": "WhiteMushroom.jpg",
+      "autor": "Raysonho @ Open Grid Scheduler / Grid Engine",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:WhiteMushroom.jpg"
+    },
+    "Albercoc": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/06/Yellow_apricots.jpg/1920px-Yellow_apricots.jpg",
+      "titol": "Yellow apricots.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Yellow_apricots.jpg"
+    },
+    "Cirera": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Chilean_cherries_%281%29.jpg/1920px-Chilean_cherries_%281%29.jpg",
+      "titol": "Chilean cherries (1).jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Chilean_cherries_(1).jpg"
+    },
+    "Codony": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Quinces_2017_A.jpg/1920px-Quinces_2017_A.jpg",
+      "titol": "Quinces 2017 A.jpg",
+      "autor": "Fructibus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Quinces_2017_A.jpg"
+    },
+    "Figa": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/32/Fresh_figs.jpg/1920px-Fresh_figs.jpg",
+      "titol": "Fresh figs.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Fresh_figs.jpg"
+    },
+    "Kaki": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/89/Sweet_red_persimmon.jpg/1920px-Sweet_red_persimmon.jpg",
+      "titol": "Sweet red persimmon.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Sweet_red_persimmon.jpg"
+    },
+    "Magrana": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/45/Soft_seed_pomegranate.jpg/1920px-Soft_seed_pomegranate.jpg",
+      "titol": "Soft seed pomegranate.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Soft_seed_pomegranate.jpg"
+    },
+    "Nectarina": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/bd/Nectarines_%281%29.jpg/1920px-Nectarines_%281%29.jpg",
+      "titol": "Nectarines (1).jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Nectarines_(1).jpg"
+    },
+    "Nespre": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/6/6a/Mt._Dabieshan_loquat.jpg/1920px-Mt._Dabieshan_loquat.jpg",
+      "titol": "Mt. Dabieshan loquat.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Mt._Dabieshan_loquat.jpg"
+    },
+    "Paraguaià": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a5/Button_peach_%281%29.jpg/1920px-Button_peach_%281%29.jpg",
+      "titol": "Button peach (1).jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Button_peach_(1).jpg"
+    },
+    "Pera": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8e/Pears_-_Massachusetts.jpg/1920px-Pears_-_Massachusetts.jpg",
+      "titol": "Pears - Massachusetts.jpg",
+      "autor": "Daderot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Pears_-_Massachusetts.jpg"
+    },
+    "Poma": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/0/00/Apples_fruit.jpg/1920px-Apples_fruit.jpg",
+      "titol": "Apples fruit.jpg",
+      "autor": "safaritravelplus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Apples_fruit.jpg"
+    },
+    "Préssec": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/A_Bowl_Of_Peaches_%28168126787%29.jpg/1920px-A_Bowl_Of_Peaches_%28168126787%29.jpg",
+      "titol": "A Bowl Of Peaches (168126787).jpg",
+      "autor": "Janos Virag",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:A_Bowl_Of_Peaches_(168126787).jpg"
+    },
+    "Pruna": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/d/d4/Prunes_Viktualienmarkt_Munich.jpg/1920px-Prunes_Viktualienmarkt_Munich.jpg",
+      "titol": "Prunes Viktualienmarkt Munich.jpg",
+      "autor": "Jebulon",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Prunes_Viktualienmarkt_Munich.jpg"
+    },
+    "Raim": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/A_bunch_of_grapes_on_a_vine.jpg/1920px-A_bunch_of_grapes_on_a_vine.jpg",
+      "titol": "A bunch of grapes on a vine.jpg",
+      "autor": "Ian Schneider on Unsplash",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:A_bunch_of_grapes_on_a_vine.jpg"
+    },
+    "Alvocat": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/34/Avocados_sold_in_supermarkets.jpg/1920px-Avocados_sold_in_supermarkets.jpg",
+      "titol": "Avocados sold in supermarkets.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Avocados_sold_in_supermarkets.jpg"
+    },
+    "Coco": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/21/Coconut-60395_-_Hans_Braxmeier.jpg/1920px-Coconut-60395_-_Hans_Braxmeier.jpg",
+      "titol": "Coconut-60395 - Hans Braxmeier.jpg",
+      "autor": "Hans Braxmeier",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Coconut-60395_-_Hans_Braxmeier.jpg"
+    },
+    "Kiwi": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/91/Kiwis_in_a_pile.jpg/1920px-Kiwis_in_a_pile.jpg",
+      "titol": "Kiwis in a pile.jpg",
+      "autor": "Apinanaivot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Kiwis_in_a_pile.jpg"
+    },
+    "Mango": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/43/Imperial_concubine_mango.jpg/1920px-Imperial_concubine_mango.jpg",
+      "titol": "Imperial concubine mango.jpg",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Imperial_concubine_mango.jpg"
+    },
+    "Pinya": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/f/f5/04012jfQueen_Formosa_pineapple_Philippines_Malolos_Cityfvf_05.jpg/1920px-04012jfQueen_Formosa_pineapple_Philippines_Malolos_Cityfvf_05.jpg",
+      "titol": "04012jfQueen Formosa pineapple Philippines Malolos Cityfvf 05.jpg",
+      "autor": "Judgefloro",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:04012jfQueen_Formosa_pineapple_Philippines_Malolos_Cityfvf_05.jpg"
+    },
+    "Plàtan": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/9/94/Bananas_by_SpencerWing-4260422.jpg/1920px-Bananas_by_SpencerWing-4260422.jpg",
+      "titol": "Bananas by SpencerWing-4260422.jpg",
+      "autor": "SpencerWing-4260422 at Pixabay",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Bananas_by_SpencerWing-4260422.jpg"
+    },
+    "Xirimoia": {
+      "url": "https://inaturalist-open-data.s3.amazonaws.com/photos/147700462/original.jpeg",
+      "titol": "cherimoya, chirimoya",
+      "autor": "Ruth Gutiérrez Oliveros",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.inaturalist.org/photos/147700462"
+    },
+    "Ametlla": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/4/41/KASHMIRI_MAMRA_ALMONDS.jpg/1920px-KASHMIRI_MAMRA_ALMONDS.jpg",
+      "titol": "KASHMIRI MAMRA ALMONDS.jpg",
+      "autor": "Ranjithkumar Murugesan",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:KASHMIRI_MAMRA_ALMONDS.jpg"
+    },
+    "Avellana": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/a/a1/Noisettes_-_Hazelnut.jpg/1920px-Noisettes_-_Hazelnut.jpg",
+      "titol": "Noisettes - Hazelnut.jpg",
+      "autor": "Cactux",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Noisettes_-_Hazelnut.jpg"
+    },
+    "Nous": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/3/36/Pile_of_walnuts.jpg/1920px-Pile_of_walnuts.jpg",
+      "titol": "Pile of walnuts.jpg",
+      "autor": "helee54 on Pixabay",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Pile_of_walnuts.jpg"
+    },
+    "Gerd": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/b/b2/Test_2016-09-09.jpg/1280px-Test_2016-09-09.jpg",
+      "titol": "Raspberries (Test 2016-09-09.jpg)",
+      "autor": "StockSnap.io (pujat per Subfader)",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Test_2016-09-09.jpg"
+    },
+    "Mores": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/8/8f/Blackberry_Basket_%28Unsplash%29.jpg/1920px-Blackberry_Basket_%28Unsplash%29.jpg",
+      "titol": "Blackberry Basket (Unsplash).jpg",
+      "autor": "Nick Sarro nicksarr1",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Blackberry_Basket_(Unsplash).jpg"
+    },
+    "Nabiu": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/1/13/Blueberries_%2852187526180%29.jpg/1920px-Blueberries_%2852187526180%29.jpg",
+      "titol": "Blueberries (52187526180).jpg",
+      "autor": "Alabama Extension",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Blueberries_(52187526180).jpg"
+    },
+    "Garrofa": {
+      "url": "https://inaturalist-open-data.s3.amazonaws.com/photos/307753693/original.jpg",
+      "titol": "Ceratonia siliqua",
+      "autor": "Allen Hurlbert",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.inaturalist.org/photos/307753693"
+    },
+    "Brócoli": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/48/Broccoli_florets_on_ice.jpg",
+      "titol": "Broccoli florets on ice",
+      "autor": "Jeffery Martin",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=61659675"
+    },
+    "Bròquil": {
+      "url": "https://pd.w.org/2026/05/3566a0c55c8e13ab9.57836235-2048x1536.jpeg",
+      "titol": "Fresh broccoli heads displayed in a grocery store.",
+      "autor": "Vishnu Chandra",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/3566a0c55c/"
+    },
+    "Carxofa": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyYXJ0aWNob2tlX3ZlZ2V0YWJsZXNfZ3JlZW5fbWFya2V0LWltYWdlLWt5YmM3MGo1LmpwZw.jpg",
+      "titol": "Artichoke vegetable, edible plant",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/6028937/photo-image-public-domain-plant-food"
+    },
+    "Coliflor": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4MTYwMjA5MS1pbWFnZS1rd3Z2bW92ei5qcGc.jpg",
+      "titol": "Free cauliflowers image",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/5909666/image-flower-public-domain-plant"
+    },
+    "Albergínia": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/1/1f/3_x_Small_Japanese_eggplant_2017_A.jpg",
+      "titol": "3 x Small Japanese eggplant 2017 A",
+      "autor": "Fructibus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=63440219"
+    },
+    "Carbassa": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e1/Pile_of_butternut_squash.jpg",
+      "titol": "Pile of butternut squash",
+      "autor": "Jeffery Martin",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=61820513"
+    },
+    "Carbassó": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/c/c6/Zucchini_%2820240716%29.jpg",
+      "titol": "Zucchini (20240716)",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=153131691"
+    },
+    "Cogombre": {
+      "url": "https://pd.w.org/2023/03/402640646a2c89b75.21860459-1536x2048.jpg",
+      "titol": "Zucchini",
+      "autor": "Topher",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/402640646a/"
+    },
+    "Fava": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/4/48/Broad_bean_pods_%281%29.jpg",
+      "titol": "Broad bean pods (1)",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=148874497"
+    },
+    "Fesol": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/d/da/White_Beans.JPG",
+      "titol": "White Beans",
+      "autor": "Miansari66",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=22594498"
+    },
+    "Maduixa": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2Zyc3RyYXdiZXJyaWVzX3JlZF9mcnVpdHlfZGVsaWNpb3VzLWltYWdlLWt5YmFsbDFoLmpwZw.jpg",
+      "titol": "Closeup many fresh strawberries",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/6018081/photo-image-public-domain-plant-botanical"
+    },
+    "Meló": {
+      "url": "https://live.staticflickr.com/5585/14997960058_8ce46c7b44_b.jpg",
+      "titol": "Stem-end, fungal rot of organically grown cantaloupe",
+      "autor": "Plant pests and diseases",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.flickr.com/photos/62295966@N07/14997960058"
+    },
+    "Mongeta": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e8/Green_Beans_%28Alabama_Extension%29.jpg",
+      "titol": "Green Beans (Alabama Extension)",
+      "autor": "Alabama Extension",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=102658376"
+    },
+    "Nyora": {
+      "url": "https://live.staticflickr.com/8019/7698343400_966335843b_b.jpg",
+      "titol": "Heap of Dried Red Chili Peppers",
+      "autor": "qubodup",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.flickr.com/photos/21051491@N02/7698343400"
+    },
+    "Pebrot": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/7/78/Three_bell_peppers_2017_A.jpg",
+      "titol": "Three bell peppers 2017 A",
+      "autor": "Fructibus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=63597305"
+    },
+    "Pèsol": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9sci9pbWFnZXMvd2Vic2l0ZS8yMDIyLTA2L3drNDk4NzY4MTgtd2lraW1lZGlhLWltYWdlLWtwNmx6YnE4LmpwZw.jpg",
+      "titol": "basket peas pods. Ukraine, Vinnytsia",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/3340655/free-photo-image-basket-cc0-creative-commons"
+    },
+    "Sindria": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/2f/National_Watermelon.jpg",
+      "titol": "National Watermelon",
+      "autor": "Kuwanishbek",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=149306024"
+    },
+    "Tomàquet": {
+      "url": "https://pd.w.org/2025/12/280694afd373ffdb1.17755890-2048x1536.jpg",
+      "titol": "A cluster of ripe red tomatoes hanging on the vine, smooth and shiny with bright green stems.",
+      "autor": "Nawodi Herath",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/280694afd3/"
+    },
+    "Alfabrega": {
+      "url": "https://pd.w.org/2023/12/4666570826a05a981.16578224-2048x1536.jpg",
+      "titol": "Sweet Basil leaves",
+      "autor": "Arslan Kalwar",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/4666570826/"
+    },
+    "Api": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/27/Celery_stacks.jpg",
+      "titol": "Celery stacks",
+      "autor": "Jeffery Martin",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=61820167"
+    },
+    "Bleda": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/5e/Silverbeet_%28chard%29_-_Harbourside_Market%2C_Wellington%2C_New_Zealand_-_DSC09787.jpg",
+      "titol": "Silverbeet (chard) - Harbourside Market, Wellington, New Zealand - DSC09787",
+      "autor": "Daderot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=158207186"
+    },
+    "Card": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL2ZyYXJ0aWNob2tlX3BsYW50X2FyY2hpdGVjdHVyZV8xNDM5MTYzLWltYWdlLWt5YmM2bGozLmpwZw.jpg",
+      "titol": "Cardoon, artichoke thistle",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/6028704/photo-image-flower-public-domain-plant"
+    },
+    "Col": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/88/Cabbage_in_a_stack.jpg",
+      "titol": "Cabbage in a stack",
+      "autor": "Jeffery Martin",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=61659596"
+    },
+    "Col de Brussel·les": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/c/c6/Brussels_sprouts_-_San_Francisco%2C_CA.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Brussels sprouts - San Francisco, CA.jpg",
+      "autor": "Daderot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Brussels_sprouts_-_San_Francisco,_CA.jpg"
+    },
+    "Enciam": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/2/22/Cos_lettuce_2017_A1.jpg",
+      "titol": "Cos lettuce 2017 A1",
+      "autor": "Fructibus",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=64028608"
+    },
+    "Escarola": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/1/13/Endive_leafs.jpg",
+      "titol": "Endive leafs",
+      "autor": "Fumikas Sagisavas",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=153134632"
+    },
+    "Espàrrec": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/6/64/Fresh_asparagus_spears_for_pickling.jpg",
+      "titol": "Fresh asparagus spears for pickling",
+      "autor": "Nutrition, Food Safety & Health",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=100901926"
+    },
+    "Espinac": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/ae/Spinach_Plant_Nourishment_Meal_Fresh_Healthy_Bio.jpg",
+      "titol": "Spinach Plant Nourishment Meal Fresh Healthy Bio",
+      "autor": "ThiloBecker",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=119567593"
+    },
+    "Julivert": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL3B4OTkxMjcyLWltYWdlLWt3dnVwZDM0LmpwZw.jpg",
+      "titol": "Parsley plants",
+      "autor": "",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/5903520/parsley-plants-free-public-domain-cc0-photo"
+    },
+    "Rucula": {
+      "url": "https://live.staticflickr.com/1842/43292059815_46f148f042_b.jpg",
+      "titol": "Arugula",
+      "autor": "Nutrition, Food Safety & Health",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.flickr.com/photos/93936679@N05/43292059815"
+    },
+    "All": {
+      "url": "https://pd.w.org/2025/11/929692580f1f125f8.11033877-2048x1536.jpeg",
+      "titol": "A large heap of fresh garlic bulbs displayed in a hypermarket in Kozhikode, Kerala. The dry outer skins and natural earthy tones show their freshness and strong aroma.",
+      "autor": "Bigul Malayi",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/929692580f/"
+    },
+    "Calçot": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/8/87/Cal%C3%A7ots_a_Arenys_de_Munt.jpg",
+      "titol": "Calçots a Arenys de Munt",
+      "autor": "Friviere",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=160028650"
+    },
+    "Ceba": {
+      "url": "https://pd.w.org/2022/01/71461f5988a0b8c82.86332526-2048x1534.jpg",
+      "titol": "Farmers’ Market Yellow Onions",
+      "autor": "Jennifer Bourn",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/71461f5988/"
+    },
+    "Cigrons": {
+      "url": "https://pd.w.org/2025/11/535692749b9085a86.97666892-2048x1536.jpeg",
+      "titol": "White chickpeas are arranged in a clean pile at a hypermarket in Kozhikode. The round grains in soft beige shades show a staple ingredient used for curries and snacks in many homes.",
+      "autor": "Bigul Malayi",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/535692749b/"
+    },
+    "Colrave": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/9/98/Brassica_oleracea_var._gongylodes_%28kohlrabi%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Brassica oleracea var. gongylodes (kohlrabi).jpg",
+      "autor": "Unknown",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Brassica_oleracea_var._gongylodes_(kohlrabi).jpg"
+    },
+    "Fonoll": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/e/e4/Stack_of_fennel.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Stack of fennel.jpg",
+      "autor": "Jeffery Martin",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Stack_of_fennel.jpg"
+    },
+    "Moniato": {
+      "url": "https://pd.w.org/2026/05/3846a0e982dbb9900.32735548-1581x2048.jpeg",
+      "titol": "A pile of raw, dusty sweet potatoes with purplish-brown skins.",
+      "autor": "Vishnu Chandra",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/3846a0e982/"
+    },
+    "Nap": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/5/5a/Turnip-5743_-_Hans_Braxmeier.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Turnip-5743 - Hans Braxmeier.jpg",
+      "autor": "Hans Braxmeier",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Turnip-5743_-_Hans_Braxmeier.jpg"
+    },
+    "Pastanaga": {
+      "url": "https://pd.w.org/2026/04/85669f206e9a2ab04.07089975-2048x1536.jpeg",
+      "titol": "A large pile of fresh, bright orange carrots with varying lengths and sizes, arranged loosely among each other. In the background, a woven basket adds to the scene’s rustic feel.",
+      "autor": "Vishnu Chandra",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/85669f206e/"
+    },
+    "Patata": {
+      "url": "https://pd.w.org/2022/08/18462edefd36d7b56.81763723-2048x1538.jpg",
+      "titol": "Potatoes freshly washed ready for cooking",
+      "autor": "ChrisEdwardsCE",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/18462edefd/"
+    },
+    "Porro": {
+      "url": "https://images.rawpixel.com/editor_1024/czNmcy1wcml2YXRlL3Jhd3BpeGVsX2ltYWdlcy93ZWJzaXRlX2NvbnRlbnQvbHIvcHgxNjAyMDk3LWltYWdlLWt3dnhwbzJ5LmpwZw.jpg",
+      "titol": "Free bunch leeks photo",
+      "autor": null,
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/5922851/photo-image-public-domain-green-food"
+    },
+    "Rave": {
+      "url": "https://pd.w.org/2024/01/7536596ef03602a07.68816693-2048x1536.jpg",
+      "titol": "Radishes, root end toward the viewer",
+      "autor": "Topher",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/7536596ef0/"
+    },
+    "Remolatxa": {
+      "url": "https://pd.w.org/2026/05/1626a0c909fdd65d5.16081103-1536x2048.jpeg",
+      "titol": "A pile of fresh, earthy beetroots with dirt-covered skin and vibrant red stems.",
+      "autor": "Vishnu Chandra",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/1626a0c909/"
+    },
+    "Xicòria": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a0/Radicchio_rosso_tardivo_di_Treviso_IGP.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Radicchio rosso tardivo di Treviso IGP.jpg",
+      "autor": "Qualcheduno",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Radicchio_rosso_tardivo_di_Treviso_IGP.jpg"
+    },
+    "Xirivia": {
+      "url": "https://images.rawpixel.com/editor_1024/cHJpdmF0ZS9zdGF0aWMvaW1hZ2Uvd2Vic2l0ZS8yMDIyLTA0L2xyL25zMTIzNTgtaW1hZ2Uta3d2d3BhMWEuanBn.jpg",
+      "titol": "Free parsnips image",
+      "autor": null,
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://www.rawpixel.com/image/5916318/image-public-domain-plant-wooden"
+    },
+    "Yuca": {
+      "url": "https://pd.w.org/2026/05/2566a13fdd6dca945.87692912-1542x2048.jpg",
+      "titol": "A cluster of freshly harvested roots sits on the ground, surrounded by green foliage.",
+      "autor": "Dorcus Nalubega",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/2566a13fdd/"
+    },
+    "Arròs": {
+      "url": "https://pd.w.org/2025/11/37069274da72871b8.33737129-2048x1536.jpeg",
+      "titol": "Short white rice grains are displayed in bulk at a hypermarket in Kozhikode. The smooth, polished grains are a common rice variety used in Kerala homes for breakfasts like dosa and idli.",
+      "autor": "Bigul Malayi",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/37069274da/"
+    },
+    "Blat de moro": {
+      "url": "https://pd.w.org/2026/05/6716a0c9848000421.43978355-2048x1415.jpeg",
+      "titol": "Freshly harvested corn cobs, mostly in husks, are arranged in a circular pattern.",
+      "autor": "Vishnu Chandra",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/6716a0c984/"
+    },
+    "Lactic": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/a/a4/Cut_wheels_of_cheese_%28Unsplash%29.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Cut wheels of cheese (Unsplash).jpg",
+      "autor": "Alexander Maasch tiefenscharf",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Cut_wheels_of_cheese_(Unsplash).jpg"
+    },
+    "Menta": {
+      "url": "https://pd.w.org/2025/12/833694aa4da033155.68691573-2048x1536.jpg",
+      "titol": "Close-up of vibrant green mint leaves, showing their textured surface, clustered densely in a garden setting. The mood is fresh and lush.",
+      "autor": "Tawhid Sadman",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/833694aa4d/"
+    },
+    "Olives": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/d/d2/Green_olives_%28pitted%29_-_Massachusetts.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+      "titol": "Green olives (pitted) - Massachusetts.jpg",
+      "autor": "Daderot",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "http://creativecommons.org/publicdomain/zero/1.0/deed.en",
+      "font_url": "https://commons.wikimedia.org/wiki/File:Green_olives_(pitted)_-_Massachusetts.jpg"
+    },
+    "Ou": {
+      "url": "https://pd.w.org/2026/05/9316a0d700eb71ed2.38599397-1153x2048.jpg",
+      "titol": "A cluster of small, cream-colored poultry eggs nestled together inside a rustic straw bird nest.",
+      "autor": "Paresh Lamichhane",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/9316a0d700/"
+    },
+    "Soja": {
+      "url": "https://upload.wikimedia.org/wikipedia/commons/thumb/2/27/Soybean_field%2C_Abbeville_County%2C_South_Carolina%2C_USA.jpg/1920px-Soybean_field%2C_Abbeville_County%2C_South_Carolina%2C_USA.jpg",
+      "titol": "Soybean field, Abbeville County, South Carolina, USA",
+      "autor": "Mlabar",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/deed.en/",
+      "font_url": "https://commons.wikimedia.org/w/index.php?curid=48932402"
+    },
+    "Suc": {
+      "url": "https://pd.w.org/2026/08/1996a70dcc08bf295.80694564-1536x2048.jpg",
+      "titol": "Two glasses of fresh orange juice on a kitchen counter.",
+      "autor": "Dilip Modhavadiya",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/1996a70dcc/"
+    },
+    "Varis": {
+      "url": "https://pd.w.org/2023/12/950657f3cf7608354.03400118-2048x1365.jpg",
+      "titol": "Fresh vegetables in a country-style kitchen.",
+      "autor": "Roy Tanck",
+      "llicencia": "CC0 1.0",
+      "llicencia_url": "https://creativecommons.org/publicdomain/zero/1.0/",
+      "font_url": "https://wordpress.org/photos/photo/950657f3cf/"
+    }
+  },
+  "ofertes": {}
+}

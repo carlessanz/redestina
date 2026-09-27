@@ -156,7 +156,6 @@ async function prepararCierre() {
   // (2) Coste del segundo producto.
   await rpc("fijar_coste_producto", {
     p_producto: PRODUCTO_2,
-    p_ejercicio: ejercicio,
     p_coste: COSTE_KG_2,
     p_motivo: `Fixture de proves ${ejercicio} — NO es una referencia real de mercat`,
   });
@@ -566,9 +565,11 @@ await rpc("fijar_tipo_caja", {
 });
 console.log(`  ${TIPO_CAJA}: tara ${TARA_CAJA} kg/caixa`);
 
+// ⚠️ Desde el 27-09-2026 hay UN coste por producto, sin ejercicio (20270405100200): esto
+//    SOBRESCRIBE la referencia de este producto, no añade la de un año. Hoy las dos que
+//    toca (Carbassa y Tomàquet) son las del propio fixture, así que no se pierde nada.
 await rpc("fijar_coste_producto", {
   p_producto: PRODUCTO,
-  p_ejercicio: ejercicio,
   p_coste: COSTE_KG,
   p_motivo: `Fixture de proves ${ejercicio} — NO es una referencia real de mercat`,
 });

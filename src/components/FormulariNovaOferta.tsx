@@ -41,7 +41,10 @@ import { cn } from '../lib/utils'
 import { aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
-import { SelectorFotos } from './FotosOferta'
+import { FotoOferta, SelectorFotos, useUrlsFotos } from './FotosOferta'
+import { FilaCasella } from './Casella'
+import { BUCKET_PRODUCTES } from '../lib/fotosProducte'
+import { eurKg } from '../lib/tancament'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import PasosProces from './proces/PasosProces'
@@ -151,6 +154,20 @@ export default function FormulariNovaOferta(
     return () => { viu = false }
   }, [productorId, t])
 
+  /**
+   * El coste por kilo lo decide el productor (27-09-2026), partiendo de la REFERENCIA del
+   * producto: al elegir producto se prellena con ella, y en cuanto el productor lo toca ya no
+   * se vuelve a pisar aunque cambie de producto.
+   */
+  const [costTocat, setCostTocat] = useState(false)
+  const producteTriat = useMemo(
+    () => (catalogos?.productos ?? []).find((p) => p.nombre === String(datos.producte ?? '')),
+    [catalogos, datos.producte],
+  )
+  const referencia = producteTriat?.cost_referencia ?? null
+  // Hook antes de cualquier `return`: la miniatura del producto junto a la casilla de la foto.
+  const urlsProducte = useUrlsFotos(producteTriat?.foto_mini ? [producteTriat.foto_mini] : [], BUCKET_PRODUCTES)
+
   const productesDeFamilia = useMemo(() => {
     const familia = String(datos.familia ?? '')
     return (catalogos?.productos ?? []).filter((p) => !familia || p.familia === familia)
@@ -161,6 +178,13 @@ export default function FormulariNovaOferta(
       const nou = { ...d, [clave]: valor }
       // Cambiar de familia invalida el producto elegido.
       if (clave === 'familia') delete nou.producte
+      // Elegir producto propone su coste de referencia, salvo que el productor ya haya
+      // escrito el suyo.
+      if (clave === 'producte' && !costTocat) {
+        const ref = (catalogos?.productos ?? []).find((p) => p.nombre === valor)?.cost_referencia
+        if (ref != null) nou.cost_kg = ref
+        else delete nou.cost_kg
+      }
       return nou
     })
     // En cuanto se toca un campo marcado, deja de estarlo: el rojo es «esto faltaba», no
@@ -424,6 +448,27 @@ export default function FormulariNovaOferta(
         )
       }
       case 'numero':
+        if (campo.clave === 'cost_kg') {
+          return (
+            <>
+              <Input id={id} name={campo.clave} type="number" step="0.01" min="0" aria-invalid={invalid}
+                value={valor == null ? '' : String(valor)}
+                onChange={(e) => {
+                  setCostTocat(true)
+                  set(campo.clave, e.target.value === '' ? null : Number(e.target.value))
+                }} />
+              <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                {referencia != null ? t('po.cost_ref', { v: eurKg(referencia) }) : t('po.cost_no_ref')}
+                {referencia != null && Number(valor) !== referencia && (
+                  <button type="button" className="font-medium text-primary hover:underline"
+                    onClick={() => { setCostTocat(false); set(campo.clave, referencia) }}>
+                    {t('po.cost_use_ref')}
+                  </button>
+                )}
+              </p>
+            </>
+          )
+        }
         return (
           <Input id={id} name={campo.clave} type="number" step="0.01" min="0" aria-invalid={invalid}
             value={valor == null ? '' : String(valor)}
@@ -568,6 +613,25 @@ export default function FormulariNovaOferta(
                   rutes={Array.isArray(datos.fotos) ? (datos.fotos as string[]) : []}
                   onChange={(r) => set('fotos', r)}
                 />
+                {/* Sin fotos propias, la oferta enseña la del producto del catálogo, salvo
+                    que el productor lo desmarque (27-09-2026). Con fotos no pinta nada. */}
+                {!(Array.isArray(datos.fotos) && datos.fotos.length > 0) && (
+                  <div className="mt-3 flex items-start gap-3">
+                    {producteTriat?.foto_mini && (
+                      <FotoOferta url={urlsProducte[producteTriat.foto_mini]} alt={producteTriat.nombre}
+                        familia={producteTriat.familia} className="size-11" />
+                    )}
+                    <div className="min-w-0 flex-1">
+                      <FilaCasella checked={datos.foto_producte !== false}
+                        onChange={(v) => set('foto_producte', v)}>
+                        {t('foto.use_product')}
+                      </FilaCasella>
+                      {datos.foto_producte === false && (
+                        <p className="text-xs text-muted-foreground">{t('foto.use_product_hint')}</p>
+                      )}
+                    </div>
+                  </div>
+                )}
               </div>
             )}
           </CardContent>

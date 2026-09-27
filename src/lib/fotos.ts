@@ -55,40 +55,52 @@ export async function pujaFoto(
 }
 
 /** Quitar una foto que se acaba de subir (antes de publicar, o al cambiarla). */
-export async function esborraFoto(ruta: string): Promise<void> {
+export async function esborraFoto(ruta: string, bucket = BUCKET_FOTOS): Promise<void> {
   try {
-    await supabase.storage.from(BUCKET_FOTOS).remove([ruta])
-    cache.delete(ruta)
+    await supabase.storage.from(bucket).remove([ruta])
+    cache.delete(`${bucket}:${ruta}`)
   } catch { /* si no se puede borrar, se queda huérfana: no es un dato, es un fichero */ }
 }
 
-/** Las fotos de una oferta ya publicada (el productor no tiene UPDATE: va por RPC). */
+/**
+ * Las fotos de una oferta ya publicada (el productor no tiene UPDATE: va por RPC). Con
+ * `rutes = null` no se tocan las fotos: sirve para cambiar solo `fotoProducte`
+ * (20270405100100).
+ */
 export async function fixaFotos(
-  excedenteId: string, rutes: string[],
+  excedenteId: string, rutes: string[] | null, fotoProducte?: boolean,
 ): Promise<{ ok: boolean; error?: string }> {
-  const { error } = await supabase.rpc('fixar_fotos_oferta', { p_excedente: excedenteId, p_fotos: rutes })
+  const { error } = await supabase.rpc('fixar_fotos_oferta', {
+    p_excedente: excedenteId,
+    p_fotos: rutes,
+    ...(fotoProducte === undefined ? {} : { p_foto_producte: fotoProducte }),
+  })
   return error ? { ok: false, error: error.message } : { ok: true }
 }
 
 const cache = new Map<string, { url: string; caduca: number }>()
 
-/** URLs firmadas de un lote de rutas. Las que no se pueden firmar (sin permiso) no vienen. */
-export async function urlsFotos(rutes: string[]): Promise<Record<string, string>> {
+/**
+ * URLs firmadas de un lote de rutas de UN bucket. Las que no se pueden firmar (sin permiso)
+ * no vienen. La caché va por `bucket:ruta`: las rutas de los dos buckets de fotos no se
+ * pisan, pero nada garantiza que no coincidan.
+ */
+export async function urlsFotos(rutes: string[], bucket = BUCKET_FOTOS): Promise<Record<string, string>> {
   const ara = Date.now()
   const out: Record<string, string> = {}
   const falten: string[] = []
   for (const r of new Set(rutes)) {
-    const c = cache.get(r)
+    const c = cache.get(`${bucket}:${r}`)
     // Margen de 5 minutos: una URL que caduca mientras se mira es una imagen rota.
     if (c && c.caduca - ara > 300_000) out[r] = c.url
     else falten.push(r)
   }
   if (falten.length === 0) return out
   try {
-    const { data } = await supabase.storage.from(BUCKET_FOTOS).createSignedUrls(falten, VALIDESA_S)
+    const { data } = await supabase.storage.from(bucket).createSignedUrls(falten, VALIDESA_S)
     for (const d of data ?? []) {
       if (!d.path || !d.signedUrl || d.error) continue
-      cache.set(d.path, { url: d.signedUrl, caduca: ara + VALIDESA_S * 1000 })
+      cache.set(`${bucket}:${d.path}`, { url: d.signedUrl, caduca: ara + VALIDESA_S * 1000 })
       out[d.path] = d.signedUrl
     }
   } catch { /* sin fotos, la pantalla sigue funcionando */ }
