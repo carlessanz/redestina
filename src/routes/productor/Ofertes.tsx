@@ -11,19 +11,34 @@ import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
-import { kgPerOferta } from '../../lib/ofertes'
-import { etiquetaEstatOferta, llegendaOferta, puntOferta } from '../../lib/procesOferta'
+import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
+import type { ProgresOferta } from '../../lib/progresOfertes'
+import {
+  estatSimpleOferta, llegendaSimpleOferta, ofertaEnCurs, puntOferta,
+} from '../../lib/procesOferta'
+import type { PuntProces } from '../../lib/procesOferta'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
-import type { Excedente } from '../../types'
+import BadgeEstat from '../../components/proces/BadgeEstat'
+import type { EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
-const ACTIVES = ['borrador', 'publicada', 'parcial', 'bloqueada']
+/**
+ * Lo que cuenta el estado de una oferta, además del propio excedente: su albarán de
+ * recepción (el papel dice si ya se ha recogido y si está conciliada) y el embudo de
+ * interés (cuántas entidades la han pedido). Se cargan con UNA consulta cada uno para
+ * todas las ofertas, nunca una por oferta (§12.5).
+ */
+interface RecResum { estado: EstadoAlbaran; numero: string | null; diesEsperant: number | null }
 
 /** Hook compartido por las dos pantallas: las ofertas de mi organización. */
 function useMevesOfertes(productorId: string | null) {
   const [ofertes, setOfertes] = useState<Excedente[]>([])
   const [kg, setKg] = useState<Record<string, number>>({})
+  /** Cuántos destinos (canalizaciones) tiene cada oferta: una oferta puede ir a varios. */
+  const [destins, setDestins] = useState<Record<string, number>>({})
+  const [recs, setRecs] = useState<Record<string, RecResum>>({})
+  const [progres, setProgres] = useState<Record<string, ProgresOferta>>({})
   const [carregant, setCarregant] = useState(true)
 
   /**
@@ -46,9 +61,48 @@ function useMevesOfertes(productorId: string | null) {
       .eq('productor_id', productorId)
       .order('created_at', { ascending: false })
     const files = (data ?? []) as Excedente[]
+    const ids = files.map((o) => o.id)
+    meusIds.current = new Set(ids)
+
+    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). Sin `.eq()` de organización
+    // en el albarán: la RLS ya devuelve solo lo suyo, y nunca los borradores.
+    const [c, a, p] = ids.length === 0
+      ? [null, null, null]
+      : await Promise.all([
+        supabase.from('canalizaciones').select('excedente_id, kg_confirmados').in('excedente_id', ids),
+        supabase.from('v_albaranes_bandeja')
+          .select('excedente_id, estado, numero_completo, dias_esperando, emitido_at')
+          .eq('tipo', 'REC')
+          .in('excedente_id', ids)
+          .order('emitido_at', { ascending: false, nullsFirst: true }),
+        carregaProgresOfertes(),
+      ])
+
+    const kgs: Record<string, number> = {}
+    const ns: Record<string, number> = {}
+    for (const f of ((c?.data ?? []) as { excedente_id: string | null; kg_confirmados: number | null }[])) {
+      if (!f.excedente_id) continue
+      kgs[f.excedente_id] = (kgs[f.excedente_id] ?? 0) + Number(f.kg_confirmados ?? 0)
+      ns[f.excedente_id] = (ns[f.excedente_id] ?? 0) + 1
+    }
+    // El REC vigente de cada oferta es el primero de la lista, igual que en el detalle
+    // (`OfertaDetall`): así el badge de la lista y la etapa del detalle no pueden discrepar.
+    const rs: Record<string, RecResum> = {}
+    for (const r of ((a?.data ?? []) as {
+      excedente_id: string | null; estado: string; numero_completo: string | null; dias_esperando: number | null
+    }[])) {
+      if (!r.excedente_id || rs[r.excedente_id]) continue
+      rs[r.excedente_id] = {
+        estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
+      }
+    }
+
     setOfertes(files)
-    meusIds.current = new Set(files.map((o) => o.id))
-    setKg(await kgPerOferta(files.map((o) => o.id)))
+    setKg(kgs)
+    setDestins(ns)
+    setRecs(rs)
+    // La RPC «nunca lanza»: sin ella se pierde el matiz «en gestió», no la pantalla.
+    setProgres(p && p.ok ? perOferta(p.data) : {})
     setCarregant(false)
   }, [productorId])
 
@@ -80,16 +134,36 @@ function useMevesOfertes(productorId: string | null) {
     return () => { void supabase.removeChannel(canal) }
   }, [carrega, productorId])
 
+  /** El punto del proceso de una oferta, con todo lo que la lista sabe de ella. */
+  const puntDe = useCallback((o: Excedente): PuntProces => {
+    const pr = progres[o.id]
+    return puntOferta({
+      estado: o.estado,
+      kgTotal: Number(o.kg_total ?? 0),
+      kgCanalitzats: kg[o.id] ?? 0,
+      nInteressades: pr?.n_interessades,
+      nPerAprovar: pr?.n_per_aprovar,
+      albaraRec: recs[o.id] ?? null,
+      motiu: o.motivo_no_colocada ?? null,
+    }, 'productor')
+  }, [kg, progres, recs])
 
-  return { ofertes, kg, carregant }
+  return { ofertes, kg, destins, puntDe, carregant }
 }
 
-function FilaOferta({ o, canalitzats }: { o: Excedente; canalitzats: number }) {
+/** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. */
+function fmtKg(n: number): string {
+  return new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 }).format(n)
+}
+
+function FilaOferta({
+  o, canalitzats, punt, ambCodi,
+}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean }) {
   const { t } = useT()
   const total = Number(o.kg_total ?? 0)
   const falten = Math.max(0, total - canalitzats)
   const pct = total > 0 ? Math.min(100, Math.round((canalitzats / total) * 100)) : 0
-  const est = etiquetaEstatOferta(o.estado)
+  const est = estatSimpleOferta(punt)
 
   return (
     <Link
@@ -100,18 +174,25 @@ function FilaOferta({ o, canalitzats }: { o: Excedente; canalitzats: number }) {
         <div className="font-medium">
           {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
         </div>
-        <div className="text-xs text-muted-foreground"><code>{o.id_excedente ?? '—'}</code></div>
+        {ambCodi && <div className="text-xs text-muted-foreground"><code>{o.id_excedente ?? '—'}</code></div>}
       </div>
-      <div className="flex items-center gap-3">
-        <div>
-          <div className="h-2 w-28 overflow-hidden rounded-full bg-muted">
-            <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
-          </div>
-          <span className="mt-1 block text-xs text-muted-foreground">
-            {canalitzats}/{total} kg · {falten > 0 ? t('off.falten', { n: falten }) : t('off.complet')}
-          </span>
-        </div>
-        <span className={cn('rounded-full px-2 py-0.5 text-xs font-medium', est.clase)}>{t(est.key)}</span>
+      <div className="flex flex-wrap items-center gap-3">
+        {/* Una oferta que ya no busca salida (cancelada o sin destino) no tiene progreso
+            que enseñar: «0 de 40 kg · falten 40» sugiere que todavía se espera algo. */}
+        {est.estat === 'cancellada' || est.estat === 'sense_sortida'
+          ? <span className="text-xs text-muted-foreground tabular-nums">{t('pi.kg_offered', { n: fmtKg(total) })}</span>
+          : (
+            <div>
+              <div className="h-2.5 w-32 overflow-hidden rounded-full bg-muted">
+                <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
+              </div>
+              <span className="mt-1 block text-xs text-muted-foreground tabular-nums">
+                {t('pi.kg_of', { n: fmtKg(canalitzats), m: fmtKg(total) })}
+                {' · '}{falten > 0 ? t('off.falten', { n: fmtKg(falten) }) : t('off.complet')}
+              </span>
+            </div>
+          )}
+        <BadgeEstat clase={est.clase} gran={ambCodi}>{t(est.key)}</BadgeEstat>
       </div>
     </Link>
   )
@@ -146,43 +227,69 @@ function CapOferta() {
 }
 
 /**
- * Una línea por oferta activa con lo que está pasando con ella, contado por
- * `procesOferta.ts`.
+ * Las ofertas que siguen en marcha, cada una con lo que hace falta saber de un vistazo:
+ * producto, kilos, situación, cuánto ha encontrado salida y qué toca ahora (revisión del
+ * 23-09-2026). El «qué toca» lo cuenta `procesOferta.ts`, el mismo que el detalle.
  *
- * Aquí NO se piden ni el albarán ni el embudo: con el estado del excedente y los kilos
- * basta para las dos primeras etapas, que es donde está casi siempre lo que se publica, y
- * el detalle —que sí los carga— completa el resto. Una consulta por oferta en la pantalla
- * de inicio sería el problema de la deuda §12.5 otra vez.
+ * ⚠️ QUÉ NO SE ENSEÑA: a qué entidades va. `progres_meves_ofertes()` y la RLS dan
+ *    cuántos destinos, nunca cuáles (20270323100000); aquí se dice el número y basta.
  */
-function QuePassaAmbLesMeves({ ofertes, kg }: { ofertes: Excedente[]; kg: Record<string, number> }) {
+function QuePassaAmbLesMeves({
+  ofertes, kg, destins, puntDe,
+}: {
+  ofertes: Excedente[]
+  kg: Record<string, number>
+  destins: Record<string, number>
+  puntDe: (o: Excedente) => PuntProces
+}) {
   const { t } = useT()
   if (ofertes.length === 0) return null
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{t('pi.process_title')}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">{t('pi.process_title')}</CardTitle>
+        <p className="mt-1 text-sm text-muted-foreground">{t('pi.process_hint')}</p>
+      </CardHeader>
       <CardContent className="space-y-2">
         {ofertes.map((o) => {
-          const punt = puntOferta({
-            estado: o.estado,
-            kgTotal: Number(o.kg_total ?? 0),
-            kgCanalitzats: kg[o.id] ?? 0,
-          }, 'productor')
+          const punt = puntDe(o)
+          const est = estatSimpleOferta(punt)
+          const total = Number(o.kg_total ?? 0)
+          const amb = kg[o.id] ?? 0
+          const falten = Math.max(0, total - amb)
+          const nDestins = destins[o.id] ?? 0
+          const toca = t(punt.claus.toca, punt.vars).trim()
           return (
             <Link
               key={o.id}
               to={`/productor/ofertes/${o.id}`}
-              className="flex items-start justify-between gap-3 rounded-lg border p-3 hover:bg-muted/40"
+              className="block rounded-lg border p-3 hover:bg-muted/40"
             >
-              <div className="min-w-0">
-                <div className="text-sm font-medium">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0 font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
+                  <span className="ml-2 font-normal text-muted-foreground tabular-nums">{fmtKg(total)} kg</span>
                 </div>
-                <p className="mt-0.5 text-sm text-muted-foreground">
-                  {t(punt.claus.toca, punt.vars)}
-                </p>
+                <BadgeEstat clase={est.clase}>{t(est.key)}</BadgeEstat>
               </div>
-              <ArrowRight className="mt-0.5 size-4 shrink-0 text-muted-foreground" aria-hidden />
+              {/* Cuánto ha encontrado salida y cuánto queda: el dato que más pregunta el
+                  productor, y que antes solo se veía entrando en el detalle. */}
+              <p className="mt-1 text-sm tabular-nums">
+                {amb > 0
+                  ? t('pi.split', { n: fmtKg(amb), m: fmtKg(falten) })
+                  : t('pi.split_none', { m: fmtKg(falten) })}
+                {nDestins > 1 ? ` · ${t('pi.n_destins', { n: nDestins })}` : ''}
+              </p>
+              {toca && toca !== '—' && toca !== punt.claus.toca && (
+                <p className={cn(
+                  'mt-1 flex items-start gap-1 text-sm',
+                  punt.emToca ? 'font-medium text-aviso' : 'text-muted-foreground',
+                )}>
+                  <ArrowRight className="mt-0.5 size-3.5 shrink-0" aria-hidden />
+                  {toca}
+                </p>
+              )}
             </Link>
           )
         })}
@@ -191,16 +298,35 @@ function QuePassaAmbLesMeves({ ofertes, kg }: { ofertes: Excedente[]; kg: Record
   )
 }
 
+/** El año en curso en hora de Madrid, que es la del servicio (no la del navegador). */
+function anyActual(): number {
+  return Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date()))
+}
+function anyDe(iso: string | null | undefined): number | null {
+  if (!iso) return null
+  return Number(new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid', year: 'numeric' }).format(new Date(iso)))
+}
+
 export function ProductorInici() {
   const { t } = useT()
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, carregant } = useMevesOfertes(productorId)
+  const { ofertes, kg, destins, puntDe, carregant } = useMevesOfertes(productorId)
 
-  const actives = ofertes.filter((o) => ACTIVES.includes(o.estado))
-  const canalitzatsTotal = Object.values(kg).reduce((s, n) => s + n, 0)
-  const pendents = actives.reduce(
+  // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
+  // marcha —pide atención o se está gestionando—, abajo lo que ya es historia. Antes las
+  // dos listaban las mismas ofertas y parecían hacer lo mismo.
+  const enCurs = ofertes.filter((o) => ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat))
+  const historic = ofertes.filter((o) => !ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat))
+
+  // Los kilos canalizados, SIEMPRE con su año: «1.320 kg» sin fecha no dice si es de este
+  // año o de toda la vida. Cuenta el año de la oferta, en hora de Madrid.
+  const any = anyActual()
+  const canalitzatsAny = ofertes
+    .filter((o) => anyDe(o.created_at) === any)
+    .reduce((s, o) => s + (kg[o.id] ?? 0), 0)
+  const pendents = enCurs.reduce(
     (s, o) => s + Math.max(0, Number(o.kg_total ?? 0) - (kg[o.id] ?? 0)), 0)
   const buit = !carregant && ofertes.length === 0
 
@@ -221,20 +347,20 @@ export function ProductorInici() {
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card><CardContent className="pt-6">
-              <div className="text-3xl font-bold text-primary">{actives.length}</div>
+              <div className="text-3xl font-bold text-primary tabular-nums">{enCurs.length}</div>
               <p className="mt-1 text-sm text-muted-foreground">{t('pi.active_offers')}</p>
             </CardContent></Card>
             <Card><CardContent className="pt-6">
-              <div className="text-3xl font-bold text-primary">{canalitzatsTotal}</div>
-              <p className="mt-1 text-sm text-muted-foreground">{t('pi.kg_channeled')}</p>
+              <div className="text-3xl font-bold text-primary tabular-nums">{fmtKg(canalitzatsAny)}</div>
+              <p className="mt-1 text-sm text-muted-foreground">{t('pi.kg_channeled_year', { any })}</p>
             </CardContent></Card>
             <Card><CardContent className="pt-6">
-              <div className="text-3xl font-bold text-primary">{pendents}</div>
+              <div className="text-3xl font-bold text-primary tabular-nums">{fmtKg(pendents)}</div>
               <p className="mt-1 text-sm text-muted-foreground">{t('pi.kg_pending')}</p>
             </CardContent></Card>
           </div>
 
-          <QuePassaAmbLesMeves ofertes={actives} kg={kg} />
+          <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} puntDe={puntDe} />
 
           <Button
             className="h-11 whitespace-normal md:h-9"
@@ -243,14 +369,24 @@ export function ProductorInici() {
             <PlusCircle className="size-4" /> {t('nav.new_offer')}
           </Button>
 
-          <Card>
-            <CardHeader><CardTitle className="text-base">{t('pi.recent')}</CardTitle></CardHeader>
-            <CardContent className="space-y-2">
-              {ofertes.slice(0, 5).map((o) => (
-                <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} />
-              ))}
-            </CardContent>
-          </Card>
+          {historic.length > 0 && (
+            <Card>
+              <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-2">
+                <div>
+                  <CardTitle className="text-base">{t('pi.recent')}</CardTitle>
+                  <p className="mt-1 text-sm text-muted-foreground">{t('pi.recent_hint')}</p>
+                </div>
+                <Link to="/productor/ofertes" className="text-sm font-medium text-primary hover:underline">
+                  {t('pi.see_all')}
+                </Link>
+              </CardHeader>
+              <CardContent className="space-y-2">
+                {historic.slice(0, 5).map((o) => (
+                  <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} />
+                ))}
+              </CardContent>
+            </Card>
+          )}
         </>
       )}
     </div>
@@ -262,7 +398,7 @@ export function ProductorOfertes() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, carregant } = useMevesOfertes(productorId)
+  const { ofertes, kg, puntDe, carregant } = useMevesOfertes(productorId)
 
   return (
     <Card>
@@ -270,9 +406,9 @@ export function ProductorOfertes() {
         <div>
           <CardTitle>{t('po.list_title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('po.list_subtitle')}</p>
-          {/* Plegada: quien conoce el circuito no necesita releer siete frases cada vez,
-              y quien no lo conoce no tenía hasta ahora dónde preguntar qué es «Coberta». */}
-          <LlegendaEstats items={llegendaOferta()} />
+          {/* Plegada: quien conoce el circuito no necesita releer las frases cada vez, y
+              quien no lo conoce tiene aquí qué significa cada estado. */}
+          <LlegendaEstats items={llegendaSimpleOferta()} ambPunt />
         </div>
         <Button
           className="h-11 whitespace-normal md:h-9"
@@ -284,7 +420,9 @@ export function ProductorOfertes() {
       <CardContent className="space-y-2">
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {!carregant && ofertes.length === 0 && <CapOferta />}
-        {ofertes.map((o) => <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} />)}
+        {ofertes.map((o) => (
+          <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi />
+        ))}
       </CardContent>
     </Card>
   )

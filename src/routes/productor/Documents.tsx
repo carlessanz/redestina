@@ -19,14 +19,12 @@
 // La excepción son los convenios, que sí llevan `.eq()` por columna: una cuenta con doble
 // rol vería también los de su otra ficha, y esta pantalla es la del productor.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { AlertTriangle, Download, Eye, Loader2, Upload } from 'lucide-react'
-import { toast } from 'sonner'
+import { useCallback, useEffect, useMemo, useState } from 'react'
+import { AlertTriangle, Download, Eye, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
-import { pujarDocumentExtern } from '../../lib/documents'
 import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import {
@@ -79,8 +77,6 @@ export default function ProductorDocuments() {
   const [periodes, setPeriodes] = useState<PeriodeFila[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pujant, setPujant] = useState<string | null>(null)
-  const fitxers = useRef<Record<string, HTMLInputElement | null>>({})
 
   const orgId = org?.id ?? null
 
@@ -199,20 +195,6 @@ export default function ProductorDocuments() {
     return mapa
   }, [periodes])
 
-  async function puja(d: Donant, fitxer: File) {
-    setPujant(d.id)
-    const res = await pujarDocumentExtern({
-      fitxer,
-      objecteTipus: 'cierre_donante',
-      objecteId: d.id,
-      tipus: 'factura',
-    })
-    setPujant(null)
-    if (!res.ok) { toast.error(t(res.motiuKey)); return }
-    toast.success(t('mydoc.invoice_uploaded', { name: res.data.nombre }))
-    await refresca()
-  }
-
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org')}</p>
   if (carregant) return <CarregantSeccio />
   if (error) return <p className="text-sm text-destructive">{error}</p>
@@ -269,16 +251,10 @@ export default function ProductorDocuments() {
                   <Dada etiqueta={t('mydoc.f_certificate')} valor={d.certificado_numero ?? '—'} />
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2">
-                  <Dada
-                    etiqueta={t('mydoc.f_invoice')}
-                    valor={d.factura_numero
-                      ? `${d.factura_numero} · ${euros(d.factura_importe)}`
-                      : t('mydoc.no_invoice')}
-                  />
-                  <Dada etiqueta={t('mydoc.f_invoice_date')} valor={dataTancament(d.factura_fecha)} />
-                </div>
-
+                {/* SIN la factura (revisión del 23-09-2026): el productor no tiene que subirla
+                    aquí —la gestiona con su gestor o su ERP— y el certificado ya no depende de
+                    ella desde el 21-09-2026 (§4). Enseñar el campo vacío y un botón para
+                    subirla hacía pensar que era obligatoria. */}
                 {/* Qué toca hacer ahora, dicho con palabras y no con un estado en inglés. */}
                 <p className="mt-3 text-sm text-muted-foreground">
                   {t(`mydoc.next_${d.estado}`)}
@@ -316,33 +292,7 @@ export default function ProductorDocuments() {
                     </div>
                   ))}
 
-                  {/* El `<input type=file>` va escondido y lo dispara el botón: un input de
-                      fichero sin estilar es el único control del sistema de diseño que no
-                      se puede pintar, y aquí es además la acción principal. */}
-                  <input
-                    ref={(el) => { fitxers.current[d.id] = el }}
-                    type="file"
-                    accept="application/pdf,image/jpeg,image/png"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0]
-                      e.target.value = ''
-                      if (f) void puja(d, f)
-                    }}
-                  />
-                  <Button
-                    size="sm"
-                    className="h-11 whitespace-normal md:h-9"
-                    disabled={pujant === d.id}
-                    onClick={() => fitxers.current[d.id]?.click()}
-                  >
-                    {pujant === d.id
-                      ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />
-                      : <Upload className="mr-1 size-4" aria-hidden />}
-                    {t('mydoc.a_upload_invoice')}
-                  </Button>
                 </div>
-                <p className="mt-2 text-xs text-muted-foreground">{t('mydoc.upload_hint')}</p>
               </div>
             )
           })}

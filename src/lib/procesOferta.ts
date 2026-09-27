@@ -395,3 +395,122 @@ export const FASES_EQUIP: readonly FaseEquip[] = [
   { clau: 'lliurament', rutes: ['/equip/albarans'] },
   { clau: 'tancament', rutes: ['/equip/costos', '/equip/tancament'] },
 ] as const
+
+// --- El estado SIMPLE, para los paneles externos ---------------------------------------
+
+/**
+ * Los cuatro estados que ve el productor en sus listas, más las dos salidas.
+ *
+ * POR QUÉ EXISTE (revisión del 23-09-2026). El badge de las listas del productor pintaba el
+ * estado crudo del excedente —«Publicada», «Parcial», «Coberta»—, que es vocabulario del
+ * equipo, y además no sabía nada del albarán: una oferta ya recogida y conciliada seguía
+ * diciendo «Coberta». Lo que el productor quiere saber es otra cosa y en otro orden:
+ *
+ *   buscant  → nadie la ha pedido todavía; el equipo le busca salida.
+ *   gestio   → alguna entidad ha mostrado interés y el equipo lo está validando.
+ *   sortida  → tiene destino (total o parcial): se coordina la recogida y sus papeles.
+ *   finalitzada → recogida y conciliada.
+ *
+ * ⚠️ SE DERIVA DE `puntOferta()`, no del estado crudo: así la etapa del detalle, la frase
+ *    de «què toca» y el badge de la lista no pueden contar dos historias distintas.
+ * ⚠️ El equipo NO lo usa: su listado necesita el estado exacto para operar.
+ */
+export type EstatSimpleOferta =
+  'buscant' | 'gestio' | 'sortida' | 'finalitzada' | 'cancellada' | 'sense_sortida'
+
+/** Los estados simples de un interés, tal como los ve la entidad receptora. */
+export type EstatSimpleInteres =
+  'per_respondre' | 'interes_enviat' | 'assignada' | 'tancada' | 'no_disponible' | 'declinada'
+
+/**
+ * Los colores de los estados simples. Cuatro estados que se tienen que distinguir de un
+ * vistazo, sin ningún color fuera de los tokens (§2bis), y con el código que pidió la
+ * revisión del 23-09-2026 (🟡 esperando · 🟢 con destino · ⚪ cerrada · 🔴 no salió):
+ *
+ *   ámbar        → esperando destino (buscant / interès enviat)
+ *   crema        → en gestión del equipo
+ *   verde        → tiene destino / asignada
+ *   contorno     → cerrada (el ⚪: sin relleno)
+ *   rojo         → no salió (cancelada, sin destino, no disponible)
+ *   coral        → te toca a ti (solo `per_respondre`)
+ *
+ * ⚠️ Aquí el ámbar NO significa «et toca a tu», al revés que en `QueTocaAra`: en un badge
+ *    de estado lo pidió la Fundación para «esperando», y probado en pantalla el coral
+ *    suave se confundía con el rojo de «Cancel·lada». Lo que es acción de quien mira va en
+ *    coral, el acento de marca, y el bloque de «què toca» sigue siendo ámbar.
+ */
+const CLASSE_SIMPLE = {
+  espera: 'bg-aviso-fondo text-aviso',
+  gestio: 'bg-muted text-foreground',
+  fet: 'bg-exito-fondo text-exito',
+  tancat: 'border border-input bg-background text-muted-foreground',
+  ko: 'bg-error-fondo text-error',
+  toca: 'bg-coral-suave text-coral-texto',
+} as const
+
+export function estatSimpleOferta(punt: PuntProces): { estat: EstatSimpleOferta; key: string; clase: string } {
+  const fes = (estat: EstatSimpleOferta, clase: string) => ({ estat, key: `est.o_${estat}`, clase })
+  switch (punt.etapa) {
+    case 'cancellada': return fes('cancellada', CLASSE_SIMPLE.ko)
+    case 'sense_desti': return fes('sense_sortida', CLASSE_SIMPLE.ko)
+    case 'tancada': return fes('finalitzada', CLASSE_SIMPLE.tancat)
+    case 'assignada':
+    case 'recollida':
+    case 'confirmada':
+      return fes('sortida', CLASSE_SIMPLE.fet)
+    case 'publicada':
+      return punt.variant === 'gestio' ? fes('gestio', CLASSE_SIMPLE.gestio) : fes('buscant', CLASSE_SIMPLE.espera)
+    // `vencuda` solo lo ve el equipo, pero si llegara aquí la oferta sigue sin destino.
+    default: return fes('buscant', CLASSE_SIMPLE.espera)
+  }
+}
+
+export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleInteres; key: string; clase: string } {
+  const fes = (estat: EstatSimpleInteres, clase: string) => ({ estat, key: `est.i_${estat}`, clase })
+  switch (punt.etapa) {
+    case 'oferta_rebuda': return fes('per_respondre', CLASSE_SIMPLE.toca)
+    case 'interes_enviat': return fes('interes_enviat', CLASSE_SIMPLE.espera)
+    case 'assignada':
+    case 'entrega':
+    case 'confirmada':
+      return fes('assignada', CLASSE_SIMPLE.fet)
+    case 'tancada': return fes('tancada', CLASSE_SIMPLE.tancat)
+    case 'declinada': return fes('declinada', CLASSE_SIMPLE.tancat)
+    // `no_assignada` (el equipo no la aprobó) y `retirada` (la oferta dejó de existir):
+    // para la entidad las dos significan lo mismo — esta oferta ya no la tendrá.
+    default: return fes('no_disponible', CLASSE_SIMPLE.ko)
+  }
+}
+
+export const ESTATS_SIMPLES_OFERTA: readonly EstatSimpleOferta[] =
+  ['buscant', 'gestio', 'sortida', 'finalitzada', 'cancellada', 'sense_sortida'] as const
+export const ESTATS_SIMPLES_INTERES: readonly EstatSimpleInteres[] =
+  ['per_respondre', 'interes_enviat', 'assignada', 'tancada', 'no_disponible', 'declinada'] as const
+
+const CLASSE_PER_ESTAT_OFERTA: Record<EstatSimpleOferta, string> = {
+  buscant: CLASSE_SIMPLE.espera, gestio: CLASSE_SIMPLE.gestio, sortida: CLASSE_SIMPLE.fet,
+  finalitzada: CLASSE_SIMPLE.tancat, cancellada: CLASSE_SIMPLE.ko, sense_sortida: CLASSE_SIMPLE.ko,
+}
+const CLASSE_PER_ESTAT_INTERES: Record<EstatSimpleInteres, string> = {
+  per_respondre: CLASSE_SIMPLE.toca, interes_enviat: CLASSE_SIMPLE.espera, assignada: CLASSE_SIMPLE.fet,
+  tancada: CLASSE_SIMPLE.tancat, no_disponible: CLASSE_SIMPLE.ko, declinada: CLASSE_SIMPLE.tancat,
+}
+
+/** La leyenda de los estados simples del productor, para `LlegendaEstats`. */
+export function llegendaSimpleOferta(): { key: string; clase: string; descKey: string }[] {
+  return ESTATS_SIMPLES_OFERTA.map((e) => ({
+    key: `est.o_${e}`, clase: CLASSE_PER_ESTAT_OFERTA[e], descKey: `est.o_${e}_d`,
+  }))
+}
+
+/** La leyenda de los estados simples del receptor. */
+export function llegendaSimpleInteres(): { key: string; clase: string; descKey: string }[] {
+  return ESTATS_SIMPLES_INTERES.map((e) => ({
+    key: `est.i_${e}`, clase: CLASSE_PER_ESTAT_INTERES[e], descKey: `est.i_${e}_d`,
+  }))
+}
+
+/** ¿Esta oferta sigue pidiendo atención, o ya es historia? Decide en qué sección de Inici va. */
+export function ofertaEnCurs(estat: EstatSimpleOferta): boolean {
+  return estat === 'buscant' || estat === 'gestio' || estat === 'sortida'
+}

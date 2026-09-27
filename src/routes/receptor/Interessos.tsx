@@ -16,12 +16,12 @@ import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
-import { puntInteres, ETAPES_INTERES } from '../../lib/procesOferta'
-import type { EtapaProces } from '../../lib/procesOferta'
+import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
+import BadgeEstat from '../../components/proces/BadgeEstat'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -41,27 +41,19 @@ interface CanalAmbOferta {
   excedentes: { id_excedente: string | null; producto: string | null; estado: string } | null
 }
 
+/** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
+function dataCurtaSenseAny(iso: string | null | undefined): string | null {
+  if (!iso) return null
+  // Montada a mano: con `toLocaleDateString` algunos navegadores ignoran el `2-digit` del
+  // mes en esta combinación y pintan «21/9».
+  const parts = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Madrid' })
+    .formatToParts(new Date(iso))
+  const v = (tipus: string) => parts.find((p) => p.type === tipus)?.value ?? ''
+  return `${v('day').padStart(2, '0')}/${v('month').padStart(2, '0')}`
+}
+
 /** Un albarán anulado o rectificado no cuenta: la entrega vuelve a estar donde estaba. */
 const ALBARA_VIU: EstadoAlbaran[] = ['emitido', 'entregado', 'confirmado', 'conciliado']
-
-/**
- * El color del badge de una etapa del interés.
- *
- * La regla es la de `PendentsDeTu` y `QueTocaAra`: **ámbar significa «et toca a tu»**, y
- * nada más. Verde son las etapas en las que la oferta ya es tuya (o ya está cerrada); el
- * resto —interés enviado, entrega en marcha, y las tres salidas— es neutro informativo.
- *
- * Se exporta porque el Mercat pinta el mismo badge sobre las ofertas ya solicitadas: dos
- * copias de un mapa de estados son dos sitios donde una etapa nueva cae en el color
- * equivocado. Si algún día lo necesita un tercer sitio, su casa es `procesOferta.ts`.
- */
-export function classeEtapaInteres(etapa: EtapaProces, emToca: boolean): string {
-  if (emToca) return 'bg-aviso-fondo text-aviso'
-  if (etapa === 'assignada' || etapa === 'confirmada' || etapa === 'tancada') {
-    return 'bg-exito-fondo text-exito'
-  }
-  return 'bg-secondary text-secondary-foreground'
-}
 
 export function Interessos() {
   const { t } = useT()
@@ -116,22 +108,17 @@ export function Interessos() {
     return () => { void supabase.removeChannel(canal) }
   }, [carrega, entidadId])
 
-  // Las seis etapas con su color y su frase: lo que el badge de cada fila NO cabe explicando.
-  // `oferta_rebuda` y `entrega` se pintan en ámbar porque son las dos etapas cuya acción es
-  // de la entidad; en una fila concreta eso lo decide `punt.emToca`, que sabe además si el
-  // albarán ya está entregado o solo emitido.
-  const llegenda = ETAPES_INTERES.map((etapa) => ({
-    key: `proc.pasi_${etapa}`,
-    clase: classeEtapaInteres(etapa, etapa === 'oferta_rebuda' || etapa === 'entrega'),
-    descKey: `proc.llegenda_interes_${etapa}`,
-  }))
+  // Los estados simples con su frase (revisión del 23-09-2026): cuatro que se distinguen de
+  // un vistazo —asignada, interés enviado, cerrada, no disponible— más los dos que solo
+  // salen a veces. La etapa fina sigue viva en la frase de «qué toca» de cada fila.
+  const llegenda = llegendaSimpleInteres()
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('int.title')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('int.subtitle')}</p>
-        <LlegendaEstats items={llegenda} />
+        <LlegendaEstats items={llegenda} ambPunt />
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
@@ -151,23 +138,26 @@ export function Interessos() {
           // Una línea que resuelve a «—» no se pinta: un hueco con su margen se lee como un
           // fallo de carga. Mismo criterio que `QueTocaAra`.
           const toca = t(punt.claus.toca, punt.vars).trim()
+          const est = estatSimpleInteres(punt)
+          // La fecha de lo último que ha hecho la entidad: cuándo contestó o, si todavía
+          // no lo ha hecho, cuándo le llegó la oferta.
+          const data = dataCurtaSenseAny(f.respondido_at ?? f.enviado_at)
+          const detall = [
+            f.kg_solicitados != null ? `${f.kg_solicitados} ${t('od.rs_kg')}` : null,
+            f.preu_ofert != null ? `${f.preu_ofert} ${t('od.rs_preu')}` : null,
+          ].filter(Boolean).join(' · ')
           return (
             <div key={f.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="min-w-0">
+                  {/* Sin el código interno (E-AAMMDD-…): es del ERP y a la entidad no le dice
+                      nada (revisión del 23-09-2026). */}
                   <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
-                  <div className="text-xs text-muted-foreground">
-                    <code>{f.excedentes?.id_excedente ?? '—'}</code>
-                    {f.kg_solicitados != null ? ` · ${f.kg_solicitados} ${t('od.rs_kg')}` : ''}
-                    {f.preu_ofert != null ? ` · ${f.preu_ofert} ${t('od.rs_preu')}` : ''}
-                  </div>
+                  {detall && <div className="text-xs text-muted-foreground">{detall}</div>}
                 </div>
-                <span className={cn(
-                  'rounded-full px-2 py-0.5 text-xs font-medium',
-                  classeEtapaInteres(punt.etapa, punt.emToca),
-                )}>
-                  {t(punt.claus.titol, punt.vars)}
-                </span>
+                <BadgeEstat clase={est.clase}>
+                  {t(est.key)}{data ? ` · ${data}` : ''}
+                </BadgeEstat>
               </div>
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className={cn(
@@ -226,9 +216,12 @@ export function Historic() {
           <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
             <div>
               <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
+              {/* Siempre una fecha, y nunca el código interno: la de recogida si ya la hay,
+                  y si no, cuándo se asignó. */}
               <div className="text-xs text-muted-foreground">
-                <code>{f.excedentes?.id_excedente ?? '—'}</code>
-                {f.data_hora_recollida ? ` · ${dataCurta(f.data_hora_recollida)}` : ''}
+                {f.data_hora_recollida
+                  ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
+                  : t('hist.assigned_on', { date: dataCurta(f.created_at) })}
               </div>
             </div>
             {/* Claves propias y no las del productor: aquí los kilos se RECIBEN, y

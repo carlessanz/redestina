@@ -10,6 +10,7 @@ import { ChevronDown } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { cn } from '../../lib/utils'
 import { Badge } from '@/components/ui/badge'
+import BadgeEstat from './BadgeEstat'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 
 export interface ItemLlegenda {
@@ -21,7 +22,11 @@ export interface ItemLlegenda {
   descKey: string
 }
 
-export default function LlegendaEstats({ items }: { items: ItemLlegenda[] }) {
+/**
+ * `ambPunt`: la leyenda de los estados simples (paneles externos) pinta la píldora con su
+ * punto, igual que la lista; la del equipo, el `Badge` de siempre.
+ */
+export default function LlegendaEstats({ items, ambPunt }: { items: ItemLlegenda[]; ambPunt?: boolean }) {
   const { t } = useT()
   const [obert, setObert] = useState(false)
 
@@ -42,7 +47,9 @@ export default function LlegendaEstats({ items }: { items: ItemLlegenda[] }) {
                   las clases de `Badge` copiadas a mano, y esta leyenda existe justamente
                   para que quien la lee reconozca la píldora de la tabla: si las dos se
                   pintan por caminos distintos, el día que una cambie dejarán de parecerse. */}
-              <Badge className={it.clase}>{t(it.key)}</Badge>
+              {ambPunt
+                ? <BadgeEstat clase={it.clase}>{t(it.key)}</BadgeEstat>
+                : <Badge className={it.clase}>{t(it.key)}</Badge>}
               <span className="text-sm text-muted-foreground">{t(it.descKey)}</span>
             </li>
           ))}

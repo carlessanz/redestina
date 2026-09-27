@@ -18,7 +18,6 @@ import { useLocation, useNavigate, useParams } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
-import { cn } from '../../lib/utils'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useT } from '../../lib/i18n'
 import { cancelaOferta } from '../../lib/ofertes'
@@ -27,11 +26,12 @@ import { carregaProgresOfertes } from '../../lib/progresOfertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import {
-  PASSOS_OFERTA_CLAUS, etiquetaEstatOferta, puntOferta,
+  PASSOS_OFERTA_CLAUS, estatSimpleOferta, puntOferta,
 } from '../../lib/procesOferta'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import BlocPublicada from '../../components/proces/BlocPublicada'
+import BadgeEstat from '../../components/proces/BadgeEstat'
 import type { Canalizacion, EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -112,7 +112,6 @@ export default function ProductorOfertaDetall() {
 
   const canalitzats = canalitzacions.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(oferta.kg_total ?? 0)
-  const est = etiquetaEstatOferta(oferta.estado)
   const cancelable = ['borrador', 'publicada', 'parcial'].includes(oferta.estado)
 
   // La fecha se compara en día, no en instante: una oferta disponible «hasta el 23» sigue
@@ -168,13 +167,15 @@ export default function ProductorOfertaDetall() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <h1 className="text-xl font-bold"><code>{oferta.id_excedente}</code></h1>
-          <p className="text-sm text-muted-foreground">
+          {/* El producto primero y la referencia debajo: es lo que el productor reconoce.
+              La referencia se queda porque es la que sale en WhatsApp y en los albaranes. */}
+          <h1 className="text-xl font-bold">
             {oferta.producto}{oferta.variedad ? ` · ${oferta.variedad}` : ''}
-          </p>
-          <span className={cn('mt-1.5 inline-block rounded-full px-2 py-0.5 text-xs font-medium', est.clase)}>
-            {t(est.key)}
-          </span>
+          </h1>
+          <p className="text-xs text-muted-foreground"><code>{oferta.id_excedente}</code></p>
+          <div className="mt-1.5">
+            <BadgeEstat clase={estatSimpleOferta(punt).clase} gran>{t(estatSimpleOferta(punt).key)}</BadgeEstat>
+          </div>
         </div>
         <div className="text-right">
           <div className="text-lg font-bold">{canalitzats}/{total} kg</div>

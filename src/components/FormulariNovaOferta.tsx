@@ -328,6 +328,20 @@ export default function FormulariNovaOferta(
             onChange={(e) => set(campo.clave, e.target.value === '' ? null : Number(e.target.value))} />
         )
       default:
+        // «Fins quin dia està disponible» con CALENDARIO (revisión del 23-09-2026): en el
+        // móvil teclear «23/07» es incómodo y deja margen a erratas. El control da ISO
+        // (aaaa-mm-dd) y lo que se guarda y viaja es «dd/mm/aaaa»: es lo que entiende
+        // `parseDisponibleFins()` en el servidor —el mismo que lee lo que escribe el
+        // productor por WhatsApp— y lo que sale impreso en el texto de la oferta. Así no
+        // hay que tocar ni la Edge Function ni el descriptor del campo.
+        if (campo.clave === 'disponible_fins') {
+          return (
+            <Input id={id} name={campo.clave} type="date" aria-invalid={invalid}
+              min={avuiIso()}
+              value={ddmmaaaaAIso(String(valor ?? ''))}
+              onChange={(e) => set(campo.clave, isoADdmmaaaa(e.target.value))} />
+          )
+        }
         return campo.clave === 'observacions'
           ? <Textarea id={id} name={campo.clave} rows={3} aria-invalid={invalid} value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
           : <Input id={id} name={campo.clave} type="text" aria-invalid={invalid} value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
@@ -432,4 +446,21 @@ export default function FormulariNovaOferta(
       </div>
     </div>
   )
+}
+
+/** Hoy en hora de Madrid, en ISO: el mínimo del calendario (no se ofrece un día pasado). */
+function avuiIso(): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
+}
+
+/** «2026-09-30» → «30/09/2026». Vacío si no es una fecha ISO. */
+export function isoADdmmaaaa(iso: string): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+
+/** «30/09/2026» → «2026-09-30». Vacío si no se reconoce (el control lo pinta en blanco). */
+export function ddmmaaaaAIso(txt: string): string {
+  const m = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
+  return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
 }

@@ -16,14 +16,13 @@
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
-import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import { manifestaInteres } from '../../lib/ofertes'
-import { puntInteres } from '../../lib/procesOferta'
+import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
-import { classeEtapaInteres } from './Interessos'
+import BadgeEstat from '../../components/proces/BadgeEstat'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Button } from '@/components/ui/button'
@@ -136,12 +135,9 @@ export default function Mercat() {
                 </div>
               </div>
               {punt ? (
-                <span className={cn(
-                  'rounded-full px-2 py-0.5 text-xs font-medium',
-                  classeEtapaInteres(punt.etapa, punt.emToca),
-                )}>
-                  {t(punt.claus.titol, punt.vars)}
-                </span>
+                <BadgeEstat clase={estatSimpleInteres(punt).clase}>
+                  {t(estatSimpleInteres(punt).key)}
+                </BadgeEstat>
               ) : (
                 <Dialog open={obert?.id === o.id} onOpenChange={(v) => !v && setObert(null)}>
                   <DialogTrigger asChild>

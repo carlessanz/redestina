@@ -25,8 +25,15 @@ import {
   FASES_EQUIP,
   PASSOS_INTERES_CLAUS,
   PASSOS_OFERTA_CLAUS,
+  ESTATS_SIMPLES_INTERES,
+  ESTATS_SIMPLES_OFERTA,
+  estatSimpleInteres,
+  estatSimpleOferta,
   etiquetaEstatOferta,
   llegendaOferta,
+  llegendaSimpleInteres,
+  llegendaSimpleOferta,
+  ofertaEnCurs,
   puntInteres,
   puntOferta,
 } from '../src/lib/procesOferta'
@@ -431,5 +438,72 @@ describe('FASES_EQUIP: el «Com funciona» del tablero', () => {
   it('cada ruta existe de verdad en el menú del equipo', () => {
     const orfes = FASES_EQUIP.flatMap((f) => f.rutes).filter((r) => !destins.has(r))
     expect(orfes, `rutas sin entrada de menú:\n  ${orfes.join('\n  ')}`).toEqual([])
+  })
+})
+
+describe('el estado SIMPLE de los paneles externos (revisión del 23-09-2026)', () => {
+  const o = (f: Partial<FetsOferta>) => estatSimpleOferta(puntOferta({ ...base, ...f }, 'productor')).estat
+
+  it('la oferta: buscant → en gestió → sortida trobada → finalitzada', () => {
+    expect(o({})).toBe('buscant')
+    expect(o({ nInteressades: 2 })).toBe('gestio')
+    expect(o({ estado: 'parcial', kgCanalitzats: 30 })).toBe('sortida')
+    expect(o({ estado: 'bloqueada', kgCanalitzats: 100 })).toBe('sortida')
+    expect(o({ estado: 'bloqueada', kgCanalitzats: 100, albaraRec: rec('entregado') })).toBe('sortida')
+    expect(o({ estado: 'bloqueada', kgCanalitzats: 100, albaraRec: rec('conciliado') })).toBe('finalitzada')
+  })
+
+  it('las salidas', () => {
+    expect(o({ estado: 'cancelada' })).toBe('cancellada')
+    expect(o({ estado: 'no_colocada' })).toBe('sense_sortida')
+  })
+
+  it('un REC anulado NO la da por finalizada', () => {
+    expect(o({ estado: 'bloqueada', kgCanalitzats: 100, albaraRec: rec('anulado') })).toBe('sortida')
+  })
+
+  it('«en curs» separa las dos secciones de Inici sin que ninguna oferta caiga en las dos', () => {
+    for (const e of ESTATS_SIMPLES_OFERTA) {
+      const enCurs = ofertaEnCurs(e)
+      expect(enCurs, e).toBe(e === 'buscant' || e === 'gestio' || e === 'sortida')
+    }
+  })
+
+  it('el interés: per respondre → interès enviat → assignada → tancada', () => {
+    const i = (f: Partial<FetsInteres>) => estatSimpleInteres(puntInteres({
+      estado: 'acceptada', aprovacio: 'pendent', ofertaEstado: 'publicada', ...f,
+    })).estat
+    expect(i({ estado: 'pendent' })).toBe('per_respondre')
+    expect(i({})).toBe('interes_enviat')
+    expect(i({ aprovacio: 'aprovada' })).toBe('assignada')
+    expect(i({ aprovacio: 'aprovada', albaraEnt: { estado: 'entregado', numero: 'ENT-1' } })).toBe('assignada')
+    expect(i({ aprovacio: 'aprovada', albaraEnt: { estado: 'conciliado', numero: 'ENT-1' } })).toBe('tancada')
+    expect(i({ aprovacio: 'rebutjada' })).toBe('no_disponible')
+    expect(i({ ofertaEstado: 'cancelada' })).toBe('no_disponible')
+    expect(i({ estado: 'rebutjada' })).toBe('declinada')
+  })
+
+  it('lo que te toca a ti va en coral, y ningún estado del productor lo lleva', () => {
+    const toca = estatSimpleInteres(puntInteres({ estado: 'pendent', aprovacio: 'pendent', ofertaEstado: 'publicada' }))
+    expect(toca.clase).toContain('coral')
+    for (const e of llegendaSimpleOferta()) expect(e.clase).not.toContain('coral')
+  })
+
+  it('los cuatro estados del productor tienen colores distintos entre sí', () => {
+    const classes = llegendaSimpleOferta()
+      .filter((e) => ['est.o_buscant', 'est.o_gestio', 'est.o_sortida', 'est.o_finalitzada'].includes(e.key))
+      .map((e) => e.clase)
+    expect(new Set(classes).size).toBe(4)
+  })
+
+  it('las dos leyendas cubren todos los estados y sus claves existen en ca y en es', () => {
+    expect(llegendaSimpleOferta()).toHaveLength(ESTATS_SIMPLES_OFERTA.length)
+    expect(llegendaSimpleInteres()).toHaveLength(ESTATS_SIMPLES_INTERES.length)
+    for (const it of [...llegendaSimpleOferta(), ...llegendaSimpleInteres()]) {
+      for (const clau of [it.key, it.descKey]) {
+        expect(DICTS.ca[clau], `falta ${clau} en ca`).toBeTruthy()
+        expect(DICTS.es[clau], `falta ${clau} en es`).toBeTruthy()
+      }
+    }
   })
 })

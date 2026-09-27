@@ -223,6 +223,10 @@ export default function ReceptorDocuments() {
         descarregador={descarregador}
         titolKey="entdoc.cr_title"
         buitKey="entdoc.cr_empty"
+        // En la revisión del 23-09-2026 esta sección se leyó como «certificados de
+        // donación», que la entidad receptora NO recibe (los recibe quien dona). No lo son:
+        // acreditan los kilos recibidos ante terceros. Se dice aquí para que no haya duda.
+        descKey="entdoc.cr_desc"
         extra={(d) => {
           const c = perCertificat[d.objeto_id]
           if (!c) return null

@@ -616,7 +616,8 @@ src/
                                LlistaDocuments y TaulaAlbarans (§6ter)
     proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
-                               BotoAmbMotiu (§6ter)
+                               BotoAmbMotiu y BadgeEstat (el estado simple de los paneles
+                               externos, §6ter)
     equip/                     CertificatsFitxa (els certificats d'una productora, des de la
                                seva fitxa) + DialegCertificatPeriode (el de «a demanda») +
                                Bloquejos (extret de TancamentDetall: el comparteixen les dues
@@ -1705,6 +1706,19 @@ en la priorización interna (que corre con `service_role`).
 políticas: `donacio`→social/animal/transformador, `venda`→comercial/transformador,
 `maquila`→transformador. Cambiar la regla de negocio es un `insert`/`delete`.
 
+🔴 **Y la regla cambió el 27-09-2026 (revisión funcional del 23-09), PENDIENTE DE APLICAR en
+remoto.** La Fundación dijo: empresa → solo venta y maquila; entidad social → donación + venta
++ maquila. `20270330100000` añade `venda`/`maquila`→`social` y `maquila`→`comercial`. **Solo
+inserta**, así que el mercado, `manifestar_interes()` y el asistido cambian a la vez sin tocar
+código. ⚠️ **Los convenios NO cambian**: una entidad social verá ya las ofertas de venta, pero
+`aprovar_resposta()` no la canalizará sin un convenio `com` vigente, que es lo que dice
+`convenios_exigidos`.
+⚠️ **No se pudo aplicar desde la sesión que la escribió**: el token del CLI del llavero de esta
+máquina pertenece a otra cuenta de Supabase (solo ve `custodia-staging`, 403 en este proyecto),
+no había MCP de Supabase y el clasificador de permisos bloqueó escribir en producción con la
+clave de servicio. Se aplica con `/publicar` o `supabase db push` desde una sesión con acceso;
+es idempotente (`on conflict do nothing`).
+
 ### El interruptor `roles_activos`
 
 > ✅ **ENCENDIDO en producción desde el 2026-07-30.** Cada cuenta ve solo lo suyo. Verificado tras
@@ -2319,6 +2333,44 @@ refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción.
 **Vocabulario fijado**: «oferta» (no «excedent») en la interfaz operativa; «Coberta» en vez de
 «Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
 que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
+
+### Los estados SIMPLES de los paneles externos (27-09-2026)
+
+Salió de la revisión funcional del 23-09-2026 (documento de Carles Pulido): los badges del
+productor enseñaban el estado crudo del excedente —«Publicada», «Parcial», «Coberta»— sin saber
+nada del albarán, así que una oferta recogida y conciliada seguía diciendo «Coberta». Ahora
+`estatSimpleOferta()` y `estatSimpleInteres()` (`procesOferta.ts`) **derivan el estado de
+`puntOferta()`/`puntInteres()`**, no del estado crudo, y los pinta `BadgeEstat` (píldora con un
+punto del mismo color):
+
+| Productor | Cuándo | Receptor | Cuándo |
+| --- | --- | --- | --- |
+| Buscant sortida (ámbar) | publicada, nadie la ha pedido | Per respondre (coral) | le llegó la oferta, no ha contestado |
+| En gestió (crema) | alguien ha mostrado interés | Interès enviat · dd/mm (ámbar) | contestó; el equipo decide |
+| Sortida trobada (verde) | asignada, recogida o confirmada | Assignada (verde) | aprobada, entrega en marcha |
+| Finalitzada (contorno) | REC conciliado | Tancada (contorno) | ENT conciliado |
+| Cancel·lada / Sense sortida (rojo) | salidas | No disponible (rojo) · Descartada | no aprobada o retirada · dijo que no |
+
+⚠️ **En estos badges el ámbar significa «esperando», no «et toca a tu»**: lo pidió la Fundación
+(🟡) y, probado en pantalla, el coral suave se confundía con el rojo de «Cancel·lada». Lo que es
+acción de quien mira va en coral. El bloque `QueTocaAra` **no cambia** y sigue en ámbar.
+⚠️ **El equipo NO los usa**: sus listados necesitan el estado exacto para operar.
+
+**La home del productor** (`ProductorInici`) tiene ahora dos secciones que no se solapan:
+«Què passa amb les teves ofertes» con las que están **en curso** (buscant, en gestió, sortida
+trobada) —producto, kg, estado, «X kg amb sortida · Y pendents», «repartida entre N
+destinacions» y qué toca— y «Les teves darreres ofertes» con el **histórico** (finalizadas,
+canceladas, sin salida), que se oculta si está vacío. Los indicadores llevan año («Kg
+canalitzats el 2026», por el año de la oferta en hora de Madrid) y «Kg pendents de sortida».
+Para el estado, la lista carga el REC y el embudo **en una consulta cada uno para todas las
+ofertas**, nunca una por oferta (§12.5). De la entidad que recibe se dice cuántas, nunca cuáles.
+
+**Y de paso**: el receptor ya no ve el código interno `E-…` en Interessos ni en Històric (la
+fecha va siempre); el Mercat se titula «Excedents disponibles»; «Nova oferta» del menú lateral
+ya no lleva un fondo que se confundía con la sección activa (ahora un contorno); el alta de
+oferta pide la disponibilidad con **calendario** (guarda «dd/mm/aaaa», que es lo que entiende
+`parseDisponibleFins()`); el productor ya no tiene la subida de factura en Documentació; y los
+certificados de recepción del receptor dicen que **no** son certificados de donación.
 
 ### La canalización asistida: el ciclo entero en una pantalla (21-09-2026)
 
@@ -4680,6 +4732,10 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **27-09-2026: se abre la 127** (el correo del resumen anual sigue pidiendo la factura), así
+que son **44 vivas** y la siguiente entrada nueva es la 128. El párrafo de abajo es el recuento
+del 22-09-2026 y no se ha rehecho entero.
+
 Estado al 22-09-2026, tras la segunda pasada de la tarde (cierra 14, 33, 112, 118; reclasifica
 21, 55 y 69), la revisión funcional en navegador de esa misma tarde (abre 119-124, más la 125
 del renombrado de migraciones) y su arreglo por la noche (cierra 119-124): **43 entradas vivas**
@@ -5177,6 +5233,13 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      que la ficha existe es `ruta_documento()`, que devuelve `0A000` si no la encuentra —y por eso
      su `select` sobre `productores`/`entidades` no es decorativo—.
 
+127. **El correo del resumen anual sigue ofreciendo subir la factura.** El 27-09-2026 se quitó
+     la subida del panel del productor (revisión funcional del 23-09: el productor gestiona su
+     factura con su gestor, y el certificado no depende de ella desde el 21-09), pero
+     `emitir_resumen()` sigue acuñando el enlace `subida_factura` y el correo lo ofrece. No se
+     tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
+     del todo o se deja como vía opcional.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **42 de las 49**. Se quedan
@@ -5352,7 +5415,8 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **944 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 939
+   Referencia: **952 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 944
+   el 27-09-2026 con las 8 de los estados simples de los paneles externos; antes, de 939
    el 22-09-2026: el bloque de claves compuestas pasa a vigilar también `orgdoc.t_*` contra el
    CHECK de `documentos_externos.tipo`, que `20270329100000` amplió — es justo el caso del que
    avisa §7: la lista de valores vive en Postgres y `cobertura.test.ts` no ve un `t(\`…${tipo}\`)`).

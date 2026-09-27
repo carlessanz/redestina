@@ -41,19 +41,24 @@ const ESTIL_ESTAT: Record<DocumentoEstado, string> = {
 }
 
 export default function LlistaDocuments({
-  files, descarregador, titolKey, buitKey, extra,
+  files, descarregador, titolKey, buitKey, descKey, extra,
 }: {
   files: DocFila[]
   descarregador: ReturnType<typeof useDescarregaDocument>
   titolKey: string
   buitKey: string
+  /** Una frase bajo el título que diga PARA QUÉ sirve la sección, si no es obvio. */
+  descKey?: string
   extra?: (d: DocFila) => ReactNode
 }) {
   const { t } = useT()
 
   return (
     <Card>
-      <CardHeader><CardTitle className="text-base">{t(titolKey)}</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle className="text-base">{t(titolKey)}</CardTitle>
+        {descKey && <p className="mt-1 text-sm text-muted-foreground">{t(descKey)}</p>}
+      </CardHeader>
       <CardContent>
         {files.length === 0
           ? <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
