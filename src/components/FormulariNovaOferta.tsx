@@ -41,6 +41,7 @@ import { cn } from '../lib/utils'
 import { aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
+import { SelectorFotos } from './FotosOferta'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import PasosProces from './proces/PasosProces'
@@ -553,6 +554,22 @@ export default function FormulariNovaOferta(
                 {campo.ayuda && <p className="mt-1 text-xs text-muted-foreground">{campo.ayuda}</p>}
               </div>
             ))}
+            {/* La FOTO va en el paso del producto, que es donde se piensa en qué se ofrece
+                (revisión del 23-09-2026: es lo primero que mira un receptor). No es un campo
+                del descriptor porque el bot de WhatsApp todavía no recibe imágenes (brecha 8):
+                viaja en `datos.fotos` y `crear-oferta` la valida aparte. */}
+            {(bloc.clau === 'producte' || (blocs.length === 1)) && productorId && (
+              <div className="sm:col-span-2">
+                <p className="mb-1.5 text-xs text-muted-foreground">
+                  {t('foto.label')} <span className="ml-1">{t('foto.recommended')}</span>
+                </p>
+                <SelectorFotos
+                  productorId={productorId}
+                  rutes={Array.isArray(datos.fotos) ? (datos.fotos as string[]) : []}
+                  onChange={(r) => set('fotos', r)}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

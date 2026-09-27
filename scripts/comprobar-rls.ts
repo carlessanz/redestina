@@ -530,6 +530,9 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // `soc_titular`, y con una ficha ajena corta con 42501 antes de mirar nada más.
   { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_dades: { nif: "B00000000" } }, descripcion: "NO edita la fitxa d'un altre productor" },
   { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_dades: { nif: "B00000000" } }, descripcion: "NO edita la fitxa d'una altra entitat" },
+  // Las fotos de una oferta ajena (20270404100000/100100): el permiso va ANTES que la
+  // existencia, así que con un id inventado también corta con 42501.
+  { tabla: "fixar_fotos_oferta", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_fotos: [] }, descripcion: "NO canvia les fotos d'una oferta que no és seva" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },

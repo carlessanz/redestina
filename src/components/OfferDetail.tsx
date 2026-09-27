@@ -23,6 +23,8 @@ import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
+import { SelectorFotos } from './FotosOferta'
+import { fixaFotos } from '../lib/fotos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -684,6 +686,25 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Las fotos del producto (20270404100000). El equipo las puede cambiar: en el modelo
+          asistido es a menudo quien las recibe por WhatsApp y las sube. */}
+      {exc.productor_id && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('foto.title')}</CardTitle></CardHeader>
+          <CardContent>
+            <SelectorFotos
+              productorId={exc.productor_id}
+              rutes={exc.fotos ?? []}
+              onChange={async (rutes) => {
+                const r = await fixaFotos(exc.id, rutes)
+                if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+                setExc((e) => (e ? { ...e, fotos: rutes } : e))
+              }}
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {exc.texto_oferta && (
         <Card>

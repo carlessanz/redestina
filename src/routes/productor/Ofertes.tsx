@@ -19,6 +19,7 @@ import {
 import type { PuntProces } from '../../lib/procesOferta'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
+import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
 import type { EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -157,8 +158,8 @@ function fmtKg(n: number): string {
 }
 
 function FilaOferta({
-  o, canalitzats, punt, ambCodi,
-}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean }) {
+  o, canalitzats, punt, ambCodi, foto,
+}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: string }) {
   const { t } = useT()
   const total = Number(o.kg_total ?? 0)
   const falten = Math.max(0, total - canalitzats)
@@ -170,11 +171,14 @@ function FilaOferta({
       to={`/productor/ofertes/${o.id}`}
       className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 hover:bg-muted/40"
     >
-      <div className="min-w-0">
-        <div className="font-medium">
-          {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
+      <div className="flex min-w-0 items-center gap-3">
+        <FotoOferta url={foto} alt={o.producto ?? ''} className="size-12" />
+        <div className="min-w-0">
+          <div className="font-medium">
+            {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
+          </div>
+          {ambCodi && <div className="text-xs text-muted-foreground"><code>{o.id_excedente ?? '—'}</code></div>}
         </div>
-        {ambCodi && <div className="text-xs text-muted-foreground"><code>{o.id_excedente ?? '—'}</code></div>}
       </div>
       <div className="flex flex-wrap items-center gap-3">
         {/* Una oferta que ya no busca salida (cancelada o sin destino) no tiene progreso
@@ -399,6 +403,7 @@ export function ProductorOfertes() {
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
   const { ofertes, kg, puntDe, carregant } = useMevesOfertes(productorId)
+  const urls = useUrlsFotos(ofertes.map((o) => o.fotos?.[0]).filter((r): r is string => Boolean(r)))
 
   return (
     <Card>
@@ -421,7 +426,8 @@ export function ProductorOfertes() {
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {!carregant && ofertes.length === 0 && <CapOferta />}
         {ofertes.map((o) => (
-          <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi />
+          <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi
+            foto={o.fotos?.[0] ? urls[o.fotos[0]] : undefined} />
         ))}
       </CardContent>
     </Card>

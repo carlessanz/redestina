@@ -766,6 +766,11 @@ const ca: Dict = {
   'mk.kg': 'Quants kg', 'mk.price': 'Preu (mínim {min} €/kg)', 'mk.send': 'Enviar interès',
 
   'mk.need_kg': 'Cal indicar quants kg.',
+  'foto.label': 'Foto del producte', 'foto.recommended': '(molt recomanada)', 'foto.title': 'Fotos del producte',
+  'foto.add': 'Afegir foto', 'foto.uploading': 'Pujant…', 'foto.remove': 'Treure la foto', 'foto.principal': 'Principal',
+  'foto.alt_n': 'Foto {n} del producte',
+  'foto.hint': 'Fins a {n} fotos. Que es vegi bé el producte i, si té algun defecte, que també s’apreciï. La primera és la que veuen els receptors a la llista.',
+  'foto.err_format': 'No s’ha pogut llegir aquesta imatge. Prova amb una foto JPG o PNG.',
   'mk.see_detail': 'Veure el detall', 'mk.detail_title': 'Detall de l’oferta',
   'mk.d_kg': 'Quilos oferts', 'mk.d_zone': 'Zona (comarca)', 'mk.d_mode': 'Modalitat',
   'mk.d_price': 'Preu', 'mk.d_until': 'Disponible fins', 'mk.d_hours': 'Horari de recollida',
@@ -2782,6 +2787,11 @@ const es: Dict = {
   'mk.kg': 'Cuántos kg', 'mk.price': 'Precio (mínimo {min} €/kg)', 'mk.send': 'Enviar interés',
 
   'mk.need_kg': 'Hay que indicar cuántos kg.',
+  'foto.label': 'Foto del producto', 'foto.recommended': '(muy recomendada)', 'foto.title': 'Fotos del producto',
+  'foto.add': 'Añadir foto', 'foto.uploading': 'Subiendo…', 'foto.remove': 'Quitar la foto', 'foto.principal': 'Principal',
+  'foto.alt_n': 'Foto {n} del producto',
+  'foto.hint': 'Hasta {n} fotos. Que se vea bien el producto y, si tiene algún defecto, que también se aprecie. La primera es la que ven los receptores en la lista.',
+  'foto.err_format': 'No se ha podido leer esta imagen. Prueba con una foto JPG o PNG.',
   'mk.see_detail': 'Ver el detalle', 'mk.detail_title': 'Detalle de la oferta',
   'mk.d_kg': 'Kilos ofrecidos', 'mk.d_zone': 'Zona (comarca)', 'mk.d_mode': 'Modalidad',
   'mk.d_price': 'Precio', 'mk.d_until': 'Disponible hasta', 'mk.d_hours': 'Horario de recogida',

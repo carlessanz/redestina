@@ -32,6 +32,8 @@ import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import BlocPublicada from '../../components/proces/BlocPublicada'
 import BadgeEstat from '../../components/proces/BadgeEstat'
+import { SelectorFotos } from '../../components/FotosOferta'
+import { fixaFotos } from '../../lib/fotos'
 import type { Canalizacion, EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -196,6 +198,25 @@ export default function ProductorOfertaDetall() {
         />
       </div>
       <QueTocaAra punt={punt} />
+
+      {/* --- Las fotos: se pueden añadir o cambiar mientras la oferta sigue viva, que es
+              cuando un receptor todavía las va a mirar. Van por RPC (`fixar_fotos_oferta`):
+              el productor no tiene UPDATE sobre `excedentes`. --- */}
+      {oferta.productor_id && (cancelable || oferta.estado === 'bloqueada' || (oferta.fotos?.length ?? 0) > 0) && (
+        <div className="space-y-2 rounded-xl border bg-card p-4">
+          <h2 className="text-base font-semibold">{t('foto.title')}</h2>
+          <SelectorFotos
+            productorId={oferta.productor_id}
+            rutes={oferta.fotos ?? []}
+            disabled={!(cancelable || oferta.estado === 'bloqueada')}
+            onChange={async (rutes) => {
+              const r = await fixaFotos(oferta.id, rutes)
+              if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+              setOferta((o) => (o ? { ...o, fotos: rutes } : o))
+            }}
+          />
+        </div>
+      )}
 
       {oferta.texto_oferta && (
         <Card>

@@ -154,6 +154,17 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Las fotos (20270404100000): como mucho 3, y todas de la carpeta de ESTE productor. La
+    // subida ya la limitó la política de Storage; esto impide citar en una oferta la foto de
+    // otro, que el receptor vería como si fuera de esta.
+    const fotos = (datos as Record<string, unknown>).fotos;
+    if (fotos !== undefined && fotos !== null) {
+      if (!Array.isArray(fotos) || fotos.length > 3 ||
+          !fotos.every((f) => typeof f === "string" && f.startsWith(`${productorId}/`))) {
+        return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
+      }
+    }
+
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46).
     const { data: productor } = await supabase
       .from("productores").select("id, name, email").eq("id", productorId).maybeSingle();

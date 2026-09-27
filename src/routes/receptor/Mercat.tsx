@@ -23,6 +23,7 @@ import { manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import BadgeEstat from '../../components/proces/BadgeEstat'
+import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Button } from '@/components/ui/button'
@@ -99,6 +100,13 @@ export default function Mercat() {
     await carrega()
   }
 
+  // Las URLs firmadas de todas las fotos de la pantalla, en UN lote (antes de cualquier `return`: es un hook): la principal de cada
+  // tarjeta y las de la oferta abierta.
+  const urls = useUrlsFotos([
+    ...ofertes.map((o) => o.fotos?.[0]).filter((r): r is string => Boolean(r)),
+    ...(obert?.fotos ?? []),
+  ])
+
   if (!entidadId) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
 
   /** El interés de esta entidad sobre una oferta, contado en una etapa (o null si se puede pedir). */
@@ -146,14 +154,19 @@ export default function Mercat() {
               {/* Toda la parte izquierda abre el detalle: es lo que se toca para «ver más». */}
               <button
                 type="button"
-                className="min-w-0 flex-1 text-left"
+                className="flex min-w-0 flex-1 items-center gap-3 text-left"
                 onClick={() => obre(o, 'detall')}
               >
+                {/* La foto primero: es lo primero que mira un receptor (revisión del 23-09). */}
+                <FotoOferta url={o.fotos?.[0] ? urls[o.fotos[0]] : null}
+                  alt={o.producto ?? ''} className="size-16" />
+                <div className="min-w-0">
                 <div className="font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
                 </div>
                 <div className="text-xs text-muted-foreground">{detall}</div>
                 <div className="mt-0.5 text-xs font-medium text-primary">{t('mk.see_detail')}</div>
+                </div>
               </button>
               {punt ? (
                 <BadgeEstat clase={estatSimpleInteres(punt).clase}>
@@ -186,6 +199,22 @@ export default function Mercat() {
                 {mode === 'detall' ? t('mk.detail_title') : t('mk.dialog_title')}
               </DialogTitle>
             </DialogHeader>
+            {/* Foto grande y, si hay más, las otras debajo para abrirlas en su tamaño. */}
+            {obert.fotos?.length > 0 && (
+              <div className="space-y-2">
+                <FotoOferta url={urls[obert.fotos[0]]} alt={obert.producto ?? ''}
+                  className="aspect-[4/3] w-full" />
+                {obert.fotos.length > 1 && (
+                  <div className="flex gap-2">
+                    {obert.fotos.slice(1).map((r) => (
+                      <a key={r} href={urls[r]} target="_blank" rel="noreferrer">
+                        <FotoOferta url={urls[r]} alt={obert.producto ?? ''} className="size-16" />
+                      </a>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
             <p className="font-titulos text-lg font-semibold">
               {obert.producto ?? '—'}{obert.variedad ? ` · ${obert.variedad}` : ''}
             </p>

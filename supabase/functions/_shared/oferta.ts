@@ -351,6 +351,9 @@ export async function crearExcedente(
       format_entrega: d.format_entrega ?? null,
       retorn_envasos: d.retorn ?? null,
       transport_propi: transportPropi,
+      // Solo llegan del panel (el bot no recibe imágenes todavía, brecha 8); `crear-oferta`
+      // ya ha comprobado que son de la carpeta de este productor.
+      fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
       modalitat: d.modalitat ?? null,
       preu_minim: preuMinim,
       causa: causa?.nombre ?? null,

@@ -601,6 +601,7 @@ src/
     i18n.tsx                   Sistema de traducciones (ca/es, per defecte ca; useT, §7)
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
     utils.ts                   cn() (shadcn)
+    fotos.ts                   Recomprimir (sin EXIF), subir, borrar y firmar las fotos de las ofertas
     validacio.ts               PURO: NIF/NIE/CIF con dígito de control, teléfono (normaliza a E.164
                                sin +), correo y CP. Devuelve claves i18n
     perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
@@ -657,6 +658,8 @@ src/
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
+    FotosOferta.tsx            Las fotos del producto: useUrlsFotos (firma en lote), FotoOferta
+                               (miniatura con hueco si no hay) y SelectorFotos (subir y quitar)
     SelectorMunicipi.tsx       Elegir municipio de la lista oficial (INE), con búsqueda y comarca;
                                lo usan el alta de oferta y la ficha de la organización
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
@@ -849,6 +852,14 @@ de prueba que habilita el envío a la entidad (§8).
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
 solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al aceptar (§5).
 
+**`fotos`** (`text[]`, como mucho 3, `20270404100000`): rutas del bucket `fotos-ofertes`; la
+primera es la principal. Llegan en el alta (`crear-oferta`, que valida que son de la carpeta de
+ese productor) y se cambian después con **`fixar_fotos_oferta(excedente, fotos)`** —el
+productor de la oferta o el equipo; el permiso se comprueba ANTES que la existencia
+(`20270404100100`)—. Se ven en el Mercat (tarjeta y detalle), en Interessos, en Històric, en el
+detalle del productor y en el del equipo. ⚠️ **Por WhatsApp no llegan**: el bot todavía no
+descarga imágenes (brecha 8).
+
 **`format_entrega`** (`caixes`·`palet`·`envasos_propis`·`altres`, check) y **`transport_propi`**
 (bool; null = no se preguntó), `20270401100000` — §6bis. `tipo_caixa` se queda para las ofertas
 anteriores y ya no se escribe.
@@ -1032,9 +1043,27 @@ lee todo el equipo.
 
 **Buckets** (`20260928100600_storage_buckets.sql`) — `documentos` (privado, 20 MB,
 pdf/png/jpeg) y `activos` (privado, 5 MB, png/jpeg, para la firma y el sello de la apoderada).
-**Sin una sola política en `storage.objects`**: nadie toca Storage directo, ni para leer ni para
-listar. Se lee por la Edge Function `descargar-documento`, que autoriza con
+**Sin una sola política en `storage.objects` para estos dos buckets**: nadie los toca directo, ni
+para leer ni para listar. Se leen por la Edge Function `descargar-documento`, que autoriza con
 `puede_ver_documento()` y firma una URL de 60 s.
+
+⚠️ **La excepción es `fotos-ofertes`** (`20270404100000`, 27-09-2026), el bucket de las **fotos del
+producto**: privado, 5 MB, jpeg/png/webp, y **con políticas propias en `storage.objects`** —las
+primeras del proyecto, limitadas a `bucket_id = 'fotos-ofertes'`—. Una foto de producto no
+necesita la lógica de un documento legal: se ve si se ve la oferta, y eso ya lo dice la RLS de
+`excedentes`. Sube el productor **solo en su carpeta** (`<productor_id>/<uuid>.jpg`) o el equipo;
+ven el equipo, el productor en su carpeta y **cualquiera que pueda ver una oferta que cite la
+ruta** en `excedentes.fotos` (el `exists` se evalúa con la RLS de quien pregunta); borra el
+productor en su carpeta o el equipo. **No hay política de UPDATE**: una foto no se sobrescribe, se
+sube otra con otro nombre. El cliente (`src/lib/fotos.ts`) firma URLs de 1 h en lote.
+✅ **Probado con sesiones reales**: el productor sube en su carpeta (200) y no en la de otro
+(rechazado); la entidad social que ve la oferta firma la URL (200) y la empresa compradora —que
+no ve donaciones— y otro productor no; `crear-oferta` rechaza citar una foto de otra carpeta
+(`fotos_invalides`).
+🔴 **La foto se recomprime en el navegador** (JPEG, lado mayor 1600 px) y eso **borra el EXIF**,
+posición GPS incluida: sin ese paso, una foto hecha en la finca publicaría dónde está (D3).
+⚠️ Las imágenes van con `loading="lazy"`: en una pestaña oculta (el panel del navegador integrado
+cerrado) no cargan, y parece que la foto está rota. No lo está.
 
 **La carpeta ordena; la tabla autoriza.** `ruta_documento()` compone en SQL, al insertar:
 
@@ -5545,7 +5574,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 957/957 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   ✅ **Referencia HOY: 964/964 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   tras las fotos: +7 de `fixar_fotos_oferta` sobre una oferta ajena, en las siete cuentas
+   externas). La anterior, del mismo día: **957/957 correctas y 28 saltadas** (27-09-2026,
    tras el bloque B de la revisión: +14 de `actualitzar_fitxa_productor` y `_entitat` —dos checks
    de «denegar» sobre una ficha ajena, en las siete cuentas externas—).
    La referencia anterior del mismo día era **943/943 correctas y 28 saltadas** (27-09-2026,

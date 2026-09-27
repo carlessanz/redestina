@@ -22,11 +22,12 @@ import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
+import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type AmbOferta = OfertaRespuesta & {
-  excedentes: { id_excedente: string | null; producto: string | null; estado: EstadoExcedente } | null
+  excedentes: { id_excedente: string | null; producto: string | null; estado: EstadoExcedente; fotos: string[] | null } | null
 }
 
 /** Lo único que hace falta del albarán de entrega para contar la etapa. */
@@ -38,7 +39,7 @@ interface CanalAmbOferta {
   kg_reales: number | null
   data_hora_recollida: string | null
   created_at: string
-  excedentes: { id_excedente: string | null; producto: string | null; estado: string } | null
+  excedentes: { id_excedente: string | null; producto: string | null; estado: string; fotos: string[] | null } | null
 }
 
 /** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
@@ -71,7 +72,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('*, excedentes(id_excedente, producto, estado)')
+        .select('*, excedentes(id_excedente, producto, estado, fotos)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -112,6 +113,7 @@ export function Interessos() {
   // un vistazo —asignada, interés enviado, cerrada, no disponible— más los dos que solo
   // salen a veces. La etapa fina sigue viva en la frase de «qué toca» de cada fila.
   const llegenda = llegendaSimpleInteres()
+  const urls = useUrlsFotos(files.map((f) => f.excedentes?.fotos?.[0]).filter((r): r is string => Boolean(r)))
 
   return (
     <Card>
@@ -149,11 +151,15 @@ export function Interessos() {
           return (
             <div key={f.id} className="rounded-lg border p-3">
               <div className="flex flex-wrap items-center justify-between gap-3">
-                <div className="min-w-0">
-                  {/* Sin el código interno (E-AAMMDD-…): es del ERP y a la entidad no le dice
-                      nada (revisión del 23-09-2026). */}
-                  <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
-                  {detall && <div className="text-xs text-muted-foreground">{detall}</div>}
+                <div className="flex min-w-0 items-center gap-3">
+                  <FotoOferta url={f.excedentes?.fotos?.[0] ? urls[f.excedentes.fotos[0]] : null}
+                    alt={f.excedentes?.producto ?? ''} className="size-12" />
+                  <div className="min-w-0">
+                    {/* Sin el código interno (E-AAMMDD-…): es del ERP y a la entidad no le dice
+                        nada (revisión del 23-09-2026). */}
+                    <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
+                    {detall && <div className="text-xs text-muted-foreground">{detall}</div>}
+                  </div>
                 </div>
                 <BadgeEstat clase={est.clase}>
                   {t(est.key)}{data ? ` · ${data}` : ''}
@@ -187,8 +193,7 @@ export function Historic() {
     let viu = true
     void supabase
       .from('canalizaciones')
-      .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, ' +
-        'excedentes(id_excedente, producto, estado)')
+      .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id_excedente, producto, estado, fotos)')
       .eq('entidad_id', entidadId)
       .order('created_at', { ascending: false })
       .then(({ data }) => {
@@ -200,6 +205,7 @@ export function Historic() {
   }, [entidadId])
 
   const totalKg = files.reduce((s, f) => s + Number(f.kg_reales ?? f.kg_confirmados ?? 0), 0)
+  const urls = useUrlsFotos(files.map((f) => f.excedentes?.fotos?.[0]).filter((r): r is string => Boolean(r)))
 
   return (
     <Card>
@@ -214,7 +220,10 @@ export function Historic() {
         )}
         {files.map((f) => (
           <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
-            <div>
+            <div className="flex min-w-0 items-center gap-3">
+              <FotoOferta url={f.excedentes?.fotos?.[0] ? urls[f.excedentes.fotos[0]] : null}
+                alt={f.excedentes?.producto ?? ''} className="size-12" />
+              <div className="min-w-0">
               <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
               {/* Siempre una fecha, y nunca el código interno: la de recogida si ya la hay,
                   y si no, cuándo se asignó. */}
@@ -222,6 +231,7 @@ export function Historic() {
                 {f.data_hora_recollida
                   ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
                   : t('hist.assigned_on', { date: dataCurta(f.created_at) })}
+              </div>
               </div>
             </div>
             {/* Claves propias y no las del productor: aquí los kilos se RECIBEN, y

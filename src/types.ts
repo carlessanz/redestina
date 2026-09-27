@@ -214,6 +214,8 @@ export interface Excedente {
   /** 20270401100000: cómo se entrega y si la lleva la productora (null = no se preguntó). */
   format_entrega: 'caixes' | 'palet' | 'envasos_propis' | 'altres' | null
   transport_propi: boolean | null
+  /** Rutas en el bucket `fotos-ofertes` (20270404100000), como mucho 3; la primera es la principal. */
+  fotos: string[]
 }
 
 export interface Canalizacion {
