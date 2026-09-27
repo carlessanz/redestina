@@ -274,5 +274,7 @@ export function kg(valor: number | string | null | undefined): string {
   if (valor === null || valor === undefined || valor === '') return '—'
   const n = Number(valor)
   if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-ES', { maximumFractionDigits: 2 })
+  // `ca-ES` y no `es-ES`: la segunda no agrupa los números de cuatro cifras («1000»
+  // junto a «1.720» de la portada, que ya usaba `ca-ES`).
+  return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
 }

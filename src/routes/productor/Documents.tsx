@@ -44,8 +44,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 type Donant = Pick<
   CierreDonante,
   | 'id' | 'kg_total' | 'valor_total' | 'estado' | 'resumen_numero' | 'certificado_numero'
-  | 'certificado_at' | 'factura_numero' | 'factura_fecha' | 'factura_importe' | 'calculado_at'
+  | 'certificado_at' | 'factura_numero' | 'factura_fecha' | 'factura_importe' | 'calculado_at' | 'tipo'
 >
+
+/** El año y el modo de cada fila, por `exercici_dels_meus_tancaments()` (20270406100000). */
+interface InfoTancament { cierre_donante_id: string; ejercicio: number; modo: 'real' | 'prueba' }
 
 type DocFila = Pick<
   Documento,
@@ -71,6 +74,7 @@ export default function ProductorDocuments() {
   const org = useOrganitzacio('productor')
 
   const [donants, setDonants] = useState<Donant[]>([])
+  const [infos, setInfos] = useState<InfoTancament[]>([])
   const [docs, setDocs] = useState<DocFila[]>([])
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
   const [convenis, setConvenis] = useState<ConveniFila[]>([])
@@ -86,9 +90,14 @@ export default function ProductorDocuments() {
     // daría la falsa impresión de que es el filtro el que protege.
     const { data: donData, error: errDon } = await supabase
       .from('cierres_donante')
-      .select('id, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at')
+      .select('id, tipo, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at')
       .order('created_at', { ascending: false })
     if (errDon) return { errDon }
+
+    // El año y el modo NO se leen de `cierres_ejercicio`, que es del equipo: los da esta
+    // RPC, solo de las filas propias. Sin ella, un cierre recién calculado (sin número
+    // todavía) salía «Exercici —» y, si era de prueba, sin la marca de prueba.
+    const { data: infoData } = await supabase.rpc('exercici_dels_meus_tancaments')
 
     const { data: docData } = await supabase
       .from('documentos')
@@ -120,6 +129,7 @@ export default function ProductorDocuments() {
 
     return {
       donants: (donData as Donant[] | null) ?? [],
+      infos: (infoData as InfoTancament[] | null) ?? [],
       docs: (docData as DocFila[] | null) ?? [],
       albarans: (albData as AlbaranBandeja[] | null) ?? [],
       convenis: (convData as ConveniFila[] | null) ?? [],
@@ -132,6 +142,7 @@ export default function ProductorDocuments() {
     const r = await carrega()
     if (r.errDon) { setError(r.errDon.message); return }
     setDonants(r.donants ?? [])
+    setInfos(r.infos ?? [])
     setDocs(r.docs ?? [])
     setAlbarans(r.albarans ?? [])
     setConvenis(r.convenis ?? [])
@@ -145,6 +156,7 @@ export default function ProductorDocuments() {
       if (!viu) return
       if (r.errDon) { setError(r.errDon.message); setCarregant(false); return }
       setDonants(r.donants ?? [])
+      setInfos(r.infos ?? [])
       setDocs(r.docs ?? [])
       setAlbarans(r.albarans ?? [])
       setConvenis(r.convenis ?? [])
@@ -169,14 +181,17 @@ export default function ProductorDocuments() {
   /** El año y el modo de una fila, deducidos de lo que el donante SÍ puede leer. */
   const info = useCallback((d: Donant) => {
     const seus = perDonant[d.id] ?? []
-    const exercici = exerciciDeNumero(d.certificado_numero)
+    const inf = infos.find((x) => x.cierre_donante_id === d.id)
+    const exercici = inf?.ejercicio
+      ?? exerciciDeNumero(d.certificado_numero)
       ?? exerciciDeNumero(d.resumen_numero)
       ?? seus[0]?.ejercicio
       ?? null
-    const prova = seus.some((x) => x.modo === 'prueba')
+    const prova = inf?.modo === 'prueba'
+      || seus.some((x) => x.modo === 'prueba')
       || (d.resumen_numero ?? d.certificado_numero ?? '').startsWith('P-')
     return { exercici, prova, docs: seus }
-  }, [perDonant])
+  }, [perDonant, infos])
 
   const algunaProva = useMemo(
     () => donants.some((d) => info(d).prova) || periodes.some((p) => p.modo === 'prueba'),
@@ -234,6 +249,9 @@ export default function ProductorDocuments() {
                   <h3 className="text-base">
                     {t('mydoc.year_title', { y: exercici ?? '—' })}
                   </h3>
+                  <Badge className="bg-secondary text-secondary-foreground">
+                    {t(d.tipo === 'transaccio' ? 'mydoc.kind_tx' : 'mydoc.kind_don')}
+                  </Badge>
                   <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
                   {prova && (
                     <Badge className="bg-aviso-fondo text-aviso whitespace-normal">
@@ -244,9 +262,12 @@ export default function ProductorDocuments() {
                 </div>
 
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  <Dada etiqueta={t('mydoc.f_kg')} valor={kg(d.kg_total)} />
+                  {/* Una fila de TRANSACCIÓN (venta o maquila, el CT) no lleva importe: su
+                      certificado no tiene ninguno, y «Valor de la donació: 0,00 €» afirmaba
+                      una donación que no existe. */}
+                  <Dada etiqueta={t(d.tipo === 'transaccio' ? 'mydoc.f_kg_tx' : 'mydoc.f_kg')} valor={kg(d.kg_total)} />
                   {/* El importe es SUYO: aquí sí, y solo aquí. */}
-                  <Dada etiqueta={t('mydoc.f_value')} valor={euros(d.valor_total)} />
+                  {d.tipo !== 'transaccio' && <Dada etiqueta={t('mydoc.f_value')} valor={euros(d.valor_total)} />}
                   <Dada etiqueta={t('mydoc.f_summary')} valor={d.resumen_numero ?? '—'} />
                   <Dada etiqueta={t('mydoc.f_certificate')} valor={d.certificado_numero ?? '—'} />
                 </div>

@@ -1694,6 +1694,15 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "veu quantes entitats s'han interessat per les SEVES ofertes",
       requiereFixture: "alguna oferta activa (borrador/publicada/parcial/bloquejada) de la seva ficha (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // El año y el modo de SUS cierres (20270406100000): el mismo puente que la RLS de
+    // `cierres_donante`, así que sin cierre suyo son 0 filas y eso no prueba nada.
+    {
+      tabla: "exercici_dels_meus_tancaments",
+      op: "rpc",
+      esperado: "permitir",
+      descripcion: "veu l'exercici i el mode dels SEUS tancaments",
+      requiereFixture: "algun cierres_donante de la seva ficha (scripts/crear-datos-documentales-prueba.ts)",
+    },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
     // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
@@ -1877,6 +1886,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "denegar",
       vacioEsDenegar: true,
       descripcion: "NO veu el progrés de les ofertes d'altri (no té fitxa de productor)",
+    },
+    // Un receptor no tiene ningún cierre de donante: la RPC le da «nada tuyo», no un error.
+    {
+      tabla: "exercici_dels_meus_tancaments",
+      op: "rpc",
+      esperado: "denegar",
+      vacioEsDenegar: true,
+      descripcion: "NO veu l'exercici dels tancaments d'altri",
     },
     { tabla: "wa_messages", op: "leer", esperado: "denegar", descripcion: "NO ve la mensajería" },
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
