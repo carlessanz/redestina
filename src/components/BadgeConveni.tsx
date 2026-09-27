@@ -11,6 +11,7 @@
 // Lo que sí cuenta vive en `convenios`. Se piden **solo los de esta organización**, con el
 // estado más avanzado por modelo, que es la misma regla que usa la vista de la campaña.
 
+import { cn } from '@/lib/utils'
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
@@ -83,12 +84,15 @@ export default function BadgeConveni({
   return (
     <div className="flex flex-wrap items-center gap-2">
       {vius.map((f) => (
-        <Link key={f.id} to={`/equip/convenis/${f.id}`}>
+        // `max-w-full` + `whitespace-normal`: el Badge de shadcn nace `whitespace-nowrap
+        // shrink-0`, y «Conveni d’entitat receptora · Pendent de signatura» se salía 13 px
+        // de la ficha a 375 px (§2, reglas 2 y 4).
+        <Link key={f.id} to={`/equip/convenis/${f.id}`} className="max-w-full">
           {/* Un `vigent` firmado en papel se pinta VERDE igual que cualquier otro: habilita
               a operar exactamente lo mismo, y pintarlo en otro tono diría que vale menos.
               Lo que cambia es el texto —de dónde viene y con qué referencia—, porque el
               número de serie que llevan los demás aquí no existe. */}
-          <Badge className={estilEstatConveni(f.estado)}>
+          <Badge className={cn(estilEstatConveni(f.estado), 'max-w-full whitespace-normal text-left')}>
             {t(`sig.model_${f.tipo}`)} · {esPaperVigent(f)
               ? t('conv.paper_badge_ok')
               : t(`conv.st_${f.estado}`)}
@@ -101,7 +105,7 @@ export default function BadgeConveni({
       {/* El histórico solo se enseña cuando NO hay convenio vigente: con uno firmado de
           verdad, la nota del Excel ya no informa de nada y solo confunde. */}
       {!teVigent && paper !== '' && (
-        <Badge className="bg-secondary text-secondary-foreground">
+        <Badge className="max-w-full whitespace-normal bg-secondary text-left text-secondary-foreground">
           {t('conv.paper_badge', { valor: paper })}
         </Badge>
       )}

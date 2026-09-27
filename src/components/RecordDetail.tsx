@@ -274,7 +274,9 @@ export default function RecordDetail({
           <SelectTrigger id={id} className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
           <SelectContent>
             <SelectItem value="__none">—</SelectItem>
-            {(c.opciones ?? []).map((o) => <SelectItem key={o} value={o}>{o}</SelectItem>)}
+            {(c.opciones ?? []).map((o) => (
+              <SelectItem key={o} value={o}>{c.etiquetaOpcion ? t(`${c.etiquetaOpcion}${o}`) : o}</SelectItem>
+            ))}
           </SelectContent>
         </Select>
       )

@@ -18,6 +18,9 @@ export interface CampoDef {
   label: string // clave i18n (f.*)
   tipo?: CampoTipo // por defecto 'text'
   opciones?: string[] // valores del desplegable cuando tipo === 'select'
+  /** Prefijo i18n de la etiqueta de cada opción (`org.tr_` → `org.tr_social`), cuando lo
+   *  que se guarda es un identificador y no un texto legible. Sin él, se pinta el valor. */
+  etiquetaOpcion?: string
   ancho?: 'full' // ocupa las dos columnas
 }
 
@@ -55,7 +58,7 @@ export const ENTIDAD_CAMPOS: CampoDef[] = [
   { key: 'modalitat', label: 'f.modalitat', tipo: 'select', opciones: ['Donació', 'Transformació', 'Venda', 'Maquila', 'Altres'] },
   // Decide qué ofertas ve esta entidad en su panel (§4bis). Sin él no ve ninguna:
   // la derivación desde `modalitat` deja en null lo que no era concluyente.
-  { key: 'tipo_receptor', label: 'f.tipo_receptor', tipo: 'select', opciones: ['social', 'animal', 'transformador', 'comercial'] },
+  { key: 'tipo_receptor', label: 'f.tipo_receptor', tipo: 'select', opciones: ['social', 'animal', 'transformador', 'comercial'], etiquetaOpcion: 'org.tr_' },
   { key: 'area_geografica', label: 'f.area_geografica' },
   { key: 'poblacion', label: 'f.poblacion' },
   { key: 'direccion', label: 'f.direccion' },
