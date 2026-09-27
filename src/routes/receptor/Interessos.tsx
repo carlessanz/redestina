@@ -204,14 +204,19 @@ export function Historic() {
     return () => { viu = false }
   }, [entidadId])
 
-  const totalKg = files.reduce((s, f) => s + Number(f.kg_reales ?? f.kg_confirmados ?? 0), 0)
+  // El título dice «rebudes»: solo cuenta lo que ha llegado (`kg_reales`). Lo asignado
+  // y todavía sin recibir va aparte, o la cifra afirmaría kilos que nadie ha entregado.
+  const totalKg = files.reduce((s, f) => s + Number(f.kg_reales ?? 0), 0)
+  const pendentKg = files.reduce((s, f) => s + (f.kg_reales == null ? Number(f.kg_confirmados ?? 0) : 0), 0)
   const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('hist.title')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">{t('hist.subtitle', { n: totalKg })}</p>
+        <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
+            ? t('hist.subtitle_pending', { n: totalKg, m: pendentKg })
+            : t('hist.subtitle', { n: totalKg })}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
