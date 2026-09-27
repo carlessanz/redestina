@@ -208,7 +208,9 @@ export interface Excedente {
    * `espigolades_per_convertir` del equipo.
    */
   producte_al_camp: boolean
-
+  /** Derivados por el trigger `excedentes_ubica` (20270331100000). El receptor ve la comarca. */
+  municipi_ine: string | null
+  comarca: string | null
 }
 
 export interface Canalizacion {

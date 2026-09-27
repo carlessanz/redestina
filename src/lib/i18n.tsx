@@ -717,6 +717,12 @@ const ca: Dict = {
   'mk.kg': 'Quants kg', 'mk.price': 'Preu (mínim {min} €/kg)', 'mk.send': 'Enviar interès',
 
   'mk.need_kg': 'Cal indicar quants kg.',
+  'mk.see_detail': 'Veure el detall', 'mk.detail_title': 'Detall de l’oferta',
+  'mk.d_kg': 'Quilos oferts', 'mk.d_zone': 'Zona (comarca)', 'mk.d_mode': 'Modalitat',
+  'mk.d_price': 'Preu', 'mk.d_until': 'Disponible fins', 'mk.d_hours': 'Horari de recollida',
+  'mk.d_field': 'On és el producte', 'mk.d_field_yes': 'Encara al camp (cal collir-lo)',
+  'mk.d_field_no': 'Ja collit', 'mk.d_format': 'Format / envasos', 'mk.d_return': 'Retorn d’envasos',
+  'mk.d_cause': 'Causa', 'mk.d_notes': 'Observacions',
   'mk.until': 'fins {date}',
   // interessos i històric del receptor
   'int.title': 'Els meus interessos',
@@ -2673,6 +2679,12 @@ const es: Dict = {
   'mk.kg': 'Cuántos kg', 'mk.price': 'Precio (mínimo {min} €/kg)', 'mk.send': 'Enviar interés',
 
   'mk.need_kg': 'Hay que indicar cuántos kg.',
+  'mk.see_detail': 'Ver el detalle', 'mk.detail_title': 'Detalle de la oferta',
+  'mk.d_kg': 'Kilos ofrecidos', 'mk.d_zone': 'Zona (comarca)', 'mk.d_mode': 'Modalidad',
+  'mk.d_price': 'Precio', 'mk.d_until': 'Disponible hasta', 'mk.d_hours': 'Horario de recogida',
+  'mk.d_field': 'Dónde está el producto', 'mk.d_field_yes': 'Todavía en el campo (hay que cosecharlo)',
+  'mk.d_field_no': 'Ya cosechado', 'mk.d_format': 'Formato / envases', 'mk.d_return': 'Devolución de envases',
+  'mk.d_cause': 'Causa', 'mk.d_notes': 'Observaciones',
   'mk.until': 'hasta {date}',
   // intereses e histórico del receptor
   'int.title': 'Mis intereses',

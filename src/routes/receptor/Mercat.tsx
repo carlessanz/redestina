@@ -30,7 +30,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
-  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle, DialogTrigger,
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 
 export default function Mercat() {
@@ -41,6 +41,8 @@ export default function Mercat() {
   const [meves, setMeves] = useState<Record<string, OfertaRespuesta>>({})
   const [carregant, setCarregant] = useState(true)
   const [obert, setObert] = useState<Excedente | null>(null)
+  /** El diálogo abre en detalle (tocar la tarjeta) o directamente en el interés (el botón). */
+  const [mode, setMode] = useState<'detall' | 'interes'>('detall')
   const [kg, setKg] = useState('')
   const [preu, setPreu] = useState('')
   const [enviant, setEnviant] = useState(false)
@@ -72,8 +74,9 @@ export default function Mercat() {
     return () => { void supabase.removeChannel(canal) }
   }, [carrega])
 
-  function obre(o: Excedente) {
+  function obre(o: Excedente, m: 'detall' | 'interes') {
     setObert(o)
+    setMode(m)
     setKg(String(o.kg_total ?? ''))
     setPreu(o.preu_minim != null ? String(o.preu_minim) : '')
   }
@@ -98,6 +101,23 @@ export default function Mercat() {
 
   if (!entidadId) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
 
+  /** El interés de esta entidad sobre una oferta, contado en una etapa (o null si se puede pedir). */
+  const puntDe = (o: Excedente) => {
+    const meva = meves[o.id]
+    // Sin `meva`, o con la fila todavía `pendent`, esta oferta se puede pedir.
+    return meva && meva.estado !== 'pendent'
+      ? puntInteres({
+        estado: meva.estado,
+        aprovacio: meva.aprovacio,
+        kg: meva.kg_solicitados,
+        ofertaEstado: o.estado,
+      })
+      : null
+  }
+
+  const obertPunt = obert ? puntDe(obert) : null
+  const obertVenda = obert?.modalitat === 'venda' || obert?.modalitat === 'maquila'
+
   return (
     <Card>
       <CardHeader>
@@ -110,93 +130,152 @@ export default function Mercat() {
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}
         {ofertes.map((o) => {
-          const meva = meves[o.id]
-          const esVenda = o.modalitat === 'venda' || o.modalitat === 'maquila'
-          // Sin `meva`, o con la fila todavía `pendent`, esta oferta se puede pedir.
-          const punt = meva && meva.estado !== 'pendent'
-            ? puntInteres({
-              estado: meva.estado,
-              aprovacio: meva.aprovacio,
-              kg: meva.kg_solicitados,
-              ofertaEstado: o.estado,
-            })
-            : null
+          const punt = puntDe(o)
+          // La tarjeta dice lo que un receptor mira primero (revisión del 23-09-2026):
+          // producto, kg, modalidad, DÓNDE —la comarca, no el municipio (D3)— y precio si
+          // hay. «Donació» va sin precio, a propósito.
+          const detall = [
+            `${kgFmt(o.kg_total)} kg`,
+            o.modalitat ? t(`od.mod_${o.modalitat}`) : null,
+            o.comarca,
+            preuDe(o),
+            o.disponible_hasta ? t('mk.until', { date: dataCurta(o.disponible_hasta) }) : null,
+          ].filter(Boolean).join(' · ')
           return (
             <div key={o.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3">
-              <div className="min-w-0">
+              {/* Toda la parte izquierda abre el detalle: es lo que se toca para «ver más». */}
+              <button
+                type="button"
+                className="min-w-0 flex-1 text-left"
+                onClick={() => obre(o, 'detall')}
+              >
                 <div className="font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
                 </div>
-                <div className="text-xs text-muted-foreground">
-                  {o.kg_total ?? '—'} kg
-                  {o.modalitat ? ` · ${t(`od.mod_${o.modalitat}`)}` : ''}
-                  {esVenda && o.preu_minim != null ? ` · ${o.preu_minim} €/kg` : ''}
-                  {o.disponible_hasta ? ` · ${t('mk.until', { date: dataCurta(o.disponible_hasta) })}` : ''}
-                </div>
-              </div>
+                <div className="text-xs text-muted-foreground">{detall}</div>
+                <div className="mt-0.5 text-xs font-medium text-primary">{t('mk.see_detail')}</div>
+              </button>
               {punt ? (
                 <BadgeEstat clase={estatSimpleInteres(punt).clase}>
                   {t(estatSimpleInteres(punt).key)}
                 </BadgeEstat>
               ) : (
-                <Dialog open={obert?.id === o.id} onOpenChange={(v) => !v && setObert(null)}>
-                  <DialogTrigger asChild>
-                    {/* Sin `size="sm"` y a 44px en móvil: es la única acción del panel
-                        del receptor y se repite en cada fila. En escritorio vuelve a la
-                        altura normal, donde se pulsa con ratón y 36px sobran. */}
-                    <Button
-                      className="h-11 md:h-9"
-                      disabled={bloqueja}
-                      title={bloqueja ? t('avis_conv.bloquejat') : undefined}
-                      onClick={() => obre(o)}
-                    >{t('mk.interested')}</Button>
-                  </DialogTrigger>
-                  {/* ⚠️ `max-h` + scroll: el diálogo cabe con el teclado cerrado (458px
-                      en 667), pero al enfocar «quants kg» el área visible baja a ~350px
-                      y, sin tope de altura, se recortaba por los dos extremos —incluido
-                      el botón de enviar—, dejando la acción inalcanzable. Se pone aquí y
-                      no en `ui/dialog.tsx` para no cambiar de paso los diálogos del
-                      panel del equipo, que no se han revisado. */}
-                  <DialogContent className="max-h-[85dvh] overflow-y-auto">
-                    <DialogHeader><DialogTitle>{t('mk.dialog_title')}</DialogTitle></DialogHeader>
-                    {/* El producto va como dato y no dentro de la frase: el texto explica
-                        quién decide, y repetir el nombre dentro lo alargaba sin decir más. */}
-                    <p className="font-medium">
-                      {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
-                    </p>
-                    <p className="text-sm text-muted-foreground">{t('mk.dialog_desc')}</p>
-                    {o.texto_oferta && (
-                      <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-xs">
-                        {o.texto_oferta}
-                      </pre>
-                    )}
-                    <div className="grid gap-3 sm:grid-cols-2">
-                      <div>
-                        <Label htmlFor="mk-kg" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.kg')}</Label>
-                        <Input id="mk-kg" name="kg" type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} />
-                      </div>
-                      {esVenda && (
-                        <div>
-                          <Label htmlFor="mk-preu" className="mb-1.5 block text-xs text-muted-foreground">
-                            {t('mk.price', { min: o.preu_minim ?? 0 })}
-                          </Label>
-                          <Input id="mk-preu" name="preu" type="number" step="0.01" value={preu}
-                            onChange={(e) => setPreu(e.target.value)} />
-                        </div>
-                      )}
-                    </div>
-                    <DialogFooter>
-                      <Button onClick={() => void envia()} disabled={enviant}>
-                        {enviant ? t('c.sending') : t('mk.send')}
-                      </Button>
-                    </DialogFooter>
-                  </DialogContent>
-                </Dialog>
+                // Sin `size="sm"` y a 44px en móvil: es la única acción del panel del
+                // receptor y se repite en cada fila. En escritorio vuelve a la altura
+                // normal, donde se pulsa con ratón y 36px sobran.
+                <Button
+                  className="h-11 md:h-9"
+                  disabled={bloqueja}
+                  title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+                  onClick={() => obre(o, 'interes')}
+                >{t('mk.interested')}</Button>
               )}
             </div>
           )
         })}
       </CardContent>
+
+      {/* UN solo diálogo, con dos modos: el detalle de la oferta y, desde él, el interés.
+          ⚠️ `max-h` + scroll: al enfocar «quants kg» en un móvil el área visible baja a
+          ~350px, y sin tope de altura el botón de enviar quedaba fuera de alcance. */}
+      <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
+        {obert && (
+          <DialogContent className="max-h-[85dvh] overflow-y-auto">
+            <DialogHeader>
+              <DialogTitle>
+                {mode === 'detall' ? t('mk.detail_title') : t('mk.dialog_title')}
+              </DialogTitle>
+            </DialogHeader>
+            <p className="font-titulos text-lg font-semibold">
+              {obert.producto ?? '—'}{obert.variedad ? ` · ${obert.variedad}` : ''}
+            </p>
+
+            <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
+              <Dada etiqueta={t('mk.d_kg')} valor={`${kgFmt(obert.kg_total)} kg`} />
+              <Dada etiqueta={t('mk.d_zone')} valor={obert.comarca ?? '—'} />
+              <Dada etiqueta={t('mk.d_mode')} valor={obert.modalitat ? t(`od.mod_${obert.modalitat}`) : '—'} />
+              {preuDe(obert) && <Dada etiqueta={t('mk.d_price')} valor={preuDe(obert) ?? ''} />}
+              <Dada etiqueta={t('mk.d_until')} valor={obert.disponible_hasta ? dataCurta(obert.disponible_hasta) : '—'} />
+              {obert.horari_recollida && <Dada etiqueta={t('mk.d_hours')} valor={obert.horari_recollida} />}
+              <Dada etiqueta={t('mk.d_field')} valor={obert.producte_al_camp ? t('mk.d_field_yes') : t('mk.d_field_no')} />
+              {(obert.tipo_caixa || obert.num_caixes != null) && (
+                <Dada
+                  etiqueta={t('mk.d_format')}
+                  valor={[obert.num_caixes != null ? `${obert.num_caixes}` : null, obert.tipo_caixa].filter(Boolean).join(' · ')}
+                />
+              )}
+              {obert.retorn_envasos && <Dada etiqueta={t('mk.d_return')} valor={obert.retorn_envasos} />}
+              {obert.causa && <Dada etiqueta={t('mk.d_cause')} valor={obert.causa} />}
+            </dl>
+            {obert.observacions && (
+              <div className="text-sm">
+                <p className="text-xs text-muted-foreground">{t('mk.d_notes')}</p>
+                <p className="whitespace-pre-wrap">{obert.observacions}</p>
+              </div>
+            )}
+
+            {mode === 'interes' && (
+              <>
+                <p className="text-sm text-muted-foreground">{t('mk.dialog_desc')}</p>
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="mk-kg" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.kg')}</Label>
+                    <Input id="mk-kg" name="kg" type="number" min="1" value={kg} onChange={(e) => setKg(e.target.value)} />
+                  </div>
+                  {obertVenda && (
+                    <div>
+                      <Label htmlFor="mk-preu" className="mb-1.5 block text-xs text-muted-foreground">
+                        {t('mk.price', { min: obert.preu_minim ?? 0 })}
+                      </Label>
+                      <Input id="mk-preu" name="preu" type="number" step="0.01" value={preu}
+                        onChange={(e) => setPreu(e.target.value)} />
+                    </div>
+                  )}
+                </div>
+              </>
+            )}
+
+            <DialogFooter>
+              {mode === 'interes' ? (
+                <Button className="h-11 md:h-9" onClick={() => void envia()} disabled={enviant}>
+                  {enviant ? t('c.sending') : t('mk.send')}
+                </Button>
+              ) : obertPunt ? (
+                <BadgeEstat clase={estatSimpleInteres(obertPunt).clase}>
+                  {t(estatSimpleInteres(obertPunt).key)}
+                </BadgeEstat>
+              ) : (
+                <Button
+                  className="h-11 md:h-9"
+                  disabled={bloqueja}
+                  title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+                  onClick={() => setMode('interes')}
+                >{t('mk.interested')}</Button>
+              )}
+            </DialogFooter>
+          </DialogContent>
+        )}
+      </Dialog>
     </Card>
   )
+}
+
+function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
+  return (
+    <div>
+      <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
+      <dd className="font-medium">{valor}</dd>
+    </div>
+  )
+}
+
+/** «1.320» i «0,45»: el format local, no el del punt decimal de la base. */
+function kgFmt(n: number | null | undefined): string {
+  return n == null ? '—' : new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 2 }).format(Number(n))
+}
+
+/** El precio, solo si la modalidad lo tiene: una donación no lleva precio. */
+function preuDe(o: Excedente): string | null {
+  if ((o.modalitat !== 'venda' && o.modalitat !== 'maquila') || o.preu_minim == null) return null
+  return `${new Intl.NumberFormat('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(o.preu_minim))} €/kg`
 }

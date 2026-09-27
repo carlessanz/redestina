@@ -686,6 +686,8 @@ scripts/
                                en lo que puede serlo; consume numeración legal de convenios
   prueba-numeracion.ts         Numeración documental sin huecos bajo concurrencia (§4)
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
+  aplicar-migracion.ts         Aplica UNA migración por la API de gestión y la registra en
+                               schema_migrations con el número del fichero (§11)
   incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
                                en base64, dentro del bundle (§11)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
@@ -838,6 +840,20 @@ de prueba que habilita el envío a la entidad (§8).
 `20260722130100_estado_cancelada.sql`). `modalitat` ∈ `donacio` · `venda` · `maquila`. **`preu_minim`**
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
 solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al aceptar (§5).
+
+**`municipi_ine`** y **`comarca`** (`20270331100000`) — de dónde es la oferta, **copiado en
+la propia oferta** porque el receptor no puede leer la ficha del productor ni sus ubicaciones.
+Los rellena el trigger `excedentes_ubica` (al insertar, y al cambiar `ubicacion_id` o
+`productor_id`) con `ubicar_excedente()`: la ubicación de recogida si tiene `municipio_ine`; si
+no, el CP de la ficha por `codis_postals` —un municipio si el CP apunta a uno solo; si apunta a
+varios, solo la comarca cuando todos comparten la misma—; si no, null. **Por trigger** porque
+`excedentes` se inserta desde varios caminos (panel, WhatsApp, espigolada, fixtures).
+⚠️ **El Mercat enseña la COMARCA, no el municipio** (D3: un municipio con un solo generador lo
+identifica). Relleno hecho: 17 de 17 ofertas con comarca el 27-09-2026.
+⚠️ **Y D3 ya se rompía antes por otro lado, sin decirlo**: el diálogo de interés del Mercat
+enseñaba el `texto_oferta` entero, que lleva la línea «PRODUCTOR: …». Desde el 27-09-2026 el
+detalle es estructurado y ya no la muestra; si la Fundación decide que el receptor sí debe ver
+quién ofrece (lo pide la revisión del 23-09), se añade explícitamente.
 
 **`producte_al_camp`** (bool, default false, `20260921221806`) — la oferta declara producto **sin
 cosechar**: hay que ir a recogerlo. Es lo que la hace **convertible en espigolada** (§6ter) y lo que
@@ -4393,6 +4409,12 @@ npm run preview            # servir el build
 
 # ⚠️ No hay Supabase local (§7): la primera base donde se ejecuta una migración es la REAL.
 # Por eso el orden es siempre dry-run y después push.
+# ⚠️ Desde el 27-09-2026, desde una sesión de Claude Code: `db push` no sale del sandbox (conexión
+# Postgres directa) y el login del CLI de esta máquina es de otra cuenta. La vía es el token
+# propio del llavero y el script, que registra la migración con el número del fichero:
+#   TOKEN=$(security find-generic-password -s "Supabase Redestina" -w)
+#   SUPABASE_ACCESS_TOKEN="$TOKEN" deno run -A scripts/aplicar-migracion.ts supabase/migrations/<f>.sql
+# Leer el token ANTES de cambiar HOME (el truco del CLI, §7): si no, `security` no encuentra el llavero.
 supabase db push --dry-run                                # qué se aplicaría, sin aplicar nada
 supabase db push                                          # aplicar migraciones en el remoto
 supabase functions deploy whatsapp-send        # con verify_jwt
