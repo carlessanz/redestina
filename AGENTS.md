@@ -1303,7 +1303,7 @@ fila por producto habría **sobrescrito y borrado el coste real**. Su check ahor
 escribir (coste 0 → `22023`), y las 79 filas de histórico que dejó se borraron en la migración. `tipos_caja` nace **sembrada provisional y
 desactivada** hasta que la Fundación dé la lista de taras.
 
-Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. GRANT: solo `SELECT` en
+Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. Desde `20270406100100` (28-09-2026), un albarán **sin oferta** —el REC de una espigolada— toma el `producto` de sus líneas (los distintos, separados por coma); antes salía «—». GRANT: solo `SELECT` en
 todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
 
 **`planes_prevencion` (fase 5, `20270301*`)** — el plan de prevención de una organización. Clave
