@@ -21,6 +21,7 @@ import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
+import { FotoOfertaResolta, useFotosOfertes } from './FotosOferta'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -58,6 +59,11 @@ const TOPE_TANCADES = 200
  * el manejador de la suscripción.
  */
 const ESPERA_RECARREGA_MS = 400
+
+/** «1.000» y no «1000»: `ca-ES` agrupa también los de cuatro cifras. */
+function fmtKg(n: number): string {
+  return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
+}
 
 export default function OffersList({ onOpen }: Props) {
   const { t } = useT()
@@ -119,6 +125,11 @@ export default function OffersList({ onOpen }: Props) {
     })
   }, [busqueda, t])
 
+  // La miniatura, con la misma regla que el resto de listas (fotoOferta.ts): la foto
+  // propia, la del producto o el icono de su familia. Firmada en lote para las dos pestañas.
+  const totes = useMemo(() => [...actives, ...tancades], [actives, tancades])
+  const foto = useFotosOfertes(totes)
+
   const grups = useMemo(() => ({
     actives: filtra(actives),
     tancades: filtra(tancades),
@@ -149,13 +160,18 @@ export default function OffersList({ onOpen }: Props) {
               return (
                 <TableRow key={o.id}>
                   <TableCell><code className="text-xs">{o.id_excedente ?? '—'}</code></TableCell>
-                  <TableCell>{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</TableCell>
+                  <TableCell>
+                    <div className="flex items-center gap-3">
+                      <FotoOfertaResolta foto={foto(o)} alt={o.producto ?? ''} className="size-10" />
+                      <span>{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</span>
+                    </div>
+                  </TableCell>
                   <TableCell className="min-w-40">
                     <div className="h-2 w-36 overflow-hidden rounded-full bg-muted">
                       <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
                     </div>
                     <span className="mt-1 block text-xs text-muted-foreground">
-                      {canalizados}/{total} kg · {faltan > 0 ? t('off.falten', { n: faltan }) : t('off.complet')}
+                      {fmtKg(canalizados)}/{fmtKg(total)} kg · {faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}
                     </span>
                   </TableCell>
                   <TableCell>

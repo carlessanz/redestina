@@ -2543,7 +2543,7 @@ su procedencia, subir / cambiar / quitar (solo **super_admin**; al resto, gris c
 coste de referencia con su histórico y el formulario para cambiarlo (`pot_aprovar()`).
 
 **La regla de la foto de una oferta** (`lib/fotoOferta.ts`, pura y con test; la aplican Mercat,
-Interessos, Històric y las dos listas del productor —en la home, las dos secciones: las ofertas en curso llevan foto desde el 28-09-2026—):
+Interessos, Històric, la lista de ofertas del equipo (`OffersList`, miniatura de 40 px, 28-09-2026) y las dos listas del productor —en la home, las dos secciones: las ofertas en curso llevan foto desde el 28-09-2026—):
 
 1. Si la oferta tiene fotos propias, la primera.
 2. Si no, y `excedentes.foto_producte` no es `false`, la **foto del producto** del catálogo —la
