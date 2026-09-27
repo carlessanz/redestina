@@ -1,5 +1,12 @@
 // Ficha de la propia organización, para productor y receptor.
 //
+// DESDE EL 27-09-2026 (revisión funcional del 23-09) va por secciones y con LISTAS CERRADAS
+// donde el dato se cruza en el ERP: tipo de empresa en desplegable, municipio del
+// nomenclátor oficial (de él salen solos población, comarca y área), NIF/correo/teléfono/CP
+// validados antes de guardar, varios lugares de recogida para el productor, y los campos
+// propios de cada tipo de receptor (`perfilReceptor.ts`). Guarda con
+// `actualitzar_fitxa_productor` / `actualitzar_fitxa_entitat` (jsonb con lista blanca).
+//
 // No usa `RecordDetail` (que escribe directo en la tabla) porque un usuario externo no
 // tiene permiso de UPDATE sobre `productores`/`entidades`: escribe por RPC con lista
 // blanca de columnas, para que nadie pueda tocar `es_test`, `codigo` o `conveni`
@@ -32,14 +39,21 @@
 //      RPC `actualizar_meu_canal`, con la misma guarda de titular que la autoedición de
 //      la ficha.
 
-import { useEffect, useState } from 'react'
-import { Info } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Info, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { cn } from '../lib/utils'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
-import SuggerimentPoblacio from '../components/SuggerimentPoblacio'
+import { creaUbicacio } from '../lib/ofertes'
+import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../lib/validacio'
+import { PERFIL_RECEPTOR, TIPUS_EMPRESA } from '../lib/perfilReceptor'
+import type { CampPerfil } from '../lib/perfilReceptor'
+import type { Municipi } from '../lib/municipis'
+import SelectorMunicipi from '../components/SelectorMunicipi'
+import { Casella } from '../components/Casella'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,53 +66,108 @@ import {
 type Fila = Record<string, unknown>
 
 /** `auto` es el sentinela de `canal_preferido = null`: Radix no admite `value=""`. */
-type Tria = 'auto' | 'whatsapp' | 'email'
+type Tria = 'auto' | 'whatsapp' | 'email' | 'telefon'
 
 const OPCIONS: { valor: Tria; labelKey: string; descKey: string }[] = [
   { valor: 'auto', labelKey: 'perf.channel_auto', descKey: 'perf.channel_auto_desc' },
   { valor: 'whatsapp', labelKey: 'perf.channel_whatsapp', descKey: 'perf.channel_whatsapp_desc' },
   { valor: 'email', labelKey: 'perf.channel_email', descKey: 'perf.channel_email_desc' },
+  // Una preferencia para el EQUIPO: los avisos automáticos no pueden llamar, así que para
+  // ellos vale como «auto» (20270402100000).
+  { valor: 'telefon', labelKey: 'perf.channel_telefon', descKey: 'perf.channel_telefon_desc' },
 ]
 
-/** Campos editables por tipo: los mismos que acepta la RPC correspondiente. */
-const CAMPS = {
+type Tipus = 'text' | 'email' | 'tel' | 'nif' | 'cp' | 'tipus_empresa' | 'municipi'
+interface Camp { clave: string; labelKey: string; tipus: Tipus; ajudaKey?: string }
+
+/** Las secciones de cada ficha. Las claves son las columnas que acepta su RPC. */
+const SECCIONS: Record<'productor' | 'entidad', { titolKey: string; camps: Camp[] }[]> = {
   productor: [
-    { clave: 'name', labelKey: 'f.name', arg: 'p_name' },
-    { clave: 'empresa', labelKey: 'f.empresa', arg: 'p_empresa' },
-    { clave: 'email', labelKey: 'f.email', arg: 'p_email' },
-    { clave: 'phone', labelKey: 'f.phone', arg: 'p_phone' },
-    { clave: 'telefono_alt', labelKey: 'f.telefono_alt', arg: 'p_telefono_alt' },
-    { clave: 'nif', labelKey: 'f.nif', arg: 'p_nif' },
-    { clave: 'direccion', labelKey: 'f.direccion', arg: 'p_direccion' },
-    { clave: 'codigo_postal', labelKey: 'f.codigo_postal', arg: 'p_codigo_postal' },
-    { clave: 'poblacion', labelKey: 'f.poblacion', arg: 'p_poblacion' },
-    { clave: 'area_geografica', labelKey: 'f.area_geografica', arg: 'p_area' },
+    {
+      titolKey: 'org.sec_identitat',
+      camps: [
+        { clave: 'empresa', labelKey: 'org.f_nom_comercial', tipus: 'text' },
+        { clave: 'razon_social', labelKey: 'org.f_rao_social', tipus: 'text', ajudaKey: 'org.h_rao_social' },
+        { clave: 'nif', labelKey: 'f.nif', tipus: 'nif' },
+        { clave: 'tipo_empresa', labelKey: 'org.f_tipus_empresa', tipus: 'tipus_empresa' },
+      ],
+    },
+    {
+      titolKey: 'org.sec_contacte',
+      camps: [
+        { clave: 'name', labelKey: 'org.f_persona_contacte', tipus: 'text' },
+        { clave: 'email', labelKey: 'f.email', tipus: 'email' },
+        { clave: 'phone', labelKey: 'org.f_telefon', tipus: 'tel' },
+        { clave: 'telefono_alt', labelKey: 'org.f_telefon2', tipus: 'tel' },
+      ],
+    },
+    {
+      titolKey: 'org.sec_adreca',
+      camps: [
+        { clave: 'direccion', labelKey: 'f.direccion', tipus: 'text' },
+        { clave: 'codigo_postal', labelKey: 'f.codigo_postal', tipus: 'cp' },
+        { clave: 'municipio_ine', labelKey: 'org.f_municipi', tipus: 'municipi' },
+      ],
+    },
   ],
   entidad: [
-    { clave: 'nombre', labelKey: 'f.nombre', arg: 'p_nombre' },
-    { clave: 'contacto', labelKey: 'f.contacto', arg: 'p_contacto' },
-    { clave: 'telefono', labelKey: 'f.phone', arg: 'p_telefono' },
-    { clave: 'email', labelKey: 'f.email', arg: 'p_email' },
-    { clave: 'direccion', labelKey: 'f.direccion', arg: 'p_direccion' },
-    { clave: 'codigo_postal', labelKey: 'f.codigo_postal', arg: 'p_codigo_postal' },
-    { clave: 'poblacion', labelKey: 'f.poblacion', arg: 'p_poblacion' },
-    { clave: 'horario', labelKey: 'f.horario', arg: 'p_horario' },
-    { clave: 'calendari_repartiment', labelKey: 'f.calendari_repartiment', arg: 'p_calendari' },
+    {
+      titolKey: 'org.sec_identitat',
+      camps: [
+        { clave: 'nombre', labelKey: 'org.f_nom_comercial', tipus: 'text' },
+        { clave: 'razon_social', labelKey: 'org.f_rao_social', tipus: 'text', ajudaKey: 'org.h_rao_social' },
+        { clave: 'nif', labelKey: 'f.nif', tipus: 'nif' },
+        { clave: 'tipo_entidad', labelKey: 'org.f_tipus_entitat', tipus: 'tipus_empresa' },
+      ],
+    },
+    {
+      titolKey: 'org.sec_contacte',
+      camps: [
+        { clave: 'contacto', labelKey: 'org.f_persona_contacte', tipus: 'text' },
+        { clave: 'email', labelKey: 'f.email', tipus: 'email' },
+        { clave: 'telefono', labelKey: 'org.f_telefon', tipus: 'tel' },
+        { clave: 'horario', labelKey: 'org.f_horari', tipus: 'text' },
+        { clave: 'calendari_repartiment', labelKey: 'f.calendari_repartiment', tipus: 'text' },
+      ],
+    },
+    {
+      titolKey: 'org.sec_adreca',
+      camps: [
+        { clave: 'direccion', labelKey: 'f.direccion', tipus: 'text' },
+        { clave: 'codigo_postal', labelKey: 'f.codigo_postal', tipus: 'cp' },
+        { clave: 'municipio_ine', labelKey: 'org.f_municipi', tipus: 'municipi' },
+      ],
+    },
   ],
-} as const
+}
+
+/** El error de un campo, como clave i18n, o null. */
+function errorDe(c: Camp, valor: string): string | null {
+  if (c.tipus === 'nif') return errorNif(valor)
+  if (c.tipus === 'email') return errorCorreu(valor)
+  if (c.tipus === 'tel') return errorTelefon(valor)
+  if (c.tipus === 'cp') return errorCp(valor)
+  return null
+}
+
+interface Ubicacio { id: string; alias: string | null; municipio: string | null; gmaps_url: string | null }
 
 export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'entidad' }) {
   const { t } = useT()
   const waActiu = useWhatsappActiu()
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
+  const [perfil, setPerfil] = useState<Record<string, unknown>>({})
   const [canal, setCanal] = useState<Tria>('auto')
   const [canalDesat, setCanalDesat] = useState<Tria>('auto')
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
+  const [errors, setErrors] = useState<Record<string, string>>({})
+  const [ubicacions, setUbicacions] = useState<Ubicacio[]>([])
+  const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
 
   const tabla = tipus === 'productor' ? 'productores' : 'entidades'
-  const camps = CAMPS[tipus]
+  const seccions = SECCIONS[tipus]
   const potEditar = organitzacio?.rol_org === 'titular'
 
   // El aviso se calcula sobre lo que hay EN EL FORMULARIO, no sobre lo guardado: quien
@@ -107,16 +176,13 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const telefon = String(fila?.[clauTelefon] ?? '').trim()
   const correu = String(fila?.email ?? '').trim()
   const descripcio = OPCIONS.find((o) => o.valor === canal)?.descKey ?? 'perf.channel_auto_desc'
+  const tipusReceptor = tipus === 'entidad' ? String(fila?.tipo_receptor ?? '') : ''
+  const campsPerfil: readonly CampPerfil[] = PERFIL_RECEPTOR[tipusReceptor] ?? []
 
   // ⚠️ La dependencia del efecto es el **id**, no el objeto, y no es cosmética.
   // `useOrganitzacio()` saca ese objeto de `ctx.organitzacions`, que `useAppContext` rehace
-  // ENTERO cada vez que recarga —y recarga con cada `SIGNED_IN`, que supabase-js reemite más
-  // de una vez; §6ter ya documenta un fallo anterior por lo mismo—. Con el objeto como
-  // dependencia, ese evento reejecuta este efecto y devuelve el formulario a lo guardado: lo
-  // tecleado y el canal elegido desaparecen **sin decir nada**. Con el id, un contexto nuevo
-  // que apunta a la misma organización no toca nada.
-  // Observado una vez en producción (el canal volvió solo a «auto») y NO reproducible a
-  // voluntad: esto no cierra esa observación, quita la fragilidad que la explicaría.
+  // ENTERO cada vez que recarga. Con el objeto como dependencia, ese evento reejecuta este
+  // efecto y devuelve el formulario a lo guardado: lo tecleado desaparece sin decir nada.
   const idOrganitzacio = organitzacio?.id ?? null
 
   useEffect(() => {
@@ -124,6 +190,9 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     // los datos de una organización con los campos de la otra.
     setCarregant(true)
     setFila(null)
+    setPerfil({})
+    setErrors({})
+    setUbicacions([])
     setCanal('auto')
     setCanalDesat('auto')
     if (!idOrganitzacio) { setCarregant(false); return }
@@ -133,11 +202,16 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       if (!viu) return
       const f = (data as Fila) ?? null
       setFila(f)
+      setPerfil(((f?.perfil_receptor as Record<string, unknown> | null) ?? {}))
 
-      // La preferencia vive en la organización, no en la ficha. Desde `20270313100000`
-      // toda ficha tiene la suya —trigger + `not null`—, así que este `if` no protege de un
-      // caso alcanzable: protege del día en que alguien desactive el trigger. Si faltara,
-      // la pantalla se queda en «auto» y la RPC responde `22023` al guardar.
+      if (tipus === 'productor') {
+        const { data: ubis } = await supabase.from('productor_ubicaciones')
+          .select('id, alias, municipio, gmaps_url').eq('productor_id', idOrganitzacio).order('alias')
+        if (!viu) return
+        setUbicacions((ubis ?? []) as Ubicacio[])
+      }
+
+      // La preferencia vive en la organización, no en la ficha (§4).
       const orgId = (f?.organizacion_id as string | null) ?? null
       if (orgId) {
         const { data: org } = await supabase
@@ -153,27 +227,72 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [idOrganitzacio, tabla])
+  }, [idOrganitzacio, tabla, tipus])
+
+  const campsTots = useMemo(() => seccions.flatMap((s) => s.camps), [seccions])
+
+  // Del código postal sale el municipio cuando no hay duda: si el CP apunta a UNO solo
+  // (el 82 % de los de Catalunya, `codis_postals`), se elige sin preguntar. Si apunta a
+  // varios no se elige ninguno —sería escribir algo que nadie ha dicho—: se elige de la lista.
+  // Sustituye a la sugerencia de población de antes, que rellenaba texto libre.
+  const cp = String(fila?.codigo_postal ?? '')
+  const teMunicipi = Boolean(fila?.municipio_ine)
+  useEffect(() => {
+    if (!potEditar || teMunicipi || !/^\d{5}$/.test(cp)) return
+    let viu = true
+    void supabase.from('codis_postals').select('codi_ine').eq('codi_postal', cp).then(({ data }) => {
+      const files = (data ?? []) as { codi_ine: string }[]
+      if (viu && files.length === 1) setFila((f) => ({ ...(f ?? {}), municipio_ine: files[0].codi_ine }))
+    })
+    return () => { viu = false }
+  }, [cp, teMunicipi, potEditar])
+
+  function setCamp(clave: string, valor: unknown) {
+    setFila((f) => ({ ...(f ?? {}), [clave]: valor }))
+    if (errors[clave]) setErrors((e) => { const n = { ...e }; delete n[clave]; return n })
+  }
 
   async function desa() {
     if (!organitzacio || !fila) return
+    // Antes de llamar a nadie: lo que está mal escrito, dicho campo por campo.
+    const nous: Record<string, string> = {}
+    for (const c of campsTots) {
+      const e = errorDe(c, String(fila[c.clave] ?? ''))
+      if (e) nous[c.clave] = e
+    }
+    setErrors(nous)
+    if (Object.keys(nous).length > 0) {
+      toast.error(t('org.fix_errors'))
+      document.getElementById(`po-${tipus}-${Object.keys(nous)[0]}`)
+        ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      return
+    }
+
     setDesant(true)
-    const args: Record<string, unknown> = { p_id: organitzacio.id }
-    for (const c of camps) args[c.arg] = (fila[c.clave] as string) || null
-    const { error } = await supabase.rpc(
-      tipus === 'productor' ? 'actualizar_mi_productor' : 'actualizar_mi_entidad', args)
+    const dades: Record<string, unknown> = {}
+    for (const c of campsTots) {
+      const v = fila[c.clave]
+      dades[c.clave] = c.tipus === 'tel' ? normalitzaTelefon(String(v ?? '')) || null : (v ?? null)
+    }
+    if (tipus === 'entidad') dades.perfil_receptor = perfil
+    const { data, error } = await supabase.rpc(
+      tipus === 'productor' ? 'actualitzar_fitxa_productor' : 'actualitzar_fitxa_entitat',
+      { p_id: organitzacio.id, p_dades: dades },
+    )
     if (error) { setDesant(false); toast.error(error.message); return }
+    // Lo que devuelve la base ya trae población y área derivadas del municipio.
+    if (data) setFila(data as Fila)
 
     // Dos escrituras porque son dos tablas y dos listas blancas; la del canal solo si ha
     // cambiado, para no tocar `organizaciones` en cada «Desar».
     if (canal !== canalDesat) {
-      const { data, error: errCanal } = await supabase.rpc('actualizar_meu_canal', {
+      const { data: o, error: errCanal } = await supabase.rpc('actualizar_meu_canal', {
         p_tipo: tipus,
         p_ficha: organitzacio.id,
         p_canal: canal === 'auto' ? null : canal,
       })
       if (errCanal) { setDesant(false); toast.error(errCanal.message); return }
-      const org = data as { canal_preferido: Tria | null } | null
+      const org = o as { canal_preferido: Tria | null } | null
       setCanalDesat((org?.canal_preferido ?? 'auto') as Tria)
     }
 
@@ -181,8 +300,147 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     toast.success(t('rec.saved'))
   }
 
+  async function afegeixLloc() {
+    if (!organitzacio || !llocNou) return
+    if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
+    const r = await creaUbicacio({
+      productorId: organitzacio.id,
+      alias: llocNou.alias.trim(),
+      gmapsUrl: llocNou.maps.trim() || null,
+      municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
+    })
+    if (!r.ok || !r.data) { toast.error(r.error ?? t('c.error')); return }
+    setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null }])
+    setLlocNou(null)
+    toast.success(t('org.place_added'))
+  }
+
+  async function esborraLloc(u: Ubicacio) {
+    const { error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id)
+    // 23503: alguna oferta apunta a este lugar. No se borra: se diría que la oferta ya no
+    // tiene dónde recogerse.
+    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : error.message); return }
+    setUbicacions((l) => l.filter((x) => x.id !== u.id))
+  }
+
   if (!organitzacio) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
+
+  const idDe = (clave: string) => `po-${tipus}-${clave}`
+  const selectClasses = 'w-full text-base md:text-sm'
+
+  function control(c: Camp) {
+    const valor = String(fila?.[c.clave] ?? '')
+    const invalid = Boolean(errors[c.clave])
+    if (c.tipus === 'municipi') {
+      return (
+        <>
+          <SelectorMunicipi id={idDe(c.clave)} valor={(fila?.municipio_ine as string | null) ?? null}
+            onChange={(m) => setCamp('municipio_ine', m?.codi_ine ?? null)} />
+          {/* Lo que había escrito a mano antes de que existiera la lista: se enseña para que
+              se sepa qué municipio elegir, y desaparece al guardar uno oficial. */}
+          {!fila?.municipio_ine && fila?.poblacion ? (
+            <p className="mt-1 text-xs text-muted-foreground">{t('org.h_poblacio_antiga', { x: String(fila.poblacion) })}</p>
+          ) : null}
+        </>
+      )
+    }
+    if (c.tipus === 'tipus_empresa') {
+      // Un valor de antes de la lista (texto libre del import) se conserva como opción
+      // propia: si no, el desplegable lo mostraría vacío y se perdería al guardar.
+      const llegat = valor && !(TIPUS_EMPRESA as readonly string[]).includes(valor) ? valor : null
+      return (
+        <Select value={valor || undefined} disabled={!potEditar} onValueChange={(v) => setCamp(c.clave, v)}>
+          <SelectTrigger id={idDe(c.clave)} className={selectClasses}><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            {llegat && <SelectItem value={llegat} className="text-base md:text-sm">{llegat}</SelectItem>}
+            {TIPUS_EMPRESA.map((te) => (
+              <SelectItem key={te} value={te} className="text-base md:text-sm">{t(`org.te_${te}`)}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )
+    }
+    return (
+      <Input
+        id={idDe(c.clave)}
+        name={c.clave}
+        value={valor}
+        disabled={!potEditar}
+        aria-invalid={invalid}
+        type={c.tipus === 'email' ? 'email' : c.tipus === 'tel' ? 'tel' : 'text'}
+        // Hay fichas (las de prueba, algunas importadas) con el nombre de la organización en
+        // `name` y `empresa` vacío: se sugiere, sin escribirlo, para que no parezca que no hay.
+        placeholder={c.clave === 'empresa' && !valor ? String(fila?.name ?? '') : undefined}
+        inputMode={c.tipus === 'cp' ? 'numeric' : c.tipus === 'tel' ? 'tel' : undefined}
+        autoComplete={c.tipus === 'email' ? 'email' : c.tipus === 'tel' ? 'tel' : undefined}
+        onChange={(e) => setCamp(c.clave, e.target.value)}
+      />
+    )
+  }
+
+  function controlPerfil(c: CampPerfil) {
+    const id = `pr-${c.clau}`
+    const v = perfil[c.clau]
+    const set = (nou: unknown) => setPerfil((p) => ({ ...p, [c.clau]: nou }))
+    if (c.tipus === 'multi') {
+      const triats = Array.isArray(v) ? (v as string[]) : []
+      return (
+        <div className="flex flex-wrap gap-2" role="group" aria-labelledby={`${id}-l`}>
+          {c.opcions!.map((o) => {
+            const on = triats.includes(o)
+            return (
+              <button
+                key={o}
+                type="button"
+                disabled={!potEditar}
+                aria-pressed={on}
+                onClick={() => set(on ? triats.filter((x) => x !== o) : [...triats, o])}
+                className={cn(
+                  'min-h-11 rounded-full border px-3 text-base md:min-h-9 md:text-sm',
+                  on ? 'border-primary bg-secondary text-secondary-foreground' : 'border-input bg-background',
+                )}
+              >
+                {t(`pr.o_${o}`)}
+              </button>
+            )
+          })}
+        </div>
+      )
+    }
+    if (c.tipus === 'select') {
+      return (
+        <Select value={typeof v === 'string' ? v : undefined} disabled={!potEditar} onValueChange={set}>
+          <SelectTrigger id={id} className={selectClasses}><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            {c.opcions!.map((o) => <SelectItem key={o} value={o} className="text-base md:text-sm">{t(`pr.o_${o}`)}</SelectItem>)}
+          </SelectContent>
+        </Select>
+      )
+    }
+    if (c.tipus === 'sino') {
+      return (
+        <div className="flex gap-4" role="group" aria-labelledby={`${id}-l`}>
+          {[true, false].map((b) => (
+            <label key={String(b)} className="flex min-h-11 items-center gap-2 text-base md:min-h-9 md:text-sm">
+              <Casella checked={v === b} disabled={!potEditar} onChange={() => set(v === b ? null : b)} />
+              {t(b ? 'pr.si' : 'pr.no')}
+            </label>
+          ))}
+        </div>
+      )
+    }
+    return (
+      <div className="flex items-center gap-2">
+        <Input id={id} value={v == null ? '' : String(v)} disabled={!potEditar}
+          type={c.tipus === 'numero' ? 'number' : 'text'} min={c.tipus === 'numero' ? 0 : undefined}
+          onChange={(e) => set(c.tipus === 'numero'
+            ? (e.target.value === '' ? null : Number(e.target.value))
+            : e.target.value)} />
+        {c.unitatKey && <span className="shrink-0 text-sm text-muted-foreground">{t(c.unitatKey)}</span>}
+      </div>
+    )
+  }
 
   return (
     <Card>
@@ -202,31 +460,115 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         )}
       </CardHeader>
       <CardContent className="space-y-8">
-        <div className="grid gap-4 sm:grid-cols-2">
-          {camps.map((c) => (
-            <div key={c.clave}>
-              <Label htmlFor={`po-${tipus}-${c.clave}`} className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>
-              <Input
-                id={`po-${tipus}-${c.clave}`}
-                name={c.clave}
-                value={String(fila?.[c.clave] ?? '')}
-                disabled={!potEditar}
-                inputMode={c.clave === 'codigo_postal' ? 'numeric' : undefined}
-                onChange={(e) => setFila((f) => ({ ...(f ?? {}), [c.clave]: e.target.value }))}
-              />
-              {/* Del código postal sale la población, que el registro ya no pregunta. Va
-                  bajo el CP y no bajo la población porque es el CP el que la decide. */}
-              {c.clave === 'codigo_postal' && (
-                <SuggerimentPoblacio
-                  codiPostal={String(fila?.codigo_postal ?? '')}
-                  poblacio={String(fila?.poblacion ?? '')}
-                  disabled={!potEditar}
-                  onTria={(nom) => setFila((f) => ({ ...(f ?? {}), poblacion: nom }))}
-                />
+        {seccions.map((sec) => (
+          <section key={sec.titolKey} className="space-y-3">
+            <h3 className="text-base font-semibold">{t(sec.titolKey)}</h3>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {sec.camps.map((c) => (
+                <div key={c.clave}>
+                  <Label htmlFor={idDe(c.clave)} className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>
+                  {control(c)}
+                  {errors[c.clave] && <p className="mt-1 text-xs text-destructive">{t(errors[c.clave])}</p>}
+                  {c.ajudaKey && !errors[c.clave] && <p className="mt-1 text-xs text-muted-foreground">{t(c.ajudaKey)}</p>}
+                </div>
+              ))}
+              {/* El área no se teclea: sale del municipio (la comarca), que es la
+                  segmentación que compara la priorización. */}
+              {sec.titolKey === 'org.sec_adreca' && (
+                <div>
+                  <p className="mb-1.5 text-xs text-muted-foreground">{t('org.f_area')}</p>
+                  <p className="text-sm font-medium">{String(fila?.area_geografica ?? '—')}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">{t('org.h_area')}</p>
+                </div>
               )}
             </div>
-          ))}
-        </div>
+            {/* El tipo de receptor decide qué ofertas ve: lo decide el equipo. */}
+            {sec.titolKey === 'org.sec_identitat' && tipus === 'entidad' && (
+              <p className="text-sm text-muted-foreground">
+                {t('org.tipus_receptor', { x: tipusReceptor ? t(`org.tr_${tipusReceptor}`) : '—' })}
+              </p>
+            )}
+          </section>
+        ))}
+
+        {tipus === 'productor' && (
+          <section className="space-y-3 border-t border-border pt-6">
+            <div>
+              <h3 className="text-base font-semibold">{t('org.sec_llocs')}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t('org.h_llocs')}</p>
+            </div>
+            {ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
+            <ul className="space-y-2">
+              {ubicacions.map((u) => (
+                <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
+                  <div className="min-w-0">
+                    <p className="font-medium">{u.alias ?? '—'}</p>
+                    <p className="text-xs text-muted-foreground">
+                      {u.municipio ?? '—'}
+                      {u.gmaps_url && <> · <a href={u.gmaps_url} target="_blank" rel="noreferrer" className="text-primary underline">{t('org.see_map')}</a></>}
+                    </p>
+                  </div>
+                  {potEditar && (
+                    <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => void esborraLloc(u)}
+                      aria-label={t('org.place_delete', { x: u.alias ?? '' })}>
+                      <Trash2 className="size-4" aria-hidden />
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {potEditar && !llocNou && (
+              <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+                onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
+                <Plus className="size-4" aria-hidden /> {t('po.place_add')}
+              </Button>
+            )}
+            {llocNou && (
+              <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="org-lloc-nom" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_name')}</Label>
+                  <Input id="org-lloc-nom" value={llocNou.alias} placeholder={t('po.place_name_ph')}
+                    onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
+                </div>
+                <div>
+                  <Label htmlFor="org-lloc-municipi" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
+                  <SelectorMunicipi id="org-lloc-municipi" valor={llocNou.municipi?.codi_ine ?? null}
+                    onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label htmlFor="org-lloc-maps" className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
+                  </Label>
+                  <Input id="org-lloc-maps" type="url" inputMode="url" value={llocNou.maps} placeholder="https://maps.app.goo.gl/…"
+                    onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
+                </div>
+                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                  <Button className="h-11 whitespace-normal md:h-9" onClick={() => void afegeixLloc()}>{t('po.place_save')}</Button>
+                  <Button variant="ghost" className="h-11 md:h-9" onClick={() => setLlocNou(null)}>{t('c.cancel')}</Button>
+                </div>
+              </div>
+            )}
+          </section>
+        )}
+
+        {tipus === 'entidad' && campsPerfil.length > 0 && (
+          <section className="space-y-3 border-t border-border pt-6">
+            <div>
+              <h3 className="text-base font-semibold">{t(`org.sec_perfil_${tipusReceptor}`)}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{t('org.h_perfil')}</p>
+            </div>
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+              {campsPerfil.map((c) => (
+                <div key={c.clau} className={c.tipus === 'multi' ? 'sm:col-span-2' : undefined}>
+                  <Label id={`pr-${c.clau}-l`} htmlFor={`pr-${c.clau}`} className="mb-1.5 block text-xs text-muted-foreground">
+                    {t(`pr.${c.clau}`)}
+                  </Label>
+                  {controlPerfil(c)}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
         <section className="space-y-3 border-t border-border pt-6">
           <div>
@@ -245,12 +587,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               onValueChange={(v) => setCanal(v as Tria)}
             >
               {/* text-base en móvil: por debajo de 16 px iOS amplía la página al enfocar y
-                  no deshace el zoom al salir (§2, regla 1). El `SelectTrigger` de shadcn
-                  trae `text-sm` fijo, pero `cn()` es tailwind-merge y se queda con el
-                  último del mismo grupo, así que esto lo sustituye de verdad. La ALTURA no
-                  se toca: `data-[size=default]:h-9` es un selector de atributo y ganaría
-                  por especificidad a un `h-11` suelto — quedaría un override escrito que
-                  no hace nada. El trigger se queda en los 36 px del resto (deuda §12.34). */}
+                  no deshace el zoom al salir (§2, regla 1). */}
               <SelectTrigger id="canal-preferit" className="w-full text-base md:text-sm">
                 <SelectValue />
               </SelectTrigger>

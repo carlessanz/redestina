@@ -175,6 +175,18 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       prefijo: 'mk.fmt_',
       valores: ['caixes', 'palet', 'envasos_propis', 'altres'],
     },
+    {
+      // CHECK de `entidades.tipo_receptor`. Se compone en la ficha de la organización
+      // (`PerfilOrganitzacio.tsx`): el nombre del tipo y el título de su perfil.
+      que: 'entidades.tipo_receptor (nombre)',
+      prefijo: 'org.tr_',
+      valores: ['social', 'animal', 'transformador', 'comercial'],
+    },
+    {
+      que: 'entidades.tipo_receptor (perfil)',
+      prefijo: 'org.sec_perfil_',
+      valores: ['social', 'animal', 'transformador', 'comercial'],
+    },
   ]
 
   for (const { que, prefijo, valores } of COMPUESTAS) {

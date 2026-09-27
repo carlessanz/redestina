@@ -531,7 +531,7 @@ src/
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
                                Registre (/registre), RestablirClau (/restablir) y
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
-  routes/PerfilOrganitzacio.tsx  Ficha propia, escrita por RPC con lista blanca
+  routes/PerfilOrganitzacio.tsx  Ficha propia por secciones, escrita por RPC con lista blanca (§6ter)
   routes/equip/                Canalitzacio[Detall] (el ciclo guiado, §6ter) +
                                envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
@@ -601,6 +601,10 @@ src/
     i18n.tsx                   Sistema de traducciones (ca/es, per defecte ca; useT, §7)
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
     utils.ts                   cn() (shadcn)
+    validacio.ts               PURO: NIF/NIE/CIF con dígito de control, teléfono (normaliza a E.164
+                               sin +), correo y CP. Devuelve claves i18n
+    perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
+                               a `entidades.perfil_receptor`, y los tipos de empresa
     municipis.ts               El nomenclátor (`municipios`) cargado una vez por sesión, y el nombre
                                oficial vuelto legible («l'Ametlla del Vallès»)
     crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
@@ -2307,6 +2311,33 @@ que corresponde al momento de cierre y todavía no está implementado.
 | **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents**` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
 | **Receptor** | `/receptor/mercat · interessos · historic · **documents**` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+
+### La meva organització con listas cerradas (27-09-2026)
+
+Revisión funcional del 23-09: la ficha tiene que servir al ERP, así que **lo que se cruza va en
+listas cerradas y lo demás en texto**. `PerfilOrganitzacio` va por secciones —Qui sou, Contacte,
+Adreça, Llocs de recollida (productor), el perfil de su tipo (receptor) y Canal— y guarda con
+**`actualitzar_fitxa_productor` / `actualitzar_fitxa_entitat`** (`20270402100000`), que reciben un
+jsonb y escriben solo las claves de su lista blanca (las `actualizar_mi_*` anteriores se quedan).
+
+| Dato | Cómo |
+| --- | --- |
+| Nom comercial / Persona de contacte | Productor: **`empresa` / `name`** (así lo guarda `registro`: `name` es la persona). Entidad: `nombre` / `contacto`. Si `empresa` está vacío se sugiere `name` como placeholder, sin escribirlo |
+| Raó social | `razon_social`, nueva en las dos fichas |
+| NIF, correo, teléfono, CP | **Validados antes de guardar** (`validacio.ts`, con pruebas): el NIF con su dígito de control, el teléfono normalizado a E.164 sin «+» (un móvil de 9 cifras recibe el 34). Es ayuda contra la errata, no seguridad: la RPC no valida el NIF |
+| Tipus d'empresa | Desplegable cerrado (`cooperativa`·`sl`·`sa`·`autonom`·`fundacio`·`associacio`·`altres`). La RPC acepta además **el valor que ya estaba** (texto libre del import): rechazarlo impediría guardar el resto |
+| Municipi | `municipio_ine` con `SelectorMunicipi`. El trigger `*_municipi` rellena **`poblacion`** (forma legible, `nom_municipi_llegible()`) y **`area_geografica` = comarca**, que ya no se teclea. Si el CP apunta a un único municipio, se elige solo |
+| Llocs de recollida | Las `productor_ubicaciones` del productor: alta y baja desde la ficha. Borrar uno que usa una oferta devuelve `23503` y se explica |
+| Perfil del receptor | `entidades.perfil_receptor` (jsonb), campos por `tipo_receptor` en `perfilReceptor.ts`. **`tipo_receptor` no lo edita la entidad**: decide qué ofertas ve |
+| Canal | Añade **`telefon`**: preferencia para el equipo. Los avisos automáticos la tratan como `auto` (`normalizarPreferencia()`), y el menú de usuario la pinta con las dos casillas marcadas |
+
+⚠️ **Lo que queda fuera, a propósito**: las «altres ubicacions» de un **receptor** (no hay tabla
+para ellas; `horari` sigue siendo texto), el «área Redestina» como segmentación propia distinta
+de la comarca (no está definida: hoy área = comarca, que es lo que compara la priorización) y
+los campos nuevos en la ficha del **equipo** (`RecordDetail`), que sigue con los de siempre.
+⚠️ **Las listas del perfil son provisionales**: las fijó la consultoría a partir de la revisión y
+las tiene que validar la Fundació. Cambiarlas es cambiar `perfilReceptor.ts` (el `id` es lo que
+se guarda; el texto se puede reescribir).
 
 ### La ficha de la organización sale de los paneles (16-09-2026)
 
@@ -5480,8 +5511,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **960 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (27-09-2026:
-   +8 del cuestionario de entrega y transporte; antes 952, que subió de 944
+   Referencia: **971 pruebas en 30 ficheros**, todas correctas y ninguna pendiente (27-09-2026:
+   +11 de la ficha de la organización —validaciones y perfil del receptor— y +8 del cuestionario
+   de entrega y transporte; antes 952, que subió de 944
    con las 8 de los estados simples de los paneles externos; antes, de 939
    el 22-09-2026: el bloque de claves compuestas pasa a vigilar también `orgdoc.t_*` contra el
    CHECK de `documentos_externos.tipo`, que `20270329100000` amplió — es justo el caso del que

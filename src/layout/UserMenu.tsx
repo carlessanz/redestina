@@ -41,8 +41,10 @@ export default function UserMenu() {
   // ⚠️ «Las dos» NO significa mandar el mensaje dos veces. `decidirCanal()` elige UN canal
   //    por envío (§8bis); marcar las dos es decir «me da igual cuál, usad el que funcione».
   //    El texto de ayuda lo dice, porque la casilla sola sugeriría lo contrario.
-  const waMarcat = canal === 'auto' || canal === 'whatsapp'
-  const mailMarcat = canal === 'auto' || canal === 'email'
+  // «Telèfon» (una preferencia para el equipo) no es un canal de avisos: para las casillas
+  // cuenta como las dos marcadas, que es lo que harán los envíos automáticos.
+  const waMarcat = canal === 'auto' || canal === 'telefon' || canal === 'whatsapp'
+  const mailMarcat = canal === 'auto' || canal === 'telefon' || canal === 'email'
 
   async function commutaCanal(quin: 'whatsapp' | 'email') {
     const wa = quin === 'whatsapp' ? !waMarcat : waMarcat
@@ -125,7 +127,7 @@ export default function UserMenu() {
               {t('perf.channel_mail')}
             </DropdownMenuCheckboxItem>
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              {t(canal === 'auto' ? 'perf.channel_both_hint' : 'perf.channel_one_hint')}
+              {t(canal === 'auto' || canal === 'telefon' ? 'perf.channel_both_hint' : 'perf.channel_one_hint')}
             </p>
           </>
         )}

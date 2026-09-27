@@ -20,7 +20,9 @@ import { supabase } from '../lib/supabase'
 import { useAppContext } from './useAppContext'
 
 /** `auto` es el centinela de `canal_preferido = null`. */
-export type TriaCanal = 'auto' | 'whatsapp' | 'email'
+/** `telefon` (20270402100000) es una preferencia para el equipo: los avisos automáticos
+ *  la tratan como `auto`. */
+export type TriaCanal = 'auto' | 'whatsapp' | 'email' | 'telefon'
 
 export function useCanalPropi() {
   const { ctx, rolActiu } = useAppContext()

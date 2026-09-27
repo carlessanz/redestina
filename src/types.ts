@@ -81,7 +81,7 @@ export type EntidadLlistat = Entidad & { rebutjada: boolean }
 export interface Organizacion {
   id: string
   /** Canal que la organización PIDE, frente al que se deduce hoy de su ficha (deuda §12.22) */
-  canal_preferido: 'whatsapp' | 'email' | null
+  canal_preferido: 'whatsapp' | 'email' | 'telefon' | null
   notas: string | null
   creada_por: string | null
   created_at: string
@@ -101,7 +101,7 @@ export interface OrganizacioVista {
   es_generadora: boolean
   es_receptora: boolean
   tipo_receptor: string | null
-  canal_preferido: 'whatsapp' | 'email' | null
+  canal_preferido: 'whatsapp' | 'email' | 'telefon' | null
   created_at: string
 }
 
