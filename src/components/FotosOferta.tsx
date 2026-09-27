@@ -170,7 +170,9 @@ export function SelectorFotos({
 
   return (
     <div className="space-y-2">
-      <div className="flex flex-wrap gap-2">
+      {/* `gap-4`: el aspa de quitar sobresale 8 px (`-right-2`); con `gap-2` tocaba la foto
+          siguiente. Así queda el mismo aire a los dos lados. */}
+      <div className="flex flex-wrap gap-4">
         {rutes.map((r, i) => (
           <div key={r} className="relative">
             <FotoOferta url={urls[r]} alt={t('foto.alt_n', { n: i + 1 })} className="size-24" />
