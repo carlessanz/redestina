@@ -230,12 +230,15 @@ export function Historic() {
                 alt={f.excedentes?.producto ?? ''} className="size-12" />
               <div className="min-w-0">
               <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
-              {/* Siempre una fecha, y nunca el código interno: la de recogida si ya la hay,
-                  y si no, cuándo se asignó. */}
+              {/* Siempre una fecha, y nunca el código interno. ⚠️ «Recollida» solo con kilos
+                  reales: `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el ENT
+                  (la fecha prevista), así que la fecha sola no dice que haya llegado nada. */}
               <div className="text-xs text-muted-foreground">
-                {f.data_hora_recollida
+                {f.data_hora_recollida && f.kg_reales != null
                   ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
-                  : t('hist.assigned_on', { date: dataCurta(f.created_at) })}
+                  : f.data_hora_recollida
+                    ? t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
+                    : t('hist.assigned_on', { date: dataCurta(f.created_at) })}
               </div>
               </div>
             </div>
