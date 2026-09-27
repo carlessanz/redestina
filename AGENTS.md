@@ -2119,9 +2119,11 @@ Dos mecanismos que conviene conocer antes de tocarlo:
   pasada echaba a quien las estuviera usando en el navegador, y de una forma engañosa: la
   pantalla seguía cargando —PostgREST solo verifica la firma del JWT— pero las Edge Functions
   respondían `401` (`getUser()` → `session_not_found`), así que las descargas fallaban sin
-  motivo aparente. ⚠️ El **«Sortir» de la aplicación sigue siendo global** (`UserMenu`,
-  `AppSidebar`): salir en un dispositivo cierra la sesión en todos, y con una cuenta de prueba
-  compartida echa a los demás.
+  motivo aparente. Y el **«Sortir» de la aplicación también es `scope: "local"`** desde el
+  mismo día (`UserMenu`, `AppSidebar` y la pantalla «sense accés» de `Comuns`), por decisión
+  del cliente: salir cierra solo el dispositivo actual. Antes era global y salir en el móvil
+  cerraba el ordenador. ⚠️ `RestablirClau` conserva el `signOut()` por defecto: ahí es el
+  final de un enlace de recuperación, no el botón de salir.
 - **Un `UPDATE` denegado por RLS no da error.** PostgREST no encuentra filas que cumplan el `using`
   y devuelve éxito con cero afectadas, así que un rechazo era indistinguible de un acierto. La rama
   de `actualizar` pide ahora las filas afectadas (`.select('id')`) y trata «cero filas sobre una

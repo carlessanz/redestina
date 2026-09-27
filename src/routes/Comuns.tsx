@@ -129,7 +129,7 @@ export function SenseAcces() {
           </p>
         )}
         {ctx?.email && <p className="mt-3 text-xs text-muted-foreground">{ctx.email}</p>}
-        <Button className="mt-5 w-full" variant="outline" onClick={() => void supabase.auth.signOut()}>
+        <Button className="mt-5 w-full" variant="outline" onClick={() => void supabase.auth.signOut({ scope: 'local' })}>
           {t('nav.logout')}
         </Button>
       </div>

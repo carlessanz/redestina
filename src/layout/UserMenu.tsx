@@ -132,7 +132,10 @@ export default function UserMenu() {
           </>
         )}
         <DropdownMenuSeparator />
-        <DropdownMenuItem onClick={() => void supabase.auth.signOut()}>
+        {/* `scope: 'local'`: salir cierra ESTE dispositivo. El `signOut()` por defecto es
+            global y cerraba también el móvil, o echaba a los demás de una cuenta de prueba
+            compartida (decisión del 28-09-2026). */}
+        <DropdownMenuItem onClick={() => void supabase.auth.signOut({ scope: 'local' })}>
           <LogOut className="size-4" /> {t('nav.logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>

@@ -240,7 +240,7 @@ export default function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip={t('nav.logout')}
-              onClick={() => { alNavegar(); void supabase.auth.signOut() }}
+              onClick={() => { alNavegar(); void supabase.auth.signOut({ scope: 'local' }) }}
             >
               <LogOut />
               <span>{t('nav.logout')}</span>
