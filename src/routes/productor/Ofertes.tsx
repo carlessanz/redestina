@@ -240,12 +240,13 @@ function CapOferta() {
  *    cuántos destinos, nunca cuáles (20270323100000); aquí se dice el número y basta.
  */
 function QuePassaAmbLesMeves({
-  ofertes, kg, destins, puntDe,
+  ofertes, kg, destins, puntDe, foto,
 }: {
   ofertes: Excedente[]
   kg: Record<string, number>
   destins: Record<string, number>
   puntDe: (o: Excedente) => PuntProces
+  foto: (o: Excedente) => FotoResolta
 }) {
   const { t } = useT()
   if (ofertes.length === 0) return null
@@ -269,8 +270,12 @@ function QuePassaAmbLesMeves({
             <Link
               key={o.id}
               to={`/productor/ofertes/${o.id}`}
-              className="block rounded-lg border p-3 hover:bg-muted/40"
+              className="flex items-start gap-3 rounded-lg border p-3 hover:bg-muted/40"
             >
+              {/* La misma foto que en el histórico de abajo (fotoOferta.ts): sin ella, las
+                  ofertas en curso —las que más se miran— eran las únicas sin imagen. */}
+              <FotoOfertaResolta foto={foto(o)} alt={o.producto ?? ''} className="size-12" />
+              <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <div className="min-w-0 font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
@@ -295,6 +300,7 @@ function QuePassaAmbLesMeves({
                   {toca}
                 </p>
               )}
+              </div>
             </Link>
           )
         })}
@@ -366,7 +372,7 @@ export function ProductorInici() {
             </CardContent></Card>
           </div>
 
-          <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} puntDe={puntDe} />
+          <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} puntDe={puntDe} foto={foto} />
 
           <Button
             className="h-11 whitespace-normal md:h-9"
