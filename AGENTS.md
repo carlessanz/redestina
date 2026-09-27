@@ -2547,8 +2547,11 @@ Commons, WordPress Photo Directory, rawpixel, Flickr e iNaturalist), revisadas a
 recortes y con su procedencia en `productos.foto_credit` y en `scripts/fotos-cataleg.json`.
 `RETORN` se queda **a propósito** con el icono: no es un producto, es la devolución de cajas. Tres
 se apartan un poco del producto exacto por falta de material libre: **Nyora** (guindillas secas),
-**Card** (la flor del cardo, no las pencas) y **Garrofa** (en el árbol, no seca). Las fotos de las
-ofertas llegan después, por el mismo script.
+**Card** (la flor del cardo, no las pencas) y **Garrofa** (en el árbol, no seca). Y las **19
+ofertas** tienen **24 fotos** de contexto (cajas, palé, campo, árbol), 5 de ellas con dos, también
+CC0 o dominio público y distintas de la foto del producto; se descartaron dos candidatas por llevar
+el nombre de una finca en la caja y por ser un escaneo con marco. Verificado en producción el
+28-09-2026: Mercat y panel del productor enseñan los tres casos (foto propia, del producto e icono).
 
 ### Los estados SIMPLES de los paneles externos (27-09-2026)
 
