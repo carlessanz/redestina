@@ -2448,7 +2448,12 @@ for (const cuenta of ordenadas) {
       vacias.has(check.tabla)) || (sinDatos && check.requiereFixture !== undefined);
     resultados.push({ cuenta: cuenta.etiqueta, rol: cuenta.rol, check, ok: saltada ? true : ok, saltada, detalle });
   }
-  await cliente.auth.signOut();
+  // 🔴 `scope: "local"`: el `signOut()` por defecto es GLOBAL y cierra TODAS las sesiones
+  //    de la cuenta. Como el arnés entra con las cuentas de prueba —las mismas de los
+  //    botones de `/login`—, cada pasada echaba a quien las estuviera usando en el
+  //    navegador: la pantalla seguía cargando (PostgREST solo mira la firma del JWT) pero
+  //    las Edge Functions respondían 401 `session_not_found`. Pasó el 28-09-2026.
+  await cliente.auth.signOut({ scope: "local" });
 }
 
 // ---------------------------------------------------------------------------

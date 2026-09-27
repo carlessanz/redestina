@@ -2113,6 +2113,15 @@ Dos mecanismos que conviene conocer antes de tocarlo:
   rota y son FALLA aunque el check sea de `permitir`. ⚠️ Lo destapó **ejecutar la función desde
   la pantalla**, no el arnés: el SQL de una migración es una cadena para `deno check`, así que
   lo único que encuentra esto es llamarla.
+- 🔴 **El arnés cierra su sesión con `signOut({ scope: "local" })`, y no es un detalle**
+  (28-09-2026). El `signOut()` por defecto de supabase-js es **global**: cierra todas las
+  sesiones de la cuenta. Como entra con las mismas cuentas de los botones de `/login`, cada
+  pasada echaba a quien las estuviera usando en el navegador, y de una forma engañosa: la
+  pantalla seguía cargando —PostgREST solo verifica la firma del JWT— pero las Edge Functions
+  respondían `401` (`getUser()` → `session_not_found`), así que las descargas fallaban sin
+  motivo aparente. ⚠️ El **«Sortir» de la aplicación sigue siendo global** (`UserMenu`,
+  `AppSidebar`): salir en un dispositivo cierra la sesión en todos, y con una cuenta de prueba
+  compartida echa a los demás.
 - **Un `UPDATE` denegado por RLS no da error.** PostgREST no encuentra filas que cumplan el `using`
   y devuelve éxito con cero afectadas, así que un rechazo era indistinguible de un acierto. La rama
   de `actualizar` pide ahora las filas afectadas (`.select('id')`) y trata «cero filas sobre una
