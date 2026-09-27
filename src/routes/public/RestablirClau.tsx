@@ -63,10 +63,14 @@ export default function RestablirClau() {
         <CardHeader><CardTitle>{t('login.new_password')}</CardTitle></CardHeader>
         <CardContent>
           <form className="grid gap-4" onSubmit={canviar}>
+            {/* El usuario, oculto: sin él, el gestor de contraseñas no sabe de qué cuenta es la
+                contraseña nueva y no ofrece actualizarla. */}
+            <input type="email" name="email" autoComplete="username" value={session.user.email ?? ''}
+              readOnly hidden />
             <div className="grid gap-2">
               <Label htmlFor="np">{t('login.new_password')}</Label>
               <div className="relative">
-                <Input id="np" type={verPassword ? 'text' : 'password'} value={password}
+                <Input id="np" name="new-password" type={verPassword ? 'text' : 'password'} value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null) }}
                   autoComplete="new-password" autoFocus required className="pr-9" />
                 <BotoUll vist={verPassword} onToggle={() => setVerPassword((v) => !v)} />

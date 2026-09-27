@@ -83,7 +83,7 @@ export default function AccesAmbCodi() {
           <p className="text-sm text-muted-foreground">{t('codi.ajuda')}</p>
           <div className="grid gap-1.5">
             <Label htmlFor="codi-email">{t('login.email')}</Label>
-            <Input id="codi-email" type="email" autoComplete="username" required
+            <Input id="codi-email" name="email" type="email" autoComplete="username" required
               value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }} />
           </div>
           <div className="grid gap-1.5">

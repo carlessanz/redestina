@@ -1303,7 +1303,7 @@ fila por producto habría **sobrescrito y borrado el coste real**. Su check ahor
 escribir (coste 0 → `22023`), y las 79 filas de histórico que dejó se borraron en la migración. `tipos_caja` nace **sembrada provisional y
 desactivada** hasta que la Fundación dé la lista de taras.
 
-Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. Desde `20270406100100` (28-09-2026), un albarán **sin oferta** —el REC de una espigolada— toma el `producto` de sus líneas (los distintos, separados por coma); antes salía «—». GRANT: solo `SELECT` en
+Vista `v_albaranes_bandeja` (`security_invoker`) para la bandeja del equipo. Desde `20270406100100` (28-09-2026), un albarán **sin oferta** —el REC de una espigolada— toma el `producto` de sus líneas (los distintos, separados por coma) y, desde `20270406100200`, el `productor_id` de la jornada (`espigoladas`); antes los dos salían «—». GRANT: solo `SELECT` en
 todas; `tipos_caja` es catálogo para cualquier autenticado, `costes_producto` solo `es_intern()`.
 
 **`planes_prevencion` (fase 5, `20270301*`)** — el plan de prevención de una organización. Clave
@@ -3825,7 +3825,7 @@ más dos Edge Functions con sus propios controles (`recuperar-password` y `regis
 | `whatsapp-send` | Desplegada **con** verificación de JWT (sin `--no-verify-jwt`) y además comprueba `getUser(token)` |
 | `whatsapp-webhook` | Sigue con `--no-verify-jwt` porque Meta no envía JWT; se valida la firma `X-Hub-Signature-256` |
 | Alta de cuentas | Admin API (`scripts/crear-usuario.ts`) **o** la Edge Function pública `registro`, que crea la cuenta con la membresía **PENDIENTE**: el acceso real lo concede el equipo al aprobar. `enable_signup` sigue `false` y así debe seguir — la Admin API lo ignora, y así el alta pasa siempre por nuestro código |
-| Login | `FormulariAcces.tsx`: `signInWithPassword` + botón «ojo» + «¿olvidaste la contraseña?». Se monta en `/login` (usuarios) y `/admin` (equipo) |
+| Login | `FormulariAcces.tsx`: `signInWithPassword` + botón «ojo» + «¿olvidaste la contraseña?». Se monta en `/login` (usuarios) y `/admin` (equipo). Los campos llevan `name` además de `autoComplete` (28-09-2026): sin él, Safari y el Llavero de iCloud no ofrecían guardar la contraseña en esta SPA. `RestablirClau` lleva el correo como campo `username` oculto, para que el gestor sepa de qué cuenta es la nueva |
 | Recuperar contraseña | Edge Function `recuperar-password` (pública) + Resend; **no** usa el mailer nativo (§ abajo) |
 
 ### Correos: ahora sí, pero solo por Resend

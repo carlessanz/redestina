@@ -49,7 +49,10 @@ function Kpi({ titulo, valor, sub, detalle, to }: {
           <CardTitle className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{titulo}</CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="text-3xl font-bold leading-none text-primary">{valor}</div>
+          {/* `ca-ES` agrupa también los de cuatro cifras («2.240»); `es-ES` no. */}
+          <div className="text-3xl font-bold leading-none text-primary">
+            {typeof valor === 'number' ? valor.toLocaleString('ca-ES', { maximumFractionDigits: 0 }) : valor}
+          </div>
           <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
           <ul className="mt-3 space-y-0.5 border-t pt-2 text-sm text-muted-foreground">
             {detalle.map((d, i) => <li key={i}>{d.texto}</li>)}
@@ -192,7 +195,7 @@ export default function Dashboard() {
               { texto: `${kpis.ofertas.canceladas} ${t('dash.cancelled')}` },
             ]} />
             <Kpi to="/equip/ofertes" titulo={t('dash.k_kg')} valor={kpis.kg.canalizados} sub={t('dash.channeled')} detalle={[
-              { texto: t('dash.pending_kg', { n: kpis.kg.pendientes }) },
+              { texto: t('dash.pending_kg', { n: kpis.kg.pendientes.toLocaleString('ca-ES', { maximumFractionDigits: 0 }) }) },
             ]} />
             <Kpi to="/equip/productors" titulo={t('dash.k_producers')} valor={kpis.productores.total} sub={t('dash.in_base')} detalle={[
               { texto: t('dash.with_mobile', { n: kpis.productores.conMovil }) },

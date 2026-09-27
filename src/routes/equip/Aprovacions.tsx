@@ -715,7 +715,7 @@ export default function Aprovacions() {
                     <div className="text-xs text-muted-foreground">
                       <code>{f.excedentes?.id_excedente ?? '—'}</code> · {f.excedentes?.producto ?? '—'}
                       {f.kg_solicitados != null ? ` · ${f.kg_solicitados} ${t('od.rs_kg')}` : ''}
-                      {f.preu_ofert != null ? ` · ${f.preu_ofert} ${t('od.rs_preu')}` : ''}
+                      {f.preu_ofert != null ? ` · ${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}` : ''}
                       {` · ${t(`od.ch_${f.canal}`)} · ${quan(f.respondido_at ?? f.enviado_at)}`}
                     </div>
                     {/* Contra qué se decide: aprobar 300 kg de una oferta que ya está

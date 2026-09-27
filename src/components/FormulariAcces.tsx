@@ -82,7 +82,7 @@ export default function FormulariAcces({ titol, subtitol }: { titol: string; sub
           <form className="grid gap-4" onSubmit={solicitarRecuperacion}>
             <div className="grid gap-2">
               <Label htmlFor="re">{t('login.email')}</Label>
-              <Input id="re" type="email" value={email}
+              <Input id="re" name="email" type="email" value={email}
                 onChange={(e) => setEmail(e.target.value)} autoComplete="username" autoFocus required />
             </div>
             <Button type="submit" disabled={ocupado || !email.trim()}>
@@ -108,7 +108,9 @@ export default function FormulariAcces({ titol, subtitol }: { titol: string; sub
         <form className="grid gap-4" onSubmit={entrar}>
           <div className="grid gap-2">
             <Label htmlFor="em">{t('login.email')}</Label>
-            <Input id="em" type="email" value={email}
+            {/* `name` además de `autoComplete`: Safari y el Llavero de iCloud (y a veces Chrome)
+                lo usan para reconocer el login en una SPA y ofrecer guardar la contraseña. */}
+            <Input id="em" name="email" type="email" value={email}
               onChange={(e) => { setEmail(e.target.value); setError(null) }}
               autoComplete="username" autoFocus required />
           </div>
@@ -121,7 +123,7 @@ export default function FormulariAcces({ titol, subtitol }: { titol: string; sub
               </button>
             </div>
             <div className="relative">
-              <Input id="pw" type={verPassword ? 'text' : 'password'} value={password}
+              <Input id="pw" name="password" type={verPassword ? 'text' : 'password'} value={password}
                 onChange={(e) => { setPassword(e.target.value); setError(null) }}
                 autoComplete="current-password" required className="pr-9" />
               <BotoUll vist={verPassword} onToggle={() => setVerPassword((v) => !v)} />

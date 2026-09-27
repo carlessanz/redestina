@@ -269,14 +269,14 @@ export default function Registre() {
 
             <div className="grid gap-2">
               <Label htmlFor="rem">{t('login.email')}</Label>
-              <Input id="rem" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }}
+              <Input id="rem" name="email" type="email" value={email} onChange={(e) => { setEmail(e.target.value); setError(null) }}
                 autoComplete="username" required />
             </div>
 
             <div className="grid gap-2">
               <Label htmlFor="rpw">{t('login.password')}</Label>
               <div className="relative">
-                <Input id="rpw" type={verPassword ? 'text' : 'password'} value={password}
+                <Input id="rpw" name="new-password" type={verPassword ? 'text' : 'password'} value={password}
                   onChange={(e) => { setPassword(e.target.value); setError(null) }}
                   autoComplete="new-password" required className="pr-9" />
                 <BotoUll vist={verPassword} onToggle={() => setVerPassword((v) => !v)} />
@@ -288,7 +288,7 @@ export default function Registre() {
                 ficha y membresía creadas. Por eso se confirma. */}
             <div className="grid gap-2">
               <Label htmlFor="rpw2">{t('reg.pw_confirm')}</Label>
-              <Input id="rpw2" type={verPassword ? 'text' : 'password'} value={password2}
+              <Input id="rpw2" name="confirm-password" type={verPassword ? 'text' : 'password'} value={password2}
                 onChange={(e) => { setPassword2(e.target.value); setError(null) }}
                 autoComplete="new-password" required
                 aria-invalid={password2 !== '' && password !== password2} />
