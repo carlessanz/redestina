@@ -601,6 +601,8 @@ src/
     i18n.tsx                   Sistema de traducciones (ca/es, per defecte ca; useT, §7)
     accessosTest.ts            Credenciales de las cuentas de prueba para /login (§6quater)
     utils.ts                   cn() (shadcn)
+    municipis.ts               El nomenclátor (`municipios`) cargado una vez por sesión, y el nombre
+                               oficial vuelto legible («l'Ametlla del Vallès»)
     crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
   components/
@@ -651,6 +653,8 @@ src/
     LayoutAcces.tsx            Marco verde (bg-primary) de las pantallas de acceso (+ ComprovantSessio)
     FormulariAcces.tsx         Entrar y pedir enlace de recuperación (+ BotoUll)
     SelectorIdioma.tsx         Idioma suelto, para lo público (dentro va en UserMenu)
+    SelectorMunicipi.tsx       Elegir municipio de la lista oficial (INE), con búsqueda y comarca;
+                               lo usan el alta de oferta y la ficha de la organización
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
     Dashboard.tsx              Tablero = cola de trabajo: Pendent de l'equip, Com funciona, KPIs (§6ter)
     OffersList.tsx             Ofertas con kg en vivo (Realtime) + buscador; pestañas Actives/Tancades/Totes
@@ -840,6 +844,10 @@ de prueba que habilita el envío a la entidad (§8).
 `20260722130100_estado_cancelada.sql`). `modalitat` ∈ `donacio` · `venda` · `maquila`. **`preu_minim`**
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
 solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al aceptar (§5).
+
+**`format_entrega`** (`caixes`·`palet`·`envasos_propis`·`altres`, check) y **`transport_propi`**
+(bool; null = no se preguntó), `20270401100000` — §6bis. `tipo_caixa` se queda para las ofertas
+anteriores y ya no se escribe.
 
 **`municipi_ine`** y **`comarca`** (`20270331100000`) — de dónde es la oferta, **copiado en
 la propia oferta** porque el receptor no puede leer la ficha del productor ni sus ubicaciones.
@@ -2175,11 +2183,44 @@ Peculiaridades verificadas de los datos, todas manejadas por el script:
 
 ## 6bis. El intake conversacional
 
-Quince pasos (14 fijos + 1 condicional; `PASOS`/`CAMPOS` en `_shared/camposOferta.ts`):
-`familia` → `producte` → `varietat` → **`producte_al_camp`** → `kg` → `caixes` →
-`tipus_caixa` → `retorn` → `ubicacio` → `disponible_fins` → `horari` → `modalitat` →
-**`preu_minim`** (solo si `modalitat` es `venda`/`maquila`; en `donació` se salta) → `causa` →
-`observacions`.
+Dieciséis pasos, seis de ellos condicionales (`PASOS`/`CAMPOS` en `_shared/camposOferta.ts`,
+desde el 27-09-2026): `familia` → `producte` → `varietat` → **`producte_al_camp`** → `kg` →
+**`format_entrega`** → `caixes` → `retorn` → **`transport`** → `ubicacio` → `disponible_fins` →
+`horari` → `modalitat` → **`preu_minim`** → `causa` → `observacions`.
+
+**Qué se salta y cuándo** (revisión funcional del 23-09-2026: «Com es farà l'entrega?» en vez de
+«Quin tipus de caixa?», y «no asumir que siempre interviene una entidad»):
+
+| Paso | Se pregunta si… | Obligatorio |
+| --- | --- | --- |
+| `format_entrega` (caixes · palet · envasos_propis · altres) | el producto **ya está cosechado** | sí |
+| `caixes` («quantes caixes o palets») | formato caixes o palet | no |
+| `retorn` (Sí/No) | formato caixes, palet o altres — no si el receptor trae sus envases | sí |
+| `transport` («Podeu oferir el transport?») | ya cosechado — lo que está en el campo se va a buscar | sí |
+| `ubicacio` («On s'ha de recollir?») | **sin transporte propio, O producto en el campo** (condición compuesta) | sí |
+| `preu_minim` | venda o maquila | sí |
+
+⚠️ **Una condición puede ser una LISTA, y es un «o»** (`condicion: CondicionCampo[]`): la
+ubicación hace falta si nadie la trae o si hay que ir a cosechar. El bot las evalúa con el
+mismo `aplica()` del descriptor dentro de `siguientePaso()`, así que **los dos canales se
+saltan exactamente lo mismo**. ⚠️ **Salvo el preu mínim**, que conserva su regla propia a
+propósito: solo se salta con una donación EXPLÍCITA; con la modalidad ausente o desconocida se
+pregunta (lo fija un test: publicar una venta sin precio es peor que pedirle un precio a quien dona).
+⚠️ **`crear-oferta` sirve las listas en `condicions`** y deja en `condicion` solo la primera: el
+panel anterior hacía `condicion.en.includes(…)` y con una lista reventaba, y las funciones se
+publican antes que el frontend (§11). El panel nuevo lee `condicions ?? condicion`.
+⚠️ **`tipus_caixa` ya no es un paso**; la columna `tipo_caixa` se queda para las ofertas
+anteriores. Las nuevas guardan `format_entrega` y `transport_propi` (§4), y el texto de la
+oferta imprime «ENVASOS: Palet · no cal retornar-los» y, solo si es cierto, «TRANSPORT: el porta
+la productora» (misma asimetría que el producte al camp).
+
+**El panel lo presenta POR PASOS** (`FormulariNovaOferta`), una sección cada vez: «Pas 2 de 5»,
+«Continuar» valida lo obligatorio de esa sección y los títulos de arriba dejan volver a una ya
+vista. En la recogida se puede **crear un lugar nuevo sin salir** (`creaUbicacio()`, directo a
+`productor_ubicaciones`, que el productor ya podía escribir por RLS), con el municipio de la lista
+oficial (`SelectorMunicipi`), y así la comarca de la oferta sale exacta. `crear-oferta` comprueba
+ahora que la ubicación es **de ese productor** (`400 ubicacio_aliena`): corre con `service_role`
+y la RLS no lo hacía por ella.
 
 ⚠️ **`producte_al_camp` va como LISTA, no como botones**, aunque sean dos opciones, por lo mismo que
 `modalitat` (§12.105): un botón solo tiene título de 20 caracteres y una fila de lista tiene
@@ -2240,14 +2281,11 @@ pasa es quien **escribe**, y el `slice` de `whatsapp.ts` es la última red, no l
   pide el enlace de Google Maps por texto. El enlace crea una `productor_ubicaciones` que
   hereda el municipio de la ficha.
 - Cantidad en unidades o manats: se convierte con `factores_conversion` si hay factor.
-- ⚠️ **`tipus_caixa` y `retorn` son opcionales en el panel pero obligatorios en el intake por
-  WhatsApp.** Son `obligatorio:false` en `camposOferta.ts`, pero el intake los pide con lista de
-  opciones y **sin fila «saltar»**, así que por WhatsApp el productor no puede avanzar sin pulsar una.
-  Las dos interfaces del «mismo cuestionario» divergen en esto.
-- ⚠️ **Callejón en `ubicacio` cuando SÍ hay ubicaciones.** Se ofrece la fila «Comparteix un punt»
-  (`ubicacio:nova`), pero `interpretar()` la excluye y exige un enlace de Maps por texto: pulsarla
-  (sin texto) cuenta como fallo y **re-muestra la misma lista** en vez de pedir el enlace. El caso
-  «sin ubicaciones» (pedir el enlace por texto) sí funciona.
+- ✅ **Ya no hay divergencia de obligatoriedad** entre canales (27-09-2026): `retorn` es
+  obligatorio en los dos cuando aplica, y `tipus_caixa` ya no se pregunta.
+- ✅ **El callejón de `ubicacio` está resuelto** (27-09-2026): la fila «Un altre lloc»
+  (`ubicacio:nova`) ya no cuenta como respuesta inválida —antes re-mostraba la misma lista—; el
+  bot contesta pidiendo el enlace de Google Maps y no suma intento.
 
 **Identificador**: `E-AAMMDD-XXX-YYY-N` (3 letras del productor, 3 del producto, N = orden
 del día). Ejemplo real: `E-260721-CAR-TOM-1`.
@@ -5442,8 +5480,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **952 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (subió de 944
-   el 27-09-2026 con las 8 de los estados simples de los paneles externos; antes, de 939
+   Referencia: **960 pruebas en 29 ficheros**, todas correctas y ninguna pendiente (27-09-2026:
+   +8 del cuestionario de entrega y transporte; antes 952, que subió de 944
+   con las 8 de los estados simples de los paneles externos; antes, de 939
    el 22-09-2026: el bloque de claves compuestas pasa a vigilar también `orgdoc.t_*` contra el
    CHECK de `documentos_externos.tipo`, que `20270329100000` amplió — es justo el caso del que
    avisa §7: la lista de valores vive en Postgres y `cobertura.test.ts` no ve un `t(\`…${tipo}\`)`).

@@ -40,7 +40,54 @@ export interface CampoOferta {
   seccion?: SeccioOferta
   obligatorio: boolean
   opciones?: OpcioOferta[]
-  condicion?: { campo: string; en: string[] }
+  /** Una lista es un «o»: basta con que se cumpla una (desde el 27-09-2026). */
+  condicion?: CondicioCamp | CondicioCamp[]
+  /**
+   * La lista completa cuando la condición es compuesta. `crear-oferta` la sirve aparte y deja
+   * en `condicion` solo la primera, para no romper el panel anterior durante la publicación.
+   */
+  condicions?: CondicioCamp[]
+}
+
+export interface CondicioCamp { campo: string; en: string[] }
+
+/**
+ * ¿Este campo se pregunta, dados los datos? Espejo de `aplica()` en
+ * `_shared/camposOferta.ts` —que es Deno y no entra en el bundle—; divergir no rompería
+ * nada (el servidor valida con el suyo), pero la pantalla preguntaría otra cosa que el bot.
+ */
+export function aplicaCamp(campo: CampoOferta, datos: Record<string, unknown>): boolean {
+  const conds = campo.condicions
+    ?? (campo.condicion ? (Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion]) : [])
+  if (conds.length === 0) return true
+  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? '')))
+}
+
+/**
+ * Da de alta un lugar de recogida del productor (campo, almacén…) desde el alta de oferta.
+ * Escribe directo en la tabla: la RLS deja al productor gestionar SUS ubicaciones y al
+ * equipo las de cualquiera (`ubicaciones: gestio intern o propia`), que es lo mismo que
+ * hace falta aquí. Devuelve la fila para añadirla al desplegable sin recargar.
+ */
+export async function creaUbicacio(args: {
+  productorId: string
+  alias: string
+  gmapsUrl: string | null
+  municipi: { codi_ine: string; nom: string } | null
+}): Promise<Resultat<{ id: string; alias: string | null; municipio: string | null }>> {
+  const { data, error } = await supabase
+    .from('productor_ubicaciones')
+    .insert({
+      productor_id: args.productorId,
+      alias: args.alias,
+      gmaps_url: args.gmapsUrl,
+      municipio: args.municipi?.nom ?? null,
+      municipio_ine: args.municipi?.codi_ine ?? null,
+    })
+    .select('id, alias, municipio')
+    .single()
+  if (error || !data) return { ok: false, error: error?.message ?? 'c.error' }
+  return { ok: true, data }
 }
 
 export interface CatalogosOferta {

@@ -168,6 +168,13 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
         'conveni_signat', 'certificat_previ', 'pla_previ', 'altre',
       ],
     },
+    {
+      // CHECK de `excedentes.format_entrega` (20270401100000). Se compone en el detalle del
+      // Mercat del receptor.
+      que: 'excedentes.format_entrega',
+      prefijo: 'mk.fmt_',
+      valores: ['caixes', 'palet', 'envasos_propis', 'altres'],
+    },
   ]
 
   for (const { que, prefijo, valores } of COMPUESTAS) {

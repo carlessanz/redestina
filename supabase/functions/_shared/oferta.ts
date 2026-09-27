@@ -162,8 +162,10 @@ export function componerTextoOferta(campos: {
   modalitat: string;
   preu?: string;
   causa: string;
-  /** Opcional en el panel (obligatorio en el intake, §6bis): sin respuesta, no se imprime. */
+  /** Formato de entrega y retorno, ya compuestos (`textoEnvasos`). Sin nada, no se imprime. */
   envasos?: string;
+  /** Solo cuando el productor lo lleva: el silencio significa «cal venir a buscar-lo». */
+  transportPropi?: boolean;
   /**
    * `responsable` y `observacions` SIEMPRE se imprimen, aunque estén vacías —al revés que
    * `ubicacio`/`horari`/`envasos` de aquí arriba—, y es una decisión distinta y ya tomada
@@ -209,6 +211,8 @@ export function componerTextoOferta(campos: {
   if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
   lineas.push(`🔴 CAUSA: ${campos.causa}`);
   if (campos.envasos) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
+  // Misma asimetría que `producte_al_camp`: solo se dice cuando cambia lo que hay que hacer.
+  if (campos.transportPropi) lineas.push("🚚 TRANSPORT: el porta la productora");
   lineas.push(
     `👥 RESPONSABLE: ${campos.responsable}`,
     `📝 OBSERVACIONS: ${campos.observacions}`,
@@ -216,6 +220,25 @@ export function componerTextoOferta(campos: {
     "✅ Per acceptar aquesta oferta respon *SÍ* (o *NO* per descartar-la).",
   );
   return lineas.join("\n");
+}
+
+/** El formato de entrega en palabras, para el texto de la oferta. */
+const ETIQUETA_FORMAT: Record<string, string> = {
+  caixes: "Caixes",
+  palet: "Palet",
+  envasos_propis: "Cal portar envasos propis",
+  altres: "Altres (vegeu observacions)",
+};
+
+/**
+ * La línea ENVASOS: formato de entrega y, si aplica, si hay que devolverlos. Vacía si no se
+ * preguntó (producto en el campo) — y entonces la línea no se imprime.
+ */
+export function textoEnvasos(format: unknown, retorn: unknown): string {
+  const f = ETIQUETA_FORMAT[String(format ?? "")] ?? "";
+  const r = String(retorn ?? "");
+  const ret = r === "Sí" ? "cal retornar-los" : r === "No" ? "no cal retornar-los" : "";
+  return [f, ret].filter(Boolean).join(" · ");
 }
 
 /**
@@ -271,6 +294,8 @@ export async function crearExcedente(
   // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
   // cuanto alguien cambie una de las dos.
   const alCamp = esProducteAlCamp(d.producte_al_camp);
+  // Tres valores, a propósito: sí, no, o no se preguntó (producto en el campo).
+  const transportPropi = d.transport === "si" ? true : d.transport === "no" ? false : null;
   const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
   let idExcedente = await generarId(supabase, productor.name, producto);
 
@@ -280,13 +305,14 @@ export async function crearExcedente(
     productor: fichaProductor?.empresa || productor.name,
     municipi: municipio,
     ubicacio: ubicacion?.gmaps_url || undefined,
-    quantitat: `${kg}kg aprox${d.caixes ? ` · ${d.caixes} caixes` : ""}`,
+    quantitat: `${kg}kg aprox${d.caixes ? ` · ${d.caixes} ${d.format_entrega === "palet" ? "palets" : "caixes"}` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
     horari: String(d.horari ?? "") || undefined,
     modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
     preu: preuMinim != null ? `${preuMinim} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
-    envasos: String(d.retorn ?? "") || undefined,
+    envasos: textoEnvasos(d.format_entrega, d.retorn) || undefined,
+    transportPropi: transportPropi === true,
     // Se asigna en el panel; el productor no lo elige.
     responsable: "",
     observacions: String(d.observacions ?? ""),
@@ -320,8 +346,11 @@ export async function crearExcedente(
       producte_al_camp: alCamp,
       kg_total: kg || null,
       num_caixes: d.caixes ?? null,
-      tipo_caixa: d.tipus_caixa ?? null,
+      // `tipo_caixa` ya no se pregunta (revisión del 23-09-2026): el formato de entrega lo
+      // sustituye, y las taras se fijan por línea en el albarán.
+      format_entrega: d.format_entrega ?? null,
       retorn_envasos: d.retorn ?? null,
+      transport_propi: transportPropi,
       modalitat: d.modalitat ?? null,
       preu_minim: preuMinim,
       causa: causa?.nombre ?? null,

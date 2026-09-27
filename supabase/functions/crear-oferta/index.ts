@@ -91,9 +91,18 @@ Deno.serve(async (req) => {
         .filter(Boolean)),
     ].sort();
 
+    // ⚠️ COMPATIBILIDAD CON EL PANEL VIEJO. Desde el 27-09-2026 una condición puede ser una
+    //    LISTA («o»), y el panel anterior hacía `condicion.en.includes(...)`: con una lista
+    //    reventaba. Las funciones se publican antes que el frontend (§11), así que durante
+    //    esa ventana el panel viejo lee este descriptor. Se sirve `condicion` con la PRIMERA
+    //    (lo que el viejo entiende) y `condicions` con todas (lo que usa el nuevo).
+    const campos = CAMPOS.map((c) =>
+      Array.isArray(c.condicion) ? { ...c, condicion: c.condicion[0], condicions: c.condicion } : c
+    );
+
     return responder({
-      campos: CAMPOS,
-      // Las secciones viajan con los campos y no se escriben en la pantalla: agrupar los 15
+      campos,
+      // Las secciones viajan con los campos y no se escriben en la pantalla: agrupar los
       // pasos es parte del cuestionario, no de una interfaz concreta, y `campos[].seccion`
       // no se puede pintar sin saber en qué orden van los bloques ni cómo se titulan.
       secciones: SECCIONES,
@@ -130,6 +139,19 @@ Deno.serve(async (req) => {
     const faltan = faltantes(datos as Record<string, unknown>);
     if (faltan.length > 0) {
       return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan }, 400);
+    }
+
+    // La ubicación tiene que ser de ESTE productor. La función corre con `service_role`, así
+    // que la RLS de `productor_ubicaciones` no lo comprueba por ella: sin esto, una oferta
+    // podría apuntar a la finca de otro con solo conocer su uuid (y el trigger de comarca
+    // copiaría además su municipio).
+    const ubicacio = (datos as Record<string, unknown>).ubicacio;
+    if (ubicacio) {
+      const { data: ubi } = await supabase.from("productor_ubicaciones")
+        .select("id").eq("id", String(ubicacio)).eq("productor_id", productorId).maybeSingle();
+      if (!ubi) {
+        return responder({ error: "Aquesta ubicació no és d'aquest productor", code: "ubicacio_aliena" }, 400);
+      }
     }
 
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46).

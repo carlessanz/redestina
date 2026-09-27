@@ -15,11 +15,12 @@
 // (`_shared/camposOferta.ts`). Si mañana el intake gana un paso, este formulario lo gana
 // solo.
 //
-// Se presenta como una sola página con secciones, NO como un asistente paso a paso: en
-// WhatsApp la conversación impone el ritmo, pero en pantalla ver el conjunto y poder
-// corregir es mejor. Lo que sí se agrupa es la lectura —producto, cantidad, recogida,
-// modalidad, causa— porque catorce campos seguidos en dos columnas no se leen como un
-// cuestionario, se leen como un formulario administrativo.
+// SE PRESENTA POR PASOS, una sección cada vez (revisión funcional del 23-09-2026: «el
+// formulario es bastante largo y puede resultar overwhelming, especialmente en móvil»).
+// Antes era una sola página con las cinco secciones: se veía el conjunto, pero en un móvil
+// eran metros de scroll. Ahora cada sección se valida al pulsar «Continuar» y los títulos de
+// arriba dejan volver a una ya vista para corregir. El orden es el de `PASOS`, el mismo que
+// recorre el bot.
 //
 // ⚠️ LAS SECCIONES SON OPCIONALES A PROPÓSITO. El descriptor las sirve desde el servidor
 //    y este fichero se despliega antes que la función (§11: base → funciones → frontend),
@@ -32,12 +33,14 @@
 //    `false` siempre para el alta asistida y dejaría al dinamizador delante de un `42501`
 //    que la pantalla podía haber anticipado.
 
-import { useEffect, useMemo, useState } from 'react'
-import { ChevronDown } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { cn } from '../lib/utils'
-import { carregaCamps, creaOferta } from '../lib/ofertes'
+import { aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio } from '../lib/ofertes'
+import type { Municipi } from '../lib/municipis'
+import SelectorMunicipi from './SelectorMunicipi'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import PasosProces from './proces/PasosProces'
@@ -62,11 +65,6 @@ function marcaProcesVist() {
   // Safari en navegación privada lanza al tocar `localStorage`: que no se pueda recordar
   // la preferencia no puede impedir publicar.
   try { localStorage.setItem(CLAU_PROCES_VIST, 'si') } catch { /* ver arriba */ }
-}
-
-function aplica(campo: CampoOferta, datos: Datos): boolean {
-  if (!campo.condicion) return true
-  return campo.condicion.en.includes(String(datos[campo.condicion.campo] ?? ''))
 }
 
 /**
@@ -127,6 +125,13 @@ export default function FormulariNovaOferta(
   // Qué claves faltan por rellenar, para marcarlas en rojo y decir cuáles son. Vacío = no
   // se ha intentado publicar todavía, o ya está todo (§12.123).
   const [campsFaltants, setCampsFaltants] = useState<Set<string>>(new Set())
+  /** La sección que se está rellenando, y la más avanzada a la que se ha llegado. */
+  const [pas, setPas] = useState(0)
+  const [pasMaxim, setPasMaxim] = useState(0)
+  const dalt = useRef<HTMLDivElement>(null)
+  /** El mini-formulario de «un lloc nou», dentro del paso de recogida. */
+  const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
+  const [desantLloc, setDesantLloc] = useState(false)
 
   useEffect(() => {
     if (!productorId) { setCarregant(false); return }
@@ -184,10 +189,58 @@ export default function FormulariNovaOferta(
 
   function marcaIVeAlPrimer(claus: string[]) {
     setCampsFaltants(new Set(claus))
-    if (claus[0]) {
+    if (!claus[0]) return
+    // Si el primero que falta está en otra sección, se va a esa sección primero.
+    const i = blocs.findIndex((b) => b.camps.some((c) => c.clave === claus[0]))
+    if (i >= 0 && i !== pas) setPas(i)
+    window.setTimeout(() => {
       document.getElementById(idDe(claus[0]))
         ?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }, 50)
+  }
+
+  /** Lo obligatorio que falta en UNA sección. */
+  function faltantsDe(camps: CampoOferta[]): CampoOferta[] {
+    const claus = new Set(camps.map((c) => c.clave))
+    return faltantsObligatoris().filter((c) => claus.has(c.clave))
+  }
+
+  function vesAlPas(i: number) {
+    setPas(i)
+    setPasMaxim((m) => Math.max(m, i))
+    setError(null)
+    dalt.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+
+  /** «Continuar»: solo si lo obligatorio de esta sección está completo. */
+  function continua(camps: CampoOferta[], seguent: number) {
+    const f = faltantsDe(camps)
+    if (f.length > 0) {
+      marcaIVeAlPrimer(f.map((c) => c.clave))
+      setError(t('po.missing_fields', { camps: f.map((c) => c.etiqueta).join(', ') }))
+      return
     }
+    setCampsFaltants(new Set())
+    vesAlPas(seguent)
+  }
+
+  async function desaLlocNou() {
+    if (!productorId || !llocNou) return
+    if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
+    setDesantLloc(true)
+    const r = await creaUbicacio({
+      productorId,
+      alias: llocNou.alias.trim(),
+      gmapsUrl: llocNou.maps.trim() || null,
+      municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
+    })
+    setDesantLloc(false)
+    if (!r.ok || !r.data) { toast.error(r.error ?? t('c.error')); return }
+    const nou = r.data
+    setCatalogos((c) => (c ? { ...c, ubicaciones: [...c.ubicaciones, nou] } : c))
+    set('ubicacio', nou.id)
+    setLlocNou(null)
+    toast.success(t('po.place_saved'))
   }
 
   async function enviar() {
@@ -291,18 +344,66 @@ export default function FormulariNovaOferta(
             ))}
           </select>
         )
-      case 'ubicacio':
-        return (catalogos?.ubicaciones ?? []).length > 0 ? (
-          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-            value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
-            <option value="">—</option>
-            {(catalogos?.ubicaciones ?? []).map((u) => (
-              <option key={u.id} value={u.id}>{u.alias ?? u.municipio ?? 'Ubicació'}</option>
-            ))}
-          </select>
-        ) : (
-          <p className="text-sm text-muted-foreground">{t('po.no_locations')}</p>
+      case 'ubicacio': {
+        const ubis = catalogos?.ubicaciones ?? []
+        return (
+          <div className="space-y-2">
+            {ubis.length > 0 && (
+              <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
+                value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
+                <option value="">—</option>
+                {ubis.map((u) => (
+                  <option key={u.id} value={u.id}>
+                    {u.alias ?? u.municipio ?? 'Ubicació'}{u.alias && u.municipio ? ` · ${u.municipio}` : ''}
+                  </option>
+                ))}
+              </select>
+            )}
+            {ubis.length === 0 && !llocNou && (
+              <p className="text-sm text-muted-foreground">{t('po.no_locations')}</p>
+            )}
+            {/* Un lloc nou sense sortir del formulari: un productor pot tenir diversos
+                camps i magatzems, i obligar-lo a anar a la fitxa a mig alta és perdre'l. */}
+            {!llocNou ? (
+              <Button type="button" variant="outline" className="h-11 whitespace-normal md:h-9"
+                onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
+                <Plus className="size-4" aria-hidden /> {t('po.place_add')}
+              </Button>
+            ) : (
+              <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
+                <div>
+                  <Label htmlFor="of-lloc-nom" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_name')}</Label>
+                  <Input id="of-lloc-nom" name="lloc-nom" value={llocNou.alias}
+                    placeholder={t('po.place_name_ph')}
+                    onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
+                </div>
+                <div>
+                  <Label htmlFor="of-lloc-municipi" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
+                  <SelectorMunicipi id="of-lloc-municipi" valor={llocNou.municipi?.codi_ine ?? null}
+                    onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
+                </div>
+                <div className="sm:col-span-2">
+                  <Label htmlFor="of-lloc-maps" className="mb-1.5 block text-xs text-muted-foreground">
+                    {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
+                  </Label>
+                  <Input id="of-lloc-maps" name="lloc-maps" type="url" inputMode="url" value={llocNou.maps}
+                    placeholder="https://maps.app.goo.gl/…"
+                    onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
+                </div>
+                <div className="flex flex-wrap gap-2 sm:col-span-2">
+                  <Button type="button" className="h-11 whitespace-normal md:h-9" disabled={desantLloc}
+                    onClick={() => void desaLlocNou()}>
+                    {desantLloc ? t('c.saving') : t('po.place_save')}
+                  </Button>
+                  <Button type="button" variant="ghost" className="h-11 md:h-9" onClick={() => setLlocNou(null)}>
+                    {t('c.cancel')}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
         )
+      }
       case 'opcions': {
         // La explicación de la opción ELEGIDA va debajo del control, no en el <option>:
         // un `<option>` no admite más que texto plano, y las tres modalidades deciden qué
@@ -350,6 +451,11 @@ export default function FormulariNovaOferta(
 
   const visibles = campos.filter((c) => aplica(c, datos))
   const blocs = agrupa(visibles, seccions)
+  // Si una respuesta hace desaparecer secciones enteras (o el descriptor cambia), el paso
+  // se queda dentro del rango en vez de apuntar a un bloque que ya no existe.
+  const pasSegur = Math.min(pas, Math.max(0, blocs.length - 1))
+  const bloc = blocs[pasSegur]
+  const ultim = pasSegur >= blocs.length - 1
   // El punto de partida: una oferta recién publicada, sin nadie interesado todavía. Sale
   // del mismo módulo que lo cuenta después en el detalle, así que lo que se promete aquí
   // y lo que se ve luego son la misma frase.
@@ -383,22 +489,58 @@ export default function FormulariNovaOferta(
         </div>
       </Collapsible>
 
-      {/* --- El cuestionario, por bloques --- */}
-      {blocs.map((bloc) => (
+      {/* --- Los pasos: dónde estás y a dónde puedes volver --- */}
+      <div ref={dalt} className="scroll-mt-20">
+        {blocs.length > 1 && (
+          <ol className="flex flex-wrap gap-x-3 gap-y-1 text-sm" aria-label={t('po.steps')}>
+            {blocs.map((b, i) => {
+              const visitat = i <= pasMaxim
+              return (
+                <li key={b.clau || i}>
+                  <button
+                    type="button"
+                    disabled={!visitat}
+                    onClick={() => vesAlPas(i)}
+                    aria-current={i === pasSegur ? 'step' : undefined}
+                    className={cn(
+                      'flex items-center gap-1.5 rounded-md px-1 py-1',
+                      i === pasSegur ? 'font-semibold text-foreground' : visitat ? 'text-primary hover:underline' : 'text-muted-foreground',
+                    )}
+                  >
+                    <span className={cn(
+                      'flex size-5 items-center justify-center rounded-full text-xs',
+                      i < pasSegur ? 'bg-primary text-primary-foreground'
+                        : i === pasSegur ? 'border-2 border-primary text-primary' : 'border border-input',
+                    )}>
+                      {i < pasSegur ? <Check className="size-3" aria-hidden /> : i + 1}
+                    </span>
+                    {b.titol ?? ''}
+                  </button>
+                </li>
+              )
+            })}
+          </ol>
+        )}
+      </div>
+
+      {bloc && (
         <Card key={bloc.clau || 'tot'}>
           {bloc.titol && (
             <CardHeader>
+              {blocs.length > 1 && (
+                <p className="text-xs text-muted-foreground">{t('po.step_of', { n: pasSegur + 1, m: blocs.length })}</p>
+              )}
               <CardTitle className="text-base">{bloc.titol}</CardTitle>
               {bloc.descripcio && (
                 <p className="mt-1 text-xs text-muted-foreground">{bloc.descripcio}</p>
               )}
             </CardHeader>
           )}
-          <CardContent className="grid gap-4 sm:grid-cols-2">
+          <CardContent className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {bloc.camps.map((campo) => (
               <div
                 key={campo.clave}
-                className={campo.clave === 'observacions' ? 'sm:col-span-2' : undefined}
+                className={campo.clave === 'observacions' || campo.tipo === 'ubicacio' ? 'sm:col-span-2' : undefined}
               >
                 {/* Sin asterisco: el formulario es mínimo y todo lo que aparece hace
                     falta, así que lo que se marca es lo que se puede dejar en blanco
@@ -413,30 +555,40 @@ export default function FormulariNovaOferta(
             ))}
           </CardContent>
         </Card>
-      ))}
+      )}
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 
-      {/* --- El pie se queda a la vista: con cinco bloques, el botón de publicar cae muy
-              por debajo del pliegue en un móvil. `env(safe-area-inset-bottom)` porque el
-              viewport va a `viewport-fit=cover` (§2). --- */}
+      {/* --- El pie se queda a la vista: en un móvil el botón caería bajo el pliegue.
+              `env(safe-area-inset-bottom)` porque el viewport va a `viewport-fit=cover` (§2). --- */}
       <div
         className="sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
-        {/* Desde la fecha de corte, sin convenio vigente la RPC devuelve 42501: el
-            botón se apaga para no dejar al productor delante de un error. */}
-        <Button
-          className="h-11 whitespace-normal md:h-9"
-          onClick={() => void enviar()}
-          disabled={enviant || bloqueja}
-          title={bloqueja ? t('avis_conv.bloquejat') : undefined}
-        >
-          {enviant ? t('c.saving') : t('po.publish')}
-        </Button>
+        {pasSegur > 0 && (
+          <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => vesAlPas(pasSegur - 1)}>
+            <ArrowLeft className="size-4" aria-hidden /> {t('po.back')}
+          </Button>
+        )}
+        {ultim ? (
+          // Desde la fecha de corte, sin convenio vigente la RPC devuelve 42501: el botón
+          // se apaga para no dejar al productor delante de un error.
+          <Button
+            className="h-11 whitespace-normal md:h-9"
+            onClick={() => void enviar()}
+            disabled={enviant || bloqueja}
+            title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+          >
+            {enviant ? t('c.saving') : t('po.publish')}
+          </Button>
+        ) : (
+          <Button className="h-11 whitespace-normal md:h-9" onClick={() => bloc && continua(bloc.camps, pasSegur + 1)}>
+            {t('po.continue')} <ArrowRight className="size-4" aria-hidden />
+          </Button>
+        )}
         {onCancel && (
           <Button
-            variant="outline"
+            variant="ghost"
             className="h-11 whitespace-normal md:h-9"
             onClick={onCancel}
           >

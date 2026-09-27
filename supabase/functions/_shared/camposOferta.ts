@@ -7,7 +7,7 @@
 // formulario» siga siendo cierto dentro de seis meses.
 //
 // Las opciones salen siempre de las tablas (§6bis), nunca escritas a mano, salvo los
-// vocabularios cerrados que ya estaban en el código (tipo de caja, retorno, modalitat).
+// vocabularios cerrados (formato de entrega, retorno, transporte, modalitat).
 //
 // Y por el mismo motivo viven aquí los TEXTOS que explican cada pregunta —la `ayuda` de
 // cada campo, la `descripcion` de cada opción y las secciones en que se agrupan—: un
@@ -21,9 +21,10 @@ export const PASOS = [
   "varietat",
   "producte_al_camp",
   "kg",
+  "format_entrega",
   "caixes",
-  "tipus_caixa",
   "retorn",
+  "transport",
   "ubicacio",
   "disponible_fins",
   "horari",
@@ -48,7 +49,9 @@ export const SECCIONES: readonly { clau: SeccionOferta; titol: string; descripci
   {
     clau: "recollida",
     titol: "Recollida",
-    descripcio: "On i quan pot venir l'entitat.",
+    // No da por hecho que venga una entidad: puede ser venta, donación o maquila, y el
+    // productor puede llevarlo él (revisión funcional del 23-09-2026).
+    descripcio: "Com arriba el producte a qui el rep, i fins quan.",
   },
   {
     clau: "modalitat",
@@ -62,16 +65,34 @@ export const SECCIONES: readonly { clau: SeccionOferta; titol: string; descripci
   },
 ];
 
-export const TIPOS_CAIXA = [
-  "Rígida FE",
-  "Plegable FE",
-  "Palot",
-  "Retornable",
-  "Productor/a",
-  "No retorn",
+/**
+ * Cómo se entrega el producto (revisión funcional del 23-09-2026). Sustituye a la pregunta
+ * «Quin tipus de caixa?» y su lista de seis modelos de caja, que el productor no sabía
+ * contestar y que no decidía nada: las taras se fijan en el albarán, por línea.
+ *
+ * ⚠️ El `id` es lo que se guarda en `excedentes.format_entrega` (check en la base), así que
+ *    tiene que sobrevivir a que alguien reescriba el título. Tope de 24/72 caracteres: el bot
+ *    lo pregunta con una LISTA (son cuatro opciones y un mensaje de botones admite tres).
+ */
+export const FORMATS_ENTREGA = [
+  { id: "caixes", titulo: "Caixes", descripcion: "En caixes, de qualsevol tipus." },
+  { id: "palet", titulo: "Palet", descripcion: "Paletitzat." },
+  {
+    id: "envasos_propis",
+    titulo: "Envasos de qui ho rep",
+    descripcion: "Qui ho reculli ha de portar els seus envasos.",
+  },
+  { id: "altres", titulo: "Altres", descripcion: "Digue-ho a Observacions." },
 ];
 
-export const OPCIONES_RETORN = ["Sí", "No", "Caixes pròpies"];
+/** Retorno de envases: sí o no. «Caixes pròpies» ya es un formato de entrega, no un retorno. */
+export const OPCIONES_RETORN = ["Sí", "No"];
+
+/** ¿El productor puede llevarlo? Si sí, no hace falta decir dónde se recoge. */
+export const OPCIONS_TRANSPORT = [
+  { id: "si", titulo: "Sí, el podem portar" },
+  { id: "no", titulo: "No, cal recollir-lo" },
+];
 
 // «Producte al camp»: lo ofrecido TODAVÍA NO ESTÁ RECOGIDO y hay que ir a cosecharlo.
 //
@@ -151,6 +172,8 @@ export interface OpcionCampo {
   descripcion?: string;
 }
 
+export interface CondicionCampo { campo: Paso; en: string[] }
+
 export interface CampoOferta {
   clave: Paso;
   tipo: TipoCampo;
@@ -161,11 +184,15 @@ export interface CampoOferta {
   seccion: SeccionOferta;
   obligatorio: boolean;
   opciones?: OpcionCampo[];
-  /** Se pregunta solo si otro campo tiene uno de estos valores. */
-  condicion?: { campo: Paso; en: string[] };
+  /**
+   * Se pregunta solo si otro campo tiene uno de estos valores. Con una LISTA, basta con que
+   * se cumpla una (es un «o»): la ubicación hace falta si nadie la trae **o** si el
+   * producto sigue en el campo.
+   */
+  condicion?: CondicionCampo | CondicionCampo[];
 }
 
-/** Descriptor de los 15 pasos, con las mismas preguntas que hace el bot. */
+/** Descriptor de los 16 pasos, con las mismas preguntas que hace el bot. */
 export const CAMPOS: CampoOferta[] = [
   {
     clave: "familia",
@@ -211,21 +238,23 @@ export const CAMPOS: CampoOferta[] = [
     obligatorio: true,
   },
   {
+    clave: "format_entrega",
+    tipo: "opcions",
+    etiqueta: "Com es farà l'entrega?",
+    ayuda: "Si el producte encara és al camp, no cal: es cull allà mateix.",
+    seccion: "quantitat",
+    obligatorio: true,
+    opciones: FORMATS_ENTREGA,
+    condicion: { campo: "producte_al_camp", en: ["no"] },
+  },
+  {
     clave: "caixes",
     tipo: "numero",
-    etiqueta: "Quantes caixes són?",
+    etiqueta: "Quantes caixes o palets són?",
     ayuda: "Deixa-ho buit si no ho saps",
     seccion: "quantitat",
     obligatorio: false,
-  },
-  {
-    clave: "tipus_caixa",
-    tipo: "opcions",
-    etiqueta: "Quin tipus de caixa?",
-    ayuda: "Si són caixes teves, tria «Productor/a».",
-    seccion: "quantitat",
-    obligatorio: false,
-    opciones: TIPOS_CAIXA.map((t) => ({ id: t, titulo: t })),
+    condicion: { campo: "format_entrega", en: ["caixes", "palet"] },
   },
   {
     clave: "retorn",
@@ -233,16 +262,33 @@ export const CAMPOS: CampoOferta[] = [
     etiqueta: "Cal retornar els envasos?",
     ayuda: "Si cal retornar-los, ho apuntem a l'albarà.",
     seccion: "quantitat",
-    obligatorio: false,
+    obligatorio: true,
     opciones: OPCIONES_RETORN.map((t) => ({ id: t, titulo: t })),
+    // Si el receptor porta els seus envasos, no hi ha res a retornar.
+    condicion: { campo: "format_entrega", en: ["caixes", "palet", "altres"] },
+  },
+  {
+    clave: "transport",
+    tipo: "opcions",
+    etiqueta: "Podeu oferir el transport?",
+    ayuda: "Si el podeu portar vosaltres, no cal dir on es recull.",
+    seccion: "recollida",
+    obligatorio: true,
+    opciones: OPCIONS_TRANSPORT,
+    // Un producte al camp s'ha d'anar a collir: no es pot portar.
+    condicion: { campo: "producte_al_camp", en: ["no"] },
   },
   {
     clave: "ubicacio",
     tipo: "ubicacio",
-    etiqueta: "On es recull?",
-    ayuda: "On ha de venir l'entitat a recollir.",
+    etiqueta: "On s'ha de recollir?",
+    ayuda: "Tria un dels teus llocs o afegeix-ne un de nou (camp, magatzem…).",
     seccion: "recollida",
-    obligatorio: false,
+    obligatorio: true,
+    condicion: [
+      { campo: "transport", en: ["no"] },
+      { campo: "producte_al_camp", en: ["si"] },
+    ],
   },
   {
     clave: "disponible_fins",
@@ -296,10 +342,11 @@ export const CAMPOS: CampoOferta[] = [
   },
 ];
 
-/** ¿Este campo se pregunta, dados los datos ya introducidos? */
+/** ¿Este campo se pregunta, dados los datos ya introducidos? Una lista es un «o». */
 export function aplica(campo: CampoOferta, datos: Record<string, unknown>): boolean {
   if (!campo.condicion) return true;
-  return campo.condicion.en.includes(String(datos[campo.condicion.campo] ?? ""));
+  const conds = Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion];
+  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? "")));
 }
 
 /** Campos obligatorios que faltan. Lista vacía = se puede crear la oferta. */

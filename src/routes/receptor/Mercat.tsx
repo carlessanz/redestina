@@ -198,10 +198,21 @@ export default function Mercat() {
               <Dada etiqueta={t('mk.d_until')} valor={obert.disponible_hasta ? dataCurta(obert.disponible_hasta) : '—'} />
               {obert.horari_recollida && <Dada etiqueta={t('mk.d_hours')} valor={obert.horari_recollida} />}
               <Dada etiqueta={t('mk.d_field')} valor={obert.producte_al_camp ? t('mk.d_field_yes') : t('mk.d_field_no')} />
-              {(obert.tipo_caixa || obert.num_caixes != null) && (
+              {/* El formato nuevo (desde el 27-09-2026) y, si no lo hay, el tipo de caja de
+                  las ofertas anteriores. */}
+              {(obert.format_entrega || obert.tipo_caixa || obert.num_caixes != null) && (
                 <Dada
                   etiqueta={t('mk.d_format')}
-                  valor={[obert.num_caixes != null ? `${obert.num_caixes}` : null, obert.tipo_caixa].filter(Boolean).join(' · ')}
+                  valor={[
+                    obert.format_entrega ? t(`mk.fmt_${obert.format_entrega}`) : obert.tipo_caixa,
+                    obert.num_caixes != null ? `${obert.num_caixes}` : null,
+                  ].filter(Boolean).join(' · ')}
+                />
+              )}
+              {obert.transport_propi != null && (
+                <Dada
+                  etiqueta={t('mk.d_transport')}
+                  valor={obert.transport_propi ? t('mk.d_transport_yes') : t('mk.d_transport_no')}
                 />
               )}
               {obert.retorn_envasos && <Dada etiqueta={t('mk.d_return')} valor={obert.retorn_envasos} />}

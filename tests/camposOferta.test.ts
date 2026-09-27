@@ -1,4 +1,4 @@
-// El cuestionario de la oferta: los 15 pasos, cuáles son obligatorios y cuál se salta.
+// El cuestionario de la oferta: los 16 pasos, cuáles son obligatorios y cuáles se saltan.
 //
 // Por qué importa: este módulo es la ÚNICA definición del cuestionario, y la comparten dos
 // interfaces que no se parecen en nada —el intake conversacional de WhatsApp (`intake.ts`,
@@ -41,9 +41,10 @@ function donacionCompleta(): Record<string, unknown> {
     varietat: '',
     producte_al_camp: 'no',
     kg: 300,
+    format_entrega: 'caixes',
     caixes: 12,
-    tipus_caixa: 'Palot',
     retorn: 'No',
+    transport: 'no',
     ubicacio: 'uuid-de-ubicacion',
     disponible_fins: '23/07',
     horari: 'matí',
@@ -60,9 +61,11 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
     expect(CAMPOS.map((c) => c.clave)).toEqual([...PASOS])
   })
 
-  it('son 15 pasos: 14 fijos más el condicional', () => {
-    expect(PASOS).toHaveLength(15)
-    expect(CAMPOS.filter((c) => c.condicion)).toHaveLength(1)
+  it('son 16 pasos, seis de ellos condicionales', () => {
+    expect(PASOS).toHaveLength(16)
+    expect(CAMPOS.filter((c) => c.condicion).map((c) => c.clave)).toEqual([
+      'format_entrega', 'caixes', 'retorn', 'transport', 'ubicacio', 'preu_minim',
+    ])
   })
 
   it('todo campo de tipo «opcions» trae sus opciones', () => {
@@ -81,13 +84,17 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
 describe('qué es obligatorio', () => {
   // Lo obligatorio es exactamente lo que una oferta necesita para poder publicarse: qué
   // es, cuánto hay, hasta cuándo, en qué modalidad y por qué. Todo lo demás afina.
-  it('los siete campos obligatorios son los que permiten publicar', () => {
+  it('los obligatorios son los que permiten publicar (algunos, solo cuando aplican)', () => {
     const obligatorios = CAMPOS.filter((c) => c.obligatorio).map((c) => c.clave)
     expect(obligatorios).toEqual([
       'familia',
       'producte',
       'producte_al_camp',
       'kg',
+      'format_entrega',
+      'retorn',
+      'transport',
+      'ubicacio',
       'disponible_fins',
       'modalitat',
       'preu_minim',
@@ -101,13 +108,10 @@ describe('qué es obligatorio', () => {
     }
   })
 
-  // ⚠️ Divergencia conocida y documentada (AGENTS.md §6bis): `tipus_caixa` y `retorn` son
-  // opcionales AQUÍ —y por tanto en el panel—, pero el intake los pregunta con lista y sin
-  // fila «saltar», así que por WhatsApp no se puede avanzar sin contestarlos. Se deja
-  // medido para que, si algún día se unifica, esta prueba avise de que ya no es cierto.
-  it('tipus_caixa y retorn son opcionales en el descriptor (el intake los exige igual)', () => {
-    expect(campo('tipus_caixa').obligatorio).toBe(false)
-    expect(campo('retorn').obligatorio).toBe(false)
+  // La divergencia que había (AGENTS.md §6bis) se cerró el 27-09-2026: el retorno es
+  // obligatorio en los dos canales cuando aplica, y `tipus_caixa` ya no se pregunta.
+  it('tipus_caixa ya no es un paso', () => {
+    expect(PASOS as readonly string[]).not.toContain('tipus_caixa')
   })
 })
 
@@ -209,15 +213,40 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
     ])
   })
 
+  it('ya collit y sin transport propi: pide formato, retorno y ubicación', () => {
+    const d = donacionCompleta()
+    delete d.format_entrega
+    delete d.retorn
+    delete d.ubicacio
+    expect(faltantes(d)).toEqual(['format_entrega', 'ubicacio'])
+    expect(faltantes({ ...d, format_entrega: 'palet' })).toEqual(['retorn', 'ubicacio'])
+  })
+
+  it('si el porta la productora, no cal ubicació', () => {
+    const d = donacionCompleta()
+    delete d.ubicacio
+    expect(faltantes({ ...d, transport: 'si' })).toEqual([])
+  })
+
+  it('si el receptor porta els seus envasos, no hi ha retorn', () => {
+    const d = donacionCompleta()
+    delete d.retorn
+    expect(faltantes({ ...d, format_entrega: 'envasos_propis' })).toEqual([])
+  })
+
+  it('al camp: ni formato ni transporte, però sí on és', () => {
+    const d = donacionCompleta()
+    for (const k of ['format_entrega', 'caixes', 'retorn', 'transport', 'ubicacio']) delete d[k]
+    expect(faltantes({ ...d, producte_al_camp: 'si' })).toEqual(['ubicacio'])
+    expect(faltantes({ ...d, producte_al_camp: 'si', ubicacio: 'uuid' })).toEqual([])
+  })
+
   it('lo opcional nunca aparece, aunque esté vacío', () => {
     const d = donacionCompleta()
     delete d.varietat
     delete d.caixes
     delete d.horari
     delete d.observacions
-    delete d.tipus_caixa
-    delete d.retorn
-    delete d.ubicacio
     expect(faltantes(d)).toEqual([])
   })
 
@@ -250,7 +279,7 @@ describe('el cuestionario se explica a sí mismo', () => {
   // contesta al bot. Un campo sin `ayuda` es una pregunta que solo entiende quien ya sabe
   // la respuesta —pasaba con `modalitat`, que ofrecía tres palabras sin decir que deciden
   // qué entidades pueden recibir la oferta y qué documento se acaba emitiendo—.
-  it('los 15 campos tienen ayuda, y no vacía', () => {
+  it('todos los campos tienen ayuda, y no vacía', () => {
     for (const c of CAMPOS) {
       expect(c.ayuda, `${c.clave} no tiene ayuda`).toBeDefined()
       expect(c.ayuda!.trim(), `la ayuda de ${c.clave} está vacía`).not.toBe('')
@@ -267,12 +296,12 @@ describe('el cuestionario se explica a sí mismo', () => {
     expect(MODALITATS.find((m) => m.id === 'donacio')!.descripcion).toContain('certificat')
   })
 
-  it('la ayuda de tipus_caixa nombra una opción que existe de verdad', () => {
-    // Si alguien renombra el vocabulario de cajas, esta ayuda se queda señalando a una
-    // opción fantasma y nadie lo vería hasta que un productor la buscara en el desplegable.
-    const opciones = campo('tipus_caixa').opciones!.map((o) => o.titulo)
-    expect(opciones).toContain('Productor/a')
-    expect(campo('tipus_caixa').ayuda).toContain('Productor/a')
+  it('los ids del formato de entrega son los del check de la base', () => {
+    // `excedentes.format_entrega` tiene un check con estos cuatro valores (20270401100000):
+    // renombrar un id aquí haría fallar el alta con 23514.
+    expect(campo('format_entrega').opciones!.map((o) => o.id))
+      .toEqual(['caixes', 'palet', 'envasos_propis', 'altres'])
+    expect(campo('transport').opciones!.map((o) => o.id)).toEqual(['si', 'no'])
   })
 
   it('el ejemplo de formato de la fecha sobrevive a la explicación', () => {
@@ -370,8 +399,8 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
     expect(porSeccion('producte')).toEqual([
       'familia', 'producte', 'varietat', 'producte_al_camp',
     ])
-    expect(porSeccion('quantitat')).toEqual(['kg', 'caixes', 'tipus_caixa', 'retorn'])
-    expect(porSeccion('recollida')).toEqual(['ubicacio', 'disponible_fins', 'horari'])
+    expect(porSeccion('quantitat')).toEqual(['kg', 'format_entrega', 'caixes', 'retorn'])
+    expect(porSeccion('recollida')).toEqual(['transport', 'ubicacio', 'disponible_fins', 'horari'])
     expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim'])
     expect(porSeccion('causa')).toEqual(['causa', 'observacions'])
   })
@@ -397,13 +426,25 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
 import { siguientePaso } from '../supabase/functions/_shared/intake.ts'
 
 describe('siguientePaso: el recorrido del cuestionario', () => {
-  it('sin modalidad elegida, va en el orden de PASOS', () => {
+  it('cuando todo aplica, va en el orden de PASOS', () => {
+    // Ya collit, en caixes, sense transport: se pregunta todo menos lo que depende de otra cosa.
+    const datos = { producte_al_camp: 'no', format_entrega: 'caixes', transport: 'no', modalitat: 'venda' }
     for (let i = 0; i < PASOS.length - 1; i++) {
-      const esperado = PASOS[i + 1]
-      // La única excepción es la de abajo; el resto del recorrido es la lista tal cual.
-      if (esperado === 'preu_minim') continue
-      expect(siguientePaso(PASOS[i], {}), `después de ${PASOS[i]}`).toBe(esperado)
+      expect(siguientePaso(PASOS[i], datos), `después de ${PASOS[i]}`).toBe(PASOS[i + 1])
     }
+  })
+
+  it('al camp salta de kg a ubicació, sense format, retorn ni transport', () => {
+    expect(siguientePaso('kg', { producte_al_camp: 'si' })).toBe('ubicacio')
+  })
+
+  it('si el porta la productora, salta la ubicació', () => {
+    expect(siguientePaso('transport', { producte_al_camp: 'no', transport: 'si' })).toBe('disponible_fins')
+  })
+
+  it('amb envasos del receptor no pregunta ni caixes ni retorn', () => {
+    expect(siguientePaso('format_entrega', { producte_al_camp: 'no', format_entrega: 'envasos_propis' }))
+      .toBe('transport')
   })
 
   it('en donació NO se pregunta el preu mínim', () => {

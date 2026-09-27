@@ -16,7 +16,9 @@ import type { FilaLista } from "./whatsapp.ts";
 import { crearExcedenteDesdeSesion } from "./oferta.ts";
 // Los pasos y los vocabularios cerrados viven en camposOferta.ts, compartidos con el
 // formulario del panel del productor: una sola lista, dos interfaces.
-import { MODALITATS, OPCIONS_AL_CAMP, PASOS, TIPOS_CAIXA } from "./camposOferta.ts";
+import {
+  aplica, CAMPOS, FORMATS_ENTREGA, MODALITATS, OPCIONS_AL_CAMP, OPCIONS_TRANSPORT, PASOS,
+} from "./camposOferta.ts";
 import type { Paso } from "./camposOferta.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
@@ -62,24 +64,33 @@ export function esCancelar(texto: string | null): boolean {
 }
 
 /**
- * Qué se pregunta después de un paso. Es el orden de `PASOS` salvo por una excepción: el
- * **preu mínim solo existe en venda y maquila**, y en donació se salta.
+ * Qué se pregunta después de un paso: el siguiente de `PASOS` **que aplique** a lo que ya se
+ * ha contestado. Las condiciones son las del descriptor (`CAMPOS[].condicion`), las mismas
+ * que usa el panel, así que los dos canales se saltan exactamente las mismas preguntas:
+ * el preu mínim en donació, el formato de entrega si el producto sigue en el campo, la
+ * ubicación si el productor lo lleva, el retorno si el receptor trae sus envases…
  *
  * ⚠️ Se EXPORTA para poder probarla. Es la única lógica del cuestionario que no se ve en el
  * mensaje que llega al móvil —el aspecto de la pregunta sí, el salto no—, así que probarla por
- * WhatsApp exige recorrer once pasos para mirar el duodécimo; y equivocarse aquí sale caro en
- * los dos sentidos: pedirle un precio a quien dona, o publicar una venta **sin preu_minim**,
- * que es el campo que la entidad confirma al aceptar (§5).
+ * WhatsApp exige recorrer muchos pasos; y equivocarse aquí sale caro en los dos sentidos:
+ * pedirle un precio a quien dona, o publicar una venta **sin preu_minim**, que es el campo
+ * que la entidad confirma al aceptar (§5).
  */
 export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso | null {
   const i = PASOS.indexOf(paso);
-  let sig: Paso | null = i >= 0 && i < PASOS.length - 1 ? PASOS[i + 1] : null;
-  // El preu mínim solo se pregunta en venda/maquila; en donació se salta.
-  if (sig === "preu_minim" && datos.modalitat === "donacio") {
-    const j = PASOS.indexOf("preu_minim");
-    sig = j >= 0 && j < PASOS.length - 1 ? PASOS[j + 1] : null;
+  if (i < 0) return null;
+  for (let j = i + 1; j < PASOS.length; j++) {
+    // ⚠️ El preu mínim NO sigue la regla general: solo se salta con una donación EXPLÍCITA.
+    //    Con la modalidad ausente o desconocida se pregunta, porque publicar una venta sin
+    //    precio es peor que pedirle un precio de más a quien dona (lo fija un test).
+    if (PASOS[j] === "preu_minim") {
+      if (datos.modalitat === "donacio") continue;
+      return PASOS[j];
+    }
+    const campo = CAMPOS.find((c) => c.clave === PASOS[j]);
+    if (!campo || aplica(campo, datos)) return PASOS[j];
   }
-  return sig;
+  return null;
 }
 
 /** Trocea las opciones en páginas de 9 y añade "Més…" cuando queda resto. */
@@ -177,19 +188,28 @@ async function preguntar(
         supabase, to,
         "Quants kg aproximadament? Si ho tens en unitats o manats, digue-ho i ho convertim.",
       )).ok;
-    case "caixes":
-      return (await sendText(supabase, to, "Quantes caixes són? (escriu '-' si no ho saps)")).ok;
-    case "tipus_caixa":
+    case "format_entrega":
+      // Lista: son cuatro opciones y un mensaje de botones admite tres.
       return (await sendLista(
-        supabase, to, "Quin tipus de caixa?", "Tria tipus",
-        TIPOS_CAIXA.map((t) => ({ id: `tipus_caixa:${t}`, titulo: t })),
+        supabase, to, "Com es farà l'entrega?", "Tria una opció",
+        FORMATS_ENTREGA.map((f) => ({
+          id: `format_entrega:${f.id}`,
+          titulo: f.titulo,
+          descripcion: f.descripcion,
+        })),
       )).ok;
+    case "caixes":
+      return (await sendText(supabase, to, "Quantes caixes o palets són? (escriu '-' si no ho saps)")).ok;
     case "retorn":
       return (await sendBotones(supabase, to, "Cal retornar els envasos?", [
         { id: "retorn:Sí", titulo: "Sí" },
         { id: "retorn:No", titulo: "No" },
-        { id: "retorn:Caixes pròpies", titulo: "Caixes pròpies" },
       ])).ok;
+    case "transport":
+      return (await sendBotones(
+        supabase, to, "Podeu oferir el transport? Si el podeu portar vosaltres, no cal dir on es recull.",
+        OPCIONS_TRANSPORT.map((o) => ({ id: `transport:${o.id}`, titulo: o.titulo })),
+      )).ok;
     case "ubicacio": {
       const { data } = await supabase
         .from("productor_ubicaciones")
@@ -200,7 +220,7 @@ async function preguntar(
       if (ubis.length === 0) {
         return (await sendText(
           supabase, to,
-          "On es recull? Comparteix un punt de Google Maps (enganxa l'enllaç).",
+          "On s'ha de recollir? Comparteix un punt de Google Maps (enganxa l'enllaç).",
         )).ok;
       }
       const filas: FilaLista[] = ubis.map((u) => ({
@@ -208,8 +228,8 @@ async function preguntar(
         titulo: u.alias ?? u.municipio ?? "Ubicació",
         descripcion: u.municipio ?? undefined,
       }));
-      filas.push({ id: "ubicacio:nova", titulo: "Comparteix un punt" });
-      return (await sendLista(supabase, to, "On es recull?", "Tria ubicació", filas)).ok;
+      filas.push({ id: "ubicacio:nova", titulo: "Un altre lloc", descripcion: "Enganxa un enllaç de Google Maps" });
+      return (await sendLista(supabase, to, "On s'ha de recollir?", "Tria ubicació", filas)).ok;
     }
     case "disponible_fins":
       return (await sendText(supabase, to, "Fins quin dia està disponible? (per exemple 23/07)")).ok;
@@ -274,7 +294,8 @@ async function interpretar(
   //    empieza por `producte_`. Conviene saberlo antes de añadir otro paso con el mismo
   //    principio.
   const conOpciones: Paso[] = [
-    "familia", "producte", "producte_al_camp", "tipus_caixa", "retorn", "modalitat", "causa",
+    "familia", "producte", "producte_al_camp", "format_entrega", "retorn", "transport", "modalitat",
+    "causa",
   ];
   if (conOpciones.includes(paso)) {
     if (!id?.startsWith(`${paso}:`)) return null;
@@ -461,6 +482,14 @@ export async function procesarIntake(
       return true;
     }
     await guardar(supabase, sesion, { datos_parciales: datos });
+    return true;
+  }
+
+  // «Un altre lloc» no es una respuesta: es pedir la forma de dar una ubicación nueva. Antes
+  // se interpretaba como respuesta inválida y el bot volvía a mandar la misma lista, así que
+  // quien tenía ubicaciones no podía añadir otra por aquí (§6bis). No cuenta como intento.
+  if (paso === "ubicacio" && id === "ubicacio:nova") {
+    await sendText(supabase, from, "Enganxa l'enllaç de Google Maps del lloc on s'ha de recollir.");
     return true;
   }
 

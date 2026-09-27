@@ -211,6 +211,9 @@ export interface Excedente {
   /** Derivados por el trigger `excedentes_ubica` (20270331100000). El receptor ve la comarca. */
   municipi_ine: string | null
   comarca: string | null
+  /** 20270401100000: cómo se entrega y si la lleva la productora (null = no se preguntó). */
+  format_entrega: 'caixes' | 'palet' | 'envasos_propis' | 'altres' | null
+  transport_propi: boolean | null
 }
 
 export interface Canalizacion {
