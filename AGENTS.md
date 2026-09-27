@@ -1706,18 +1706,21 @@ en la priorización interna (que corre con `service_role`).
 políticas: `donacio`→social/animal/transformador, `venda`→comercial/transformador,
 `maquila`→transformador. Cambiar la regla de negocio es un `insert`/`delete`.
 
-🔴 **Y la regla cambió el 27-09-2026 (revisión funcional del 23-09), PENDIENTE DE APLICAR en
-remoto.** La Fundación dijo: empresa → solo venta y maquila; entidad social → donación + venta
+🔴 **Y la regla cambió el 27-09-2026 (revisión funcional del 23-09), aplicada en remoto ese
+mismo día.** La Fundación dijo: empresa → solo venta y maquila; entidad social → donación + venta
 + maquila. `20270330100000` añade `venda`/`maquila`→`social` y `maquila`→`comercial`. **Solo
 inserta**, así que el mercado, `manifestar_interes()` y el asistido cambian a la vez sin tocar
 código. ⚠️ **Los convenios NO cambian**: una entidad social verá ya las ofertas de venta, pero
 `aprovar_resposta()` no la canalizará sin un convenio `com` vigente, que es lo que dice
 `convenios_exigidos`.
-⚠️ **No se pudo aplicar desde la sesión que la escribió**: el token del CLI del llavero de esta
-máquina pertenece a otra cuenta de Supabase (solo ve `custodia-staging`, 403 en este proyecto),
-no había MCP de Supabase y el clasificador de permisos bloqueó escribir en producción con la
-clave de servicio. Se aplica con `/publicar` o `supabase db push` desde una sesión con acceso;
-es idempotente (`on conflict do nothing`).
+Comprobado en el navegador con `Menjador Social de Prova`: el Mercat enseña ya la maquila y
+la venta de Mas de Prova, con su precio, junto a las donaciones.
+⚠️ **Cómo se aplicó, porque es la vía de ahora en adelante**: el login del CLI de esta máquina
+es de otra cuenta de Supabase (Custodia/Reemprende), así que hay un token propio en el llavero,
+**`Supabase Redestina`**, y la migración entra por la API de gestión
+(`POST /v1/projects/uxppvaldhptdomvdhsmn/database/query`) en **una transacción junto con su
+`insert` en `supabase_migrations.schema_migrations` con el número del fichero**. Así el
+historial remoto y el repo casan sin renumerar nada, al revés que `apply_migration` del MCP (§7).
 
 ### El interruptor `roles_activos`
 
@@ -4091,7 +4094,9 @@ cuenta que lo recorra y **73 comprobaciones dejan de ejecutarse en silencio**. S
 `hola+senserol-arnes@carlessanz.com`, es una cuenta de Auth sin membresía ni rol, y cubre el
 bloque `sense_rol` (70 más).
 
-🔴 **Y YA HA PASADO UNA VEZ: el 16-09-2026 alguien la aprobó** —sin mala intención, probando
+🔴 **Y YA HA PASADO DOS VECES: el 16-09-2026 y otra vez el 23-09-2026 a las 16:41 (UTC)** —la
+segunda, casi seguro, durante la revisión funcional de ese día, que recorrió la cola de
+«Registres pendents»—. Restaurada el 27-09-2026 con el procedimiento de abajo. **La primera vez alguien la aprobó** —sin mala intención, probando
 la cola— y el arnés pasó a sacar **cuatro FALLA** que parecían una regresión de permisos y no
 lo eran: una membresía aprobada y activa *sí* debe ver su ficha, así que la RLS estaba
 haciendo lo correcto. Lo destapó el paso 7 de `/publicar`. **Se restaura poniéndola otra vez
@@ -5427,7 +5432,13 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 945/945 correctas y 26 saltadas, «Sin fallos de permisos»**
+   ✅ **Referencia HOY: 943/943 correctas y 28 saltadas, «Sin fallos de permisos»** (27-09-2026,
+   tras `20270330100000`). **El total no se movió (971)**: la migración solo amplía una matriz
+   de catálogo, y dos comprobaciones pasaron de correctas a «sin datos» porque desapareció la
+   fila de prueba que las alimentaba —las de «producte al camp» del productor, entre otras—,
+   no porque cambiara ningún permiso. Antes de esta cifra hubo que devolver `pendent-arnes` a
+   pendiente (§9): aprobada, sacaba las cuatro FALLA de siempre.
+   La referencia anterior era **945/945 correctas y 26 saltadas, «Sin fallos de permisos»**
    (22-09-2026, tras `20270329100000`…`100300`: la documentación de la organización y el
    convenio en papel). Son las 925 anteriores más **20**: `preparar_conveni_en_paper` y
    `registrar_conveni_en_paper` en `DOCUMENTAL_EXTERN` —que recorre **siete** cuentas
