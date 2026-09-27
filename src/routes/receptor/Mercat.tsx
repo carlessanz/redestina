@@ -174,8 +174,10 @@ export default function Mercat() {
                 // Sin `size="sm"` y a 44px en móvil: es la única acción del panel del
                 // receptor y se repite en cada fila. En escritorio vuelve a la altura
                 // normal, donde se pulsa con ratón y 36px sobran.
+                // ⚠️ `w-full` en móvil: con la foto de 64 px, el botón en la misma fila dejaba
+                // ~69 px al texto a 375 px y el nombre se salía (§2, regla 4).
                 <Button
-                  className="h-11 md:h-9"
+                  className="h-11 w-full sm:w-auto md:h-9"
                   disabled={bloqueja}
                   title={bloqueja ? t('avis_conv.bloquejat') : undefined}
                   onClick={() => obre(o, 'interes')}

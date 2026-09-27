@@ -378,6 +378,9 @@ dos con la página en esos mismos 0 px):
    deja debajo del aspa (que se queda arriba a la derecha, donde se espera un descarte), y desde
    `sm` todo vuelve a la fila de siempre, verificado sin cambio de anchos en escritorio. Resultado
    a 320 px: 226 px y 4 líneas en el convenio, 198 px y 4 en el diagnóstico.
+   ⚠️ **Volvió a pasar en las tarjetas del Mercat** (28-09-2026): con la foto de 64 px y
+   «M'interessa» en la misma fila, a 375 px al nombre le quedaban 69 px y «Carbassó» se salía
+   4 px. Mismo arreglo (`w-full sm:w-auto` en el botón, la fila ya era `flex-wrap`): 170-191 px.
    ⚠️ **Corolario**: una fila con texto y botón **no se audita con `scrollWidth`**. Hay que mirar
    el ancho que le queda al párrafo, o mirarla.
 5. 🔴 **`grid ... sm:grid-cols-2` SIN `grid-cols-1` deja la columna de móvil en `auto`, y la
