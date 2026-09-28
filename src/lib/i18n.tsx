@@ -1359,7 +1359,7 @@ const ca: Dict = {
   'proc.publicada_another': 'Publica’n una altra',
   // El procés vist pel productor
   'proc.p_publicada_t': 'Publicada',
-  'proc.p_publicada_passa': 'L’equip de Redestina ja la té. Buscarà entitats que la puguin aprofitar i els l’enviarà per WhatsApp o correu.',
+  'proc.p_publicada_passa': 'L’equip de Redestina ja la té i la fa arribar, per WhatsApp o correu, a les entitats que la poden aprofitar. Quan alguna hi mostri interès, ho veuràs aquí.',
   'proc.p_publicada_toca': 'Res, de moment. Tingues el producte disponible fins al dia que has indicat.',
   'proc.p_publicada_qui': 'L’equip de Redestina',
   'proc.p_publicada_gestio_t': 'En mans de l’equip',
@@ -3403,7 +3403,7 @@ const es: Dict = {
   'proc.publicada_another': 'Publica otra',
   // El proceso visto por el productor
   'proc.p_publicada_t': 'Publicada',
-  'proc.p_publicada_passa': 'El equipo de Redestina ya la tiene. Buscará entidades que la puedan aprovechar y se la enviará por WhatsApp o correo.',
+  'proc.p_publicada_passa': 'El equipo de Redestina ya la tiene y la hace llegar, por WhatsApp o correo, a las entidades que la pueden aprovechar. Cuando alguna muestre interés, lo verás aquí.',
   'proc.p_publicada_toca': 'Nada, de momento. Ten el producto disponible hasta el día que has indicado.',
   'proc.p_publicada_qui': 'El equipo de Redestina',
   'proc.p_publicada_gestio_t': 'En manos del equipo',
