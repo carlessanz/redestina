@@ -26,7 +26,7 @@
 //    un código que desaparece convierte ese plan en un documento que habla de algo que ya no
 //    existe. Por eso las tablas no tienen GRANT de DELETE y aquí solo hay un interruptor.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
@@ -83,6 +83,28 @@ export default function EditorDiagnostic() {
   useEffect(() => { void carrega() }, [carrega])
 
   const vigent = questionaris.find((q) => q.vigente) ?? null
+
+  // Una regla que apunta a una pregunta que el cuestionario vigente ya no tiene NO dispara
+  // (28-09-2026: al publicar la versión 1 del productor quedaron cinco así, desactivadas).
+  // Sin marcarlo, activarla parecía arreglar algo y no hacía nada.
+  const idsPreguntes = useMemo(
+    () => new Set((vigent?.preguntes ?? []).map((p) => p.id)),
+    [vigent],
+  )
+  const esOrfe = useCallback(
+    (r: ReglaPla) => r.operador !== 'sempre' && r.pregunta_id != null && !idsPreguntes.has(r.pregunta_id),
+    [idsPreguntes],
+  )
+  /** Primero las que disparan; al final las retiradas y las huérfanas. */
+  const reglesOrdenades = useMemo(() => {
+    const pes = (r: ReglaPla) => (r.activa && !esOrfe(r) ? 0 : 1)
+    return [...regles].sort((a, b) => pes(a) - pes(b))
+  }, [regles, esOrfe])
+  /** Medidas activas que ninguna regla viva propone: nunca entrarán en un plan. */
+  const mesuresSenseRegla = useMemo(() => {
+    const vives = new Set(regles.filter((r) => r.activa && !esOrfe(r)).map((r) => r.mesura_codi))
+    return new Set(mesures.filter((m) => m.activa && !vives.has(m.codi)).map((m) => m.codi))
+  }, [regles, mesures, esOrfe])
 
   /** El JSON tecleado, o `null` si no es JSON. Sin excepciones hacia fuera. */
   function preguntesDelText(): unknown[] | null {
@@ -250,6 +272,9 @@ export default function EditorDiagnostic() {
                       {m.obligatoria_per_defecte && (
                         <Badge className="ml-2 bg-aviso-fondo text-aviso">{t('pla.required')}</Badge>
                       )}
+                      {mesuresSenseRegla.has(m.codi) && (
+                        <Badge className="ml-2 whitespace-normal bg-aviso-fondo text-aviso">{t('cfgd.no_rule')}</Badge>
+                      )}
                     </span>
                   </li>
                 ))}
@@ -260,7 +285,7 @@ export default function EditorDiagnostic() {
               <h3 className="font-titulos text-sm font-semibold">{t('cfgd.rules_t')}</h3>
               <p className="text-xs text-muted-foreground">{t('cfgd.rules_help')}</p>
               <ul className="space-y-1">
-                {regles.map((r) => (
+                {reglesOrdenades.map((r) => (
                   <li key={r.id} className="flex min-h-11 items-start gap-3 text-sm">
                     <Casella
                       checked={r.activa}
@@ -269,12 +294,20 @@ export default function EditorDiagnostic() {
                       className="mt-0.5"
                       onChange={(v) => void canviaRegla(r.id, v)}
                     />
-                    <span className="min-w-0 font-mono text-xs">
-                      {r.pregunta_id ?? t('cfgd.always')} {r.operador}{' '}
-                      {r.valor === null || r.valor === undefined ? '' : JSON.stringify(r.valor)}
+                    <span className={cn('min-w-0 font-mono text-xs break-words', (!r.activa || esOrfe(r)) && 'text-muted-foreground')}>
+                      {/* `sempre` no tiene pregunta ni valor: antes salía «sempre sempre». */}
+                      {r.operador === 'sempre'
+                        ? t('cfgd.always')
+                        : <>{r.pregunta_id} {r.operador}{' '}
+                          {r.valor === null || r.valor === undefined ? '' : JSON.stringify(r.valor)}</>}
                       {' → '}
                       {r.mesura_codi}
                       {r.obligatoria && ' *'}
+                      {esOrfe(r) && (
+                        <Badge className={cn('ml-2 font-sans', r.activa ? 'bg-aviso-fondo text-aviso' : 'bg-secondary text-secondary-foreground')}>
+                          {t('cfgd.orphan')}
+                        </Badge>
+                      )}
                     </span>
                   </li>
                 ))}

@@ -2114,6 +2114,8 @@ const ca: Dict = {
   'cfgd.rules_t': 'Regles',
   'cfgd.rules_help': 'D’una resposta a una mesura. L’asterisc marca les que la fan obligatòria.',
   'cfgd.always': 'sempre',
+  'cfgd.orphan': 'Pregunta retirada',
+  'cfgd.no_rule': 'Cap regla la proposa',
   'cfgd.denied': 'La base ha rebutjat el canvi: cal ser administrador.',
 
 }
@@ -4139,6 +4141,8 @@ const es: Dict = {
   'cfgd.rules_t': 'Reglas',
   'cfgd.rules_help': 'De una respuesta a una medida. El asterisco marca las que la hacen obligatoria.',
   'cfgd.always': 'siempre',
+  'cfgd.orphan': 'Pregunta retirada',
+  'cfgd.no_rule': 'Ninguna regla la propone',
   'cfgd.denied': 'La base ha rechazado el cambio: hace falta ser administrador.',
 
 }

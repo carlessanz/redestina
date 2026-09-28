@@ -1397,6 +1397,11 @@ un único volumen anual en kg (no por producto) y la temporalidad como doce mese
 enseñan **solo las familias marcadas** en «Quins productes produïu?» (`opcionsVisibles()` en
 `diagnostic.ts`, mapa `OPCIONS_DERIVADES`, con prueba). Es solo pantalla: el servidor sigue
 aceptando cualquier opción, y lo ya elegido se queda visible aunque se desmarque arriba.
+✅ **El editor de Configuració lo enseña** (28-09-2026): las reglas cuya pregunta ya no está en el
+cuestionario vigente llevan «Pregunta retirada» y van al final, y una medida activa que ninguna
+regla viva propone lleva «Cap regla la proposa» — hoy, `cadena_fred_minima` del productor, que
+se quedó sin regla al retirar `capacitat_fred` en la versión 1. Antes, además, la regla
+`sempre` salía «sempre sempre».
 ⚠️ **El del receptor sigue en la versión 0**: la revisión dice que su diagnóstico va «solo cuando
 corresponda a prevención y gestión de excedentes», sin contenido.
 
