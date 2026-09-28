@@ -43,14 +43,16 @@ export default defineConfig({
         ],
       },
       workbox: {
-        globPatterns: ['**/*.{js,css,html,svg,png,woff2}'],
+        // 🔴 SIN `html` y SIN `navigateFallback` desde la cortina de contraseña (28-09-2026,
+        //    `middleware.ts`). Con el `index.html` en la caché del service worker, un móvil
+        //    que ya hubiera entrado abriría la aplicación desde su caché sin pasar nunca por
+        //    el servidor, o sea sin cortina, también pasada la semana de la cookie. Cada
+        //    navegación va ahora a la red, que es donde está la cortina.
+        globPatterns: ['**/*.{js,css,svg,png,woff2}'],
         cleanupOutdatedCaches: true,
         clientsClaim: true,
         skipWaiting: true,
-        // El shell responde a cualquier ruta (el router es de cliente), pero nunca a
-        // las llamadas al backend.
-        navigateFallback: '/index.html',
-        navigateFallbackDenylist: [/^\/functions\//, /^\/rest\//, /^\/auth\//],
+        navigateFallback: null,
         runtimeCaching: [
           {
             urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co'),

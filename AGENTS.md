@@ -311,6 +311,9 @@ se cachea** (`NetworkOnly` para `*.supabase.co`, y `/functions/`, `/rest/` y `/a
 es solo el shell estático—, y cachear una respuesta de
 PostgREST en un móvil compartido podría servírsela a la siguiente persona. Para retirar el service
 worker de los dispositivos, desplegar una vez con `selfDestroying: true`.
+🔴 **Y desde el 28-09-2026 no guarda `index.html` ni responde a las navegaciones**
+(`navigateFallback: null`): la web está detrás de la cortina de contraseña (§9) y una página
+servida desde la caché del móvil se la saltaría. Consecuencia: sin red, la aplicación no abre.
 
 **Aviso de instalación** (2026-08-01, `src/hooks/useInstalacio.ts` + `src/components/AvisInstallacio.tsx`).
 La aplicación era instalable desde el principio, pero la opción vivía en un menú del navegador que
@@ -510,6 +513,8 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
 ```text
 index.html                     Carga Sora e Inter (Google Fonts), theme-color verde
 vercel.json                    Rewrite de SPA (sin él, recargar una ruta profunda da 404)
+middleware.ts                  La CORTINA de contraseña delante de toda la web (Vercel, §9)
+cortina/                       Su lógica (pura, con pruebas) y el logo que pinta (§9)
 vitest.config.ts               Config de las pruebas, aparte de vite.config.ts (§11)
 tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO debe ver
 .githooks/pre-commit           Tipos + vitest + deno check antes de cada commit (§13)
@@ -3886,6 +3891,38 @@ cierre real (kg reales, albaranes, o marcar `no_colocada` con motivo).
 
 ## 9. Seguridad y autenticación
 
+### 🔴 La cortina: una contraseña delante de TODA la web (28-09-2026)
+
+A petición del cliente, mientras Redestina esté en pruebas nadie que no tenga la contraseña ve
+ni una página ni un fichero: ni la portada, ni `/login`, ni el bundle de JavaScript. Pantalla
+verde con el logo y un campo de contraseña; acertarla deja una cookie **`redestina_cortina`**
+de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
+
+- **La comprueba el SERVIDOR**, con Vercel Routing Middleware (`middleware.ts` en la raíz, que
+  delega en `cortina/cortina.ts`, puro y con 12 pruebas en `tests/cortina.test.ts`). Una
+  contraseña comprobada en el navegador viajaría dentro del bundle; y así el bundle —que con
+  `VITE_ACCESSOS_TEST` lleva las contraseñas de las cuentas de prueba— tampoco se sirve.
+- **La contraseña no está en git**: solo `HASH_TOKEN` = SHA-256 del token, y el token es
+  PBKDF2-SHA256 (100.000 vueltas) de la contraseña. Con el repo no se fabrica la cookie.
+  **Para cambiarla**: `node scripts/cortina-hash.mjs 'nova'`, sustituir `HASH_TOKEN` y
+  publicar; todas las cookies anteriores dejan de valer al momento. La contraseña vigente la
+  tiene el cliente (no se escribe en ningún fichero del repo ni de la consultoría).
+- **Se sirven sin cortina solo cinco cosas sin datos** (`esLliure()`): `logo-email.png` (los
+  correos lo pintan desde la bandeja), `segell-redestina*.svg` (el sello vive en webs de
+  terceros), `favicon.svg`, `sw.js` y `workbox-*.js`.
+- **Una navegación ve la cortina con 401**; un script o una imagen, un 401 seco. `robots`
+  `noindex`.
+- 🔴 **El service worker ya NO guarda `index.html` ni tiene `navigateFallback`**
+  (`vite.config.ts`): con la página en su caché, un móvil que ya hubiera entrado abriría la
+  aplicación sin pasar por el servidor, o sea sin cortina, también pasada la semana. `sw.js`
+  queda libre justamente para que los móviles con el service worker viejo se actualicen.
+- ⚠️ **Consecuencias que hay que saber**: los enlaces que llegan por correo —acceso, cambio de
+  contraseña, firma de convenio, confirmación de albarán, factura— y la página `/verificar` del
+  sello **piden primero la contraseña**. Es lo que se pidió («que nadie pueda entrar»); para
+  abrirlos a terceros habrá que retirar la cortina o eximir esas rutas.
+- ⚠️ **En `npm run dev` no corre** (Vite no conoce el middleware): la cortina solo existe en
+  Vercel, producción y previews.
+
 **Todo DATO exige una sesión de Supabase Auth.** Ya no hay lectura anónima: el
 `PasswordGate` cosmético se sustituyó por un login real con `signInWithPassword`, las políticas RLS
 y los GRANT pasaron de `anon` a `authenticated`, y `whatsapp-send` valida el JWT del usuario.
@@ -5739,7 +5776,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **991 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (28-09-2026:
+   Referencia: **1.003 pruebas en 32 ficheros**: 1.002 correctas y **1 saltada a propósito**, la
+   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
+   +12 de la cortina, `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
    +4 de `opcionsVisibles`, las opciones del diagnóstico que derivan de otra respuesta. Antes, 987:
    +1 de la nota de la espigolada en pasado cuando la oferta ya está cerrada. Antes, 986:
    +3 de `estatEfectiuEnllac`, el estado REAL de un enlace —activo y vencido es caducado, porque la
