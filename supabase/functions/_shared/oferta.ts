@@ -324,7 +324,8 @@ export async function crearExcedente(
     disponible: String(d.disponible_fins ?? ""),
     horari: String(d.horari ?? "") || undefined,
     modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
-    preu: preuMinim != null ? `${preuMinim} €/kg` : undefined,
+    // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
+    preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
     envasos: textoEnvasos(d.format_entrega, d.retorn) || undefined,
     transportPropi: transportPropi === true,

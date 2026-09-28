@@ -314,6 +314,14 @@ describe('la nota del «producte al camp» (F3)', () => {
       .toBe('proc.e_nota_espigolada')
   })
 
+  // Con la jornada ya conciliada, la nota del generador va en pasado: «seran els que es
+  // pesin aquell dia» sería falso con los kilos ya pesados (28-09-2026).
+  it('cerrada, la nota de la espigolada del generador va en pasado', () => {
+    const tancat: FetsOferta = { ...base, espigoladaId: 'j', albaraRec: rec('conciliado') }
+    expect(puntOferta(tancat, 'productor').notaClau).toBe('proc.p_nota_espigolada_fet')
+    expect(puntOferta(tancat, 'equip').notaClau).toBe('proc.e_nota_espigolada')
+  })
+
   // Cancelada o sin destino, la jornada ya no es la historia de este lote.
   it('las salidas no llevan nota', () => {
     for (const estado of ['cancelada', 'no_colocada'] as EstadoExcedente[]) {
@@ -327,7 +335,7 @@ describe('la nota del «producte al camp» (F3)', () => {
   it('las cuatro claves existen en ca y es, y no piden ningún dato', () => {
     for (const clau of [
       'proc.p_nota_camp', 'proc.e_nota_camp',
-      'proc.p_nota_espigolada', 'proc.e_nota_espigolada',
+      'proc.p_nota_espigolada', 'proc.e_nota_espigolada', 'proc.p_nota_espigolada_fet',
     ]) {
       expect(DICTS.ca[clau], `falta ${clau} en ca`).toBeTruthy()
       expect(DICTS.es[clau], `falta ${clau} en es`).toBeTruthy()

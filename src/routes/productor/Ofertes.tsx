@@ -65,6 +65,7 @@ function useMevesOfertes(productorId: string | null) {
     const files = (data ?? []) as Excedente[]
     const ids = files.map((o) => o.id)
     meusIds.current = new Set(ids)
+    const espIds = [...new Set(files.map((o) => o.espigolada_id).filter((v): v is string => !!v))]
 
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). Sin `.eq()` de organización
     // en el albarán: la RLS ya devuelve solo lo suyo, y nunca los borradores.
@@ -72,10 +73,13 @@ function useMevesOfertes(productorId: string | null) {
       ? [null, null, null]
       : await Promise.all([
         supabase.from('canalizaciones').select('excedente_id, kg_confirmados').in('excedente_id', ids),
+        // El REC de una ESPIGOLADA no cuelga de la oferta sino de la jornada
+        // (`espigolada_id`): sin buscarlo también por ahí, una oferta convertida y ya
+        // conciliada se quedaba en «Espera el contacte de l'equip» (28-09-2026).
         supabase.from('v_albaranes_bandeja')
-          .select('excedente_id, estado, numero_completo, dias_esperando, emitido_at')
+          .select('excedente_id, espigolada_id, estado, numero_completo, dias_esperando, emitido_at')
           .eq('tipo', 'REC')
-          .in('excedente_id', ids)
+          .or(`excedente_id.in.(${ids.join(',')})${espIds.length ? `,espigolada_id.in.(${espIds.join(',')})` : ''}`)
           .order('emitido_at', { ascending: false, nullsFirst: true }),
         carregaProgresOfertes(),
       ])
@@ -91,11 +95,18 @@ function useMevesOfertes(productorId: string | null) {
     // (`OfertaDetall`): así el badge de la lista y la etapa del detalle no pueden discrepar.
     const rs: Record<string, RecResum> = {}
     for (const r of ((a?.data ?? []) as {
-      excedente_id: string | null; estado: string; numero_completo: string | null; dias_esperando: number | null
+      excedente_id: string | null; espigolada_id: string | null; estado: string
+      numero_completo: string | null; dias_esperando: number | null
     }[])) {
-      if (!r.excedente_id || rs[r.excedente_id]) continue
-      rs[r.excedente_id] = {
-        estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
+      // De una espigolada, el REC vale para todas las ofertas de esa jornada.
+      const destins = r.excedente_id
+        ? [r.excedente_id]
+        : files.filter((o) => r.espigolada_id && o.espigolada_id === r.espigolada_id).map((o) => o.id)
+      for (const eid of destins) {
+        if (rs[eid]) continue
+        rs[eid] = {
+          estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
+        }
       }
     }
 

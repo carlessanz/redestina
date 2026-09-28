@@ -210,7 +210,8 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
     if (index < 0) return {}
     if (fets.espigoladaId) {
       return {
-        notaClau: `proc.${p}_nota_espigolada`,
+        // Cerrada, la jornada ya pasó: la nota del generador va en pasado (28-09-2026).
+        notaClau: p === 'p' && index >= 4 ? 'proc.p_nota_espigolada_fet' : `proc.${p}_nota_espigolada`,
         notaEnllac: rol === 'equip' ? `/equip/espigolades/${fets.espigoladaId}` : undefined,
       }
     }

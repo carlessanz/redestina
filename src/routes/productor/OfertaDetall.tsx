@@ -60,16 +60,20 @@ export default function ProductorOfertaDetall() {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     // Sin `.eq()` de organización en el albarán: la RLS ya devuelve solo lo suyo, igual
     // que en `productor/Documents.tsx`.
-    const [e, c, a] = await Promise.all([
+    const [e, c] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', id).maybeSingle(),
       supabase.from('canalizaciones').select('*').eq('excedente_id', id)
         .order('created_at', { ascending: true }),
-      supabase.from('v_albaranes_bandeja')
-        .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
-        .eq('excedente_id', id)
-        .eq('tipo', 'REC')
-        .order('emitido_at', { ascending: false, nullsFirst: true }),
     ])
+    // El REC de una ESPIGOLADA cuelga de la jornada, no de la oferta: sin buscarlo por
+    // `espigolada_id`, una oferta convertida y ya conciliada decía «Espera el contacte de
+    // l'equip» (28-09-2026). Por eso va después de leer la oferta.
+    const espId = (e.data as Excedente | null)?.espigolada_id ?? null
+    const a = await supabase.from('v_albaranes_bandeja')
+      .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+      .eq('tipo', 'REC')
+      .or(`excedente_id.eq.${id}${espId ? `,espigolada_id.eq.${espId}` : ''}`)
+      .order('emitido_at', { ascending: false, nullsFirst: true })
     setOferta((e.data as Excedente) ?? null)
     setCanalitzacions((c.data ?? []) as Canalizacion[])
     const albarans = (a.data as AlbaranBandeja[] | null) ?? []
@@ -180,9 +184,10 @@ export default function ProductorOfertaDetall() {
           </div>
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold">{canalitzats}/{total} kg</div>
+          {/* `ca-ES` agrupa también los de cuatro cifras («1.000»); sin formato salía «1000». */}
+          <div className="text-lg font-bold">{canalitzats.toLocaleString('ca-ES')}/{total.toLocaleString('ca-ES')} kg</div>
           <span className="text-sm text-muted-foreground">
-            {total - canalitzats > 0 ? t('off.falten', { n: total - canalitzats }) : t('off.complet')}
+            {total - canalitzats > 0 ? t('off.falten', { n: (total - canalitzats).toLocaleString('ca-ES') }) : t('off.complet')}
           </span>
         </div>
       </div>

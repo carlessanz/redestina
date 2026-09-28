@@ -42,8 +42,15 @@ export default function QueTocaAra({
   // Una línea que resuelve a «—» (o a su propia clave, si faltara) no se pinta: un hueco en
   // blanco con su margen se lee como un fallo de carga. Las fichas del equipo usan `c.none`
   // justamente para dejar vacíos los huecos que su máquina de estados no llena.
+  // Los kilos con separador de miles («1.000», no «1000»). Solo a partir de 1.000: un
+  // contador `{n}` que vale 1 tiene que seguir siendo el número 1, que es lo que activa la
+  // variante en singular de la clave (§7).
+  const varsFormatades = Object.fromEntries(Object.entries(punt.vars).map(([k, v]) => [
+    k, typeof v === 'number' && Math.abs(v) >= 1000 ? v.toLocaleString('ca-ES') : v,
+  ]))
+
   const text = (clau: string): string => {
-    const v = t(clau, punt.vars).trim()
+    const v = t(clau, varsFormatades).trim()
     return v === '—' || v === clau ? '' : v
   }
 
@@ -87,8 +94,10 @@ export default function QueTocaAra({
           variant={punt.emToca ? 'default' : 'outline'}
           className="mt-3 h-11 whitespace-normal md:h-9"
         >
+          {/* «Fes-ho ara» solo cuando te toca; si no, «Veure-ho»: con «Res» justo encima,
+              «Fes-ho ara» se contradecía. */}
           <Link to={punt.enllac}>
-            {t('proc.a_do')}
+            {t(punt.emToca ? 'proc.a_do' : 'proc.a_see')}
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         </Button>
