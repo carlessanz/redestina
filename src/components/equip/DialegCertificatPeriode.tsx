@@ -30,6 +30,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { calcularCertificatPeriode, emetreCertificatPeriode, bloqueja, euros } from '../../lib/tancament'
 import { calcularCertificatRecepcio, emetreCertificatRecepcio } from '../../lib/certificatRecepcio'
 import { dataCurta, kg } from '../../lib/albarans'
@@ -124,7 +125,7 @@ export default function DialegCertificatPeriode(
       ? await calcularCertificatPeriode({ productor: orgId, desde, hasta, modo })
       : await calcularCertificatRecepcio({ entitat: orgId, desde, hasta, modo })
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setCalcul(res.data as Calcul)
   }
 
@@ -150,10 +151,10 @@ export default function DialegCertificatPeriode(
       ? await emetreCertificatPeriode(calcul.id)
       : await emetreCertificatRecepcio(calcul.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('cdp.done', { num: res.data.numero ?? '' }))
     if ((res.data.substitueix ?? 0) > 0) {
-      toast.info(t('cdp.done_subst', { m: res.data.substitueix ?? 0 }))
+      toast.info(t('cdp.done_subst', { n: res.data.substitueix ?? 0 }))
     }
     onEmes()
     onTancar()

@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { iniciarFirmaAssistida } from '../../lib/convenis'
 import FirmaConveni from '../FirmaConveni'
 import {
@@ -48,7 +49,7 @@ export default function DialegFirmaAssistida(
       const r = await iniciarFirmaAssistida(conveniId)
       if (!viu) return
       if (!r.ok) {
-        setError(r.missatge === 'conv.err_generic' ? t('c.error') : r.missatge)
+        setError(textError(t, r))
         return
       }
       setToken(r.data.enllac.token)

@@ -9,6 +9,7 @@ import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { textoRecollidaConfirmada } from '../lib/textos'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
@@ -281,8 +282,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // kilos, no se parseaba como número y el bot le contestaba «escriu només el número» sin
   // que nada explicara de dónde salía esa pregunta. Visto en producción, con la oferta de
   // prueba de venda. Reenviar es volver a preguntar desde el principio.
-  async function registrarEnvio(ent: EntidadPuntuada, canal: 'whatsapp' | 'email') {
-    const { error } = await supabase.from('oferta_respuestas').upsert({
+  //
+  // Devuelve si quedó registrado. Si no, el envío YA ha salido, así que no se anuncia como
+  // fallo: se avisa de que la respuesta habrá que marcarla a mano (sin fila, el webhook no
+  // tiene dónde apuntarla).
+  async function registrarEnvio(ent: EntidadPuntuada, canal: 'whatsapp' | 'email'): Promise<boolean> {
+    const { data, error } = await supabase.from('oferta_respuestas').upsert({
       excedente_id: excedente.id,
       entidad_id: ent.id,
       telefono: ent.telefono,
@@ -296,17 +301,36 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       kg_solicitados: null,
       caixes_solicitades: null,
       preu_ofert: null,
-    }, { onConflict: 'excedente_id,entidad_id' })
-    if (error) console.error('oferta_respuestas upsert:', error.message)
+    }, { onConflict: 'excedente_id,entidad_id' }).select('id')
     await recargarRespuestas()
+    if (error || !data || data.length === 0) {
+      toast.warning(t('od.sent_not_logged', { name: ent.nombre }))
+      return false
+    }
+    return true
+  }
+
+  /**
+   * Tras un envío que el servidor da por bueno: si fue SIMULADO (el interruptor de envío
+   * real apagado) no se anuncia como enviado, porque no ha salido nada.
+   */
+  async function trasEnviar(
+    ent: EntidadPuntuada, canal: 'whatsapp' | 'email', simulat: boolean | undefined, clauExit: string,
+  ) {
+    // Si no quedó registrado, el aviso ámbar ya dice que salió: no se apila un verde encima.
+    if (!(await registrarEnvio(ent, canal))) return
+    if (simulat) toast.info(t(canal === 'email' ? 'doc.resend_simulat' : 'od.wa_simulat'))
+    else toast.success(t(clauExit, { name: ent.nombre }))
   }
 
   // Marcado manual (imprescindible para el email, que no tiene respuesta automática).
   async function marcarRespuesta(id: string, estado: 'pendent' | 'acceptada' | 'rebutjada') {
-    await supabase.from('oferta_respuestas').update({
+    const { data, error } = await supabase.from('oferta_respuestas').update({
       estado,
       respondido_at: estado === 'pendent' ? null : new Date().toISOString(),
-    }).eq('id', id)
+    }).eq('id', id).select('id')
+    // Un UPDATE que la RLS no deja pasar no da error: devuelve cero filas (§12.48).
+    if (error || !data || data.length === 0) toast.error(t('c.error'))
     await recargarRespuestas()
   }
 
@@ -339,7 +363,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const preu = preuRaw !== '' ? Number(preuRaw) : null
     const res = await aprovarResposta({ id: r.id, kg, preu })
     if (!res.ok) {
-      toast.error(res.codi === 'sense_conveni' ? t('od.conv_blocked') : res.missatge)
+      toast.error(textError(t, res))
       return
     }
     toast.success(t('od.approved'))
@@ -353,7 +377,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
   async function rebutjarAprovacio(r: RespuestaConEntidad, motiu: string) {
     const res = await rebutjarResposta({ id: r.id, motiu })
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     await recargarRespuestas()
     toast.success(t('od.rejected_ok'))
     void refrescaComptadors()
@@ -389,7 +413,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         { id: 'accept:no', titulo: 'Ara no' },
       ],
     })
-    if (r.ok) { await registrarEnvio(ent, 'whatsapp'); toast.success(t('od.sent_wa', { name: ent.nombre })); return true }
+    if (r.ok) { await trasEnviar(ent, 'whatsapp', r.simulat, 'od.sent_wa'); return true }
     const data = r.data as { code?: string } | null
     if (data?.code === 'window_closed') {
       // Fuera de la ventana de 24 h solo cabe una plantilla aprobada por Meta.
@@ -403,6 +427,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       return false
     }
     if (data?.code === 'whatsapp_desactivat') avisar(toast.error, t('od.wa_off'))
+    else if (data?.code === 'opt_out') avisar(toast.error, t('od.optout_toast', { name: ent.nombre }))
     else if (data?.code === 'no_test_user') avisar(toast.error, t('od.not_test_toast', { name: ent.nombre }))
     else if (data?.code === 'no_test_recipient') avisar(toast.error, t('od.no_test_meta', { name: ent.nombre }))
     else if (data?.code === 'unknown_contact') avisar(toast.error, t('od.must_write', { name: ent.nombre }))
@@ -451,8 +476,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // wa_contact antes, para pasar los gates unknown_contact/opt_in del servidor.
   async function enviarOfertaPlantilla(ent: EntidadPuntuada) {
     if (!ent.telefono) { toast.error(t('od.need_phone', { name: ent.nombre })); return }
+    // SIN opt_in: crear el contacto no es su consentimiento. Antes se creaba con
+    // `opt_in: true`, que es justo lo que la plantilla exige que la persona haya dado.
     await supabase.from('wa_contacts').upsert(
-      { phone: ent.telefono, name: ent.nombre, opt_in: true, opt_in_at: new Date().toISOString() },
+      { phone: ent.telefono, name: ent.nombre },
       { onConflict: 'phone', ignoreDuplicates: true },
     )
     const components = construirComponentsOferta({
@@ -465,7 +492,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       to: ent.telefono, type: 'template',
       template: PLANTILLA_OFERTA.name, language: PLANTILLA_OFERTA.language, components,
     })
-    if (r.ok) { await registrarEnvio(ent, 'whatsapp'); toast.success(t('od.sent_tpl', { name: ent.nombre })); return }
+    if (r.ok) { await trasEnviar(ent, 'whatsapp', r.simulat, 'od.sent_tpl'); return }
     const data = r.data as { code?: string } | null
     if (data?.code === 'no_opt_in') toast.error(t('od.no_optin_toast', { name: ent.nombre }))
     else if (data?.code === 'unknown_contact') toast.error(t('od.must_write', { name: ent.nombre }))
@@ -493,7 +520,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         boton: { texto: t('od.email_button'), url: `${window.location.origin}/receptor/mercat` },
       },
     })
-    if (r.ok) { await registrarEnvio(ent, 'email'); toast.success(t('od.sent_email', { name: ent.nombre })); return }
+    if (r.ok) { await trasEnviar(ent, 'email', r.simulat, 'od.sent_email'); return }
     const data = r.data as { code?: string } | null
     if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: ent.nombre }))
     else if (data?.code === 'no_test_recipient') toast.error(t('od.email_no_test', { email }))
@@ -511,11 +538,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       titol: t('od.over_alloc_t'),
       descripcio: t('od.over_alloc', { n: faltan }),
     }))) return
-    await supabase.from('canalizaciones').insert({
+    const { data: alta, error: errAlta } = await supabase.from('canalizaciones').insert({
       excedente_id: excedente.id, entidad_id, kg_confirmados,
       caixes_entregades: Number(fd.get('caixes') || 0) || null,
       comentarios: String(fd.get('comentarios') || '') || null,
-    })
+    }).select('id')
+    // Sin la canalización no se toca el estado de la oferta: la marcaría Coberta sin nada.
+    if (errAlta || !alta || alta.length === 0) { toast.error(t('c.error')); return }
     const nuevoCanalizado = canalizados + kg_confirmados
     if (total > 0 && nuevoCanalizado >= total) {
       await supabase.from('excedentes').update({ estado: 'bloqueada' }).eq('id', excedente.id)
@@ -529,12 +558,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }
 
   async function guardarKgReales(canalId: string, kgReales: number) {
-    await supabase.from('canalizaciones').update({ kg_reales: kgReales }).eq('id', canalId)
+    const { data, error } = await supabase.from('canalizaciones')
+      .update({ kg_reales: kgReales }).eq('id', canalId).select('id')
+    if (error || !data || data.length === 0) toast.error(t('c.error'))
     await recargar()
   }
 
   async function marcarNoColocada(motivo: string) {
-    await supabase.from('excedentes').update({ estado: 'no_colocada', motivo_no_colocada: motivo }).eq('id', excedente.id)
+    const { data, error } = await supabase.from('excedentes')
+      .update({ estado: 'no_colocada', motivo_no_colocada: motivo }).eq('id', excedente.id).select('id')
+    if (error || !data || data.length === 0) { toast.error(t('c.error')); return }
     setNoColocada(false)
     await recargar()
     // La oferta desaparece del listado de actives: sin este aviso, el único indicio de que
@@ -554,7 +587,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       confirmar: t('od.cancel_offer_confirm'),
       destructiu: true,
     }))) return
-    await supabase.from('excedentes').update({ estado: 'cancelada' }).eq('id', excedente.id)
+    const { data, error } = await supabase.from('excedentes')
+      .update({ estado: 'cancelada' }).eq('id', excedente.id).select('id')
+    if (error || !data || data.length === 0) { toast.error(t('c.error')); return }
     await recargar()
     toast.success(t('od.cancel_ok'))
     void refrescaComptadors()
@@ -714,7 +749,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               rutes={exc.fotos ?? []}
               onChange={async (rutes) => {
                 const r = await fixaFotos(exc.id, rutes)
-                if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+                if (!r.ok) { toast.error(textError(t, r.error)); return }
                 setExc((e) => (e ? { ...e, fotos: rutes } : e))
               }}
             />

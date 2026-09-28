@@ -468,7 +468,8 @@ describe('textMaxim', () => {
   })
 
   it('no arrastra decimales que no aportan nada', () => {
-    expect(textMaxim(212.5)).toBe(' El màxim són 212.5 kg.')
+    expect(textMaxim(212.5)).toBe(' El màxim són 212,5 kg.')
+    expect(textMaxim(1)).toBe(' El màxim és 1 kg.')
   })
 })
 
@@ -494,6 +495,6 @@ describe('avisKgExcessius', () => {
   // Lo que se le pide al aviso es que la persona pueda RESPONDERLO sin pensar: el número
   // que tiene que escribir sale literal en el texto.
   it('el texto trae el número exacto que hay que escribir', () => {
-    expect(avisKgExcessius(500, 212.5)).toContain('escriu 212.5')
+    expect(avisKgExcessius(500, 212.5)).toContain('escriu 212,5')
   })
 })

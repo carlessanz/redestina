@@ -40,7 +40,19 @@ type DocFila = Pick<
 type ConveniFila = Pick<
   Convenio,
   'id' | 'tipo' | 'tipo_org' | 'estado' | 'numero_completo' | 'ejercicio'
-  | 'enviado_at' | 'firmado_at' | 'contrafirmado_at' | 'created_at'
+  | 'enviado_at' | 'firmado_at' | 'contrafirmado_at' | 'created_at' | 'origen' | 'referencia_paper'
+>
+
+/**
+ * Lo que esta pantalla usa de la bandeja de albaranes, y nada más. 🔴 Sin `id_excedente`,
+ * `productor_id` ni `codigo_lote`: el primero lleva las tres letras de la productora y los
+ * otros dos la identifican. No se pintaban, pero llegaban al navegador (D3 en la API).
+ */
+type AlbaraFila = Pick<
+  AlbaranBandeja,
+  | 'id' | 'tipo' | 'numero_completo' | 'estado' | 'ejercicio' | 'canalizacion_id' | 'producto'
+  | 'emitido_at' | 'entregado_at' | 'confirmado_at' | 'conciliado_at' | 'rechazo'
+  | 'kg_previstos' | 'kg_neto' | 'kg_confirmados' | 'kg_validados' | 'dias_esperando'
 >
 
 type CertificatFila = Pick<
@@ -53,22 +65,24 @@ export default function ReceptorDocuments() {
   const org = useOrganitzacio('entidad')
   const orgId = org?.id ?? null
 
-  const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
+  const [albarans, setAlbarans] = useState<AlbaraFila[]>([])
   const [docs, setDocs] = useState<DocFila[]>([])
   const [convenis, setConvenis] = useState<ConveniFila[]>([])
   const [certificats, setCertificats] = useState<CertificatFila[]>([])
   const [acumulat, setAcumulat] = useState<KgRebutsExercici | null>(null)
   const [carregant, setCarregant] = useState(true)
-  const [error, setError] = useState<string | null>(null)
+  const [error, setError] = useState(false)
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     // `ENT` y `R-ENT`: una entrega rectificada sigue siendo una entrega suya, y esconderla
-    // dejaría a la entidad sin el documento que de verdad vale.
+    // dejaría a la entidad sin el documento que de verdad vale. Y `OPE`/`R-OPE`: en venta y
+    // maquila lo que recibe es un OPE, y sus kilos ya cuentan en el acumulado de arriba
+    // (`kg_rebuts_exercici` suma donación y compra).
     const { data: albData, error: err } = await supabase
       .from('v_albaranes_bandeja')
-      .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
-      .in('tipo', ['ENT', 'R-ENT'])
+      .select('id, tipo, numero_completo, estado, ejercicio, canalizacion_id, producto, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+      .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE'])
       .order('emitido_at', { ascending: false, nullsFirst: true })
     if (err) return { err }
 
@@ -86,7 +100,7 @@ export default function ReceptorDocuments() {
     const { data: convData } = orgId
       ? await supabase
         .from('convenios')
-        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at')
+        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
         .eq('entidad_id', orgId)
         .order('created_at', { ascending: false })
       : { data: [] }
@@ -108,7 +122,7 @@ export default function ReceptorDocuments() {
     const acum = orgId ? await kgRebutsExercici(orgId) : null
 
     return {
-      albarans: (albData as AlbaranBandeja[] | null) ?? [],
+      albarans: (albData as AlbaraFila[] | null) ?? [],
       docs: (docData as DocFila[] | null) ?? [],
       convenis: (convData as ConveniFila[] | null) ?? [],
       certificats: (certData as CertificatFila[] | null) ?? [],
@@ -127,7 +141,7 @@ export default function ReceptorDocuments() {
 
   const refresca = useCallback(async () => {
     const r = await carrega()
-    if (r.err) { setError(r.err.message); return }
+    if (r.err) { setError(true); return }
     aplica(r)
   }, [carrega, aplica])
 
@@ -136,7 +150,7 @@ export default function ReceptorDocuments() {
     void (async () => {
       const r = await carrega()
       if (!viu) return
-      if (r.err) { setError(r.err.message); setCarregant(false); return }
+      if (r.err) { setError(true); setCarregant(false); return }
       aplica(r)
       setCarregant(false)
     })()
@@ -147,7 +161,8 @@ export default function ReceptorDocuments() {
 
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org_entity')}</p>
   if (carregant) return <CarregantSeccio />
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  // El texto de Postgres no le dice nada a la entidad (y va en catalán sin acentos).
+  if (error) return <p className="text-sm text-destructive">{t('c.error')}</p>
 
   const docsCr = docs.filter((d) => d.objeto_tipo === 'cierre_receptor')
   const perCertificat = Object.fromEntries(certificats.map((c) => [c.id, c]))

@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { crearEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada } from '../../lib/albarans'
 import { motiuConversio } from '../../lib/conversioEspigolada'
@@ -170,7 +171,7 @@ export default function DialegEspigolada(
       // Los siete rechazos de la conversión se enseñan traducidos POR SU CÓDIGO; lo demás,
       // como siempre, con el mensaje que dio la base.
       const clau = motiuConversio(r.missatge)
-      toast.error(clau ? t(clau) : r.missatge)
+      toast.error(clau ? t(clau) : textError(t, r))
       return
     }
     toast.success(t('conv_esp.done'))

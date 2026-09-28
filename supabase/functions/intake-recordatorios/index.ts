@@ -77,7 +77,7 @@ Deno.serve(async (req) => {
   let enviados = 0;
   for (const s of sesiones ?? []) {
     if (modoTest && !(await esTelefonoTest(supabase, s.telefono))) continue;
-    await sendBotones(
+    const r = await sendBotones(
       supabase,
       s.telefono,
       "Encara tens una oferta a mig fer 📝\n\nVols continuar on ho vas deixar o cancel·lar-la?",
@@ -86,6 +86,9 @@ Deno.serve(async (req) => {
         { id: "intake:cancelar", titulo: "Cancel·lar ✖️" },
       ],
     );
+    // Si no salió, no se marca: el siguiente pase del job lo vuelve a intentar. Antes se
+    // marcaba siempre, y un fallo de red dejaba esa oferta a medias sin ningún recordatorio.
+    if (!r.ok) continue;
     // Solo marca el aviso; no toca updated_at (si no, la ventana de 10 min se reiniciaría).
     const { error: upError } = await supabase
       .from("intake_sessions")

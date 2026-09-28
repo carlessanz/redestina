@@ -25,6 +25,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, FileText, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { refrescaAvisos } from '../lib/refrescAvisos'
+import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { useDescarregaDocument } from '../hooks/useDescarregaDocument'
 import { Casella } from './Casella'
@@ -120,8 +122,10 @@ export default function PlaPrevencio({
     }
 
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     toast.success(t('pla.regenerated', { n: r.data.mesures_n }))
+    // La banda y la marca del diagnóstico del panel viven en AppShell: que se recalculen.
+    refrescaAvisos()
     await carrega()
     await onCanvi?.()
   }
@@ -132,8 +136,9 @@ export default function PlaPrevencio({
     const seg = llista.filter((m) => !tretes.has(m.codi))
     const r = await desarMesuresPla(pla.id, seg, observacions.trim() === '' ? null : observacions.trim())
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     toast.success(t('pla.adjusted', { n: r.data.mesures_n }))
+    refrescaAvisos()
     await carrega()
     await onCanvi?.()
   }
@@ -143,7 +148,7 @@ export default function PlaPrevencio({
     setOcupat('nivell')
     const r = await fixarNivellPla(pla.id, nivell)
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     await carrega()
   }
 
@@ -159,8 +164,9 @@ export default function PlaPrevencio({
     setOcupat('emetre')
     const r = await emetrePla(pla.id)
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     toast.success(t('pla.emitted', { numero: r.data.numero ?? '—' }))
+    refrescaAvisos()
     // El PDF lo genera una Edge Function que el trigger acaba de encolar, así que lo normal
     // es que todavía no exista: `mostra()` espera y reintenta sola.
     await descarregador.mostra(r.data.document)

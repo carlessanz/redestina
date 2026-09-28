@@ -29,13 +29,15 @@ import { useT } from '../lib/i18n'
 import { useConveni } from '../hooks/useConveni'
 import { useAppContext } from '../hooks/useAppContext'
 import { cn } from '../lib/utils'
+import { dataCurta } from '../lib/albarans'
+import { refrescaAvisos } from '../lib/refrescAvisos'
 import DialegFirmaConveni from './DialegFirmaConveni'
 import { Button } from '@/components/ui/button'
 
 export default function AvisConveni() {
   const { t } = useT()
   const { rolActiu, organitzacio } = useAppContext()
-  const { estat, dataTall, avisa, bloqueja, recarrega } = useConveni()
+  const { estat, dataTall, avisa, bloqueja } = useConveni()
   const [obert, setObert] = useState(false)
 
   if (!avisa) return null
@@ -58,7 +60,8 @@ export default function AvisConveni() {
   const consequencia = bloqueja
     ? t(`avis_conv.bloquejat${sufix}`)
     : dataTall
-      ? t(`avis_conv.des_de${sufix}`, { data: dataTall })
+      // «16/09/2026» y no el ISO crudo de la base.
+      ? t(`avis_conv.des_de${sufix}`, { data: dataCurta(dataTall) })
       : t('avis_conv.encara_no_bloqueja')
 
   const Icona = bloqueja ? AlertTriangle : FileSignature
@@ -99,7 +102,9 @@ export default function AvisConveni() {
           tipusOrg={tipusOrg}
           orgId={organitzacio.id}
           onTancar={() => setObert(false)}
-          onFirmat={() => { setObert(false); recarrega() }}
+          // `refrescaAvisos()` y no solo el `recarrega` de esta banda: el Mercat y los
+          // contadores del menú también dependen del convenio y tienen su propia lectura.
+          onFirmat={() => { setObert(false); refrescaAvisos() }}
         />
       )}
     </div>

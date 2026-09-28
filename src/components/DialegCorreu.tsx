@@ -72,7 +72,13 @@ export default function DialegCorreu({
       objeto_id: destinatari.id,
     })
     setEnviant(false)
-    if (r.ok) { toast.success(t('correu.sent', { email })); onObert(false); return }
+    if (r.ok) {
+      // Simulado (RESEND_ENVIO_REAL apagado): no ha salido, así que no se anuncia como enviado.
+      if (r.simulat) toast.info(t('doc.resend_simulat'))
+      else toast.success(t('correu.sent', { email }))
+      onObert(false)
+      return
+    }
     const data = r.data as { code?: string } | null
     if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: destinatari.nom ?? email }))
     else if (data?.code === 'no_test_recipient') toast.error(t('od.email_no_test', { email }))

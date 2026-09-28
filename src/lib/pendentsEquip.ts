@@ -93,7 +93,10 @@ export async function refrescaComptadors(): Promise<void> {
   const meva = ++ultimaPeticio
   const r = await carregaPendentsEquip()
   if (meva !== ultimaPeticio) return
-  pendents = r.ok ? r.data : []
+  // Si la carga falla se CONSERVAN las cifras de antes: vaciarlas apagaba todos los badges
+  // y el tablero decía «Res pendent» por un corte de red, que es mentir en verde.
+  if (!r.ok) return
+  pendents = r.data
   carregat = true
   avisa()
 }

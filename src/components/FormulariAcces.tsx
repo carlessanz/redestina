@@ -54,7 +54,8 @@ export default function FormulariAcces({ titol, subtitol }: { titol: string; sub
     const { error: authError } = await supabase.auth.signInWithPassword({ email: email.trim(), password })
     setOcupado(false)
     if (authError) {
-      setError(authError.message === 'Invalid login credentials' ? t('login.bad_creds') : authError.message)
+      setError(authError.code === 'invalid_credentials' || authError.message === 'Invalid login credentials'
+        ? t('login.bad_creds') : t('c.error'))
       setPassword('')
     }
   }
@@ -64,12 +65,15 @@ export default function FormulariAcces({ titol, subtitol }: { titol: string; sub
     if (ocupado) return
     setOcupado(true)
     setError(null)
-    await fetch(`${supabaseUrl}/functions/v1/recuperar-password`, {
+    const res = await fetch(`${supabaseUrl}/functions/v1/recuperar-password`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email: email.trim() }),
     }).catch(() => null)
     setOcupado(false)
+    // La función responde el mismo 200 genérico exista o no el correo (§9): un fallo de red
+    // o un 5xx NO es esa respuesta, y confirmarlo dejaría a la persona esperando un correo.
+    if (!res || !res.ok) { toast.error(t('c.error')); return }
     toast.success(t('login.recover_sent'))
     setModo('login')
   }

@@ -22,6 +22,12 @@ function orDefault(v: string | null | undefined, fallback: string): string {
 }
 
 /** Devuelve los `components` (solo `body`, 7 variables) de `oferta_excedent`. */
+/** «2026-07-30» → «30/07/2026». Cualquier otra cosa se deja como está. */
+function dataLlegible(v: string | null | undefined): string | null | undefined {
+  const m = /^(\d{4})-(\d{2})-(\d{2})/.exec(v ?? '')
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : v
+}
+
 export function construirComponentsOferta(d: DatosOfertaPlantilla): unknown[] {
   // ⚠️ Se comprueba `producto` ANTES de interpolar. Con `producto: null` y una variedad
   // puesta, la plantilla anterior producía la cadena literal «null · Pera» —y `orDefault` no
@@ -33,14 +39,15 @@ export function construirComponentsOferta(d: DatosOfertaPlantilla): unknown[] {
     '—',
   )
   const quantitat = d.kg
-    ? `${d.kg} kg${d.caixes ? ` · ${d.caixes} caixes` : ''}`
+    ? `${String(d.kg).replace('.', ',')} kg${d.caixes ? ` · ${d.caixes} ${d.caixes === 1 ? 'caixa' : 'caixes'}` : ''}`
     : 'a convenir'
   const textos = [
     producte,
     orDefault(d.productor, '—'),
     orDefault(d.municipi, '—'),
     quantitat,
-    orDefault(d.disponible, 'consultar'),
+    // La fecha llega en ISO («2026-07-30») y se lee como se escribe aquí: 30/07/2026.
+    orDefault(dataLlegible(d.disponible), 'consultar'),
     orDefault(d.horari, 'a convenir'),
     orDefault(d.responsable, 'Equip Redestina'),
   ]

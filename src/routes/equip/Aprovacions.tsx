@@ -39,6 +39,7 @@ import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../../lib/aprovarResposta'
@@ -327,7 +328,7 @@ export default function Aprovacions() {
   }, [carrega, carregaRegistres, carregaConvenis])
 
   /** Los dos errores que las RPC lanzan a propósito tienen texto propio. */
-  function textError(err: { code?: string; message: string }): string {
+  function textErrorRegistre(err: { code?: string; message: string }): string {
     if (err.code === '42501') return t('appr.reg_no_perm')
     if (err.code === '22023') return t('appr.reg_gone')
     return t('appr.reg_error', { msg: err.message })
@@ -358,7 +359,7 @@ export default function Aprovacions() {
     }
 
     const { error } = await supabase.rpc('aprovar_registre', { p_membresia: r.id })
-    if (error) { setOcupat(null); toast.error(textError(error)); return }
+    if (error) { setOcupat(null); toast.error(textErrorRegistre(error)); return }
 
     const correu = perfils[r.user_id]?.email ?? null
     const enviat = correu ? await enviarAcces(correu) : null
@@ -383,7 +384,7 @@ export default function Aprovacions() {
       { p_membresia: r.id, p_motiu: motiu || null })
     setOcupat(null)
     setMotiuDe(null)
-    if (error) { toast.error(textError(error)); return }
+    if (error) { toast.error(textErrorRegistre(error)); return }
     toast.success(t('appr.reg_rejected'))
     void carregaRegistres()
   }
@@ -399,7 +400,7 @@ export default function Aprovacions() {
     // Los mensajes de la RPC ya vienen en catalán y explican el motivo (ficha del mismo tipo,
     // convenios que chocan): enseñarlos tal cual dice más que un texto genérico.
     if (error) {
-      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : error.message)
+      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : t('appr.reg_error', { msg: error.message }))
       return
     }
     toast.success(t('appr.link_ok'))
@@ -452,7 +453,7 @@ export default function Aprovacions() {
     })
     setOcupat(null)
     if (!res.ok) {
-      toast.error(res.codi === 'sense_conveni' ? t('od.conv_blocked') : res.missatge)
+      toast.error(textError(t, res))
       return
     }
     toast.success(t('od.approved'))
@@ -468,7 +469,7 @@ export default function Aprovacions() {
     const res = await rebutjarResposta({ id: f.id, motiu })
     setOcupat(null)
     setMotiuDe(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('od.rejected_ok'))
     setFiles((prev) => prev.filter((x) => x.id !== f.id))
     void refrescaComptadors()
@@ -478,7 +479,7 @@ export default function Aprovacions() {
     setOcupat(c.id)
     const res = await contrafirmarConveni(c.id)
     setOcupat(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.countersigned'))
     void carregaConvenis()
   }
@@ -488,7 +489,7 @@ export default function Aprovacions() {
     const res = await retornarConveni(c.id, motiu)
     setOcupat(null)
     setMotiuDe(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.returned'))
     void carregaConvenis()
   }

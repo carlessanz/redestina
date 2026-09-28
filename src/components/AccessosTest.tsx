@@ -20,7 +20,9 @@ export default function AccessosTest() {
     setOcupat(email)
     const { error } = await supabase.auth.signInWithPassword({ email, password })
     setOcupat(null)
-    if (error) toast.error(error.message)
+    // El mensaje de Supabase va en inglés: credenciales malas tienen su texto, el resto no.
+    if (error) toast.error(error.code === 'invalid_credentials' || error.message === 'Invalid login credentials'
+      ? t('login.bad_creds') : t('c.error'))
   }
 
   return (

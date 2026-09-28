@@ -580,6 +580,13 @@ src/
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
     settings.ts                Los dos interruptores de app_settings: modo test y whatsapp_activo (§8)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
+                               + reenviarDocument() (botó «Reenvia», equip)
+    textError.ts               El texto de un error para un aviso: el código conocido se traduce
+                               (sense_conveni…), una clave i18n pasa por t(), el texto crudo de
+                               Postgres/Auth/red cae a c.error. Antes muchos avisos enseñaban
+                               «alb.err_generic» o un mensaje de la base sin acentos
+    refrescAvisos.ts           refrescaAvisos()/useTicAvisos(): las bandas y contadores del panel
+                               (convenio, ficha incompleta, diagnóstico) se recalculan tras actuar
     pendents.ts                pendents_meus() i acunar_enllac_propi(): què falta signar o
                                confirmar, i l'enllaç propi per fer-ho (§6ter)
     documentsPanell.ts         Helpers purs de les pantalles de documents (agrupar per
@@ -1803,6 +1810,31 @@ correo (`enviaEnllacosConfirmacio`, desde `AlbaraDetall` y desde la pantalla gui
 en catalán en un correo en castellano; y el recordatorio de factura al donante queda apagado
 (§12.129).
 
+**Revisión de avisos y mensajes del 28-09-2026** (WhatsApp, avisos de la aplicación y todo lo
+que ve el receptor; migración `20270407100000`). Lo que cambia de comportamiento:
+- **WhatsApp**: BAIXA corta de verdad (`403 opt_out`) y se acepta además de BAJA; la salutació
+  pide ALTA, no «OK»; una oferta enviada por correo ya no captura respuestas de WhatsApp; los
+  mensajes que no son sí/no reciben otra vez los botones; «t'avisarem quan estigui canalitzada»
+  y «ho revisem i et diem alguna cosa» se retiraron (nadie avisaba); el intake acepta la
+  ubicación de WhatsApp, no inventa kg si no hay factor de conversión, limita el texto libre a
+  400 caracteres, repite la pregunta tras tres fallos y apostrofa («d'Albercoc»). §5, §6bis, §8.
+- **Receptor**: «M'interessa» comprueba el convenio que exige la modalidad (en el Mercat y en
+  la base); las consultas de sus pantallas ya **no reciben** `texto_oferta`, `id_excedente`,
+  `productor_id` ni `ubicacion_id` (D3: ninguna los pintaba, pero llegaban al navegador); un
+  interés sobre una oferta ya cubierta sale «No disponible» y no «Per respondre»; el Històric
+  da por recibida una entrega confirmada; ofertas vencidas sin botón; errores traducidos.
+- **Avisos**: Configuració ya no dice «desat» a un `admin` que la RLS ha rechazado; los avisos
+  de éxito de `OfferDetail` miran el resultado; un envío simulado se anuncia como simulado; las
+  bandas se recalculan tras actuar (`refrescAvisos`); `textError()` en todas las pantallas del
+  equipo; la banda de convenio ya no enseña un instante «de moment pots seguir operant» al
+  cargar (el contexto llega en dos tiempos, y sin organización no se avisa).
+- ⚠️ **Queda una decisión**: el `texto_oferta` que se manda por WhatsApp y correo a las
+  entidades sigue diciendo «PRODUCTOR: …» y el enlace de Maps de la finca, también en
+  donación. El panel del receptor ya no lo recibe; el mensaje, sí. Lo decide la Fundació (D3,
+  y la revisión del 23-09 pide que el receptor vea quién ofrece).
+- Siguen con texto crudo, fuera de esta tanda: los errores de CARGA de los listados del equipo
+  (`setError(err.message)`), `DadesFundacio` y las whitelists.
+
 **Revisión de los PDF y del panel del 28-09-2026** (sin migraciones): en los albaranes, la
 columna «Motiu fora de circuit» se montaba sobre «Caixes» (ahora «Motiu»), la línea salía
 numerada «0» —el trigger crea las líneas con `ordre = 0`; ahora se numera por posición— y las
@@ -2022,7 +2054,7 @@ funciones, no políticas:
 
 | RPC | Qué hace |
 | --- | --- |
-| `manifestar_interes(excedente, entidad, kg, preu, caixes)` | El receptor acepta desde el panel. Deja la fila igual que el diálogo de WhatsApp (`acceptada` + `aprovacio='pendent'`, `canal='panel'`), así **cae en la misma cola de aprobación** que ya existe. Valida compatibilidad y `preu_minim` |
+| `manifestar_interes(excedente, entidad, kg, preu, caixes)` | El receptor acepta desde el panel. Deja la fila igual que el diálogo de WhatsApp (`acceptada` + `aprovacio='pendent'`, `canal='panel'`), así **cae en la misma cola de aprobación** que ya existe. Valida compatibilidad y `preu_minim`, y desde `20270407100000` (28-09-2026) **el convenio que exige la modalidad** (`exigir_convenio(…, modalitat, 'recibe')`: una entidad social con solo el `don_rec` no puede pedir una venta, que exige el `com`) y que los kg no pasen de `kg_total` (`kg_maxim`). Antes no miraba ningún convenio y el rechazo llegaba al aprobar, sin que la entidad lo supiera |
 | `aprovar_resposta(resposta, kg, preu, motiu)` | Aprobar y canalizar **en una transacción** (hoy `OfferDetail` hace 3-4 llamadas sueltas). Exige `pot_aprovar()` |
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
@@ -2281,13 +2313,21 @@ responder por correo.
 eso no había forma de saber después qué filas se mandaron ni si una descripción llegó cortada
 (§12.107). Van **ya recortadas** a los topes de Meta, que corta sin avisar.
 
-**Palabras clave** — `BAJA` pone `opt_in=false` + `opt_out_at`; `ALTA` pone `opt_in=true` +
-`opt_in_at`. **Ambas responden confirmación** por WhatsApp (estamos en ventana, es gratis) y
-se registran como `outbound`.
+**Palabras clave** — `BAIXA` (o `BAJA`, la única que se reconocía hasta el 28-09-2026) pone
+`opt_in=false` + `opt_out_at`; `ALTA` pone `opt_in=true` + `opt_in_at`. **Ambas responden
+confirmación** por WhatsApp (estamos en ventana, es gratis) y se registran como `outbound`.
+🔴 **Y la baja ya corta de verdad** (28-09-2026): `whatsapp-send` responde `403 opt_out` a
+cualquier tipo —texto y botones incluidos— mientras `opt_out_at` sea posterior a `opt_in_at`.
+Antes solo miraba el opt-in en las plantillas, y escribir BAIXA **abre** la ventana de 24 h:
+la siguiente oferta con botones le llegaba igual a quien acababa de darse de baja.
+La salutació (`textoSalutacio`, `plantillas-meta.md §0`) pide ahora responder **ALTA**, no «OK»:
+un «OK» solo abría la ventana y, con una oferta pendiente, la aceptaba.
 
 **Aceptación de una oferta (diálogo)** — `procesarRespuestaOferta()` (`_shared/respuestas.ts`),
 enganchada en el webhook **antes del intake y con prioridad sobre él**. Trabaja sobre la fila
-`pendent` de `oferta_respuestas` más reciente para ese teléfono (**la última oferta enviada**) y
+`pendent` de `oferta_respuestas` más reciente para ese teléfono **con `canal = 'whatsapp'`**
+(**la última oferta enviada por WhatsApp**; desde el 28-09-2026 —antes una oferta enviada por
+correo también capturaba cualquier «ok» que la entidad escribiera por WhatsApp—) y
 conduce un **diálogo corto**: un **sí** arranca `dialeg_pas='kg'` («quants kg vols?»); tras el número,
 si la modalitat es `venda`/`maquila` con `preu_minim` pide **confirmar el preu** con botones
 (`accept:preu_*`) y finaliza dejando `estado='acceptada'`, `kg_solicitados`, `preu_ofert` y
@@ -2303,6 +2343,14 @@ de més» del panel es **no bloqueante**, así que el número podía llegar hast
 devolvía `estado` a `pendent` pero dejaba `dialeg_pas` donde estuviera, así que a quien ya había
 contestado «sí» el botón «M'interessa» del reenvío le llegaba al paso de los kilos y el bot le
 pedía «només el número» sin que nada explicara por qué.
+
+✅ **Tres arreglos del 28-09-2026 en este diálogo**: en el paso `kg` se mira **primero el número**
+y después el «no» («no més de 200» es una aceptación con cantidad, y se registraba como rechazo);
+la pregunta dice **de qué oferta** se habla («Quants kg de Tomàquet (E-…) en vols?»); y un
+mensaje que no es ni sí ni no, con la oferta enviada hace menos de **48 h**, recibe otra vez los
+botones [M'interessa] [Ara no] en vez de silencio (o, con doble rol, la guía para publicar).
+Quien rechaza el precio ya no recibe «Perfecte… coordinarà la recollida»: se le dice que el
+equipo lo revisará.
 
 ⚠️ **Rechazar el preu mínimo NO marca `rebutjada`**: la fila queda `estado='acceptada'` con
 `preu_ofert=null` y `mensaje_respuesta="L'entitat no accepta el preu mínim (a revisar per l'equip)."`,
@@ -2505,8 +2553,13 @@ pasa es quien **escribe**, y el `slice` de `whatsapp.ts` es la última red, no l
 **Casos que el motor ya contempla:**
 
 - Respuesta que no encaja: se repite la pregunta hasta 2 veces; a partir del 3.er fallo el motor
-  responde el texto «Escriu Stop per aturar». ⚠️ **No** es un botón de cancelar, y **no** resetea el
-  contador de intentos: si se sigue fallando, repite ese texto en bucle hasta una respuesta válida.
+  responde «No acabo d'entendre la resposta… escriu *Stop*» **y repite la pregunta** (desde el
+  28-09-2026; antes solo el aviso, en bucle, y la persona dejaba de ver qué se le preguntaba).
+- `Stop` sin sesión abierta contesta «No tens cap oferta a mig fer», y «Continuar» sobre una
+  sesión caducada lo dice y ofrece empezar otra.
+- Texto libre (varietat, horari, observacions) de más de **400** caracteres: se pide más corto.
+  Sin tope, el `texto_oferta` podía pasar de los 1024 que admite un interactivo y la entidad no
+  recibía la oferta.
 - **Cancelar en cualquier momento**: la palabra **`Stop`** (alias ocultos `CANCELAR`/`CANCEL·LAR`) **o** el botón
   `intake:cancelar` (del recordatorio) borran la sesión de `intake_sessions`.
 - **Recordatorio a los 10 min** de inactividad: aviso «Continuar / Cancel·lar» (§5). *Continuar*
@@ -2514,8 +2567,11 @@ pasa es quien **escribe**, y el `slice` de `whatsapp.ts` es la última red, no l
 - Sesión inactiva más de 12 h: se descarta y se empieza de cero (el recordatorio actúa antes).
 - Productor **sin ubicaciones** (329 de 341): no se puede enviar una lista vacía, así que se
   pide el enlace de Google Maps por texto. El enlace crea una `productor_ubicaciones` que
-  hereda el municipio de la ficha.
-- Cantidad en unidades o manats: se convierte con `factores_conversion` si hay factor.
+  hereda el municipio de la ficha, con alias `Compartida el dd/mm`. Desde el 28-09-2026 vale
+  también **la ubicación de WhatsApp** (📎 → Ubicació, mensaje `location`), que se convierte
+  en enlace de Maps. Con 10 ubicaciones o más se enseñan 9 y «Un altre lloc» siempre.
+- Cantidad en unidades o manats: se convierte con `factores_conversion` si hay factor; **si no
+  lo hay, se pide el número en kg** (antes «20 manats» se guardaba como 20 kg).
 - ✅ **Ya no hay divergencia de obligatoriedad** entre canales (27-09-2026): `retorn` es
   obligatorio en los dos cuando aplica, y `tipus_caixa` ya no se pregunta.
 - ✅ **El callejón de `ubicacio` está resuelto** (27-09-2026): la fila «Un altre lloc»
@@ -3803,6 +3859,7 @@ llega a simularse):
 
 | Tipo | Condición | Si no se cumple | Por qué |
 | --- | --- | --- | --- |
+| cualquiera | que no se haya dado de baja (`opt_out_at` ≤ `opt_in_at`) | `403 opt_out` | Escribió BAIXA: no se le escribe nada hasta que vuelva a escribir ALTA |
 | `text` | ventana de 24 h abierta (`last_inbound_at` < 24 h) | `409 window_closed` | Es una respuesta de servicio; **no** requiere opt-in |
 | `template` | `opt_in = true` | `403 no_opt_in` | La iniciamos nosotros: requiere consentimiento (RGPD + Meta) |
 
@@ -5859,7 +5916,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.017 pruebas en 33 ficheros**: 1.016 correctas y **1 saltada a propósito**, la
+   Referencia: **1.023 pruebas en 33 ficheros**: 1.022 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
    +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,
    `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:

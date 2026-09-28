@@ -15,26 +15,33 @@
 //    `AppShell` y alimenta también el badge del menú. Si lo calculara aquí, el contador y la
 //    banda podrían decir cosas distintas.
 
-import { Link } from 'react-router'
+import { Link, useLocation } from 'react-router'
 import { AlertTriangle } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { Button } from '@/components/ui/button'
 
+// La banda NO se pinta en la pantalla a la que manda (§6ter, mismo criterio que
+// `AvisDiagnostic`): en /organitzacio invitaba a ir donde ya estabas.
+const RUTES_MUDES = ['/organitzacio']
+
 export default function AvisRegistreIncomplet({ falten }: { falten: string[] }) {
   const { t } = useT()
-  if (falten.length === 0) return null
+  const { pathname } = useLocation()
+  if (falten.length === 0 || RUTES_MUDES.includes(pathname)) return null
 
   return (
     <div
       role="status"
-      className="mb-4 flex items-start gap-3 rounded-lg border border-error bg-error-fondo px-4 py-3 text-sm text-error"
+      className="mb-4 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border border-error bg-error-fondo px-4 py-3 text-sm text-error"
     >
       <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-      <p className="min-w-0">
+      <p className="min-w-0 flex-1">
         <span className="font-medium">{t('reg_inc.titol')}</span>{' '}
         <span>{t('reg_inc.falten', { camps: falten.map((c) => t(`f.${c}`)).join(', ') })}</span>
       </p>
-      <Button asChild size="sm" className="ml-auto h-11 shrink-0 whitespace-normal md:h-8">
+      {/* Regla 4 de §2: en móvil el botón va en su propia línea, o aplasta el texto. */}
+      <Button asChild size="sm"
+        className="order-1 h-11 w-full shrink-0 whitespace-normal sm:order-none sm:ml-auto sm:h-8 sm:w-auto">
         <Link to="/organitzacio">{t('reg_inc.completa')}</Link>
       </Button>
     </div>

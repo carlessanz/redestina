@@ -19,6 +19,11 @@
 //    `localStorage`, ni estado que sobreviva a la pantalla.
 //
 // Mismo contrato que `albarans.ts`, `convenis.ts` y `documents.ts`: **nunca lanza**.
+//
+// ⚠️ `missatge` ES SIEMPRE UNA CLAVE i18n, nunca el texto de Postgres (28-09-2026). Antes
+//    devolvía `error.message` tal cual, y el toast enseñaba «Aquest conveni no esta pendent
+//    de signatura (estat vigent)» —sin acentos y en catalán también en castellano—. Quien
+//    llama hace `t(r.missatge)`.
 
 import { supabase } from './supabase'
 import type { ResultatRpc } from './albarans'
@@ -62,10 +67,23 @@ export interface EnllacPropi {
   caduca_at: string
 }
 
+/**
+ * El rechazo de `acunar_enllac_propi()` / `signar_conveni_propi()` traducido a una clave.
+ * Se reconoce por una subcadena estable del mensaje (el SQLSTATE lo comparten varios).
+ */
+export function clauErrorPendent(missatge: string | null | undefined): string {
+  const m = missatge ?? ''
+  if (m.includes('Ja has signat')) return 'pend.err_ja_signat'
+  if (m.includes('no esta pendent')) return 'pend.err_no_pendent'
+  if (m.includes('Nomes el titular')) return 'pend.err_titular'
+  if (m.includes('no es teu') || m.includes('no es teva')) return 'pend.err_no_teu'
+  return 'pend.err_generic'
+}
+
 export async function carregaPendents(): Promise<ResultatRpc<Pendent[]>> {
   try {
     const { data, error } = await supabase.rpc('pendents_meus')
-    if (error) return { ok: false, missatge: error.message || 'pend.err_generic', codi: error.code ?? null }
+    if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
     return { ok: true, data: (data as Pendent[] | null) ?? [] }
   } catch {
     return { ok: false, missatge: 'pend.err_generic', codi: null }
@@ -80,7 +98,7 @@ export async function acunarEnllacPropi(p: Pendent): Promise<ResultatRpc<EnllacP
       p_objeto_id: p.objeto_id,
       p_rol_parte: p.rol_parte,
     })
-    if (error) return { ok: false, missatge: error.message || 'pend.err_generic', codi: error.code ?? null }
+    if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
     return { ok: true, data: data as EnllacPropi }
   } catch {
     return { ok: false, missatge: 'pend.err_generic', codi: null }
@@ -105,7 +123,7 @@ export async function signarConveniPropi(
       p_tipo_org: tipusOrg,
       p_org: orgId,
     })
-    if (error) return { ok: false, missatge: error.message || 'pend.err_generic', codi: error.code ?? null }
+    if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
     return { ok: true, data: data as EnllacPropi }
   } catch {
     return { ok: false, missatge: 'pend.err_generic', codi: null }

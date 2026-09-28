@@ -22,6 +22,7 @@ import { AlertTriangle, ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
@@ -426,7 +427,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await calcularTancament(id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.calculated', {
       n: res.data.donants, kg: kg(res.data.kg_total), b: res.data.bloquejats,
     }))
@@ -450,7 +451,7 @@ export default function TancamentDetall() {
     for (const d of candidats) {
       const res = await emetreResum(d.id, true)
       if (res.ok) fets += 1
-      else fallits.push(`${nom(d)}: ${res.missatge}`)
+      else fallits.push(`${nom(d)}: ${textError(t, res)}`)
     }
     setOcupat(false)
     if (fets > 0) { toast.success(t('tan.summaries_sent', { n: fets })); void refrescaComptadors() }
@@ -464,7 +465,7 @@ export default function TancamentDetall() {
     // Por `id`, no por ejercicio: se cierra el que se tiene delante. Ver `tancament.ts`.
     const res = await tancarTancament(id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.closed'))
     void refrescaComptadors()
     await refresca()
@@ -474,7 +475,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await marcarDeclarat(id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.declared'))
     void refrescaComptadors()
     await refresca()
@@ -485,7 +486,7 @@ export default function TancamentDetall() {
     const res = await reiniciarTancamentProva(id)
     setOcupat(false)
     setReinici(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     // Las dos cifras que hay que poder leer: el reinicio NO toca canalizaciones ni
     // albaranes, y esto es lo que lo demuestra sin abrir la base.
     toast.success(t('tan.reset_done', {
@@ -498,7 +499,7 @@ export default function TancamentDetall() {
 
   async function exporta182() {
     const res = await dades182(id)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     if (res.data.length === 0) { toast.error(t('tan.no_182')); return }
     const capceleres: Record<string, string> = {
       nif: t('tan.h182_nif'), razon_social: t('tan.h182_name'),
@@ -568,7 +569,7 @@ export default function TancamentDetall() {
     }
     if (entrada.length === 0) { toast.error(t('tan.cmp_bad_input')); return }
     const res = await compararTancamentProva(id, entrada)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setComparacio(res.data)
   }
 
@@ -578,7 +579,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await emetreResum(d.id, provisional)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.summary_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
@@ -590,7 +591,7 @@ export default function TancamentDetall() {
     const res = await registrarFactura({ cd: factura.id, numero, data, import: importe, docExtern: null })
     setOcupat(false)
     setFactura(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t(res.data.estado === 'coincident' ? 'tan.inv_ok' : 'tan.inv_diff'))
     void refrescaComptadors()
     await refresca()
@@ -602,7 +603,7 @@ export default function TancamentDetall() {
     const res = await simularFactura(simula.id, desviacio)
     setOcupat(false)
     setSimula(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t(res.data.estado === 'coincident' ? 'tan.inv_ok' : 'tan.inv_diff'))
     void refrescaComptadors()
     await refresca()
@@ -631,7 +632,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await emetreCertificatsTancament(id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setResultatMassiu(res.data)
     toast.success(t('tan.certs_done', {
       n: res.data.emesos, m: res.data.saltats.length,
@@ -644,7 +645,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await emetreCertificat(d.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.cert_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
@@ -656,7 +657,7 @@ export default function TancamentDetall() {
     const res = await rectificarCertificat(rectifica.id, motiu)
     setOcupat(false)
     setRectifica(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.cert_rectified', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
     await refresca()
@@ -666,7 +667,7 @@ export default function TancamentDetall() {
     setOcupat(true)
     const res = await marcarEnviat(d.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.marked_sent'))
     void refrescaComptadors()
     await refresca()

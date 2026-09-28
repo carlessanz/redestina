@@ -24,6 +24,7 @@ import { FileSignature, Loader2, PackageCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { acunarEnllacPropi, carregaPendents } from '../../lib/pendents'
+import { refrescaAvisos } from '../../lib/refrescAvisos'
 import DialegFirmaConveni from '../DialegFirmaConveni'
 import type { Pendent } from '../../lib/pendents'
 import { rutaPerProposit } from '../../lib/documentsPanell'
@@ -77,7 +78,8 @@ export default function PendentsDeTu({
     setObrint(clau(p))
     const r = await acunarEnllacPropi(p)
     setObrint(null)
-    if (!r.ok) { toast.error(r.missatge || t('pend.err_generic')); return }
+    // `missatge` es siempre una clave (`pendents.ts`): nunca el texto de Postgres.
+    if (!r.ok) { toast.error(t(r.missatge || 'pend.err_generic')); return }
     // `url_path` lo compone la base; `rutaPerProposit` es el respaldo si un día no viniera.
     const desti = r.data.url_path || rutaPerProposit(p.proposito, r.data.token)
     navigate(desti, { state: { tornar: tornarA } })
@@ -152,7 +154,9 @@ export default function PendentsDeTu({
           tipusOrg={firmant.tipus}
           orgId={firmant.org}
           onTancar={() => setFirmant(null)}
-          onFirmat={() => { setFirmant(null); void carrega() }}
+          // Y la banda del convenio, el Mercat y los contadores del menú: todos dependen de
+          // él y tienen su propia lectura (`refrescAvisos.ts`).
+          onFirmat={() => { setFirmant(null); void carrega(); refrescaAvisos() }}
         />
       )}
     </Card>

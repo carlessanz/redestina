@@ -296,7 +296,8 @@ export function parseNumero(texto: string | null): number | null {
 
 /** El trozo « El màxim són N kg.» que acompaña a la pregunta, o nada si no se sabe. */
 export function textMaxim(disp: number): string {
-  return disp > 0 ? ` El màxim són ${formatKg(disp)} kg.` : "";
+  if (disp <= 0) return "";
+  return disp === 1 ? " El màxim és 1 kg." : ` El màxim són ${formatKg(disp)} kg.`;
 }
 
 /** El aviso de pasarse, o `null` si el número cabe (o si no hay tope que aplicar). */
@@ -307,10 +308,37 @@ export function avisKgExcessius(kg: number, disp: number): string | null {
     `Escriu un número igual o inferior a ${max}. Si els vols tots, escriu ${max}.`;
 }
 
-/** Sin decimales cuando no hacen falta: «300», no «300.00». */
-function formatKg(n: number): string {
-  return Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)));
+/** Sin decimales cuando no hacen falta, y con coma: «300», «212,5». */
+export function formatKg(n: number): string {
+  return (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)))).replace(".", ",");
 }
+
+/** «0,80 €/kg», igual que en el texto de la oferta. */
+function eurKg(n: number): string {
+  return `${n.toFixed(2).replace(".", ",")} €/kg`;
+}
+
+/** «de Tomàquet» / «d'Albercoc». */
+function de(nom: string): string {
+  return /^[aeiouàèéíòóúh]/i.test(nom.trim()) ? `d'${nom}` : `de ${nom}`;
+}
+
+/** De qué oferta se habla, para que la pregunta no sea anónima: «de Tomàquet (E-…)». */
+async function quinaOferta(supabase: Cliente, excedenteId: string): Promise<string> {
+  const { data } = await supabase
+    .from("excedentes").select("producto, id_excedente").eq("id", excedenteId).maybeSingle();
+  if (!data?.producto) return "";
+  return ` ${de(String(data.producto))}${data.id_excedente ? ` (${data.id_excedente})` : ""}`;
+}
+
+/** Los dos botones con los que se envía la oferta (`OfferDetail`). */
+const BOTONS_OFERTA = [
+  { id: "accept:si", titulo: "M'interessa" },
+  { id: "accept:no", titulo: "Ara no" },
+];
+
+/** Cuánto tiempo, tras enviar la oferta, un mensaje que no se entiende repite la pregunta. */
+const HORES_REPETIR_PREGUNTA = 48;
 
 /** Los kg de la oferta que todavía no tienen entidad. 0 = no se sabe (ver arriba). */
 async function kgDisponibles(supabase: Cliente, excedenteId: string): Promise<number> {
@@ -372,6 +400,8 @@ async function finalizarAceptacion(
   kg: number,
   preu: number | null,
   nota: string | null,
+  /** Lo que se le contesta. Por defecto, la confirmación normal. */
+  resposta?: string,
 ): Promise<void> {
   const cambios: Record<string, unknown> = {
     estado: "acceptada",
@@ -386,8 +416,9 @@ async function finalizarAceptacion(
   if (error) console.error("oferta_respuestas finalizar:", error.message);
   await sendText(
     supabase, from,
-    `Perfecte, hem registrat que en vols ${kg} kg. L'equip de Redestina ho confirmarà i ` +
-      "coordinarà la recollida. 🚚",
+    resposta ??
+      `Perfecte, hem registrat que en vols ${formatKg(kg)} kg. L'equip de Redestina ho ` +
+        "confirmarà i coordinarà la recollida. 🚚",
   );
 }
 
@@ -422,11 +453,15 @@ export async function procesarRespuestaOferta(
   // intake) no se tocan: se dejan pasar al intake.
   if (id && !id.startsWith("accept:")) return false;
 
-  // La respuesta se vincula a la última oferta pendiente enviada a este número.
+  // La respuesta se vincula a la última oferta pendiente enviada a este número POR WHATSAPP.
+  // ⚠️ El canal importa: una oferta enviada por correo también deja su fila `pendent` con
+  //    el teléfono de la ficha, y sin este filtro un «ok» cualquiera por WhatsApp aceptaba
+  //    una oferta que la entidad solo había visto (o no) en su bandeja de correo.
   const { data: filas } = await supabase
     .from("oferta_respuestas")
     .select("id, excedente_id, entidad_id, dialeg_pas, dialeg_dades, enviado_at")
     .eq("telefono", from)
+    .eq("canal", "whatsapp")
     .eq("estado", "pendent")
     .order("enviado_at", { ascending: false })
     .limit(1);
@@ -456,18 +491,19 @@ export async function procesarRespuestaOferta(
 
   // ---- Paso: quants kg ----
   if (pas === "kg") {
-    // Cambio de idea: un "no" claro cancela la aceptación.
-    if (clasificar(texto ?? "") === "rebutjada") {
+    // Primero el NÚMERO y después el «no»: «no més de 200» o «no ho sé, uns 100» son
+    // aceptaciones con cantidad, y clasificándolas primero se registraban como rechazo.
+    const disp = await kgDisponibles(supabase, fila.excedente_id);
+    const kg = parseNumero(texto);
+    if (kg === null && clasificar(texto ?? "") === "rebutjada") {
       await rechazar(supabase, from, fila.id, texto ?? "");
       return true;
     }
-    const disp = await kgDisponibles(supabase, fila.excedente_id);
-    const kg = parseNumero(texto);
     if (kg === null || kg <= 0) {
       await sendText(
         supabase,
         from,
-        `Escriu quants kg en vols, només el número (p. ex. 200).${textMaxim(disp)}`,
+        `No t'he entès. Escriu quants kg en vols (p. ex. 200), o *NO* si ja no la vols.${textMaxim(disp)}`,
       );
       return true;
     }
@@ -488,7 +524,7 @@ export async function procesarRespuestaOferta(
         .eq("id", fila.id);
       await sendBotones(
         supabase, from,
-        `El preu mínim d'aquesta oferta és ${Number(exc.preu_minim)} €/kg. Hi estàs d'acord?`,
+        `El preu mínim d'aquesta oferta és ${eurKg(Number(exc.preu_minim))}. Hi estàs d'acord?`,
         BOTONS_PREU,
       );
       return true;
@@ -515,9 +551,13 @@ export async function procesarRespuestaOferta(
         .from("excedentes").select("preu_minim").eq("id", fila.excedente_id).maybeSingle();
       await finalizarAceptacion(supabase, from, fila.id, kg, Number(exc?.preu_minim ?? 0), null);
     } else {
+      // No se le puede contestar «Perfecte… coordinarà la recollida»: acaba de decir que no
+      // al precio, y la fila queda para que el equipo decida.
       await finalizarAceptacion(
         supabase, from, fila.id, kg, null,
         "L'entitat no accepta el preu mínim (a revisar per l'equip).",
+        `D'acord. Hem apuntat que en vols ${formatKg(kg)} kg però que no acceptes el preu mínim. ` +
+          "L'equip de Redestina ho revisarà.",
       );
     }
     return true;
@@ -537,7 +577,20 @@ export async function procesarRespuestaOferta(
     : id === "accept:no"
     ? "rebutjada" as const
     : clasificar(texto ?? "");
-  if (!inicial) return false;
+  if (!inicial) {
+    // Un mensaje que no es ni sí ni no, con una oferta enviada hace poco: se le vuelve a
+    // preguntar con los botones. Antes se devolvía `false` y a una entidad no le contestaba
+    // nadie —o, con doble rol, le salía la guía para publicar una oferta suya—.
+    const enviado = fila.enviado_at ? new Date(fila.enviado_at).getTime() : null;
+    const recent = enviado !== null && Date.now() - enviado <= HORES_REPETIR_PREGUNTA * 3600_000;
+    if (!recent || !(texto ?? "").trim()) return false;
+    await sendBotones(
+      supabase, from,
+      `Tens pendent de resposta l'oferta${await quinaOferta(supabase, fila.excedente_id)}. T'interessa?`,
+      BOTONS_OFERTA,
+    );
+    return true;
+  }
 
   if (inicial === "rebutjada") {
     await rechazar(supabase, from, fila.id, texto ?? "");
@@ -554,7 +607,8 @@ export async function procesarRespuestaOferta(
   await sendText(
     supabase,
     from,
-    `Perfecte! Quants kg en vols?${textMaxim(disp)} Escriu només el número.`,
+    `Perfecte! Quants kg${await quinaOferta(supabase, fila.excedente_id)} en vols?${textMaxim(disp)} ` +
+      "Escriu només el número.",
   );
   return true;
 }

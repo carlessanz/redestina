@@ -13,10 +13,13 @@ parámetros. Abajo va el mapeo desde los campos del excedente (`componerTextoOfe
 
 ---
 
-## 0. Plantillas de primer contacto (salutació) — piden responder «OK»
+## 0. Plantillas de primer contacto (salutació) — piden responder «ALTA»
 
 Sirven para el **primer contacto** (fuera de la ventana de 24 h): abren la conversación pidiendo
-que respondan «OK». La app las elige por rol desde `src/lib/plantillas.ts`
+que respondan «ALTA».
+⚠️ **ALTA y no «OK»** (28-09-2026): ALTA es la palabra que da el consentimiento (`opt_in`) y el
+webhook la confirma; un «OK» solo abría 24 h de ventana y, si la entidad tenía una oferta
+pendiente, **la aceptaba** sin querer. La app las elige por rol desde `src/lib/plantillas.ts`
 (`plantillaPrimerContacte`); hoy con el flag `PLANTILLES_CA_APROVADES = false` → mientras se está
 en test se envía `hello_world`, y al aprobarlas en Meta y poner el flag a `true` se envían estas.
 
@@ -28,7 +31,7 @@ en test se envía `hello_world`, y al aprobarlas en Meta y poner el flag a `true
 - **Body** (sin variables):
 
 ```
-Hola! Som l'equip de Redestina d'Espigoladors 🌱. T'ajudem a canalitzar els teus excedents agrícoles. Respon OK per activar la conversa i poder oferir-nos excedents quan vulguis. Gràcies!
+Hola! Som l'equip de Redestina, d'Espigoladors 🌱. T'ajudem a donar sortida als teus excedents agrícoles. Si vols que et puguem escriure per WhatsApp, respon ALTA. Gràcies!
 ```
 
 ### 0b. `salutacio_entitat` — primer contacto con una entidad receptora
@@ -39,11 +42,11 @@ Hola! Som l'equip de Redestina d'Espigoladors 🌱. T'ajudem a canalitzar els te
 - **Body** (sin variables):
 
 ```
-Hola! Som l'equip de Redestina d'Espigoladors 🌱. Col·laborem amb entitats socials per aprofitar excedents agrícoles. Respon OK per activar la conversa i començar a rebre les nostres ofertes. Gràcies!
+Hola! Som l'equip de Redestina, d'Espigoladors 🌱. Col·laborem amb entitats socials per aprofitar excedents agrícoles. Si vols rebre les nostres ofertes per WhatsApp, respon ALTA. Gràcies!
 ```
 
 Sin variables → aprobación más fácil. Si Meta las reclasifica a `MARKETING`, requerirán opt-in de
-marketing; en ese caso valorar añadir un botón de respuesta rápida «OK» en lugar de pedirlo en el texto.
+marketing; en ese caso valorar añadir un botón de respuesta rápida «ALTA» en lugar de pedirlo en el texto.
 
 ---
 
@@ -56,7 +59,7 @@ marketing; en ese caso valorar añadir un botón de respuesta rápida «OK» en 
 - **Body** (7 variables):
 
 ```
-Hola! Hi ha un excedent disponible que us pot interessar:
+Hola! Hi ha un excedent disponible que et pot interessar:
 
 🌿 Producte: {{1}}
 👩‍🌾 Productor: {{2}}
@@ -65,7 +68,7 @@ Hola! Hi ha un excedent disponible que us pot interessar:
 📅 Disponible: {{5}}
 ⏰ Horari recollida: {{6}}
 
-Responsable: {{7}}. Respon a aquest missatge si el voleu recollir.
+Responsable: {{7}}. Respon a aquest missatge si la vols.
 ```
 
 - **Mapeo de variables** (desde el excedente):
@@ -76,6 +79,13 @@ Responsable: {{7}}. Respon a aquest missatge si el voleu recollir.
   5. `disponible_hasta`
   6. `horari_recollida`
   7. responsable (equipo Redestina)
+
+- ⚠️ **Antes de darla de alta en Meta** (revisión del 28-09-2026): le falta una variable con la
+  **modalidad y el preu mínim** —tal como está, una venta llegaría sin precio— y no lleva botones
+  de respuesta rápida, así que la respuesta dependería de adivinar el sí/no del texto. Y la línea
+  «Productor» nombra al donante: en donación, D3 pide municipio y comarca, no el nombre (§4).
+  Añadir la variable y los botones [M'interessa] [Ara no] y decidir lo de D3 antes de enviarla a
+  aprobar. La fecha (5) ya se manda como `dd/mm/aaaa` (`ofertaTemplate.ts`).
 
 - **Ejemplo de `components` para `whatsapp-send`:**
 
@@ -105,7 +115,7 @@ Responsable: {{7}}. Respon a aquest missatge si el voleu recollir.
 - **Body** (2 variables):
 
 ```
-Gràcies! Hem registrat la teva oferta de {{1}} amb la referència {{2}}. T'avisarem quan estigui canalitzada. 🌱
+Gràcies! Hem registrat la teva oferta de {{1}} amb la referència {{2}}. L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar. 🌱
 ```
 
 - **Mapeo:** 1 = `producto`, 2 = `id_excedente`.

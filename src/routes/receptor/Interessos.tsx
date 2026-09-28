@@ -17,14 +17,16 @@ import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
+import type { PuntProces } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
-import type { EstadoAlbaran, Excedente, OfertaRespuesta } from '../../types'
+import type { EstadoAlbaran, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor, { kgFmt } from '../../components/DetallOfertaReceptor'
+import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Link } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
@@ -32,12 +34,23 @@ import {
   Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 
-// La oferta entera (`excedentes(*)`): la tarjeta abre su detalle (28-09-2026), y el detalle
-// es el mismo del Mercat.
-type AmbOferta = OfertaRespuesta & { excedentes: Excedente | null }
+// La oferta con las columnas de `OfertaReceptor` y ninguna más (D3 también en la API: ni
+// `texto_oferta` ni `id_excedente` ni `productor_id`). La tarjeta abre su detalle, que es el
+// mismo del Mercat.
+type AmbOferta = Pick<
+  OfertaRespuesta,
+  | 'id' | 'estado' | 'aprovacio' | 'kg_solicitados' | 'preu_ofert' | 'motiu_aprovacio'
+  | 'canalizacion_id' | 'enviado_at' | 'respondido_at'
+> & { excedentes: OfertaReceptor | null }
 
-/** Lo único que hace falta del albarán de entrega para contar la etapa. */
-type AlbaraEnt = Pick<AlbaranBandeja, 'id' | 'numero_completo' | 'estado' | 'canalizacion_id'>
+/**
+ * Lo único que hace falta del albarán de entrega para contar la etapa. `ENT` en donación y
+ * `OPE` en venta o maquila: los dos cuelgan 1:1 de la canalización.
+ */
+type AlbaraEnt = Pick<
+  AlbaranBandeja,
+  'id' | 'numero_completo' | 'estado' | 'canalizacion_id' | 'confirmado_at' | 'kg_confirmados'
+>
 
 interface CanalAmbOferta {
   id: string
@@ -45,8 +58,8 @@ interface CanalAmbOferta {
   kg_reales: number | null
   data_hora_recollida: string | null
   created_at: string
-  // La oferta entera: la fila abre su detalle, el mismo del Mercat (28-09-2026).
-  excedentes: Excedente | null
+  // La oferta, con las columnas de `OfertaReceptor`: la fila abre su detalle (28-09-2026).
+  excedentes: OfertaReceptor | null
 }
 
 /** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
@@ -63,44 +76,55 @@ function dataCurtaSenseAny(iso: string | null | undefined): string | null {
 /** Un albarán anulado o rectificado no cuenta: la entrega vuelve a estar donde estaba. */
 const ALBARA_VIU: EstadoAlbaran[] = ['emitido', 'entregado', 'confirmado', 'conciliado']
 
+/** De cada canalización, su albarán de entrega, prefiriendo el vivo al anulado. */
+function albaraPerCanalitzacio(files: AlbaraEnt[]): Record<string, AlbaraEnt> {
+  const per: Record<string, AlbaraEnt> = {}
+  for (const a of files) {
+    if (!a.canalizacion_id) continue
+    const actual = per[a.canalizacion_id]
+    const viu = ALBARA_VIU.includes(a.estado as EstadoAlbaran)
+    if (!actual || (viu && !ALBARA_VIU.includes(actual.estado as EstadoAlbaran))) {
+      per[a.canalizacion_id] = a
+    }
+  }
+  return per
+}
+
 export function Interessos() {
   const { t } = useT()
   const organitzacio = useOrganitzacio('entidad')
   const [files, setFiles] = useState<AmbOferta[]>([])
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   const [carregant, setCarregant] = useState(true)
+  const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
 
   const carrega = useCallback(async () => {
     if (!entidadId) { setCarregant(false); return }
-    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
-    // `ENT` y `R-ENT`: una entrega rectificada sigue siendo la entrega de ese interés, y
-    // mirar solo el original dejaría la etapa colgada en «Assignada» para siempre.
+    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46), y la de la oferta sin nada
+    // que nombre a la productora (`OfertaReceptor`).
+    // `ENT`/`R-ENT` en donación y `OPE`/`R-OPE` en venta o maquila: una entrega rectificada
+    // sigue siendo la entrega de ese interés, y mirar solo el original dejaría la etapa
+    // colgada en «Assignada» para siempre.
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('*, excedentes(*)')
+        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
         .from('v_albaranes_bandeja')
-        .select('id, numero_completo, estado, canalizacion_id')
-        .in('tipo', ['ENT', 'R-ENT']),
+        .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
+        .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE']),
     ])
+    // Un fallo de carga no es «todavía no has pedido nada»: se dice.
+    if (resp.error || alb.error) { setErrorCarrega(true); setCarregant(false); return }
+    setErrorCarrega(false)
 
     // El interés aprobado y su albarán de entrega comparten `canalizacion_id`: es lo único
     // que los une, porque el albarán cuelga de la canalización y no de la respuesta.
-    const per: Record<string, AlbaraEnt> = {}
-    for (const a of ((alb.data as AlbaraEnt[] | null) ?? [])) {
-      if (!a.canalizacion_id) continue
-      const actual = per[a.canalizacion_id]
-      const viu = ALBARA_VIU.includes(a.estado as EstadoAlbaran)
-      if (!actual || (viu && !ALBARA_VIU.includes(actual.estado as EstadoAlbaran))) {
-        per[a.canalizacion_id] = a
-      }
-    }
-    setAlbarans(per)
+    setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
     setFiles((resp.data as unknown as AmbOferta[]) ?? [])
     setCarregant(false)
   }, [entidadId])
@@ -123,6 +147,15 @@ export function Interessos() {
   const llegenda = llegendaSimpleInteres()
   const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
+  /**
+   * Cuando el equipo no se la asignó, el porqué: sin él la entidad solo veía «No
+   * disponible» y la leyenda la mandaba a abrirla para ver un motivo que no se pintaba.
+   * Con `{motiu}` vacío el texto acaba en espacio; se recorta.
+   */
+  const passaAmbMotiu = (punt: PuntProces): string | null => (punt.etapa === 'no_assignada'
+    ? t(punt.claus.passa, punt.vars).replace(/\s+/g, ' ').trim()
+    : null)
+
   return (
     <Card>
       <CardHeader>
@@ -132,10 +165,11 @@ export function Interessos() {
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
-        {!carregant && files.length === 0 && (
+        {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
+        {!carregant && !errorCarrega && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('int.empty')}</p>
         )}
-        {files.map((f) => {
+        {!errorCarrega && files.map((f) => {
           const alb = f.canalizacion_id ? albarans[f.canalizacion_id] : undefined
           const punt = puntInteres({
             estado: f.estado,
@@ -148,6 +182,7 @@ export function Interessos() {
           // Una línea que resuelve a «—» no se pinta: un hueco con su margen se lee como un
           // fallo de carga. Mismo criterio que `QueTocaAra`.
           const toca = t(punt.claus.toca, punt.vars).trim()
+          const passa = passaAmbMotiu(punt)
           const est = estatSimpleInteres(punt)
           // La fecha de lo último que ha hecho la entidad: cuándo contestó o, si todavía
           // no lo ha hecho, cuándo le llegó la oferta.
@@ -178,6 +213,7 @@ export function Interessos() {
                   {t(est.key)}{data ? ` · ${data}` : ''}
                 </BadgeEstat>
               </div>
+              {passa && <p className="mt-2 text-sm text-muted-foreground">{passa}</p>}
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className={cn(
                   'mt-2 text-sm',
@@ -204,6 +240,7 @@ export function Interessos() {
           })
           const est = estatSimpleInteres(punt)
           const toca = t(punt.claus.toca, punt.vars).trim()
+          const passa = passaAmbMotiu(punt)
           // La oferta todavía se puede pedir: se manda al Mercat, que es donde vive el botón.
           const perDemanar = est.estat === 'per_respondre'
             && ['publicada', 'parcial'].includes(obert.excedentes.estado)
@@ -211,6 +248,7 @@ export function Interessos() {
             <DialogContent className="max-h-[85dvh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
               <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              {passa && <p className="text-sm">{passa}</p>}
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className="text-sm text-muted-foreground">{toca}</p>
               )}
@@ -236,73 +274,98 @@ export function Historic() {
   const [files, setFiles] = useState<CanalAmbOferta[]>([])
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   const [carregant, setCarregant] = useState(true)
+  const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<CanalAmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
 
   useEffect(() => {
     if (!entidadId) { setCarregant(false); return }
     let viu = true
-    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). El albarán de entrega de cada
-    // canalización, igual que en Interessos: `ENT` y `R-ENT`, prefiriendo el vivo.
+    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46), y la oferta con las columnas
+    // de `OfertaReceptor` (D3). El albarán de entrega de cada canalización, igual que en
+    // Interessos: `ENT`/`R-ENT` y `OPE`/`R-OPE`, prefiriendo el vivo.
     void Promise.all([
       supabase
         .from('canalizaciones')
-        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(*)')
+        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('created_at', { ascending: false }),
       supabase
         .from('v_albaranes_bandeja')
-        .select('id, numero_completo, estado, canalizacion_id')
-        .in('tipo', ['ENT', 'R-ENT']),
+        .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
+        .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE']),
     ]).then(([can, alb]) => {
       if (!viu) return
-      const per: Record<string, AlbaraEnt> = {}
-      for (const a of ((alb.data as AlbaraEnt[] | null) ?? [])) {
-        if (!a.canalizacion_id) continue
-        const actual = per[a.canalizacion_id]
-        const viuA = ALBARA_VIU.includes(a.estado as EstadoAlbaran)
-        if (!actual || (viuA && !ALBARA_VIU.includes(actual.estado as EstadoAlbaran))) per[a.canalizacion_id] = a
-      }
-      setAlbarans(per)
+      if (can.error || alb.error) { setErrorCarrega(true); setCarregant(false); return }
+      setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
       setFiles((can.data as unknown as CanalAmbOferta[]) ?? [])
       setCarregant(false)
     })
     return () => { viu = false }
   }, [entidadId])
 
-  // El título dice «rebudes»: solo cuenta lo que ha llegado (`kg_reales`). Lo asignado
-  // y todavía sin recibir va aparte, o la cifra afirmaría kilos que nadie ha entregado.
-  const totalKg = files.reduce((s, f) => s + Number(f.kg_reales ?? 0), 0)
-  const pendentKg = files.reduce((s, f) => s + (f.kg_reales == null ? Number(f.kg_confirmados ?? 0) : 0), 0)
+  /**
+   * ¿Ha llegado ya? `kg_reales` solo lo escribe la CONCILIACIÓN, así que una entrega que la
+   * entidad ya confirmó seguía saliendo «pendent de confirmar» hasta que el equipo
+   * conciliara. Lo decide el albarán: confirmado o conciliado = recibida.
+   */
+  const estatEntrega = (f: CanalAmbOferta): 'conciliada' | 'confirmada' | 'pendent' => {
+    const alb = albarans[f.id]
+    if (f.kg_reales != null || alb?.estado === 'conciliado') return 'conciliada'
+    if (alb?.estado === 'confirmado') return 'confirmada'
+    return 'pendent'
+  }
+  /** Los kilos recibidos: los reales si ya se concilió; los que confirmó la entidad si no. */
+  const kgRebuts = (f: CanalAmbOferta): number | null => {
+    const e = estatEntrega(f)
+    if (e === 'conciliada') return Number(f.kg_reales ?? albarans[f.id]?.kg_confirmados ?? f.kg_confirmados ?? 0)
+    if (e === 'confirmada') return Number(albarans[f.id]?.kg_confirmados ?? f.kg_confirmados ?? 0)
+    return null
+  }
+
+  // El título dice «rebudes»: cuenta lo que ha llegado, conciliado o ya confirmado por la
+  // entidad. Lo asignado y todavía sin recibir va aparte, o la cifra afirmaría kilos que
+  // nadie ha entregado — y lo ya confirmado no puede seguir contando como «pendent de rebre».
+  const totalKg = files.reduce((s, f) => s + (kgRebuts(f) ?? 0), 0)
+  const pendentKg = files.reduce((s, f) => s + (kgRebuts(f) == null ? Number(f.kg_confirmados ?? 0) : 0), 0)
   const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
-  /** Siempre una fecha, y nunca el código interno. ⚠️ «Recollida» solo con kilos reales:
-   *  `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el ENT (la fecha prevista),
-   *  así que la fecha sola no dice que haya llegado nada. */
-  const quan = (f: CanalAmbOferta) => (f.data_hora_recollida && f.kg_reales != null
-    ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
-    : f.data_hora_recollida
-      ? t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
-      : t('hist.assigned_on', { date: dataCurta(f.created_at) }))
+  /** Siempre una fecha, y nunca el código interno. ⚠️ La fecha sola no dice que haya
+   *  llegado nada: `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el albarán
+   *  (la fecha prevista). Lo que dice si llegó es `estatEntrega()`. */
+  const quan = (f: CanalAmbOferta) => {
+    const e = estatEntrega(f)
+    const data = f.data_hora_recollida ?? albarans[f.id]?.confirmado_at ?? null
+    if (e === 'conciliada' && data) return t('hist.collected_on', { date: dataCurta(data) })
+    if (e === 'confirmada' && data) return t('hist.confirmed_on', { date: dataCurta(data) })
+    if (f.data_hora_recollida) return t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
+    return t('hist.assigned_on', { date: dataCurta(f.created_at) })
+  }
   /** Claves propias y no las del productor: aquí los kilos se RECIBEN. */
-  const quants = (f: CanalAmbOferta) => (f.kg_reales != null
-    ? t('hist.kg_reals', { n: kgFmt(f.kg_reales) })
-    : t('hist.kg_assignats', { n: kgFmt(f.kg_confirmados ?? 0) }))
+  const quants = (f: CanalAmbOferta) => {
+    const rebuts = kgRebuts(f)
+    return rebuts != null
+      ? t('hist.kg_reals', { n: kgFmt(rebuts) })
+      : t('hist.kg_assignats', { n: kgFmt(f.kg_confirmados ?? 0) })
+  }
 
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('hist.title')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
+        {!errorCarrega && (
+          <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
             ? t('hist.subtitle_pending', { n: kgFmt(totalKg), m: kgFmt(pendentKg) })
             : t('hist.subtitle', { n: kgFmt(totalKg) })}</p>
+        )}
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
-        {!carregant && files.length === 0 && (
+        {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
+        {!carregant && !errorCarrega && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}
-        {files.map((f) => (
+        {!errorCarrega && files.map((f) => (
           // Toda la fila abre el detalle, como en Interessos (28-09-2026).
           <button type="button" key={f.id} onClick={() => f.excedentes && setObert(f)}
             className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">

@@ -27,17 +27,22 @@ export type DocFila = Pick<
   'id' | 'objeto_id' | 'objeto_tipo' | 'tipo' | 'numero_completo' | 'estado' | 'vigente' | 'ejercicio' | 'emitido_at'
 >
 
-/** Mismo vocabulario que la bandeja del equipo: los estados no se renombran por panel. */
+/**
+ * Esta lista solo la montan los paneles EXTERNOS, y ahí «Error» o «Pendent de PDF» no
+ * dicen nada útil a quien mira: el documento existe, su PDF se está preparando o el
+ * equipo lo está reintentando (el job reencola los fallidos, §4). Las dos cosas se dicen
+ * igual, «En preparació», en ámbar. La bandeja del equipo conserva los estados finos.
+ */
 const CLAU_ESTAT: Record<DocumentoEstado, string> = {
   emitido: 'doc.st_emitido',
-  pendiente_fichero: 'doc.st_pendent',
-  error: 'doc.st_error',
+  pendiente_fichero: 'doc.st_preparant',
+  error: 'doc.st_preparant',
 }
 
 const ESTIL_ESTAT: Record<DocumentoEstado, string> = {
   emitido: 'bg-exito-fondo text-exito',
   pendiente_fichero: 'bg-aviso-fondo text-aviso',
-  error: 'bg-error-fondo text-error',
+  error: 'bg-aviso-fondo text-aviso',
 }
 
 export default function LlistaDocuments({

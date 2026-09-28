@@ -112,7 +112,7 @@ export default function EnllacOrganitzacio({
     setOcupat(false)
     setObert(false)
     if (error) {
-      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : error.message)
+      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : t('appr.reg_error', { msg: error.message }))
       return
     }
     toast.success(t('org.unlink_ok'))

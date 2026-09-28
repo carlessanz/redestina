@@ -256,8 +256,10 @@ Deno.serve(async (req) => {
           // Palabras clave de opt-in / opt-out. Ambas se confirman por mensaje:
           // estamos dentro de la ventana de servicio, así que es gratis y no
           // requiere plantilla.
+          // BAIXA (catalán, que es la lengua de los mensajes) y BAJA, que era la única que
+          // se reconocía; se conservan las dos.
           const keyword = cuerpo?.trim().toUpperCase();
-          if (keyword === "BAJA") {
+          if (keyword === "BAIXA" || keyword === "BAJA") {
             const { error } = await supabase
               .from("wa_contacts")
               .update({ opt_in: false, opt_out_at: new Date().toISOString() })
@@ -266,8 +268,8 @@ Deno.serve(async (req) => {
             await sendText(
               supabase,
               from,
-              "Has estat donat de baixa de les notificacions. " +
-                "Escriu ALTA si vols tornar a rebre-les.",
+              "T'hem donat de baixa: no et tornarem a escriure per WhatsApp. " +
+                "Si vols tornar a rebre ofertes, escriu ALTA.",
             );
             continue;
           }
@@ -280,7 +282,8 @@ Deno.serve(async (req) => {
             await sendText(
               supabase,
               from,
-              "Alta confirmada. Escriu BAJA per deixar de rebre notificacions.",
+              "Alta confirmada: ja et podem escriure per WhatsApp. " +
+                "Si vols deixar de rebre missatges, escriu BAIXA.",
             );
             continue;
           }

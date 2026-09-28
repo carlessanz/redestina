@@ -188,7 +188,7 @@ Deno.serve(async (req) => {
 
     const { data: contact, error: contactError } = await supabase
       .from("wa_contacts")
-      .select("phone, opt_in, last_inbound_at")
+      .select("phone, opt_in, opt_in_at, opt_out_at, last_inbound_at")
       .eq("phone", to)
       .maybeSingle();
 
@@ -200,6 +200,19 @@ Deno.serve(async (req) => {
       return responder(
         { error: `El contacto ${to} no existe en wa_contacts`, code: "unknown_contact" },
         404,
+      );
+    }
+
+    // Quien escribió BAIXA no recibe NADA más, tampoco texto dentro de la ventana: escribir
+    // BAIXA la abre, y sin esto la siguiente oferta con botones le habría llegado igual.
+    // Vale hasta que vuelva a escribir ALTA (opt_in_at posterior a opt_out_at).
+    if (
+      contact.opt_out_at &&
+      (!contact.opt_in_at || new Date(contact.opt_out_at) > new Date(contact.opt_in_at))
+    ) {
+      return responder(
+        { error: `${to} s'ha donat de baixa dels missatges de WhatsApp`, code: "opt_out" },
+        403,
       );
     }
 

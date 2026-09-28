@@ -20,6 +20,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { cancelaOferta } from '../../lib/ofertes'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
@@ -107,7 +108,7 @@ export default function ProductorOfertaDetall() {
     setOcupatCancel(true)
     const r = await cancelaOferta(oferta.id, motiu)
     setOcupatCancel(false)
-    if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
     setCancelant(false)
     toast.success(t('po.cancelled'))
     await carrega()
@@ -216,7 +217,7 @@ export default function ProductorOfertaDetall() {
             disabled={!(cancelable || oferta.estado === 'bloqueada')}
             onChange={async (rutes) => {
               const r = await fixaFotos(oferta.id, rutes)
-              if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+              if (!r.ok) { toast.error(textError(t, r.error)); return }
               setOferta((o) => (o ? { ...o, fotos: rutes } : o))
             }}
           />

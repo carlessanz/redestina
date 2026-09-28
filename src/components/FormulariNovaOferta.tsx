@@ -37,6 +37,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { cn } from '../lib/utils'
 import { aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
@@ -142,7 +143,7 @@ export default function FormulariNovaOferta(
     let viu = true
     void carregaCamps(productorId).then((r) => {
       if (!viu) return
-      if (!r.ok || !r.data) setError(r.error ?? t('c.error'))
+      if (!r.ok || !r.data) setError(textError(t, r.error))
       else {
         setCampos(r.data.campos)
         // Puede no venir: la función se despliega después que esta pantalla.
@@ -260,7 +261,7 @@ export default function FormulariNovaOferta(
       municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
     })
     setDesantLloc(false)
-    if (!r.ok || !r.data) { toast.error(r.error ?? t('c.error')); return }
+    if (!r.ok || !r.data) { toast.error(textError(t, r.error)); return }
     const nou = r.data
     setCatalogos((c) => (c ? { ...c, ubicaciones: [...c.ubicaciones, nou] } : c))
     set('ubicacio', nou.id)
@@ -295,8 +296,8 @@ export default function FormulariNovaOferta(
         setError(t('po.missing_fields', { camps: etiquetas.join(', ') }))
         return
       }
-      setError(r.error ?? t('c.error'))
-      toast.error(r.error ?? t('c.error'))
+      // Solo la banda: un toast con el mismo texto a la vez repetía el aviso.
+      setError(textError(t, r.error))
       return
     }
     marcaProcesVist()

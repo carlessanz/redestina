@@ -25,6 +25,8 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { refrescaAvisos } from '../lib/refrescAvisos'
+import { textError } from '../lib/textError'
 import { signarConveniPropi } from '../lib/pendents'
 import FirmaConveni from './FirmaConveni'
 import {
@@ -57,7 +59,7 @@ export default function DialegFirmaConveni(
       if (!r.ok) {
         // El mensaje del servidor es el útil («ja l'has signat, falta la contrasignatura»,
         // «no hi ha plantilla vigent»): un «ha habido un error» no deja hacer nada.
-        setError(r.missatge === 'pend.err_generic' ? t('c.error') : r.missatge)
+        setError(textError(t, r))
         return
       }
       // De `/signar/<token>` solo interesa el token: la página no se visita.
@@ -94,6 +96,8 @@ export default function DialegFirmaConveni(
               ample
               onFirmat={() => {
                 onFirmat?.()
+                // Las bandas del panel (convenio, contadores) viven en AppShell.
+                refrescaAvisos()
                 toast.success(t('sig.done_title'))
               }}
             />

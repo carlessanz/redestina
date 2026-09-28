@@ -1,7 +1,7 @@
 // La tabla de albaranes de una organización, compartida por los dos paneles externos.
 //
-// Al productor le enseña los REC (lo que se le recogió) y al receptor los ENT (lo que se le
-// entregó), y en ninguno de los dos casos hay una sola columna de dinero — `albaran_lineas`
+// Al productor le enseña los REC (lo que se le recogió) y al receptor los ENT y los OPE (lo
+// que se le entregó), y en ninguno de los dos casos hay una sola columna de dinero — `albaran_lineas`
 // no la tiene, a propósito: un albarán con un precio convierte una donación en una venta a
 // ojos de quien lo lea.
 //
@@ -31,7 +31,13 @@ import {
 export default function TaulaAlbarans({
   files, docs, descarregador,
 }: {
-  files: AlbaranBandeja[]
+  // Solo lo que se pinta: el panel del receptor no pide a la bandeja las columnas que
+  // nombran a la productora (D3), y no tiene por qué para usar esta tabla.
+  files: Pick<
+    AlbaranBandeja,
+    'id' | 'numero_completo' | 'producto' | 'estado' | 'emitido_at'
+    | 'kg_validados' | 'kg_confirmados' | 'kg_neto' | 'kg_previstos'
+  >[]
   docs: Pick<Documento, 'id' | 'objeto_id' | 'objeto_tipo' | 'numero_completo' | 'estado' | 'vigente'>[]
   descarregador: ReturnType<typeof useDescarregaDocument>
 }) {

@@ -224,9 +224,15 @@ export function componerTextoOferta(campos: {
     `👥 RESPONSABLE: ${campos.responsable}`,
     `📝 OBSERVACIONS: ${campos.observacions}`,
     "",
-    "✅ Per acceptar aquesta oferta respon *SÍ* (o *NO* per descartar-la).",
+    "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
   );
   return lineas.join("\n");
+}
+
+/** «1 caixa», «3 caixes», «1 palet», «2 palets». */
+export function textCaixes(n: number, format: unknown): string {
+  const palet = format === "palet";
+  return `${n} ${palet ? (n === 1 ? "palet" : "palets") : (n === 1 ? "caixa" : "caixes")}`;
 }
 
 /** El formato de entrega en palabras, para el texto de la oferta. */
@@ -320,7 +326,7 @@ export async function crearExcedente(
     productor: nomOrganitzacio,
     municipi: municipio,
     ubicacio: ubicacion?.gmaps_url || undefined,
-    quantitat: `${kg}kg aprox${d.caixes ? ` · ${d.caixes} ${d.format_entrega === "palet" ? "palets" : "caixes"}` : ""}`,
+    quantitat: `${String(kg).replace(".", ",")} kg aprox${d.caixes ? ` · ${textCaixes(Number(d.caixes), d.format_entrega)}` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
     horari: String(d.horari ?? "") || undefined,
     modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
@@ -421,7 +427,10 @@ export async function crearExcedenteDesdeSesion(
   if (!r.ok) {
     await sendText(
       supabase, sesion.telefono,
-      "Hi ha hagut un problema en registrar l'oferta. Ho revisem i et diem alguna cosa.",
+      // La sesión se queda en el último paso: volver a escribir las observaciones reintenta
+      // el alta. Antes decía «ho revisem i et diem alguna cosa», y no avisaba a nadie.
+      "No hem pogut registrar l'oferta per un error tècnic. D'aquí a uns minuts, torna a " +
+        "escriure les observacions per tornar-ho a provar, o escriu *Stop* per cancel·lar-la.",
     );
     return;
   }
@@ -430,7 +439,7 @@ export async function crearExcedenteDesdeSesion(
   await sendText(
     supabase, sesion.telefono,
     `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${r.idExcedente}. ` +
-      `T'avisarem quan estigui canalitzada.`,
+      "L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar.",
   );
 
   // Y por correo, si la ficha lo tiene (deuda §12.94). No sustituye al WhatsApp de arriba:

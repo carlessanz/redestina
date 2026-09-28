@@ -246,7 +246,7 @@ describe('componerTextoOferta', () => {
   it('termina explicando cómo aceptar, con el SÍ y el NO que espera el diálogo', () => {
     const t = componerTextoOferta(campos())
     expect(t.trimEnd().endsWith(
-      '✅ Per acceptar aquesta oferta respon *SÍ* (o *NO* per descartar-la).',
+      "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
     )).toBe(true)
   })
 
@@ -382,7 +382,7 @@ describe('componerTextoOferta · producte al camp', () => {
       expect(t, `falta ${etiqueta}`).toContain(etiqueta)
     }
     expect(t.trimEnd().endsWith(
-      '✅ Per acceptar aquesta oferta respon *SÍ* (o *NO* per descartar-la).',
+      "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
     )).toBe(true)
   })
 })

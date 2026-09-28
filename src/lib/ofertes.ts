@@ -205,6 +205,44 @@ export async function manifestaInteres(args: {
   return { ok: true, data: data as OfertaRespuesta }
 }
 
+/**
+ * El rechazo de `manifestar_interes()` traducido a una clave i18n.
+ *
+ * La base responde en catalán sin acentos («Aquesta oferta ja no esta disponible»), y
+ * pintarlo tal cual era enseñar a la entidad el texto de Postgres —en castellano incluido—.
+ * Se reconoce por el prefijo o por una subcadena estable del mensaje, no por el SQLSTATE:
+ * `22023` lo comparten casi todos. Lo que no se reconoce cae a `c.error`.
+ */
+export function clauErrorInteres(missatge: string | null | undefined): {
+  clau: string
+  vars?: Record<string, string>
+} {
+  const m = missatge ?? ''
+  const num = (re: RegExp, decimals: number) => {
+    const x = m.match(re)?.[1]
+    if (x == null) return null
+    const n = Number(x.replace(',', '.'))
+    if (Number.isNaN(n)) return null
+    return new Intl.NumberFormat('ca-ES', {
+      minimumFractionDigits: decimals, maximumFractionDigits: decimals || 2,
+    }).format(n)
+  }
+  if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
+  if (m.startsWith('kg_maxim')) {
+    const n = num(/(\d+(?:[.,]\d+)?)\s*kg/, 0)
+    return n ? { clau: 'mk.err_kg_maxim', vars: { n } } : { clau: 'c.error' }
+  }
+  if (m.includes('ja no esta disponible')) return { clau: 'mk.err_no_disponible' }
+  if (m.includes('no encaixa')) return { clau: 'mk.err_no_encaixa' }
+  if (m.includes('preu ha de ser')) {
+    const min = num(/(\d+(?:[.,]\d+)?)\s*EUR/, 2)
+    return min ? { clau: 'mk.err_preu', vars: { min } } : { clau: 'c.error' }
+  }
+  if (m.includes('ja esta resolta')) return { clau: 'mk.err_resolta' }
+  if (m.includes('Cal indicar quants kg')) return { clau: 'mk.need_kg' }
+  return { clau: 'c.error' }
+}
+
 /** Kg ya canalizados por oferta, para pintar el progreso. */
 export async function kgPerOferta(ids: string[]): Promise<Record<string, number>> {
   if (ids.length === 0) return {}

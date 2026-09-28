@@ -26,6 +26,7 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { crearEspigolada, dataCurta, estilEstatAlbara, kg, repartirEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada, LotEspigolada } from '../../lib/albarans'
 import type { Espigolada } from '../../types'
@@ -337,7 +338,7 @@ export function NovaEspigolada() {
     })
     setOcupat(false)
 
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('esp.created', { n: res.data.registres.length }))
     navigate(`/equip/espigolades/${res.data.espigolada_id}`)
   }
@@ -588,12 +589,12 @@ export function EspigoladaDetall() {
     setOcupat(true)
     const res = await repartirEspigolada(id, utils)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
 
-    // Los avisos de convenio no bloquean nada hoy (el `exigir_convenio()` de la base es un
-    // stub hasta la fase 2), pero se enseñan: cuando dejen de ser avisos y pasen a ser
-    // bloqueos, la persona ya estará acostumbrada a leerlos.
-    for (const avis of res.data.avisos) toast.warning(avis)
+    // Los avisos de convenio de `exigir_convenio()` (antes de la fecha de corte) no bloquean,
+    // pero se enseñan. Llegan como texto de la base («AVIS: … encara no te conveni
+    // vigent»), en catalán y sin acentos, así que se dice UNA vez con texto propio.
+    if (res.data.avisos.length > 0) toast.warning(t('esp.avis_conveni'))
     toast.success(t('esp.distributed', { n: res.data.lots.length }))
     setLots([])
     await carrega()

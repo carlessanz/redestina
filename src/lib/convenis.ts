@@ -283,7 +283,7 @@ export async function enviarCorreuConveni(camps: {
   nota: string
   /** El idioma de la pantalla, que es el del texto: el pie del correo va en el mismo. */
   idioma?: 'ca' | 'es'
-}): Promise<{ ok: boolean; missatge: string | null }> {
+}): Promise<{ ok: boolean; missatge: string | null; code: string | null; simulat: boolean }> {
   const res = await enviarEmail({
     to: camps.email,
     subject: camps.assumpte,
@@ -296,9 +296,12 @@ export async function enviarCorreuConveni(camps: {
       idioma: camps.idioma,
     },
   })
-  if (res.ok) return { ok: true, missatge: null }
+  // `simulat`: el servidor dice ok pero el correo no ha salido (RESEND_ENVIO_REAL apagado).
+  if (res.ok) return { ok: true, missatge: null, code: null, simulat: res.simulat === true }
   const cos = res.data as { error?: string; code?: string } | null
-  return { ok: false, missatge: cos?.error ?? cos?.code ?? null }
+  // `code` aparte del texto: la pantalla traduce los gates del modo test (no_test_user…)
+  // en vez de enseñar el mensaje del servidor, que va en castellano.
+  return { ok: false, missatge: cos?.error ?? cos?.code ?? null, code: cos?.code ?? null, simulat: false }
 }
 
 /** Estado → clase de token. El error es rojo; el coral no significa fallo (§2bis). */

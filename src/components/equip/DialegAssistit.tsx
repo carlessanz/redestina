@@ -26,6 +26,7 @@ import { useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { enllacAssistit } from '../../lib/canalitzacio'
 import FormulariConfirmacio from '../FormulariConfirmacio'
 import FormulariFactura from '../FormulariFactura'
@@ -68,7 +69,7 @@ export default function DialegAssistit(
       if (!r.ok) {
         // El mensaje de la base es el útil («aquest albarà no està entregat»): un «ha
         // habido un error» no deja hacer nada.
-        setError(r.missatge === 'canalz.err_enllac' ? t('c.error') : r.missatge)
+        setError(textError(t, r))
         return
       }
       setToken(r.data.token)

@@ -36,9 +36,12 @@ function noticeFromError(data: unknown, t: Tfn): Notice {
     case 'whatsapp_desactivat': return { kind: 'warning', text: t('msg.w_wa_off') }
     case 'window_closed': return { kind: 'warning', text: t('msg.w_closed') }
     case 'no_opt_in': return { kind: 'warning', text: t('msg.w_optin') }
+    case 'opt_out': return { kind: 'warning', text: t('msg.w_optout') }
     case 'no_test_user': return { kind: 'warning', text: t('msg.w_no_test') }
+    case 'no_test_recipient': return { kind: 'warning', text: t('msg.w_no_test_meta') }
     case 'unknown_contact': return { kind: 'error', text: t('msg.w_unknown') }
     case 'unauthorized': return { kind: 'error', text: t('msg.w_unauth') }
+    case 'forbidden': return { kind: 'error', text: t('msg.w_unauth') }
   }
   if (typeof err === 'string') return { kind: 'error', text: err }
   if (err && typeof err === 'object') {
@@ -49,7 +52,7 @@ function noticeFromError(data: unknown, t: Tfn): Notice {
     }
     return { kind: 'error', text: `Meta (${meta.code ?? '?'}): ${meta.message ?? '?'}${details ? ` — ${details}` : ''}` }
   }
-  return { kind: 'error', text: 'Error' }
+  return { kind: 'error', text: t('c.error') }
 }
 
 function formatTime(iso: string): string {
@@ -192,9 +195,9 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
       destructiu: true,
     }))) return
     const { error: msgError } = await supabase.from('wa_messages').delete().eq('contact_phone', contact.phone)
-    if (msgError) { setNotice({ kind: 'error', text: msgError.message }); return }
+    if (msgError) { setNotice({ kind: 'error', text: t('c.error') }); return }
     const { error: contactError } = await supabase.from('wa_contacts').delete().eq('phone', contact.phone)
-    if (contactError) { setNotice({ kind: 'error', text: contactError.message }); return }
+    if (contactError) { setNotice({ kind: 'error', text: t('c.error') }); return }
     toast.success(t('msg.thread_deleted'))
     onDeleted()
   }
@@ -229,12 +232,8 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
     if (!result.ok) { setNotice(noticeFromError(result.data, t)); return }
     // Éxito: confirmar (faltaba feedback) y evitar reenvíos accidentales.
     const nombre = contact.name ?? t('msg.this_contact')
-    if (ventanaAbierta) {
-      toast.success(t('msg.greeting_sent'))
-    } else {
-      toast.success(t('msg.template_sent', { name: nombre }))
-      setNotice({ kind: 'success', text: t('msg.template_sent', { name: nombre }) })
-    }
+    // Un solo aviso: antes la plantilla salía a la vez en toast y en la banda.
+    toast.success(ventanaAbierta ? t('msg.greeting_sent') : t('msg.template_sent', { name: nombre }))
     setJustSent(true)
     setTimeout(() => setJustSent(false), 30000)
   }

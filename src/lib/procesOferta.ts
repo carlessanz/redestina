@@ -320,6 +320,15 @@ export function puntInteres(fets: FetsInteres): PuntProces {
   ) {
     return fes('retirada', null, -1, {}, false)
   }
+  // La oferta ya no se reparte (cubierta, cerrada o convertida) y este interés nunca se
+  // aprobó: sin esto salía «Per respondre» o «Interès enviat» PARA SIEMPRE, esperando una
+  // decisión que ya nadie va a tomar. Es una salida, con su variante: se repartió sin ella.
+  if (
+    fets.ofertaEstado !== 'publicada' && fets.ofertaEstado !== 'parcial' &&
+    fets.aprovacio !== 'aprovada'
+  ) {
+    return fes('retirada', 'coberta', -1, {}, false)
+  }
 
   if (fets.estado === 'pendent') {
     return fes('oferta_rebuda', null, 0, {}, true, '/receptor/mercat')
@@ -477,8 +486,9 @@ export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleIntere
       return fes('assignada', CLASSE_SIMPLE.fet)
     case 'tancada': return fes('tancada', CLASSE_SIMPLE.tancat)
     case 'declinada': return fes('declinada', CLASSE_SIMPLE.tancat)
-    // `no_assignada` (el equipo no la aprobó) y `retirada` (la oferta dejó de existir):
-    // para la entidad las dos significan lo mismo — esta oferta ya no la tendrá.
+    // `no_assignada` (el equipo no la aprobó) y `retirada` (la oferta dejó de existir, o se
+    // repartió sin ella: variante `coberta`): para la entidad significan lo mismo — esta
+    // oferta ya no la tendrá.
     default: return fes('no_disponible', CLASSE_SIMPLE.ko)
   }
 }

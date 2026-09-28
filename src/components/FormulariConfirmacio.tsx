@@ -38,6 +38,7 @@ import { useT } from '../lib/i18n'
 import { carregaEnllac, confirmaEnllac } from '../lib/enllacPublic'
 import type { DadesEnllac } from '../lib/enllacPublic'
 import { useSessio } from '../hooks/useSessio'
+import { refrescaAvisos } from '../lib/refrescAvisos'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -120,6 +121,8 @@ export default function FormulariConfirmacio(
 
     if (!res.ok) { setErrorKey(res.motiuKey); return }
     setFet(true)
+    // El contador de «Documents» y «Pendent de tu» del panel, si se llegó desde él.
+    refrescaAvisos()
     onConfirmat?.()
   }
 
@@ -137,12 +140,23 @@ export default function FormulariConfirmacio(
   const mostraTornar = session && !ample
 
   if (!dades || errorKey) {
+    // «Escriu-nos i te'n tornem a enviar un» solo tiene sentido cuando el problema ES el
+    // enlace. Con sesión, además, no hace falta escribir a nadie: «Pendent de tu» acuña uno
+    // nuevo. Dentro del diálogo asistido no se dice nada: lo resuelve quien lo conduce.
+    const errorEnllac = errorKey === 'conf.err_no_existeix'
+      || errorKey === 'conf.err_caducat' || errorKey === 'conf.err_revocat'
+    // Un enlace ya usado quiere decir «esto ya está hecho»: reintentar no lleva a nada.
+    const potReintentar = dades && errorKey !== 'conf.err_ja_usat'
     return (
       <div className="space-y-3">
         <h2 className="text-lg font-semibold">{t('conf.problem')}</h2>
         <p className="text-sm">{t(errorKey ?? 'conf.err_generic')}</p>
-        <p className="text-sm text-muted-foreground">{t('conf.problem_help')}</p>
-        {dades && (
+        {errorEnllac && !ample && (
+          <p className="text-sm text-muted-foreground">
+            {session ? t('conf.problem_help_panell') : t('conf.problem_help')}
+          </p>
+        )}
+        {potReintentar && (
           <Button variant="outline" className="h-11 w-full whitespace-normal"
             onClick={() => { setErrorKey(null) }}>
             {t('conf.retry')}
@@ -198,7 +212,10 @@ export default function FormulariConfirmacio(
         </p>
       )}
 
-      <p className="text-sm">{t('conf.intro')}</p>
+      {/* En un OPE no hay donación: es venta o maquila, y lo lee la productora. */}
+      <p className="text-sm">
+        {dades.albara.tipo === 'OPE' || dades.albara.tipo === 'R-OPE' ? t('conf.intro_ope') : t('conf.intro')}
+      </p>
 
       {dades.pdf_url && (
         <Button asChild variant="outline" className="h-11 w-full whitespace-normal">

@@ -23,11 +23,14 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 
+// `origen` y `referencia_paper` son opcionales en el tipo para no obligar a cada panel a
+// cambiar su tipo de fila, pero los dos paneles los piden: sin ellos, un convenio firmado
+// en papel salía «Vigent · — · Sense PDF», como si faltara algo.
 export type ConveniFila = Pick<
   Convenio,
   'id' | 'tipo' | 'tipo_org' | 'estado' | 'numero_completo' | 'ejercicio'
   | 'enviado_at' | 'firmado_at' | 'contrafirmado_at' | 'created_at'
->
+> & Partial<Pick<Convenio, 'origen' | 'referencia_paper'>>
 
 type DocFila = Pick<
   Documento,
@@ -71,11 +74,15 @@ export default function LlistaConvenis({
                     // que todavía no es el definitivo: lo que falta es la firma de la
                     // Fundación, no nada suyo.
                     const provisional = doc?.subtipo === 'firmat'
+                    // Firmado fuera de la plataforma: no tiene número de serie (lo lleva el
+                    // papel) ni PDF de Redestina, a propósito (§4). Lo que acredita es el
+                    // escaneado, que está en «Documentació aportada per l'equip».
+                    const paper = c.origen === 'paper'
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{t(`sig.model_${c.tipo}`)}</TableCell>
                         <TableCell className="whitespace-nowrap tabular-nums">
-                          {c.numero_completo ?? '—'}
+                          {c.numero_completo ?? (paper ? c.referencia_paper : null) ?? '—'}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-wrap items-center gap-1">
@@ -123,7 +130,15 @@ export default function LlistaConvenis({
                                   </Button>
                                 </>
                               )
-                              : <span className="text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>}
+                              : (
+                                // La celda hereda `whitespace-nowrap` (§2, regla 6): la
+                                // frase del papel es larga y tiene que poder partirse.
+                                <span className={paper
+                                  ? 'block min-w-48 whitespace-normal text-right text-xs text-muted-foreground'
+                                  : 'text-xs text-muted-foreground'}>
+                                  {paper ? t('mydoc.conv_paper') : t('mydoc.no_pdf')}
+                                </span>
+                              )}
                           </div>
                         </TableCell>
                       </TableRow>

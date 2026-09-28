@@ -15,8 +15,32 @@ import type { Excedente } from '../types'
 import { FotoOferta, FotoOfertaResolta, useUrlsFotos } from './FotosOferta'
 import type { FotoResolta } from './FotosOferta'
 
+/**
+ * La oferta tal como la puede recibir un receptor: SOLO estas columnas.
+ *
+ * 🔴 D3 TAMBIÉN EN LA API, no solo en la pantalla (28-09-2026). Con `select('*')` el
+ *    navegador de la entidad recibía `texto_oferta` (lleva la línea «PRODUCTOR: …»),
+ *    `id_excedente` (sus tres letras son las de la productora), `productor_id` y
+ *    `ubicacion_id`: no se pintaban, pero cualquiera los leía en la pestaña de red. Las
+ *    pantallas del receptor piden estas columnas y ninguna más, cada una en su literal (§7):
+ *
+ *    id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa,
+ *    retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions,
+ *    preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos,
+ *    foto_producte
+ *
+ *    Si esta lista cambia, hay que cambiar los `select` de Mercat e Interessos a la vez.
+ */
+export type OfertaReceptor = Pick<
+  Excedente,
+  | 'id' | 'estado' | 'familia' | 'producto' | 'variedad' | 'kg_total' | 'num_caixes'
+  | 'tipo_caixa' | 'retorn_envasos' | 'modalitat' | 'causa' | 'disponible_hasta'
+  | 'horari_recollida' | 'observacions' | 'preu_minim' | 'producte_al_camp' | 'comarca'
+  | 'format_entrega' | 'transport_propi' | 'fotos' | 'foto_producte'
+>
+
 export default function DetallOfertaReceptor({ oferta, foto }: {
-  oferta: Excedente
+  oferta: OfertaReceptor
   /** La foto principal ya resuelta (la de la oferta, la del producto o el icono), en grande. */
   foto: FotoResolta
 }) {

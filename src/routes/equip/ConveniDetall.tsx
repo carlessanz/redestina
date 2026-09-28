@@ -22,6 +22,7 @@ import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta } from '../../lib/albarans'
@@ -171,7 +172,7 @@ export default function ConveniDetall() {
     setOcupat(true)
     const res = await enviarConveni(conv.id, correu.trim() || null)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setEnllacNou(res.data.enllac)
     setPotDemanarCodi(false)
     toast.success(t('conv.sent'))
@@ -184,7 +185,7 @@ export default function ConveniDetall() {
     setOcupat(true)
     const res = await iniciarFirmaAssistida(conv.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setEnllacNou(res.data.enllac)
     // Sin correo en la ficha no hay segundo factor posible, y eso se dice en pantalla en
     // vez de dejar a quien conduce la firma esperando un código que nadie va a mandar
@@ -212,7 +213,14 @@ export default function ConveniDetall() {
       idioma: lang,
     })
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge ?? t('conv.mail_error')); return }
+    if (!res.ok) {
+      // Los mismos textos que `DialegCorreu` para los dos gates del modo test (§8).
+      if (res.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: enllacNou.nom ?? desti }))
+      else if (res.code === 'no_test_recipient') toast.error(t('od.email_no_test', { email: desti }))
+      else toast.error(t('conv.mail_error'))
+      return
+    }
+    if (res.simulat) { toast.info(t('doc.resend_simulat')); return }
     toast.success(t('conv.mail_sent', { email: desti }))
   }
 
@@ -221,7 +229,7 @@ export default function ConveniDetall() {
     setOcupat(true)
     const res = await contrafirmarConveni(conv.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.countersigned'))
     void refrescaComptadors()
     await carrega()
@@ -233,7 +241,7 @@ export default function ConveniDetall() {
     const res = await retornarConveni(conv.id, motiu)
     setOcupat(false)
     setDialegRetorn(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.returned'))
     void refrescaComptadors()
     await carrega()
@@ -245,7 +253,7 @@ export default function ConveniDetall() {
     const res = await resoldreConveni(conv.id, motiu, dataEfecte || null)
     setOcupat(false)
     setDialegResol(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.resolved'))
     void refrescaComptadors()
     await carrega()

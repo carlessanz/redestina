@@ -18,12 +18,17 @@ import GestorWhitelist from './GestorWhitelist'
 import DadesFundacio from './equip/DadesFundacio'
 import EditorDiagnostic from './equip/EditorDiagnostic'
 import { cn } from '../lib/utils'
+import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function Settings() {
   const { t, lang, setLang } = useT()
   const { confirma, dialeg } = useConfirma()
-  const { recarrega } = useAppContext()
+  const { ctx, recarrega } = useAppContext()
+  // Escribir en `app_settings` exige `es_super_admin()`. Al resto del equipo se le deja
+  // el interruptor gris CON el motivo, en vez de dejarle pulsar y que no se guarde nada.
+  const potCanviar = ctx?.esSuperAdmin ?? false
+  const motiu = potCanviar ? undefined : t('set.only_super')
   const [testMode, setTest] = useState<boolean | null>(null)
   const [waActiu, setWaActiu] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -52,7 +57,7 @@ export default function Settings() {
     setSaving(true)
     const error = await setTestMode(activo)
     setSaving(false)
-    if (error) { toast.error(error); return }
+    if (error) { toast.error(t(error)); return }
     setTest(activo)
     toast.success(activo ? t('set.saved_on') : t('set.saved_off'))
   }
@@ -78,7 +83,7 @@ export default function Settings() {
     setSaving(true)
     const error = await setWhatsappActiu(activo)
     setSaving(false)
-    if (error) { toast.error(error); return }
+    if (error) { toast.error(t(error)); return }
     setWaActiu(activo)
     // El interruptor viaja en el contexto de sesión: sin recargarlo, el resto de la
     // aplicación (botones, banners) seguiría pintando el estado anterior.
@@ -119,18 +124,21 @@ export default function Settings() {
               </div>
 
               <div className="inline-flex rounded-md border p-0.5">
-                <button type="button" disabled={saving} onClick={() => void cambiarTestMode(true)}
-                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    testMode ? 'bg-exito text-white' : 'text-muted-foreground hover:bg-muted')}>
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarTestMode(true)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    testMode ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.on')}
-                </button>
-                <button type="button" disabled={saving} onClick={() => void cambiarTestMode(false)}
-                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    !testMode ? 'bg-error text-white' : 'text-muted-foreground hover:bg-muted')}>
+                </BotoAmbMotiu>
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarTestMode(false)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    !testMode ? 'bg-error text-white hover:bg-error hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.off')}
-                </button>
+                </BotoAmbMotiu>
               </div>
 
+              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
               <p className="text-xs text-muted-foreground">{t('set.test_help')}</p>
             </>
           )}
@@ -163,18 +171,21 @@ export default function Settings() {
               </div>
 
               <div className="inline-flex rounded-md border p-0.5">
-                <button type="button" disabled={saving} onClick={() => void cambiarWhatsapp(true)}
-                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    waActiu ? 'bg-exito text-white' : 'text-muted-foreground hover:bg-muted')}>
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarWhatsapp(true)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    waActiu ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.on')}
-                </button>
-                <button type="button" disabled={saving} onClick={() => void cambiarWhatsapp(false)}
-                  className={cn('rounded px-4 py-1.5 text-sm font-medium transition-colors disabled:opacity-60',
-                    !waActiu ? 'bg-aviso text-white' : 'text-muted-foreground hover:bg-muted')}>
+                </BotoAmbMotiu>
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarWhatsapp(false)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    !waActiu ? 'bg-aviso text-white hover:bg-aviso hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
                   {t('set.off')}
-                </button>
+                </BotoAmbMotiu>
               </div>
 
+              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
               <p className="text-xs text-muted-foreground">{t('set.wa_help')}</p>
             </>
           )}

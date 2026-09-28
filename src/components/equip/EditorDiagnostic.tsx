@@ -30,6 +30,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { Casella } from '../Casella'
 import TriaPaper from '../TriaPaper'
@@ -122,7 +123,7 @@ export default function EditorDiagnostic() {
     setOcupat('comprovar')
     const r = await problemesQuestionari(preguntes)
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     setProblemes(r.data ?? [])
     if ((r.data ?? []).length === 0) toast.success(t('cfgd.check_ok'))
   }
@@ -134,7 +135,7 @@ export default function EditorDiagnostic() {
     setOcupat('publicar')
     const r = await publicarQuestionari(tipus, vigent.titol, preguntes, vigent.provisional, true)
     setOcupat(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
 
     toast.success(t('cfgd.published', { v: r.data.versio }))
     // Las reglas huérfanas NO bloquean la publicación, pero quien publica tiene que verlas:
@@ -153,7 +154,7 @@ export default function EditorDiagnostic() {
   /** Un rechazo por RLS llega como la CLAVE `cfgd.denied`, no como una frase de la base:
    *  ahí no hay mensaje que enseñar, porque PostgREST responde éxito con cero filas. */
   function avisa(missatge: string) {
-    toast.error(missatge === 'cfgd.denied' ? t('cfgd.denied') : missatge)
+    toast.error(textError(t, missatge))
   }
 
   async function canviaMesura(codi: string, activa: boolean) {

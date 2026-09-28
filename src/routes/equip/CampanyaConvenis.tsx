@@ -23,6 +23,7 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/albarans'
 import { enviarConveni, enviarCorreuConveni, prepararConveni } from '../../lib/convenis'
 import type { CampanyaFila, FitxaIncompleta } from '../../lib/convenis'
@@ -149,13 +150,13 @@ export default function CampanyaConvenis() {
       const nom = f.nom ?? '—'
       const prep = await prepararConveni(f.tipo_org, f.org_id, f.tipo)
       if (!prep.ok) {
-        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: prep.missatge })
+        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: textError(t, prep) })
         setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
         continue
       }
       const env = await enviarConveni(prep.data.id, f.email)
       if (!env.ok) {
-        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: env.missatge })
+        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: textError(t, env) })
         setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
         continue
       }
@@ -178,7 +179,7 @@ export default function CampanyaConvenis() {
         clau: clauDe(f),
         nom,
         ok: correu.ok,
-        missatge: correu.ok ? null : (correu.missatge ?? t('conv.mail_error')),
+        missatge: correu.ok ? null : t('camp.res_mail_ko'),
       })
       setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
       setResultats([...sortida])
@@ -189,7 +190,9 @@ export default function CampanyaConvenis() {
     setProgres(null)
     setTriades(new Set())
     const be = sortida.filter((r) => r.ok).length
-    toast.success(t('camp.batch_done', { ok: be, total: sortida.length }))
+    // Si alguno no salió, el resumen no puede ir en verde: la lista de abajo dice cuáles.
+    if (be === sortida.length) toast.success(t('camp.batch_done', { ok: be, total: sortida.length }))
+    else toast.warning(t('camp.batch_done', { ok: be, total: sortida.length }))
     await carrega()
   }
 

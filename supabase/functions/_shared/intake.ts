@@ -101,6 +101,14 @@ async function referenciaCost(supabase: Cliente, producte: string): Promise<numb
   return data?.coste_kg != null ? Number(data.coste_kg) : null;
 }
 
+/**
+ * «de Tomàquet» / «d'Albercoc»: la preposición apostrofada ante vocal o h, como se escribe.
+ * Sin esto el bot decía «de Horta Fulla» o «de Enciam» (4 familias y muchos productos).
+ */
+export function de(nom: string): string {
+  return /^[aeiouàèéíòóúh]/i.test(nom.trim()) ? `d'${nom}` : `de ${nom}`;
+}
+
 /** «0,60 €/kg»: como se lee en català. */
 export function eurKg(n: number): string {
   return `${n.toFixed(2).replace(".", ",")} €/kg`;
@@ -174,14 +182,14 @@ async function preguntar(
       const productos = (data ?? []).map((p: { nombre: string }) => p.nombre) as string[];
       const r = await sendLista(
         supabase, to,
-        `Quin producte de ${datos.familia}?`,
+        `Quin producte ${de(String(datos.familia ?? ""))}?`,
         "Tria producte",
         paginar(productos.map((n) => ({ id: `producte:${n}`, titulo: n })), pagina, "producte"),
       );
       return r.ok;
     }
     case "varietat":
-      return (await sendText(supabase, to, "Quina varietat és? (escriu '-' si no aplica)")).ok;
+      return (await sendText(supabase, to, "Quina varietat és? (escriu '-' si no ho saps)")).ok;
     case "producte_al_camp":
       // Lista y no botones, por lo mismo que `modalitat` (deuda §12.105): un botón solo
       // lleva título, y aquí el título solo dice «sí» o «no» a una pregunta que decide un
@@ -220,7 +228,7 @@ async function preguntar(
       ])).ok;
     case "transport":
       return (await sendBotones(
-        supabase, to, "Podeu oferir el transport? Si el podeu portar vosaltres, no cal dir on es recull.",
+        supabase, to, "Pots encarregar-te del transport? Si el portes tu, no cal dir on es recull.",
         OPCIONS_TRANSPORT.map((o) => ({ id: `transport:${o.id}`, titulo: o.titulo })),
       )).ok;
     case "ubicacio": {
@@ -233,7 +241,8 @@ async function preguntar(
       if (ubis.length === 0) {
         return (await sendText(
           supabase, to,
-          "On s'ha de recollir? Comparteix un punt de Google Maps (enganxa l'enllaç).",
+          "On s'ha de recollir? Envia la ubicació des de WhatsApp (📎 → Ubicació) o enganxa " +
+            "l'enllaç de Google Maps.",
         )).ok;
       }
       const filas: FilaLista[] = ubis.map((u) => ({
@@ -241,7 +250,10 @@ async function preguntar(
         titulo: u.alias ?? u.municipio ?? "Ubicació",
         descripcion: u.municipio ?? undefined,
       }));
-      filas.push({ id: "ubicacio:nova", titulo: "Un altre lloc", descripcion: "Enganxa un enllaç de Google Maps" });
+      // ⚠️ Una lista admite 10 filas: con 10 ubicaciones o más, «Un altre lloc» se quedaría
+      //    fuera sin avisar. Se enseñan las 9 primeras y esa opción siempre.
+      filas.splice(9);
+      filas.push({ id: "ubicacio:nova", titulo: "Un altre lloc", descripcion: "Ubicació de WhatsApp o enllaç de Maps" });
       return (await sendLista(supabase, to, "On s'ha de recollir?", "Tria ubicació", filas)).ok;
     }
     case "disponible_fins":
@@ -266,7 +278,7 @@ async function preguntar(
     case "preu_minim":
       return (await sendText(
         supabase, to,
-        "A quin preu mínim (€/kg) la vols oferir? Escriu un número (p. ex. 0.80).",
+        "A quin preu mínim (€/kg) la vols oferir? Escriu un número (p. ex. 0,80).",
       )).ok;
     case "cost_kg": {
       // El coste lo decide el productor; la pantalla «Productes» solo da la REFERENCIA
@@ -277,7 +289,7 @@ async function preguntar(
         return (await sendBotones(
           supabase, to,
           `Quin és el cost per quilo? És el valor amb què es calcula la donació al certificat.\n\n` +
-            `El valor de referència de ${datos.producte} és ${eurKg(ref)}.`,
+            `El valor de referència ${de(String(datos.producte ?? ""))} és ${eurKg(ref)}.`,
           [
             { id: "cost_kg:ref", titulo: `Mantenir ${eurKg(ref)}`.slice(0, 20) },
             { id: "cost_kg:altre", titulo: "Un altre valor" },
@@ -353,7 +365,9 @@ async function interpretar(
         const factor = (data ?? []).find((f: { producto: string }) =>
           f.producto.toUpperCase().startsWith(producto.slice(0, 4))
         );
-        if (factor?.kg_por_unidad) kg = kg * Number(factor.kg_por_unidad);
+        // Sin equivalencia no se inventa: «20 manats» no son 20 kg. Se pide el número en kg.
+        if (!factor?.kg_por_unidad) return SENSE_FACTOR;
+        kg = kg * Number(factor.kg_por_unidad);
       }
       return kg;
     }
@@ -390,7 +404,8 @@ async function interpretar(
         .from("productor_ubicaciones")
         .insert({
           productor_id: sesion.productor_id,
-          alias: "Compartida per WhatsApp",
+          // Con fecha: si no, cada enlace nuevo añadía otra fila idéntica a la lista.
+          alias: `Compartida el ${new Date().toLocaleDateString("ca-ES", { day: "2-digit", month: "2-digit", timeZone: "Europe/Madrid" })}`,
           gmaps_url: enlace[0],
           municipio: ficha?.poblacion ?? null,
         })
@@ -411,6 +426,10 @@ async function interpretar(
 
 // Distingue "respondió válidamente que no aplica" de "no entendí la respuesta".
 const OMITIDO = Symbol("omitido");
+// Ha dado la cantidad en unidades o manats de un producto sin factor de conversión.
+const SENSE_FACTOR = Symbol("sense_factor");
+/** Tope de un texto libre: el `texto_oferta` entero no puede pasar de 1024 en un interactivo. */
+const MAX_TEXT_LLIURE = 400;
 function null_ok(): unknown {
   return OMITIDO;
 }
@@ -437,7 +456,14 @@ export async function procesarIntake(
     .from("productores").select("id, name, email").eq("phone", from).maybeSingle();
   if (!productor) return false;
 
-  const { texto, id } = leerRespuesta(message);
+  const lectura = leerRespuesta(message);
+  const id = lectura.id;
+  let texto = lectura.texto;
+  // La ubicación compartida desde WhatsApp (📎 → Ubicació) se convierte en un enlace de
+  // Maps: antes se tomaba por respuesta inválida y se repetía la pregunta.
+  if (message?.type === "location" && message.location?.latitude != null) {
+    texto = `https://www.google.com/maps?q=${message.location.latitude},${message.location.longitude}`;
+  }
 
   const { data: sesiones } = await supabase
     .from("intake_sessions").select("*").eq("telefono", from)
@@ -452,8 +478,25 @@ export async function procesarIntake(
 
   // Cancelar en cualquier momento: por palabra clave o por el botón del recordatorio.
   if (esCancelar(texto) || id === "intake:cancelar") {
-    if (sesion) await supabase.from("intake_sessions").delete().eq("id", sesion.id);
-    await sendText(supabase, from, "D'acord, ho hem cancel·lat. Escriu quan vulguis. 👋");
+    if (sesion) {
+      await supabase.from("intake_sessions").delete().eq("id", sesion.id);
+      await sendText(supabase, from, "D'acord, ho hem cancel·lat. Escriu quan vulguis. 👋");
+    } else {
+      await sendText(supabase, from, "No tens cap oferta a mig fer. Escriu quan vulguis. 👋");
+    }
+    return true;
+  }
+
+  // «Continuar» sobre una sesión que ya caducó: decirlo, en vez de la guía genérica.
+  if (id === "intake:continuar" && !sesion) {
+    await sendBotones(
+      supabase, from,
+      "La teva oferta a mig fer ha caducat. Vols començar-ne una de nova?",
+      [
+        { id: "intake:si", titulo: "Sí" },
+        { id: "intake:no", titulo: "Ara no" },
+      ],
+    );
     return true;
   }
 
@@ -475,7 +518,7 @@ export async function procesarIntake(
   // formulario a quien solo quería comentar algo.
   if (!sesion) {
     if (id === "intake:no") {
-      await sendText(supabase, from, "Cap problema. Si més tard tens excedent, escriu-nos.");
+      await sendText(supabase, from, "Cap problema. Quan vulguis publicar una oferta, escriu-nos.");
       return true;
     }
     if (id === "intake:si") {
@@ -501,11 +544,11 @@ export async function procesarIntake(
     }
     await sendBotones(
       supabase, from,
-      `Hola ${productor.name}! 👋 Sóc l'assistent d'excedents d'Espigoladors.\n\n` +
-        "T'ajudo a publicar un excedent en un moment: et faré unes preguntes senzilles " +
+      `Hola ${productor.name}! 👋 Sóc l'assistent de Redestina, d'Espigoladors.\n\n` +
+        "T'ajudo a publicar una oferta en un moment: et faré unes preguntes senzilles " +
         "(producte, quantitat, ubicació…) i crearé l'oferta automàticament. 🥬📦\n\n" +
         "✍️ Escriu *Stop* quan vulguis per aturar el procés.\n\n" +
-        "Vols oferir un excedent ara?",
+        "Vols publicar una oferta ara?",
       [
         { id: "intake:si", titulo: "Sí" },
         { id: "intake:no", titulo: "Ara no" },
@@ -545,7 +588,24 @@ export async function procesarIntake(
     return true;
   }
 
+  // Un texto libre demasiado largo haría que el mensaje de la oferta pasara de los 1024
+  // caracteres que admite un interactivo de Meta, y la entidad no lo recibiría.
+  if ((paso === "observacions" || paso === "varietat" || paso === "horari") &&
+    (texto ?? "").trim().length > MAX_TEXT_LLIURE) {
+    await sendText(supabase, from, `És massa llarg: escriu-ho en menys de ${MAX_TEXT_LLIURE} caràcters.`);
+    return true;
+  }
+
   const valor = await interpretar(supabase, sesion, paso, texto, id);
+
+  if (valor === SENSE_FACTOR) {
+    await sendText(
+      supabase, from,
+      `No tinc l'equivalència en kg ${de(String(datos.producte ?? ""))}. ` +
+        "Escriu els kg aproximats (p. ex. 150).",
+    );
+    return true;
+  }
 
   if (valor === null) {
     // ⚠️ El contador sube porque la RESPUESTA no se ha entendido, que es lo que cuenta
@@ -557,10 +617,15 @@ export async function procesarIntake(
     datos._intentos = intentos;
     await guardar(supabase, sesion, { datos_parciales: datos });
     if (intentos > MAX_INTENTOS) {
+      // El aviso Y la pregunta: antes solo salía el aviso, en bucle, y la persona dejaba de
+      // ver qué se le estaba preguntando.
       await sendText(
         supabase, from,
-        "No acabo d'entendre la resposta. Escriu *Stop* per aturar.",
+        "No acabo d'entendre la resposta. Torna-ho a provar; si vols aturar, escriu *Stop*.",
       );
+      if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
+        console.error("intake: no se pudo repetir la pregunta", paso, "a", from);
+      }
     } else if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
       console.error("intake: no se pudo repetir la pregunta", paso, "a", from);
     }

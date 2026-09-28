@@ -14,6 +14,7 @@ import { Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { creaUbicacio } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
@@ -52,7 +53,7 @@ export default function LlocsRecollida({
       gmapsUrl: llocNou.maps.trim() || null,
       municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
     })
-    if (!r.ok || !r.data) { toast.error(r.error ?? t('c.error')); return }
+    if (!r.ok || !r.data) { toast.error(textError(t, r.error)); return }
     setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null }])
     setLlocNou(null)
     toast.success(t('org.place_added'))
@@ -62,7 +63,7 @@ export default function LlocsRecollida({
     const { error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id)
     // 23503: alguna oferta apunta a este lugar. No se borra: se diría que la oferta ya no
     // tiene dónde recogerse.
-    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : error.message); return }
+    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : t('c.error')); return }
     setUbicacions((l) => l.filter((x) => x.id !== u.id))
   }
 

@@ -17,6 +17,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { ESTATS_DIAGNOSTIC, estilEstatDiagnostic } from '../../lib/diagnostic'
 import { diagnosticsEquip } from '../../lib/diagnosticApi'
 import type { DiagnosticEquip } from '../../types'
@@ -117,7 +118,8 @@ export default function Diagnostics() {
         </p>
 
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {/* Se traduce al pintar: el mensaje puede ser una clave i18n. */}
+        {error && <p className="text-sm text-destructive">{textError(t, error)}</p>}
 
         {!carregant && !error && (
           visibles.length === 0

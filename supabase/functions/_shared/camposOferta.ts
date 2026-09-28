@@ -91,7 +91,7 @@ export const OPCIONES_RETORN = ["Sí", "No"];
 
 /** ¿El productor puede llevarlo? Si sí, no hace falta decir dónde se recoge. */
 export const OPCIONS_TRANSPORT = [
-  { id: "si", titulo: "Sí, el podem portar" },
+  { id: "si", titulo: "Sí, el porto jo" },
   { id: "no", titulo: "No, cal recollir-lo" },
 ];
 
@@ -141,17 +141,19 @@ export const MODALITATS = [
   {
     id: "donacio",
     titulo: "Donació",
-    descripcion: "Entitats socials i d'alimentació animal. Genera certificat de donació.",
+    // Quién la puede recibir sale de `modalitat_receptor_compat` (§4bis), que cambió el
+    // 27-09-2026: la social ya recibe venta y maquila, y el comercio, maquila.
+    descripcion: "Entitats socials, alimentació animal, obradors · certificat de donació",
   },
   {
     id: "venda",
     titulo: "Venda",
-    descripcion: "Ho vens a un preu mínim per kg. Comerços i obradors.",
+    descripcion: "La vens a un preu mínim per kg. Comerços, obradors i entitats socials.",
   },
   {
     id: "maquila",
     titulo: "Maquila",
-    descripcion: "Ho transformen per a tu i et tornen producte. Obradors.",
+    descripcion: "Et transformen el producte i te'l tornen. Obradors, comerços, entitats.",
   },
 ];
 
@@ -271,8 +273,8 @@ export const CAMPOS: CampoOferta[] = [
   {
     clave: "transport",
     tipo: "opcions",
-    etiqueta: "Podeu oferir el transport?",
-    ayuda: "Si el podeu portar vosaltres, no cal dir on es recull.",
+    etiqueta: "Pots encarregar-te del transport?",
+    ayuda: "Si el portes tu, no cal dir on es recull.",
     seccion: "recollida",
     obligatorio: true,
     opciones: OPCIONS_TRANSPORT,

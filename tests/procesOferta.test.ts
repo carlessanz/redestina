@@ -88,6 +88,8 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'ent conciliat', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'cerrada', kg: 40, albaraEnt: { estado: 'conciliado', numero: 'ENT-2026-00001' } } },
     { nom: 'no assignada', fets: { estado: 'acceptada', aprovacio: 'rebutjada', ofertaEstado: 'parcial', motiu: 'Massa lluny' } },
     { nom: 'retirada', fets: { estado: 'acceptada', aprovacio: 'pendent', ofertaEstado: 'cancelada' } },
+    { nom: 'coberta sense ella', fets: { estado: 'acceptada', aprovacio: 'pendent', ofertaEstado: 'bloqueada' } },
+    { nom: 'rebuda i ja coberta', fets: { estado: 'pendent', aprovacio: 'pendent', ofertaEstado: 'cerrada' } },
     { nom: 'declinada', fets: { estado: 'rebutjada', aprovacio: 'pendent', ofertaEstado: 'publicada' } },
   ]
   for (const c of interessos) fora.push({ nom: `receptor/${c.nom}`, punt: puntInteres(c.fets) })
@@ -234,6 +236,29 @@ describe('puntInteres: la lectura del receptor', () => {
       )
       expect(p.index, e).toBe(-1)
     }
+  })
+
+  // La oferta se repartió (o se cerró) sin aprobar este interés: antes se quedaba en «Per
+  // respondre» o «Interès enviat» para siempre, esperando una decisión que ya no llegará.
+  it('oferta ya no publicada y sin aprobar: «oferta coberta», nunca a la espera', () => {
+    for (const ofertaEstado of ['bloqueada', 'cerrada', 'borrador'] as EstadoExcedente[]) {
+      for (const estado of ['pendent', 'acceptada'] as const) {
+        const p = puntInteres({ ...b, estado, ofertaEstado })
+        expect([p.etapa, p.variant, p.index, p.emToca], `${estado}/${ofertaEstado}`)
+          .toEqual(['retirada', 'coberta', -1, false])
+        expect(p.claus.titol).toBe('proc.r_retirada_coberta_t')
+        expect(estatSimpleInteres(p).estat).toBe('no_disponible')
+      }
+    }
+    // Parcial sigue abierta: ahí sí se puede seguir esperando.
+    expect(puntInteres({ ...b, estado: 'acceptada', ofertaEstado: 'parcial' }).etapa).toBe('interes_enviat')
+    // Y la salida por cancelación conserva su propio texto, sin variante.
+    expect(puntInteres({ ...b, estado: 'acceptada', ofertaEstado: 'cancelada' }).variant).toBeNull()
+  })
+
+  it('una oferta cubierta NO retira un interés ya aprobado', () => {
+    const p = puntInteres({ ...b, estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 30 })
+    expect(p.etapa).toBe('assignada')
   })
 
   // Un interés ya aprobado no se «retira» porque la oferta se cierre: lo que le pasó a esa
@@ -488,6 +513,8 @@ describe('el estado SIMPLE de los paneles externos (revisión del 23-09-2026)', 
     expect(i({ aprovacio: 'aprovada', albaraEnt: { estado: 'conciliado', numero: 'ENT-1' } })).toBe('tancada')
     expect(i({ aprovacio: 'rebutjada' })).toBe('no_disponible')
     expect(i({ ofertaEstado: 'cancelada' })).toBe('no_disponible')
+    expect(i({ ofertaEstado: 'bloqueada' })).toBe('no_disponible')
+    expect(i({ estado: 'pendent', ofertaEstado: 'bloqueada' })).toBe('no_disponible')
     expect(i({ estado: 'rebutjada' })).toBe('declinada')
   })
 

@@ -9,6 +9,7 @@ import {
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { cn } from '../lib/utils'
 import { BUCKET_FOTOS, MAX_FOTOS, esborraFoto, fixaFotos, pujaFoto, urlsFotos } from '../lib/fotos'
 import { FilaCasella } from './Casella'
@@ -157,7 +158,7 @@ export function SelectorFotos({
     for (const f of llista) {
       const r = await pujaFoto(productorId, f)
       if (r.ok) noves.push(r.ruta)
-      else toast.error(r.error.startsWith('foto.') ? t(r.error) : r.error)
+      else toast.error(textError(t, r.error))
     }
     setPujant(false)
     if (noves.length) onChange([...rutes, ...noves])

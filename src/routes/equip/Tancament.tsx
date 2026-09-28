@@ -16,6 +16,7 @@ import { AlertTriangle } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import {
   dataTancament, estilEstatTancament, euros, obrirTancament,
@@ -147,7 +148,7 @@ export default function Tancament() {
     setObrint(true)
     const res = await obrirTancament(any, mode)
     setObrint(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t(mode === 'real' ? 'tan.opened_real' : 'tan.opened_test', { y: any }))
     await refresca()
   }

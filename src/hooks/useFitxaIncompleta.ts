@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from './useAppContext'
+import { useTicAvisos } from '../lib/refrescAvisos'
 
 /** Lo que el registro no pregunta y el convenio sí imprime. */
 export const CAMPS_NECESSARIS = ['nif', 'direccion', 'codigo_postal', 'poblacion'] as const
@@ -31,6 +32,8 @@ export function useFitxaIncompleta(): { falten: string[]; carregant: boolean } {
   const [carregant, setCarregant] = useState(true)
 
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
+  // Cambia cuando alguien guarda la ficha, firma o emite: la banda se vuelve a calcular.
+  const tic = useTicAvisos()
   const orgs = ctx?.organitzacions ?? []
   // Clave estable del contenido: `orgs` es un array nuevo en cada render del contexto.
   const clau = orgs.map((o) => `${o.tipo}:${o.id}`).join(',')
@@ -67,7 +70,7 @@ export function useFitxaIncompleta(): { falten: string[]; carregant: boolean } {
     })()
 
     return () => { viu = false }
-  }, [extern, clau]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [extern, clau, tic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { falten, carregant }
 }

@@ -33,6 +33,11 @@ export interface EmailResult {
   ok: boolean
   status: number
   data: unknown
+  /**
+   * `RESEND_ENVIO_REAL` apagado: el servidor responde `ok` pero el correo NO ha salido
+   * (campo `simulat` de `enviar-email`). Quien llama no debe anunciarlo como enviado.
+   */
+  simulat?: boolean
 }
 
 export async function enviarEmail(payload: EmailPayload): Promise<EmailResult> {
@@ -48,7 +53,8 @@ export async function enviarEmail(payload: EmailPayload): Promise<EmailResult> {
       body: JSON.stringify(payload),
     })
     const body: unknown = await res.json().catch(() => null)
-    return { ok: res.ok, status: res.status, data: body }
+    const simulat = (body as { simulat?: boolean } | null)?.simulat === true
+    return { ok: res.ok, status: res.status, data: body, simulat }
   } catch (err) {
     return {
       ok: false,

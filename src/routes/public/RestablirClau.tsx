@@ -49,7 +49,8 @@ export default function RestablirClau() {
     const { error: updError } = await supabase.auth.updateUser({ password })
     setOcupado(false)
     if (updError) {
-      setError(updError.message)
+      // El mensaje de Supabase va en inglés y no se traduce: el genérico.
+      setError(t('c.error'))
       return
     }
     toast.success(t('login.pw_updated'))

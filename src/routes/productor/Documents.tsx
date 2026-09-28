@@ -118,7 +118,7 @@ export default function ProductorDocuments() {
     const { data: convData } = orgId
       ? await supabase
         .from('convenios')
-        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at')
+        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
         .eq('productor_id', orgId)
         .order('created_at', { ascending: false })
       : { data: [] }

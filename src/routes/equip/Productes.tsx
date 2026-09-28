@@ -19,6 +19,7 @@ import { toast } from 'sonner'
 import { Link } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
 import { dataCurta } from '../../lib/albarans'
@@ -148,7 +149,7 @@ export default function Productes() {
     setOcupat(true)
     const res = await fixarCostProducte({ producte, cost, motiu: motiu.trim() })
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('cost.saved', { p: producte }))
     setEditant(null)
     await refresca()
@@ -159,7 +160,7 @@ export default function Productes() {
     const res = await esborrarCostProducte(producte, motiu)
     setOcupat(false)
     setEsborrant(null)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('cost.deleted', { p: producte }))
     await refresca()
   }

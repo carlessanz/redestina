@@ -42,16 +42,18 @@ export function plantillaPrimerContacte(rol: RolContacte): PlantillaRef {
 }
 
 // Texto de la salutació en català (mismo contenido que las plantillas salutacio_*),
-// que pide responder OK. Se usa como TEXTO LIBRE cuando la ventana de 24 h ya está
+// que pide responder ALTA. Se usa como TEXTO LIBRE cuando la ventana de 24 h ya está
 // abierta: así en pruebas se ve el mensaje real en català, sin depender de que Meta
 // apruebe la plantilla. Fuera de la ventana solo cabe la plantilla (plantillaPrimerContacte).
 export function textoSalutacio(rol: RolContacte): string {
   if (rol === 'entitat') {
-    return "Hola! Som l'equip de Redestina d'Espigoladors 🌱. Col·laborem amb entitats socials " +
-      'per aprofitar excedents agrícoles. Respon *OK* per activar la conversa i començar a ' +
-      'rebre les nostres ofertes. Gràcies!'
+    // ALTA y no «OK»: ALTA es lo que da el consentimiento (opt-in) y lo confirma; un «OK»
+    // solo abría 24 h de ventana y, con una oferta pendiente, la aceptaba sin querer.
+    return "Hola! Som l'equip de Redestina, d'Espigoladors 🌱. Col·laborem amb entitats " +
+      'socials per aprofitar excedents agrícoles. Si vols rebre les nostres ofertes per ' +
+      'WhatsApp, respon *ALTA*. Gràcies!'
   }
-  return "Hola! Som l'equip de Redestina d'Espigoladors 🌱. T'ajudem a canalitzar els teus " +
-    'excedents agrícoles. Respon *OK* per activar la conversa i poder oferir-nos excedents ' +
-    'quan vulguis. Gràcies!'
+  return "Hola! Som l'equip de Redestina, d'Espigoladors 🌱. T'ajudem a donar sortida als " +
+    'teus excedents agrícoles. Si vols que et puguem escriure per WhatsApp, respon *ALTA*. ' +
+    'Gràcies!'
 }

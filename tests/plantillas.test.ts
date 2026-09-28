@@ -110,8 +110,8 @@ describe('textoSalutacio', () => {
     expect(textoSalutacio('entitat')).toContain('entitats socials')
   })
 
-  it('el texto del productor habla de canalizar SUS excedentes', () => {
-    expect(textoSalutacio('productor')).toContain('els teus')
+  it('el texto del productor habla de SUS excedentes', () => {
+    expect(textoSalutacio('productor')).toContain('teus excedents')
     expect(textoSalutacio('productor')).not.toContain('entitats socials')
   })
 
@@ -119,11 +119,12 @@ describe('textoSalutacio', () => {
     expect(textoSalutacio(null)).toBe(textoSalutacio('productor'))
   })
 
-  it('los dos piden «respon OK», que es lo que abre la ventana de 24 h', () => {
-    // Sin esa respuesta la conversación no se abre y todo lo demás (intake incluido)
-    // seguiría necesitando plantilla de pago.
+  it('los dos piden «respon ALTA», que da el consentimiento y abre la ventana de 24 h', () => {
+    // ALTA y no «OK» (28-09-2026): «OK» solo abría la ventana, sin opt-in, y con una oferta
+    // pendiente la aceptaba sin querer. ALTA pone el opt-in y el webhook lo confirma.
     for (const rol of ['productor', 'entitat'] as const) {
-      expect(textoSalutacio(rol)).toContain('*OK*')
+      expect(textoSalutacio(rol)).toContain('*ALTA*')
+      expect(textoSalutacio(rol)).not.toContain('*OK*')
     }
   })
 

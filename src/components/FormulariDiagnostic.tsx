@@ -28,6 +28,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { refrescaAvisos } from '../lib/refrescAvisos'
+import { textError } from '../lib/textError'
 import { FilaCasella } from './Casella'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
@@ -145,7 +147,7 @@ export default function FormulariDiagnostic({
     const r = await desarDiagnostic(
       tipusOrg, orgId, respostes, notes.trim() === '' ? null : notes.trim(), lang)
     setDesant(null)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
 
     if (r.data.complet) {
       toast.success(r.data.te_mesures
@@ -154,6 +156,8 @@ export default function FormulariDiagnostic({
     } else {
       toast.success(t('diag.saved_partial', { n: r.data.falten.length }))
     }
+    // La banda del diagnóstico vive en AppShell y no se enteraría sola (refrescAvisos.ts).
+    refrescaAvisos()
     // Se recarga SIEMPRE, también tras un guardado parcial: la respuesta trae `falten` tal
     // como lo ve el servidor, y esa es la lista que manda sobre la que se calcula aquí.
     await carrega()
@@ -161,7 +165,9 @@ export default function FormulariDiagnostic({
   }
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  // Se traduce al pintar, no al guardar: meter `t` en la carga la relanzaría al cambiar de
+  // idioma y se perderían las respuestas sin guardar.
+  if (error) return <p className="text-sm text-destructive">{textError(t, error)}</p>
 
   if (!questionari) {
     return (

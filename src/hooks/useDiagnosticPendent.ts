@@ -19,6 +19,7 @@ import { useEffect, useState } from 'react'
 import { diagnosticEstat } from '../lib/diagnosticApi'
 import type { EstatDiagnostic } from '../types'
 import { useAppContext } from './useAppContext'
+import { useTicAvisos } from '../lib/refrescAvisos'
 
 /** Los estados en los que queda algo por hacer. `emes` está hecho; `sense_questionari`
  *  no es de la organización —es que no hay cuestionario vigente— y no se le puede pedir. */
@@ -39,6 +40,8 @@ export function useDiagnosticPendent(): DiagnosticPendent {
   const [carregant, setCarregant] = useState(true)
 
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
+  // Cambia cuando alguien guarda la ficha, firma o emite: la banda se vuelve a calcular.
+  const tic = useTicAvisos()
   const orgs = ctx?.organitzacions ?? []
   // Clave estable del contenido: `ctx.organitzacions` es un array nuevo en cada render del
   // contexto, y con el objeto como dependencia este efecto se relanzaría con cada
@@ -73,7 +76,7 @@ export function useDiagnosticPendent(): DiagnosticPendent {
     })()
 
     return () => { viu = false }
-  }, [extern, clau]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [extern, clau, tic]) // eslint-disable-line react-hooks/exhaustive-deps
 
   return { pendent, estat, carregant }
 }

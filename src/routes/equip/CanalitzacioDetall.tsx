@@ -26,6 +26,7 @@ import { Link, useParams } from 'react-router'
 import { ChevronDown, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { cn } from '../../lib/utils'
 import { FASES_EQUIP } from '../../lib/procesOferta'
 import {
@@ -130,7 +131,7 @@ export default function CanalitzacioDetall() {
     ])
     setOferta((exc.data as Excedente | null) ?? null)
     if (!r.ok) {
-      setError(r.missatge === 'canalz.err_generic' ? t('c.error') : r.missatge)
+      setError(textError(t, r))
       setCarregant(false)
       return
     }
@@ -158,11 +159,13 @@ export default function CanalitzacioDetall() {
     return () => { viu = false }
   }, [])
 
-  async function fes(accio: () => Promise<{ ok: boolean; missatge?: string }>, okKey: string) {
+  async function fes(
+    accio: () => Promise<{ ok: boolean; missatge?: string; codi?: string | null }>, okKey: string,
+  ) {
     setOcupat(true)
     const r = await accio()
     setOcupat(false)
-    if (!r.ok) { toast.error(r.missatge ?? t('c.error')); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     toast.success(t(okKey))
     void refrescaComptadors()
     await carrega()
@@ -217,7 +220,8 @@ export default function CanalitzacioDetall() {
     await fes(
       async () => {
         const r = await aprovarResposta({ id: respostaId, kg })
-        return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
+        // El `codi` viaja: `sense_conveni` se traduce a `od.conv_blocked`, como en Aprovacions.
+        return r.ok ? { ok: true } : { ok: false, missatge: r.missatge, codi: r.codi }
       },
       'canalz.ok_aprovat',
     )
@@ -615,7 +619,8 @@ export default function CanalitzacioDetall() {
                                     // token solo existe en esta respuesta, y nadie lo enviaba.
                                     const correu = await enviaEnllacosConfirmacio(a.numero ?? null, r.data.enllacos ?? [], t, lang)
                                     if (correu.enviats > 0) toast.success(t('alb.mail_sent', { n: correu.enviats }))
-                                    if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
+                                    // Esta pantalla no enseña los enlaces: la salida es la confirmación asistida.
+                                    if (correu.fallits > 0) toast.warning(t('alb.mail_failed_assistit'))
                                     return { ok: true }
                                   },
                                   'canalz.ok_entregat',

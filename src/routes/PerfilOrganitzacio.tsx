@@ -44,6 +44,7 @@ import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { refrescaAvisos } from '../lib/refrescAvisos'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../lib/validacio'
@@ -266,7 +267,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       tipus === 'productor' ? 'actualitzar_fitxa_productor' : 'actualitzar_fitxa_entitat',
       { p_id: organitzacio.id, p_dades: dades },
     )
-    if (error) { setDesant(false); toast.error(error.message); return }
+    if (error) { setDesant(false); toast.error(t('c.error')); return }
     // Lo que devuelve la base ya trae población y área derivadas del municipio.
     if (data) setFila(data as Fila)
 
@@ -278,13 +279,15 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         p_ficha: organitzacio.id,
         p_canal: canal === 'auto' ? null : canal,
       })
-      if (errCanal) { setDesant(false); toast.error(errCanal.message); return }
+      if (errCanal) { setDesant(false); toast.error(t('c.error')); return }
       const org = o as { canal_preferido: Tria | null } | null
       setCanalDesat((org?.canal_preferido ?? 'auto') as Tria)
     }
 
     setDesant(false)
     toast.success(t('rec.saved'))
+    // La banda de «ficha incompleta» y su marca en el menú viven en AppShell.
+    refrescaAvisos()
   }
 
   if (!organitzacio) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>

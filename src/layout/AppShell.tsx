@@ -27,6 +27,7 @@ import AvisRegistreIncomplet from '../components/AvisRegistreIncomplet'
 import AvisDiagnostic from '../components/AvisDiagnostic'
 import { useFitxaIncompleta } from '../hooks/useFitxaIncompleta'
 import { useDiagnosticPendent } from '../hooks/useDiagnosticPendent'
+import { useTicAvisos } from '../lib/refrescAvisos'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 /** Metadatos que cada ruta puede declarar en su `handle`. */
@@ -94,6 +95,9 @@ export default function AppShell() {
   // que no entran en aquel; y con una sola llamada, porque la base ya sabe repartir por
   // tipo de organización.
   const esExtern = (ctx?.rols.includes('productor') || ctx?.rols.includes('receptor')) ?? false
+  // Se recalcula al navegar y tras firmar o confirmar (`refrescaAvisos()`): antes se leía
+  // una sola vez al montar y el contador seguía pidiendo lo ya firmado.
+  const ticAvisos = useTicAvisos()
   useEffect(() => {
     if (!esExtern) return
     let viu = true
@@ -107,7 +111,7 @@ export default function AppShell() {
       }))
     })()
     return () => { viu = false }
-  }, [esExtern])
+  }, [esExtern, pathname, ticAvisos])
 
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">

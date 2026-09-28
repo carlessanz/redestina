@@ -20,13 +20,21 @@ async function getSetting(key: string): Promise<string | null> {
   return (data as { value: string | null } | null)?.value ?? null
 }
 
-/** Escribe una clave. Devuelve el mensaje de error o null. */
+/**
+ * Escribe una clave. Devuelve una CLAVE i18n de error o null.
+ *
+ * ⚠️ A quien no es super_admin la RLS no le da error: responde 200 con cero filas, y la
+ * pantalla decía «desat». Por eso se piden las filas escritas (`.select`) y cero filas se
+ * trata como denegación (el argumento de §12.48).
+ */
 async function setSetting(key: string, value: string): Promise<string | null> {
-  const { error } = await supabase.from('app_settings').upsert(
+  const { data, error } = await supabase.from('app_settings').upsert(
     { key, value, updated_at: new Date().toISOString() },
     { onConflict: 'key' },
-  )
-  return error?.message ?? null
+  ).select('key')
+  if (error) return 'c.error'
+  if (!data || data.length === 0) return 'set.denied'
+  return null
 }
 
 /** ¿Modo test activo? Solo un `'false'` explícito lo apaga (default ON). */
@@ -34,7 +42,7 @@ export async function getTestMode(): Promise<boolean> {
   return (await getSetting('test_mode')) !== 'false'
 }
 
-/** Guarda el modo test. Devuelve el mensaje de error o null. */
+/** Guarda el modo test. Devuelve una clave i18n de error o null. */
 export async function setTestMode(activo: boolean): Promise<string | null> {
   return setSetting('test_mode', activo ? 'true' : 'false')
 }
@@ -44,7 +52,7 @@ export async function getWhatsappActiu(): Promise<boolean> {
   return (await getSetting('whatsapp_activo')) !== 'false'
 }
 
-/** Guarda el interruptor de WhatsApp. Devuelve el mensaje de error o null. */
+/** Guarda el interruptor de WhatsApp. Devuelve una clave i18n de error o null. */
 export async function setWhatsappActiu(activo: boolean): Promise<string | null> {
   return setSetting('whatsapp_activo', activo ? 'true' : 'false')
 }

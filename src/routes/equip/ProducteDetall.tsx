@@ -11,6 +11,7 @@ import { ArrowLeft, Camera, ExternalLink, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { dataCurta } from '../../lib/albarans'
 import { eurKg, fixarCostProducte } from '../../lib/tancament'
@@ -80,7 +81,7 @@ export default function ProducteDetall() {
     setOcupat(true)
     const r = await pujaFotoProducte(fitxa.nombre, f)
     setOcupat(false)
-    if (!r.ok) { toast.error(r.error.startsWith('foto.') ? t(r.error) : r.error); return }
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
     toast.success(t('prod.photo_saved'))
     await carrega()
   }
@@ -97,7 +98,7 @@ export default function ProducteDetall() {
     setOcupat(true)
     const r = await treuFotoProducte(fitxa.nombre)
     setOcupat(false)
-    if (!r.ok) { toast.error(r.error); return }
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
     toast.success(t('prod.photo_removed'))
     invalidaCataleg()
     await carrega()
@@ -110,7 +111,7 @@ export default function ProducteDetall() {
     setOcupat(true)
     const r = await fixarCostProducte({ producte: nom, cost: n, motiu: motiu.trim() })
     setOcupat(false)
-    if (!r.ok) { toast.error(r.missatge); return }
+    if (!r.ok) { toast.error(textError(t, r)); return }
     toast.success(t('cost.saved', { p: nom }))
     setValor('')
     setMotiu('')

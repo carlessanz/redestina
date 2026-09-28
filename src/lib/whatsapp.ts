@@ -24,6 +24,11 @@ export interface SendResult {
   ok: boolean
   status: number
   data: unknown
+  /**
+   * `WHATSAPP_ENVIO_REAL` apagado: `whatsapp-send` responde `ok` con `{ simulado: true }`
+   * y el mensaje NO ha salido. Quien llama no debe anunciarlo como enviado.
+   */
+  simulat?: boolean
 }
 
 // Llama a la Edge Function whatsapp-send. Nunca lanza: devuelve el error en `data`.
@@ -53,7 +58,8 @@ export async function sendWhatsApp(payload: SendPayload): Promise<SendResult> {
       body: JSON.stringify(payload),
     })
     const body: unknown = await res.json().catch(() => null)
-    return { ok: res.ok, status: res.status, data: body }
+    const simulat = (body as { simulado?: boolean } | null)?.simulado === true
+    return { ok: res.ok, status: res.status, data: body, simulat }
   } catch (err) {
     return {
       ok: false,

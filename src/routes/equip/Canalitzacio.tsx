@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { lotsActius } from '../../lib/canalitzacio'
 import type { LotActiu } from '../../lib/canalitzacio'
 import { escalaCanal, PASSOS_FASE_CLAUS } from '../../lib/passosCanalitzacio'
@@ -108,7 +109,7 @@ export default function Canalitzacio() {
   const carrega = useCallback(async () => {
     setCarregant(true)
     const r = await lotsActius()
-    if (!r.ok) { setError(r.missatge === 'canalz.err_generic' ? t('c.error') : r.missatge) }
+    if (!r.ok) { setError(textError(t, r)) }
     else { setFiles(r.data ?? []); setError(null) }
     setCarregant(false)
   }, [t])

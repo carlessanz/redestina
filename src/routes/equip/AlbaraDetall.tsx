@@ -21,6 +21,7 @@ import { ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
@@ -340,7 +341,7 @@ export default function AlbaraDetall() {
       albara.idioma,
     )
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('alb.emitted'))
     void refrescaComptadors()
     await carrega()
@@ -351,7 +352,7 @@ export default function AlbaraDetall() {
     setOcupat(true)
     const res = await marcarEntregat(albara.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
 
     // El token en claro solo existe aquí. Se manda por correo a cada destinatario y,
     // además, se enseña como enlace copiable, porque el modelo de Redestina es asistido
@@ -362,8 +363,10 @@ export default function AlbaraDetall() {
     }))
     setEnllacosNous(nous)
     const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang)
-    toast.success(t('alb.delivered', { n: nous.length }))
-    if (correu.enviats > 0) toast.success(t('alb.mail_sent', { n: correu.enviats }))
+    // Un solo aviso verde, no dos seguidos: «entregat» y «correu enviat» son el mismo acto.
+    if (nous.length === 0) toast.warning(t('alb.delivered_0'))
+    else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
+    else toast.success(t('alb.delivered', { n: nous.length }))
     if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
     void refrescaComptadors()
     await carrega()
@@ -374,7 +377,7 @@ export default function AlbaraDetall() {
     setOcupat(true)
     const res = await propostaConciliacio(albara.id)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setProposta(res.data)
     setDialegConciliar(true)
   }
@@ -389,7 +392,7 @@ export default function AlbaraDetall() {
       desti.trim() || null,
     )
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setDialegConciliar(false)
     toast.success(t('alb.reconciled'))
     void refrescaComptadors()
@@ -401,7 +404,7 @@ export default function AlbaraDetall() {
     setOcupat(true)
     const res = await anullarAlbara(albara.id, motiu)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setDialegAnullar(false)
     toast.success(t('alb.cancelled'))
     void refrescaComptadors()
@@ -413,7 +416,7 @@ export default function AlbaraDetall() {
     setOcupat(true)
     const res = await rectificarAlbara(albara.id, linesRect.map(aEntrada), motiu)
     setOcupat(false)
-    if (!res.ok) { toast.error(res.missatge); return }
+    if (!res.ok) { toast.error(textError(t, res)); return }
     setDialegRectificar(false)
     const nou = (res.data as { id?: string }).id
     toast.success(t('alb.rectified'))
