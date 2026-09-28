@@ -47,67 +47,164 @@ function destiSegur(desti) {
 function escapa(text) {
   return text.replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
 }
-function paginaCortina({ desti, error }) {
+var COOKIE_IDIOMA = "redestina_idioma";
+var TEXTOS = {
+  ca: {
+    titol_pagina: "Redestina \xB7 Acc\xE9s restringit",
+    titol: "Acc\xE9s restringit",
+    intro: "Redestina est\xE0 en fase de proves. Introdueix la contrasenya per accedir-hi.",
+    etiqueta: "Contrasenya",
+    mostra: "Mostra",
+    amaga: "Amaga",
+    boto: "Entra",
+    error: "La contrasenya no \xE9s correcta. Torna-ho a provar.",
+    recorda: "No te la tornarem a demanar en aquest dispositiu durant una setmana.",
+    peu: "Una iniciativa de la Fundaci\xF3 Espigoladors",
+    idioma: "Idioma"
+  },
+  es: {
+    titol_pagina: "Redestina \xB7 Acceso restringido",
+    titol: "Acceso restringido",
+    intro: "Redestina est\xE1 en fase de pruebas. Introduce la contrase\xF1a para acceder.",
+    etiqueta: "Contrase\xF1a",
+    mostra: "Mostrar",
+    amaga: "Ocultar",
+    boto: "Entrar",
+    error: "La contrase\xF1a no es correcta. Vuelve a intentarlo.",
+    recorda: "No te la volveremos a pedir en este dispositivo durante una semana.",
+    peu: "Una iniciativa de la Fundaci\xF3 Espigoladors",
+    idioma: "Idioma"
+  }
+};
+function idiomaDe(url, capcaleraCookie) {
+  const demanat = url.searchParams.get("idioma");
+  if (demanat === "ca" || demanat === "es") return demanat;
+  const desat = llegeixCookie(capcaleraCookie, COOKIE_IDIOMA);
+  return desat === "es" ? "es" : "ca";
+}
+function senseIdioma(url) {
+  const u = new URL(url);
+  u.searchParams.delete("idioma");
+  return u.pathname + u.search;
+}
+function paginaCortina({ desti, error, idioma = "ca" }) {
+  const t = TEXTOS[idioma];
+  const enllac = (l) => `${escapa(desti.split("?")[0] || "/")}?idioma=${l}`;
+  const opcio = (l, nom) => l === idioma ? `<span class="idioma actiu" aria-current="true" lang="${l}">${nom}</span>` : `<a class="idioma" href="${enllac(l)}" lang="${l}" hreflang="${l}">${nom}</a>`;
   return `<!doctype html>
-<html lang="ca">
+<html lang="${idioma}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <meta name="theme-color" content="#4e6b45">
-<title>Redestina \xB7 Acc\xE9s</title>
+<title>${t.titol_pagina}</title>
 <link rel="icon" href="/favicon.svg" type="image/svg+xml">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Sora:wght@600;700&display=swap" rel="stylesheet">
 <style>
   *{box-sizing:border-box}
-  html,body{margin:0;min-height:100%;background:#4e6b45;color:#fff;font-family:Inter,system-ui,sans-serif}
-  main{min-height:100dvh;display:flex;flex-direction:column;align-items:center;justify-content:center;
-    padding:24px max(16px,env(safe-area-inset-right)) 24px max(16px,env(safe-area-inset-left));gap:32px}
-  .logo{width:220px;max-width:70vw;height:auto}
-  form{width:100%;max-width:340px;display:flex;flex-direction:column;gap:12px}
-  h1{font-family:Sora,Inter,sans-serif;font-weight:600;font-size:1.125rem;margin:0;text-align:center}
-  p{margin:0;text-align:center;font-size:.875rem;line-height:1.4;color:#e6ede3}
-  label{font-size:.875rem;font-weight:500}
-  input[type=password]{width:100%;height:48px;border-radius:10px;border:1px solid #d9e2d4;padding:0 14px;
-    font-size:16px;font-family:inherit;color:#1d1d1b;background:#fff}
-  input[type=password]:focus{outline:3px solid #f5f1ea;outline-offset:2px}
-  button{height:48px;border:0;border-radius:10px;background:#f5f1ea;color:#3e5139;font-weight:600;
-    font-size:1rem;font-family:inherit;cursor:pointer}
-  button:hover{background:#fff}
-  button:focus-visible{outline:3px solid #ef7d77;outline-offset:2px}
-  .error{background:#fbe4e0;color:#b3261e;border-radius:8px;padding:10px 12px;font-size:.875rem;text-align:left}
-  .peu{font-size:.75rem;color:#cfdbc9}
+  html,body{margin:0;min-height:100%}
+  body{font-family:Inter,system-ui,sans-serif;color:#1d1d1b;
+    background:radial-gradient(120% 80% at 50% 0%,#5d7a54 0%,#4e6b45 55%,#3e5139 100%) fixed #4e6b45}
+  .pagina{min-height:100dvh;display:flex;flex-direction:column;
+    padding:max(16px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(16px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  header{display:flex;justify-content:flex-end}
+  .idiomes{display:inline-flex;gap:2px;padding:3px;border-radius:999px;background:rgba(255,255,255,.12);
+    border:1px solid rgba(255,255,255,.22)}
+  .idioma{min-width:44px;height:32px;padding:0 12px;display:inline-flex;align-items:center;justify-content:center;
+    border-radius:999px;font-size:.8125rem;font-weight:600;letter-spacing:.02em;color:#fff;text-decoration:none}
+  a.idioma:hover{background:rgba(255,255,255,.14)}
+  a.idioma:focus-visible{outline:2px solid #f5f1ea;outline-offset:2px}
+  .idioma.actiu{background:#f5f1ea;color:#3e5139}
+  main{flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:28px;padding:24px 0}
+  .logo{width:200px;max-width:62vw;height:auto}
+  .targeta{width:100%;max-width:380px;background:#fff;border-radius:18px;padding:28px 24px 24px;
+    box-shadow:0 18px 40px -12px rgba(20,30,18,.45),0 2px 6px rgba(20,30,18,.12)}
+  .cadenat{width:44px;height:44px;border-radius:12px;background:#e4eadf;color:#4e6b45;
+    display:flex;align-items:center;justify-content:center;margin-bottom:16px}
+  h1{font-family:Sora,Inter,sans-serif;font-weight:700;font-size:1.25rem;line-height:1.3;color:#3e5139;margin:0 0 6px}
+  .intro{margin:0 0 20px;font-size:.9375rem;line-height:1.5;color:#5f6b5a}
+  form{display:flex;flex-direction:column;gap:8px}
+  label{font-size:.875rem;font-weight:600;color:#1d1d1b}
+  .camp{position:relative}
+  input[type=password],input[type=text]{width:100%;height:48px;border-radius:10px;border:1px solid #cfc6b3;
+    padding:0 84px 0 14px;font-size:16px;font-family:inherit;color:#1d1d1b;background:#fff}
+  input:focus{outline:none;border-color:#4e6b45;box-shadow:0 0 0 3px rgba(78,107,69,.25)}
+  .mostra{position:absolute;right:6px;top:6px;height:36px;padding:0 12px;border:0;border-radius:8px;
+    background:transparent;color:#4e6b45;font:600 .8125rem Inter,system-ui,sans-serif;cursor:pointer}
+  .mostra:hover{background:#e4eadf}
+  .mostra:focus-visible{outline:2px solid #4e6b45;outline-offset:1px}
+  .entra{margin-top:12px;height:48px;border:0;border-radius:10px;background:#4e6b45;color:#fff;
+    font:600 1rem Inter,system-ui,sans-serif;cursor:pointer}
+  .entra:hover{background:#3e5139}
+  .entra:focus-visible{outline:3px solid #ef7d77;outline-offset:2px}
+  .error{display:flex;gap:8px;align-items:flex-start;background:#fbe4e0;color:#b3261e;border-radius:10px;
+    padding:10px 12px;font-size:.875rem;line-height:1.4;margin:0 0 12px}
+  .recorda{margin:14px 0 0;font-size:.8125rem;line-height:1.4;color:#5f6b5a}
+  footer{text-align:center;font-size:.8125rem;color:#d7e1d2;padding-bottom:4px}
 </style>
 </head>
 <body>
-<main>
-  ${LOGO_NEGATIU}
-  <form method="post" action="${RUTA_ENTRADA}" autocomplete="on">
-    <h1>Acc\xE9s restringit \xB7 Acceso restringido</h1>
-    <p>Redestina est\xE0 en proves. Escriu la contrasenya per entrar.<br>Redestina est\xE1 en pruebas. Escribe la contrase\xF1a para entrar.</p>
-    ${error ? '<div class="error" role="alert">La contrasenya no \xE9s correcta. \xB7 La contrase\xF1a no es correcta.</div>' : ""}
-    <input type="text" name="username" value="redestina" autocomplete="username" hidden>
-    <input type="hidden" name="desti" value="${escapa(desti)}">
-    <label for="contrasenya">Contrasenya \xB7 Contrase\xF1a</label>
-    <input id="contrasenya" name="contrasenya" type="password" autocomplete="current-password" required autofocus>
-    <button type="submit">Entra \xB7 Entrar</button>
-  </form>
-  <p class="peu">Fundaci\xF3 Espigoladors</p>
-</main>
+<div class="pagina">
+  <header>
+    <nav class="idiomes" aria-label="${t.idioma}">${opcio("ca", "CA")}${opcio("es", "ES")}</nav>
+  </header>
+  <main>
+    ${LOGO_NEGATIU}
+    <section class="targeta">
+      <div class="cadenat" aria-hidden="true">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/></svg>
+      </div>
+      <h1>${t.titol}</h1>
+      <p class="intro">${t.intro}</p>
+      ${error ? `<p class="error" role="alert">${t.error}</p>` : ""}
+      <form method="post" action="${RUTA_ENTRADA}" autocomplete="on">
+        <input type="text" name="username" value="redestina" autocomplete="username" hidden>
+        <input type="hidden" name="desti" value="${escapa(desti)}">
+        <input type="hidden" name="idioma" value="${idioma}">
+        <label for="contrasenya">${t.etiqueta}</label>
+        <div class="camp">
+          <input id="contrasenya" name="contrasenya" type="password" autocomplete="current-password" required autofocus${error ? ' aria-invalid="true"' : ""}>
+          <button type="button" class="mostra" aria-controls="contrasenya" aria-pressed="false" data-mostra="${t.mostra}" data-amaga="${t.amaga}">${t.mostra}</button>
+        </div>
+        <button type="submit" class="entra">${t.boto}</button>
+      </form>
+      <p class="recorda">${t.recorda}</p>
+    </section>
+  </main>
+  <footer>${t.peu}</footer>
+</div>
+<script>
+  // Mostrar/ocultar la contrase\xF1a, y que la aplicaci\xF3n abra en el idioma elegido aqu\xED
+  // (la aplicaci\xF3n guarda el suyo en localStorage, clave 'redestina-lang').
+  (function () {
+    var b = document.querySelector('.mostra'), i = document.getElementById('contrasenya');
+    b.addEventListener('click', function () {
+      var visible = i.type === 'text';
+      i.type = visible ? 'password' : 'text';
+      b.textContent = visible ? b.dataset.mostra : b.dataset.amaga;
+      b.setAttribute('aria-pressed', String(!visible));
+      i.focus();
+    });
+    try { localStorage.setItem('redestina-lang', '${idioma}'); } catch (e) {}
+  })();
+</script>
 </body>
 </html>`;
 }
-function htmlCortina(desti, error) {
-  return new Response(paginaCortina({ desti, error }), {
+function htmlCortina(desti, error, idioma) {
+  return new Response(paginaCortina({ desti, error, idioma }), {
     // 401 y no 200: que ningún buscador la indexe como si fuera la portada, y que ninguna
     // comprobación automática la confunda con la web de verdad.
     status: 401,
     headers: {
       "content-type": "text/html; charset=utf-8",
       "cache-control": "no-store",
-      "x-robots-tag": "noindex, nofollow"
+      "x-robots-tag": "noindex, nofollow",
+      // Recordar el idioma elegido: la próxima vez que salga la cortina, ya en ese idioma.
+      "set-cookie": `${COOKIE_IDIOMA}=${idioma}; Path=/; Max-Age=31536000; Secure; SameSite=Lax`
     }
   });
 }
@@ -121,8 +218,9 @@ async function gestiona(req) {
     const form = await req.formData().catch(() => null);
     const contrasenya = String(form?.get("contrasenya") ?? "");
     const desti = destiSegur(String(form?.get("desti") ?? "/"));
+    const idioma = form?.get("idioma") === "es" ? "es" : "ca";
     const token = contrasenya ? await tokenDeContrasenya(contrasenya) : "";
-    if (!await esTokenValid(token)) return htmlCortina(desti, true);
+    if (!await esTokenValid(token)) return htmlCortina(desti, true, idioma);
     return new Response(null, {
       status: 303,
       headers: {
@@ -138,7 +236,7 @@ async function gestiona(req) {
   if (!navegacio) {
     return new Response("Acc\xE9s restringit", { status: 401, headers: { "cache-control": "no-store" } });
   }
-  return htmlCortina(destiSegur(url.pathname + url.search), false);
+  return htmlCortina(destiSegur(senseIdioma(url)), false, idiomaDe(url, req.headers.get("cookie")));
 }
 
 // <stdin>

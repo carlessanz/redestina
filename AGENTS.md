@@ -3911,6 +3911,11 @@ de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
 - **Se sirven sin cortina solo cinco cosas sin datos** (`esLliure()`): `logo-email.png` (los
   correos lo pintan desde la bandeja), `segell-redestina*.svg` (el sello vive en webs de
   terceros), `favicon.svg`, `sw.js` y `workbox-*.js`.
+- **Un idioma cada vez, catalán por defecto**, con un selector CA/ES arriba a la derecha
+  (`?idioma=es`, recordado en la cookie `redestina_idioma`, un año). La pantalla es una
+  tarjeta blanca sobre el verde de marca, con el logo en negativo, «Mostra» para ver lo que
+  se escribe y el aviso de la semana. Al elegir idioma escribe también `redestina-lang` en
+  `localStorage`, así que la aplicación abre luego en ese mismo idioma.
 - **Una navegación ve la cortina con 401**; un script o una imagen, un 401 seco. `robots`
   `noindex`.
 - 🔴 **El service worker ya NO guarda `index.html` ni tiene `navigateFallback`**
@@ -5782,9 +5787,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.003 pruebas en 32 ficheros**: 1.002 correctas y **1 saltada a propósito**, la
+   Referencia: **1.006 pruebas en 32 ficheros**: 1.005 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
-   +12 de la cortina, `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
+   +15 de la cortina, `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
    +4 de `opcionsVisibles`, las opciones del diagnóstico que derivan de otra respuesta. Antes, 987:
    +1 de la nota de la espigolada en pasado cuando la oferta ya está cerrada. Antes, 986:
    +3 de `estatEfectiuEnllac`, el estado REAL de un enlace —activo y vencido es caducado, porque la

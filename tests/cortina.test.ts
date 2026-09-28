@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { empaqueta } from '../scripts/construir-cortina.mjs'
 import {
-  COOKIE, RUTA_ENTRADA, destiSegur, esLliure, esTokenValid, gestiona, llegeixCookie,
+  COOKIE, COOKIE_IDIOMA, RUTA_ENTRADA, destiSegur, idiomaDe, esLliure, esTokenValid, gestiona, llegeixCookie,
   tokenDeContrasenya,
 } from '../cortina/cortina.ts'
 
@@ -103,5 +103,24 @@ describe('middleware.js', () => {
   it('está al día con cortina/cortina.ts', async () => {
     const actual = readFileSync(new URL('../middleware.js', import.meta.url), 'utf8')
     expect(actual, 'Executa: node scripts/construir-cortina.mjs').toBe(await empaqueta())
+  })
+})
+
+describe('el idioma de la cortina', () => {
+  it('catalán por defecto, castellano si se pide o si está guardado', () => {
+    expect(idiomaDe(new URL(`${BASE}/`), null)).toBe('ca')
+    expect(idiomaDe(new URL(`${BASE}/?idioma=es`), null)).toBe('es')
+    expect(idiomaDe(new URL(`${BASE}/`), `${COOKIE_IDIOMA}=es`)).toBe('es')
+    expect(idiomaDe(new URL(`${BASE}/?idioma=ca`), `${COOKIE_IDIOMA}=es`)).toBe('ca')
+    expect(idiomaDe(new URL(`${BASE}/?idioma=fr`), null)).toBe('ca')
+  })
+  it('un solo idioma en la página, y el cambio no se arrastra al destino', async () => {
+    const r = await gestiona(new Request(`${BASE}/login?idioma=es`, { headers: { 'sec-fetch-mode': 'navigate' } }))
+    const html = await r.text()
+    expect(html).toContain('<html lang="es">')
+    expect(html).toContain('Acceso restringido')
+    expect(html).not.toContain('Accés restringit')
+    expect(html).toContain('value="/login"')
+    expect(r.headers.get('set-cookie')).toContain(`${COOKIE_IDIOMA}=es`)
   })
 })
