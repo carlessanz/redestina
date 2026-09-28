@@ -45,7 +45,8 @@ interface CanalAmbOferta {
   kg_reales: number | null
   data_hora_recollida: string | null
   created_at: string
-  excedentes: { id_excedente: string | null; producto: string | null; estado: string; fotos: string[] | null; foto_producte: boolean | null } | null
+  // La oferta entera: la fila abre su detalle, el mismo del Mercat (28-09-2026).
+  excedentes: Excedente | null
 }
 
 /** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
@@ -233,22 +234,39 @@ export function Historic() {
   const { t } = useT()
   const organitzacio = useOrganitzacio('entidad')
   const [files, setFiles] = useState<CanalAmbOferta[]>([])
+  const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   const [carregant, setCarregant] = useState(true)
+  const [obert, setObert] = useState<CanalAmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
 
   useEffect(() => {
     if (!entidadId) { setCarregant(false); return }
     let viu = true
-    void supabase
-      .from('canalizaciones')
-      .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id_excedente, producto, estado, fotos, foto_producte)')
-      .eq('entidad_id', entidadId)
-      .order('created_at', { ascending: false })
-      .then(({ data }) => {
-        if (!viu) return
-        setFiles((data as unknown as CanalAmbOferta[]) ?? [])
-        setCarregant(false)
-      })
+    // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). El albarán de entrega de cada
+    // canalización, igual que en Interessos: `ENT` y `R-ENT`, prefiriendo el vivo.
+    void Promise.all([
+      supabase
+        .from('canalizaciones')
+        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(*)')
+        .eq('entidad_id', entidadId)
+        .order('created_at', { ascending: false }),
+      supabase
+        .from('v_albaranes_bandeja')
+        .select('id, numero_completo, estado, canalizacion_id')
+        .in('tipo', ['ENT', 'R-ENT']),
+    ]).then(([can, alb]) => {
+      if (!viu) return
+      const per: Record<string, AlbaraEnt> = {}
+      for (const a of ((alb.data as AlbaraEnt[] | null) ?? [])) {
+        if (!a.canalizacion_id) continue
+        const actual = per[a.canalizacion_id]
+        const viuA = ALBARA_VIU.includes(a.estado as EstadoAlbaran)
+        if (!actual || (viuA && !ALBARA_VIU.includes(actual.estado as EstadoAlbaran))) per[a.canalizacion_id] = a
+      }
+      setAlbarans(per)
+      setFiles((can.data as unknown as CanalAmbOferta[]) ?? [])
+      setCarregant(false)
+    })
     return () => { viu = false }
   }, [entidadId])
 
@@ -258,13 +276,26 @@ export function Historic() {
   const pendentKg = files.reduce((s, f) => s + (f.kg_reales == null ? Number(f.kg_confirmados ?? 0) : 0), 0)
   const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
+  /** Siempre una fecha, y nunca el código interno. ⚠️ «Recollida» solo con kilos reales:
+   *  `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el ENT (la fecha prevista),
+   *  así que la fecha sola no dice que haya llegado nada. */
+  const quan = (f: CanalAmbOferta) => (f.data_hora_recollida && f.kg_reales != null
+    ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
+    : f.data_hora_recollida
+      ? t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
+      : t('hist.assigned_on', { date: dataCurta(f.created_at) }))
+  /** Claves propias y no las del productor: aquí los kilos se RECIBEN. */
+  const quants = (f: CanalAmbOferta) => (f.kg_reales != null
+    ? t('hist.kg_reals', { n: kgFmt(f.kg_reales) })
+    : t('hist.kg_assignats', { n: kgFmt(f.kg_confirmados ?? 0) }))
+
   return (
     <Card>
       <CardHeader>
         <CardTitle>{t('hist.title')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
-            ? t('hist.subtitle_pending', { n: totalKg, m: pendentKg })
-            : t('hist.subtitle', { n: totalKg })}</p>
+            ? t('hist.subtitle_pending', { n: kgFmt(totalKg), m: kgFmt(pendentKg) })
+            : t('hist.subtitle', { n: kgFmt(totalKg) })}</p>
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
@@ -272,34 +303,56 @@ export function Historic() {
           <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}
         {files.map((f) => (
-          <div key={f.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-sm">
+          // Toda la fila abre el detalle, como en Interessos (28-09-2026).
+          <button type="button" key={f.id} onClick={() => f.excedentes && setObert(f)}
+            className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
             <div className="flex min-w-0 items-center gap-3">
               <FotoOfertaResolta foto={foto(f.excedentes ?? { producto: null })}
                 alt={f.excedentes?.producto ?? ''} className="size-12" />
               <div className="min-w-0">
-              <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
-              {/* Siempre una fecha, y nunca el código interno. ⚠️ «Recollida» solo con kilos
-                  reales: `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el ENT
-                  (la fecha prevista), así que la fecha sola no dice que haya llegado nada. */}
-              <div className="text-xs text-muted-foreground">
-                {f.data_hora_recollida && f.kg_reales != null
-                  ? t('hist.collected_on', { date: dataCurta(f.data_hora_recollida) })
-                  : f.data_hora_recollida
-                    ? t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
-                    : t('hist.assigned_on', { date: dataCurta(f.created_at) })}
-              </div>
+                <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
+                <div className="text-xs text-muted-foreground">
+                  {quan(f)}
+                  {f.excedentes?.modalitat ? ` · ${t(`od.mod_${f.excedentes.modalitat}`)}` : ''}
+                </div>
               </div>
             </div>
-            {/* Claves propias y no las del productor: aquí los kilos se RECIBEN, y
-                «canalitzats» es la palabra de quien los entrega. */}
-            <span>
-              {f.kg_reales != null
-                ? t('hist.kg_reals', { n: Number(f.kg_reales) })
-                : t('hist.kg_assignats', { n: Number(f.kg_confirmados ?? 0) })}
-            </span>
-          </div>
+            <span className="tabular-nums">{quants(f)}</span>
+          </button>
         ))}
       </CardContent>
+
+      <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
+        {obert?.excedentes && (() => {
+          const alb = albarans[obert.id]
+          return (
+            <DialogContent className="max-h-[85dvh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
+              <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              {/* La entrega: lo que llegó, cuándo y con qué albarán. El PDF vive en
+                  Documents, que es donde ya se descarga. */}
+              <div className="space-y-1 rounded-md border p-3 text-sm">
+                <p className="text-xs text-muted-foreground">{t('hist.d_entrega')}</p>
+                <p className="font-medium tabular-nums">{quants(obert)}</p>
+                <p className="text-muted-foreground">{quan(obert)}</p>
+                {alb && (
+                  <p>
+                    {t('hist.d_albara', { num: alb.numero_completo ?? t('alb.no_number') })}
+                    {' · '}{t(`alb.st_${alb.estado}`)}
+                  </p>
+                )}
+              </div>
+              {alb?.numero_completo && (
+                <DialogFooter>
+                  <Button asChild variant="outline" className="h-11 md:h-9">
+                    <Link to="/receptor/documents">{t('hist.a_documents')}</Link>
+                  </Button>
+                </DialogFooter>
+              )}
+            </DialogContent>
+          )
+        })()}
+      </Dialog>
     </Card>
   )
 }

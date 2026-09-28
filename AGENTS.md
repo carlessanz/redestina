@@ -688,7 +688,8 @@ src/
                                SelectorFotos (subir y quitar) y CasellaFotoProducte
     DetallOfertaReceptor.tsx   El detalle de una oferta como lo ve el receptor (foto grande, kilos, comarca,
                                modalidad, precio, formato…). Uno solo para el Mercat y para Els meus
-                               interessos, cuyas tarjetas lo abren desde el 28-09-2026
+                               interessos y el Històric, cuyas filas lo abren desde el 28-09-2026 (el
+                               Històric añade la entrega: kilos, fecha y albarán)
     CampsPerfilReceptor.tsx    Los campos del perfil de cada tipo de receptor (`perfil_receptor`). Uno
                                solo para la ficha propia y la del equipo
     LlocsRecollida.tsx         Los lugares de recogida de una productora: lista, alta y baja. Uno solo
