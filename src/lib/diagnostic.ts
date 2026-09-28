@@ -22,7 +22,7 @@
 //    rellenar su diagnóstico por un dato de configuración.
 
 import type {
-  BlocMesura, CondicioPregunta, MesuraPla, OperadorRegla, PreguntaDiagnostic,
+  BlocMesura, CondicioPregunta, MesuraPla, OpcioPregunta, OperadorRegla, PreguntaDiagnostic,
   TextBilingue, TipusPregunta,
 } from '../types'
 import type { PuntProces } from './procesOferta'
@@ -107,6 +107,34 @@ export function preguntaAplica(pregunta: PreguntaDiagnostic, respostes: Resposte
   // está, y cualquier operador que no sea `buit` devuelve false — la hija tampoco aplica,
   // que es el resultado correcto sin necesidad de recursión.
   return avaluarCondicio(c.operador ?? '=', c.valor, respostes[c.pregunta])
+}
+
+/**
+ * Preguntas cuyas opciones son un SUBCONJUNTO de lo marcado en otra (28-09-2026).
+ * «Quins són els principals?» dice «dels que has marcat», pero el motor no sabe construir
+ * opciones a partir de otra respuesta (una de las cuatro adaptaciones de la versión 1, §4),
+ * así que ofrecía las once familias. Filtrarlo aquí es solo PANTALLA: el servidor sigue
+ * aceptando cualquier opción del cuestionario, y por eso no hace falta tocar SQL.
+ */
+export const OPCIONS_DERIVADES: Readonly<Record<string, string>> = {
+  productes_principals: 'productes',
+  productes_excedent: 'productes',
+}
+
+/**
+ * Las opciones que se enseñan de una pregunta. Si deriva de otra que ya tiene respuesta,
+ * solo las marcadas allí — más las que esta ya tenga elegidas, para que desmarcar arriba
+ * no deje una respuesta escondida que no se puede quitar.
+ */
+export function opcionsVisibles(pregunta: PreguntaDiagnostic, respostes: Respostes): OpcioPregunta[] {
+  const opcions = pregunta.opcions ?? []
+  const origen = OPCIONS_DERIVADES[pregunta.id]
+  if (!origen) return opcions
+  const marcats = respostes[origen]
+  if (!Array.isArray(marcats) || marcats.length === 0) return opcions
+  const propis = respostes[pregunta.id]
+  const triats = Array.isArray(propis) ? propis : []
+  return opcions.filter((o) => marcats.includes(o.valor) || triats.includes(o.valor))
 }
 
 /** Las preguntas visibles ahora mismo, en el orden del cuestionario. */

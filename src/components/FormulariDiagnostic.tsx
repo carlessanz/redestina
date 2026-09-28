@@ -33,7 +33,7 @@ import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import {
   PASSOS_DIAGNOSTIC_CLAUS, agrupaPerSeccio, esBuit, obligatoriesQueFalten,
-  prefillDesDeFitxa, progresDiagnostic, puntDiagnostic, textBilingue,
+  opcionsVisibles, prefillDesDeFitxa, progresDiagnostic, puntDiagnostic, textBilingue,
 } from '../lib/diagnostic'
 import type { Respostes } from '../lib/diagnostic'
 import {
@@ -41,7 +41,7 @@ import {
 } from '../lib/diagnosticApi'
 import type { TipusOrg } from '../lib/diagnosticApi'
 import type {
-  DiagnosticEstat, PreguntaDiagnostic, QuestionariDiagnostic, SobreDiagnostic,
+  DiagnosticEstat, OpcioPregunta, PreguntaDiagnostic, QuestionariDiagnostic, SobreDiagnostic,
 } from '../types'
 import { cn } from '../lib/utils'
 import { Button } from '@/components/ui/button'
@@ -224,6 +224,7 @@ export default function FormulariDiagnostic({
                 key={p.id}
                 pregunta={p}
                 valor={respostes[p.id]}
+                opcions={opcionsVisibles(p, respostes)}
                 falta={falten.includes(p.id)}
                 proposat={proposats.has(p.id)}
                 onCanvi={(v) => respon(p.id, v)}
@@ -286,10 +287,11 @@ export default function FormulariDiagnostic({
 // ---------------------------------------------------------------------------
 
 function Pregunta({
-  pregunta, valor, falta, proposat, onCanvi,
+  pregunta, valor, opcions, falta, proposat, onCanvi,
 }: {
   pregunta: PreguntaDiagnostic
   valor: unknown
+  opcions: OpcioPregunta[]
   falta: boolean
   proposat: boolean
   onCanvi: (valor: unknown) => void
@@ -326,10 +328,10 @@ function Pregunta({
       </div>
 
       {unSolControl
-        ? <Control pregunta={pregunta} valor={valor} id={id} onCanvi={onCanvi} />
+        ? <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
         : (
           <div role="group" aria-labelledby={`${id}-etiqueta`}>
-            <Control pregunta={pregunta} valor={valor} id={id} onCanvi={onCanvi} />
+            <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
           </div>
         )}
 
@@ -339,15 +341,15 @@ function Pregunta({
 }
 
 function Control({
-  pregunta, valor, id, onCanvi,
+  pregunta, opcions, valor, id, onCanvi,
 }: {
   pregunta: PreguntaDiagnostic
+  opcions: OpcioPregunta[]
   valor: unknown
   id: string
   onCanvi: (valor: unknown) => void
 }) {
   const { t, lang } = useT()
-  const opcions = pregunta.opcions ?? []
 
   if (pregunta.tipus === 'boolea') {
     // 🔴 DOS CASILLAS Y NO UNA, y no es un capricho de diseño. Una casilla sola tiene dos

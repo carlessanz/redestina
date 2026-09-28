@@ -23,7 +23,7 @@ import { DICTS } from '../src/lib/i18n'
 import {
   BLOCS_MESURA, ETAPES_DIAGNOSTIC, ESTATS_DIAGNOSTIC, PASSOS_DIAGNOSTIC_CLAUS,
   SECCIONS_CONEGUDES, agrupaPerSeccio, avaluarCondicio, clauSeccio, esBuit,
-  estilEstatDiagnostic, mesuresPerBloc, obligatoriesQueFalten, prefillDesDeFitxa,
+  estilEstatDiagnostic, mesuresPerBloc, obligatoriesQueFalten, opcionsVisibles, prefillDesDeFitxa,
   prefillPregunta, preguntaAplica, preguntesQueApliquen, progresDiagnostic,
   puntDiagnostic, textBilingue,
 } from '../src/lib/diagnostic'
@@ -418,5 +418,31 @@ describe('textBilingue', () => {
     expect(textBilingue({ ca: 'Hola', es: 'Hola es' }, 'es')).toBe('Hola es')
     expect(textBilingue({ ca: 'Hola', es: '' }, 'es')).toBe('Hola')
     expect(textBilingue(null, 'ca')).toBe('')
+  })
+})
+
+describe('opcionsVisibles: «dels que has marcat»', () => {
+  const op = (v: string) => ({ valor: v, etiqueta: { ca: v, es: v } })
+  const principals = pregunta({
+    id: 'productes_principals', tipus: 'multi', opcions: ['a', 'b', 'c'].map(op),
+  })
+
+  it('sin respuesta arriba, todas las opciones', () => {
+    expect(opcionsVisibles(principals, {}).map((o) => o.valor)).toEqual(['a', 'b', 'c'])
+  })
+
+  it('con respuesta arriba, solo lo marcado', () => {
+    expect(opcionsVisibles(principals, { productes: ['c', 'a'] }).map((o) => o.valor))
+      .toEqual(['a', 'c'])
+  })
+
+  it('lo ya elegido se queda aunque se desmarque arriba, para poder quitarlo', () => {
+    expect(opcionsVisibles(principals, { productes: ['a'], productes_principals: ['b'] })
+      .map((o) => o.valor)).toEqual(['a', 'b'])
+  })
+
+  it('una pregunta que no deriva de otra no cambia', () => {
+    const altra = pregunta({ id: 'causes', tipus: 'multi', opcions: ['a', 'b'].map(op) })
+    expect(opcionsVisibles(altra, { productes: ['a'] })).toHaveLength(2)
   })
 })

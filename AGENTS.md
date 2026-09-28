@@ -1393,6 +1393,10 @@ Airtable de la Fundació y no las tenemos. Y **el motor obligó a cuatro adaptac
 revisar con ellos: productos por **familia** (no los 90 del catálogo), «los principales» y «los que
 más excedente dan» como listas completas (no se construyen opciones a partir de otra respuesta),
 un único volumen anual en kg (no por producto) y la temporalidad como doce meses.
+✅ La segunda, a medias desde el 28-09-2026: «els principals» y «els que més excedent donen»
+enseñan **solo las familias marcadas** en «Quins productes produïu?» (`opcionsVisibles()` en
+`diagnostic.ts`, mapa `OPCIONS_DERIVADES`, con prueba). Es solo pantalla: el servidor sigue
+aceptando cualquier opción, y lo ya elegido se queda visible aunque se desmarque arriba.
 ⚠️ **El del receptor sigue en la versión 0**: la revisión dice que su diagnóstico va «solo cuando
 corresponda a prevención y gestión de excedentes», sin contenido.
 
@@ -5710,7 +5714,8 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **987 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (28-09-2026:
+   Referencia: **991 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (28-09-2026:
+   +4 de `opcionsVisibles`, las opciones del diagnóstico que derivan de otra respuesta. Antes, 987:
    +1 de la nota de la espigolada en pasado cuando la oferta ya está cerrada. Antes, 986:
    +3 de `estatEfectiuEnllac`, el estado REAL de un enlace —activo y vencido es caducado, porque la
    caducidad no se guarda—, que usan las fichas de convenio y de albarán. Antes, 983 (27-09-2026,
