@@ -2420,7 +2420,7 @@ pasa es quien **escribe**, y el `slice` de `whatsapp.ts` es la última red, no l
   (`ubicacio:nova`) ya no cuenta como respuesta inválida —antes re-mostraba la misma lista—; el
   bot contesta pidiendo el enlace de Google Maps y no suma intento.
 
-**Identificador**: `E-AAMMDD-XXX-YYY-N` (3 letras del productor, 3 del producto, N = orden
+**Identificador**: `E-AAMMDD-XXX-YYY-N` (3 letras de la organización productora —`empresa`, y `name` si no hay; desde el 28-09-2026—, 3 del producto, N = orden
 del día). Ejemplo real: `E-260721-CAR-TOM-1`.
 
 **Textos que se publican** — reproducen los que el equipo escribe hoy a mano, emojis
@@ -2451,7 +2451,7 @@ jsonb y escriben solo las claves de su lista blanca (las `actualizar_mi_*` anter
 
 | Dato | Cómo |
 | --- | --- |
-| Nom comercial / Persona de contacte | Productor: **`empresa` / `name`** (así lo guarda `registro`: `name` es la persona). Entidad: `nombre` / `contacto`. Si `empresa` está vacío se sugiere `name` como placeholder, sin escribirlo. ✅ **Desde el 28-09-2026 la ficha del equipo usa las mismas etiquetas** (`crudCampos`, `empresa` primero) y el **listado de productoras y la cabecera de la ficha enseñan `empresa || name`**, con la persona debajo si es otra (`RecordDetail.titolKey`). Las fichas de prueba `TEST-PROD-*` tenían la organización en `name` y `empresa` vacío: se copió a `empresa`, y `crear-usuarios-prueba.ts` ya la escribe. ⚠️ `id_excedente` sigue tomando sus tres letras de `name`: en una ficha del registro son las de la persona |
+| Nom comercial / Persona de contacte | Productor: **`empresa` / `name`** (así lo guarda `registro`: `name` es la persona). Entidad: `nombre` / `contacto`. Si `empresa` está vacío se sugiere `name` como placeholder, sin escribirlo. ✅ **Desde el 28-09-2026 la ficha del equipo usa las mismas etiquetas** (`crudCampos`, `empresa` primero) y el **listado de productoras y la cabecera de la ficha enseñan `empresa || name`**, con la persona debajo si es otra (`RecordDetail.titolKey`). Las fichas de prueba `TEST-PROD-*` tenían la organización en `name` y `empresa` vacío: se copió a `empresa`, y `crear-usuarios-prueba.ts` ya la escribe. ✅ Y desde el mismo día `id_excedente` toma sus tres letras de **`empresa || name`**, la organización y no la persona (`crearExcedente()`; en SQL ya lo hacían `crear_espigolada()` y el alta de albaranes) |
 | Raó social | `razon_social`, nueva en las dos fichas |
 | NIF, correo, teléfono, CP | **Validados antes de guardar** (`validacio.ts`, con pruebas): el NIF con su dígito de control, el teléfono normalizado a E.164 sin «+» (un móvil de 9 cifras recibe el 34). Es ayuda contra la errata, no seguridad: la RPC no valida el NIF |
 | Tipus d'empresa | Desplegable cerrado (`cooperativa`·`sl`·`sa`·`autonom`·`fundacio`·`associacio`·`altres`). La RPC acepta además **el valor que ya estaba** (texto libre del import): rechazarlo impediría guardar el resto |

@@ -307,12 +307,17 @@ export async function crearExcedente(
   // Tres valores, a propósito: sí, no, o no se preguntó (producto en el campo).
   const transportPropi = d.transport === "si" ? true : d.transport === "no" ? false : null;
   const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
-  let idExcedente = await generarId(supabase, productor.name, producto);
+  // El nombre de la ORGANIZACIÓN (`empresa`, el «Nom comercial»), con `name` de respaldo:
+  // en una ficha del registro `name` es la persona de contacto, y el código de la oferta
+  // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplican en SQL
+  // `crear_espigolada()` y el alta de albaranes (`coalesce(p.empresa, p.name)`).
+  const nomOrganitzacio = fichaProductor?.empresa || productor.name;
+  let idExcedente = await generarId(supabase, nomOrganitzacio, producto);
 
   const textoOferta = componerTextoOferta({
     producte: producto,
     producteAlCamp: alCamp,
-    productor: fichaProductor?.empresa || productor.name,
+    productor: nomOrganitzacio,
     municipi: municipio,
     ubicacio: ubicacion?.gmaps_url || undefined,
     quantitat: `${kg}kg aprox${d.caixes ? ` · ${d.caixes} ${d.format_entrega === "palet" ? "palets" : "caixes"}` : ""}`,
@@ -389,7 +394,7 @@ export async function crearExcedente(
     if (!error) break;
     if (error.code !== "23505") break;
     console.warn("excedentes: id_excedente ocupado, reintentando:", idExcedente);
-    idExcedente = await generarId(supabase, productor.name, producto);
+    idExcedente = await generarId(supabase, nomOrganitzacio, producto);
   }
 
   if (error) {
