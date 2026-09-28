@@ -91,6 +91,11 @@ function aprovacioClases(a: string): string {
   }
 }
 
+/** Kilos con separador de miles: `ca-ES` agrupa también los de cuatro cifras. */
+function kgCa(n: number): string {
+  return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
+}
+
 export default function OfferDetail({ excedente, onBack }: Props) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
@@ -633,20 +638,31 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {t(estat.key)}
             </span>
           </div>
+          {/* De quién es y de dónde: la ficha del equipo no lo decía en ningún sitio más que
+              dentro del texto de la oferta. Enlaza a la ficha de la productora. */}
+          {(datosOferta.productor || exc.comarca) && (
+            <p className="mt-1 text-sm text-muted-foreground">
+              {datosOferta.productor && exc.productor_id
+                ? <Link to={`/equip/productors/${exc.productor_id}`} className="font-medium text-primary hover:underline">{datosOferta.productor}</Link>
+                : datosOferta.productor}
+              {datosOferta.productor && exc.comarca ? ' · ' : ''}
+              {exc.comarca}
+            </p>
+          )}
           {exc.modalitat && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-xs font-semibold text-primary">
                 {t(`od.mod_${exc.modalitat}`)}
               </span>
               {(exc.modalitat === 'venda' || exc.modalitat === 'maquila') && exc.preu_minim != null && (
-                <span className="text-sm font-medium text-primary">{exc.preu_minim} €/kg</span>
+                <span className="text-sm font-medium text-primary">{Number(exc.preu_minim).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg</span>
               )}
             </div>
           )}
         </div>
         <div className="text-right">
-          <div className="text-lg font-bold">{canalizados}/{total} kg</div>
-          <span className="text-sm text-muted-foreground">{faltan > 0 ? t('off.falten', { n: faltan }) : t('off.complet')}</span>
+          <div className="text-lg font-bold">{kgCa(canalizados)}/{kgCa(total)} kg</div>
+          <span className="text-sm text-muted-foreground">{faltan > 0 ? t('off.falten', { n: kgCa(faltan) }) : t('off.complet')}</span>
         </div>
       </div>
 
@@ -770,7 +786,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     )}
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
+                {/* `flex-wrap`: opt-in + tres botones piden ~309 px y a 375 px de pantalla la
+                    fila solo tiene 291; sin partir, las acciones se salían de la tarjeta. */}
+                <div className="flex flex-wrap items-center gap-2">
                   <label className="flex items-center gap-2 text-xs text-muted-foreground">
                     <Casella checked={ent.opt_in} onChange={() => void toggleOptIn(ent.id, ent.opt_in)} />
                     {t('od.optin')}
