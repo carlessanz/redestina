@@ -157,7 +157,8 @@ export default function Canalitzacio() {
               <Loader2 className="size-4 animate-spin" />{t('c.loading')}
             </p>
           ) : visibles.length === 0 ? (
-            <p className="py-6 text-sm text-muted-foreground">{t('canalz.empty')}</p>
+            // Con error no se dice «cap lot en curs»: no se sabe, y el error ya está arriba.
+            !error && <p className="py-6 text-sm text-muted-foreground">{t('canalz.empty')}</p>
           ) : (
             <div className="overflow-x-auto">
               <Table>
@@ -197,7 +198,7 @@ export default function Canalitzacio() {
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {l.n_per_aprovar > 0 && (
-                            <Badge className="bg-white text-coral-texto">{l.n_per_aprovar}</Badge>
+                            <Badge className="bg-aviso-fondo text-aviso">{l.n_per_aprovar}</Badge>
                           )}
                         </TableCell>
                         <TableCell className="text-right">

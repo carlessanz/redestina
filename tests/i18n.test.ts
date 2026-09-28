@@ -187,6 +187,24 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       prefijo: 'org.sec_perfil_',
       valores: ['social', 'animal', 'transformador', 'comercial'],
     },
+    {
+      // CHECK de `cierres_donante.estado`. Se compone en `productor/Documents.tsx`: el badge
+      // del año (`mydoc.st_`) y el «qué toca» (`mydoc.next_`), dichos para el donante.
+      que: 'cierres_donante.estado (badge del donante)',
+      prefijo: 'mydoc.st_',
+      valores: [
+        'calculat', 'resum_enviat', 'factura_pendent', 'factura_rebuda', 'coincident',
+        'discrepancia', 'certificat_emes', 'enviat', 'declarat',
+      ],
+    },
+    {
+      que: 'cierres_donante.estado (qué toca)',
+      prefijo: 'mydoc.next_',
+      valores: [
+        'calculat', 'resum_enviat', 'factura_pendent', 'factura_rebuda', 'coincident',
+        'discrepancia', 'certificat_emes', 'enviat', 'declarat',
+      ],
+    },
   ]
 
   for (const { que, prefijo, valores } of COMPUESTAS) {

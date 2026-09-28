@@ -295,6 +295,9 @@ export async function enviarCorreuConveni(camps: {
       nota: camps.nota,
       idioma: camps.idioma,
     },
+    // Sin esto `enviar-email` lo registraba como `oferta` (su valor por defecto), y en la
+    // pestaña Enviaments de Documents un enlace de firma salía como «Oferta».
+    proposito: 'firma_conveni',
   })
   // `simulat`: el servidor dice ok pero el correo no ha salido (RESEND_ENVIO_REAL apagado).
   if (res.ok) return { ok: true, missatge: null, code: null, simulat: res.simulat === true }

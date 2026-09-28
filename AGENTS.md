@@ -1835,6 +1835,36 @@ que ve el receptor; migración `20270407100000`). Lo que cambia de comportamient
 - Siguen con texto crudo, fuera de esta tanda: los errores de CARGA de los listados del equipo
   (`setError(err.message)`), `DadesFundacio` y las whitelists.
 
+**Revisión de los paneles del productor y del equipo, 28-09-2026** (sin migraciones):
+- **Servidor**: `crear-oferta` comprueba el convenio que exige la modalidad a quien entrega
+  (`exigir_convenio(…, 'entrega')`, `403 sense_conveni` con la clave `po.cal_conveni_*`) cuando
+  publica el propio productor; el alta asistida no, porque el equipo lo resuelve en la fase 1
+  del ciclo guiado. Por WhatsApp ya no se acepta interés sobre una oferta cubierta, cancelada o
+  cerrada (se le dice y la fila, que sigue `pendent`, pasa a `dialeg_pas = 'fet'`). Los correos
+  a organizaciones (`enviar-email` y los documentos) llevan `reply_to` al buzón del equipo
+  (`bustiaEquip()`): salían de `no-reply@` y las respuestas no llegaban a nadie.
+- **Productor**: fuera las promesas falsas («t'avisarem quan estigui decidit»), los kg de
+  «Tancada» dicen cuáles son los oficiales, la factura se presenta como opcional (no condiciona
+  el certificado desde el 21-09), la venta o maquila no se publica sin el convenio `com`, quitar
+  una foto ya no deja la oferta apuntando a un fichero borrado, y los errores de carga ya no se
+  pintan como lista vacía. Su navegador deja de recibir `canalizaciones.*` y el REC entero.
+- **Equipo**: un `tecnic` ve en gris, con el motivo, lo que la base le rechazaría (contrafirmar,
+  aprobar, borrar, costes, listas de prueba, plan personalizado); las acciones irreversibles o
+  que envían algo fuera (emitir albarán, marcar entregado, contrafirmar, aprobar un alta,
+  resúmenes, cerrar el ejercicio, abrir el cierre real, campañas) preguntan antes y dicen qué
+  pasará; los guardados comprueban filas (RLS devuelve 200 con 0 filas); una URL de ficha
+  inexistente ya no abre el formulario de alta; en el ciclo guiado el interés asistido de venta
+  o maquila pide precio (siempre fallaba) y «Prepara el conveni» prepara el tipo que toca.
+- ⚠️ **Decisiones que quedan para Carles**: (1) `assegurarContacte()` y el alta manual de
+  Missatgeria marcan `opt_in: true` al abrir un chat, sin que la persona lo haya dado (§8 dice
+  que la plantilla exige consentimiento); quitarlo impide al equipo el primer contacto por
+  plantilla. (2) El descriptor del alta (`camposOferta.ts`) solo está en catalán. (3)
+  `cancelar_meva_oferta()` deja cancelar una oferta con canalizaciones sin tocarlas; el diálogo
+  ya lo advierte. (4) El intake por WhatsApp comprueba el convenio **al final**, en
+  `crearExcedenteDesdeSesion()` (el intake no pasa por `crear-oferta`, y hasta hoy publicaba sin
+  él): sin convenio se le dice y se descarta la sesión. Preguntarlo al empezar exigiría saber
+  la modalidad antes, que es el paso 13.
+
 **Revisión de los PDF y del panel del 28-09-2026** (sin migraciones): en los albaranes, la
 columna «Motiu fora de circuit» se montaba sobre «Caixes» (ahora «Motiu»), la línea salía
 numerada «0» —el trigger crea las líneas con `ordre = 0`; ahora se numera por posición— y las
@@ -5916,7 +5946,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.023 pruebas en 33 ficheros**: 1.022 correctas y **1 saltada a propósito**, la
+   Referencia: **1.025 pruebas en 33 ficheros**: 1.024 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
    +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,
    `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:

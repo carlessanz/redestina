@@ -145,7 +145,7 @@ export default function Convenis() {
                que repetirlo aquí, igual que en un `<select>` nativo (§2, regla 1). Y
                `w-full` porque el trigger nace `w-fit` con `whitespace-nowrap`: dentro de una
                celda de rejilla eso puede crecer más que la celda y empujar la página. */}
-        <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label htmlFor="conv-cerca">{t('c.search')}</Label>
             <Input id="conv-cerca" type="search" placeholder={t('conv.search')}
@@ -197,7 +197,7 @@ export default function Convenis() {
         </div>
 
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!carregant && !error && (
           visibles.length === 0

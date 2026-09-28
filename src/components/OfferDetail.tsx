@@ -17,6 +17,7 @@ import { construirComponentsOferta } from '../lib/ofertaTemplate'
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../lib/aprovarResposta'
 import { etiquetaEstatOferta, PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import { refrescaComptadors } from '../lib/pendentsEquip'
+import { useAppContext } from '../hooks/useAppContext'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
@@ -98,8 +99,12 @@ function kgCa(n: number): string {
 }
 
 export default function OfferDetail({ excedente, onBack }: Props) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { confirma, dialeg } = useConfirma()
+  const { ctx } = useAppContext()
+  // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a un técnico se le dejan
+  // grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
+  const potAprovar = ctx?.potAprovar ?? true
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
   // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
@@ -259,14 +264,20 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
   }, [ranking, testMode])
 
+  // Las dos escrituras piden las filas afectadas: un UPDATE que la RLS no deja pasar no da
+  // error, devuelve cero filas (§12.48), y la pantalla daba el cambio por hecho.
   async function guardarFecha(valor: string) {
     setFecha(valor)
-    await supabase.from('excedentes').update({ disponible_hasta: valor || null }).eq('id', excedente.id)
+    const { data, error } = await supabase.from('excedentes')
+      .update({ disponible_hasta: valor || null }).eq('id', excedente.id).select('id')
+    if (error || !data || data.length === 0) toast.error(t('c.error'))
     await recargar()
   }
 
   async function toggleOptIn(entidadId: string, actual: boolean) {
-    await supabase.from('entidades').update({ opt_in: !actual }).eq('id', entidadId)
+    const { data, error } = await supabase.from('entidades')
+      .update({ opt_in: !actual }).eq('id', entidadId).select('id')
+    if (error || !data || data.length === 0) toast.error(t('c.error'))
     const r = await priorizarEntidades(excedente.id)
     setRanking(r.ranking)
   }
@@ -346,11 +357,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     e.preventDefault()
     const fd = new FormData(e.currentTarget)
     const kg = Number(fd.get('kg') || 0)
-    if (!r.entidad_id || !kg) { toast.error(t('od.no_text')); return }
+    // Antes decía «L'oferta no té text generat», que no tenía nada que ver con esto.
+    if (!r.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
     // Aviso no bloqueante si se canaliza más de lo que falta por cubrir.
     if (kg > faltan && !(await confirma({
       titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: faltan }),
+      descripcio: t('od.over_alloc', { n: kgCa(faltan) }),
     }))) return
 
     const falta = await comprovaConvenis(exc, r.entidad_id, t)
@@ -508,9 +520,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     // El HTML lo maqueta el servidor (cabecera, logo, pie): aquí solo va el
     // contenido. Ver `plantilla` en supabase/functions/enviar-email.
     const r = await enviarEmail({
-      to: email, subject: `Oferta d'excedent: ${exc.producto ?? ''}`,
+      to: email, subject: t('od.email_subject', { producto: exc.producto ?? '' }),
       text: exc.texto_oferta,
       plantilla: {
+        // El pie y el `lang` del correo, en el mismo idioma que el resto del texto.
+        idioma: lang,
         titulo: t('od.email_title'),
         preheader: t('od.email_preheader', { producto: exc.producto ?? '' }),
         nota: t('od.email_note'),
@@ -536,7 +550,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     if (!entidad_id || !kg_confirmados) return
     if (kg_confirmados > faltan && !(await confirma({
       titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: faltan }),
+      descripcio: t('od.over_alloc', { n: kgCa(faltan) }),
     }))) return
     const { data: alta, error: errAlta } = await supabase.from('canalizaciones').insert({
       excedente_id: excedente.id, entidad_id, kg_confirmados,
@@ -596,6 +610,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }
 
   const nombrePorId = (id: string | null) => ranking.find((e) => e.id === id)?.nombre ?? id ?? '—'
+  // Solo una oferta publicada (o a medias) admite todavía interés: es lo que comprueba
+  // `manifestar_interes()`. Fuera de esos dos estados, enviarla no tiene sentido.
+  const ofertaOberta = exc.estado === 'publicada' || exc.estado === 'parcial'
   const vencida = exc.disponible_hasta != null && new Date(exc.disponible_hasta) < new Date() && faltan > 0
 
   /**
@@ -749,8 +766,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               rutes={exc.fotos ?? []}
               onChange={async (rutes) => {
                 const r = await fixaFotos(exc.id, rutes)
-                if (!r.ok) { toast.error(textError(t, r.error)); return }
+                if (!r.ok) { toast.error(textError(t, r.error)); return false }
                 setExc((e) => (e ? { ...e, fotos: rutes } : e))
+                return true
               }}
             />
             <CasellaFotoProducte excedenteId={exc.id} fotos={exc.fotos ?? []}
@@ -788,7 +806,15 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         <CardHeader><CardTitle className="text-base">{t('od.prioritized')}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {cargandoRanking && <p className="text-sm text-muted-foreground">{t('od.calculating')}</p>}
-          {rankingError && <p className="text-sm text-destructive">{rankingError}</p>}
+          {/* El texto de `priorizarEntidades` va en castellano escrito a mano o crudo del
+              servidor: la pantalla dice lo suyo, traducido. */}
+          {rankingError && <p className="text-sm text-destructive">{t('od.rank_error')}</p>}
+          {/* Coberta, cancel·lada, no col·locada o sense publicar: la base ya no acepta interés
+              (`manifestar_interes` solo admite `publicada`/`parcial`), así que enviarla
+              pedía a una entidad algo que después no podría hacer. */}
+          {!cargandoRanking && !rankingError && !ofertaOberta && (
+            <p className="text-sm text-muted-foreground">{t('od.send_closed')}</p>
+          )}
           {!cargandoRanking && !rankingError && rankingOrdenado.slice(0, 15).map((ent) => {
             const puedeTest = !testMode || ent.es_test
             // Si no es usuari de prova, se muestra el motivo visible (antes solo en el title).
@@ -832,15 +858,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                       Los tres se bloquean mientras esa fila tiene un envío en curso, y el
                       pulsado lo dice: el toast llega cuando contesta el servidor, y hasta
                       entonces la única señal de que se ha pulsado es esta. */}
-                  <Button size="sm" disabled={enviant === ent.id}
+                  <BotoAmbMotiu size="sm" disabled={enviant === ent.id || !ofertaOberta}
+                    motiu={ofertaOberta ? undefined : t('od.send_closed')}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOferta(ent))}>
                     {enviant === ent.id ? t('od.sending') : t('od.send')}
-                  </Button>
+                  </BotoAmbMotiu>
                   {whatsappActiu && (
-                    <Button size="sm" variant="outline" title={t('od.force_wa')} disabled={enviant === ent.id}
+                    <Button size="sm" variant="outline" title={t('od.force_wa')} disabled={enviant === ent.id || !ofertaOberta}
                       onClick={() => void ambBloqueig(ent.id, () => enviarOfertaWhatsApp(ent))}>{t('od.whatsapp')}</Button>
                   )}
-                  <Button size="sm" variant="outline" title={t('od.force_email')} disabled={enviant === ent.id}
+                  <Button size="sm" variant="outline" title={t('od.force_email')} disabled={enviant === ent.id || !ofertaOberta}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</Button>
                 </div>
               </div>
@@ -877,8 +904,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     <div className="font-medium">{nombre}</div>
                     <div className="text-xs text-muted-foreground">
                       {t(`od.ch_${r.canal}`)} · {fechaCorta(cuando)}
-                      {r.kg_solicitados != null ? ` · ${r.kg_solicitados} ${t('od.rs_kg')}` : ''}
-                      {r.preu_ofert != null ? ` · ${r.preu_ofert} ${t('od.rs_preu')}` : ''}
+                      {r.kg_solicitados != null ? ` · ${kgCa(Number(r.kg_solicitados))} ${t('od.rs_kg')}` : ''}
+                      {r.preu_ofert != null ? ` · ${Number(r.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}` : ''}
                       {r.mensaje_respuesta ? ` · «${r.mensaje_respuesta}»` : ''}
                     </div>
                   </div>
@@ -899,9 +926,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                       <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
                         placeholder={t('od.rs_preu')} className="h-8 w-20" />
                     )}
-                    <Button size="sm" type="submit">{t('od.approve')}</Button>
-                    <Button size="sm" variant="outline" type="button"
-                      onClick={() => setRebutjant(r)}>{t('od.reject_appr')}</Button>
+                    <BotoAmbMotiu size="sm" type="submit" disabled={!potAprovar}
+                      motiu={potAprovar ? undefined : t('appr.need_approver')}>{t('od.approve')}</BotoAmbMotiu>
+                    <BotoAmbMotiu size="sm" variant="outline" type="button" disabled={!potAprovar}
+                      motiu={potAprovar ? undefined : t('appr.need_approver')}
+                      onClick={() => setRebutjant(r)}>{t('od.reject_appr')}</BotoAmbMotiu>
                   </form>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'aprovada' && (

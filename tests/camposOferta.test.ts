@@ -310,10 +310,11 @@ describe('el cuestionario se explica a sí mismo', () => {
     expect(campo('transport').opciones!.map((o) => o.id)).toEqual(['si', 'no'])
   })
 
-  it('el ejemplo de formato de la fecha sobrevive a la explicación', () => {
-    // La ayuda creció para decir qué pasa al vencer, pero el ejemplo va al final: sin él,
-    // «fins quin dia» se contesta en cualquier formato y `parseDisponibleFins` no lo entiende.
-    expect(campo('disponible_fins').ayuda).toMatch(/23\/07$/)
+  it('la ayuda de la fecha no pide un formato: en el panel es un calendario', () => {
+    // Desde el 27-09-2026 el panel pregunta con `type="date"`, así que «Per exemple 23/07»
+    // sobraba. El bot tiene su propia pregunta, con su ejemplo (`intake.ts`), que es donde
+    // `parseDisponibleFins` necesita el formato.
+    expect(campo('disponible_fins').ayuda).not.toMatch(/23\/07/)
   })
 })
 

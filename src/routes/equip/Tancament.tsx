@@ -17,6 +17,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
+import { useConfirma } from '../../components/DialegConfirma'
 import { useAppContext } from '../../hooks/useAppContext'
 import {
   dataTancament, estilEstatTancament, euros, obrirTancament,
@@ -75,6 +76,7 @@ export default function Tancament() {
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
 
   const [files, setFiles] = useState<Fila[]>([])
   const [totals, setTotals] = useState<Record<string, Totals>>({})
@@ -145,6 +147,14 @@ export default function Tancament() {
 
   async function obre(mode: 'prueba' | 'real') {
     if (any === null) { toast.error(t('tan.bad_year')); return }
+    // Hay UN solo cierre real por ejercicio y la aplicación no sabe retirarlo (§4, el del
+    // 28-09-2026 se quitó a mano): se pregunta antes, diciéndolo.
+    if (mode === 'real' && !(await confirma({
+      titol: t('tan.open_real_confirm_t', { y: any }),
+      descripcio: t('tan.open_real_confirm'),
+      confirmar: t('tan.open_real_do'),
+      destructiu: true,
+    }))) return
     setObrint(true)
     const res = await obrirTancament(any, mode)
     setObrint(false)
@@ -162,7 +172,7 @@ export default function Tancament() {
         </CardHeader>
         <CardContent className="space-y-4">
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
           {!carregant && !error && files.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('tan.empty')}</p>
@@ -227,7 +237,7 @@ export default function Tancament() {
             <p className="mt-1 text-sm text-muted-foreground">{t('tan.open_hint')}</p>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="tan-exercici">{t('tan.f_year')}</Label>
                 <Input
@@ -239,7 +249,7 @@ export default function Tancament() {
               </div>
             </div>
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="rounded-md border border-input p-3">
                 <p className="font-medium">{t('tan.open_test')}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t('tan.open_test_hint')}</p>
@@ -274,6 +284,7 @@ export default function Tancament() {
           </CardContent>
         </Card>
       )}
+      {dialegConfirma}
     </div>
   )
 }

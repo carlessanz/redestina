@@ -211,7 +211,7 @@ export default function OffersList({ onOpen }: Props) {
       <CardContent className="space-y-4">
         <Input type="search" placeholder={t('off.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {loading && <CarregantSeccio files={5} ambCapcalera={false} />}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!loading && !error && (
           <Tabs defaultValue="actives">

@@ -49,6 +49,7 @@ import { FilaCasella } from '../../components/Casella'
 import { enviarAcces } from '../../lib/acces'
 import type { Convenio, Membresia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
@@ -199,6 +200,9 @@ export default function Aprovacions() {
   const [carregantReg, setCarregantReg] = useState(true)
   const [convenis, setConvenis] = useState<ConveniPendent[]>([])
   const [carregantConv, setCarregantConv] = useState(true)
+  // Qué cola no se pudo leer. Sin esto, un fallo de carga se pintaba como «No hi ha res per
+  // aprovar»: la mentira en verde que más cuesta detectar.
+  const [errCarrega, setErrCarrega] = useState<{ resp?: boolean; reg?: boolean; conv?: boolean }>({})
   /** Id de la fila que se está resolviendo, para no dejar pulsar dos veces. */
   const [ocupat, setOcupat] = useState<string | null>(null)
   /** El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35). */
@@ -220,12 +224,13 @@ export default function Aprovacions() {
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en dos cadenas
     // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('oferta_respuestas')
       .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, productor_id, preu_minim)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
+    setErrCarrega((e) => ({ ...e, resp: Boolean(error) }))
     const files = (data as unknown as Fila[]) ?? []
     setFiles(files)
     setCarregant(false)
@@ -251,6 +256,7 @@ export default function Aprovacions() {
       // Migración del registro público sin aplicar (la columna `aprovacio` no existe):
       // la sección se queda vacía y la cola de ofertas sigue viva.
       console.warn('registres pendents:', error.message)
+      setErrCarrega((e) => ({ ...e, reg: true }))
       setRegistres([])
       setPerfils({})
       setCandidats({})
@@ -258,6 +264,7 @@ export default function Aprovacions() {
       return
     }
 
+    setErrCarrega((e) => ({ ...e, reg: false }))
     const pendents = (data as unknown as Registre[]) ?? []
     setRegistres(pendents)
 
@@ -300,10 +307,12 @@ export default function Aprovacions() {
       // Migración de convenios sin aplicar: la sección se queda vacía y las otras dos
       // siguen vivas.
       console.warn('convenis per contrasignar:', error.message)
+      setErrCarrega((e) => ({ ...e, conv: true }))
       setConvenis([])
       setCarregantConv(false)
       return
     }
+    setErrCarrega((e) => ({ ...e, conv: false }))
     setConvenis((data as unknown as ConveniPendent[]) ?? [])
     setCarregantConv(false)
   }, [])
@@ -331,7 +340,9 @@ export default function Aprovacions() {
   function textErrorRegistre(err: { code?: string; message: string }): string {
     if (err.code === '42501') return t('appr.reg_no_perm')
     if (err.code === '22023') return t('appr.reg_gone')
-    return t('appr.reg_error', { msg: err.message })
+    // El texto que la RPC levanta a propósito se enseña; el crudo de Postgres, no.
+    const msg = textError(t, err.message)
+    return msg === t('c.error') ? msg : t('appr.reg_error', { msg })
   }
 
   // Aprobar y avisar son DOS cosas, y en ese orden. La aprobación es la que cuenta: si el
@@ -342,6 +353,15 @@ export default function Aprovacions() {
   // (deuda 27). El cliente lo pidió así: «al aceptar una organización, un correo con el
   // acceso directo a su panel».
   async function aprovarRegistre(r: Registre) {
+    // Aprobar abre el acceso y manda un correo fuera: se dice antes, y a quién.
+    const correuDesti = perfils[r.user_id]?.email ?? null
+    if (!(await confirma({
+      titol: t('appr.reg_confirm_t'),
+      descripcio: correuDesti
+        ? t(deProva.has(r.id) ? 'appr.reg_confirm_test' : 'appr.reg_confirm', { email: correuDesti })
+        : t('appr.reg_confirm_nomail'),
+      confirmar: t('appr.reg_approve'),
+    }))) return
     setOcupat(r.id)
 
     // El `es_test` va ANTES de aprobar, no después: `esCuentaPermitida` lo mira al mandar
@@ -351,10 +371,12 @@ export default function Aprovacions() {
       const taula = r.tipo === 'productor' ? 'productores' : 'entidades'
       const fitxaId = r.tipo === 'productor' ? r.productores?.id : r.entidades?.id
       if (fitxaId) {
-        const { error: errTest } = await supabase.from(taula).update({ es_test: true }).eq('id', fitxaId)
+        const { data: marcades, error: errTest } = await supabase.from(taula)
+          .update({ es_test: true }).eq('id', fitxaId).select('id')
         // No se aborta la aprobación por esto: es una marca de pruebas, no el alta. Pero se
-        // dice, porque si falló el correo tampoco saldrá y hay que saber por qué.
-        if (errTest) toast.warning(t('appr.reg_es_test_ko'))
+        // dice, porque si falló el correo tampoco saldrá y hay que saber por qué. Cero filas
+        // también es fallo: así deniega un UPDATE la RLS (§12.48).
+        if (errTest || !marcades || marcades.length === 0) toast.warning(t('appr.reg_es_test_ko'))
       }
     }
 
@@ -372,7 +394,8 @@ export default function Aprovacions() {
       //    recién aprobada nace `es_test = false` y el gate la descarta (`no_test_user`,
       //    §8). Decirlo es la diferencia entre que el equipo avise a mano y que crea que ya
       //    está avisado.
-      toast.success(t('appr.reg_approved'))
+      // UN aviso, ámbar: la aprobación sí ha ocurrido, pero hay que avisar a mano. Antes
+      // salían dos seguidos, uno verde y otro ámbar, y el verde era el que se leía.
       toast.warning(t(enviat?.codi === 'no_test_user' ? 'appr.mail_test' : 'appr.mail_ko'))
     }
     void carregaRegistres()
@@ -400,12 +423,15 @@ export default function Aprovacions() {
     // Los mensajes de la RPC ya vienen en catalán y explican el motivo (ficha del mismo tipo,
     // convenios que chocan): enseñarlos tal cual dice más que un texto genérico.
     if (error) {
-      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : t('appr.reg_error', { msg: error.message }))
+      toast.error(error.code === '42501' ? t('org.link_no_perm') : t('appr.reg_error', { msg: textError(t, error.message) }))
       return
     }
     toast.success(t('appr.link_ok'))
     void carregaRegistres()
   }
+
+  /** Kilos con separador de miles y coma decimal («1.250,5», no «1250.5»). */
+  const kgFmt = (n: number) => n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
 
   /** Lo que falta por cubrir de esa oferta. Es contra lo que se avisa al canalizar de más. */
   function faltenDe(f: Fila): number {
@@ -434,7 +460,7 @@ export default function Aprovacions() {
     if (!f.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
     if (kg > faltenDe(f) && !(await confirma({
       titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: faltenDe(f) }),
+      descripcio: t('od.over_alloc', { n: kgFmt(faltenDe(f)) }),
     }))) return
 
     const falta = await comprovaConvenis(
@@ -476,6 +502,12 @@ export default function Aprovacions() {
   }
 
   async function contrafirmar(c: ConveniPendent) {
+    // Estampa la firma de la Fundación, lo deja vigente y manda el PDF por correo: no se deshace.
+    if (!(await confirma({
+      titol: t('conv.countersign_confirm_t'),
+      descripcio: t('conv.countersign_confirm'),
+      confirmar: t('appr.conv_countersign'),
+    }))) return
     setOcupat(c.id)
     const res = await contrafirmarConveni(c.id)
     setOcupat(null)
@@ -503,7 +535,8 @@ export default function Aprovacions() {
         </CardHeader>
         <CardContent className="space-y-2">
           {carregantReg && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {!carregantReg && registres.length === 0 && (
+          {errCarrega.reg && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+          {!carregantReg && !errCarrega.reg && registres.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.reg_empty')}</p>
           )}
           {registres.map((r) => {
@@ -607,14 +640,16 @@ export default function Aprovacions() {
                       onClick={() => ruta && navigate(ruta)}>
                       {t('appr.reg_view')}
                     </Button>
-                    <Button size="sm" disabled={!potAprovar || ocupat === r.id}
+                    <BotoAmbMotiu size="sm" disabled={!potAprovar || ocupat === r.id}
+                      motiu={potAprovar ? undefined : t('appr.reg_no_perm')}
                       onClick={() => void aprovarRegistre(r)}>
                       {t('appr.reg_approve')}
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={!potAprovar || ocupat === r.id}
+                    </BotoAmbMotiu>
+                    <BotoAmbMotiu size="sm" variant="outline" disabled={!potAprovar || ocupat === r.id}
+                      motiu={potAprovar ? undefined : t('appr.reg_no_perm')}
                       onClick={() => setMotiuDe({ tipus: 'registre', registre: r })}>
                       {t('appr.reg_reject')}
-                    </Button>
+                    </BotoAmbMotiu>
                   </div>
                 </div>
               </div>
@@ -631,7 +666,8 @@ export default function Aprovacions() {
         </CardHeader>
         <CardContent className="space-y-2">
           {carregantConv && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {!carregantConv && convenis.length === 0 && (
+          {errCarrega.conv && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+          {!carregantConv && !errCarrega.conv && convenis.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.conv_empty')}</p>
           )}
           {convenis.map((c) => {
@@ -670,15 +706,17 @@ export default function Aprovacions() {
                     <Button asChild size="sm" variant="outline">
                       <Link to={`/equip/convenis/${c.id}`}>{t('c.detail')}</Link>
                     </Button>
-                    <Button size="sm" className="whitespace-normal"
+                    <BotoAmbMotiu size="sm" className="whitespace-normal"
                       disabled={!potAprovar || ocupat === c.id}
+                      motiu={potAprovar ? undefined : t('conv.need_approver')}
                       onClick={() => void contrafirmar(c)}>
                       {t('appr.conv_countersign')}
-                    </Button>
-                    <Button size="sm" variant="outline" disabled={!potAprovar || ocupat === c.id}
+                    </BotoAmbMotiu>
+                    <BotoAmbMotiu size="sm" variant="outline" disabled={!potAprovar || ocupat === c.id}
+                      motiu={potAprovar ? undefined : t('conv.need_approver')}
                       onClick={() => setMotiuDe({ tipus: 'conveni', conveni: c })}>
                       {t('conv.return')}
-                    </Button>
+                    </BotoAmbMotiu>
                   </div>
                 </div>
               </div>
@@ -698,7 +736,8 @@ export default function Aprovacions() {
         </CardHeader>
         <CardContent className="space-y-2">
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {!carregant && files.length === 0 && (
+          {errCarrega.resp && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+          {!carregant && !errCarrega.resp && files.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
           {files.map((f) => {
@@ -715,14 +754,14 @@ export default function Aprovacions() {
                     </div>
                     <div className="text-xs text-muted-foreground">
                       <code>{f.excedentes?.id_excedente ?? '—'}</code> · {f.excedentes?.producto ?? '—'}
-                      {f.kg_solicitados != null ? ` · ${f.kg_solicitados} ${t('od.rs_kg')}` : ''}
+                      {f.kg_solicitados != null ? ` · ${Number(f.kg_solicitados).toLocaleString('ca-ES', { maximumFractionDigits: 2 })} ${t('od.rs_kg')}` : ''}
                       {f.preu_ofert != null ? ` · ${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}` : ''}
                       {` · ${t(`od.ch_${f.canal}`)} · ${quan(f.respondido_at ?? f.enviado_at)}`}
                     </div>
                     {/* Contra qué se decide: aprobar 300 kg de una oferta que ya está
                         cubierta no es lo mismo que de una que empieza. */}
                     <div className="text-xs font-medium text-primary">
-                      {t('appr.progres', { n: faltenDe(f), m: total })}
+                      {t('appr.progres', { n: kgFmt(faltenDe(f)), m: kgFmt(total) })}
                     </div>
                   </div>
                   <div className="flex flex-wrap items-end justify-end gap-2">
@@ -744,16 +783,16 @@ export default function Aprovacions() {
                           onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], preu: e.target.value } }))} />
                       </label>
                     )}
-                    <Button size="sm" className="h-11 whitespace-normal md:h-9"
-                      disabled={bloquejat} title={potAprovar ? undefined : t('appr.need_approver')}
+                    <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-9"
+                      disabled={bloquejat} motiu={potAprovar ? undefined : t('appr.need_approver')}
                       onClick={() => void aprovarFila(f)}>
                       {t('od.approve')}
-                    </Button>
-                    <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-9"
-                      disabled={bloquejat} title={potAprovar ? undefined : t('appr.need_approver')}
+                    </BotoAmbMotiu>
+                    <BotoAmbMotiu size="sm" variant="outline" className="h-11 whitespace-normal md:h-9"
+                      disabled={bloquejat} motiu={potAprovar ? undefined : t('appr.need_approver')}
                       onClick={() => setMotiuDe({ tipus: 'resposta', fila: f })}>
                       {t('od.reject_appr')}
-                    </Button>
+                    </BotoAmbMotiu>
                     {/* El detalle sigue a un clic: aquí no caben el resto de respuestas ni
                         el ranking de entidades, y a veces son justo lo que hay que mirar. */}
                     <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-9"

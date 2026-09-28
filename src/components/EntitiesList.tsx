@@ -139,7 +139,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('ent.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{entidades.length === 0 ? t('ent.empty') : t('ent.no_match')}</p>}
         {test.length > 0 && (
           <section className="space-y-2">

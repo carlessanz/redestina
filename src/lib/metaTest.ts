@@ -36,23 +36,30 @@ export async function listarNumerosTest(): Promise<MetaTestRecipient[]> {
   return data ?? []
 }
 
+/**
+ * Devuelve una CLAVE i18n si falla (la traduce quien pinta), o `null` si fue bien. Antes
+ * devolvía texto en castellano escrito a mano y, ante cualquier otro error, el mensaje crudo
+ * de Postgres —«new row violates row-level security policy…» a un técnico—.
+ */
 export async function anadirNumeroTest(phone: string, etiqueta: string): Promise<string | null> {
   const limpio = phone.replace(/\D/g, '')
-  if (!/^[1-9]\d{6,14}$/.test(limpio)) {
-    return 'Teléfono no válido. Usa E.164 sin «+» (ej. 34612345678).'
-  }
+  if (!/^[1-9]\d{6,14}$/.test(limpio)) return 'wl.bad_phone'
   const { error } = await supabase
     .from('meta_test_recipients')
     .insert({ phone: limpio, etiqueta: etiqueta.trim() || null })
   if (error) {
-    return error.message.includes('duplicate') || error.code === '23505'
-      ? 'Ese número ya está en la lista.'
-      : error.message
+    if (error.code === '23505') return 'wl.dup_phone'
+    return error.code === '42501' ? 'wl.no_perm' : 'c.error'
   }
   return null
 }
 
-export async function borrarNumeroTest(phone: string): Promise<void> {
-  const { error } = await supabase.from('meta_test_recipients').delete().eq('phone', phone)
-  if (error) console.error('meta_test_recipients delete:', error.message)
+/**
+ * Clave i18n si no se borró, o `null`. Un DELETE que la RLS no deja pasar no da error: borra
+ * cero filas, así que se piden las filas borradas (§12.48).
+ */
+export async function borrarNumeroTest(phone: string): Promise<string | null> {
+  const { data, error } = await supabase.from('meta_test_recipients').delete().eq('phone', phone).select('phone')
+  if (error) { console.error('meta_test_recipients delete:', error.message); return 'c.error' }
+  return data && data.length > 0 ? null : 'wl.no_perm'
 }

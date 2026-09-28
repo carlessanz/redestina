@@ -25,6 +25,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, FileText, Loader2, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { useAppContext } from '../hooks/useAppContext'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
@@ -62,6 +63,8 @@ export default function PlaPrevencio({
   tipusOrg, orgId, potEditar = false, plaVigentId = null, onCanvi,
 }: Props) {
   const { t } = useT()
+  const { ctx } = useAppContext()
+  const potAprovar = ctx?.potAprovar ?? false
   const { confirma, dialeg } = useConfirma()
   const descarregador = useDescarregaDocument()
 
@@ -337,8 +340,15 @@ export default function PlaPrevencio({
                     <SelectItem value="basic" className="text-base md:text-sm">
                       {t('pla.level_basic')}
                     </SelectItem>
-                    <SelectItem value="personalitzat" className="text-base md:text-sm">
+                    {/* Subir a personalitzat exige pot_aprovar() (`fixar_nivell_pla`): a un
+                        tècnic se le enseña la opción, pero apagada con el motivo. */}
+                    <SelectItem
+                      value="personalitzat"
+                      className="text-base md:text-sm"
+                      disabled={!potAprovar && pla.nivel !== 'personalitzat'}
+                    >
                       {t('pla.level_custom')}
+                      {!potAprovar && pla.nivel !== 'personalitzat' && ` · ${t('pe.only_admin')}`}
                     </SelectItem>
                   </SelectContent>
                 </Select>

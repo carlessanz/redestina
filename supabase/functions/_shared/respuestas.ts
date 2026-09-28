@@ -463,6 +463,8 @@ export async function procesarRespuestaOferta(
     .eq("telefono", from)
     .eq("canal", "whatsapp")
     .eq("estado", "pendent")
+    // `fet` con la fila aún `pendent` = la oferta se cerró antes de que contestara (abajo).
+    .or("dialeg_pas.is.null,dialeg_pas.neq.fet")
     .order("enviado_at", { ascending: false })
     .limit(1);
   const fila = (filas ?? [])[0];
@@ -484,6 +486,25 @@ export async function procesarRespuestaOferta(
     await registrarDobleRol(supabase, from, atencion.motivo);
   }
   if (!atencion.dialogo) return false;
+
+  // ¿La oferta sigue abierta? Por WhatsApp se aceptaba interés sobre una oferta ya cubierta,
+  // cancelada o cerrada, que `manifestar_interes()` rechaza en el panel (28-09-2026). Si
+  // contesta a una cerrada, se le dice y la fila deja de capturar sus mensajes; un texto
+  // cualquiera que no es respuesta pasa de largo, como si no hubiera oferta.
+  const { data: oferta } = await supabase
+    .from("excedentes").select("estado").eq("id", fila.excedente_id).maybeSingle();
+  if (oferta && !["publicada", "parcial"].includes(String(oferta.estado))) {
+    const responde = (id ?? "").startsWith("accept:") || fila.dialeg_pas === "kg" ||
+      fila.dialeg_pas === "preu" || clasificar(texto ?? "") !== null;
+    if (!responde) return false;
+    await supabase.from("oferta_respuestas").update({ dialeg_pas: "fet" }).eq("id", fila.id);
+    await sendText(
+      supabase, from,
+      `Aquesta oferta${await quinaOferta(supabase, fila.excedente_id)} ja no està disponible: ` +
+        "s'ha repartit o s'ha retirat. Gràcies igualment!",
+    );
+    return true;
+  }
 
   // Un diálogo caducado se reclasifica desde cero: la fila sigue `pendent`, pero deja de
   // consumir todo lo que escriba este número.

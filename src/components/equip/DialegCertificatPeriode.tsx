@@ -177,7 +177,7 @@ export default function DialegCertificatPeriode(
           <DialogDescription>{t(perfil.descKey)}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>
             <Label className="mb-1 block text-xs text-muted-foreground" htmlFor="cdp-desde">
               {t('cdp.f_from')}

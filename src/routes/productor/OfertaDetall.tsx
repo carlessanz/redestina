@@ -25,7 +25,6 @@ import { cancelaOferta } from '../../lib/ofertes'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
-import type { AlbaranBandeja } from '../../lib/albarans'
 import {
   PASSOS_OFERTA_CLAUS, estatSimpleOferta, puntOferta,
 } from '../../lib/procesOferta'
@@ -39,6 +38,14 @@ import type { Canalizacion, EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
+/**
+ * Lo único que esta pantalla usa de cada canalización y de su REC. Van estrechas a propósito:
+ * `canalizaciones` lleva `entidad_id` y `v_albaranes_bandeja` también, y al productor no le
+ * toca saber a qué entidad va su producto (§4bis, «cuántas, sin nombres»).
+ */
+type CanalitzacioMeva = Pick<Canalizacion, 'id' | 'kg_confirmados' | 'kg_reales'>
+interface RecMeu { id: string; estado: string; numero_completo: string | null; dias_esperando: number | null }
+
 /** Lo que `NovaOferta` deja al navegar aquí. Nada de esto sobrevive a una recarga. */
 interface EstatArribada { publicada?: boolean; correuEnviat?: boolean }
 
@@ -50,11 +57,13 @@ export default function ProductorOfertaDetall() {
   const arribada = (location.state ?? {}) as EstatArribada
 
   const [oferta, setOferta] = useState<Excedente | null>(null)
-  const [canalitzacions, setCanalitzacions] = useState<Canalizacion[]>([])
-  const [rec, setRec] = useState<AlbaranBandeja | null>(null)
+  const [canalitzacions, setCanalitzacions] = useState<CanalitzacioMeva[]>([])
+  const [rec, setRec] = useState<RecMeu | null>(null)
   const [pendentDeMi, setPendentDeMi] = useState(false)
   const [progres, setProgres] = useState<ProgresOferta | null>(null)
   const [carregant, setCarregant] = useState(true)
+  /** Fallo al leer la oferta: no es lo mismo que «no existe o no es tuya». */
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -63,7 +72,7 @@ export default function ProductorOfertaDetall() {
     // que en `productor/Documents.tsx`.
     const [e, c] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', id).maybeSingle(),
-      supabase.from('canalizaciones').select('*').eq('excedente_id', id)
+      supabase.from('canalizaciones').select('id, kg_confirmados, kg_reales').eq('excedente_id', id)
         .order('created_at', { ascending: true }),
     ])
     // El REC de una ESPIGOLADA cuelga de la jornada, no de la oferta: sin buscarlo por
@@ -71,13 +80,14 @@ export default function ProductorOfertaDetall() {
     // l'equip» (28-09-2026). Por eso va después de leer la oferta.
     const espId = (e.data as Excedente | null)?.espigolada_id ?? null
     const a = await supabase.from('v_albaranes_bandeja')
-      .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+      .select('id, estado, numero_completo, dias_esperando, emitido_at')
       .eq('tipo', 'REC')
       .or(`excedente_id.eq.${id}${espId ? `,espigolada_id.eq.${espId}` : ''}`)
       .order('emitido_at', { ascending: false, nullsFirst: true })
+    setErrorCarrega(Boolean(e.error))
     setOferta((e.data as Excedente) ?? null)
-    setCanalitzacions((c.data ?? []) as Canalizacion[])
-    const albarans = (a.data as AlbaranBandeja[] | null) ?? []
+    setCanalitzacions((c.data ?? []) as CanalitzacioMeva[])
+    const albarans = (a.data as RecMeu[] | null) ?? []
     const recVigent = albarans[0] ?? null
     setRec(recVigent)
 
@@ -115,7 +125,7 @@ export default function ProductorOfertaDetall() {
   }
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
-  if (!oferta) return <p className="text-sm text-destructive">{t('od.not_found')}</p>
+  if (!oferta) return <p className="text-sm text-destructive">{t(errorCarrega ? 'po.err_load_one' : 'od.not_found')}</p>
 
   const canalitzats = canalitzacions.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(oferta.kg_total ?? 0)
@@ -217,8 +227,11 @@ export default function ProductorOfertaDetall() {
             disabled={!(cancelable || oferta.estado === 'bloqueada')}
             onChange={async (rutes) => {
               const r = await fixaFotos(oferta.id, rutes)
-              if (!r.ok) { toast.error(textError(t, r.error)); return }
+              // `false` le dice al selector que NO borre el fichero: la oferta sigue
+              // apuntándolo, y borrarlo dejaría la foto rota.
+              if (!r.ok) { toast.error(textError(t, r.error)); return false }
               setOferta((o) => (o ? { ...o, fotos: rutes } : o))
+              return true
             }}
           />
           <CasellaFotoProducte excedenteId={oferta.id} fotos={oferta.fotos ?? []}
@@ -253,9 +266,9 @@ export default function ProductorOfertaDetall() {
           )}
           {canalitzacions.map((c) => (
             <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 text-sm">
-              <span>{t('po.channeled_kg', { n: Number(c.kg_confirmados ?? 0) })}</span>
+              <span>{t('po.channeled_kg', { n: Number(c.kg_confirmados ?? 0).toLocaleString('ca-ES') })}</span>
               {c.kg_reales != null && (
-                <span className="text-muted-foreground">{t('po.real_kg', { n: Number(c.kg_reales) })}</span>
+                <span className="text-muted-foreground">{t('po.real_kg', { n: Number(c.kg_reales).toLocaleString('ca-ES') })}</span>
               )}
             </div>
           ))}
@@ -280,7 +293,11 @@ export default function ProductorOfertaDetall() {
         obert={cancelant}
         onObert={setCancelant}
         titol={t('po.cancel_offer')}
-        descripcio={t('po.cancel_desc')}
+        // Con kilos ya asignados, cancelar deja a esas entidades sin su entrega y nada las
+        // avisa solo: se dice antes de confirmar.
+        descripcio={canalitzats > 0
+          ? `${t('po.cancel_desc')} ${t('po.cancel_desc_assigned', { n: canalitzats.toLocaleString('ca-ES') })}`
+          : t('po.cancel_desc')}
         etiqueta={t('po.cancel_reason')}
         confirmar={t('po.cancel_offer_confirm')}
         destructiu

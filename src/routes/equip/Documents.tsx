@@ -39,7 +39,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Download, Eye, Loader2, Send } from 'lucide-react'
 import { toast } from 'sonner'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -145,6 +145,9 @@ const CLAU_PROPOSIT: Record<string, string> = {
   codi_firma: 'doc.pr_codi_firma',
   recordatori_equip: 'doc.pr_recordatori_equip',
   recordatori_factura: 'doc.pr_recordatori_factura',
+  // Los dos que manda el propio panel (`albarans.ts`, `convenis.ts`): antes salían en crudo.
+  confirmacio_albara: 'doc.pr_confirmacio_albara',
+  firma_conveni: 'doc.pr_firma_conveni',
 }
 
 /**
@@ -184,6 +187,11 @@ function casa(d: Fila, q: string): boolean {
 
 export default function Documents() {
   const { t } = useT()
+  // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
+  // «Tots» dejaba los fallidos mezclados con el resto.
+  const [params] = useSearchParams()
+  const PESTANYES = ['tots', 'error', 'conciliar', 'discrepancia', 'enviaments', 'enllacos']
+  const pestanyaInicial = PESTANYES.includes(params.get('tab') ?? '') ? (params.get('tab') as string) : 'tots'
   const [documents, setDocuments] = useState<Fila[]>([])
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
   const [enviaments, setEnviaments] = useState<Enviament[]>([])
@@ -590,10 +598,10 @@ export default function Documents() {
           onChange={(e) => setCerca(e.target.value)}
         />
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!carregant && !error && (
-          <Tabs defaultValue="tots">
+          <Tabs defaultValue={pestanyaInicial}>
             {/* Las tres etiquetas no caben a 360 px: la lista scrollea ella sola en vez
                 de empujar la página entera hacia la derecha. */}
             <div className="-mx-1 overflow-x-auto px-1">

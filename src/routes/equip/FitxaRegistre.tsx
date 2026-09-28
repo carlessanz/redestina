@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { useAppContext } from '../../hooks/useAppContext'
 import { assegurarContacte } from '../../lib/contactes'
 import { ENTIDAD_CAMPOS, PRODUCTOR_CAMPOS } from '../../lib/crudCampos'
 import RecordDetail from '../../components/RecordDetail'
@@ -28,8 +29,10 @@ export default function FitxaRegistre({ tabla }: Props) {
   const { t } = useT()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const { ctx } = useAppContext()
   const [registre, setRegistre] = useState<Registre | null>(null)
   const [carregant, setCarregant] = useState(id !== undefined)
+  const [errCarrega, setErrCarrega] = useState(false)
 
   const esProductor = tabla === 'productores'
   const llista = esProductor ? '/equip/productors' : '/equip/entitats'
@@ -39,8 +42,9 @@ export default function FitxaRegistre({ tabla }: Props) {
     let viu = true
     setCarregant(true)
     void supabase.from(tabla).select('*').eq('id', id).maybeSingle()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (!viu) return
+        setErrCarrega(Boolean(error))
         setRegistre((data as Registre) ?? null)
         setCarregant(false)
       })
@@ -48,6 +52,11 @@ export default function FitxaRegistre({ tabla }: Props) {
   }, [id, tabla])
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
+  // Con `id` y sin fila, NO se pinta el formulario: `RecordDetail` sin registro es el ALTA,
+  // así que una URL de una ficha borrada enseñaba «Nova entitat…» y «Desar» creaba otra.
+  if (id && !registre) {
+    return <p className="text-sm text-destructive">{t(errCarrega ? 'c.load_error' : 'rec.not_found')}</p>
+  }
 
   return (
     <RecordDetail
@@ -74,7 +83,8 @@ export default function FitxaRegistre({ tabla }: Props) {
           />
           {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
               aquí, semanas después, y no solo en la cola de registros pendientes. */}
-          <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null} />
+          <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null}
+            potAprovar={ctx?.potAprovar ?? true} />
           {/* En qué punto está su diagnóstico de prevención, y el camino para hacerlo con
               ella delante (modelo asistido). Como `BadgeConveni`, no carga nada en el alta:
               sin `id` no hay a qué colgar un diagnóstico. */}

@@ -33,13 +33,13 @@ export default function Missatgeria() {
       .order('name', { ascending: true, nullsFirst: false })
       .order('phone', { ascending: true })
     if (err) {
-      setError(`No se pudieron cargar los contactos: ${err.message}`)
+      setError(t('c.load_error'))
       setContacts([])
     } else {
       setContacts(data ?? [])
     }
     setLoading(false)
-  }, [])
+  }, [t])
 
   useEffect(() => { void loadContacts() }, [loadContacts])
 

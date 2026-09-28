@@ -32,6 +32,7 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
+import { useConfirma } from '../DialegConfirma'
 import { Casella } from '../Casella'
 import TriaPaper from '../TriaPaper'
 import { textBilingue } from '../../lib/diagnostic'
@@ -54,6 +55,7 @@ const PAPERS: readonly TipusOrg[] = ['productor', 'entidad']
 export default function EditorDiagnostic() {
   const { t, lang } = useT()
   const { ctx } = useAppContext()
+  const { confirma, dialeg } = useConfirma()
   const potEditar = ctx?.potAprovar === true
 
   const [tipus, setTipus] = useState<TipusOrg>('productor')
@@ -132,6 +134,12 @@ export default function EditorDiagnostic() {
     if (!potEditar || !vigent) return
     const preguntes = preguntesDelText()
     if (!preguntes) { setProblemes([t('cfgd.bad_json')]); return }
+    // Retira la versión vigente en la misma transacción y no se deshace: se pregunta antes.
+    if (!(await confirma({
+      titol: t('cfgd.publish_confirm_t'),
+      descripcio: t('cfgd.publish_help'),
+      confirmar: t('cfgd.publish'),
+    }))) return
     setOcupat('publicar')
     const r = await publicarQuestionari(tipus, vigent.titol, preguntes, vigent.provisional, true)
     setOcupat(null)
@@ -316,6 +324,7 @@ export default function EditorDiagnostic() {
             </section>
           </>
         )}
+        {dialeg}
       </CardContent>
     </Card>
   )

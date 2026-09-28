@@ -35,6 +35,7 @@ import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
@@ -184,6 +185,7 @@ export default function AlbaraDetall() {
   const navigate = useNavigate()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
 
   const [albara, setAlbara] = useState<Albaran | null>(null)
   const [linies, setLinies] = useState<AlbaranLinea[]>([])
@@ -226,7 +228,7 @@ export default function AlbaraDetall() {
       .eq('id', id)
       .maybeSingle()
 
-    if (errA) { setError(errA.message); setCarregant(false); return }
+    if (errA) { setError(t('c.load_error')); setCarregant(false); return }
     if (!a) { setError(t('alb.not_found')); setCarregant(false); return }
 
     const fila = a as Albaran
@@ -324,6 +326,13 @@ export default function AlbaraDetall() {
 
   async function emet() {
     if (!albara) return
+    // Emetre consume un número de la serie legal y congela partes y líneas: no se deshace,
+    // solo se rectifica o se anula. Se pregunta antes, diciendo exactamente eso.
+    if (!(await confirma({
+      titol: t('alb.emit_confirm_t'),
+      descripcio: t('alb.emit_confirm'),
+      confirmar: t('alb.emit'),
+    }))) return
     setOcupat(true)
     const res = await emetreAlbara(
       albara.id,
@@ -349,6 +358,12 @@ export default function AlbaraDetall() {
 
   async function entrega() {
     if (!albara) return
+    // Marcar entregado manda un correo a cada parte con correo: se dice antes de mandarlo.
+    if (!(await confirma({
+      titol: t('alb.deliver_confirm_t'),
+      descripcio: t('alb.deliver_confirm'),
+      confirmar: t('alb.mark_delivered'),
+    }))) return
     setOcupat(true)
     const res = await marcarEntregat(albara.id)
     setOcupat(false)
@@ -364,10 +379,15 @@ export default function AlbaraDetall() {
     setEnllacosNous(nous)
     const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang)
     // Un solo aviso verde, no dos seguidos: «entregat» y «correu enviat» son el mismo acto.
+    // Si no ha salido NINGÚN correo, el aviso es ámbar y uno solo: un verde «Entregat»
+    // seguido de un ámbar se leía como éxito.
     if (nous.length === 0) toast.warning(t('alb.delivered_0'))
-    else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
-    else toast.success(t('alb.delivered', { n: nous.length }))
-    if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
+    else if (correu.enviats > 0) {
+      toast.success(t('alb.delivered_mail', { n: correu.enviats }))
+      if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
+    } else {
+      toast.warning(`${t('alb.delivered', { n: nous.length })} ${t('alb.mail_failed', { n: correu.fallits })}`)
+    }
     void refrescaComptadors()
     await carrega()
   }
@@ -562,7 +582,7 @@ export default function AlbaraDetall() {
       {/* ── Partes ── */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('alb.parties')}</CardTitle></CardHeader>
-        <CardContent className="grid gap-4 text-sm sm:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-4 text-sm sm:grid-cols-2">
           {albara.partes ? (
             <>
               <div>
@@ -593,7 +613,7 @@ export default function AlbaraDetall() {
       {/* ── Recogida ── */}
       <Card>
         <CardHeader><CardTitle className="text-base">{t('alb.pickup')}</CardTitle></CardHeader>
-        <CardContent className="grid gap-3 sm:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           {(['fecha_hora', 'lugar', 'responsable_origen', 'quien_recoge', 'transportista', 'matricula', 'temperatura'] as const).map((camp) => (
             <div key={camp} className="space-y-1.5">
               <Label htmlFor={`rec-${camp}`}>{t(`alb.pk_${camp}`)}</Label>
@@ -619,7 +639,7 @@ export default function AlbaraDetall() {
           {esBorrador ? (
             <>
               {form.map((l, i) => (
-                <div key={i} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+                <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-prod-${i}`}>{t('alb.ln_product')}</Label>
                     {/* ⚠️ `text-base md:text-sm` obligatorio en un `<select>` estilado a mano:
@@ -904,7 +924,7 @@ export default function AlbaraDetall() {
               WhatsApp o por correo y se quedaban ahí: la Edge Function existía y el panel
               no la llamaba. El tipo, el número y la fecha son del documento que se sube,
               no de este albarán. */}
-          <div className="grid gap-3 rounded-md border border-input p-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 rounded-md border border-input p-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ex-tipus">{t('alb.ex_type')}</Label>
               {/* ⚠️ `text-base md:text-sm` obligatorio en un `<select>` estilado a mano (§2). */}
@@ -1009,6 +1029,7 @@ export default function AlbaraDetall() {
 
       {/* El visor de PDF. Una sola vez por pantalla. */}
       {descarregador.visor}
+      {dialegConfirma}
     </div>
   )
 }

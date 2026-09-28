@@ -195,6 +195,8 @@ export default function ProducteDetall() {
               {cost.motivo} · {dataCurta(cost.updated_at)}
             </p>
           )}
+          {/* Sin el formulario, un técnico no sabía por qué no podía cambiarlo. */}
+          {!potAprovar && <p className="text-sm text-muted-foreground">{t('cost.readonly')}</p>}
           {potAprovar && (
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div>

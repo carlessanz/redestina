@@ -422,6 +422,27 @@ export async function crearExcedenteDesdeSesion(
   productor: { id: string; name: string; email?: string | null },
 ): Promise<void> {
   const producto = String(sesion.datos_parciales.producte ?? "");
+
+  // El convenio que exige la modalidad a quien entrega, igual que `crear-oferta` desde el
+  // panel (28-09-2026). Por aquí se publicaba sin él: el intake no pasa por aquella función.
+  // Desde la fecha de corte, 42501; antes, solo un aviso que aquí no se usa.
+  const modalitat = String(sesion.datos_parciales.modalitat ?? "");
+  const { error: errConv } = await supabase.rpc("exigir_convenio", {
+    p_tipo: "productor", p_org: productor.id, p_valorizacion: modalitat, p_parte: "entrega",
+  });
+  if (errConv?.code === "42501") {
+    await supabase.from("intake_sessions").delete().eq("id", sesion.id);
+    await sendText(
+      supabase, sesion.telefono,
+      modalitat === "donacio"
+        ? "No podem publicar l'oferta: per a donacions cal tenir vigent el conveni de donació. " +
+          "Demana'l a l'equip de Redestina i torna-ho a provar."
+        : "No podem publicar l'oferta: per a venda o maquila cal tenir vigent el conveni de " +
+          "compravenda i maquila. Demana'l a l'equip de Redestina, o publica-la com a donació.",
+    );
+    return;
+  }
+
   const r = await crearExcedente(supabase, sesion.datos_parciales, productor, "intake");
 
   if (!r.ok) {

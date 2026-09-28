@@ -132,7 +132,7 @@ function DialegFactura({
           <DialogDescription>{t('tan.inv_desc', { v: euros(valorEsperat) })}</DialogDescription>
         </DialogHeader>
 
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5 sm:col-span-2">
             <Label htmlFor="fac-numero">{t('tan.f_inv_number')}</Label>
             <Input id="fac-numero" value={numero} onChange={(e) => setNumero(e.target.value)} autoFocus />
@@ -445,6 +445,12 @@ export default function TancamentDetall() {
   async function resumsProvisionals() {
     const candidats = donants.filter((d) => !bloqueja(d.bloqueos) && Number(d.kg_total) > 0)
     if (candidats.length === 0) { toast.error(t('tan.no_candidates')); return }
+    // N números de serie legal y N correos a donantes: se pregunta antes, diciéndolo.
+    if (!(await confirma({
+      titol: t('tan.summaries_confirm_t', { n: candidats.length }),
+      descripcio: t('tan.summaries_confirm', { serie: esProva ? 'P-RES' : 'RES' }),
+      confirmar: t('tan.a_provisional'),
+    }))) return
     setOcupat(true)
     let fets = 0
     const fallits: string[] = []
@@ -461,6 +467,14 @@ export default function TancamentDetall() {
 
   async function tanca() {
     if (!cap) return
+    // Es EL acto irreversible del cierre (§4bis): recalcula, emite y manda los resúmenes
+    // definitivos y congela el cálculo. Hasta hoy se hacía con un clic sin preguntar.
+    if (!(await confirma({
+      titol: t('tan.close_confirm_t', { y: cap.ejercicio }),
+      descripcio: t('tan.close_confirm'),
+      confirmar: t('tan.a_close'),
+      destructiu: !esProva,
+    }))) return
     setOcupat(true)
     // Por `id`, no por ejercicio: se cierra el que se tiene delante. Ver `tancament.ts`.
     const res = await tancarTancament(id)
@@ -472,6 +486,11 @@ export default function TancamentDetall() {
   }
 
   async function declara() {
+    if (!(await confirma({
+      titol: t('tan.declare_confirm_t'),
+      descripcio: t('tan.declare_confirm'),
+      confirmar: t('tan.a_declare'),
+    }))) return
     setOcupat(true)
     const res = await marcarDeclarat(id)
     setOcupat(false)
@@ -634,9 +653,10 @@ export default function TancamentDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(textError(t, res)); return }
     setResultatMassiu(res.data)
-    toast.success(t('tan.certs_done', {
-      n: res.data.emesos, m: res.data.saltats.length,
-    }))
+    // Cero emitidos no es un éxito: el resumen de abajo dice por qué se saltaron.
+    const text = t('tan.certs_done', { n: res.data.emesos, m: res.data.saltats.length })
+    if (res.data.emesos > 0) toast.success(text)
+    else toast.warning(text)
     void refrescaComptadors()
     await refresca()
   }
@@ -676,7 +696,7 @@ export default function TancamentDetall() {
   // --- Render --------------------------------------------------------------
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
-  if (error) return <p className="text-sm text-destructive">{error}</p>
+  if (error) return <p className="text-sm text-destructive">{t('c.load_error')}</p>
   if (!cap) return <p className="text-sm text-muted-foreground">{t('tan.not_found')}</p>
 
   return (
@@ -735,7 +755,9 @@ export default function TancamentDetall() {
                     <li key={x.cd} className="rounded-md bg-aviso-fondo p-2 text-sm text-aviso">
                       <span className="font-medium">{x.donant ?? '—'}</span>
                       {' · '}{t(`tan.skip_${x.codi}`)}
-                      {x.motiu ? ` · ${x.motiu}` : ''}
+                      {/* En `error` el motivo es el `sqlerrm` de la base: pasa por `textError`
+                          para no enseñar el crudo de Postgres. Los otros dos ya son legibles. */}
+                      {x.motiu ? ` · ${x.codi === 'error' ? textError(t, x.motiu) : x.motiu}` : ''}
                     </li>
                   ))}
                 </ul>
@@ -743,7 +765,7 @@ export default function TancamentDetall() {
             </div>
           )}
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Dada etiqueta={t('tan.c_donors')} valor={String(donants.length)} />
             <Dada etiqueta={t('tan.c_kg')} valor={kg(totals.kg)} />
             <Dada etiqueta={t('tan.c_value')} valor={euros(totals.valor)} />

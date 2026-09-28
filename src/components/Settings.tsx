@@ -29,6 +29,8 @@ export default function Settings() {
   // el interruptor gris CON el motivo, en vez de dejarle pulsar y que no se guarde nada.
   const potCanviar = ctx?.esSuperAdmin ?? false
   const motiu = potCanviar ? undefined : t('set.only_super')
+  // Las listas de prueba, en cambio, las escribe `pot_aprovar()` (admin o super_admin).
+  const motiuLlistes = (ctx?.potAprovar ?? false) ? undefined : t('wl.no_perm')
   const [testMode, setTest] = useState<boolean | null>(null)
   const [waActiu, setWaActiu] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
@@ -219,12 +221,17 @@ export default function Settings() {
               items={lista.map((r) => ({ clave: r.phone, etiqueta: r.etiqueta }))}
               placeholderClave={t('dash.ph_phone')} placeholderEtiqueta={t('dash.ph_label')} max={5}
               addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
+              deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
               onAdd={async (c, e) => {
                 const err = await anadirNumeroTest(c, e)
                 if (!err) setLista(await listarNumerosTest())
-                return err
+                return err ? t(err) : null
               }}
-              onDelete={async (c) => { await borrarNumeroTest(c); setLista(await listarNumerosTest()) }}
+              onDelete={async (c) => {
+                const err = await borrarNumeroTest(c)
+                setLista(await listarNumerosTest())
+                return err ? t(err) : null
+              }}
             />
           </div>
           <GestorWhitelist
@@ -232,12 +239,17 @@ export default function Settings() {
             items={listaEmail.map((r) => ({ clave: r.email, etiqueta: r.etiqueta }))}
             placeholderClave={t('dash.ph_email')} placeholderEtiqueta={t('dash.ph_label')} max={20}
             addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
+            deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
             onAdd={async (c, e) => {
               const err = await anadirEmailTest(c, e)
               if (!err) setListaEmail(await listarEmailsTest())
-              return err
+              return err ? t(err) : null
             }}
-            onDelete={async (c) => { await borrarEmailTest(c); setListaEmail(await listarEmailsTest()) }}
+            onDelete={async (c) => {
+              const err = await borrarEmailTest(c)
+              setListaEmail(await listarEmailsTest())
+              return err ? t(err) : null
+            }}
           />
         </CardContent>
       </Card>

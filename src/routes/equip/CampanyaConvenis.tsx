@@ -227,7 +227,7 @@ export default function CampanyaConvenis() {
               : t('camp.cutoff_none')}
           </p>
 
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <Xifra etiqueta={t('camp.k_orgs')} valor={String(totals.organitzacions)} />
             <Xifra etiqueta={t('camp.k_signed')} valor={`${pctTotal}%`} />
             <Xifra etiqueta={t('camp.k_tocounter')} valor={String(totals.per_contrasignar)} />
@@ -235,7 +235,7 @@ export default function CampanyaConvenis() {
           </div>
 
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
           {resum.length > 0 && (
             <div className="overflow-x-auto">
@@ -279,7 +279,7 @@ export default function CampanyaConvenis() {
           <p className="mt-1 text-sm text-muted-foreground">{t('camp.list_subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-4">
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div className="space-y-1.5">
               <Label htmlFor="camp-vista">{t('camp.f_view')}</Label>
               <Select value={vista} onValueChange={(v) => setVista(v as Vista)}>

@@ -22,7 +22,7 @@ export default function OfertaDetall() {
     void supabase.from('excedentes').select('*').eq('id', id).maybeSingle()
       .then(({ data, error: err }) => {
         if (!viu) return
-        if (err) setError(err.message)
+        if (err) setError(t('c.load_error'))
         else if (!data) setError(t('od.not_found'))
         else setExcedente(data as Excedente)
       })

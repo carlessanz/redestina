@@ -23,12 +23,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Download, Eye, Loader2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import {
-  dataTancament, estilEstatDonant, euros, exerciciDeNumero,
+  dataTancament, euros, exerciciDeNumero,
 } from '../../lib/tancament'
 import type { CierreDonante, Convenio, Documento } from '../../types'
 import PendentsDeTu from '../../components/documents/PendentsDeTu'
@@ -141,21 +142,21 @@ export default function ProductorDocuments() {
 
   const refresca = useCallback(async () => {
     const r = await carrega()
-    if (r.errDon) { setError(r.errDon.message); return }
+    if (r.errDon) { setError(textError(t, r.errDon.message)); return }
     setDonants(r.donants ?? [])
     setInfos(r.infos ?? [])
     setDocs(r.docs ?? [])
     setAlbarans(r.albarans ?? [])
     setConvenis(r.convenis ?? [])
     setPeriodes(r.periodes ?? [])
-  }, [carrega])
+  }, [carrega, t])
 
   useEffect(() => {
     let viu = true
     void (async () => {
       const r = await carrega()
       if (!viu) return
-      if (r.errDon) { setError(r.errDon.message); setCarregant(false); return }
+      if (r.errDon) { setError(textError(t, r.errDon.message)); setCarregant(false); return }
       setDonants(r.donants ?? [])
       setInfos(r.infos ?? [])
       setDocs(r.docs ?? [])
@@ -165,7 +166,7 @@ export default function ProductorDocuments() {
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [carrega])
+  }, [carrega, t])
 
   const descarregador = useDescarregaDocument(refresca)
 
@@ -253,7 +254,7 @@ export default function ProductorDocuments() {
                   <Badge className="bg-secondary text-secondary-foreground">
                     {t(d.tipo === 'transaccio' ? 'mydoc.kind_tx' : 'mydoc.kind_don')}
                   </Badge>
-                  <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
+                  <Badge className={estilEstatPropi(d.estado)}>{t(`mydoc.st_${d.estado}`)}</Badge>
                   {prova && (
                     <Badge className="bg-aviso-fondo text-aviso whitespace-normal">
                       <AlertTriangle className="mr-1 size-3.5 shrink-0" aria-hidden />
@@ -373,6 +374,29 @@ export default function ProductorDocuments() {
       {descarregador.visor}
     </div>
   )
+}
+
+/**
+ * El estado de su año, dicho para el donante y no con el vocabulario del equipo.
+ *
+ * ⚠️ `tan.ds_*` decía «Factura pendent» en ámbar: desde el 21-09-2026 el certificado no
+ *    depende de la factura, y desde el 23-09 el productor no la sube aquí, así que ese
+ *    badge le pedía algo que nadie le pide. Aquí los estados de la factura se leen como lo
+ *    que son para él: el resumen ya le ha llegado, o su factura ya se ha recibido.
+ */
+function estilEstatPropi(estat: string): string {
+  switch (estat) {
+    case 'certificat_emes':
+    case 'enviat':
+    case 'declarat':
+      return 'bg-exito-fondo text-exito'
+    // La única en ámbar: el importe de su factura no cuadra y el equipo lo tiene que mirar.
+    case 'discrepancia':
+      return 'bg-aviso-fondo text-aviso'
+    // Todo lo demás espera al equipo, no a él: neutro.
+    default:
+      return 'bg-secondary text-secondary-foreground'
+  }
 }
 
 /** Qué toca ahora. En venta y maquila no hay resumen ni declaración de donación, así que

@@ -176,7 +176,7 @@ export function Espigolades() {
         </div>
 
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!carregant && !error && visibles.length === 0 && (
           <p className="text-sm text-muted-foreground">
@@ -254,7 +254,7 @@ export function NovaEspigolada() {
 
   const [productor, setProductor] = useState('')
   const [ubicacio, setUbicacio] = useState('')
-  const [data, setData] = useState(() => new Date().toISOString().slice(0, 10))
+  const [data, setData] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }))
   const [voluntaris, setVoluntaris] = useState('')
   const [notes, setNotes] = useState('')
   const [refExterna, setRefExterna] = useState('')
@@ -350,7 +350,7 @@ export function NovaEspigolada() {
         <p className="mt-1 text-sm text-muted-foreground">{t('esp.new_subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid gap-3 sm:grid-cols-2">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="esp-prod">{t('esp.producer')}</Label>
             <select id="esp-prod" className={SELECT} value={productor}
@@ -391,7 +391,7 @@ export function NovaEspigolada() {
         <div className="space-y-3">
           <h2 className="text-base">{t('esp.lines')}</h2>
           {linies.map((l, i) => (
-            <div key={i} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+            <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`el-prod-${i}`}>{t('alb.ln_product')}</Label>
                 <select id={`el-prod-${i}`} className={SELECT} value={l.producto}
@@ -510,7 +510,7 @@ export function EspigoladaDetall() {
     const { data: e, error: errE } = await supabase.from('espigoladas')
       .select('id, productor_id, ubicacion_id, fecha, num_voluntarios, notas, ref_externa, oferta_origen_id, estado, creada_por, created_at')
       .eq('id', id).maybeSingle()
-    if (errE) { setError(errE.message); setCarregant(false); return }
+    if (errE) { setError(t('c.load_error')); setCarregant(false); return }
     if (!e) { setError(t('esp.not_found')); setCarregant(false); return }
     setEspigolada(e as Espigolada)
 
@@ -621,7 +621,7 @@ export function EspigoladaDetall() {
 
       <Card>
         <CardHeader><CardTitle className="text-base">{t('esp.summary')}</CardTitle></CardHeader>
-        <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+        <CardContent className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
           {origen.productor && (
             <p>
               {t('esp.producer')}:{' '}
@@ -706,7 +706,7 @@ export function EspigoladaDetall() {
                   {meus.map((l, i) => {
                     const idx = lots.indexOf(l)
                     return (
-                      <div key={`${r.id}-${i}`} className="grid gap-2 rounded-md border p-3 sm:grid-cols-2">
+                      <div key={`${r.id}-${i}`} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <Label htmlFor={`lot-ent-${idx}`}>{t('esp.entity')}</Label>
                           <select id={`lot-ent-${idx}`} className={SELECT} value={l.entidad_id}

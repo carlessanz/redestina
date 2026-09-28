@@ -32,19 +32,23 @@ export async function listarEmailsTest(): Promise<EmailTestRecipient[]> {
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+/** Clave i18n si falla, o `null`. Mismo contrato que `anadirNumeroTest`. */
 export async function anadirEmailTest(email: string, etiqueta: string): Promise<string | null> {
   const limpio = email.trim().toLowerCase()
-  if (!EMAIL_RE.test(limpio)) return 'Email no válido.'
+  if (!EMAIL_RE.test(limpio)) return 'wl.bad_email'
   const { error } = await supabase
     .from('email_test_recipients')
     .insert({ email: limpio, etiqueta: etiqueta.trim() || null })
   if (error) {
-    return error.code === '23505' ? 'Ese email ya está en la lista.' : error.message
+    if (error.code === '23505') return 'wl.dup_email'
+    return error.code === '42501' ? 'wl.no_perm' : 'c.error'
   }
   return null
 }
 
-export async function borrarEmailTest(email: string): Promise<void> {
-  const { error } = await supabase.from('email_test_recipients').delete().eq('email', email)
-  if (error) console.error('email_test_recipients delete:', error.message)
+/** Clave i18n si no se borró, o `null`. Mismo contrato que `borrarNumeroTest`. */
+export async function borrarEmailTest(email: string): Promise<string | null> {
+  const { data, error } = await supabase.from('email_test_recipients').delete().eq('email', email).select('email')
+  if (error) { console.error('email_test_recipients delete:', error.message); return 'c.error' }
+  return data && data.length > 0 ? null : 'wl.no_perm'
 }

@@ -43,7 +43,7 @@ export default function DialegCorreu({
   destinatari: DestinatariCorreu | null
   assumpteInicial?: string
 }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [assumpte, setAssumpte] = useState(assumpteInicial)
   const [text, setText] = useState('')
   const [enviant, setEnviant] = useState(false)
@@ -66,7 +66,8 @@ export default function DialegCorreu({
       to: email,
       subject: assumpte.trim(),
       text: text.trim(),
-      plantilla: { titulo: assumpte.trim() },
+      // Sin `idioma`, el pie del correo salía siempre en catalán.
+      plantilla: { titulo: assumpte.trim(), idioma: lang },
       proposito: 'missatge',
       objeto_tipo: destinatari.tipus,
       objeto_id: destinatari.id,

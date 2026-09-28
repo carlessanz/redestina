@@ -134,11 +134,12 @@ export default function Dashboard() {
   useEffect(() => { void cargar() }, [cargar])
 
   const kpis = useMemo(() => {
-    const ofertas = { activas: 0, bloqueadas: 0, cerradas: 0, noColocadas: 0, canceladas: 0 }
+    // Sin `cerradas`: `excedentes.estado = 'cerrada'` no lo escribe nadie (deuda §12.106),
+    // así que la línea «0 tancades» era siempre falsa. Lo cerrado se ve por su REC conciliado.
+    const ofertas = { activas: 0, bloqueadas: 0, noColocadas: 0, canceladas: 0 }
     let pendientes = 0
     for (const e of excedentes) {
       if (e.estado === 'bloqueada') ofertas.bloqueadas += 1
-      else if (e.estado === 'cerrada') ofertas.cerradas += 1
       else if (e.estado === 'no_colocada') ofertas.noColocadas += 1
       else if (e.estado === 'cancelada') ofertas.canceladas += 1
       if (['borrador', 'publicada', 'parcial'].includes(e.estado)) ofertas.activas += 1
@@ -187,10 +188,9 @@ export default function Dashboard() {
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">{t('dash.glance')}</h2>
         {loading ? <p className="text-sm text-muted-foreground">{t('c.loading')}</p> : (
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Kpi to="/equip/ofertes" titulo={t('dash.k_offers')} valor={kpis.ofertas.activas} sub={t('dash.active')} detalle={[
               { texto: `${kpis.ofertas.bloqueadas} ${t('dash.blocked')}` },
-              { texto: `${kpis.ofertas.cerradas} ${t('dash.closed')}` },
               { texto: `${kpis.ofertas.noColocadas} ${t('dash.uncoll')}` },
               { texto: `${kpis.ofertas.canceladas} ${t('dash.cancelled')}` },
             ]} />

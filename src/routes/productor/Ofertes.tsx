@@ -12,6 +12,7 @@ import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
+import { carregaPendents } from '../../lib/pendents'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import {
   estatSimpleOferta, llegendaSimpleOferta, ofertaEnCurs, puntOferta,
@@ -31,7 +32,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
  * interés (cuántas entidades la han pedido). Se cargan con UNA consulta cada uno para
  * todas las ofertas, nunca una por oferta (§12.5).
  */
-interface RecResum { estado: EstadoAlbaran; numero: string | null; diesEsperant: number | null }
+interface RecResum { id: string; estado: EstadoAlbaran; numero: string | null; diesEsperant: number | null }
 
 /** Hook compartido por las dos pantallas: las ofertas de mi organización. */
 function useMevesOfertes(productorId: string | null) {
@@ -41,7 +42,11 @@ function useMevesOfertes(productorId: string | null) {
   const [destins, setDestins] = useState<Record<string, number>>({})
   const [recs, setRecs] = useState<Record<string, RecResum>>({})
   const [progres, setProgres] = useState<Record<string, ProgresOferta>>({})
+  /** Los REC que esperan la confirmación de esta organización (`pendents_meus`). */
+  const [recsPendents, setRecsPendents] = useState<Set<string>>(new Set())
   const [carregant, setCarregant] = useState(true)
+  /** Un fallo de carga NO es «no tienes ofertas»: antes se pintaba el estado vacío. */
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   /**
    * Los ids de mis ofertas, para poder decidir si un evento de `canalizaciones` me toca.
@@ -58,10 +63,12 @@ function useMevesOfertes(productorId: string | null) {
 
   const carrega = useCallback(async () => {
     if (!productorId) { setCarregant(false); return }
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('excedentes').select('*')
       .eq('productor_id', productorId)
       .order('created_at', { ascending: false })
+    if (error) { setErrorCarrega(true); setCarregant(false); return }
+    setErrorCarrega(false)
     const files = (data ?? []) as Excedente[]
     const ids = files.map((o) => o.id)
     meusIds.current = new Set(ids)
@@ -69,19 +76,22 @@ function useMevesOfertes(productorId: string | null) {
 
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). Sin `.eq()` de organización
     // en el albarán: la RLS ya devuelve solo lo suyo, y nunca los borradores.
-    const [c, a, p] = ids.length === 0
-      ? [null, null, null]
+    const [c, a, p, pend] = ids.length === 0
+      ? [null, null, null, null]
       : await Promise.all([
         supabase.from('canalizaciones').select('excedente_id, kg_confirmados').in('excedente_id', ids),
         // El REC de una ESPIGOLADA no cuelga de la oferta sino de la jornada
         // (`espigolada_id`): sin buscarlo también por ahí, una oferta convertida y ya
         // conciliada se quedaba en «Espera el contacte de l'equip» (28-09-2026).
         supabase.from('v_albaranes_bandeja')
-          .select('excedente_id, espigolada_id, estado, numero_completo, dias_esperando, emitido_at')
+          .select('id, excedente_id, espigolada_id, estado, numero_completo, dias_esperando, emitido_at')
           .eq('tipo', 'REC')
           .or(`excedente_id.in.(${ids.join(',')})${espIds.length ? `,espigolada_id.in.(${espIds.join(',')})` : ''}`)
           .order('emitido_at', { ascending: false, nullsFirst: true }),
         carregaProgresOfertes(),
+        // Lo que espera SU confirmación: sin esto, una oferta con el REC por confirmar salía
+        // en la lista sin el ámbar de «et toca a tu», al revés que en el detalle.
+        carregaPendents(),
       ])
 
     const kgs: Record<string, number> = {}
@@ -95,7 +105,7 @@ function useMevesOfertes(productorId: string | null) {
     // (`OfertaDetall`): así el badge de la lista y la etapa del detalle no pueden discrepar.
     const rs: Record<string, RecResum> = {}
     for (const r of ((a?.data ?? []) as {
-      excedente_id: string | null; espigolada_id: string | null; estado: string
+      id: string; excedente_id: string | null; espigolada_id: string | null; estado: string
       numero_completo: string | null; dias_esperando: number | null
     }[])) {
       // De una espigolada, el REC vale para todas las ofertas de esa jornada.
@@ -105,7 +115,7 @@ function useMevesOfertes(productorId: string | null) {
       for (const eid of destins) {
         if (rs[eid]) continue
         rs[eid] = {
-          estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
+          id: r.id, estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
         }
       }
     }
@@ -116,6 +126,9 @@ function useMevesOfertes(productorId: string | null) {
     setRecs(rs)
     // La RPC «nunca lanza»: sin ella se pierde el matiz «en gestió», no la pantalla.
     setProgres(p && p.ok ? perOferta(p.data) : {})
+    setRecsPendents(new Set(pend && pend.ok
+      ? pend.data.filter((x) => x.proposito === 'confirmacion_albaran' && x.tipo_org === 'productor').map((x) => x.objeto_id)
+      : []))
     setCarregant(false)
   }, [productorId])
 
@@ -158,10 +171,11 @@ function useMevesOfertes(productorId: string | null) {
       nPerAprovar: pr?.n_per_aprovar,
       albaraRec: recs[o.id] ?? null,
       motiu: o.motivo_no_colocada ?? null,
+      pendentDeMi: recs[o.id] ? recsPendents.has(recs[o.id].id) : false,
     }, 'productor')
-  }, [kg, progres, recs])
+  }, [kg, progres, recs, recsPendents])
 
-  return { ofertes, kg, destins, puntDe, carregant }
+  return { ofertes, kg, destins, puntDe, carregant, errorCarrega }
 }
 
 /** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. */
@@ -334,7 +348,7 @@ export function ProductorInici() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, destins, puntDe, carregant } = useMevesOfertes(productorId)
+  const { ofertes, kg, destins, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
@@ -351,7 +365,7 @@ export function ProductorInici() {
     .reduce((s, o) => s + (kg[o.id] ?? 0), 0)
   const pendents = enCurs.reduce(
     (s, o) => s + Math.max(0, Number(o.kg_total ?? 0) - (kg[o.id] ?? 0)), 0)
-  const buit = !carregant && ofertes.length === 0
+  const buit = !carregant && !errorCarrega && ofertes.length === 0
 
   return (
     <div className="space-y-6">
@@ -361,12 +375,13 @@ export function ProductorInici() {
       </div>
 
       {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+      {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('po.err_load')}</p>}
 
       {/* Sin ninguna oferta, los tres contadores a cero y la lista vacía solo repiten lo
           mismo tres veces: se enseña el estado vacío y nada más. */}
       {buit && <CapOferta />}
 
-      {!carregant && !buit && (
+      {!carregant && !errorCarrega && !buit && (
         <>
           <div className="grid gap-3 sm:grid-cols-3">
             <Card><CardContent className="pt-6">
@@ -421,13 +436,15 @@ export function ProductorOfertes() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, puntDe, carregant } = useMevesOfertes(productorId)
+  const { ofertes, kg, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   return (
     <Card>
-      <CardHeader className="flex flex-row items-start justify-between gap-4">
-        <div>
+      {/* `flex-wrap` y el botón a lo ancho en móvil: con `shrink-0` de serie, en la misma
+          fila aplastaba el título y la leyenda a 320 px (§2, regla 4). */}
+      <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
+        <div className="min-w-0 flex-1">
           <CardTitle>{t('po.list_title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('po.list_subtitle')}</p>
           {/* Plegada: quien conoce el circuito no necesita releer las frases cada vez, y
@@ -435,7 +452,7 @@ export function ProductorOfertes() {
           <LlegendaEstats items={llegendaSimpleOferta()} ambPunt />
         </div>
         <Button
-          className="h-11 whitespace-normal md:h-9"
+          className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
           onClick={() => navigate('/productor/ofertes/nova')}
         >
           <PlusCircle className="size-4" /> {t('nav.new_offer')}
@@ -443,7 +460,8 @@ export function ProductorOfertes() {
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {!carregant && ofertes.length === 0 && <CapOferta />}
+        {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('po.err_load')}</p>}
+        {!carregant && !errorCarrega && ofertes.length === 0 && <CapOferta />}
         {ofertes.map((o) => (
           <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi
             foto={foto(o)} />

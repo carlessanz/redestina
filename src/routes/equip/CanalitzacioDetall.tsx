@@ -41,6 +41,8 @@ import type { ConvenioTipo, Excedente } from '../../types'
 import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
+import { useAppContext } from '../../hooks/useAppContext'
+import { useConfirma } from '../../components/DialegConfirma'
 import { supabase } from '../../lib/supabase'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
@@ -85,6 +87,18 @@ function conveniQueCalRebre(modalitat: string | null): ConvenioTipo | null {
   return null
 }
 
+/**
+ * Lo mismo por el lado de quien ENTREGA (`parte = 'entrega'`): donación pide `don_gen`, y
+ * venta y maquila el comercial. Hasta el 28-09-2026 el botón preparaba SIEMPRE `don_gen`,
+ * así que en una venta creaba un convenio que la RPC del ciclo no mira (busca el `com`) y
+ * el botón volvía a salir, sin fin.
+ */
+function conveniQueCalEntregar(modalitat: string | null): ConvenioTipo | null {
+  if (modalitat === 'donacio') return 'don_gen'
+  if (modalitat === 'venda' || modalitat === 'maquila') return 'com'
+  return null
+}
+
 const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
   fet: 'bg-exito-fondo text-exito',
   ara: 'bg-aviso-fondo text-aviso',
@@ -95,6 +109,17 @@ const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
 export default function CanalitzacioDetall() {
   const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
+  const { ctx } = useAppContext()
+  // Contrasignar y aprobar exigen `pot_aprovar()` (§4bis): a un técnico se le dejan grises
+  // CON el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
+  const potAprovar = ctx?.potAprovar ?? true
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
+  /** Contrasignar estampa la firma de la Fundación y manda el PDF: no se deshace. */
+  const confirmaContrasignar = () => confirma({
+    titol: t('conv.countersign_confirm_t'),
+    descripcio: t('conv.countersign_confirm'),
+    confirmar: t('canalz.b_contrasignar'),
+  })
 
   const [fets, setFets] = useState<FetsCanal | null>(null)
   const [extra, setExtra] = useState<Extra | null>(null)
@@ -119,6 +144,9 @@ export default function CanalitzacioDetall() {
   const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
   const [entitatTriada, setEntitatTriada] = useState('')
   const [kgInteres, setKgInteres] = useState('')
+  // En venta y maquila la RPC exige precio ≥ `preu_minim`; sin este campo el interés
+  // asistido de esas modalidades fallaba SIEMPRE («El preu ha de ser com a mínim…»).
+  const [preuInteres, setPreuInteres] = useState('')
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -159,14 +187,19 @@ export default function CanalitzacioDetall() {
     return () => { viu = false }
   }, [])
 
+  /**
+   * `avisat: true` = la acción ya ha dado su propio aviso (marcar entregado junta en uno
+   * solo «entregat» y «correu enviat»): no se apila otro verde encima.
+   */
   async function fes(
-    accio: () => Promise<{ ok: boolean; missatge?: string; codi?: string | null }>, okKey: string,
+    accio: () => Promise<{ ok: boolean; missatge?: string; codi?: string | null; avisat?: boolean }>,
+    okKey: string,
   ) {
     setOcupat(true)
     const r = await accio()
     setOcupat(false)
     if (!r.ok) { toast.error(textError(t, r)); return }
-    toast.success(t(okKey))
+    if (!r.avisat) toast.success(t(okKey))
     void refrescaComptadors()
     await carrega()
   }
@@ -185,6 +218,7 @@ export default function CanalitzacioDetall() {
   // Copia no nula tras la guarda: TypeScript no estrecha el estado dentro de las
   // funciones declaradas más abajo, y pasarlo por argumento a todas sería peor.
   const ex = extra
+  const esVenda = ex.oferta.modalitat === 'venda' || ex.oferta.modalitat === 'maquila'
 
   const escala = escalaCanal(fets)
   const punt = puntCanal(fets)
@@ -350,13 +384,15 @@ export default function CanalitzacioDetall() {
                   <div className="flex flex-wrap gap-2">
                     {i === 0 && (
                       <>
-                        {!fets.conveni_gen && extra.productor && (
+                        {!fets.conveni_gen && extra.productor && conveniQueCalEntregar(extra.oferta.modalitat) && (
                           <Button
                             className="h-11 whitespace-normal md:h-9"
                             disabled={ocupat}
                             onClick={() => void fes(
                               async () => {
-                                const r = await prepararConveni('productor', extra.productor!.id, 'don_gen')
+                                const r = await prepararConveni(
+                                  'productor', extra.productor!.id, conveniQueCalEntregar(extra.oferta.modalitat)!,
+                                )
                                 return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
                               },
                               'canalz.ok_preparat',
@@ -374,19 +410,23 @@ export default function CanalitzacioDetall() {
                           </Button>
                         )}
                         {fets.conveni_gen?.estado === 'firmat' && (
-                          <Button
+                          <BotoAmbMotiu
                             className="h-11 whitespace-normal md:h-9"
-                            disabled={ocupat}
-                            onClick={() => void fes(
+                            disabled={ocupat || !potAprovar}
+                            motiu={potAprovar ? undefined : t('conv.need_approver')}
+                            onClick={async () => {
+                              if (!(await confirmaContrasignar())) return
+                              void fes(
                               async () => {
                                 const r = await contrafirmarConveni(fets.conveni_gen!.id)
                                 return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
                               },
                               'canalz.ok_contrasignat',
-                            )}
+                              )
+                            }}
                           >
                             {t('canalz.b_contrasignar')}
-                          </Button>
+                          </BotoAmbMotiu>
                         )}
                         {fets.conveni_gen && (
                           <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
@@ -456,7 +496,7 @@ export default function CanalitzacioDetall() {
                     <div className="space-y-2 rounded-md border p-3">
                       <p className="text-sm font-medium">{t('canalz.interes_title')}</p>
                       <p className="text-xs text-muted-foreground">{t('canalz.interes_hint')}</p>
-                      <div className="grid gap-2 sm:grid-cols-3">
+                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
                         <div className="sm:col-span-2">
                           <Label htmlFor="cd-interes-entitat" className="mb-1 block text-xs text-muted-foreground">
                             {t('canalz.interes_entitat')}
@@ -484,16 +524,32 @@ export default function CanalitzacioDetall() {
                             onChange={(e) => setKgInteres(e.target.value)}
                           />
                         </div>
+                        {esVenda && (
+                          <div>
+                            <Label htmlFor="cd-interes-preu" className="mb-1 block text-xs text-muted-foreground">
+                              {t('canalz.interes_preu')}
+                            </Label>
+                            <Input
+                              id="cd-interes-preu"
+                              name="preu"
+                              type="number" min="0" step="0.01" inputMode="decimal"
+                              placeholder={oferta?.preu_minim != null ? String(oferta.preu_minim) : undefined}
+                              value={preuInteres}
+                              onChange={(e) => setPreuInteres(e.target.value)}
+                            />
+                          </div>
+                        )}
                       </div>
                       <Button
                         className="h-11 whitespace-normal md:h-9"
-                        disabled={ocupat || !entitatTriada || kgInteres.trim() === ''}
+                        disabled={ocupat || !entitatTriada || kgInteres.trim() === '' || (esVenda && preuInteres.trim() === '')}
                         onClick={() => void fes(
                           async () => {
                             const r = await interesAssistit(
-                              ex.oferta.id, entitatTriada, Number(kgInteres), null, null,
+                              ex.oferta.id, entitatTriada, Number(kgInteres),
+                              esVenda && preuInteres.trim() !== '' ? Number(preuInteres) : null, null,
                             )
-                            if (r.ok) { setEntitatTriada(''); setKgInteres('') }
+                            if (r.ok) { setEntitatTriada(''); setKgInteres(''); setPreuInteres('') }
                             return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
                           },
                           'canalz.ok_interes',
@@ -520,21 +576,22 @@ export default function CanalitzacioDetall() {
                                 <span className="text-sm">
                                   {r.entitat}
                                   {r.kg_solicitados != null && (
-                                    <span className="tabular-nums"> · {r.kg_solicitados} kg</span>
+                                    <span className="tabular-nums"> · {Number(r.kg_solicitados).toLocaleString('ca-ES', { maximumFractionDigits: 2 })} kg</span>
                                   )}
                                 </span>
                                 <span className="flex flex-wrap items-center gap-2">
                                   <Badge className={vigent ? 'bg-exito-fondo text-exito' : 'bg-aviso-fondo text-aviso'}>
                                     {cv ? t(`conv.st_${cv.estado}`) : t('canalz.rec_sense_conveni')}
                                   </Badge>
-                                  <Button
+                                  <BotoAmbMotiu
                                     size="sm"
                                     className="h-11 whitespace-normal md:h-8"
-                                    disabled={ocupat || r.kg_solicitados == null || !vigent}
+                                    disabled={ocupat || r.kg_solicitados == null || !vigent || !potAprovar}
+                                    motiu={!potAprovar ? t('appr.need_approver') : !vigent ? t('canalz.rec_sense_conveni') : undefined}
                                     onClick={() => void aprovaInteres(r.id, r.entidad_id, Number(r.kg_solicitados ?? 0))}
                                   >
                                     {t('canalz.b_aprova')}
-                                  </Button>
+                                  </BotoAmbMotiu>
                                 </span>
                               </div>
 
@@ -569,20 +626,24 @@ export default function CanalitzacioDetall() {
                                       </Button>
                                     )}
                                     {cv?.estado === 'firmat' && (
-                                      <Button
+                                      <BotoAmbMotiu
                                         size="sm"
                                         className="h-11 whitespace-normal md:h-8"
-                                        disabled={ocupat}
-                                        onClick={() => void fes(
+                                        disabled={ocupat || !potAprovar}
+                                        motiu={potAprovar ? undefined : t('conv.need_approver')}
+                                        onClick={async () => {
+                                          if (!(await confirmaContrasignar())) return
+                                          void fes(
                                           async () => {
                                             const res = await contrafirmarConveni(cv.id)
                                             return res.ok ? { ok: true } : { ok: false, missatge: res.missatge }
                                           },
                                           'canalz.ok_contrasignat',
-                                        )}
+                                          )
+                                        }}
                                       >
                                         {t('canalz.b_contrasignar')}
-                                      </Button>
+                                      </BotoAmbMotiu>
                                     )}
                                     {cv && (
                                       <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
@@ -611,20 +672,34 @@ export default function CanalitzacioDetall() {
                               <Button
                                 size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
                                 disabled={ocupat}
-                                onClick={() => void fes(
+                                onClick={async () => {
+                                  // Manda correo a las partes: se pregunta antes (como en `AlbaraDetall`).
+                                  if (!(await confirma({
+                                    titol: t('alb.deliver_confirm_t'),
+                                    descripcio: t('alb.deliver_confirm'),
+                                    confirmar: t('alb.mark_delivered'),
+                                  }))) return
+                                  void fes(
                                   async () => {
                                     const r = await marcarEntregat(a.id)
                                     if (!r.ok) return { ok: false, missatge: r.missatge }
                                     // Hasta el 28-09-2026 aquí se DESCARTABAN los enlaces: el
                                     // token solo existe en esta respuesta, y nadie lo enviaba.
-                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, r.data.enllacos ?? [], t, lang)
-                                    if (correu.enviats > 0) toast.success(t('alb.mail_sent', { n: correu.enviats }))
-                                    // Esta pantalla no enseña los enlaces: la salida es la confirmación asistida.
-                                    if (correu.fallits > 0) toast.warning(t('alb.mail_failed_assistit'))
-                                    return { ok: true }
+                                    const enllacos = r.data.enllacos ?? []
+                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, enllacos, t, lang)
+                                    // UN aviso, no dos verdes seguidos: «entregat» y «correu
+                                    // enviat» son el mismo acto (como en `AlbaraDetall`). Esta
+                                    // pantalla no enseña los enlaces: la salida, si el correo no
+                                    // sale, es la confirmación asistida.
+                                    if (enllacos.length === 0) toast.warning(t('alb.delivered_0'))
+                                    else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
+                                    else toast.warning(`${t('canalz.ok_entregat')} ${t('alb.mail_failed_assistit')}`)
+                                    if (correu.enviats > 0 && correu.fallits > 0) toast.warning(t('alb.mail_failed_assistit'))
+                                    return { ok: true, avisat: true }
                                   },
                                   'canalz.ok_entregat',
-                                )}
+                                  )
+                                }}
                               >
                                 {t('canalz.b_entregat')}
                               </Button>
@@ -678,6 +753,7 @@ export default function CanalitzacioDetall() {
           onFet={() => { setDlgAlbara(null); void carrega() }}
         />
       )}
+      {dialegConfirma}
     </div>
   )
 }

@@ -44,6 +44,7 @@ import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
@@ -160,6 +161,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
+  /** La ficha no se pudo leer: sin esto salía el formulario vacío, como si no hubiera datos. */
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   const tabla = tipus === 'productor' ? 'productores' : 'entidades'
   const seccions = SECCIONS[tipus]
@@ -192,8 +195,9 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     if (!idOrganitzacio) { setCarregant(false); return }
     let viu = true
     void (async () => {
-      const { data } = await supabase.from(tabla).select('*').eq('id', idOrganitzacio).maybeSingle()
+      const { data, error } = await supabase.from(tabla).select('*').eq('id', idOrganitzacio).maybeSingle()
       if (!viu) return
+      setErrorCarrega(Boolean(error))
       const f = (data as Fila) ?? null
       setFila(f)
       setPerfil(((f?.perfil_receptor as Record<string, unknown> | null) ?? {}))
@@ -267,7 +271,9 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       tipus === 'productor' ? 'actualitzar_fitxa_productor' : 'actualitzar_fitxa_entitat',
       { p_id: organitzacio.id, p_dades: dades },
     )
-    if (error) { setDesant(false); toast.error(t('c.error')); return }
+    // El motivo de la RPC (una columna que no admite, un valor fuera de lista) y no un
+    // «Hi ha hagut un error» que no dice qué corregir.
+    if (error) { setDesant(false); toast.error(textError(t, error.message)); return }
     // Lo que devuelve la base ya trae población y área derivadas del municipio.
     if (data) setFila(data as Fila)
 
@@ -279,7 +285,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         p_ficha: organitzacio.id,
         p_canal: canal === 'auto' ? null : canal,
       })
-      if (errCanal) { setDesant(false); toast.error(t('c.error')); return }
+      if (errCanal) { setDesant(false); toast.error(textError(t, errCanal.message)); return }
       const org = o as { canal_preferido: Tria | null } | null
       setCanalDesat((org?.canal_preferido ?? 'auto') as Tria)
     }
@@ -292,6 +298,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
 
   if (!organitzacio) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
+  if (errorCarrega || !fila) return <p className="text-sm text-destructive">{t('org.err_load')}</p>
 
   const idDe = (clave: string) => `po-${tipus}-${clave}`
   const selectClasses = 'w-full text-base md:text-sm'

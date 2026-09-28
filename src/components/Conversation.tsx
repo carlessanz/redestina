@@ -8,6 +8,7 @@ import { plantillaPrimerContacte, textoSalutacio } from '../lib/plantillas'
 import type { RolContacte } from '../lib/plantillas'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import type { WaContact, WaMessage } from '../types'
@@ -43,7 +44,8 @@ function noticeFromError(data: unknown, t: Tfn): Notice {
     case 'unauthorized': return { kind: 'error', text: t('msg.w_unauth') }
     case 'forbidden': return { kind: 'error', text: t('msg.w_unauth') }
   }
-  if (typeof err === 'string') return { kind: 'error', text: err }
+  // Un texto del servidor: el legible pasa, el crudo de Postgres o de la red no (`textError`).
+  if (typeof err === 'string') return { kind: 'error', text: textError(t, err) }
   if (err && typeof err === 'object') {
     const meta = err as { code?: number; message?: string; error_data?: { details?: string } }
     const details = meta.error_data?.details ?? ''
@@ -265,7 +267,7 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
 
       <div className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-5">
         {loading && <p className="text-sm text-muted-foreground">{t('msg.loading')}</p>}
-        {loadError && <p className="text-sm text-destructive">{loadError}</p>}
+        {loadError && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {!loading && !loadError && messages.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('msg.no_messages')}</p>
         )}

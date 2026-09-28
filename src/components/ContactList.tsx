@@ -100,7 +100,7 @@ export default function ContactList({ contacts, loading, error, selectedPhone, o
     })
     setSaving(false)
     if (insertError) {
-      setFormError(insertError.code === '23505' ? t('msg.exists') : insertError.message)
+      setFormError(insertError.code === '23505' ? t('msg.exists') : t('c.error'))
       return
     }
     setName(''); setPhone(''); setShowForm(false)

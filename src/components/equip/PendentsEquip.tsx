@@ -62,7 +62,7 @@ const FILES: readonly FilaCua[] = [
   { cua: 'albarans_conciliar', desti: '/equip/albarans?tab=conciliar' },
   { cua: 'costos', desti: '/equip/productes' },
   { cua: 'tancament', desti: '/equip/tancament' },
-  { cua: 'documents_error', desti: '/equip/documents' },
+  { cua: 'documents_error', desti: '/equip/documents?tab=error' },
 ] as const
 
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
@@ -123,13 +123,15 @@ export default function PendentsEquip() {
               estado: t(`tan.st_${estado}`),
               bloquejats: Number(detall?.bloquejats ?? 0),
             })
-            : t(`pe.${f.cua}`)
+            // `n` viaja aunque el texto no lo lleve: la cifra va fuera, pero la frase tiene
+            // que concordar con ella («1 alta per validar», no «1 altes»; §7, `<clau>_1`).
+            : t(`pe.${f.cua}`, { n })
 
           // La única cola con subtítulo variable: cuántos esperan a la otra parte.
           const esperant = f.cua === 'albarans_conciliar' ? quants('albarans_esperant') : 0
           const sub = esperant > 0
             ? t('pe.albarans_conciliar_sub', { m: esperant })
-            : AMB_SUBTITOL.includes(f.cua) ? t(`pe.${f.cua}_sub`) : null
+            : AMB_SUBTITOL.includes(f.cua) ? t(`pe.${f.cua}_sub`, { n }) : null
 
           const desti = esTancament && ref ? `/equip/tancament/${ref}` : f.desti
 

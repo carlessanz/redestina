@@ -150,6 +150,18 @@ export interface ResultadoDestinatarios {
   bustiaEquip: boolean;
 }
 
+/**
+ * El buzón del equipo (`parametros_documentales.email_equipo`), para el `reply_to` de los
+ * correos que van a organizaciones: salen de `no-reply@` y, sin esto, contestar no llegaba
+ * a nadie. `null` si no está puesto o no se puede leer: entonces el correo sale sin él.
+ */
+export async function bustiaEquip(supabase: Cliente): Promise<string | null> {
+  const { data } = await supabase
+    .from("parametros_documentales").select("id, email_equipo").eq("id", 1).maybeSingle();
+  const e = (data?.email_equipo ?? "").trim();
+  return e.includes("@") && !e.endsWith(".invalid") ? e : null;
+}
+
 export async function destinatariosPrueba(
   supabase: Cliente,
   documento: DocumentoParaEnviar,

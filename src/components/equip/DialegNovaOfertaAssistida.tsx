@@ -88,7 +88,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {/* Primero de quién es. Sin productor no hay descriptor que pedir: los catálogos
               de `crear-oferta/campos` dependen de sus ubicaciones. */}
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <Label htmlFor="dnoa-cerca" className="mb-1 block text-xs text-muted-foreground">
                 {t('canalz.nova_cerca')}

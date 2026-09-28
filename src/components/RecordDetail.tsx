@@ -14,7 +14,9 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useWhatsappActiu } from '../hooks/useAppContext'
+import { useAppContext, useWhatsappActiu } from '../hooks/useAppContext'
+import { textError } from '../lib/textError'
+import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import DialegCorreu from './DialegCorreu'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
@@ -70,6 +72,9 @@ export default function RecordDetail({
   const { confirma, dialeg } = useConfirma()
   const { tria, dialeg: dialegTria } = useTria()
   const waActiu = useWhatsappActiu()
+  const { ctx } = useAppContext()
+  // Borrar exige `es_super_admin()` (§4bis): a los demás se les deja gris con el motivo.
+  const potEsborrar = ctx?.esSuperAdmin ?? false
   const [correuObert, setCorreuObert] = useState(false)
   const esNuevo = registro == null
   const [form, setForm] = useState<Record<string, unknown>>(() => ({ ...(registro ?? {}) }))
@@ -80,7 +85,9 @@ export default function RecordDetail({
   const set = (key: string, value: unknown) => setForm((f) => ({ ...f, [key]: value }))
 
   function mensajeError(err: { code?: string; message: string }): string {
-    return err.code === '23505' ? t('rec.err_unique') : err.message
+    // El crudo de Postgres («new row violates…») no llega a la pantalla: `textError` lo cambia
+    // por el genérico y deja pasar lo que una RPC levanta a propósito.
+    return err.code === '23505' ? t('rec.err_unique') : textError(t, err.message)
   }
 
   /**
@@ -144,11 +151,14 @@ export default function RecordDetail({
     const datos = normalizar()
     if (!datos[nombreKey]) { setError(t('rec.name_required')); return }
     setGuardando(true)
+    // `.select('id')`: un UPDATE que la RLS no deja pasar no da error, devuelve cero filas
+    // (§12.48), y la pantalla anunciaba «Desat» sin haber guardado nada.
     const resp = registro
-      ? await supabase.from(tabla).update(datos).eq('id', registro.id)
-      : await supabase.from(tabla).insert(datos)
+      ? await supabase.from(tabla).update(datos).eq('id', registro.id).select('id')
+      : await supabase.from(tabla).insert(datos).select('id')
     setGuardando(false)
     if (resp.error) { setError(mensajeError(resp.error)); return }
+    if (!resp.data || resp.data.length === 0) { setError(t('c.error')); return }
     toast.success(esNuevo ? t('rec.created') : t('rec.saved'))
     onSaved()
   }
@@ -369,7 +379,7 @@ export default function RecordDetail({
         <CardContent className="space-y-6">
           {avisos}
           {error && <p className="text-sm text-destructive">{error}</p>}
-          <div className="grid gap-4 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             {campos.map((c) => (
               <div key={c.key} className={c.ancho === 'full' ? 'sm:col-span-2' : undefined}>
                 <Label htmlFor={idDe(c)} className="mb-1.5 block text-xs text-muted-foreground">{t(c.label)}</Label>
@@ -379,9 +389,11 @@ export default function RecordDetail({
           </div>
           {!esNuevo && (
             <div className="border-t pt-4">
-              <Button variant="destructive" onClick={() => void borrar()} disabled={guardando}>
+              <BotoAmbMotiu variant="destructive" onClick={() => void borrar()} disabled={guardando || !potEsborrar}
+                motiu={potEsborrar ? undefined : t('rec.no_permission_delete')}>
                 <Trash2 className="size-4" /> {t('rec.delete_x', { x: tipo })}
-              </Button>
+              </BotoAmbMotiu>
+              {!potEsborrar && <p className="mt-2 text-xs text-muted-foreground">{t('rec.no_permission_delete')}</p>}
             </div>
           )}
         </CardContent>

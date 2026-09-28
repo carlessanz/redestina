@@ -8,7 +8,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { bloquePreformateado, plantillaEmail, sendEmail } from "../_shared/resend.ts";
-import { esEmailTest, modoTestActivo } from "../_shared/gate.ts";
+import { bustiaEquip, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
@@ -146,7 +146,7 @@ Deno.serve(async (req) => {
       }
     }
 
-    const r = await sendEmail({ to, subject, html: htmlFinal, text }, {
+    const r = await sendEmail({ to, subject, html: htmlFinal, text, replyTo: await bustiaEquip(supabase) }, {
       supabase,
       proposito,
       objetoTipo,

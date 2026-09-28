@@ -141,7 +141,11 @@ export function SelectorFotos({
 }: {
   productorId: string
   rutes: string[]
-  onChange: (rutes: string[]) => void
+  /**
+   * Devolver `false` (también dentro de una promesa) = el cambio NO se guardó: al quitar una
+   * foto, el fichero no se borra, porque la oferta todavía la cita.
+   */
+  onChange: (rutes: string[]) => void | boolean | Promise<void | boolean>
   disabled?: boolean
 }) {
   const { t } = useT()
@@ -160,12 +164,19 @@ export function SelectorFotos({
       if (r.ok) noves.push(r.ruta)
       else toast.error(textError(t, r.error))
     }
+    if (noves.length) {
+      const ok = await onChange([...rutes, ...noves])
+      // Si la oferta no las ha aceptado, las subidas se quedarían huérfanas en el bucket.
+      if (ok === false) await Promise.all(noves.map((r) => esborraFoto(r)))
+    }
     setPujant(false)
-    if (noves.length) onChange([...rutes, ...noves])
   }
 
   async function treu(ruta: string) {
-    onChange(rutes.filter((r) => r !== ruta))
+    // Primero se desenlaza y solo después se borra: al revés, un fallo al guardar dejaba la
+    // oferta citando un fichero que ya no existe (la foto salía rota a las entidades).
+    const ok = await onChange(rutes.filter((r) => r !== ruta))
+    if (ok === false) return
     await esborraFoto(ruta)
   }
 
@@ -230,7 +241,7 @@ export function CasellaFotoProducte({
           setDesant(true)
           const r = await fixaFotos(excedenteId, null, v)
           setDesant(false)
-          if (!r.ok) { toast.error(r.error ?? t('c.error')); return }
+          if (!r.ok) { toast.error(textError(t, r.error)); return }
           onCanvi(v)
           toast.success(t('foto.use_product_saved'))
         }}>

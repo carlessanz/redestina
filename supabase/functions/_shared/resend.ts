@@ -93,6 +93,11 @@ export interface EmailPayload {
    * diciendo dónde descargarlo.
    */
   attachments?: { filename: string; content: string }[];
+  /**
+   * A dónde van las respuestas. El remitente es `no-reply@`, así que sin esto contestar a
+   * una oferta o a un mensaje del equipo no llegaba a nadie (revisión del 28-09-2026).
+   */
+  replyTo?: string | null;
 }
 
 export interface EmailResult {
@@ -228,6 +233,7 @@ async function enviarResend(payload: EmailPayload): Promise<EmailResult> {
         ...(payload.html ? { html: payload.html } : {}),
         ...(payload.text ? { text: payload.text } : {}),
         ...(payload.attachments?.length ? { attachments: payload.attachments } : {}),
+        ...(payload.replyTo ? { reply_to: payload.replyTo } : {}),
       }),
     });
     const data = await res.json().catch(() => null);

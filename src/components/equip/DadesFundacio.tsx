@@ -26,6 +26,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { Loader2, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useConfirma } from '../DialegConfirma'
 import { FilaCasella } from '../Casella'
@@ -82,7 +83,8 @@ export default function DadesFundacio() {
 
   function mostraResultat(r: { ok: boolean; denegat: boolean; error: string | null }, exit: string) {
     if (r.ok) { toast.success(exit); return true }
-    toast.error(r.denegat ? t('cfgf.denied') : (r.error ?? t('c.error')))
+    // El mensaje crudo de Postgres no llega a la pantalla (`textError`).
+    toast.error(r.denegat ? t('cfgf.denied') : textError(t, r.error))
     return false
   }
 
@@ -141,7 +143,7 @@ export default function DadesFundacio() {
           </p>
         ) : error ? (
           <p className="rounded-md border border-error/30 bg-error-fondo p-3 text-sm text-error">
-            {t('cfgf.load_error', { error })}
+            {t('c.load_error')}
           </p>
         ) : (
           <>
@@ -170,7 +172,7 @@ export default function DadesFundacio() {
               </p>
             )}
 
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               {CAMPS_FUNDACIO.map((camp) => (
                 <div key={camp} className={cn('space-y-1', AMPLES.has(camp) && 'sm:col-span-2')}>
                   <label htmlFor={`fund-${camp}`} className="text-sm font-medium">

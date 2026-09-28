@@ -114,7 +114,7 @@ export default function DialegEspigolada(
   useEffect(() => {
     if (!obert) return
     setUbicacio(oferta.ubicacion_id ?? '')
-    setData(new Date().toISOString().slice(0, 10))
+    setData(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }))
     setVoluntaris('')
     setNotes('')
     setRefExterna('')
@@ -205,7 +205,7 @@ export default function DialegEspigolada(
             {t('conv_esp.hint')}
           </p>
 
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ce-ubi">{t('esp.location')}</Label>
               <select
@@ -247,7 +247,7 @@ export default function DialegEspigolada(
           <div className="space-y-3 rounded-md border p-3">
             <h3 className="text-base">{t('conv_esp.line')}</h3>
             <p className="text-sm text-muted-foreground">{t('conv_esp.line_hint')}</p>
-            <div className="grid gap-3 sm:grid-cols-2">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ce-prod">{t('alb.ln_product')}</Label>
                 <select

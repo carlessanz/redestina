@@ -35,12 +35,18 @@ export default function LlocsRecollida({
   const { t } = useT()
   const [ubicacions, setUbicacions] = useState<Ubicacio[]>([])
   const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
+  /** Un fallo de lectura no es «no tens cap lloc»: se decía eso mismo. */
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   useEffect(() => {
     let viu = true
     void supabase.from('productor_ubicaciones')
       .select('id, alias, municipio, gmaps_url').eq('productor_id', productorId).order('alias')
-      .then(({ data }) => { if (viu) setUbicacions((data ?? []) as Ubicacio[]) })
+      .then(({ data, error }) => {
+        if (!viu) return
+        setErrorCarrega(Boolean(error))
+        setUbicacions((data ?? []) as Ubicacio[])
+      })
     return () => { viu = false }
   }, [productorId])
 
@@ -60,16 +66,20 @@ export default function LlocsRecollida({
   }
 
   async function esborra(u: Ubicacio) {
-    const { error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id)
+    // `.select('id')`: un DELETE que la RLS no deja pasar no da error, borra cero filas, y
+    // la pantalla quitaba el lugar de la lista aunque seguía existiendo.
+    const { data, error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id).select('id')
     // 23503: alguna oferta apunta a este lugar. No se borra: se diría que la oferta ya no
     // tiene dónde recogerse.
-    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : t('c.error')); return }
+    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : textError(t, error.message)); return }
+    if (!data || data.length === 0) { toast.error(t('c.error')); return }
     setUbicacions((l) => l.filter((x) => x.id !== u.id))
   }
 
   return (
     <>
-      {ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
+      {errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
+      {!errorCarrega && ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
       <ul className="space-y-2">
         {ubicacions.map((u) => (
           <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">

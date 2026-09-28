@@ -12,7 +12,9 @@
 // en `documento_envios` (`proposito = 'document'`, con `documento_id`).
 
 import { composaCorreuDocument } from "./correu-document.ts";
-import { destinatariosPrueba, enLlistaCorreuTest, esEmailTest, modoTestActivo } from "./gate.ts";
+import {
+  bustiaEquip, destinatariosPrueba, enLlistaCorreuTest, esEmailTest, modoTestActivo,
+} from "./gate.ts";
 import { plantillaEmail, sendEmail } from "./resend.ts";
 
 // deno-lint-ignore no-explicit-any
@@ -108,6 +110,7 @@ export async function enviaDocument(
       to: c.destinatari,
       subject: c.assumpte,
       html,
+      replyTo: await bustiaEquip(supabase),
       ...(adjunt ? { attachments: [{ filename: c.fitxer, content: encodeBase64(bytes) }] } : {}),
     }, {
       supabase,

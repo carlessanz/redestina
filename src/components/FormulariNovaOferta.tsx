@@ -107,8 +107,19 @@ export interface PropsFormulariNovaOferta {
   /** De quién es la oferta. En el panel sale de la organización; en el alta asistida, del
    *  productor que el equipo ha elegido. */
   productorId: string | null
-  /** Desde la fecha de corte, sin convenio vigente la base responde `42501 sense_conveni`. */
+  /**
+   * Desde la fecha de corte, sin ningún convenio vigente no se publica. ⚠️ Lo impone ESTA
+   * pantalla, no `crear-oferta`, que hoy no lo comprueba: la base solo corta más tarde, al
+   * aprobar un interés (`aprovar_resposta` → `exigir_convenio`, `42501 sense_conveni`).
+   */
   bloqueja?: boolean
+  /**
+   * Por qué no se puede publicar CON ESTA MODALIDAD (clave i18n), o null. La venta y la
+   * maquila exigen el convenio `com` a quien entrega (`convenios_exigidos`): con solo el de
+   * donación vigente la oferta circularía y el interés chocaría con `sense_conveni` al
+   * aprobarlo. Lo pasa quien sabe los convenios de la organización (el panel del productor).
+   */
+  motiuModalitat?: (modalitat: string) => string | null
   /** Qué hacer con la oferta recién creada. Quien monta el formulario decide a dónde va. */
   onCreada: (r: ResultatNovaOferta) => void
   /** Si no se pasa, no se pinta el botón de cancelar. */
@@ -116,7 +127,7 @@ export interface PropsFormulariNovaOferta {
 }
 
 export default function FormulariNovaOferta(
-  { productorId, bloqueja = false, onCreada, onCancel }: PropsFormulariNovaOferta,
+  { productorId, bloqueja = false, motiuModalitat, onCreada, onCancel }: PropsFormulariNovaOferta,
 ) {
   const { t } = useT()
   const [campos, setCampos] = useState<CampoOferta[]>([])
@@ -380,7 +391,7 @@ export default function FormulariNovaOferta(
                 <option value="">—</option>
                 {ubis.map((u) => (
                   <option key={u.id} value={u.id}>
-                    {u.alias ?? u.municipio ?? 'Ubicació'}{u.alias && u.municipio ? ` · ${u.municipio}` : ''}
+                    {u.alias ?? u.municipio ?? t('po.place_unnamed')}{u.alias && u.municipio ? ` · ${u.municipio}` : ''}
                   </option>
                 ))}
               </select>
@@ -445,6 +456,11 @@ export default function FormulariNovaOferta(
             {triada?.descripcion && (
               <p className="mt-1 text-xs text-muted-foreground">{triada.descripcion}</p>
             )}
+            {/* Dicho aquí, al elegir, y no solo al final: si no, se descubre en el último
+                paso con el botón de publicar apagado. */}
+            {campo.clave === 'modalitat' && motiuConveni && (
+              <p className="mt-1 text-xs text-error">{t(motiuConveni)}</p>
+            )}
           </>
         )
       }
@@ -506,6 +522,11 @@ export default function FormulariNovaOferta(
   // El punto de partida: una oferta recién publicada, sin nadie interesado todavía. Sale
   // del mismo módulo que lo cuenta después en el detalle, así que lo que se promete aquí
   // y lo que se ve luego son la misma frase.
+  // Por qué no se puede publicar ahora mismo, si no se puede: se DICE, no solo se apaga el
+  // botón (en táctil no hay tooltip, §6ter).
+  const motiuConveni = bloqueja
+    ? 'avis_conv.bloquejat'
+    : (motiuModalitat && datos.modalitat ? motiuModalitat(String(datos.modalitat)) : null)
   const puntInicial = puntOferta(
     { estado: 'publicada', kgTotal: 0, kgCanalitzats: 0 }, 'productor',
   )
@@ -653,13 +674,11 @@ export default function FormulariNovaOferta(
           </Button>
         )}
         {ultim ? (
-          // Desde la fecha de corte, sin convenio vigente la RPC devuelve 42501: el botón
-          // se apaga para no dejar al productor delante de un error.
+          // Sin el convenio que toca, el botón se apaga y el motivo va escrito debajo.
           <Button
             className="h-11 whitespace-normal md:h-9"
             onClick={() => void enviar()}
-            disabled={enviant || bloqueja}
-            title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+            disabled={enviant || motiuConveni !== null}
           >
             {enviant ? t('c.saving') : t('po.publish')}
           </Button>
@@ -676,6 +695,9 @@ export default function FormulariNovaOferta(
           >
             {t('c.cancel')}
           </Button>
+        )}
+        {ultim && motiuConveni && (
+          <p className="w-full text-sm text-error">{t(motiuConveni)}</p>
         )}
       </div>
     </div>

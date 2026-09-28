@@ -29,6 +29,8 @@ import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { textError } from '../lib/textError'
+import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -64,11 +66,13 @@ export default function EnllacOrganitzacio({
     // literal (§7) o supabase-js deja de poder tipar la fila.
     if (tipus === 'productor') {
       const { data: p } = await supabase.from('productores')
-        .select('organizacion_id, name, nif').eq('id', fitxa).maybeSingle()
-      const propi = p as { organizacion_id: string | null; name: string | null; nif: string | null } | null
+        .select('organizacion_id, name, empresa, nif').eq('id', fitxa).maybeSingle()
+      const propi = p as { organizacion_id: string | null; name: string | null; empresa: string | null; nif: string | null } | null
       const org = propi?.organizacion_id ?? null
       if (!org) { setAltra(null); setMeva(null); return }
-      setMeva({ nom: propi?.name ?? null, nif: propi?.nif ?? null })
+      // El nombre de la organización es `empresa`; `name` es la persona de contacto. Comparar
+      // `name` con el `nombre` de la entidad avisaba de una discrepancia que no existía.
+      setMeva({ nom: propi?.empresa || propi?.name || null, nif: propi?.nif ?? null })
 
       // Una sola consulta a la otra tabla: dice a la vez si comparten y con quién. No hace
       // falta `v_organizaciones`, que para esta ficha devolvería su propio nombre, no el de
@@ -112,7 +116,9 @@ export default function EnllacOrganitzacio({
     setOcupat(false)
     setObert(false)
     if (error) {
-      toast.error(error.code === '42501' ? t('appr.reg_no_perm') : t('appr.reg_error', { msg: error.message }))
+      // Antes decía «només un admin pot validar un registre», que es otra acción; y el crudo
+      // de Postgres llegaba tal cual.
+      toast.error(error.code === '42501' ? t('org.link_no_perm') : textError(t, error.message))
       return
     }
     toast.success(t('org.unlink_ok'))
@@ -126,10 +132,11 @@ export default function EnllacOrganitzacio({
         <span className="font-medium">{t('org.shared_title')}</span>
         {' · '}
         {t('org.shared_with', { nom: altra.nom || '—' })}
-        <Button size="sm" variant="outline" className="ml-2 h-8 whitespace-normal"
-          disabled={!potAprovar || ocupat} onClick={() => setObert(true)}>
+        <BotoAmbMotiu size="sm" variant="outline" className="ml-2 h-8 whitespace-normal"
+          disabled={!potAprovar || ocupat} motiu={potAprovar ? undefined : t('org.link_no_perm')}
+          onClick={() => setObert(true)}>
           {t('org.unlink')}
-        </Button>
+        </BotoAmbMotiu>
       </div>
 
       {/* Solo lo dice: no hay botón que lo arregle solo, porque elegir el nombre bueno es una

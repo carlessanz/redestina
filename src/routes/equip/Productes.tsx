@@ -27,6 +27,7 @@ import type { CosteProducto } from '../../types'
 import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
 import { BUCKET_PRODUCTES } from '../../lib/fotosProducte'
 import DialegMotiu from '../../components/DialegMotiu'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,6 +57,9 @@ export default function Productes() {
   const { t } = useT()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
+  // Fijar el coste es de `pot_aprovar()`, pero BORRARLO exige `es_super_admin()`
+  // (`borrar_coste_producto`): a un admin se le deja gris con el motivo.
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const [productes, setProductes] = useState<Producte[]>([])
   const [costos, setCostos] = useState<CosteProducto[]>([])
@@ -215,7 +219,7 @@ export default function Productes() {
           </div>
 
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {error && <p className="text-sm text-destructive">{error}</p>}
+          {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
           {!potAprovar && <p className="text-sm text-muted-foreground">{t('cost.readonly')}</p>}
 
           {!carregant && files.length === 0 && (
@@ -313,13 +317,15 @@ export default function Productes() {
                                     {t(c ? 'cost.a_edit' : 'cost.a_set')}
                                   </Button>
                                   {c && (
-                                    <Button
+                                    <BotoAmbMotiu
                                       size="sm" variant="outline"
                                       className="h-11 whitespace-normal md:h-8"
+                                      disabled={!esSuperAdmin}
+                                      motiu={esSuperAdmin ? undefined : t('cost.del_only_super')}
                                       onClick={() => setEsborrant(p.nombre)}
                                     >
                                       {t('c.delete')}
-                                    </Button>
+                                    </BotoAmbMotiu>
                                   )}
                                 </>
                               )}

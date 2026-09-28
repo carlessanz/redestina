@@ -36,6 +36,7 @@ import { PASSOS_CONVENI_CLAUS, seguentPasConveni } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Convenio, Documento, EnlaceToken, Evidencia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
@@ -93,6 +94,7 @@ export default function ConveniDetall() {
   const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
 
   const [conv, setConv] = useState<Fila | null>(null)
   const [nomFitxa, setNomFitxa] = useState<string | null>(null)
@@ -226,6 +228,12 @@ export default function ConveniDetall() {
 
   async function contrafirma() {
     if (!conv) return
+    // Estampa la firma de la Fundación, lo deja vigente y manda el PDF por correo.
+    if (!(await confirma({
+      titol: t('conv.countersign_confirm_t'),
+      descripcio: t('conv.countersign_confirm'),
+      confirmar: t('conv.countersign'),
+    }))) return
     setOcupat(true)
     const res = await contrafirmarConveni(conv.id)
     setOcupat(false)
@@ -335,7 +343,7 @@ export default function ConveniDetall() {
           />
           <QueTocaAra punt={punt} compacte />
 
-          <div className="grid gap-2 text-sm sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
             <p className="text-muted-foreground">{t('conv.d_sent', { date: dataCurta(conv.enviado_at) })}</p>
             <p className="text-muted-foreground">{t('conv.d_signed', { date: dataCurta(conv.firmado_at) })}</p>
             <p className="text-muted-foreground">{t('conv.d_countersigned', { date: dataCurta(conv.contrafirmado_at) })}</p>
@@ -453,7 +461,7 @@ export default function ConveniDetall() {
       <Card>
         <CardHeader><CardTitle className="text-base">{t('conv.org_title')}</CardTitle></CardHeader>
         <CardContent>
-          <div className="grid gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             {CAMPS_ORG.map((c) => (
               <div key={c.clau}>
                 <p className="text-xs text-muted-foreground">{t(c.label)}</p>
@@ -583,6 +591,7 @@ export default function ConveniDetall() {
 
       {/* El visor de PDF. Una sola vez por pantalla. */}
       {descarregador.visor}
+      {dialegConfirma}
     </div>
   )
 }

@@ -195,6 +195,31 @@ Deno.serve(async (req) => {
       .from("productores").select("id, name, email").eq("id", productorId).maybeSingle();
     if (!productor) return responder({ error: "Productor no trobat" }, 404);
 
+    // El convenio que exige ESTA modalidad a quien entrega (28-09-2026). Hasta hoy solo lo
+    // comprobaba la pantalla: la oferta se publicaba igual y el choque llegaba al aprobar el
+    // primer interés, con la oferta ya circulando. `exigir_convenio()` es la misma regla que
+    // usan `aprovar_resposta()` y `manifestar_interes()`: antes de la fecha de corte avisa (y
+    // aquí no se hace nada con el aviso), desde la fecha de corte levanta 42501.
+    // ⚠️ El alta ASISTIDA no pasa por aquí: el equipo resuelve el convenio en la fase 1 del
+    //    ciclo guiado, con la persona delante (§6ter).
+    if (!ctx.esIntern) {
+      const modalitat = String((datos as Record<string, unknown>).modalitat ?? "");
+      const { error: errConv } = await supabase.rpc("exigir_convenio", {
+        p_tipo: "productor", p_org: productorId, p_valorizacion: modalitat, p_parte: "entrega",
+      });
+      if (errConv?.code === "42501") {
+        // La CLAVE i18n como mensaje: la pantalla la traduce con `textError()`.
+        return responder({
+          error: modalitat === "donacio" ? "po.cal_conveni_don" : "po.cal_conveni_com",
+          code: "sense_conveni",
+        }, 403);
+      }
+      if (errConv) {
+        console.error("crear-oferta: exigir_convenio:", errConv.message);
+        return responder({ error: "c.error" }, 500);
+      }
+    }
+
     // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
     // equipo en su nombre, que es el modelo de operación del servicio (§1bis) y a la
     // hora de leer los datos no es lo mismo que si la hubiera publicado él.

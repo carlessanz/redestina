@@ -192,7 +192,7 @@ export default function Albarans() {
           onChange={(e) => setCerca(e.target.value)}
         />
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!carregant && !error && (
           <Tabs value={tab} onValueChange={(v) => setParams(v === 'tots' ? {} : { tab: v }, { replace: true })}>

@@ -154,12 +154,12 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
           <CardTitle>{t('prod.title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('prod.subtitle')}</p>
         </div>
-        <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_m')}</Button>
+        <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_f')}</Button>
       </CardHeader>
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('prod.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-        {error && <p className="text-sm text-destructive">{error}</p>}
+        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{producers.length === 0 ? t('prod.empty') : t('prod.no_match')}</p>}
         {test.length > 0 && (
           <section className="space-y-2">

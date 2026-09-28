@@ -30,7 +30,7 @@ export default function ComFunciona() {
   const { t } = useT()
 
   return (
-    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
       {FASES_EQUIP.map((fase, i) => (
         <Card key={fase.clau}>
           <CardContent className="space-y-2 pt-6">

@@ -42,11 +42,12 @@ export default function QueTocaAra({
   // Una línea que resuelve a «—» (o a su propia clave, si faltara) no se pinta: un hueco en
   // blanco con su margen se lee como un fallo de carga. Las fichas del equipo usan `c.none`
   // justamente para dejar vacíos los huecos que su máquina de estados no llena.
-  // Los kilos con separador de miles («1.000», no «1000»). Solo a partir de 1.000: un
-  // contador `{n}` que vale 1 tiene que seguir siendo el número 1, que es lo que activa la
-  // variante en singular de la clave (§7).
+  // Los kilos con separador de miles («1.000», no «1000») y coma decimal («12,5», no
+  // «12.5»). Un entero por debajo de 1.000 se deja tal cual: un contador `{n}` que vale 1
+  // tiene que seguir siendo el número 1, que es lo que activa la variante en singular (§7).
   const varsFormatades = Object.fromEntries(Object.entries(punt.vars).map(([k, v]) => [
-    k, typeof v === 'number' && Math.abs(v) >= 1000 ? v.toLocaleString('ca-ES') : v,
+    k, typeof v === 'number' && (Math.abs(v) >= 1000 || !Number.isInteger(v))
+      ? v.toLocaleString('ca-ES', { maximumFractionDigits: 2 }) : v,
   ]))
 
   const text = (clau: string): string => {

@@ -19,14 +19,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function GestorWhitelist({
   titulo, ayuda, items, placeholderClave, placeholderEtiqueta, max, onAdd, onDelete,
-  addLabel, noneLabel,
+  addLabel, noneLabel, deleteLabel, motiuBloqueig,
 }: {
   titulo: string; ayuda: string; items: { clave: string; etiqueta: string | null }[]
   placeholderClave: string; placeholderEtiqueta: string; max: number
   addLabel: string; noneLabel: string
-  /** Devuelve el mensaje de error, o `null` si fue bien. */
+  /** Etiqueta accesible del aspa de cada fila (ya traducida). */
+  deleteLabel: string
+  /**
+   * Si viene, la lista es de solo lectura y esto dice por qué (ya traducido). Escribir exige
+   * `pot_aprovar()` (§4bis): un técnico la ve, pero sus altas y bajas las rechaza la base —
+   * las altas con un error y las bajas en silencio, con cero filas borradas—.
+   */
+  motiuBloqueig?: string
+  /** Devuelven el mensaje de error ya traducido, o `null` si fue bien. */
   onAdd: (clave: string, etiqueta: string) => Promise<string | null>
-  onDelete: (clave: string) => Promise<void>
+  onDelete: (clave: string) => Promise<string | null>
 }) {
   const [clave, setClave] = useState('')
   const [etiqueta, setEtiqueta] = useState('')
@@ -49,13 +57,20 @@ export default function GestorWhitelist({
                 <span className="break-all font-medium tabular-nums">{r.clave}</span>
                 <span className="break-words text-muted-foreground">{r.etiqueta ?? '—'}</span>
               </div>
-              <Button variant="ghost" size="icon" className="size-7" onClick={() => void onDelete(r.clave)}>
-                <X className="size-4" />
-              </Button>
+              {!motiuBloqueig && (
+                <Button variant="ghost" size="icon" className="size-7" aria-label={deleteLabel}
+                  onClick={async () => {
+                    const err = await onDelete(r.clave)
+                    setError(err)
+                  }}>
+                  <X className="size-4" />
+                </Button>
+              )}
             </div>
           ))}
         </div>
-        {items.length < max && (
+        {motiuBloqueig && <p className="text-xs text-aviso">{motiuBloqueig}</p>}
+        {!motiuBloqueig && items.length < max && (
           <div className="flex flex-wrap gap-2">
             <Input className="flex-1" placeholder={placeholderClave} value={clave}
               onChange={(e) => { setClave(e.target.value); setError(null) }} />
