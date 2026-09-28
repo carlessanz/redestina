@@ -347,6 +347,8 @@ const ca: Dict = {
   'c.email_action': 'Correu',
   // campos CRUD
   'f.name': 'Nom', 'f.empresa': 'Empresa', 'f.razon_social': 'Raó social',
+  'f.municipi': 'Municipi', 'f.tipo_entidad': 'Tipus d’entitat',
+  'rec.h_llocs': 'On es pot recollir el producte d’aquesta entitat. Es trien en publicar una oferta; un lloc que ja fa servir una oferta no es pot esborrar.',
   'f.perfil_receptor': 'Perfil del receptor', 'f.perfil_sense_tipus': 'Tria primer el tipus de receptor: els camps depenen d’ell.', 'f.phone': 'Telèfon (E.164 sense +, 34…)',
   'f.telefono_alt': 'Telèfon alternatiu', 'f.email': 'Correu', 'f.nif': 'NIF', 'f.direccion': 'Adreça',
   'f.codigo_postal': 'Codi postal', 'f.poblacion': 'Població', 'f.area_geografica': 'Àrea geogràfica',
@@ -2415,6 +2417,8 @@ const es: Dict = {
   'correu.sent': 'Correo enviado a {email}',
   'c.email_action': 'Correo',
   'f.name': 'Nombre', 'f.empresa': 'Empresa', 'f.razon_social': 'Razón social',
+  'f.municipi': 'Municipio', 'f.tipo_entidad': 'Tipo de entidad',
+  'rec.h_llocs': 'Dónde se puede recoger el producto de esta entidad. Se eligen al publicar una oferta; un lugar que ya usa una oferta no se puede borrar.',
   'f.perfil_receptor': 'Perfil del receptor', 'f.perfil_sense_tipus': 'Elige primero el tipo de receptor: los campos dependen de él.', 'f.phone': 'Teléfono (E.164 sin +, 34…)',
   'f.telefono_alt': 'Teléfono alternativo', 'f.email': 'Email', 'f.nif': 'NIF', 'f.direccion': 'Dirección',
   'f.codigo_postal': 'Código postal', 'f.poblacion': 'Población', 'f.area_geografica': 'Área geográfica',

@@ -15,6 +15,8 @@ import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import TargetaDiagnostic from '../../components/TargetaDiagnostic'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
+import LlocsRecollida from '../../components/LlocsRecollida'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 type Registre = Record<string, unknown> & { id: string }
 
@@ -100,11 +102,27 @@ export default function FitxaRegistre({ tabla }: Props) {
            y no en `avisos` porque es un apartado de trabajo con su propia tarjeta, no algo
            que haya que saber antes de tocar los campos. Como el resto, solo sobre una ficha
            que ya existe: en el alta no hay `id` del que colgar nada. */
-        <DocumentacioOrganitzacio
-          tipusOrg={esProductor ? 'productor' : 'entidad'}
-          orgId={id}
-          nom={(registre?.[esProductor ? 'name' : 'nombre'] as string | null) ?? null}
-        />
+        <>
+          {/* Los lugares de recogida, con el mismo componente que la ficha propia: cada lugar
+              es una fila de `productor_ubicaciones` y se guarda al momento, sin esperar al
+              «Desar» de la ficha. */}
+          {esProductor && (
+            <Card>
+              <CardHeader>
+                <CardTitle className="text-base">{t('org.sec_llocs')}</CardTitle>
+                <p className="mt-1 text-sm text-muted-foreground">{t('rec.h_llocs')}</p>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                <LlocsRecollida productorId={id} idPrefix="fitxa-lloc" />
+              </CardContent>
+            </Card>
+          )}
+          <DocumentacioOrganitzacio
+            tipusOrg={esProductor ? 'productor' : 'entidad'}
+            orgId={id}
+            nom={(registre?.[esProductor ? 'name' : 'nombre'] as string | null) ?? null}
+          />
+        </>
       ) : null}
       onSendMessage={(phone, name) => {
         void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))

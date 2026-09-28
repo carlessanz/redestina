@@ -13,6 +13,8 @@ export type CampoTipo =
   | 'list' // text[] separado por comas
   | 'select' // desplegable con opciones fijas (usa `opciones`)
   | 'perfil_receptor' // jsonb con los campos del tipo de receptor (CampsPerfilReceptor)
+  | 'tipus_empresa' // lista cerrada TIPUS_EMPRESA; conserva un valor antiguo de texto libre
+  | 'municipi' // codi INE del nomenclátor (SelectorMunicipi); el trigger rellena población y comarca
 
 export interface CampoDef {
   key: string
@@ -36,9 +38,12 @@ export const PRODUCTOR_CAMPOS: CampoDef[] = [
   { key: 'nif', label: 'f.nif' },
   { key: 'direccion', label: 'f.direccion' },
   { key: 'codigo_postal', label: 'f.codigo_postal' },
+  // El municipio de la lista oficial: al guardarlo, el trigger `*_municipi` escribe
+  // `poblacion` y `area_geografica` (la comarca). Los dos siguen editables a mano.
+  { key: 'municipio_ine', label: 'f.municipi', tipo: 'municipi' },
   { key: 'poblacion', label: 'f.poblacion' },
   { key: 'area_geografica', label: 'f.area_geografica' },
-  { key: 'tipo_empresa', label: 'f.tipo_empresa' },
+  { key: 'tipo_empresa', label: 'f.tipo_empresa', tipo: 'tipus_empresa' },
   { key: 'codigo', label: 'f.codigo' },
   { key: 'conveni', label: 'f.conveni' },
   { key: 'visitado', label: 'f.visitado' },
@@ -65,10 +70,13 @@ export const ENTIDAD_CAMPOS: CampoDef[] = [
   // Los campos propios del tipo (20270402100000). Los mismos que edita la organización en
   // «La meva organització»: el equipo los completa en el modelo asistido.
   { key: 'perfil_receptor', label: 'f.perfil_receptor', tipo: 'perfil_receptor', ancho: 'full' },
-  { key: 'area_geografica', label: 'f.area_geografica' },
-  { key: 'poblacion', label: 'f.poblacion' },
+  { key: 'tipo_entidad', label: 'f.tipo_entidad', tipo: 'tipus_empresa' },
   { key: 'direccion', label: 'f.direccion' },
   { key: 'codigo_postal', label: 'f.codigo_postal' },
+  // Como en la productora: el trigger rellena población y comarca a partir del municipio.
+  { key: 'municipio_ine', label: 'f.municipi', tipo: 'municipi' },
+  { key: 'poblacion', label: 'f.poblacion' },
+  { key: 'area_geografica', label: 'f.area_geografica' },
   { key: 'nif', label: 'f.nif' },
   { key: 'telefono', label: 'f.phone', tipo: 'tel' },
   { key: 'telefono2', label: 'f.telefono2', tipo: 'tel' },

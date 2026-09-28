@@ -1,5 +1,7 @@
 import { useState } from 'react'
 import CampsPerfilReceptor from './CampsPerfilReceptor'
+import SelectorMunicipi from './SelectorMunicipi'
+import { TIPUS_EMPRESA } from '../lib/perfilReceptor'
 import type { ReactNode } from 'react'
 import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -122,8 +124,9 @@ export default function RecordDetail({
       } else if (tp === 'boolnull') {
         v = v == null ? null : Boolean(v)
       } else if (tp === 'perfil_receptor') {
-        // Se guarda el objeto tal cual; vacío, null (la columna admite null).
-        v = v && typeof v === 'object' && Object.keys(v).length > 0 ? v : null
+        // Se guarda el objeto tal cual y, vacío, `{}`: la columna es `not null default '{}'`
+        // (20270402100000), así que un null haría fallar el guardado de la ficha entera.
+        v = v && typeof v === 'object' ? v : {}
       } else {
         const s = typeof v === 'string' ? v.trim() : v
         v = s === '' || s == null ? null : s
@@ -281,6 +284,29 @@ export default function RecordDetail({
             {(c.opciones ?? []).map((o) => (
               <SelectItem key={o} value={o}>{c.etiquetaOpcion ? t(`${c.etiquetaOpcion}${o}`) : o}</SelectItem>
             ))}
+          </SelectContent>
+        </Select>
+      )
+    }
+    if (tp === 'municipi') {
+      return (
+        <SelectorMunicipi id={id} valor={(v as string | null) ?? null}
+          onChange={(m) => set(c.key, m?.codi_ine ?? null)} />
+      )
+    }
+    if (tp === 'tipus_empresa') {
+      // Un valor de antes de la lista (texto libre del import) se conserva como opción propia:
+      // si no, el desplegable lo enseñaría vacío y se perdería al guardar. Igual que en
+      // `PerfilOrganitzacio`, y la RPC `tipus_empresa_valid()` lo acepta por lo mismo.
+      const val = (v as string | null) ?? ''
+      const llegat = val && !(TIPUS_EMPRESA as readonly string[]).includes(val) ? val : null
+      return (
+        <Select value={val === '' ? '__none' : val} onValueChange={(nv) => set(c.key, nv === '__none' ? null : nv)}>
+          <SelectTrigger id={id} className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">—</SelectItem>
+            {llegat && <SelectItem value={llegat}>{llegat}</SelectItem>}
+            {TIPUS_EMPRESA.map((te) => <SelectItem key={te} value={te}>{t(`org.te_${te}`)}</SelectItem>)}
           </SelectContent>
         </Select>
       )

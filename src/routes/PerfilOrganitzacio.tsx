@@ -40,18 +40,17 @@
 //      la ficha.
 
 import { useEffect, useMemo, useState } from 'react'
-import { Info, Plus, Trash2 } from 'lucide-react'
+import { Info } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
-import { creaUbicacio } from '../lib/ofertes'
 import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../lib/validacio'
 import { PERFIL_RECEPTOR, TIPUS_EMPRESA } from '../lib/perfilReceptor'
 import type { CampPerfil } from '../lib/perfilReceptor'
-import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from '../components/SelectorMunicipi'
+import LlocsRecollida from '../components/LlocsRecollida'
 import CampsPerfilReceptor from '../components/CampsPerfilReceptor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -149,8 +148,6 @@ function errorDe(c: Camp, valor: string): string | null {
   return null
 }
 
-interface Ubicacio { id: string; alias: string | null; municipio: string | null; gmaps_url: string | null }
-
 export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'entidad' }) {
   const { t } = useT()
   const waActiu = useWhatsappActiu()
@@ -162,8 +159,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [ubicacions, setUbicacions] = useState<Ubicacio[]>([])
-  const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
 
   const tabla = tipus === 'productor' ? 'productores' : 'entidades'
   const seccions = SECCIONS[tipus]
@@ -191,7 +186,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     setFila(null)
     setPerfil({})
     setErrors({})
-    setUbicacions([])
     setCanal('auto')
     setCanalDesat('auto')
     if (!idOrganitzacio) { setCarregant(false); return }
@@ -203,12 +197,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       setFila(f)
       setPerfil(((f?.perfil_receptor as Record<string, unknown> | null) ?? {}))
 
-      if (tipus === 'productor') {
-        const { data: ubis } = await supabase.from('productor_ubicaciones')
-          .select('id, alias, municipio, gmaps_url').eq('productor_id', idOrganitzacio).order('alias')
-        if (!viu) return
-        setUbicacions((ubis ?? []) as Ubicacio[])
-      }
 
       // La preferencia vive en la organización, no en la ficha (§4).
       const orgId = (f?.organizacion_id as string | null) ?? null
@@ -297,29 +285,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
 
     setDesant(false)
     toast.success(t('rec.saved'))
-  }
-
-  async function afegeixLloc() {
-    if (!organitzacio || !llocNou) return
-    if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
-    const r = await creaUbicacio({
-      productorId: organitzacio.id,
-      alias: llocNou.alias.trim(),
-      gmapsUrl: llocNou.maps.trim() || null,
-      municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
-    })
-    if (!r.ok || !r.data) { toast.error(r.error ?? t('c.error')); return }
-    setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null }])
-    setLlocNou(null)
-    toast.success(t('org.place_added'))
-  }
-
-  async function esborraLloc(u: Ubicacio) {
-    const { error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id)
-    // 23503: alguna oferta apunta a este lugar. No se borra: se diría que la oferta ya no
-    // tiene dónde recogerse.
-    if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : error.message); return }
-    setUbicacions((l) => l.filter((x) => x.id !== u.id))
   }
 
   if (!organitzacio) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
@@ -433,57 +398,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               <h3 className="text-base font-semibold">{t('org.sec_llocs')}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{t('org.h_llocs')}</p>
             </div>
-            {ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
-            <ul className="space-y-2">
-              {ubicacions.map((u) => (
-                <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
-                  <div className="min-w-0">
-                    <p className="font-medium">{u.alias ?? '—'}</p>
-                    <p className="text-xs text-muted-foreground">
-                      {u.municipio ?? '—'}
-                      {u.gmaps_url && <> · <a href={u.gmaps_url} target="_blank" rel="noreferrer" className="text-primary underline">{t('org.see_map')}</a></>}
-                    </p>
-                  </div>
-                  {potEditar && (
-                    <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => void esborraLloc(u)}
-                      aria-label={t('org.place_delete', { x: u.alias ?? '' })}>
-                      <Trash2 className="size-4" aria-hidden />
-                    </Button>
-                  )}
-                </li>
-              ))}
-            </ul>
-            {potEditar && !llocNou && (
-              <Button variant="outline" className="h-11 whitespace-normal md:h-9"
-                onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
-                <Plus className="size-4" aria-hidden /> {t('po.place_add')}
-              </Button>
-            )}
-            {llocNou && (
-              <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
-                <div>
-                  <Label htmlFor="org-lloc-nom" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_name')}</Label>
-                  <Input id="org-lloc-nom" value={llocNou.alias} placeholder={t('po.place_name_ph')}
-                    onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
-                </div>
-                <div>
-                  <Label htmlFor="org-lloc-municipi" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
-                  <SelectorMunicipi id="org-lloc-municipi" valor={llocNou.municipi?.codi_ine ?? null}
-                    onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
-                </div>
-                <div className="sm:col-span-2">
-                  <Label htmlFor="org-lloc-maps" className="mb-1.5 block text-xs text-muted-foreground">
-                    {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
-                  </Label>
-                  <Input id="org-lloc-maps" type="url" inputMode="url" value={llocNou.maps} placeholder="https://maps.app.goo.gl/…"
-                    onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
-                </div>
-                <div className="flex flex-wrap gap-2 sm:col-span-2">
-                  <Button className="h-11 whitespace-normal md:h-9" onClick={() => void afegeixLloc()}>{t('po.place_save')}</Button>
-                  <Button variant="ghost" className="h-11 md:h-9" onClick={() => setLlocNou(null)}>{t('c.cancel')}</Button>
-                </div>
-              </div>
-            )}
+            <LlocsRecollida productorId={organitzacio.id} potEditar={potEditar} idPrefix="org-lloc" />
           </section>
         )}
 
