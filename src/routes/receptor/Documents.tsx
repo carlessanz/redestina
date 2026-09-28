@@ -189,6 +189,13 @@ export default function ReceptorDocuments() {
                 </div>
                 <p className="mt-3 text-xs text-muted-foreground">
                   {t('entdoc.kg_ops', { n: acumulat.operacions })}
+                  {/* Una operación conciliada sin albarán de entrega visible (la conciliación
+                      retroactiva de datos anteriores, o un albarán que se quedó en borrador)
+                      hacía que «3 entregues» no cuadrara con los 2 albaranes de abajo, sin
+                      ninguna explicación (28-09-2026). */}
+                  {acumulat.operacions > albarans.filter((a) =>
+                    a.estado === 'conciliado' && a.ejercicio === acumulat.ejercicio).length
+                    && ` ${t('entdoc.kg_ops_sense_albara')}`}
                 </p>
 
                 {/* 🔴 Lo pendiente de conciliar NO es oficial (D13), y hay que decirlo: si
