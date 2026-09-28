@@ -1280,7 +1280,13 @@ para registros de espigolada —la jornada ya tiene el suyo—: sin esa excepci�
 la entrada y la conciliación contaba dos veces.
 
 **`espigoladas`** agrupa una jornada de espigueo: sus registros son `excedentes` con
-`origen='espigolament'` y su REC cuelga de `espigolada_id`. Desde `20260921221806` guarda además
+`origen='espigolament'` y su REC cuelga de `espigolada_id`.
+✅ **Se cierra sola** (`20270406100300`, 28-09-2026): el trigger `canalizaciones_estat_espigolada`
+pasa la jornada a `tancada` cuando cada registro tiene canalizaciones que suman al menos su
+`kg_total` (`kg_confirmados`, la cuenta de la ficha) y la **reabre** si vuelve a quedar algo,
+porque `repartir_espigolada()` solo admite jornadas `oberta`. Por trigger y no dentro del reparto:
+las canalizaciones se tocan desde más de un camino. `recalcula_estat_espigolada()` no la puede
+llamar nadie con sesión (el arnés lo vigila). Antes nada escribía `tancada`. Desde `20260921221806` guarda además
 **`oferta_origen_id`**: de qué oferta «producte al camp» nació, cuando nació de una.
 🔴 **Con `on delete set null`, y no es estilo**: `borrar_ficha_completa()` borra `excedentes`
 **antes** que `espigoladas`, así que con el `no action` por defecto la **única puerta de borrado de
@@ -5721,7 +5727,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 979/979 correctas y 28 saltadas, «Sin fallos de permisos»** (28-09-2026,
+   ✅ **Referencia HOY: 988/988 correctas y 28 saltadas, «Sin fallos de permisos»** (28-09-2026,
+   tras `20270406100300`: +9 de `recalcula_estat_espigolada`, denegada a las siete cuentas externas
+   y a las dos del equipo —la llama solo el trigger—). La anterior: **979/979** (28-09-2026,
    tras `20270406100000`: +5 de `exercici_dels_meus_tancaments`, permitida a las dos cuentas de
    productor y vacía para las tres de receptor). La anterior: **974/974 y 28 saltadas** (27-09-2026,
    tarde, tras `20270405100000`…`100200`: +10 —`fixar_foto_producte` denegada a las siete cuentas

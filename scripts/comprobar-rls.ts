@@ -698,6 +698,15 @@ const DOCUMENTAL_EXTERN: Check[] = [
     },
     descripcion: "NO crea ni converteix cap espigolada (nomes l'equip)",
   },
+  // El cierre automático de la espigolada (20270406100300) lo hace un TRIGGER; la función
+  // que recalcula no la puede llamar nadie con sesión, ni el equipo (bloque de abajo).
+  {
+    tabla: "recalcula_estat_espigolada",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_espigolada: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO obre ni tanca espigolades a mà (ho fa el trigger)",
+  },
   // --- Certificat de recepcio (CR, 20260921223245 / 223246) ---
   // Nada de este circuito es de un externo: ni la tabla —que no tiene GRANT de escritura
   // para nadie— ni ninguna de sus acciones, todas de `pot_aprovar()`. Que la RECEPTORA vea
@@ -956,6 +965,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       p_excedente: "00000000-0000-0000-0000-000000000000",
     },
       descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
+    },
+    {
+      tabla: "recalcula_estat_espigolada",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_espigolada: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "NO obre ni tanca espigolades a mà (ho fa el trigger)",
     },
     // --- Certificat de recepcio (CR): el equipo LEE, y escribir es de `pot_aprovar()` ---
     {
@@ -1276,6 +1292,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
         p_excedente: "00000000-0000-0000-0000-000000000000",
       },
       descripcion: "pot convertir una oferta en espigolada (la guarda el deixa passar)",
+    },
+    {
+      tabla: "recalcula_estat_espigolada",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_espigolada: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "NO obre ni tanca espigolades a mà (ho fa el trigger)",
     },
     // --- Certificat de recepcio (CR). Todos contra un uuid inexistente o el ejercicio
     //     1999: miden la guarda de ROL y no dejan rastro. Emitir uno de verdad consumiría

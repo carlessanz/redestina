@@ -695,6 +695,11 @@ export function EspigoladaDetall() {
                 </div>
               )}
 
+              {/* Cerrada, la jornada ya no admite lotes (20270406100300: se cierra sola al
+                  repartir el último kilo), pero se dice por qué, en vez de no enseñar nada. */}
+              {espigolada.estado === 'tancada' && (
+                <p className="text-sm text-muted-foreground">{t('esp.all_distributed')}</p>
+              )}
               {espigolada.estado === 'oberta' && (
                 <>
                   {meus.map((l, i) => {
