@@ -3,9 +3,52 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
+import type { Plugin } from 'vite'
+import { gestiona } from './cortina/cortina.ts'
+
+/**
+ * La cortina de contraseña también en `npm run dev` (28-09-2026). En Vercel la pone
+ * `middleware.js`; Vite no lo ejecuta, así que aquí se engancha la MISMA función
+ * (`gestiona()`) al servidor de desarrollo. Así localhost se comporta como producción.
+ */
+function cortinaDev(): Plugin {
+  return {
+    name: 'redestina-cortina',
+    configureServer(server) {
+      server.middlewares.use(async (req, res, next) => {
+        try {
+          const cos = req.method === 'POST'
+            ? await new Promise<Buffer>((ok) => {
+              const trossos: Buffer[] = []
+              req.on('data', (t: Buffer) => trossos.push(t))
+              req.on('end', () => ok(Buffer.concat(trossos)))
+            })
+            : undefined
+          const capcaleres = new Headers()
+          for (const [k, v] of Object.entries(req.headers)) {
+            if (typeof v === 'string') capcaleres.set(k, v)
+            else if (Array.isArray(v)) capcaleres.set(k, v.join(', '))
+          }
+          const resposta = await gestiona(new Request(`http://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, {
+            method: req.method, headers: capcaleres, body: cos,
+          }))
+          if (resposta.headers.get('x-middleware-next') === '1') { next(); return }
+          res.statusCode = resposta.status
+          // En http://localhost la cookie `Secure` también vale (los navegadores lo tratan
+          // como origen seguro), así que no hace falta otra versión para desarrollo.
+          resposta.headers.forEach((v, k) => res.setHeader(k, v))
+          res.end(Buffer.from(await resposta.arrayBuffer()))
+        } catch (e) {
+          next(e)
+        }
+      })
+    },
+  }
+}
 
 export default defineConfig({
   plugins: [
+    cortinaDev(),
     react(),
     tailwindcss(),
     // PWA instalable. Dos decisiones que importan más que el resto:

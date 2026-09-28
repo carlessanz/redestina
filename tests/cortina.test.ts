@@ -6,6 +6,8 @@
 //    contraseña por entorno: `CORTINA_PROVA='…' npx vitest run tests/cortina.test.ts`.
 
 import { describe, it, expect } from 'vitest'
+import { readFileSync } from 'node:fs'
+import { empaqueta } from '../scripts/construir-cortina.mjs'
 import {
   COOKIE, RUTA_ENTRADA, destiSegur, esLliure, esTokenValid, gestiona, llegeixCookie,
   tokenDeContrasenya,
@@ -92,5 +94,14 @@ describe('la petición', () => {
     const token = cookie.split(';')[0].split('=')[1]
     const r2 = await gestiona(new Request(`${BASE}/`, { headers: { cookie: `${COOKIE}=${token}` } }))
     expect(r2.headers.get('x-middleware-next')).toBe('1')
+  })
+})
+
+describe('middleware.js', () => {
+  // Es un fichero GENERADO (Vercel no compilaba el .ts): si alguien toca cortina/*.ts y no lo
+  // regenera, producción seguiría con la cortina vieja sin que nada lo dijera.
+  it('está al día con cortina/cortina.ts', async () => {
+    const actual = readFileSync(new URL('../middleware.js', import.meta.url), 'utf8')
+    expect(actual, 'Executa: node scripts/construir-cortina.mjs').toBe(await empaqueta())
   })
 })

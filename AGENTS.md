@@ -513,7 +513,8 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
 ```text
 index.html                     Carga Sora e Inter (Google Fonts), theme-color verde
 vercel.json                    Rewrite de SPA (sin él, recargar una ruta profunda da 404)
-middleware.ts                  La CORTINA de contraseña delante de toda la web (Vercel, §9)
+middleware.js                  La CORTINA de contraseña (Vercel, §9). GENERADO por
+                               scripts/construir-cortina.mjs desde cortina/: no se edita a mano
 cortina/                       Su lógica (pura, con pruebas) y el logo que pinta (§9)
 vitest.config.ts               Config de las pruebas, aparte de vite.config.ts (§11)
 tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO debe ver
@@ -3898,7 +3899,7 @@ ni una página ni un fichero: ni la portada, ni `/login`, ni el bundle de JavaSc
 verde con el logo y un campo de contraseña; acertarla deja una cookie **`redestina_cortina`**
 de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
 
-- **La comprueba el SERVIDOR**, con Vercel Routing Middleware (`middleware.ts` en la raíz, que
+- **La comprueba el SERVIDOR**, con Vercel Routing Middleware (`middleware.js` en la raíz, que
   delega en `cortina/cortina.ts`, puro y con 12 pruebas en `tests/cortina.test.ts`). Una
   contraseña comprobada en el navegador viajaría dentro del bundle; y así el bundle —que con
   `VITE_ACCESSOS_TEST` lleva las contraseñas de las cuentas de prueba— tampoco se sirve.
@@ -3920,8 +3921,13 @@ de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
   contraseña, firma de convenio, confirmación de albarán, factura— y la página `/verificar` del
   sello **piden primero la contraseña**. Es lo que se pidió («que nadie pueda entrar»); para
   abrirlos a terceros habrá que retirar la cortina o eximir esas rutas.
-- ⚠️ **En `npm run dev` no corre** (Vite no conoce el middleware): la cortina solo existe en
-  Vercel, producción y previews.
+- **En `npm run dev` también sale**: el plugin `cortinaDev()` de `vite.config.ts` engancha la
+  misma `gestiona()` al servidor de desarrollo.
+- 🔴 **`middleware.js` es JavaScript ya empaquetado, no `.ts`, y no es estilo**: el primer
+  despliegue con `middleware.ts` FALLÓ en Vercel y producción se quedó en la versión anterior
+  sin que nada avisara (solo se ve porque la cortina no sale). Vercel compila el `.ts` con su
+  propio TypeScript, y este proyecto importa con extensión `.ts`. Tras tocar `cortina/`:
+  `node scripts/construir-cortina.mjs`; una prueba falla si se olvida.
 
 **Todo DATO exige una sesión de Supabase Auth.** Ya no hay lectura anónima: el
 `PasswordGate` cosmético se sustituyó por un login real con `signInWithPassword`, las políticas RLS

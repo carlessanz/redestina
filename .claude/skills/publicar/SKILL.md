@@ -229,12 +229,12 @@ Después, que el dominio sirva de verdad y el rewrite de SPA funcione:
 ```bash
 for r in / /login /admin /registre /panell; do
   printf "%-12s → %s\n" "$r" "$(curl -sS -o /dev/null -w '%{http_code}' -H 'Accept: text/html' "https://redestina.carlessanz.com$r")"
-done   # los cinco deben dar 401: es la CORTINA de contraseña (middleware.ts, AGENTS §9)
+done   # los cinco deben dar 401: es la CORTINA de contraseña (middleware.js, AGENTS §9)
 curl -sS -H 'Accept: text/html' https://redestina.carlessanz.com/ | grep -c 'name="contrasenya"'   # 1
 curl -sS -o /dev/null -w '%{http_code}\n' https://redestina.carlessanz.com/logo-email.png         # 200: libre
 ```
 
-⚠️ **Desde el 28-09-2026 la web entera está detrás de una contraseña** (`middleware.ts` +
+⚠️ **Desde el 28-09-2026 la web entera está detrás de una contraseña** (`middleware.js` +
 `cortina/cortina.ts`). Un 200 en `/` sin cookie es ahora un FALLO: significa que la cortina no
 se ha desplegado o no corre. Lo que hay detrás (rewrite de SPA, rutas profundas) se comprueba
 en el navegador tras entrar, no con curl. ⚠️ Y una petición cada vez: no en bucle (el

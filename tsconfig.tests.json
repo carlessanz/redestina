@@ -14,5 +14,5 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["tests", "vitest.config.ts", "cortina", "middleware.ts"]
+  "include": ["tests", "vitest.config.ts", "cortina", "scripts/construir-cortina.d.mts"]
 }

@@ -1,7 +1,7 @@
 // LA CORTINA: una contraseña delante de toda la web (28-09-2026, a petición del cliente).
 //
 // Mientras Redestina esté en pruebas, nadie que no la tenga puede ver ni una página ni un
-// fichero. La comprueba el SERVIDOR (Vercel Routing Middleware, `middleware.ts`), no el
+// fichero. La comprueba el SERVIDOR (Vercel Routing Middleware, `middleware.js`), no el
 // navegador: una contraseña comprobada en JavaScript viaja dentro del propio bundle y la lee
 // cualquiera. Y como la cortina va delante de todo, tampoco se sirve ese bundle —que con
 // `VITE_ACCESSOS_TEST` lleva las contraseñas de las cuentas de prueba— a quien no la tenga.
