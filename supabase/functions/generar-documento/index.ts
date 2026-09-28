@@ -44,6 +44,9 @@ import { renderCr } from "../_shared/pdf/render/cr.ts";
 import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
+import { composaCorreuDocument } from "../_shared/correu-document.ts";
+import { destinatariosPrueba, enLlistaCorreuTest, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
+import { plantillaEmail, sendEmail } from "../_shared/resend.ts";
 
 // Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
 // resuelve el esquema a `never` y las llamadas dejan de compilar (misma nota que en
@@ -196,6 +199,13 @@ Deno.serve(async (req) => {
     });
     if (errMarca) throw new Error(`marcar_documento_generado: ${errMarca.message}`);
 
+    // El correo con el PDF adjunto (deuda §12.129). DESPUÉS de marcarlo generado y fuera
+    // del `try` del render: un correo que falla no puede dejar el documento en `error`,
+    // porque el documento existe y está bien. Solo corre cuando el fichero se genera por
+    // primera vez —la idempotencia de arriba corta antes—, así que los documentos que ya
+    // existían el día que se estrenó esto no se reenvían de golpe.
+    const correu = await enviaDocument(supabase, doc, bytes);
+
     // Desglose de CPU: el límite del runtime es 2 s por petición y el criterio de
     // salida del spike, 800 ms. Sin este log no hay forma de saber dónde se va.
     const traza = {
@@ -210,6 +220,7 @@ Deno.serve(async (req) => {
       ms_subida: Number(msSubida.toFixed(1)),
       ms_total: Number((performance.now() - t0).toFixed(1)),
       activos_en_frio: msActivos > 1,
+      correu,
     };
 
     // Por encima del presupuesto del spike, el mismo JSON pero en `warn`, para que se
@@ -354,6 +365,83 @@ async function plantillaDe(
   return fila
     ? { titulo: fila.titulo ?? null, cuerpo: fila.cuerpo, version: fila.version ?? null }
     : null;
+}
+
+/** Base64 de los bytes del PDF, por trozos: `String.fromCharCode(...bytes)` de golpe
+ *  revienta la pila con un fichero de unos cientos de KB. */
+function encodeBase64(b: Uint8Array): string {
+  let s = "";
+  for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
+  return btoa(s);
+}
+
+/** El PDF adjunto no puede pasar de aquí: Resend limita el correo a 40 MB y base64 infla un 33 %. */
+const MAX_ADJUNT_BYTES = 25 * 1024 * 1024;
+
+/**
+ * Manda el documento por correo a quien dice `documentos.envio`, con el PDF adjunto.
+ * Nunca lanza: devuelve qué pasó, para el log. Cada intento queda en `documento_envios`.
+ *
+ * Los gates, los de siempre (§8), y los dos, porque son cosas distintas:
+ * · documento de PRUEBA → `destinatariosPrueba()`: solo organizaciones `es_test` y el
+ *   buzón del equipo, esté como esté el modo test global.
+ * · documento REAL → con el modo test global activo, solo fichas `es_test`.
+ * · y en los dos, la lista blanca `email_test_recipients` si tiene filas.
+ */
+async function enviaDocument(
+  supabase: Cliente,
+  doc: FilaDocumento,
+  bytes: Uint8Array,
+): Promise<string> {
+  try {
+    const c = composaCorreuDocument({
+      tipo: doc.tipo,
+      subtipo: doc.subtipo,
+      objeto_tipo: doc.objeto_tipo,
+      numero_completo: doc.numero_completo,
+      ejercicio: doc.ejercicio,
+      idioma: doc.idioma,
+      modo: doc.modo,
+      envio: doc.envio as { destinatario?: string | null; nombre?: string | null } | null,
+    });
+    if (!c) return "no_s_envia";
+
+    if (doc.modo === "prueba") {
+      const r = await destinatariosPrueba(supabase, doc, [c.destinatari]);
+      if (r.permitidos.length === 0) return "bloquejat_prova";
+    } else if ((await modoTestActivo(supabase)) && !(await esEmailTest(supabase, c.destinatari))) {
+      return "bloquejat_mode_test";
+    }
+    if (!(await enLlistaCorreuTest(supabase, c.destinatari))) return "fora_llista_test";
+
+    const adjunt = bytes.length <= MAX_ADJUNT_BYTES;
+    const html = plantillaEmail({
+      titulo: c.titol,
+      preheader: c.preheader,
+      cuerpoHtml: c.cosHtml,
+      boton: { texto: c.boto, url: `${APP_URL}/login` },
+      nota: c.nota,
+      idioma: c.idioma,
+    });
+    const r = await sendEmail({
+      to: c.destinatari,
+      subject: c.assumpte,
+      html,
+      ...(adjunt ? { attachments: [{ filename: c.fitxer, content: encodeBase64(bytes) }] } : {}),
+    }, {
+      supabase,
+      proposito: "document",
+      documentoId: doc.id,
+      objetoTipo: doc.objeto_tipo,
+      objetoId: doc.objeto_id,
+      funcion: "generar-documento",
+    });
+    if (!r.ok) return "error";
+    return r.simulado ? "simulat" : adjunt ? "enviat" : "enviat_sense_adjunt";
+  } catch (e) {
+    console.error("generar-documento: correu:", doc.id, mensaje(e));
+    return "error";
+  }
 }
 
 /** Elige el renderizador por `tipo`. Un tipo desconocido es un error, no un vacío. */

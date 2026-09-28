@@ -194,3 +194,20 @@ export async function destinatariosPrueba(
   }
   return { permitidos, bloqueados, modoPrueba: true, bustiaEquip: equipo !== "" };
 }
+
+/**
+ * La lista blanca de correos de prueba (`email_test_recipients`, §4): si tiene filas, solo
+ * se escribe a las que están; vacía, no restringe. Es la misma regla que aplica
+ * `enviar-email`, sacada aquí para que la use también el envío de documentos
+ * (`generar-documento`, 28-09-2026). Fail-safe: si no se puede leer, bloquea.
+ */
+export async function enLlistaCorreuTest(supabase: Cliente, email: string): Promise<boolean> {
+  const { data: fila, error } = await supabase
+    .from("email_test_recipients").select("email").ilike("email", email.trim()).maybeSingle();
+  if (error) return false;
+  if (fila) return true;
+  const { count, error: errCount } = await supabase
+    .from("email_test_recipients").select("email", { count: "exact", head: true });
+  if (errCount) return false;
+  return (count ?? 0) === 0;
+}

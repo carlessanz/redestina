@@ -789,6 +789,7 @@ supabase/
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
+    _shared/correu-document.ts Qué dice el correo que acompaña a un documento emitido (puro, §4)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo
 docs/                          Material de trabajo local — IGNORADO POR GIT (§7)
   nuevas-funcionalidades/      Specs Redestina, manuales y CSV de origen
@@ -1090,6 +1091,33 @@ que editarlo en cada fase** —cuando la fase 3 cree `albaranes`, empieza a comp
 `created_at`. `canal` admite solo correo a propósito: un
 documento o un enlace de firma por WhatsApp quedaría publicado en la consola de Mensajería, que
 lee todo el equipo.
+
+**Envío de documentos por correo** (28-09-2026, cierra §12.129). `generar-documento`, en
+cuanto sube el PDF y lo marca generado, lo manda **adjunto** a `envio.destinatario`. Qué se
+dice lo decide `_shared/correu-document.ts` (puro, con 9 pruebas), según tipo, subtipo e idioma:
+
+| Documento | Se manda | Nota |
+| --- | --- | --- |
+| `CONV` firmado / contrafirmado | ✅ | «Hem rebut el teu conveni signat» / «El teu conveni ja és vigent» |
+| `RES`, `CD` (anual y a demanda), `CT`, `CR` | ✅ | El resumen **no pide la factura** (§12.127) |
+| `REC`/`ENT`/`OPE` y sus `R-` | ❌ | Se manda el ENLACE de confirmación, no el PDF (`enviaEnllacosConfirmacio`, cliente) |
+| `PLA`, `PROVA` | ❌ | El plan se descarga al momento; `envio` va a null |
+
+- **Gates** (§8): documento de prueba → `destinatariosPrueba()` (solo `es_test` y el buzón del
+  equipo); documento real → con el modo test activo, solo fichas `es_test`; y en los dos, la
+  lista `email_test_recipients` si tiene filas (`enLlistaCorreuTest()`, nueva en `gate.ts`).
+- **Solo al generar el fichero por primera vez**: la idempotencia (`fichero_at`) corta antes,
+  así que los documentos que ya existían el día del estreno **no se reenviaron**.
+- **Un correo que falla no marca el documento en `error`**: el documento está bien. Queda en
+  `documento_envios` (`proposito = 'document'`, con `documento_id`) y se ve en la pestaña
+  Enviaments de Documents. ⚠️ No hay reintento automático del correo ni botón de reenviar.
+- Por encima de 25 MB se manda sin adjunto (Resend limita a 40 MB y base64 infla un 33 %).
+- ✅ **Probado en producción el 28-09-2026**: un certificado de recepción de prueba
+  (`P-CR-2026-0001`, Obrador de Prova) se generó (3 páginas) y salió por Resend con el PDF
+  adjunto (`enviat`); un `PROVA` se generó igual (6 páginas, 123.621 bytes) y sin envío.
+  Retirados los dos después.
+- ⚠️ El aviso «conveni signat» de `enlace-publico` va ya **solo al equipo**: a quien firma le
+  llega su copia en PDF por aquí.
 
 **Buckets** (`20260928100600_storage_buckets.sql`) — `documentos` (privado, 20 MB,
 pdf/png/jpeg) y `activos` (privado, 5 MB, png/jpeg, para la firma y el sello de la apoderada).
@@ -2711,11 +2739,8 @@ modalidad, el precio mínimo ni la comprobación de convenio.
 Cada RPC del circuito llama ya a su `*_emet_document(...)` con su `envio` jsonb; el trigger
 `documentos_encola_generacion` llama a `generar-documento`, que genera el PDF. O sea que
 **si el equipo ejecuta las RPC reales, todo sale igual**.
-🔴 **Corregido el 28-09-2026: `generar-documento` NO manda ningún correo**, y esta frase decía
-que sí. `documentos.envio` se prepara al emitir y **no lo lee nadie**: ni albaranes, ni
-resúmenes, ni certificados salen por correo (deuda §12.129). Lo único que sí sale son los
-enlaces: el de firma del convenio y —desde ese mismo día— el de confirmación del albarán, los
-dos desde el cliente, que es quien tiene el token. El trabajo era otro: dar una
+✅ **Y desde el 28-09-2026 `generar-documento` sí manda el correo** (§12.129, cerrada): hasta
+ese día no lo hacía, y esta frase decía que sí. Ver «Envío de documentos por correo» en §4. El trabajo era otro: dar una
 puerta a los tres actos que no la tenían, que quedaran registrados como **asistidos** y no como
 otra cosa, y orquestarlo para que el atajo deje de ser el camino cómodo.
 
@@ -5132,8 +5157,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-⚠️ **28-09-2026: se abre la 129** (ningún documento sale por correo), así que son **46 vivas** y
-la siguiente entrada nueva es la 130.
+⚠️ **28-09-2026: se abre y se cierra la 129** (ningún documento salía por correo): siguen **45
+vivas** y la siguiente entrada nueva es la 130.
 ⚠️ **27-09-2026: se abren la 127** (el correo del resumen anual sigue pidiendo la factura) **y la
 128** (una canalización conciliada sin coste no se puede valorar después), así que son **45 vivas**
 y la siguiente entrada nueva es la 129. El párrafo de abajo es el recuento
@@ -5633,19 +5658,6 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
 
-129. 🔴 **Ningún documento sale por correo.** `documentos.envio` (destinatario, asunto, y en el
-     resumen el token de la factura) se prepara al emitir y **ninguna función lo lee**:
-     `generar-documento` solo genera el PDF, y no hay otro emisor. Medido el 28-09-2026 en
-     `documento_envios`: confirmaciones de oferta, mensajes, avisos al equipo, accesos y un
-     reset; ni un albarán, resumen o certificado. La organización los tiene en su panel
-     (Documents) y el equipo puede pasarlos a mano, pero **el resumen anual con su petición de
-     factura y el certificado no le llegan a nadie**. Arreglarlo es un emisor que, al pasar un
-     documento a `emitido`, mande `envio` con el PDF (enlace o adjunto) respetando
-     `destinatariosPrueba` (§8). Mientras tanto se apagó el recordatorio de factura al donante
-     (`RECORDA_FACTURES = false`), que reclamaba la factura de un resumen nunca enviado.
-     ⚠️ Y con la cortina de contraseña (§9), cualquier enlace que salga por correo pide antes
-     esa contraseña.
-
 128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
      análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
      el albarán entregado o confirmado, y `conciliacion_retroactiva()` rechaza las ya conciliadas,
@@ -5722,7 +5734,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **77** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **78** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -5822,15 +5834,17 @@ se va solo **cómo se llegó hasta aquí**.
 | 122 | El texto de WhatsApp imprimía `UBICACIÓ`/`HORARI RECOLLIDA`/`ENVASOS` vacíos y `MODALITAT` en minúscula | 22-09-2026 |
 | 123 | El alta de oferta solo validaba en el servidor, con un mensaje genérico sin decir qué campo faltaba | 22-09-2026 |
 | 99 | Los paneles externos listaban el plan solo por su PDF, sin enlace al diagnóstico y con el plan sustituido pintado «Emès» | 28-09-2026 |
+| 129 | Ningún documento salía por correo: `documentos.envio` se preparaba y no lo leía nadie | 28-09-2026 |
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.008 pruebas en 32 ficheros**: 1.007 correctas y **1 saltada a propósito**, la
+   Referencia: **1.017 pruebas en 33 ficheros**: 1.016 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
-   +17 de la cortina, `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
+   +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,
+   `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
    +4 de `opcionsVisibles`, las opciones del diagnóstico que derivan de otra respuesta. Antes, 987:
    +1 de la nota de la espigolada en pasado cuando la oferta ya está cerrada. Antes, 986:
    +3 de `estatEfectiuEnllac`, el estado REAL de un enlace —activo y vencido es caducado, porque la
