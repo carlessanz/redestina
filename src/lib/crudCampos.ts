@@ -29,8 +29,10 @@ export interface CampoDef {
 
 // productores (ver src/types.ts). id y created_at no se editan.
 export const PRODUCTOR_CAMPOS: CampoDef[] = [
-  { key: 'name', label: 'f.name' },
-  { key: 'empresa', label: 'f.empresa' },
+  // Las mismas etiquetas que «La meva organització»: `empresa` es el nombre de la
+  // organización y `name` la persona de contacto, que es como lo guarda `registro`.
+  { key: 'empresa', label: 'org.f_nom_comercial' },
+  { key: 'name', label: 'org.f_persona_contacte' },
   { key: 'razon_social', label: 'f.razon_social' },
   { key: 'phone', label: 'f.phone', tipo: 'tel' },
   { key: 'telefono_alt', label: 'f.telefono_alt', tipo: 'tel' },

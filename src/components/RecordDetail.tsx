@@ -30,6 +30,9 @@ interface Props {
   campos: CampoDef[]
   registro: Registro | null
   nombreKey: string
+  /** El campo que da nombre a la ficha en la cabecera, si no es `nombreKey`: en una
+   *  productora, `empresa` (el nombre comercial), con `name` de respaldo. */
+  titolKey?: string
   telefonoKey?: string
   /** Campo del correo de la ficha. Sin él no se ofrece «Correu». */
   emailKey?: string
@@ -60,7 +63,7 @@ interface Props {
 }
 
 export default function RecordDetail({
-  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, telefonoKey, emailKey, onBack, onSaved,
+  tipoKey, femenino, volverKey, tabla, campos, registro, nombreKey, titolKey, telefonoKey, emailKey, onBack, onSaved,
   onSendMessage, avisos, seccions,
 }: Props) {
   const { t } = useT()
@@ -169,7 +172,7 @@ export default function RecordDetail({
 
   async function borrar() {
     if (!registro) return
-    const nombre = String(form[nombreKey] ?? tipo)
+    const nombre = String((titolKey && form[titolKey]) || form[nombreKey] || tipo)
     const germana = await fitxaGermana()
     const tipusPropi: 'productor' | 'entidad' = tabla === 'productores' ? 'productor' : 'entidad'
 
@@ -340,7 +343,7 @@ export default function RecordDetail({
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div>
             <CardTitle>
-              {esNuevo ? (femenino ? t('rec.new_f', { x: tipo }) : t('rec.new', { x: tipo })) : String(form[nombreKey] ?? tipo)}
+              {esNuevo ? (femenino ? t('rec.new_f', { x: tipo }) : t('rec.new', { x: tipo })) : String((titolKey && form[titolKey]) || form[nombreKey] || tipo)}
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
               {esNuevo ? t('rec.alta') : t('rec.editing', { x: tipo })}

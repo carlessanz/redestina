@@ -2437,7 +2437,7 @@ jsonb y escriben solo las claves de su lista blanca (las `actualizar_mi_*` anter
 
 | Dato | Cómo |
 | --- | --- |
-| Nom comercial / Persona de contacte | Productor: **`empresa` / `name`** (así lo guarda `registro`: `name` es la persona). Entidad: `nombre` / `contacto`. Si `empresa` está vacío se sugiere `name` como placeholder, sin escribirlo |
+| Nom comercial / Persona de contacte | Productor: **`empresa` / `name`** (así lo guarda `registro`: `name` es la persona). Entidad: `nombre` / `contacto`. Si `empresa` está vacío se sugiere `name` como placeholder, sin escribirlo. ✅ **Desde el 28-09-2026 la ficha del equipo usa las mismas etiquetas** (`crudCampos`, `empresa` primero) y el **listado de productoras y la cabecera de la ficha enseñan `empresa || name`**, con la persona debajo si es otra (`RecordDetail.titolKey`). Las fichas de prueba `TEST-PROD-*` tenían la organización en `name` y `empresa` vacío: se copió a `empresa`, y `crear-usuarios-prueba.ts` ya la escribe. ⚠️ `id_excedente` sigue tomando sus tres letras de `name`: en una ficha del registro son las de la persona |
 | Raó social | `razon_social`, nueva en las dos fichas |
 | NIF, correo, teléfono, CP | **Validados antes de guardar** (`validacio.ts`, con pruebas): el NIF con su dígito de control, el teléfono normalizado a E.164 sin «+» (un móvil de 9 cifras recibe el 34). Es ayuda contra la errata, no seguridad: la RPC no valida el NIF |
 | Tipus d'empresa | Desplegable cerrado (`cooperativa`·`sl`·`sa`·`autonom`·`fundacio`·`associacio`·`altres`). La RPC acepta además **el valor que ya estaba** (texto libre del import): rechazarlo impediría guardar el resto |

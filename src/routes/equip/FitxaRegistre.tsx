@@ -58,6 +58,7 @@ export default function FitxaRegistre({ tabla }: Props) {
       campos={esProductor ? PRODUCTOR_CAMPOS : ENTIDAD_CAMPOS}
       registro={registre}
       nombreKey={esProductor ? 'name' : 'nombre'}
+      titolKey={esProductor ? 'empresa' : undefined}
       telefonoKey={esProductor ? 'phone' : 'telefono'}
       emailKey="email"
       onBack={() => navigate(llista)}
@@ -120,7 +121,7 @@ export default function FitxaRegistre({ tabla }: Props) {
           <DocumentacioOrganitzacio
             tipusOrg={esProductor ? 'productor' : 'entidad'}
             orgId={id}
-            nom={(registre?.[esProductor ? 'name' : 'nombre'] as string | null) ?? null}
+            nom={((esProductor ? (registre?.empresa || registre?.name) : registre?.nombre) as string | null) ?? null}
           />
         </>
       ) : null}

@@ -126,6 +126,10 @@ async function asseguraOrg(org: Org): Promise<string | null> {
 
   const fila: Record<string, unknown> = {
     [campoNombre]: org.nombre,
+    // En una productora el nombre de la organización es `empresa` («Nom comercial»), y
+    // `name` la persona de contacte, igual que lo guarda `registro` (28-09-2026). Sin persona
+    // conocida, `name` repite el nombre: es obligatorio.
+    ...(org.tipo === "productor" ? { empresa: org.nombre } : {}),
     codigo: org.codigo,
     poblacion: org.poblacion,
     area_geografica: org.area,

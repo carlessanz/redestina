@@ -44,7 +44,10 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
       .then(({ data, error: loadError }) => {
         if (cancelled) return
         if (loadError) setError(loadError.message)
-        else setProducers(data ?? [])
+        // Ordenado por el nombre que se ENSEÑA (el comercial, o `name` de respaldo), no
+        // por `name`, que en una productora es la persona de contacto.
+        else setProducers([...(data ?? [])].sort((x, y) =>
+          String(x.empresa || x.name || '').localeCompare(String(y.empresa || y.name || ''), 'ca')))
         setLoading(false)
       })
     return () => { cancelled = true }
@@ -100,12 +103,17 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
                 <TableRow key={p.id}>
                   <TableCell className="font-medium">
                     <span className="flex flex-wrap items-center gap-2">
-                      {p.name}
+                      {/* El nombre comercial, y si no hay, `name` (fichas antiguas o personas).
+                          La persona de contacto, debajo, solo si es otra cosa. */}
+                      {p.empresa || p.name}
                       {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
                       {/* Un alta rechazada se MARCA, no se esconde: el super_admin
                           llega a la ficha desde aquí y es quien la borra (§12.29). */}
                       {p.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
                       {sinContestar > 0 && <Badge variant="destructive">{t('prod.unanswered', { n: sinContestar })}</Badge>}
+                      {p.empresa && p.name && p.name !== p.empresa && (
+                        <span className="w-full text-xs font-normal text-muted-foreground">{p.name}</span>
+                      )}
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
@@ -123,7 +131,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
                       )}
                       <Button variant="outline" size="sm" disabled={!p.email}
                         title={p.email ? undefined : t('correu.no_email')}
-                        onClick={() => setCorreuA({ email: p.email, nom: p.name, tipus: 'productor', id: p.id })}>
+                        onClick={() => setCorreuA({ email: p.email, nom: p.empresa || p.name, tipus: 'productor', id: p.id })}>
                         {t('c.email_action')}
                       </Button>
                     </div>
