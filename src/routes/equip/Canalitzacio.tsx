@@ -40,24 +40,57 @@ import {
  */
 function fetsDeLaFila(l: LotActiu): FetsCanal {
   const canalitzats = Number(l.kg_canalitzats ?? 0)
+  // Los intereses que esperan aprobación (28-09-2026): sin ellos, un lote con uno pendiente
+  // salía «Envia l'oferta a les entitats». Los de una receptora sin su convenio van sin él,
+  // que es lo que hace que la escalera diga «conveni de la receptora», como la ficha.
+  const senseConveni = l.n_per_aprovar_sense_conveni ?? 0
+  const perAprovar = Array.from({ length: l.n_per_aprovar ?? 0 }, (_, i) => ({
+    id: 'p', entidad_id: null, entitat: '', estado: 'acceptada' as const,
+    aprovacio: 'pendent' as const, canalizacion_id: null,
+    conveni_rec: i < senseConveni ? null : { id: 'p', estado: 'vigent' as ConvenioEstado },
+  }))
+  // Enviada y sin respuesta: la distribución está hecha aunque nadie haya contestado.
+  const nConegudes = (canalitzats > 0 ? 1 : 0) + perAprovar.length
+  const enviades = (l.n_respostes ?? 0) > nConegudes
+    ? [{
+        id: 'e', entidad_id: null, entitat: '', estado: 'pendent' as const,
+        aprovacio: 'pendent' as const, canalizacion_id: null, conveni_rec: null,
+      }]
+    : []
   return {
-    oferta: { estado: l.estado as EstadoExcedente, kg_total: l.kg_total, origen: null },
+    oferta: { estado: l.estado as EstadoExcedente, kg_total: l.kg_total, origen: l.origen ?? null },
     conveni_gen: l.conveni_gen
       ? { id: 'x', estado: l.conveni_gen as ConvenioEstado }
       : null,
     // Una canalización ya creada implica que hubo interés aprobado: es lo único que el
     // resumen permite afirmar, y se afirma solo eso.
-    respostes: canalitzats > 0
-      ? [{
-          id: 'x', entidad_id: null, entitat: '', estado: 'acceptada',
-          aprovacio: 'aprovada', canalizacion_id: 'x',
-          conveni_rec: { id: 'x', estado: 'vigent' },
-        }]
+    respostes: [
+      ...(canalitzats > 0
+        ? [{
+            id: 'x', entidad_id: null, entitat: '', estado: 'acceptada' as const,
+            aprovacio: 'aprovada' as const, canalizacion_id: 'x',
+            conveni_rec: { id: 'x', estado: 'vigent' as ConvenioEstado },
+          }]
+        : []),
+      ...perAprovar,
+      ...enviades,
+    ],
+    // `kg_conciliados` no nulo = conciliada: es lo que mira `escalaCanal` para el cierre.
+    canalitzacions: canalitzats > 0
+      ? [{ id: 'x', kg_conciliados: l.tot_conciliat ? 1 : null, coste_kg: null }]
       : [],
-    canalitzacions: canalitzats > 0 ? [{ id: 'x', kg_conciliados: null, coste_kg: null }] : [],
-    albarans: l.rec_estado
-      ? [{ id: 'x', tipo: 'REC', estado: l.rec_estado as EstadoAlbaran, numero: null, canalizacion_id: null }]
-      : [],
+    albarans: [
+      ...(l.rec_estado
+        ? [{ id: 'x', tipo: 'REC' as const, estado: l.rec_estado as EstadoAlbaran, numero: null, canalizacion_id: null }]
+        : []),
+      // El de salida menos avanzado, que es a cuyo ritmo va la escalera (`avancSortides`).
+      ...(l.sortida_estado
+        ? [{
+            id: 's', tipo: (l.modalitat === 'donacio' ? 'ENT' : 'OPE') as 'ENT' | 'OPE',
+            estado: l.sortida_estado as EstadoAlbaran, numero: null, canalizacion_id: 'x',
+          }]
+        : []),
+    ],
     cost_falten: 0,
     exercici: null,
   }
@@ -159,7 +192,7 @@ export default function Canalitzacio() {
                           )}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
-                          {Number(l.kg_canalitzats ?? 0)} / {Number(l.kg_total ?? 0)}
+                          {Number(l.kg_canalitzats ?? 0).toLocaleString('ca-ES')} / {Number(l.kg_total ?? 0).toLocaleString('ca-ES')}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {l.n_per_aprovar > 0 && (

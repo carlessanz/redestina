@@ -53,6 +53,16 @@ export interface LotActiu {
   ents_pendents: number
   conveni_gen: string | null
   created_at: string | null
+  /** Desde `20270406100400`: sin ellos el índice no sabía nada de los albaranes de salida. */
+  origen?: string | null
+  /** El estado del albarán de salida (ENT/OPE) menos avanzado. */
+  sortida_estado?: string | null
+  /** Todas las canalizaciones del lote conciliadas; null si no hay ninguna. */
+  tot_conciliat?: boolean | null
+  /** Desde `20270406100500`: respuestas (envíos) del lote, contesten o no. */
+  n_respostes?: number | null
+  /** Intereses por aprobar de una receptora sin el convenio vigente que le toca. */
+  n_per_aprovar_sense_conveni?: number | null
 }
 
 export function lotsActius(limit = 200): Promise<ResultatRpc<LotActiu[]>> {

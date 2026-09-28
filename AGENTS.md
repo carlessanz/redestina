@@ -2697,6 +2697,15 @@ guiado se puede recorrer **entero**, certificado incluido. Lo decide
 ⚠️ **La fase del ÍNDICE es una aproximación honesta.** `canalitzacions_actives()` devuelve un
 resumen —no las respuestas ni los albaranes uno a uno—, así que la fila afirma solo lo que ese
 resumen permite afirmar y lo que no viene se deja **vacío**, nunca inventado. El detalle manda.
+✅ **Y desde el 28-09-2026 coincide con la ficha en los 12 lotes de prueba**, medido fila a fila
+(`20270406100400` y `…100500`). Antes discrepaba en cinco: no sabía nada de los albaranes de
+salida (una espigolada conciliada entera salía «Emet els albarans de sortida»), ni de los envíos
+sin respuesta, ni de los intereses por aprobar, y daba por bueno **cualquier** convenio del
+generador cuando una venta o maquila exige el `com`. La RPC devuelve ahora `origen`,
+`sortida_estado` (el ENT/OPE menos avanzado), `tot_conciliat`, `n_respostes` y
+`n_per_aprovar_sense_conveni`, y elige el convenio con `convenios_exigidos`, como
+`canalitzacio_assistida()`. El texto del paso de cierre se reescribió en condicional: bajo
+«Bloquejat» afirmaba que el lote «ja pot entrar» al cierre.
 
 🔴 **Y la pantalla es una CONVENCIÓN, NO UNA IMPOSICIÓN** (deuda §12.109). `authenticated`
 conserva escritura directa sobre `oferta_respuestas` y `canalizaciones`, así que los atajos de
