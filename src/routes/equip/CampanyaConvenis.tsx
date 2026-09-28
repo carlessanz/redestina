@@ -57,7 +57,7 @@ function clauDe(f: FitxaIncompleta): string {
 }
 
 export default function CampanyaConvenis() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [fitxes, setFitxes] = useState<FitxaIncompleta[]>([])
   const [resum, setResum] = useState<CampanyaFila[]>([])
   const [dataCorte, setDataCorte] = useState<string | null>(null)
@@ -169,6 +169,7 @@ export default function CampanyaConvenis() {
         cos: t('conv.mail_body'),
         boto: t('conv.mail_button'),
         nota: t('conv.mail_note'),
+        idioma: lang,
       })
       // El enlace ya existe aunque el correo no salga (modo test, dirección mala): eso no
       // es un fallo del convenio, es un fallo del envío, y se dice como tal para que el

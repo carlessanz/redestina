@@ -12,6 +12,7 @@
 // exactamente qué regla se ha incumplido) más una clave i18n de respaldo para lo genérico.
 
 import { supabase } from './supabase'
+import { enviarEmail } from './email'
 
 /** Resultado uniforme. `missatge` ya es texto listo para enseñar; `codi` es el SQLSTATE. */
 export type ResultatRpc<T> =
@@ -277,4 +278,44 @@ export function kg(valor: number | string | null | undefined): string {
   // `ca-ES` y no `es-ES`: la segunda no agrupa los números de cuatro cifras («1000»
   // junto a «1.720» de la portada, que ya usaba `ca-ES`).
   return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
+}
+
+/**
+ * Manda por correo los enlaces de confirmación que acaba de crear `marcar_entregado()`.
+ *
+ * HASTA EL 28-09-2026 NO LO HACÍA NADIE, y un comentario decía que «el correo lo manda el
+ * servidor por su cuenta»: la base no puede mandar correo y `generar-documento` no lo hace,
+ * así que quien recibía la mercancía no tenía forma de confirmarla salvo que el equipo le
+ * pasara el enlace a mano. El token en claro solo existe en este momento, en el cliente, así
+ * que el envío es de quien lo tiene — la misma decisión que el enlace de firma del convenio
+ * (`enviarCorreuConveni`). Los gates del modo test los aplica `enviar-email`.
+ */
+export async function enviaEnllacosConfirmacio(
+  numero: string | null,
+  enllacos: EnllacConfirmacio[],
+  t: (clau: string, params?: Record<string, string | number>) => string,
+  idioma: 'ca' | 'es',
+): Promise<{ enviats: number; fallits: number }> {
+  let enviats = 0
+  let fallits = 0
+  for (const e of enllacos) {
+    if (!e.destinatari) { fallits++; continue }
+    const r = await enviarEmail({
+      to: e.destinatari,
+      subject: t('alb.mail_subject', { num: numero ?? '' }),
+      text: t('alb.mail_body', { num: numero ?? '' }),
+      plantilla: {
+        titulo: t('alb.mail_title'),
+        preheader: t('alb.mail_preheader', { num: numero ?? '' }),
+        boton: { texto: t('alb.mail_button'), url: `${window.location.origin}/confirmar/${e.token}` },
+        nota: t('alb.mail_note'),
+        idioma,
+      },
+      proposito: 'confirmacio_albara',
+      objeto_tipo: 'albaran',
+    })
+    if (r.ok) enviats++
+    else fallits++
+  }
+  return { enviats, fallits }
 }

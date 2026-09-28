@@ -55,7 +55,7 @@ export async function confirmarOfertaPerCorreu(
       cuerpoHtml: `<p>Hola ${escaparHtml(productor.name ?? "")},</p>` +
         `<p>Hem registrat la teva oferta${producte ? ` de ${escaparHtml(producte)}` : ""} ` +
         `amb la referència <strong>${escaparHtml(idExcedente)}</strong>.</p>` +
-        `<p>L'equip de Redestina buscarà qui la pugui aprofitar i t'avisarem quan estigui canalitzada.</p>`,
+        `<p>L'equip de Redestina buscarà qui la pugui aprofitar. En pots seguir l'estat al teu panell, a «Les meves ofertes».</p>`,
       boton: { texto: "Veure les meves ofertes", url: `${appUrl()}/productor/ofertes` },
     }),
   }, {

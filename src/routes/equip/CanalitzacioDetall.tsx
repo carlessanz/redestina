@@ -37,7 +37,7 @@ import {
 } from '../../lib/canalitzacio'
 import { contrafirmarConveni, prepararConveni } from '../../lib/convenis'
 import type { ConvenioTipo, Excedente } from '../../types'
-import { marcarEntregat } from '../../lib/albarans'
+import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { supabase } from '../../lib/supabase'
@@ -92,7 +92,7 @@ const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
 }
 
 export default function CanalitzacioDetall() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
 
   const [fets, setFets] = useState<FetsCanal | null>(null)
@@ -610,7 +610,13 @@ export default function CanalitzacioDetall() {
                                 onClick={() => void fes(
                                   async () => {
                                     const r = await marcarEntregat(a.id)
-                                    return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
+                                    if (!r.ok) return { ok: false, missatge: r.missatge }
+                                    // Hasta el 28-09-2026 aquí se DESCARTABAN los enlaces: el
+                                    // token solo existe en esta respuesta, y nadie lo enviaba.
+                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, r.data.enllacos ?? [], t, lang)
+                                    if (correu.enviats > 0) toast.success(t('alb.mail_sent', { n: correu.enviats }))
+                                    if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
+                                    return { ok: true }
                                   },
                                   'canalz.ok_entregat',
                                 )}

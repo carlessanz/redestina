@@ -1957,44 +1957,59 @@ async function avisarFirma(
     const emailEquipo = (params?.email_equipo ?? "").trim();
     const modoTest = await modoTestActivo(supabase);
 
-    const destinos: string[] = [];
+    // DOS correos distintos, no uno para todos (28-09-2026): la persona que firma recibía el
+    // botón a `/equip/convenis`, una pantalla del equipo, y una nota que hablaba en plural
+    // del equipo. Ahora ella recibe su texto y su panel, y el equipo, el suyo.
+    const destinos: { to: string; perFirmant: boolean }[] = [];
     if (emailFirmante) {
-      if (!modoTest || (await esEmailTest(supabase, emailFirmante))) destinos.push(emailFirmante);
+      if (!modoTest || (await esEmailTest(supabase, emailFirmante))) destinos.push({ to: emailFirmante, perFirmant: true });
       else saltados.push(emailFirmante);
     }
-    if (emailEquipo && !destinos.includes(emailEquipo)) destinos.push(emailEquipo);
+    if (emailEquipo && emailEquipo !== emailFirmante) destinos.push({ to: emailEquipo, perFirmant: false });
     if (destinos.length === 0) return { enviados, saltados };
 
-    const cuerpo = `
+    const htmlEquip = plantillaEmail({
+      titulo: "Conveni signat",
+      preheader: `${numero} · ${nombreOrg}`.slice(0, 120),
+      cuerpoHtml: `
       <p>S'ha signat el conveni <strong>${escaparHtml(numero)}</strong> de
       <strong>${escaparHtml(nombreOrg)}</strong>.</p>
       <p>L'ha signat ${escaparHtml(firmante.nombre)}${
       firmante.cargo ? `, ${escaparHtml(firmante.cargo)}` : ""
     }.</p>
-      <p>Queda <strong>pendent de contrasignatura</strong> per part de la Fundació Espigoladors.
-      Quan es validi s'emetrà la versió definitiva del document, amb la signatura i el segell.</p>`;
-
-    const html = plantillaEmail({
-      titulo: "Conveni signat",
+      <p>Queda <strong>pendent de contrasignatura</strong>: valida'l des de la cua d'aprovacions.</p>`,
+      boton: { texto: "Contrasigna'l", url: `${APP_URL}/equip/aprovacions` },
+      nota: "Aquest avís arriba a la bústia de l'equip de Redestina cada vegada que una organització signa un conveni.",
+    });
+    const htmlFirmant = plantillaEmail({
+      titulo: "Hem rebut el teu conveni signat",
       preheader: `${numero} · ${nombreOrg}`.slice(0, 120),
-      cuerpoHtml: cuerpo,
-      boton: { texto: "Obre Redestina", url: `${APP_URL}/equip/convenis` },
-      nota:
-        "Rebeu aquest avís perquè heu signat aquest conveni o perquè formeu part de l'equip de Redestina.",
+      cuerpoHtml: `
+      <p>Hola ${escaparHtml(firmante.nombre)},</p>
+      <p>Hem rebut el conveni <strong>${escaparHtml(numero)}</strong> de
+      <strong>${escaparHtml(nombreOrg)}</strong> signat. Gràcies!</p>
+      <p>Ara l'ha de contrasignar la Fundació Espigoladors. Quan ho faci, el conveni quedarà
+      vigent i en podràs descarregar la versió definitiva des del teu panell.</p>`,
+      boton: { texto: "Entra al teu panell", url: `${APP_URL}/login` },
+      nota: "Has rebut aquest correu perquè has signat aquest conveni a Redestina.",
     });
 
-    for (const to of destinos) {
-      const r = await sendEmail({ to, subject: `Redestina · conveni signat ${numero}`, html }, {
+    for (const d of destinos) {
+      const r = await sendEmail({
+        to: d.to,
+        subject: d.perFirmant ? `Redestina · hem rebut el teu conveni ${numero}` : `Redestina · conveni signat ${numero}`,
+        html: d.perFirmant ? htmlFirmant : htmlEquip,
+      }, {
         supabase,
         proposito: "avis_firma",
         objetoTipo: "convenio",
         objetoId: conv.id,
         funcion: "enlace-publico",
       });
-      if (r.ok) enviados.push(to);
+      if (r.ok) enviados.push(d.to);
       else {
-        saltados.push(to);
-        console.error("enlace-publico: aviso de firma no enviado a", to, r.status, r.data);
+        saltados.push(d.to);
+        console.error("enlace-publico: aviso de firma no enviado a", d.to, r.status, r.data);
       }
     }
   } catch (e) {

@@ -17,6 +17,8 @@ export interface EmailPayload {
     preheader?: string
     boton?: { texto: string; url: string }
     nota?: string
+    /** El idioma del pie y del `lang` del correo. Sin él, catalán. */
+    idioma?: 'ca' | 'es'
   }
   /**
    * Traza del envío (`documento_envios`, deuda §12.25). Opcionales: sin ellos el servidor

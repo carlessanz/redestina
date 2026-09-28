@@ -86,6 +86,8 @@ const DIA_MS = 24 * 60 * 60 * 1000;
  * `recordatorios >= 2` es justo el filtro de la bandeja del equipo).
  */
 const HITOS_DIAS = [7, 14] as const;
+/** Los avisos de factura pendiente al donante (segundo bloque). Ver dónde se usa. */
+const RECORDA_FACTURES = false;
 
 /**
  * Dos avisos del mismo enlace no pueden ir seguidos. El caso que esto evita no es el
@@ -708,7 +710,15 @@ Deno.serve(async (req) => {
   // ---------------------------------------------------------------------------
   // Se calcula ANTES de mandar nada: el correo del equipo tiene que ser uno solo, con
   // las dos listas dentro, y para eso hay que tener las dos antes de escribirlo.
-  const facturas = await facturasPendientes(supabase, ahoraMs, modoTest, salta);
+  // 🔴 APAGADO desde el 28-09-2026. La factura ya no condiciona el certificado (21-09-2026),
+  //    el panel del productor dejó de ofrecer su subida (27-09-2026) y el resumen anual NO
+  //    se le envía a nadie por correo (deuda §12.129): este aviso reclamaba la factura de un
+  //    resumen que el donante nunca había recibido y le mandaba a subirla a un sitio donde
+  //    ya no se puede. Se deja el código, no la llamada: volver a encenderlo es decidir
+  //    antes qué pasa con la factura (deuda §12.127).
+  const facturas = RECORDA_FACTURES
+    ? await facturasPendientes(supabase, ahoraMs, modoTest, salta)
+    : { pendientes: [] as FacturaPendiente[], revisadas: 0, limitadas: 0 };
 
   // El tope de la ejecución sale como CAMPO PROPIO, no enterrado en `motivos` (deuda
   // §12.58). `limit_execucio` seguía ahí, pero en un diccionario de motivos junto a otros

@@ -96,6 +96,7 @@ Deno.serve(async (req) => {
       preheader?: string;
       boton?: { texto: string; url: string };
       nota?: string;
+      idioma?: string;
     };
     const contenido = typeof html === "string" ? html : bloquePreformateado(String(text));
     const htmlFinal = plantillaEmail({
@@ -103,6 +104,7 @@ Deno.serve(async (req) => {
       preheader: opciones.preheader,
       boton: opciones.boton,
       nota: opciones.nota,
+      idioma: opciones.idioma === "es" ? "es" : "ca",
       cuerpoHtml: contenido,
     });
 

@@ -89,7 +89,7 @@ function valor(o: Record<string, unknown> | null, clau: string): string {
 }
 
 export default function ConveniDetall() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
 
@@ -209,6 +209,7 @@ export default function ConveniDetall() {
       cos: t('conv.mail_body'),
       boto: t('conv.mail_button'),
       nota: t('conv.mail_note'),
+      idioma: lang,
     })
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge ?? t('conv.mail_error')); return }

@@ -281,6 +281,8 @@ export async function enviarCorreuConveni(camps: {
   cos: string
   boto: string
   nota: string
+  /** El idioma de la pantalla, que es el del texto: el pie del correo va en el mismo. */
+  idioma?: 'ca' | 'es'
 }): Promise<{ ok: boolean; missatge: string | null }> {
   const res = await enviarEmail({
     to: camps.email,
@@ -291,6 +293,7 @@ export async function enviarCorreuConveni(camps: {
       preheader: camps.preheader,
       boton: { texto: camps.boto, url: urlSignatura(camps.token) },
       nota: camps.nota,
+      idioma: camps.idioma,
     },
   })
   if (res.ok) return { ok: true, missatge: null }

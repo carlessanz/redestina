@@ -294,12 +294,31 @@ export interface PlantillaOpciones {
   boton?: Boton;
   /** Nota final dentro de la tarjeta (letra pequeña). */
   nota?: string;
+  /**
+   * El idioma del pie, de la línea legal y del `lang`. Catalán por defecto: los correos
+   * del servidor están en catalán. Sin esto, un correo en castellano —el del convenio, que
+   * sale del idioma de la pantalla— acababa con el pie en catalán (28-09-2026).
+   */
+  idioma?: "ca" | "es";
 }
+
+const PEU: Record<"ca" | "es", { lema: string; motiu: string }> = {
+  ca: {
+    lema: "aprofitament d'excedents agrícoles",
+    motiu: "Has rebut aquest correu perquè formes part de la xarxa de Redestina, el servei de canalització d'excedents de la Fundació Espigoladors.",
+  },
+  es: {
+    lema: "aprovechamiento de excedentes agrícolas",
+    motiu: "Has recibido este correo porque formas parte de la red de Redestina, el servicio de canalización de excedentes de la Fundació Espigoladors.",
+  },
+};
 
 // Construye el correo completo. Maquetado con tablas y estilos en línea porque es
 // lo único que renderizan igual Gmail, Outlook y Apple Mail; nada de flex/grid.
 export function plantillaEmail(o: PlantillaOpciones): string {
   const APP_URL = appUrl();
+  const idioma = o.idioma === "es" ? "es" : "ca";
+  const peu = PEU[idioma];
   const LOGO_URL = `${APP_URL}/logo-email.png`;
   const preheader = o.preheader
     ? `<div style="display:none;max-height:0;max-width:0;opacity:0;overflow:hidden;mso-hide:all;font-size:1px;line-height:1px;color:${FONDO}">${
@@ -322,7 +341,7 @@ export function plantillaEmail(o: PlantillaOpciones): string {
     : "";
 
   return `<!doctype html>
-<html lang="ca">
+<html lang="${idioma}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
@@ -363,7 +382,7 @@ ${preheader}
       <!-- Pie -->
       <tr><td bgcolor="${CREMA}" style="background:${CREMA};border-radius:0 0 16px 16px;padding:20px 32px">
         <p style="margin:0;font-family:${FUENTE};font-size:13px;line-height:1.6;color:${TEXTO}">
-          <strong>Redestina</strong> · aprofitament d'excedents agrícoles<br>
+          <strong>Redestina</strong> · ${peu.lema}<br>
           <a href="${APP_URL}" style="color:${TEXTO};text-decoration:underline">${
     APP_URL.replace(/^https?:\/\//, "")
   }</a>
@@ -373,7 +392,7 @@ ${preheader}
     </table>
 
     <p style="margin:16px 0 0;font-family:${FUENTE};font-size:11px;line-height:1.5;color:${SUAVE};max-width:600px">
-      Has rebut aquest correu perquè formes part de la xarxa de Redestina, el servei de canalització d'excedents de la Fundació Espigoladors.
+      ${peu.motiu}
     </p>
 
   </td></tr>

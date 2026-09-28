@@ -26,7 +26,7 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
-  marcarEntregat, propostaConciliacio, rectificarAlbara,
+  enviaEnllacosConfirmacio, marcarEntregat, propostaConciliacio, rectificarAlbara,
 } from '../../lib/albarans'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
@@ -178,7 +178,7 @@ function aDataHoraLocal(iso: string): string {
 }
 
 export default function AlbaraDetall() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { ctx } = useAppContext()
@@ -353,15 +353,18 @@ export default function AlbaraDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(res.missatge); return }
 
-    // El token en claro solo existe aquí. Se enseña como enlace copiable porque el modelo
-    // de Redestina es asistido (§1bis): hay confirmaciones que el dinamizador conduce por
-    // teléfono. El correo lo manda el servidor por su cuenta; esto es la vía asistida.
+    // El token en claro solo existe aquí. Se manda por correo a cada destinatario y,
+    // además, se enseña como enlace copiable, porque el modelo de Redestina es asistido
+    // (§1bis): hay confirmaciones que el dinamizador conduce por teléfono.
     const nous = (res.data.enllacos ?? []).map((e) => ({
       nom: e.nom || e.destinatari,
       url: `${window.location.origin}/confirmar/${e.token}`,
     }))
     setEnllacosNous(nous)
+    const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang)
     toast.success(t('alb.delivered', { n: nous.length }))
+    if (correu.enviats > 0) toast.success(t('alb.mail_sent', { n: correu.enviats }))
+    if (correu.fallits > 0) toast.warning(t('alb.mail_failed', { n: correu.fallits }))
     void refrescaComptadors()
     await carrega()
   }

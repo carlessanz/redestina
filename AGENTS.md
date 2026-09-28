@@ -1749,6 +1749,15 @@ en un paso aparte, justo por esto. Es el paso (4) de la función de arriba.
 por un `.delete()` suelto. Un borrado que se salte `borrar_ficha_completa()` vuelve a tener
 los tres comportamientos, así que **el panel y cualquier limpieza manual usan la RPC**.
 
+**Revisión de los correos del 28-09-2026**: la confirmación de albarán se manda por fin por
+correo (`enviaEnllacosConfirmacio`, desde `AlbaraDetall` y desde la pantalla guiada, que
+**descartaba** el enlace); el aviso de «conveni signat» son dos correos, uno para quien firma
+(a su panel) y otro para el equipo (a Aprovacions), en vez de mandar a quien firma a
+`/equip/convenis`; se retiraron dos promesas falsas («te n’enviarem una còpia en PDF»,
+«t’avisarem quan estigui canalitzada»); `plantillaEmail()` acepta `idioma` y el pie deja de salir
+en catalán en un correo en castellano; y el recordatorio de factura al donante queda apagado
+(§12.129).
+
 **Revisión de los PDF y del panel del 28-09-2026** (sin migraciones): en los albaranes, la
 columna «Motiu fora de circuit» se montaba sobre «Caixes» (ahora «Motiu»), la línea salía
 numerada «0» —el trigger crea las líneas con `ordre = 0`; ahora se numera por posición— y las
@@ -2700,8 +2709,13 @@ modalidad, el precio mínimo ni la comprobación de convenio.
 
 🔴 **Los documentos y los correos NO se construyen aquí, y ese es el hallazgo que ordena todo.**
 Cada RPC del circuito llama ya a su `*_emet_document(...)` con su `envio` jsonb; el trigger
-`documentos_encola_generacion` llama a `generar-documento`, que manda el correo por Resend. O
-sea que **si el equipo ejecuta las RPC reales, todo sale igual**. El trabajo era otro: dar una
+`documentos_encola_generacion` llama a `generar-documento`, que genera el PDF. O sea que
+**si el equipo ejecuta las RPC reales, todo sale igual**.
+🔴 **Corregido el 28-09-2026: `generar-documento` NO manda ningún correo**, y esta frase decía
+que sí. `documentos.envio` se prepara al emitir y **no lo lee nadie**: ni albaranes, ni
+resúmenes, ni certificados salen por correo (deuda §12.129). Lo único que sí sale son los
+enlaces: el de firma del convenio y —desde ese mismo día— el de confirmación del albarán, los
+dos desde el cliente, que es quien tiene el token. El trabajo era otro: dar una
 puerta a los tres actos que no la tenían, que quedaran registrados como **asistidos** y no como
 otra cosa, y orquestarlo para que el atajo deje de ser el camino cómodo.
 
@@ -5118,6 +5132,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **28-09-2026: se abre la 129** (ningún documento sale por correo), así que son **46 vivas** y
+la siguiente entrada nueva es la 130.
 ⚠️ **27-09-2026: se abren la 127** (el correo del resumen anual sigue pidiendo la factura) **y la
 128** (una canalización conciliada sin coste no se puede valorar después), así que son **45 vivas**
 y la siguiente entrada nueva es la 129. El párrafo de abajo es el recuento
@@ -5616,6 +5632,19 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      `emitir_resumen()` sigue acuñando el enlace `subida_factura` y el correo lo ofrece. No se
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
+
+129. 🔴 **Ningún documento sale por correo.** `documentos.envio` (destinatario, asunto, y en el
+     resumen el token de la factura) se prepara al emitir y **ninguna función lo lee**:
+     `generar-documento` solo genera el PDF, y no hay otro emisor. Medido el 28-09-2026 en
+     `documento_envios`: confirmaciones de oferta, mensajes, avisos al equipo, accesos y un
+     reset; ni un albarán, resumen o certificado. La organización los tiene en su panel
+     (Documents) y el equipo puede pasarlos a mano, pero **el resumen anual con su petición de
+     factura y el certificado no le llegan a nadie**. Arreglarlo es un emisor que, al pasar un
+     documento a `emitido`, mande `envio` con el PDF (enlace o adjunto) respetando
+     `destinatariosPrueba` (§8). Mientras tanto se apagó el recordatorio de factura al donante
+     (`RECORDA_FACTURES = false`), que reclamaba la factura de un resumen nunca enviado.
+     ⚠️ Y con la cortina de contraseña (§9), cualquier enlace que salga por correo pide antes
+     esa contraseña.
 
 128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
      análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
