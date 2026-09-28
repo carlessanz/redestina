@@ -26,6 +26,8 @@ export const COOKIE = 'redestina_cortina'
 export const DURADA_S = 7 * 24 * 60 * 60
 /** Adonde envía el formulario. No existe como página: lo contesta el middleware. */
 export const RUTA_ENTRADA = '/__cortina'
+/** Borra la cookie: la cortina vuelve a salir. */
+export const RUTA_SORTIDA = '/__cortina/surt'
 
 const SAL = 'redestina-cortina-v1'
 const VOLTES = 100_000
@@ -286,6 +288,20 @@ function continua(): Response {
  */
 export async function gestiona(req: Request): Promise<Response> {
   const url = new URL(req.url)
+
+  // Borrar la cookie y volver a ver la cortina. Existe para PROBARLA: el navegador integrado
+  // de la aplicación es compartido, y una prueba con la contraseña buena dejaba la cookie de
+  // una semana a quien lo abriera después, que «entraba sin contraseña» (28-09-2026).
+  if (url.pathname === RUTA_SORTIDA) {
+    return new Response(null, {
+      status: 303,
+      headers: {
+        location: '/',
+        'cache-control': 'no-store',
+        'set-cookie': `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`,
+      },
+    })
+  }
 
   if (url.pathname === RUTA_ENTRADA) {
     if (req.method !== 'POST') return Response.redirect(new URL('/', url), 303)

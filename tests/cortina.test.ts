@@ -9,7 +9,7 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { empaqueta } from '../scripts/construir-cortina.mjs'
 import {
-  COOKIE, COOKIE_IDIOMA, RUTA_ENTRADA, destiSegur, idiomaDe, esLliure, esTokenValid, gestiona, llegeixCookie,
+  COOKIE, COOKIE_IDIOMA, RUTA_ENTRADA, RUTA_SORTIDA, destiSegur, idiomaDe, esLliure, esTokenValid, gestiona, llegeixCookie,
   tokenDeContrasenya,
 } from '../cortina/cortina.ts'
 
@@ -122,5 +122,21 @@ describe('el idioma de la cortina', () => {
     expect(html).not.toContain('Accés restringit')
     expect(html).toContain('value="/login"')
     expect(r.headers.get('set-cookie')).toContain(`${COOKIE_IDIOMA}=es`)
+  })
+})
+
+describe('salir de la cortina', () => {
+  it('borra la cookie y vuelve a la portada, que pedirá la contraseña', async () => {
+    const r = await gestiona(new Request(`${BASE}${RUTA_SORTIDA}`))
+    expect(r.status).toBe(303)
+    expect(r.headers.get('location')).toBe('/')
+    expect(r.headers.get('set-cookie')).toContain(`${COOKIE}=; Path=/; Max-Age=0`)
+  })
+  it('un POST con el campo vacío NO da cookie', async () => {
+    const r = await gestiona(new Request(`${BASE}${RUTA_ENTRADA}`, {
+      method: 'POST', body: new URLSearchParams({ contrasenya: '', desti: '/' }),
+    }))
+    expect(r.status).toBe(401)
+    expect(r.headers.get('set-cookie') ?? '').not.toContain(`${COOKIE}=`)
   })
 })

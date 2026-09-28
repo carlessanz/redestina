@@ -8,6 +8,7 @@ var HASH_TOKEN = "df8d7e4a9627eaf3650b2b5de6eff139fb2813c8f29f2e2bd9276a4ba89201
 var COOKIE = "redestina_cortina";
 var DURADA_S = 7 * 24 * 60 * 60;
 var RUTA_ENTRADA = "/__cortina";
+var RUTA_SORTIDA = "/__cortina/surt";
 var SAL = "redestina-cortina-v1";
 var VOLTES = 1e5;
 function esLliure(ruta) {
@@ -213,6 +214,16 @@ function continua() {
 }
 async function gestiona(req) {
   const url = new URL(req.url);
+  if (url.pathname === RUTA_SORTIDA) {
+    return new Response(null, {
+      status: 303,
+      headers: {
+        location: "/",
+        "cache-control": "no-store",
+        "set-cookie": `${COOKIE}=; Path=/; Max-Age=0; HttpOnly; Secure; SameSite=Lax`
+      }
+    });
+  }
   if (url.pathname === RUTA_ENTRADA) {
     if (req.method !== "POST") return Response.redirect(new URL("/", url), 303);
     const form = await req.formData().catch(() => null);
