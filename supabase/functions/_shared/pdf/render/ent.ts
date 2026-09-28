@@ -76,7 +76,9 @@ export async function renderEnt(
     { titulo: t.col.kg_confirmats, ancho: 13, alinear: "derecha" },
   ];
   const filas = lineas.map((l, i) => [
-    String(l.ordre ?? i + 1),
+    // La posición en el documento, no `ordre`: las líneas que crea el trigger nacen con
+    // `ordre = 0` y el PDF imprimía «0» como número de línea (28-09-2026).
+    String(i + 1),
     l.producte ?? "",
     l.varietat ?? "",
     entero(l.caixes),

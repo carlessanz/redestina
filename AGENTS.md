@@ -1735,6 +1735,15 @@ en un paso aparte, justo por esto. Es el paso (4) de la función de arriba.
 por un `.delete()` suelto. Un borrado que se salte `borrar_ficha_completa()` vuelve a tener
 los tres comportamientos, así que **el panel y cualquier limpieza manual usan la RPC**.
 
+**Revisión de los PDF y del panel del 28-09-2026** (sin migraciones): en los albaranes, la
+columna «Motiu fora de circuit» se montaba sobre «Caixes» (ahora «Motiu»), la línea salía
+numerada «0» —el trigger crea las líneas con `ordre = 0`; ahora se numera por posición— y las
+incidencias guardadas con la clave `descripcion` se imprimían como JSON crudo
+(`textoIncidencias()` acepta ya las dos lenguas). En el panel: la columna «Espera» de Albarans
+pasa a «Espera o data» (mezcla días y fechas), «Subtipus» de Documents a «Fase», el aviso de
+convenio distingue productora («publicar ofertes») de receptora («mostrar interès»), `/registre`
+pierde el único asterisco y la portada habla de tú en las dos tarjetas.
+
 ### Integridad
 
 Las tablas Redestina sí tienen foreign keys. Las de mensajería **no**: `productores`,

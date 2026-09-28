@@ -179,7 +179,7 @@ export default function Mercat() {
                 <Button
                   className="h-11 w-full sm:w-auto md:h-9"
                   disabled={bloqueja}
-                  title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+                  title={bloqueja ? t('avis_conv.bloquejat_rec') : undefined}
                   onClick={() => obre(o, 'interes')}
                 >{t('mk.interested')}</Button>
               )}
@@ -235,7 +235,7 @@ export default function Mercat() {
                 <Button
                   className="h-11 md:h-9"
                   disabled={bloqueja}
-                  title={bloqueja ? t('avis_conv.bloquejat') : undefined}
+                  title={bloqueja ? t('avis_conv.bloquejat_rec') : undefined}
                   onClick={() => setMode('interes')}
                 >{t('mk.interested')}</Button>
               )}

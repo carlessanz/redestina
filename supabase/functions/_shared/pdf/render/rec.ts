@@ -47,7 +47,9 @@ export async function renderRec(
     { titulo: t.col.kg_net, ancho: 10, alinear: "derecha" },
   ];
   const filas = lineas.map((l, i) => [
-    String(l.ordre ?? i + 1),
+    // La posición en el documento, no `ordre`: las líneas que crea el trigger nacen con
+    // `ordre = 0` y el PDF imprimía «0» como número de línea (28-09-2026).
+    String(i + 1),
     // La familia acompaña al producto en la misma casilla: como columna propia se
     // comería el ancho de las de kilos, que son las que hay que poder leer.
     l.familia ? `${l.producte ?? ""}\n${l.familia}` : (l.producte ?? ""),

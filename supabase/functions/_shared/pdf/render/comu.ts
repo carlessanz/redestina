@@ -354,7 +354,7 @@ const CA: Diccionario = {
     producte: "Producte",
     varietat: "Varietat",
     familia: "Família",
-    causa: "Motiu fora de circuit",
+    causa: "Motiu",
     caixes: "Caixes",
     tipus_caixa: "Tipus",
     kg_brut: "Kg bruts",
@@ -446,7 +446,7 @@ const ES: Diccionario = {
     producte: "Producto",
     varietat: "Variedad",
     familia: "Familia",
-    causa: "Motivo fuera de circuito",
+    causa: "Motivo",
     caixes: "Cajas",
     tipus_caixa: "Tipo",
     kg_brut: "Kg brutos",
@@ -644,17 +644,29 @@ export function textoIncidencias(valor: unknown): string {
     return valor
       .map((i) =>
         i && typeof i === "object"
-          ? String((i as Record<string, unknown>).texto ?? (i as Record<string, unknown>).descripcio ?? JSON.stringify(i))
+          ? textoDeObjeto(i as Record<string, unknown>)
           : String(i)
       )
       .filter(Boolean)
       .join(" · ");
   }
   if (typeof valor === "object") {
-    const o = valor as Record<string, unknown>;
-    return String(o.texto ?? o.descripcio ?? JSON.stringify(o));
+    return textoDeObjeto(valor as Record<string, unknown>);
   }
   return String(valor);
+}
+
+/**
+ * El texto de una incidencia en objeto. Acepta la clave en catalán y en castellano: el
+ * fixture y la confirmación escriben `descripcion`, y con solo `descripcio` el PDF imprimía
+ * el JSON en crudo (28-09-2026). Si no hay ninguna clave conocida, los valores de texto, y
+ * el JSON solo como último recurso.
+ */
+function textoDeObjeto(o: Record<string, unknown>): string {
+  const directo = o.texto ?? o.text ?? o.descripcio ?? o.descripcion ?? o.motiu ?? o.motivo;
+  if (typeof directo === "string" && directo.trim() !== "") return directo;
+  const textos = Object.values(o).filter((v): v is string => typeof v === "string" && v.trim() !== "");
+  return textos.length > 0 ? textos.join(" · ") : JSON.stringify(o);
 }
 
 // ---------------------------------------------------------------------------

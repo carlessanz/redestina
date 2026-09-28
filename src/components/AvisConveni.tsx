@@ -52,10 +52,13 @@ export default function AvisConveni() {
   const potSignar = estat !== 'firmat' && organitzacio !== null
   const tipusOrg = rolActiu === 'receptor' ? 'entidad' : 'productor'
 
+  // Lo que se bloquea depende del papel: una receptora no publica ofertas, muestra interés
+  // por ellas. El texto único decía «publicar ofertes» también a ella (28-09-2026).
+  const sufix = tipusOrg === 'entidad' ? '_rec' : ''
   const consequencia = bloqueja
-    ? t('avis_conv.bloquejat')
+    ? t(`avis_conv.bloquejat${sufix}`)
     : dataTall
-      ? t('avis_conv.des_de', { data: dataTall })
+      ? t(`avis_conv.des_de${sufix}`, { data: dataTall })
       : t('avis_conv.encara_no_bloqueja')
 
   const Icona = bloqueja ? AlertTriangle : FileSignature

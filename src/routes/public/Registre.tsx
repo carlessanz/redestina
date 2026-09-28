@@ -258,7 +258,9 @@ export default function Registre() {
                 elige de la lista real de municipios junto al domicilio y el código postal.
                 En la puerta había que teclearla a mano, sin validar, y corregirla igual. */}
             <div className="grid gap-2">
-              <Label htmlFor="tel">{t('reg.phone')} *</Label>
+              {/* Sin asterisco: todos los campos de esta pantalla son obligatorios, y marcar solo
+                  este hacía pensar que los demás no lo eran (design/DESIGN.md §6). */}
+              <Label htmlFor="tel">{t('reg.phone')}</Label>
               <Input id="tel" type="tel" inputMode="tel" value={telefon}
                 onChange={(e) => { setTelefon(e.target.value); setError(null) }}
                 autoComplete="tel" required />
