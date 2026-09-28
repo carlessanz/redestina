@@ -525,6 +525,7 @@ const ca: Dict = {
   'esp.distributed': '{n} lot(s) repartits. Cada un ja té el seu albarà d’entrega en esborrany.',
   'esp.need_lots': 'Cal com a mínim un lot amb entitat i quilos.',
   'esp.kg_line': '{total} kg · repartits {done} · queden {left}',
+  'esp.all_distributed': 'Ja està repartit tot: no queden quilos per a cap lot més.',
   'esp.created_1': 'Espigolada creada amb 1 registre i el seu albarà de recepció.',
   'esp.err_generic': 'No s’ha pogut fer. Torna-ho a provar.',
   // Convertir una oferta «producte al camp» en espigolada (F3)
@@ -2583,6 +2584,7 @@ const es: Dict = {
   'esp.distributed': '{n} lote(s) repartidos. Cada uno ya tiene su albarán de entrega en borrador.',
   'esp.need_lots': 'Hace falta como mínimo un lote con entidad y kilos.',
   'esp.kg_line': '{total} kg · repartidos {done} · quedan {left}',
+  'esp.all_distributed': 'Ya está todo repartido: no quedan kilos para ningún lote más.',
   'esp.created_1': 'Espigueo creado con 1 registro y su albarán de recepción.',
   'esp.err_generic': 'No se ha podido hacer. Inténtalo de nuevo.',
   // Convertir una oferta «producto en el campo» en espigueo (F3)

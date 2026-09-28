@@ -494,6 +494,10 @@ export function EspigoladaDetall() {
   const [registres, setRegistres] = useState<RegistreFila[]>([])
   const [albarans, setAlbarans] = useState<AlbaraFila[]>([])
   const [repartit, setRepartit] = useState<Record<string, number>>({})
+  // Cada entrega (canalización) con su entidad y sus kilos, para decir a quién fue cada ENT.
+  const [lliurats, setLliurats] = useState<Record<string, { entidad_id: string | null; kg: number }>>({})
+  // Quién y dónde: la ficha no decía ni la productora ni la finca de la jornada.
+  const [origen, setOrigen] = useState<{ productor: string | null; lloc: string | null }>({ productor: null, lloc: null })
   const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
   const [lots, setLots] = useState<LotForm[]>([])
   const [carregant, setCarregant] = useState(true)
@@ -522,17 +526,35 @@ export function EspigoladaDetall() {
         .select('id, tipo, numero_completo, estado, excedente_id, canalizacion_id')
         .or(`espigolada_id.eq.${id}${ids.length ? `,excedente_id.in.(${ids.join(',')})` : ''}`),
       ids.length
-        ? supabase.from('canalizaciones').select('id, excedente_id, kg_confirmados').in('excedente_id', ids)
+        ? supabase.from('canalizaciones').select('id, excedente_id, entidad_id, kg_confirmados, kg_reales').in('excedente_id', ids)
         : Promise.resolve({ data: [] }),
     ])
     setAlbarans((alb.data as AlbaraFila[] | null) ?? [])
 
     const suma: Record<string, number> = {}
-    for (const c of (can.data ?? []) as { excedente_id: string | null; kg_confirmados: number | null }[]) {
+    const perCanal: Record<string, { entidad_id: string | null; kg: number }> = {}
+    for (const c of (can.data ?? []) as { id: string; excedente_id: string | null; entidad_id: string | null; kg_confirmados: number | null; kg_reales: number | null }[]) {
+      // Los kilos de la entrega: los reales si ya los hay, si no los asignados.
+      perCanal[c.id] = { entidad_id: c.entidad_id, kg: Number(c.kg_reales ?? c.kg_confirmados ?? 0) }
       if (!c.excedente_id) continue
       suma[c.excedente_id] = (suma[c.excedente_id] ?? 0) + Number(c.kg_confirmados ?? 0)
     }
     setRepartit(suma)
+    setLliurats(perCanal)
+
+    const esp = e as Espigolada
+    const [prod, ubi] = await Promise.all([
+      supabase.from('productores').select('name, empresa').eq('id', esp.productor_id).maybeSingle(),
+      esp.ubicacion_id
+        ? supabase.from('productor_ubicaciones').select('alias, municipio').eq('id', esp.ubicacion_id).maybeSingle()
+        : Promise.resolve({ data: null }),
+    ])
+    const p = prod.data as { name: string | null; empresa: string | null } | null
+    const u = ubi.data as { alias: string | null; municipio: string | null } | null
+    setOrigen({
+      productor: p ? (p.empresa || p.name) : null,
+      lloc: u ? [u.alias, u.municipio].filter(Boolean).join(' · ') : null,
+    })
     setCarregant(false)
   }, [id, t])
 
@@ -599,6 +621,15 @@ export function EspigoladaDetall() {
       <Card>
         <CardHeader><CardTitle className="text-base">{t('esp.summary')}</CardTitle></CardHeader>
         <CardContent className="grid gap-2 text-sm sm:grid-cols-2">
+          {origen.productor && (
+            <p>
+              {t('esp.producer')}:{' '}
+              <Link className="font-medium text-primary hover:underline" to={`/equip/productors/${espigolada.productor_id}`}>
+                {origen.productor}
+              </Link>
+            </p>
+          )}
+          {origen.lloc && <p>{t('esp.location')}: {origen.lloc}</p>}
           <p>{t('esp.volunteers')}: <span className="tabular-nums">{espigolada.num_voluntarios ?? '—'}</span></p>
           <p>{t('esp.ref')}: {espigolada.ref_externa ?? '—'}</p>
           {espigolada.notas && <p className="sm:col-span-2 text-muted-foreground">{espigolada.notas}</p>}
@@ -646,15 +677,21 @@ export function EspigoladaDetall() {
             <CardContent className="space-y-3">
               {entregues.length > 0 && (
                 <div className="space-y-1 text-sm">
-                  {entregues.map((a) => (
-                    <p key={a.id}>
-                      <Link className="underline" to={`/equip/albarans/${a.id}`}>
-                        {a.numero_completo ?? t('alb.no_number')}
-                      </Link>{' '}
-                      <Badge variant="outline">{a.tipo}</Badge>{' '}
-                      <Badge className={estilEstatAlbara(a.estado)}>{t(`alb.st_${a.estado}`)}</Badge>
-                    </p>
-                  ))}
+                  {entregues.map((a) => {
+                    // A quién fue y cuántos kilos: sin eso, la lista eran tres números de albarán.
+                    const l = a.canalizacion_id ? lliurats[a.canalizacion_id] : undefined
+                    const ent = l?.entidad_id ? entitats.find((e) => e.id === l.entidad_id)?.nombre : null
+                    return (
+                      <p key={a.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+                        <Link className="underline" to={`/equip/albarans/${a.id}`}>
+                          {a.numero_completo ?? t('alb.no_number')}
+                        </Link>
+                        {ent && <span>{ent}</span>}
+                        {l && <span className="tabular-nums text-muted-foreground">{kg(l.kg)} kg</span>}
+                        <Badge className={estilEstatAlbara(a.estado)}>{t(`alb.st_${a.estado}`)}</Badge>
+                      </p>
+                    )
+                  })}
                 </div>
               )}
 
@@ -696,10 +733,16 @@ export function EspigoladaDetall() {
                       </div>
                     )
                   })}
-                  <Button variant="outline" className="h-11 whitespace-normal md:h-9"
-                    onClick={() => afegeixLot(r.id)}>
-                    {t('esp.lot_add')}
-                  </Button>
+                  {/* Solo mientras quedan kilos: un lote más sobre una jornada ya repartida
+                      entera lo rechazaría la base, y el botón invitaba a intentarlo. */}
+                  {resta > 0
+                    ? (
+                      <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+                        onClick={() => afegeixLot(r.id)}>
+                        {t('esp.lot_add')}
+                      </Button>
+                    )
+                    : <p className="text-sm text-muted-foreground">{t('esp.all_distributed')}</p>}
                 </>
               )}
             </CardContent>
