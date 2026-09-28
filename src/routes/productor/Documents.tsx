@@ -35,6 +35,7 @@ import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
+import LlistaPlans from '../../components/documents/LlistaPlans'
 import DocumentsDeLEquip from '../../components/documents/DocumentsDeLEquip'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
@@ -268,7 +269,9 @@ export default function ProductorDocuments() {
                   <Dada etiqueta={t(d.tipo === 'transaccio' ? 'mydoc.f_kg_tx' : 'mydoc.f_kg')} valor={kg(d.kg_total)} />
                   {/* El importe es SUYO: aquí sí, y solo aquí. */}
                   {d.tipo !== 'transaccio' && <Dada etiqueta={t('mydoc.f_value')} valor={euros(d.valor_total)} />}
-                  <Dada etiqueta={t('mydoc.f_summary')} valor={d.resumen_numero ?? '—'} />
+                  {/* El CT no tiene resumen anual: no hay factura que pedir (la RPC lo niega,
+                      `20270301100100`). Un «Resum anual —» prometía un papel que no llegará. */}
+                  {d.tipo !== 'transaccio' && <Dada etiqueta={t('mydoc.f_summary')} valor={d.resumen_numero ?? '—'} />}
                   <Dada etiqueta={t('mydoc.f_certificate')} valor={d.certificado_numero ?? '—'} />
                 </div>
 
@@ -278,7 +281,7 @@ export default function ProductorDocuments() {
                     subirla hacía pensar que era obligatoria. */}
                 {/* Qué toca hacer ahora, dicho con palabras y no con un estado en inglés. */}
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {t(`mydoc.next_${d.estado}`)}
+                  {t(textSeguent(d))}
                 </p>
 
                 <div className="mt-3 flex flex-wrap gap-2">
@@ -357,15 +360,9 @@ export default function ProductorDocuments() {
         />
       )}
 
-      {/* --- Su plan de prevención. Se lista desde `documentos` y no desde
-              `planes_prevencion` porque no hay ninguna pantalla de planes todavía: lo
-              único que existe del plan es su PDF. --- */}
-      <LlistaDocuments
-        files={docsDe('plan')}
-        descarregador={descarregador}
-        titolKey="mydoc.pla_title"
-        buitKey="mydoc.pla_empty"
-      />
+      {/* --- Su plan de prevención: los PDF, con el sustituido marcado, y el enlace a la
+              pantalla del diagnóstico, que es donde el plan se trabaja. --- */}
+      <LlistaPlans files={docsDe('plan')} descarregador={descarregador} />
 
       {/* Lo que la Fundación guarda de esta organización y llegó de fuera: convenios
           firmados en papel, certificados de ejercicios anteriores, planes previos. Lo sube
@@ -376,6 +373,15 @@ export default function ProductorDocuments() {
       {descarregador.visor}
     </div>
   )
+}
+
+/** Qué toca ahora. En venta y maquila no hay resumen ni declaración de donación, así que
+    esos dos textos, escritos para el donante, dirían algo falso. */
+function textSeguent(d: Pick<Donant, 'tipo' | 'estado'>): string {
+  if (d.tipo === 'transaccio' && (d.estado === 'calculat' || d.estado === 'declarat')) {
+    return `mydoc.next_tx_${d.estado}`
+  }
+  return `mydoc.next_${d.estado}`
 }
 
 function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {

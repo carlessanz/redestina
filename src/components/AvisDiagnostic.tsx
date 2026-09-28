@@ -90,7 +90,7 @@ export default function AvisDiagnostic({ estat }: { estat: EstatDiagnostic | nul
           palabra por línea—; a 390 px, 120 px y 8 líneas. Con `w-full` el botón fuerza el
           salto, y desde `sm` vuelve a la derecha de la misma fila. */}
       <Button asChild size="sm" className="order-1 h-11 w-full shrink-0 whitespace-normal sm:order-none sm:ml-auto sm:h-8 sm:w-auto">
-        <Link to="/organitzacio/diagnostic">{t('diag.banner_go')}</Link>
+        <Link to="/organitzacio/diagnostic">{t(`diag.banner_go_${estat}`)}</Link>
       </Button>
       {/* 44 px de área táctil en móvil con `-m-2 p-2`, sin ocupar 44 px de ancho en la
           fila: el mismo truco de `AvisInstallacio`. */}

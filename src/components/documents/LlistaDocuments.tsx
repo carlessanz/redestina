@@ -41,7 +41,7 @@ const ESTIL_ESTAT: Record<DocumentoEstado, string> = {
 }
 
 export default function LlistaDocuments({
-  files, descarregador, titolKey, buitKey, descKey, extra,
+  files, descarregador, titolKey, buitKey, descKey, extra, substituit, accio,
 }: {
   files: DocFila[]
   descarregador: ReturnType<typeof useDescarregaDocument>
@@ -50,13 +50,21 @@ export default function LlistaDocuments({
   /** Una frase bajo el título que diga PARA QUÉ sirve la sección, si no es obvio. */
   descKey?: string
   extra?: (d: DocFila) => ReactNode
+  /** Un documento que sigue vigente como PDF pero cuyo objeto ya se sustituyó (un plan de
+      prevención reemplazado por otro): sin esto salía «Emès» igual que el bueno. */
+  substituit?: (d: DocFila) => boolean
+  /** Un enlace junto al título: a la pantalla donde ese documento se trabaja. */
+  accio?: ReactNode
 }) {
   const { t } = useT()
 
   return (
     <Card>
       <CardHeader>
-        <CardTitle className="text-base">{t(titolKey)}</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <CardTitle className="text-base">{t(titolKey)}</CardTitle>
+          {accio}
+        </div>
         {descKey && <p className="mt-1 text-sm text-muted-foreground">{t(descKey)}</p>}
       </CardHeader>
       <CardContent>
@@ -85,7 +93,9 @@ export default function LlistaDocuments({
                         {extra?.(d)}
                       </TableCell>
                       <TableCell>
-                        <Badge className={ESTIL_ESTAT[d.estado]}>{t(CLAU_ESTAT[d.estado])}</Badge>
+                        {substituit?.(d)
+                          ? <Badge className="bg-secondary text-secondary-foreground">{t('tan.ds_substituit')}</Badge>
+                          : <Badge className={ESTIL_ESTAT[d.estado]}>{t(CLAU_ESTAT[d.estado])}</Badge>}
                       </TableCell>
                       <TableCell className="whitespace-nowrap text-muted-foreground">
                         {dataCurta(d.emitido_at)}

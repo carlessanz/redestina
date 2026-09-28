@@ -24,6 +24,7 @@ import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
+import LlistaPlans from '../../components/documents/LlistaPlans'
 import DocumentsDeLEquip from '../../components/documents/DocumentsDeLEquip'
 import SegellRedestina from '../../components/documents/SegellRedestina'
 import CarregantSeccio from '../../components/CarregantSeccio'
@@ -257,14 +258,8 @@ export default function ReceptorDocuments() {
         <SegellRedestina codi={codiSegell} numero={docSegell?.numero_completo ?? null} />
       )}
 
-      {/* Se lista desde `documentos` porque no hay pantalla de planes: lo único que existe
-          del plan de prevención es su PDF. */}
-      <LlistaDocuments
-        files={docs.filter((d) => d.objeto_tipo === 'plan')}
-        descarregador={descarregador}
-        titolKey="mydoc.pla_title"
-        buitKey="mydoc.pla_empty"
-      />
+      {/* Sus PDF, con el sustituido marcado, y el enlace a la pantalla del diagnóstico. */}
+      <LlistaPlans files={docs.filter((d) => d.objeto_tipo === 'plan')} descarregador={descarregador} />
 
       {/* Lo que la Fundación guarda de esta organización y llegó de fuera: convenios
           firmados en papel, certificados de ejercicios anteriores, planes previos. Lo sube

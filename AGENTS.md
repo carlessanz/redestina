@@ -642,9 +642,10 @@ src/
                                misma elección en dos pantallas seguidas
     DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
                                mensajería cuando WhatsApp está apagado (§8)
-    documents/                 Las cuatro piezas que comparten los dos paneles externos:
+    documents/                 Las piezas que comparten los dos paneles externos:
                                PendentsDeTu (firmar/confirmar desde el panel), LlistaConvenis,
-                               LlistaDocuments y TaulaAlbarans (§6ter)
+                               LlistaDocuments, TaulaAlbarans y LlistaPlans (los PDF del plan,
+                               el sustituido marcado, y el enlace al diagnóstico; §6ter)
     proces/                    Lo que pinta el modelo del proceso en los TRES paneles:
                                PasosProces, QueTocaAra, LlegendaEstats, BlocPublicada,
                                BotoAmbMotiu y BadgeEstat (el estado simple de los paneles
@@ -2930,12 +2931,12 @@ mismo salvo los importes, y comparten los cuatro componentes de `src/components/
 | --- | --- | --- |
 | **Pendent de tu** (`PendentsDeTu`) | ✅ | ✅ |
 | Convenis (`LlistaConvenis`) | ✅ | ✅ |
-| Acumulado del año, factura y certificado | ✅ **con importe** | ❌ **por diseño** |
+| Acumulado del año, factura y certificado | ✅ **con importe** (venta y maquila, sin importe ni resumen anual: el CT no tiene) | ❌ **por diseño** |
 | Albarans (`TaulaAlbarans`) | REC | ENT y R-ENT |
 | Certificats a demanda (`cierre_periodo`) | ✅ | ❌ |
 | **Quilos rebuts de l'exercici** (`kg_rebuts_exercici()`) | ❌ | ✅ **leído en SQL**, no sumado en cliente |
 | **Certificats de recepció** (`cierre_receptor`) | ❌ | ✅ |
-| Pla de prevenció | ✅ | ✅ |
+| Pla de prevenció (`LlistaPlans`: el sustituido sale «Substituït», enlace al diagnóstico) | ✅ | ✅ |
 
 ⚠️ **Listar no necesitaba nada de base**: `documents_meus()` ya devolvía convenios, planes y
 certificados a demanda desde la fase 5, y **las pantallas los descartaban en silencio** (el
@@ -5399,19 +5400,6 @@ panel del equipo y en el externo).
     plegado— y no se repiten: son claves distintas. Lo que coincide es el TEXTO, y solo se vería
     en una cuenta que tuviera a la vez panel de equipo y de receptor, que hoy no existe (las de
     doble rol son productor+receptor).
-99. ✅ **Ya existe una pantalla de planes** — corregido el 22-09-2026, cuando el cuestionario de
-    diagnóstico llegó (F2, §1bis) y con él `src/components/PlaPrevencio.tsx`, que lee
-    `planes_prevencion` directamente vía `plaPerId()` (`src/lib/diagnosticApi.ts:99,116`). Se
-    monta en `src/routes/Diagnostic.tsx` (panel externo, `/organitzacio/diagnostic`) y en
-    `src/routes/equip/DiagnosticDetall.tsx` (equipo) — justo lo que esta entrada decía que no
-    existía «ni de equipo ni externa».
-    ⚠️ **Lo que sigue siendo cierto tal cual, y en los DOS paneles externos**:
-    `productor/Documents.tsx:388-396` y `receptor/Documents.tsx:248-249` siguen listando el plan
-    como una entrada de `documentos` (su PDF), con el mismo comentario literal —"no hay pantalla de
-    planes"— que ya no describe la realidad. Ninguno de los dos enlaza a la pantalla nueva. Queda
-    como deuda real, pero mucho más acotada de lo que decía el texto original: no falta la
-    pantalla, falta que estos dos listados enlacen a ella en vez de (o además de) mostrar el PDF.
-
 106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
      la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
      pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
@@ -5549,7 +5537,7 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **42 de las 49**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **41 de las 48**. Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -5595,7 +5583,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 71 · 77 · 84 | Los textos legales de RES, CD, CT, **CR**, PLA y los seis convenios | **La asesoría** |
 | **115** | El cuestionario de diagnóstico, sus 20 medidas y sus 32 reglas | **La fase 0** (anexo B). Mientras tanto se emite marcado como provisional, y el PDF lo dice |
 | 85 | Prueba end-to-end del CT | 🟡 **Ya no está bloqueada**: desde `20260921214526` el CT se emite en modo prueba (`P-CT`). Queda ejercitarlo, que es trabajo, no espera |
-| 99 | El plan de prevención se lista desde `documentos` y no desde `planes_prevencion` | **La fase 0**: sin el cuestionario (anexo B) no hay pantalla de planes, así que del plan solo existe su PDF |
 
 ### Son interruptores de producción, no código
 
@@ -5617,7 +5604,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **76** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **77** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -5716,6 +5703,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 121 | Seis pantallas tenían las etiquetas sin `htmlFor`/`id`: `FormulariNovaOferta`, `RecordDetail`, `DialegNovaOfertaAssistida`, `Mercat`, `CanalitzacioDetall`, `PerfilOrganitzacio` | 22-09-2026 |
 | 122 | El texto de WhatsApp imprimía `UBICACIÓ`/`HORARI RECOLLIDA`/`ENVASOS` vacíos y `MODALITAT` en minúscula | 22-09-2026 |
 | 123 | El alta de oferta solo validaba en el servidor, con un mensaje genérico sin decir qué campo faltaba | 22-09-2026 |
+| 99 | Los paneles externos listaban el plan solo por su PDF, sin enlace al diagnóstico y con el plan sustituido pintado «Emès» | 28-09-2026 |
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
 
 ## 13. Al terminar cualquier cambio
