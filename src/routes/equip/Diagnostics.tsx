@@ -141,7 +141,10 @@ export default function Diagnostics() {
                   <TableBody>
                     {visibles.map((f) => (
                       <TableRow key={`${f.tipo_org}-${f.org_id}`}>
-                        <TableCell className="max-w-56 truncate font-medium">
+                        {/* Parte en líneas en vez de cortar: con `truncate` el nombre salía
+                            «Comercial de Prova SL…» y la marca «Prova» desaparecía justo en
+                            los nombres largos (§2, regla 6: la celda hereda `nowrap`). */}
+                        <TableCell className="min-w-44 max-w-64 whitespace-normal font-medium">
                           {f.nom ?? '—'}
                           {f.es_test && (
                             <Badge variant="outline" className="ml-2">{t('diagl.test')}</Badge>

@@ -2869,6 +2869,12 @@ dos booleanos de la ficha apuntan a preguntas de selección múltiple. Donde no 
 propone nada**, y lo que sí se propone se marca como propuesto hasta que alguien lo toca: un valor
 sugerido que se queda sin revisar acaba siendo una respuesta que la persona no ha dado.
 
+✅ **Y el botón dice lo que falta** (28-09-2026): en la banda (`diag.banner_go_<estat>`) y en la
+tarjeta de la ficha (`TargetaDiagnostic`: «Fes-lo», «Continua», «Revisa i emet el pla», «Obre’l»).
+Antes las dos decían «fes el diagnòstic» con el diagnóstico ya contestado. La lista del equipo
+(`/equip/diagnostics`) ya no recorta los nombres: con el recorte, la marca «Prova» desaparecía
+justo en los largos.
+
 ⚠️ **Regenerar el plan se intenta SIN forzar**, y solo se pregunta cuando la base contesta
 `22023 mesures_editades`. Y **las obligatorias no llevan casilla de quitar**: la base rechaza la
 lista que las pierda, y ofrecer un control que va a fallar es peor que no ofrecerlo.

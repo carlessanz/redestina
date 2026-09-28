@@ -64,7 +64,9 @@ export default function TargetaDiagnostic({
   const fet = estat.estat === 'emes'
 
   return (
-    <Card className="border-border">
+    // `py-0`: el `Card` de shadcn trae `py-6` y el contenido ya lleva su `py-4`; sumados
+    // dejaban la tarjeta con el doble de aire que su vecina de certificados.
+    <Card className="border-border py-0">
       <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 items-start gap-3">
           <ClipboardList className="mt-0.5 size-5 shrink-0 text-muted-foreground" aria-hidden />
@@ -96,11 +98,19 @@ export default function TargetaDiagnostic({
           className="h-11 shrink-0 whitespace-normal md:h-9"
         >
           <Link to={desti}>
-            {t(fet ? 'diag.card_open' : 'diag.card_do')}
+            {t(clauBoto(estat.estat))}
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         </Button>
       </CardContent>
     </Card>
   )
+}
+
+/** El botón dice lo que queda por hacer: «Fes-lo» ante un plan a punto de emitir era falso. */
+function clauBoto(estat: DiagnosticEstat['estat']): string {
+  if (estat === 'incomplet') return 'diag.card_continue'
+  if (estat === 'a_punt') return 'diag.card_emit'
+  if (estat === 'emes') return 'diag.card_open'
+  return 'diag.card_do'
 }
