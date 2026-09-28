@@ -171,7 +171,7 @@ describe('el orden de las comprobaciones es la regla de negocio', () => {
     expect(escalaCanal(f).find((p) => p.pas === 'rec_emetre')!.estat).not.toBe('fet')
   })
 
-  it('sin coste del ejercicio, el cierre está bloqueado', () => {
+  it('sin coste por kilo, el cierre está bloqueado', () => {
     const f = { ...complet(), cost_falten: 1, exercici: { estado: 'obert', modo: 'real' } }
     const pas = escalaCanal(f).find((p) => p.pas === 'tancament')!
     expect(pas.estat).toBe('bloquejat')
