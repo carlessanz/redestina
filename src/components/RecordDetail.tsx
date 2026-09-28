@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import CampsPerfilReceptor from './CampsPerfilReceptor'
 import type { ReactNode } from 'react'
 import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -120,6 +121,9 @@ export default function RecordDetail({
         v = Boolean(v)
       } else if (tp === 'boolnull') {
         v = v == null ? null : Boolean(v)
+      } else if (tp === 'perfil_receptor') {
+        // Se guarda el objeto tal cual; vacío, null (la columna admite null).
+        v = v && typeof v === 'object' && Object.keys(v).length > 0 ? v : null
       } else {
         const s = typeof v === 'string' ? v.trim() : v
         v = s === '' || s == null ? null : s
@@ -280,6 +284,18 @@ export default function RecordDetail({
           </SelectContent>
         </Select>
       )
+    }
+    if (tp === 'perfil_receptor') {
+      // Depende del tipo que haya ahora en el formulario: si el equipo lo cambia, los campos
+      // cambian con él (los del tipo anterior se quedan en el objeto, sin pintarse).
+      const tipus = (form.tipo_receptor as string | null) ?? null
+      return tipus
+        ? (
+          <CampsPerfilReceptor tipusReceptor={tipus} idPrefix={id}
+            perfil={(v as Record<string, unknown> | null) ?? {}}
+            onChange={(p) => set(c.key, p)} />
+        )
+        : <p className="text-sm text-muted-foreground">{t('f.perfil_sense_tipus')}</p>
     }
     if (tp === 'list') {
       const texto = Array.isArray(v) ? (v as string[]).join(', ') : ((v as string) ?? '')

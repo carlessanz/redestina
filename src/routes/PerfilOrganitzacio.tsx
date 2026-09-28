@@ -44,7 +44,6 @@ import { Info, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import { cn } from '../lib/utils'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { creaUbicacio } from '../lib/ofertes'
@@ -53,7 +52,7 @@ import { PERFIL_RECEPTOR, TIPUS_EMPRESA } from '../lib/perfilReceptor'
 import type { CampPerfil } from '../lib/perfilReceptor'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from '../components/SelectorMunicipi'
-import { Casella } from '../components/Casella'
+import CampsPerfilReceptor from '../components/CampsPerfilReceptor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -379,69 +378,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     )
   }
 
-  function controlPerfil(c: CampPerfil) {
-    const id = `pr-${c.clau}`
-    const v = perfil[c.clau]
-    const set = (nou: unknown) => setPerfil((p) => ({ ...p, [c.clau]: nou }))
-    if (c.tipus === 'multi') {
-      const triats = Array.isArray(v) ? (v as string[]) : []
-      return (
-        <div className="flex flex-wrap gap-2" role="group" aria-labelledby={`${id}-l`}>
-          {c.opcions!.map((o) => {
-            const on = triats.includes(o)
-            return (
-              <button
-                key={o}
-                type="button"
-                disabled={!potEditar}
-                aria-pressed={on}
-                onClick={() => set(on ? triats.filter((x) => x !== o) : [...triats, o])}
-                className={cn(
-                  'min-h-11 rounded-full border px-3 text-base md:min-h-9 md:text-sm',
-                  on ? 'border-primary bg-secondary text-secondary-foreground' : 'border-input bg-background',
-                )}
-              >
-                {t(`pr.o_${o}`)}
-              </button>
-            )
-          })}
-        </div>
-      )
-    }
-    if (c.tipus === 'select') {
-      return (
-        <Select value={typeof v === 'string' ? v : undefined} disabled={!potEditar} onValueChange={set}>
-          <SelectTrigger id={id} className={selectClasses}><SelectValue placeholder="—" /></SelectTrigger>
-          <SelectContent>
-            {c.opcions!.map((o) => <SelectItem key={o} value={o} className="text-base md:text-sm">{t(`pr.o_${o}`)}</SelectItem>)}
-          </SelectContent>
-        </Select>
-      )
-    }
-    if (c.tipus === 'sino') {
-      return (
-        <div className="flex gap-4" role="group" aria-labelledby={`${id}-l`}>
-          {[true, false].map((b) => (
-            <label key={String(b)} className="flex min-h-11 items-center gap-2 text-base md:min-h-9 md:text-sm">
-              <Casella checked={v === b} disabled={!potEditar} onChange={() => set(v === b ? null : b)} />
-              {t(b ? 'pr.si' : 'pr.no')}
-            </label>
-          ))}
-        </div>
-      )
-    }
-    return (
-      <div className="flex items-center gap-2">
-        <Input id={id} value={v == null ? '' : String(v)} disabled={!potEditar}
-          type={c.tipus === 'numero' ? 'number' : 'text'} min={c.tipus === 'numero' ? 0 : undefined}
-          onChange={(e) => set(c.tipus === 'numero'
-            ? (e.target.value === '' ? null : Number(e.target.value))
-            : e.target.value)} />
-        {c.unitatKey && <span className="shrink-0 text-sm text-muted-foreground">{t(c.unitatKey)}</span>}
-      </div>
-    )
-  }
-
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
@@ -557,16 +493,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               <h3 className="text-base font-semibold">{t(`org.sec_perfil_${tipusReceptor}`)}</h3>
               <p className="mt-1 text-sm text-muted-foreground">{t('org.h_perfil')}</p>
             </div>
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-              {campsPerfil.map((c) => (
-                <div key={c.clau} className={c.tipus === 'multi' ? 'sm:col-span-2' : undefined}>
-                  <Label id={`pr-${c.clau}-l`} htmlFor={`pr-${c.clau}`} className="mb-1.5 block text-xs text-muted-foreground">
-                    {t(`pr.${c.clau}`)}
-                  </Label>
-                  {controlPerfil(c)}
-                </div>
-              ))}
-            </div>
+            <CampsPerfilReceptor tipusReceptor={tipusReceptor} perfil={perfil}
+              onChange={setPerfil} disabled={!potEditar} />
           </section>
         )}
 

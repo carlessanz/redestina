@@ -12,6 +12,7 @@ export type CampoTipo =
   | 'boolnull' // boolean que admite «sin definir» (—/Sí/No)
   | 'list' // text[] separado por comas
   | 'select' // desplegable con opciones fijas (usa `opciones`)
+  | 'perfil_receptor' // jsonb con los campos del tipo de receptor (CampsPerfilReceptor)
 
 export interface CampoDef {
   key: string
@@ -28,6 +29,7 @@ export interface CampoDef {
 export const PRODUCTOR_CAMPOS: CampoDef[] = [
   { key: 'name', label: 'f.name' },
   { key: 'empresa', label: 'f.empresa' },
+  { key: 'razon_social', label: 'f.razon_social' },
   { key: 'phone', label: 'f.phone', tipo: 'tel' },
   { key: 'telefono_alt', label: 'f.telefono_alt', tipo: 'tel' },
   { key: 'email', label: 'f.email', tipo: 'email' },
@@ -50,6 +52,7 @@ export const PRODUCTOR_CAMPOS: CampoDef[] = [
 // entidades (ver src/types.ts). id y created_at no se editan.
 export const ENTIDAD_CAMPOS: CampoDef[] = [
   { key: 'nombre', label: 'f.nombre' },
+  { key: 'razon_social', label: 'f.razon_social' },
   { key: 'codigo', label: 'f.codigo' },
   { key: 'familia', label: 'f.familia' },
   { key: 'prioritat', label: 'f.prioritat', tipo: 'number' },
@@ -59,6 +62,9 @@ export const ENTIDAD_CAMPOS: CampoDef[] = [
   // Decide qué ofertas ve esta entidad en su panel (§4bis). Sin él no ve ninguna:
   // la derivación desde `modalitat` deja en null lo que no era concluyente.
   { key: 'tipo_receptor', label: 'f.tipo_receptor', tipo: 'select', opciones: ['social', 'animal', 'transformador', 'comercial'], etiquetaOpcion: 'org.tr_' },
+  // Los campos propios del tipo (20270402100000). Los mismos que edita la organización en
+  // «La meva organització»: el equipo los completa en el modelo asistido.
+  { key: 'perfil_receptor', label: 'f.perfil_receptor', tipo: 'perfil_receptor', ancho: 'full' },
   { key: 'area_geografica', label: 'f.area_geografica' },
   { key: 'poblacion', label: 'f.poblacion' },
   { key: 'direccion', label: 'f.direccion' },

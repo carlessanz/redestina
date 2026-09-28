@@ -672,6 +672,8 @@ src/
                                FotoGenerica (icono por familia), useFotosOfertes + FotoOfertaResolta
                                (la regla de `fotoOferta.ts`, firmada en lote en los dos buckets),
                                SelectorFotos (subir y quitar) y CasellaFotoProducte
+    CampsPerfilReceptor.tsx    Los campos del perfil de cada tipo de receptor (`perfil_receptor`). Uno
+                               solo para la ficha propia y la del equipo
     SelectorMunicipi.tsx       Elegir municipio de la lista oficial (INE), con búsqueda y comarca;
                                lo usan el alta de oferta y la ficha de la organización
     AccessosTest.tsx           Botones de «entrar com a…» en /login (§6quater)
@@ -2444,8 +2446,13 @@ jsonb y escriben solo las claves de su lista blanca (las `actualizar_mi_*` anter
 
 ⚠️ **Lo que queda fuera, a propósito**: las «altres ubicacions» de un **receptor** (no hay tabla
 para ellas; `horari` sigue siendo texto), el «área Redestina» como segmentación propia distinta
-de la comarca (no está definida: hoy área = comarca, que es lo que compara la priorización) y
-los campos nuevos en la ficha del **equipo** (`RecordDetail`), que sigue con los de siempre.
+de la comarca (no está definida: hoy área = comarca, que es lo que compara la priorización).
+✅ **La ficha del equipo ya tiene la razón social y el perfil del receptor** (28-09-2026): el
+perfil lo pinta **`components/CampsPerfilReceptor`**, el MISMO componente que usa
+`PerfilOrganitzacio` —estaba escrito dentro de esta, y copiarlo habría dado dos formularios del
+mismo dato—. En `RecordDetail` es el tipo de campo `perfil_receptor` de `crudCampos.ts`, y sus
+campos dependen del `tipo_receptor` que haya en el formulario. El resto de campos nuevos (tipo de
+empresa cerrado, municipio del nomenclátor, lugares de recogida) sigue solo en la ficha propia.
 ⚠️ **Las listas del perfil son provisionales**: las fijó la consultoría a partir de la revisión y
 las tiene que validar la Fundació. Cambiarlas es cambiar `perfilReceptor.ts` (el `id` es lo que
 se guarda; el texto se puede reescribir).
