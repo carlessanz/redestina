@@ -1507,6 +1507,14 @@ el donante ve su fila por `cierres_donante_meus()` —los cierres de **prueba** 
 Series `P-RES`/`P-CD` en prueba; `reiniciar_cierre_prueba()` las devuelve a 0 **sin tocar
 canalizaciones ni albaranes**.
 
+⚠️ **El 28-09-2026 se retiró a mano un cierre REAL de 2026** abierto el 21-09 y nunca calculado
+(0 donantes, 0 documentos, series `RES`/`CD`/`CT` de 2026 a 0): un `delete` con esas mismas
+condiciones en el `where`. **Cerrarlo habría sido irreversible**: `cerrar_cierre()` recalcula
+—y en modo real habría metido las donaciones de las fichas de prueba en el cierre fiscal—, lo
+deja `tancat` para siempre y el único parcial `(ejercicio) where modo = 'real'` impediría abrir
+otro. No hay RPC para retirar un cierre real vacío; si vuelve a pasar, el mismo `delete`
+condicionado. Y conviene no abrir el real hasta que toque de verdad (D1).
+
 Job `congelar-ejercicio` en `pg_cron` a `59 22 31 12 *` **UTC**, que son las 23:59 de Madrid en
 horario de invierno.
 
