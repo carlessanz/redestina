@@ -17,7 +17,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { crearExcedente } from "../_shared/oferta.ts";
-import { CAMPOS, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
+import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 
@@ -119,7 +119,11 @@ Deno.serve(async (req) => {
         familias,
         productos: ((productos.data ?? []) as { nombre: string; familia: string | null; foto_mini: string | null }[])
           .map((p) => ({ ...p, cost_referencia: referencia.get(p.nombre) ?? null })),
-        causas: causas.data ?? [],
+        // `nombre_es` y `familias_es`: solo para enseñarlas en castellano; el valor que se
+        // guarda no cambia (camposOferta.ts, FAMILIES_ES / CAUSES_ES).
+        causas: ((causas.data ?? []) as { codigo: string; nombre: string | null }[])
+          .map((c) => ({ ...c, nombre_es: CAUSES_ES[c.codigo] ?? null })),
+        familias_es: FAMILIES_ES,
         ubicaciones: ubicaciones.data ?? [],
       },
     });

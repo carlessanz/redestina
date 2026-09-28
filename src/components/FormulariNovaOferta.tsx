@@ -39,7 +39,9 @@ import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { cn } from '../lib/utils'
-import { aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio } from '../lib/ofertes'
+import {
+  aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio, etiquetaFamilia, localitzaDescriptor,
+} from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
 import { FotoOferta, SelectorFotos, useUrlsFotos } from './FotosOferta'
@@ -129,10 +131,15 @@ export interface PropsFormulariNovaOferta {
 export default function FormulariNovaOferta(
   { productorId, bloqueja = false, motiuModalitat, onCreada, onCancel }: PropsFormulariNovaOferta,
 ) {
-  const { t } = useT()
-  const [campos, setCampos] = useState<CampoOferta[]>([])
-  const [seccions, setSeccions] = useState<BlocOferta[]>([])
-  const [catalogos, setCatalogos] = useState<CatalogosOferta | null>(null)
+  const { t, lang } = useT()
+  // El descriptor tal como llega (catalán + castellano), y debajo, en el idioma de la pantalla.
+  const [campsCrus, setCampos] = useState<CampoOferta[]>([])
+  const [seccionsCrues, setSeccions] = useState<BlocOferta[]>([])
+  const [catalogosCrus, setCatalogos] = useState<CatalogosOferta | null>(null)
+  const { campos, seccions, catalogos } = useMemo(
+    () => localitzaDescriptor(campsCrus, seccionsCrues, catalogosCrus, lang),
+    [campsCrus, seccionsCrues, catalogosCrus, lang],
+  )
   const [datos, setDatos] = useState<Datos>({})
   const [carregant, setCarregant] = useState(true)
   const [enviant, setEnviant] = useState(false)
@@ -359,7 +366,9 @@ export default function FormulariNovaOferta(
           <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
             value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
             <option value="">—</option>
-            {(catalogos?.familias ?? []).map((f) => <option key={f} value={f}>{f}</option>)}
+            {(catalogos?.familias ?? []).map((f) => (
+              <option key={f} value={f}>{etiquetaFamilia(f, catalogos, lang)}</option>
+            ))}
           </select>
         )
       case 'producte':

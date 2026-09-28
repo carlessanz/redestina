@@ -40,12 +40,16 @@ export type Paso = typeof PASOS[number];
 /** Los cinco bloques del cuestionario. `PASOS` respeta este orden: una sección no se parte. */
 export type SeccionOferta = "producte" | "quantitat" | "recollida" | "modalitat" | "causa";
 
-export const SECCIONES: readonly { clau: SeccionOferta; titol: string; descripcio?: string }[] = [
-  { clau: "producte", titol: "Producte" },
+export const SECCIONES: readonly {
+  clau: SeccionOferta; titol: string; descripcio?: string; titol_es: string; descripcio_es?: string;
+}[] = [
+  { clau: "producte", titol: "Producte", titol_es: "Producto" },
   {
     clau: "quantitat",
     titol: "Quantitat i envasos",
     descripcio: "N'hi ha prou amb una xifra aproximada: els kg definitius es pesen a la recollida.",
+    titol_es: "Cantidad y envases",
+    descripcio_es: "Basta con una cifra aproximada: los kg definitivos se pesan en la recogida.",
   },
   {
     clau: "recollida",
@@ -53,16 +57,22 @@ export const SECCIONES: readonly { clau: SeccionOferta; titol: string; descripci
     // No da por hecho que venga una entidad: puede ser venta, donación o maquila, y el
     // productor puede llevarlo él (revisión funcional del 23-09-2026).
     descripcio: "Com arriba el producte a qui el rep, i fins quan.",
+    titol_es: "Recogida",
+    descripcio_es: "Cómo llega el producto a quien lo recibe, y hasta cuándo.",
   },
   {
     clau: "modalitat",
     titol: "Com vols donar-hi sortida",
     descripcio: "Decideix quines entitats la poden rebre i quin document es genera.",
+    titol_es: "Cómo quieres darle salida",
+    descripcio_es: "Decide qué entidades pueden recibirla y qué documento se genera.",
   },
   {
     clau: "causa",
     titol: "Causa i observacions",
     descripcio: "Només per a estadística i per ajudar l'entitat.",
+    titol_es: "Causa y observaciones",
+    descripcio_es: "Solo para estadística y para ayudar a la entidad.",
   },
 ];
 
@@ -76,14 +86,25 @@ export const SECCIONES: readonly { clau: SeccionOferta; titol: string; descripci
  *    lo pregunta con una LISTA (son cuatro opciones y un mensaje de botones admite tres).
  */
 export const FORMATS_ENTREGA = [
-  { id: "caixes", titulo: "Caixes", descripcion: "En caixes, de qualsevol tipus." },
-  { id: "palet", titulo: "Palet", descripcion: "Paletitzat." },
+  {
+    id: "caixes", titulo: "Caixes", descripcion: "En caixes, de qualsevol tipus.",
+    titulo_es: "Cajas", descripcion_es: "En cajas, de cualquier tipo.",
+  },
+  {
+    id: "palet", titulo: "Palet", descripcion: "Paletitzat.",
+    titulo_es: "Palé", descripcion_es: "Paletizado.",
+  },
   {
     id: "envasos_propis",
     titulo: "Envasos de qui ho rep",
     descripcion: "Qui ho reculli ha de portar els seus envasos.",
+    titulo_es: "Envases de quien lo recibe",
+    descripcion_es: "Quien lo recoja tiene que traer sus envases.",
   },
-  { id: "altres", titulo: "Altres", descripcion: "Digue-ho a Observacions." },
+  {
+    id: "altres", titulo: "Altres", descripcion: "Digue-ho a Observacions.",
+    titulo_es: "Otros", descripcion_es: "Dilo en Observaciones.",
+  },
 ];
 
 /** Retorno de envases: sí o no. «Caixes pròpies» ya es un formato de entrega, no un retorno. */
@@ -91,8 +112,8 @@ export const OPCIONES_RETORN = ["Sí", "No"];
 
 /** ¿El productor puede llevarlo? Si sí, no hace falta decir dónde se recoge. */
 export const OPCIONS_TRANSPORT = [
-  { id: "si", titulo: "Sí, el porto jo" },
-  { id: "no", titulo: "No, cal recollir-lo" },
+  { id: "si", titulo: "Sí, el porto jo", titulo_es: "Sí, lo llevo yo" },
+  { id: "no", titulo: "No, cal recollir-lo", titulo_es: "No, hay que recogerlo" },
 ];
 
 // «Producte al camp»: lo ofrecido TODAVÍA NO ESTÁ RECOGIDO y hay que ir a cosecharlo.
@@ -114,11 +135,15 @@ export const OPCIONS_AL_CAMP = [
     id: "si",
     titulo: "Sí, és a la planta",
     descripcion: "Cal collir-ho. Es pot organitzar com a espigolada.",
+    titulo_es: "Sí, está en la planta",
+    descripcion_es: "Hay que cosecharlo. Se puede organizar como espigoleo.",
   },
   {
     id: "no",
     titulo: "No, ja està collit",
     descripcion: "Ja està collit i a punt per recollir.",
+    titulo_es: "No, ya está cosechado",
+    descripcion_es: "Ya está cosechado y listo para recoger.",
   },
 ];
 
@@ -144,16 +169,22 @@ export const MODALITATS = [
     // Quién la puede recibir sale de `modalitat_receptor_compat` (§4bis), que cambió el
     // 27-09-2026: la social ya recibe venta y maquila, y el comercio, maquila.
     descripcion: "Entitats socials, alimentació animal, obradors · certificat de donació",
+    titulo_es: "Donación",
+    descripcion_es: "Entidades sociales, alimentación animal, obradores · certificado de donación",
   },
   {
     id: "venda",
     titulo: "Venda",
     descripcion: "La vens a un preu mínim per kg. Comerços, obradors i entitats socials.",
+    titulo_es: "Venta",
+    descripcion_es: "La vendes a un precio mínimo por kg. Comercios, obradores y entidades sociales.",
   },
   {
     id: "maquila",
     titulo: "Maquila",
     descripcion: "Et transformen el producte i te'l tornen. Obradors, comerços, entitats.",
+    titulo_es: "Maquila",
+    descripcion_es: "Te transforman el producto y te lo devuelven. Obradores, comercios, entidades.",
   },
 ];
 
@@ -171,6 +202,9 @@ export type TipoCampo = "familia" | "producte" | "text" | "numero" | "opcions" |
 export interface OpcionCampo {
   id: string;
   titulo: string;
+  /** El título en castellano, para el panel. El bot pregunta siempre en catalán. */
+  titulo_es?: string;
+  descripcion_es?: string;
   /** Una línea: qué implica elegir esta opción. Obligatoria en `modalitat`. */
   descripcion?: string;
 }
@@ -183,6 +217,14 @@ export interface CampoOferta {
   /** Etiqueta en català, la misma que se pregunta por WhatsApp. */
   etiqueta: string;
   ayuda?: string;
+  /**
+   * Los mismos textos en castellano (28-09-2026). Viven AQUÍ, al lado del catalán, y no en el
+   * diccionario de la aplicación: si vivieran allí, cambiar una pregunta obligaría a
+   * acordarse de otro fichero, y el castellano se quedaría preguntando lo de antes. Los usa
+   * solo el panel; el bot de WhatsApp habla en catalán. Lo vigila `camposOferta.test.ts`.
+   */
+  etiqueta_es: string;
+  ayuda_es?: string;
   /** En qué bloque del cuestionario va. Los campos de una sección van seguidos en `PASOS`. */
   seccion: SeccionOferta;
   obligatorio: boolean;
@@ -195,6 +237,41 @@ export interface CampoOferta {
   condicion?: CondicionCampo | CondicionCampo[];
 }
 
+/**
+ * Las familias y las causas vienen de la base (`productos.familia`, `causas.nombre`) y
+ * están en catalán. En el panel en castellano se ENSEÑAN traducidas; lo que se guarda sigue
+ * siendo el valor catalán (la familia) o el código (la causa). Una familia o una causa nueva
+ * sin traducción sale tal cual.
+ * ⚠️ Los nombres de PRODUCTO no se traducen: son el nombre del catálogo, el mismo que sale
+ *    en el Mercat, en los albaranes y en los certificados.
+ */
+export const FAMILIES_ES: Record<string, string> = {
+  "Bolets": "Setas",
+  "Fruita Cítrics": "Fruta cítricos",
+  "Fruita Dolça": "Fruta dulce",
+  "Fruita Exòtica": "Fruta exótica",
+  "Fruita Seca": "Frutos secos",
+  "Fruita Vermella": "Frutos rojos",
+  "Horta Flor": "Huerta flor",
+  "Horta Fruit": "Huerta fruto",
+  "Horta Fulla": "Huerta hoja",
+  "Horta Tub/Bul/Arr": "Huerta tubérculo/bulbo/raíz",
+  "Indeterminat": "Indeterminado",
+  "Varis": "Varios",
+};
+
+/** Por código de `causas`. */
+export const CAUSES_ES: Record<string, string> = {
+  CE: "Criterios estéticos",
+  CL: "Clima",
+  CN: "Canalización",
+  EX: "Excedente",
+  FC: "Final de cultivo",
+  GD: "Gestión deficiente",
+  MQ: "Maquila",
+  PR: "Precio",
+};
+
 /** Descriptor de los 17 pasos, con las mismas preguntas que hace el bot. */
 export const CAMPOS: CampoOferta[] = [
   {
@@ -202,6 +279,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "familia",
     etiqueta: "De quina família és el producte?",
     ayuda: "Serveix per acotar la llista de productes.",
+    etiqueta_es: "¿De qué familia es el producto?",
+    ayuda_es: "Sirve para acotar la lista de productos.",
     seccion: "producte",
     obligatorio: true,
   },
@@ -210,6 +289,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "producte",
     etiqueta: "Quin producte?",
     ayuda: "Si no hi és, tria el més semblant i digue-ho a Observacions.",
+    etiqueta_es: "¿Qué producto?",
+    ayuda_es: "Si no está, elige el más parecido y dilo en Observaciones.",
     seccion: "producte",
     obligatorio: true,
   },
@@ -218,6 +299,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "text",
     etiqueta: "Quina varietat és?",
     ayuda: "Deixa-ho buit si no ho saps",
+    etiqueta_es: "¿Qué variedad es?",
+    ayuda_es: "Déjalo vacío si no lo sabes",
     seccion: "producte",
     obligatorio: false,
   },
@@ -228,6 +311,8 @@ export const CAMPOS: CampoOferta[] = [
     // Lo que separa las dos respuestas no es el estado del producto, es el trabajo que
     // implica: por eso la ayuda habla de collir y no de «sense recollir».
     ayuda: "«Sí» vol dir que encara s'ha de collir, no que estigui pendent de recollida.",
+    etiqueta_es: "¿El producto todavía está en el campo?",
+    ayuda_es: "«Sí» quiere decir que todavía hay que cosecharlo, no que esté pendiente de recogida.",
     seccion: "producte",
     obligatorio: true,
     opciones: OPCIONS_AL_CAMP,
@@ -237,6 +322,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "numero",
     etiqueta: "Quants kg aproximadament?",
     ayuda: "Aproximats. Els definitius es pesen a la recollida.",
+    etiqueta_es: "¿Cuántos kg aproximadamente?",
+    ayuda_es: "Aproximados. Los definitivos se pesan en la recogida.",
     seccion: "quantitat",
     obligatorio: true,
   },
@@ -245,6 +332,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "opcions",
     etiqueta: "Com es farà l'entrega?",
     ayuda: "Si el producte encara és al camp, no cal: es cull allà mateix.",
+    etiqueta_es: "¿Cómo se hará la entrega?",
+    ayuda_es: "Si el producto todavía está en el campo, no hace falta: se cosecha allí mismo.",
     seccion: "quantitat",
     obligatorio: true,
     opciones: FORMATS_ENTREGA,
@@ -255,6 +344,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "numero",
     etiqueta: "Quantes caixes o palets són?",
     ayuda: "Deixa-ho buit si no ho saps",
+    etiqueta_es: "¿Cuántas cajas o palés son?",
+    ayuda_es: "Déjalo vacío si no lo sabes",
     seccion: "quantitat",
     obligatorio: false,
     condicion: { campo: "format_entrega", en: ["caixes", "palet"] },
@@ -264,9 +355,11 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "opcions",
     etiqueta: "Cal retornar els envasos?",
     ayuda: "Si cal retornar-los, ho apuntem a l'albarà.",
+    etiqueta_es: "¿Hay que devolver los envases?",
+    ayuda_es: "Si hay que devolverlos, lo apuntamos en el albarán.",
     seccion: "quantitat",
     obligatorio: true,
-    opciones: OPCIONES_RETORN.map((t) => ({ id: t, titulo: t })),
+    opciones: OPCIONES_RETORN.map((t) => ({ id: t, titulo: t, titulo_es: t })),
     // Si el receptor porta els seus envasos, no hi ha res a retornar.
     condicion: { campo: "format_entrega", en: ["caixes", "palet", "altres"] },
   },
@@ -275,6 +368,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "opcions",
     etiqueta: "Pots encarregar-te del transport?",
     ayuda: "Si el portes tu, no cal dir on es recull.",
+    etiqueta_es: "¿Puedes encargarte del transporte?",
+    ayuda_es: "Si lo llevas tú, no hace falta decir dónde se recoge.",
     seccion: "recollida",
     obligatorio: true,
     opciones: OPCIONS_TRANSPORT,
@@ -286,6 +381,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "ubicacio",
     etiqueta: "On s'ha de recollir?",
     ayuda: "Tria un dels teus llocs o afegeix-ne un de nou (camp, magatzem…).",
+    etiqueta_es: "¿Dónde hay que recogerlo?",
+    ayuda_es: "Elige uno de tus lugares o añade uno nuevo (campo, almacén…).",
     seccion: "recollida",
     obligatorio: true,
     condicion: [
@@ -298,6 +395,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "text",
     etiqueta: "Fins quin dia està disponible?",
     ayuda: "Passat aquest dia, si no s'ha col·locat, l'oferta es tanca sola.",
+    etiqueta_es: "¿Hasta qué día está disponible?",
+    ayuda_es: "Pasado este día, si no se ha colocado, la oferta se cierra sola.",
     seccion: "recollida",
     obligatorio: true,
   },
@@ -306,6 +405,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "text",
     etiqueta: "Quin horari de recollida va bé?",
     ayuda: "matí, tarda, hores…",
+    etiqueta_es: "¿Qué horario de recogida va bien?",
+    ayuda_es: "mañana, tarde, horas…",
     seccion: "recollida",
     obligatorio: false,
   },
@@ -314,6 +415,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "opcions",
     etiqueta: "Quina modalitat és?",
     ayuda: "Decideix quines entitats la poden rebre i quin document es genera.",
+    etiqueta_es: "¿Qué modalidad es?",
+    ayuda_es: "Decide qué entidades pueden recibirla y qué documento se genera.",
     seccion: "modalitat",
     obligatorio: true,
     opciones: MODALITATS,
@@ -323,6 +426,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "numero",
     etiqueta: "A quin preu mínim (€/kg) la vols oferir?",
     ayuda: "Les entitats el veuran i no la podran demanar per sota d'aquest preu.",
+    etiqueta_es: "¿A qué precio mínimo (€/kg) quieres ofrecerla?",
+    ayuda_es: "Las entidades lo verán y no podrán pedirla por debajo de este precio.",
     seccion: "modalitat",
     obligatorio: true,
     condicion: { campo: "modalitat", en: ["venda", "maquila"] },
@@ -340,6 +445,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "numero",
     etiqueta: "Quin és el cost per quilo (€/kg)?",
     ayuda: "És el valor amb què es calcula la donació al certificat. Et proposem el de referència del producte; el pots canviar.",
+    etiqueta_es: "¿Cuál es el coste por kilo (€/kg)?",
+    ayuda_es: "Es el valor con el que se calcula la donación en el certificado. Te proponemos el de referencia del producto; lo puedes cambiar.",
     seccion: "modalitat",
     obligatorio: false,
     condicion: { campo: "modalitat", en: ["donacio"] },
@@ -349,6 +456,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "causa",
     etiqueta: "Quina és la causa de l'excedent?",
     ayuda: "Per què no va pel canal habitual. Només per a estadística.",
+    etiqueta_es: "¿Cuál es la causa del excedente?",
+    ayuda_es: "Por qué no va por el canal habitual. Solo para estadística.",
     seccion: "causa",
     obligatorio: true,
   },
@@ -357,6 +466,8 @@ export const CAMPOS: CampoOferta[] = [
     tipo: "text",
     etiqueta: "Alguna observació?",
     ayuda: "Tot el que ajudi l'entitat: accés, càrrega, contacte a la finca…",
+    etiqueta_es: "¿Alguna observación?",
+    ayuda_es: "Todo lo que ayude a la entidad: acceso, carga, contacto en la finca…",
     seccion: "causa",
     obligatorio: false,
   },

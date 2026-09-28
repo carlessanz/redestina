@@ -1858,7 +1858,7 @@ que ve el receptor; migración `20270407100000`). Lo que cambia de comportamient
 - ⚠️ **Decisiones que quedan para Carles**: (1) `assegurarContacte()` y el alta manual de
   Missatgeria marcan `opt_in: true` al abrir un chat, sin que la persona lo haya dado (§8 dice
   que la plantilla exige consentimiento); quitarlo impide al equipo el primer contacto por
-  plantilla. (2) El descriptor del alta (`camposOferta.ts`) solo está en catalán. (3)
+  plantilla. (2) ~~El descriptor del alta solo está en catalán~~ — traducido el mismo día (§6bis). (3)
   `cancelar_meva_oferta()` deja cancelar una oferta con canalizaciones sin tocarlas; el diálogo
   ya lo advierte. (4) El intake por WhatsApp comprueba el convenio **al final**, en
   `crearExcedenteDesdeSesion()` (el intake no pasa por `crear-oferta`, y hasta hoy publicaba sin
@@ -2526,6 +2526,16 @@ publican antes que el frontend (§11). El panel nuevo lee `condicions ?? condici
 anteriores. Las nuevas guardan `format_entrega` y `transport_propi` (§4), y el texto de la
 oferta imprime «ENVASOS: Palet · no cal retornar-los» y, solo si es cierto, «TRANSPORT: el porta
 la productora» (misma asimetría que el producte al camp).
+
+**Y en castellano** (28-09-2026): cada campo, opción y sección de `camposOferta.ts` lleva su
+`*_es` al lado del catalán (`etiqueta_es`, `ayuda_es`, `titulo_es`, `descripcion_es`,
+`titol_es`, `descripcio_es`), `crear-oferta` los sirve con el resto y el panel elige con
+`localitzaDescriptor()` (`src/lib/ofertes.ts`). Viven ahí y no en `i18n.tsx` para que cambiar
+una pregunta no obligue a acordarse de otro fichero; `tests/camposOferta.test.ts` falla si a
+una le falta el castellano. Las **familias** y las **causas** vienen de la base en catalán y se
+enseñan traducidas (`FAMILIES_ES`, `CAUSES_ES`) sin cambiar el valor que se guarda. Los
+**nombres de producto no se traducen**: son el nombre del catálogo, el mismo del Mercat, los
+albaranes y los certificados. El bot de WhatsApp sigue en catalán.
 
 **El panel lo presenta POR PASOS** (`FormulariNovaOferta`), una sección cada vez: «Pas 2 de 5»,
 «Continuar» valida lo obligatorio de esa sección y los títulos de arriba dejan volver a una ya
@@ -5946,7 +5956,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.025 pruebas en 33 ficheros**: 1.024 correctas y **1 saltada a propósito**, la
+   Referencia: **1.029 pruebas en 33 ficheros**: 1.028 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
    +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,
    `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:

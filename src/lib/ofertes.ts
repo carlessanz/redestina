@@ -17,6 +17,9 @@ export interface BlocOferta {
   clau: SeccioOferta
   titol: string
   descripcio?: string
+  /** En castellano (28-09-2026). Un servidor anterior no los manda: se cae al catalán. */
+  titol_es?: string
+  descripcio_es?: string
 }
 
 export interface OpcioOferta {
@@ -24,6 +27,8 @@ export interface OpcioOferta {
   titulo: string
   /** Una línea: qué implica elegir esta opción. La traen las tres modalidades. */
   descripcion?: string
+  titulo_es?: string
+  descripcion_es?: string
 }
 
 export interface CampoOferta {
@@ -31,6 +36,9 @@ export interface CampoOferta {
   tipo: TipoCampo
   etiqueta: string
   ayuda?: string
+  /** Los mismos textos en castellano; los sirve `crear-oferta` desde `camposOferta.ts`. */
+  etiqueta_es?: string
+  ayuda_es?: string
   /**
    * En qué bloque va. **Opcional en el cliente aunque el servidor la dé siempre**: este
    * fichero se despliega antes que la Edge Function (§11, de abajo arriba), así que hay una
@@ -94,8 +102,51 @@ export interface CatalogosOferta {
   familias: string[]
   /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
   productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
-  causas: { codigo: string; nombre: string | null }[]
+  causas: { codigo: string; nombre: string | null; nombre_es?: string | null }[]
   ubicaciones: { id: string; alias: string | null; municipio: string | null }[]
+  /** Familia (valor catalán, el que se guarda) → cómo se enseña en castellano. */
+  familias_es?: Record<string, string>
+}
+
+/**
+ * El descriptor en el idioma de la pantalla. Los textos en castellano viven en
+ * `_shared/camposOferta.ts` junto al catalán; aquí solo se elige. Lo que falte en castellano
+ * sale en catalán, nunca vacío. **Los valores no cambian** —ids, familias y códigos de causa
+ * son los mismos—: solo cambia lo que se lee.
+ */
+export function localitzaDescriptor(
+  campos: CampoOferta[],
+  seccions: BlocOferta[],
+  catalogos: CatalogosOferta | null,
+  lang: string,
+): { campos: CampoOferta[]; seccions: BlocOferta[]; catalogos: CatalogosOferta | null } {
+  if (lang !== 'es') return { campos, seccions, catalogos }
+  return {
+    campos: campos.map((c) => ({
+      ...c,
+      etiqueta: c.etiqueta_es ?? c.etiqueta,
+      ayuda: c.ayuda_es ?? c.ayuda,
+      opciones: c.opciones?.map((o) => ({
+        ...o,
+        titulo: o.titulo_es ?? o.titulo,
+        descripcion: o.descripcion_es ?? o.descripcion,
+      })),
+    })),
+    seccions: seccions.map((b) => ({
+      ...b,
+      titol: b.titol_es ?? b.titol,
+      descripcio: b.descripcio_es ?? b.descripcio,
+    })),
+    catalogos: catalogos && {
+      ...catalogos,
+      causas: catalogos.causas.map((c) => ({ ...c, nombre: c.nombre_es ?? c.nombre })),
+    },
+  }
+}
+
+/** Cómo se enseña una familia en el idioma de la pantalla. */
+export function etiquetaFamilia(f: string, catalogos: CatalogosOferta | null, lang: string): string {
+  return lang === 'es' ? catalogos?.familias_es?.[f] ?? f : f
 }
 
 export interface Resultat<T> {

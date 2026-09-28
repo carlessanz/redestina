@@ -482,3 +482,36 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
     expect(siguientePaso(PASOS[PASOS.length - 1], {})).toBeNull()
   })
 })
+
+describe('el formulario también en castellano (28-09-2026)', () => {
+  // Los textos en castellano viven junto al catalán, en el mismo descriptor que usa el panel.
+  // Sin esta prueba, una pregunta nueva escrita solo en catalán saldría así en la pantalla
+  // en castellano sin que nada avisara: `localitzaDescriptor()` cae al catalán en silencio.
+  it('cada campo tiene su etiqueta, y su ayuda si la tiene en catalán', () => {
+    for (const c of CAMPOS) {
+      expect(c.etiqueta_es, c.clave).toBeTruthy()
+      if (c.ayuda) expect(c.ayuda_es, c.clave).toBeTruthy()
+    }
+  })
+
+  it('cada opción de un vocabulario cerrado tiene título, y descripción si la tiene', () => {
+    for (const c of CAMPOS) {
+      for (const o of c.opciones ?? []) {
+        expect(o.titulo_es, `${c.clave}:${o.id}`).toBeTruthy()
+        if (o.descripcion) expect(o.descripcion_es, `${c.clave}:${o.id}`).toBeTruthy()
+      }
+    }
+  })
+
+  it('cada sección tiene título, y descripción si la tiene', () => {
+    for (const s of SECCIONES) {
+      expect(s.titol_es, s.clau).toBeTruthy()
+      if (s.descripcio) expect(s.descripcio_es, s.clau).toBeTruthy()
+    }
+  })
+
+  it('el castellano no es una copia del catalán (salvo las palabras que coinciden)', () => {
+    const iguals = CAMPOS.filter((c) => c.etiqueta_es === c.etiqueta).map((c) => c.clave)
+    expect(iguals).toEqual([])
+  })
+})
