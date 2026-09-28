@@ -5689,7 +5689,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **983 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (27-09-2026,
+   Referencia: **986 pruebas en 31 ficheros**, todas correctas y ninguna pendiente (28-09-2026:
+   +3 de `estatEfectiuEnllac`, el estado REAL de un enlace —activo y vencido es caducado, porque la
+   caducidad no se guarda—, que usan las fichas de convenio y de albarán. Antes, 983 (27-09-2026,
    tarde: +12 de la foto de las ofertas y el coste que declara el productor —`fotoOferta.test.ts`—
    y del paso `cost_kg`; antes 971. Y antes, el 27-09-2026:
    +11 de la ficha de la organización —validaciones y perfil del receptor— y +8 del cuestionario

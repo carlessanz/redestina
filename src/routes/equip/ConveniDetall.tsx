@@ -25,6 +25,7 @@ import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta } from '../../lib/albarans'
+import { estatEfectiuEnllac } from '../../lib/documentsPanell'
 import {
   contrafirmarConveni, enviarConveni, enviarCorreuConveni, estilEstatConveni,
   iniciarFirmaAssistida, resoldreConveni, retornarConveni, urlSignatura,
@@ -290,9 +291,25 @@ export default function ConveniDetall() {
         <CardHeader>
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <CardTitle>{valor(conv.datos_org, 'raso_social') !== '—'
-                ? valor(conv.datos_org, 'raso_social')
-                : (nomFitxa ?? '—')}</CardTitle>
+              {/* La organización de hoy, con enlace a su ficha. La razón social con la que se
+                  firmó es un dato congelado —sale en «Dades del conveni»— y aquí, debajo, solo
+                  si no coincide: antes el título era ese dato y un convenio de prueba se
+                  llamaba «TEST-PROD-1 (donació generador)» sin decir de quién era. */}
+              <CardTitle>
+                {nomFitxa && (conv.productor_id || conv.entidad_id)
+                  ? (
+                    <Link className="hover:underline"
+                      to={conv.productor_id ? `/equip/productors/${conv.productor_id}` : `/equip/entitats/${conv.entidad_id}`}>
+                      {nomFitxa}
+                    </Link>
+                  )
+                  : valor(conv.datos_org, 'raso_social')}
+              </CardTitle>
+              {nomFitxa && valor(conv.datos_org, 'raso_social') !== '—' && valor(conv.datos_org, 'raso_social') !== nomFitxa && (
+                <p className="mt-1 text-sm text-muted-foreground">
+                  {t('conv.signed_as', { nom: valor(conv.datos_org, 'raso_social') })}
+                </p>
+              )}
               <p className="mt-1 text-sm tabular-nums text-muted-foreground">
                 {conv.numero_completo ?? t('conv.no_number')} · {t(`sig.model_${conv.tipo}`)}
                 {conv.roles_com.length > 0 ? ` · ${conv.roles_com.map((r) => t(`conv.role_${r}`)).join(', ')}` : ''}
@@ -501,8 +518,14 @@ export default function ConveniDetall() {
             <div key={e.id} className="border-b pb-2 text-sm">
               <p className="font-medium">{e.destinatario_nombre || e.destinatario_email || '—'}</p>
               <p className="text-muted-foreground">
-                {t(`conv.lk_${e.estado}`)} · {t(`conv.ch_${e.canal}`)} ·{' '}
-                {t('alb.expires', { date: dataCurta(e.caduca_at) })}
+                {/* El estado REAL: la caducidad se calcula, no se guarda. «Caduca el» solo
+                    mientras está vivo; usado o anulado, la fecha no dice nada. */}
+                {t(`conv.lk_${estatEfectiuEnllac(e.estado, e.caduca_at)}`)} · {t(`conv.ch_${e.canal}`)}
+                {estatEfectiuEnllac(e.estado, e.caduca_at) === 'activo'
+                  ? <> · {t('alb.expires', { date: dataCurta(e.caduca_at) })}</>
+                  : estatEfectiuEnllac(e.estado, e.caduca_at) === 'caducado'
+                    ? <> · {t('alb.expired_on', { date: dataCurta(e.caduca_at) })}</>
+                    : null}
                 {e.recordatorios > 0 ? ` · ${t('conv.reminders', { n: e.recordatorios })}` : ''}
               </p>
               {evidencies.filter((v) => v.enlace_id === e.id).map((v) => (

@@ -29,6 +29,7 @@ import {
   marcarEntregat, propostaConciliacio, rectificarAlbara,
 } from '../../lib/albarans'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
+import { estatEfectiuEnllac } from '../../lib/documentsPanell'
 import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
@@ -962,7 +963,13 @@ export default function AlbaraDetall() {
                 )}
               </div>
               <p className="text-muted-foreground">
-                {t(`alb.lk_${e.estado}`)} · {t('alb.expires', { date: dataCurta(e.caduca_at) })}
+                {/* El estado REAL (la caducidad se calcula) y la fecha solo si significa algo. */}
+                {t(`alb.lk_${estatEfectiuEnllac(e.estado, e.caduca_at)}`)}
+                {estatEfectiuEnllac(e.estado, e.caduca_at) === 'activo'
+                  ? <> · {t('alb.expires', { date: dataCurta(e.caduca_at) })}</>
+                  : estatEfectiuEnllac(e.estado, e.caduca_at) === 'caducado'
+                    ? <> · {t('alb.expired_on', { date: dataCurta(e.caduca_at) })}</>
+                    : null}
               </p>
               {evidencies.filter((v) => v.enlace_id === e.id).map((v) => (
                 <p key={v.id} className="text-xs text-muted-foreground">

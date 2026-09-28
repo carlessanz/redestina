@@ -224,8 +224,13 @@ export default function Convenis() {
                           <TableCell className="font-medium whitespace-nowrap tabular-nums">
                             {f.numero_completo ?? t('conv.no_number')}
                           </TableCell>
-                          <TableCell className="max-w-56 truncate">
-                            {nomOrganitzacio(f.datos_org, o.nom)}
+                          {/* La organización ACTUAL, que es por lo que se busca; la razón social
+                              con la que se firmó, debajo, solo si es otra cosa. */}
+                          <TableCell className="max-w-56">
+                            <span className="block truncate">{o.nom !== '—' ? o.nom : nomOrganitzacio(f.datos_org, null)}</span>
+                            {o.nom !== '—' && nomOrganitzacio(f.datos_org, o.nom) !== o.nom && (
+                              <span className="block truncate text-xs text-muted-foreground">{nomOrganitzacio(f.datos_org, o.nom)}</span>
+                            )}
                           </TableCell>
                           <TableCell><Badge variant="outline">{t(`sig.model_${f.tipo}`)}</Badge></TableCell>
                           <TableCell className="text-muted-foreground">{o.comarca ?? '—'}</TableCell>

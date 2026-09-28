@@ -11,6 +11,7 @@ import {
   agrupaPerExercici,
   docVigent,
   estatConveniMesAvancat,
+  estatEfectiuEnllac,
   etiquetaTipusDocument,
   rutaPerProposit,
 } from '../src/lib/documentsPanell'
@@ -136,5 +137,19 @@ describe('rutaPerProposit', () => {
   it('el token viaja tal cual', () => {
     const token = `aA0-_zZ9${'x'.repeat(35)}`
     expect(rutaPerProposit('firma_convenio', token)).toBe(`/signar/${token}`)
+  })
+})
+
+describe('estatEfectiuEnllac', () => {
+  const ara = new Date('2026-09-28T10:00:00Z')
+  it('un enlace activo con la caducidad pasada es caducado', () => {
+    expect(estatEfectiuEnllac('activo', '2026-09-23T10:00:00Z', ara)).toBe('caducado')
+  })
+  it('activo y dentro de plazo sigue activo', () => {
+    expect(estatEfectiuEnllac('activo', '2026-10-14T10:00:00Z', ara)).toBe('activo')
+  })
+  it('usado o revocado no cambian aunque haya vencido', () => {
+    expect(estatEfectiuEnllac('usado', '2026-09-01T00:00:00Z', ara)).toBe('usado')
+    expect(estatEfectiuEnllac('revocado', '2026-09-01T00:00:00Z', ara)).toBe('revocado')
   })
 })

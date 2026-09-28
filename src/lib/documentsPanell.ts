@@ -102,3 +102,24 @@ export function estatConveniMesAvancat(
   }
   return millor
 }
+
+/** Estado de un enlace de `enlaces_token` tal como se guarda. */
+export type EstatEnllac = 'activo' | 'usado' | 'caducado' | 'revocado'
+
+/**
+ * El estado REAL de un enlace, no el guardado.
+ *
+ * La caducidad no se escribe en la base, se calcula (§4, `resolver_enlace`): un enlace que
+ * venció sigue diciendo `activo` en su fila. Las fichas del equipo pintaban ese valor, así
+ * que un enlace caducado hace cinco días salía «Actiu» (28-09-2026). Aquí se deriva igual
+ * que en SQL: activo y con `caduca_at` en el pasado es caducado.
+ */
+export function estatEfectiuEnllac(
+  estado: string,
+  caducaAt: string | null,
+  ara: Date = new Date(),
+): EstatEnllac {
+  const e = (['activo', 'usado', 'caducado', 'revocado'] as const).find((x) => x === estado) ?? 'activo'
+  if (e === 'activo' && caducaAt && new Date(caducaAt).getTime() <= ara.getTime()) return 'caducado'
+  return e
+}
