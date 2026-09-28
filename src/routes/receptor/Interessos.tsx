@@ -19,16 +19,22 @@ import { useOrganitzacio } from '../../hooks/useAppContext'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
-import type { EstadoAlbaran, EstadoExcedente, OfertaRespuesta } from '../../types'
+import type { EstadoAlbaran, Excedente, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
+import DetallOfertaReceptor, { kgFmt } from '../../components/DetallOfertaReceptor'
+import { Link } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import {
+  Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
-type AmbOferta = OfertaRespuesta & {
-  excedentes: { id_excedente: string | null; producto: string | null; estado: EstadoExcedente; fotos: string[] | null; foto_producte: boolean | null } | null
-}
+// La oferta entera (`excedentes(*)`): la tarjeta abre su detalle (28-09-2026), y el detalle
+// es el mismo del Mercat.
+type AmbOferta = OfertaRespuesta & { excedentes: Excedente | null }
 
 /** Lo único que hace falta del albarán de entrega para contar la etapa. */
 type AlbaraEnt = Pick<AlbaranBandeja, 'id' | 'numero_completo' | 'estado' | 'canalizacion_id'>
@@ -62,6 +68,7 @@ export function Interessos() {
   const [files, setFiles] = useState<AmbOferta[]>([])
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   const [carregant, setCarregant] = useState(true)
+  const [obert, setObert] = useState<AmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
 
   const carrega = useCallback(async () => {
@@ -72,7 +79,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('*, excedentes(id_excedente, producto, estado, fotos, foto_producte)')
+        .select('*, excedentes(*)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -145,11 +152,16 @@ export function Interessos() {
           // no lo ha hecho, cuándo le llegó la oferta.
           const data = dataCurtaSenseAny(f.respondido_at ?? f.enviado_at)
           const detall = [
-            f.kg_solicitados != null ? `${f.kg_solicitados} ${t('od.rs_kg')}` : null,
-            f.preu_ofert != null ? `${f.preu_ofert} ${t('od.rs_preu')}` : null,
+            f.kg_solicitados != null ? `${kgFmt(f.kg_solicitados)} ${t('od.rs_kg')}` : null,
+            f.preu_ofert != null
+              ? `${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}`
+              : null,
           ].filter(Boolean).join(' · ')
+          // Toda la tarjeta abre el detalle de la oferta: antes no se podía abrir y el
+          // interés no decía ni dónde estaba ni en qué formato venía.
           return (
-            <div key={f.id} className="rounded-lg border p-3">
+            <button type="button" key={f.id} onClick={() => f.excedentes && setObert(f)}
+              className="block w-full rounded-lg border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
                   <FotoOfertaResolta foto={foto(f.excedentes ?? { producto: null })}
@@ -173,10 +185,46 @@ export function Interessos() {
                   {toca}
                 </p>
               )}
-            </div>
+            </button>
           )
         })}
       </CardContent>
+
+      <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
+        {obert?.excedentes && (() => {
+          const alb = obert.canalizacion_id ? albarans[obert.canalizacion_id] : undefined
+          const punt = puntInteres({
+            estado: obert.estado,
+            aprovacio: obert.aprovacio,
+            kg: obert.kg_solicitados,
+            ofertaEstado: obert.excedentes.estado ?? 'publicada',
+            albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
+            motiu: obert.motiu_aprovacio,
+          })
+          const est = estatSimpleInteres(punt)
+          const toca = t(punt.claus.toca, punt.vars).trim()
+          // La oferta todavía se puede pedir: se manda al Mercat, que es donde vive el botón.
+          const perDemanar = est.estat === 'per_respondre'
+            && ['publicada', 'parcial'].includes(obert.excedentes.estado)
+          return (
+            <DialogContent className="max-h-[85dvh] overflow-y-auto">
+              <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
+              <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              {toca && toca !== '—' && toca !== punt.claus.toca && (
+                <p className="text-sm text-muted-foreground">{toca}</p>
+              )}
+              <DialogFooter className="items-center gap-2 sm:justify-between">
+                <BadgeEstat clase={est.clase}>{t(est.key)}</BadgeEstat>
+                {perDemanar && (
+                  <Button asChild className="h-11 md:h-9">
+                    <Link to="/receptor/mercat">{t('int.a_mercat')}</Link>
+                  </Button>
+                )}
+              </DialogFooter>
+            </DialogContent>
+          )
+        })()}
+      </Dialog>
     </Card>
   )
 }

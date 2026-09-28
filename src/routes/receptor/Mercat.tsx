@@ -23,9 +23,10 @@ import { manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import BadgeEstat from '../../components/proces/BadgeEstat'
-import { FotoOferta, FotoOfertaResolta, useFotosOfertes, useUrlsFotos } from '../../components/FotosOferta'
+import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import type { Excedente, OfertaRespuesta } from '../../types'
 import CarregantSeccio from '../../components/CarregantSeccio'
+import DetallOfertaReceptor, { kgFmt, preuDe } from '../../components/DetallOfertaReceptor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -102,9 +103,8 @@ export default function Mercat() {
 
   // Las URLs firmadas de todas las fotos de la pantalla, en lote (antes de cualquier
   // `return`: son hooks). `foto()` resuelve la principal de cada oferta —la suya, la del
-  // producto o el icono— y `urls` firma las demás fotos de la oferta abierta.
+  // producto o el icono—; las demás de la oferta abierta las firma `DetallOfertaReceptor`.
   const foto = useFotosOfertes(obert ? [...ofertes, obert] : ofertes)
-  const urls = useUrlsFotos(obert?.fotos ?? [])
 
   if (!entidadId) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
 
@@ -199,59 +199,7 @@ export default function Mercat() {
                 {mode === 'detall' ? t('mk.detail_title') : t('mk.dialog_title')}
               </DialogTitle>
             </DialogHeader>
-            {/* Foto grande y, si hay más, las otras debajo para abrirlas en su tamaño. Sin
-                fotos propias, la del producto con la etiqueta «orientativa», o el icono. */}
-            <div className="space-y-2">
-                <FotoOfertaResolta foto={foto(obert, true)} alt={obert.producto ?? ''}
-                  className="aspect-[4/3] w-full" etiqueta />
-                {(obert.fotos?.length ?? 0) > 1 && (
-                  <div className="flex gap-2">
-                    {obert.fotos.slice(1).map((r) => (
-                      <a key={r} href={urls[r]} target="_blank" rel="noreferrer">
-                        <FotoOferta url={urls[r]} alt={obert.producto ?? ''} className="size-16" />
-                      </a>
-                    ))}
-                  </div>
-                )}
-            </div>
-            <p className="font-titulos text-lg font-semibold">
-              {obert.producto ?? '—'}{obert.variedad ? ` · ${obert.variedad}` : ''}
-            </p>
-
-            <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
-              <Dada etiqueta={t('mk.d_kg')} valor={`${kgFmt(obert.kg_total)} kg`} />
-              <Dada etiqueta={t('mk.d_zone')} valor={obert.comarca ?? '—'} />
-              <Dada etiqueta={t('mk.d_mode')} valor={obert.modalitat ? t(`od.mod_${obert.modalitat}`) : '—'} />
-              {preuDe(obert) && <Dada etiqueta={t('mk.d_price')} valor={preuDe(obert) ?? ''} />}
-              <Dada etiqueta={t('mk.d_until')} valor={obert.disponible_hasta ? dataCurta(obert.disponible_hasta) : '—'} />
-              {obert.horari_recollida && <Dada etiqueta={t('mk.d_hours')} valor={obert.horari_recollida} />}
-              <Dada etiqueta={t('mk.d_field')} valor={obert.producte_al_camp ? t('mk.d_field_yes') : t('mk.d_field_no')} />
-              {/* El formato nuevo (desde el 27-09-2026) y, si no lo hay, el tipo de caja de
-                  las ofertas anteriores. */}
-              {(obert.format_entrega || obert.tipo_caixa || obert.num_caixes != null) && (
-                <Dada
-                  etiqueta={t('mk.d_format')}
-                  valor={[
-                    obert.format_entrega ? t(`mk.fmt_${obert.format_entrega}`) : obert.tipo_caixa,
-                    obert.num_caixes != null ? `${obert.num_caixes}` : null,
-                  ].filter(Boolean).join(' · ')}
-                />
-              )}
-              {obert.transport_propi != null && (
-                <Dada
-                  etiqueta={t('mk.d_transport')}
-                  valor={obert.transport_propi ? t('mk.d_transport_yes') : t('mk.d_transport_no')}
-                />
-              )}
-              {obert.retorn_envasos && <Dada etiqueta={t('mk.d_return')} valor={obert.retorn_envasos} />}
-              {obert.causa && <Dada etiqueta={t('mk.d_cause')} valor={obert.causa} />}
-            </dl>
-            {obert.observacions && (
-              <div className="text-sm">
-                <p className="text-xs text-muted-foreground">{t('mk.d_notes')}</p>
-                <p className="whitespace-pre-wrap">{obert.observacions}</p>
-              </div>
-            )}
+            <DetallOfertaReceptor oferta={obert} foto={foto(obert, true)} />
 
             {mode === 'interes' && (
               <>
@@ -297,24 +245,4 @@ export default function Mercat() {
       </Dialog>
     </Card>
   )
-}
-
-function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
-  return (
-    <div>
-      <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
-      <dd className="font-medium">{valor}</dd>
-    </div>
-  )
-}
-
-/** «1.320» i «0,45»: el format local, no el del punt decimal de la base. */
-function kgFmt(n: number | null | undefined): string {
-  return n == null ? '—' : new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 2 }).format(Number(n))
-}
-
-/** El precio, solo si la modalidad lo tiene: una donación no lleva precio. */
-function preuDe(o: Excedente): string | null {
-  if ((o.modalitat !== 'venda' && o.modalitat !== 'maquila') || o.preu_minim == null) return null
-  return `${new Intl.NumberFormat('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(o.preu_minim))} €/kg`
 }

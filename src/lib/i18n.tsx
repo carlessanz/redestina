@@ -808,6 +808,7 @@ const ca: Dict = {
   'mk.until': 'fins {date}',
   // interessos i històric del receptor
   'int.title': 'Els meus interessos',
+  'int.a_mercat': 'Demana-la al Mercat',
   'int.empty': 'Encara no heu mostrat interès en cap oferta.',
   'hist.title': 'Històric',
 
@@ -2860,6 +2861,7 @@ const es: Dict = {
   'mk.until': 'hasta {date}',
   // intereses e histórico del receptor
   'int.title': 'Mis intereses',
+  'int.a_mercat': 'Pídela en el Mercat',
   'int.empty': 'Todavía no habéis mostrado interés en ninguna oferta.',
   'hist.title': 'Histórico',
 
