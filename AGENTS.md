@@ -1402,6 +1402,11 @@ cuestionario vigente llevan «Pregunta retirada» y van al final, y una medida a
 regla viva propone lleva «Cap regla la proposa» — hoy, `cadena_fred_minima` del productor, que
 se quedó sin regla al retirar `capacitat_fred` en la versión 1. Antes, además, la regla
 `sempre` salía «sempre sempre».
+✅ **Y el PDF del plan ya conoce esas cuatro secciones** (28-09-2026, `render/pla.ts`): hasta
+entonces el primer plan emitido con la versión 1 habría impreso «produccio» o «generacio» como
+título de las respuestas, en un orden cualquiera. Comprobado renderizando en local el borrador de
+Mas de Prova, sin emitir. De paso, el distintivo OBLIGATÒRIA/RECOMANADA tiene un ancho fijo (el
+del más largo) y la columna de títulos de las medidas ya no sale torcida.
 ⚠️ **El del receptor sigue en la versión 0**: la revisión dice que su diagnóstico va «solo cuando
 corresponda a prevención y gestión de excedentes», sin contenido.
 

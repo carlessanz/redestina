@@ -268,6 +268,12 @@ const CA: DiccionarioPlan = {
     conservacio: "Conservació",
     canalitzacio: "Canalització",
     seguiment: "Seguiment i registre",
+    // Las secciones del cuestionario del productor desde la versión 1 (27-09-2026). Sin
+    // ellas el PDF imprimía «produccio» o «generacio» como título, en un orden cualquiera.
+    produccio: "A. Producció",
+    generacio: "B. Generació de l’excedent",
+    gestio: "C. Gestió actual",
+    necessitats: "D. Necessitats i oportunitats",
   },
   bloc_altres: "Altres",
 };
@@ -330,6 +336,10 @@ const ES: DiccionarioPlan = {
     conservacio: "Conservación",
     canalitzacio: "Canalización",
     seguiment: "Seguimiento y registro",
+    produccio: "A. Producción",
+    generacio: "B. Generación del excedente",
+    gestio: "C. Gestión actual",
+    necessitats: "D. Necesidades y oportunidades",
   },
   bloc_altres: "Otros",
 };
@@ -469,6 +479,10 @@ function respuestaLegible(r: RespuestaPlan, t: DiccionarioPlan, lengua: "ca" | "
 
 /** El orden de los bloques es el del proceso, no el alfabético. */
 const ORDEN_BLOQUES = [
+  "produccio",
+  "generacio",
+  "gestio",
+  "necessitats",
   "planificacio",
   "collita",
   "conservacio",
@@ -814,8 +828,13 @@ function pintarMesura(
 
   const tamanoDistintivo = 7.5;
   const relleno = 5;
-  const anchoDistintivo = m.medir(distintivo, m.fuentes.cuerpoFuerte, tamanoDistintivo) +
-    relleno * 2;
+  // El ancho del MÁS LARGO de los dos, no el de este: con el suyo, el título de una
+  // obligatoria empezaba unos puntos más a la derecha que el de una recomendada y la
+  // columna de títulos se veía torcida (28-09-2026).
+  const anchoDistintivo = Math.max(
+    m.medir(t.obligatoria, m.fuentes.cuerpoFuerte, tamanoDistintivo),
+    m.medir(t.recomanada, m.fuentes.cuerpoFuerte, tamanoDistintivo),
+  ) + relleno * 2;
   const sangria = anchoDistintivo + 8;
 
   const titulo = textoIdioma(mesura.titol, lengua) || (mesura.codi ?? "").trim() || t.buit;
