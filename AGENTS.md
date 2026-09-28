@@ -784,12 +784,16 @@ supabase/
                                las fuentes y el logo, y su copia EN EL BUNDLE (incrustats.ts):
                                static_files ya no llega al isolate (§11)
     descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
+    reenviar-documento/        POST (JWT, equipo): vuelve a mandar un documento emitido por
+                               correo, al destinatario de su `envio` y con las mismas barreras (§4)
     recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
     _shared/correu-document.ts Qué dice el correo que acompaña a un documento emitido (puro, §4)
+    _shared/envia-document.ts  Lo manda: barreras + PDF adjunto + traza. Uno solo para
+                               generar-documento y reenviar-documento (§4)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo
 docs/                          Material de trabajo local — IGNORADO POR GIT (§7)
   nuevas-funcionalidades/      Specs Redestina, manuales y CSV de origen
@@ -1110,7 +1114,20 @@ dice lo decide `_shared/correu-document.ts` (puro, con 9 pruebas), según tipo, 
   así que los documentos que ya existían el día del estreno **no se reenviaron**.
 - **Un correo que falla no marca el documento en `error`**: el documento está bien. Queda en
   `documento_envios` (`proposito = 'document'`, con `documento_id`) y se ve en la pestaña
-  Enviaments de Documents. ⚠️ No hay reintento automático del correo ni botón de reenviar.
+  Enviaments de Documents. No hay reintento automático; hay **botón «Reenvia»** (abajo).
+- ✅ **«Reenvia»** (28-09-2026): en `/equip/documents`, en la fila de cada documento que se
+  manda por correo (CONV, RES, CD, CT, CR emitidos) y en la de cada envío de la pestaña
+  Enviaments. Pregunta antes y llama a la Edge Function **`reenviar-documento`** (JWT,
+  `exigirEquipo`), que manda **el PDF que ya está en el bucket** —no lo vuelve a renderizar—
+  **al destinatario de `documentos.envio`** —nunca a uno que llegue en la petición: el botón no
+  puede ser «manda este certificado a cualquier correo»; si la dirección está mal se corrige la
+  ficha y se emite de nuevo—. Pasa por **las mismas barreras**, porque el envío vive en
+  `_shared/envia-document.ts` y lo llaman las dos funciones: con dos copias, el reenvío podría
+  acabar siendo la forma de saltarse el modo test. Responde `429 enviat_fa_poc` si ya salió
+  (enviat o simulat) hace menos de 2 minutos, que es lo que para un doble clic; un error
+  reciente no lo impide. Sirve también para los documentos anteriores al envío automático.
+  Probado en producción: una productora recibe `403`, el equipo `429` justo después del
+  envío y, pasados los dos minutos, el reenvío sale (`funcion = 'reenviar-documento'`).
 - Por encima de 25 MB se manda sin adjunto (Resend limita a 40 MB y base64 infla un 33 %).
 - ✅ **Probado en producción el 28-09-2026**: un certificado de recepción de prueba
   (`P-CR-2026-0001`, Obrador de Prova) se generó (3 páginas) y salió por Resend con el PDF
@@ -4826,6 +4843,7 @@ supabase functions deploy registro --no-verify-jwt               # registro púb
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
 supabase functions deploy generar-documento --no-verify-jwt      # la llama el trigger por pg_net
 supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 60 s)
+supabase functions deploy reenviar-documento  # con verify_jwt (equipo: reenviar un documento)
 supabase functions deploy recordatorios-documentales --no-verify-jwt  # lo llama pg_cron
 supabase functions deploy enlace-publico --no-verify-jwt        # confirmación pública (§9)
 supabase functions deploy subir-documento-externo               # con verify_jwt (multipart, 10 MB)

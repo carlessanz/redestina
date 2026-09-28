@@ -37,11 +37,14 @@
 //     pregunta que hay que contestar —«¿este correo salió?»— sin publicar una credencial.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Eye, Loader2 } from 'lucide-react'
+import { Download, Eye, Loader2, Send } from 'lucide-react'
+import { toast } from 'sonner'
 import { Link } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
+import { reenviarDocument } from '../../lib/documents'
+import { useConfirma } from '../../components/DialegConfirma'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
@@ -94,6 +97,13 @@ interface Enviament {
   enviado_at: string | null
   created_at: string
 }
+
+/**
+ * Los tipos que salen por correo con el PDF adjunto (`_shared/correu-document.ts`). Es una
+ * pista para no enseñar un botón que no hace nada; la autoridad es el servidor, que
+ * contesta `no_s_envia` si ese documento no lleva destinatario.
+ */
+const TIPUS_ENVIABLES = new Set(['CONV', 'RES', 'CD', 'CT', 'CR'])
 
 /** Solo se traen los últimos: la tabla crece con cada correo y no se pagina (§12.5). */
 const MAX_ENVIAMENTS = 200
@@ -180,6 +190,8 @@ export default function Documents() {
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [cerca, setCerca] = useState('')
+  const [reenviant, setReenviant] = useState<string | null>(null)
+  const { confirma, dialeg } = useConfirma()
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas va en UN literal: partida, supabase-js pierde el tipo de
@@ -221,20 +233,54 @@ export default function Documents() {
   // Los correos, también aparte y también fail-soft: si la migración que generalizó
   // `documento_envios` no está aplicada, PostgREST responde `42703` por las columnas
   // nuevas y lo único que pasa es que esta pestaña sale vacía.
+  const carregaEnviaments = useCallback(async () => {
+    // ⚠️ Lista de columnas en UN literal (§7). No se pide el asunto porque la tabla
+    // NO lo guarda, y es deliberado (§12.25).
+    const { data: files } = await supabase
+      .from('documento_envios')
+      .select('id, documento_id, destinatario, estado, proposito, funcion, error, enviado_at, created_at')
+      .order('created_at', { ascending: false })
+      .limit(MAX_ENVIAMENTS)
+    return (files as Enviament[] | null) ?? []
+  }, [])
+
   useEffect(() => {
     let cancelled = false
     void (async () => {
-      // ⚠️ Lista de columnas en UN literal (§7). No se pide el asunto porque la tabla
-      // NO lo guarda, y es deliberado (§12.25).
-      const { data: files } = await supabase
-        .from('documento_envios')
-        .select('id, documento_id, destinatario, estado, proposito, funcion, error, enviado_at, created_at')
-        .order('created_at', { ascending: false })
-        .limit(MAX_ENVIAMENTS)
-      if (!cancelled) setEnviaments((files as Enviament[] | null) ?? [])
+      const files = await carregaEnviaments()
+      if (!cancelled) setEnviaments(files)
     })()
     return () => { cancelled = true }
-  }, [])
+  }, [carregaEnviaments])
+
+  /**
+   * Vuelve a mandar el documento por correo, al destinatario que ya tenía. Pregunta antes:
+   * es un correo que sale a una organización. El destinatario solo se conoce cuando se
+   * reenvía desde la pestaña de envíos (`documentos.envio` no lo lee el panel).
+   */
+  async function reenvia(documentoId: string, numero: string | null, destinatari: string | null) {
+    const ok = await confirma({
+      titol: t('doc.resend_title', { num: numero ?? '—' }),
+      descripcio: destinatari
+        ? t('doc.resend_desc_to', { email: destinatari })
+        : t('doc.resend_desc'),
+      confirmar: t('doc.resend'),
+    })
+    if (!ok) return
+    setReenviant(documentoId)
+    const r = await reenviarDocument(documentoId)
+    setReenviant(null)
+    if (!r.ok) {
+      toast.error(t(r.motiuKey))
+    } else if (r.simulat) {
+      toast.info(t('doc.resend_simulat'))
+    } else {
+      toast.success(r.destinatari
+        ? t('doc.resend_ok_to', { email: r.destinatari })
+        : t('doc.resend_ok'))
+    }
+    setEnviaments(await carregaEnviaments())
+  }
 
   /** Recarga silenciosa: tras generarse un PDF, la fila ya no dice «Generant…». */
   const refresca = useCallback(async () => {
@@ -372,6 +418,20 @@ export default function Documents() {
                           : <Download className="size-4" />}
                         {esperant ? t('doc.generating') : t('doc.download')}
                       </Button>
+                      {TIPUS_ENVIABLES.has(d.tipo) && d.estado === 'emitido' && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          className="h-11 whitespace-normal md:h-8"
+                          disabled={reenviant === d.id}
+                          onClick={() => void reenvia(d.id, d.numero_completo, null)}
+                        >
+                          {reenviant === d.id
+                            ? <Loader2 className="size-4 animate-spin" />
+                            : <Send className="size-4" aria-hidden />}
+                          {t('doc.resend')}
+                        </Button>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>
@@ -455,6 +515,7 @@ export default function Documents() {
               <TableHead>{t('doc.c_function')}</TableHead>
               <TableHead>{t('doc.c_document')}</TableHead>
               <TableHead>{t('doc.c_status')}</TableHead>
+              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
             </TableRow>
           </TableHeader>
           <TableBody>
@@ -485,6 +546,24 @@ export default function Documents() {
                       <p className="mt-1 max-w-xs text-xs text-error">{e.error}</p>
                     )}
                   </TableCell>
+                  <TableCell className="text-right">
+                    {/* Solo los correos de un documento: el resto (accesos, avisos) no se
+                        reenvían desde aquí, cada uno tiene su propia pantalla. */}
+                    {e.proposito === 'document' && e.documento_id && (
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="h-11 whitespace-normal md:h-8"
+                        disabled={reenviant === e.documento_id}
+                        onClick={() => void reenvia(e.documento_id!, numero ?? null, e.destinatario)}
+                      >
+                        {reenviant === e.documento_id
+                          ? <Loader2 className="size-4 animate-spin" />
+                          : <Send className="size-4" aria-hidden />}
+                        {t('doc.resend')}
+                      </Button>
+                    )}
+                  </TableCell>
                 </TableRow>
               )
             })}
@@ -498,6 +577,7 @@ export default function Documents() {
 
   return (
     <Card>
+      {dialeg}
       <CardHeader>
         <CardTitle>{t('doc.title')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('doc.subtitle')}</p>

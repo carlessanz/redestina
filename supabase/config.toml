@@ -147,6 +147,14 @@ verify_jwt = true
 import_map = "./functions/descargar-documento/deno.json"
 entrypoint = "./functions/descargar-documento/index.ts"
 
+# Vuelve a mandar por correo un documento ya emitido, al destinatario de su `envio` y con
+# las mismas barreras que el envío original (_shared/envia-document.ts). Solo el equipo.
+[functions.reenviar-documento]
+enabled = true
+verify_jwt = true
+import_map = "./functions/reenviar-documento/deno.json"
+entrypoint = "./functions/reenviar-documento/index.ts"
+
 # Recordatorios del circuito documental: enlaces sin usar a 7 y 14 días. La llama pg_cron
 # a las 7:00 (disparar_recordatorios_documentales), así que va sin JWT y con el mismo
 # secreto compartido que generar-documento. No sirve ficheros estáticos.

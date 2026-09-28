@@ -323,3 +323,67 @@ export async function pujarDocumentExtern(camps: {
     return { ok: false, codi: 'xarxa', motiuKey: MOTIU_PUJADA.xarxa }
   }
 }
+
+// ------------------------------------------------------------ reenviar un documento
+
+/**
+ * Qué puede contestar `reenviar-documento`, más los fallos que solo ocurren aquí.
+ * Los cuatro del medio son las barreras de siempre (§8): el documento está bien, lo que
+ * no deja es mandarlo a esa dirección.
+ */
+export type CodiReenviament =
+  | 'unauthorized' | 'forbidden' | 'no_existeix' | 'sense_fitxer' | 'enviat_fa_poc'
+  | 'no_s_envia' | 'bloquejat_prova' | 'bloquejat_mode_test' | 'fora_llista_test'
+  | 'error_envio' | 'xarxa' | 'desconegut'
+
+const MOTIU_REENVIAMENT: Record<CodiReenviament, string> = {
+  unauthorized: 'doc.err_sessio',
+  forbidden: 'doc.resend_err_permis',
+  no_existeix: 'doc.err_no_existeix',
+  sense_fitxer: 'doc.err_generant',
+  enviat_fa_poc: 'doc.resend_err_recent',
+  no_s_envia: 'doc.resend_err_no_envia',
+  bloquejat_prova: 'doc.resend_err_prova',
+  bloquejat_mode_test: 'doc.resend_err_mode_test',
+  fora_llista_test: 'doc.resend_err_llista',
+  error_envio: 'doc.resend_err_envio',
+  xarxa: 'doc.err_xarxa',
+  desconegut: 'doc.resend_err_generic',
+}
+
+export type ResultatReenviament =
+  | { ok: true; simulat: boolean; destinatari: string | null }
+  | { ok: false; codi: CodiReenviament; motiuKey: string }
+
+/**
+ * Vuelve a mandar un documento emitido al destinatario que ya tenía, con el PDF adjunto.
+ * Solo el equipo. Nunca lanza.
+ */
+export async function reenviarDocument(documentoId: string): Promise<ResultatReenviament> {
+  const falla = (codi: CodiReenviament): ResultatReenviament =>
+    ({ ok: false, codi, motiuKey: MOTIU_REENVIAMENT[codi] })
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return falla('unauthorized')
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/reenviar-documento`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ documento_id: documentoId }),
+    })
+    const cos = (await res.json().catch(() => null)) as
+      | { resultat?: string; destinatari?: string | null; code?: string }
+      | null
+
+    if (res.ok && cos?.resultat) {
+      return { ok: true, simulat: cos.resultat === 'simulat', destinatari: cos.destinatari ?? null }
+    }
+    const codi = typeof cos?.code === 'string' && cos.code in MOTIU_REENVIAMENT
+      ? cos.code as CodiReenviament
+      : res.status === 401 ? 'unauthorized' : res.status === 403 ? 'forbidden' : 'desconegut'
+    return falla(codi)
+  } catch {
+    return falla('xarxa')
+  }
+}

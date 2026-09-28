@@ -141,7 +141,7 @@ tampoco prueba nada** (deuda §12.44): una función sin cambios puede volver a e
 deno run -A scripts/huellas-funciones.ts guardar
 ```
 
-**Las quince, cada una con su flag** (el flag tiene que coincidir con lo que declara
+**Las diecisiete, cada una con su flag** (el flag tiene que coincidir con lo que declara
 `config.toml`, que es quien manda):
 
 ```bash
@@ -160,6 +160,8 @@ supabase functions deploy recordatorios-documentales --no-verify-jwt # lo llama 
 supabase functions deploy enlace-publico --no-verify-jwt             # confirmación y firma públicas
 supabase functions deploy subir-documento-externo                    # verify_jwt
 supabase functions deploy limpiar-documentos-prueba                  # verify_jwt (super_admin)
+supabase functions deploy verificar-certificat --no-verify-jwt       # pública: verificar un certificado
+supabase functions deploy reenviar-documento                         # verify_jwt (equipo)
 ```
 
 🔴 **Este paso es la ÚNICA forma de publicar una función: si no la despliegas aquí, no se
@@ -180,16 +182,16 @@ branching activo, un commit de solo markdown cambió las quince), así que solo 
 las funciones que acabas de desplegar. Ahora que el branching está apagado vuelve a ser útil: si
 cambia una que no tocaste, pregúntate por qué. Detalle en §12.44.
 
-Luego comprueba que las quince quedaron `ACTIVE` y con el `verify_jwt` que toca:
+Luego comprueba que las diecisiete quedaron `ACTIVE` y con el `verify_jwt` que toca:
 
 ```bash
 supabase functions list
 ```
 
 `true` en `whatsapp-send`, `priorizar-entidades`, `enviar-email`, `crear-oferta`, `enviar-acceso`,
-`descargar-documento`, `subir-documento-externo` y `limpiar-documentos-prueba`; `false` en `whatsapp-webhook`,
-`intake-recordatorios`, `recuperar-password`, `registro`, `generar-documento`,
-`recordatorios-documentales` y `enlace-publico`.
+`descargar-documento`, `subir-documento-externo`, `limpiar-documentos-prueba` y `reenviar-documento`;
+`false` en `whatsapp-webhook`, `intake-recordatorios`, `recuperar-password`, `registro`,
+`generar-documento`, `recordatorios-documentales`, `enlace-publico` y `verificar-certificat`.
 
 ⚠️ El `verify_jwt` que acaba aplicándose sale de **`config.toml`**, no del flag de la línea de
 comandos: si una función discrepa de esa lista, se corrige ahí y se vuelve a desplegar. Pasó con
@@ -250,7 +252,8 @@ del pedido, y es el navegador quien bloquea.
 SB=https://uxppvaldhptdomvdhsmn.supabase.co/functions/v1
 O=https://redestina.carlessanz.com
 for f in whatsapp-send priorizar-entidades enviar-email recuperar-password crear-oferta \
-         enviar-acceso registro enlace-publico descargar-documento subir-documento-externo; do
+         enviar-acceso registro enlace-publico descargar-documento subir-documento-externo \
+         reenviar-documento; do
   A=$(curl -sS -o /dev/null -D - -X OPTIONS "$SB/$f" -H "Origin: $O" \
       -H "Access-Control-Request-Method: POST" \
       -H "Access-Control-Request-Headers: authorization,content-type" \
@@ -259,7 +262,7 @@ for f in whatsapp-send priorizar-entidades enviar-email recuperar-password crear
 done
 ```
 
-Las diez deben devolver **exactamente** `https://redestina.carlessanz.com`. Cualquier otra cosa
+Las once deben devolver **exactamente** `https://redestina.carlessanz.com`. Cualquier otra cosa
 —incluido `http://localhost:5173`— significa que esa función no ve el `ALLOWED_ORIGIN` bueno:
 vuelve al paso 4 y redespliégala.
 
