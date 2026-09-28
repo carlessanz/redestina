@@ -149,13 +149,31 @@ function aEntrada(l: LiniaForm, ordre: number): LiniaEntrada {
   }
 }
 
+/** El orden en que se leen los datos de una parte. `jsonb` reordena las claves (las cortas
+ *  primero), así que pintarlas en el orden en que llegan ponía el CIF antes que el nombre y
+ *  el municipio antes que la entidad. Lo que no esté aquí va al final, en el orden de antes. */
+const ORDRE_PART = ['razon_social', 'nombre', 'nif', 'domicilio', 'municipio', 'comarca', 'inscripcion', 'contacto', 'codigo_lote']
+
 /** Texto de una parte congelada de `partes`. Se lee de un jsonb, así que se navega a mano. */
 function part(partes: Record<string, unknown> | null, clau: string): Record<string, string> {
   const p = (partes?.[clau] ?? null) as Record<string, unknown> | null
   if (!p) return {}
+  const pos = (k: string) => { const i = ORDRE_PART.indexOf(k); return i < 0 ? ORDRE_PART.length : i }
   const out: Record<string, string> = {}
-  for (const [k, v] of Object.entries(p)) if (typeof v === 'string' && v) out[k] = v
+  for (const [k, v] of Object.entries(p).sort(([a], [b]) => pos(a) - pos(b))) {
+    if (typeof v === 'string' && v) out[k] = v
+  }
   return out
+}
+
+/** Un instante ISO (`2026-09-14T14:47:46.962Z`) al formato de `<input type="datetime-local">`,
+ *  en la hora del navegador. Ese control no acepta la `Z` ni los segundos con decimales, y
+ *  con el ISO tal cual se quedaba vacío: parecía que el albarán no tenía fecha de recogida. */
+function aDataHoraLocal(iso: string): string {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return iso
+  const z = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${z(d.getMonth() + 1)}-${z(d.getDate())}T${z(d.getHours())}:${z(d.getMinutes())}`
 }
 
 export default function AlbaraDetall() {
@@ -215,7 +233,7 @@ export default function AlbaraDetall() {
       Object.fromEntries(
         Object.entries((fila.recogida ?? {}) as Record<string, unknown>)
           .filter(([, v]) => typeof v === 'string')
-          .map(([k, v]) => [k, v as string]),
+          .map(([k, v]) => [k, k === 'fecha_hora' ? aDataHoraLocal(v as string) : v as string]),
       ),
     )
 
@@ -307,7 +325,16 @@ export default function AlbaraDetall() {
     setOcupat(true)
     const res = await emetreAlbara(
       albara.id,
-      Object.keys(recollida).length ? recollida : null,
+      // La fecha vuelve a ISO con su zona: `datetime-local` no lleva zona, y sin convertirla
+      // la base la leería en UTC y la movería dos horas.
+      Object.keys(recollida).length
+        ? {
+          ...recollida,
+          ...(recollida.fecha_hora && !Number.isNaN(new Date(recollida.fecha_hora).getTime())
+            ? { fecha_hora: new Date(recollida.fecha_hora).toISOString() }
+            : {}),
+        }
+        : null,
       form.map(aEntrada),
       albara.idioma,
     )
