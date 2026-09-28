@@ -117,7 +117,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
                     </span>
                   </TableCell>
                   <TableCell className="text-muted-foreground">
-                    <div className="max-w-[180px] break-all leading-tight">{p.email ?? '—'}</div>
+                    <div className="max-w-[180px] break-all whitespace-normal leading-tight">{p.email ?? '—'}</div>
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{p.phone ? `+${p.phone}` : '—'}</TableCell>
                   <TableCell>

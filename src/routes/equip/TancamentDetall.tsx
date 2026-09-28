@@ -1112,7 +1112,9 @@ function FilaDonant({
       </TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(d.kg_total)}</TableCell>
       <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(d.valor_total)}</TableCell>
-      <TableCell className="max-w-52">
+      {/* `whitespace-normal`: la celda hereda `whitespace-nowrap` de la tabla, y el «qué
+          toca» se salía del `max-w-52` y se pintaba encima de la columna siguiente. */}
+      <TableCell className="min-w-44 max-w-52 whitespace-normal">
         <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
         {d.excepcion_sin_factura && (
           <Badge className="ml-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.exception')}</Badge>
@@ -1132,7 +1134,9 @@ function FilaDonant({
           )
           : <span className="text-muted-foreground">{t('tan.no_invoice')}</span>}
       </TableCell>
-      <TableCell>
+      {/* `min-w-48`: el botón con el número del documento mide ~175 px por sí solo; sin
+          ancho mínimo, la tabla estrechaba la columna y el botón se salía de ella. */}
+      <TableCell className="min-w-48">
         {docs.length === 0
           ? <span className="text-sm text-muted-foreground">—</span>
           : (

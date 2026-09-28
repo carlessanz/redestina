@@ -48,9 +48,13 @@ export default function Landing() {
             —la navegación centrada «flotaba» lejos de la marca— y acciones a la derecha,
             separadas del idioma por un divisor. Enlaces en peso medio y con zona de clic y
             foco visibles, no texto suelto en gris claro. */}
-        <div className="mx-auto flex h-16 max-w-6xl items-center gap-2 px-4 md:h-20 md:px-6">
+        {/* ⚠️ En móvil el logo, los márgenes y los botones encogen: con los tamaños de
+            escritorio la cabecera pedía 403 px y a 375 toda la página se desplazaba de lado
+            (medido el 28-09-2026; se rehízo el 16-09 y no se había vuelto a medir). Cabe
+            desde 320 px. */}
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-1.5 px-3 sm:gap-2 sm:px-4 md:h-20 md:px-6">
           <Link to="/" aria-label="Redestina" className="flex shrink-0 items-center rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
-            <img src="/logo-redestina.svg" alt="Redestina" className="h-10 w-auto md:h-11 lg:h-12" />
+            <img src="/logo-redestina.svg" alt="Redestina" className="h-8 w-auto max-[359px]:h-6 sm:h-10 md:h-11 lg:h-12" />
           </Link>
 
           <nav className="ml-6 hidden items-center gap-1 md:flex lg:ml-10">
@@ -65,10 +69,10 @@ export default function Landing() {
           <div className="ml-auto flex items-center gap-1 sm:gap-2">
             <SelectorIdioma />
             <span aria-hidden className="mx-1 hidden h-6 w-px bg-border sm:block" />
-            <Button asChild variant="ghost" className="font-medium">
+            <Button asChild variant="ghost" className="px-2.5 font-medium sm:px-4">
               <Link to="/login">{t('land.enter')}</Link>
             </Button>
-            <Button asChild className="font-medium">
+            <Button asChild className="px-3 font-medium sm:px-4">
               <Link to="/registre">{t('land.signup')}</Link>
             </Button>
           </div>
@@ -130,7 +134,7 @@ export default function Landing() {
       <section id="com-funciona" className="scroll-mt-16 md:scroll-mt-20 bg-background">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
           <h2 className="text-2xl font-bold text-coral-oscuro md:text-3xl">{t('land.how_title')}</h2>
-          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
             {PROCES.map((p) => (
               <Card key={p.n}>
                 <CardContent className="pt-6">
@@ -150,7 +154,7 @@ export default function Landing() {
       <section id="per-a-qui" className="scroll-mt-16 md:scroll-mt-20 bg-muted/50">
         <div className="mx-auto max-w-6xl space-y-4 px-4 py-16">
           <h2 className="text-2xl font-bold text-coral-oscuro md:text-3xl">{t('land.who_title')}</h2>
-          <div className="grid gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             <Card>
               <CardContent className="pt-6">
                 <h3 className="text-lg font-semibold text-primary">{t('land.prod_title')}</h3>

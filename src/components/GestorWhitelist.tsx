@@ -42,8 +42,13 @@ export default function GestorWhitelist({
           {items.length === 0 && <p className="text-sm text-muted-foreground">{noneLabel}</p>}
           {items.map((r) => (
             <div key={r.clave} className="flex items-center gap-3 rounded-md border px-3 py-2 text-sm">
-              <span className="font-medium tabular-nums">{r.clave}</span>
-              <span className="flex-1 text-muted-foreground">{r.etiqueta ?? '—'}</span>
+              {/* El correo y su etiqueta, uno encima del otro en una columna que SÍ encoge
+                  (`min-w-0`): en una sola fila, un correo largo no bajaba de su ancho y
+                  empujaba el aspa fuera de la tarjeta en el móvil. Desde `sm`, en línea. */}
+              <div className="flex min-w-0 flex-1 flex-col sm:flex-row sm:items-center sm:gap-3">
+                <span className="break-all font-medium tabular-nums">{r.clave}</span>
+                <span className="break-words text-muted-foreground">{r.etiqueta ?? '—'}</span>
+              </div>
               <Button variant="ghost" size="icon" className="size-7" onClick={() => void onDelete(r.clave)}>
                 <X className="size-4" />
               </Button>

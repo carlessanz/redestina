@@ -119,7 +119,7 @@ function Resposta({ res }: { res: ResultatVerificacio }) {
       )}
 
       {/* Una columna en móvil y dos desde `sm`: son cinco datos cortos, no una tabla. */}
-      <dl className="grid gap-3 sm:grid-cols-2">
+      <dl className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Dada etiqueta={t('ver.f_number')} valor={d.numero ?? '—'} />
         <Dada etiqueta={t('ver.f_entity')} valor={d.entitat ?? '—'} />
         <Dada

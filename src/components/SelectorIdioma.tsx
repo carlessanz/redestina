@@ -26,7 +26,9 @@ export default function SelectorIdioma({ clar = false }: { clar?: boolean }) {
           aria-label={t('set.language')}
           className={cn('gap-1.5', clar && 'text-primary-foreground/80 hover:bg-primary-foreground/10 hover:text-primary-foreground')}
         >
-          <Languages className="size-4" />
+          {/* Sin icono por debajo de 360 px: el código del idioma basta, y es lo que deja
+              caber la cabecera de la portada a 320. */}
+          <Languages className="size-4 max-[359px]:hidden" />
           <span className="text-xs font-medium uppercase">{lang}</span>
         </Button>
       </DropdownMenuTrigger>

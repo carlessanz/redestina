@@ -98,7 +98,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{tel ? `+${tel}` : '—'}</TableCell>
                   <TableCell className="text-muted-foreground">
-                    <div className="max-w-[170px] break-all leading-tight">{e.email ?? '—'}</div>
+                    <div className="max-w-[170px] break-all whitespace-normal leading-tight">{e.email ?? '—'}</div>
                   </TableCell>
                   <TableCell>{e.prioritat ?? '—'}</TableCell>
                   <TableCell>

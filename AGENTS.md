@@ -334,7 +334,7 @@ la pantalla y, al elegir un contacto, la conversación pasa a pantalla completa 
 escribe `h-dvh` propio** (era texto residual de la arquitectura anterior, contradecía el contrato de
 alturas de arriba): su alto lo aporta el shell porque su ruta va marcada `fullBleed` (§6ter).
 
-**Cinco reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
+**Siete reglas de móvil que se comprobaron midiendo, no leyendo** (2026-08-01; auditoría con
 Playwright a 320/360/390 px sobre las 11 rutas, públicas y privadas — **0 px de desbordamiento
 horizontal en todas**, que es la referencia a mantener; las reglas 4 y 5 salieron después, y las
 dos con la página en esos mismos 0 px):
@@ -393,9 +393,23 @@ dos con la página en esos mismos 0 px):
    `repeat(1, minmax(0, 1fr))`, que sí se deja encoger, y por eso va **explícito** aunque
    parezca redundante. Vale para cualquier rejilla de formulario, no solo para las que
    llevan un fichero: el día que a una celda le entre un texto largo, pasa lo mismo.
+   ✅ **Y la portada pública la incumplía**, en «Per a qui és» y en «Com funciona»: a 320 px
+   la rejilla se salía y la página se desplazaba de lado (28-09-2026). Ya lleva `grid-cols-1`.
    ⚠️ **Otra vez con la página a 0 px de desbordamiento.** Es el tercer defecto seguido que
    `scrollWidth` del documento no ve: lo que hay que mirar es `scrollWidth > clientWidth`
    **en los hijos**, que es la comprobación que encontró los tres.
+
+6. 🔴 **Una celda de tabla de shadcn hereda `whitespace-nowrap`**, así que un `max-w-*` o un
+   `break-all` dentro de ella NO parten el texto: el texto se sale de la celda y se pinta
+   **encima de la columna siguiente** (28-09-2026: el «qué toca» del cierre, los correos de los
+   listados de productoras y receptoras). Lo que lo arregla es `whitespace-normal` en la celda
+   o en el bloque, y un `min-w-*` cuando el contenido no se puede partir (un botón con un
+   número de documento). ⚠️ Tampoco se ve con `scrollWidth` de la página: la tabla vive en un
+   `overflow-x-auto`.
+7. 🔴 **La cabecera de la portada pública desbordaba desde que se rehízo el 16-09**: logo de
+   136 px más idioma, «Entrar» y «Registra’t» pedían 403 px, y a 375 toda la página se
+   desplazaba de lado. En móvil el logo, los márgenes y los botones encogen, y por debajo de
+   360 px el selector de idioma pierde el icono; cabe desde 320. Medido el 28-09-2026.
 
 ## 2bis. Sistema de diseño (10-09-2026)
 
