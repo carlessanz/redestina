@@ -7,12 +7,30 @@
 import { describe, it, expect } from 'vitest'
 import { classeIcona, fotoPrincipal } from '../src/lib/fotoOferta'
 import type { ProducteFoto } from '../src/lib/fotoOferta'
+import { slugProducte } from '../src/lib/iconaProducte'
+import { readdirSync } from 'node:fs'
+import { fileURLToPath } from 'node:url'
 import { costDeclarat } from '../supabase/functions/_shared/oferta.ts'
 import { eurKg } from '../supabase/functions/_shared/intake.ts'
 
+// Los 90 productos del catálogo el 29-09-2026 (`select nombre from productos`). Uno nuevo en
+// la base sin su dibujo en `scripts/icones-productes.ts` saldría con el icono de su familia.
+const CATALEG = [
+  'Albercoc', 'Albergínia', 'Alfabrega', 'All', 'Alvocat', 'Ametlla', 'Api', 'Arròs', 'Avellana',
+  'Blat de moro', 'Bleda', 'Bolet', 'Brócoli', 'Bròquil', 'Calçot', 'Carbassa', 'Carbassó', 'Card',
+  'Carxofa', 'Ceba', 'Cigrons', 'Cirera', 'Coco', 'Codony', 'Cogombre', 'Col', 'Col de Brussel·les',
+  'Coliflor', 'Colrave', 'Enciam', 'Escarola', 'Espàrrec', 'Espinac', 'Fava', 'Fesol', 'Figa',
+  'Fonoll', 'Garrofa', 'Gerd', 'Julivert', 'Kaki', 'Kiwi', 'Lactic', 'Llima', 'Llimona', 'Maduixa',
+  'Magrana', 'Mandarina', 'Mango', 'Meló', 'Menta', 'Mongeta', 'Moniato', 'Mores', 'Nabiu', 'Nap',
+  'Nectarina', 'Nespre', 'Nous', 'Nyora', 'Olives', 'Ou', 'Paraguaià', 'Pastanaga', 'Patata',
+  'Pebrot', 'Pera', 'Pèsol', 'Pinya', 'Plàtan', 'Poma', 'Porro', 'Préssec', 'Pruna', 'Raim', 'Rave',
+  'Remolatxa', 'RETORN', 'Rucula', 'Sindria', 'Soja', 'Suc', 'Taronja', 'Tomàquet', 'Varis',
+  'Xampinyó', 'Xicòria', 'Xirimoia', 'Xirivia', 'Yuca',
+]
+
 const cataleg = new Map<string, ProducteFoto>([
-  ['Tomàquet', { familia: 'Horta Fruit', foto: 'tomaquet.webp', foto_mini: 'tomaquet-mini.webp' }],
-  ['Taronja', { familia: 'Fruita Cítrics', foto: null, foto_mini: null }],
+  ['Tomàquet', { familia: 'Horta Fruit' }],
+  ['Taronja', { familia: 'Fruita Cítrics' }],
 ])
 
 describe('fotoPrincipal', () => {
@@ -21,30 +39,35 @@ describe('fotoPrincipal', () => {
       .toEqual({ tipus: 'oferta', ruta: 'p/a.jpg' })
   })
 
-  it('sin fotos, la del producto (grande y miniatura)', () => {
+  it('sin fotos, el icono del producto con su familia de respaldo', () => {
     expect(fotoPrincipal({ producto: 'Tomàquet', fotos: [] }, cataleg))
-      .toEqual({ tipus: 'producte', ruta: 'tomaquet.webp', mini: 'tomaquet-mini.webp' })
+      .toEqual({ tipus: 'icona', producto: 'Tomàquet', familia: 'Horta Fruit' })
   })
 
-  it('`foto_producte` ausente vale sí (el defecto de la columna)', () => {
-    expect(fotoPrincipal({ producto: 'Tomàquet' }, cataleg).tipus).toBe('producte')
+  it('`foto_producte` ya no cambia nada: sin fotos, siempre el icono', () => {
+    expect(fotoPrincipal({ producto: 'Taronja', fotos: [], foto_producte: false }, cataleg))
+      .toEqual({ tipus: 'icona', producto: 'Taronja', familia: 'Fruita Cítrics' })
   })
 
-  it('desactivada, el icono de su familia aunque el producto tenga foto', () => {
-    expect(fotoPrincipal({ producto: 'Tomàquet', fotos: [], foto_producte: false }, cataleg))
-      .toEqual({ tipus: 'generica', familia: 'Horta Fruit' })
-  })
-
-  it('producto sin foto, o fuera del catálogo: el icono', () => {
-    expect(fotoPrincipal({ producto: 'Taronja', fotos: [] }, cataleg))
-      .toEqual({ tipus: 'generica', familia: 'Fruita Cítrics' })
+  it('producto fuera del catálogo: icono sin familia', () => {
     expect(fotoPrincipal({ producto: 'Inventat', fotos: null }, cataleg))
-      .toEqual({ tipus: 'generica', familia: null })
+      .toEqual({ tipus: 'icona', producto: 'Inventat', familia: null })
+  })
+})
+
+describe('slugProducte', () => {
+  it('quita acentos y signos: es el nombre del fichero del icono', () => {
+    expect(slugProducte('Col de Brussel·les')).toBe('col-de-brussel-les')
+    expect(slugProducte('Brócoli')).toBe('brocoli')
+    expect(slugProducte('Bròquil')).toBe('broquil')
+    expect(slugProducte('Blat de moro')).toBe('blat-de-moro')
+    expect(slugProducte('RETORN')).toBe('retorn')
   })
 
-  it('las fotos propias mandan aunque esté desactivada la del producto', () => {
-    expect(fotoPrincipal({ producto: 'Tomàquet', fotos: ['p/a.jpg'], foto_producte: false }, cataleg).tipus)
-      .toBe('oferta')
+  it('cada producto del catálogo tiene su icono en public/', () => {
+    const dir = fileURLToPath(new URL('../public/icones-productes/', import.meta.url))
+    const fitxers = new Set(readdirSync(dir))
+    for (const nom of CATALEG) expect(fitxers.has(`${slugProducte(nom)}.svg`), nom).toBe(true)
   })
 })
 

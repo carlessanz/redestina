@@ -51,9 +51,9 @@ export default function DetallOfertaReceptor({ oferta, foto }: {
   return (
     <>
       {/* Foto grande y, si hay más, las otras debajo para abrirlas en su tamaño. Sin
-          fotos propias, la del producto con la etiqueta «orientativa», o el icono. */}
+          fotos propias, el icono del producto. */}
       <div className="space-y-2">
-        <FotoOfertaResolta foto={foto} alt={oferta.producto ?? ''} className="aspect-[4/3] w-full" etiqueta />
+        <FotoOfertaResolta foto={foto} alt={oferta.producto ?? ''} className="aspect-[4/3] w-full" />
         {(oferta.fotos?.length ?? 0) > 1 && (
           <div className="flex gap-2">
             {oferta.fotos.slice(1).map((r) => (

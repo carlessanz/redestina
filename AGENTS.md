@@ -651,10 +651,11 @@ src/
     utils.ts                   cn() (shadcn)
     fotos.ts                   Recomprimir (sin EXIF), subir, borrar y firmar las fotos de las ofertas
                                (`urlsFotos` firma en cualquiera de los dos buckets de fotos)
-    fotoOferta.ts              PURO, con test: QUÉ foto enseña una oferta —la suya, la del
-                               producto o el icono de su familia— (§6ter)
-    fotosProducte.ts           El catálogo con fotos (una vez por sesión) y subir/quitar la foto
-                               de un producto: recorte 1000×750 + miniatura 240×240 en el navegador
+    fotoOferta.ts              PURO, con test: QUÉ enseña una oferta —su foto o el icono de su
+                               producto— (§6ter)
+    iconaProducte.ts           PURO, con test: `slugProducte()` y la URL del icono de un producto
+                               (`public/icones-productes/<slug>.svg`)
+    fotosProducte.ts           El catálogo (nombre y familia), una vez por sesión
     validacio.ts               PURO: NIF/NIE/CIF con dígito de control, teléfono (normaliza a E.164
                                sin +), correo y CP. Devuelve claves i18n
     perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
@@ -765,7 +766,10 @@ scripts/
                                schema_migrations con el número del fichero (§11)
   fotos-cataleg.ts (+ .json)   Las fotos del catálogo y de las ofertas desde un MANIFIESTO versionado
                                (fuente, autor y licencia CC0/dominio público de cada una): descarga,
-                               recorta, WebP sin metadatos y sube. Los binarios no van a git (§11)
+                               recorta, WebP sin metadatos y sube. Los binarios no van a git (§11).
+                               ⚠️ La parte de PRODUCTOS ya no se usa: desde el 29-09-2026 son iconos
+  icones-productes.ts          Dibuja los 90 iconos de producto (SVG plano 64×64, sin licencias de
+                               terceros) en public/icones-productes/ (§6ter)
   incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
                                en base64, dentro del bundle (§11)
   roles-activos.ts             Interruptor del modelo de roles: on | off | estat (§4bis)
@@ -1183,6 +1187,7 @@ posición GPS incluida: sin ese paso, una foto hecha en la finca publicaría dó
 ⚠️ Las imágenes van con `loading="lazy"`: en una pestaña oculta (el panel del navegador integrado
 cerrado) no cargan, y parece que la foto está rota. No lo está.
 
+⚠️ **Sin uso desde el 29-09-2026: el catálogo pasó a iconos propios (§6ter)**; lo que sigue describe el bucket, que se conserva.
 ✅ **Y el catálogo tiene su propio bucket, `fotos-productes`** (`20270405100000`, 27-09-2026),
 **separado a propósito** del de las ofertas: aquellas son del productor —se ven si se ve la oferta y
 pueden enseñar su finca— y estas son del catálogo, sin dueño. Privado, 2 MB, jpeg/webp. Políticas:
@@ -2775,40 +2780,40 @@ refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción.
 «Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
 que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
 
-### «Productes»: el catálogo con foto, y qué foto enseña una oferta (27-09-2026)
+### «Productes»: el catálogo con icono, y qué enseña una oferta (27-09-2026, iconos desde el 29-09)
 
 **`/equip/productes`** sustituye a «Costos per quilo» (`/equip/costos` redirige: había enlaces
 guardados). Misma posición en el menú —antes del Tancament— y mismo contador `costos`. La lista
-enseña la **miniatura** de cada producto (o el icono de su familia), el **coste de referencia** y ya
-**no tiene desplegable de ejercicio**. **`/equip/productes/:nom`** es el detalle: la foto grande con
-su procedencia, subir / cambiar / quitar (solo **super_admin**; al resto, gris con el motivo) y el
-coste de referencia con su histórico y el formulario para cambiarlo (`pot_aprovar()`).
+enseña el **icono** de cada producto, el **coste de referencia** y ya **no tiene desplegable de
+ejercicio**. **`/equip/productes/:nom`** es el detalle: el icono en grande y el coste de referencia
+con su histórico y el formulario para cambiarlo (`pot_aprovar()`).
 
-**La regla de la foto de una oferta** (`lib/fotoOferta.ts`, pura y con test; la aplican Mercat,
-Interessos, Històric, la lista de ofertas del equipo (`OffersList`, miniatura de 40 px, 28-09-2026) y las dos listas del productor —en la home, las dos secciones: las ofertas en curso llevan foto desde el 28-09-2026—):
+🔴 **Desde el 29-09-2026 el catálogo NO tiene fotos: tiene un ICONO PROPIO por producto**, a
+petición del cliente. Los 90 los dibuja `scripts/icones-productes.ts` —SVG plano de 64×64, colores
+naturales del producto, contorno en los claros para que no se pierdan sobre el crema— y viven en
+`public/icones-productes/<slug>.svg`; el nombre del fichero es `slugProducte()`
+(`lib/iconaProducte.ts`), la misma función en el script y en la pantalla. **Sin licencias de
+terceros y sin red.** Se revisaron a ojo renderizados. Un producto nuevo en la base sin su dibujo
+sale con el icono genérico de su familia (el `<img>` falla y pinta `FotoGenerica`), y
+`tests/fotoOferta.test.ts` comprueba que los 90 del catálogo tienen fichero.
+⚠️ **Lo que quedó en la base sin uso**: `productos.foto`/`foto_mini`/`foto_credit` (vaciadas el
+29-09; copia de las rutas fuera del repo), el bucket `fotos-productes` con sus ficheros (no se
+borraron), la RPC `fixar_foto_producte()` y `excedentes.foto_producte`. `crear-oferta` sigue
+sirviendo `foto_mini` (null). La parte de productos de `scripts/fotos-cataleg.ts` no se debe
+volver a ejecutar: rellenaría columnas que ya no lee nadie.
+
+**La regla de una oferta** (`lib/fotoOferta.ts`, pura y con test; la aplican Mercat, Interessos,
+Històric, la lista de ofertas del equipo y las dos listas del productor):
 
 1. Si la oferta tiene fotos propias, la primera.
-2. Si no, y `excedentes.foto_producte` no es `false`, la **foto del producto** del catálogo —la
-   miniatura en listas y tarjetas, la grande en el detalle del Mercat— con la etiqueta **«Foto
-   orientativa del producte»** en grande, para que la entidad no la tome por la del lote.
-3. Si no, el **icono genérico de su familia** (`FotoGenerica`: lucide en verde sobre crema —cítric,
-   fruita, baia, fruita seca, exòtica, fulla, arrel, horta, gra—; por defecto `Sprout`, la hoja de
-   la marca). Sustituye al `ImageOff` gris, que parecía una imagen rota.
+2. Si no, el **icono de su producto** (`IconaProducte`), y si no tiene dibujo, el de su familia.
 
-La casilla **«Si no hi ha fotos, mostra la foto genèrica del producte»** está en el alta (bajo el
-selector de fotos, con la miniatura del producto elegido) y en los dos detalles (productor y
-equipo, `CasellaFotoProducte`); solo se pinta mientras la oferta no tiene fotos propias.
+Ya no hay casilla «mostra la foto genèrica del producte» ni etiqueta «foto orientativa»: un dibujo
+no se confunde con la foto del lote. En el alta, sin fotos, se enseña el icono con «Sense fotos,
+l’oferta es veurà amb la icona del producte».
 
-**Estado de las fotos (28-09-2026)**: **89 de 90 productos** con foto, todas **CC0** (Wikimedia
-Commons, WordPress Photo Directory, rawpixel, Flickr e iNaturalist), revisadas a ojo en los dos
-recortes y con su procedencia en `productos.foto_credit` y en `scripts/fotos-cataleg.json`.
-`RETORN` se queda **a propósito** con el icono: no es un producto, es la devolución de cajas. Tres
-se apartan un poco del producto exacto por falta de material libre: **Nyora** (guindillas secas),
-**Card** (la flor del cardo, no las pencas) y **Garrofa** (en el árbol, no seca). Y las **19
-ofertas** tienen **24 fotos** de contexto (cajas, palé, campo, árbol), 5 de ellas con dos, también
-CC0 o dominio público y distintas de la foto del producto; se descartaron dos candidatas por llevar
-el nombre de una finca en la caja y por ser un escaneo con marco. Verificado en producción el
-28-09-2026: Mercat y panel del productor enseñan los tres casos (foto propia, del producto e icono).
+Las **fotos propias de las ofertas** (bucket `fotos-ofertes`, las 24 de contexto del 28-09) no
+cambian.
 
 ### Los estados SIMPLES de los paneles externos (27-09-2026)
 

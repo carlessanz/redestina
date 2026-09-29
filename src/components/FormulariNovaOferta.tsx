@@ -44,9 +44,7 @@ import {
 } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
-import { FotoOferta, SelectorFotos, useUrlsFotos } from './FotosOferta'
-import { FilaCasella } from './Casella'
-import { BUCKET_PRODUCTES } from '../lib/fotosProducte'
+import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
@@ -184,8 +182,6 @@ export default function FormulariNovaOferta(
     [catalogos, datos.producte],
   )
   const referencia = producteTriat?.cost_referencia ?? null
-  // Hook antes de cualquier `return`: la miniatura del producto junto a la casilla de la foto.
-  const urlsProducte = useUrlsFotos(producteTriat?.foto_mini ? [producteTriat.foto_mini] : [], BUCKET_PRODUCTES)
 
   const productesDeFamilia = useMemo(() => {
     const familia = String(datos.familia ?? '')
@@ -644,23 +640,11 @@ export default function FormulariNovaOferta(
                   rutes={Array.isArray(datos.fotos) ? (datos.fotos as string[]) : []}
                   onChange={(r) => set('fotos', r)}
                 />
-                {/* Sin fotos propias, la oferta enseña la del producto del catálogo, salvo
-                    que el productor lo desmarque (27-09-2026). Con fotos no pinta nada. */}
-                {!(Array.isArray(datos.fotos) && datos.fotos.length > 0) && (
-                  <div className="mt-3 flex items-start gap-3">
-                    {producteTriat?.foto_mini && (
-                      <FotoOferta url={urlsProducte[producteTriat.foto_mini]} alt={producteTriat.nombre}
-                        familia={producteTriat.familia} className="size-11" />
-                    )}
-                    <div className="min-w-0 flex-1">
-                      <FilaCasella checked={datos.foto_producte !== false}
-                        onChange={(v) => set('foto_producte', v)}>
-                        {t('foto.use_product')}
-                      </FilaCasella>
-                      {datos.foto_producte === false && (
-                        <p className="text-xs text-muted-foreground">{t('foto.use_product_hint')}</p>
-                      )}
-                    </div>
+                {/* Sin fotos propias, la oferta se ve con el icono de su producto (29-09-2026). */}
+                {producteTriat && !(Array.isArray(datos.fotos) && datos.fotos.length > 0) && (
+                  <div className="mt-3 flex items-center gap-3">
+                    <IconaProducte producto={producteTriat.nombre} familia={producteTriat.familia} className="size-11" />
+                    <p className="min-w-0 flex-1 text-xs text-muted-foreground">{t('foto.icon_hint')}</p>
                   </div>
                 )}
               </div>

@@ -1,6 +1,6 @@
 // «Productes» (antes «Costos per quilo», renombrada el 27-09-2026): el CATÁLOGO del equipo.
-// Cada producto con su foto —la que sale de respaldo en el Mercat cuando una oferta no trae
-// ninguna— y su COSTE DE REFERENCIA.
+// Cada producto con su ICONO —el que sale en el Mercat cuando una oferta no trae foto;
+// desde el 29-09-2026 sustituye a las fotos del catálogo— y su COSTE DE REFERENCIA.
 //
 // ⚠️ EL COSTE ES DE REFERENCIA, NO EL QUE VALORA LA DONACIÓN. Desde el 27-09-2026 el coste
 // de cada oferta lo declara el productor al publicarla (`excedentes.coste_kg`), y esta cifra
@@ -12,7 +12,7 @@
 // (20270405100200). El motivo sigue siendo obligatorio: `costes_producto_hist` guarda cada
 // valor sobrescrito con el suyo.
 //
-// La FOTO se gestiona en el detalle (`/equip/productes/:nom`); aquí sale en miniatura.
+// Los iconos no se editan desde la aplicación: salen de `scripts/icones-productes.ts`.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -24,8 +24,7 @@ import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
 import { dataCurta } from '../../lib/albarans'
 import type { CosteProducto } from '../../types'
-import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
-import { BUCKET_PRODUCTES } from '../../lib/fotosProducte'
+import { IconaProducte } from '../../components/FotosOferta'
 import DialegMotiu from '../../components/DialegMotiu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { Badge } from '@/components/ui/badge'
@@ -40,7 +39,6 @@ import {
 interface Producte {
   nombre: string
   familia: string | null
-  foto_mini: string | null
 }
 
 /** La ruta del detalle de un producto: el nombre lleva acentos, espacios y «·». */
@@ -82,7 +80,7 @@ export default function Productes() {
       // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
       const { data, error: err } = await supabase
         .from('productos')
-        .select('nombre, familia, foto_mini')
+        .select('nombre, familia')
         .order('familia', { ascending: true, nullsFirst: false })
         .order('nombre', { ascending: true })
       if (!viu) return
@@ -169,11 +167,6 @@ export default function Productes() {
     await refresca()
   }
 
-  const urls = useUrlsFotos(
-    productes.map((p) => p.foto_mini).filter((r): r is string => Boolean(r)),
-    BUCKET_PRODUCTES,
-  )
-
   return (
     <div className="space-y-4">
       <Card>
@@ -248,8 +241,7 @@ export default function Productes() {
                       <TableRow key={p.nombre}>
                         <TableCell>
                           <Link to={rutaProducte(p.nombre)} aria-label={t('prod.open', { p: p.nombre })}>
-                            <FotoOferta url={p.foto_mini ? urls[p.foto_mini] : null} alt=""
-                              familia={p.familia} className="size-10" />
+                            <IconaProducte producto={p.nombre} familia={p.familia} className="size-10" />
                           </Link>
                         </TableCell>
                         <TableCell className="font-medium">

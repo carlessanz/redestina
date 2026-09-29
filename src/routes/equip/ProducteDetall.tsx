@@ -1,13 +1,12 @@
-// El detalle de un producto del catálogo (27-09-2026): su foto en grande —la que sale de
-// respaldo en las ofertas sin foto propia— y su coste de referencia con el histórico.
+// El detalle de un producto del catálogo (27-09-2026): su icono —el que sale en las ofertas
+// sin foto propia— y su coste de referencia con el histórico.
 //
-// La foto la gestiona SOLO el super_admin (lo imponen la política de Storage y la RPC
-// `fixar_foto_producte`, no esta pantalla). Al resto del equipo los botones le salen grises
-// con el motivo, no escondidos (§6ter).
+// ⚠️ Hasta el 29-09-2026 aquí se subía una FOTO por producto. Se sustituyeron por iconos
+// propios (`scripts/icones-productes.ts`), que no se editan desde la aplicación.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { ArrowLeft, Camera, ExternalLink, Trash2 } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -15,13 +14,7 @@ import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { dataCurta } from '../../lib/albarans'
 import { eurKg, fixarCostProducte } from '../../lib/tancament'
-import {
-  BUCKET_PRODUCTES, invalidaCataleg, pujaFotoProducte, treuFotoProducte,
-} from '../../lib/fotosProducte'
-import type { CreditFoto } from '../../lib/fotosProducte'
-import { FotoOferta, useUrlsFotos } from '../../components/FotosOferta'
-import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
-import { useConfirma } from '../../components/DialegConfirma'
+import { IconaProducte } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -31,9 +24,6 @@ import { Label } from '@/components/ui/label'
 interface Fitxa {
   nombre: string
   familia: string | null
-  foto: string | null
-  foto_mini: string | null
-  foto_credit: CreditFoto | null
 }
 interface Cost { coste_kg: number; motivo: string; updated_at: string }
 interface Hist { id: string; coste_kg: number; motivo: string; vigente_desde: string | null; vigente_hasta: string }
@@ -42,9 +32,7 @@ export default function ProducteDetall() {
   const { t } = useT()
   const { nom = '' } = useParams()
   const { ctx } = useAppContext()
-  const esSuper = ctx?.esSuperAdmin ?? false
   const potAprovar = ctx?.potAprovar ?? false
-  const { confirma, dialeg } = useConfirma()
 
   const [fitxa, setFitxa] = useState<Fitxa | null>(null)
   const [cost, setCost] = useState<Cost | null>(null)
@@ -53,12 +41,11 @@ export default function ProducteDetall() {
   const [ocupat, setOcupat] = useState(false)
   const [valor, setValor] = useState('')
   const [motiu, setMotiu] = useState('')
-  const input = useRef<HTMLInputElement>(null)
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     const [p, c, h] = await Promise.all([
-      supabase.from('productos').select('nombre, familia, foto, foto_mini, foto_credit')
+      supabase.from('productos').select('nombre, familia')
         .eq('nombre', nom).maybeSingle(),
       supabase.from('costes_producto').select('coste_kg, motivo, updated_at')
         .eq('producto', nom).maybeSingle(),
@@ -72,37 +59,6 @@ export default function ProducteDetall() {
   }, [nom])
 
   useEffect(() => { void carrega() }, [carrega])
-
-  const urls = useUrlsFotos(fitxa?.foto ? [fitxa.foto] : [], BUCKET_PRODUCTES)
-
-  async function puja(fitxers: FileList | null) {
-    const f = fitxers?.[0]
-    if (!f || !fitxa) return
-    setOcupat(true)
-    const r = await pujaFotoProducte(fitxa.nombre, f)
-    setOcupat(false)
-    if (!r.ok) { toast.error(textError(t, r.error)); return }
-    toast.success(t('prod.photo_saved'))
-    await carrega()
-  }
-
-  async function treu() {
-    if (!fitxa) return
-    const ok = await confirma({
-      titol: t('prod.remove_title', { p: fitxa.nombre }),
-      descripcio: t('prod.remove_desc'),
-      confirmar: t('prod.remove'),
-      destructiu: true,
-    })
-    if (!ok) return
-    setOcupat(true)
-    const r = await treuFotoProducte(fitxa.nombre)
-    setOcupat(false)
-    if (!r.ok) { toast.error(textError(t, r.error)); return }
-    toast.success(t('prod.photo_removed'))
-    invalidaCataleg()
-    await carrega()
-  }
 
   async function desaCost() {
     const n = Number(valor.trim().replace(',', '.'))
@@ -130,9 +86,6 @@ export default function ProducteDetall() {
     )
   }
 
-  const credit = fitxa.foto_credit
-  const motiuSuper = esSuper ? undefined : t('prod.only_superadmin')
-
   return (
     <div className="space-y-4">
       <Link to="/equip/productes" className="inline-flex items-center gap-1 text-sm text-primary hover:underline">
@@ -144,42 +97,8 @@ export default function ProducteDetall() {
           <CardTitle>{fitxa.nombre}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{fitxa.familia ?? '—'}</p>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <FotoOferta url={fitxa.foto ? urls[fitxa.foto] : null} alt={fitxa.nombre}
-            familia={fitxa.familia} className="aspect-[4/3] w-full max-w-2xl" />
-          {fitxa.foto && credit && (
-            <p className="text-xs text-muted-foreground">
-              {t('prod.credit')}{' '}
-              {[credit.titol, credit.autor, credit.llicencia].filter(Boolean).join(' · ')}
-              {credit.font_url && (
-                <>
-                  {' · '}
-                  <a href={credit.font_url} target="_blank" rel="noreferrer"
-                    className="inline-flex items-center gap-0.5 text-primary hover:underline">
-                    {t('prod.source')} <ExternalLink className="size-3" aria-hidden />
-                  </a>
-                </>
-              )}
-            </p>
-          )}
-          <p className="text-sm text-muted-foreground">
-            {fitxa.foto ? t('prod.photo_hint') : t('prod.no_photo_hint')}
-          </p>
-          <div className="flex flex-wrap gap-2">
-            <BotoAmbMotiu className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={!esSuper || ocupat}
-              motiu={motiuSuper} onClick={() => input.current?.click()}>
-              <Camera className="size-4" aria-hidden />
-              {ocupat ? t('foto.uploading') : fitxa.foto ? t('prod.change') : t('prod.upload')}
-            </BotoAmbMotiu>
-            {fitxa.foto && (
-              <BotoAmbMotiu variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
-                disabled={!esSuper || ocupat} motiu={motiuSuper} onClick={() => void treu()}>
-                <Trash2 className="size-4" aria-hidden /> {t('prod.remove')}
-              </BotoAmbMotiu>
-            )}
-          </div>
-          <input ref={input} type="file" accept="image/*" className="hidden"
-            onChange={(e) => { const f = e.target.files; void puja(f); e.target.value = '' }} />
+        <CardContent>
+          <IconaProducte producto={fitxa.nombre} familia={fitxa.familia} className="size-40 sm:size-48" />
         </CardContent>
       </Card>
 
@@ -231,7 +150,6 @@ export default function ProducteDetall() {
           )}
         </CardContent>
       </Card>
-      {dialeg}
     </div>
   )
 }

@@ -32,7 +32,7 @@ import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import BlocPublicada from '../../components/proces/BlocPublicada'
 import BadgeEstat from '../../components/proces/BadgeEstat'
-import { CasellaFotoProducte, SelectorFotos } from '../../components/FotosOferta'
+import { SelectorFotos } from '../../components/FotosOferta'
 import { fixaFotos } from '../../lib/fotos'
 import type { Canalizacion, EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
@@ -234,10 +234,6 @@ export default function ProductorOfertaDetall() {
               return true
             }}
           />
-          <CasellaFotoProducte excedenteId={oferta.id} fotos={oferta.fotos ?? []}
-            fotoProducte={oferta.foto_producte !== false}
-            disabled={!(cancelable || oferta.estado === 'bloqueada')}
-            onCanvi={(v) => setOferta((o) => (o ? { ...o, foto_producte: v } : o))} />
         </div>
       )}
 

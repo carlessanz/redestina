@@ -1,18 +1,17 @@
-// QUÉ FOTO ENSEÑA UNA OFERTA (27-09-2026). Puro, sin red, con test: es la única regla y la
-// comparten el Mercat, Interessos, Històric y los listados del productor.
+// QUÉ FOTO ENSEÑA UNA OFERTA. Puro, sin red, con test: es la única regla y la comparten el
+// Mercat, Interessos, Històric y los listados del productor y del equipo.
 //
 //   1. Si la oferta tiene fotos propias, la primera.
-//   2. Si no tiene, y el productor no lo ha desactivado (`excedentes.foto_producte`), la foto
-//      del PRODUCTO del catálogo (bucket `fotos-productes`), marcada como orientativa.
-//   3. Si tampoco hay, o está desactivado, el icono GENÉRICO de su familia.
+//   2. Si no, el ICONO DEL PRODUCTO (`public/icones-productes/`, `iconaProducte.ts`). Si el
+//      producto no tiene dibujo, el de su familia.
 //
-// ⚠️ `foto_producte` ausente vale `true`: es el defecto de la columna, y un `select` que no
-//    la pida (o una fila anterior a 20270405100100) tiene que comportarse igual.
+// ⚠️ Hasta el 29-09-2026 el paso 2 era una FOTO del catálogo (bucket `fotos-productes`) y
+//    `excedentes.foto_producte` permitía desactivarla. Las fotos se sustituyeron por iconos
+//    —un dibujo no se confunde con la foto del lote— y la casilla dejó de tener sentido:
+//    la columna sigue en la base, pero ya no la lee nadie.
 
 export interface ProducteFoto {
   familia: string | null
-  foto: string | null
-  foto_mini: string | null
 }
 
 export interface OfertaAmbFotos {
@@ -23,8 +22,7 @@ export interface OfertaAmbFotos {
 
 export type FotoPrincipal =
   | { tipus: 'oferta'; ruta: string }
-  | { tipus: 'producte'; ruta: string; mini: string }
-  | { tipus: 'generica'; familia: string | null }
+  | { tipus: 'icona'; producto: string | null; familia: string | null }
 
 export function fotoPrincipal(
   o: OfertaAmbFotos,
@@ -33,10 +31,7 @@ export function fotoPrincipal(
   const propia = o.fotos?.find(Boolean)
   if (propia) return { tipus: 'oferta', ruta: propia }
   const p = o.producto ? cataleg.get(o.producto) : undefined
-  if (o.foto_producte !== false && p?.foto && p.foto_mini) {
-    return { tipus: 'producte', ruta: p.foto, mini: p.foto_mini }
-  }
-  return { tipus: 'generica', familia: p?.familia ?? null }
+  return { tipus: 'icona', producto: o.producto ?? null, familia: p?.familia ?? null }
 }
 
 /**
