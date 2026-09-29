@@ -2566,6 +2566,14 @@ vista. En la recogida se puede **crear un lugar nuevo sin salir** (`creaUbicacio
 oficial (`SelectorMunicipi`), y así la comarca de la oferta sale exacta. `crear-oferta` comprueba
 ahora que la ubicación es **de ese productor** (`400 ubicacio_aliena`): corre con `service_role`
 y la RLS no lo hacía por ella.
+🔴 **Tres arreglos del paso 1→2 en el móvil (29-09-2026)**, porque en un iPhone a veces «Continuar»
+no dejaba pasar y parecía un bucle: (1) el **error de campos que faltan va DENTRO del pie fijo**,
+junto al botón —debajo de la tarjeta lo tapaba ese mismo pie, y solo se veía un salto de scroll—;
+(2) el alta guarda un **borrador en `sessionStorage`** (por productor, 24 h, se borra al publicar o
+cancelar): Safari puede recargar la pestaña al volver de la cámara o la galería y el formulario
+volvía vacío al paso 1; ahora recupera lo escrito y el paso, con el aviso «Hem recuperat l’oferta
+que tenies a mig fer»; (3) cambiar de **familia ya no borra el producto si es de la nueva** —antes
+cualquier cambio lo borraba en silencio, también la rueda del desplegable del iPhone—.
 
 ⚠️ **`producte_al_camp` va como LISTA, no como botones**, aunque sean dos opciones, por lo mismo que
 `modalitat` (§12.105): un botón solo tiene título de 20 caracteres y una fila de lista tiene

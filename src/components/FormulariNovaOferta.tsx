@@ -66,6 +66,40 @@ function procesJaVist(): boolean {
   try { return localStorage.getItem(CLAU_PROCES_VIST) === 'si' } catch { return false }
 }
 
+/**
+ * El BORRADOR del alta, en `sessionStorage` (29-09-2026). En un iPhone, abrir la cámara o la
+ * galería para la foto puede hacer que Safari descarte la pestaña por memoria y la recargue
+ * al volver: el formulario volvía al paso 1 vacío, y al pulsar «Continuar» parecía un bucle.
+ * Con el borrador, la recarga devuelve lo escrito y el paso. Por productor (el alta asistida
+ * del equipo puede abrir varios) y solo 24 h. `sessionStorage` y no `localStorage`: sobrevive
+ * a la recarga de la pestaña, no se queda en un móvil compartido.
+ */
+const PREFIX_ESBORRANY = 'redestina-oferta-esborrany:'
+const VIDA_ESBORRANY_MS = 24 * 3600 * 1000
+
+interface Esborrany { datos: Datos; pas: number; pasMaxim: number; costTocat: boolean; desat: number }
+
+function llegeixEsborrany(productorId: string): Esborrany | null {
+  try {
+    const cru = sessionStorage.getItem(PREFIX_ESBORRANY + productorId)
+    if (!cru) return null
+    const e = JSON.parse(cru) as Esborrany
+    if (!e || typeof e !== 'object' || !e.datos || Date.now() - e.desat > VIDA_ESBORRANY_MS) return null
+    return e
+  } catch { return null }
+}
+
+function desaEsborrany(productorId: string, e: Omit<Esborrany, 'desat'>) {
+  try {
+    if (Object.keys(e.datos).length === 0) sessionStorage.removeItem(PREFIX_ESBORRANY + productorId)
+    else sessionStorage.setItem(PREFIX_ESBORRANY + productorId, JSON.stringify({ ...e, desat: Date.now() }))
+  } catch { /* Safari privado: sin borrador, pero se puede publicar igual */ }
+}
+
+function esborraEsborrany(productorId: string) {
+  try { sessionStorage.removeItem(PREFIX_ESBORRANY + productorId) } catch { /* ídem */ }
+}
+
 function marcaProcesVist() {
   // Safari en navegación privada lanza al tocar `localStorage`: que no se pueda recordar
   // la preferencia no puede impedir publicar.
@@ -140,6 +174,8 @@ export default function FormulariNovaOferta(
   )
   const [datos, setDatos] = useState<Datos>({})
   const [carregant, setCarregant] = useState(true)
+  /** Hasta leer el borrador no se escribe: si no, el primer render lo pisaría con `{}`. */
+  const recuperat = useRef(false)
   const [enviant, setEnviant] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [procesObert, setProcesObert] = useState(() => !procesJaVist())
@@ -165,7 +201,18 @@ export default function FormulariNovaOferta(
         // Puede no venir: la función se despliega después que esta pantalla.
         setSeccions(r.data.secciones ?? [])
         setCatalogos(r.data.catalogos)
+        // Lo que había a medias antes de una recarga (ver `PREFIX_ESBORRANY`).
+        // Solo la primera carga: si el efecto se repite (cambio de idioma), no se pisa lo escrito.
+        const e = recuperat.current ? null : llegeixEsborrany(productorId)
+        if (e) {
+          setDatos(e.datos)
+          setPas(e.pas)
+          setPasMaxim(e.pasMaxim)
+          setCostTocat(e.costTocat)
+          toast.info(t('po.draft_restored'))
+        }
       }
+      recuperat.current = true
       setCarregant(false)
     })
     return () => { viu = false }
@@ -183,6 +230,11 @@ export default function FormulariNovaOferta(
   )
   const referencia = producteTriat?.cost_referencia ?? null
 
+  useEffect(() => {
+    if (!productorId || !recuperat.current) return
+    desaEsborrany(productorId, { datos, pas, pasMaxim, costTocat })
+  }, [productorId, datos, pas, pasMaxim, costTocat])
+
   const productesDeFamilia = useMemo(() => {
     const familia = String(datos.familia ?? '')
     return (catalogos?.productos ?? []).filter((p) => !familia || p.familia === familia)
@@ -191,8 +243,13 @@ export default function FormulariNovaOferta(
   function set(clave: string, valor: unknown) {
     setDatos((d) => {
       const nou = { ...d, [clave]: valor }
-      // Cambiar de familia invalida el producto elegido.
-      if (clave === 'familia') delete nou.producte
+      // Cambiar de familia invalida el producto elegido, pero SOLO si no es de la nueva: en
+      // el iPhone, abrir el desplegable de familia y cerrarlo sobre otra (o la rueda que
+      // pasa por varias) borraba en silencio el producto, y «Continuar» no dejaba pasar.
+      if (clave === 'familia') {
+        const actual = (catalogos?.productos ?? []).find((p) => p.nombre === d.producte)
+        if (!actual || actual.familia !== valor) delete nou.producte
+      }
       // Elegir producto propone su coste de referencia, salvo que el productor ya haya
       // escrito el suyo.
       if (clave === 'producte' && !costTocat) {
@@ -315,6 +372,7 @@ export default function FormulariNovaOferta(
       return
     }
     marcaProcesVist()
+    esborraEsborrany(productorId)
     // Sin toast: lo que hay que decir —la referencia, qué pasa ahora y por dónde seguir—
     // no cabe en un aviso que se va solo. Lo cuenta `BlocPublicada` en el detalle, que
     // además se puede volver a mirar. La confirmación por correo solo se promete si ha
@@ -653,14 +711,16 @@ export default function FormulariNovaOferta(
         </Card>
       )}
 
-      {error && <p className="text-sm text-destructive">{error}</p>}
-
       {/* --- El pie se queda a la vista: en un móvil el botón caería bajo el pliegue.
               `env(safe-area-inset-bottom)` porque el viewport va a `viewport-fit=cover` (§2). --- */}
       <div
         className="sticky bottom-0 -mx-4 flex flex-wrap gap-2 border-t bg-background/95 px-4 py-3 backdrop-blur"
         style={{ paddingBottom: 'max(0.75rem, env(safe-area-inset-bottom))' }}
       >
+        {/* El error va DENTRO del pie fijo (29-09-2026): debajo de la tarjeta quedaba tapado
+            por este mismo pie en el móvil, y al pulsar «Continuar» solo se veía un salto de
+            scroll —parecía un bucle—. Aquí está siempre a la vista, junto al botón. */}
+        {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
         {pasSegur > 0 && (
           <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => vesAlPas(pasSegur - 1)}>
             <ArrowLeft className="size-4" aria-hidden /> {t('po.back')}
@@ -684,7 +744,7 @@ export default function FormulariNovaOferta(
           <Button
             variant="ghost"
             className="h-11 whitespace-normal md:h-9"
-            onClick={onCancel}
+            onClick={() => { if (productorId) esborraEsborrany(productorId); onCancel() }}
           >
             {t('c.cancel')}
           </Button>

@@ -703,6 +703,7 @@ const ca: Dict = {
   // QUINS: en un formulari de 14 camps repartits en cinc blocs amb scroll llarg, obligava a
   // repassar-los tots un per un (deuda §12.123). Ara diu quins falten i s'hi va directe.
   'po.missing_fields': 'Falten camps per omplir: {camps}.',
+  'po.draft_restored': 'Hem recuperat l’oferta que tenies a mig fer.',
 
   'po.no_org': 'El teu compte no està vinculat a cap organització.',
   'po.no_locations': 'Encara no tens cap lloc de recollida. Afegeix-ne un aquí mateix.',
@@ -2916,6 +2917,7 @@ const es: Dict = {
   'po.new_title': 'Nueva oferta', 'po.new_subtitle': 'Las mismas preguntas que te haría el bot por WhatsApp.',
   'po.publish': 'Publicar oferta',
   'po.missing_fields': 'Faltan campos por rellenar: {camps}.',
+  'po.draft_restored': 'Hemos recuperado la oferta que tenías a medias.',
 
   'po.no_org': 'Tu cuenta no está vinculada a ninguna organización.',
   'po.no_locations': 'Todavía no tienes ningún lugar de recogida. Añade uno aquí mismo.',
