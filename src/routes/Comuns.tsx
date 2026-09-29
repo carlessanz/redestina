@@ -12,6 +12,7 @@ import { Hourglass, ShieldAlert, ShieldX } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useSessio } from '../hooks/useSessio'
+import { useVersioNova } from '../hooks/useVersioNova'
 import { AppContextProvider, useAppContext } from '../hooks/useAppContext'
 import { rutaArrel, type Rol } from '../lib/rols'
 import { Button } from '@/components/ui/button'
@@ -32,6 +33,7 @@ function Carregant() {
 export function ArrelApp() {
   const { esRecovery } = useSessio()
   const { pathname } = useLocation()
+  useVersioNova()
   if (esRecovery && pathname !== '/restablir') return <Navigate to="/restablir" replace />
   return <Outlet />
 }

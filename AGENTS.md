@@ -300,20 +300,28 @@ adorna. Hay un tercer flag de layout en el
 `max-w-6xl px-4` a `w-[96%] px-2` y lo llevan los tres listados del equipo (`productors`, `entitats`,
 `ofertes`), que necesitan más ancho.
 
-**PWA instalable** (`vite-plugin-pwa`, `generateSW`): manifest, iconos 192/512 + *maskable*
-(generados desde `public/isotipo-redestina.svg`, la hoja sola; §2bis), `apple-touch-icon` y los metas de iOS —que no lee el
-manifest—, `viewport-fit=cover` para que `env(safe-area-inset-*)` valga algo en iPhone.
-`registerType: 'autoUpdate'` + `cleanupOutdatedCaches` + `Cache-Control: must-revalidate` en
-`/index.html` y `/sw.js` (`vercel.json`): un service worker mal desplegado se queda pegado en los
-dispositivos, y esto hace que una recarga baste para coger la versión nueva. ⚠️ **Nada de Supabase
-se cachea** (`NetworkOnly` para `*.supabase.co`, y `/functions/`, `/rest/` y `/auth/` fuera del
-`navigateFallback`): los datos siguen siendo 100 % autenticados y personales —lo público (§6quater)
-es solo el shell estático—, y cachear una respuesta de
-PostgREST en un móvil compartido podría servírsela a la siguiente persona. Para retirar el service
-worker de los dispositivos, desplegar una vez con `selfDestroying: true`.
-🔴 **Y desde el 28-09-2026 no guarda `index.html` ni responde a las navegaciones**
-(`navigateFallback: null`): la web está detrás de la cortina de contraseña (§9) y una página
-servida desde la caché del móvil se la saltaría. Consecuencia: sin red, la aplicación no abre.
+**PWA instalable, SIN service worker desde el 29-09-2026** (`vite-plugin-pwa` con
+`selfDestroying: true`): manifest, iconos 192/512 + *maskable* (generados desde
+`public/isotipo-redestina.svg`, la hoja sola; §2bis), `apple-touch-icon` y los metas de iOS —que no
+lee el manifest—, `viewport-fit=cover` para que `env(safe-area-inset-*)` valga algo en iPhone.
+🔴 **Por qué se retiró el service worker**: era la razón de que **el cliente no viera los
+despliegues**, y no Vercel (que invalida su CDN en cada despliegue; los assets llevan hash e
+`index.html` va con `must-revalidate`). El de antes del 28-09 guardaba `index.html` y el bundle en
+el móvil y los servía **sin pasar por la red** —así que tampoco por la cortina (§9)—; el `sw.js`
+nuevo sí llegaba, pero su precache pedía `/assets/*.js` **sin la cookie de la cortina**, recibía
+401, la instalación fallaba y el viejo seguía mandando para siempre. Reproducido en el navegador el
+29-09-2026. Ahora el `sw.js` publicado (libre de cortina, `esLliure()`) no descarga nada: se
+instala, se da de baja, borra las cachés y recarga las pestañas; y `main.tsx` retira además
+cualquier registro que quede (`retiraServiceWorkers()`). Sin red la aplicación no abre, igual que
+desde el 28-09. ⚠️ **No volver a poner un service worker con precache mientras exista la cortina.**
+
+**Versión nueva con la pestaña abierta** (`src/lib/versio.ts` + `hooks/useVersioNova.ts`, en
+`ArrelApp`). Cada build compila su identificador (`__VERSIO__`, el SHA del commit en Vercel) y lo
+publica en **`/version.json`** (`Cache-Control: no-store` en `vercel.json`). Se compara al abrir,
+al volver a la pestaña y cada 5 minutos; si difiere, sale un aviso con «Actualitza» y **la página
+se recarga sola al siguiente cambio de pantalla**, que es el primer momento en que no hay un
+formulario a medias que perder. Con la cookie de la cortina caducada, `version.json` da 401 y no
+se avisa de nada. **No hay que hacer nada en cada despliegue**: es automático.
 
 **Aviso de instalación** (2026-08-01, `src/hooks/useInstalacio.ts` + `src/components/AvisInstallacio.tsx`).
 La aplicación era instalable desde el principio, pero la opción vivía en un menú del navegador que
@@ -579,6 +587,8 @@ src/
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
     settings.ts                Los dos interruptores de app_settings: modo test y whatsapp_activo (§8)
+    versio.ts                  La versión compilada (`__VERSIO__`) contra `/version.json`, y
+                               retiraServiceWorkers() (§2)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
                                + reenviarDocument() (botó «Reenvia», equip)
     textError.ts               El texto de un error para un aviso: el código conocido se traduce
@@ -4083,6 +4093,8 @@ de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
   probar con la buena, pasar por esa ruta.
 - **Una navegación ve la cortina con 401**; un script o una imagen, un 401 seco. `robots`
   `noindex`.
+- 🔴 **Y desde el 29-09-2026 ya no hay service worker** (§2): se autodestruye. Lo de abajo
+  explica el paso intermedio.
 - 🔴 **El service worker ya NO guarda `index.html` ni tiene `navigateFallback`**
   (`vite.config.ts`): con la página en su caché, un móvil que ya hubiera entrado abriría la
   aplicación sin pasar por el servidor, o sea sin cortina, también pasada la semana. `sw.js`

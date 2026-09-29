@@ -46,9 +46,29 @@ function cortinaDev(): Plugin {
   }
 }
 
+/**
+ * Identificador del build (29-09-2026). Va compilado dentro del bundle (`__VERSIO__`) y,
+ * a la vez, en `/version.json`, que se pide sin caché: si no coinciden, esa pestaña lleva
+ * código de un despliegue anterior (`src/lib/versio.ts`). En Vercel es el SHA del commit;
+ * en local, la hora del build.
+ */
+const VERSIO = process.env.VERCEL_GIT_COMMIT_SHA?.slice(0, 12) ?? `local-${Date.now()}`
+
+function fitxerVersio(): Plugin {
+  return {
+    name: 'redestina-versio',
+    apply: 'build',
+    generateBundle() {
+      this.emitFile({ type: 'asset', fileName: 'version.json', source: JSON.stringify({ versio: VERSIO }) })
+    },
+  }
+}
+
 export default defineConfig({
+  define: { __VERSIO__: JSON.stringify(VERSIO) },
   plugins: [
     cortinaDev(),
+    fitxerVersio(),
     react(),
     tailwindcss(),
     // PWA instalable. Dos decisiones que importan más que el resto:
@@ -85,24 +105,15 @@ export default defineConfig({
           { src: '/icona-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
-      workbox: {
-        // 🔴 SIN `html` y SIN `navigateFallback` desde la cortina de contraseña (28-09-2026,
-        //    `middleware.ts`). Con el `index.html` en la caché del service worker, un móvil
-        //    que ya hubiera entrado abriría la aplicación desde su caché sin pasar nunca por
-        //    el servidor, o sea sin cortina, también pasada la semana de la cookie. Cada
-        //    navegación va ahora a la red, que es donde está la cortina.
-        globPatterns: ['**/*.{js,css,svg,png,woff2}'],
-        cleanupOutdatedCaches: true,
-        clientsClaim: true,
-        skipWaiting: true,
-        navigateFallback: null,
-        runtimeCaching: [
-          {
-            urlPattern: ({ url }) => url.hostname.endsWith('.supabase.co'),
-            handler: 'NetworkOnly',
-          },
-        ],
-      },
+      // 🔴 AUTODESTRUCCIÓN (29-09-2026). El service worker ya no aportaba nada —sin red la
+      //    aplicación no abre desde la cortina (28-09)— y se había vuelto el motivo de que
+      //    el cliente NO VIERA LOS DESPLIEGUES: el de antes del 28-09 servía `index.html`
+      //    desde el móvil sin pasar por la red, y el nuevo no llegaba a instalarse porque
+      //    su precache pedía `/assets/*.js` sin cookie de la cortina y recibía 401. Con
+      //    `selfDestroying`, el `sw.js` (libre de cortina) se instala sin descargar nada,
+      //    se da de baja y recarga las pestañas: la siguiente carga ya va a la red.
+      //    Lo que queda de «PWA» es el manifest: instalable, sin caché propia.
+      selfDestroying: true,
       devOptions: { enabled: false },
     }),
   ],
