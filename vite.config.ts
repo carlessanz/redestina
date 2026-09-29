@@ -87,24 +87,11 @@ export default defineConfig({
     VitePWA({
       registerType: 'autoUpdate',
       includeAssets: ['favicon.svg', 'apple-touch-icon.png', 'logo-redestina.svg', 'logo-redestina-negativo.svg', 'isotipo-redestina.svg'],
-      manifest: {
-        name: 'Redestina — Espigoladors',
-        short_name: 'Redestina',
-        description: 'Canalització d’excedents agrícoles de la Fundació Espigoladors.',
-        // La raíz, no una ruta de rol: cada cuenta aterriza en su panel (§6ter).
-        start_url: '/',
-        scope: '/',
-        display: 'standalone',
-        orientation: 'portrait',
-        lang: 'ca',
-        background_color: '#f5f1ea',
-        theme_color: '#4e6b45',
-        icons: [
-          { src: '/icona-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/icona-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/icona-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-        ],
-      },
+      // 🔴 El manifest NO lo genera ni lo enlaza el plugin (29-09-2026): vive en
+      //    `public/manifest.webmanifest` y lo enlaza `escoltaInstalacio()` SOLO en móvil.
+      //    Con el `<link rel="manifest">` en el HTML, Chrome de escritorio enseñaba su
+      //    icono «Instal·la» en la barra de direcciones, y la instalación es solo para móvil.
+      manifest: false,
       // 🔴 AUTODESTRUCCIÓN (29-09-2026). El service worker ya no aportaba nada —sin red la
       //    aplicación no abre desde la cortina (28-09)— y se había vuelto el motivo de que
       //    el cliente NO VIERA LOS DESPLIEGUES: el de antes del 28-09 servía `index.html`

@@ -64,6 +64,19 @@ function esIOS(): boolean {
 }
 
 /**
+ * ¿Es un móvil o una tableta? La instalación se ofrece SOLO ahí (decisión del cliente):
+ * el equipo y cualquiera en un ordenador trabaja desde el navegador. Se decide por el
+ * dispositivo y no por el ancho de la ventana: un escritorio con la ventana estrecha
+ * no es un móvil. `pointer: coarse` + `hover: none` cubre las tabletas que se presentan
+ * como escritorio; un portátil táctil tiene ratón como puntero principal y queda fuera.
+ */
+export function esDispositiuMobil(): boolean {
+  if (esIOS() || /Android|Mobi/i.test(navigator.userAgent)) return true
+  return window.matchMedia?.('(pointer: coarse)').matches === true
+    && window.matchMedia?.('(hover: none)').matches === true
+}
+
+/**
  * ¿Descartado hace menos de 30 días? Se guarda la FECHA, no un booleano: un booleano
  * no sabría expresar «vuelve a ofrecerlo dentro de un mes».
  */
@@ -81,13 +94,21 @@ function descartatFaPoc(): boolean {
 /** El valor que lee el hook. Es un string para que `useSyncExternalStore` pueda
  *  compararlo por identidad sin recrear objetos en cada render. */
 function llegeixMode(): ModeInstalacio {
-  if (descartat || descartatFaPoc() || jaInstalada()) return 'no'
+  if (!esDispositiuMobil() || descartat || descartatFaPoc() || jaInstalada()) return 'no'
   if (esdeveniment) return 'automatica'
   return esIOS() ? 'manual-ios' : 'no'
 }
 
 /** Se llama UNA vez, en el arranque (`main.tsx`), antes de montar React. */
 export function escoltaInstalacio() {
+  // Sin manifest el navegador no la considera instalable: en escritorio no se enlaza, y
+  // así Chrome tampoco pinta su icono de instalar en la barra de direcciones.
+  if (!esDispositiuMobil()) return
+  const enllac = document.createElement('link')
+  enllac.rel = 'manifest'
+  enllac.href = '/manifest.webmanifest'
+  document.head.appendChild(enllac)
+
   window.addEventListener('beforeinstallprompt', (e) => {
     // Sin esto Chrome enseña su propia barra y perdemos el control del momento.
     e.preventDefault()
