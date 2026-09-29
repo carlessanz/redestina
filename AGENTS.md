@@ -767,7 +767,8 @@ scripts/
   fotos-cataleg.ts (+ .json)   Las fotos del catálogo y de las ofertas desde un MANIFIESTO versionado
                                (fuente, autor y licencia CC0/dominio público de cada una): descarga,
                                recorta, WebP sin metadatos y sube. Los binarios no van a git (§11).
-                               ⚠️ La parte de PRODUCTOS ya no se usa: desde el 29-09-2026 son iconos
+                               ⚠️ Ya no se usa (29-09-2026): productos → iconos, y las fotos de
+                               ejemplo de las ofertas se retiraron
   icones-productes.ts          Dibuja los 90 iconos de producto (SVG plano 64×64, sin licencias de
                                terceros) en public/icones-productes/ (§6ter)
   incrustar-activos.ts         Regenera activos/incrustats.ts: las fuentes y el logo del PDF
@@ -2812,8 +2813,12 @@ Ya no hay casilla «mostra la foto genèrica del producte» ni etiqueta «foto o
 no se confunde con la foto del lote. En el alta, sin fotos, se enseña el icono con «Sense fotos,
 l’oferta es veurà amb la icona del producte».
 
-Las **fotos propias de las ofertas** (bucket `fotos-ofertes`, las 24 de contexto del 28-09) no
-cambian.
+Las **24 fotos de ejemplo** que el 28-09 se pusieron a las 19 ofertas de prueba (WebP de
+`scripts/fotos-cataleg.ts`, ninguna subida desde la app) **se retiraron también el 29-09**: con
+ellas esas ofertas no enseñaban el icono. Hoy ninguna oferta tiene foto (`excedentes.fotos = '{}'`);
+los ficheros siguen en el bucket `fotos-ofertes`. Las fotos que suba un productor desde la app
+(JPEG) funcionan como siempre. **`scripts/fotos-cataleg.ts` ya no se debe ejecutar**, ni la parte
+de productos ni la de ofertas.
 
 ### Los estados SIMPLES de los paneles externos (27-09-2026)
 
