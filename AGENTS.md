@@ -336,6 +336,12 @@ saldría nunca. El banner es **hermano flex `shrink-0`, no `fixed`** —mismo co
 barra inferior—, así que resta alto al `main` y no tapa nada. Quien lo descarta no lo vuelve a ver en
 **30 días**: `redestina-install-descartat` guarda la **fecha**, no un booleano, porque un booleano no sabe
 expresar eso.
+🔴 **Desde el 29-09-2026 «móvil» es el DISPOSITIVO, no el ancho** (`esDispositiuMobil()`: iOS,
+Android/`Mobi`, o `pointer: coarse` + `hover: none`), y **en escritorio no se enlaza el manifest**:
+vive en `public/manifest.webmanifest` (el plugin tiene `manifest: false`) y lo añade
+`escoltaInstalacio()` solo en móvil. Con el `<link rel="manifest">` en el HTML, Chrome de
+escritorio pintaba su propio icono de instalar en la barra de direcciones, que no es nuestro y que
+`md:hidden` no podía esconder.
 
 **Responsive** (breakpoint `md`, 768px). Los **listados** van
 en tabla con `overflow-x-auto` (scroll horizontal en móvil); los **detalles/CRUD** usan grids
