@@ -546,6 +546,7 @@ public/                        Logo en seis variantes SVG, favicon, iconos PWA y
 .claude/skills/publicar/       Skill /publicar: el procedimiento de publicación (§11)
 .claude/agents/                Tres agentes de proyecto (dades, servidor, interficie) con los que se
                                ejecutan por fases el sistema documental (§1, §7); Opus a esfuerzo alto
+.codex/agents/, .agents/skills/ Los mismos tres agentes y el skill /publicar para Codex (29-09-2026)
 src/
   main.tsx                     Punto de entrada React
   App.tsx                      Dos capas: SessioProvider → RouterProvider (el contexto de rol
