@@ -250,7 +250,7 @@ proyecto piden 66-112 px —son largas a propósito: `nav.ts` las elige únicas 
 los tooltips del menú plegado no se repitan (§2bis, `text-nav`)—. Medido: con cuatro entradas la
 barra pide **exactamente 360 px** en los dos paneles; con cinco pedía **393** y desbordaba.
 Consecuencias: una entrada que no quepa se marca **`barra: false`** en `NavItem` y se queda solo en
-el menú lateral (hoy, «Nova oferta» en productor —ya es `primari` y cabe dentro de Inici— e
+el menú lateral (hoy, «Nova oferta» en productor —cabe dentro de Inici— e
 «Històric» en receptor); y **cualquier etiqueta nueva o traducción más larga rompe la barra**, así
 que al añadir una hay que medirla, no estimarla.
 
@@ -2853,7 +2853,7 @@ ofertas**, nunca una por oferta (§12.5). De la entidad que recibe se dice cuán
 
 **Y de paso**: el receptor ya no ve el código interno `E-…` en Interessos ni en Històric (la
 fecha va siempre); el Mercat se titula «Excedents disponibles»; «Nova oferta» del menú lateral
-ya no lleva un fondo que se confundía con la sección activa (ahora un contorno); el alta de
+se pinta igual que las demás entradas (29-09-2026: sin fondo ni contorno, a petición del cliente); el alta de
 oferta pide la disponibilidad con **calendario** (guarda «dd/mm/aaaa», que es lo que entiende
 `parseDisponibleFins()`); el productor ya no tiene la subida de factura en Documentació; y los
 certificados de recepción del receptor dicen que **no** son certificados de donación.

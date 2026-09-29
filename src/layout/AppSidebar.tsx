@@ -141,12 +141,6 @@ export default function AppSidebar({
                               asChild
                               isActive={actiu}
                               tooltip={t(item.labelKey)}
-                              // «Nova oferta» es una ACCIÓN, no un sitio: antes llevaba un
-                              // fondo crema propio y se confundía con la sección activa
-                              // (revisión del 23-09-2026). Ahora solo la sección activa
-                              // lleva relleno; la acción se marca con un contorno, y
-                              // cuando se está en ella se pinta como cualquier activa.
-                              className={cn(item.primari && !actiu && 'ring-1 ring-inset ring-sidebar-foreground/40')}
                             >
                               <NavLink to={item.to} onClick={alNavegar}>
                                 <item.icon />

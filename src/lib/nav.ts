@@ -37,8 +37,6 @@ export interface NavItem {
   /** Coincidencia exacta (para los índices de sección). */
   end?: boolean
   comptador?: Comptador
-  /** Acción destacada del panel (se pinta como botón, no como enlace). */
-  primari?: boolean
   /**
    * `false` = fuera de la barra inferior de móvil; sigue en el menú lateral.
    *
@@ -121,7 +119,7 @@ const PRODUCTOR: NavGrup[] = [
   {
     items: [
       { to: '/productor/inici', labelKey: 'nav.home', icon: Home, end: true },
-      { to: '/productor/ofertes/nova', labelKey: 'nav.new_offer', icon: PlusCircle, primari: true, barra: false },
+      { to: '/productor/ofertes/nova', labelKey: 'nav.new_offer', icon: PlusCircle, barra: false },
       // `Sprout` y no `Package`: el panel del equipo ya usa `Package` para «Ofertes», y
       // con los dos menús a la vez el mismo icono dos veces no distingue nada.
       { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true },
