@@ -81,3 +81,13 @@ export function errorCp(cp: string): string | null {
   if (c === '') return null
   return /^\d{5}$/.test(c) ? null : 'val.cp'
 }
+
+/**
+ * ¿La «varietat» de una oferta parece una CANTIDAD? («200», «1.500 kg»). Pasó en la revisión
+ * del 05-10-2026: se escribió el peso en la variedad. Es un aviso, no un error: la variedad
+ * es opcional y libre, y no se bloquea a nadie por ella.
+ */
+export function varietatSemblaQuantitat(v: unknown): boolean {
+  if (typeof v !== 'string') return false
+  return /^\s*\d+(?:[.,]\d+)*\s*(?:kg|kgs|quilos?|kilos?)?\s*$/i.test(v)
+}

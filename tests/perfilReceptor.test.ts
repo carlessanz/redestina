@@ -5,7 +5,7 @@
 // que las claves COMPUESTAS de `perfilReceptor.ts` existan en los dos idiomas.
 
 import { describe, it, expect } from 'vitest'
-import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../src/lib/validacio'
+import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon, varietatSemblaQuantitat } from '../src/lib/validacio'
 import { PERFIL_RECEPTOR, TIPUS_EMPRESA, clausPerfil } from '../src/lib/perfilReceptor'
 import { DICTS } from '../src/lib/i18n'
 
@@ -69,5 +69,14 @@ describe('los campos por tipo de receptor', () => {
         else expect(c.opcions, c.clau).toBeUndefined()
       }
     }
+  })
+})
+
+describe('varietatSemblaQuantitat', () => {
+  it('avisa cuando la variedad es solo un número o un peso', () => {
+    for (const v of ['200', ' 1.500 ', '200 kg', '12,5kg', '300 quilos']) expect(varietatSemblaQuantitat(v)).toBe(true)
+  })
+  it('no avisa con una variedad de verdad ni con vacío', () => {
+    for (const v of ['Golden', 'Raf', 'Conference 2', '', null, undefined]) expect(varietatSemblaQuantitat(v)).toBe(false)
   })
 })

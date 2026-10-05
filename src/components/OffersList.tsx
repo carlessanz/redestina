@@ -15,6 +15,7 @@
 // un estado nuevo podía caer en el color equivocado. La leyenda plegada explica los siete.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
@@ -33,6 +34,8 @@ import {
 
 interface Props {
   onOpen: (excedente: Excedente) => void
+  /** Un botón de cabecera opcional: «Nova oferta» en el panel del equipo (05-10-2026). */
+  accio?: ReactNode
 }
 
 type KgPorExcedente = Record<string, number>
@@ -65,7 +68,7 @@ function fmtKg(n: number): string {
   return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
 }
 
-export default function OffersList({ onOpen }: Props) {
+export default function OffersList({ onOpen, accio }: Props) {
   const { t } = useT()
   const [actives, setActives] = useState<Excedente[]>([])
   const [tancades, setTancades] = useState<Excedente[]>([])
@@ -204,7 +207,10 @@ export default function OffersList({ onOpen }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('off.title_all')}</CardTitle>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <CardTitle>{t('off.title_all')}</CardTitle>
+          {accio}
+        </div>
         <p className="mt-1 text-sm text-muted-foreground">{t('off.subtitle_all')}</p>
         <LlegendaEstats items={llegendaOferta()} />
       </CardHeader>

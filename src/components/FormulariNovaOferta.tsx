@@ -38,6 +38,7 @@ import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
+import { varietatSemblaQuantitat } from '../lib/validacio'
 import { cn } from '../lib/utils'
 import {
   aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio, etiquetaFamilia, localitzaDescriptor,
@@ -567,6 +568,17 @@ export default function FormulariNovaOferta(
               min={avuiIso()}
               value={ddmmaaaaAIso(String(valor ?? ''))}
               onChange={(e) => set(campo.clave, isoADdmmaaaa(e.target.value))} />
+          )
+        }
+        if (campo.clave === 'varietat') {
+          return (
+            <>
+              <Input id={id} name={campo.clave} type="text" aria-invalid={invalid}
+                value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)} />
+              {varietatSemblaQuantitat(valor) && (
+                <p className="mt-1 text-xs text-aviso">{t('po.variety_looks_kg')}</p>
+              )}
+            </>
           )
         }
         return campo.clave === 'observacions'

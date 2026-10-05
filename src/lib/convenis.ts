@@ -144,6 +144,14 @@ export function retornarConveni(id: string, motiu: string): Promise<ResultatRpc<
   return crida('retornar_convenio', { p_id: id, p_motiu: motiu }, 'conv.err_generic')
 }
 
+/**
+ * Descarta un BORRADOR (sin número, nunca enviado). Solo admin o super_admin; la base
+ * se niega con 22023 si ya no es borrador o tiene documentos adjuntos.
+ */
+export function descartarConveni(id: string): Promise<ResultatRpc<null>> {
+  return crida('descartar_convenio_esborrany', { p_id: id }, 'conv.err_generic')
+}
+
 /** La baja, con su fecha de efecto (por defecto, dos meses de preaviso). */
 export function resoldreConveni(
   id: string,

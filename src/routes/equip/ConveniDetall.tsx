@@ -17,7 +17,7 @@
 //    column` — que es exactamente la protección funcionando.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
@@ -29,7 +29,7 @@ import { dataCurta } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
 import {
   contrafirmarConveni, enviarConveni, enviarCorreuConveni, estilEstatConveni,
-  iniciarFirmaAssistida, resoldreConveni, retornarConveni, urlSignatura,
+  descartarConveni, iniciarFirmaAssistida, resoldreConveni, retornarConveni, urlSignatura,
 } from '../../lib/convenis'
 import type { EnllacFirma } from '../../lib/convenis'
 import { PASSOS_CONVENI_CLAUS, seguentPasConveni } from '../../lib/seguentPas'
@@ -117,6 +117,7 @@ export default function ConveniDetall() {
   // Con el contexto degradado (RPC de sesión no desplegada) se asume que sí, como se ha
   // comportado la app siempre. La RPC revalida y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? true
+  const navigate = useNavigate()
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -255,6 +256,25 @@ export default function ConveniDetall() {
     await carrega()
   }
 
+  async function descarta() {
+    if (!conv) return
+    // Un borrador no tiene número: borrarlo no deja hueco en ninguna serie. Aun así se
+    // pregunta, porque no se puede deshacer.
+    if (!(await confirma({
+      titol: t('conv.discard_confirm_t'),
+      descripcio: t('conv.discard_confirm'),
+      confirmar: t('conv.discard'),
+      destructiu: true,
+    }))) return
+    setOcupat(true)
+    const res = await descartarConveni(conv.id)
+    setOcupat(false)
+    if (!res.ok) { toast.error(textError(t, res)); return }
+    toast.success(t('conv.discarded'))
+    void refrescaComptadors()
+    navigate('/equip/convenis')
+  }
+
   async function resol(motiu: string) {
     if (!conv) return
     setOcupat(true)
@@ -382,6 +402,13 @@ export default function ConveniDetall() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{t('conv.send_hint')}</p>
+              {conv.estado === 'esborrany' && (
+                <BotoAmbMotiu variant="ghost" className="h-11 whitespace-normal text-destructive md:h-9"
+                  disabled={ocupat || !potAprovar} motiu={motiuRol}
+                  onClick={() => void descarta()}>
+                  {t('conv.discard')}
+                </BotoAmbMotiu>
+              )}
             </div>
           )}
 

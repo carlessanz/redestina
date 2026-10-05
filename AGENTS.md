@@ -590,6 +590,10 @@ src/
     plantillas.ts              plantillaPrimerContacte(): tría plantilla de 1r contacte per rol (§6ter)
     ofertaTemplate.ts          construirComponentsOferta(): variables de la plantilla oferta_excedent (§6ter)
     redestina.ts               priorizarEntidades(): llama a la Edge Function con el JWT
+    rankingEntitats.ts         PURO: filtro por `tipo_receptor` y «veure'n més» (de 15 en 15) del
+                               ranking de entidades del detalle de oferta (05-10-2026)
+    filtresMercat.ts           PURO: filtros del Mercat (comarca + categoría de producto, el mismo
+                               vocabulario que `perfil_receptor`), recordados por entidad (05-10-2026)
     mensajes.ts                countUnanswered(): mensajes «sin contestar» por teléfono (§5)
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
@@ -658,7 +662,8 @@ src/
                                (`public/icones-productes/<slug>.svg`)
     fotosProducte.ts           El catálogo (nombre y familia), una vez por sesión
     validacio.ts               PURO: NIF/NIE/CIF con dígito de control, teléfono (normaliza a E.164
-                               sin +), correo y CP. Devuelve claves i18n
+                               sin +), correo y CP. Devuelve claves i18n. Y `varietatSemblaQuantitat()`,
+                               el aviso del alta de oferta cuando la variedad es un número (05-10-2026)
     perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
                                a `entidades.perfil_receptor`, y los tipos de empresa
     municipis.ts               El nomenclátor (`municipios`) cargado una vez por sesión, y el nombre
@@ -2165,6 +2170,7 @@ funciones, no políticas:
 | `puc_veure_document_extern(id, user default null)` (`20270329100000`) | Autoriza la **descarga de un externo**. Espejo de `puede_ver_documento()`: guarda anti-suplantación, equipo por rol, fail-open del interruptor, y si no, la misma condición que la política de lectura. ⚠️ `documentos_externos` **no tiene columna `modo`**, así que el modo prueba se reconoce **por la ruta** (`…/proves/…`), como ya hace `limpiar-documentos-prueba`. ⚠️ Para `productor`/`entidad` consulta `membresias` **inline** y no `mis_productores()`: aquellas leen `auth.uid()` y con `service_role` —que es como la llama la Edge Function— devolverían vacío, o sea que un externo propio se vería como ajeno |
 | `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
+| `descartar_convenio_esborrany(id)` (`20270408100000`) | Borra un convenio en **`esborrany`** (sin número: no deja hueco en ninguna serie). Solo `pot_aprovar()` (`42501`); `22023` si no es borrador o si tiene `documentos_externos`. Borra antes sus `enlaces_token` (no debería tener). `pendent_firma` **no** se descarta: ya ha salido un enlace hacia alguien. Deja `raise log` con quién y qué. Botón «Descarta l'esborrany» en `ConveniDetall`. Existe porque `convenios` no tiene `grant delete` y la Fundació va a un único convenio por tipo de entidad (reunión del 05-10-2026) |
 | `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
@@ -2669,6 +2675,29 @@ que corresponde al momento de cierre y todavía no está implementado.
 | **Equip** (`intern`) | `/equip/tauler · ofertes[/:id] · aprovacions · productors[/:id] · entitats[/:id] · missatgeria[/:phone] · **documents** · **albarans[/:id]** · **espigolades/nova[/:id]** · configuracio` | Todo lo que ya existía, más la **cola global de aprobaciones** y la **bandeja de documentos** (§4) |
 | **Productor** | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · **documents**` | Sus ofertas, su progreso, el **alta con el mismo cuestionario del intake** y sus **documentos** |
 | **Receptor** | `/receptor/mercat · interessos · historic · **documents**` | Las ofertas **compatibles con su `tipo_receptor`** (el filtro NO es de cliente: lo aplica la RLS de `excedentes` con la matriz `modalitat_receptor_compat`, §4bis), su interés, su histórico y sus **documentos** |
+
+### Reunión de seguimiento del 05-10-2026: rebanada 0
+
+Primera rebanada del plan `3. Claude Code/2026-10-05-plan-ejecucion-reunion-seguimiento.md`
+(revisión del perfil ofertante con Sebastián). Lo que cambia en los paneles:
+
+- **Equip → Ofertes** tiene botón **«Nova oferta»**: abre `DialegNovaOfertaAssistida`, el mismo
+  diálogo de Canalització (no hay segundo formulario), y al crearla lleva a `/equip/ofertes/:id`.
+  `OffersList` acepta una prop `accio` para el botón de cabecera.
+- **Detalle de oferta → Entitats prioritzades**: ya no se corta en 15. «Veure'n N més» de 15 en 15
+  y un desplegable **«Tipus d'entitat»** (`tipo_receptor`) que solo aparece si el ranking tiene más
+  de un tipo. `priorizar-entidades` devuelve `tipo_receptor` por fila (no puntúa: solo filtra).
+  Lógica pura en `lib/rankingEntitats.ts`; el filtro **no reordena**.
+- **Receptor → Mercat**: filtros **Zona** (comarca) y **Tipus de producte** (fruita · verdura ·
+  tubercles · fruita seca · altres, agrupando las familias del catálogo con
+  `categoriaDeFamilia()`). Sin filtro por defecto; solo se ofrecen valores que dan resultado; se
+  recuerdan por entidad en `localStorage` (comodidad: si falla, sin filtro). Lógica pura en
+  `lib/filtresMercat.ts`. ⚠️ Las categorías son las de `perfil_receptor.productes_*` a propósito:
+  el día que el filtro se preseleccione con lo que declaró la entidad, ya hablan igual.
+- **Alta de oferta → Varietat**: ayuda con ejemplos («els quilos es demanen després») en el
+  descriptor —la ven panel y bot— y aviso ámbar en el panel si la respuesta es solo un número o un
+  peso (`varietatSemblaQuantitat`). No bloquea: el campo es opcional.
+- **Convenis**: «Descarta l'esborrany» (`descartar_convenio_esborrany`, §4bis).
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -5993,8 +6022,10 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.029 pruebas en 33 ficheros**: 1.028 correctas y **1 saltada a propósito**, la
-   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (28-09-2026:
+   Referencia: **1.040 pruebas en 35 ficheros**: 1.039 correctas y **1 saltada a propósito**, la
+   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026:
+   +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
+   Antes, 1.029 en 33 ficheros. 28-09-2026:
    +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,
    `tests/cortina.test.ts`. Antes, 991 y ninguna saltada (28-09-2026:
    +4 de `opcionsVisibles`, las opciones del diagnóstico que derivan de otra respuesta. Antes, 987:
@@ -6016,6 +6047,11 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
+   ⏳ **05-10-2026: cifra pendiente de medir.** Se declararon tres checks nuevos de
+   `descartar_convenio_esborrany` (denegar en el bloque externo y en `tecnic`, permitir en el de
+   aprobación); se ejecutan por cuenta, así que la cifra subirá más de 3 (ver el aviso de
+   «subió 12, no 4» más abajo). Se mide al publicar la migración `20270408100000`; mientras, la
+   última medida es la de abajo.
    ✅ **Referencia HOY: 988/988 correctas y 28 saltadas, «Sin fallos de permisos»** (28-09-2026,
    tras `20270406100300`: +9 de `recalcula_estat_espigolada`, denegada a las siete cuentas externas
    y a las dos del equipo —la llama solo el trigger—). La anterior: **979/979** (28-09-2026,

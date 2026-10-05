@@ -8,6 +8,7 @@ import { sendWhatsApp } from '../lib/whatsapp'
 import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
+import { filtraRanking, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
@@ -116,6 +117,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const [ranking, setRanking] = useState<EntidadPuntuada[]>([])
   const [rankingError, setRankingError] = useState<string | null>(null)
   const [cargandoRanking, setCargandoRanking] = useState(true)
+  /** Filtro por `tipo_receptor` y cuántas filas del ranking se enseñan (`rankingEntitats.ts`). */
+  const [filtreTipus, setFiltreTipus] = useState('')
+  const [mostrats, setMostrats] = useState(PAS_RANKING)
   const [copiado, setCopiado] = useState<string | null>(null)
   // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
   // (p. ej. si el intake dejó una fecha parseada o el usuario la edita).
@@ -263,6 +267,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const contactable = (e: EntidadPuntuada) => (!testMode || e.es_test) && e.canal !== 'cap'
     return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
   }, [ranking, testMode])
+  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, filtreTipus), [rankingOrdenado, filtreTipus])
+  const tipusDelRanking = useMemo(() => tipusPresents(ranking), [ranking])
 
   // Las dos escrituras piden las filas afectadas: un UPDATE que la RLS no deja pasar no da
   // error, devuelve cero filas (§12.48), y la pantalla daba el cambio por hecho.
@@ -812,7 +818,19 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {!cargandoRanking && !rankingError && !ofertaOberta && (
             <p className="text-sm text-muted-foreground">{t('od.send_closed')}</p>
           )}
-          {!cargandoRanking && !rankingError && rankingOrdenado.slice(0, 15).map((ent) => {
+          {!cargandoRanking && !rankingError && tipusDelRanking.length > 1 && (
+            <div className="flex flex-wrap items-center gap-2">
+              <label htmlFor="od-filtre-tipus" className="text-sm text-muted-foreground">{t('od.f_type')}</label>
+              <select id="od-filtre-tipus"
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={filtreTipus}
+                onChange={(e) => { setFiltreTipus(e.target.value); setMostrats(PAS_RANKING) }}>
+                <option value="">{t('od.f_type_all', { n: ranking.length })}</option>
+                {tipusDelRanking.map((tp) => <option key={tp} value={tp}>{t(`org.tr_${tp}`)}</option>)}
+              </select>
+            </div>
+          )}
+          {!cargandoRanking && !rankingError && rankingFiltrat.slice(0, mostrats).map((ent) => {
             const puedeTest = !testMode || ent.es_test
             // Si no es usuari de prova, se muestra el motivo visible (antes solo en el title).
             const motivos = puedeTest ? ent.motivos : [...ent.motivos, t('od.not_test')]
@@ -870,6 +888,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </div>
             )
           })}
+          {!cargandoRanking && !rankingError && rankingFiltrat.length > mostrats && (
+            <Button variant="ghost" size="sm" className="w-full"
+              onClick={() => setMostrats((n) => n + PAS_RANKING)}>
+              {t('od.more', { n: Math.min(PAS_RANKING, rankingFiltrat.length - mostrats), total: rankingFiltrat.length })}
+            </Button>
+          )}
         </CardContent>
       </Card>
 

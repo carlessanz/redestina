@@ -298,9 +298,11 @@ export const CAMPOS: CampoOferta[] = [
     clave: "varietat",
     tipo: "text",
     etiqueta: "Quina varietat és?",
-    ayuda: "Deixa-ho buit si no ho saps",
+    // «Els quilos van després» (reunión del 05-10-2026): en la demo se escribió «200» aquí
+    // pensando que eran kg. El panel avisa además si la respuesta es solo un número.
+    ayuda: "P. ex. Golden, Conference, Raf. Deixa-ho buit si no ho saps; els quilos es demanen després.",
     etiqueta_es: "¿Qué variedad es?",
-    ayuda_es: "Déjalo vacío si no lo sabes",
+    ayuda_es: "P. ej. Golden, Conference, Raf. Déjalo vacío si no lo sabes; los kilos se piden después.",
     seccion: "producte",
     obligatorio: false,
   },

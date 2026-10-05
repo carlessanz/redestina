@@ -101,7 +101,7 @@ Deno.serve(async (req) => {
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
       // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
       // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
-      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro");
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor");
     if (entError) {
       console.error("entidades select:", entError.message);
       return json({ error: "Error consultando las entidades" }, 500);
@@ -131,7 +131,7 @@ Deno.serve(async (req) => {
     const porTelefono = new Map<string, { opt_in: boolean | null; last_inbound_at: string | null }>();
     for (const c of contactos ?? []) porTelefono.set(c.phone, c);
 
-    const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null }>();
+    const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null }>();
     for (const e of entidades ?? []) porId.set(e.id, e);
 
     // La preferencia de canal de la organización de cada entidad. Fail-soft: si no se
@@ -173,6 +173,9 @@ Deno.serve(async (req) => {
         ...e,
         email: ficha?.email ?? null,
         es_test: ficha?.es_test === true,
+        // Para el filtro «tipus d'entitat» del panel (reunión del 05-10-2026). No entra en
+        // la puntuación: la compatibilidad de tipo ya la decide la matriz de modalidades.
+        tipo_receptor: ficha?.tipo_receptor ?? null,
         canal: d.canal,
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,

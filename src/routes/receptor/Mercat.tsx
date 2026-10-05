@@ -13,7 +13,7 @@
 // ⚠️ `estado === 'pendent'` SÍ enseña el botón: significa que el equipo le mandó la oferta
 // y todavía no ha contestado. Es la fila que existe justamente para que la conteste.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -22,6 +22,10 @@ import { useConveni } from '../../hooks/useConveni'
 import { clauErrorInteres, manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
+import {
+  desaFiltres, filtraMercat, llegeixFiltres, opcionsMercat, SENSE_FILTRES,
+} from '../../lib/filtresMercat'
+import type { FiltresMercat } from '../../lib/filtresMercat'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import type { ConvenioTipo, OfertaRespuesta } from '../../types'
@@ -69,6 +73,18 @@ export default function Mercat() {
   const [enviant, setEnviant] = useState(false)
 
   const entidadId = organitzacio?.id ?? null
+
+  // Zona y tipo de producto (reunión del 05-10-2026). Por defecto, sin filtro: se ve todo lo
+  // que la RLS deja ver. Recordado por entidad en este navegador (`filtresMercat.ts`).
+  const [filtres, setFiltres] = useState<FiltresMercat>(SENSE_FILTRES)
+  useEffect(() => { setFiltres(llegeixFiltres(entidadId)) }, [entidadId])
+  function canviaFiltres(f: FiltresMercat) {
+    setFiltres(f)
+    desaFiltres(entidadId, f)
+  }
+  const opcions = useMemo(() => opcionsMercat(ofertes), [ofertes])
+  const visibles = useMemo(() => filtraMercat(ofertes, filtres), [ofertes, filtres])
+  const ambFiltre = filtres.comarca !== '' || filtres.categoria !== ''
 
   const carrega = useCallback(async () => {
     // ⚠️ Columnas explícitas y en UN literal (§7): sin `texto_oferta`, `id_excedente`,
@@ -206,7 +222,45 @@ export default function Mercat() {
         {!carregant && !errorCarrega && ofertes.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}
-        {ofertes.map((o) => {
+        {!carregant && !errorCarrega && ofertes.length > 0 && (opcions.comarques.length > 1 || opcions.categories.length > 1 || ambFiltre) && (
+          <div className="flex flex-wrap items-end gap-2 pb-1">
+            <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+              <Label htmlFor="mk-f-zona" className="text-xs text-muted-foreground">{t('mk.f_zone')}</Label>
+              <select id="mk-f-zona"
+                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base sm:w-48 md:h-9 md:text-sm"
+                value={filtres.comarca}
+                onChange={(e) => canviaFiltres({ ...filtres, comarca: e.target.value })}>
+                <option value="">{t('mk.f_all_zones')}</option>
+                {/* Una comarca recordada que hoy ya no tiene ofertas se sigue ofreciendo: si no,
+                    el select no podría enseñar el valor elegido. */}
+                {[...new Set([...opcions.comarques, ...(filtres.comarca ? [filtres.comarca] : [])])].map((c) => (
+                  <option key={c} value={c}>{c}</option>
+                ))}
+              </select>
+            </div>
+            <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+              <Label htmlFor="mk-f-tipus" className="text-xs text-muted-foreground">{t('mk.f_type')}</Label>
+              <select id="mk-f-tipus"
+                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base sm:w-48 md:h-9 md:text-sm"
+                value={filtres.categoria}
+                onChange={(e) => canviaFiltres({ ...filtres, categoria: e.target.value as FiltresMercat['categoria'] })}>
+                <option value="">{t('mk.f_all_types')}</option>
+                {[...new Set([...opcions.categories, ...(filtres.categoria ? [filtres.categoria] : [])])].map((c) => (
+                  <option key={c} value={c}>{t(c === 'altres' ? 'mk.f_other' : `pr.o_${c}`)}</option>
+                ))}
+              </select>
+            </div>
+            {ambFiltre && (
+              <Button variant="ghost" className="h-11 md:h-9" onClick={() => canviaFiltres(SENSE_FILTRES)}>
+                {t('mk.f_clear')}
+              </Button>
+            )}
+          </div>
+        )}
+        {!carregant && !errorCarrega && ofertes.length > 0 && visibles.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t('mk.f_empty', { n: ofertes.length })}</p>
+        )}
+        {visibles.map((o) => {
           const punt = puntDe(o)
           const motiu = motiuNoPot(o)
           // La tarjeta dice lo que un receptor mira primero (revisión del 23-09-2026):

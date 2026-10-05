@@ -27,6 +27,8 @@ export interface EntidadPuntuada {
   // --- Canal recomendado, decidido en el servidor -------------------------
   email: string | null
   es_test: boolean
+  /** `entidades.tipo_receptor` (social · animal · transformador · comercial). Solo filtra. */
+  tipo_receptor?: string | null
   canal: Canal
   motiu_canal: MotivoCanal
   whatsapp_possible: boolean
