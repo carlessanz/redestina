@@ -31,6 +31,10 @@ export type Comptador =
   // Uno por panel: una cuenta con doble rol no debe ver en su menú de productor lo que
   // espera su entidad.
   | 'pendents_productor' | 'pendents_receptor'
+  // Avisos sin leer (05-10-2026, rebanada 2): los de productor en «Les meves ofertes», los
+  // de entidad en «Els meus interessos»; y las ofertas nuevas del Mercat desde la última
+  // visita (`perfiles.mercat_vist_at`).
+  | 'avisos_ofertes' | 'avisos_interessos' | 'mercat_noves'
 
 export interface NavItem {
   to: string
@@ -124,7 +128,7 @@ const PRODUCTOR: NavGrup[] = [
       { to: '/productor/ofertes/nova', labelKey: 'nav.new_offer', icon: PlusCircle, barra: false },
       // `Sprout` y no `Package`: el panel del equipo ya usa `Package` para «Ofertes», y
       // con los dos menús a la vez el mismo icono dos veces no distingue nada.
-      { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true },
+      { to: '/productor/ofertes', labelKey: 'nav.my_offers', icon: Sprout, end: true, comptador: 'avisos_ofertes' },
       { to: '/productor/documents', labelKey: 'nav.my_documents', icon: FolderOpen, comptador: 'pendents_productor' },
     ],
   },
@@ -133,8 +137,8 @@ const PRODUCTOR: NavGrup[] = [
 const RECEPTOR: NavGrup[] = [
   {
     items: [
-      { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true },
-      { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake },
+      { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true, comptador: 'mercat_noves' },
+      { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake, comptador: 'avisos_interessos' },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
       { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },
     ],

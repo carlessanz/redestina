@@ -18,9 +18,11 @@ import type { Comptador } from '../lib/nav'
 import { buidaComptadors, refrescaComptadors } from '../lib/pendentsEquip'
 import { useComptadorsEquip } from '../hooks/useComptadorsEquip'
 import { carregaPendents } from '../lib/pendents'
+import { carregaAvisos, comptaMercatNou, noLlegitsPerPanell, useAvisos } from '../lib/avisos'
 import AppSidebar from './AppSidebar'
 import BottomNav from './BottomNav'
 import UserMenu from './UserMenu'
+import CampanaAvisos from '../components/CampanaAvisos'
 import AvisInstallacio from '../components/AvisInstallacio'
 import AvisConveni from '../components/AvisConveni'
 import AvisRegistreIncomplet from '../components/AvisRegistreIncomplet'
@@ -113,6 +115,30 @@ export default function AppShell() {
     return () => { viu = false }
   }, [esExtern, pathname, ticAvisos])
 
+  // Los avisos (05-10-2026, rebanada 2): se recargan al navegar, como los pendientes. Los
+  // badges salen del store, así que bajan en cuanto una pantalla los marca como leídos.
+  const fitxesMeves = (ctx?.organitzacions ?? []).map((o) => o.id).join(',')
+  useEffect(() => {
+    if (!esExtern) return
+    void carregaAvisos(fitxesMeves ? fitxesMeves.split(',') : [])
+  }, [esExtern, fitxesMeves, pathname])
+  const avisos = useAvisos()
+  const noLlegits = noLlegitsPerPanell(avisos)
+  // El badge «noves» del Mercat: no en el propio Mercat (allí cada tarjeta dice «Nova»).
+  const esReceptor = ctx?.rols.includes('receptor') ?? false
+  const userId = ctx?.userId ?? null
+  const [mercatNou, setMercatNou] = useState(0)
+  useEffect(() => {
+    if (!esReceptor || !userId) return
+    if (pathname.startsWith('/receptor/mercat')) { setMercatNou(0); return }
+    let viu = true
+    void comptaMercatNou(userId).then((n) => { if (viu) setMercatNou(n) })
+    return () => { viu = false }
+  }, [esReceptor, userId, pathname])
+  comptadors.avisos_ofertes = noLlegits.ofertes
+  comptadors.avisos_interessos = noLlegits.interessos
+  comptadors.mercat_noves = mercatNou
+
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">
       <AppSidebar
@@ -145,6 +171,7 @@ export default function AppShell() {
               {t('app.degraded')}
             </span>
           )}
+          {esExtern && <CampanaAvisos />}
           <UserMenu />
         </header>
 

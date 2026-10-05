@@ -1,18 +1,20 @@
 // Detalle de una oferta desde el panel del productor: qué publicó, en qué punto del
-// proceso está y qué le toca hacer (casi siempre, nada). Puede cancelarla; editarla no,
-// porque el texto de la oferta ya ha circulado por WhatsApp y cambiarlo dejaría a las
-// entidades mirando algo que no existe.
+// proceso está y qué le toca hacer (casi siempre, nada). Puede cancelarla y, desde el
+// 05-10-2026, EDITARLA (`DialegEditaOferta`): kilos, modalidades, precio, fechas, franja y
+// observaciones. El texto de la oferta se recompone en el servidor; si cambian los kilos o
+// las modalidades vuelve a validación (D4).
 //
 // ES TAMBIÉN LA PANTALLA DE «PUBLICADA». Publicar ya no termina en un toast: `NovaOferta`
 // navega aquí con `state.publicada`, y lo primero que se ve es la referencia, qué pasa
 // ahora y por dónde seguir. Un toast dice eso mismo durante cuatro segundos y se lo lleva;
 // esto se puede volver a mirar, y se llega por una URL que se puede compartir.
 //
-// ⚠️ QUÉ NO SE ENSEÑA, Y NO ES UN OLVIDO: el nombre de la entidad que se queda el producto.
-//    `progres_meves_ofertes()` devuelve cuántas, nunca cuáles (20270323100000): quién
-//    quiere el producto es información de la otra parte y de la coordinación. Antes esa
-//    ausencia no se explicaba y parecía un dato que faltaba; ahora se dice en una línea.
+// ⚠️ QUÉ NO SE ENSEÑA, Y NO ES UN OLVIDO: quién ha MOSTRADO INTERÉS. `progres_meves_ofertes()`
+//    devuelve cuántas, nunca cuáles (20270323100000). Lo que sí se enseña desde el
+//    05-10-2026 (D1) es a qué entidad va cada entrega ya APROBADA.
 
+import DialegEditaOferta from '../../components/DialegEditaOferta'
+import { carregaContraparts, marcaLlegits, useAvisos } from '../../lib/avisos'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
@@ -105,6 +107,23 @@ export default function ProductorOfertaDetall() {
   }, [id])
 
   useEffect(() => { void carrega() }, [carrega])
+
+  // Los avisos de esta oferta se dan por leídos al abrirla (05-10-2026).
+  const avisos = useAvisos()
+  useEffect(() => {
+    const ids = avisos.filter((a) => !a.llegit_at && a.objecte_id === id).map((a) => a.id)
+    if (ids.length > 0) void marcaLlegits({ ids })
+  }, [avisos, id])
+  // D1: una vez aprobada, a quién va cada entrega.
+  const [destins, setDestins] = useState<Record<string, string>>({})
+  useEffect(() => {
+    void carregaContraparts().then((cs) => {
+      const m: Record<string, string> = {}
+      for (const c of cs) if (c.rol === 'productor' && c.contrapart) m[c.canalizacion_id] = c.contrapart
+      setDestins(m)
+    })
+  }, [canalitzacions])
+  const [editant, setEditant] = useState(false)
 
   // El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35): este es
   // el panel del productor, o sea el público con más probabilidad de abrirlo desde el
@@ -251,9 +270,9 @@ export default function ProductorOfertaDetall() {
       <Card>
         <CardHeader>
           <CardTitle className="text-base">{t('po.kg_with_dest')}</CardTitle>
-          {/* El nombre de la entidad no se muestra: ni la RPC del embudo ni esta pantalla
-              lo piden (§4bis, y la cabecera de 20270323100000). Decirlo aquí evita que
-              parezca un dato que falta. */}
+          {/* D1 (05-10-2026): una vez APROBADA, cada entrega dice a qué entidad va
+              (`contraparts_canalitzacions()`). Antes de aprobar sigue sin nombrarse nadie:
+              el embudo de `progres_meves_ofertes()` solo cuenta. */}
           <p className="mt-1 text-sm text-muted-foreground">{t('po.dest_hint')}</p>
         </CardHeader>
         <CardContent className="space-y-2">
@@ -262,7 +281,10 @@ export default function ProductorOfertaDetall() {
           )}
           {canalitzacions.map((c) => (
             <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 text-sm">
-              <span>{t('po.channeled_kg', { n: Number(c.kg_confirmados ?? 0).toLocaleString('ca-ES') })}</span>
+              <span>
+                {t('po.channeled_kg', { n: Number(c.kg_confirmados ?? 0).toLocaleString('ca-ES') })}
+                {destins[c.id] ? ` · ${destins[c.id]}` : ''}
+              </span>
               {c.kg_reales != null && (
                 <span className="text-muted-foreground">{t('po.real_kg', { n: Number(c.kg_reales).toLocaleString('ca-ES') })}</span>
               )}
@@ -270,6 +292,14 @@ export default function ProductorOfertaDetall() {
           ))}
         </CardContent>
       </Card>
+
+      {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(oferta.estado) && (
+        <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => setEditant(true)}>
+          {t('edit.cta')}
+        </Button>
+      )}
+      <DialegEditaOferta obert={editant} onObert={setEditant} oferta={oferta}
+        kgCanalitzats={canalitzats} esEquip={false} onFet={carrega} />
 
       {cancelable && (
         <Button

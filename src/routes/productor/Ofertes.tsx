@@ -12,6 +12,7 @@ import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
+import { marcaLlegits } from '../../lib/avisos'
 import { carregaPendents } from '../../lib/pendents'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import {
@@ -131,6 +132,10 @@ function useMevesOfertes(productorId: string | null) {
       : []))
     setCarregant(false)
   }, [productorId])
+
+  // Entrar en «Les meves ofertes» da por leídos los avisos de ofertas (05-10-2026): el
+  // badge del menú baja aquí, que es donde se ve el estado de cada una.
+  useEffect(() => { void marcaLlegits({ objecteTipo: 'excedente' }) }, [])
 
   useEffect(() => {
     void carrega()

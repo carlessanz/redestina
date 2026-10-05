@@ -25,6 +25,7 @@ import DialegMotiu from './DialegMotiu'
 import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import ValidacioOferta from './equip/ValidacioOferta'
+import DialegEditaOferta from './DialegEditaOferta'
 import SelectorModalitat from './SelectorModalitat'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
@@ -149,6 +150,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     { productor: null, municipi: null },
   )
 
+  const [editant, setEditant] = useState(false)
   const canalizados = canalizaciones.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(exc.kg_total ?? 0)
   const faltan = Math.max(0, total - canalizados)
@@ -746,6 +748,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
           {exc.estado === 'pendent_validacio' && (
             <ValidacioOferta excedenteId={exc.id} potAprovar={potAprovar} onFet={recargar} />
+          )}
+          {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado) && (
+            <>
+              <Button variant="outline" className="h-11 md:h-9" onClick={() => setEditant(true)}>{t('edit.cta')}</Button>
+              <DialegEditaOferta obert={editant} onObert={setEditant} oferta={exc}
+                kgCanalitzats={canalizados} esEquip onFet={recargar} />
+            </>
           )}
 
           {/* ── F3: convertir en espigolada ──

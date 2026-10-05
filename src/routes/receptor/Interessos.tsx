@@ -11,6 +11,8 @@
 // final— los resuelve `puntInteres()` en UNA etapa, y debajo va qué toca hacer. La
 // traducción de estados a frases vive en `procesOferta.ts` y la comparten los tres paneles.
 
+import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
+import type { Contrapart } from '../../lib/avisos'
 import { modalitatsOferta, textModalitats } from '../../lib/modalitats'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
@@ -41,7 +43,7 @@ import {
 type AmbOferta = Pick<
   OfertaRespuesta,
   | 'id' | 'estado' | 'aprovacio' | 'kg_solicitados' | 'preu_ofert' | 'motiu_aprovacio'
-  | 'canalizacion_id' | 'enviado_at' | 'respondido_at'
+  | 'canalizacion_id' | 'enviado_at' | 'respondido_at' | 'kg_aprovats' | 'modalitat'
 > & { excedentes: OfertaReceptor | null }
 
 /**
@@ -111,7 +113,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -129,6 +131,19 @@ export function Interessos() {
     setFiles((resp.data as unknown as AmbOferta[]) ?? [])
     setCarregant(false)
   }, [entidadId])
+
+  // Abrir la pantalla da por leídos los avisos de intereses (05-10-2026): el badge del
+  // menú baja al entrar, que es donde se mira lo que dicen.
+  useEffect(() => { void marcaLlegits({ objecteTipo: 'oferta_resposta' }) }, [])
+  // D1: con quién has quedado, una vez aprobado.
+  const [contraparts, setContraparts] = useState<Record<string, Contrapart>>({})
+  useEffect(() => {
+    void carregaContraparts().then((cs) => {
+      const m: Record<string, Contrapart> = {}
+      for (const c of cs) if (c.rol === 'entidad' && c.resposta_id) m[c.resposta_id] = c
+      setContraparts(m)
+    })
+  }, [files])
 
   useEffect(() => {
     void carrega()
@@ -188,8 +203,14 @@ export function Interessos() {
           // La fecha de lo último que ha hecho la entidad: cuándo contestó o, si todavía
           // no lo ha hecho, cuándo le llegó la oferta.
           const data = dataCurtaSenseAny(f.respondido_at ?? f.enviado_at)
+          // Pedido y aprobado por separado (05-10-2026): aprobar ya no pisa lo que se pidió.
+          const kgs = f.kg_aprovats != null && f.aprovacio === 'aprovada'
+            ? t('int.kg_sol_apr', { n: kgFmt(f.kg_solicitados), m: kgFmt(f.kg_aprovats) })
+            : f.kg_solicitados != null ? `${kgFmt(f.kg_solicitados)} ${t('od.rs_kg')}` : null
+          const qui = contraparts[f.id]
           const detall = [
-            f.kg_solicitados != null ? `${kgFmt(f.kg_solicitados)} ${t('od.rs_kg')}` : null,
+            kgs,
+            f.modalitat ? t(`od.mod_${f.modalitat}`) : null,
             f.preu_ofert != null
               ? `${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}`
               : null,
@@ -208,6 +229,11 @@ export function Interessos() {
                         nada (revisión del 23-09-2026). */}
                     <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
                     {detall && <div className="text-xs text-muted-foreground">{detall}</div>}
+                    {qui?.contrapart && (
+                      <div className="text-xs text-muted-foreground">
+                        {t('int.ofereix', { nom: qui.contrapart })}{qui.municipi ? ` · ${qui.municipi}` : ''}
+                      </div>
+                    )}
                   </div>
                 </div>
                 <BadgeEstat clase={est.clase}>
@@ -249,6 +275,18 @@ export function Interessos() {
             <DialogContent className="max-h-[85dvh] overflow-y-auto">
               <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
               <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              {/* D1: una vez aprobada, quién la ofrece y dónde se recoge. */}
+              {contraparts[obert.id]?.contrapart && (
+                <div className="space-y-1 rounded-md border p-3 text-sm">
+                  <p className="text-xs text-muted-foreground">{t('int.d_contrapart')}</p>
+                  <p className="font-medium">{contraparts[obert.id].contrapart}{contraparts[obert.id].municipi ? ` · ${contraparts[obert.id].municipi}` : ''}</p>
+                  {contraparts[obert.id].gmaps_url && (
+                    <a href={contraparts[obert.id].gmaps_url!} target="_blank" rel="noreferrer" className="text-primary hover:underline">
+                      {t('int.d_maps')}
+                    </a>
+                  )}
+                </div>
+              )}
               {passa && <p className="text-sm">{passa}</p>}
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className="text-sm text-muted-foreground">{toca}</p>

@@ -597,6 +597,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Validar o rechazar una oferta antes del Mercat (05-10-2026): solo `pot_aprovar()`.
   { tabla: "validar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida cap oferta" },
   { tabla: "rebutjar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO rebutja cap oferta" },
+  // Avisos y edición (05-10-2026, rebanada 2). `editar_oferta` es solo del servidor (la llama
+  // `crear-oferta/editar` con el actor): un `authenticated` podría pasar el uuid de otro.
+  { tabla: "editar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_canvis: {}, p_texto: "", p_actor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO edita ofertes directament (només el servidor)" },
+  { tabla: "crear_avis", op: "rpc", esperado: "denegar", args: { p_destinatari_tipo: "productor", p_destinatari_id: "00000000-0000-0000-0000-000000000000", p_tipus: "oferta_validada", p_objecte_tipo: "excedente", p_objecte_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crea avisos (només triggers i servidor)" },
   { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol cap conveni" },
   { tabla: "iniciar_firma_asistida", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO obre cap firma assistida" },
   { tabla: "firmar_convenio_por_enlace", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO firma per enllaç (això és del servidor)" },
@@ -1213,6 +1217,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "retornar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna un conveni (és de pot_aprovar)" },
     { tabla: "descartar_convenio_esborrany", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO descarta un conveni (és de pot_aprovar)" },
     { tabla: "validar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida una oferta (és de pot_aprovar)" },
+    { tabla: "editar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_canvis: {}, p_texto: "", p_actor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NI l'equip edita per RPC (només el servidor)" },
     { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol un conveni (és de pot_aprovar)" },
     // Y NI EL EQUIPO firma por nadie: `firmar_convenio_por_enlace` y `validar_codi_firma`
     // son solo de `service_role`. Es lo que hace que una firma acredite algo: si el equipo

@@ -253,6 +253,38 @@ export async function creaOferta(
   }
 }
 
+/**
+ * Edita una oferta publicada (05-10-2026, rebanada 2). Pasa por la Edge Function porque es
+ * la que recompone el `texto_oferta`; la regla (quién, estado, kg ≥ canalizado, D4) la
+ * impone `editar_oferta()` en la base. `code` es el motivo del rechazo, para traducirlo
+ * (`edit.err_<code>`). `estado` dice si ha vuelto a validación.
+ */
+export async function editaOferta(
+  id: string,
+  canvis: Record<string, unknown>,
+): Promise<Resultat<{ estado: string | null }> & { code?: string }> {
+  try {
+    const t = await token()
+    if (!t) return { ok: false, error: 'unauthorized' }
+    const res = await fetch(`${supabaseUrl}/functions/v1/crear-oferta/editar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, canvis }),
+    })
+    const body = await res.json().catch(() => null) as { error?: string; code?: string; estado?: string | null } | null
+    if (!res.ok) return { ok: false, error: body?.error ?? 'error', code: body?.code }
+    return { ok: true, data: { estado: body?.estado ?? null } }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Los códigos de rechazo de `editar_oferta()` que tienen texto propio. */
+export const CODIS_EDICIO = [
+  'kg_menys_canalitzats', 'kg_invalids', 'modalitats_buides', 'modalitat_amb_canalitzacions',
+  'oferta_no_editable', 'sense_canvis', 'forbidden',
+] as const
+
 /** El productor cancela su propia oferta (RPC con comprobación de pertenencia). */
 export async function cancelaOferta(excedenteId: string, motiu: string): Promise<Resultat<Excedente>> {
   const { data, error } = await supabase.rpc('cancelar_meva_oferta', {

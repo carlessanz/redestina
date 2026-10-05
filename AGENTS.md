@@ -2170,6 +2170,8 @@ funciones, no políticas:
 | `puc_veure_document_extern(id, user default null)` (`20270329100000`) | Autoriza la **descarga de un externo**. Espejo de `puede_ver_documento()`: guarda anti-suplantación, equipo por rol, fail-open del interruptor, y si no, la misma condición que la política de lectura. ⚠️ `documentos_externos` **no tiene columna `modo`**, así que el modo prueba se reconoce **por la ruta** (`…/proves/…`), como ya hace `limpiar-documentos-prueba`. ⚠️ Para `productor`/`entidad` consulta `membresias` **inline** y no `mis_productores()`: aquellas leen `auth.uid()` y con `service_role` —que es como la llama la Edge Function— devolverían vacío, o sea que un externo propio se vería como ajeno |
 | `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
+| `marcar_avisos_llegits(ids, objecte_tipo)` · `marcar_mercat_vist()` · `contraparts_canalitzacions()` (`20270410100000`) | Avisos y D1 (§6ter, rebanada 2). Las tres solo de lo propio (`mis_productores()`/`mis_entidades()`/`auth.uid()`). `crear_avis()` y `disparar_avisos_pendents()` solo `service_role` |
+| `editar_oferta(id, canvis, texto, actor)` (`20270410100000`) | **Solo `service_role`** (la llama `crear-oferta/editar` con el actor de la sesión). Lista blanca de campos, kg ≥ canalizado, D4 (revalidación si el productor cambia kg o modalidades) e historial en `excedentes_canvis` |
 | `validar_oferta(id)` · `rebutjar_oferta(id, motiu)` (`20270409100000`) | Sacan una oferta de `pendent_validacio`: a `publicada` (sale al Mercat) o a `cancelada` con el motivo en `motivo_no_colocada`. `pot_aprovar()` (`42501`); `22023` si no está pendiente o sin motivo. Guardan `validada_at`/`validada_per` |
 | `descartar_convenio_esborrany(id)` (`20270408100000`) | Borra un convenio en **`esborrany`** (sin número: no deja hueco en ninguna serie). Solo `pot_aprovar()` (`42501`); `22023` si no es borrador o si tiene `documentos_externos`. Borra antes sus `enlaces_token` (no debería tener). `pendent_firma` **no** se descarta: ya ha salido un enlace hacia alguien. Deja `raise log` con quién y qué. Botón «Descarta l'esborrany» en `ConveniDetall`. Existe porque `convenios` no tiene `grant delete` y la Fundació va a un único convenio por tipo de entidad (reunión del 05-10-2026) |
 | `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
@@ -2742,6 +2744,45 @@ tres tocan el alta de la oferta y su paso al Mercat:
 ⚠️ **Limitación conocida (deuda 130)**: la pantalla guiada (`/equip/canalitzacio/:id`) no
 tiene selector de modalidad. Si la oferta tiene varias y la respuesta no trae la suya, aprobar
 desde ahí falla con `cal_modalitat` y hay que hacerlo desde Aprovacions o el detalle.
+
+### Reunión de seguimiento del 05-10-2026: rebanada 2 (avisos, badges y edición)
+
+Migración `20270410100000_avisos_i_edicio.sql` y Edge Function nueva **`enviar-avis`**.
+
+- **Tabla `avisos`**: lo que la aplicación le cuenta a una organización. Cinco tipos
+  (`oferta_validada`, `oferta_rebutjada`, `sortida_trobada`, `interes_aprovat`,
+  `interes_rebutjat`), destinatario = ficha (`productor`/`entidad`). **Los crean TRIGGERS**
+  (`oferta_respuestas_avis` al cambiar `aprovacio`; `excedentes_avis_validacio` al salir de
+  `pendent_validacio`), no las RPC: las respuestas se rechazan con un `update` del panel y
+  así ningún camino se queda sin aviso. Solo SELECT para `authenticated` (RLS: los de mis
+  fichas, o el equipo); se marcan leídos con `marcar_avisos_llegits(ids?, objecte_tipo?)`.
+  `crear_avis()` solo `service_role`. Al insertar, `net.http_post` a **`enviar-avis`** con el
+  **mismo secreto** que los documentos (`x-documentos-secret`); sin secreto, no-op. Job
+  `avisos-pendents` cada 15 min (tres intentos). `enviar-avis` decide canal con
+  `decidirCanal()`: WhatsApp solo con ventana abierta, si no correo; respeta `test_mode`
+  (`es_test`) y `email_test_recipients`; deja `canal_enviat`/`error_envio`. Los textos:
+  `_shared/textAvis.ts` (correo/WhatsApp) y `avis.t_<tipus>` (panel), vigilados por
+  `tests/textAvis.test.ts`.
+- **Panel**: campana en la barra superior (`components/CampanaAvisos`, solo cuentas con
+  organización) y badges `avisos_ofertes` («Les meves ofertes») y `avisos_interessos`
+  («Els meus interessos»), del store `lib/avisos.ts` que `AppShell` recarga al navegar.
+  Entrar en esas pantallas los da por leídos.
+- **`kg_aprovats`** en `oferta_respuestas`: `aprovar_resposta()` ya no pisa `kg_solicitados`.
+  «Els meus interessos» enseña «Sol·licitats X · Aprovats Y» y el aviso lo dice.
+- **D1** (`contraparts_canalitzacions()`): una vez aprobada la canalización, la entidad ve
+  la productora, el municipio y el enlace de Maps; la productora, la entidad de cada entrega.
+  Antes de aprobar sigue rigiendo D3.
+- **Mercat «noves»**: `perfiles.mercat_vist_at` + `marcar_mercat_vist()`, que se llama al
+  SALIR del Mercat. Badge `mercat_noves` en el menú (ofertas con `created_at` o
+  `validada_at` posteriores) y chip «Nova» en cada tarjeta durante la visita.
+- **Editar una oferta** (`components/DialegEditaOferta`, en el detalle del productor y del
+  equipo): kilos, modalidades, precio mínimo, disponibilidad, franja, variedad y
+  observaciones; **el producto no**. Va por `POST crear-oferta/editar`, que recompone el
+  `texto_oferta` (`textoOfertaDeFila()`) y llama a **`editar_oferta(id, canvis, texto,
+  actor)`** (solo `service_role`): kg ≥ canalizado, no quitar una modalidad con entregas,
+  historial en `excedentes_canvis`, y **D4**: si el productor cambia kilos o modalidades,
+  vuelve a `pendent_validacio`. `validar_oferta()` devuelve entonces `parcial`/`bloqueada`
+  si ya había canalizaciones.
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -5059,6 +5100,7 @@ supabase functions deploy subir-documento-externo               # con verify_jwt
 #    acepta ahora `{documento_extern_id}` además de `{documento_id}`.
 supabase functions deploy limpiar-documentos-prueba            # con verify_jwt (super_admin; §12.51)
 supabase functions deploy verificar-certificat --no-verify-jwt   # pública: comprobar un certificado (§9)
+supabase functions deploy enviar-avis --no-verify-jwt            # la llama la base (avisos, 05-10-2026)
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -6074,9 +6116,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.081 pruebas en 37 ficheros**: 1.080 correctas y **1 saltada a propósito**, la
+   Referencia: **1.103 pruebas en 39 ficheros**: 1.102 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026,
-   rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
+   rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
    «pendent de validació» en `procesOferta.test.ts`. Antes, 1.040 en 35 (05-10-2026:
    +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
    Antes, 1.029 en 33 ficheros. 28-09-2026:

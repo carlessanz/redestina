@@ -16,7 +16,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { crearExcedente, modalitatsAmbConveni } from "../_shared/oferta.ts";
+import { canvisOferta, crearExcedente, modalitatsAmbConveni, textoOfertaDeFila } from "../_shared/oferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
@@ -131,6 +131,40 @@ Deno.serve(async (req) => {
   }
 
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
+
+  // ── Editar una oferta publicada (05-10-2026, rebanada 2) ──
+  // POST /crear-oferta/editar  { id, canvis }
+  // Vive aquí porque es quien sabe componer el `texto_oferta` (`componerTextoOferta()`); la
+  // regla —quién, en qué estado, kg ≥ canalizado, D4— la impone `editar_oferta()` en la base.
+  if (new URL(req.url).pathname.endsWith("/editar")) {
+    try {
+      const { id, canvis } = await req.json();
+      if (!id || typeof id !== "string" || !canvis || typeof canvis !== "object") {
+        return responder({ error: "Falten 'id' o 'canvis'" }, 400);
+      }
+      const { data: fila } = await supabase.from("excedentes").select("*").eq("id", id).maybeSingle();
+      if (!fila) return responder({ error: "Oferta inexistent", code: "no_trobada" }, 404);
+      if (!puedeOfertar(fila.productor_id)) {
+        return responder({ error: "No pots editar aquesta oferta", code: "forbidden" }, 403);
+      }
+      const c = canvisOferta(canvis as Record<string, unknown>);
+      if (Object.keys(c).length === 0) return responder({ error: "Cap canvi", code: "sense_canvis" }, 400);
+      const texto = await textoOfertaDeFila(supabase, { ...fila, ...c, modalitat: null });
+      const { data, error } = await supabase.rpc("editar_oferta", {
+        p_id: id, p_canvis: c, p_texto: texto, p_actor: ctx.userId,
+      });
+      if (error) {
+        // Los rechazos de negocio van con su código delante del mensaje (`kg_menys_canalitzats: …`).
+        const code = (error.message ?? "").split(":")[0].trim();
+        const status = error.code === "42501" ? 403 : 400;
+        return responder({ error: error.message, code }, status);
+      }
+      return responder({ ok: true, estado: (data as { estado?: string } | null)?.estado ?? null });
+    } catch (err) {
+      console.error("crear-oferta/editar:", err instanceof Error ? err.message : String(err));
+      return responder({ error: "Error interno o JSON inválido" }, 500);
+    }
+  }
 
   // -------------------------------------------------------------------------
   // POST — crear la oferta

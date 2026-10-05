@@ -31,6 +31,8 @@ import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta
 import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
 import { ambPreu, modalitatsDe, modalitatsOferta, textModalitats } from '../../lib/modalitats'
 import SelectorModalitat from '../../components/SelectorModalitat'
+import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
+import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor, { kgFmt, preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
@@ -59,6 +61,7 @@ export default function Mercat() {
   const { t } = useT()
   const { bloqueja, tipusVigents, tallPassat } = useConveni()
   const organitzacio = useOrganitzacio('entidad')
+  const ctxUserId = useAppContext().ctx?.userId ?? null
   const [ofertes, setOfertes] = useState<OfertaReceptor[]>([])
   const [meves, setMeves] = useState<Record<string, RespostaMeva>>({})
   // La matriz `convenios_exigidos`, fila `parte = 'recibe'`: qué convenio exige cada
@@ -98,7 +101,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -132,6 +135,23 @@ export default function Mercat() {
       .subscribe()
     return () => { void supabase.removeChannel(canal) }
   }, [carrega])
+
+  // «Noves» (05-10-2026, rebanada 2): lo publicado desde la última vez que se salió del
+  // Mercat. Se lee al entrar y se marca al SALIR, así que las tarjetas dicen «Nova» durante
+  // toda la visita y el badge del menú no vuelve hasta que haya algo más nuevo.
+  const [vistAt, setVistAt] = useState<string | null | undefined>(undefined)
+  const userId = ctxUserId
+  useEffect(() => {
+    if (!userId) return
+    void llegeixMercatVist(userId).then(setVistAt)
+    return () => { void marcaMercatVist() }
+  }, [userId])
+  const esNova = (o: OfertaReceptor & { created_at?: string; validada_at?: string | null }) => {
+    if (vistAt === undefined) return false
+    if (vistAt === null) return false
+    const quan = o.validada_at ?? o.created_at
+    return quan != null && quan > vistAt
+  }
 
   /** Las modalidades de la oferta que esta entidad puede recibir (05-10-2026). */
   function compatibles(o: OfertaReceptor): Modalitat[] {
@@ -317,6 +337,9 @@ export default function Mercat() {
                 <div className="min-w-0">
                 <div className="font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
+                  {esNova(o) && (
+                    <span className="ml-2 rounded-full bg-coral-suave px-2 py-0.5 text-xs font-semibold text-coral-texto">{t('mk.nova')}</span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">{detall}</div>
                 {vencuda(o, avui) && (

@@ -524,3 +524,81 @@ export async function modalitatsAmbConveni(
   }
   return cobertes;
 }
+
+/**
+ * El `texto_oferta` de una oferta YA EXISTENTE, compuesto desde su fila (05-10-2026: editar
+ * una oferta lo reescribe). Usa el mismo `componerTextoOferta()` que el alta, así que el
+ * formato no puede divergir; lo que cambia es de dónde salen los datos: la fecha de
+ * disponibilidad es la normalizada (`dd/mm/aaaa`) y no el texto que escribió el productor,
+ * que no se guarda aparte.
+ */
+export async function textoOfertaDeFila(
+  supabase: Cliente,
+  fila: Record<string, unknown>,
+): Promise<string> {
+  const [{ data: prod }, { data: ubi }] = await Promise.all([
+    supabase.from("productores").select("name, empresa, poblacion").eq("id", fila.productor_id).maybeSingle(),
+    fila.ubicacion_id
+      ? supabase.from("productor_ubicaciones").select("municipio, gmaps_url").eq("id", fila.ubicacion_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const modalitats = modalitatsDe(
+    Array.isArray(fila.modalitats) && fila.modalitats.length > 0 ? fila.modalitats : fila.modalitat,
+  );
+  const kg = Number(fila.kg_total ?? 0);
+  const preu = ambPreu(modalitats) && fila.preu_minim != null ? Number(fila.preu_minim) : null;
+  const data = typeof fila.disponible_hasta === "string" && /^\d{4}-\d{2}-\d{2}/.test(fila.disponible_hasta)
+    ? fila.disponible_hasta.slice(0, 10).split("-").reverse().join("/")
+    : "";
+  return componerTextoOferta({
+    producte: String(fila.producto ?? ""),
+    producteAlCamp: fila.producte_al_camp === true,
+    productor: prod?.empresa || prod?.name || "",
+    municipi: ubi?.municipio ?? prod?.poblacion ?? "",
+    ubicacio: ubi?.gmaps_url || undefined,
+    quantitat: `${String(kg).replace(".", ",")} kg aprox${fila.num_caixes ? ` · ${textCaixes(Number(fila.num_caixes), fila.format_entrega)}` : ""}`,
+    disponible: data,
+    horari: fila.horari_recollida ? String(fila.horari_recollida) : undefined,
+    modalitat: etiquetaModalitats(modalitats),
+    preu: preu != null ? `${preu.toFixed(2).replace(".", ",")} €/kg` : undefined,
+    causa: String(fila.causa ?? ""),
+    envasos: textoEnvasos(fila.format_entrega, fila.retorn_envasos) || undefined,
+    transportPropi: fila.transport_propi === true,
+    responsable: "",
+    observacions: String(fila.observacions ?? ""),
+  });
+}
+
+/**
+ * Los cambios que acepta `editar_oferta()`, a partir de lo que manda el panel. Puro: lo
+ * prueba `tests/oferta.test.ts`. La franja llega como `{inici, fi}` y se guarda en sus dos
+ * columnas MÁS el texto, como en el alta. Lo que no se reconoce se descarta en silencio;
+ * la RPC rechaza igualmente cualquier clave fuera de su lista.
+ */
+export function canvisOferta(entrada: Record<string, unknown>): Record<string, unknown> {
+  const fora: Record<string, unknown> = {};
+  const num = (v: unknown) => {
+    if (v === null || v === "") return null;
+    const n = Number(String(v).replace(",", "."));
+    return Number.isFinite(n) ? n : undefined;
+  };
+  if ("kg_total" in entrada) { const n = num(entrada.kg_total); if (n !== undefined) fora.kg_total = n; }
+  if ("modalitats" in entrada) fora.modalitats = modalitatsDe(entrada.modalitats);
+  if ("preu_minim" in entrada) { const n = num(entrada.preu_minim); if (n !== undefined) fora.preu_minim = n; }
+  if ("coste_kg" in entrada) { const n = num(entrada.coste_kg); if (n !== undefined) fora.coste_kg = n; }
+  if ("num_caixes" in entrada) { const n = num(entrada.num_caixes); if (n !== undefined) fora.num_caixes = n === null ? null : Math.round(n); }
+  if ("disponible_hasta" in entrada) {
+    const v = String(entrada.disponible_hasta ?? "");
+    fora.disponible_hasta = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
+  }
+  for (const k of ["observacions", "variedad"]) {
+    if (k in entrada) fora[k] = entrada[k] == null ? null : String(entrada[k]).trim().slice(0, 400);
+  }
+  if ("franja" in entrada) {
+    const h = llegeixHorari(entrada.franja);
+    fora.hora_recollida_inici = h.franja?.inici ?? null;
+    fora.hora_recollida_fi = h.franja?.fi ?? null;
+    fora.horari_recollida = h.text;
+  }
+  return fora;
+}

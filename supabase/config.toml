@@ -202,3 +202,12 @@ enabled = true
 verify_jwt = true
 import_map = "./functions/limpiar-documentos-prueba/deno.json"
 entrypoint = "./functions/limpiar-documentos-prueba/index.ts"
+
+# Avisos a las organizaciones (05-10-2026, rebanada 2). La llama la base por pg_net al
+# insertar en `avisos` (y el job `avisos-pendents`), así que va sin JWT y con el secreto
+# compartido de los documentos (`x-documentos-secret`).
+[functions.enviar-avis]
+enabled = true
+verify_jwt = false
+import_map = "./functions/enviar-avis/deno.json"
+entrypoint = "./functions/enviar-avis/index.ts"
