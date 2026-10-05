@@ -22,6 +22,7 @@
 import { sendBotones, sendText } from "./whatsapp.ts";
 import { leerRespuesta } from "./intake.ts";
 import { rolesDelTelefono } from "./organizacion.ts";
+import { ambPreu, modalitatsDe } from "./modalitats.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -536,9 +537,12 @@ export async function procesarRespuestaOferta(
       return true;
     }
     const { data: exc } = await supabase
-      .from("excedentes").select("modalitat, preu_minim").eq("id", fila.excedente_id).maybeSingle();
-    const conPreu = !!exc && (exc.modalitat === "venda" || exc.modalitat === "maquila") &&
-      exc.preu_minim != null;
+      .from("excedentes").select("modalitat, modalitats, preu_minim").eq("id", fila.excedente_id).maybeSingle();
+    // Con varias modalidades (05-10-2026) el precio solo se pregunta si la oferta NO admite
+    // donación: si la admite, quien contesta por WhatsApp puede estar pidiéndola donada, y
+    // por aquí no hay forma de elegir. Lo decide el equipo al aprobar (D2).
+    const ms = modalitatsDe(exc?.modalitats ?? exc?.modalitat);
+    const conPreu = !!exc && ambPreu(ms) && !ms.includes("donacio") && exc.preu_minim != null;
     if (conPreu) {
       await supabase.from("oferta_respuestas")
         .update({ kg_solicitados: kg, dialeg_pas: "preu", dialeg_dades: marcaDialogo(fila.dialeg_dades) })

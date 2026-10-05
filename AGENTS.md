@@ -930,7 +930,7 @@ de prueba que habilita el envío a la entidad (§8).
 
 **`excedentes`** — cabecera de la oferta. `id_excedente` UNIQUE con formato
 `E-AAMMDD-XXX-YYY-N`. `estado` ∈ `borrador` · `publicada` · `parcial` · `bloqueada` ·
-`cerrada` · `no_colocada` · **`cancelada`** (anulada desde el panel; check en
+`cerrada` · `no_colocada` · **`cancelada`** · **`pendent_validacio`** (05-10-2026: espera al equipo antes del Mercat, §6ter rebanada 1) (anulada desde el panel; check en
 `20260722130100_estado_cancelada.sql`). `modalitat` ∈ `donacio` · `venda` · `maquila`. **`preu_minim`**
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
 solo en `venda`/`maquila`; sale en `texto_oferta` y la entidad lo confirma al aceptar (§5).
@@ -2170,6 +2170,7 @@ funciones, no políticas:
 | `puc_veure_document_extern(id, user default null)` (`20270329100000`) | Autoriza la **descarga de un externo**. Espejo de `puede_ver_documento()`: guarda anti-suplantación, equipo por rol, fail-open del interruptor, y si no, la misma condición que la política de lectura. ⚠️ `documentos_externos` **no tiene columna `modo`**, así que el modo prueba se reconoce **por la ruta** (`…/proves/…`), como ya hace `limpiar-documentos-prueba`. ⚠️ Para `productor`/`entidad` consulta `membresias` **inline** y no `mis_productores()`: aquellas leen `auth.uid()` y con `service_role` —que es como la llama la Edge Function— devolverían vacío, o sea que un externo propio se vería como ajeno |
 | `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
+| `validar_oferta(id)` · `rebutjar_oferta(id, motiu)` (`20270409100000`) | Sacan una oferta de `pendent_validacio`: a `publicada` (sale al Mercat) o a `cancelada` con el motivo en `motivo_no_colocada`. `pot_aprovar()` (`42501`); `22023` si no está pendiente o sin motivo. Guardan `validada_at`/`validada_per` |
 | `descartar_convenio_esborrany(id)` (`20270408100000`) | Borra un convenio en **`esborrany`** (sin número: no deja hueco en ninguna serie). Solo `pot_aprovar()` (`42501`); `22023` si no es borrador o si tiene `documentos_externos`. Borra antes sus `enlaces_token` (no debería tener). `pendent_firma` **no** se descarta: ya ha salido un enlace hacia alguien. Deja `raise log` con quién y qué. Botón «Descarta l'esborrany» en `ConveniDetall`. Existe porque `convenios` no tiene `grant delete` y la Fundació va a un único convenio por tipo de entidad (reunión del 05-10-2026) |
 | `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
@@ -2698,6 +2699,49 @@ Primera rebanada del plan `3. Claude Code/2026-10-05-plan-ejecucion-reunion-segu
   descriptor —la ven panel y bot— y aviso ámbar en el panel si la respuesta es solo un número o un
   peso (`varietatSemblaQuantitat`). No bloquea: el campo es opcional.
 - **Convenis**: «Descarta l'esborrany» (`descartar_convenio_esborrany`, §4bis).
+
+### Reunión de seguimiento del 05-10-2026: rebanada 1 (validación, modalidades, franja)
+
+Migración `20270409100000_validacio_i_modalitats.sql`. Tres cambios que van juntos porque los
+tres tocan el alta de la oferta y su paso al Mercat:
+
+1. **«Pendent de validació»**. Estado nuevo de `excedentes`. Lo pone el trigger
+   `excedentes_validacio` (before insert) cuando una oferta llega `publicada` con `origen`
+   `intake` o `panel` **y** `app_settings.validacio_ofertes` no es `'false'` (fail-safe hacia
+   validar: `validacio_ofertes_activa()`). Las del equipo (`asistido`) y las de espigolada no
+   esperan. La regla vive en la base y no en `crearExcedente()` porque las ofertas entran por
+   dos caminos. **No sale al Mercat**: la rama del receptor de la RLS solo admite
+   `publicada`/`parcial`. El equipo la valida o la rechaza (con motivo → `cancelada`) con
+   `validar_oferta()` / `rebutjar_oferta()` (`pot_aprovar()`), desde la banda
+   `components/equip/ValidacioOferta` del detalle; la lista de Ofertes tiene la pestaña
+   **«Per validar»** (`?tab=validar`), el menú un badge (`comptador: 'ofertes'`) y el tablero
+   la cola **`ofertes_per_validar`** (la 14.ª de `pendents_equip()`). El productor la ve como
+   «En revisió» (`estatSimpleOferta` → `validacio`) y la puede cancelar. Interruptor en
+   Configuració (solo super_admin). El job de vencidas cancela las que caducan sin validar.
+2. **Modalidad múltiple** (D2: el receptor elige, el equipo confirma). `excedentes.modalitats
+   text[]` en orden canónico; `modalitat` sigue siendo **la principal** (la primera: la
+   donación si está) y la mantiene sincronizada el trigger `trg_excedentes_modalitats`, así
+   que todo lo que lee una sola sigue funcionando. La RLS del receptor compara por
+   **solapamiento** (`modalitats && modalitats_compatibles_meves()`). El interés lleva
+   `oferta_respuestas.modalitat` (`manifestar_interes(…, p_modalitat)` y la asistida); si la
+   oferta tiene varias y no se dice, `cal_modalitat`. Aprobar fija la de la entrega en
+   `canalizaciones.valorizacion` (`aprovar_resposta(…, p_modalitat)`: la del equipo, la de la
+   respuesta o la única), que es la que decide ENT/OPE y el cierre. En el panel: selector
+   `components/SelectorModalitat` en el Mercat (solo las modalidades compatibles y, desde el
+   corte, con convenio), en Aprovacions y en el detalle de oferta. Módulo puro
+   `_shared/modalitats.ts` con copia `src/lib/modalitats.ts` (las vigila
+   `tests/modalitats.test.ts`). El descriptor sirve `modalitat` con `multiple: true` (sigue
+   siendo `tipo: "opcions"` para el panel anterior) y el bot ofrece una cuarta fila «Totes».
+   El alta avisa de las modalidades sin convenio (`modalitats_sense_conveni`) pero **no
+   bloquea**.
+3. **Franja de recogida**: `hora_recollida_inici`/`_fi` (`time`, check fi > inici). El panel
+   pide dos horas con cuartos (06–22 h, `src/lib/franja.ts`); el bot sigue en texto libre y
+   `_shared/franja.ts` lo intenta leer («de 9 a 12», «matí»…), y si no lo entiende se guarda
+   solo el texto. `horari_recollida` se sigue escribiendo («de 9:00 a 12:30»).
+
+⚠️ **Limitación conocida (deuda 130)**: la pantalla guiada (`/equip/canalitzacio/:id`) no
+tiene selector de modalidad. Si la oferta tiene varias y la respuesta no trae la suya, aprobar
+desde ahí falla con `cal_modalitat` y hay que hacerlo desde Aprovacions o el detalle.
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -5338,6 +5382,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **05-10-2026: se abre la 130** (la pantalla guiada no elige modalidad): **46 vivas** y la
+siguiente entrada nueva es la 131.
 ⚠️ **28-09-2026: se abre y se cierra la 129** (ningún documento salía por correo): siguen **45
 vivas** y la siguiente entrada nueva es la 130.
 ⚠️ **27-09-2026: se abren la 127** (el correo del resumen anual sigue pidiendo la factura) **y la
@@ -5839,6 +5885,12 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
 
+130. **La pantalla guiada no elige modalidad.** `/equip/canalitzacio/:id` aprueba con
+     `aprovarResposta()` sin `modalitat`: con una oferta de varias modalidades y una respuesta
+     que no la trae (llegó por WhatsApp o asistida sin elegir), la RPC responde
+     `cal_modalitat` y hay que aprobar desde Aprovacions o el detalle de la oferta, que sí
+     tienen selector. `canalitzacio_assistida()` devuelve todavía una sola `modalitat`.
+
 128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
      análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
      el albarán entregado o confirmado, y `conciliacion_retroactiva()` rechaza las ya conciliadas,
@@ -6022,8 +6074,10 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.040 pruebas en 35 ficheros**: 1.039 correctas y **1 saltada a propósito**, la
-   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026:
+   Referencia: **1.081 pruebas en 37 ficheros**: 1.080 correctas y **1 saltada a propósito**, la
+   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026,
+   rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
+   «pendent de validació» en `procesOferta.test.ts`. Antes, 1.040 en 35 (05-10-2026:
    +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
    Antes, 1.029 en 33 ficheros. 28-09-2026:
    +9 del correo de los documentos, `tests/correuDocument.test.ts`, y +17 de la cortina,

@@ -11,6 +11,7 @@
 // final— los resuelve `puntInteres()` en UNA etapa, y debajo va qué toca hacer. La
 // traducción de estados a frases vive en `procesOferta.ts` y la comparten los tres paneles.
 
+import { modalitatsOferta, textModalitats } from '../../lib/modalitats'
 import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
@@ -110,7 +111,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -287,7 +288,7 @@ export function Historic() {
     void Promise.all([
       supabase
         .from('canalizaciones')
-        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('created_at', { ascending: false }),
       supabase
@@ -376,7 +377,7 @@ export function Historic() {
                 <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
                 <div className="text-xs text-muted-foreground">
                   {quan(f)}
-                  {f.excedentes?.modalitat ? ` · ${t(`od.mod_${f.excedentes.modalitat}`)}` : ''}
+                  {f.excedentes ? ` · ${textModalitats(modalitatsOferta(f.excedentes), t)}` : ''}
                 </div>
               </div>
             </div>

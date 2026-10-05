@@ -49,6 +49,7 @@ interface FilaCua {
 const FILES: readonly FilaCua[] = [
   { cua: 'registres', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'convenis_contrasignar', desti: '/equip/aprovacions', nomesAdmin: true },
+  { cua: 'ofertes_per_validar', desti: '/equip/ofertes?tab=validar', nomesAdmin: true },
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
@@ -67,7 +68,7 @@ const FILES: readonly FilaCua[] = [
 
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
-  'registres', 'convenis_contrasignar', 'respostes', 'ofertes_vencudes', 'costos',
+  'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_vencudes', 'costos',
   'espigolades_per_convertir',
 ]
 

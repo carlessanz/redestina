@@ -24,6 +24,9 @@ import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
 import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
+import ValidacioOferta from './equip/ValidacioOferta'
+import SelectorModalitat from './SelectorModalitat'
+import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
@@ -371,15 +374,19 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       descripcio: t('od.over_alloc', { n: kgCa(faltan) }),
     }))) return
 
-    const falta = await comprovaConvenis(exc, r.entidad_id, t)
+    // La modalidad de ESTA entrega: la del selector si la oferta tiene varias, si no la
+    // que pidió el receptor, si no la única de la oferta (05-10-2026, D2).
+    const modalitat = String(fd.get('modalitat') ?? '') || r.modalitat || (mods.length === 1 ? mods[0] : null)
+    const falta = await comprovaConvenis({ modalitat, productor_id: exc.productor_id }, r.entidad_id, t)
     if (falta && !(await confirma({
       titol: t('od.conv_missing_t'),
       descripcio: t('od.conv_missing', { parts: falta }),
     }))) return
 
     const preuRaw = String(fd.get('preu') ?? '')
-    const preu = preuRaw !== '' ? Number(preuRaw) : null
-    const res = await aprovarResposta({ id: r.id, kg, preu })
+    // Una entrega en donación no lleva precio aunque la oferta también se ofrezca en venta.
+    const preu = preuRaw !== '' && modalitat !== 'donacio' ? Number(preuRaw) : null
+    const res = await aprovarResposta({ id: r.id, kg, preu, modalitat })
     if (!res.ok) {
       toast.error(textError(t, res))
       return
@@ -661,6 +668,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   }, 'equip')
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)
+  const mods = modalitatsOferta(exc)
 
   /**
    * Por qué NO se puede convertir en espigolada, si no se puede (F3).
@@ -707,12 +715,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {exc.comarca}
             </p>
           )}
-          {exc.modalitat && (
+          {mods.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-xs font-semibold text-primary">
-                {t(`od.mod_${exc.modalitat}`)}
+                {textModalitats(mods, t)}
               </span>
-              {(exc.modalitat === 'venda' || exc.modalitat === 'maquila') && exc.preu_minim != null && (
+              {ambPreu(mods) && exc.preu_minim != null && (
                 <span className="text-sm font-medium text-primary">{Number(exc.preu_minim).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} €/kg</span>
               )}
             </div>
@@ -735,6 +743,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             destructiva={punt.etapa === 'cancellada'}
           />
           <QueTocaAra punt={punt} />
+
+          {exc.estado === 'pendent_validacio' && (
+            <ValidacioOferta excedenteId={exc.id} potAprovar={potAprovar} onFet={recargar} />
+          )}
 
           {/* ── F3: convertir en espigolada ──
               Solo cuando la oferta declara producto SIN COSECHAR y todavía no es una
@@ -909,7 +921,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {respuestas.map((r) => {
             const nombre = r.entidades?.nombre ?? r.telefono ?? '—'
             const cuando = r.respondido_at ?? r.enviado_at
-            const esVenda = exc.modalitat === 'venda' || exc.modalitat === 'maquila'
+            const esVenda = ambPreu(mods)
             return (
               <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 text-sm">
                 <div className="flex items-center gap-2.5">
@@ -925,6 +937,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     <div className="font-medium">{nombre}</div>
                     <div className="text-xs text-muted-foreground">
                       {t(`od.ch_${r.canal}`)} · {fechaCorta(cuando)}
+                      {r.modalitat && mods.length > 1 ? ` · ${t(`od.mod_${r.modalitat}`)}` : ''}
                       {r.kg_solicitados != null ? ` · ${kgCa(Number(r.kg_solicitados))} ${t('od.rs_kg')}` : ''}
                       {r.preu_ofert != null ? ` · ${Number(r.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}` : ''}
                       {r.mensaje_respuesta ? ` · «${r.mensaje_respuesta}»` : ''}
@@ -943,6 +956,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   <form className="flex flex-wrap items-center gap-1" onSubmit={(ev) => void aprovarRespuesta(ev, r)}>
                     <Input name="kg" type="number" required defaultValue={r.kg_solicitados ?? ''}
                       placeholder={t('od.kg_ph')} className="h-8 w-20" />
+                    {mods.length > 1 && (
+                      <SelectorModalitat modalitats={mods} inicial={r.modalitat ?? null} ambBuit={!r.modalitat} />
+                    )}
                     {esVenda && (
                       <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
                         placeholder={t('od.rs_preu')} className="h-8 w-20" />

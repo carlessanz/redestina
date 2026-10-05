@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface ExcRow { id: string; estado: string; kg_total: number | null }
 
-const ACTIVOS = ['borrador', 'publicada', 'parcial', 'bloqueada']
+const ACTIVOS = ['borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada']
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 

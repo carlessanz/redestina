@@ -28,7 +28,9 @@ import {
 import type { FiltresMercat } from '../../lib/filtresMercat'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
-import type { ConvenioTipo, OfertaRespuesta } from '../../types'
+import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
+import { ambPreu, modalitatsDe, modalitatsOferta, textModalitats } from '../../lib/modalitats'
+import SelectorModalitat from '../../components/SelectorModalitat'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor, { kgFmt, preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
@@ -70,6 +72,10 @@ export default function Mercat() {
   const [mode, setMode] = useState<'detall' | 'interes'>('detall')
   const [kg, setKg] = useState('')
   const [preu, setPreu] = useState('')
+  /** La modalidad con la que pide la entrega, si la oferta se ofrece de varias (D2). */
+  const [modalitat, setModalitat] = useState<Modalitat | ''>('')
+  /** Las que puede recibir alguna de mis entidades; null = no se pudo leer (no se filtra). */
+  const [compat, setCompat] = useState<Modalitat[] | null>(null)
   const [enviant, setEnviant] = useState(false)
 
   const entidadId = organitzacio?.id ?? null
@@ -92,7 +98,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -100,6 +106,10 @@ export default function Mercat() {
         : Promise.resolve({ data: [], error: null }),
       supabase.from('convenios_exigidos').select('valorizacion, tipo_convenio').eq('parte', 'recibe'),
     ])
+    // Qué modalidades puede recibir (05-10-2026): una oferta «donació o venda» la ve una
+    // empresa, pero solo puede pedir la venta. Si falla, no se filtra: la base decide igual.
+    const cm = await supabase.rpc('modalitats_compatibles_meves')
+    setCompat(cm.error ? null : modalitatsDe(cm.data as unknown))
     if (exc.error) { setErrorCarrega(true); setCarregant(false); return }
     setErrorCarrega(false)
     setOfertes((exc.data ?? []) as OfertaReceptor[])
@@ -123,11 +133,25 @@ export default function Mercat() {
     return () => { void supabase.removeChannel(canal) }
   }, [carrega])
 
+  /** Las modalidades de la oferta que esta entidad puede recibir (05-10-2026). */
+  function compatibles(o: OfertaReceptor): Modalitat[] {
+    const ms = modalitatsOferta(o)
+    return compat ? ms.filter((m) => compat.includes(m)) : ms
+  }
+  /** Y de esas, las que puede pedir hoy: desde el corte, solo las que tienen su convenio. */
+  function possibles(o: OfertaReceptor): Modalitat[] {
+    const ms = compatibles(o)
+    if (!tallPassat) return ms
+    return ms.filter((m) => (exigits[m] ?? []).every((tipus) => tipusVigents.includes(tipus)))
+  }
+
   function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
     setObert(o)
     setMode(m)
     setKg(String(o.kg_total ?? ''))
     setPreu(o.preu_minim != null ? String(o.preu_minim) : '')
+    const ms = possibles(o)
+    setModalitat(ms.length === 1 ? ms[0] : '')
   }
 
   async function envia() {
@@ -140,12 +164,16 @@ export default function Mercat() {
       toast.error(t('mk.max_kg', { n: kgFmt(obert.kg_total) }))
       return
     }
+    const ms = possibles(obert)
+    const triada = modalitat || (ms.length === 1 ? ms[0] : '')
+    if (ms.length > 1 && !triada) { toast.error(t('mk.need_mode')); return }
     setEnviant(true)
     const r = await manifestaInteres({
       excedenteId: obert.id,
       entidadId,
       kg: nKg,
-      preu: preu === '' ? null : Number(preu.replace(',', '.')),
+      preu: preu === '' || triada === 'donacio' ? null : Number(preu.replace(',', '.')),
+      modalitat: triada || null,
     })
     setEnviant(false)
     if (!r.ok) {
@@ -179,11 +207,12 @@ export default function Mercat() {
   const motiuNoPot = (o: OfertaReceptor): string | null => {
     if (vencuda(o, avui)) return 'mk.expired'
     if (!tallPassat) return null
-    const cal = (o.modalitat ? exigits[o.modalitat] : undefined) ?? []
-    const falta = cal.filter((tipus) => !tipusVigents.includes(tipus))
-    if (falta.includes('com')) return 'mk.cal_conveni_com'
-    if (falta.length > 0 || bloqueja) return 'avis_conv.bloquejat_rec'
-    return null
+    // Con varias modalidades basta con que UNA se pueda pedir (05-10-2026).
+    const ms = compatibles(o)
+    const faltes = ms.map((m) => (exigits[m] ?? []).filter((tipus) => !tipusVigents.includes(tipus)))
+    if (ms.length > 0 && faltes.some((f) => f.length === 0) && !bloqueja) return null
+    if (faltes.length > 0 && faltes.every((f) => f.includes('com'))) return 'mk.cal_conveni_com'
+    return 'avis_conv.bloquejat_rec'
   }
 
   /** El interés de esta entidad sobre una oferta, contado en una etapa (o null si se puede pedir). */
@@ -201,7 +230,9 @@ export default function Mercat() {
   }
 
   const obertPunt = obert ? puntDe(obert) : null
-  const obertVenda = obert?.modalitat === 'venda' || obert?.modalitat === 'maquila'
+  const obertMods = obert ? possibles(obert) : []
+  // El precio se pide si la entrega elegida lleva precio; sin elegir todavía, si alguna lo lleva.
+  const obertVenda = modalitat ? modalitat !== 'donacio' : ambPreu(obertMods)
   const obertMotiu = obert ? motiuNoPot(obert) : null
   // El precio mínimo con coma y dos decimales, como lo escribe la gente; sin mínimo, sin cifra.
   const preuMinim = obert?.preu_minim != null
@@ -268,7 +299,7 @@ export default function Mercat() {
           // hay. «Donació» va sin precio, a propósito.
           const detall = [
             `${kgFmt(o.kg_total)} kg`,
-            o.modalitat ? t(`od.mod_${o.modalitat}`) : null,
+            textModalitats(compatibles(o), t) || null,
             o.comarca,
             preuDe(o),
             o.disponible_hasta && !vencuda(o, avui) ? t('mk.until', { date: dataCurta(o.disponible_hasta) }) : null,
@@ -341,6 +372,14 @@ export default function Mercat() {
                     ahora evita que lo descubra cuando el equipo le asigne menos. */}
                 {obert.estado === 'parcial' && (
                   <p className="rounded-md bg-aviso-fondo p-2 text-sm text-aviso">{t('mk.parcial')}</p>
+                )}
+                {obertMods.length > 1 && (
+                  <div>
+                    <Label htmlFor="mk-mode" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.mode_q')}</Label>
+                    <SelectorModalitat id="mk-mode" modalitats={obertMods} valor={modalitat} ambBuit
+                      className="h-11 w-full md:h-9" onCanvi={setModalitat} />
+                    <p className="mt-1 text-xs text-muted-foreground">{t('mk.mode_help')}</p>
+                  </div>
                 )}
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>

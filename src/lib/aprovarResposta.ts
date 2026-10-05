@@ -72,6 +72,11 @@ export async function aprovarResposta(args: {
   kg: number
   preu?: number | null
   motiu?: string | null
+  /**
+   * La modalidad de ESTA entrega (05-10-2026). Si la oferta tiene varias y la respuesta no la
+   * trae, la RPC se niega con `cal_modalitat` y quien aprueba tiene que elegirla.
+   */
+  modalitat?: string | null
 }): Promise<ResultatRpc<Canalizacion>> {
   try {
     const { data, error } = await supabase.rpc('aprovar_resposta', {
@@ -79,13 +84,15 @@ export async function aprovarResposta(args: {
       p_kg: args.kg,
       p_preu: args.preu ?? null,
       p_motiu: args.motiu ?? null,
+      p_modalitat: args.modalitat ?? null,
     })
     if (error) {
       const esConveni = (error.message ?? '').includes('sense_conveni')
+      const calModalitat = (error.message ?? '').startsWith('cal_modalitat')
       return {
         ok: false,
-        missatge: error.message || 'od.conv_blocked',
-        codi: esConveni ? 'sense_conveni' : (error.code ?? null),
+        missatge: calModalitat ? 'appr.cal_modalitat' : (error.message || 'od.conv_blocked'),
+        codi: esConveni ? 'sense_conveni' : calModalitat ? 'cal_modalitat' : (error.code ?? null),
       }
     }
     return { ok: true, data: data as Canalizacion }

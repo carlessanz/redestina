@@ -129,7 +129,7 @@ export default function ProductorOfertaDetall() {
 
   const canalitzats = canalitzacions.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(oferta.kg_total ?? 0)
-  const cancelable = ['borrador', 'publicada', 'parcial'].includes(oferta.estado)
+  const cancelable = ['borrador', 'pendent_validacio', 'publicada', 'parcial'].includes(oferta.estado)
 
   // La fecha se compara en día, no en instante: una oferta disponible «hasta el 23» sigue
   // valiendo el 23 entero.

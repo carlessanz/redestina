@@ -57,6 +57,8 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
   const rols: RolMira[] = ['productor', 'equip']
   const combinacions: { nom: string; fets: FetsOferta }[] = [
     { nom: 'publicada', fets: { ...base } },
+    // 05-10-2026: esperando a que el equipo la valide.
+    { nom: 'per validar', fets: { ...base, estado: 'pendent_validacio' } },
     { nom: 'publicada+gestio', fets: { ...base, nEnviades: 4, nInteressades: 2, nPerAprovar: 1 } },
     { nom: 'parcial', fets: { ...base, estado: 'parcial', kgCanalitzats: 40 } },
     { nom: 'bloqueada', fets: { ...base, estado: 'bloqueada', kgCanalitzats: 100 } },
@@ -540,5 +542,22 @@ describe('el estado SIMPLE de los paneles externos (revisión del 23-09-2026)', 
         expect(DICTS.es[clau], `falta ${clau} en es`).toBeTruthy()
       }
     }
+  })
+})
+
+describe('pendent de validació (05-10-2026)', () => {
+  it('es la primera etapa con su variante, y le toca al equipo', () => {
+    const e = puntOferta({ ...base, estado: 'pendent_validacio' }, 'equip')
+    expect(e.etapa).toBe('publicada')
+    expect(e.index).toBe(0)
+    expect(e.variant).toBe('validacio')
+    expect(e.emToca).toBe(true)
+    const p = puntOferta({ ...base, estado: 'pendent_validacio' }, 'productor')
+    expect(p.emToca).toBe(false)
+    expect(estatSimpleOferta(p).estat).toBe('validacio')
+  })
+  it('gana a los envíos: sin validar no se ha enviado a nadie', () => {
+    const p = puntOferta({ ...base, estado: 'pendent_validacio', nEnviades: 3, nInteressades: 1 }, 'productor')
+    expect(p.variant).toBe('validacio')
   })
 })

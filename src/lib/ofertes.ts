@@ -48,6 +48,10 @@ export interface CampoOferta {
   seccion?: SeccioOferta
   obligatorio: boolean
   opciones?: OpcioOferta[]
+  /** Se pueden marcar varias (05-10-2026, `modalitat`): el valor es una lista de ids. */
+  multiple?: boolean
+  /** `franja` (05-10-2026, `horari`): dos pares de desplegables, el valor es `{inici, fi}`. */
+  format?: 'franja'
   /** Una lista es un «o»: basta con que se cumpla una (desde el 27-09-2026). */
   condicion?: CondicioCamp | CondicioCamp[]
   /**
@@ -68,7 +72,21 @@ export function aplicaCamp(campo: CampoOferta, datos: Record<string, unknown>): 
   const conds = campo.condicions
     ?? (campo.condicion ? (Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion]) : [])
   if (conds.length === 0) return true
-  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? '')))
+  return conds.some((c) => valorsDe(datos[c.campo]).some((v) => c.en.includes(v)))
+}
+
+/** Espejo de `valorsDe()` de `camposOferta.ts`: una lista cuenta valor por valor. */
+export function valorsDe(v: unknown): string[] {
+  if (v === 'totes') return ['donacio', 'venda', 'maquila']
+  if (Array.isArray(v)) return v.map((x) => String(x))
+  return [String(v ?? '')]
+}
+
+/** Espejo de `esBuit()`: una lista vacía o una franja sin horas también cuentan como vacías. */
+export function esBuit(v: unknown): boolean {
+  if (Array.isArray(v)) return v.length === 0
+  if (v && typeof v === 'object') return Object.values(v).every((x) => x == null || String(x).trim() === '')
+  return v === undefined || v === null || String(v).trim() === ''
 }
 
 /**
@@ -196,7 +214,15 @@ export async function creaOferta(
   productorId: string,
   datos: Record<string, unknown>,
 ): Promise<
-  Resultat<{ id: string; id_excedente: string; confirmacio_email?: ConfirmacioEmail }> & {
+  Resultat<{
+    id: string
+    id_excedente: string
+    confirmacio_email?: ConfirmacioEmail
+    /** `pendent_validacio` o `publicada` (05-10-2026). Un servidor anterior no lo manda. */
+    estado?: string
+    /** Las modalidades marcadas para las que falta el convenio (no impiden publicar). */
+    modalitats_sense_conveni?: string[]
+  }> & {
     /**
      * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es
      * `code: 'campos_faltantes'`. El cliente ya valida esto ANTES de llamar (§12.123), así
@@ -244,6 +270,8 @@ export async function manifestaInteres(args: {
   kg: number
   preu?: number | null
   caixes?: number | null
+  /** Cómo la quiere recibir, si la oferta se ofrece de varias maneras (05-10-2026). */
+  modalitat?: string | null
 }): Promise<Resultat<OfertaRespuesta>> {
   const { data, error } = await supabase.rpc('manifestar_interes', {
     p_excedente: args.excedenteId,
@@ -251,6 +279,7 @@ export async function manifestaInteres(args: {
     p_kg: args.kg,
     p_preu: args.preu ?? null,
     p_caixes: args.caixes ?? null,
+    p_modalitat: args.modalitat ?? null,
   })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data as OfertaRespuesta }
@@ -279,6 +308,7 @@ export function clauErrorInteres(missatge: string | null | undefined): {
     }).format(n)
   }
   if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
+  if (m.startsWith('cal_modalitat')) return { clau: 'mk.err_cal_modalitat' }
   if (m.startsWith('kg_maxim')) {
     const n = num(/(\d+(?:[.,]\d+)?)\s*kg/, 0)
     return n ? { clau: 'mk.err_kg_maxim', vars: { n } } : { clau: 'c.error' }

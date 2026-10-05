@@ -38,7 +38,10 @@ import type { Comptador } from './nav'
  *    añadirla también aquí.
  */
 export type CuaEquip =
-  | 'registres' | 'convenis_contrasignar' | 'respostes' | 'missatges'
+  | 'registres' | 'convenis_contrasignar'
+  // 05-10-2026: ofertas que esperan a que el equipo las valide antes de salir al Mercat.
+  | 'ofertes_per_validar'
+  | 'respostes' | 'missatges'
   | 'ofertes_sense_enviar' | 'ofertes_vencudes'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
@@ -119,6 +122,9 @@ export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptado
     // y en el título de cada cola, no en el badge.
     aprovacions: n('registres') + n('convenis_contrasignar') + n('respostes'),
     missatges: n('missatges'),
+    // No baja al entrar en Ofertes: solo al validar o rechazar, porque la oferta se queda
+    // parada hasta que alguien decide.
+    ofertes: n('ofertes_per_validar'),
     // Lo que espera al EQUIPO: borradores por emitir y REC por conciliar. Los que esperan
     // la confirmación de la otra parte (`albarans_esperant`) no cuentan aquí.
     albarans: n('albarans_esborrany') + n('albarans_conciliar'),

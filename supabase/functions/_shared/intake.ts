@@ -20,6 +20,7 @@ import {
   aplica, CAMPOS, FORMATS_ENTREGA, MODALITATS, OPCIONS_AL_CAMP, OPCIONS_TRANSPORT, PASOS,
 } from "./camposOferta.ts";
 import type { Paso } from "./camposOferta.ts";
+import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
 const CADUCIDAD_HORAS = 12;
@@ -84,7 +85,11 @@ export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso 
     //    Con la modalidad ausente o desconocida se pregunta, porque publicar una venta sin
     //    precio es peor que pedirle un precio de más a quien dona (lo fija un test).
     if (PASOS[j] === "preu_minim") {
-      if (datos.modalitat === "donacio") continue;
+      // Desde el 05-10-2026 la modalidad puede ser una LISTA: se salta solo si lo marcado
+      // es exclusivamente donación. Con «totes» o con venda/maquila entre las marcadas, se
+      // pregunta (`modalitats.ts`).
+      const ms = modalitatsDe(datos.modalitat);
+      if (ms.length > 0 && !ambPreu(ms)) continue;
       return PASOS[j];
     }
     const campo = CAMPOS.find((c) => c.clave === PASOS[j]);
@@ -259,7 +264,13 @@ async function preguntar(
     case "disponible_fins":
       return (await sendText(supabase, to, "Fins quin dia està disponible? (per exemple 23/07)")).ok;
     case "horari":
-      return (await sendText(supabase, to, "Quin horari de recollida va bé? (matí, tarda, hores…)")).ok;
+      // Una FRANJA (05-10-2026). Se sigue preguntando en texto: un desplegable de horas no
+      // existe en WhatsApp, y dos listas seguidas para «de» y «a» serían cuatro toques. El
+      // servidor intenta leer la respuesta (`franja.ts`); si no la entiende, se guarda el texto.
+      return (await sendText(
+        supabase, to,
+        "Entre quines hores es pot recollir? (per exemple «de 9 a 12», o «matí»)",
+      )).ok;
     case "modalitat":
       // Lista y no botones, aunque solo sean tres opciones: un botón de WhatsApp admite
       // título y nada más, así que por aquí se elegía a ciegas entre tres palabras
@@ -269,11 +280,21 @@ async function preguntar(
       // que es la de `MODALITATS`, la misma que lee el panel (deuda §12.105).
       return (await sendLista(
         supabase, to, "Quina modalitat és?", "Tria modalitat",
-        MODALITATS.map((m) => ({
-          id: `modalitat:${m.id}`,
-          titulo: m.titulo,
-          descripcion: m.descripcion,
-        })),
+        [
+          ...MODALITATS.map((m) => ({
+            id: `modalitat:${m.id}`,
+            titulo: m.titulo,
+            descripcion: m.descripcion,
+          })),
+          // Varias a la vez (05-10-2026): por WhatsApp no hay casillas, así que la forma de
+          // decir «más de una» es esta cuarta fila. Es justo el caso que describió la
+          // Fundació: quien no sabe cuál es la mejor salida.
+          {
+            id: `modalitat:${TOTES}`,
+            titulo: "No ho sé · totes",
+            descripcion: "L'oferim de totes les maneres i l'equip t'ajuda a triar.",
+          },
+        ],
       )).ok;
     case "preu_minim":
       return (await sendText(
@@ -346,7 +367,14 @@ async function interpretar(
   ];
   if (conOpciones.includes(paso)) {
     if (!id?.startsWith(`${paso}:`)) return null;
-    return id.slice(paso.length + 1);
+    const valor = id.slice(paso.length + 1);
+    // La modalidad se guarda como LISTA (05-10-2026), también cuando se elige una sola: así
+    // el resto del circuito solo conoce una forma. «totes» son las tres.
+    if (paso === "modalitat") {
+      const ms = modalitatsDe(valor);
+      return ms.length > 0 ? ms : null;
+    }
+    return valor;
   }
 
   const t = (texto ?? "").trim();

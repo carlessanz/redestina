@@ -6,6 +6,7 @@ import { useConfirma } from './DialegConfirma'
 import type { Lang } from '../lib/i18n'
 import {
   fitxesSenseCorreuAmbTelefon, getTestMode, getWhatsappActiu, setTestMode, setWhatsappActiu,
+  getValidacioOfertes, setValidacioOfertes,
 } from '../lib/settings'
 import { useAppContext } from '../hooks/useAppContext'
 import {
@@ -33,6 +34,7 @@ export default function Settings() {
   const motiuLlistes = (ctx?.potAprovar ?? false) ? undefined : t('wl.no_perm')
   const [testMode, setTest] = useState<boolean | null>(null)
   const [waActiu, setWaActiu] = useState<boolean | null>(null)
+  const [validacio, setValidacio] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
   // Las dos whitelists del entorno de pruebas (§4, §8). Vivían en el Tauler y ocupaban
   // media pantalla de la landing del equipo: no son trabajo del día, son el ajuste que
@@ -43,6 +45,7 @@ export default function Settings() {
   useEffect(() => {
     void getTestMode().then(setTest)
     void getWhatsappActiu().then(setWaActiu)
+    void getValidacioOfertes().then(setValidacio)
     void listarNumerosTest().then(setLista)
     void listarEmailsTest().then(setListaEmail)
   }, [])
@@ -91,6 +94,17 @@ export default function Settings() {
     // aplicación (botones, banners) seguiría pintando el estado anterior.
     await recarrega()
     toast.success(activo ? t('set.wa_saved_on') : t('set.wa_saved_off'))
+  }
+
+  /** El interruptor de validación previa de ofertas (05-10-2026). Sin confirmación: es reversible. */
+  async function cambiarValidacio(activa: boolean) {
+    if (activa === validacio || saving) return
+    setSaving(true)
+    const error = await setValidacioOfertes(activa)
+    setSaving(false)
+    if (error) { toast.error(t(error)); return }
+    setValidacio(activa)
+    toast.success(activa ? t('set.val_saved_on') : t('set.val_saved_off'))
   }
 
   return (
@@ -142,6 +156,37 @@ export default function Settings() {
 
               {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
               <p className="text-xs text-muted-foreground">{t('set.test_help')}</p>
+            </>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Validación previa de las ofertas que publica el productor (05-10-2026). */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('set.val_title')}</CardTitle></CardHeader>
+        <CardContent className="space-y-4">
+          {validacio === null ? (
+            <p className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="size-4 animate-spin" /> {t('c.loading')}
+            </p>
+          ) : (
+            <>
+              <p className="text-sm text-muted-foreground">{validacio ? t('set.val_on_desc') : t('set.val_off_desc')}</p>
+              <div className="inline-flex rounded-md border p-0.5">
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarValidacio(true)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    validacio ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
+                  {t('set.on')}
+                </BotoAmbMotiu>
+                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
+                  onClick={() => void cambiarValidacio(false)}
+                  className={cn('rounded px-4 font-medium disabled:opacity-60',
+                    !validacio ? 'bg-aviso text-white hover:bg-aviso hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
+                  {t('set.off')}
+                </BotoAmbMotiu>
+              </div>
+              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
             </>
           )}
         </CardContent>

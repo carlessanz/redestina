@@ -16,7 +16,8 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { crearExcedente } from "../_shared/oferta.ts";
+import { crearExcedente, modalitatsAmbConveni } from "../_shared/oferta.ts";
+import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
@@ -206,22 +207,21 @@ Deno.serve(async (req) => {
     // aquí no se hace nada con el aviso), desde la fecha de corte levanta 42501.
     // ⚠️ El alta ASISTIDA no pasa por aquí: el equipo resuelve el convenio en la fase 1 del
     //    ciclo guiado, con la persona delante (§6ter).
+    // Desde el 05-10-2026 una oferta puede ofrecerse en VARIAS modalidades, y basta con que
+    // UNA tenga su convenio vigente para publicarla: la que no lo tenga la para
+    // `aprovar_resposta()` al canalizar, y la pantalla avisa de cuáles son.
+    const modalitats = modalitatsDe((datos as Record<string, unknown>).modalitat);
+    let senseConveni: string[] = [];
     if (!ctx.esIntern) {
-      const modalitat = String((datos as Record<string, unknown>).modalitat ?? "");
-      const { error: errConv } = await supabase.rpc("exigir_convenio", {
-        p_tipo: "productor", p_org: productorId, p_valorizacion: modalitat, p_parte: "entrega",
-      });
-      if (errConv?.code === "42501") {
+      const cobertes = await modalitatsAmbConveni(supabase, productorId, modalitats);
+      if (cobertes.length === 0) {
         // La CLAVE i18n como mensaje: la pantalla la traduce con `textError()`.
         return responder({
-          error: modalitat === "donacio" ? "po.cal_conveni_don" : "po.cal_conveni_com",
+          error: modalitats.length === 1 && modalitats[0] === "donacio" ? "po.cal_conveni_don" : "po.cal_conveni_com",
           code: "sense_conveni",
         }, 403);
       }
-      if (errConv) {
-        console.error("crear-oferta: exigir_convenio:", errConv.message);
-        return responder({ error: "c.error" }, 500);
-      }
+      senseConveni = modalitats.filter((m) => !cobertes.includes(m));
     }
 
     // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
@@ -238,10 +238,16 @@ Deno.serve(async (req) => {
     // La confirmación que el intake manda por WhatsApp (`_shared/oferta.ts`), aquí por
     // correo: quien publica desde el panel también tiene derecho a su referencia por
     // escrito, y con WhatsApp apagado (§8) esta es la única que va a recibir.
-    const confirmacio = await confirmarOfertaPerCorreu(productor, r.idExcedente ?? "", r.excedenteId ?? "", datos, supabase, "crear-oferta");
+    const confirmacio = await confirmarOfertaPerCorreu(productor, r.idExcedente ?? "", r.excedenteId ?? "", datos, supabase, "crear-oferta", r.estado);
 
     return responder(
-      { ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio },
+      {
+        ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio,
+        // `pendent_validacio` o `publicada` (05-10-2026): lo decide la base, y la pantalla lo
+        // dice tal cual en vez de dar por publicada una oferta que nadie ve todavía.
+        estado: r.estado ?? "publicada",
+        modalitats_sense_conveni: senseConveni,
+      },
       200,
     );
   } catch (err) {

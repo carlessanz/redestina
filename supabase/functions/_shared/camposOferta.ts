@@ -230,6 +230,20 @@ export interface CampoOferta {
   obligatorio: boolean;
   opciones?: OpcionCampo[];
   /**
+   * Se pueden marcar VARIAS opciones (05-10-2026, solo `modalitat`). El tipo sigue siendo
+   * `opcions` a propósito: un panel anterior que no conoce este campo pinta el desplegable de
+   * siempre y manda una sola, que el servidor sigue aceptando (§11: las funciones se publican
+   * antes que el frontend). El valor nuevo es una lista de ids.
+   */
+  multiple?: boolean;
+  /**
+   * Un texto con forma (05-10-2026, solo `horari`): `franja` = de qué hora a qué hora. El tipo
+   * sigue siendo `text` por la misma compatibilidad que `multiple`: el panel nuevo pinta dos
+   * pares de desplegables y manda `{inici, fi}`; el viejo y el bot mandan texto, y el servidor
+   * intenta leerlo (`franja.ts`).
+   */
+  format?: "franja";
+  /**
    * Se pregunta solo si otro campo tiene uno de estos valores. Con una LISTA, basta con que
    * se cumpla una (es un «o»): la ubicación hace falta si nadie la trae **o** si el
    * producto sigue en el campo.
@@ -405,20 +419,27 @@ export const CAMPOS: CampoOferta[] = [
   {
     clave: "horari",
     tipo: "text",
-    etiqueta: "Quin horari de recollida va bé?",
-    ayuda: "matí, tarda, hores…",
-    etiqueta_es: "¿Qué horario de recogida va bien?",
-    ayuda_es: "mañana, tarde, horas…",
+    // Una FRANJA, no una hora (reunión del 05-10-2026): el productor dice de qué hora a qué
+    // hora se puede recoger, y quien recoge elige dentro de ella. Por WhatsApp se sigue
+    // preguntando en texto y se intenta leer («de 9 a 12», «matí»).
+    format: "franja",
+    etiqueta: "Entre quines hores es pot recollir?",
+    ayuda: "La franja en què hi ha algú per lliurar-lo. Qui el reculli triarà l'hora dins d'aquesta franja.",
+    etiqueta_es: "¿Entre qué horas se puede recoger?",
+    ayuda_es: "La franja en la que hay alguien para entregarlo. Quien lo recoja elegirá la hora dentro de ella.",
     seccion: "recollida",
     obligatorio: false,
   },
   {
     clave: "modalitat",
     tipo: "opcions",
-    etiqueta: "Quina modalitat és?",
-    ayuda: "Decideix quines entitats la poden rebre i quin document es genera.",
-    etiqueta_es: "¿Qué modalidad es?",
-    ayuda_es: "Decide qué entidades pueden recibirla y qué documento se genera.",
+    // VARIAS a la vez (reunión del 05-10-2026, D2): la definitiva de cada entrega la elige
+    // quien la recibe y la confirma el equipo. Ver `modalitats.ts`.
+    multiple: true,
+    etiqueta: "Quines modalitats vols oferir?",
+    ayuda: "Pots marcar-ne més d'una. Si no ho tens clar, marca-les totes: l'equip t'ajudarà a triar.",
+    etiqueta_es: "¿Qué modalidades quieres ofrecer?",
+    ayuda_es: "Puedes marcar más de una. Si no lo tienes claro, márcalas todas: el equipo te ayudará a elegir.",
     seccion: "modalitat",
     obligatorio: true,
     opciones: MODALITATS,
@@ -479,16 +500,31 @@ export const CAMPOS: CampoOferta[] = [
 export function aplica(campo: CampoOferta, datos: Record<string, unknown>): boolean {
   if (!campo.condicion) return true;
   const conds = Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion];
-  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? "")));
+  return conds.some((c) => valorsDe(datos[c.campo]).some((v) => c.en.includes(v)));
+}
+
+/**
+ * Lo que vale un campo, como lista de textos. Un campo `multiple` guarda una lista; el resto,
+ * un valor. Así una condición «modalitat en venda/maquila» se cumple con `["donacio","venda"]`
+ * igual que con `"venda"`. `"totes"` (la fila de WhatsApp) cuenta como las tres.
+ */
+export function valorsDe(v: unknown): string[] {
+  if (v === "totes") return ["donacio", "venda", "maquila"];
+  if (Array.isArray(v)) return v.map((x) => String(x));
+  return [String(v ?? "")];
+}
+
+/** ¿Está vacío? Una lista vacía también lo está: «al menos una» modalidad. */
+export function esBuit(v: unknown): boolean {
+  if (Array.isArray(v)) return v.length === 0;
+  if (v && typeof v === "object") return Object.keys(v).length === 0;
+  return v === undefined || v === null || String(v).trim() === "";
 }
 
 /** Campos obligatorios que faltan. Lista vacía = se puede crear la oferta. */
 export function faltantes(datos: Record<string, unknown>): Paso[] {
   return CAMPOS
     .filter((c) => c.obligatorio && aplica(c, datos))
-    .filter((c) => {
-      const v = datos[c.clave];
-      return v === undefined || v === null || String(v).trim() === "";
-    })
+    .filter((c) => esBuit(datos[c.clave]))
     .map((c) => c.clave);
 }

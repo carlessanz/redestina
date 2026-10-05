@@ -25,6 +25,8 @@ export type Comptador =
   // los que esperan a la otra parte) y productos canalizados este año sin coste por kilo.
   // Los alimenta `pendents_equip()` (14-09-2026), la misma fuente que el tablero.
   | 'albarans' | 'costos'
+  // Ofertas pendientes de validar (05-10-2026).
+  | 'ofertes'
   // Lo que el panel externo tiene pendiente de firmar o confirmar (`pendents_meus()`).
   // Uno por panel: una cuenta con doble rol no debe ver en su menú de productor lo que
   // espera su entidad.
@@ -73,7 +75,7 @@ const EQUIP: NavGrup[] = [
       // (modelo asistido, §1bis). Las de debajo son sus paradas sueltas.
       // `barra: false` — el equipo tiene siete secciones y la barra de móvil admite cuatro.
       { to: '/equip/canalitzacio', labelKey: 'nav.canalitzacio', icon: Workflow, barra: false },
-      { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package },
+      { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package, comptador: 'ofertes' },
       // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
       { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },

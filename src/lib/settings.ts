@@ -75,3 +75,16 @@ export async function fitxesSenseCorreuAmbTelefon(): Promise<{ productors: numbe
   ])
   return { productors: prod.count ?? 0, entitats: ent.count ?? 0 }
 }
+
+/**
+ * ¿Las ofertas nuevas esperan a que el equipo las valide? (05-10-2026). Fail-safe hacia
+ * VALIDAR, como `validacio_ofertes_activa()` en la base: solo un `'false'` explícito lo apaga.
+ */
+export async function getValidacioOfertes(): Promise<boolean> {
+  return (await getSetting('validacio_ofertes')) !== 'false'
+}
+
+/** Guarda el interruptor de validación. Devuelve una clave i18n de error o null. */
+export async function setValidacioOfertes(activa: boolean): Promise<string | null> {
+  return setSetting('validacio_ofertes', activa ? 'true' : 'false')
+}

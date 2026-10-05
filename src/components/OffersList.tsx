@@ -14,6 +14,7 @@
 // había dos mapas idénticos —uno aquí, otro en el panel del productor— y dos sitios donde
 // un estado nuevo podía caer en el color equivocado. La leyenda plegada explica los siete.
 
+import { useSearchParams } from 'react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
@@ -39,7 +40,7 @@ interface Props {
 }
 
 type KgPorExcedente = Record<string, number>
-const ACTIVOS = ['borrador', 'publicada', 'parcial', 'bloqueada']
+const ACTIVOS = ['borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada']
 const TANCADES = ['cerrada', 'no_colocada', 'cancelada']
 
 /**
@@ -134,6 +135,9 @@ export default function OffersList({ onOpen, accio }: Props) {
   const foto = useFotosOfertes(totes)
 
   const grups = useMemo(() => ({
+    // Las que esperan a que el equipo las valide (05-10-2026): son también activas, y esta
+    // pestaña es a donde manda el badge del menú y la cola del tablero.
+    validar: filtra(actives.filter((o) => o.estado === 'pendent_validacio')),
     actives: filtra(actives),
     tancades: filtra(tancades),
     totes: filtra([...actives, ...tancades]),
@@ -203,6 +207,8 @@ export default function OffersList({ onOpen, accio }: Props) {
   }
 
   const senseCoincidencia = busqueda.trim() !== ''
+  const [params] = useSearchParams()
+  const pestanyaInicial = params.get('tab')
 
   return (
     <Card>
@@ -220,17 +226,22 @@ export default function OffersList({ onOpen, accio }: Props) {
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!loading && !error && (
-          <Tabs defaultValue="actives">
+          <Tabs defaultValue={pestanyaInicial === 'validar' ? 'validar' : 'actives'}>
             {/* A 360 px tres etiquetas con su cifra van justas: la lista scrollea sola en
                 vez de empujar la página entera hacia la derecha. */}
             <div className="-mx-1 overflow-x-auto px-1">
               <TabsList>
+                <TabsTrigger value="validar">{t('off.tab_validar', { n: grups.validar.length })}</TabsTrigger>
                 <TabsTrigger value="actives">{t('off.tab_active', { n: grups.actives.length })}</TabsTrigger>
                 <TabsTrigger value="tancades">{t('off.tab_closed', { n: grups.tancades.length })}</TabsTrigger>
                 <TabsTrigger value="totes">{t('off.tab_all', { n: grups.totes.length })}</TabsTrigger>
               </TabsList>
             </div>
 
+            <TabsContent value="validar" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('off.validar_hint')}</p>
+              {taula(grups.validar, senseCoincidencia ? 'off.no_match' : 'off.empty_validar')}
+            </TabsContent>
             <TabsContent value="actives" className="space-y-2">
               {taula(grups.actives, senseCoincidencia ? 'off.no_match' : 'off.empty_active')}
             </TabsContent>

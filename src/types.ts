@@ -161,6 +161,8 @@ export interface Entidad {
 
 export type EstadoExcedente =
   | 'borrador'
+  /** Espera a que el equipo la valide antes de salir al Mercat (05-10-2026). */
+  | 'pendent_validacio'
   | 'publicada'
   | 'parcial'
   | 'bloqueada'
@@ -220,6 +222,16 @@ export interface Excedente {
   foto_producte: boolean
   /** Coste por kilo que declara el productor; null = el de referencia del producto. */
   coste_kg: number | null
+  /**
+   * Las modalidades en que se ofrece, en orden canónico (05-10-2026). `modalitat` es la
+   * primera. La de cada entrega la fija la aprobación (`canalizaciones.valorizacion`).
+   * Opcional: una consulta con columnas explícitas puede no pedirla.
+   */
+  modalitats?: Modalitat[] | null
+  /** La franja de recogida, «HH:MM:SS» (05-10-2026). */
+  hora_recollida_inici?: string | null
+  hora_recollida_fi?: string | null
+  validada_at?: string | null
 }
 
 export interface Canalizacion {
@@ -264,6 +276,8 @@ export interface OfertaRespuesta {
   kg_solicitados: number | null
   caixes_solicitades: number | null
   preu_ofert: number | null
+  /** La modalidad que pide quien muestra interés; la confirma el equipo (05-10-2026). */
+  modalitat?: Modalitat | null
   /** Decisión del SUPERADMIN (aprueba y convierte en canalización) */
   aprovacio: 'pendent' | 'aprovada' | 'rebutjada'
   aprovat_at: string | null

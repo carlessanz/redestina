@@ -9,6 +9,7 @@
 // ⚠️ Sin el nombre del productor, a propósito (D3, §4): el receptor ve la comarca, no quién
 //    ofrece. Si la Fundación decide lo contrario, se añade aquí y sale en los dos sitios.
 
+import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import { useT } from '../lib/i18n'
 import { dataCurta } from '../lib/albarans'
 import type { Excedente } from '../types'
@@ -25,7 +26,7 @@ import type { FotoResolta } from './FotosOferta'
  *    pantallas del receptor piden estas columnas y ninguna más, cada una en su literal (§7):
  *
  *    id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa,
- *    retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions,
+ *    retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions,
  *    preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos,
  *    foto_producte
  *
@@ -34,7 +35,7 @@ import type { FotoResolta } from './FotosOferta'
 export type OfertaReceptor = Pick<
   Excedente,
   | 'id' | 'estado' | 'familia' | 'producto' | 'variedad' | 'kg_total' | 'num_caixes'
-  | 'tipo_caixa' | 'retorn_envasos' | 'modalitat' | 'causa' | 'disponible_hasta'
+  | 'tipo_caixa' | 'retorn_envasos' | 'modalitat' | 'modalitats' | 'causa' | 'disponible_hasta'
   | 'horari_recollida' | 'observacions' | 'preu_minim' | 'producte_al_camp' | 'comarca'
   | 'format_entrega' | 'transport_propi' | 'fotos' | 'foto_producte'
 >
@@ -71,7 +72,7 @@ export default function DetallOfertaReceptor({ oferta, foto }: {
       <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
         <Dada etiqueta={t('mk.d_kg')} valor={`${kgFmt(oferta.kg_total)} kg`} />
         <Dada etiqueta={t('mk.d_zone')} valor={oferta.comarca ?? '—'} />
-        <Dada etiqueta={t('mk.d_mode')} valor={oferta.modalitat ? t(`od.mod_${oferta.modalitat}`) : '—'} />
+        <Dada etiqueta={t('mk.d_mode')} valor={textModalitats(modalitatsOferta(oferta), t) || '—'} />
         {preu && <Dada etiqueta={t('mk.d_price')} valor={preu} />}
         <Dada etiqueta={t('mk.d_until')} valor={oferta.disponible_hasta ? dataCurta(oferta.disponible_hasta) : '—'} />
         {oferta.horari_recollida && <Dada etiqueta={t('mk.d_hours')} valor={oferta.horari_recollida} />}
@@ -121,7 +122,9 @@ export function kgFmt(n: number | null | undefined): string {
 }
 
 /** El precio, solo si la modalidad lo tiene: una donación no lleva precio. */
-export function preuDe(o: Pick<Excedente, 'modalitat' | 'preu_minim'>): string | null {
-  if ((o.modalitat !== 'venda' && o.modalitat !== 'maquila') || o.preu_minim == null) return null
+export function preuDe(o: Pick<Excedente, 'modalitat' | 'modalitats' | 'preu_minim'>): string | null {
+  // Con varias modalidades (05-10-2026) el precio vale para la venta o la maquila, no para
+  // la donación: basta con que la oferta incluya una con precio.
+  if (!ambPreu(modalitatsOferta(o)) || o.preu_minim == null) return null
   return `${new Intl.NumberFormat('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(o.preu_minim))} €/kg`
 }

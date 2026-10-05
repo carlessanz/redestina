@@ -40,9 +40,13 @@ import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { varietatSemblaQuantitat } from '../lib/validacio'
 import { cn } from '../lib/utils'
+import { FilaCasella } from './Casella'
 import {
-  aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio, etiquetaFamilia, localitzaDescriptor,
+  aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio, esBuit, etiquetaFamilia, localitzaDescriptor,
 } from '../lib/ofertes'
+import { modalitatsDe } from '../lib/modalitats'
+import { HORES, QUARTS, esFranjaValida } from '../lib/franja'
+import type { Franja } from '../lib/franja'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
 import { IconaProducte, SelectorFotos } from './FotosOferta'
@@ -68,37 +72,53 @@ function procesJaVist(): boolean {
 }
 
 /**
- * El BORRADOR del alta, en `sessionStorage` (29-09-2026). En un iPhone, abrir la cámara o la
- * galería para la foto puede hacer que Safari descarte la pestaña por memoria y la recargue
- * al volver: el formulario volvía al paso 1 vacío, y al pulsar «Continuar» parecía un bucle.
- * Con el borrador, la recarga devuelve lo escrito y el paso. Por productor (el alta asistida
- * del equipo puede abrir varios) y solo 24 h. `sessionStorage` y no `localStorage`: sobrevive
- * a la recarga de la pestaña, no se queda en un móvil compartido.
+ * El BORRADOR del alta (29-09-2026; desde el 05-10-2026 en `localStorage` y durante 7 días).
+ *
+ * Nació en `sessionStorage` y 24 h para el caso del iPhone —abrir la cámara puede hacer que
+ * Safari recargue la pestaña y el formulario volvía vacío al paso 1—. En la reunión del
+ * 05-10-2026 se le dijo a la Fundació que el borrador «se guarda una semana y se borra
+ * solo», y eso no era lo que había: `sessionStorage` se pierde al CERRAR la pestaña. Ahora
+ * cumple lo dicho: sobrevive a cerrar el navegador, caduca a los 7 días y se borra al
+ * publicar o cancelar.
+ *
+ * ⚠️ El precio es que en un MÓVIL COMPARTIDO lo escrito se queda a la vista del siguiente que
+ *    abra el alta con esa misma organización. Es aceptable porque la clave es POR PRODUCTOR
+ *    (otra organización no lo ve) y no contiene nada que esa organización no sepa ya. El
+ *    aviso «Hem recuperat l'oferta…» lo hace visible.
  */
 const PREFIX_ESBORRANY = 'redestina-oferta-esborrany:'
-const VIDA_ESBORRANY_MS = 24 * 3600 * 1000
+export const VIDA_ESBORRANY_MS = 7 * 24 * 3600 * 1000
 
 interface Esborrany { datos: Datos; pas: number; pasMaxim: number; costTocat: boolean; desat: number }
 
 function llegeixEsborrany(productorId: string): Esborrany | null {
   try {
-    const cru = sessionStorage.getItem(PREFIX_ESBORRANY + productorId)
+    // El de antes del 05-10-2026 vivía en `sessionStorage`: se recoge una vez y se migra.
+    const cru = localStorage.getItem(PREFIX_ESBORRANY + productorId)
+      ?? sessionStorage.getItem(PREFIX_ESBORRANY + productorId)
     if (!cru) return null
     const e = JSON.parse(cru) as Esborrany
-    if (!e || typeof e !== 'object' || !e.datos || Date.now() - e.desat > VIDA_ESBORRANY_MS) return null
+    if (!e || typeof e !== 'object' || !e.datos || Date.now() - e.desat > VIDA_ESBORRANY_MS) {
+      localStorage.removeItem(PREFIX_ESBORRANY + productorId)
+      return null
+    }
     return e
   } catch { return null }
 }
 
 function desaEsborrany(productorId: string, e: Omit<Esborrany, 'desat'>) {
   try {
-    if (Object.keys(e.datos).length === 0) sessionStorage.removeItem(PREFIX_ESBORRANY + productorId)
-    else sessionStorage.setItem(PREFIX_ESBORRANY + productorId, JSON.stringify({ ...e, desat: Date.now() }))
+    sessionStorage.removeItem(PREFIX_ESBORRANY + productorId)
+    if (Object.keys(e.datos).length === 0) localStorage.removeItem(PREFIX_ESBORRANY + productorId)
+    else localStorage.setItem(PREFIX_ESBORRANY + productorId, JSON.stringify({ ...e, desat: Date.now() }))
   } catch { /* Safari privado: sin borrador, pero se puede publicar igual */ }
 }
 
 function esborraEsborrany(productorId: string) {
-  try { sessionStorage.removeItem(PREFIX_ESBORRANY + productorId) } catch { /* ídem */ }
+  try {
+    localStorage.removeItem(PREFIX_ESBORRANY + productorId)
+    sessionStorage.removeItem(PREFIX_ESBORRANY + productorId)
+  } catch { /* ídem */ }
 }
 
 function marcaProcesVist() {
@@ -279,10 +299,20 @@ export default function FormulariNovaOferta(
   function faltantsObligatoris(): CampoOferta[] {
     return campos
       .filter((c) => c.obligatorio && aplica(c, datos))
-      .filter((c) => {
-        const v = datos[c.clave]
-        return v === undefined || v === null || String(v).trim() === ''
-      })
+      .filter((c) => esBuit(datos[c.clave]))
+  }
+
+  /**
+   * Una franja a medias —solo «de», o el final antes del principio— no es una franja. El
+   * campo es opcional, así que vacío vale; lo que no vale es a medias, porque el servidor la
+   * descartaría y el productor creería haberla dicho.
+   */
+  function franjaAMitges(): CampoOferta | null {
+    const c = campos.find((x) => x.format === 'franja' && aplica(x, datos))
+    if (!c) return null
+    const v = datos[c.clave]
+    if (!v || typeof v !== 'object' || esBuit(v)) return null
+    return esFranjaValida(v as Partial<Franja>) ? null : c
   }
 
   function marcaIVeAlPrimer(claus: string[]) {
@@ -312,6 +342,12 @@ export default function FormulariNovaOferta(
 
   /** «Continuar»: solo si lo obligatorio de esta sección está completo. */
   function continua(camps: CampoOferta[], seguent: number) {
+    const fr = franjaAMitges()
+    if (fr && camps.some((c) => c.clave === fr.clave)) {
+      marcaIVeAlPrimer([fr.clave])
+      setError(t('po.franja_invalida'))
+      return
+    }
     const f = faltantsDe(camps)
     if (f.length > 0) {
       marcaIVeAlPrimer(f.map((c) => c.clave))
@@ -349,6 +385,12 @@ export default function FormulariNovaOferta(
     if (faltants.length > 0) {
       marcaIVeAlPrimer(faltants.map((c) => c.clave))
       setError(t('po.missing_fields', { camps: faltants.map((c) => c.etiqueta).join(', ') }))
+      return
+    }
+    const fr = franjaAMitges()
+    if (fr) {
+      marcaIVeAlPrimer([fr.clave])
+      setError(t('po.franja_invalida'))
       return
     }
     setCampsFaltants(new Set())
@@ -506,6 +548,34 @@ export default function FormulariNovaOferta(
         )
       }
       case 'opcions': {
+        if (campo.multiple) {
+          // VARIAS a la vez (05-10-2026): una casilla por opción, con su explicación al lado,
+          // que aquí sí cabe. El valor es la lista de ids, en el orden de las opciones.
+          const triades = modalitatsDe(valor) as string[]
+          const canvia = (idOpcio: string, on: boolean) => {
+            const nou = (campo.opciones ?? [])
+              .map((o) => o.id)
+              .filter((x) => (x === idOpcio ? on : triades.includes(x)))
+            set(campo.clave, nou)
+          }
+          return (
+            <div id={id} role="group" aria-invalid={invalid}
+              className={cn('space-y-1 rounded-md', invalid && 'ring-2 ring-destructive/40')}>
+              {(campo.opciones ?? []).map((o) => (
+                <FilaCasella key={o.id} checked={triades.includes(o.id)} onChange={(on) => canvia(o.id, on)}>
+                  <span className="font-medium">{o.titulo}</span>
+                  {o.descripcion && <span className="block text-xs text-muted-foreground">{o.descripcion}</span>}
+                </FilaCasella>
+              ))}
+              {campo.clave === 'modalitat' && avisModalitats && (
+                <p className="text-xs text-aviso">{avisModalitats}</p>
+              )}
+              {campo.clave === 'modalitat' && motiuConveni && (
+                <p className="text-xs text-error">{t(motiuConveni)}</p>
+              )}
+            </div>
+          )
+        }
         // La explicación de la opción ELEGIDA va debajo del control, no en el <option>:
         // un `<option>` no admite más que texto plano, y las tres modalidades deciden qué
         // entidades pueden recibir la oferta y qué documento se genera.
@@ -570,6 +640,46 @@ export default function FormulariNovaOferta(
               onChange={(e) => set(campo.clave, isoADdmmaaaa(e.target.value))} />
           )
         }
+        if (campo.format === 'franja') {
+          // De qué hora a qué hora (05-10-2026): cuatro desplegables, hora y cuarto. Un
+          // `<input type="time">` deja escribir cualquier minuto y en iOS sale una rueda de
+          // 60; la unidad mínima es el cuarto de hora (lo confirmó la Fundació).
+          const f = (valor && typeof valor === 'object' ? valor : {}) as Partial<Franja>
+          const [hi, mi] = (f.inici ?? '').split(':')
+          const [hf, mf] = (f.fi ?? '').split(':')
+          const posa = (clau: 'inici' | 'fi', h: string | undefined, m: string | undefined) => {
+            const nou: Partial<Franja> = { ...f }
+            nou[clau] = h ? `${h}:${m || '00'}` : ''
+            set(campo.clave, nou.inici || nou.fi ? nou : null)
+          }
+          const sel = 'h-9 rounded-md border border-input bg-transparent px-2 text-base md:text-sm aria-invalid:border-destructive'
+          return (
+            <div id={id} role="group" className="flex flex-wrap items-center gap-2 text-sm">
+              <span className="text-muted-foreground">{t('po.franja_de')}</span>
+              <select aria-label={t('po.franja_h_inici')} className={sel} aria-invalid={invalid}
+                value={hi ?? ''} onChange={(e) => posa('inici', e.target.value, mi)}>
+                <option value="">--</option>
+                {HORES.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+              <span aria-hidden>:</span>
+              <select aria-label={t('po.franja_m_inici')} className={sel} aria-invalid={invalid}
+                value={mi ?? ''} disabled={!hi} onChange={(e) => posa('inici', hi, e.target.value)}>
+                {QUARTS.map((q) => <option key={q} value={q}>{q}</option>)}
+              </select>
+              <span className="text-muted-foreground">{t('po.franja_a')}</span>
+              <select aria-label={t('po.franja_h_fi')} className={sel} aria-invalid={invalid}
+                value={hf ?? ''} onChange={(e) => posa('fi', e.target.value, mf)}>
+                <option value="">--</option>
+                {HORES.map((h) => <option key={h} value={h}>{h}</option>)}
+              </select>
+              <span aria-hidden>:</span>
+              <select aria-label={t('po.franja_m_fi')} className={sel} aria-invalid={invalid}
+                value={mf ?? ''} disabled={!hf} onChange={(e) => posa('fi', hf, e.target.value)}>
+                {QUARTS.map((q) => <option key={q} value={q}>{q}</option>)}
+              </select>
+            </div>
+          )
+        }
         if (campo.clave === 'varietat') {
           return (
             <>
@@ -599,9 +709,18 @@ export default function FormulariNovaOferta(
   // y lo que se ve luego son la misma frase.
   // Por qué no se puede publicar ahora mismo, si no se puede: se DICE, no solo se apaga el
   // botón (en táctil no hay tooltip, §6ter).
+  // Con varias modalidades (05-10-2026) solo se bloquea si NINGUNA tiene su convenio: con
+  // una basta para publicar —es lo que hace también `crear-oferta`—, y de las demás se avisa.
+  const modalitatsTriades = modalitatsDe(datos.modalitat)
+  const bloquejades = motiuModalitat ? modalitatsTriades.filter((m) => motiuModalitat(m) !== null) : []
   const motiuConveni = bloqueja
     ? 'avis_conv.bloquejat'
-    : (motiuModalitat && datos.modalitat ? motiuModalitat(String(datos.modalitat)) : null)
+    : (motiuModalitat && modalitatsTriades.length > 0 && bloquejades.length === modalitatsTriades.length
+      ? motiuModalitat(modalitatsTriades[0])
+      : null)
+  const avisModalitats = !motiuConveni && bloquejades.length > 0
+    ? t('po.mod_sense_conveni', { mods: bloquejades.map((m) => t(`od.mod_${m}`)).join(', ') })
+    : null
   const puntInicial = puntOferta(
     { estado: 'publicada', kgTotal: 0, kgCanalitzats: 0 }, 'productor',
   )
@@ -683,7 +802,7 @@ export default function FormulariNovaOferta(
             {bloc.camps.map((campo) => (
               <div
                 key={campo.clave}
-                className={campo.clave === 'observacions' || campo.tipo === 'ubicacio' ? 'sm:col-span-2' : undefined}
+                className={campo.clave === 'observacions' || campo.tipo === 'ubicacio' || campo.multiple || campo.format === 'franja' ? 'sm:col-span-2' : undefined}
               >
                 {/* Sin asterisco: el formulario es mínimo y todo lo que aparece hace
                     falta, así que lo que se marca es lo que se puede dejar en blanco

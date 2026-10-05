@@ -12,6 +12,7 @@ import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
 import { modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
+import { modalitatsDe } from "../_shared/modalitats.ts";
 
 const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
   .split(",").map((o) => o.trim()).filter(Boolean);
@@ -70,7 +71,7 @@ Deno.serve(async (req) => {
 
     const { data: excedente, error: exError } = await supabase
       .from("excedentes")
-      .select("familia, producto, kg_total, ubicacion_id, productor_id, modalitat")
+      .select("familia, producto, kg_total, ubicacion_id, productor_id, modalitat, modalitats")
       .eq("id", excedente_id)
       .maybeSingle();
     if (exError) {
@@ -152,11 +153,17 @@ Deno.serve(async (req) => {
     const waActivo = await whatsappActivo(supabase);
 
     // Y `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
-    const sinConvenio = await entidadesSinConvenio(
-      supabase,
-      excedente.modalitat,
-      (entidades ?? []).map((e: { id: string }) => e.id),
-    );
+    // Con VARIAS modalidades (05-10-2026) a una entidad le falta el papel solo si no tiene el
+    // convenio de NINGUNA: con el de una, puede pedirla en esa modalidad (D2). Es la
+    // intersección de los «sin convenio» de cada una.
+    const ids = (entidades ?? []).map((e: { id: string }) => e.id);
+    const modalitats = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
+    let sinConvenio: Set<string> | null = null;
+    for (const m of modalitats) {
+      const sin = await entidadesSinConvenio(supabase, m, ids);
+      sinConvenio = sinConvenio === null ? sin : new Set([...sinConvenio].filter((x) => sin.has(x)));
+    }
+    sinConvenio ??= new Set<string>();
 
     const rankingConCanal = ranking.map((e) => {
       const ficha = porId.get(e.id);
@@ -196,6 +203,7 @@ Deno.serve(async (req) => {
       modo_test: modoTest,
       whatsapp_actiu: waActivo,
       modalitat: excedente.modalitat ?? null,
+      modalitats,
       ranking: rankingConCanal,
     });
   } catch (err) {

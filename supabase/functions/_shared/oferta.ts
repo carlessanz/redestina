@@ -2,6 +2,8 @@
 
 import { sendText } from "./whatsapp.ts";
 import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
+import { ambPreu, etiquetaModalitats, modalitatsDe, principal } from "./modalitats.ts";
+import { llegeixHorari } from "./franja.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -17,11 +19,6 @@ interface SesionCompleta {
 // Con mayúscula inicial: todos los demás valores del mensaje la llevan —PRODUCTE,
 // PRODUCTOR, CAUSA— porque salen tal cual de la base o de lo que ha escrito la persona;
 // esta era la única en minúscula, por venir de un mapa escrito a mano (deuda §12.122).
-const ETIQUETA_MODALITAT: Record<string, string> = {
-  donacio: "Donació",
-  venda: "Venda",
-  maquila: "Maquila",
-};
 
 /**
  * ¿La oferta declara producto SIN COSECHAR? (`excedentes.producte_al_camp`, 20260921221806)
@@ -269,6 +266,12 @@ export interface ResultadoCreacion {
   /** Identificador legible (E-AAMMDD-XXX-YYY-N) cuando ok. */
   idExcedente?: string;
   excedenteId?: string;
+  /**
+   * El estado con el que ha quedado: `publicada` o `pendent_validacio` (05-10-2026). Lo decide
+   * la BASE (trigger `excedentes_validacio`), no esta función, así que quien llama lo lee
+   * aquí para decirle al productor lo que de verdad ha pasado.
+   */
+  estado?: string;
   error?: string;
 }
 
@@ -302,10 +305,18 @@ export async function crearExcedente(
     .from("productores").select("poblacion, empresa").eq("id", productor.id).maybeSingle();
 
   const kg = Number(d.kg ?? 0);
-  const preuMinim = d.preu_minim != null ? Number(d.preu_minim) : null;
-  // El coste que declara el productor (27-09-2026). Solo se pregunta en donació; si no lo
-  // dice, null y la canalización toma la referencia del producto.
-  const costKg = d.modalitat === "donacio" ? costDeclarat(d.cost_kg) : null;
+  // Las modalidades, en plural desde el 05-10-2026 (`modalitats.ts`). `modalitat` sigue
+  // guardando la PRINCIPAL para todo lo que todavía lee una sola.
+  const modalitats = modalitatsDe(d.modalitat);
+  const preuMinim = ambPreu(modalitats) && d.preu_minim != null && d.preu_minim !== ""
+    ? Number(String(d.preu_minim).replace(",", "."))
+    : null;
+  // El coste que declara el productor (27-09-2026). Solo se pregunta si se ofrece en
+  // donació; si no lo dice, null y la canalización toma la referencia del producto.
+  const costKg = modalitats.includes("donacio") ? costDeclarat(d.cost_kg) : null;
+  // La franja de recogida (05-10-2026): del panel llega `{inici, fi}`; del bot, texto, que
+  // se intenta leer. El texto se guarda siempre (`horari_recollida`).
+  const horari = llegeixHorari(d.horari);
   // Se resuelve UNA vez. El texto que circula y la columna que decide el flujo tienen que
   // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
   // cuanto alguien cambie una de las dos.
@@ -328,8 +339,8 @@ export async function crearExcedente(
     ubicacio: ubicacion?.gmaps_url || undefined,
     quantitat: `${String(kg).replace(".", ",")} kg aprox${d.caixes ? ` · ${textCaixes(Number(d.caixes), d.format_entrega)}` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
-    horari: String(d.horari ?? "") || undefined,
-    modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
+    horari: horari.text ?? undefined,
+    modalitat: etiquetaModalitats(modalitats),
     // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
     preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
@@ -355,7 +366,7 @@ export async function crearExcedente(
   //    exactamente lo que el comentario de esta función decía que pasaba desde julio y
   //    no pasaba. Tres intentos: si tres números seguidos chocan, el problema no es una
   //    carrera.
-  let fila: { id: string } | null = null;
+  let fila: { id: string; estado: string } | null = null;
   let error: { message: string; code?: string } | null = null;
   for (let intento = 0; intento < 3; intento++) {
     const r = await supabase.from("excedentes").insert({
@@ -378,7 +389,8 @@ export async function crearExcedente(
       fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
       // Sin fotos propias, ¿se enseña la del catálogo? Solo un `false` explícito lo apaga.
       foto_producte: d.foto_producte !== false,
-      modalitat: d.modalitat ?? null,
+      modalitat: principal(modalitats),
+      modalitats,
       preu_minim: preuMinim,
       coste_kg: costKg,
       causa: causa?.nombre ?? null,
@@ -386,7 +398,9 @@ export async function crearExcedente(
       // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha
       // reconocible queda null y el panel la normaliza a mano.
       disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
-      horari_recollida: d.horari ?? null,
+      horari_recollida: horari.text,
+      hora_recollida_inici: horari.franja?.inici ?? null,
+      hora_recollida_fi: horari.franja?.fi ?? null,
       observacions: d.observacions ?? null,
       valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
       texto_oferta: textoOferta,
@@ -394,8 +408,12 @@ export async function crearExcedente(
       // cuatro valores y default `'intake'`; escribirlo explícitamente es lo que hace que
       // el default deje de ser una suposición sobre el caso mayoritario.
       origen,
+      // Se escribe `publicada` y la BASE decide si en realidad queda pendiente de validar
+      // (trigger `excedentes_validacio`, 05-10-2026): así la regla vive en un solo sitio
+      // aunque las ofertas entren por cuatro caminos, y el interruptor de Configuració manda
+      // sobre todos ellos sin redesplegar nada.
       estado: "publicada",
-    }).select("id").single();
+    }).select("id, estado").single();
     fila = r.data;
     error = r.error;
     if (!error) break;
@@ -408,7 +426,7 @@ export async function crearExcedente(
     console.error("excedentes insert:", error.message);
     return { ok: false, error: error.message };
   }
-  return { ok: true, idExcedente, excedenteId: fila?.id };
+  return { ok: true, idExcedente, excedenteId: fila?.id, estado: fila?.estado };
 }
 
 /**
@@ -426,19 +444,20 @@ export async function crearExcedenteDesdeSesion(
   // El convenio que exige la modalidad a quien entrega, igual que `crear-oferta` desde el
   // panel (28-09-2026). Por aquí se publicaba sin él: el intake no pasa por aquella función.
   // Desde la fecha de corte, 42501; antes, solo un aviso que aquí no se usa.
-  const modalitat = String(sesion.datos_parciales.modalitat ?? "");
-  const { error: errConv } = await supabase.rpc("exigir_convenio", {
-    p_tipo: "productor", p_org: productor.id, p_valorizacion: modalitat, p_parte: "entrega",
-  });
-  if (errConv?.code === "42501") {
+  // Con varias modalidades (05-10-2026) basta con que UNA tenga su convenio vigente: la
+  // oferta circula, y la que no lo tenga la para `aprovar_resposta()` al canalizar. Es la
+  // misma regla que `crear-oferta` (`modalitatsAmbConveni()`).
+  const modalitats = modalitatsDe(sesion.datos_parciales.modalitat);
+  const cobertes = await modalitatsAmbConveni(supabase, productor.id, modalitats);
+  if (cobertes.length === 0) {
     await supabase.from("intake_sessions").delete().eq("id", sesion.id);
     await sendText(
       supabase, sesion.telefono,
-      modalitat === "donacio"
+      modalitats.length === 1 && modalitats[0] === "donacio"
         ? "No podem publicar l'oferta: per a donacions cal tenir vigent el conveni de donació. " +
           "Demana'l a l'equip de Redestina i torna-ho a provar."
-        : "No podem publicar l'oferta: per a venda o maquila cal tenir vigent el conveni de " +
-          "compravenda i maquila. Demana'l a l'equip de Redestina, o publica-la com a donació.",
+        : "No podem publicar l'oferta: cal tenir vigent el conveni de col·laboració per a " +
+          "alguna de les modalitats triades. Demana'l a l'equip de Redestina.",
     );
     return;
   }
@@ -460,7 +479,12 @@ export async function crearExcedenteDesdeSesion(
   await sendText(
     supabase, sesion.telefono,
     `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${r.idExcedente}. ` +
-      "L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar.",
+      (r.estado === "pendent_validacio"
+        // Desde el 05-10-2026 una oferta nueva espera a que el equipo la revise antes de
+        // salir al Mercat. Decir «la farem arribar» sin más sería prometer algo que todavía
+        // no ha pasado.
+        ? "L'equip de Redestina la revisarà i, un cop validada, la farà arribar a les entitats que la puguin aprofitar."
+        : "L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar."),
   );
 
   // Y por correo, si la ficha lo tiene (deuda §12.94). No sustituye al WhatsApp de arriba:
@@ -473,5 +497,30 @@ export async function crearExcedenteDesdeSesion(
   // registrado en `documento_envios` con su motivo.
   await confirmarOfertaPerCorreu(
     productor, r.idExcedente ?? "", r.excedenteId ?? "", sesion.datos_parciales, supabase, "intake",
+    r.estado,
   );
+}
+
+/**
+ * De las modalidades de una oferta, las que el productor puede ofrecer HOY porque tiene el
+ * convenio que exigen a quien entrega (`exigir_convenio`). Antes de la fecha de corte la RPC
+ * solo avisa, así que todas cuentan; desde el corte, solo las cubiertas. Un error que no sea
+ * el `42501` de «sin convenio» no se interpreta como «no cubierta» —sería bloquear por un
+ * fallo de red—: cuenta como cubierta y lo registra.
+ */
+export async function modalitatsAmbConveni(
+  supabase: Cliente,
+  productorId: string,
+  modalitats: readonly string[],
+): Promise<string[]> {
+  const cobertes: string[] = [];
+  for (const m of modalitats) {
+    const { error } = await supabase.rpc("exigir_convenio", {
+      p_tipo: "productor", p_org: productorId, p_valorizacion: m, p_parte: "entrega",
+    });
+    if (error?.code === "42501") continue;
+    if (error) console.error("modalitatsAmbConveni:", m, error.message);
+    cobertes.push(m);
+  }
+  return cobertes;
 }

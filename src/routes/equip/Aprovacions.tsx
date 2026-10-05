@@ -53,6 +53,9 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
+import SelectorModalitat from '../../components/SelectorModalitat'
+import { ambPreu, modalitatsOferta } from '../../lib/modalitats'
+import type { Modalitat } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,6 +70,8 @@ interface Fila {
   entidad_id: string | null
   kg_solicitados: number | null
   preu_ofert: number | null
+  /** La que pidió quien muestra interés (05-10-2026); null si llegó por WhatsApp. */
+  modalitat: Modalitat | null
   canal: string
   respondido_at: string | null
   enviado_at: string
@@ -77,6 +82,8 @@ interface Fila {
     kg_total: number | null
     /** Decide si se pide preu y qué convenios exige la operación. */
     modalitat: string | null
+    /** Las que ofrece la oferta (05-10-2026). La de esta entrega se elige al aprobar. */
+    modalitats: Modalitat[] | null
     productor_id: string | null
     preu_minim: number | null
   } | null
@@ -191,7 +198,7 @@ export default function Aprovacions() {
    * y no el valor: mientras no se toque el campo manda `kg_solicitados`, así que un
    * refresco de Realtime no pisa lo escrito ni lo escrito congela lo que llega.
    */
-  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string }>>({})
+  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string; modalitat?: Modalitat | '' }>>({})
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
   /** Qué altas se aprueban marcándolas como usuario de prueba. Por id de membresía. */
@@ -226,7 +233,7 @@ export default function Aprovacions() {
     // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data, error } = await supabase
       .from('oferta_respuestas')
-      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, productor_id, preu_minim)')
+      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
@@ -450,6 +457,18 @@ export default function Aprovacions() {
     return defecte != null ? String(defecte) : ''
   }
 
+  function modsDe(f: Fila): Modalitat[] {
+    return f.excedentes ? modalitatsOferta(f.excedentes as { modalitat: Modalitat | null; modalitats: Modalitat[] | null }) : []
+  }
+  /** La modalidad de esta entrega: la elegida aquí, la que pidió el receptor o la única. */
+  function valorModalitat(f: Fila): Modalitat | '' {
+    const e = edicions[f.id]?.modalitat
+    if (e !== undefined) return e
+    const ms = modsDe(f)
+    if (f.modalitat && ms.includes(f.modalitat)) return f.modalitat
+    return ms.length === 1 ? ms[0] : ''
+  }
+
   /**
    * Aprobar desde la cola. Es la misma operación del detalle de la oferta —las dos llaman a
    * `aprovarResposta()`— con los mismos dos avisos delante: canalizar más de lo que falta,
@@ -458,13 +477,15 @@ export default function Aprovacions() {
   async function aprovarFila(f: Fila) {
     const kg = Number(valorKg(f) || 0)
     if (!f.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
+    const modalitat = valorModalitat(f)
+    if (!modalitat) { toast.error(t('appr.cal_modalitat')); return }
     if (kg > faltenDe(f) && !(await confirma({
       titol: t('od.over_alloc_t'),
       descripcio: t('od.over_alloc', { n: kgFmt(faltenDe(f)) }),
     }))) return
 
     const falta = await comprovaConvenis(
-      { modalitat: f.excedentes?.modalitat ?? null, productor_id: f.excedentes?.productor_id ?? null },
+      { modalitat, productor_id: f.excedentes?.productor_id ?? null },
       f.entidad_id, t,
     )
     if (falta && !(await confirma({
@@ -475,7 +496,7 @@ export default function Aprovacions() {
     const preuText = valorPreu(f)
     setOcupat(f.id)
     const res = await aprovarResposta({
-      id: f.id, kg, preu: preuText !== '' ? Number(preuText) : null,
+      id: f.id, kg, preu: preuText !== '' && modalitat !== 'donacio' ? Number(preuText) : null, modalitat,
     })
     setOcupat(null)
     if (!res.ok) {
@@ -741,7 +762,9 @@ export default function Aprovacions() {
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
           {files.map((f) => {
-            const esVenda = f.excedentes?.modalitat === 'venda' || f.excedentes?.modalitat === 'maquila'
+            const mods = modsDe(f)
+            const modTriada = valorModalitat(f)
+            const esVenda = modTriada ? modTriada !== 'donacio' : ambPreu(mods)
             const total = Number(f.excedentes?.kg_total ?? 0)
             const bloquejat = !potAprovar || ocupat === f.id
             return (
@@ -774,6 +797,14 @@ export default function Aprovacions() {
                         value={valorKg(f)}
                         onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], kg: e.target.value } }))} />
                     </label>
+                    {mods.length > 1 && (
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        {t('mod.entrega')}
+                        <SelectorModalitat modalitats={mods} valor={modTriada} ambBuit
+                          className="h-11 md:h-9"
+                          onCanvi={(m) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], modalitat: m } }))} />
+                      </label>
+                    )}
                     {esVenda && (
                       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t('od.rs_preu')}
