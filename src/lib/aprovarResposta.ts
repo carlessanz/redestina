@@ -77,6 +77,8 @@ export async function aprovarResposta(args: {
    * trae, la RPC se niega con `cal_modalitat` y quien aprueba tiene que elegirla.
    */
   modalitat?: string | null
+  /** Cuándo se recoge (ISO). Sin ella, la que pidió la entidad (rebanada 3). */
+  recollida?: string | null
 }): Promise<ResultatRpc<Canalizacion>> {
   try {
     const { data, error } = await supabase.rpc('aprovar_resposta', {
@@ -85,10 +87,14 @@ export async function aprovarResposta(args: {
       p_preu: args.preu ?? null,
       p_motiu: args.motiu ?? null,
       p_modalitat: args.modalitat ?? null,
+      p_recollida: args.recollida ?? null,
     })
     if (error) {
       const esConveni = (error.message ?? '').includes('sense_conveni')
       const calModalitat = (error.message ?? '').startsWith('cal_modalitat')
+      if ((error.message ?? '').startsWith('hora_')) {
+        return { ok: false, missatge: 'appr.err_hora', codi: 'hora' }
+      }
       return {
         ok: false,
         missatge: calModalitat ? 'appr.cal_modalitat' : (error.message || 'od.conv_blocked'),

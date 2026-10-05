@@ -280,6 +280,8 @@ export interface OfertaRespuesta {
   modalitat?: Modalitat | null
   /** Los kg que aprobó el equipo; `kg_solicitados` se queda con lo pedido (05-10-2026). */
   kg_aprovats?: number | null
+  /** Cuándo quiere recoger quien muestra interés (rebanada 3). */
+  recollida_at?: string | null
   /** Decisión del SUPERADMIN (aprueba y convierte en canalización) */
   aprovacio: 'pendent' | 'aprovada' | 'rebutjada'
   aprovat_at: string | null

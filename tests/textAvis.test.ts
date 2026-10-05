@@ -4,7 +4,7 @@
 // caso que motivó todo esto —«pediste 1.000, te aprobamos 500»— se dice.
 
 import { describe, expect, it } from 'vitest'
-import { TIPUS_AVIS, textAvis } from '../supabase/functions/_shared/textAvis.ts'
+import { TIPUS_AVIS, textAvis, textConfirmacioRecollida } from '../supabase/functions/_shared/textAvis.ts'
 import { DICTS } from '../src/lib/i18n'
 
 const PARAMS = {
@@ -49,4 +49,18 @@ describe('textAvis', () => {
       }
     }
   })
+})
+
+describe('textConfirmacioRecollida (rebanada 3)', () => {
+  for (const idioma of ['ca', 'es'] as const) {
+    it(`primer envío y reenvío · ${idioma}`, () => {
+      const a = textConfirmacioRecollida('ENT-2026-00001', idioma, false)
+      const b = textConfirmacioRecollida('ENT-2026-00001', idioma, true)
+      expect(a.asunto).toContain('ENT-2026-00001')
+      expect(a.cuerpo).toContain('48')
+      // El reenvío avisa de que el enlace anterior ya no vale, y el primero no.
+      expect(b.cuerpo.split('\n').length).toBe(a.cuerpo.split('\n').length + 1)
+      expect(b.asunto).not.toBe(a.asunto)
+    })
+  }
 })

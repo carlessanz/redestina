@@ -43,7 +43,7 @@ import {
 type AmbOferta = Pick<
   OfertaRespuesta,
   | 'id' | 'estado' | 'aprovacio' | 'kg_solicitados' | 'preu_ofert' | 'motiu_aprovacio'
-  | 'canalizacion_id' | 'enviado_at' | 'respondido_at' | 'kg_aprovats' | 'modalitat'
+  | 'canalizacion_id' | 'enviado_at' | 'respondido_at' | 'kg_aprovats' | 'modalitat' | 'recollida_at'
 > & { excedentes: OfertaReceptor | null }
 
 /**
@@ -113,7 +113,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, recollida_at, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -211,6 +211,7 @@ export function Interessos() {
           const detall = [
             kgs,
             f.modalitat ? t(`od.mod_${f.modalitat}`) : null,
+            f.recollida_at ? t('int.recollida', { quan: new Date(f.recollida_at).toLocaleString('ca-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }) : null,
             f.preu_ofert != null
               ? `${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}`
               : null,
@@ -326,7 +327,7 @@ export function Historic() {
     void Promise.all([
       supabase
         .from('canalizaciones')
-        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('created_at', { ascending: false }),
       supabase

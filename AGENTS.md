@@ -2171,6 +2171,8 @@ funciones, no políticas:
 | `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
 | `marcar_avisos_llegits(ids, objecte_tipo)` · `marcar_mercat_vist()` · `contraparts_canalitzacions()` (`20270410100000`) | Avisos y D1 (§6ter, rebanada 2). Las tres solo de lo propio (`mis_productores()`/`mis_entidades()`/`auth.uid()`). `crear_avis()` y `disparar_avisos_pendents()` solo `service_role` |
+| `programar_albarans_recollida()` · `recordar_confirmacions_recollida()` · `conciliacions_automatiques()` (`20270412100000`) | Los jobs de la recogida programada (§6ter, rebanada 3). **Solo `service_role`** (`42501` con sesión). Devuelven los tokens en claro las dos primeras: la única vez que existen |
+| `bloqueig_per_albara(tipo, org)` · `comprova_hora_recollida(ex, quan)` (`20270412100000`) | El bloqueo de 48 h (G1) y la regla de la hora de recogida. La primera solo responde por lo propio a un externo |
 | `editar_oferta(id, canvis, texto, actor)` (`20270410100000`) | **Solo `service_role`** (la llama `crear-oferta/editar` con el actor de la sesión). Lista blanca de campos, kg ≥ canalizado, D4 (revalidación si el productor cambia kg o modalidades) e historial en `excedentes_canvis` |
 | `validar_oferta(id)` · `rebutjar_oferta(id, motiu)` (`20270409100000`) | Sacan una oferta de `pendent_validacio`: a `publicada` (sale al Mercat) o a `cancelada` con el motivo en `motivo_no_colocada`. `pot_aprovar()` (`42501`); `22023` si no está pendiente o sin motivo. Guardan `validada_at`/`validada_per` |
 | `descartar_convenio_esborrany(id)` (`20270408100000`) | Borra un convenio en **`esborrany`** (sin número: no deja hueco en ninguna serie). Solo `pot_aprovar()` (`42501`); `22023` si no es borrador o si tiene `documentos_externos`. Borra antes sus `enlaces_token` (no debería tener). `pendent_firma` **no** se descarta: ya ha salido un enlace hacia alguien. Deja `raise log` con quién y qué. Botón «Descarta l'esborrany» en `ConveniDetall`. Existe porque `convenios` no tiene `grant delete` y la Fundació va a un único convenio por tipo de entidad (reunión del 05-10-2026) |
@@ -2783,6 +2785,43 @@ Migración `20270410100000_avisos_i_edicio.sql` y Edge Function nueva **`enviar-
   historial en `excedentes_canvis`, y **D4**: si el productor cambia kilos o modalidades,
   vuelve a `pendent_validacio`. `validar_oferta()` devuelve entonces `parcial`/`bloqueada`
   si ya había canalizaciones.
+
+### Reunión de seguimiento del 05-10-2026: rebanada 3 (recogida, confirmación y bloqueo)
+
+Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
+**`recollides-programades`**.
+
+- **Hora de recogida**: `oferta_respuestas.recollida_at`. El receptor la elige al mostrar
+  interés (día ≤ disponibilidad, hora por cuartos dentro de la franja; opcional) y
+  `manifestar_interes(…, p_recollida)` la comprueba con `comprova_hora_recollida()`
+  (`hora_passada`, `hora_fora_disponibilitat`, `hora_fora_franja`). El equipo la ve y la
+  puede cambiar al aprobar (Aprovacions y detalle de oferta, `datetime-local`):
+  `aprovar_resposta(…, p_recollida)` la escribe en **`canalizaciones.data_hora_recollida`**
+  (la del equipo solo se exige que no sea pasada: puede salirse de la franja si lo ha hablado).
+- **Emisión automática (D3)**: pg_cron `recollides-programades` (cada 15 min) → Edge Function
+  → `programar_albarans_recollida()` (solo `service_role`): para cada albarán en borrador cuya
+  recogida ha llegado, rellena las líneas con los kilos previstos (el REC con la suma de las
+  canalizaciones, no el `kg_total` publicado), **emite y marca entregado** y devuelve los
+  enlaces en claro, que la función manda por correo a cada parte (`textConfirmacioRecollida`
+  en `_shared/textAvis.ts`; gates de §8). ⚠️ **Consume numeración legal** en cuanto llega la
+  hora; un error se corrige con `anular_albaran`/`rectificar_albaran`.
+- **Reenvío a las 4 h**: `recordar_confirmacions_recollida()` renueva el token en la MISMA
+  fila de `enlaces_token` (`reenviat_at`, una sola vez, solo `canal='email'`); el correo dice
+  que el enlace anterior ya no vale.
+- **Conciliación automática (D6)**: pg_cron `conciliacions-automatiques` →
+  `conciliacions_automatiques()`: REC y todas sus entregas confirmadas y
+  `propuesta_conciliacion()` dentro de tolerancia → concilia todo con motivo «conciliació
+  automàtica»; un OPE confirmado por las dos partes, también. Fuera de tolerancia, la cola
+  `albarans_conciliar` de siempre.
+- **Bloqueo 48 h (G1)**: `bloqueig_per_albara(tipo, org)` = albaranes entregados con enlace
+  activo sin usar desde hace > 48 h. `crear-oferta` (no asistida) responde `409
+  albara_pendent` y `manifestar_interes()` levanta `albara_pendent`; los paneles lo
+  traducen y mandan a «Documents → Pendent de tu». ⚠️ El intake por WhatsApp **no** lo
+  comprueba todavía.
+- **Confirmación asistida con nota**: en `canal='asistido'`, `enlace-publico` exige `nota`
+  (con quién y cómo) y la guarda en `evidencias.payload.nota_assistida`; el formulario la pide.
+- ⬜ **PDF de una página (F5)**: espera el modelo de Sebastián. Plantillas de WhatsApp
+  `confirmacio_recollida_*` redactadas en `plantillas-meta.md §4`, sin dar de alta.
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -5101,6 +5140,7 @@ supabase functions deploy subir-documento-externo               # con verify_jwt
 supabase functions deploy limpiar-documentos-prueba            # con verify_jwt (super_admin; §12.51)
 supabase functions deploy verificar-certificat --no-verify-jwt   # pública: comprobar un certificado (§9)
 supabase functions deploy enviar-avis --no-verify-jwt            # la llama la base (avisos, 05-10-2026)
+supabase functions deploy recollides-programades --no-verify-jwt # pg_cron cada 15 min (recogida programada)
 supabase secrets set --env-file .secrets.env
 # ⚠️ Los flags de arriba están además DECLARADOS en `supabase/config.toml`, que manda sobre el
 # CLI: desde el 10-09-2026 las nueve tienen su `verify_jwt` escrito (antes, tres se apoyaban en
@@ -6116,9 +6156,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.103 pruebas en 39 ficheros**: 1.102 correctas y **1 saltada a propósito**, la
+   Referencia: **1.107 pruebas en 39 ficheros**: 1.106 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026,
-   rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
+   rebanada 3: el correo de la recogida programada y `localDateTime`. Rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
    «pendent de validació» en `procesOferta.test.ts`. Antes, 1.040 en 35 (05-10-2026:
    +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
    Antes, 1.029 en 33 ficheros. 28-09-2026:

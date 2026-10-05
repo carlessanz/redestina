@@ -261,6 +261,19 @@ Deno.serve(async (req) => {
     // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
     // equipo en su nombre, que es el modelo de operación del servicio (§1bis) y a la
     // hora de leer los datos no es lo mismo que si la hubiera publicado él.
+    // G1 (05-10-2026, rebanada 3): con un albarán entregado y sin confirmar desde hace más
+    // de 48 h, primero se confirma. Solo la productora: el equipo opera en su nombre y es
+    // quien resuelve la confirmación, por eso el alta asistida no se bloquea.
+    if (!ctx.esIntern) {
+      const { data: pendents } = await supabase.rpc("bloqueig_per_albara", {
+        p_tipo: "productor", p_org: productorId,
+      });
+      const ids = ((pendents ?? []) as unknown[]).map((x) => String(x));
+      if (ids.length > 0) {
+        return responder({ error: "po.err_albara_pendent", code: "albara_pendent", albarans: ids }, 409);
+      }
+    }
+
     const r = await crearExcedente(
       supabase,
       datos as Record<string, unknown>,

@@ -304,6 +304,8 @@ export async function manifestaInteres(args: {
   caixes?: number | null
   /** Cómo la quiere recibir, si la oferta se ofrece de varias maneras (05-10-2026). */
   modalitat?: string | null
+  /** Cuándo quiere recogerla (ISO), dentro de la franja y la disponibilidad (rebanada 3). */
+  recollida?: string | null
 }): Promise<Resultat<OfertaRespuesta>> {
   const { data, error } = await supabase.rpc('manifestar_interes', {
     p_excedente: args.excedenteId,
@@ -312,6 +314,7 @@ export async function manifestaInteres(args: {
     p_preu: args.preu ?? null,
     p_caixes: args.caixes ?? null,
     p_modalitat: args.modalitat ?? null,
+    p_recollida: args.recollida ?? null,
   })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data as OfertaRespuesta }
@@ -341,6 +344,8 @@ export function clauErrorInteres(missatge: string | null | undefined): {
   }
   if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
   if (m.startsWith('cal_modalitat')) return { clau: 'mk.err_cal_modalitat' }
+  if (m.startsWith('albara_pendent')) return { clau: 'mk.err_albara_pendent' }
+  if (m.startsWith('hora_')) return { clau: 'mk.err_hora' }
   if (m.startsWith('kg_maxim')) {
     const n = num(/(\d+(?:[.,]\d+)?)\s*kg/, 0)
     return n ? { clau: 'mk.err_kg_maxim', vars: { n } } : { clau: 'c.error' }

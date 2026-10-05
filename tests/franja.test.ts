@@ -66,3 +66,15 @@ describe('franja · navegador', () => {
     }
   })
 })
+
+describe('localDateTime (rebanada 3)', () => {
+  it('vacío o inválido, cadena vacía', () => {
+    expect(web.localDateTime(null)).toBe('')
+    expect(web.localDateTime('no')).toBe('')
+  })
+  it('formato de datetime-local, ida y vuelta', () => {
+    const v = web.localDateTime('2026-10-07T08:30:00Z')
+    expect(v).toMatch(/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/)
+    expect(new Date(v).toISOString()).toBe('2026-10-07T08:30:00.000Z')
+  })
+})

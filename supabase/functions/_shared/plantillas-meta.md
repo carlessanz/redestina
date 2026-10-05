@@ -128,6 +128,30 @@ Si se quisiera notificar fuera de ventana el cierre de una canalización, replic
 `src/lib/textos.ts` (`textoRecollidaConfirmada`) como plantilla con variables entitat / data /
 kg recollits / kg falten. Hoy se **copia a mano** desde el panel, así que no es urgente.
 
+## 4. `confirmacio_recollida_productor` / `confirmacio_recollida_receptor` (rebanada 3, 05-10-2026)
+
+A la hora de recogida, `recollides-programades` emite el albarán y manda a cada parte el enlace
+de confirmación. Hoy sale **por correo** (§8bis: el correo es el canal por defecto). Para
+mandarlo también por WhatsApp fuera de la ventana de 24 h hacen falta estas dos plantillas
+(`UTILITY`, `ca`). **Sin la URL en el cuerpo** (Meta la desaconseja en UTILITY): va en un botón
+de URL dinámica con el token como sufijo (`https://redestina.carlessanz.com/confirmar/{{1}}`).
+
+```
+confirmacio_recollida_productor
+La recollida de l'albarà {{1}} ja ha arribat a la seva hora. Confirma els quilos que has lliurat o fes constar qualsevol incidència. És un minut i no cal tenir compte.
+[Botó: Confirma la recollida → /confirmar/{{1}}]
+```
+
+```
+confirmacio_recollida_receptor
+La recollida de l'albarà {{1}} ja ha arribat a la seva hora. Confirma els quilos que has rebut o fes constar qualsevol incidència. És un minut i no cal tenir compte.
+[Botó: Confirma la recepció → /confirmar/{{1}}]
+```
+
+- **Mapeo:** cuerpo 1 = `albaranes.numero_completo`; botón 1 = el token en claro.
+- No están dadas de alta. Cuando Meta las apruebe, `recollides-programades` puede probar WhatsApp
+  antes que el correo (y añadirlas a `TEXTO_PLANTILLA`, §6ter).
+
 ---
 
 ### Notas de aprobación

@@ -31,6 +31,7 @@ import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta
 import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
 import { ambPreu, modalitatsDe, modalitatsOferta, textModalitats } from '../../lib/modalitats'
 import SelectorModalitat from '../../components/SelectorModalitat'
+import { HORES, QUARTS, hhmm } from '../../lib/franja'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
@@ -75,6 +76,10 @@ export default function Mercat() {
   const [mode, setMode] = useState<'detall' | 'interes'>('detall')
   const [kg, setKg] = useState('')
   const [preu, setPreu] = useState('')
+  // Cuándo la quiere recoger (rebanada 3): día dentro de la disponibilidad y hora dentro de
+  // la franja. Opcional: si no lo dice, la fija el equipo al aprobar.
+  const [diaRec, setDiaRec] = useState('')
+  const [horaRec, setHoraRec] = useState('')
   /** La modalidad con la que pide la entrega, si la oferta se ofrece de varias (D2). */
   const [modalitat, setModalitat] = useState<Modalitat | ''>('')
   /** Las que puede recibir alguna de mis entidades; null = no se pudo leer (no se filtra). */
@@ -101,7 +106,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, created_at, validada_at')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -172,6 +177,8 @@ export default function Mercat() {
     setPreu(o.preu_minim != null ? String(o.preu_minim) : '')
     const ms = possibles(o)
     setModalitat(ms.length === 1 ? ms[0] : '')
+    setDiaRec('')
+    setHoraRec('')
   }
 
   async function envia() {
@@ -187,6 +194,8 @@ export default function Mercat() {
     const ms = possibles(obert)
     const triada = modalitat || (ms.length === 1 ? ms[0] : '')
     if (ms.length > 1 && !triada) { toast.error(t('mk.need_mode')); return }
+    if ((diaRec && !horaRec) || (!diaRec && horaRec)) { toast.error(t('mk.need_dia_hora')); return }
+    const recollida = diaRec && horaRec ? new Date(`${diaRec}T${horaRec}:00`).toISOString() : null
     setEnviant(true)
     const r = await manifestaInteres({
       excedenteId: obert.id,
@@ -194,6 +203,7 @@ export default function Mercat() {
       kg: nKg,
       preu: preu === '' || triada === 'donacio' ? null : Number(preu.replace(',', '.')),
       modalitat: triada || null,
+      recollida,
     })
     setEnviant(false)
     if (!r.ok) {
@@ -396,6 +406,27 @@ export default function Mercat() {
                 {obert.estado === 'parcial' && (
                   <p className="rounded-md bg-aviso-fondo p-2 text-sm text-aviso">{t('mk.parcial')}</p>
                 )}
+                {/* Cuándo la recoge: el día hasta la disponibilidad, la hora dentro de la
+                    franja que dio la productora (por cuartos). */}
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                  <div>
+                    <Label htmlFor="mk-dia" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.dia_rec')}</Label>
+                    <Input id="mk-dia" type="date" value={diaRec} min={avuiIso()}
+                      max={obert.disponible_hasta ?? undefined}
+                      onChange={(e) => setDiaRec(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="mk-hora" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.hora_rec')}</Label>
+                    <select id="mk-hora" value={horaRec} onChange={(e) => setHoraRec(e.target.value)}
+                      className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm">
+                      <option value="">—</option>
+                      {horesDins(obert.hora_recollida_inici, obert.hora_recollida_fi).map((h) => (
+                        <option key={h} value={h}>{h}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <p className="text-xs text-muted-foreground sm:col-span-2">{t('mk.rec_help')}</p>
+                </div>
                 {obertMods.length > 1 && (
                   <div>
                     <Label htmlFor="mk-mode" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.mode_q')}</Label>
@@ -454,4 +485,17 @@ export default function Mercat() {
       </Dialog>
     </Card>
   )
+}
+
+/** Las horas por cuartos dentro de la franja (o de 06 a 22 si la oferta no tiene). */
+function horesDins(inici: string | null | undefined, fi: string | null | undefined): string[] {
+  const a = hhmm(inici) || '06:00'
+  const b = hhmm(fi) || '22:45'
+  return HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).filter((x) => x >= a && x <= b)
+}
+
+/** Hoy, «aaaa-mm-dd», en hora local. */
+function avuiIso(): string {
+  const d = new Date()
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

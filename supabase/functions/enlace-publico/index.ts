@@ -824,6 +824,17 @@ async function manejarPost(
 
   const caixesRetornades = numeroOpcional(body.caixes_retornades);
 
+  // La nota de la confirmación ASISTIDA (05-10-2026, rebanada 3): quien la conduce deja
+  // escrito con quién habló y cómo («per telèfon amb la Maria, ha dit que…»). Obligatoria en
+  // ese canal: sin ella, «confirmat per l'equip» no dice en nombre de quién.
+  const notaAssistida = enlace.canal === "asistido" ? textNet(body.nota).slice(0, 400) : "";
+  if (enlace.canal === "asistido" && !notaAssistida) {
+    return responder(
+      { error: "Cal una nota: amb qui has parlat i com t'ho ha confirmat.", code: "dades_invalides", camp: "nota" },
+      400,
+    );
+  }
+
   // --------------------------------------------------- la huella de lo aceptado
   const sha = await shaDatosVigente(supabase, albaran.id);
   const texto = actaConfirmacion(albaran, lineas, codigoDe(sha));
@@ -890,6 +901,7 @@ async function manejarPost(
       // Del servidor, siempre. Ver la nota larga de `actaConfirmacion`.
       sha256_texto: shaTexto,
       ...(panell ? { payload: { panell } } : {}),
+      ...(notaAssistida ? { payload: { nota_assistida: notaAssistida } } : {}),
     },
   });
 

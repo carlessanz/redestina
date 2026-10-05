@@ -211,3 +211,11 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/enviar-avis/deno.json"
 entrypoint = "./functions/enviar-avis/index.ts"
+
+# La recogida programada (05-10-2026, rebanada 3). La llama pg_cron cada 15 min: emite los
+# albaranes a la hora de recogida, los marca entregados y manda los enlaces de confirmación.
+[functions.recollides-programades]
+enabled = true
+verify_jwt = false
+import_map = "./functions/recollides-programades/deno.json"
+entrypoint = "./functions/recollides-programades/index.ts"

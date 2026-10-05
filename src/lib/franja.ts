@@ -33,3 +33,12 @@ export function textFranja(inici: string | null | undefined, fi: string | null |
   const b = hhmm(fi).replace(/^0(\d)/, '$1')
   return a && b ? `${a}–${b}` : ''
 }
+
+/** Un instante ISO como valor de `<input type="datetime-local">`, en hora local (rebanada 3). */
+export function localDateTime(iso: string | null | undefined): string {
+  if (!iso) return ''
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return ''
+  const p = (n: number) => String(n).padStart(2, '0')
+  return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
+}

@@ -245,6 +245,8 @@ export interface Confirmacio {
   sha256Texto: string | null
   /** Honeypot: siempre vacío en una persona. Si viene lleno, el servidor finge un 200. */
   web: string
+  /** Solo en la confirmación ASISTIDA, y ahí obligatoria (05-10-2026): con quién y cómo. */
+  nota?: string | null
 }
 
 export async function confirmaEnllac(
@@ -267,6 +269,7 @@ export async function confirmaEnllac(
         motivo_rechazo: dades.motiuRebuig,
         sha256_texto: dades.sha256Texto,
         web: dades.web,
+        nota: dades.nota ?? null,
       }),
     })
     if (!res.ok) {

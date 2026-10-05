@@ -78,6 +78,8 @@ export default function FormulariConfirmacio(
   const [incidencies, setIncidencies] = useState('')
   const [rebuig, setRebuig] = useState<Rebuig>('cap')
   const [motiu, setMotiu] = useState('')
+  // La nota de la confirmación asistida (05-10-2026): con quién se ha hablado y cómo.
+  const [nota, setNota] = useState('')
   // Honeypot. Una persona nunca lo ve ni lo rellena; un robot que rellena el formulario
   // entero, sí. Mismo mecanismo que el registro público (§9).
   const [web, setWeb] = useState('')
@@ -116,6 +118,7 @@ export default function FormulariConfirmacio(
       motiuRebuig: rebuig === 'cap' ? null : motiu.trim(),
       sha256Texto: dades?.sha256Texto ?? null,
       web,
+      nota: dades?.assistida ? nota.trim() : null,
     })
     setEnviant(false)
 
@@ -189,7 +192,8 @@ export default function FormulariConfirmacio(
   }
 
   const faltaMotiu = rebuig !== 'cap' && motiu.trim() === ''
-  const potEnviar = nom.trim() !== '' && !faltaMotiu && !enviant
+  const faltaNota = Boolean(dades?.assistida) && nota.trim() === ''
+  const potEnviar = nom.trim() !== '' && !faltaMotiu && !faltaNota && !enviant
 
   return (
     <div className="space-y-5">
@@ -309,6 +313,15 @@ export default function FormulariConfirmacio(
         <Input id="conf-carrec" className="h-11"
           value={carrec} onChange={(e) => setCarrec(e.target.value)} />
       </div>
+
+      {dades.assistida && (
+        <div className="space-y-1.5">
+          <Label htmlFor="conf-nota">{t('conf.nota_assistida')}</Label>
+          <Textarea id="conf-nota" rows={2} maxLength={400} value={nota}
+            onChange={(e) => setNota(e.target.value)} />
+          <p className="text-xs text-muted-foreground">{t('conf.nota_assistida_help')}</p>
+        </div>
+      )}
 
       {/* Trampa para robots: una persona no ve este campo y por tanto no lo rellena.
           Mismo mecanismo (y misma clase `hidden`) que el registro público. */}

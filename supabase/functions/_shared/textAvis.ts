@@ -130,3 +130,41 @@ export function textAvis(
     }
   }
 }
+
+/**
+ * El correo con el enlace de confirmación de una recogida programada (rebanada 3). Lo manda
+ * `recollides-programades` justo después de emitir el albarán y, si a las 4 h sigue sin
+ * usarse, otra vez con un enlace nuevo (`reenviament`): el del primer correo deja de valer,
+ * y hay que decirlo para que nadie lo intente.
+ */
+export function textConfirmacioRecollida(
+  numero: string,
+  idioma: Idioma,
+  reenviament: boolean,
+): { asunto: string; titulo: string; cuerpo: string; boton: string; nota: string } {
+  const es = idioma === "es";
+  const linies = [
+    es
+      ? `La recogida del albarán ${numero} ya ha llegado a su hora. Con este enlace confirmas los kilos o haces constar cualquier incidencia. Es un minuto y no hace falta cuenta.`
+      : `La recollida de l’albarà ${numero} ja ha arribat a la seva hora. Amb aquest enllaç confirmes els quilos o fas constar qualsevol incidència. És un minut i no cal tenir compte.`,
+  ];
+  if (reenviament) {
+    linies.push(es
+      ? "Te lo volvemos a enviar porque todavía no está confirmado. El enlace del correo anterior ya no sirve: usa este."
+      : "Te’l tornem a enviar perquè encara no està confirmat. L’enllaç del correu anterior ja no serveix: fes servir aquest.");
+  }
+  linies.push(es
+    ? "Mientras no se confirme, no podrás publicar ni pedir ofertas nuevas pasadas 48 horas."
+    : "Mentre no es confirmi, passades 48 hores no podràs publicar ni demanar ofertes noves.");
+  return {
+    asunto: es
+      ? `${reenviament ? "Recordatorio: " : ""}confirma la recogida del albarán ${numero}`
+      : `${reenviament ? "Recordatori: " : ""}confirma la recollida de l’albarà ${numero}`,
+    titulo: es ? "Confirma la recogida" : "Confirma la recollida",
+    cuerpo: linies.join("\n"),
+    boton: es ? "Confirma la recogida" : "Confirma la recollida",
+    nota: es
+      ? "El enlace es personal y caduca a los 15 días."
+      : "L’enllaç és personal i caduca al cap de 15 dies.",
+  };
+}

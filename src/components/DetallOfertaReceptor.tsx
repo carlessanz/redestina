@@ -26,7 +26,8 @@ import type { FotoResolta } from './FotosOferta'
  *    pantallas del receptor piden estas columnas y ninguna más, cada una en su literal (§7):
  *
  *    id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa,
- *    retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, observacions,
+ *    retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida,
+ *    hora_recollida_inici, hora_recollida_fi, observacions,
  *    preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos,
  *    foto_producte
  *
@@ -36,7 +37,7 @@ export type OfertaReceptor = Pick<
   Excedente,
   | 'id' | 'estado' | 'familia' | 'producto' | 'variedad' | 'kg_total' | 'num_caixes'
   | 'tipo_caixa' | 'retorn_envasos' | 'modalitat' | 'modalitats' | 'causa' | 'disponible_hasta'
-  | 'horari_recollida' | 'observacions' | 'preu_minim' | 'producte_al_camp' | 'comarca'
+  | 'horari_recollida' | 'hora_recollida_inici' | 'hora_recollida_fi' | 'observacions' | 'preu_minim' | 'producte_al_camp' | 'comarca'
   | 'format_entrega' | 'transport_propi' | 'fotos' | 'foto_producte'
 >
 

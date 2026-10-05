@@ -54,6 +54,7 @@ import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
 import SelectorModalitat from '../../components/SelectorModalitat'
+import { localDateTime } from '../../lib/franja'
 import { ambPreu, modalitatsOferta } from '../../lib/modalitats'
 import type { Modalitat } from '../../types'
 import { Button } from '@/components/ui/button'
@@ -72,6 +73,8 @@ interface Fila {
   preu_ofert: number | null
   /** La que pidió quien muestra interés (05-10-2026); null si llegó por WhatsApp. */
   modalitat: Modalitat | null
+  /** Cuándo quiere recoger (rebanada 3). El equipo la confirma o la cambia. */
+  recollida_at: string | null
   canal: string
   respondido_at: string | null
   enviado_at: string
@@ -198,7 +201,7 @@ export default function Aprovacions() {
    * y no el valor: mientras no se toque el campo manda `kg_solicitados`, así que un
    * refresco de Realtime no pisa lo escrito ni lo escrito congela lo que llega.
    */
-  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string; modalitat?: Modalitat | '' }>>({})
+  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string; modalitat?: Modalitat | ''; recollida?: string }>>({})
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
   /** Qué altas se aprueban marcándolas como usuario de prueba. Por id de membresía. */
@@ -233,7 +236,7 @@ export default function Aprovacions() {
     // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data, error } = await supabase
       .from('oferta_respuestas')
-      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim)')
+      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, recollida_at, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
@@ -497,6 +500,8 @@ export default function Aprovacions() {
     setOcupat(f.id)
     const res = await aprovarResposta({
       id: f.id, kg, preu: preuText !== '' && modalitat !== 'donacio' ? Number(preuText) : null, modalitat,
+      // Solo si el equipo la ha cambiado: si no, vale la que pidió la entidad.
+      recollida: edicions[f.id]?.recollida ? new Date(edicions[f.id]!.recollida!).toISOString() : null,
     })
     setOcupat(null)
     if (!res.ok) {
@@ -797,6 +802,13 @@ export default function Aprovacions() {
                         value={valorKg(f)}
                         onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], kg: e.target.value } }))} />
                     </label>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {t('appr.recollida')}
+                      <Input type="datetime-local"
+                        className="h-11 w-48 text-base md:h-9 md:text-sm"
+                        value={edicions[f.id]?.recollida ?? localDateTime(f.recollida_at)}
+                        onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], recollida: e.target.value } }))} />
+                    </label>
                     {mods.length > 1 && (
                       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                         {t('mod.entrega')}
@@ -889,3 +901,4 @@ export default function Aprovacions() {
     </div>
   )
 }
+

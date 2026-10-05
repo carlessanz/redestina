@@ -28,6 +28,7 @@ import ValidacioOferta from './equip/ValidacioOferta'
 import DialegEditaOferta from './DialegEditaOferta'
 import SelectorModalitat from './SelectorModalitat'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
+import { localDateTime } from '../lib/franja'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
@@ -388,7 +389,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const preuRaw = String(fd.get('preu') ?? '')
     // Una entrega en donación no lleva precio aunque la oferta también se ofrezca en venta.
     const preu = preuRaw !== '' && modalitat !== 'donacio' ? Number(preuRaw) : null
-    const res = await aprovarResposta({ id: r.id, kg, preu, modalitat })
+    const recRaw = String(fd.get('recollida') ?? '')
+    const res = await aprovarResposta({
+      id: r.id, kg, preu, modalitat,
+      // Solo si se ha cambiado: si no, vale la que pidió la entidad.
+      recollida: recRaw && recRaw !== localDateTime(r.recollida_at) ? new Date(recRaw).toISOString() : null,
+    })
     if (!res.ok) {
       toast.error(textError(t, res))
       return
@@ -968,6 +974,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     {mods.length > 1 && (
                       <SelectorModalitat modalitats={mods} inicial={r.modalitat ?? null} ambBuit={!r.modalitat} />
                     )}
+                    <Input name="recollida" type="datetime-local" defaultValue={localDateTime(r.recollida_at)}
+                      aria-label={t('appr.recollida')} className="h-8 w-48" />
                     {esVenda && (
                       <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
                         placeholder={t('od.rs_preu')} className="h-8 w-20" />
