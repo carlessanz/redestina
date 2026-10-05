@@ -9,6 +9,12 @@ const PESO_MISMA_POBLACION = 2; // adicional, encima de la misma área
 const PESO_TRANSPORT = 1;
 const PESO_TORO = 1;
 const PESO_FRESCOS = 2;
+/**
+ * La entidad ha dicho en su perfil que le interesa esta categoría de producto (C3 v1,
+ * 05-10-2026). Pesa como los frescos: es una declaración de la propia entidad, no una
+ * deducción, y con la misma fuerza que la otra señal de «esto le sirve».
+ */
+export const PESO_PRODUCTE = 2;
 const UMBRAL_KG_GRANDE = 500; // por encima, la capacidad de transporte pesa doble
 const PRIORITAT_MAX = 3; // prioritat 1 es la más alta; suma (3 - prioritat)
 
@@ -31,6 +37,8 @@ export interface EntidadPriorizable {
   productes_frescos: boolean | null;
   transport_plataforma: boolean | null;
   descarrega_toro: boolean | null;
+  /** `entidades.perfil_receptor` (jsonb): de aquí salen las categorías que le interesan. */
+  perfil_receptor?: Record<string, unknown> | null;
 }
 
 export interface ExcedenteContexto {
@@ -50,6 +58,46 @@ export interface EntidadPuntuada {
   motivos: string[];
   /** Estat pendiente: candidata pero avisada, va al final del ranking. */
   pendiente: boolean;
+  /**
+   * ¿Ha dicho la entidad que le interesa esta categoría de producto? `null` si no ha
+   * declarado ninguna (perfil sin rellenar): no se le puede atribuir ni un sí ni un no.
+   */
+  interessa_producte: boolean | null;
+}
+
+/** Las categorías del perfil del receptor (`perfilReceptor.ts`), el mismo vocabulario. */
+export type CategoriaProducte = "fruita" | "verdura" | "tuberculs" | "fruita_seca" | "altres";
+
+/**
+ * La categoría de una familia del catálogo. COPIA de `categoriaDeFamilia()` de
+ * `src/lib/filtresMercat.ts` (el navegador no importa Deno); `tests/priorizacion.test.ts`
+ * comprueba que dicen lo mismo.
+ */
+export function categoriaDeFamilia(familia: string | null | undefined): CategoriaProducte {
+  const f = (familia ?? "").trim();
+  if (f === "Fruita Seca") return "fruita_seca";
+  if (f.startsWith("Fruita")) return "fruita";
+  if (f === "Horta Tub/Bul/Arr") return "tuberculs";
+  if (f.startsWith("Horta")) return "verdura";
+  return "altres";
+}
+
+/** Las tres claves del perfil que dicen qué productos quiere, según el tipo de receptor. */
+const CLAUS_PRODUCTES = ["productes_rebre", "productes_interes", "productes_transformar"];
+
+/**
+ * Las categorías que declara el perfil, o null si no declara ninguna. `tots` = todas.
+ */
+export function categoriesInteres(perfil: Record<string, unknown> | null | undefined): Set<string> | null {
+  if (!perfil || typeof perfil !== "object") return null;
+  const fora = new Set<string>();
+  for (const k of CLAUS_PRODUCTES) {
+    const v = perfil[k];
+    if (Array.isArray(v)) for (const x of v) fora.add(String(x));
+  }
+  if (fora.size === 0) return null;
+  if (fora.has("tots")) return new Set(["fruita", "verdura", "tuberculs", "fruita_seca", "altres"]);
+  return fora;
 }
 
 function norm(s: string | null | undefined): string {
@@ -101,6 +149,15 @@ export function puntuarEntidad(
     motivos.push("Accepta productes frescos");
   }
 
+  // Producto declarado en su perfil (C3 v1)
+  const cats = categoriesInteres(entidad.perfil_receptor);
+  const catExc = categoriaDeFamilia(excedente.familia);
+  const interessa = cats === null ? null : cats.has(catExc);
+  if (interessa) {
+    puntuacion += PESO_PRODUCTE;
+    motivos.push("Li interessa aquest producte");
+  }
+
   // Prioritat (1 = más alta)
   if (entidad.prioritat != null) {
     const p = Math.max(0, PRIORITAT_MAX - entidad.prioritat);
@@ -122,6 +179,7 @@ export function puntuarEntidad(
     puntuacion,
     motivos,
     pendiente,
+    interessa_producte: interessa,
   };
 }
 

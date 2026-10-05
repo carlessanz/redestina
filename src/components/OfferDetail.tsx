@@ -8,7 +8,7 @@ import { sendWhatsApp } from '../lib/whatsapp'
 import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
-import { filtraRanking, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import { filtraRanking, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
@@ -30,7 +30,7 @@ import SelectorModalitat from './SelectorModalitat'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import { localDateTime } from '../lib/franja'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
-import { Casella } from './Casella'
+import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
 import { fixaFotos } from '../lib/fotos'
 import { Button } from '@/components/ui/button'
@@ -124,6 +124,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const [cargandoRanking, setCargandoRanking] = useState(true)
   /** Filtro por `tipo_receptor` y cuántas filas del ranking se enseñan (`rankingEntitats.ts`). */
   const [filtreTipus, setFiltreTipus] = useState('')
+  // C3 v1: solo las que dicen en su perfil que les interesa esta categoría de producto.
+  const [nomesProducte, setNomesProducte] = useState(false)
   const [mostrats, setMostrats] = useState(PAS_RANKING)
   const [copiado, setCopiado] = useState<string | null>(null)
   // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
@@ -273,7 +275,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const contactable = (e: EntidadPuntuada) => (!testMode || e.es_test) && e.canal !== 'cap'
     return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
   }, [ranking, testMode])
-  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, filtreTipus), [rankingOrdenado, filtreTipus])
+  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, filtreTipus, nomesProducte), [rankingOrdenado, filtreTipus, nomesProducte])
+  const ambInteresProducte = useMemo(() => hiHaInteresProducte(ranking), [ranking])
   const tipusDelRanking = useMemo(() => tipusPresents(ranking), [ranking])
 
   // Las dos escrituras piden las filas afectadas: un UPDATE que la RLS no deja pasar no da
@@ -856,6 +859,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 {tipusDelRanking.map((tp) => <option key={tp} value={tp}>{t(`org.tr_${tp}`)}</option>)}
               </select>
             </div>
+          )}
+          {!cargandoRanking && !rankingError && ambInteresProducte && (
+            <FilaCasella checked={nomesProducte} onChange={(v) => { setNomesProducte(v); setMostrats(PAS_RANKING) }}>
+              {t('od.f_producte')}
+            </FilaCasella>
           )}
           {!cargandoRanking && !rankingError && rankingFiltrat.slice(0, mostrats).map((ent) => {
             const puedeTest = !testMode || ent.es_test

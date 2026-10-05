@@ -29,6 +29,11 @@ export interface EntidadPuntuada {
   es_test: boolean
   /** `entidades.tipo_receptor` (social · animal · transformador · comercial). Solo filtra. */
   tipo_receptor?: string | null
+  /**
+   * ¿Ha declarado en su perfil que le interesa esta categoría de producto? `null` = no ha
+   * declarado ninguna (C3 v1, 05-10-2026). Un servidor anterior no lo manda.
+   */
+  interessa_producte?: boolean | null
   canal: Canal
   motiu_canal: MotivoCanal
   whatsapp_possible: boolean

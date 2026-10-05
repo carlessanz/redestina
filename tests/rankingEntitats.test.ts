@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtraRanking, tipusPresents } from '../src/lib/rankingEntitats'
+import { filtraRanking, hiHaInteresProducte, tipusPresents } from '../src/lib/rankingEntitats'
 import type { EntidadPuntuada } from '../src/lib/redestina'
 
 function ent(id: string, tipo_receptor: string | null, puntuacion = 1): EntidadPuntuada {
@@ -30,5 +30,19 @@ describe('filtraRanking', () => {
 describe('tipusPresents', () => {
   it('ofrece solo los tipos que hay, en el orden fijo', () => {
     expect(tipusPresents([ent('a', 'animal'), ent('b', 'social'), ent('c', null)])).toEqual(['social', 'animal'])
+  })
+})
+
+describe('filtro por interés en el producto (C3 v1)', () => {
+  it('deja solo las que lo declaran; las que no dicen nada quedan fuera', () => {
+    const r = [
+      { id: 'a', interessa_producte: true },
+      { id: 'b', interessa_producte: false },
+      { id: 'c', interessa_producte: null },
+    ] as unknown as Parameters<typeof filtraRanking>[0]
+    expect(filtraRanking(r, '', true).map((e) => e.id)).toEqual(['a'])
+    expect(filtraRanking(r, '', false).map((e) => e.id)).toEqual(['a', 'b', 'c'])
+    expect(hiHaInteresProducte(r)).toBe(true)
+    expect(hiHaInteresProducte(r.slice(1))).toBe(false)
   })
 })

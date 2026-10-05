@@ -2823,6 +2823,21 @@ Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
 - ⬜ **PDF de una página (F5)**: espera el modelo de Sebastián. Plantillas de WhatsApp
   `confirmacio_recollida_*` redactadas en `plantillas-meta.md §4`, sin dar de alta.
 
+### Reunión de seguimiento del 05-10-2026: rebanada 4 (interés por producto, v1)
+
+- **C3 v1** (D5 todavía abierta, así que con lo que ya hay): las categorías de producto que la
+  entidad declara en su perfil (`perfil_receptor.productes_rebre` / `productes_interes` /
+  `productes_transformar`, con `tots` = todas) entran en la priorización:
+  **`PESO_PRODUCTE` = 2** si la categoría de la oferta (`categoriaDeFamilia()`, copia en
+  `_shared/priorizacion.ts` del mismo vocabulario que el Mercat) está entre ellas, con el
+  motivo «Li interessa aquest producte». `priorizar-entidades` devuelve
+  `interessa_producte` (`true`/`false`, o `null` si no ha declarado nada) y el detalle de
+  oferta ofrece la casilla «Només les que diuen que els interessa aquest tipus de producte»
+  (`filtraRanking(…, nomesProducte)`), que deja fuera a las que no han dicho nada.
+- ⬜ **La v2** (pregunta por producto del catálogo en el cuestionario de entidad) espera a D5.
+- ⬜ **H2, convenio único** (`col_productor`/`col_receptor`): espera el texto legal de la
+  asesoría (`1. Fuentes/Convenis de colaboracio/`). No hay código.
+
 ### La meva organització con listas cerradas (27-09-2026)
 
 Revisión funcional del 23-09: la ficha tiene que servir al ERP, así que **lo que se cruza va en
@@ -6156,9 +6171,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.107 pruebas en 39 ficheros**: 1.106 correctas y **1 saltada a propósito**, la
+   Referencia: **1.111 pruebas en 39 ficheros**: 1.110 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026,
-   rebanada 3: el correo de la recogida programada y `localDateTime`. Rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
+   rebanada 4: el interés por producto en la priorización y el filtro del ranking. Rebanada 3: el correo de la recogida programada y `localDateTime`. Rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
    «pendent de validació» en `procesOferta.test.ts`. Antes, 1.040 en 35 (05-10-2026:
    +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
    Antes, 1.029 en 33 ficheros. 28-09-2026:

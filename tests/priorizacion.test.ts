@@ -11,6 +11,8 @@
 // se prueban aparte, porque son las únicas que pueden dejar a una entidad sin ver nada.
 
 import { describe, it, expect } from 'vitest'
+import { categoriaDeFamilia as catSrv, categoriesInteres, PESO_PRODUCTE } from '../supabase/functions/_shared/priorizacion.ts'
+import { categoriaDeFamilia as catWeb } from '../src/lib/filtresMercat'
 import {
   puntuarEntidad,
   priorizar,
@@ -354,5 +356,37 @@ describe('el ranking contiene exactamente a las candidatas, con su puntuación i
       expect(fila.puntuacion).toBe(suelta!.puntuacion)
       expect(fila.motivos).toEqual(suelta!.motivos)
     }
+  })
+})
+
+// C3 v1 (05-10-2026): el interés por producto que declara la entidad en su perfil.
+
+describe('interés por producto (C3 v1)', () => {
+  it('las dos copias de categoriaDeFamilia dicen lo mismo', () => {
+    for (const f of ['Fruita Dolça', 'Fruita Seca', 'Horta Fruit', 'Horta Tub/Bul/Arr', 'Horta Fulla', 'Varis', null, '']) {
+      expect(catSrv(f)).toBe(catWeb(f))
+    }
+  })
+  it('categoriesInteres une las tres claves y entiende «tots»', () => {
+    expect(categoriesInteres(null)).toBeNull()
+    expect(categoriesInteres({})).toBeNull()
+    expect([...categoriesInteres({ productes_rebre: ['fruita'], productes_interes: ['verdura'] })!].sort())
+      .toEqual(['fruita', 'verdura'])
+    expect(categoriesInteres({ productes_transformar: ['tots'] })!.has('tuberculs')).toBe(true)
+  })
+  it('suma PESO_PRODUCTE y lo dice; sin perfil, null', () => {
+    const base = {
+      id: 'e', nombre: 'E', poblacion: null, telefono: null, opt_in: true, area_geografica: null,
+      estat: 'Signat', prioritat: null, productes_frescos: null, transport_plataforma: null, descarrega_toro: null,
+    }
+    const exc = { familia: 'Fruita Dolça', area_geografica: null, poblacion: null, kg_total: 100 }
+    const sense = puntuarEntidad(base, exc)!
+    const amb = puntuarEntidad({ ...base, perfil_receptor: { productes_rebre: ['fruita'] } }, exc)!
+    const altra = puntuarEntidad({ ...base, perfil_receptor: { productes_rebre: ['verdura'] } }, exc)!
+    expect(sense.interessa_producte).toBeNull()
+    expect(amb.interessa_producte).toBe(true)
+    expect(altra.interessa_producte).toBe(false)
+    expect(amb.puntuacion - sense.puntuacion).toBe(PESO_PRODUCTE)
+    expect(amb.motivos).toContain('Li interessa aquest producte')
   })
 })
