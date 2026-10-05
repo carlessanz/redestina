@@ -41,3 +41,7 @@ coverage/
 # no describe el proyecto y cambia en cada ejecución.
 tsconfig.tsbuildinfo
 *.tsbuildinfo
+
+# Salidas de Playwright (E2E, 05-10-2026)
+test-results/
+playwright-report/

@@ -534,6 +534,8 @@ vitest.config.ts               Config de las pruebas, aparte de vite.config.ts (
 tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO debe ver
 .githooks/pre-commit           Tipos + vitest + deno check antes de cada commit (§13)
 tests/                         Pruebas unitarias (Vitest). Módulos de negocio, no pantallas
+  e2e/                         Playwright (`*.e2e.ts`, `playwright.config.ts`): recorridos de
+                               las rebanadas del 05-10-2026; se saltan sin credenciales (§11)
   deno.d.ts                    El global `Deno` declarado al mínimo, para que tsc compruebe
   cobertura.test.ts            Que el menú, las rutas y las claves i18n apunten a algo real
   passosCanalitzacio.test.ts   Las claves COMPUESTAS del ciclo guiado (`canal.<pas>_t`) en ca
@@ -5212,6 +5214,14 @@ SUPABASE_URL="$VITE_SUPABASE_URL" SB_SECRET_KEY=sb_secret_… \
 deno check scripts/*.ts
 for d in supabase/functions/*/; do [ "$(basename $d)" = "_shared" ] && continue; \
   deno check --config "$d/deno.json" "$d/index.ts"; done
+
+# Pruebas de extremo a extremo (Playwright, 05-10-2026). NO van en `npm run check`: abren
+# sesión de verdad contra el remoto con las cuentas de `scripts/data/cuentas-prueba.json`
+# y necesitan la contraseña de la cortina. Sin ellas, se SALTAN. Las que escriben, solo con
+# E2E_ESCRIU=1 (y modo test encendido; no fijan hora de recogida, así que no emiten albaranes).
+E2E_CORTINA='…' npm run test:e2e                     # móvil 390 px y escritorio
+E2E_CORTINA='…' E2E_ESCRIU=1 npm run test:e2e        # también el circuito que escribe
+SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run]  # cancela las [E2E] y borra fichas E2E-
 
 # Pruebas unitarias (Vitest 4). Corren en Node sobre los módulos de negocio, que son
 # TypeScript puro: ni una referencia a `Deno.`, ni un import `npm:`/`jsr:`.

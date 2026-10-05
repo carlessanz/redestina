@@ -13,7 +13,8 @@
     "check:deno": "deno check scripts/*.ts && for d in supabase/functions/*/; do [ \"$(basename $d)\" = \"_shared\" ] && continue; deno check --config \"$d/deno.json\" \"$d/index.ts\" || exit 1; done",
     "lint": "eslint src --max-warnings 0",
     "check": "npm run check:tipos && npm run lint && vitest run && npm run check:deno",
-    "check:tipos": "tsc && tsc -p tsconfig.tests.json"
+    "check:tipos": "tsc && tsc -p tsconfig.tests.json",
+    "test:e2e": "playwright test"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2",
@@ -32,6 +33,7 @@
   },
   "devDependencies": {
     "@eslint/js": "^9.39.5",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^22.20.2",
     "@types/react": "^19.1.0",
     "@types/react-dom": "^19.1.0",
