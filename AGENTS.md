@@ -6261,12 +6261,13 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ⏳ **05-10-2026: cifra pendiente de medir.** Se declararon tres checks nuevos de
-   `descartar_convenio_esborrany` (denegar en el bloque externo y en `tecnic`, permitir en el de
-   aprobación); se ejecutan por cuenta, así que la cifra subirá más de 3 (ver el aviso de
-   «subió 12, no 4» más abajo). Se mide al publicar la migración `20270408100000`; mientras, la
-   última medida es la de abajo.
-   ✅ **Referencia HOY: 988/988 correctas y 28 saltadas, «Sin fallos de permisos»** (28-09-2026,
+   ✅ **Referencia HOY: 1.052/1.052 correctas y 26 sin datos, «Sin fallos de permisos»** (06-10-2026,
+   tras publicar las rebanadas 0-4: `20270408100000`…`20270412100000`). Sube **64** sobre la anterior
+   (988): los checks de `descartar_convenio_esborrany` y de las RPC nuevas, multiplicados por las
+   cuentas de cada bloque. Las saltadas bajan de 28 a 26 por datos, no por permisos. La cuenta
+   `pendent-arnes` seguía en `pendent` tras la pasada (§9).
+   La referencia anterior era:
+   **988/988 correctas y 28 saltadas, «Sin fallos de permisos»** (28-09-2026,
    tras `20270406100300`: +9 de `recalcula_estat_espigolada`, denegada a las siete cuentas externas
    y a las dos del equipo —la llama solo el trigger—). La anterior: **979/979** (28-09-2026,
    tras `20270406100000`: +5 de `exercici_dels_meus_tancaments`, permitida a las dos cuentas de
