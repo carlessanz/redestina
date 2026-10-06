@@ -29,6 +29,10 @@ export type Comptador =
   // Uno por panel: una cuenta con doble rol no debe ver en su menú de productor lo que
   // espera su entidad.
   | 'pendents_productor' | 'pendents_receptor'
+  // 06-10-2026. `ofertes`: ofertas que esperan validación (persistente hasta que el equipo
+  // actúa). `mercat` e `interessos`: novedades de la receptora, que se borran al salir del
+  // apartado o al cerrar sesión (`novetats.ts`).
+  | 'ofertes' | 'mercat' | 'interessos'
 
 export interface NavItem {
   to: string
@@ -73,7 +77,7 @@ const EQUIP: NavGrup[] = [
       // (modelo asistido, §1bis). Las de debajo son sus paradas sueltas.
       // `barra: false` — el equipo tiene siete secciones y la barra de móvil admite cuatro.
       { to: '/equip/canalitzacio', labelKey: 'nav.canalitzacio', icon: Workflow, barra: false },
-      { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package },
+      { to: '/equip/ofertes', labelKey: 'nav.offers', icon: Package, comptador: 'ofertes' },
       // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
       { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
@@ -131,8 +135,8 @@ const PRODUCTOR: NavGrup[] = [
 const RECEPTOR: NavGrup[] = [
   {
     items: [
-      { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true },
-      { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake },
+      { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true, comptador: 'mercat' },
+      { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake, comptador: 'interessos' },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
       { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },
     ],

@@ -20,6 +20,7 @@
 
 import { supabase } from './supabase'
 import { conveniVigent } from './convenis'
+import { avisaInteresAprovat } from './avisosCanalitzacio'
 import type { ResultatRpc } from './albarans'
 import type { Canalizacion } from '../types'
 
@@ -88,6 +89,10 @@ export async function aprovarResposta(args: {
         codi: esConveni ? 'sense_conveni' : (error.code ?? null),
       }
     }
+    // Avisar a la receptora (kg aprobados) y al productor (su oferta tiene salida),
+    // acordado el 06-10-2026. Sin `await`: la aprobación ya está hecha y el aviso no la
+    // puede deshacer ni retrasar.
+    void avisaInteresAprovat(args.id)
     return { ok: true, data: data as Canalizacion }
   } catch {
     return { ok: false, missatge: 'c.error', codi: null }

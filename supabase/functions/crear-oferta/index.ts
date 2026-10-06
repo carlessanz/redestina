@@ -16,8 +16,8 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { crearExcedente } from "../_shared/oferta.ts";
-import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
+import { crearExcedente, editarExcedente } from "../_shared/oferta.ts";
+import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes, modalitatsDe } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 
@@ -41,7 +41,7 @@ function corsPara(req: Request): Record<string, string> {
     "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
     "Vary": "Origin",
     "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
+    "Access-Control-Allow-Methods": "GET, POST, PATCH, OPTIONS",
   };
 }
 
@@ -129,6 +129,33 @@ Deno.serve(async (req) => {
     });
   }
 
+  // -------------------------------------------------------------------------
+  // PATCH — editar una oferta ya creada (06-10-2026)
+  //   body: { id: uuid, canvis: { kg?, varietat?, caixes?, disponible_fins?, horari?,
+  //           preu_minim?, cost_kg?, observacions?, modalitat? } }
+  // El equipo o el productor de la oferta. El texto se recompone aquí, con la misma
+  // función del alta, y cada edición queda en `excedente_edicions`.
+  // -------------------------------------------------------------------------
+  if (req.method === "PATCH") {
+    try {
+      const body = await req.json() as { id?: string; canvis?: Record<string, unknown> };
+      if (!body.id || !body.canvis || typeof body.canvis !== "object") {
+        return responder({ error: "Falten l'id o els canvis", code: "peticio_invalida" }, 400);
+      }
+      const { data: e } = await supabase.from("excedentes").select("*").eq("id", body.id).maybeSingle();
+      if (!e) return responder({ error: "Oferta no trobada", code: "no_trobada" }, 404);
+      if (!puedeOfertar(String(e.productor_id ?? ""))) {
+        return responder({ error: "No pots editar aquesta oferta", code: "forbidden" }, 403);
+      }
+      const r = await editarExcedente(supabase, e, body.canvis, { esEquip: ctx.esIntern, userId: ctx.userId });
+      if (!r.ok) return responder({ error: r.error, code: r.code }, r.status);
+      return responder({ ok: true, canvis: r.canvis ?? {} }, 200);
+    } catch (err) {
+      console.error("crear-oferta PATCH:", err instanceof Error ? err.message : String(err));
+      return responder({ error: "Error interno o JSON inválido" }, 500);
+    }
+  }
+
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
 
   // -------------------------------------------------------------------------
@@ -207,20 +234,37 @@ Deno.serve(async (req) => {
     // ⚠️ El alta ASISTIDA no pasa por aquí: el equipo resuelve el convenio en la fase 1 del
     //    ciclo guiado, con la persona delante (§6ter).
     if (!ctx.esIntern) {
-      const modalitat = String((datos as Record<string, unknown>).modalitat ?? "");
-      const { error: errConv } = await supabase.rpc("exigir_convenio", {
-        p_tipo: "productor", p_org: productorId, p_valorizacion: modalitat, p_parte: "entrega",
-      });
-      if (errConv?.code === "42501") {
+      // Con VARIAS modalidades (06-10-2026) basta con tener el convenio de UNA: el productor
+      // marca varias justamente porque no sabe cuál, y la definitiva la fija el equipo al
+      // validar, que es donde `validar_oferta()` exige el convenio de esa.
+      const modalitats = modalitatsDe((datos as Record<string, unknown>).modalitat);
+      let algunaValida = false;
+      for (const modalitat of modalitats) {
+        const { error: errConv } = await supabase.rpc("exigir_convenio", {
+          p_tipo: "productor", p_org: productorId, p_valorizacion: modalitat, p_parte: "entrega",
+        });
+        if (!errConv) { algunaValida = true; break; }
+        if (errConv.code !== "42501") {
+          console.error("crear-oferta: exigir_convenio:", errConv.message);
+          return responder({ error: "c.error" }, 500);
+        }
+      }
+      if (modalitats.length > 0 && !algunaValida) {
         // La CLAVE i18n como mensaje: la pantalla la traduce con `textError()`.
         return responder({
-          error: modalitat === "donacio" ? "po.cal_conveni_don" : "po.cal_conveni_com",
+          error: modalitats.length === 1 && modalitats[0] === "donacio" ? "po.cal_conveni_don" : "po.cal_conveni_com",
           code: "sense_conveni",
         }, 403);
       }
-      if (errConv) {
-        console.error("crear-oferta: exigir_convenio:", errConv.message);
-        return responder({ error: "c.error" }, 500);
+
+      // Un albarán entregado y sin confirmar más de 48 h bloquea publicar (06-10-2026). El
+      // equipo no pasa por aquí: es quien resuelve el albarán con la persona delante.
+      const { data: bloquejants, error: errBloq } = await supabase.rpc("albarans_bloquejants", {
+        p_tipo_org: "productor", p_org: productorId,
+      });
+      if (errBloq) console.error("crear-oferta: albarans_bloquejants:", errBloq.message);
+      if (Array.isArray(bloquejants) && bloquejants.length > 0) {
+        return responder({ error: "bloq.albara_pendent", code: "albara_pendent", albarans: bloquejants }, 403);
       }
     }
 
@@ -241,7 +285,7 @@ Deno.serve(async (req) => {
     const confirmacio = await confirmarOfertaPerCorreu(productor, r.idExcedente ?? "", r.excedenteId ?? "", datos, supabase, "crear-oferta");
 
     return responder(
-      { ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio },
+      { ok: true, id: r.excedenteId, id_excedente: r.idExcedente, estado: r.estado, confirmacio_email: confirmacio },
       200,
     );
   } catch (err) {

@@ -18,6 +18,7 @@ import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
+import { marcaTotVist } from '../lib/novetats'
 import { ORGANITZACIO, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
@@ -234,7 +235,7 @@ export default function AppSidebar({
           <SidebarMenuItem>
             <SidebarMenuButton
               tooltip={t('nav.logout')}
-              onClick={() => { alNavegar(); void supabase.auth.signOut({ scope: 'local' }) }}
+              onClick={() => { alNavegar(); marcaTotVist(ctx?.userId); void supabase.auth.signOut({ scope: 'local' }) }}
             >
               <LogOut />
               <span>{t('nav.logout')}</span>

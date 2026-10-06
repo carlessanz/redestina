@@ -15,7 +15,9 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
-import { useOrganitzacio } from '../../hooks/useAppContext'
+import { useAppContext, useOrganitzacio } from '../../hooks/useAppContext'
+import { darreraVisita, marcaVist } from '../../lib/novetats'
+import { textRecollida } from '../../lib/avisosCanalitzacio'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import type { PuntProces } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
@@ -40,8 +42,8 @@ import {
 type AmbOferta = Pick<
   OfertaRespuesta,
   | 'id' | 'estado' | 'aprovacio' | 'kg_solicitados' | 'preu_ofert' | 'motiu_aprovacio'
-  | 'canalizacion_id' | 'enviado_at' | 'respondido_at'
-> & { excedentes: OfertaReceptor | null }
+  | 'canalizacion_id' | 'enviado_at' | 'respondido_at' | 'recollida_prevista'
+> & { excedentes: OfertaReceptor | null; aprovat_at?: string | null }
 
 /**
  * Lo único que hace falta del albarán de entrega para contar la etapa. `ENT` en donación y
@@ -99,6 +101,14 @@ export function Interessos() {
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
+  // Lo aprobado de verdad por canalización (06-10-2026): para decir «de 1.000 kg
+  // sol·licitats, se n'han aprovat 500» y la hora acordada.
+  const [canals, setCanals] = useState<Record<string, { kg_confirmados: number | null; recollida_prevista: string | null }>>({})
+  // Las decisiones nuevas desde la última vez que se dejó esta pantalla (badge del menú).
+  const { ctx } = useAppContext()
+  const userId = ctx?.userId ?? null
+  const [vistAbans] = useState(() => (userId ? darreraVisita('interessos', userId) : null))
+  useEffect(() => () => { if (userId) marcaVist('interessos', userId) }, [userId])
 
   const carrega = useCallback(async () => {
     if (!entidadId) { setCarregant(false); return }
@@ -110,7 +120,7 @@ export function Interessos() {
     const [resp, alb] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, aprovacio, kg_solicitados, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, recollida_prevista, aprovat_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false }),
       supabase
@@ -125,7 +135,16 @@ export function Interessos() {
     // El interés aprobado y su albarán de entrega comparten `canalizacion_id`: es lo único
     // que los une, porque el albarán cuelga de la canalización y no de la respuesta.
     setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
-    setFiles((resp.data as unknown as AmbOferta[]) ?? [])
+    const rows = (resp.data as unknown as AmbOferta[]) ?? []
+    setFiles(rows)
+    const ids = rows.map((r) => r.canalizacion_id).filter(Boolean) as string[]
+    if (ids.length > 0) {
+      const { data: cs } = await supabase.from('canalizaciones')
+        .select('id, kg_confirmados, recollida_prevista').in('id', ids)
+      const m: Record<string, { kg_confirmados: number | null; recollida_prevista: string | null }> = {}
+      for (const c of (cs ?? []) as { id: string; kg_confirmados: number | null; recollida_prevista: string | null }[]) m[c.id] = c
+      setCanals(m)
+    }
     setCarregant(false)
   }, [entidadId])
 
@@ -213,6 +232,27 @@ export function Interessos() {
                   {t(est.key)}{data ? ` · ${data}` : ''}
                 </BadgeEstat>
               </div>
+              {(() => {
+                // Lo aprobado frente a lo pedido, dicho en grande cuando no coincide
+                // (06-10-2026): antes el cambio salía en pequeño y sin aviso.
+                const c = f.canalizacion_id ? canals[f.canalizacion_id] : undefined
+                const aprovats = c?.kg_confirmados != null ? Number(c.kg_confirmados) : null
+                const demanats = f.kg_solicitados != null ? Number(f.kg_solicitados) : null
+                const quan = textRecollida(c?.recollida_prevista ?? f.recollida_prevista)
+                const nova = vistAbans != null && (f.aprovat_at ?? '') > vistAbans
+                if (f.aprovacio !== 'aprovada' || aprovats == null) {
+                  return quan ? <p className="mt-2 text-xs text-muted-foreground">{t('int.recollida_proposada', { d: quan })}</p> : null
+                }
+                return (
+                  <div className={cn('mt-2 rounded-md p-2 text-sm', nova ? 'bg-exito-fondo' : 'bg-muted/40')}>
+                    {nova && <span className="mr-2 rounded-full bg-background px-2 py-0.5 text-xs font-medium text-exito">{t('mk.nova')}</span>}
+                    {demanats != null && Math.abs(demanats - aprovats) > 0.001
+                      ? <span className="font-medium">{t('int.kg_parcial', { s: kgFmt(demanats), a: kgFmt(aprovats) })}</span>
+                      : <span className="font-medium">{t('int.kg_aprovats', { a: kgFmt(aprovats) })}</span>}
+                    {quan && <span className="block text-muted-foreground">{t('int.recollida', { d: quan })}</span>}
+                  </div>
+                )
+              })()}
               {passa && <p className="mt-2 text-sm text-muted-foreground">{passa}</p>}
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className={cn(

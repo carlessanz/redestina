@@ -29,7 +29,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface ExcRow { id: string; estado: string; kg_total: number | null }
 
-const ACTIVOS = ['borrador', 'publicada', 'parcial', 'bloqueada']
+const ACTIVOS = ['borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada']
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 
@@ -142,7 +142,7 @@ export default function Dashboard() {
       if (e.estado === 'bloqueada') ofertas.bloqueadas += 1
       else if (e.estado === 'no_colocada') ofertas.noColocadas += 1
       else if (e.estado === 'cancelada') ofertas.canceladas += 1
-      if (['borrador', 'publicada', 'parcial'].includes(e.estado)) ofertas.activas += 1
+      if (['borrador', 'pendent_validacio', 'publicada', 'parcial'].includes(e.estado)) ofertas.activas += 1
       if (ACTIVOS.includes(e.estado)) pendientes += Math.max(0, Number(e.kg_total ?? 0) - (canalKg[e.id] ?? 0))
     }
     const conMovil = prodPhones.filter((p) => p && soloDigitos(p).length >= 9).length

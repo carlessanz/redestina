@@ -16,6 +16,7 @@ import { useAppContext } from '../hooks/useAppContext'
 import { itemsPlans, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import { buidaComptadors, refrescaComptadors } from '../lib/pendentsEquip'
+import { comptaDecisionsNoves, comptaOfertesNoves, darreraVisita } from '../lib/novetats'
 import { useComptadorsEquip } from '../hooks/useComptadorsEquip'
 import { carregaPendents } from '../lib/pendents'
 import AppSidebar from './AppSidebar'
@@ -112,6 +113,25 @@ export default function AppShell() {
     })()
     return () => { viu = false }
   }, [esExtern, pathname, ticAvisos])
+
+  // Las novedades de la receptora (06-10-2026). Se recalculan al navegar: al salir del
+  // Mercat la pantalla marca la visita y, en esta misma navegación, el badge baja a 0.
+  const entitats = (ctx?.organitzacions ?? []).filter((o) => o.tipo === 'entidad').map((o) => o.id)
+  const clauEntitats = entitats.join(',')
+  const userId = ctx?.userId ?? null
+  useEffect(() => {
+    if (!userId || !clauEntitats) return
+    let viu = true
+    void (async () => {
+      const [mercat, interessos] = await Promise.all([
+        comptaOfertesNoves(darreraVisita('mercat', userId)),
+        comptaDecisionsNoves(clauEntitats.split(','), darreraVisita('interessos', userId)),
+      ])
+      if (!viu) return
+      setComptadorsExterns((c) => ({ ...c, mercat, interessos }))
+    })()
+    return () => { viu = false }
+  }, [userId, clauEntitats, pathname, ticAvisos])
 
   return (
     <SidebarProvider className="h-dvh min-h-0 overflow-hidden">

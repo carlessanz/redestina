@@ -27,7 +27,8 @@ import type { FotoResolta } from './FotosOferta'
  *    id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa,
  *    retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions,
  *    preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos,
- *    foto_producte
+ *    foto_producte (+ horari_desde, horari_fins: la franja, 06-10-2026; y en el Mercat
+ *    validada_at y created_at para marcar las nuevas)
  *
  *    Si esta lista cambia, hay que cambiar los `select` de Mercat e Interessos a la vez.
  */
@@ -37,7 +38,7 @@ export type OfertaReceptor = Pick<
   | 'tipo_caixa' | 'retorn_envasos' | 'modalitat' | 'causa' | 'disponible_hasta'
   | 'horari_recollida' | 'observacions' | 'preu_minim' | 'producte_al_camp' | 'comarca'
   | 'format_entrega' | 'transport_propi' | 'fotos' | 'foto_producte'
->
+> & Partial<Pick<Excedente, 'horari_desde' | 'horari_fins' | 'validada_at' | 'created_at'>>
 
 export default function DetallOfertaReceptor({ oferta, foto }: {
   oferta: OfertaReceptor

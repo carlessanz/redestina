@@ -259,7 +259,7 @@ async function preguntar(
     case "disponible_fins":
       return (await sendText(supabase, to, "Fins quin dia està disponible? (per exemple 23/07)")).ok;
     case "horari":
-      return (await sendText(supabase, to, "Quin horari de recollida va bé? (matí, tarda, hores…)")).ok;
+      return (await sendText(supabase, to, "Entre quines hores es pot passar a recollir? (p. ex. 9:00-13:00). L'entitat triarà l'hora dins d'aquesta franja.")).ok;
     case "modalitat":
       // Lista y no botones, aunque solo sean tres opciones: un botón de WhatsApp admite
       // título y nada más, así que por aquí se elegía a ciegas entre tres palabras

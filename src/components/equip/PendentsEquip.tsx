@@ -51,6 +51,8 @@ const FILES: readonly FilaCua[] = [
   { cua: 'convenis_contrasignar', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
+  // 06-10-2026: las ofertas nuevas esperan aquí antes de salir al Mercat.
+  { cua: 'ofertes_per_validar', desti: '/equip/ofertes', nomesAdmin: true },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_vencudes', desti: '/equip/ofertes' },
   // F3. Va al listado de ofertas y NO a `/equip/espigolades`: la jornada todavía no
@@ -68,7 +70,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'respostes', 'ofertes_vencudes', 'costos',
-  'espigolades_per_convertir',
+  'espigolades_per_convertir', 'ofertes_per_validar',
 ]
 
 export default function PendentsEquip() {

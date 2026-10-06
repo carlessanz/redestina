@@ -15,7 +15,23 @@ type Traductor = (clau: string, params?: Record<string, string | number>) => str
 /** Códigos propios que llegan en `codi` o dentro del mensaje, con su texto. */
 const CODIS: Record<string, string> = {
   sense_conveni: 'od.conv_blocked',
+  // 06-10-2026: validar una oferta, el bloqueo por albarán y la hora de recogida.
+  albara_pendent: 'bloq.albara_pendent',
+  cal_modalitat: 'val.err_cal_modalitat',
+  cal_preu: 'val.err_cal_preu',
+  no_pendent: 'val.err_no_pendent',
+  hora_passada: 'rec.err_hora_passada',
+  hora_quarts: 'rec.err_hora_quarts',
+  ja_decidit: 'rec.err_ja_decidit',
+  cal_hora: 'rec.err_cal_hora',
 }
+
+/**
+ * Códigos cuyo mensaje lleva DATOS (la franja, la fecha) que la clave no podría decir: se
+ * enseña el texto de la base sin el prefijo del código. Están en catalán, como el resto de
+ * mensajes que la base escribe a propósito.
+ */
+const AMB_DADES = ['fora_franja', 'fora_disponibilitat']
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */
 const EXACTES: Record<string, string> = {
@@ -47,6 +63,10 @@ export function textError(
   const missatge = (typeof r === 'string' ? r : r?.missatge) ?? ''
   const codi = typeof r === 'string' ? null : r?.codi ?? null
   if (codi && CODIS[codi]) return t(CODIS[codi])
+  for (const c of AMB_DADES) {
+    const i = missatge.indexOf(`${c}: `)
+    if (i >= 0) return missatge.slice(i + c.length + 2)
+  }
   for (const [c, clau] of Object.entries(CODIS)) if (missatge.includes(c)) return t(clau)
   if (missatge === '') return t(fallback)
   if (EXACTES[missatge]) return t(EXACTES[missatge])

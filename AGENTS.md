@@ -924,7 +924,7 @@ con **`es_test`** (bool, default false, `20260723110000_es_test.sql`): como en p
 de prueba que habilita el envío a la entidad (§8).
 
 **`excedentes`** — cabecera de la oferta. `id_excedente` UNIQUE con formato
-`E-AAMMDD-XXX-YYY-N`. `estado` ∈ `borrador` · `publicada` · `parcial` · `bloqueada` ·
+`E-AAMMDD-XXX-YYY-N`. `estado` ∈ `borrador` · **`pendent_validacio`** (06-10-2026, §6quinquies) · `publicada` · `parcial` · `bloqueada` ·
 `cerrada` · `no_colocada` · **`cancelada`** (anulada desde el panel; check en
 `20260722130100_estado_cancelada.sql`). `modalitat` ∈ `donacio` · `venda` · `maquila`. **`preu_minim`**
 (numeric €/kg, `20260723130000_aceptacion_ofertas.sql`): preu mínim que fija el productor en el intake,
@@ -2182,7 +2182,7 @@ funciones, no políticas:
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
-| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **trece** filas `(cua, n, ref, detall)`, **siempre las trece** aunque `n` valga 0. La 13 es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
+| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **catorce** filas `(cua, n, ref, detall)`, **siempre las catorce** aunque `n` valga 0 (la 14, `ofertes_per_validar`, desde `20270408100000`). La 13 es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
 | `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20260921160536`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
 | `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20260921160749`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
@@ -3649,6 +3649,32 @@ traducido a `od.conv_blocked`, misma confirmación al canalizar de más. Una cue
 botones grises con el motivo («Només admin»): no se le esconde nada, se le dice por qué (§6ter).
 ⚠️ `appr.rej_desc` y `appr.rej_reason` se usan a través de la tabla `TEXTOS_MOTIU`, no como literal
 dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si faltaran.
+
+## 6quinquies. Reunión con la Fundació del 06-10-2026: validación, edición, franja y bloqueo
+
+Cambios acordados con Sebastián en la revisión del perfil de ofertante. Migración
+**`20270408100000_reunio_validacio_i_edicio_ofertes.sql`** (idempotente), Edge Functions
+**`crear-oferta`** (POST cambiado + PATCH nuevo) y **`priorizar-entidades`**, y el panel.
+
+| Qué | Cómo |
+| --- | --- |
+| **Estado `pendent_validacio`** | Toda oferta nueva nace así (panel, WhatsApp y asistida con varias modalidades); la asistida con UNA modalidad nace `publicada`. La RLS del Mercat ya solo enseña `publicada`/`parcial`, así que no sale a ninguna receptora hasta que el equipo la valida con **`validar_oferta(excedente, modalitat)`** (`pot_aprovar()`, exige el convenio de la modalidad DEFINITIVA). Pestaña «Per validar» en Ofertes, bloque de validación en el detalle y cola 14 `ofertes_per_validar` en `pendents_equip()` = badge **persistente** de «Ofertes» |
+| **Modalidad múltiple** | `excedentes.modalitats text[]` (lo que acepta el productor; casillas en el panel, una sola por WhatsApp). `modalitat` sigue siendo la definitiva que usa todo el circuito y solo se escribe con una; con varias la fija el equipo al validar. `crear-oferta` acepta si hay convenio de AL MENOS UNA. `aplica()`/`aplicaCamp()` tratan las listas (sin eso el preu mínim dejaba de preguntarse) |
+| **Franja de recogida** | `horari` pasa a obligatorio y `widget: 'franja'`: dos horas en cuartos (`SelectorFranja`), guardadas como «HH:MM-HH:MM» en `horari_recollida` y en `excedentes.horari_desde/fins` (time). Por WhatsApp se pregunta como texto y `parseFranja()` lo intenta leer |
+| **Hora de la receptora** | `oferta_respuestas.recollida_prevista` con **`fixar_recollida_interes(resposta, quan)`** (dentro de la franja y de `disponible_hasta`, en cuartos). El Mercat la pide al mostrar interés (segunda llamada tras `manifestar_interes()`, que NO se ha tocado). Al aprobar, un trigger la copia a `canalizaciones.recollida_prevista`. ⚠️ **No es `data_hora_recollida`**, que decide el ejercicio fiscal y sigue escribiéndola solo `emitir_albaran()` |
+| **Editar una oferta** | `PATCH crear-oferta {id, canvis}` (equipo o su productor; `editarExcedente()` en `_shared/oferta.ts`): kg (nunca por debajo de lo canalizado), variedad, cajas, disponible, franja, preu, coste, observaciones y —solo en `pendent_validacio`— modalidades. Recompone `texto_oferta` con la misma función del alta y deja rastro en **`excedente_edicions`** (lectura: equipo o el productor; escritura: solo `service_role`). Lo ya enviado no se retira. `DialegEditaOferta` en los dos detalles. La cabecera de §4bis «editarla no» queda superada |
+| **Bloqueo por albarán** | **`albarans_bloquejants(tipo_org, org)`**: albaranes `entregado` sin confirmar por ESA parte desde hace más de `hores_bloqueig_albara()` horas (48, `app_settings.hores_bloqueig_albara`). Productor: `crear-oferta` responde `403 albara_pendent`. Receptora: trigger `respuestas_bloqueig_albara` en `oferta_respuestas` (solo `canal='panel'`). `AvisAlbaraPendent` lo dice antes y lleva a confirmar (`acunar_enllac_propi`) |
+| **Avisos al aprobar** | `aprovarResposta()` llama a `avisaInteresAprovat()` (`src/lib/avisosCanalitzacio.ts`): correo a la receptora («de X kg sol·licitats, se n'han aprovat Y») y al productor (kg, **qué entidad** y cuándo). ⚠️ Nombra a la receptora ante el productor: decisión de la reunión, contraria a la de `progres_meves_ofertes()` (cifras sin nombres) |
+| **Badges de la receptora** | `mercat` (ofertas nuevas) e `interessos` (decisiones nuevas), en `localStorage` por cuenta (`src/lib/novetats.ts`): se borran al SALIR del apartado o al cerrar sesión, a propósito (al revés que el del equipo) |
+| **Filtros** | Mercat: zona (comarca) y tipo (fruta/verdura/otros), por defecto todo. Entidades priorizadas del detalle: «veure-les totes» (antes `slice(0, 15)`) y filtro por `tipo_receptor`, que `priorizar-entidades` devuelve ahora |
+| **Varios** | Borrador del alta en `localStorage` 7 días (antes `sessionStorage` 24 h); aviso si la variedad parece una cantidad (`semblaQuantitat`); «Nova oferta en nom d'un productor» también en `/equip/ofertes`; etiquetas `sig.model_*` pasan a «Conveni de col·laboració (…)» (solo texto: el modelo de tres tipos sigue igual hasta que llegue el convenio único validado); `cancelar_meva_oferta()` admite `pendent_validacio` |
+
+Las piezas puras del cliente (`aplicaCamp`, `valorsDe`, `respostaBuida`, `semblaQuantitat`,
+`partFranja`) viven en **`src/lib/ofertaPura.ts`** para poder probarlas (`tests/reunio20261006.test.ts`);
+`ofertes.ts` las reexporta.
+
+**Para publicarlo**: migración → `crear-oferta`, `priorizar-entidades` y `whatsapp-webhook`
+(importan `_shared/camposOferta.ts`/`oferta.ts`; el texto del bot cambió) → frontend.
 
 ## 7. Convenciones
 
@@ -5816,6 +5842,20 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      así que fijar después la referencia (o el coste de la oferta) no llega a esa canalización y su
      bloqueo `sense_cost` del cierre no se levanta. Hoy no hay ninguna en ese estado que importe
      (son fixtures); cuando la haya hará falta una RPC de «valorar a posteriori» con motivo.
+
+130. **El bloqueo por albarán no alcanza la aceptación por WhatsApp.** El trigger
+     `respuestas_bloqueig_albara` solo mira `canal='panel'`: por WhatsApp un rechazo de la base
+     dejaría el diálogo del bot sin respuesta. Hace falta comprobarlo en `_shared/respuestas.ts`
+     y contestar al usuario antes de marcar `acceptada`.
+131. **La confirmación automática de la recogida no está hecha** (reunión del 06-10-2026: aviso a
+     la hora +1 h a las dos partes, «he recogido / he entregado + kg reales», reenvío a las 4 h y
+     albarán automático cuando confirman las dos). Choca con el circuito legal actual —emitir
+     consume numeración y hoy lo hace el equipo con las líneas— y depende del modelo de albarán
+     simplificado que tiene que mandar la Fundació. Ya existe la pieza que necesitaba
+     (`canalizaciones.recollida_prevista`).
+132. **El convenio único es solo de nombre.** Las etiquetas dicen «Conveni de col·laboració»,
+     pero siguen existiendo `don_gen`/`don_rec`/`com` y `convenios_exigidos`. Unificarlo espera la
+     versión validada por la asesoría.
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 

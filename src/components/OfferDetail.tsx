@@ -22,6 +22,8 @@ import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
 import DialegEspigolada from './equip/DialegEspigolada'
+import DialegEditaOferta from './DialegEditaOferta'
+import { validaOferta } from '../lib/ofertes'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella } from './Casella'
@@ -105,6 +107,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a un técnico se le dejan
   // grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
   const potAprovar = ctx?.potAprovar ?? true
+  // Editar la oferta (06-10-2026): el equipo siempre, salvo cerrada o cancelada.
+  const [editant, setEditant] = useState(false)
+  // Validar (06-10-2026): la modalidad definitiva que elige el equipo.
+  const [modalitatValida, setModalitatValida] = useState<string>('')
+  const [validant, setValidant] = useState(false)
+  // El listado de entidades: todas o las 15 primeras, y por tipo de entidad (06-10-2026).
+  const [rankingTotes, setRankingTotes] = useState(false)
+  const [filtreTipus, setFiltreTipus] = useState<string>('')
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
   // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
@@ -261,8 +271,36 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // estable: dentro de cada grupo se conserva la puntuación del servidor.
   const rankingOrdenado = useMemo(() => {
     const contactable = (e: EntidadPuntuada) => (!testMode || e.es_test) && e.canal !== 'cap'
-    return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
-  }, [ranking, testMode])
+    return [...ranking]
+      .filter((e) => !filtreTipus || (e.tipo_receptor ?? 'sense') === filtreTipus)
+      .sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
+  }, [ranking, testMode, filtreTipus])
+  // Los tipos que hay de verdad en el ranking: un desplegable con opciones vacías no ayuda.
+  const tipusRanking = useMemo(
+    () => [...new Set(ranking.map((e) => e.tipo_receptor ?? 'sense'))].sort(),
+    [ranking],
+  )
+  const LIMIT_RANKING = 15
+  const rankingVisible = rankingTotes ? rankingOrdenado : rankingOrdenado.slice(0, LIMIT_RANKING)
+
+  async function validar() {
+    const mods = exc.modalitats && exc.modalitats.length ? exc.modalitats : (exc.modalitat ? [exc.modalitat] : [])
+    const triada = modalitatValida || (mods.length === 1 ? mods[0] : '')
+    if (!triada) { toast.error(t('val.err_cal_modalitat')); return }
+    const ok = await confirma({
+      titol: t('val.confirm_t'),
+      descripcio: t('val.confirm_d', { m: t(`od.mod_${triada}`) }),
+      confirmar: t('val.button'),
+    })
+    if (!ok) return
+    setValidant(true)
+    const r = await validaOferta(exc.id, triada)
+    setValidant(false)
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
+    toast.success(t('val.done'))
+    await recargar()
+    void refrescaComptadors()
+  }
 
   // Las dos escrituras piden las filas afectadas: un UPDATE que la RLS no deja pasar no da
   // error, devuelve cero filas (§12.48), y la pantalla daba el cambio por hecho.
@@ -701,6 +739,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {exc.comarca}
             </p>
           )}
+          {!exc.modalitat && (exc.modalitats?.length ?? 0) > 0 && (
+            <p className="mt-1.5 text-xs text-muted-foreground">
+              {t('val.modalitats_marcades', { m: (exc.modalitats ?? []).map((m) => t(`od.mod_${m}`)).join(' / ') })}
+            </p>
+          )}
           {exc.modalitat && (
             <div className="mt-1.5 flex flex-wrap items-center gap-2">
               <span className="rounded-full bg-secondary/60 px-2 py-0.5 text-xs font-semibold text-primary">
@@ -715,8 +758,49 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         <div className="text-right">
           <div className="text-lg font-bold">{kgCa(canalizados)}/{kgCa(total)} kg</div>
           <span className="text-sm text-muted-foreground">{faltan > 0 ? t('off.falten', { n: kgCa(faltan) }) : t('off.complet')}</span>
+          {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado) && (
+            <div className="mt-2">
+              <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setEditant(true)}>
+                {t('edit.button')}
+              </Button>
+            </div>
+          )}
         </div>
       </div>
+
+      {/* ── Pendent de validació (06-10-2026) ──
+          Toda oferta nueva espera aquí antes de salir al Mercat. El equipo fija la modalidad
+          definitiva (el productor puede haber marcado varias) y la valida; si no es viable,
+          la cancela con el botón de siempre, al final de la pantalla. */}
+      {exc.estado === 'pendent_validacio' && (
+        <Card className="border-aviso/40 bg-aviso-fondo">
+          <CardContent className="space-y-3 pt-6">
+            <p className="font-medium text-aviso">{t('val.title')}</p>
+            <p className="text-sm">{t('val.desc')}</p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label htmlFor="val-modalitat" className="mb-1.5 block text-xs text-muted-foreground">{t('val.tria')}</label>
+                <select id="val-modalitat"
+                  className="h-9 w-56 rounded-md border border-input bg-background px-3 text-base md:text-sm"
+                  value={modalitatValida || (exc.modalitats?.length === 1 ? exc.modalitats[0] : (exc.modalitat ?? ''))}
+                  onChange={(e) => setModalitatValida(e.target.value)}>
+                  <option value="">—</option>
+                  {(['donacio', 'venda', 'maquila'] as const).map((m) => (
+                    <option key={m} value={m}>
+                      {t(`od.mod_${m}`)}{(exc.modalitats ?? []).includes(m) ? ` · ${t('val.marcada')}` : ''}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <BotoAmbMotiu className="h-11 whitespace-normal md:h-9" disabled={validant || !potAprovar}
+                motiu={potAprovar ? undefined : t('val.only_admin')} onClick={() => void validar()}>
+                {validant ? t('c.saving') : t('val.button')}
+              </BotoAmbMotiu>
+            </div>
+            {!potAprovar && <p className="text-xs text-muted-foreground">{t('val.only_admin')}</p>}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Dónde está y qué toca. Va aquí arriba a propósito: es la pregunta con la que se
           abre esta pantalla, y hasta hoy había que deducirla del estado y de los kg. */}
@@ -812,7 +896,26 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {!cargandoRanking && !rankingError && !ofertaOberta && (
             <p className="text-sm text-muted-foreground">{t('od.send_closed')}</p>
           )}
-          {!cargandoRanking && !rankingError && rankingOrdenado.slice(0, 15).map((ent) => {
+          {/* Filtro por tipo de entidad y «ver todas» (06-10-2026): antes se cortaba en 15 sin
+              forma de ver el resto. */}
+          {!cargandoRanking && !rankingError && ranking.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2 pb-1">
+              <label htmlFor="rank-tipus" className="text-xs text-muted-foreground">{t('od.rank_filter_tipus')}</label>
+              <select id="rank-tipus"
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={filtreTipus} onChange={(e) => setFiltreTipus(e.target.value)}>
+                <option value="">{t('od.rank_filter_all')}</option>
+                {tipusRanking.map((tp) => (
+                  <option key={tp} value={tp}>{tp === 'sense' ? t('od.rank_tipus_sense') : t(`org.tr_${tp}`)}</option>
+                ))}
+              </select>
+              <span className="text-xs text-muted-foreground">{t('od.rank_count', { n: rankingOrdenado.length })}</span>
+            </div>
+          )}
+          {!cargandoRanking && !rankingError && ranking.length > 0 && rankingOrdenado.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('od.rank_none_filter')}</p>
+          )}
+          {!cargandoRanking && !rankingError && rankingVisible.map((ent) => {
             const puedeTest = !testMode || ent.es_test
             // Si no es usuari de prova, se muestra el motivo visible (antes solo en el title).
             const motivos = puedeTest ? ent.motivos : [...ent.motivos, t('od.not_test')]
@@ -870,6 +973,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </div>
             )
           })}
+          {!cargandoRanking && !rankingError && rankingOrdenado.length > LIMIT_RANKING && (
+            <Button variant="outline" size="sm" className="h-11 md:h-8" onClick={() => setRankingTotes((x) => !x)}>
+              {rankingTotes ? t('od.rank_show_less') : t('od.rank_show_all', { n: rankingOrdenado.length })}
+            </Button>
+          )}
         </CardContent>
       </Card>
 
@@ -1037,6 +1145,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
       {/* Al crear la jornada se recarga: `exc.espigolada_id` pasa a tener valor, el bloque
           de arriba desaparece y la nota de `QueTocaAra` enseña el enlace a la jornada. */}
+      <DialegEditaOferta obert={editant} onObert={setEditant} oferta={exc}
+        onDesada={() => { void recargar() }} />
+
       <DialegEspigolada
         obert={convertint}
         oferta={exc}

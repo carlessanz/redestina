@@ -161,6 +161,8 @@ export interface Entidad {
 
 export type EstadoExcedente =
   | 'borrador'
+  /** Nueva (06-10-2026): espera la validación del equipo antes de salir al Mercat. */
+  | 'pendent_validacio'
   | 'publicada'
   | 'parcial'
   | 'bloqueada'
@@ -184,6 +186,12 @@ export interface Excedente {
   tipo_caixa: string | null
   retorn_envasos: string | null
   modalitat: Modalitat | null
+  /** Las que acepta el productor (varias si no lo tiene claro). La definitiva es `modalitat`. */
+  modalitats?: Modalitat[]
+  /** La franja de recogida («HH:MM:SS»). */
+  horari_desde?: string | null
+  horari_fins?: string | null
+  validada_at?: string | null
   causa: string | null
   causa_codigo: string | null
   disponible_desde: string | null
@@ -226,6 +234,8 @@ export interface Canalizacion {
   id: string
   excedente_id: string | null
   entidad_id: string | null
+  /** La recogida acordada. NO es `data_hora_recollida` (ejercicio fiscal). */
+  recollida_prevista?: string | null
   kg_confirmados: number | null
   kg_reales: number | null
   caixes_entregades: number | null
@@ -256,6 +266,8 @@ export interface OfertaRespuesta {
   id: string
   excedente_id: string
   entidad_id: string | null
+  /** Cuándo dice la receptora que irá a recoger (06-10-2026). */
+  recollida_prevista?: string | null
   /** E.164 sin '+'; casa la respuesta entrante con la fila pendiente */
   telefono: string | null
   canal: 'whatsapp' | 'email'

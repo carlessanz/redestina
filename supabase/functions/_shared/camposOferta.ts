@@ -235,6 +235,18 @@ export interface CampoOferta {
    * producto sigue en el campo.
    */
   condicion?: CondicionCampo | CondicionCampo[];
+  /**
+   * El panel deja marcar VARIAS opciones (casillas) y guarda una lista (06-10-2026, reunión
+   * con la Fundació: muchos productores no saben qué salida les conviene). El bot de WhatsApp
+   * lo ignora y sigue preguntando una sola, que llega como lista de un elemento. La definitiva
+   * la fija el equipo al validar la oferta (`validar_oferta()`).
+   */
+  multiple?: boolean;
+  /**
+   * Cómo lo pinta el panel cuando no basta con el `tipo`. `franja`: dos horas (inicio y
+   * final) en cuartos de hora, guardadas como «HH:MM-HH:MM». El bot lo pregunta como texto.
+   */
+  widget?: "franja";
 }
 
 /**
@@ -298,9 +310,11 @@ export const CAMPOS: CampoOferta[] = [
     clave: "varietat",
     tipo: "text",
     etiqueta: "Quina varietat és?",
-    ayuda: "Deixa-ho buit si no ho saps",
+    // La reunión del 06-10-2026 vio a alguien escribir «200» aquí pensando que eran kg: la
+    // ayuda dice ahora qué va y dónde van los quilos.
+    ayuda: "El nom de la varietat (p. ex. Conference). Els quilos es posen al pas següent. Deixa-ho buit si no ho saps.",
     etiqueta_es: "¿Qué variedad es?",
-    ayuda_es: "Déjalo vacío si no lo sabes",
+    ayuda_es: "El nombre de la variedad (p. ej. Conference). Los kilos van en el paso siguiente. Déjalo vacío si no lo sabes.",
     seccion: "producte",
     obligatorio: false,
   },
@@ -403,20 +417,24 @@ export const CAMPOS: CampoOferta[] = [
   {
     clave: "horari",
     tipo: "text",
-    etiqueta: "Quin horari de recollida va bé?",
-    ayuda: "matí, tarda, hores…",
-    etiqueta_es: "¿Qué horario de recogida va bien?",
-    ayuda_es: "mañana, tarde, horas…",
+    // Una FRANJA, no una hora (06-10-2026): el productor dice entre qué horas se puede pasar
+    // y la entidad elige la hora concreta dentro de ella.
+    widget: "franja",
+    etiqueta: "Entre quines hores es pot recollir?",
+    ayuda: "La franja en què es pot passar a recollir. L'entitat triarà l'hora concreta dins d'aquesta franja.",
+    etiqueta_es: "¿Entre qué horas se puede recoger?",
+    ayuda_es: "La franja en la que se puede pasar a recoger. La entidad elegirá la hora concreta dentro de esa franja.",
     seccion: "recollida",
-    obligatorio: false,
+    obligatorio: true,
   },
   {
     clave: "modalitat",
     tipo: "opcions",
-    etiqueta: "Quina modalitat és?",
-    ayuda: "Decideix quines entitats la poden rebre i quin document es genera.",
-    etiqueta_es: "¿Qué modalidad es?",
-    ayuda_es: "Decide qué entidades pueden recibirla y qué documento se genera.",
+    multiple: true,
+    etiqueta: "Quina sortida t'interessa?",
+    ayuda: "Pots marcar-ne més d'una si no ho tens clar: l'equip de Redestina triarà la millor en validar l'oferta.",
+    etiqueta_es: "¿Qué salida te interesa?",
+    ayuda_es: "Puedes marcar más de una si no lo tienes claro: el equipo de Redestina elegirá la mejor al validar la oferta.",
     seccion: "modalitat",
     obligatorio: true,
     opciones: MODALITATS,
@@ -477,16 +495,50 @@ export const CAMPOS: CampoOferta[] = [
 export function aplica(campo: CampoOferta, datos: Record<string, unknown>): boolean {
   if (!campo.condicion) return true;
   const conds = Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion];
-  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? "")));
+  return conds.some((c) => valorsDe(datos[c.campo]).some((v) => c.en.includes(v)));
+}
+
+/**
+ * Los valores de una respuesta como lista. Una respuesta MÚLTIPLE (la modalidad del panel)
+ * llega como array; el resto, como un valor suelto. Con `String(array)` una lista de dos
+ * («donacio,venda») no casaría con nada y el preu mínim dejaría de preguntarse.
+ */
+export function valorsDe(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map((x) => String(x ?? ""));
+  return [String(v ?? "")];
+}
+
+/** Una respuesta está vacía: nada, texto en blanco, o una lista sin elementos. */
+function buit(v: unknown): boolean {
+  if (Array.isArray(v)) return v.length === 0;
+  return v === undefined || v === null || String(v).trim() === "";
+}
+
+/** Las modalidades de una respuesta (una o varias), solo las que existen. */
+export function modalitatsDe(v: unknown): string[] {
+  const valides = new Set(MODALITATS.map((m) => m.id));
+  return [...new Set(valorsDe(v).filter((m) => valides.has(m)))];
+}
+
+/** «09:00-13:30» → {desde, fins}. null si no es una franja de horas reconocible. */
+export function parseFranja(texto: string): { desde: string; fins: string } | null {
+  const m = String(texto ?? "").match(/(\d{1,2})(?:[:.h](\d{2}))?\s*(?:-|–|a|fins)\s*(\d{1,2})(?:[:.h](\d{2}))?/i);
+  if (!m) return null;
+  const hh = (h: string, mm?: string) => {
+    const H = Number(h), M = Number(mm ?? "0");
+    if (!(H >= 0 && H <= 23 && M >= 0 && M <= 59)) return null;
+    return `${String(H).padStart(2, "0")}:${String(M).padStart(2, "0")}`;
+  };
+  const desde = hh(m[1], m[2]);
+  const fins = hh(m[3], m[4]);
+  if (!desde || !fins || desde >= fins) return null;
+  return { desde, fins };
 }
 
 /** Campos obligatorios que faltan. Lista vacía = se puede crear la oferta. */
 export function faltantes(datos: Record<string, unknown>): Paso[] {
   return CAMPOS
     .filter((c) => c.obligatorio && aplica(c, datos))
-    .filter((c) => {
-      const v = datos[c.clave];
-      return v === undefined || v === null || String(v).trim() === "";
-    })
+    .filter((c) => buit(datos[c.clave]))
     .map((c) => c.clave);
 }

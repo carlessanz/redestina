@@ -48,6 +48,8 @@ export interface EntidadPuntuada {
    * la oferta y el fallo aparecía al final, al aprobar. Mismo patrón que la deuda 38.
    */
   sense_conveni: boolean
+  /** Para filtrar por tipo de entidad en el panel (06-10-2026). Puede no llegar de un servidor anterior. */
+  tipo_receptor?: string | null
 }
 
 export interface PriorizacionResult {

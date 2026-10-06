@@ -96,14 +96,16 @@ describe('qué es obligatorio', () => {
       'transport',
       'ubicacio',
       'disponible_fins',
+      // La franja es obligatoria desde el 06-10-2026: la entidad elige la hora dentro de ella.
+      'horari',
       'modalitat',
       'preu_minim',
       'causa',
     ])
   })
 
-  it('varietat, caixes, horari y observacions son opcionales', () => {
-    for (const c of ['varietat', 'caixes', 'horari', 'observacions'] as Paso[]) {
+  it('varietat, caixes y observacions son opcionales', () => {
+    for (const c of ['varietat', 'caixes', 'observacions'] as Paso[]) {
       expect(campo(c).obligatorio, `${c} no debería ser obligatorio`).toBe(false)
     }
   })
@@ -214,6 +216,7 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
       'producte_al_camp',
       'kg',
       'disponible_fins',
+      'horari',
       'modalitat',
       'causa',
     ])
@@ -251,7 +254,6 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
     const d = donacionCompleta()
     delete d.varietat
     delete d.caixes
-    delete d.horari
     delete d.observacions
     expect(faltantes(d)).toEqual([])
   })

@@ -44,6 +44,8 @@ export type CuaEquip =
   | 'costos' | 'tancament' | 'documents_error'
   // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
   | 'espigolades_per_convertir'
+  // 06-10-2026: ofertas que esperan la validación del equipo antes de salir al Mercat.
+  | 'ofertes_per_validar'
 
 export interface PendentEquip {
   cua: CuaEquip
@@ -125,6 +127,8 @@ export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptado
     costos: n('costos'),
     // Solo PDFs con error, como antes: es lo único de Documents que necesita una persona.
     documents: n('documents_error'),
+    // Persistente hasta que el equipo valida o cancela (reunión del 06-10-2026).
+    ofertes: n('ofertes_per_validar'),
   }
 }
 

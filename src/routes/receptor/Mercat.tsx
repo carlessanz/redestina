@@ -13,13 +13,16 @@
 // ⚠️ `estado === 'pendent'` SÍ enseña el botón: significa que el equipo le mandó la oferta
 // y todavía no ha contestado. Es la fila que existe justamente para que la conteste.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { useOrganitzacio } from '../../hooks/useAppContext'
+import { useAppContext, useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
-import { clauErrorInteres, manifestaInteres } from '../../lib/ofertes'
+import { clauErrorInteres, fixaRecollidaInteres, manifestaInteres } from '../../lib/ofertes'
+import { darreraVisita, marcaVist } from '../../lib/novetats'
+import AvisAlbaraPendent from '../../components/AvisAlbaraPendent'
+import { textError } from '../../lib/textError'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { dataCurta } from '../../lib/albarans'
 import BadgeEstat from '../../components/proces/BadgeEstat'
@@ -49,6 +52,34 @@ function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boo
   return o.disponible_hasta != null && o.disponible_hasta.slice(0, 10) < avui
 }
 
+/** El grupo de producto para el filtro: «Fruita», «Horta» o la familia tal cual. */
+function grupDe(familia: string | null | undefined): string {
+  const f = familia ?? ''
+  if (f.startsWith('Fruita')) return 'fruita'
+  if (f.startsWith('Horta')) return 'horta'
+  return f || 'altres'
+}
+
+/** El desfase de Madrid ese día («+02:00» en verano, «+01:00» en invierno). */
+function desfasMadrid(dia: string): string {
+  const d = new Date(`${dia}T12:00:00Z`)
+  const h = Number(new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/Madrid', hour: '2-digit', hour12: false }).format(d))
+  const off = h - 12
+  return `${off >= 0 ? '+' : '-'}${String(Math.abs(off)).padStart(2, '0')}:00`
+}
+
+/** Las horas de la franja en cuartos; sin franja, de 6 a 21. */
+function horesDeFranja(o: { horari_desde?: string | null; horari_fins?: string | null }): string[] {
+  const aMin = (v: string) => Number(v.slice(0, 2)) * 60 + Number(v.slice(3, 5))
+  const ini = o.horari_desde ? aMin(o.horari_desde) : 6 * 60
+  const fi = o.horari_fins ? aMin(o.horari_fins) : 21 * 60
+  const res: string[] = []
+  for (let m = ini; m <= fi; m += 15) {
+    res.push(`${String(Math.floor(m / 60)).padStart(2, '0')}:${String(m % 60).padStart(2, '0')}`)
+  }
+  return res
+}
+
 export default function Mercat() {
   const { t } = useT()
   const { bloqueja, tipusVigents, tallPassat } = useConveni()
@@ -67,6 +98,20 @@ export default function Mercat() {
   const [kg, setKg] = useState('')
   const [preu, setPreu] = useState('')
   const [enviant, setEnviant] = useState(false)
+  // Cuándo irá a recoger (06-10-2026): el productor da una franja y la receptora elige.
+  const [diaRecollida, setDiaRecollida] = useState('')
+  const [horaRecollida, setHoraRecollida] = useState('')
+  // Filtros (06-10-2026): por defecto se ve todo; se filtra por zona y por producto.
+  const [filtreZona, setFiltreZona] = useState('')
+  const [filtreGrup, setFiltreGrup] = useState('')
+  // Albarán sin confirmar más de 48 h: no se puede mostrar interés (06-10-2026).
+  const [bloquejatAlbara, setBloquejatAlbara] = useState(false)
+  // Las «noves»: salidas al Mercat desde la última vez que se dejó esta pantalla. Se lee al
+  // entrar y se marca al SALIR, que es lo que baja el badge del menú (novetats.ts).
+  const { ctx } = useAppContext()
+  const userId = ctx?.userId ?? null
+  const [vistAbans] = useState(() => (userId ? darreraVisita('mercat', userId) : null))
+  useEffect(() => () => { if (userId) marcaVist('mercat', userId) }, [userId])
 
   const entidadId = organitzacio?.id ?? null
 
@@ -76,7 +121,7 @@ export default function Mercat() {
     // porqué, en `OfertaReceptor`.
     const [exc, resp, exi] = await Promise.all([
       supabase.from('excedentes')
-        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte')
+        .select('id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, causa, disponible_hasta, horari_recollida, horari_desde, horari_fins, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte, validada_at, created_at')
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
@@ -112,6 +157,8 @@ export default function Mercat() {
     setMode(m)
     setKg(String(o.kg_total ?? ''))
     setPreu(o.preu_minim != null ? String(o.preu_minim) : '')
+    setDiaRecollida('')
+    setHoraRecollida('')
   }
 
   async function envia() {
@@ -124,6 +171,7 @@ export default function Mercat() {
       toast.error(t('mk.max_kg', { n: kgFmt(obert.kg_total) }))
       return
     }
+    if (!diaRecollida || !horaRecollida) { toast.error(t('mk.need_quan')); return }
     setEnviant(true)
     const r = await manifestaInteres({
       excedenteId: obert.id,
@@ -131,13 +179,18 @@ export default function Mercat() {
       kg: nKg,
       preu: preu === '' ? null : Number(preu.replace(',', '.')),
     })
-    setEnviant(false)
     if (!r.ok) {
+      setEnviant(false)
       const e = clauErrorInteres(r.error)
       toast.error(t(e.clau, e.vars))
       return
     }
-    toast.success(t('mk.sent'))
+    // La hora, en una segunda llamada: `manifestar_interes()` es la RPC de siempre y no se
+    // ha tocado. Si esto falla el interés ya está enviado, y se dice así.
+    const q = await fixaRecollidaInteres(r.data?.id ?? '', `${diaRecollida}T${horaRecollida}:00${desfasMadrid(diaRecollida)}`)
+    setEnviant(false)
+    if (!q.ok) toast.warning(t('mk.quan_err', { e: textError(t, q.error) }))
+    else toast.success(t('mk.sent'))
     setObert(null)
     await carrega()
   }
@@ -146,6 +199,16 @@ export default function Mercat() {
   // `return`: son hooks). `foto()` resuelve la principal de cada oferta —la suya, la del
   // producto o el icono—; las demás de la oferta abierta las firma `DetallOfertaReceptor`.
   const foto = useFotosOfertes(obert ? [...ofertes, obert] : ofertes)
+
+  const zones = useMemo(
+    () => [...new Set(ofertes.map((o) => o.comarca).filter(Boolean) as string[])].sort((a, b) => a.localeCompare(b, 'ca')),
+    [ofertes],
+  )
+  const grups = useMemo(() => [...new Set(ofertes.map((o) => grupDe(o.familia)))].sort(), [ofertes])
+  const visibles = ofertes.filter((o) =>
+    (!filtreZona || o.comarca === filtreZona) && (!filtreGrup || grupDe(o.familia) === filtreGrup))
+  const esNova = (o: OfertaReceptor) =>
+    vistAbans != null && (o.validada_at ?? o.created_at ?? '') > vistAbans
 
   if (!entidadId) return <p className="text-sm text-muted-foreground">{t('po.no_org')}</p>
 
@@ -162,6 +225,7 @@ export default function Mercat() {
    */
   const motiuNoPot = (o: OfertaReceptor): string | null => {
     if (vencuda(o, avui)) return 'mk.expired'
+    if (bloquejatAlbara) return 'bloq.albara_pendent'
     if (!tallPassat) return null
     const cal = (o.modalitat ? exigits[o.modalitat] : undefined) ?? []
     const falta = cal.filter((tipus) => !tipusVigents.includes(tipus))
@@ -199,6 +263,39 @@ export default function Mercat() {
         <p className="mt-1 text-sm text-muted-foreground">{t('mk.subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-2">
+        <AvisAlbaraPendent tipusOrg="entidad" orgId={entidadId} tornarA="/receptor/mercat"
+          onCanvi={setBloquejatAlbara} />
+        {/* Filtros: por defecto todo; zona (comarca) y tipo de producto (06-10-2026). */}
+        {ofertes.length > 0 && (
+          <div className="flex flex-wrap items-end gap-3 pb-1">
+            <div>
+              <Label htmlFor="mk-f-zona" className="mb-1 block text-xs text-muted-foreground">{t('mk.f_zona')}</Label>
+              <select id="mk-f-zona" className="h-9 w-48 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={filtreZona} onChange={(e) => setFiltreZona(e.target.value)}>
+                <option value="">{t('mk.f_zona_all')}</option>
+                {zones.map((z) => <option key={z} value={z}>{z}</option>)}
+              </select>
+            </div>
+            <div>
+              <Label htmlFor="mk-f-grup" className="mb-1 block text-xs text-muted-foreground">{t('mk.f_tipus')}</Label>
+              <select id="mk-f-grup" className="h-9 w-48 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={filtreGrup} onChange={(e) => setFiltreGrup(e.target.value)}>
+                <option value="">{t('mk.f_tipus_all')}</option>
+                {grups.map((g) => (
+                  <option key={g} value={g}>{g === 'fruita' ? t('mk.g_fruita') : g === 'horta' ? t('mk.g_horta') : g === 'altres' ? t('mk.g_altres') : g}</option>
+                ))}
+              </select>
+            </div>
+            {(filtreZona || filtreGrup) && (
+              <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={() => { setFiltreZona(''); setFiltreGrup('') }}>
+                {t('mk.f_neteja')}
+              </Button>
+            )}
+          </div>
+        )}
+        {!carregant && !errorCarrega && ofertes.length > 0 && visibles.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t('mk.f_cap')}</p>
+        )}
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && (
           <p className="text-sm text-destructive">{t('c.error')}</p>
@@ -206,7 +303,7 @@ export default function Mercat() {
         {!carregant && !errorCarrega && ofertes.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}
-        {ofertes.map((o) => {
+        {visibles.map((o) => {
           const punt = puntDe(o)
           const motiu = motiuNoPot(o)
           // La tarjeta dice lo que un receptor mira primero (revisión del 23-09-2026):
@@ -232,6 +329,9 @@ export default function Mercat() {
                 <div className="min-w-0">
                 <div className="font-medium">
                   {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
+                  {esNova(o) && (
+                    <span className="ml-2 rounded-full bg-exito-fondo px-2 py-0.5 text-xs font-medium text-exito">{t('mk.nova')}</span>
+                  )}
                 </div>
                 <div className="text-xs text-muted-foreground">{detall}</div>
                 {vencuda(o, avui) && (
@@ -296,6 +396,25 @@ export default function Mercat() {
                       value={kg} onChange={(e) => setKg(e.target.value)} />
                     {obert.kg_total != null && (
                       <p className="mt-1 text-xs text-muted-foreground">{t('mk.max_kg', { n: kgFmt(obert.kg_total) })}</p>
+                    )}
+                  </div>
+                  <div>
+                    <Label htmlFor="mk-dia" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.quan_dia')}</Label>
+                    <Input id="mk-dia" name="dia" type="date" min={avui}
+                      max={obert.disponible_hasta ? obert.disponible_hasta.slice(0, 10) : undefined}
+                      value={diaRecollida} onChange={(e) => setDiaRecollida(e.target.value)} />
+                  </div>
+                  <div>
+                    <Label htmlFor="mk-hora" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.quan_hora')}</Label>
+                    <select id="mk-hora" className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                      value={horaRecollida} onChange={(e) => setHoraRecollida(e.target.value)}>
+                      <option value="">—</option>
+                      {horesDeFranja(obert).map((h) => <option key={h} value={h}>{h}</option>)}
+                    </select>
+                    {obert.horari_desde && obert.horari_fins && (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {t('mk.quan_ajuda', { f: `${obert.horari_desde.slice(0, 5)}–${obert.horari_fins.slice(0, 5)}` })}
+                      </p>
                     )}
                   </div>
                   {obertVenda && (

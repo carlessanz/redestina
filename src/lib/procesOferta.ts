@@ -228,6 +228,14 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
       rol === 'productor' ? '/productor/ofertes/nova' : undefined)
   }
 
+  // 1bis. Pendiente de validar (06-10-2026): la oferta existe pero todavía no ha salido al
+  // Mercat. Va antes que el albarán porque una oferta sin validar no puede tener ninguno.
+  if (fets.estado === 'pendent_validacio') {
+    return rol === 'productor'
+      ? fes('publicada', 'validacio', 0, {}, false)
+      : fes('publicada', 'validacio', 0, {}, true)
+  }
+
   // 2. El papel manda sobre el estado del excedente.
   if (rec?.estado === 'conciliado' || fets.estado === 'cerrada') {
     return fes('tancada', null, 4, { kg: fets.kgCanalitzats }, false,
@@ -358,6 +366,7 @@ export function puntInteres(fets: FetsInteres): PuntProces {
  */
 export function etiquetaEstatOferta(estado: EstadoExcedente): { key: string; clase: string } {
   switch (estado) {
+    case 'pendent_validacio': return { key: 'off.st_pending_validation', clase: 'bg-aviso-fondo text-aviso' }
     case 'publicada': return { key: 'off.st_published', clase: 'bg-secondary text-secondary-foreground' }
     case 'parcial': return { key: 'off.st_partial', clase: 'bg-aviso-fondo text-aviso' }
     case 'bloqueada': return { key: 'off.st_blocked', clase: 'bg-exito-fondo text-exito' }
@@ -370,7 +379,7 @@ export function etiquetaEstatOferta(estado: EstadoExcedente): { key: string; cla
 }
 
 export const ESTATS_OFERTA: readonly EstadoExcedente[] = [
-  'borrador', 'publicada', 'parcial', 'bloqueada', 'cerrada', 'no_colocada', 'cancelada',
+  'borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada', 'cerrada', 'no_colocada', 'cancelada',
 ] as const
 
 /** Los siete estados con su badge y su explicación, para `LlegendaEstats`. */
@@ -426,7 +435,7 @@ export const FASES_EQUIP: readonly FaseEquip[] = [
  * ⚠️ El equipo NO lo usa: su listado necesita el estado exacto para operar.
  */
 export type EstatSimpleOferta =
-  'buscant' | 'gestio' | 'sortida' | 'finalitzada' | 'cancellada' | 'sense_sortida'
+  'validacio' | 'buscant' | 'gestio' | 'sortida' | 'finalitzada' | 'cancellada' | 'sense_sortida'
 
 /** Los estados simples de un interés, tal como los ve la entidad receptora. */
 export type EstatSimpleInteres =
@@ -469,6 +478,7 @@ export function estatSimpleOferta(punt: PuntProces): { estat: EstatSimpleOferta;
     case 'confirmada':
       return fes('sortida', CLASSE_SIMPLE.fet)
     case 'publicada':
+      if (punt.variant === 'validacio') return fes('validacio', CLASSE_SIMPLE.espera)
       return punt.variant === 'gestio' ? fes('gestio', CLASSE_SIMPLE.gestio) : fes('buscant', CLASSE_SIMPLE.espera)
     // `vencuda` solo lo ve el equipo, pero si llegara aquí la oferta sigue sin destino.
     default: return fes('buscant', CLASSE_SIMPLE.espera)
@@ -494,12 +504,12 @@ export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleIntere
 }
 
 export const ESTATS_SIMPLES_OFERTA: readonly EstatSimpleOferta[] =
-  ['buscant', 'gestio', 'sortida', 'finalitzada', 'cancellada', 'sense_sortida'] as const
+  ['validacio', 'buscant', 'gestio', 'sortida', 'finalitzada', 'cancellada', 'sense_sortida'] as const
 export const ESTATS_SIMPLES_INTERES: readonly EstatSimpleInteres[] =
   ['per_respondre', 'interes_enviat', 'assignada', 'tancada', 'no_disponible', 'declinada'] as const
 
 const CLASSE_PER_ESTAT_OFERTA: Record<EstatSimpleOferta, string> = {
-  buscant: CLASSE_SIMPLE.espera, gestio: CLASSE_SIMPLE.gestio, sortida: CLASSE_SIMPLE.fet,
+  validacio: CLASSE_SIMPLE.espera, buscant: CLASSE_SIMPLE.espera, gestio: CLASSE_SIMPLE.gestio, sortida: CLASSE_SIMPLE.fet,
   finalitzada: CLASSE_SIMPLE.tancat, cancellada: CLASSE_SIMPLE.ko, sense_sortida: CLASSE_SIMPLE.ko,
 }
 const CLASSE_PER_ESTAT_INTERES: Record<EstatSimpleInteres, string> = {

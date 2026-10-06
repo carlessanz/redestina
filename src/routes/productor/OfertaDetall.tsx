@@ -1,7 +1,8 @@
 // Detalle de una oferta desde el panel del productor: qué publicó, en qué punto del
-// proceso está y qué le toca hacer (casi siempre, nada). Puede cancelarla; editarla no,
-// porque el texto de la oferta ya ha circulado por WhatsApp y cambiarlo dejaría a las
-// entidades mirando algo que no existe.
+// proceso está y qué le toca hacer (casi siempre, nada). Puede cancelarla y, desde el
+// 06-10-2026, también EDITARLA (reunión con la Fundació: el caso era un cero de más en los
+// kg). El texto se recompone en el servidor; lo que ya circuló por WhatsApp o correo no se
+// puede retirar, y el diálogo lo dice antes de guardar.
 //
 // ES TAMBIÉN LA PANTALLA DE «PUBLICADA». Publicar ya no termina en un toast: `NovaOferta`
 // navega aquí con `state.publicada`, y lo primero que se ve es la referencia, qué pasa
@@ -19,6 +20,7 @@ import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import DialegMotiu from '../../components/DialegMotiu'
+import DialegEditaOferta from '../../components/DialegEditaOferta'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { cancelaOferta } from '../../lib/ofertes'
@@ -111,6 +113,7 @@ export default function ProductorOfertaDetall() {
   // navegador integrado de WhatsApp, donde `prompt()` devuelve `null` sin decir nada y la
   // cancelación no ocurriría.
   const [cancelant, setCancelant] = useState(false)
+  const [editant, setEditant] = useState(false)
   const [ocupatCancel, setOcupatCancel] = useState(false)
 
   async function cancelar(motiu: string) {
@@ -129,7 +132,8 @@ export default function ProductorOfertaDetall() {
 
   const canalitzats = canalitzacions.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(oferta.kg_total ?? 0)
-  const cancelable = ['borrador', 'publicada', 'parcial'].includes(oferta.estado)
+  const cancelable = ['borrador', 'pendent_validacio', 'publicada', 'parcial'].includes(oferta.estado)
+  const editable = ['pendent_validacio', 'publicada', 'parcial'].includes(oferta.estado)
 
   // La fecha se compara en día, no en instante: una oferta disponible «hasta el 23» sigue
   // valiendo el 23 entero.
@@ -270,6 +274,13 @@ export default function ProductorOfertaDetall() {
           ))}
         </CardContent>
       </Card>
+
+      {editable && (
+        <Button variant="outline" className="mr-2 h-11 whitespace-normal md:h-9" onClick={() => setEditant(true)}>
+          {t('edit.button')}
+        </Button>
+      )}
+      <DialegEditaOferta obert={editant} onObert={setEditant} oferta={oferta} onDesada={() => { void carrega() }} />
 
       {cancelable && (
         <Button

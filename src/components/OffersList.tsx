@@ -27,6 +27,8 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useNavigate } from 'react-router'
+import DialegNovaOfertaAssistida from './equip/DialegNovaOfertaAssistida'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -36,7 +38,7 @@ interface Props {
 }
 
 type KgPorExcedente = Record<string, number>
-const ACTIVOS = ['borrador', 'publicada', 'parcial', 'bloqueada']
+const ACTIVOS = ['borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada']
 const TANCADES = ['cerrada', 'no_colocada', 'cancelada']
 
 /**
@@ -73,6 +75,10 @@ export default function OffersList({ onOpen }: Props) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [busqueda, setBusqueda] = useState('')
+  // Alta en nombre de un productor desde aquí (06-10-2026): cuando llaman por teléfono, el
+  // sitio lógico para registrarla es el panel de ofertas, no solo el ciclo guiado.
+  const [altaAssistida, setAltaAssistida] = useState(false)
+  const navigate = useNavigate()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -131,6 +137,8 @@ export default function OffersList({ onOpen }: Props) {
   const foto = useFotosOfertes(totes)
 
   const grups = useMemo(() => ({
+    // Pendientes de validar: las que esperan al equipo (badge de «Ofertes»).
+    perValidar: filtra(actives.filter((o) => o.estado === 'pendent_validacio')),
     actives: filtra(actives),
     tancades: filtra(tancades),
     totes: filtra([...actives, ...tancades]),
@@ -204,8 +212,15 @@ export default function OffersList({ onOpen }: Props) {
   return (
     <Card>
       <CardHeader>
-        <CardTitle>{t('off.title_all')}</CardTitle>
-        <p className="mt-1 text-sm text-muted-foreground">{t('off.subtitle_all')}</p>
+        <div className="flex flex-wrap items-start justify-between gap-2">
+          <div>
+            <CardTitle>{t('off.title_all')}</CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">{t('off.subtitle_all')}</p>
+          </div>
+          <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" onClick={() => setAltaAssistida(true)}>
+            {t('off.new_assisted')}
+          </Button>
+        </div>
         <LlegendaEstats items={llegendaOferta()} />
       </CardHeader>
       <CardContent className="space-y-4">
@@ -214,17 +229,22 @@ export default function OffersList({ onOpen }: Props) {
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!loading && !error && (
-          <Tabs defaultValue="actives">
+          <Tabs defaultValue={grups.perValidar.length > 0 && !senseCoincidencia ? 'validar' : 'actives'}>
             {/* A 360 px tres etiquetas con su cifra van justas: la lista scrollea sola en
                 vez de empujar la página entera hacia la derecha. */}
             <div className="-mx-1 overflow-x-auto px-1">
               <TabsList>
+                <TabsTrigger value="validar">{t('off.tab_validate', { n: grups.perValidar.length })}</TabsTrigger>
                 <TabsTrigger value="actives">{t('off.tab_active', { n: grups.actives.length })}</TabsTrigger>
                 <TabsTrigger value="tancades">{t('off.tab_closed', { n: grups.tancades.length })}</TabsTrigger>
                 <TabsTrigger value="totes">{t('off.tab_all', { n: grups.totes.length })}</TabsTrigger>
               </TabsList>
             </div>
 
+            <TabsContent value="validar" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('off.validate_hint')}</p>
+              {taula(grups.perValidar, senseCoincidencia ? 'off.no_match' : 'off.empty_validate')}
+            </TabsContent>
             <TabsContent value="actives" className="space-y-2">
               {taula(grups.actives, senseCoincidencia ? 'off.no_match' : 'off.empty_active')}
             </TabsContent>
@@ -241,6 +261,11 @@ export default function OffersList({ onOpen }: Props) {
           </Tabs>
         )}
       </CardContent>
+      <DialegNovaOfertaAssistida
+        obert={altaAssistida}
+        onTancar={() => setAltaAssistida(false)}
+        onCreada={(r) => { setAltaAssistida(false); navigate(`/equip/ofertes/${r.id}`) }}
+      />
     </Card>
   )
 }

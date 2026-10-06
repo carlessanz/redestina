@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
+import { marcaTotVist } from '../lib/novetats'
 import { useCanalPropi } from '../hooks/useCanalPropi'
 import type { TriaCanal } from '../hooks/useCanalPropi'
 import { cn } from '../lib/utils'
@@ -135,7 +136,7 @@ export default function UserMenu() {
         {/* `scope: 'local'`: salir cierra ESTE dispositivo. El `signOut()` por defecto es
             global y cerraba también el móvil, o echaba a los demás de una cuenta de prueba
             compartida (decisión del 28-09-2026). */}
-        <DropdownMenuItem onClick={() => void supabase.auth.signOut({ scope: 'local' })}>
+        <DropdownMenuItem onClick={() => { marcaTotVist(ctx?.userId); void supabase.auth.signOut({ scope: 'local' }) }}>
           <LogOut className="size-4" /> {t('nav.logout')}
         </DropdownMenuItem>
       </DropdownMenuContent>

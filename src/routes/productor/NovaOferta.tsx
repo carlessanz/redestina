@@ -16,6 +16,7 @@ import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import FormulariNovaOferta from '../../components/FormulariNovaOferta'
+import AvisAlbaraPendent from '../../components/AvisAlbaraPendent'
 import type { ConvenioTipo } from '../../types'
 
 export default function NovaOferta() {
@@ -24,6 +25,8 @@ export default function NovaOferta() {
   const { bloqueja, tipusVigents, tallPassat } = useConveni()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
+  // Un albarán sin confirmar más de 48 h no deja publicar (06-10-2026).
+  const [bloquejatAlbara, setBloquejatAlbara] = useState(false)
 
   // La matriz `convenios_exigidos`, fila `parte = 'entrega'`: qué convenio exige cada
   // modalidad a quien entrega (hoy donació → don_gen; venda y maquila → com). Se lee de la
@@ -64,9 +67,13 @@ export default function NovaOferta() {
         <p className="mt-1 text-sm text-muted-foreground">{t('po.new_intro')}</p>
       </div>
 
+      <AvisAlbaraPendent tipusOrg="productor" orgId={productorId} tornarA="/productor/ofertes/nova"
+        onCanvi={setBloquejatAlbara} />
+
       <FormulariNovaOferta
         productorId={productorId}
         bloqueja={bloqueja}
+        motiuBloqueig={bloquejatAlbara ? 'bloq.albara_pendent' : null}
         motiuModalitat={motiuModalitat}
         // La referencia, qué pasa ahora y por dónde seguir los cuenta `BlocPublicada` en
         // el detalle, que además se puede volver a mirar. La confirmación por correo solo

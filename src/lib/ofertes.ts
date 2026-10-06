@@ -55,21 +55,19 @@ export interface CampoOferta {
    * en `condicion` solo la primera, para no romper el panel anterior durante la publicación.
    */
   condicions?: CondicioCamp[]
+  /** Se pueden marcar varias opciones (la modalidad, desde el 06-10-2026). */
+  multiple?: boolean
+  /** `franja`: dos horas en cuartos, guardadas como «HH:MM-HH:MM». */
+  widget?: 'franja'
 }
 
 export interface CondicioCamp { campo: string; en: string[] }
 
-/**
- * ¿Este campo se pregunta, dados los datos? Espejo de `aplica()` en
- * `_shared/camposOferta.ts` —que es Deno y no entra en el bundle—; divergir no rompería
- * nada (el servidor valida con el suyo), pero la pantalla preguntaría otra cosa que el bot.
- */
-export function aplicaCamp(campo: CampoOferta, datos: Record<string, unknown>): boolean {
-  const conds = campo.condicions
-    ?? (campo.condicion ? (Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion]) : [])
-  if (conds.length === 0) return true
-  return conds.some((c) => c.en.includes(String(datos[c.campo] ?? '')))
-}
+export { aplicaCamp, partFranja, respostaBuida, semblaQuantitat, valorsDe } from './ofertaPura'
+
+
+
+
 
 /**
  * Da de alta un lugar de recogida del productor (campo, almacén…) desde el alta de oferta.
@@ -196,7 +194,7 @@ export async function creaOferta(
   productorId: string,
   datos: Record<string, unknown>,
 ): Promise<
-  Resultat<{ id: string; id_excedente: string; confirmacio_email?: ConfirmacioEmail }> & {
+  Resultat<{ id: string; id_excedente: string; estado?: string; confirmacio_email?: ConfirmacioEmail }> & {
     /**
      * Las claves (`CampoOferta.clave`) que la RPC echa en falta, cuando el rechazo es
      * `code: 'campos_faltantes'`. El cliente ya valida esto ANTES de llamar (§12.123), así
@@ -226,6 +224,74 @@ export async function creaOferta(
     return { ok: false, error: err instanceof Error ? err.message : String(err) }
   }
 }
+
+/**
+ * Edita una oferta ya creada (06-10-2026): el equipo o su productor. Pasa por `crear-oferta`
+ * en PATCH porque el `texto_oferta` se recompone en el servidor con la función del alta.
+ * `canvis` usa las claves del cuestionario (kg, varietat, horari…). Nunca lanza.
+ */
+export async function editaOferta(
+  excedenteId: string,
+  canvis: Record<string, unknown>,
+): Promise<Resultat<{ canvis: Record<string, { abans: unknown; despres: unknown }> }> & { code?: string }> {
+  try {
+    const t = await token()
+    if (!t) return { ok: false, error: 'unauthorized' }
+    const res = await fetch(`${supabaseUrl}/functions/v1/crear-oferta`, {
+      method: 'PATCH',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: excedenteId, canvis }),
+    })
+    const body = await res.json().catch(() => null) as { error?: string; code?: string; canvis?: Record<string, { abans: unknown; despres: unknown }> } | null
+    if (!res.ok) return { ok: false, error: body?.code ? `edit.err_${body.code}` : (body?.error ?? 'error'), code: body?.code }
+    return { ok: true, data: { canvis: body?.canvis ?? {} } }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** El equipo valida una oferta y fija su modalidad definitiva (`validar_oferta()`). */
+export async function validaOferta(excedenteId: string, modalitat: string | null): Promise<Resultat<Excedente>> {
+  const { data, error } = await supabase.rpc('validar_oferta', {
+    p_excedente: excedenteId,
+    p_modalitat: modalitat,
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data as Excedente }
+}
+
+/** La receptora (o el equipo) dice cuándo irá a recoger. ISO con zona. */
+export async function fixaRecollidaInteres(respostaId: string, quan: string): Promise<Resultat<OfertaRespuesta>> {
+  const { data, error } = await supabase.rpc('fixar_recollida_interes', {
+    p_resposta: respostaId,
+    p_quan: quan,
+  })
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: data as OfertaRespuesta }
+}
+
+export interface AlbaraBloquejant {
+  albaran_id: string
+  numero: string | null
+  tipo: string
+  entregado_at: string
+}
+
+/**
+ * Los albaranes que esta organización tiene sin confirmar más de 48 h. Con alguno no puede
+ * publicar (productor) ni aceptar (receptora). La regla la impone la base; esto es para
+ * poder avisar ANTES. Ante un error devuelve lista vacía: avisar de más no, bloquear por
+ * un fallo de red, tampoco — el servidor sigue cortando.
+ */
+export async function albaransBloquejants(
+  tipusOrg: 'productor' | 'entidad',
+  orgId: string,
+): Promise<AlbaraBloquejant[]> {
+  const { data, error } = await supabase.rpc('albarans_bloquejants', { p_tipo_org: tipusOrg, p_org: orgId })
+  if (error) return []
+  return (data as AlbaraBloquejant[] | null) ?? []
+}
+
 
 /** El productor cancela su propia oferta (RPC con comprobación de pertenencia). */
 export async function cancelaOferta(excedenteId: string, motiu: string): Promise<Resultat<Excedente>> {
@@ -279,6 +345,7 @@ export function clauErrorInteres(missatge: string | null | undefined): {
     }).format(n)
   }
   if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
+  if (m.includes('albara_pendent')) return { clau: 'bloq.albara_pendent' }
   if (m.startsWith('kg_maxim')) {
     const n = num(/(\d+(?:[.,]\d+)?)\s*kg/, 0)
     return n ? { clau: 'mk.err_kg_maxim', vars: { n } } : { clau: 'c.error' }

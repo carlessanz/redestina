@@ -2,6 +2,7 @@
 
 import { sendText } from "./whatsapp.ts";
 import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
+import { modalitatsDe, parseFranja } from "./camposOferta.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -266,6 +267,8 @@ export type OrigenExcedente = "intake" | "panel" | "asistido" | "espigolament";
 /** Resultado de crear un excedente, para que quien llame decida qué contar. */
 export interface ResultadoCreacion {
   ok: boolean;
+  /** `publicada` o `pendent_validacio` (06-10-2026). */
+  estado?: string;
   /** Identificador legible (E-AAMMDD-XXX-YYY-N) cuando ok. */
   idExcedente?: string;
   excedenteId?: string;
@@ -302,10 +305,21 @@ export async function crearExcedente(
     .from("productores").select("poblacion, empresa").eq("id", productor.id).maybeSingle();
 
   const kg = Number(d.kg ?? 0);
-  const preuMinim = d.preu_minim != null ? Number(d.preu_minim) : null;
+  // Una o varias modalidades (06-10-2026): el panel deja marcar varias; el bot, una. La
+  // DEFINITIVA solo se escribe si hay una; con varias la fija el equipo al validar.
+  const modalitats = modalitatsDe(d.modalitat);
+  const modalitat = modalitats.length === 1 ? modalitats[0] : null;
+  const ambPreu = modalitats.some((m) => m === "venda" || m === "maquila");
+  const preuMinim = ambPreu && d.preu_minim != null && d.preu_minim !== "" ? Number(d.preu_minim) : null;
   // El coste que declara el productor (27-09-2026). Solo se pregunta en donació; si no lo
   // dice, null y la canalización toma la referencia del producto.
-  const costKg = d.modalitat === "donacio" ? costDeclarat(d.cost_kg) : null;
+  const costKg = modalitats.includes("donacio") ? costDeclarat(d.cost_kg) : null;
+  // La franja de recogida (06-10-2026). El panel la manda como «HH:MM-HH:MM»; por WhatsApp es
+  // texto libre y se intenta leer igual. Si no se entiende, solo queda el texto.
+  const franja = parseFranja(String(d.horari ?? ""));
+  // Toda oferta nueva espera la validación del equipo antes de salir al Mercat. La excepción
+  // es la que introduce el propio equipo con UNA modalidad: ya la está validando al teclearla.
+  const estado = origen === "asistido" && modalitat ? "publicada" : "pendent_validacio";
   // Se resuelve UNA vez. El texto que circula y la columna que decide el flujo tienen que
   // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
   // cuanto alguien cambie una de las dos.
@@ -329,7 +343,9 @@ export async function crearExcedente(
     quantitat: `${String(kg).replace(".", ",")} kg aprox${d.caixes ? ` · ${textCaixes(Number(d.caixes), d.format_entrega)}` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
     horari: String(d.horari ?? "") || undefined,
-    modalitat: ETIQUETA_MODALITAT[String(d.modalitat ?? "")] ?? String(d.modalitat ?? ""),
+    modalitat: modalitats.length
+      ? modalitats.map((m) => ETIQUETA_MODALITAT[m] ?? m).join(" / ")
+      : String(d.modalitat ?? ""),
     // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
     preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
@@ -378,7 +394,8 @@ export async function crearExcedente(
       fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
       // Sin fotos propias, ¿se enseña la del catálogo? Solo un `false` explícito lo apaga.
       foto_producte: d.foto_producte !== false,
-      modalitat: d.modalitat ?? null,
+      modalitat,
+      modalitats,
       preu_minim: preuMinim,
       coste_kg: costKg,
       causa: causa?.nombre ?? null,
@@ -387,6 +404,8 @@ export async function crearExcedente(
       // reconocible queda null y el panel la normaliza a mano.
       disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
       horari_recollida: d.horari ?? null,
+      horari_desde: franja?.desde ?? null,
+      horari_fins: franja?.fins ?? null,
       observacions: d.observacions ?? null,
       valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
       texto_oferta: textoOferta,
@@ -394,7 +413,7 @@ export async function crearExcedente(
       // cuatro valores y default `'intake'`; escribirlo explícitamente es lo que hace que
       // el default deje de ser una suposición sobre el caso mayoritario.
       origen,
-      estado: "publicada",
+      estado,
     }).select("id").single();
     fila = r.data;
     error = r.error;
@@ -408,7 +427,7 @@ export async function crearExcedente(
     console.error("excedentes insert:", error.message);
     return { ok: false, error: error.message };
   }
-  return { ok: true, idExcedente, excedenteId: fila?.id };
+  return { ok: true, estado, idExcedente, excedenteId: fila?.id };
 }
 
 /**
@@ -460,7 +479,7 @@ export async function crearExcedenteDesdeSesion(
   await sendText(
     supabase, sesion.telefono,
     `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${r.idExcedente}. ` +
-      "L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar.",
+      "L'equip de Redestina la revisarà i, un cop validada, la farà arribar a les entitats que la puguin aprofitar.",
   );
 
   // Y por correo, si la ficha lo tiene (deuda §12.94). No sustituye al WhatsApp de arriba:
@@ -474,4 +493,208 @@ export async function crearExcedenteDesdeSesion(
   await confirmarOfertaPerCorreu(
     productor, r.idExcedente ?? "", r.excedenteId ?? "", sesion.datos_parciales, supabase, "intake",
   );
+}
+
+// ---------------------------------------------------------------------------------------
+// Edición de una oferta ya creada (06-10-2026)
+// ---------------------------------------------------------------------------------------
+//
+// La reunión con la Fundació pidió poder corregir una oferta publicada —el caso real: un
+// cero de más en los kg— tanto el equipo como el propio productor. Hasta hoy no se podía,
+// y el motivo que se daba («el texto_oferta ya circuló») sigue valiendo a medias: el texto
+// se vuelve a componer aquí, con la MISMA función que en el alta, y lo que ya se envió por
+// WhatsApp o correo no se puede retirar. Por eso cada edición deja rastro en
+// `excedente_edicions`.
+
+/** Qué se puede editar y en qué columna vive. La clave es la del cuestionario. */
+export const CAMPS_EDITABLES = [
+  "kg", "varietat", "caixes", "disponible_fins", "horari", "preu_minim", "cost_kg",
+  "observacions", "modalitat",
+] as const;
+export type CampEditable = typeof CAMPS_EDITABLES[number];
+
+/** Estados en que se puede editar. Cubierta o cerrada ya está en manos de los albaranes. */
+export const ESTATS_EDITABLES_PRODUCTOR = ["pendent_validacio", "publicada", "parcial"];
+export const ESTATS_EDITABLES_EQUIP = ["pendent_validacio", "publicada", "parcial", "bloqueada"];
+
+/** «2026-10-06» → «06/10/2026». */
+function isoADdmm(iso: string | null | undefined): string {
+  const m = String(iso ?? "").match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : "";
+}
+
+/**
+ * Vuelve a componer el `texto_oferta` desde la FILA, no desde el cuestionario: después de una
+ * edición la fila es la única fuente que tiene todos los campos.
+ */
+// deno-lint-ignore no-explicit-any
+export async function recomponerTextoOferta(supabase: Cliente, e: any): Promise<string> {
+  const [{ data: ubicacion }, { data: ficha }] = await Promise.all([
+    e.ubicacion_id
+      ? supabase.from("productor_ubicaciones").select("municipio, gmaps_url").eq("id", e.ubicacion_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+    e.productor_id
+      ? supabase.from("productores").select("name, empresa, poblacion").eq("id", e.productor_id).maybeSingle()
+      : Promise.resolve({ data: null }),
+  ]);
+  const modalitats: string[] = Array.isArray(e.modalitats) && e.modalitats.length
+    ? e.modalitats
+    : (e.modalitat ? [e.modalitat] : []);
+  const definitiva = e.modalitat ? [e.modalitat] : modalitats;
+  const kg = Number(e.kg_total ?? 0);
+  const horari = e.horari_desde && e.horari_fins
+    ? `${String(e.horari_desde).slice(0, 5)}-${String(e.horari_fins).slice(0, 5)}`
+    : (e.horari_recollida ?? "");
+  return componerTextoOferta({
+    producte: e.producto ?? "",
+    producteAlCamp: e.producte_al_camp === true,
+    productor: ficha?.empresa || ficha?.name || "",
+    municipi: ubicacion?.municipio ?? ficha?.poblacion ?? "",
+    ubicacio: ubicacion?.gmaps_url || undefined,
+    quantitat: `${String(kg).replace(".", ",")} kg aprox${e.num_caixes ? ` · ${textCaixes(Number(e.num_caixes), e.format_entrega)}` : ""}`,
+    disponible: isoADdmm(e.disponible_hasta),
+    horari: horari || undefined,
+    modalitat: definitiva.map((m) => ETIQUETA_MODALITAT[m] ?? m).join(" / "),
+    preu: e.preu_minim != null ? `${Number(e.preu_minim).toFixed(2).replace(".", ",")} €/kg` : undefined,
+    causa: e.causa ?? "",
+    envasos: textoEnvasos(e.format_entrega, e.retorn_envasos) || undefined,
+    transportPropi: e.transport_propi === true,
+    responsable: "",
+    observacions: e.observacions ?? "",
+  });
+}
+
+export interface ResultatEdicio {
+  ok: boolean;
+  status: number;
+  code?: string;
+  error?: string;
+  canvis?: Record<string, { abans: unknown; despres: unknown }>;
+}
+
+/**
+ * Aplica una edición a una oferta. Quien llama ya ha comprobado que puede tocarla (rol y
+ * propiedad); aquí se valida QUÉ cambia.
+ */
+export async function editarExcedente(
+  supabase: Cliente,
+  // deno-lint-ignore no-explicit-any
+  e: any,
+  canvisDemanats: Record<string, unknown>,
+  opcions: { esEquip: boolean; userId: string | null },
+): Promise<ResultatEdicio> {
+  const estatsOk = opcions.esEquip ? ESTATS_EDITABLES_EQUIP : ESTATS_EDITABLES_PRODUCTOR;
+  if (!estatsOk.includes(String(e.estado))) {
+    return { ok: false, status: 409, code: "no_editable", error: "Aquesta oferta ja no es pot editar" };
+  }
+
+  const fila: Record<string, unknown> = {};
+  const canvis: Record<string, { abans: unknown; despres: unknown }> = {};
+  const marca = (col: string, nou: unknown) => {
+    const abans = e[col] ?? null;
+    if (JSON.stringify(abans) === JSON.stringify(nou ?? null)) return;
+    fila[col] = nou ?? null;
+    canvis[col] = { abans, despres: nou ?? null };
+  };
+  const num = (v: unknown) => (v === null || v === "" || v === undefined ? null : Number(String(v).replace(",", ".")));
+
+  for (const [clau, valor] of Object.entries(canvisDemanats)) {
+    switch (clau as CampEditable) {
+      case "kg": {
+        const kg = num(valor);
+        if (kg == null || !Number.isFinite(kg) || kg <= 0) {
+          return { ok: false, status: 400, code: "kg_invalid", error: "Els kg han de ser un número positiu" };
+        }
+        // No se puede bajar de lo que ya tiene destino.
+        const { data: canals } = await supabase.from("canalizaciones")
+          .select("kg_confirmados").eq("excedente_id", e.id);
+        const canalitzat = ((canals ?? []) as { kg_confirmados: number | null }[])
+          .reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0);
+        if (kg < canalitzat) {
+          return { ok: false, status: 409, code: "kg_sota_canalitzat", error: `Ja hi ha ${canalitzat} kg amb destí` };
+        }
+        marca("kg_total", kg);
+        const { data: prod } = await supabase.from("productos").select("eur_kg").eq("nombre", e.producto).maybeSingle();
+        marca("valor_eur", kg * Number(prod?.eur_kg ?? 1));
+        break;
+      }
+      case "varietat":
+        marca("variedad", String(valor ?? "").trim() || null);
+        break;
+      case "caixes": {
+        const n = num(valor);
+        if (n != null && (!Number.isInteger(n) || n < 0)) {
+          return { ok: false, status: 400, code: "caixes_invalid", error: "Les caixes han de ser un número enter" };
+        }
+        marca("num_caixes", n);
+        break;
+      }
+      case "disponible_fins": {
+        const iso = parseDisponibleFins(String(valor ?? ""));
+        if (!iso) return { ok: false, status: 400, code: "data_invalida", error: "La data no és vàlida" };
+        marca("disponible_hasta", iso);
+        break;
+      }
+      case "horari": {
+        const f = parseFranja(String(valor ?? ""));
+        if (!f) return { ok: false, status: 400, code: "franja_invalida", error: "La franja ha de ser «HH:MM-HH:MM»" };
+        marca("horari_recollida", `${f.desde}-${f.fins}`);
+        marca("horari_desde", `${f.desde}:00`);
+        marca("horari_fins", `${f.fins}:00`);
+        break;
+      }
+      case "preu_minim": {
+        const p = num(valor);
+        if (p != null && (!Number.isFinite(p) || p < 0)) {
+          return { ok: false, status: 400, code: "preu_invalid", error: "El preu ha de ser un número" };
+        }
+        marca("preu_minim", p);
+        break;
+      }
+      case "cost_kg": {
+        const c = num(valor);
+        if (c != null && (!Number.isFinite(c) || c <= 0)) {
+          return { ok: false, status: 400, code: "cost_invalid", error: "El cost per quilo ha de ser un número positiu" };
+        }
+        marca("coste_kg", c);
+        break;
+      }
+      case "observacions":
+        marca("observacions", String(valor ?? "").trim() || null);
+        break;
+      case "modalitat": {
+        // La modalidad solo se cambia ANTES de validar: después decide qué entidades la ven y
+        // qué documento se emite, y ya puede haber intereses con esa regla.
+        if (e.estado !== "pendent_validacio") {
+          return { ok: false, status: 409, code: "modalitat_fixada", error: "La modalitat ja està fixada" };
+        }
+        const ms = modalitatsDe(valor);
+        if (ms.length === 0) return { ok: false, status: 400, code: "cal_modalitat", error: "Cal almenys una modalitat" };
+        marca("modalitats", ms);
+        marca("modalitat", ms.length === 1 ? ms[0] : null);
+        break;
+      }
+      default:
+        return { ok: false, status: 400, code: "camp_no_editable", error: `No es pot editar «${clau}»` };
+    }
+  }
+
+  if (Object.keys(fila).length === 0) return { ok: true, status: 200, canvis: {} };
+
+  const nova = { ...e, ...fila };
+  fila.texto_oferta = await recomponerTextoOferta(supabase, nova);
+
+  const { error } = await supabase.from("excedentes").update(fila).eq("id", e.id);
+  if (error) {
+    console.error("editarExcedente:", error.message);
+    return { ok: false, status: 500, error: error.message };
+  }
+  const { error: errHist } = await supabase.from("excedente_edicions").insert({
+    excedente_id: e.id,
+    editat_per: opcions.userId,
+    canal: opcions.esEquip ? "asistido" : "panel",
+    canvis,
+  });
+  if (errHist) console.error("excedente_edicions:", errHist.message);
+  return { ok: true, status: 200, canvis };
 }
