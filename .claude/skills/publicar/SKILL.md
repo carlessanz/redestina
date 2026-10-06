@@ -22,6 +22,33 @@ Datos fijos del proyecto:
 
 ---
 
+## 🔑 Credenciales: sesión con token temporal (desde el 06-10-2026)
+
+Los pasos 3 y 4 —y cualquier llamada al Management API— necesitan el token de Supabase
+**`Redestina - Admin - Producción`**. Ya **no se lee del llavero** ni de ningún fichero: lo pega
+el usuario en una sesión temporal de su terminal. Procedimiento completo y reglas en
+`AGENTS.md` §11 («Despliegues con token temporal»). En la práctica:
+
+1. Decide al principio **si esta publicación necesita token**: hay migraciones pendientes, una
+   función que redesplegar, un secreto o una llamada al Management API. **Si solo cambia el
+   frontend, no** — basta el `git push` del paso 5; no lo pidas por rutina.
+2. Si lo necesita, dale al usuario el comando para abrir la sesión (o reutiliza la que tenga
+   abierta de Redestina):
+   ```bash
+   bash scripts/sesion-supabase-temporal.sh
+   ```
+3. Prepara después **los comandos exactos** de los pasos 3 y 4 para esta entrega —migraciones
+   concretas, funciones concretas con su flag— y que los ejecute **en esa misma terminal**. Tus
+   herramientas no heredan `SUPABASE_ACCESS_TOKEN`: revisa la salida que te pase (sin secretos).
+4. Nunca pidas el token por chat, no leas el portapapeles, no uses `security find-generic-password`
+   ni la CLI de 1Password, no actives `--debug` ni `set -x`.
+5. Al terminar, recuérdale **`exit`** para cerrar la sesión.
+
+Los pasos que no necesitan token (build, commit, `git push`, comprobaciones de dominio, CORS y
+permisos) los sigues haciendo tú.
+
+---
+
 ## ⚠️ El orden: base de datos → funciones → frontend
 
 **Se publica de abajo arriba, y no es una preferencia de estilo: es la única secuencia sin

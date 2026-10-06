@@ -2043,8 +2043,9 @@ código. ⚠️ **Los convenios NO cambian**: una entidad social verá ya las of
 Comprobado en el navegador con `Menjador Social de Prova`: el Mercat enseña ya la maquila y
 la venta de Mas de Prova, con su precio, junto a las donaciones.
 ⚠️ **Cómo se aplicó, porque es la vía de ahora en adelante**: el login del CLI de esta máquina
-es de otra cuenta de Supabase (Custodia/Reemprende), así que hay un token propio en el llavero,
-**`Supabase Redestina`**, y la migración entra por la API de gestión
+es de otra cuenta de Supabase (Custodia/Reemprende), así que hay un token propio de Redestina
+—desde el 06-10-2026 **`Redestina - Admin - Producción`**, pegado en la sesión temporal (§11);
+antes se leía del llavero como `Supabase Redestina`—, y la migración entra por la API de gestión
 (`POST /v1/projects/uxppvaldhptdomvdhsmn/database/query`) en **una transacción junto con su
 `insert` en `supabase_migrations.schema_migrations` con el número del fichero**. Así el
 historial remoto y el repo casan sin renumerar nada, al revés que `apply_migration` del MCP (§7).
@@ -3904,7 +3905,7 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   `anon` antigua podía usarla— aunque este repo no las usara en ningún sitio. Ahora una
   petición con la `anon` legacy responde **401**, comprobado.
   ```bash
-  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+  TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
   REF=uxppvaldhptdomvdhsmn
   curl -sS -H "Authorization: Bearer $TOKEN" \
     https://api.supabase.com/v1/projects/$REF/api-keys/legacy        # → {"enabled":false}
@@ -3973,19 +3974,21 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   del sandbox de una sesión de Claude Code, `supabase` muere con
   `EPERM … /Users/<tu>/.supabase/telemetry.json.tmp` **antes de hacer nada**, y eso se leyó
   durante días como «el CLI está bloqueado, hay que ir por el MCP». No lo está: el fallo es que
-  no puede escribir su fichero de telemetría. Con un HOME temporal y el token del llavero
-  funciona entero —`functions list`, `functions deploy`, `migration list`—:
+  no puede escribir su fichero de telemetría. Con un HOME temporal y el token en
+  `SUPABASE_ACCESS_TOKEN` funciona entero —`functions list`, `functions deploy`, `migration list`—:
   ```bash
   mkdir -p "$TMPDIR/sbhome"
-  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
-  HOME="$TMPDIR/sbhome" SUPABASE_ACCESS_TOKEN="$TOKEN" supabase functions deploy <funcio>
+  HOME="$TMPDIR/sbhome" supabase functions deploy <funcio>   # con SUPABASE_ACCESS_TOKEN ya exportado
   ```
+  🔁 **Desde el 06-10-2026 el token ya no sale del llavero** (§11, «Despliegues con token
+  temporal»): el usuario lo pega en una sesión de terminal suya y los comandos autenticados se
+  ejecutan **en esa terminal**, que no tiene sandbox. Este rodeo del HOME queda solo como
+  explicación del `EPERM`, por si vuelve a salir.
   ⚠️ Hace falta además **declarar `api.supabase.com` en los dominios permitidos** del comando:
   el sandbox filtra la salida de red y la denegación se lee como `403 Connection blocked by
   network allowlist`, que parece un problema de permisos de la cuenta y no lo es.
   ⚠️ El token va por `SUPABASE_ACCESS_TOKEN` porque el login del CLI vive en `~/.supabase`, que
-  es justo lo que el HOME nuevo deja de ver; el llavero **sí** sigue accesible, porque es por
-  usuario y no depende de HOME.
+  es justo lo que el HOME nuevo deja de ver.
   🔴 **Pero esto NO alcanza a `db push`, y la diferencia importa**: `functions deploy` habla por
   HTTPS con `api.supabase.com` y pasa por el proxy del sandbox; `db push` abre una **conexión
   Postgres directa** al pooler (`aws-0-eu-west-1.pooler.supabase.com:5432`), que no va por el
@@ -4007,7 +4010,7 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   apagó a propósito, aceptando el coste: **el despliegue de funciones pasa a ser siempre
   manual** (§11 y paso 4 de `/publicar`).
   ```bash
-  TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+  TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
   curl -sS -H "Authorization: Bearer $TOKEN" \
     https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/branches
   # Correcto hoy: []  (lista vacía = branching desactivado)
@@ -4934,10 +4937,10 @@ por el **Dashboard o el Management API**, no por `config.toml`. Dos razones:
    remoto** — GoTrue responde entonces "Email logins are disabled", que no es un error de
    contraseña sino del proveedor apagado. Pasó el 21-07-2026 y dejó fuera al equipo.
 
-Para reactivarlo (Management API, con el token del CLI en el keychain):
+Para reactivarlo (Management API, con el token de la sesión temporal, §11):
 
 ```bash
-TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
 curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
   https://api.supabase.com/v1/projects/<ref>/config/auth \
   -d '{"external_email_enabled": true}'
@@ -5043,7 +5046,7 @@ Cuatro cosas que costaron descubrir y siguen valiendo:
    `supabase/.temp/linked-project.json`, que trae `"name": "pdApp-wp"`. **El proyecto se llama
    `Redestina`**, y se comprueba preguntando al remoto en vez de a un fichero local:
    ```bash
-   TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+   TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
    curl -sS -H "Authorization: Bearer $TOKEN" \
      https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn   # → "name": "Redestina"
    ```
@@ -5081,7 +5084,7 @@ procedimiento a repetir el día que cambie el dominio, y porque dos de ellos tie
    `verify_jwt` (§11) — que además es lo que llevó a producción los textos con el nombre nuevo.
 4. **Auth — `site_url` y `uri_allow_list`** por Management API (**nunca** `config push`, §9):
    ```bash
-   TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+   TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
    curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
      https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/config/auth \
      -d '{"site_url":"https://redestina.carlessanz.com","uri_allow_list":"…"}'
@@ -5114,6 +5117,53 @@ Lo único que queda del rename es **el logo** (§10bis, deuda 41).
 
 ## 11. Comandos
 
+### Despliegues con token temporal (06-10-2026)
+
+**Cualquier operación que necesite el token de gestión de Supabase** —`functions deploy`,
+`migration list`, `scripts/aplicar-migracion.ts`, `secrets set`, las llamadas al Management API
+de §7, §9 y §10ter— **se hace dentro de una sesión temporal abierta por el usuario**. El token ya
+no vive en el llavero ni en ningún fichero.
+
+- **Token**: Personal Access Token *scoped* de Supabase, **`Redestina - Admin - Producción`**
+  (mismo nombre en 1Password). Cuenta `hola@carlessanz.com`, organización **Carles Sanz**,
+  **solo** el proyecto `uxppvaldhptdomvdhsmn`. Caducidad **Never** (decisión del usuario, igual que
+  Custodia360). Preset *Full access* con los siete permisos de *Account and organization* en
+  **None**: 34 capacidades read-write y 5 read (Advisors, Logs, Usage Analytics, API Key Secrets,
+  Data API JWT Secret) sobre 1 proyecto. Administra todo dentro de Redestina y nada fuera.
+  ⚠️ No da `supabase projects list` (necesita *Projects account-wide*): no se amplía para eso.
+- **Abrir la sesión**, en una terminal del usuario en el repo:
+  ```bash
+  bash scripts/sesion-supabase-temporal.sh
+  ```
+  Pide el token con entrada oculta (solo el valor `sbp_…`, sin comillas ni `export`), lo exporta
+  como `SUPABASE_ACCESS_TOKEN` en una bash hija sin historial y con el prompt
+  `[Token temporal · Redestina]`. **No despliega nada**: los comandos los prepara el asistente para
+  cada entrega y el usuario los ejecuta ahí. Al terminar, **`exit`** (cerrar la sesión no revoca el
+  token en Supabase).
+
+Reglas para el asistente:
+
+1. Antes de publicar, identifica rama (`main`), SHA, componentes y destino. Tener el token no
+   autoriza por sí solo a publicar, cambiar datos o permisos: valen las reglas de `/publicar`.
+2. **No pidas el token por chat, memoria, adjunto ni captura**, no leas el portapapeles, no uses el
+   llavero (`security find-generic-password`) ni la CLI de 1Password.
+3. Si hace falta token, da el comando de la sesión y luego los comandos concretos de la entrega.
+   **Tus herramientas no heredan la variable** de esa terminal: no supongas que la tienes. Si ya hay
+   una sesión de Redestina abierta, se reutiliza; si es de otro proyecto, `exit` antes.
+4. **Si solo cambia el frontend**, no hace falta token de Supabase: basta el `git push` (Vercel).
+5. No imprimas el entorno ni el token, ni actives `set -x` o `--debug`.
+6. Si un paso falla, para los que dependen de él. Sigue la publicación hasta comprobar el estado
+   final y recuerda `exit` al terminar.
+
+Incidencias: `Invalid access token format` → `exit`, reabrir y pegar solo el token. `401`/`403` →
+revisar vigencia y que el token sea el de Redestina; no cambiar a otro token ni ampliar permisos.
+
+El token anterior, **`Redestina Claude Code`** (llavero: `Supabase Redestina`, caduca 27-02-2027),
+se revoca y se borra del llavero cuando el nuevo esté probado en una publicación real. Lo hace el
+usuario.
+
+### Referencia
+
 ```bash
 npm run dev                # Vite en tu máquina, siempre contra el Supabase REMOTO
 npm run build              # tsc && vite build  (solo mira src/: ni scripts ni Edge Functions)
@@ -5121,12 +5171,11 @@ npm run preview            # servir el build
 
 # ⚠️ No hay Supabase local (§7): la primera base donde se ejecuta una migración es la REAL.
 # Por eso el orden es siempre dry-run y después push.
-# ⚠️ Desde el 27-09-2026, desde una sesión de Claude Code: `db push` no sale del sandbox (conexión
-# Postgres directa) y el login del CLI de esta máquina es de otra cuenta. La vía es el token
-# propio del llavero y el script, que registra la migración con el número del fichero:
-#   TOKEN=$(security find-generic-password -s "Supabase Redestina" -w)
-#   SUPABASE_ACCESS_TOKEN="$TOKEN" deno run -A scripts/aplicar-migracion.ts supabase/migrations/<f>.sql
-# Leer el token ANTES de cambiar HOME (el truco del CLI, §7): si no, `security` no encuentra el llavero.
+# ⚠️ El login del CLI de esta máquina es de otra cuenta. Todo lo que pide token de Supabase va
+# DENTRO de la sesión temporal (ver «Despliegues con token temporal», justo debajo). Ahí dentro,
+# las migraciones van por el script, que las registra con el número del fichero:
+#   deno run -A scripts/aplicar-migracion.ts supabase/migrations/<f>.sql --dry-run
+#   deno run -A scripts/aplicar-migracion.ts supabase/migrations/<f>.sql
 
 # Fotos del catálogo y de las ofertas (27-09-2026), desde scripts/fotos-cataleg.json. Primero en
 # local para REVISARLAS a ojo; luego a la base (salta lo que ya tiene foto, salvo --forcar).
@@ -5211,7 +5260,11 @@ SUPABASE_URL="$VITE_SUPABASE_URL" SB_SECRET_KEY=sb_secret_… \
 
 # Typecheck de lo que `tsc` NO mira. ⚠️ El --config es obligatorio: `deno check` toma la
 # configuración del cwd, no la de la carpeta del módulo, y sin ella no resuelve los imports.
-deno check scripts/*.ts
+# ⚠️ Y los scripts van con --node-modules-dir=none (06-10-2026): al ver package.json, Deno
+# resolvía los `npm:` de jsr:@supabase/supabase-js contra el node_modules de npm, y en cuanto
+# JSR publicó una versión que pide un realtime-js que el lockfile no tiene, el check (y el CI,
+# que hace `npm ci` antes) se rompió sin que nadie tocara nada.
+deno check --node-modules-dir=none scripts/*.ts
 for d in supabase/functions/*/; do [ "$(basename $d)" = "_shared" ] && continue; \
   deno check --config "$d/deno.json" "$d/index.ts"; done
 
@@ -5282,10 +5335,10 @@ supabase secrets set DOCUMENTOS_SECRET='<el mismo valor>'       # secreto de la 
 Logs de las Edge Functions **en remoto**. ⚠️ Este CLI **no tiene `functions logs`** (`supabase
 functions` solo trae list/delete/download/deploy/new/serve), así que durante un tiempo se dio por
 hecho que había que abrir el panel. No hace falta: el **Management API de analítica** los sirve por
-SQL, con el mismo token del keychain que se usa para Auth (§9).
+SQL, con el mismo token de la sesión temporal que se usa para Auth (§9, §11).
 
 ```bash
-TOKEN=$(security find-generic-password -s "Supabase CLI" -w)
+TOKEN="$SUPABASE_ACCESS_TOKEN"   # dentro de la sesión temporal (§11)
 SQL="select timestamp, event_message from function_logs order by timestamp desc limit 20"
 curl -sS -G "https://api.supabase.com/v1/projects/uxppvaldhptdomvdhsmn/analytics/endpoints/logs.all" \
   -H "Authorization: Bearer $TOKEN" --data-urlencode "sql=$SQL"

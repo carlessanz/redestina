@@ -8,11 +8,11 @@
 // que obliga a renombrar. La API de gestión va por HTTPS y deja escribir el registro a mano:
 // el repo y el historial remoto quedan casados 1:1 sin tocar el nombre de nada.
 //
-// Uso (el token es uno personal de la cuenta de Redestina; en esta máquina vive en el
-// llavero como «Supabase Redestina»):
+// Uso: dentro de la sesión temporal (AGENTS.md §11), que exporta SUPABASE_ACCESS_TOKEN con el
+// token «Redestina - Admin - Producción» que pega el usuario:
 //
-//   SUPABASE_ACCESS_TOKEN=$(security find-generic-password -s "Supabase Redestina" -w) \
-//     deno run -A scripts/aplicar-migracion.ts supabase/migrations/<fichero>.sql [--dry-run]
+//   bash scripts/sesion-supabase-temporal.sh
+//   deno run -A scripts/aplicar-migracion.ts supabase/migrations/<fichero>.sql [--dry-run]
 //
 // ⚠️ Es producción: la única base del proyecto es la remota (§7). El `--dry-run` enseña qué
 //    haría y si la versión ya está registrada, sin ejecutar nada.
@@ -22,7 +22,7 @@ const token = Deno.env.get("SUPABASE_ACCESS_TOKEN");
 const fichero = Deno.args.find((a) => !a.startsWith("--"));
 const dryRun = Deno.args.includes("--dry-run");
 
-if (!token) throw new Error("Falta SUPABASE_ACCESS_TOKEN");
+if (!token) throw new Error("Falta SUPABASE_ACCESS_TOKEN: abre antes bash scripts/sesion-supabase-temporal.sh");
 if (!fichero) throw new Error("Uso: aplicar-migracion.ts <fichero.sql> [--dry-run]");
 
 const nombre = fichero.split("/").pop()!;
