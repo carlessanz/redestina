@@ -5158,10 +5158,6 @@ Reglas para el asistente:
 Incidencias: `Invalid access token format` → `exit`, reabrir y pegar solo el token. `401`/`403` →
 revisar vigencia y que el token sea el de Redestina; no cambiar a otro token ni ampliar permisos.
 
-El token anterior, **`Redestina Claude Code`** (llavero: `Supabase Redestina`, caduca 27-02-2027),
-se revoca y se borra del llavero cuando el nuevo esté probado en una publicación real. Lo hace el
-usuario.
-
 ### Referencia
 
 ```bash
