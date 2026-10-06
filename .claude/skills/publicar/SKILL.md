@@ -168,7 +168,7 @@ tampoco prueba nada** (deuda §12.44): una función sin cambios puede volver a e
 deno run -A scripts/huellas-funciones.ts guardar
 ```
 
-**Las diecisiete, cada una con su flag** (el flag tiene que coincidir con lo que declara
+**Las diecinueve, cada una con su flag** (el flag tiene que coincidir con lo que declara
 `config.toml`, que es quien manda):
 
 ```bash
@@ -189,6 +189,8 @@ supabase functions deploy subir-documento-externo                    # verify_jw
 supabase functions deploy limpiar-documentos-prueba                  # verify_jwt (super_admin)
 supabase functions deploy verificar-certificat --no-verify-jwt       # pública: verificar un certificado
 supabase functions deploy reenviar-documento                         # verify_jwt (equipo)
+supabase functions deploy enviar-avis --no-verify-jwt                # la llama la base (avisos)
+supabase functions deploy recollides-programades --no-verify-jwt     # pg_cron cada 15 min
 ```
 
 🔴 **Este paso es la ÚNICA forma de publicar una función: si no la despliegas aquí, no se
@@ -209,7 +211,7 @@ branching activo, un commit de solo markdown cambió las quince), así que solo 
 las funciones que acabas de desplegar. Ahora que el branching está apagado vuelve a ser útil: si
 cambia una que no tocaste, pregúntate por qué. Detalle en §12.44.
 
-Luego comprueba que las diecisiete quedaron `ACTIVE` y con el `verify_jwt` que toca:
+Luego comprueba que las diecinueve quedaron `ACTIVE` y con el `verify_jwt` que toca:
 
 ```bash
 supabase functions list
@@ -218,7 +220,8 @@ supabase functions list
 `true` en `whatsapp-send`, `priorizar-entidades`, `enviar-email`, `crear-oferta`, `enviar-acceso`,
 `descargar-documento`, `subir-documento-externo`, `limpiar-documentos-prueba` y `reenviar-documento`;
 `false` en `whatsapp-webhook`, `intake-recordatorios`, `recuperar-password`, `registro`,
-`generar-documento`, `recordatorios-documentales`, `enlace-publico` y `verificar-certificat`.
+`generar-documento`, `recordatorios-documentales`, `enlace-publico`, `verificar-certificat`,
+`enviar-avis` y `recollides-programades`.
 
 ⚠️ El `verify_jwt` que acaba aplicándose sale de **`config.toml`**, no del flag de la línea de
 comandos: si una función discrepa de esa lista, se corrige ahí y se vuelve a desplegar. Pasó con
