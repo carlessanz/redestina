@@ -158,12 +158,11 @@ Deno.serve(async (req) => {
     // intersección de los «sin convenio» de cada una.
     const ids = (entidades ?? []).map((e: { id: string }) => e.id);
     const modalitats = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
-    let sinConvenio: Set<string> | null = null;
-    for (const m of modalitats) {
-      const sin = await entidadesSinConvenio(supabase, m, ids);
-      sinConvenio = sinConvenio === null ? sin : new Set([...sinConvenio].filter((x) => sin.has(x)));
-    }
-    sinConvenio ??= new Set<string>();
+    const sinPorModalitat: Set<string>[] = [];
+    for (const m of modalitats) sinPorModalitat.push(await entidadesSinConvenio(supabase, m, ids));
+    const sinConvenio: Set<string> = sinPorModalitat.length === 0
+      ? new Set<string>()
+      : sinPorModalitat.reduce((acc, sin) => new Set([...acc].filter((x) => sin.has(x))));
 
     const rankingConCanal = ranking.map((e) => {
       const ficha = porId.get(e.id);

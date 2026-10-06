@@ -80,7 +80,7 @@ Deno.serve(async (req) => {
         && !(perfils ?? []).some((p: { idioma: string | null }) => p.idioma === "ca")) idioma = "es";
   }
 
-  const telefono = (tipo === "productor" ? ficha.phone : ficha.telefono) as string | null;
+  const telefono = ("phone" in ficha ? ficha.phone : ficha.telefono) as string | null;
   const { data: contacto } = telefono
     ? await supabase.from("wa_contacts").select("opt_in, last_inbound_at").eq("phone", telefono.replace(/\D/g, "")).maybeSingle()
     : { data: null };

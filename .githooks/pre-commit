@@ -30,7 +30,7 @@ npx vitest run
 # cambia; correrla siempre haría el hook molesto sin ganar nada.
 if git diff --cached --name-only | grep -qE '^(scripts/|supabase/functions/)'; then
   echo "→ deno check"
-  deno check scripts/*.ts
+  deno check --node-modules-dir=none scripts/*.ts
   for d in supabase/functions/*/; do
     [ "$(basename "$d")" = "_shared" ] && continue
     deno check --config "$d/deno.json" "$d/index.ts"

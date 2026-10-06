@@ -10,7 +10,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "test:cobertura": "vitest run --coverage",
-    "check:deno": "deno check scripts/*.ts && for d in supabase/functions/*/; do [ \"$(basename $d)\" = \"_shared\" ] && continue; deno check --config \"$d/deno.json\" \"$d/index.ts\" || exit 1; done",
+    "check:deno": "deno check --node-modules-dir=none scripts/*.ts && for d in supabase/functions/*/; do [ \"$(basename $d)\" = \"_shared\" ] && continue; deno check --config \"$d/deno.json\" \"$d/index.ts\" || exit 1; done",
     "lint": "eslint src --max-warnings 0",
     "check": "npm run check:tipos && npm run lint && vitest run && npm run check:deno",
     "check:tipos": "tsc && tsc -p tsconfig.tests.json",
