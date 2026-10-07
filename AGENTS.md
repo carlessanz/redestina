@@ -4149,6 +4149,11 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   el MCP no puede publicar cómodamente —habría que pasarle a mano cada fichero de `_shared/`,
   incluido el `activos/incrustats.ts` con las fuentes en base64—, así que sin este rodeo no hay
   forma de desplegarlas desde una sesión con sandbox.
+- **En git solo existen `main` y `staging` (norma del 07-10-2026).** `main` es donde se trabaja y
+  lo que publica Vercel; `staging`, si existe, se conserva. Cualquier otra rama sobra: antes de
+  borrarla se comprueba con `git log origin/main..origin/<rama>` que no le falte nada a `main`, y se
+  borra en local y en remoto. Al publicar no se crea ninguna. Comprobado el 07-10-2026: en GitHub
+  solo había `main` (`reunio-sebastian-2026-10` ya estaba borrada).
 - **Una sola rama en Supabase, siempre `main` (norma del 14-09-2026).** No se crean ramas en
   el proyecto remoto: ni de preview, ni persistentes, ni para probar una migración. Todo el
   esquema vive en la base de producción y se llega a ella por `db push`, igual que el código
@@ -5331,6 +5336,15 @@ Reglas para el asistente:
 
 Incidencias: `Invalid access token format` → `exit`, reabrir y pegar solo el token. `401`/`403` →
 revisar vigencia y que el token sea el de Redestina; no cambiar a otro token ni ampliar permisos.
+
+⚠️ **En la app de escritorio, una orden con `!` desde el chat NO llega a la sesión** (07-10-2026).
+El `!` se ejecuta en la pestaña del panel Terminal **solo si está libre**; la sesión temporal la deja
+ocupada (es una sub-shell), así que el `!` siguiente abre una pestaña nueva **sin token** y se lee como
+`Format is Authorization: Bearer [token]` o `unexpected login role status 401`. Lo que funcionó: el
+usuario escribe **en el panel**, dentro de la sesión, una sola línea `bash scripts/data/<fase>.sh`
+—scripts de la entrega en `scripts/data/` (fuera de git), que dejan su salida en un `.log` que el
+asistente lee— y para recargar el token sin abrir otra sesión, `source scripts/cargar-token.sh`
+(bash o zsh). Cada pestaña nueva parte sin token: cerrar las que sobren y trabajar en una.
 
 ### El clon local (07-10-2026)
 
@@ -6552,8 +6566,8 @@ se va solo **cómo se llegó hasta aquí**.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
    ✅ **Referencia HOY: 1.156/1.156 correctas y 26 sin datos, «Sin fallos de permisos»** (07-10-2026,
-   **contra el clon local**, tras `20270414100000`…`20270414101100`; **producción todavía no las tiene**, hay
-   que aplicarlas en orden y volver a pasar el arnés allí). Sube **104** sobre la anterior (1.052): **18** de
+   tras `20270414100000`…`20270414101100`; medida primero contra el clon local y **confirmada contra
+   producción al publicar `0034a92`**, la misma cifra en las dos bases). Sube **104** sobre la anterior (1.052): **18** de
    la conciliación y el CT (`emitir_certificados_transaccion_cierre` y `albarans_germans_rec`, denegados a las
    siete cuentas externas y al equipo, permitida la primera al super_admin con uuid inventado), **93** de la
    auditoría de funciones (11 en `DOCUMENTAL_EXTERN` × 7 cuentas, 10 en `equip`, el check global
