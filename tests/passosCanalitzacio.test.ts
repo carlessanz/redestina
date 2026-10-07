@@ -191,7 +191,7 @@ describe('el orden de las comprobaciones es la regla de negocio', () => {
 
   it('en modo PRUEBA los datos provisionales ya NO bloquean el certificado', () => {
     // Decisión del cliente del 21-09-2026, y la base hace lo mismo desde
-    // `20260921214526`. Un documento `modo = 'prueba'` usa serie `P-CD`, sale con marca de
+    // `20270328100900`. Un documento `modo = 'prueba'` usa serie `P-CD`, sale con marca de
     // agua y solo llega a fichas `es_test` o al buzón del equipo, así que no puede
     // alcanzar a un donante real: exigirle los datos fiscales de verdad solo conseguía que
     // el último escalón de la guía de prueba fuera inalcanzable para siempre.

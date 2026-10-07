@@ -2,8 +2,8 @@
 //
 // POR QUÉ ES UN EDITOR MÍNIMO Y NO UN CONSTRUCTOR DE FORMULARIOS. Lo que se edita aquí es
 // **texto que redacta la Fundación** y una matriz de reglas de negocio; las dos cosas viven
-// en la base justamente para que cambiarlas no sea un despliegue (20260921231946,
-// 20260921231947). Lo que hace falta desde la aplicación es poder **publicar la versión
+// en la base justamente para que cambiarlas no sea un despliegue (20270328101300,
+// 20270328101400). Lo que hace falta desde la aplicación es poder **publicar la versión
 // siguiente** y **retirar** una medida o una regla; inventar aquí un editor visual de doce
 // preguntas con sus opciones bilingües sería construir la mitad de un CMS para un contenido
 // que va a cambiar dos veces en cinco años.

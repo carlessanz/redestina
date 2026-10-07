@@ -38,6 +38,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { corsPara } from "../_shared/cors.ts";
+import { urlPublica } from "../_shared/url-publica.ts";
 import { esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 // ⚠️ `_shared/pdf/convenio.ts` es PURO (solo importa `bloques.ts`): NO arrastra `pdf-lib`
@@ -251,7 +252,7 @@ async function urlPdf(
   const { data: firma } = await supabase.storage
     .from(BUCKET)
     .createSignedUrl(data.ruta as string, SEGUNDOS_FIRMA);
-  return firma?.signedUrl ?? null;
+  return firma?.signedUrl ? urlPublica(firma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")) : null;
 }
 
 // ---------------------------------------------------------------------------
@@ -860,7 +861,7 @@ async function manejarPost(
   //                  La cuenta va en `payload.panell`, NUNCA en `asistido_por`: esa
   //                  columna significa «alguien del equipo condujo el acto», y decir eso
   //                  de una confirmación propia sería falso en un documento legal.
-  //   · `asistido` — el dinamizador la conduce con la persona delante (20260921160536).
+  //   · `asistido` — el dinamizador la conduce con la persona delante (20270328100200).
   //                  Aquí NO se compone nada: `registrar_confirmacion()` escribe
   //                  `asistido_por` leyéndolo de `enlaces_token.creado_por` dentro de
   //                  SQL, y solo cuando el canal es ese. Que lo imponga la base y no
@@ -880,7 +881,7 @@ async function manejarPost(
 
   // `p_payload` es LO RESPONDIDO por la persona; `p_evidencia.payload`, lo que el
   // servidor constata sobre el acto. `registrar_confirmacion()` los funde con el segundo
-  // encima (20260921160536), igual que `firmar_convenio_por_enlace` (20270320100200).
+  // encima (20270328100200), igual que `firmar_convenio_por_enlace` (20270320100200).
   // `panell` cambia de sitio por eso: no es una respuesta, es una constatación.
   const payload = {
     kg_confirmados: kgConfirmados,

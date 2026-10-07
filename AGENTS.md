@@ -227,11 +227,12 @@ suelto (ver el plan citado arriba).
 | Scripts | Deno 2.x (`scripts/import-ara.ts`) |
 | Hosting frontend | Vercel (proyecto `redestina`) |
 
-> ⚠️ **Una sola base: la remota.** Desde el 14-09-2026 este proyecto **no usa Supabase local**.
-> No hay `supabase start` ni Docker: el CLI se usa solo contra el proyecto enlazado (migraciones
-> con `db push`, funciones con `functions deploy`) y `npm run dev` levanta el frontend en tu
-> máquina apuntando al remoto con `.env.local`. Las consecuencias para el trabajo diario están
-> en §7 (convenciones) y §11 (comandos).
+> ⚠️ **La base de verdad es la remota; el clon local es una copia.** Producción manda: las
+> migraciones se aplican allí (§11) y `npm run dev` apunta allí con `.env.local`. Desde el
+> 07-10-2026 hay además un **clon local completo en Docker** —esquema, datos, cuentas, ficheros,
+> Edge Functions y jobs— para desarrollar sin tocar producción: `npm run dev:local`, la skill
+> `supabase-local` y `scripts/local/` (§11, «El clon local»). Entre el 14-09 y el 07-10-2026 el
+> proyecto no tuvo stack local; lo que §4, §7 y §13 cuentan de esas fechas es histórico.
 
 **Con router** (`react-router` v7, desde 2026-07-30: los paneles por rol necesitan URL propia,
 enlace profundo y gesto «atrás»; el `useState<View>` anterior no daba ninguna de las tres) y sin
@@ -772,6 +773,12 @@ scripts/
   huellas-funciones.ts         Qué Edge Functions cambiaron de verdad entre dos despliegues (§12.44)
   aplicar-migracion.ts         Aplica UNA migración por la API de gestión y la registra en
                                schema_migrations con el número del fichero (§11)
+  historial-migraciones.ts     El historial de migraciones de producción frente al repo
+                               (`comparar`), y la renumeración de la deuda 125 (§7)
+  local/                       EL CLON LOCAL (§11): volcar-produccion.sh (lo ejecuta Carles con el
+                               token), preparar-entorno.sh, cargar-local.sh, copiar-storage.ts,
+                               funciones-local.sh, entorno-local.sh y recompte.ts. Nunca escriben
+                               fuera de 127.0.0.1
   fotos-cataleg.ts (+ .json)   Las fotos del catálogo y de las ofertas desde un MANIFIESTO versionado
                                (fuente, autor y licencia CC0/dominio público de cada una): descarga,
                                recorta, WebP sin metadatos y sube. Los binarios no van a git (§11).
@@ -827,6 +834,8 @@ supabase/
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)
+    _shared/url-publica.ts     Reescribe el origen de una URL firmada con URL_PUBLICA_STORAGE (solo
+                               el clon local; en producción no hace nada, §11)
     _shared/correu-document.ts Qué dice el correo que acompaña a un documento emitido (puro, §4)
     _shared/envia-document.ts  Lo manda: barreras + PDF adjunto + traza. Uno solo para
                                generar-documento y reenviar-documento (§4)
@@ -1243,10 +1252,10 @@ negocio sino el ejemplo ejecutable del formato.
 de que exista `documentos` y el `alter table` fallaría. Que en su día funcionara fue un accidente
 del orden en que se aplicaron —`100200` ya estaba y `100100` llegó después—, y entonces lo habría
 destapado el primer `db reset`.
-⚠️ **Ese destapador ya no existe**: sin stack local (§7) no hay `db reset` ni ninguna forma barata
-de recrear el esquema desde cero, así que **este fallo está latente y solo saldría en el peor
-momento** — el día que alguien monte un proyecto nuevo desde las migraciones. La FK ya está en su
-fichero aparte, que es lo que lo arregla; lo que se pierde es la manera de comprobarlo.
+✅ **Y desde el 07-10-2026 está comprobado**: el clon local (§11) recrea el esquema desde cero con
+las 148 migraciones y sale **idéntico al de producción** (comparado sin comentarios). Entre el
+14-09 y el 07-10 este párrafo decía que el fallo estaba latente porque no había forma de
+recrear nada; ahora la hay, y es la forma de comprobar cualquier migración nueva.
 
 **`enlaces_token`** — firmar y confirmar **sin tener cuenta** (`20260928100300`): `proposito`
 (`firma_convenio`·`confirmacion_albaran`·`subida_factura`), `objeto_tipo` + `objeto_id`,
@@ -2307,8 +2316,9 @@ sesión** → `401` (no `403`).
 key, como el navegador— y comprueba una matriz declarativa de *(cuenta, tabla, operación) →
 permitir/denegar*. **La cifra de referencia está en §13 y solo ahí**: este párrafo llegó a decir
 95/95 cuando §13 ya iba por 442, que es el desfase exacto que el skill `/publicar` también sufrió
-dos veces. Abre sesión de verdad contra el proyecto remoto, así que una cuenta que no puede
-entrar sale en rojo: no hay ninguna rama alternativa desde que se retiró el Supabase local (§7).
+dos veces. Abre sesión de verdad contra la base a la que apunte `SUPABASE_URL` —producción o el
+clon local (§11)—, así que una cuenta que no puede entrar sale en rojo. Contra el clon da la
+misma cifra que contra producción, porque lleva las mismas cuentas y los mismos datos.
 
 Del sistema documental comprueba que el técnico lee plantillas y parámetros pero **no los
 escribe**, que el super_admin sí, que ninguna cuenta externa ve plantillas, parámetros, enlaces ni
@@ -4022,13 +4032,20 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   —**otra base de datos**, y además un proyecto aparte en la cuenta—: esa se integra en `main`
   y se borra. Verificado tras desactivar: la lista quedó vacía, el proyecto sigue
   `ACTIVE_HEALTHY`, la base responde y las quince funciones siguen `ACTIVE`.
-- **Sin Supabase local (14-09-2026)**: este proyecto trabaja SIEMPRE contra el proyecto
-  remoto enlazado. No se usa `supabase start`, ni Docker, ni el rango de puertos 553xx que
-  usaba antes. `supabase/config.toml` conserva solo lo que hace falta para el remoto
-  (`project_id`, `major_version`, migraciones, `edge_runtime` y el bloque de cada función);
-  las secciones del stack local se retiraron. Las migraciones se aplican con
-  `supabase db push --dry-run` y después `supabase db push` (§11), así que el SQL tiene que
-  ser revisable e idempotente: el primer sitio donde se ejecuta ya es la base real.
+- **Producción y el clon local (07-10-2026)**. Producción es la base de verdad y la primera
+  donde se aplica de verdad una migración (con `scripts/aplicar-migracion.ts`, §11), así que el
+  SQL tiene que ser revisable e idempotente. Lo nuevo es que **antes** se puede probar en el
+  **clon local** (§11, «El clon local»): `supabase/config.toml` vuelve a tener las secciones del
+  stack local (puertos 553xx, Auth como producción, sin analítica) y todo lo que crea Docker
+  lleva «Redestina» en el nombre (`project_id`). Entre el 14-09 y el 07-10-2026 no hubo stack
+  local: se retiró aquel día y se recuperó como clon de producción.
+  🔴 **Las 148 migraciones reconstruyen producción desde cero** desde el 07-10-2026 (deuda 125,
+  cerrada): las 22 que llevaban la fecha real del 21/22-09 se renumeraron a
+  `20270328100100`…`102200` —el sitio en que producción las aplicó de verdad, según git— en el
+  repo **y** en el historial de producción a la vez (`scripts/historial-migraciones.ts`).
+  ⚠️ **Al aplicar una migración, su número es el del fichero, siempre**: `aplicar-migracion.ts`
+  lo registra así. Lo que obligó a renumerar fue `apply_migration` del MCP, que registra la
+  fecha real; no se vuelve a usar para migraciones.
 
 ## 8. Reglas de negocio
 
@@ -4905,7 +4922,8 @@ aprueba**.
   30-07-2026 y verificado (§4bis): cada cuenta ve solo lo suyo, y `hola@carlessanz.com` es
   `super_admin`. Dar de alta una cuenta ya **no** equivale a dar acceso total: sin rol ni membresía
   activa no se ve nada. Se revierte con `deno run -A scripts/roles-activos.ts off`.
-- `enable_signup = false` vive en `config.toml` y **debe seguir así**: el alta pasa siempre por
+- `enable_signup = false` vive en el proyecto remoto (Management API) y, desde el 07-10-2026,
+  también en `[auth]` del `config.toml` para el clon local. **Debe seguir así**: el alta pasa siempre por
   nuestro código (Admin API o la Edge Function `registro`, que la ignora porque usa `service_role`).
   Si alguien reactivara el flag, cualquiera podría registrarse **saltándose la validación del
   equipo** y quedaría con una cuenta sin membresía —que hoy no ve nada, pero tampoco pasa por la
@@ -4947,8 +4965,10 @@ curl -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/js
 ```
 
 Los dos flags se gobiernan **solo desde el proyecto remoto**, con el Management API de arriba.
-Este proyecto no tiene stack local (§7), así que `supabase config push` no entra en el flujo
-—y seguiría prohibido (§9)— y `npm run dev` trabaja con `.env.local`, que apunta al remoto.
+⚠️ Desde el 07-10-2026 `config.toml` vuelve a tener `[auth]` —para el clon local, con
+`site_url` en localhost—, así que un `config push` sería **todavía más dañino** que el de
+julio. Sigue prohibido. Y en el clon, `[auth.email] enable_signup` va a `true` a propósito: es el
+interruptor del proveedor, y en `false` el stack local apaga el login con contraseña.
 
 ## 10. Variables de entorno
 
@@ -4997,6 +5017,9 @@ Este proyecto no tiene stack local (§7), así que `supabase config push` no ent
 - `APP_URL` — URL de la app para el `redirectTo` del reset. Valor actual:
   `https://redestina.carlessanz.com`; tiene que estar en la allow-list de Auth (`uri_allow_list`).
 - `SB_SECRET_KEY` (`sb_secret_...`)
+- `URL_PUBLICA_STORAGE` — **solo en el clon local** (`supabase/.env.funciones-local`, §11): el
+  origen público con el que `descargar-documento` y `enlace-publico` reescriben las URLs firmadas,
+  que dentro de Docker salen con `http://kong:8000`. En producción no existe y no se crea.
 - `SUPABASE_URL` (la inyecta Supabase automáticamente)
 
 **Redirect URLs de Auth** (Management API, no config push): `site_url` = APP_URL y `uri_allow_list`
@@ -5158,15 +5181,81 @@ Reglas para el asistente:
 Incidencias: `Invalid access token format` → `exit`, reabrir y pegar solo el token. `401`/`403` →
 revisar vigencia y que el token sea el de Redestina; no cambiar a otro token ni ampliar permisos.
 
+### El clon local (07-10-2026)
+
+Una **copia completa de producción en Docker**, para desarrollar y probar sin tocarla. Todo lo que
+crea Docker lleva «Redestina» en el nombre (`supabase_db_Redestina`, la red
+`supabase_network_Redestina`…: el CLI lo toma de `project_id`) y usa los puertos 553xx:
+
+| Servicio | Dirección |
+| --- | --- |
+| API (y Edge Functions en `/functions/v1`) | `http://127.0.0.1:55321` |
+| Postgres | `127.0.0.1:55322` (`postgres`/`postgres`) |
+| Studio | `http://127.0.0.1:55323` |
+| Buzón de pruebas (Mailpit) | `http://127.0.0.1:55324` (los correos de Redestina NO llegan aquí: van por Resend y en local se simulan) |
+| Frontend (`npm run dev:local`) | `http://localhost:5173`, con la cortina igual que producción |
+
+**Qué es igual que producción, comprobado el 07-10-2026**:
+- el esquema de `public`, **idéntico línea a línea** quitando comentarios: lo construyen las 148
+  migraciones desde cero (deuda 125, cerrada);
+- las 51 tablas, las cuentas (`auth.users` e `auth.identities`, con su contraseña), los 244
+  ficheros de los buckets, los 8 jobs, las políticas de Storage, las extensiones y el historial
+  de migraciones (`scripts/local/recompte.ts comparar`: «Ninguna diferencia»);
+- el arnés de permisos: 1.052/1.052 y 26 sin datos, la misma cifra (§13).
+
+**Qué es distinto a propósito**:
+- `app_config` **no se copia**: son los secretos de producción, y con ellos los jobs locales
+  llamarían a las funciones de producción. El clon lleva secretos propios, y
+  `functions_base_url = http://kong:8000/functions/v1`, así que **todos** los jobs y triggers
+  llaman a las funciones LOCALES. El del intake también desde `20270413100000`, que lo pasó por
+  `url_funciones()`: era la única llamada con la URL de producción escrita a mano.
+- Correo y WhatsApp **simulados** (`RESEND_ENVIO_REAL=false`, `WHATSAPP_ENVIO_REAL=false`, y sin
+  claves de Resend ni de Meta).
+- `roles_activos` y `test_mode` encendidos siempre, aunque producción los cambie.
+- El webhook de WhatsApp no recibe nada: Meta solo llama a producción (haría falta un túnel).
+- Las URLs firmadas de Storage salen con `http://kong:8000`, que el navegador no abre; en local
+  las reescribe `URL_PUBLICA_STORAGE` (`_shared/url-publica.ts`). En producción la variable no
+  existe. ⚠️ No puede llamarse `SUPABASE_*`: el CLI descarta en silencio esas variables.
+
+**Montarlo o refrescarlo** (el orden importa):
+
+```bash
+# 1. Arrancar el stack (la skill supabase-local, o `supabase start`). Con la base vacía
+#    aplica las 148 migraciones.
+# 2. Volcar producción: lo hace Carles, en la sesión del token (solo lee de producción).
+bash scripts/local/volcar-produccion.sh            # → supabase/.local-dump/ (fuera de git)
+# 3. Entorno local: secretos locales y claves del stack (ficheros .env* fuera de git).
+bash scripts/local/preparar-entorno.sh
+# 4. Cargar datos y cuentas (una transacción; sin triggers; comprueba las FK y compara con producción).
+bash scripts/local/cargar-local.sh
+# 5. Copiar los ficheros de los buckets (de producción solo lee).
+deno run -A --node-modules-dir=none scripts/local/copiar-storage.ts
+# 6. Servir las funciones y el frontend.
+bash scripts/local/funciones-local.sh               # en una pestaña aparte; Ctrl+C para
+npm run dev:local
+# Scripts del repo contra el clon (en vez de `source .env.local`):
+eval "$(bash scripts/local/entorno-local.sh)"; deno run -A --node-modules-dir=none scripts/comprobar-rls.ts
+```
+
+⚠️ **Probar una migración nueva**: `supabase migration up` (sin `--linked`) la aplica al clon; y
+`supabase db reset` (sin `--linked`) reconstruye el clon desde cero, después de lo cual hay que
+repetir los pasos 4 y 5. **Nunca `--linked`** con `db reset`: el repo está enlazado a producción.
+⚠️ Los scripts de `scripts/local/` se niegan a seguir si la URL no es `127.0.0.1`/`localhost`.
+⚠️ `supabase/.local-dump/` lleva datos personales de prueba y hashes de contraseñas: nunca a git
+ni a la carpeta de consultoría.
+⚠️ Al acabar, la skill `supabase-local` pregunta si se para el stack (libera ~1 GB; los datos se
+conservan en los volúmenes).
+
 ### Referencia
 
 ```bash
-npm run dev                # Vite en tu máquina, siempre contra el Supabase REMOTO
+npm run dev                # Vite en tu máquina, contra PRODUCCIÓN (.env.local)
+npm run dev:local          # Vite contra el CLON LOCAL (.env.supabase-local.local, §11 «El clon local»)
 npm run build              # tsc && vite build  (solo mira src/: ni scripts ni Edge Functions)
 npm run preview            # servir el build
 
-# ⚠️ No hay Supabase local (§7): la primera base donde se ejecuta una migración es la REAL.
-# Por eso el orden es siempre dry-run y después push.
+# ⚠️ Producción es la base de verdad (§7). Una migración se prueba ANTES en el clon local
+# (`supabase migration up`, sin --linked) y después se aplica en producción con dry-run y push.
 # ⚠️ El login del CLI de esta máquina es de otra cuenta. Todo lo que pide token de Supabase va
 # DENTRO de la sesión temporal (ver «Despliegues con token temporal», justo debajo). Ahí dentro,
 # las migraciones van por el script, que las registra con el número del fichero:
@@ -5538,6 +5627,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **07-10-2026: se cierra la 125** (el repo ya reconstruye producción desde cero, §11 «El clon
+local»): **45 vivas** y la siguiente entrada nueva sigue siendo la 131.
 ⚠️ **05-10-2026: se abre la 130** (la pantalla guiada no elige modalidad): **46 vivas** y la
 siguiente entrada nueva es la 131.
 ⚠️ **28-09-2026: se abre y se cierra la 129** (ningún documento salía por correo): siguen **45
@@ -5997,30 +6088,6 @@ de sus entregas (§4bis, `20260922124240`), el desmontaje de la pantalla en cada
 contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla tiraba
 (§4bis). Las seis numeradas (119-124) están en §12ter.
 
-125. 🔴 **Las cinco migraciones de la vía asistida están ahora ANTES de las tablas que usan.**
-     Se renombraron el 22-09-2026 de su fecha de proyecto (`20270329100000`…`20270402100000`) a
-     la fecha real con la que quedaron registradas al aplicarlas por MCP
-     (`20260921160536`…`20260921171041`), que es lo que pide §7 y lo que hace que `db push` vea
-     cero pendientes en vez de cinco. **El precio, decidido con el cliente sabiendo cuál era**:
-     cuatro de las cinco usan `enlaces_token`/`evidencias` (`20260928100300`), `albaranes` y
-     `espigoladas` (`20261012100*`), `cierres_donante` (`20261109100000`) y `convenios`
-     (`20270111100000`), todas con timestamp **mayor**, así que en un entorno recreado desde
-     cero se aplicarían antes de que esas tablas existan y fallarían.
-     ⚠️ **Contra el remoto de hoy no cambia nada**: las cinco están aplicadas y el historial
-     cuadra. Es un fallo **latente**, igual que el de la FK `20260928100250` (§4), y con el
-     mismo destapador: el día que alguien monte un proyecto nuevo desde las migraciones. Sin
-     stack local (§7) no hay forma barata de comprobarlo.
-     ⚠️ La alternativa que lo habría evitado era la contraria —corregir el historial remoto para
-     que llevara las versiones de proyecto, dejando los ficheros donde estaban— y se descartó
-     explícitamente: tocar `schema_migrations` por algo que no rompe nada hoy se consideró peor.
-     Si algún día hay que recrear desde cero, la salida es renumerar las cinco por encima de
-     `20270111100000` y arreglar el historial remoto en la misma operación.
-     ⚠️ Y queda **una referencia que no se pudo actualizar**: `20260921231950_rpc_diagnostic.sql`
-     cita `20270402100000` en un comentario, y es una migración aplicada — editarla está
-     prohibido (§7). Las demás referencias del repo sí se actualizaron; de paso se corrigieron
-     cuatro comentarios de `comprobar-rls.ts` que citaban esa migración hablando del **borrado de
-     ficha**, que es `20260921153439`.
-
 126. **`documentos_objeto_existe` no conoce `cierre_periodo` ni el archivo de una ficha.** El
      `case` del trigger (`20260928100200:270-276`) resuelve `albaran`, `convenio`,
      `cierre_donante`, `espigolada` y `plan`; `cierre_periodo` **sí está** en el CHECK de
@@ -6090,7 +6157,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
 | 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
-| 125 | Las cinco migraciones de la vía asistida llevan su fecha real, no la de proyecto | Repo y base cuadran y `db push` ve cero pendientes, pero cuatro de ellas quedan por delante de las tablas que usan: una recreación **desde cero** fallaría. Hoy no cambia nada —están aplicadas— y la alternativa (tocar `schema_migrations`) se descartó explícitamente |
 | 21 | Sin fallback a correo dentro de `whatsapp-send`; el intake no tiene equivalente por correo | El primero es diseño (lo orquesta el llamante, que sabe qué texto tiene sentido); el segundo no puede tenerlo: no hay sesión de intake sin WhatsApp. La vía sin WhatsApp es el panel (§6ter) |
 | 55 | El GRANT de columna se puede reabrir con un `grant select on all tables` masivo | Ya son 5 de 5 columnas sensibles con check dedicado en el arnés (14-09-2026). La causa de fondo —`alter default privileges` de Supabase concede SELECT a tabla nueva salvo `revoke` explícito— es de la plataforma, no del repo: la vigilancia es la única defensa posible |
 
@@ -6123,7 +6189,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **78** entradas de §12 que están resueltas. Su cuerpo se retiró del documento el 15-09-2026;
+Las **85** entradas de §12 que están resueltas (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -6225,13 +6291,15 @@ se va solo **cómo se llegó hasta aquí**.
 | 99 | Los paneles externos listaban el plan solo por su PDF, sin enlace al diagnóstico y con el plan sustituido pintado «Emès» | 28-09-2026 |
 | 129 | Ningún documento salía por correo: `documentos.envio` se preparaba y no lo leía nadie | 28-09-2026 |
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
+| 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.111 pruebas en 39 ficheros**: 1.110 correctas y **1 saltada a propósito**, la
-   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (05-10-2026,
+   Referencia: **1.115 pruebas en 40 ficheros**: 1.114 correctas y **1 saltada a propósito**, la
+   de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (07-10-2026:
+   +4 de `tests/urlPublica.test.ts`, la URL firmada del clon local. Antes, 1.111 en 39 (05-10-2026,
    rebanada 4: el interés por producto en la priorización y el filtro del ranking. Rebanada 3: el correo de la recogida programada y `localDateTime`. Rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
    «pendent de validació» en `procesOferta.test.ts`. Antes, 1.040 en 35 (05-10-2026:
    +4 de `rankingEntitats.test.ts`, +5 de `filtresMercat.test.ts` y +2 de `varietatSemblaQuantitat`.
@@ -6439,11 +6507,11 @@ se va solo **cómo se llegó hasta aquí**.
    (`REC-2026-00001`, `ENT-2026-00001`…`00004`, `OPE-2026-00001`, `CONV-DON-GEN-2026-0001`,
    `PLA-2026-0001/2`), y **no se pueden borrar**: `documentos_no_esborrar` solo permite el
    `delete` con `modo = 'prueba'` (§4). O sea que el primer albarán real de 2026 será el `00002`.
-   ⚠️ **Ya no hay una segunda referencia «en local».** Hasta el 14-09-2026 esta lista traía
-   también la del stack local con el fixture entero (411 comprobaciones), que salía más alta
-   porque allí sí existían albaranes, cierres y convenios de prueba. **Sin stack local esa cifra
-   no se puede reproducir**, así que se retira en vez de dejarla envejecer: la única referencia
-   viva es la de arriba, contra el remoto (§7).
+   ✅ **Y contra el clon local da exactamente la misma cifra** (07-10-2026: 1.052/1.052 y 26 sin
+   datos), porque el clon lleva las mismas cuentas y los mismos datos. Se ejecuta con
+   `eval "$(bash scripts/local/entorno-local.sh)"` delante (§11). Si las dos cifras divergen, o el
+   clon está desfasado (refrescarlo) o algo distinto se ha aplicado en uno de los dos. La
+   referencia del stack local anterior (411, hasta el 14-09-2026) ya no vale para nada.
    **Cualquier FALLA es una regresión**: ya no hay rojos «conocidos y correctos» que haya que
    aprender a ignorar (§12.48). Una cuenta que no existe en esa base tampoco es un fallo: sale
    SALTADA, con el mismo criterio.

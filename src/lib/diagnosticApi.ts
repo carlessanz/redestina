@@ -2,10 +2,10 @@
 //
 // Todo lo que escribe es una RPC, nunca un `update`: `authenticated` no tiene ninguna
 // escritura sobre `planes_prevencion` ni sobre `questionaris_diagnostic` (20270301100000,
-// 20260921231946). Y no podría tenerla aunque se quisiera: guardar el diagnóstico y generar
+// 20270328101300). Y no podría tenerla aunque se quisiera: guardar el diagnóstico y generar
 // su plan **son la misma transacción** —entre dos llamadas existiría un instante con un
 // cuestionario contestado y un plan que dice otra cosa, y si la segunda falla ese instante
-// se queda para siempre (§20260921231950)—.
+// se queda para siempre (§20270328101700)—.
 //
 // Mismo contrato que `albarans.ts`, `canalitzacio.ts` y `documents.ts`: **nunca lanza**.
 // Devuelve `ok` y, cuando no, el mensaje que da la base —que ya viene en catalán y dice qué

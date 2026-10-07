@@ -117,7 +117,7 @@ describe('qué es obligatorio', () => {
 
 describe('producte al camp: la oferta dice si hay que ir a collir', () => {
   // No es un matiz descriptivo: decide si el equipo puede convertir la oferta en una
-  // espigolada (`crear_espigolada(p_excedente => …)`, 20260921221806) y es lo que la
+  // espigolada (`crear_espigolada(p_excedente => …)`, 20270328101000) y es lo que la
   // entidad necesita saber antes de comprometerse a recoger algo que aún está en la planta.
   it('es obligatorio: no se puede publicar sin decirlo', () => {
     expect(campo('producte_al_camp').obligatorio).toBe(true)

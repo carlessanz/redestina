@@ -3,7 +3,7 @@
 //
 // 🔴 POR QUÉ ESTA PRUEBA ES LA QUE SOSTIENE LA FASE. `src/lib/diagnostic.ts` reimplementa en
 //    TypeScript la gramática de condiciones que vive en SQL (`avaluar_regla`,
-//    20260921231947), porque ocultar una pregunta condicional mientras se escribe no se
+//    20270328101400), porque ocultar una pregunta condicional mientras se escribe no se
 //    puede hacer con una ida y vuelta por tecla. Las dos copias tienen que decidir igual, y
 //    **divergir no falla: miente**. Si la pantalla oculta una pregunta que el servidor
 //    considera aplicable, esa pregunta cuenta como obligatoria sin contestar: el formulario

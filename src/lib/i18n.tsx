@@ -2031,7 +2031,7 @@ const ca: Dict = {
   'ver.scope': 'Aquest certificat acredita quilos d’aliments rebuts dins del període indicat. No recull cap import i no és un certificat de donació a efectes fiscals.',
   'ver.foot': 'Redestina · Fundació Espigoladors',
 
-  // --- Diagnòstic de prevenció (F2, migracions 20260921231946…231950) ---
+  // --- Diagnòstic de prevenció (F2, migracions 20270328101300…231950) ---
   //
   // ⚠️ El qüestionari sembrat és PROVISIONAL: text de treball fins que la Fundació tanqui
   //    l'annex B. Els textos d'aquí no el descriuen —el contingut viu a la base—: només

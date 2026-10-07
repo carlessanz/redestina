@@ -50,15 +50,25 @@ Actualiza `AGENTS.md` cuando cambie cualquiera de estas cosas:
 - variables de entorno o comandos
 - deuda técnica: lo que se resuelva se tacha, lo que se introduzca se anota
 
-## Una sola base de datos: la remota
+## Producción es la base de verdad; el clon local es una copia
 
-**Este proyecto no usa Supabase local** (desde el 14-09-2026). No hay `supabase start`, ni
-Docker, ni puertos 553xx: el CLI trabaja solo contra el proyecto enlazado, `npm run dev` levanta
-el frontend en tu máquina **apuntando al remoto**, y la primera base donde se ejecuta una
-migración es la real — por eso va siempre `supabase db push --dry-run` antes de `db push`.
+**Producción (el proyecto remoto) sigue siendo la única base de verdad**: las migraciones se
+aplican allí con `scripts/aplicar-migracion.ts` dentro de la sesión del token (AGENTS.md §11),
+y `npm run dev` levanta el frontend **apuntando al remoto** con `.env.local`.
 ⚠️ `.env.local` **no es «Supabase local»**: es el nombre que Vite da a las variables de esta
-máquina, y su contenido apunta al remoto. Renombrarlo rompe `npm run dev`. Detalle en
-`AGENTS.md §7` y §11.
+máquina, y su contenido apunta a producción. Renombrarlo rompe `npm run dev`.
+
+**Desde el 07-10-2026 hay además un CLON LOCAL completo en Docker** (todo con «Redestina» en el
+nombre, puertos 553xx): mismo esquema —las 148 migraciones lo reconstruyen idéntico—, los datos,
+las cuentas y los ficheros de producción, las Edge Functions con secretos solo locales y el
+frontend con `npm run dev:local`. Sirve para desarrollar y probar sin tocar producción. Se
+arranca y se para con la skill `supabase-local`, y se monta o refresca con `scripts/local/`
+(AGENTS.md §11, «El clon local»). Tres reglas que no se rompen:
+- **nunca `supabase db reset --linked`** (el repo está enlazado a producción y la borraría);
+- **nunca `supabase config push`** (subiría la configuración de Auth local, §9);
+- **nunca `source .env.local` ni `.secrets.env` para trabajar contra el clon**: los scripts
+  locales salen de `eval "$(bash scripts/local/entorno-local.sh)"`, que se niega a apuntar a
+  otra cosa que no sea esta máquina.
 
 **Y una sola rama, siempre `main`** (norma del 14-09-2026): no se crean ramas en el proyecto
 de Supabase —ni de preview, ni para probar una migración—, igual que no se crean ramas de git.

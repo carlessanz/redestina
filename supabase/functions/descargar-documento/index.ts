@@ -35,6 +35,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
+import { urlPublica } from "../_shared/url-publica.ts";
 
 const BUCKET = "documentos";
 const SEGUNDOS_FIRMA = 60;
@@ -186,7 +187,7 @@ Deno.serve(async (req) => {
     }
 
     return responder({
-      url: firmaExt.signedUrl,
+      url: urlPublica(firmaExt.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")),
       nombre: nombreExterno(ext),
       sha256: ext.sha256,
       bytes: ext.bytes,
@@ -240,7 +241,7 @@ Deno.serve(async (req) => {
   }
 
   return responder({
-    url: firma.signedUrl,
+    url: urlPublica(firma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")),
     nombre: nombreFichero(doc),
     sha256_fichero: doc.sha256_fichero,
     bytes: doc.bytes,

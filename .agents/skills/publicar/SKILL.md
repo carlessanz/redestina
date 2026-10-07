@@ -272,8 +272,11 @@ curl -sS -o /dev/null -w '%{http_code}\n' -X POST "$SB/generar-documento" -H 'Co
 ```bash
 set -a; . ./.env.local; set +a
 export SUPABASE_URL="${SUPABASE_URL:-$VITE_SUPABASE_URL}"   # el script pide SUPABASE_URL, .env.local trae VITE_SUPABASE_URL
-deno run -A scripts/comprobar-rls.ts
+deno run -A --node-modules-dir=none scripts/comprobar-rls.ts
 ```
+
+⚠️ Esto es **producción** (`.env.local`). El clon local (AGENTS.md §11) tiene su propio entorno
+(`eval "$(bash scripts/local/entorno-local.sh)"`) y da la misma cifra; nunca se mezclan.
 
 **La referencia vigente está en `AGENTS.md §13`, no aquí** — este fichero se quedó desfasado una
 vez y dio por buena una cifra de antes del sistema documental — **y ha vuelto a pasar**: decía
@@ -306,6 +309,10 @@ Una línea por paso, con OK o FALLO y el detalle de lo que hiciste. Incluye siem
 - `timeout` no existe (macOS/zsh): no lo uses para acotar comandos.
 - El arnés y los scripts de Deno leen las claves de `.env.local`; la service key está en
   `.secrets.env`. Los dos están fuera de git.
+- **El clon local** (AGENTS.md §11) no se publica ni se toca al publicar: es una copia en
+  Docker. Antes de publicar, comprobar que el repo sigue enlazado a producción
+  (`cat supabase/.temp/project-ref` → `uxppvaldhptdomvdhsmn`) y no usar nunca `--linked` con
+  `db reset`. Una migración nueva se prueba primero en el clon (`supabase migration up`).
 - Los **logs de las funciones** no se leen con el CLI (no tiene `functions logs`) sino con el
   Management API de analítica: la orden, con sus trampas, en `AGENTS.md §11`.
 - El CLI de Vercel está autenticado como `upsocial`, que es **DEVELOPER**: puede desplegar y leer,

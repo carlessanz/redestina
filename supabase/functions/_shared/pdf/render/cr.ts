@@ -67,7 +67,7 @@ import {
 } from "./cierre.ts";
 
 /**
- * El cuerpo MIENTRAS no haya plantilla vigente. Hoy sí la hay —`20260921223245` siembra
+ * El cuerpo MIENTRAS no haya plantilla vigente. Hoy sí la hay —`20270328101100` siembra
  * la de `CR` en ca y es— y `emetre_certificat_recepcio()` se niega a emitir sin ella, así
  * que esto no se imprime nunca por el camino normal. Se mantiene por dos motivos: es la
  * red si alguien retira la plantilla sin publicar la siguiente, y es donde se lee qué

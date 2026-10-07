@@ -15,7 +15,7 @@
 //    COPIADOS y ya resueltos al idioma del plan. No se cruza con `mesures_prevencio`: ese
 //    catálogo es del equipo (RLS `es_intern()`), así que una organización no podría leerlo
 //    — y aunque pudiera, un plan de hace cinco años no puede depender de que la redacción
-//    del catálogo no haya cambiado (20260921231948).
+//    del catálogo no haya cambiado (20270328101500).
 //
 // ⚠️ EL PDF SE ESPERA POR POLLING, no por Realtime, y de eso ya se encarga
 //    `useDescarregaDocument`: pide la URL firmada, y si el servidor contesta que todavía no

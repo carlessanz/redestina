@@ -296,7 +296,7 @@ interface Check {
    *
    *   · `@meva_membresia`      → el id de la propia membresía (uuid nulo si no ve ninguna)
    *   · `@fitxa_amb_documents` → un productor con algún albarán fuera de borrador, o sea
-   *                              una ficha que NO se puede borrar (20260921160536). Uuid
+   *                              una ficha que NO se puede borrar (20270328100200). Uuid
    *                              nulo si el fixture documental no está puesto.
    */
   args?: Record<string, unknown>;
@@ -545,7 +545,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "reiniciar_cierre_prueba", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO reinicia un cierre de prueba" },
   { tabla: "datos_182", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta los datos del 182" },
   { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca cap exercici" },
-  // Emitir TODOS los certificados de un cierre de golpe (20260921211356). Es la acción
+  // Emitir TODOS los certificados de un cierre de golpe (20270328100800). Es la acción
   // más destructiva del circuito fiscal —N documentos con número legal y N correos a N
   // donantes— así que es la primera que tiene que cortar para cualquier cuenta externa.
   { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament" },
@@ -670,7 +670,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat a demanda" },
   { tabla: "marcar_enviado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat a demanda" },
   { tabla: "reiniciar_periodes_prova", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO reinicia els certificats a demanda de prova" },
-  // Borrado de una ficha (20260921153439, deuda §12.108). Las dos funciones nuevas están
+  // Borrado de una ficha (20270328100100, deuda §12.108). Las dos funciones nuevas están
   // cerradas a cualquiera que no sea del equipo, y la destructiva además al que no sea
   // super_admin. El uuid es el nulo a propósito: la guarda va ANTES de buscar la ficha, así
   // que un externo se lleva el `42501` sin que la función llegue a mirar ninguna fila —que
@@ -696,7 +696,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
     args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" },
     descripcion: "NO consulta els bloquejos d'esborrat d'una fitxa",
   },
-  // Crear una espigolada es del EQUIPO, y desde la F3 (20260921221806) además CONVIERTE
+  // Crear una espigolada es del EQUIPO, y desde la F3 (20270328101000) además CONVIERTE
   // una oferta: la saca del mercado, le cambia el origen y le monta un REC. Si un externo
   // pudiera llamarla, podría convertir la oferta de otra organización y quedarse con la
   // entrada de producto. Hasta esta fase la RPC no la miraba nadie en el arnés.
@@ -719,7 +719,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
     args: { p_espigolada: "00000000-0000-0000-0000-000000000000" },
     descripcion: "NO obre ni tanca espigolades a mà (ho fa el trigger)",
   },
-  // --- Certificat de recepcio (CR, 20260921223245 / 223246) ---
+  // --- Certificat de recepcio (CR, 20270328101100 / 223246) ---
   // Nada de este circuito es de un externo: ni la tabla —que no tiene GRANT de escritura
   // para nadie— ni ninguna de sus acciones, todas de `pot_aprovar()`. Que la RECEPTORA vea
   // EL SUYO se comprueba en el bloque `receptor`, que es donde esa afirmación significa algo.
@@ -736,19 +736,19 @@ const DOCUMENTAL_EXTERN: Check[] = [
   //    `cierre_base()`, y por eso se vigila desde el primer día.
   { tabla: "cierre_base_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul d'un certificat de recepcio" },
   { tabla: "cierre_pendents_recepcio", op: "rpc", esperado: "denegar", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "NO llegeix els lliuraments pendents de conciliar" },
-  // --- Diagnòstic i pla de prevenció (F2, 20260921231946…231950) ---
+  // --- Diagnòstic i pla de prevenció (F2, 20270328101300…231950) ---
   // El CUESTIONARIO sí lo ve cualquier cuenta con sesión: es el formulario que tiene que
   // contestar, y la política es `vigente or es_intern()`. Lo que NO ve es la maquinaria que
   // decide qué medidas le tocan —el catálogo y las reglas—, que es configuración del
   // servicio: su plan lleva el título y la descripción de cada medida COPIADOS dentro, así
   // que cerrarlas no le quita nada que necesite para leer su propio plan.
-  { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "veu el questionari vigent que ha de contestar", requiereFixture: "el questionari sembrat (migració 20260921231949)" },
+  { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "veu el questionari vigent que ha de contestar", requiereFixture: "el questionari sembrat (migració 20270328101600)" },
   { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari (no hi ha GRANT per a ningu)" },
   { tabla: "mesures_prevencio", op: "leer", esperado: "denegar", descripcion: "NO veu el cataleg de mesures de prevencio" },
   { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura" },
   { tabla: "regles_pla", op: "leer", esperado: "denegar", descripcion: "NO veu les regles que generen el pla" },
   { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla" },
-  { tabla: "questionari_vigent", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor" }, descripcion: "pot demanar el questionari vigent", requiereFixture: "el questionari sembrat (migració 20260921231949)" },
+  { tabla: "questionari_vigent", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor" }, descripcion: "pot demanar el questionari vigent", requiereFixture: "el questionari sembrat (migració 20270328101600)" },
   // Publicar una versión del cuestionario es `pot_aprovar()`: decidir qué se le pregunta a
   // una organización es una decisión, no una edición. Las preguntas van VACÍAS a propósito —
   // el 42501 llega antes de validarlas, así que esto no escribe nada ni siendo del equipo.
@@ -767,7 +767,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
 // si alguien relaja una política sin querer, aquí sale en rojo.
 const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   equip: [
-    // --- La via assistida (20260921160536 / 20260921160749 / 20260921160920) ---
+    // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
     //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
@@ -1022,9 +1022,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // El técnico LEE las tres tablas del servicio y no escribe ninguna: declarar obligatoria
     // una medida o cambiar el cuestionario es `pot_aprovar()`, igual que publicar el texto de
     // una plantilla documental.
-    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20260921231949)" },
-    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20260921231949)" },
-    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20260921231949)" },
+    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20270328101600)" },
+    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20270328101600)" },
+    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20270328101600)" },
     { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura (nomes pot_aprovar)" },
     { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla (nomes pot_aprovar)" },
     { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
@@ -1243,7 +1243,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
     { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
-    // Borrado de una ficha (20260921153439, deuda §12.108). El técnico SÍ puede preguntar
+    // Borrado de una ficha (20270328100100, deuda §12.108). El técnico SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
     // super_admin, igual que las políticas `productores: baixa super_admin` y
@@ -1295,7 +1295,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       },
       descripcion: "pot donar per vigent un conveni signat en paper (la guarda el deixa passar)",
     },
-    // La guarda de rol de la conversión de una oferta en jornada (F3, 20260921221806).
+    // La guarda de rol de la conversión de una oferta en jornada (F3, 20270328101000).
     // Mismo criterio que en `equip`: uuid de ceros, porque en positivo no se prueba nunca
     // —convertiría una oferta real contra producción—. Devuelve `22023 oferta_inexistent`,
     // que es error de negocio y cuenta como ejecutada.
@@ -1328,9 +1328,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierres_receptor", op: "leer", esperado: "permitir", descripcion: "ve els certificats de recepcio", requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)" },
     { tabla: "kg_rebuts_exercici", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu els quilos rebuts", requiereFixture: "alguna canalización conciliada del ejercicio en curso" },
     // --- Diagnostic i pla de prevencio (F2) ---
-    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20260921231949)" },
-    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20260921231949)" },
-    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20260921231949)" },
+    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20270328101600)" },
+    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20270328101600)" },
+    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20270328101600)" },
     // Ni el super_admin escribe la tabla a mano: publicar retira la version anterior y publica
     // la nueva en una transaccion, y eso no se hace con dos `update` desde el navegador.
     { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
@@ -1343,7 +1343,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
     { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot generar el pla en nom d'una organitzacio (22023 sense_esborrany)" },
     { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },
-    // --- La via assistida (20260921160536 / 20260921160749 / 20260921160920) ---
+    // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
     //    la operación se complete. `acunar_enllac_assistit()` ESCRIBE —acuña un enlace y
@@ -1495,7 +1495,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
       descripcion: "pot rectificar un certificat de transaccio (autoritza; l'acumulat no existeix)",
     },
-    // Emitir en bloque los certificados de un cierre (20260921211356). Sobre un uuid
+    // Emitir en bloque los certificados de un cierre (20270328100800). Sobre un uuid
     // inventado la guarda de rol pasa y la función cae con 22023 («aquest tancament no
     // existeix») sin dejar rastro. **El bloque real no se prueba nunca en positivo**: una
     // sola llamada buena consumiría N números de la serie CD y mandaría N correos, y eso
@@ -1600,7 +1600,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve tots els convenis",
       requiereFixture: "algún convenio (scripts/crear-datos-documentales-prueba.ts)",
     },
-    // ── Borrado de una ficha (20260921153439, deuda §12.108) ───────────────────
+    // ── Borrado de una ficha (20270328100100, deuda §12.108) ───────────────────
     //
     // La contraparte del «denegar» del técnico: el super_admin SÍ pasa la guarda. Sobre el
     // uuid nulo la autorización pasa y la función falla después con `22023
@@ -2090,7 +2090,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     periodo_hasta: "1999-12-31",
     ejercicio: 1999,
   },
-  // Diagnóstico (F2, 20260921231946…231950). Se rellenan ENTERAS por el mismo motivo que las
+  // Diagnóstico (F2, 20270328101300…231950). Se rellenan ENTERAS por el mismo motivo que las
   // del cierre: lo que tiene que cortar es el permiso, no un `not null` ni un check de forma
   // sobre el jsonb — y las tres tienen checks de forma que saltarían antes.
   questionaris_diagnostic: {
@@ -2236,7 +2236,7 @@ async function resolverArgs(
       salida[clave] = data?.id ?? UUID_NULO;
     } else if (valor === "@fitxa_amb_documents") {
       // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
-      // se puede borrar (20260921160536). Se busca en vez de codificar `TEST-PROD-1` para
+      // se puede borrar (20270328100200). Se busca en vez de codificar `TEST-PROD-1` para
       // que el check siga midiendo algo si el fixture cambia de nombre; si no hay ninguno,
       // cae al uuid nulo y el `requiereFixture` del check lo marca como saltado.
       const { data } = await cliente.from("v_albaranes_bandeja")

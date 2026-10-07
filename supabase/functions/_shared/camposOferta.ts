@@ -118,7 +118,7 @@ export const OPCIONS_TRANSPORT = [
 
 // «Producte al camp»: lo ofrecido TODAVÍA NO ESTÁ RECOGIDO y hay que ir a cosecharlo.
 //
-// No es un matiz descriptivo, decide un flujo (20260921221806): esa oferta la puede
+// No es un matiz descriptivo, decide un flujo (20270328101000): esa oferta la puede
 // convertir el equipo en una jornada de espigueo con `crear_espigolada(p_excedente => …)`,
 // reutilizando el excedente en vez de crear una segunda entrada del mismo producto. Y la
 // entidad que la recibe tiene derecho a saberlo ANTES de mostrar interés: comprometerse a

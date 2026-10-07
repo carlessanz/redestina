@@ -316,7 +316,7 @@ describe('componerTextoOferta · etiquetas que desaparecen si no hay nada que de
 // ---------------------------------------------------------------------------
 // Producte al camp: lo que la entidad tiene que saber antes de decir que sí
 // ---------------------------------------------------------------------------
-// `excedentes.producte_al_camp` (20260921221806) declara que lo ofrecido TODAVÍA NO ESTÁ
+// `excedentes.producte_al_camp` (20270328101000) declara que lo ofrecido TODAVÍA NO ESTÁ
 // RECOGIDO. Decide dos cosas: que el equipo pueda convertir la oferta en una jornada de
 // espigueo sin duplicar la entrada, y qué se está comprometiendo a hacer quien la acepta
 // —ir a una finca a collir no es pasar a recoger unos palots—.

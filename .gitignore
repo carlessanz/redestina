@@ -12,6 +12,9 @@ dist/
 # Supabase CLI
 supabase/.temp/
 supabase/.branches/
+# Volcado de producción para el clon local (scripts/local/): datos personales de prueba
+# y hashes de contraseñas. Nunca entra en git.
+supabase/.local-dump/
 # Lockfiles por función: se generan al desplegar/checkear; no se versionan
 supabase/functions/*/deno.lock
 

@@ -4,7 +4,7 @@
 //
 // Mismo reparto que `tancament.ts` y `albarans.ts`: todo es RPC y **ninguna escritura
 // directa**. `authenticated` no tiene INSERT ni UPDATE sobre `cierres_receptor` ni sobre
-// `cierre_receptor_lineas` (20260921223245), porque cada acción mueve varias tablas en una
+// `cierre_receptor_lineas` (20270328101100), porque cada acción mueve varias tablas en una
 // transacción —pedir número de serie, congelar el snapshot, encolar el PDF, sustituir los
 // certificados contenidos— y eso no cabe en un `update` desde el navegador.
 //

@@ -21,7 +21,7 @@ interface SesionCompleta {
 // esta era la única en minúscula, por venir de un mapa escrito a mano (deuda §12.122).
 
 /**
- * ¿La oferta declara producto SIN COSECHAR? (`excedentes.producte_al_camp`, 20260921221806)
+ * ¿La oferta declara producto SIN COSECHAR? (`excedentes.producte_al_camp`, 20270328101000)
  *
  * Existe porque la respuesta llega de dos sitios con formas distintas y no se puede
  * confiar en ninguna: el intake guarda el `id` de la opción pulsada (`"si"` / `"no"`) y el

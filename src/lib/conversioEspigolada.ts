@@ -19,7 +19,7 @@
 
 /**
  * Los siete rechazos de la conversión, con el nombre exacto que usa
- * `20260921221806_producte_al_camp.sql`.
+ * `20270328101000_producte_al_camp.sql`.
  *
  * Están ordenados como las guardas de la RPC, que es el orden en que se pueden dar.
  */

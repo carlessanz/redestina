@@ -22,7 +22,7 @@
 // ⚠️ EL PREFILL SE MARCA. Un valor propuesto desde la ficha se enseña con su nota («proposat
 //    des de la teva fitxa») hasta que alguien lo toca. Sin la marca sería indistinguible de
 //    una respuesta dada, y `prefill` existe justamente para no escribir en el diagnóstico
-//    algo que la persona no ha dicho (20260921231949).
+//    algo que la persona no ha dicho (20270328101600).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'

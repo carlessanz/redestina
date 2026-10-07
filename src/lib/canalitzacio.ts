@@ -98,7 +98,7 @@ export function estatCanalitzacio(
  * prefijo `P-`, sale con marca de agua y `destinatariosPrueba` (§8) solo lo deja llegar a
  * una organización `es_test` o al buzón del equipo: no puede alcanzar a un donante real,
  * así que exigirle los datos fiscales de verdad solo conseguía que el ciclo no se pudiera
- * ensayar entero. Lo mismo hacen las RPC desde `20260921214526`.
+ * ensayar entero. Lo mismo hacen las RPC desde `20270328100900`.
  *
  * ⚠️ El modo tiene que constar: si no se sabe —no hay ejercicio todavía— se **bloquea**,
  * igual que `dadesFiscalsProvisionals()` responde `true` ante la duda. Decir «ya puedes

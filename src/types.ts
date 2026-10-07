@@ -942,7 +942,7 @@ export interface PlanPrevencion {
   updated_at: string
 }
 
-// --- Certificado de recepción (CR, migraciones 20260921223245 / 223246) ---
+// --- Certificado de recepción (CR, migraciones 20270328101100 / 223246) ---
 //
 // El espejo del certificado del donante, para la entidad que RECIBE: los kilos que le han
 // entrado en una ventana de fechas, donación y compra juntas. No cuelga de ningún
@@ -1022,7 +1022,7 @@ export interface KgRebutsExercici {
   operacions_pendents: number
 }
 
-// --- Diagnóstico de prevención (F2, migraciones 20260921231946…231950) ---
+// --- Diagnóstico de prevención (F2, migraciones 20270328101300…231950) ---
 //
 // ⚠️ El cuestionario sembrado es PROVISIONAL (`versio 0`, `provisional: true`): es texto de
 //    trabajo hasta que la Fundación cierre el anexo B. La versión 1 será la suya. Un plan

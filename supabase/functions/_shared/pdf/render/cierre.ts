@@ -70,7 +70,7 @@ export interface Bloqueo {
 // La procedencia del CR: DOS formas, y la diferencia es D3
 // ---------------------------------------------------------------------------
 // 🔴 Son dos interfaces y no una con un campo `tipus`, por lo mismo que en la base son
-//    dos listas y no una columna (20260921223245): **la de donación no tiene dónde
+//    dos listas y no una columna (20270328101100): **la de donación no tiene dónde
 //    guardar un nombre**. Si algún día alguien intenta imprimir el generador en el bloque
 //    de las donaciones, no se encuentra un campo vacío — no compila. Es el espejo en
 //    TypeScript del `check` que en SQL hace NULL obligatorio a `productor_nom` en las

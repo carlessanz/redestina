@@ -3,7 +3,7 @@
 //
 // 🔴 LA GRAMÁTICA DE LAS CONDICIONES ESTÁ AQUÍ **POR SEGUNDA VEZ**, y eso es lo primero que
 //    hay que saber de este fichero. La primera vive en SQL (`avaluar_regla`,
-//    20260921231947) y es la que manda: decide qué medidas entran en el plan y qué
+//    20270328101400) y es la que manda: decide qué medidas entran en el plan y qué
 //    obligatorias faltan. Esta copia existe para una sola cosa que SQL no puede hacer —
 //    **ocultar una pregunta mientras se rellena el formulario**, sin una ida y vuelta por
 //    cada tecla.
@@ -255,7 +255,7 @@ export function mesuresPerBloc(llista: MesuraPla[]): GrupMesures[] {
 // 3. Prefill: proponer, nunca decidir
 // ---------------------------------------------------------------------------
 // `prefill` es `"<taula>.<columna>"` y **el servidor no lo lee nunca**: si lo leyera, el
-// diagnóstico contendría algo que la persona no ha dicho (20260921231949 §prefill).
+// diagnóstico contendría algo que la persona no ha dicho (20270328101600 §prefill).
 //
 // 🔴 LA REGLA DE ESTA FUNCIÓN: solo se propone un valor que la pregunta pueda aceptar de
 //    verdad. Cuatro de los cinco `prefill` sembrados NO se pueden mapear —
