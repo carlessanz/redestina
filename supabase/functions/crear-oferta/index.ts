@@ -21,40 +21,15 @@ import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
-
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
-  .split(",").map((o) => o.trim()).filter(Boolean);
-
-function originPermitido(origin: string): boolean {
-  return ALLOWED_ORIGINS.some((patron) => {
-    if (!patron.includes("*")) return patron === origin;
-    const re = new RegExp(
-      "^" + patron.split("*").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[A-Za-z0-9-]+") + "$",
-    );
-    return re.test(origin);
-  });
-}
-
-function corsPara(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  };
-}
+import { corsPara } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
+import { fotosValides, veuCostReferencia } from "./validacio.ts";
 
 Deno.serve(async (req) => {
-  const cors = corsPara(req);
-  const responder = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const cors = corsPara(req, "GET, POST, OPTIONS");
+  const responder = respondedor(cors);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,
@@ -81,6 +56,7 @@ Deno.serve(async (req) => {
     // propone al productor al publicar (27-09-2026): se lee aquí con `service_role` y viaja
     // pegado a cada producto, sin abrir la tabla. `foto_mini` es para enseñar la foto del
     // catálogo junto a la casilla «fes servir la foto del producte».
+    const veuCost = veuCostReferencia(ctx);
     const [productos, causas, ubicaciones, costos] = await Promise.all([
       supabase.from("productos").select("nombre, familia, foto_mini").order("nombre"),
       supabase.from("causas").select("codigo, nombre").order("nombre"),
@@ -88,7 +64,11 @@ Deno.serve(async (req) => {
         ? supabase.from("productor_ubicaciones")
           .select("id, alias, municipio").eq("productor_id", productorId)
         : Promise.resolve({ data: [] }),
-      supabase.from("costes_producto").select("producto, coste_kg"),
+      // Solo el equipo o quien tiene ficha de productor (M8): a cualquier otra sesión
+      // —receptora, cuenta pendiente— no se le sirve una tabla que la RLS le niega.
+      veuCost
+        ? supabase.from("costes_producto").select("producto, coste_kg")
+        : Promise.resolve({ data: [] }),
     ]);
     const referencia = new Map(
       ((costos.data ?? []) as { producto: string; coste_kg: number }[])
@@ -119,7 +99,7 @@ Deno.serve(async (req) => {
       catalogos: {
         familias,
         productos: ((productos.data ?? []) as { nombre: string; familia: string | null; foto_mini: string | null }[])
-          .map((p) => ({ ...p, cost_referencia: referencia.get(p.nombre) ?? null })),
+          .map((p) => veuCost ? { ...p, cost_referencia: referencia.get(p.nombre) ?? null } : p),
         // `nombre_es` y `familias_es`: solo para enseñarlas en castellano; el valor que se
         // guarda no cambia (camposOferta.ts, FAMILIES_ES / CAUSES_ES).
         causas: ((causas.data ?? []) as { codigo: string; nombre: string | null }[])
@@ -206,12 +186,10 @@ Deno.serve(async (req) => {
     // Las fotos (20270404100000): como mucho 3, y todas de la carpeta de ESTE productor. La
     // subida ya la limitó la política de Storage; esto impide citar en una oferta la foto de
     // otro, que el receptor vería como si fuera de esta.
+    // Forma exacta `<productor>/<uuid>.<ext>`: sin `..`, barras dobles ni subcarpetas (B7).
     const fotos = (datos as Record<string, unknown>).fotos;
-    if (fotos !== undefined && fotos !== null) {
-      if (!Array.isArray(fotos) || fotos.length > 3 ||
-          !fotos.every((f) => typeof f === "string" && f.startsWith(`${productorId}/`))) {
-        return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
-      }
+    if (!fotosValides(fotos, productorId)) {
+      return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
     }
 
     // El coste que declara el productor (27-09-2026): un número positivo o nada. La base lo

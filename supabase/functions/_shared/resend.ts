@@ -13,6 +13,8 @@
 // solo sitio, porque un correo mal maquetado no lo detecta `tsc` ni ninguna
 // prueba, solo la persona que lo recibe.
 
+import type { ClienteSupabase } from "./cliente.ts";
+
 // Los secretos se leen DENTRO de las funciones, no en el cuerpo del módulo. Mismo motivo
 // que en `_shared/whatsapp.ts`: escrito como `const X = Deno.env.get(...)` a nivel de
 // módulo, cualquier `import` desde Node moría con `ReferenceError: Deno is not defined`
@@ -108,8 +110,7 @@ export interface EmailResult {
   simulado?: boolean;
 }
 
-// deno-lint-ignore no-explicit-any
-type Cliente = any;
+type Cliente = ClienteSupabase;
 
 /**
  * Con qué se registra el envío en la base. Es OPCIONAL: sin esto, `sendEmail()` se
@@ -153,8 +154,11 @@ async function registrarEnvio(
   r: EmailResult,
 ): Promise<void> {
   if (!registroDisponible) return;
-  // deno-lint-ignore no-explicit-any
-  const datos = r.data as any;
+  // Lo que se lee de la respuesta de Resend: el id si salió, el mensaje de error si no.
+  const datos = r.data as
+    | { id?: unknown; message?: unknown; error?: { message?: unknown } | null }
+    | null
+    | undefined;
   const estado = !r.ok ? "error" : r.simulado ? "simulat" : "enviat";
   try {
     const { error } = await traza.supabase.from("documento_envios").insert({

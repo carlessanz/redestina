@@ -13,40 +13,14 @@ import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
 import { modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
-
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
-  .split(",").map((o) => o.trim()).filter(Boolean);
-
-function originPermitido(origin: string): boolean {
-  return ALLOWED_ORIGINS.some((patron) => {
-    if (!patron.includes("*")) return patron === origin;
-    const re = new RegExp(
-      "^" + patron.split("*").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[A-Za-z0-9-]+") + "$",
-    );
-    return re.test(origin);
-  });
-}
-
-function corsPara(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-}
+import { corsPara } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
 
 Deno.serve(async (req) => {
   const cors = corsPara(req);
-  const json = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const json = respondedor(cors);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
   const supabase = createClient(

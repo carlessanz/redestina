@@ -17,7 +17,7 @@
 import { describe, it, expect } from 'vitest'
 import { DICTS } from '../src/lib/i18n'
 import {
-  escalaCanal, PASSOS_CANAL, PASSOS_FASE_CLAUS, puntCanal,
+  certificatsDelLot, clauPas, escalaCanal, PASSOS_CANAL, PASSOS_FASE_CLAUS, puntCanal,
 } from '../src/lib/passosCanalitzacio'
 import type { FetsCanal } from '../src/lib/passosCanalitzacio'
 
@@ -33,6 +33,43 @@ function base(): FetsCanal {
     albarans: [],
     cost_falten: 0,
     exercici: null,
+  }
+}
+
+/**
+ * Una venta entera hecha: sin REC (no existe en venta y maquila) y con su OPE conciliado.
+ * Ejercicio en prueba y cerrado, para que el último escalón sea el que se mira.
+ */
+function venda(): FetsCanal {
+  return {
+    oferta: { estado: 'bloqueada', kg_total: 100, origen: null, modalitat: 'venda' },
+    conveni_gen: { id: 'c1', estado: 'vigent' },
+    respostes: [{
+      id: 'r1', entidad_id: 'e1', entitat: 'Obrador', estado: 'acceptada',
+      aprovacio: 'aprovada', canalizacion_id: 'ca1',
+      conveni_rec: { id: 'c2', estado: 'vigent' },
+    }],
+    canalitzacions: [{ id: 'ca1', kg_conciliados: 100, coste_kg: null }],
+    albarans: [
+      { id: 'a2', tipo: 'OPE', estado: 'conciliado', numero: 'OPE-2026-1', canalizacion_id: 'ca1' },
+    ],
+    // El coste falta a propósito: en venta no debe frenar nada.
+    cost_falten: 1,
+    exercici: { estado: 'tancat', modo: 'prueba' },
+    dadesProvisionals: true,
+  }
+}
+
+/** Una oferta de varias modalidades con una entrega de cada: pide los dos certificados. */
+function mixt(): FetsCanal {
+  const c = complet()
+  return {
+    ...c,
+    canalitzacions: [...c.canalitzacions, { id: 'ca2', kg_conciliados: 50, coste_kg: null }],
+    albarans: [
+      ...c.albarans,
+      { id: 'a3', tipo: 'OPE', estado: 'conciliado', numero: 'OPE-2026-2', canalizacion_id: 'ca2' },
+    ],
   }
 }
 
@@ -95,6 +132,13 @@ describe('claves i18n', () => {
           aprovacio: 'pendent', canalizacion_id: null, conveni_rec: null,
         }],
       },
+      // Los motivos de la venta, la validación y el certificado bloqueado en el cierre.
+      venda(),
+      { ...base(), conveni_gen: { id: 'c1', estado: 'vigent' }, oferta: { estado: 'pendent_validacio', kg_total: 10, origen: null } },
+      {
+        ...complet(), exercici: { estado: 'tancat', modo: 'prueba' },
+        certificats: [{ tipo: 'donacio', certificado_numero: null, bloqueja: true }],
+      },
     ]
     for (const c of casos) {
       for (const p of escalaCanal(c)) if (p.motiuKey) motius.add(p.motiuKey)
@@ -103,6 +147,25 @@ describe('claves i18n', () => {
     for (const clau of motius) {
       for (const idioma of IDIOMES) {
         expect(DICTS[idioma][clau], `falta ${clau} en ${idioma}`).toBeTruthy()
+      }
+    }
+  })
+
+  it('las variantes de clave de un paso (`clau`) existen en los dos idiomas', () => {
+    // El certificado de una venta es el CT, y el cierre sin donación no pide resumen: esas
+    // variantes se componen igual que las normales y tampoco las ve `cobertura.test.ts`.
+    const claus = new Set<string>()
+    const casos: FetsCanal[] = [
+      venda(), mixt(), complet(), { ...venda(), oferta: { ...venda().oferta, modalitat: 'maquila' } },
+    ]
+    for (const c of casos) for (const p of escalaCanal(c)) claus.add(clauPas(p))
+    expect(claus.has('certificat_ct')).toBe(true)
+    expect(claus.has('certificat_mixt')).toBe(true)
+    for (const clau of claus) {
+      for (const sufix of ['_t', '_passa', '_toca']) {
+        for (const idioma of IDIOMES) {
+          expect(DICTS[idioma][`canal.${clau}${sufix}`], `falta canal.${clau}${sufix} en ${idioma}`).toBeTruthy()
+        }
       }
     }
   })
@@ -116,7 +179,7 @@ describe('claves i18n', () => {
 })
 
 describe('la escalera', () => {
-  it('devuelve los 19 pasos, siempre, en el mismo orden', () => {
+  it('devuelve todos los pasos, siempre, en el mismo orden', () => {
     const e = escalaCanal(base())
     expect(e).toHaveLength(PASSOS_CANAL.length)
     expect(e.map((x) => x.pas)).toEqual([...PASSOS_CANAL])
@@ -259,5 +322,127 @@ describe('el ciclo completo', () => {
       expect(DICTS[idioma]['canal.complet_passa']).toBeTruthy()
       expect(DICTS[idioma]['canal.complet_toca']).toBeTruthy()
     }
+  })
+})
+
+describe('venta y maquila: sin REC, y el certificado es el CT', () => {
+  it('los cuatro pasos del REC salen HECHOS con su motivo, no esperando para siempre', () => {
+    const escala = escalaCanal(venda())
+    for (const pas of ['rec_emetre', 'rec_entregat', 'rec_confirmar', 'rec_conciliar'] as const) {
+      const p = escala.find((x) => x.pas === pas)!
+      expect(p.estat, `${pas} no aplica en venta`).toBe('fet')
+      expect(p.motiuKey).toBe('canal.bl_sense_rec_venda')
+    }
+  })
+
+  it('antes de haber albaranes, decide la modalidad de la oferta', () => {
+    const f: FetsCanal = { ...base(), oferta: { estado: 'publicada', kg_total: 10, origen: null, modalitat: 'maquila' } }
+    expect(escalaCanal(f).find((p) => p.pas === 'rec_emetre')!.estat).toBe('fet')
+    expect(certificatsDelLot(f)).toEqual({ donacio: false, transaccio: true })
+  })
+
+  it('con albaranes de salida, mandan ELLOS y no la modalidad principal', () => {
+    // Una oferta de varias modalidades lleva `modalitat = 'donacio'` (la principal), pero si
+    // la única entrega se aprobó como venta, el trigger creó un OPE y ningún REC.
+    const f: FetsCanal = { ...venda(), oferta: { ...venda().oferta, modalitat: 'donacio' } }
+    expect(certificatsDelLot(f)).toEqual({ donacio: false, transaccio: true })
+    expect(escalaCanal(f).find((p) => p.pas === 'rec_emetre')!.motiuKey).toBe('canal.bl_sense_rec_venda')
+  })
+
+  it('una oferta sin modalidad conocida se trata como donación, como siempre', () => {
+    expect(certificatsDelLot(base())).toEqual({ donacio: true, transaccio: false })
+  })
+
+  it('el coste por kilo no frena una venta: el CT no lleva importes', () => {
+    const escala = escalaCanal(venda())
+    const cost = escala.find((p) => p.pas === 'cost')!
+    expect(cost.estat).toBe('fet')
+    expect(cost.motiuKey).toBe('canal.bl_cost_no_cal')
+    expect(escala.find((p) => p.pas === 'tancament')!.estat).toBe('fet')
+  })
+
+  it('el último escalón apunta al CT, y en prueba los datos provisionales no lo bloquean', () => {
+    const cert = escalaCanal(venda()).find((p) => p.pas === 'certificat')!
+    expect(clauPas(cert)).toBe('certificat_ct')
+    expect(cert.estat).toBe('ara')
+    expect(puntCanal(venda()).claus.titol).toBe('canal.certificat_ct_t')
+  })
+
+  it('en REAL con datos provisionales, el CT también está bloqueado', () => {
+    const f: FetsCanal = { ...venda(), exercici: { estado: 'tancat', modo: 'real' } }
+    const cert = escalaCanal(f).find((p) => p.pas === 'certificat')!
+    expect(cert.estat).toBe('bloquejat')
+    expect(cert.motiuKey).toBe('canal.bl_dades_provisionals')
+  })
+
+  it('con el CT emitido en el cierre, el ciclo está completo', () => {
+    const f: FetsCanal = {
+      ...venda(),
+      certificats: [{ tipo: 'transaccio', certificado_numero: 'P-CT-2026-0001', bloqueja: false }],
+    }
+    expect(escalaCanal(f).find((p) => p.pas === 'certificat')!.estat).toBe('fet')
+    expect(puntCanal(f).pas).toBeNull()
+  })
+
+  it('con el CT bloqueado en el cierre, el escalón lo dice', () => {
+    const f: FetsCanal = {
+      ...venda(),
+      certificats: [{ tipo: 'transaccio', certificado_numero: null, bloqueja: true }],
+    }
+    const cert = escalaCanal(f).find((p) => p.pas === 'certificat')!
+    expect(cert.estat).toBe('bloquejat')
+    expect(cert.motiuKey).toBe('canal.bl_certificat_bloquejat')
+  })
+
+  it('un OPE confirmado sin conciliar: toca conciliar las salidas', () => {
+    const f: FetsCanal = {
+      ...venda(),
+      canalitzacions: [{ id: 'ca1', kg_conciliados: null, coste_kg: null }],
+      albarans: [{ id: 'a2', tipo: 'OPE', estado: 'confirmado', numero: 'OPE-2026-1', canalizacion_id: 'ca1' }],
+    }
+    expect(puntCanal(f).pas).toBe('ent_conciliar')
+  })
+})
+
+describe('una oferta con donación y venta pide los dos certificados', () => {
+  it('el escalón dice los dos, y no está hecho con solo uno emitido', () => {
+    const f: FetsCanal = {
+      ...mixt(), exercici: { estado: 'tancat', modo: 'prueba' },
+      certificats: [
+        { tipo: 'donacio', certificado_numero: 'P-CD-2026-0001', bloqueja: false },
+        { tipo: 'transaccio', certificado_numero: null, bloqueja: false },
+      ],
+    }
+    const cert = escalaCanal(f).find((p) => p.pas === 'certificat')!
+    expect(clauPas(cert)).toBe('certificat_mixt')
+    expect(cert.estat).not.toBe('fet')
+  })
+
+  it('y los pasos del REC sí aplican', () => {
+    expect(escalaCanal(mixt()).find((p) => p.pas === 'rec_emetre')!.motiuKey).toBeUndefined()
+  })
+})
+
+describe('una oferta pendiente de validación', () => {
+  const f: FetsCanal = {
+    ...base(),
+    conveni_gen: { id: 'c1', estado: 'vigent' },
+    oferta: { estado: 'pendent_validacio', kg_total: 10, origen: null },
+  }
+
+  it('NO cuenta como publicada: toca validarla', () => {
+    expect(puntCanal(f).pas).toBe('oferta_validar')
+    expect(puntCanal(f).emToca).toBe(true)
+  })
+
+  it('la distribución queda bloqueada con su motivo visible', () => {
+    const p = escalaCanal(f).find((x) => x.pas === 'distribuir')!
+    expect(p.estat).toBe('bloquejat')
+    expect(p.motiuKey).toBe('canal.bl_pendent_validacio')
+  })
+
+  it('una vez validada (publicada), el paso está hecho', () => {
+    const v = { ...f, oferta: { ...f.oferta, estado: 'publicada' as const } }
+    expect(escalaCanal(v).find((x) => x.pas === 'oferta_validar')!.estat).toBe('fet')
   })
 })

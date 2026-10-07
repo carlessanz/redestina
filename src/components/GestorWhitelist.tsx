@@ -16,6 +16,8 @@ import { X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useT } from '../lib/i18n'
+import { useConfirma } from './DialegConfirma'
 
 export default function GestorWhitelist({
   titulo, ayuda, items, placeholderClave, placeholderEtiqueta, max, onAdd, onDelete,
@@ -39,8 +41,11 @@ export default function GestorWhitelist({
   const [clave, setClave] = useState('')
   const [etiqueta, setEtiqueta] = useState('')
   const [error, setError] = useState<string | null>(null)
+  const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   return (
     <Card>
+      {dialeg}
       <CardHeader>
         <CardTitle className="text-base">{titulo}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{ayuda}</p>
@@ -58,8 +63,14 @@ export default function GestorWhitelist({
                 <span className="break-words text-muted-foreground">{r.etiqueta ?? '—'}</span>
               </div>
               {!motiuBloqueig && (
-                <Button variant="ghost" size="icon" className="size-7" aria-label={deleteLabel}
+                <Button variant="ghost" size="icon" className="size-11 shrink-0 md:size-7" aria-label={deleteLabel}
                   onClick={async () => {
+                    if (!(await confirma({
+                      titol: t('wl.remove_t', { x: r.clave }),
+                      descripcio: t('wl.remove_d'),
+                      confirmar: t('wl.remove_ok'),
+                      destructiu: true,
+                    }))) return
                     const err = await onDelete(r.clave)
                     setError(err)
                   }}>

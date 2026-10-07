@@ -21,6 +21,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { avuiLocal } from '../../lib/format'
 import { motiuConveniPaper, prepararConveniEnPaper, registrarConveniEnPaper } from '../../lib/convenis'
 import { pujarDocumentExtern } from '../../lib/documents'
 import type { ConvenioTipo } from '../../types'
@@ -49,13 +50,6 @@ function modelPerDefecte(tipusOrg: 'productor' | 'entidad'): ConvenioTipo {
   return tipusOrg === 'productor' ? 'don_gen' : 'don_rec'
 }
 
-/** Hoy en `AAAA-MM-DD`, en hora local: es el `max` de la fecha de firma. */
-function avui(): string {
-  const d = new Date()
-  const mes = String(d.getMonth() + 1).padStart(2, '0')
-  const dia = String(d.getDate()).padStart(2, '0')
-  return `${d.getFullYear()}-${mes}-${dia}`
-}
 
 interface Props {
   obert: boolean
@@ -156,7 +150,7 @@ export default function DialegConveniPaper({
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v && !ocupat) onTancar() }}>
       <DialogContent
-        className="flex h-[88vh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
+        className="flex h-[88dvh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
         showCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
@@ -206,7 +200,7 @@ export default function DialegConveniPaper({
                 id="cp-data"
                 name="data_firma"
                 type="date"
-                max={avui()}
+                max={avuiLocal()}
                 value={dataFirma}
                 onChange={(e) => setDataFirma(e.target.value)}
               />

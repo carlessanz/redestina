@@ -84,7 +84,7 @@ export default function FitxaRegistre({ tabla }: Props) {
           {/* Y con quién comparte organización, que es donde se deshace un enlace equivocado:
               aquí, semanas después, y no solo en la cola de registros pendientes. */}
           <EnllacOrganitzacio tipus={esProductor ? 'productor' : 'entidad'} fitxa={id ?? null}
-            potAprovar={ctx?.potAprovar ?? true} />
+            potAprovar={ctx?.potAprovar ?? false} />
           {/* En qué punto está su diagnóstico de prevención, y el camino para hacerlo con
               ella delante (modelo asistido). Como `BadgeConveni`, no carga nada en el alta:
               sin `id` no hay a qué colgar un diagnóstico. */}

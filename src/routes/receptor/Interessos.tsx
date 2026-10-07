@@ -21,14 +21,14 @@ import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import type { PuntProces } from '../../lib/procesOferta'
-import { dataCurta } from '../../lib/albarans'
+import { dataCurta, diaMes, kg, preu } from '../../lib/format'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, OfertaRespuesta } from '../../types'
 import LlegendaEstats from '../../components/proces/LlegendaEstats'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
-import DetallOfertaReceptor, { kgFmt } from '../../components/DetallOfertaReceptor'
+import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Link } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -63,17 +63,6 @@ interface CanalAmbOferta {
   created_at: string
   // La oferta, con las columnas de `OfertaReceptor`: la fila abre su detalle (28-09-2026).
   excedentes: OfertaReceptor | null
-}
-
-/** «23/09»: en una píldora el año sobra, y la lista va del más reciente al más antiguo. */
-function dataCurtaSenseAny(iso: string | null | undefined): string | null {
-  if (!iso) return null
-  // Montada a mano: con `toLocaleDateString` algunos navegadores ignoran el `2-digit` del
-  // mes en esta combinación y pintan «21/9».
-  const parts = new Intl.DateTimeFormat('en-GB', { day: '2-digit', month: '2-digit', timeZone: 'Europe/Madrid' })
-    .formatToParts(new Date(iso))
-  const v = (tipus: string) => parts.find((p) => p.type === tipus)?.value ?? ''
-  return `${v('day').padStart(2, '0')}/${v('month').padStart(2, '0')}`
 }
 
 /** Un albarán anulado o rectificado no cuenta: la entrega vuelve a estar donde estaba. */
@@ -115,7 +104,8 @@ export function Interessos() {
         .from('oferta_respuestas')
         .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, recollida_at, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
-        .order('enviado_at', { ascending: false }),
+        .order('enviado_at', { ascending: false })
+        .overrideTypes<AmbOferta[], { merge: false }>(),
       supabase
         .from('v_albaranes_bandeja')
         .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
@@ -128,7 +118,7 @@ export function Interessos() {
     // El interés aprobado y su albarán de entrega comparten `canalizacion_id`: es lo único
     // que los une, porque el albarán cuelga de la canalización y no de la respuesta.
     setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
-    setFiles((resp.data as unknown as AmbOferta[]) ?? [])
+    setFiles(resp.data ?? [])
     setCarregant(false)
   }, [entidadId])
 
@@ -202,18 +192,18 @@ export function Interessos() {
           const est = estatSimpleInteres(punt)
           // La fecha de lo último que ha hecho la entidad: cuándo contestó o, si todavía
           // no lo ha hecho, cuándo le llegó la oferta.
-          const data = dataCurtaSenseAny(f.respondido_at ?? f.enviado_at)
+          const data = diaMes(f.respondido_at ?? f.enviado_at)
           // Pedido y aprobado por separado (05-10-2026): aprobar ya no pisa lo que se pidió.
           const kgs = f.kg_aprovats != null && f.aprovacio === 'aprovada'
-            ? t('int.kg_sol_apr', { n: kgFmt(f.kg_solicitados), m: kgFmt(f.kg_aprovats) })
-            : f.kg_solicitados != null ? `${kgFmt(f.kg_solicitados)} ${t('od.rs_kg')}` : null
+            ? t('int.kg_sol_apr', { n: kg(f.kg_solicitados), m: kg(f.kg_aprovats) })
+            : f.kg_solicitados != null ? `${kg(f.kg_solicitados)} ${t('od.rs_kg')}` : null
           const qui = contraparts[f.id]
           const detall = [
             kgs,
             f.modalitat ? t(`od.mod_${f.modalitat}`) : null,
             f.recollida_at ? t('int.recollida', { quan: new Date(f.recollida_at).toLocaleString('ca-ES', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }) }) : null,
             f.preu_ofert != null
-              ? `${Number(f.preu_ofert).toLocaleString('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${t('od.rs_preu')}`
+              ? `${preu(f.preu_ofert)} ${t('od.rs_preu')}`
               : null,
           ].filter(Boolean).join(' · ')
           // Toda la tarjeta abre el detalle de la oferta: antes no se podía abrir y el
@@ -329,7 +319,8 @@ export function Historic() {
         .from('canalizaciones')
         .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
-        .order('created_at', { ascending: false }),
+        .order('created_at', { ascending: false })
+        .overrideTypes<CanalAmbOferta[], { merge: false }>(),
       supabase
         .from('v_albaranes_bandeja')
         .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
@@ -338,7 +329,7 @@ export function Historic() {
       if (!viu) return
       if (can.error || alb.error) { setErrorCarrega(true); setCarregant(false); return }
       setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
-      setFiles((can.data as unknown as CanalAmbOferta[]) ?? [])
+      setFiles(can.data ?? [])
       setCarregant(false)
     })
     return () => { viu = false }
@@ -385,8 +376,8 @@ export function Historic() {
   const quants = (f: CanalAmbOferta) => {
     const rebuts = kgRebuts(f)
     return rebuts != null
-      ? t('hist.kg_reals', { n: kgFmt(rebuts) })
-      : t('hist.kg_assignats', { n: kgFmt(f.kg_confirmados ?? 0) })
+      ? t('hist.kg_reals', { n: kg(rebuts) })
+      : t('hist.kg_assignats', { n: kg(f.kg_confirmados ?? 0) })
   }
 
   return (
@@ -395,8 +386,8 @@ export function Historic() {
         <CardTitle>{t('hist.title')}</CardTitle>
         {!errorCarrega && (
           <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
-            ? t('hist.subtitle_pending', { n: kgFmt(totalKg), m: kgFmt(pendentKg) })
-            : t('hist.subtitle', { n: kgFmt(totalKg) })}</p>
+            ? t('hist.subtitle_pending', { n: kg(totalKg), m: kg(pendentKg) })
+            : t('hist.subtitle', { n: kg(totalKg) })}</p>
         )}
       </CardHeader>
       <CardContent className="space-y-2">

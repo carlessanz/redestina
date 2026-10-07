@@ -73,10 +73,10 @@ export default function AvisConveni() {
         'mb-4 flex flex-wrap items-start gap-x-3 gap-y-2 rounded-lg border px-4 py-3 text-sm',
         bloqueja
           ? 'border-error bg-error-fondo text-error'
-          : 'border-accent bg-accent/30 text-foreground',
+          : 'border-aviso/30 bg-aviso-fondo text-foreground',
       )}
     >
-      <Icona className="mt-0.5 size-4 shrink-0" />
+      <Icona className={cn('mt-0.5 size-4 shrink-0', !bloqueja && 'text-aviso')} />
       <p className="min-w-0 flex-1">
         <span className="font-medium">{t(clau)}</span>{' '}
         <span className={bloqueja ? undefined : 'text-muted-foreground'}>{consequencia}</span>

@@ -18,6 +18,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import { filtraCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { lotsActius } from '../../lib/canalitzacio'
 import type { LotActiu } from '../../lib/canalitzacio'
@@ -59,7 +61,12 @@ function fetsDeLaFila(l: LotActiu): FetsCanal {
       }]
     : []
   return {
-    oferta: { estado: l.estado as EstadoExcedente, kg_total: l.kg_total, origen: l.origen ?? null },
+    // La modalidad hace falta: en venta y maquila no hay REC, y sin ella la escalera daría
+    // por hecho que es una donación (`certificatsDelLot`).
+    oferta: {
+      estado: l.estado as EstadoExcedente, kg_total: l.kg_total, origen: l.origen ?? null,
+      modalitat: l.modalitat,
+    },
     conveni_gen: l.conveni_gen
       ? { id: 'x', estado: l.conveni_gen as ConvenioEstado }
       : null,
@@ -102,7 +109,7 @@ export default function Canalitzacio() {
   const [files, setFiles] = useState<LotActiu[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [dlgNova, setDlgNova] = useState(false)
   const navega = useNavigate()
 
@@ -117,12 +124,8 @@ export default function Canalitzacio() {
   useEffect(() => { void carrega() }, [carrega])
 
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    if (!q) return files
-    return files.filter((f) =>
-      (f.id_excedente ?? '').toLowerCase().includes(q)
-      || (f.productor ?? '').toLowerCase().includes(q))
-  }, [files, cerca])
+    return filtraCerca(files, q, (f) => [f.id_excedente, f.productor])
+  }, [files, q])
 
   return (
     <div className="space-y-4">

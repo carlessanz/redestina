@@ -9,15 +9,6 @@ export interface EmailTestRecipient {
   created_at: string
 }
 
-export async function cargarEmailsTest(): Promise<Set<string>> {
-  const { data, error } = await supabase.from('email_test_recipients').select('email')
-  if (error) {
-    console.error('email_test_recipients select:', error.message)
-    return new Set()
-  }
-  return new Set((data ?? []).map((r) => r.email.toLowerCase()))
-}
-
 export async function listarEmailsTest(): Promise<EmailTestRecipient[]> {
   const { data, error } = await supabase
     .from('email_test_recipients')

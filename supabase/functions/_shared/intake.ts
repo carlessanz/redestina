@@ -21,6 +21,8 @@ import {
 } from "./camposOferta.ts";
 import type { Paso } from "./camposOferta.ts";
 import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
+import type { ClienteSupabase } from "./cliente.ts";
+import { enmascararTelefono } from "./enmascarar.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
 const CADUCIDAD_HORAS = 12;
@@ -38,17 +40,37 @@ interface Sesion {
   updated_at: string;
 }
 
-// deno-lint-ignore no-explicit-any
-type Cliente = any;
+type Cliente = ClienteSupabase;
 
 // ---------------------------------------------------------------------------
 // Utilidades
 // ---------------------------------------------------------------------------
 
+/** Una pulsación interactiva: el `id` que pusimos al botón o a la fila, y su título. */
+interface Pulsacion {
+  id?: string | null;
+  title?: string | null;
+}
+
+/**
+ * Lo que este módulo lee de un mensaje entrante de la Cloud API (`value.messages[]`). No es
+ * el objeto entero —Meta manda más campos y se guardan tal cual en `wa_messages.raw`—: es
+ * solo lo que el intake y el diálogo de respuestas consultan, y todo opcional porque nada
+ * de eso está garantizado en un cuerpo que viene de fuera.
+ */
+export interface MensajeEntrante {
+  type?: string | null;
+  text?: { body?: string | null } | null;
+  interactive?: {
+    button_reply?: Pulsacion | null;
+    list_reply?: Pulsacion | null;
+  } | null;
+  location?: { latitude?: number | null; longitude?: number | null } | null;
+}
+
 /** Extrae lo que ha respondido el usuario, sea texto o pulsación interactiva. */
 export function leerRespuesta(
-  // deno-lint-ignore no-explicit-any
-  message: any,
+  message: MensajeEntrante | null | undefined,
 ): { texto: string | null; id: string | null } {
   if (message?.type === "interactive") {
     const i = message.interactive ?? {};
@@ -473,8 +495,7 @@ function null_ok(): unknown {
 export async function procesarIntake(
   supabase: Cliente,
   from: string,
-  // deno-lint-ignore no-explicit-any
-  message: any,
+  message: MensajeEntrante | null | undefined,
 ): Promise<boolean> {
   // Solo se atiende a productores dados de alta.
   // `email` hace falta para la confirmación por correo de la oferta (§12.94): sin él,
@@ -537,7 +558,7 @@ export async function procesarIntake(
     // Aquí no se avanza de paso, así que un fallo de envío no descoloca nada: solo deja
     // el recordatorio sin efecto y el siguiente volverá a intentarlo.
     if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, pasoActual))) {
-      console.error("intake: no se pudo reanudar el paso", pasoActual, "de", from);
+      console.error("intake: no se pudo reanudar el paso", pasoActual, "de", enmascararTelefono(from));
     }
     return true;
   }
@@ -566,7 +587,7 @@ export async function procesarIntake(
       // Si la primera pregunta no sale, la sesión queda en `familia` sin haberla hecho.
       // No se borra: el recordatorio de los 10 minutos ofrece «Continuar», que la repite.
       if (!(await preguntar(supabase, data as Sesion, "familia"))) {
-        console.error("intake: no se pudo enviar la primera pregunta a", from);
+        console.error("intake: no se pudo enviar la primera pregunta a", enmascararTelefono(from));
       }
       return true;
     }
@@ -595,7 +616,7 @@ export async function procesarIntake(
     // Se pregunta ANTES de guardar la página: si la lista no sale, el contador no se
     // mueve y volver a pulsar «Més…» ofrece la misma página, no la siguiente.
     if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso, pagina))) {
-      console.error("intake: no se pudo enviar la página", pagina, "de", paso, "a", from);
+      console.error("intake: no se pudo enviar la página", pagina, "de", paso, "a", enmascararTelefono(from));
       return true;
     }
     await guardar(supabase, sesion, { datos_parciales: datos });
@@ -652,10 +673,10 @@ export async function procesarIntake(
         "No acabo d'entendre la resposta. Torna-ho a provar; si vols aturar, escriu *Stop*.",
       );
       if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
-        console.error("intake: no se pudo repetir la pregunta", paso, "a", from);
+        console.error("intake: no se pudo repetir la pregunta", paso, "a", enmascararTelefono(from));
       }
     } else if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
-      console.error("intake: no se pudo repetir la pregunta", paso, "a", from);
+      console.error("intake: no se pudo repetir la pregunta", paso, "a", enmascararTelefono(from));
     }
     return true;
   }
@@ -678,7 +699,7 @@ export async function procesarIntake(
       // La respuesta SÍ se guarda —está entendida y validada— pero el paso no avanza. Es
       // idempotente: cuando la persona vuelva a contestar (o pulse «Continuar» en el
       // recordatorio de los 10 minutos) se reescribe el mismo valor y se reintenta.
-      console.error("intake: no se pudo preguntar", siguiente, "a", from, "— el paso no avanza");
+      console.error("intake: no se pudo preguntar", siguiente, "a", enmascararTelefono(from), "— el paso no avanza");
       await guardar(supabase, sesion, { datos_parciales: datos });
       return true;
     }

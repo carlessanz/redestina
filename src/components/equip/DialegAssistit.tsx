@@ -83,7 +83,7 @@ export default function DialegAssistit(
       {/* 80 % de ancho y 88 % de alto, como `DialegFirmaConveni`. El `max-w-none` es
           imprescindible: `DialogContent` trae un `max-w` estrecho de serie. */}
       <DialogContent
-        className="flex h-[88vh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
+        className="flex h-[88dvh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
         showCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

@@ -122,6 +122,8 @@ export default function CertificatsFitxa(
   const [docs, setDocs] = useState<Doc[]>([])
   const [provisionals, setProvisionals] = useState(true)
   const [obert, setObert] = useState(false)
+  // Un fallo de lectura no se pinta como «cap certificat emès».
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   const carrega = useCallback(async () => {
     // ⚠️ Columnas EXPLÍCITAS en `documentos`: un `select('*')` lo corta el GRANT por
@@ -139,6 +141,11 @@ export default function CertificatsFitxa(
           .select('id, cierre_id, estado, certificado_numero')
           .eq('productor_id', orgId).eq('tipo', 'donacio'),
       ])
+      if (per.error || anu.error) {
+        console.warn('CertificatsFitxa:', (per.error ?? anu.error)?.message)
+        setErrorCarrega(true)
+        return
+      }
       const fp = (per.data as FilaPeriode[] | null) ?? []
       const fa = (anu.data as FilaAnual[] | null) ?? []
       files = [
@@ -154,10 +161,15 @@ export default function CertificatsFitxa(
     } else {
       // El certificado de recepción es SIEMPRE a demanda: no cuelga de ningún cierre, así
       // que aquí no hay un «anual» que enseñar aparte ni ningún enlace al que ir.
-      const { data } = await supabase.from('cierres_receptor')
+      const { data, error } = await supabase.from('cierres_receptor')
         .select('id, periodo_desde, periodo_hasta, estado, certificado_numero')
         .eq('entidad_id', orgId)
         .order('periodo_hasta', { ascending: false })
+      if (error) {
+        console.warn('CertificatsFitxa:', error.message)
+        setErrorCarrega(true)
+        return
+      }
       files = ((data as FilaPeriode[] | null) ?? [])
         .filter((p) => p.certificado_numero)
         .map((p) => ({
@@ -167,11 +179,13 @@ export default function CertificatsFitxa(
     }
 
     setEmesos(files)
-    if (files.length === 0) { setDocs([]); return }
-    const { data } = await supabase.from('documentos')
+    if (files.length === 0) { setDocs([]); setErrorCarrega(false); return }
+    const { data, error } = await supabase.from('documentos')
       .select('id, objeto_id, numero_completo, estado')
       .eq('tipo', perfil.tipusDoc).eq('vigente', true)
       .in('objeto_id', files.map((f) => f.id))
+    if (error) console.warn('CertificatsFitxa.docs:', error.message)
+    setErrorCarrega(error !== null)
     setDocs((data as Doc[] | null) ?? [])
   }, [orgId, tipus, perfil.tipusDoc, t])
 
@@ -212,7 +226,8 @@ export default function CertificatsFitxa(
       {/* El motivo, visible y no solo en el tooltip. */}
       {motiu && <p className="mt-2 text-xs text-muted-foreground">{motiu}</p>}
 
-      {emesos.length === 0
+      {errorCarrega && <p className="mt-2 text-sm text-destructive">{t('c.load_error')}</p>}
+      {errorCarrega && emesos.length === 0 ? null : emesos.length === 0
         ? <p className="mt-2 text-sm text-muted-foreground">{t(perfil.buitKey)}</p>
         : (
           <ul className="mt-2 space-y-1">

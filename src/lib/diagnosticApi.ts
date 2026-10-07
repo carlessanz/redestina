@@ -103,7 +103,7 @@ export async function plaEsborrany(
       .eq('estado', 'esborrany')
       .maybeSingle()
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as unknown as PlanPrevencion | null) ?? null }
+    return { ok: true, data: (data as PlanPrevencion | null) ?? null }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }
@@ -118,7 +118,7 @@ export async function plaPerId(id: string): Promise<ResultatRpc<PlanPrevencion |
       .eq('id', id)
       .maybeSingle()
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as unknown as PlanPrevencion | null) ?? null }
+    return { ok: true, data: (data as PlanPrevencion | null) ?? null }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }
@@ -254,7 +254,7 @@ export async function mesuresCataleg(tipus: TipusOrg): Promise<ResultatRpc<Mesur
       .order('bloc')
       .order('ordre')
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as unknown as MesuraPrevencio[]) ?? [] }
+    return { ok: true, data: (data as MesuraPrevencio[] | null) ?? [] }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }
@@ -268,7 +268,7 @@ export async function reglesCataleg(tipus: TipusOrg): Promise<ResultatRpc<ReglaP
       .eq('tipo_org', tipus)
       .order('mesura_codi')
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as unknown as ReglaPla[]) ?? [] }
+    return { ok: true, data: (data as ReglaPla[] | null) ?? [] }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }
@@ -318,7 +318,7 @@ export async function questionarisDelTipus(
       .eq('tipo_org', tipus)
       .order('versio', { ascending: false })
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as unknown as QuestionariDiagnostic[]) ?? [] }
+    return { ok: true, data: (data as QuestionariDiagnostic[] | null) ?? [] }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }

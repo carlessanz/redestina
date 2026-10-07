@@ -25,16 +25,13 @@ import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resen
 import { sendText } from "../_shared/whatsapp.ts";
 import { TIPUS_AVIS, textAvis } from "../_shared/textAvis.ts";
 import type { TipusAvis } from "../_shared/textAvis.ts";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { exigirSecreto, json } from "../_shared/http.ts";
+import type { ClienteSupabase } from "../_shared/cliente.ts";
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
-  const esperado = Deno.env.get("DOCUMENTOS_SECRET");
-  if (!esperado || req.headers.get("x-documentos-secret") !== esperado) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  const rechazo = exigirSecreto(req, "x-documentos-secret", Deno.env.get("DOCUMENTOS_SECRET"));
+  if (rechazo) return rechazo;
 
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SB_SECRET_KEY")!);
 
@@ -44,16 +41,58 @@ Deno.serve(async (req) => {
   } catch { /* cuerpo vacío o no JSON */ }
   if (!avisoId) return json({ error: "Falta aviso_id" }, 400);
 
-  const { data: aviso } = await supabase.from("avisos").select("*").eq("id", avisoId).maybeSingle();
-  if (!aviso) return json({ error: "Avís inexistent" }, 404);
-  if (aviso.enviat_at) return json({ ok: true, ja_enviat: true });
-  if (!TIPUS_AVIS.includes(aviso.tipus as TipusAvis)) return json({ error: "Tipus desconegut" }, 400);
+  // RECLAMAR EL AVISO DE FORMA ATÓMICA (B3, 07-10-2026). El trigger al insertar, el job
+  // de cada 15 min y un reintento de `pg_net` pueden llegar a la vez: leer `enviat_at` y
+  // decidir después dejaba a dos ejecuciones pasar la misma comprobación y mandar dos
+  // veces. Ahora la primera que consigue el `update … where enviat_at is null` se queda
+  // el aviso (lo marca con `error_envio = 'en_curs'`); las demás no encuentran fila.
+  //   · Si algo falla con una excepción, se SUELTA (vuelve `enviat_at` a null) para que el
+  //     job lo reintente, igual que antes.
+  //   · Si el isolate muere a medias (corte por CPU), queda `enviat_at` puesto con
+  //     `canal_enviat` null y `error_envio = 'en_curs'`: no se reintenta. Es el precio
+  //     elegido —un aviso sin mandar antes que uno doble—, y el aviso sigue en el panel.
+  const { data: reclamat, error: errReclamar } = await supabase.from("avisos")
+    .update({ enviat_at: new Date().toISOString(), canal_enviat: null, error_envio: "en_curs" })
+    .eq("id", avisoId).is("enviat_at", null)
+    .select("*").maybeSingle();
+  if (errReclamar) return json({ error: "No s'ha pogut reclamar l'avís" }, 500);
+  if (!reclamat) {
+    const { data: existeix } = await supabase.from("avisos").select("id").eq("id", avisoId).maybeSingle();
+    return existeix ? json({ ok: true, ja_enviat: true }) : json({ error: "Avís inexistent" }, 404);
+  }
+  const aviso = reclamat;
 
+  let marcat = false;
   const marca = async (canal: "email" | "whatsapp" | "cap", error: string | null) => {
+    marcat = true;
     await supabase.from("avisos").update({
       canal_enviat: canal, enviat_at: new Date().toISOString(), error_envio: error,
     }).eq("id", avisoId);
   };
+
+  try {
+    return await enviarAviso(supabase, aviso, marca);
+  } catch (e) {
+    const missatge = e instanceof Error ? e.message : String(e);
+    console.error("enviar-avis:", missatge);
+    // Soltarlo, si no se llegó a marcar: el job lo reintentará (como mucho tres veces).
+    if (!marcat) {
+      await supabase.from("avisos").update({ enviat_at: null, error_envio: missatge.slice(0, 200) })
+        .eq("id", avisoId);
+    }
+    return json({ error: "Error intern" }, 500);
+  }
+});
+
+type Marca = (canal: "email" | "whatsapp" | "cap", error: string | null) => Promise<void>;
+
+/** El envío de un aviso YA reclamado. Toda salida pasa por `marca()`. */
+// deno-lint-ignore no-explicit-any
+async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca): Promise<Response> {
+  if (!TIPUS_AVIS.includes(aviso.tipus as TipusAvis)) {
+    await marca("cap", "tipus_desconegut");
+    return json({ error: "Tipus desconegut" }, 400);
+  }
 
   // La ficha destinataria.
   const tipo = aviso.destinatari_tipo as "productor" | "entidad";
@@ -126,4 +165,4 @@ Deno.serve(async (req) => {
 
   await marca("cap", decision.motivo);
   return json({ ok: false, motiu: decision.motivo });
-});
+}

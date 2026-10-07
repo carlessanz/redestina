@@ -19,6 +19,8 @@ import { toast } from 'sonner'
 import { Link } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { casaCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
@@ -63,7 +65,7 @@ export default function Productes() {
   const [costos, setCostos] = useState<CosteProducto[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   /** Solo los productos que ya tienen coste; apagado, salen todos los del catálogo. */
   const [nomesAmbCost, setNomesAmbCost] = useState(false)
   const [ocupat, setOcupat] = useState(false)
@@ -124,13 +126,11 @@ export default function Productes() {
   }, [costos])
 
   const files = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
     return productes.filter((p) => {
       if (nomesAmbCost && !perProducte[p.nombre]) return false
-      if (!q) return true
-      return [p.nombre, p.familia].some((c) => (c ?? '').toLowerCase().includes(q))
+      return casaCerca([p.nombre, p.familia], q)
     })
-  }, [productes, perProducte, cerca, nomesAmbCost])
+  }, [productes, perProducte, q, nomesAmbCost])
 
   const senseCost = useMemo(
     () => productes.filter((p) => !perProducte[p.nombre]).length,
@@ -253,7 +253,7 @@ export default function Productes() {
                             ? eurKg(c.coste_kg)
                             : <Badge className="bg-aviso-fondo text-aviso">{t('cost.missing')}</Badge>}
                         </TableCell>
-                        <TableCell className="max-w-64 text-sm text-muted-foreground">
+                        <TableCell className="max-w-64 min-w-40 text-sm whitespace-normal text-muted-foreground">
                           {obert
                             ? (
                               <Input

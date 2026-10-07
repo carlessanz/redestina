@@ -22,6 +22,21 @@
 //    `pendent`: una pantalla que le pide «publica la oferta» a un lote de espigueo es una
 //    pantalla que no entiende de dónde viene su propio producto.
 //
+// ⚠️ **VENTA Y MAQUILA NO TIENEN REC** (07-10-2026). El trigger que crea los albaranes
+//    (`trg_canalizaciones_crea_albaranes`) solo crea la entrada del generador en donación:
+//    en venta y maquila la mercancía va del generador al comprador con el OPE. Hasta hoy
+//    la escalera solo sabía de donación y dejaba los cuatro pasos del REC en «ara» para
+//    siempre en una venta. Ahora salen `fet` con su motivo (`bl_sense_rec_venda`), el coste
+//    por kilo no frena nada —el CT no lleva importes— y el último escalón es el
+//    **certificado de transacción** (CT), no el de donación. Una oferta con varias
+//    modalidades puede necesitar los dos: lo dicen los albaranes de salida (ENT u OPE), que
+//    son la modalidad real de cada entrega; la de la oferta solo vale mientras no hay
+//    ninguno.
+//
+// ⚠️ **`pendent_validacio` ES UN PASO** (`oferta_validar`), no «publicada». La oferta está
+//    dada de alta pero no sale al Mercat hasta que el equipo la valida, así que distribuirla
+//    queda bloqueado con su motivo hasta entonces.
+//
 // ⚠️ **LAS CLAVES SE COMPONEN** (`canal.<pas>_t`), así que `tests/cobertura.test.ts` no las
 //    ve: solo mira literales. Por eso existe `tests/passosCanalitzacio.test.ts`, que exige
 //    cada una en `ca` y en `es`. Sin esa red, una fase sin traducir sale en pantalla como
@@ -37,36 +52,36 @@ export type PasCanal =
   // 1 · conveni
   | 'conv_gen_preparar' | 'conv_gen_firmar' | 'conv_gen_contrasignar'
   // 2 · entrada
-  | 'oferta_alta' | 'oferta_publicar'
+  | 'oferta_alta' | 'oferta_publicar' | 'oferta_validar'
   // 3 · distribucio
   | 'distribuir'
   // 4 · aprovacio
   | 'interes' | 'conv_rec' | 'aprovar'
   // 5 · lliurament
   | 'rec_emetre' | 'rec_entregat' | 'rec_confirmar' | 'rec_conciliar'
-  | 'ent_emetre' | 'ent_entregat' | 'ent_confirmar'
+  | 'ent_emetre' | 'ent_entregat' | 'ent_confirmar' | 'ent_conciliar'
   // 6 · tancament
   | 'cost' | 'tancament' | 'certificat'
 
 /** Índice de la fase en `FASES_EQUIP`. Se reutilizan sus seis nombres, no se inventan otros. */
 const FASE_DE: Record<PasCanal, number> = {
   conv_gen_preparar: 0, conv_gen_firmar: 0, conv_gen_contrasignar: 0,
-  oferta_alta: 1, oferta_publicar: 1,
+  oferta_alta: 1, oferta_publicar: 1, oferta_validar: 1,
   distribuir: 2,
   interes: 3, conv_rec: 3, aprovar: 3,
   rec_emetre: 4, rec_entregat: 4, rec_confirmar: 4, rec_conciliar: 4,
-  ent_emetre: 4, ent_entregat: 4, ent_confirmar: 4,
+  ent_emetre: 4, ent_entregat: 4, ent_confirmar: 4, ent_conciliar: 4,
   cost: 5, tancament: 5, certificat: 5,
 }
 
 /** En el orden en que se recorren. Es la escalera que ve la pantalla. */
 export const PASSOS_CANAL: readonly PasCanal[] = [
   'conv_gen_preparar', 'conv_gen_firmar', 'conv_gen_contrasignar',
-  'oferta_alta', 'oferta_publicar',
+  'oferta_alta', 'oferta_publicar', 'oferta_validar',
   'distribuir',
   'interes', 'conv_rec', 'aprovar',
   'rec_emetre', 'rec_entregat', 'rec_confirmar', 'rec_conciliar',
-  'ent_emetre', 'ent_entregat', 'ent_confirmar',
+  'ent_emetre', 'ent_entregat', 'ent_confirmar', 'ent_conciliar',
   'cost', 'tancament', 'certificat',
 ] as const
 
@@ -89,6 +104,18 @@ export interface PasEscala {
    * sin haber pasado por el alta, y eso hay que explicarlo.
    */
   motiuKey?: string
+  /**
+   * La base de sus claves i18n (`canal.<clau>_t/_passa/_toca`) cuando no es el propio
+   * `pas`. Existe para los pasos que dicen cosas distintas según la modalidad: el
+   * certificado de una venta es el CT (`certificat_ct`), no el de donación. Ausente = `pas`.
+   * Léase con `clauPas()`, no a mano.
+   */
+  clau?: string
+}
+
+/** La base de las claves i18n de un paso: su variante si la tiene, si no el propio paso. */
+export function clauPas(p: Pick<PasEscala, 'pas' | 'clau'>): string {
+  return p.clau ?? p.pas
 }
 
 // --- Los hechos ------------------------------------------------------------------------
@@ -127,6 +154,12 @@ export interface FetsCanal {
     kg_total: number | null
     /** `espigolament` = entró por la jornada de espigueo, no por el alta. */
     origen?: string | null
+    /**
+     * La modalidad PRINCIPAL de la oferta (la donación si la tiene). Solo decide mientras
+     * no hay albaranes de salida; en cuanto los hay, mandan ellos (ENT = donación, OPE =
+     * venta o maquila). Ausente = se asume donación, que es lo que el ciclo hacía siempre.
+     */
+    modalitat?: string | null
   }
   conveni_gen: ConveniCanal | null
   respostes: RespostaCanal[]
@@ -141,6 +174,21 @@ export interface FetsCanal {
    * por mucho que todo lo demás esté hecho (`emitir_certificado`, 42501).
    */
   dadesProvisionals?: boolean
+  /**
+   * Los acumulados del generador en el cierre del ejercicio (`cierres_donante`): uno por
+   * tipo. Tampoco viene de la RPC del ciclo —no lee el cierre—: lo añade la pantalla. Con
+   * ellos el escalón del certificado sabe si YA se emitió; sin ellos (el índice, o un fallo
+   * de lectura) se conserva la aproximación de antes, «ejercicio declarado».
+   */
+  certificats?: CertificatGenerador[]
+}
+
+/** Lo que la escalera necesita de una fila de `cierres_donante`. */
+export interface CertificatGenerador {
+  tipo: 'donacio' | 'transaccio'
+  certificado_numero: string | null
+  /** Algún bloqueo `bloqueja: true` en la fila. */
+  bloqueja: boolean
 }
 
 // --- El cálculo ------------------------------------------------------------------------
@@ -177,8 +225,31 @@ function avancSortides(f: FetsCanal): number {
 
 const CONVENI_FET: ConvenioEstado[] = ['firmat', 'vigent']
 
+const VENDA = ['venda', 'maquila']
+
 /**
- * La escalera entera: los 19 pasos con su estado.
+ * Qué certificados pide este lote: el de donación (CD), el de transacción (CT) o los dos.
+ *
+ * El orden de las preguntas es el de la fiabilidad del hecho: una espigolada o un REC vivo
+ * dicen donación sin duda; los albaranes de salida dicen la modalidad REAL de cada entrega
+ * (el trigger elige ENT u OPE con la `valorizacion` de la canalización); y solo si todavía
+ * no hay ninguno se mira la modalidad principal de la oferta.
+ */
+export function certificatsDelLot(f: FetsCanal): { donacio: boolean; transaccio: boolean } {
+  const sortidesTotes = f.albarans.filter((a) => a.tipo === 'ENT' || a.tipo === 'OPE')
+  const ambEnt = sortidesTotes.some((a) => a.tipo === 'ENT')
+  const ambOpe = sortidesTotes.some((a) => a.tipo === 'OPE')
+  const modalitatVenda = VENDA.includes(f.oferta.modalitat ?? '')
+  const donacio = f.oferta.origen === 'espigolament'
+    || rec(f) != null
+    || ambEnt
+    || (sortidesTotes.length === 0 && !modalitatVenda)
+  const transaccio = ambOpe || (sortidesTotes.length === 0 && modalitatVenda)
+  return { donacio, transaccio }
+}
+
+/**
+ * La escalera entera: los 21 pasos con su estado.
  *
  * Primero se decide, paso a paso, si está HECHO y si algo lo BLOQUEA —las dos cosas son
  * propiedades del paso, no de dónde esté el cursor—. Después, el primero que no está hecho
@@ -206,8 +277,30 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
     && f.canalitzacions.every((c) => c.kg_conciliados != null)
 
   const cancellada = f.oferta.estado === 'cancelada' || f.oferta.estado === 'no_colocada'
+  const perValidar = f.oferta.estado === 'pendent_validacio'
 
-  const brut: { fet: boolean; motiu?: string; bloqueig?: string }[] = PASSOS_CANAL.map((pas) => {
+  // Venta o maquila PURAS: sin ninguna entrega de donación, no hay REC ni coste que exigir.
+  const { donacio, transaccio } = certificatsDelLot(f)
+  const senseRec = !donacio
+
+  /**
+   * ¿Está emitido el certificado (o los dos) que pide este lote? Con los acumulados del
+   * cierre a mano, se mira el número; sin ellos, la aproximación de siempre.
+   */
+  const cal: ('donacio' | 'transaccio')[] = [
+    ...(donacio ? ['donacio' as const] : []),
+    ...(transaccio ? ['transaccio' as const] : []),
+  ]
+  const certs = f.certificats
+  const certFet = certs
+    ? cal.length > 0 && cal.every((tipo) => certs.some((c) => c.tipo === tipo && c.certificado_numero))
+    : f.exercici?.estado === 'declarat'
+  const certBloquejat = certs != null && cal.some((tipo) => certs.some(
+    (c) => c.tipo === tipo && !c.certificado_numero && c.bloqueja,
+  ))
+  const clauCert = donacio && transaccio ? 'certificat_mixt' : transaccio ? 'certificat_ct' : undefined
+
+  const brut: { fet: boolean; motiu?: string; bloqueig?: string; clau?: string }[] = PASSOS_CANAL.map((pas) => {
     switch (pas) {
       // ── 1 · conveni ──
       case 'conv_gen_preparar':
@@ -228,11 +321,18 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
           fet: f.oferta.estado !== 'borrador',
           bloqueig: !cgVigent ? 'canal.bl_sense_conveni_gen' : undefined,
         }
+      case 'oferta_validar':
+        // Lo hace el equipo (`validar_oferta`), así que es un paso con su «ara», no un
+        // bloqueo: el bloqueo con motivo lo lleva la distribución, que es lo que frena.
+        if (cancellada) return { fet: false, bloqueig: `canal.bl_${f.oferta.estado}` }
+        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
+        return { fet: f.oferta.estado !== 'borrador' && !perValidar }
 
       // ── 3 · distribucio ──
       case 'distribuir':
         if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
         if (cancellada) return { fet: false, bloqueig: `canal.bl_${f.oferta.estado}` }
+        if (perValidar) return { fet: false, bloqueig: 'canal.bl_pendent_validacio' }
         return { fet: f.respostes.length > 0 }
 
       // ── 4 · aprovacio ──
@@ -250,13 +350,19 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
         }
 
       // ── 5 · lliurament ──
+      // En venta y maquila puras no hay REC: los cuatro pasos de la entrada no le tocan,
+      // y se dice por qué en vez de dejarlos esperando un documento que no existirá nunca.
       case 'rec_emetre':
+        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
         return { fet: aRec >= 1 }
       case 'rec_entregat':
+        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
         return { fet: aRec >= 2 }
       case 'rec_confirmar':
+        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
         return { fet: aRec >= 3 }
       case 'rec_conciliar':
+        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
         return {
           fet: aRec >= 4,
           // Conciliar el REC contrasta su neto con la suma de los ENT confirmados: sin
@@ -271,28 +377,39 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
         return { fet: aSort >= 2 }
       case 'ent_confirmar':
         return { fet: aSort >= 3 }
+      case 'ent_conciliar':
+        // Los kilos oficiales de cada entrega. En donación lo normal es que lleguen solos
+        // al conciliar el REC (arrastra las salidas confirmadas, `20270414100100`); en venta
+        // y maquila se concilia cada OPE. Sin salidas no hay nada que conciliar todavía.
+        return { fet: sortides(f).length > 0 && aSort >= 4 }
 
       // ── 6 · tancament ──
       case 'cost':
+        // El CT no lleva importes: en venta y maquila el coste por kilo es un indicador
+        // interno (`sense_cost` avisa, no bloquea), así que no frena el ciclo.
+        if (!donacio) return { fet: true, motiu: 'canal.bl_cost_no_cal' }
         return { fet: f.cost_falten === 0 }
       case 'tancament':
         return {
           fet: f.exercici != null && ['tancat', 'declarat'].includes(f.exercici.estado),
-          bloqueig: f.cost_falten > 0
+          bloqueig: donacio && f.cost_falten > 0
             ? 'canal.bl_sense_cost'
             : !totConciliat ? 'canal.bl_sense_conciliar' : undefined,
+          clau: donacio ? undefined : 'tancament_ct',
         }
       case 'certificat':
         return {
-          fet: f.exercici?.estado === 'declarat',
+          fet: certFet,
           // No es código: la fila de `parametros_documentales` sigue con valores
-          // provisionales y `emitir_certificado()` se niega (42501). Es el último escalón
-          // del ciclo y se enseña EXPLICADO, no escondido (§12.10).
+          // provisionales y `emitir_certificado()` se niega (42501) — y la del CT igual.
+          // Es el último escalón del ciclo y se enseña EXPLICADO, no escondido (§12.10).
           // Solo bloquea en REAL: un certificado de prueba lleva marca de agua y no
           // sale de las fichas `es_test` (mismo criterio que `bloquejaProvisionals`).
           bloqueig: f.dadesProvisionals !== false && f.exercici?.modo !== 'prueba'
             ? 'canal.bl_dades_provisionals'
-            : !totConciliat ? 'canal.bl_sense_conciliar' : undefined,
+            : !totConciliat ? 'canal.bl_sense_conciliar'
+              : certBloquejat ? 'canal.bl_certificat_bloquejat' : undefined,
+          clau: clauCert,
         }
     }
   })
@@ -301,10 +418,11 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
   return PASSOS_CANAL.map((pas, i) => {
     const b = brut[i]
     const fase = FASE_DE[pas]
-    if (b.fet) return { pas, fase, estat: 'fet' as EstatPas, motiuKey: b.motiu }
-    if (b.bloqueig) return { pas, fase, estat: 'bloquejat' as EstatPas, motiuKey: b.bloqueig }
-    if (!jaHiHaAra) { jaHiHaAra = true; return { pas, fase, estat: 'ara' as EstatPas } }
-    return { pas, fase, estat: 'pendent' as EstatPas }
+    const clau = b.clau ? { clau: b.clau } : {}
+    if (b.fet) return { pas, fase, estat: 'fet' as EstatPas, motiuKey: b.motiu, ...clau }
+    if (b.bloqueig) return { pas, fase, estat: 'bloquejat' as EstatPas, motiuKey: b.bloqueig, ...clau }
+    if (!jaHiHaAra) { jaHiHaAra = true; return { pas, fase, estat: 'ara' as EstatPas, ...clau } }
+    return { pas, fase, estat: 'pendent' as EstatPas, ...clau }
   })
 }
 
@@ -347,10 +465,10 @@ export function puntCanal(f: FetsCanal): PuntProces & { pas: PasCanal | null; fa
     index: punt.fase,
     variant: punt.estat === 'bloquejat' ? 'bloquejat' : null,
     claus: {
-      titol: `canal.${punt.pas}_t`,
-      passa: `canal.${punt.pas}_passa`,
+      titol: `canal.${clauPas(punt)}_t`,
+      passa: `canal.${clauPas(punt)}_passa`,
       // Un paso bloqueado no dice «haz esto», dice POR QUÉ no se puede todavía.
-      toca: punt.motiuKey ?? `canal.${punt.pas}_toca`,
+      toca: punt.motiuKey ?? `canal.${clauPas(punt)}_toca`,
       qui: 'canal.qui_equip',
     },
     vars: {},

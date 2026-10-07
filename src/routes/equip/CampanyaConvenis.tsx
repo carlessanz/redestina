@@ -23,11 +23,15 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { casaCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/albarans'
 import { enviarConveni, enviarCorreuConveni, prepararConveni } from '../../lib/convenis'
 import type { CampanyaFila, FitxaIncompleta } from '../../lib/convenis'
 import { Casella } from '../../components/Casella'
+import { useConfirma } from '../../components/DialegConfirma'
+import { getTestMode } from '../../lib/settings'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -67,12 +71,13 @@ export default function CampanyaConvenis() {
 
   const [vista, setVista] = useState<Vista>('llestes')
   const [comarca, setComarca] = useState<string>(TOTS)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [triades, setTriades] = useState<Set<string>>(new Set())
 
   const [enviant, setEnviant] = useState(false)
   const [progres, setProgres] = useState<{ fetes: number; total: number } | null>(null)
   const [resultats, setResultats] = useState<Resultat[]>([])
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
@@ -104,7 +109,6 @@ export default function CampanyaConvenis() {
   }, [fitxes])
 
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
     return fitxes.filter((f) => {
       // Quien ya tiene convenio vigente no es trabajo de la campaña, en ninguna vista
       // salvo la de «totes»: si sale ahí es para poder comprobarlo, no para reenviarle.
@@ -114,10 +118,9 @@ export default function CampanyaConvenis() {
       if (vista === 'incompletes' && (f.nomes_firma_assistida || falta.length === 0)) return false
       if (vista === 'sense_correu' && !f.nomes_firma_assistida) return false
       if (comarca !== TOTS && (f.comarca ?? '') !== comarca) return false
-      if (!q) return true
-      return [f.nom, f.email, f.comarca].some((c) => (c ?? '').toLowerCase().includes(q))
+      return casaCerca([f.nom, f.email, f.comarca], q)
     })
-  }, [fitxes, vista, comarca, cerca])
+  }, [fitxes, vista, comarca, q])
 
   /** Solo se puede mandar a quien tiene correo: sin él, la vía es la firma presencial. */
   const enviables = useMemo(
@@ -141,6 +144,21 @@ export default function CampanyaConvenis() {
   async function enviaTanda() {
     const llista = enviables.filter((f) => triades.has(clauDe(f)))
     if (llista.length === 0) return
+    // Antes de crear convenios y mandar correos a organizaciones de verdad, se pregunta:
+    // cuántas, de qué modelo y si los correos saldrán o los cortará el modo test (§8).
+    // `getTestMode()` es fail-safe hacia «activo», así que ante la duda no promete envíos.
+    const modeTest = await getTestMode()
+    const models = [...new Set(llista.map((f) => f.tipo))].map((m) => t(`sig.model_${m}`)).join(', ')
+    const nTest = llista.filter((f) => f.es_test).length
+    const ok = await confirma({
+      titol: t('camp.confirm_title', { n: llista.length }),
+      descripcio: [
+        t('camp.confirm_desc', { n: llista.length, models }),
+        modeTest ? t('camp.confirm_test_on', { m: nTest }) : t('camp.confirm_test_off'),
+      ].join('\n\n'),
+      confirmar: t('camp.send_batch', { n: llista.length }),
+    })
+    if (!ok) return
     setEnviant(true)
     setResultats([])
     setProgres({ fetes: 0, total: llista.length })
@@ -214,6 +232,7 @@ export default function CampanyaConvenis() {
 
   return (
     <div className="space-y-4">
+      {dialegConfirma}
       {/* ── Seguimiento ── */}
       <Card>
         <CardHeader>

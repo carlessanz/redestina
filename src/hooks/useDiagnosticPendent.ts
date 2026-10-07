@@ -20,6 +20,7 @@ import { diagnosticEstat } from '../lib/diagnosticApi'
 import type { EstatDiagnostic } from '../types'
 import { useAppContext } from './useAppContext'
 import { useTicAvisos } from '../lib/refrescAvisos'
+import { clauOrganitzacions, organitzacionsDeClau } from '../lib/rols'
 
 /** Los estados en los que queda algo por hacer. `emes` está hecho; `sense_questionari`
  *  no es de la organización —es que no hay cuestionario vigente— y no se le puede pedir. */
@@ -42,11 +43,11 @@ export function useDiagnosticPendent(): DiagnosticPendent {
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
   // Cambia cuando alguien guarda la ficha, firma o emite: la banda se vuelve a calcular.
   const tic = useTicAvisos()
-  const orgs = ctx?.organitzacions ?? []
   // Clave estable del contenido: `ctx.organitzacions` es un array nuevo en cada render del
   // contexto, y con el objeto como dependencia este efecto se relanzaría con cada
   // `SIGNED_IN` que supabase-js reemite (el mismo fallo que documenta `PerfilOrganitzacio`).
-  const clau = orgs.map((o) => `${o.tipo}:${o.id}`).join(',')
+  // El efecto depende de la clave y saca de ella las organizaciones.
+  const clau = clauOrganitzacions(ctx?.organitzacions ?? [])
 
   useEffect(() => {
     if (!extern || clau === '') { setPendent(false); setEstat(null); setCarregant(false); return }
@@ -56,7 +57,7 @@ export function useDiagnosticPendent(): DiagnosticPendent {
     void (async () => {
       // Como mucho dos organizaciones (productora y receptora): dos llamadas, no una lista.
       const resultats = await Promise.all(
-        orgs.map((o) => diagnosticEstat(o.tipo, o.id)),
+        organitzacionsDeClau(clau).map((o) => diagnosticEstat(o.tipo, o.id)),
       )
       if (!viu) return
 
@@ -76,7 +77,7 @@ export function useDiagnosticPendent(): DiagnosticPendent {
     })()
 
     return () => { viu = false }
-  }, [extern, clau, tic]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [extern, clau, tic])
 
   return { pendent, estat, carregant }
 }

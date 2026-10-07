@@ -16,28 +16,19 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendBotones } from "../_shared/whatsapp.ts";
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
+import { exigirSecreto, json } from "../_shared/http.ts";
 
 // Ventana de inactividad: se avisa a partir de 10 min y hasta la caducidad de 12 h
 // (a partir de ahí la sesión se descarta sola en el próximo mensaje).
 const MIN_INACTIVO_MS = 10 * 60 * 1000;
 const CADUCIDAD_MS = 12 * 60 * 60 * 1000;
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
 
   // Autenticación por secreto compartido: solo el job (que lo lee de app_config) entra.
-  const esperado = Deno.env.get("RECORDATORIOS_SECRET");
-  const recibido = req.headers.get("x-recordatorios-secret");
-  if (!esperado || recibido !== esperado) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  const rechazo = exigirSecreto(req, "x-recordatorios-secret", Deno.env.get("RECORDATORIOS_SECRET"));
+  if (rechazo) return rechazo;
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

@@ -11,7 +11,7 @@
 
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import { useT } from '../lib/i18n'
-import { dataCurta } from '../lib/albarans'
+import { dataCurta, kg, preu } from '../lib/format'
 import type { Excedente } from '../types'
 import { FotoOferta, FotoOfertaResolta, useUrlsFotos } from './FotosOferta'
 import type { FotoResolta } from './FotosOferta'
@@ -71,7 +71,7 @@ export default function DetallOfertaReceptor({ oferta, foto }: {
       </p>
 
       <dl className="grid grid-cols-1 gap-x-4 gap-y-2 text-sm sm:grid-cols-2">
-        <Dada etiqueta={t('mk.d_kg')} valor={`${kgFmt(oferta.kg_total)} kg`} />
+        <Dada etiqueta={t('mk.d_kg')} valor={`${kg(oferta.kg_total)} kg`} />
         <Dada etiqueta={t('mk.d_zone')} valor={oferta.comarca ?? '—'} />
         <Dada etiqueta={t('mk.d_mode')} valor={textModalitats(modalitatsOferta(oferta), t) || '—'} />
         {preu && <Dada etiqueta={t('mk.d_price')} valor={preu} />}
@@ -117,15 +117,10 @@ function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
   )
 }
 
-/** «1.320» i «0,45»: el format local, no el del punt decimal de la base. */
-export function kgFmt(n: number | null | undefined): string {
-  return n == null ? '—' : new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 2 }).format(Number(n))
-}
-
 /** El precio, solo si la modalidad lo tiene: una donación no lleva precio. */
 export function preuDe(o: Pick<Excedente, 'modalitat' | 'modalitats' | 'preu_minim'>): string | null {
   // Con varias modalidades (05-10-2026) el precio vale para la venta o la maquila, no para
   // la donación: basta con que la oferta incluya una con precio.
   if (!ambPreu(modalitatsOferta(o)) || o.preu_minim == null) return null
-  return `${new Intl.NumberFormat('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(o.preu_minim))} €/kg`
+  return `${preu(o.preu_minim)} €/kg`
 }

@@ -5,6 +5,7 @@
 // cambia nunca en ejecución, así que no tiene sentido pedirlo en cada pantalla.
 
 import { supabase } from './supabase'
+import { senseAccents } from './cerca'
 
 export interface Municipi {
   codi_ine: string
@@ -41,7 +42,5 @@ export function nomLlegible(nom: string): string {
   return art.endsWith("'") ? `${art}${m[1]}` : `${art} ${m[1]}`
 }
 
-/** Sin acentos ni mayúsculas: «sant cugat» encuentra «Sant Cugat del Vallès». */
-export function normalitza(s: string): string {
-  return s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-}
+/** Sin acentos ni mayúsculas: «sant cugat» encuentra «Sant Cugat del Vallès». Vive en `cerca.ts`. */
+export const normalitza = senseAccents

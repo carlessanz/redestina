@@ -26,40 +26,15 @@ import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { esCuentaPermitida, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciaDeCuenta } from "../_shared/organizacion.ts";
-
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
-  .split(",").map((o) => o.trim()).filter(Boolean);
-
-function originPermitido(origin: string): boolean {
-  return ALLOWED_ORIGINS.some((patron) => {
-    if (!patron.includes("*")) return patron === origin;
-    const re = new RegExp(
-      "^" + patron.split("*").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[A-Za-z0-9-]+") + "$",
-    );
-    return re.test(origin);
-  });
-}
-
-function corsPara(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-}
+import { corsPara, origenPorDefecto } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
+import { enmascararEmail } from "../_shared/enmascarar.ts";
 
 Deno.serve(async (req) => {
   const cors = corsPara(req);
-  const responder = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const responder = respondedor(cors);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
 
   const supabase = createClient(
@@ -131,13 +106,13 @@ Deno.serve(async (req) => {
         // Que no pase en silencio: quien mira los logs tiene que poder ver que se ha
         // contactado por un canal distinto del que la organización pidió.
         console.warn(
-          `[enviar-acceso] preferència no respectada: ${email} demana ${preferido} ` +
+          `[enviar-acceso] preferència no respectada: ${enmascararEmail(email)} demana ${preferido} ` +
             `i s'envia per ${canal} (${motivoCanal})`,
         );
       }
     }
 
-    const redirectTo = Deno.env.get("APP_URL") ?? ALLOWED_ORIGINS[0];
+    const redirectTo = Deno.env.get("APP_URL") ?? origenPorDefecto();
     const { data, error } = await supabase.auth.admin.generateLink({
       type: "magiclink",
       email,

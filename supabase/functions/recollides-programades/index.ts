@@ -20,9 +20,7 @@ import { createClient } from "@supabase/supabase-js";
 import { bustiaEquip, enLlistaCorreuTest, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { textConfirmacioRecollida } from "../_shared/textAvis.ts";
-
-const json = (body: unknown, status = 200) =>
-  new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+import { exigirSecreto, json } from "../_shared/http.ts";
 
 interface Enllac { id: string; destinatari: string | null; nom: string | null; rol_part: string | null; token: string }
 interface Programat {
@@ -32,10 +30,8 @@ interface Programat {
 
 Deno.serve(async (req) => {
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405);
-  const esperado = Deno.env.get("DOCUMENTOS_SECRET");
-  if (!esperado || req.headers.get("x-documentos-secret") !== esperado) {
-    return json({ error: "unauthorized" }, 401);
-  }
+  const rechazo = exigirSecreto(req, "x-documentos-secret", Deno.env.get("DOCUMENTOS_SECRET"));
+  if (rechazo) return rechazo;
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SB_SECRET_KEY")!);
 
   const [prog, rec] = await Promise.all([

@@ -34,13 +34,17 @@ export function useCanalPropi() {
   const fitxa = (ctx?.organitzacions ?? [])[0] ?? null
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
 
+  // Solo el tipo y el id: el objeto de la ficha es nuevo en cada render del contexto.
+  const tipoFitxa = fitxa?.tipo ?? null
+  const idFitxa = fitxa?.id ?? null
+
   useEffect(() => {
-    if (!extern || !fitxa) { setCarregant(false); return }
+    if (!extern || !tipoFitxa || !idFitxa) { setCarregant(false); return }
     let viu = true
     void (async () => {
-      const taula = fitxa.tipo === 'productor' ? 'productores' : 'entidades'
+      const taula = tipoFitxa === 'productor' ? 'productores' : 'entidades'
       const { data } = await supabase
-        .from(taula).select('organizacion_id').eq('id', fitxa.id).maybeSingle()
+        .from(taula).select('organizacion_id').eq('id', idFitxa).maybeSingle()
       const orgId = (data as { organizacion_id: string | null } | null)?.organizacion_id
       if (!orgId) { if (viu) setCarregant(false); return }
       const { data: org } = await supabase
@@ -50,7 +54,7 @@ export function useCanalPropi() {
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [extern, fitxa?.tipo, fitxa?.id]) // eslint-disable-line react-hooks/exhaustive-deps
+  }, [extern, tipoFitxa, idFitxa])
 
   const desa = useCallback(async (nou: TriaCanal): Promise<boolean> => {
     if (!fitxa) return false

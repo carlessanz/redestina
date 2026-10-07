@@ -14,6 +14,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { casaCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { dataCurta } from '../../lib/albarans'
 import { ESTATS_CONVENI, TIPUS_CONVENI, estilEstatConveni, nomOrganitzacio } from '../../lib/convenis'
 import type { ConvenioEstado, ConvenioTipo } from '../../types'
@@ -55,7 +57,7 @@ export default function Convenis() {
   const [orgs, setOrgs] = useState<Record<string, Org>>({})
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [estat, setEstat] = useState<string>(TOTS)
   const [tipus, setTipus] = useState<string>(TOTS)
   const [comarca, setComarca] = useState<string>(TOTS)
@@ -119,17 +121,14 @@ export default function Convenis() {
   }, [files, orgDe])
 
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
     return files.filter((f) => {
       if (estat !== TOTS && f.estado !== estat) return false
       if (tipus !== TOTS && f.tipo !== tipus) return false
       const o = orgDe(f)
       if (comarca !== TOTS && (o.comarca ?? '') !== comarca) return false
-      if (!q) return true
-      const camps = [f.numero_completo, o.nom, o.comarca, nomOrganitzacio(f.datos_org, null)]
-      return camps.some((c) => (c ?? '').toLowerCase().includes(q))
+      return casaCerca([f.numero_completo, o.nom, o.comarca, nomOrganitzacio(f.datos_org, null)], q)
     })
-  }, [files, cerca, estat, tipus, comarca, orgDe])
+  }, [files, q, estat, tipus, comarca, orgDe])
 
   return (
     <Card>

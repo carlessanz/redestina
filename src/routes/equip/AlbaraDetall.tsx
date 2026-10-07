@@ -27,7 +27,8 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
-  enviaEnllacosConfirmacio, marcarEntregat, propostaConciliacio, rectificarAlbara,
+  enviaEnllacosConfirmacio, marcarEntregat, paramsConciliacio, propostaConciliacio,
+  rectificarAlbara, venciment,
 } from '../../lib/albarans'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
@@ -215,6 +216,9 @@ export default function AlbaraDetall() {
   const [dialegRectificar, setDialegRectificar] = useState(false)
   const [dialegConciliar, setDialegConciliar] = useState(false)
   const [proposta, setProposta] = useState<PropostaConciliacio | null>(null)
+  // Plazo para conciliar sin confirmación. Lo exige la base en los tres tipos; aquí solo se
+  // lee para decirlo ANTES de que alguien rellene el diálogo para nada.
+  const [terminiDies, setTerminiDies] = useState<number>(7)
   const [enllacosNous, setEnllacosNous] = useState<{ nom: string; url: string }[]>([])
   // La confirmación conducida por teléfono, con la persona al otro lado (§9).
   const [dlgAssistit, setDlgAssistit] = useState(false)
@@ -392,13 +396,21 @@ export default function AlbaraDetall() {
     await carrega()
   }
 
+  /**
+   * Abre la conciliación. Solo el REC tiene propuesta —contrasta su neto con lo que han
+   * confirmado sus salidas—; un ENT o un OPE se concilian solos, con sus propios kilos.
+   */
   async function obreConciliacio() {
     if (!albara) return
     setOcupat(true)
-    const res = await propostaConciliacio(albara.id)
+    const [params, res] = await Promise.all([
+      paramsConciliacio(),
+      albara.tipo === 'REC' ? propostaConciliacio(albara.id) : Promise.resolve(null),
+    ])
     setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    setProposta(res.data)
+    setTerminiDies(params.terminiDies)
+    if (res && !res.ok) { toast.error(textError(t, res)); return }
+    setProposta(res && res.ok ? res.data : null)
     setDialegConciliar(true)
   }
 
@@ -414,7 +426,9 @@ export default function AlbaraDetall() {
     setOcupat(false)
     if (!res.ok) { toast.error(textError(t, res)); return }
     setDialegConciliar(false)
-    toast.success(t('alb.reconciled'))
+    // Un REC arrastra sus salidas confirmadas (`20270414100100`): se dice, porque si no el
+    // equipo iría a conciliarlas una a una.
+    toast.success(t(albara.tipo === 'REC' ? 'alb.reconciled_rec' : 'alb.reconciled'))
     void refrescaComptadors()
     await carrega()
   }
@@ -515,15 +529,16 @@ export default function AlbaraDetall() {
       : esBorrador ? 'alb.why_emit_first'
         : 'alb.why_already_delivered')
 
-  const potConciliar = albara.tipo === 'REC'
-    && (albara.estado === 'entregado' || albara.estado === 'confirmado')
+  // Los tres tipos se concilian desde el 07-10-2026: `conciliar_albaran()` admite REC, ENT
+  // y OPE en `entregado`/`confirmado` (sin confirmar, con plazo vencido y motivo). Antes
+  // solo el REC, y un OPE de venta —que no tiene REC— no tenía ninguna puerta a mano.
+  const potConciliar = albara.estado === 'entregado' || albara.estado === 'confirmado'
   const motiuConciliar = potConciliar
     ? undefined
-    : t(albara.tipo !== 'REC' ? 'alb.why_only_rec'
-      : inactiu ? 'alb.why_inactive'
-        : esBorrador ? 'alb.why_emit_first'
-          : albara.estado === 'emitido' ? 'alb.why_deliver_first'
-            : 'alb.why_already_reconciled')
+    : t(inactiu ? 'alb.why_inactive'
+      : esBorrador ? 'alb.why_emit_first'
+        : albara.estado === 'emitido' ? 'alb.why_deliver_first'
+          : 'alb.why_already_reconciled')
 
   const potRectificar = potAprovar && !esBorrador && !inactiu
   const motiuRectificar = potRectificar
@@ -1023,6 +1038,9 @@ export default function AlbaraDetall() {
 
       <DialegConciliar
         obert={dialegConciliar} onObert={setDialegConciliar}
+        tipus={albara.tipo}
+        confirmat={albara.confirmado_at != null}
+        venc={venciment(albara.entregado_at, terminiDies)}
         proposta={proposta} linies={linies} ocupat={ocupat}
         onConfirma={(k, m, d) => void concilia(k, m, d)}
       />
@@ -1092,19 +1110,32 @@ function DialegRectificar({
 }
 
 // ---------------------------------------------------------------------------
-// Conciliar: la propuesta del servidor con su semáforo.
+// Conciliar.
 //
-// El semáforo no es decoración: verde = la diferencia cabe en la tolerancia y se concilia
-// de un clic; rojo = no cabe, y entonces el motivo pasa a ser obligatorio y hay que decir
-// qué pasó con los kilos que no llegaron (`destino_final`). El aviso de «todavía no ha
-// vencido el plazo» lo pinta también la base como excepción; enseñarlo antes evita que la
-// persona rellene el formulario para nada.
+// En un REC, la propuesta del servidor con su semáforo: verde = la diferencia cabe en la
+// tolerancia; rojo = no cabe, y entonces el motivo es obligatorio (la base lo exige desde
+// `20270414100100`, `fora_de_tolerancia`) y hay que decir qué pasó con los kilos que no
+// llegaron (`destino_final`). Y avisa de la CASCADA: conciliar el REC concilia también sus
+// salidas ya confirmadas, con el mismo motivo.
+//
+// En un ENT o un OPE no hay propuesta —no hay nada con qué contrastar—: se validan sus
+// propios kilos.
+//
+// En los tres, la misma regla del plazo, que es la de `conciliar_albaran()`: sin
+// confirmación, solo con el plazo vencido y con motivo. Antes de vencer, el botón se
+// apaga diciendo hasta cuándo: rellenar el formulario para que la base lo rechace no
+// ayuda a nadie.
 // ---------------------------------------------------------------------------
 function DialegConciliar({
-  obert, onObert, proposta, linies, ocupat, onConfirma,
+  obert, onObert, tipus, confirmat, venc, proposta, linies, ocupat, onConfirma,
 }: {
   obert: boolean
   onObert: (v: boolean) => void
+  tipus: string
+  /** `albaranes.confirmado_at` no nulo. En un OPE, cuando han confirmado las dos partes. */
+  confirmat: boolean
+  /** Cuándo vence el plazo para conciliar sin confirmación (`null` = no consta entregado). */
+  venc: Date | null
   proposta: PropostaConciliacio | null
   linies: AlbaranLinea[]
   ocupat: boolean
@@ -1127,41 +1158,76 @@ function DialegConciliar({
     setDesti('')
   }, [obert, linies])
 
-  if (!proposta) return null
+  const esRec = tipus === 'REC'
+  if (esRec && !proposta) return null
 
-  const fora = !proposta.dins_tolerancia
-  const motiuObligatori = fora || !proposta.termini_vencut
-  const potConfirmar = !ocupat && (!motiuObligatori || motiu.trim() !== '')
+  const fora = esRec && proposta != null && !proposta.dins_tolerancia
+  // `Date.now()` en el render: es un aviso, no una regla; la que decide es la de la base.
+  const ara = Date.now()
+  const terminiVencut = venc != null && venc.getTime() < ara
+  // Sin confirmación y sin plazo vencido la base lo rechaza: no hay motivo que lo arregle.
+  const esperant = !confirmat && !terminiVencut
+  const motiuObligatori = fora || !confirmat
+  const potConfirmar = !ocupat && !esperant && (!motiuObligatori || motiu.trim() !== '')
+
+  // Las salidas que se conciliarán con el REC (las confirmadas) y las que se quedan.
+  const sortides = proposta?.entregues ?? []
+  const nCascada = sortides.filter((e) => e.estat === 'confirmado').length
+  const nEsperen = sortides.filter((e) => e.estat === 'emitido' || e.estat === 'entregado').length
 
   return (
     <Dialog open={obert} onOpenChange={onObert}>
       <DialogContent className="max-h-[85dvh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>{t('alb.reconcile')}</DialogTitle>
-          <DialogDescription>{t('alb.reconcile_desc')}</DialogDescription>
+          <DialogDescription>
+            {t(esRec ? 'alb.reconcile_desc' : 'alb.rc_sortida_desc')}
+          </DialogDescription>
         </DialogHeader>
 
         <div className="space-y-3 text-sm">
-          {/* El semáforo. `exito` y `error` son tokens; el coral no significa fallo. */}
-          <div className={`rounded-md p-3 ${fora ? 'bg-error-fondo text-error' : 'bg-exito-fondo text-exito'}`}>
-            <p className="font-medium">
-              {fora
-                ? t('alb.out_of_tolerance', { pct: proposta.diferencia_pct ?? 0, tol: proposta.tolerancia_pct })
-                : t('alb.in_tolerance', { tol: proposta.tolerancia_pct })}
-            </p>
-            <p>{t('alb.prop_reception', { kg: kg(proposta.kg_recepcio) })}</p>
-            <p>{t('alb.prop_delivered', { kg: kg(proposta.kg_entregues) })}</p>
-            <p>{t('alb.prop_diff', { kg: kg(proposta.diferencia) })}</p>
-          </div>
-
-          {!proposta.termini_vencut && (
-            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.deadline_not_due')}</p>
+          {/* El semáforo, solo en el REC. `exito` y `error` son tokens; el coral no
+              significa fallo. */}
+          {esRec && proposta && (
+            <div className={`rounded-md p-3 ${fora ? 'bg-error-fondo text-error' : 'bg-exito-fondo text-exito'}`}>
+              <p className="font-medium">
+                {fora
+                  ? t('alb.out_of_tolerance', { pct: proposta.diferencia_pct ?? 0, tol: proposta.tolerancia_pct })
+                  : t('alb.in_tolerance', { tol: proposta.tolerancia_pct })}
+              </p>
+              <p>{t('alb.prop_reception', { kg: kg(proposta.kg_recepcio) })}</p>
+              <p>{t('alb.prop_delivered', { kg: kg(proposta.kg_entregues) })}</p>
+              <p>{t('alb.prop_diff', { kg: kg(proposta.diferencia) })}</p>
+            </div>
           )}
 
-          {proposta.entregues.length > 0 && (
+          {/* El plazo: o se espera, o se concilia con motivo. Lo que dice la base. */}
+          {esperant && (
+            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">
+              {venc
+                ? t('alb.rc_wait_deadline', { d: dataCurta(venc.toISOString()) })
+                : t('alb.rc_wait_no_date')}
+            </p>
+          )}
+          {!confirmat && terminiVencut && (
+            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.rc_no_confirm')}</p>
+          )}
+
+          {/* La cascada (REC): qué se concilia con él y qué se queda esperando. */}
+          {esRec && (
+            <div className="rounded-md bg-secondary p-3 text-secondary-foreground">
+              <p>{t('alb.rc_cascade', { n: nCascada })}</p>
+              {nEsperen > 0 && <p className="mt-1">{t('alb.rc_cascade_pending', { n: nEsperen })}</p>}
+            </div>
+          )}
+          {tipus === 'ENT' && (
+            <p className="rounded-md bg-secondary p-3 text-secondary-foreground">{t('alb.rc_ent_hint')}</p>
+          )}
+
+          {esRec && sortides.length > 0 && (
             <div className="space-y-1">
               <p className="font-medium">{t('alb.prop_entries')}</p>
-              {proposta.entregues.map((e, i) => (
+              {sortides.map((e, i) => (
                 <p key={`${e.albara ?? i}`} className="text-muted-foreground">
                   {e.albara ?? '—'} · {e.entitat ?? '—'} · {kg(e.kg)} kg · {t(`alb.st_${e.estat}`)}
                 </p>

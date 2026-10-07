@@ -154,3 +154,56 @@ describe('las pantallas que importa el router existen', () => {
     expect(rotos, `Imports del router sin fichero:\n  ${rotos.join('\n  ')}`).toEqual([])
   })
 })
+
+describe('ninguna clave de i18n se queda huérfana', () => {
+  // La dirección inversa de la primera suite: una clave que nadie usa es texto muerto, y
+  // peor que inofensiva — al cambiar una pantalla se traduce una clave que ya no se pinta y
+  // la que sí se pinta se queda vieja. Se juntaron ~45 de funciones retiradas (fotos del
+  // catálogo, factura subida por el productor, el contexto degradado…) antes de mirar.
+  //
+  // CÓMO NO DAR FALSOS POSITIVOS con las claves compuestas (`t(\`od.ch_${canal}\`)`): una
+  // clave cuenta como usada si aparece LITERAL entre comillas en cualquier sitio, o si
+  // empieza por el prefijo fijo de alguna plantilla (`\`prefijo${…}`) o concatenación
+  // (`'prefijo' + …`). Eso es generoso a propósito —`canal.${pas}_t` cubre todo `canal.`—:
+  // esta prueba puede dejar pasar una clave muerta, nunca marcar una viva.
+  //
+  // Se leen también `supabase/functions` y `supabase/migrations`: hay claves que devuelve el
+  // servidor como mensaje (`po.err_albara_pendent` de `crear-oferta`) y que la pantalla
+  // traduce con `textError()`. Las pruebas NO cuentan como uso: una clave que solo cita un
+  // test es exactamente lo que se busca (pasó con `alb.why_only_rec`).
+  function recorre(dir: string, ext: RegExp): string[] {
+    const fuera: string[] = []
+    for (const e of readdirSync(join(RAIZ, dir), { withFileTypes: true })) {
+      const rel = `${dir}/${e.name}`
+      if (e.isDirectory()) fuera.push(...recorre(rel, ext))
+      else if (ext.test(e.name)) fuera.push(rel)
+    }
+    return fuera
+  }
+  const fitxers = [
+    ...FUENTES.filter((f) => f !== 'src/lib/i18n.tsx'),
+    ...recorre('supabase/functions', /\.ts$/),
+    ...recorre('supabase/migrations', /\.sql$/),
+  ]
+  const text = fitxers.map(lee).join('\n')
+  const literals = new Set([...text.matchAll(/['"`]([a-z_0-9]+\.[A-Za-z0-9_]+)['"`]/g)].map((m) => m[1]))
+  const prefixos = [
+    ...[...text.matchAll(/`([a-z_0-9]+\.[A-Za-z0-9_]*)\$\{/g)].map((m) => m[1]),
+    ...[...text.matchAll(/'([a-z_0-9]+\.[A-Za-z0-9_]*)'\s*\+/g)].map((m) => m[1]),
+  ]
+
+  it('la extracción encuentra literales y prefijos', () => {
+    expect(literals.size).toBeGreaterThan(500)
+    expect(prefixos.length).toBeGreaterThan(20)
+  })
+
+  it('cada clave del catalán se usa en algún sitio', () => {
+    const usada = (k: string) =>
+      literals.has(k)
+      // La variante singular la sirve `t()` sola cuando `n` vale 1 (§7).
+      || (k.endsWith('_1') && literals.has(k.slice(0, -2)))
+      || prefixos.some((p) => k.startsWith(p))
+    const orfes = [...CLAVES_CA].filter((k) => !usada(k)).sort()
+    expect(orfes, `Claves que no usa nadie (bórralas en ca y es):\n  ${orfes.join('\n  ')}`).toEqual([])
+  })
+})

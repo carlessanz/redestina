@@ -23,6 +23,14 @@ const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:517
   .map((o) => o.trim())
   .filter(Boolean);
 
+/**
+ * El primer origen de la lista. `enviar-acceso` y `recuperar-password` lo usan como
+ * `redirectTo` cuando falta `APP_URL`, igual que hacían con su copia de la lista.
+ */
+export function origenPorDefecto(): string {
+  return ALLOWED_ORIGINS[0];
+}
+
 /** ¿Está este origen en la allow-list? `*` cubre un tramo de dominio (previews de Vercel). */
 export function originPermitido(origin: string): boolean {
   return ALLOWED_ORIGINS.some((patron) => {

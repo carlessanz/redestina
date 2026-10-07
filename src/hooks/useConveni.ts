@@ -15,7 +15,7 @@
 //
 // El equipo no pasa por aquí: trabaja en nombre de otros y no tiene organización propia.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useAppContext } from './useAppContext'
 import { useTicAvisos } from '../lib/refrescAvisos'
@@ -42,6 +42,14 @@ export interface EstatConveni {
   tallPassat: boolean
   carregant: boolean
   /**
+   * La última lectura FALLÓ (red, base). No se sabe si tiene convenio, y lo que no se sabe
+   * no bloquea ni avisa: `avisa`, `bloqueja` y `tallPassat` valen `false` y se reintenta
+   * solo. Antes un error se leía como «cero convenios» y, con el corte pasado, apagaba
+   * «Publicar» o «M'interessa» a una organización con el convenio vigente. Quien decide de
+   * verdad es la base (`exigir_convenio()`), que sigue cortando si de verdad falta.
+   */
+  desconegut: boolean
+  /**
    * Vuelve a leer el estado. Hace falta desde que se puede firmar sin salir del panel
    * (`DialegFirmaConveni`): al cerrar el diálogo, la banda tiene que dejar de avisar sin
    * que nadie recargue la página a mano.
@@ -66,6 +74,10 @@ export function useConveni(): EstatConveni {
   const recarrega = useCallback(() => setTic((n) => n + 1), [])
   // Y el de todo el panel: firmar desde «Pendent de tu» tiene que apagar también esta banda.
   const ticAvisos = useTicAvisos()
+  const [desconegut, setDesconegut] = useState(false)
+  // Reintentos tras un fallo: 3 s, 10 s, 30 s y 60 s, y ahí se para (la siguiente
+  // navegación o acción vuelve a leer igualmente). Se pone a 0 en cuanto una lectura sale.
+  const intents = useRef(0)
 
   const orgId = organitzacio?.id ?? null
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
@@ -74,8 +86,9 @@ export function useConveni(): EstatConveni {
   const carregant = clauLlegida !== clau
 
   useEffect(() => {
-    if (!extern || !orgId) { setEstat(null); setTipusVigents([]); setClauLlegida('cap'); return }
+    if (!extern || !orgId) { setEstat(null); setTipusVigents([]); setDesconegut(false); setClauLlegida('cap'); return }
     let viu = true
+    let reintent: ReturnType<typeof setTimeout> | null = null
 
     void (async () => {
       const [convenis, tall] = await Promise.all([
@@ -83,6 +96,21 @@ export function useConveni(): EstatConveni {
         supabase.rpc('data_tall_convenis'),
       ])
       if (!viu) return
+
+      if (convenis.error || tall.error) {
+        console.warn('useConveni:', (convenis.error ?? tall.error)?.message)
+        // Se conserva lo último que se supo; solo se marca que ahora no se sabe.
+        setDesconegut(true)
+        setClauLlegida(`${columna}:${orgId}:${tic}:${ticAvisos}`)
+        const esperes = [3000, 10000, 30000, 60000]
+        if (intents.current < esperes.length) {
+          reintent = setTimeout(() => setTic((n) => n + 1), esperes[intents.current])
+          intents.current += 1
+        }
+        return
+      }
+      intents.current = 0
+      setDesconegut(false)
 
       const files = (convenis.data as { estado: ConvenioEstado; tipo: ConvenioTipo }[] | null) ?? []
       let millor: ConvenioEstado | null = null
@@ -96,17 +124,19 @@ export function useConveni(): EstatConveni {
       setClauLlegida(`${columna}:${orgId}:${tic}:${ticAvisos}`)
     })()
 
-    return () => { viu = false }
+    return () => { viu = false; if (reintent) clearTimeout(reintent) }
   }, [extern, orgId, columna, tic, ticAvisos])
 
   // Sin organización todavía (el contexto de sesión llega en dos tiempos) no se sabe nada:
   // no se avisa. Antes se avisaba con «encara no tens conveni» durante ese instante.
-  const avisa = extern && orgId !== null && !carregant && estat !== 'vigent'
+  const avisa = extern && orgId !== null && !carregant && !desconegut && estat !== 'vigent'
   // `new Date('2027-04-01')` es medianoche UTC y aquí basta: la fecha de corte es un día
   // entero, no un instante, y la base decide de verdad con `current_date`.
-  const passat = dataTall !== null && new Date(dataTall) <= new Date()
+  // Sin saber qué convenios tiene, tampoco se aplica el corte en la pantalla: `tallPassat`
+  // es lo que Mercat y NovaOferta usan para filtrar por tipo de convenio.
+  const passat = !desconegut && dataTall !== null && new Date(dataTall) <= new Date()
 
   return {
-    estat, dataTall, avisa, bloqueja: avisa && passat, tipusVigents, tallPassat: passat, carregant, recarrega,
+    estat, dataTall, avisa, bloqueja: avisa && passat, tipusVigents, tallPassat: passat, carregant, desconegut, recarrega,
   }
 }

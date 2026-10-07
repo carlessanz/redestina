@@ -61,6 +61,7 @@ export default function DocumentacioOrganitzacio({
 
   const [files, setFiles] = useState<Fila[]>([])
   const [carregant, setCarregant] = useState(true)
+  const [errorCarrega, setErrorCarrega] = useState(false)
   const [formulari, setFormulari] = useState(false)
   const [tipus, setTipus] = useState<DocumentExternTipus>('certificat_previ')
   const [exercici, setExercici] = useState<string>(() => String(new Date().getFullYear()))
@@ -73,39 +74,50 @@ export default function DocumentacioOrganitzacio({
 
   /**
    * Registrar un convenio en papel lo exige la RPC (`no_autoritzat`), así que aquí solo se
-   * refleja. Fail-open mientras el contexto no ha llegado, como el resto del panel del
-   * equipo (`Aprovacions`): quien decide de verdad es la base, y esto es para no enseñar un
+   * refleja. Fail-cerrado mientras el contexto no ha llegado (07-10-2026), como el resto
+   * del panel del equipo: quien decide de verdad es la base, y esto es para no enseñar un
    * botón que va a fallar — no para sustituir la guarda.
    */
-  const esSuperAdmin = ctx?.esSuperAdmin ?? true
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const carrega = useCallback(async () => {
     setCarregant(true)
 
     // Lista de columnas en UN literal (§7): supabase-js deduce el tipo de la fila
     // analizándolo, y ante una expresión se queda sin columnas.
-    const propis = await supabase
-      .from('documentos_externos')
-      .select('id, objeto_tipo, objeto_id, tipo, numero, fecha, created_at')
-      .eq('objeto_tipo', tipusOrg)
-      .eq('objeto_id', orgId)
-
     const columna = tipusOrg === 'productor' ? 'productor_id' : 'entidad_id'
-    const { data: convenis } = await supabase
-      .from('convenios')
-      .select('id')
-      .eq(columna, orgId)
-    const idsConveni = ((convenis as { id: string }[] | null) ?? []).map((c) => c.id)
+    const [propis, convenis] = await Promise.all([
+      supabase
+        .from('documentos_externos')
+        .select('id, objeto_tipo, objeto_id, tipo, numero, fecha, created_at')
+        .eq('objeto_tipo', tipusOrg)
+        .eq('objeto_id', orgId),
+      supabase
+        .from('convenios')
+        .select('id')
+        .eq(columna, orgId),
+    ])
+    const idsConveni = ((convenis.data as { id: string }[] | null) ?? []).map((c) => c.id)
 
     // Sin convenios no se pregunta: un `.in()` con lista vacía es una consulta que no puede
     // devolver nada y aun así viaja.
-    const deConvenis = idsConveni.length === 0
-      ? { data: [] as Fila[] }
+    const deConvenis = convenis.error || idsConveni.length === 0
+      ? { data: [] as Fila[], error: null }
       : await supabase
         .from('documentos_externos')
         .select('id, objeto_tipo, objeto_id, tipo, numero, fecha, created_at')
         .eq('objeto_tipo', 'convenio')
         .in('objeto_id', idsConveni)
+
+    // Un fallo de cualquiera de las tres no se pinta como «cap document»: se dice.
+    const fallada = propis.error ?? convenis.error ?? deConvenis.error
+    if (fallada) {
+      console.warn('DocumentacioOrganitzacio:', fallada.message)
+      setErrorCarrega(true)
+      setCarregant(false)
+      return
+    }
+    setErrorCarrega(false)
 
     const totes = [
       ...((propis.data as Fila[] | null) ?? []),
@@ -311,7 +323,9 @@ export default function DocumentacioOrganitzacio({
 
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
 
-        {!carregant && files.length === 0 && (
+        {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+
+        {!carregant && !errorCarrega && files.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('orgdoc.empty')}</p>
         )}
 

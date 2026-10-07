@@ -59,10 +59,13 @@ export interface FetsAlbara {
 /**
  * Qué toca con este albarán.
  *
- * ⚠️ El REC y el ENT divergen en dos estados, y no es cosmético: un REC entregado **ya se
- * puede conciliar** (con motivo, pasado el plazo) mientras que un ENT solo puede esperar a
- * la entidad; y la conciliación de un ENT no existe: se hace desde el REC del registro.
- * Decir lo mismo en los dos mandaría al equipo a buscar un botón que no está.
+ * ⚠️ El REC y el albarán de salida (ENT/OPE) divergen en dos estados, y no es cosmético: un
+ * REC entregado **ya se puede conciliar** (con motivo, pasado el plazo) mientras que una
+ * salida entregada solo puede esperar a la entidad. Una vez confirmada, la salida se
+ * concilia sola con el REC del registro (o por el proceso automático en venta y maquila),
+ * y también desde su propia ficha (`AlbaraDetall`), así que el texto lo dice así
+ * (`alb.next_confirmado_sortida`). Hasta el 07-10-2026 este comentario —y el texto— decían
+ * que la conciliación de un ENT no existía, y ya existía.
  */
 export function seguentPasAlbara(a: FetsAlbara): PuntProces {
   const esRec = a.tipo === 'REC'
@@ -82,7 +85,7 @@ export function seguentPasAlbara(a: FetsAlbara): PuntProces {
     case 'confirmado':
       return esRec
         ? punt('confirmado', index, titol, 'alb.next_confirmado_rec', {}, true, 'rec')
-        : punt('confirmado', index, titol, 'alb.next_confirmado_ent', {}, false, 'altres')
+        : punt('confirmado', index, titol, 'alb.next_confirmado_sortida', {}, false, 'altres')
     case 'conciliado':
       return punt('conciliado', index, titol, 'alb.next_conciliado')
     case 'anulado':

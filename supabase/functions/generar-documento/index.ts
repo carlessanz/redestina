@@ -45,6 +45,7 @@ import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
 import { enviaDocument } from "../_shared/envia-document.ts";
+import { exigirSecreto, json } from "../_shared/http.ts";
 
 // Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
 // resuelve el esquema a `never` y las llamadas dejan de compilar (misma nota que en
@@ -95,13 +96,6 @@ interface FilaDocumento {
   envio: Record<string, unknown> | null;
 }
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json" },
-  });
-}
-
 /** Huella de los bytes que se van a subir. Hex en minúsculas, como `pgcrypto`. */
 async function sha256(bytes: Uint8Array): Promise<string> {
   const copia = new Uint8Array(bytes.length);
@@ -122,9 +116,8 @@ Deno.serve(async (req) => {
 
   // Secreto compartido: lo guarda `app_config.documentos_secret` (lo lee el job) y
   // el secreto DOCUMENTOS_SECRET (lo valida esto). Nunca en git.
-  const esperado = Deno.env.get("DOCUMENTOS_SECRET");
-  const recibido = req.headers.get("x-documentos-secret");
-  if (!esperado || recibido !== esperado) return json({ error: "unauthorized" }, 401);
+  const rechazo = exigirSecreto(req, "x-documentos-secret", Deno.env.get("DOCUMENTOS_SECRET"));
+  if (rechazo) return rechazo;
 
   const supabase = createClient(
     Deno.env.get("SUPABASE_URL")!,

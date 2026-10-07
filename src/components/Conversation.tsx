@@ -8,6 +8,7 @@ import { plantillaPrimerContacte, textoSalutacio } from '../lib/plantillas'
 import type { RolContacte } from '../lib/plantillas'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
+import { diaMesHora } from '../lib/format'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { useWhatsappActiu } from '../hooks/useAppContext'
@@ -57,11 +58,13 @@ function noticeFromError(data: unknown, t: Tfn): Notice {
   return { kind: 'error', text: t('c.error') }
 }
 
+/** Solo la hora si es de hoy; si no, día y hora. */
 function formatTime(iso: string): string {
   const date = new Date(iso)
-  const time = date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
-  if (date.toDateString() === new Date().toDateString()) return time
-  return `${date.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit' })} ${time}`
+  if (date.toDateString() === new Date().toDateString()) {
+    return date.toLocaleTimeString('es-ES', { hour: '2-digit', minute: '2-digit' })
+  }
+  return diaMesHora(iso)
 }
 
 /**
@@ -291,7 +294,7 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
                   : m.direction === 'outbound' ? 'rounded-br-sm bg-secondary text-secondary-foreground'
                   : 'rounded-bl-sm bg-card')}>
                 <p className="whitespace-pre-wrap wrap-break-word">{m.body ?? <em>[{m.type ?? '—'}]</em>}</p>
-                <span className={cn('mt-1 block text-right text-[0.65rem]',
+                <span className={cn('mt-1 block text-right text-xs',
                   fallido ? 'font-medium text-destructive' : 'text-muted-foreground')}>
                   {formatTime(m.created_at)}
                   {fallido ? <> · {t('msg.not_delivered')}</>
@@ -302,7 +305,7 @@ export default function Conversation({ contact, onBack, onDeleted }: Props) {
                     de un número fuera de la lista de prueba — tres causas con tres arreglos
                     distintos (§8ter). */}
                 {fallido && motiuMeta(m) && (
-                  <span className="mt-1 block text-[0.65rem] text-destructive/80">
+                  <span className="mt-1 block text-xs text-destructive/80">
                     {motiuMeta(m)}
                   </span>
                 )}

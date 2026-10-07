@@ -126,7 +126,7 @@ demanda; organización (alta→convenio→verificada; y diagnóstico); match
 (propuesto→validado→coordinado→conciliado); albarán (borrador→emitido→entregado→conciliado).
 
 **Albaranes y conciliación:** un albarán por entrega física; en donaciones **doble tramo**
-(donante→Espigoladors y Espigoladors→entidad); numeración de serie sin huecos (ALB/ALR); kilos
+(donante→Espigoladors y Espigoladors→entidad); numeración de serie sin huecos (en lo construido: `REC`/`ENT`/`OPE` y sus rectificativos `R-…`; «ALB/ALR» es la nomenclatura del funcional, no del código); kilos
 oficiales solo desde operaciones **conciliadas**; **ningún certificado antes de conciliar**. Certificado
 de **donación** (al donante, lo emite Espigoladors) y de **transacción** (al generador).
 
@@ -605,6 +605,20 @@ src/
                                retiraServiceWorkers() (§2)
     documents.ts               descarregarDocument() (URL firmada 60 s) i esperarGeneracio() (§4)
                                + reenviarDocument() (botó «Reenvia», equip)
+    tancamentFormat.ts         PURO: lo que de `tancament.ts` no necesita el cliente de Supabase (`csv182` con
+                               escape de fórmulas, `euros`, `eurKg`, `bloqueja`, `exerciciDeNumero`). `tancament.ts` lo
+                               reexporta, así que ningún import cambia, y es probable desde Vitest
+    esborranyOferta.ts         PURO: el borrador de la oferta (sessionStorage, 24 h) y la conversión de fechas
+                               dd/mm/aaaa ↔ ISO de `FormulariNovaOferta`; un borrador sin `desat` se descarta
+    cerca.ts                   PURO: el buscador de los listados (`consultaCerca`, `casaCerca`,
+                               `filtraCerca`; minúsculas, SIN quitar acentos a propósito —`senseAccents()`
+                               existe y activarlo es una línea, pero cambiaría lo que encuentra cada
+                               listado—). `hooks/useCerca.ts` lo envuelve. 13 pantallas lo usan (07-10-2026)
+    format.ts                  PURO: números (`nombre`, `kg`, `preu`), fechas (`dataCurta`, `dataHora`,
+                               `diaMes`, `diaMesHora`) y «hoy» (`avuiMadrid`, `avuiLocal`). Sustituye las
+                               copias de `fmtKg`, `kgFmt`, `dataCurtaSenseAny`… `albarans.ts` y
+                               `tancament.ts` conservan aún sus propias `dataCurta`/`dataTancament`
+                               idénticas: se pueden reexportar desde aquí
     textError.ts               El texto de un error para un aviso: el código conocido se traduce
                                (sense_conveni…), una clave i18n pasa por t(), el texto crudo de
                                Postgres/Auth/red cae a c.error. Antes muchos avisos enseñaban
@@ -638,9 +652,10 @@ src/
                                exercici, donant
     canalitzacio.ts            Cliente de la pantalla guiada; nunca lanza, como albarans.ts
     passosCanalitzacio.ts      EL CICLO ENTERO de una canalización para la pantalla guiada
-                               del equipo: 19 pasos sobre las seis fases de FASES_EQUIP, con
-                               qué los bloquea. Puro, y con su propio test porque sus claves
-                               se componen (cobertura.test.ts no las ve)
+                               del equipo: 21 pasos sobre las seis fases de FASES_EQUIP, con
+                               qué los bloquea (incluye `oferta_validar` y `ent_conciliar`, y
+                               venta/maquila sin REC que terminan en el CT). Puro, y con su
+                               propio test porque sus claves se componen (cobertura.test.ts no las ve)
     pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
                                de módulo; alimenta los badges del menú Y el tablero (§6ter)
     conversioEspigolada.ts     Los siete rechazos de la conversión, traducidos POR SU CÓDIGO.
@@ -798,7 +813,12 @@ supabase/
   config.toml                  Config del CLI: project_id, migraciones y verify_jwt por función (§7)
   migrations/*.sql             Migraciones versionadas
   functions/
-    _shared/cors.ts            originPermitido()/corsPara(): CORS de las funciones públicas (§10)
+    _shared/cors.ts            originPermitido()/corsPara()/origenPorDefecto(): CORS de las funciones públicas (§10)
+    _shared/http.ts            json(), respondedor(cors), preflight(cors), igualesTiempoConstante() y
+                               exigirSecreto(req, cabecera, esperado): lo que antes estaba copiado en las
+                               19 funciones (07-10-2026). Todas las funciones lo importan
+    _shared/cliente.ts         El tipo ClienteSupabase (solo tipo: Vitest no carga la librería)
+    _shared/enmascarar.ts      enmascararEmail()/enmascararTelefono() para los logs (PII)
     _shared/pdf/               Motor de PDF: maquetador A4, fuentes embebidas, plantillas y
                                render/ (rec, ent, ope, res, cd, conv, pla, ct + cierre.ts común).
                                `pintarFirma()` la comparten CD y CT; el CT NO importa lletres.ts
@@ -807,7 +827,13 @@ supabase/
     _shared/intake.ts          Motor conversacional (máquina de estados)
     _shared/oferta.ts          crearExcedente(): id_excedente + texto "OFERTA DISPONIBLE"
     _shared/camposOferta.ts    Los 14 pasos, compartidos por el intake y el panel (§6bis)
-    crear-oferta/index.ts      GET /campos (descriptor) + POST (alta desde el panel del productor)
+    crear-oferta/index.ts      GET /campos (descriptor) + POST (alta desde el panel del productor);
+                               `validacio.ts` (puro): `fotosValides()` y `veuCostReferencia()`
+    enlace-publico/            `index.ts` solo enruta (254 líneas; era 2.195): `comun.ts` (cliente, token,
+                               anti-abuso, URL firmada, base64), `albaran.ts`, `factura.ts`, `convenio.ts`
+    registro/                  `index.ts` (anti-abuso, orden de pasos, compensación) + `validacio.ts`,
+                               `deteccio.ts` (duplicados), `conveni.ts`, `cliente.ts` y `coincidencies.ts`
+    recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)
     _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5)
     _shared/gate.ts            Gate de envío: quién PUEDE recibir (es_test, cuenta) + modoTestActivo (§8)
@@ -1099,8 +1125,9 @@ rollback, cinco pasadas, `1..N` sin huecos; y en estrés, 200 × 30 % de fallos.
 
 **`documentos`** (`20260928100200_documentos.sql`) — una fila por documento emitido.
 Polimórfica (`objeto_tipo`/`objeto_id`, sin FK por tipo ni FK inversa desde el dominio); el
-dominio nunca apunta al PDF, se le pregunta con `documento_vigente()`. Columnas: `tipo` (12
-valores, de REC a PROVA) · `subtipo` · `objeto_tipo` (6) · `objeto_id` · `numero_completo` ·
+dominio nunca apunta al PDF, se le pregunta con `documento_vigente()`. Columnas: `tipo` (13
+valores en el CHECK vigente, de REC a PROVA; eran 12 al crearse la tabla) · `subtipo` · `objeto_tipo` (8 hoy,
+con `cierre_periodo` y `cierre_receptor`; eran 6) · `objeto_id` · `numero_completo` ·
 `version` · `serie` · `ejercicio` · **`modo`** (`real`/`prueba`) · `idioma` · `plantilla_id` ·
 `datos jsonb` · `sha256_datos` · `ruta` · `sha256_fichero` · `bytes` · `paginas` · `estado`
 (`pendiente_fichero`/`emitido`/`error`) · `intentos` · **`reencolados`** · `ultimo_error` · `envio jsonb` ·
@@ -1148,7 +1175,7 @@ dice lo decide `_shared/correu-document.ts` (puro, con 9 pruebas), según tipo, 
 | Documento | Se manda | Nota |
 | --- | --- | --- |
 | `CONV` firmado / contrafirmado | ✅ | «Hem rebut el teu conveni signat» / «El teu conveni ja és vigent» |
-| `RES`, `CD` (anual y a demanda), `CT`, `CR` | ✅ | El resumen **no pide la factura** (§12.127) |
+| `RES`, `CD` (anual y a demanda), `CT`, `CR` | ✅ | El **cuerpo del correo** del resumen no pide la factura. ⚠️ Pero `emitir_resumen()` sigue acuñando el enlace `subida_factura` (60 días), el PDF del resumen imprime la caja «Per què cal la factura» y el RES definitivo deja al donante en `factura_pendent`: la afirmación «no pide la factura» solo vale para el texto del correo (§12.127, abierta; verificado contra el código el 07-10-2026) |
 | `REC`/`ENT`/`OPE` y sus `R-` | ❌ | Se manda el ENLACE de confirmación, no el PDF (`enviaEnllacosConfirmacio`, cliente) |
 | `PLA`, `PROVA` | ❌ | El plan se descarga al momento; `envio` va a null |
 
@@ -2100,7 +2127,8 @@ los dos llegan con `organizaciones = []`, porque la membresía pendiente es `act
 `20270317100000`, **`whatsapp_actiu`** — el interruptor global viaja aquí porque `app_settings` solo
 la lee el equipo y esto lo necesitan los tres paneles).
 
-⚠️ **Dos matices del contexto que el resto de la doc no capturaba** (verificado 2026-08-01):
+⚠️ **Dos matices del contexto que el resto de la doc no capturaba** (verificado 2026-08-01; el contexto ya no tiene
+modo degradado desde el 07-10-2026, §6quater):
 - `get_my_session_context()` calcula `es_intern`/`pot_aprovar`/`es_super_admin` con **`mi_rol()`**
   (rol real, **sin** el fail-open de los helpers homónimos de RLS). Consecuencia deliberada: con el
   interruptor apagado la **base** es permisiva (todo autenticado puede todo), pero la **interfaz**
@@ -2146,9 +2174,11 @@ funciones, no políticas:
 | `marcar_documento_generado(id, sha, bytes, paginas)` / `marcar_documento_error(id, err)` | Solo `service_role`. La `ruta` no se pasa: ya está fijada. `generado` es idempotente |
 | `emitir_albaran(id, recogida, lineas, idioma)` | Pide número, congela `partes`, emite el PDF. `es_intern()`; `22023` si no es borrador |
 | `marcar_entregado(id)` | Crea los enlaces de confirmación y **devuelve el token en claro**: es la única vez que existe (en la base solo está su hash). `es_intern()` |
-| `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`.** Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada |
+| `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`.** Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada. ⚠️ **Desde `20270414100000` un OPE lo confirman las DOS partes**: solo pasa a `confirmado` cuando confirma la última parte con enlace vivo (otro `rol_parte`, no usado, `activo` y no caducado); si solo hay un enlace —ficha sin correo— o el de la otra parte caducó o se revocó, pasa a `confirmado` como en REC/ENT. Los kg de la línea los fija la parte `recibe` (`entrega` solo escribe si `recibe` aún no confirmó); se conserva el rechazo más grave (`total` > `parcial` > `cap`) con los motivos encadenados; una parte que ya confirmó recibe `PT409`. En REC y ENT no cambia nada |
 | `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
-| `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo |
+| `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo. ⚠️ **Desde `20270414100100` sobre un REC exige motivo fuera de tolerancia (`22023 fora_de_tolerancia`) y concilia EN CASCADA** los ENT/OPE hermanos en `confirmado` (los obtiene `albarans_germans_rec(rec)`: mismo excedente o misma espigolada), con el motivo propagado o «Conciliat amb l'albarà de recepció <num>»; las canalizaciones quedan `conciliada` con `coste_kg` congelado. Todo o nada: si un hermano falla, falla el REC entero. Antes, conciliar un REC no tocaba las salidas y el cierre quedaba bloqueado por `sense_conciliar`. Un ENT/OPE se puede conciliar también por separado (UI `AlbaraDetall` desde el 07-10-2026) |
+| `albarans_germans_rec(rec)` (`20270414100100`) | Los ENT/OPE de un REC (mismo excedente o misma espigolada), con la condición de `propuesta_conciliacion()`. Interna: solo `service_role` |
+| `conciliacions_automatiques()` (`20270414100100`) | Job (solo `service_role`). Tres ramas: (1) REC `confirmado` con todas sus salidas confirmadas y dentro de tolerancia → concilia el REC, que arrastra las salidas (incluye el REC de una espigolada); (2) ENT/OPE `confirmado` cuyo REC ya está `conciliado` —el caso que antes se quedaba colgado—; (3) OPE `confirmado` sin REC vivo (venta o maquila puras). Ya no cuenta enlaces usados: con `registrar_confirmacion` de dos partes, un OPE `confirmado` ya significa que confirmaron todas |
 | `anular_albaran` / `rectificar_albaran` | `pot_aprovar()`. El rectificativo usa serie `R-<tipo>` y deja el original en `rectificado` |
 | `crear_espigolada(productor, ubicacion, fecha, voluntarios, notas, lineas, ref_externa, excedente)` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()`. ⚠️ **Con `p_excedente` CONVIERTE una oferta** (`20260921221806`, §6ter): no crea ningún excedente, **reutiliza ese** —`origen` a `espigolament`, `espigolada_id` a la jornada, `estado` a `borrador` hasta el reparto— y crea el REC con su línea. Se niega con `22023` y un código legible en `oferta_inexistent` · `productor_no_coincideix` · `sense_producte_al_camp` · `ja_es_espigolada` · `ja_te_canalitzacions` · `ja_te_albarans` · `massa_linies`. Toma `for update` sobre la oferta **antes de insertar nada**: sin ese bloqueo, dos conversiones simultáneas pasarían las guardas a la vez y crearían dos jornadas del mismo producto, que es la duplicación que esta fase existe para impedir. ⚠️ **La firma de siete argumentos se retiró en la misma migración**: `create or replace` no puede cambiar el número de argumentos, así que habrían convivido dos y cualquier llamada de siete sería **ambigua (42725)** |
 | `fijar_coste_producto(producto, coste, motivo)` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto(producto, motivo)` (`es_super_admin()`) | El coste **de referencia** y las taras. **Sin ejercicio desde `20270405100200`** (drop de las firmas viejas con `p_ejercicio`): un coste por producto que se actualiza cuando hace falta |
@@ -2156,7 +2186,8 @@ funciones, no políticas:
 | `fixar_fotos_oferta(excedente, fotos, foto_producte default null)` | Las fotos de una oferta publicada y, desde `20270405100100`, la casilla «foto del producte». `p_fotos` null = no tocar las fotos. El productor de la oferta o el equipo |
 | `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
 | `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
-| `abrir_cierre` · `calcular_cierre` · `emitir_resumen` · `registrar_factura` · `simular_factura` · `emitir_certificado` · `marcar_enviado` · `marcar_declarado` · `rectificar_certificado` · `reiniciar_cierre_prueba` · `conciliacion_retroactiva` | El ciclo del cierre anual. `abrir_cierre` en modo real exige `es_super_admin()`; `simular_factura` solo existe en cierres de prueba |
+| `abrir_cierre` · `calcular_cierre` · `emitir_resumen` · `registrar_factura` · `simular_factura` · `emitir_certificado` · `marcar_enviado` · `marcar_declarado` · `rectificar_certificado` · `reiniciar_cierre_prueba` · `conciliacion_retroactiva` | El ciclo del cierre anual. `abrir_cierre` en modo real exige `es_super_admin()`; `simular_factura` solo existe en cierres de prueba. ⚠️ **Desde `20270414100200`**: `calcular_cierre()` calcula también las filas `transaccio` (llama a `calcular_cierre_transacciones`, idempotente; el retorno gana la clave `transaccions`, y `congelar_un_cierre()` las vuelve a calcular al cerrar, inocuo) y `marcar_declarado()` marca **solo `tipo='donacio'`**: el CT no va al 182 |
+| `emitir_certificados_transaccion_cierre(cierre)` (`20270414100200`) | Espejo de `emitir_certificados_cierre` para los **CT**: mismas cinco guardas en el mismo orden (`42501` sin `pot_aprovar()`; `22023` si no existe, no está `tancat` o no está calculado; `42501` por datos provisionales solo en modo real). Recorre las filas `transaccio` sin número, salta `bloquejat` y `sense_kg` (el valor no cuenta: el CT no lleva importe) y emite el resto en subbloques. Devuelve `{emesos, ja_tenien, saltats[{cd, generador, codi, motiu}]}`. No la llama `cerrar_cierre()` ni el job de fin de año (mismo criterio que la tanda de CD) |
 | `cierre_base` · `cierre_pendents` · `datos_182` · `comparar_cierre_prueba` · `provincia_por_cp` | Las consultas. La base de cálculo son donaciones **conciliadas** con la fecha de recogida dentro del año **en hora de Madrid**, con los kilos del REC conciliado repartidos entre las canalizaciones del registro (D13) |
 | `cerrar_cierre(cierre)` | Cierra **un** cierre por su uuid: recalcula, emite los resúmenes definitivos y pasa a `tancat`. `pot_aprovar()`, y **`es_super_admin()` si el cierre es real** |
 | `congelar_un_cierre(cierre)` | La misma operación, interna (`service_role`). El job `congelar_ejercicio(año)` la llama en bucle, así que **hay una sola implementación** de «qué es congelar un cierre» |
@@ -2192,7 +2223,8 @@ funciones, no políticas:
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
-| `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling |
+| `guardar_plan_basico` · `emitir_plan_basico` · `plan_datos` · `puc_gestionar_pla` | El plan de prevención. `emitir_plan_basico` deja `envio` null: descarga inmediata por polling. ⚠️ `plan_datos()` es **solo `service_role`** desde `20270414100500` (devolvía NIF, correo y respuestas del cuestionario a cualquier sesión que tuviera el uuid) y además lleva guarda con `puc_gestionar_pla` como defensa en profundidad |
+| `auditoria_funcions_obertes()` (`20270414101000`) | Funciones de `public` abiertas de más: categoría `definer_anon` (`security definer`, no trigger, ejecutable por `anon`/PUBLIC) y `trigger_api` (de trigger, ejecutable por `anon`/`authenticated`). `security invoker`, solo equipo (`42501`). La vigila un check global del arnés contra `PERMITIDAS_ABIERTAS` (vacía; añadir una entrada exige escribir el motivo). Hoy devuelve 0 filas |
 | `questionari_vigent(tipo_org)` | El cuestionario que toca contestar. **`security invoker`**: la política de la tabla (`vigente or es_intern()`) ya dice lo que hay que decir, y una `definer` solo podría ampliar el alcance |
 | `publicar_questionari(tipo_org, titol, preguntes, provisional, vigent)` | La versión siguiente, retirando la anterior **en la misma transacción**. `pot_aprovar()`. Devuelve **`regles_orfes`**: las reglas que apuntan a una pregunta que ya no existe. **No bloquea** —una regla huérfana no dispara— pero quien publica tiene que verlo, o el plan siguiente saldría con menos medidas y nadie sabría por qué |
 | `desar_diagnostic(tipo_org, org, respostes, notes, idioma)` | Guarda **siempre**, completo o no —un cuestionario de doce preguntas no se contesta de una sentada—, compone el sobre autocontenido y, si no falta ninguna obligatoria, genera el plan. ⚠️ `p_respostes` es el mapa plano `{pregunta_id: valor}`: **el array con los textos lo compone el servidor**, porque si lo compusiera el cliente el texto congelado sería el que el navegador dijo haber enseñado (mismo criterio que `sha256_texto` en la firma de un convenio) |
@@ -2201,11 +2233,11 @@ funciones, no políticas:
 | `fixar_nivell_pla(plan, nivel)` | Subir a `personalitzat` exige `pot_aprovar()`; bajar a `basic`, no. El plan personalizado es un **servicio técnico**, no una casilla: si una organización pudiera declararlo desde su panel, estaría contratándose a sí misma algo que nadie ha prestado |
 | `diagnostic_estat(tipo_org, org)` · `diagnostics_equip()` | En qué punto está, en una llamada (`sense_questionari · sense_comencar · incomplet · a_punt · emes`, con `falten[]`), y la misma pregunta para toda la base. La segunda es `security invoker` con guarda de equipo, como `pendents_equip()` |
 | `avaluar_regla` · `pregunta_aplica` · `diagnostic_falten` · `compondre_respostes` · `questionari_valid`… | Los helpers puros (`immutable`, sin tocar ninguna tabla). ⚠️ `avaluar_regla` es **la única** gramática de condiciones: la comparten `regles_pla` y el `aplica_a` de una pregunta condicional, porque dos implementaciones de «¿se cumple esto?» acabarían divergiendo — y entonces **una pregunta que la pantalla oculta contaría como obligatoria en el servidor** |
-| `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true` — solo en modo real** (`20260921214526`); en prueba usa la serie `P-CT` |
+| `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true` — solo en modo real** (`20260921214526`); en prueba usa la serie `P-CT`. ⚠️ **Desde `20270414100400` `cierre_base_transaccion` y `cierre_pendents_transaccion` llevan la guarda de equipo** (`auth.uid() is not null and not es_intern()` → `42501`; conservan el GRANT a `authenticated` porque son la base de cálculo, como `cierre_base`): sin ella, una receptora o un productor leía todas las ventas y maquilas conciliadas de la plataforma con productor, entidad, kg y valor. `cierre_datos_certificado_transaccion` pasa a solo `service_role`, como sus hermanas. **Desde el 07-10-2026 el CT tiene pantalla**: tarjeta «Certificats de transacció» en `TancamentDetall` (§6ter) |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
-| `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` |
+| `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` (esta, desde `20270414100300`, exige el convenio **del generador** además del de la entidad). ⚠️ **Desde `20270414100600` `exigir_convenio()` y `organizacion_de()` son solo `service_role`** (y las llamadas internas de las funciones definer): el mensaje de la primera llevaba el NOMBRE de la organización —una receptora lo obtenía de un productor ajeno—, lo que rompe D3. `convenio_vigente()` sí la llama el navegador (`aprovarResposta.ts`, solo pantallas del equipo) y por eso lleva guarda de pertenencia: con sesión, o eres del equipo o la ficha es de `mis_productores()`/`mis_entidades()`; si no, `42501` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
-| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **trece** filas `(cua, n, ref, detall)`, **siempre las trece** aunque `n` valga 0. La 13 es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
+| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **catorce** filas `(cua, n, ref, detall)` (medido en el clon el 07-10-2026; eran trece hasta la rebanada 1, que añadió `ofertes_per_validar`), **siempre las catorce** aunque `n` valga 0: `registres`, `convenis_contrasignar`, `ofertes_per_validar`, `respostes`, `missatges`, `ofertes_sense_enviar`, `ofertes_vencudes`, `albarans_esborrany`, `albarans_conciliar`, `albarans_esperant`, `costos`, `tancament`, `documents_error` y `espigolades_per_convertir`. `albarans_esperant` solo se enseña como subtítulo, no como cola accionable. Una de ellas es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
 | `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20260921160536`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
 | `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20260921160749`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
@@ -2256,8 +2288,10 @@ a la entidad**, no la de la entrada del donante (deuda 69).
 ⚠️ **Cerrar el cierre real exige `es_super_admin()`; el de prueba, solo `pot_aprovar()`.** No es
 simetría con `abrir_cierre`: es que **cerrar es el acto irreversible**. Abrir consume la serie del
 año; cerrar emite los resúmenes definitivos con los que se le pide la factura al donante y congela
-el cálculo, y a partir de ahí toda corrección pasa por `rectificar_certificado()`, que numera una
-rectificativa — el error de un clic no se deshace, se documenta. Un cierre de prueba no tiene
+el cálculo, y a partir de ahí toda corrección pasa por `rectificar_certificado()`, que **no consume
+número**: emite la versión siguiente del MISMO número de certificado (`rectificaciones + 1`, con el motivo en
+el snapshot) —no existe serie `R-CD`; verificado contra la base el 07-10-2026, y una versión anterior de este
+párrafo decía lo contrario— — el error de un clic no se deshace, se documenta. Un cierre de prueba no tiene
 ninguna de esas consecuencias, y exigir el super_admin ahí solo conseguiría que el ensayo no se
 hiciera.
 
@@ -2309,6 +2343,41 @@ priorizar entidades. `_shared/autorizacion.ts` (`contextoUsuario`, `exigirEquipo
 respeta el mismo interruptor que la base. Devuelve `401 unauthorized` sin sesión y `403 forbidden` si
 no es del equipo. ⚠️ `contextoUsuario` trata una cuenta con `perfiles.activo=false` como **sin
 sesión** → `401` (no `403`).
+
+🔴 **`rolesActivos()` falla CERRADO ante un error de lectura** (07-10-2026). Hasta ese día devolvía `false`
+también cuando la lectura de `app_settings` fallaba —no distinguía un error del valor `'false'`—, y como
+`false` es el modo permisivo, un fallo transitorio de la base dejaba `exigirEquipo` abierto a cualquier cuenta
+con sesión, incluida una recién registrada y sin aprobar (`whatsapp-send`, `enviar-email`,
+`priorizar-entidades`, `enviar-acceso`, `reenviar-documento`, `limpiar-documentos-prueba`). Ahora un error
+—o una excepción del cliente— devuelve `true` y deja un `console.error`; solo `'true'` enciende el
+interruptor, y la fila ausente o `'false'` explícito siguen siendo el modo permisivo documentado. `tests/autorizacion.test.ts`.
+(El equipo sigue pasando aunque la lectura falle: su rol se lee aparte.) Queda anotado, sin cambiar:
+`contextoUsuario()` no detecta una cuenta desactivada si falla la lectura de `perfiles`.
+
+🔴 **Auditoría de funciones y GRANT del 07-10-2026** (`20270414100400`…`101000`; el detalle de cada RPC
+está en la tabla de arriba). Causa común: el `alter default privileges … on functions` de Supabase concede
+EXECUTE a PUBLIC, `anon`, `authenticated` y `service_role` a **toda función nueva** salvo `revoke`
+explícito. «`anon` no tiene ningún privilegio» (§4) es verdad para las **tablas**, no para las funciones.
+Se cerraron: `cierre_base_transaccion`/`cierre_pendents_transaccion` (guarda de equipo),
+`cierre_datos_certificado_transaccion` y `plan_datos` (solo `service_role`), `exigir_convenio` y
+`organizacion_de` (solo `service_role`), `convenio_vigente` (guarda de pertenencia), `ruta_documento` (volvió
+a tener EXECUTE para `authenticated` por un regrant de `20270111100100`; otra vez solo `service_role`),
+`disparar_recordatorios_intake` y `marcar_excedentes_vencidos` (**ejecutables por `anon`** con la clave
+pública: cualquiera podía disparar el job con el secreto válido; ahora solo `service_role` y con
+`search_path = public, pg_temp`) y 32 funciones de trigger sin EXECUTE para la API (siguen disparando: el
+EXECUTE se comprueba al crear el trigger, no al dispararlo). **Costumbre desde hoy**: toda función nueva lleva
+`revoke execute … from public, anon` (y de `authenticated` si es solo del servidor o de trigger); lo vigila el
+check global `auditoria_funcions_obertes()` del arnés. Propuesta no aplicada: `alter default privileges for role
+postgres in schema public revoke execute on functions from public, anon` (mantendría `authenticated`; una
+función futura que deba ser anónima necesitaría su `grant` explícito).
+Otras correcciones de Edge Functions del mismo día: `crear-oferta` GET solo sirve `cost_referencia` al
+equipo o a quien tiene ficha de productor (antes, a cualquier sesión) y valida las rutas de `fotos` con su forma
+exacta `<productor_id>/<uuid>.<jpg|jpeg|png|webp>` (rechaza `..`, `//` y subcarpetas); `enviar-avis` reclama el
+aviso de forma atómica (`update … where enviat_at is null returning`; `error_envio='en_curs'` con
+`canal_enviat` null significa «reclamado y no terminado», y si el isolate muere se prefiere no reintentar a
+mandar doble); los logs con PII enmascaran correo y teléfono (`_shared/enmascarar.ts`; el log del webhook de
+WhatsApp se queda como estaba, decisión documentada); el `verify_token` del GET del webhook se compara en
+tiempo constante.
 
 ### Verificación
 
@@ -2822,10 +2891,15 @@ Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
   fila de `enlaces_token` (`reenviat_at`, una sola vez, solo `canal='email'`); el correo dice
   que el enlace anterior ya no vale.
 - **Conciliación automática (D6)**: pg_cron `conciliacions-automatiques` →
-  `conciliacions_automatiques()`: REC y todas sus entregas confirmadas y
-  `propuesta_conciliacion()` dentro de tolerancia → concilia todo con motivo «conciliació
-  automàtica»; un OPE confirmado por las dos partes, también. Fuera de tolerancia, la cola
-  `albarans_conciliar` de siempre.
+  `conciliacions_automatiques()` (reescrita el 07-10-2026, `20270414100100`, tres ramas): (1) REC
+  `confirmado` con todas sus salidas confirmadas y `propuesta_conciliacion()` dentro de tolerancia →
+  concilia el REC, que arrastra las salidas en cascada (motivo «conciliació automàtica»); (2) ENT/OPE
+  `confirmado` cuyo REC ya está `conciliado`; (3) OPE `confirmado` sin REC vivo (venta o maquila puras).
+  Un OPE solo llega a `confirmado` cuando han confirmado las dos partes (o la única con enlace; §4bis
+  `registrar_confirmacion`). Fuera de tolerancia, la cola `albarans_conciliar` de siempre. El equipo
+  también concilia a mano ENT y OPE desde `AlbaraDetall` (con motivo y plazo vencido si no están
+  confirmados). ⚠️ Los albaranes de **espigolada** no se emiten solos: el cron los excluye y los lotes no
+  llevan hora de recogida; los emite el equipo.
 - **Bloqueo 48 h (G1)**: `bloqueig_per_albara(tipo, org)` = albaranes entregados con enlace
   activo sin usar desde hace > 48 h. `crear-oferta` (no asistida) responde `409
   albara_pendent` y `manifestar_interes()` levanta `albara_pendent`; los paneles lo
@@ -2850,6 +2924,49 @@ Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
 - ⬜ **La v2** (pregunta por producto del catálogo en el cuestionario de entidad) espera a D5.
 - ⬜ **H2, convenio único** (`col_productor`/`col_receptor`): espera el texto legal de la
   asesoría (`1. Fuentes/Convenis de colaboracio/`). No hay código.
+
+### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
+
+Revisión exhaustiva del código y de los flujos (informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
+Lo que se cambió en las pantallas y la lógica del circuito; las migraciones, en §4bis.
+
+- **El certificado de transacción (CT) tiene pantalla.** `TancamentDetall` gana la tarjeta «Certificats de
+  transacció», debajo de la de donantes: tabla por entidad productora (kg, estado con el siguiente paso,
+  `Bloquejos`, número `CT-…`, documentos y acciones), «Emet certificat» por fila (con confirmación: consume número
+  y se envía por correo), «Emet tots els certificats de transacció» (`emitir_certificados_transaccion_cierre`,
+  con confirmación que dice la serie `CT` o `P-CT` y el panel de resultado emitidos/saltados con su motivo) y
+  «Rectifica el certificat» con motivo obligatorio. Los botones salen siempre y a quien no tiene
+  `pot_aprovar()` se le ven grises con el motivo (`BotoAmbMotiu`). Los PDF se abren con el componente
+  `BotonsDocuments`, compartido con las filas de CD. «Calcula» enseña también el resumen de transacciones. Sigue
+  sin existir «Marca com a enviat» para el CT (deuda 138). Antes de hoy el CT no tenía ninguna pantalla —un
+  comentario de la propia pantalla decía «el CT tiene la suya»— y la única forma de emitir uno era SQL a mano.
+- **Conciliar un albarán desde la pantalla** (`AlbaraDetall`): «Concilia» se activa para **REC, ENT y OPE** en
+  `entregado` o `confirmado` (antes solo REC, así que una venta o una maquila no se podía conciliar nunca). El
+  diálogo lee el plazo y la tolerancia de `parametros_documentales` (7 días y 2 % si la lectura falla); sin
+  confirmar y con el plazo sin vencer dice hasta qué fecha esperar y apaga el botón; con el plazo vencido pide
+  motivo; en un REC fuera de tolerancia el motivo es obligatorio (lo exige la base) y el diálogo avisa de
+  cuántas salidas confirmadas se conciliarán en cascada y cuántas se quedan esperando.
+- **Contexto de sesión cerrado por defecto, `useConveni` que no bloquea ante un error, «Envia tanda» con
+  confirmación, errores de carga que ya no se pintan como «sin datos»** (Dashboard, `OfferDetail`, documentos
+  de productor y de receptor —ahora en `Promise.all`—, documentación y certificados de la ficha): §6quater y
+  los propios componentes. `useConveni` gana el estado `desconegut` (ante un fallo de lectura no avisa ni
+  bloquea y reintenta a los 3, 10, 30 y 60 s; la base sigue cortando con `exigir_convenio()` si de verdad
+  falta el convenio). Confirmación antes de borrar un lugar de recogida, una foto o una entrada de whitelist.
+- **Tokens de diseño**: `text-accent`/`border-accent` (crema de hover, ≈1,2:1 sobre blanco) dejan de usarse
+  como color de texto o borde; seis rejillas ganan `grid-cols-1` (regla 5 de §2); tres celdas de tabla
+  `whitespace-normal` (regla 6); siete diálogos usan `dvh` en vez de `vh`.
+- **Seguridad de la interfaz de datos**: `csv182` neutraliza fórmulas (un texto que empieza por `=`, `+`, `-` o `@`
+  lleva un apóstrofo delante; los negativos no se tocan). Pruebas nuevas de `textError`, de `tancamentFormat.ts` (lo
+  puro de `tancament.ts`, que lo reexporta) y de `esborranyOferta.ts` (borrador y fechas de `FormulariNovaOferta`;
+  un borrador sin la marca `desat` ahora se descarta). `tests/cobertura.test.ts` gana la comprobación inversa
+  («ninguna clave de i18n se queda huérfana», generosa a propósito: cuenta como usada cualquier clave literal o con
+  prefijo de plantilla, también en `supabase/functions` y `supabase/migrations`).
+- **Código muerto retirado**: `cargarNumerosTest`, `cargarEmailsTest` y ~43 claves i18n de funciones retiradas (fotos del
+  catálogo, subida de factura por el productor). Quedan **anotados sin tocar**: `SuggerimentPoblacio.tsx` (0
+  importadores), `mensajes.ts` (solo vive por su test), y las dos funciones del CR de la deuda 138.
+- **Refactor sin cambio de comportamiento**: ver §3 (`cerca.ts`, `format.ts`, `_shared/http.ts`, módulos de
+  `enlace-publico`, `registro` y `recordatorios-documentales`). 5 `eslint-disable` retirados y 9 de los 14
+  `as unknown as` de `src/`.
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -3073,10 +3190,22 @@ ese día no lo hacía, y esta frase decía que sí. Ver «Envío de documentos p
 puerta a los tres actos que no la tenían, que quedaran registrados como **asistidos** y no como
 otra cosa, y orquestarlo para que el atajo deje de ser el camino cómodo.
 
-**Seis fases, 19 pasos.** La escalera reutiliza `FASES_EQUIP` (`procesOferta.ts`) —`conveni ·
+**Seis fases, 21 pasos** (07-10-2026; eran 19). La escalera reutiliza `FASES_EQUIP` (`procesOferta.ts`) —`conveni ·
 entrada · distribucio · aprovacio · lliurament · tancament`— en vez de inventar un segundo
 vocabulario para el mismo proceso. Los pasos y lo que los bloquea viven en
 `src/lib/passosCanalitzacio.ts`, puro y con su propio test (§3).
+Los dos pasos nuevos y el cambio de fondo del 07-10-2026: **`oferta_validar`** —una oferta en
+`pendent_validacio` ya no cuenta como publicada: ese paso queda «ara» y `distribuir` queda bloqueado con
+`canal.bl_pendent_validacio`— y **`ent_conciliar`** —conciliar las salidas, necesario sobre todo en venta y
+maquila, donde no hay REC que las arrastre—. **Venta y maquila:** `certificatsDelLot()` decide si el lote
+necesita CD, CT o los dos (primero espigolada o REC vivo, después los albaranes de salida ENT/OPE, y solo si no
+hay ninguno la modalidad principal de la oferta); sin donación los cuatro pasos del REC salen `fet` con el motivo
+`canal.bl_sense_rec_venda`, el coste por kilo sale `fet` con `canal.bl_cost_no_cal` y no frena el cierre, y el
+último escalón es el **CT**. `FetsCanal.certificats` dice si el certificado ya está emitido (mira el número) y un
+certificado con bloqueos en el cierre da `canal.bl_certificat_bloquejat`. `canalitzacio_assistida()` elige el
+cierre del ejercicio con desempate determinista (`calculado_at desc nulls last, created_at desc`,
+`20270414101100`) y devuelve además, como claves opcionales que el frontend actual ignora, `oferta.modalitats` y
+`canalitzacions[].valorizacion` —lo que necesitaría la deuda 130—.
 
 | Fase | Qué se hace desde aquí |
 | --- | --- |
@@ -3174,7 +3303,7 @@ cierre de prueba: `acunar_enllac_assistit()` deja la fila con `canal = 'asistido
 más que su fila.
 
 ⚠️ **Lo que NO se ha ejercitado todavía es el ciclo entero**, y no por falta de ganas: cada
-recorrido **quema numeración legal** (ALB/ALR, CONV) de forma irreversible, igual que ya ocurre
+recorrido **quema numeración legal** (REC/ENT/OPE, CONV) de forma irreversible, igual que ya ocurre
 con cualquier prueba de albarán. El guion de la demo —`Horta de Prova SL` como generador, con su
 `don_gen` en `esborrany`, y `Menjador Social de Prova` como receptora, con su `don_rec` en
 `pendent_firma` a propósito (§9)— está listo para cuando se decida pagar ese precio. **No usar
@@ -3652,10 +3781,22 @@ router    ArrelApp                  si esRecovery → /restablir, desde cualquie
 ```
 
 **Por qué dos contextos y no uno.** `useSessio` (nuevo) solo dice si hay token; `useAppContext` dice
-quién eres, y tiene un fallback (`contextDegradat`) que **simula equipo interno** cuando la RPC de
-sesión falla. Ese fallback es correcto dentro de la aplicación y catastrófico fuera: montarlo sin
-sesión regalaría el panel del equipo a cualquiera que abriera la web. Por eso `AppContextProvider`
-vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
+quién eres. `AppContextProvider` vive **dentro** de `RequireSessio` y no puede alcanzarse de otra manera.
+
+🔴 **El contexto falla CERRADO (07-10-2026).** Hasta ese día, si `get_my_session_context` fallaba (red,
+5xx, timeout), `contextDegradat()` construía un contexto que **simulaba equipo interno** (`esIntern`,
+`admin`, `potAprovar`, `esSuperAdmin` a `true`, `rols: ['intern']`) y la interfaz le abría el panel del equipo
+con todos los botones a **cualquier** usuario, productor o receptor incluidos, sin reintento hasta recargar
+(la RLS cortaba los datos y las escrituras daban 0 filas silenciosas, pero la interfaz no debía abrirlo).
+Ahora `resolContext(data, error)` (`src/lib/rols.ts`) devuelve `{ ok: false }` ante un error o una respuesta
+vacía; `mapejaContext` solo concede `esIntern`/`potAprovar`/`esSuperAdmin` cuando la base devuelve exactamente
+`true`; y `useAppContext` pinta la pantalla «No s'ha pogut carregar el teu compte» con «Torna-ho a provar»
+(vuelve a cargar) y «Sortir» (cierra solo este dispositivo), sin montar nada de la aplicación privada. Se
+retiró también el badge «Mode compatibilitat» de `AppShell` y no queda modo de compatibilidad ni en
+desarrollo (la RPC existe en producción y en el clon). Los seis gates que daban `true` por defecto sin
+contexto (`OfferDetail`, `Aprovacions`, `CanalitzacioDetall`, `ConveniDetall`, `FitxaRegistre`,
+`DocumentacioOrganitzacio`) ahora dan `false`. `tests/rols.test.ts` fija que un error, una respuesta vacía o una
+fila sin las claves de permisos no conceden nada.
 
 🔴 **`carregant` DESMONTA LA PANTALLA, así que solo lo enciende la PRIMERA carga**
 (22-09-2026). `RoleGuard` y `ArrelPerRol` hacen `if (carregant) return <Carregant />`: mientras
@@ -4039,7 +4180,7 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   stack local (puertos 553xx, Auth como producción, sin analítica) y todo lo que crea Docker
   lleva «Redestina» en el nombre (`project_id`). Entre el 14-09 y el 07-10-2026 no hubo stack
   local: se retiró aquel día y se recuperó como clon de producción.
-  🔴 **Las 148 migraciones reconstruyen producción desde cero** desde el 07-10-2026 (deuda 125,
+  🔴 **Las migraciones (148 el 07-10-2026 por la mañana, 160 tras la revisión completa) reconstruyen producción desde cero** desde el 07-10-2026 (deuda 125,
   cerrada): las 22 que llevaban la fecha real del 21/22-09 se renumeraron a
   `20270328100100`…`102200` —el sitio en que producción las aplicó de verdad, según git— en el
   repo **y** en el historial de producción a la vez (`scripts/historial-migraciones.ts`).
@@ -4482,6 +4623,16 @@ documentos legales de entrega (REC/ENT/OPE), no del resumen: su función es just
 donante una factura por una cifra concreta (anexo B.1).
 
 ### Firma de convenios por enlace (fase 2)
+
+🔴 **El formulario exige lo mismo que el servidor** (07-10-2026). `enlace-publico` rechaza la
+firma con `400 dades_invalides` si el nombre o el cargo de quien firma tienen menos de 2
+caracteres o el documento de identidad menos de 5, y dice el campo (`camp`). `FirmaConveni`
+encendía el botón con cualquier texto no vacío y, al rechazarse, tiraba el motivo y pintaba
+«No podem obrir aquest enllaç · Hi ha alguna dada que no quadra» — reportado por el cliente
+probando con datos cortos, y leído como un bloqueo por convenio. Ahora valida los mismos
+mínimos (`MIN_NOM`, `MIN_DNI`) con aviso bajo el campo, y un rechazo de datos se enseña junto
+al botón con el campo traducido (`ERROR_CAMP`), sin la pantalla de enlace roto. Si se cambian
+los mínimos del servidor, cambiarlos en los dos sitios.
 
 `enlace-publico` gana el propósito `firma_convenio` con tres acciones: `firmar`, `enviar_codi` y
 `validar_codi`. Es **firma electrónica simple**: lo que la acredita no es el trazo, es la evidencia.
@@ -5221,7 +5372,7 @@ crea Docker lleva «Redestina» en el nombre (`supabase_db_Redestina`, la red
 
 ```bash
 # 1. Arrancar el stack (la skill supabase-local, o `supabase start`). Con la base vacía
-#    aplica las 148 migraciones.
+#    aplica las migraciones (160 a 07-10-2026).
 # 2. Volcar producción: lo hace Carles, en la sesión del token (solo lee de producción).
 bash scripts/local/volcar-produccion.sh            # → supabase/.local-dump/ (fuera de git)
 # 3. Entorno local: secretos locales y claves del stack (ficheros .env* fuera de git).
@@ -5627,6 +5778,14 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **07-10-2026 (revisión completa): se abren la 131-139** —cinco son decisiones de producto o de
+política, no defectos (131, 132, 133, 134, 137)—: **54 vivas** (45 + 9; el recuento por `grep` no es fiable
+porque la lista de checkpoints de arriba usa la misma numeración, así que esta cifra es aritmética y no se
+ha recontado) y la siguiente entrada nueva es la 140. De paso se **cierran sin número propio** cuatro
+errores funcionales de los flujos —ventas y maquilas que no conciliaban nunca (OPE de dos partes y
+conciliación manual de ENT/OPE), REC conciliado sin arrastrar las salidas, el CT sin pantalla ni emisión en
+bloque, y `repartir_espigolada` sin exigir el convenio del generador— y la lista de §4bis de funciones
+abiertas a `anon`.
 ⚠️ **07-10-2026: se cierra la 125** (el repo ya reconstruye producción desde cero, §11 «El clon
 local»): **45 vivas** y la siguiente entrada nueva sigue siendo la 131.
 ⚠️ **05-10-2026: se abre la 130** (la pantalla guiada no elige modalidad): **46 vivas** y la
@@ -6121,9 +6280,68 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      bloqueo `sense_cost` del cierre no se levanta. Hoy no hay ninguna en ese estado que importe
      (son fixtures); cuando la haya hará falta una RPC de «valorar a posteriori» con motivo.
 
+**Abiertas por la revisión completa del 07-10-2026** (auditoría de seguridad y de calidad del frontend,
+más el trazado de los flujos contra el código; informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
+Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos que se arreglen solos.
+
+131. **D3 sigue abierta en la capa REST: `excedentes` entrega al receptor columnas que identifican al
+     donante.** El GRANT SELECT de `excedentes` es de tabla y la política de lectura deja a la
+     receptora leer filas del Mercat y de sus canalizaciones, con `texto_oferta` («PRODUCTOR: …»),
+     `id_excedente` (las tres primeras letras del donante), `productor_id`, `ubicacion_id`,
+     `responsable`, `observacions` y `validada_per`; Realtime las emite igual (medido en el clon: 13 de 26
+     `texto_oferta` llevan «PRODUCTOR»). El cliente ya no las pide, pero la API sí las sirve. Propuesta técnica:
+     RPC `mercat_ofertes()` `security definer` con lista blanca de columnas y recortar las ramas del
+     receptor de la política a lo que necesitan Interessos e Històric; después un check «denegar» de
+     `leer` con `columnas: "texto_oferta"` desde una cuenta receptora. **Decisión de producto previa**: si el
+     receptor debe ver quién ofrece (la revisión del 23-09 lo pide), y el WhatsApp/correo ya lo mandan.
+132. **Un `tecnic` se salta las puertas `pot_aprovar()` escribiendo directo en las tablas** (misma raíz que la
+     109). `canalizaciones` tiene INSERT/UPDATE por columnas —incluidas `estado`, `kg_conciliados`, `coste_kg`,
+     `conciliada_at`— y DELETE de tabla con la política `es_intern()`, sin trigger de control: puede crear una
+     canalización sin `aprovar_resposta()` ni `exigir_convenio()` y conciliar kilos y coste sin
+     `conciliar_albaran()`, datos que alimentan `cierre_base` y los certificados fiscales. En `excedentes`,
+     `trg_excedentes_validacio` es solo `BEFORE INSERT`: un técnico puede hacer `UPDATE estado='publicada'` y
+     saltarse `validar_oferta()` y la revalidación D4. No es explotable desde fuera. Propuesta: trigger
+     `before update` que, con `auth.uid() is not null`, rechace los cambios fiscales salvo que la RPC haya fijado
+     `set_config('redestina.rpc_fiscal','on',true)` (patrón de `redestina.reinicio_prueba`), o GRANT de UPDATE
+     por columnas limitado a las operativas.
+133. **`recuperar-password` (`verify_jwt=false`) no tiene ningún freno**: ni límite por IP o por correo, ni
+     honeypot. Con `test_mode` apagado, un bucle POST con el correo de la víctima le manda N correos de
+     recuperación e invalida los enlaces vivos; el camino «la cuenta existe» tarda más que el otro y permite
+     enumerar. Propuesta (solo dentro del stack): 5 intentos/10 min por IP en memoria, un enlace como mucho
+     cada 5-15 min por correo mirando `documento_envios`, honeypot, y la misma respuesta 200 genérica siempre.
+134. **El anti-abuso de `registro` es débil y las cuentas nacen con el correo sin verificar.** La IP sale de
+     `x-forwarded-for` (controlable; también en `enlace-publico` y `verificar-certificat`, y el contador es en
+     memoria por isolate), el único freno real son los 20 pendientes por hora —un atacante que rote la cabecera
+     bloquea el registro legítimo y deja basura en `auth.users`/organizaciones/convenios— y `email_confirm: true`
+     permite reclamar el correo de una organización real con la contraseña del atacante (el equipo aprueba por
+     organización, no por titularidad del correo). Turnstile queda descartado (§7).
+135. **D3 residual en snapshots y vistas.** `documentos.datos.referencies.registre` de los ENT lleva
+     `E-AAMMDD-XXX-YYY-N` (XXX = tres letras del donante; 7 de 8 ENT del clon) y la entidad lee su fila por
+     `documents_meus()`; `v_albaranes_bandeja` expone `id_excedente` y `productor_id` a la entidad dueña de
+     un ENT; `albaranes.recogida` es jsonb libre y solo `enlace-publico/albaran.ts` tapa `lugar` y
+     `responsable_origen` con una lista negra. Arreglo: vistas o RPC que filtren, o sanear al emitir.
+136. **Sin code splitting**: las rutas se importan todas de forma estática (un único chunk de 1,65 MB; aviso de
+     Vite >500 kB). Propuesta lista: `React.lazy` salvo `Landing`, `LoginUsuaris`, `LoginEquip`, `Comuns` y
+     `AppShell`, un `<Suspense fallback={<CarregantSeccio />}>` alrededor de los `<Outlet />` de `AppShell` y
+     otro en `ArrelApp`, y escuchar `vite:preloadError` para recargar cuando un despliegue invalida los chunks.
+     Pendiente también partir `i18n.tsx` (4.713 líneas) por idioma/módulo.
+137. **Los privilegios por defecto de funciones siguen abiertos**: cada función nueva nace con EXECUTE para
+     PUBLIC y `anon`. El arnés ya lo detecta con `auditoria_funcions_obertes()` (§4bis), pero la causa
+     sigue: propuesta `alter default privileges for role postgres in schema public revoke execute on
+     functions from public, anon` (conservando `authenticated`, que algunas RPC del panel usan sin grant
+     explícito; el default de `supabase_admin` no se puede cambiar desde `postgres`).
+138. **El certificado de recepción no se puede rectificar ni marcar enviado desde la interfaz**: existen las
+     RPC (`rectificar_certificat_recepcio`, `marcar_enviat_recepcio`, `20270328101200`) y los envoltorios en
+     `src/lib/certificatRecepcio.ts` (`rectificarCertificatRecepcio`, `marcarEnviatRecepcio`) pero ningún
+     botón los llama. Brecha funcional, no solo código muerto. Mismo tipo de hueco: «Marca com a enviat» del CT.
+139. **Por verificar: el REC suma los kilos de TODAS las canalizaciones del excedente aunque la oferta
+     tenga varias modalidades** (donación y venta a la vez). El reparto del neto del REC en el CD asigna ese
+     neto solo a las líneas de donación, así que podría inflarse. Lo señaló el trazado de flujos desde el
+     código; no está reproducido en el clon. Reproducir antes de tocar nada.
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **41 de las 48**. Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **46 de las 54** (aritmética del 07-10-2026: 41 + las 131, 132, 133, 134 y 137; no recontado). Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -6186,6 +6404,10 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | # | Qué decisión falta | Por qué no se toma sola |
 |---|---|---|
 | 69 | Si se hace un backfill de `data_hora_recollida` en las donaciones antiguas (solo ENT/OPE la escriben hoy, el REC no) | Un backfill cambiaría el ejercicio fiscal de datos que ya pueden estar certificados. Se dijo explícitamente que no se toca sin el equipo/la Fundación delante — no es una tarea de ingeniería, es una decisión sobre datos fiscales reales |
+| 131 | Si el receptor puede ver quién ofrece antes de aprobar (D3) | Cerrar las columnas de `excedentes` cambia lo que ve el receptor y el equipo; la revisión del 23-09 pide justo lo contrario que el criterio original. La propuesta técnica está en la entrada, pero no se aplica sin esa decisión |
+| 132 | Si el rol `tecnic` conserva escritura directa sobre `canalizaciones` y `excedentes` | Restringirla cambia lo que puede hacer el rol técnico en el día a día del equipo; es política de la Fundación, no solo ingeniería (misma raíz que la 109) |
+| 133 · 134 | Qué frenos añadir a `recuperar-password` y `registro`, y si el alta debe verificar la titularidad del correo | Cada freno es comportamiento nuevo para personas reales (límites, esperas, verificación) y Turnstile está descartado por §7 |
+| 137 | Si se cambian los privilegios por defecto de funciones de `public` | Afecta a cómo se escriben todas las migraciones futuras; el arnés ya vigila el síntoma |
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
@@ -6296,8 +6518,12 @@ se va solo **cómo se llegó hasta aquí**.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
-   `deno check` de los scripts y las 15 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.115 pruebas en 40 ficheros**: 1.114 correctas y **1 saltada a propósito**, la
+   `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
+   Referencia: **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
+   tras la revisión completa: +123 sobre 1.115, de `tests/http.test.ts`, `autorizacion.test.ts`,
+   `crearOferta.test.ts`, `enmascarar.test.ts`, `cerca.test.ts`, `format.test.ts`, `textError.test.ts`,
+   `tancamentFormat.test.ts`, `esborranyOferta.test.ts`, las 17 de la escalera y la comprobación inversa de
+   i18n). Antes, 1.115 pruebas en 40 ficheros: 1.114 correctas y **1 saltada a propósito**, la
    de la cortina con la contraseña buena, que solo corre con `CORTINA_PROVA='…'` (07-10-2026:
    +4 de `tests/urlPublica.test.ts`, la URL firmada del clon local. Antes, 1.111 en 39 (05-10-2026,
    rebanada 4: el interés por producto en la priorización y el filtro del ranking. Rebanada 3: el correo de la recogida programada y `localDateTime`. Rebanada 2: `tests/textAvis.test.ts` y `tests/edicioOferta.test.ts`. Rebanada 1: `tests/modalitats.test.ts` y `tests/franja.test.ts`, más el estado
@@ -6325,7 +6551,15 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 1.052/1.052 correctas y 26 sin datos, «Sin fallos de permisos»** (06-10-2026,
+   ✅ **Referencia HOY: 1.156/1.156 correctas y 26 sin datos, «Sin fallos de permisos»** (07-10-2026,
+   **contra el clon local**, tras `20270414100000`…`20270414101100`; **producción todavía no las tiene**, hay
+   que aplicarlas en orden y volver a pasar el arnés allí). Sube **104** sobre la anterior (1.052): **18** de
+   la conciliación y el CT (`emitir_certificados_transaccion_cierre` y `albarans_germans_rec`, denegados a las
+   siete cuentas externas y al equipo, permitida la primera al super_admin con uuid inventado), **93** de la
+   auditoría de funciones (11 en `DOCUMENTAL_EXTERN` × 7 cuentas, 10 en `equip`, el check global
+   `auditoria_funcions_obertes` y los de `convenio_vigente` sobre la ficha propia y la ajena) y −7 por el check
+   de `convenio_vigente` ajeno, que pasó de «permitir» a «denegar». La migración de desempate del cierre
+   (`20270414101100`) no añadió ninguno. Antes, 1.052/1.052 (06-10-2026,
    tras publicar las rebanadas 0-4: `20270408100000`…`20270412100000`). Sube **64** sobre la anterior
    (988): los checks de `descartar_convenio_esborrany` y de las RPC nuevas, multiplicados por las
    cuentas de cada bloque. Las saltadas bajan de 28 a 26 por datos, no por permisos. La cuenta

@@ -19,6 +19,9 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { filtraCerca } from '../lib/cerca'
+import { kg as fmtKg } from '../lib/format'
+import { useCerca } from '../hooks/useCerca'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
@@ -64,10 +67,6 @@ const TOPE_TANCADES = 200
  */
 const ESPERA_RECARREGA_MS = 400
 
-/** «1.000» y no «1000»: `ca-ES` agrupa también los de cuatro cifras. */
-function fmtKg(n: number): string {
-  return n.toLocaleString('ca-ES', { maximumFractionDigits: 2 })
-}
 
 export default function OffersList({ onOpen, accio }: Props) {
   const { t } = useT()
@@ -76,7 +75,7 @@ export default function OffersList({ onOpen, accio }: Props) {
   const [kg, setKg] = useState<KgPorExcedente>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [busqueda, setBusqueda] = useState('')
+  const { cerca, setCerca, q } = useCerca()
 
   const load = useCallback(async () => {
     setLoading(true)
@@ -120,14 +119,8 @@ export default function OffersList({ onOpen, accio }: Props) {
     }
   }, [load])
 
-  const filtra = useCallback((files: Excedente[]) => {
-    const q = busqueda.trim().toLowerCase()
-    if (!q) return files
-    return files.filter((o) => {
-      const campos = [o.id_excedente, o.producto, o.variedad, t(etiquetaEstatOferta(o.estado).key)]
-      return campos.some((c) => (c ?? '').toLowerCase().includes(q))
-    })
-  }, [busqueda, t])
+  const filtra = useCallback((files: Excedente[]) => filtraCerca(files, q,
+    (o) => [o.id_excedente, o.producto, o.variedad, t(etiquetaEstatOferta(o.estado).key)]), [q, t])
 
   // La miniatura, con la misma regla que el resto de listas (fotoOferta.ts): la foto
   // propia, la del producto o el icono de su familia. Firmada en lote para las dos pestañas.
@@ -206,7 +199,7 @@ export default function OffersList({ onOpen, accio }: Props) {
     )
   }
 
-  const senseCoincidencia = busqueda.trim() !== ''
+  const senseCoincidencia = q !== ''
   const [params] = useSearchParams()
   const pestanyaInicial = params.get('tab')
 
@@ -221,7 +214,7 @@ export default function OffersList({ onOpen, accio }: Props) {
         <LlegendaEstats items={llegendaOferta()} />
       </CardHeader>
       <CardContent className="space-y-4">
-        <Input type="search" placeholder={t('off.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+        <Input type="search" placeholder={t('off.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
         {loading && <CarregantSeccio files={5} ambCapcalera={false} />}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 

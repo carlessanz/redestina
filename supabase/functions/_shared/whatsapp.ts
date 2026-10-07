@@ -18,6 +18,7 @@
 // No cambia el comportamiento en Deno: el entorno del isolate no cambia durante su vida, asi
 // que da igual cuando se pregunte.
 import { whatsappActivo } from "./gate.ts";
+import type { ClienteSupabase } from "./cliente.ts";
 
 function apiVersion(): string {
   return Deno.env.get("WHATSAPP_API_VERSION") ?? "v23.0";
@@ -63,6 +64,15 @@ export interface RespuestaMeta {
 }
 
 /**
+ * Lo que interesa de la respuesta de la Graph API: el wamid si salió, el error si no.
+ * Es una lectura, no una validación: Meta puede mandar más campos y se conservan en `data`.
+ */
+interface CuerpoGraph {
+  messages?: { id?: string | null }[];
+  error?: { message?: unknown; [clave: string]: unknown };
+}
+
+/**
  * El ÚNICO punto por el que sale algo hacia Meta, y por eso también el último cierre del
  * interruptor global (§8).
  *
@@ -77,13 +87,11 @@ export interface RespuestaMeta {
  *    `whatsapp-send` cortan mucho antes, así que no son 14 lecturas por intake.
  */
 async function enviar(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   payload: Record<string, unknown>,
 ): Promise<RespuestaMeta> {
   if (!(await whatsappActivo(supabase))) {
-    // deno-lint-ignore no-explicit-any
-    const destino = (payload as any)?.to ?? "?";
+    const destino = payload.to ?? "?";
     console.warn(`[whatsapp_desactivat] no s'envia a ${destino}`);
     return {
       ok: false,
@@ -99,8 +107,7 @@ async function enviar(
   if (!envioReal()) {
     // Modo PoC: no se contacta con Meta. Se devuelve una respuesta simulada para
     // que el flujo (intake, panel) continúe con normalidad.
-    // deno-lint-ignore no-explicit-any
-    const to = (payload as any)?.to ?? "?";
+    const to = payload.to ?? "?";
     console.log(`[SIMULADO] no se envía a ${to} (WHATSAPP_ENVIO_REAL != true)`);
     return {
       ok: true,
@@ -122,7 +129,7 @@ async function enviar(
       body: JSON.stringify({ messaging_product: "whatsapp", ...payload }),
     },
   );
-  const data = await res.json().catch(() => null);
+  const data: CuerpoGraph | null = await res.json().catch(() => null);
   if (!res.ok) {
     console.error("Graph API:", JSON.stringify(data));
     return { ok: false, status: res.status, waMessageId: null, data };
@@ -130,16 +137,14 @@ async function enviar(
   return {
     ok: true,
     status: res.status,
-    // deno-lint-ignore no-explicit-any
-    waMessageId: (data as any)?.messages?.[0]?.id ?? null,
+    waMessageId: data?.messages?.[0]?.id ?? null,
     data,
   };
 }
 
 /** Deja constancia del saliente para que aparezca en la conversación de la consola. */
 export async function registrarSaliente(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   tipo: string,
   body: string | null,
@@ -178,15 +183,13 @@ export async function registrarSaliente(
  * rechaza, y la columna es UNIQUE: sin un valor propio, dos fallos chocarían.
  */
 export async function registrarFallo(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   tipo: string,
   body: string | null,
   r: RespuestaMeta,
 ): Promise<void> {
-  // deno-lint-ignore no-explicit-any
-  const err = (r.data as any)?.error ?? {};
+  const err = (r.data as CuerpoGraph | null)?.error ?? {};
   const motivo = err.message ?? `HTTP ${r.status}`;
   const { error } = await supabase.from("wa_messages").insert({
     wa_message_id: `err-${crypto.randomUUID()}`,
@@ -201,8 +204,7 @@ export async function registrarFallo(
 }
 
 export async function sendText(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   body: string,
   /**
@@ -227,8 +229,7 @@ const TEXTO_PLANTILLA: Record<string, string> = {
 };
 
 export async function sendTemplate(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   nombre: string,
   idioma: string,
@@ -247,8 +248,7 @@ export async function sendTemplate(
 
 /** Pregunta con hasta 3 botones. */
 export async function sendBotones(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   texto: string,
   botones: Boton[],
@@ -283,8 +283,7 @@ export async function sendBotones(
 
 /** Pregunta con lista desplegable, hasta 10 filas. */
 export async function sendLista(
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  supabase: ClienteSupabase,
   to: string,
   texto: string,
   etiquetaBoton: string,

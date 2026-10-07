@@ -75,74 +75,81 @@ export default function ReceptorDocuments() {
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
-    // `ENT` y `R-ENT`: una entrega rectificada sigue siendo una entrega suya, y esconderla
-    // dejaría a la entidad sin el documento que de verdad vale. Y `OPE`/`R-OPE`: en venta y
-    // maquila lo que recibe es un OPE, y sus kilos ya cuentan en el acumulado de arriba
-    // (`kg_rebuts_exercici` suma donación y compra).
-    const { data: albData, error: err } = await supabase
-      .from('v_albaranes_bandeja')
-      .select('id, tipo, numero_completo, estado, ejercicio, canalizacion_id, producto, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
-      .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE'])
-      .order('emitido_at', { ascending: false, nullsFirst: true })
-    if (err) return { err }
-
-    // Sin filtrar por `objeto_tipo`: hacen falta también los convenios, el plan y los
-    // certificados de recepción, y la RLS ya devuelve solo los documentos de sus
-    // organizaciones (`documents_meus()`).
-    const { data: docData } = await supabase
-      .from('documentos')
-      .select('id, objeto_id, objeto_tipo, tipo, subtipo, numero_completo, estado, vigente, ejercicio, emitido_at, sha256_datos')
-      .eq('vigente', true)
-      .order('emitido_at', { ascending: false })
-
-    // Por columna, como en el panel del productor: una cuenta con doble rol vería si no
-    // los convenios de su ficha de productor, que no son de esta pantalla.
-    const { data: convData } = orgId
-      ? await supabase
-        .from('convenios')
-        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
-        .eq('entidad_id', orgId)
-        .order('created_at', { ascending: false })
-      : { data: [] }
-
-    // Los certificados de recepción EMITIDOS. Los borradores sin número no se enseñan: son
-    // cálculos del equipo probando una ventana, no un papel que exista (deuda §12.112).
-    const { data: certData } = orgId
-      ? await supabase
-        .from('cierres_receptor')
-        .select('id, periodo_desde, periodo_hasta, estado, certificado_numero, ejercicio')
-        .eq('entidad_id', orgId)
-        .not('certificado_numero', 'is', null)
-        .order('periodo_hasta', { ascending: false })
-      : { data: [] }
-
-    // 🔴 El acumulado del año lo calcula la BASE (`kg_rebuts_exercici`), no este navegador.
-    //    Sumar aquí las canalizaciones sería la forma de que esta cifra y la del
-    //    certificado acaben diciendo cosas distintas sobre exactamente lo mismo.
-    const acum = orgId ? await kgRebutsExercici(orgId) : null
+    //
+    // Las cinco lecturas son independientes: van en paralelo, y se mira el error de CADA
+    // una. Antes solo se miraba la primera, y un fallo de las otras salía como «cap
+    // conveni» o como un acumulado vacío, que se lee como dato real.
+    const [alb, doc, conv, cert, acum] = await Promise.all([
+      // `ENT` y `R-ENT`: una entrega rectificada sigue siendo una entrega suya, y esconderla
+      // dejaría a la entidad sin el documento que de verdad vale. Y `OPE`/`R-OPE`: en venta y
+      // maquila lo que recibe es un OPE, y sus kilos ya cuentan en el acumulado de arriba
+      // (`kg_rebuts_exercici` suma donación y compra).
+      supabase
+        .from('v_albaranes_bandeja')
+        .select('id, tipo, numero_completo, estado, ejercicio, canalizacion_id, producto, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+        .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE'])
+        .order('emitido_at', { ascending: false, nullsFirst: true }),
+      // Sin filtrar por `objeto_tipo`: hacen falta también los convenios, el plan y los
+      // certificados de recepción, y la RLS ya devuelve solo los documentos de sus
+      // organizaciones (`documents_meus()`).
+      supabase
+        .from('documentos')
+        .select('id, objeto_id, objeto_tipo, tipo, subtipo, numero_completo, estado, vigente, ejercicio, emitido_at, sha256_datos')
+        .eq('vigente', true)
+        .order('emitido_at', { ascending: false }),
+      // Por columna, como en el panel del productor: una cuenta con doble rol vería si no
+      // los convenios de su ficha de productor, que no son de esta pantalla.
+      orgId
+        ? supabase
+          .from('convenios')
+          .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
+          .eq('entidad_id', orgId)
+          .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      // Los certificados de recepción EMITIDOS. Los borradores sin número no se enseñan: son
+      // cálculos del equipo probando una ventana, no un papel que exista (deuda §12.112).
+      orgId
+        ? supabase
+          .from('cierres_receptor')
+          .select('id, periodo_desde, periodo_hasta, estado, certificado_numero, ejercicio')
+          .eq('entidad_id', orgId)
+          .not('certificado_numero', 'is', null)
+          .order('periodo_hasta', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      // 🔴 El acumulado del año lo calcula la BASE (`kg_rebuts_exercici`), no este navegador.
+      //    Sumar aquí las canalizaciones sería la forma de que esta cifra y la del
+      //    certificado acaben diciendo cosas distintas sobre exactamente lo mismo.
+      orgId ? kgRebutsExercici(orgId) : Promise.resolve(null),
+    ])
+    const fallada = [alb, doc, conv, cert].map((r) => r.error?.message).find((m) => m)
+      ?? (acum && !acum.ok ? acum.missatge ?? 'error' : null)
+    if (fallada) {
+      console.warn('ReceptorDocuments:', fallada)
+      return { err: true as const }
+    }
 
     return {
-      albarans: (albData as AlbaraFila[] | null) ?? [],
-      docs: (docData as DocFila[] | null) ?? [],
-      convenis: (convData as ConveniFila[] | null) ?? [],
-      certificats: (certData as CertificatFila[] | null) ?? [],
+      err: false as const,
+      albarans: (alb.data as AlbaraFila[] | null) ?? [],
+      docs: (doc.data as DocFila[] | null) ?? [],
+      convenis: (conv.data as ConveniFila[] | null) ?? [],
+      certificats: (cert.data as CertificatFila[] | null) ?? [],
       acumulat: acum && acum.ok ? acum.data : null,
-      err: null,
     }
   }, [orgId])
 
   const aplica = useCallback((r: Awaited<ReturnType<typeof carrega>>) => {
-    setAlbarans(r.albarans ?? [])
-    setDocs(r.docs ?? [])
-    setConvenis(r.convenis ?? [])
-    setCertificats(r.certificats ?? [])
-    setAcumulat(r.acumulat ?? null)
+    if (r.err) { setError(true); return }
+    setError(false)
+    setAlbarans(r.albarans)
+    setDocs(r.docs)
+    setConvenis(r.convenis)
+    setCertificats(r.certificats)
+    setAcumulat(r.acumulat)
   }, [])
 
   const refresca = useCallback(async () => {
-    const r = await carrega()
-    if (r.err) { setError(true); return }
-    aplica(r)
+    aplica(await carrega())
   }, [carrega, aplica])
 
   useEffect(() => {
@@ -150,7 +157,6 @@ export default function ReceptorDocuments() {
     void (async () => {
       const r = await carrega()
       if (!viu) return
-      if (r.err) { setError(true); setCarregant(false); return }
       aplica(r)
       setCarregant(false)
     })()
@@ -162,7 +168,7 @@ export default function ReceptorDocuments() {
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org_entity')}</p>
   if (carregant) return <CarregantSeccio />
   // El texto de Postgres no le dice nada a la entidad (y va en catalán sin acentos).
-  if (error) return <p className="text-sm text-destructive">{t('c.error')}</p>
+  if (error) return <p className="text-sm text-destructive">{t('c.load_error')}</p>
 
   const docsCr = docs.filter((d) => d.objeto_tipo === 'cierre_receptor')
   const perCertificat = Object.fromEntries(certificats.map((c) => [c.id, c]))
@@ -198,7 +204,7 @@ export default function ReceptorDocuments() {
             ? <p className="text-sm text-muted-foreground">{t('entdoc.kg_empty')}</p>
             : (
               <>
-                <div className="grid gap-3 sm:grid-cols-3">
+                <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
                   <Xifra etiqueta={t('entdoc.kg_total')} valor={`${kg(acumulat.kg_total)} kg`} gran />
                   <Xifra etiqueta={t('entdoc.kg_donacio')} valor={`${kg(acumulat.kg_donacio)} kg`} />
                   <Xifra etiqueta={t('entdoc.kg_compra')} valor={`${kg(acumulat.kg_compra)} kg`} />

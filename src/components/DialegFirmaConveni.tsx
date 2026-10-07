@@ -78,7 +78,7 @@ export default function DialegFirmaConveni(
           aplica. `flex flex-col` + `min-h-0` en el cuerpo es lo que hace que scrollee el
           contenido y no el diálogo entero. */}
       <DialogContent
-        className="flex h-[88vh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
+        className="flex h-[88dvh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
         showCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

@@ -37,6 +37,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowLeft, ArrowRight, Check, ChevronDown, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
+import { avuiMadrid } from '../lib/format'
 import { textError } from '../lib/textError'
 import { varietatSemblaQuantitat } from '../lib/validacio'
 import { cn } from '../lib/utils'
@@ -61,6 +62,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
+import { ddmmaaaaAIso, interpretaEsborrany, isoADdmmaaaa, type Esborrany } from '../lib/esborranyOferta'
 
 type Datos = Record<string, unknown>
 
@@ -87,26 +89,21 @@ function procesJaVist(): boolean {
  *    aviso «Hem recuperat l'oferta…» lo hace visible.
  */
 const PREFIX_ESBORRANY = 'redestina-oferta-esborrany:'
-export const VIDA_ESBORRANY_MS = 7 * 24 * 3600 * 1000
 
-interface Esborrany { datos: Datos; pas: number; pasMaxim: number; costTocat: boolean; desat: number }
-
-function llegeixEsborrany(productorId: string): Esborrany | null {
+// La decisión de si un borrador leído vale (forma y caducidad) está en
+// `lib/esborranyOferta.ts`, pura y con pruebas; aquí solo se lee y se escribe.
+function llegeixEsborrany(productorId: string): Esborrany<Datos> | null {
   try {
     // El de antes del 05-10-2026 vivía en `sessionStorage`: se recoge una vez y se migra.
     const cru = localStorage.getItem(PREFIX_ESBORRANY + productorId)
       ?? sessionStorage.getItem(PREFIX_ESBORRANY + productorId)
-    if (!cru) return null
-    const e = JSON.parse(cru) as Esborrany
-    if (!e || typeof e !== 'object' || !e.datos || Date.now() - e.desat > VIDA_ESBORRANY_MS) {
-      localStorage.removeItem(PREFIX_ESBORRANY + productorId)
-      return null
-    }
-    return e
+    const { esborrany, treu } = interpretaEsborrany(cru, Date.now())
+    if (treu) localStorage.removeItem(PREFIX_ESBORRANY + productorId)
+    return esborrany
   } catch { return null }
 }
 
-function desaEsborrany(productorId: string, e: Omit<Esborrany, 'desat'>) {
+function desaEsborrany(productorId: string, e: Omit<Esborrany<Datos>, 'desat'>) {
   try {
     sessionStorage.removeItem(PREFIX_ESBORRANY + productorId)
     if (Object.keys(e.datos).length === 0) localStorage.removeItem(PREFIX_ESBORRANY + productorId)
@@ -635,7 +632,7 @@ export default function FormulariNovaOferta(
         if (campo.clave === 'disponible_fins') {
           return (
             <Input id={id} name={campo.clave} type="date" aria-invalid={invalid}
-              min={avuiIso()}
+              min={avuiMadrid()}
               value={ddmmaaaaAIso(String(valor ?? ''))}
               onChange={(e) => set(campo.clave, isoADdmmaaaa(e.target.value))} />
           )
@@ -886,21 +883,4 @@ export default function FormulariNovaOferta(
       </div>
     </div>
   )
-}
-
-/** Hoy en hora de Madrid, en ISO: el mínimo del calendario (no se ofrece un día pasado). */
-function avuiIso(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
-}
-
-/** «2026-09-30» → «30/09/2026». Vacío si no es una fecha ISO. */
-export function isoADdmmaaaa(iso: string): string {
-  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
-  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
-}
-
-/** «30/09/2026» → «2026-09-30». Vacío si no se reconoce (el control lo pinta en blanco). */
-export function ddmmaaaaAIso(txt: string): string {
-  const m = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
-  return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
 }

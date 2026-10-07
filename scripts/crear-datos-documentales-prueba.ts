@@ -349,29 +349,36 @@ async function prepararTransaccio(cierre: string) {
 
     await rpc("marcar_entregado", { p_id: ope.id });
 
-    // En un OPE confirman las dos partes; con una basta para poder conciliar.
+    // En un OPE confirman LAS DOS partes (20270414100000): con la primera el albarán sigue
+    // `entregado`, y solo con la última pasa a `confirmado`. Los kilos de la línea los fija
+    // la parte que RECIBE, así que el generador declara 200 y la entidad 195, y quedan 195.
     const { data: enlaces } = await db.from("enlaces_token")
-      .select("id").eq("objeto_tipo", "albaran").eq("objeto_id", ope.id)
-      .eq("proposito", "confirmacion_albaran").order("created_at");
+      .select("id, rol_parte").eq("objeto_tipo", "albaran").eq("objeto_id", ope.id)
+      .eq("proposito", "confirmacion_albaran").eq("estado", "activo").order("created_at");
     const enlace = (enlaces ?? [])[0];
 
     if (enlace) {
       const { data: lineas } = await db.from("albaran_lineas")
         .select("id, kg_neto").eq("albaran_id", ope.id);
-      await rpc("registrar_confirmacion", {
-        p_enlace: enlace.id,
-        p_payload: {
-          kg_confirmados: (lineas ?? []).map((l) => ({ linea_id: l.id, kg: 195 })),
-          rechazo: "cap",
-        },
-        p_evidencia: {
-          nombre: "Responsable de TEST-ENT-COMERCIAL (fixture)",
-          cargo: "Compres",
-          ip: "127.0.0.1",
-          user_agent: "crear-datos-documentales-prueba.ts",
-          sha256_texto: "0".repeat(64),
-        },
-      });
+      for (const e of enlaces ?? []) {
+        const rep = e.rol_parte !== "entrega";
+        await rpc("registrar_confirmacion", {
+          p_enlace: e.id,
+          p_payload: {
+            kg_confirmados: (lineas ?? []).map((l) => ({ linea_id: l.id, kg: rep ? 195 : 200 })),
+            rechazo: "cap",
+          },
+          p_evidencia: {
+            nombre: rep
+              ? "Responsable de TEST-ENT-COMERCIAL (fixture)"
+              : "Titular de Mas de Prova (fixture)",
+            cargo: rep ? "Compres" : "Titular",
+            ip: "127.0.0.1",
+            user_agent: "crear-datos-documentales-prueba.ts",
+            sha256_texto: "0".repeat(64),
+          },
+        });
+      }
       await rpc("conciliar_albaran", {
         p_id: ope.id, p_kg_validados: null, p_motivo: null, p_destino_final: null,
       });

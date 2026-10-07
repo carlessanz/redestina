@@ -215,7 +215,7 @@ describe('todas las claves existen en ca y en es', () => {
   // están en dos sitios, acaban contradiciéndose.
   it('los motivos de botón deshabilitado están traducidos', () => {
     const motius = [
-      'alb.why_emit_first', 'alb.why_deliver_first', 'alb.why_only_rec',
+      'alb.why_emit_first', 'alb.why_deliver_first',
       'alb.why_no_cancel', 'alb.why_only_emitted',
       // `tan.why_no_invoice` se retiró el 21-09-2026: la factura dejó de condicionar el
       // certificado, así que ese motivo habría pasado a ser falso.

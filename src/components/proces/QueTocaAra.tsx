@@ -12,6 +12,7 @@
 import { Link } from 'react-router'
 import { ArrowRight } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import { nombre } from '../../lib/format'
 import { cn } from '../../lib/utils'
 import type { PuntProces } from '../../lib/procesOferta'
 import { Badge } from '@/components/ui/badge'
@@ -47,7 +48,7 @@ export default function QueTocaAra({
   // tiene que seguir siendo el número 1, que es lo que activa la variante en singular (§7).
   const varsFormatades = Object.fromEntries(Object.entries(punt.vars).map(([k, v]) => [
     k, typeof v === 'number' && (Math.abs(v) >= 1000 || !Number.isInteger(v))
-      ? v.toLocaleString('ca-ES', { maximumFractionDigits: 2 }) : v,
+      ? nombre(v) : v,
   ]))
 
   const text = (clau: string): string => {

@@ -90,83 +90,87 @@ export default function ProductorDocuments() {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     // Sin `.eq()` de organización: la RLS ya devuelve solo lo suyo, y filtrar aquí además
     // daría la falsa impresión de que es el filtro el que protege.
-    const { data: donData, error: errDon } = await supabase
-      .from('cierres_donante')
-      .select('id, tipo, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at')
-      .order('created_at', { ascending: false })
-    if (errDon) return { errDon }
-
-    // El año y el modo NO se leen de `cierres_ejercicio`, que es del equipo: los da esta
-    // RPC, solo de las filas propias. Sin ella, un cierre recién calculado (sin número
-    // todavía) salía «Exercici —» y, si era de prueba, sin la marca de prueba.
-    const { data: infoData } = await supabase.rpc('exercici_dels_meus_tancaments')
-
-    const { data: docData } = await supabase
-      .from('documentos')
-      .select('id, objeto_id, objeto_tipo, tipo, subtipo, numero_completo, version, modo, ejercicio, estado, vigente, emitido_at')
-      .eq('vigente', true)
-      .order('emitido_at', { ascending: false })
-
-    const { data: albData } = await supabase
-      .from('v_albaranes_bandeja')
-      .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
-      .eq('tipo', 'REC')
-      .order('emitido_at', { ascending: false, nullsFirst: true })
-
-    // Los convenios SÍ se filtran por columna: la RLS deja ver los de todas las fichas de
-    // la cuenta, y una con doble rol vería aquí los de su entidad. Mismo criterio que
-    // `useConveni`.
-    const { data: convData } = orgId
-      ? await supabase
-        .from('convenios')
-        .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
-        .eq('productor_id', orgId)
-        .order('created_at', { ascending: false })
-      : { data: [] }
-
-    const { data: perData } = await supabase
-      .from('cierres_periodo')
-      .select('id, periodo_desde, periodo_hasta, modo')
-      .order('periodo_hasta', { ascending: false })
+    //
+    // Las seis lecturas son independientes: van en paralelo, y se mira el error de CADA
+    // una. Antes solo se miraba la primera, y un fallo en las otras cinco se pintaba como
+    // «no tens cap albarà / cap conveni», que se lee como dato real.
+    const [don, info, doc, alb, conv, per] = await Promise.all([
+      supabase
+        .from('cierres_donante')
+        .select('id, tipo, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at')
+        .order('created_at', { ascending: false }),
+      // El año y el modo NO se leen de `cierres_ejercicio`, que es del equipo: los da esta
+      // RPC, solo de las filas propias. Sin ella, un cierre recién calculado (sin número
+      // todavía) salía «Exercici —» y, si era de prueba, sin la marca de prueba.
+      supabase.rpc('exercici_dels_meus_tancaments'),
+      supabase
+        .from('documentos')
+        .select('id, objeto_id, objeto_tipo, tipo, subtipo, numero_completo, version, modo, ejercicio, estado, vigente, emitido_at')
+        .eq('vigente', true)
+        .order('emitido_at', { ascending: false }),
+      supabase
+        .from('v_albaranes_bandeja')
+        .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
+        .eq('tipo', 'REC')
+        .order('emitido_at', { ascending: false, nullsFirst: true }),
+      // Los convenios SÍ se filtran por columna: la RLS deja ver los de todas las fichas de
+      // la cuenta, y una con doble rol vería aquí los de su entidad. Mismo criterio que
+      // `useConveni`.
+      orgId
+        ? supabase
+          .from('convenios')
+          .select('id, tipo, tipo_org, estado, numero_completo, ejercicio, enviado_at, firmado_at, contrafirmado_at, created_at, origen, referencia_paper')
+          .eq('productor_id', orgId)
+          .order('created_at', { ascending: false })
+        : Promise.resolve({ data: [], error: null }),
+      supabase
+        .from('cierres_periodo')
+        .select('id, periodo_desde, periodo_hasta, modo')
+        .order('periodo_hasta', { ascending: false }),
+    ])
+    const fallada = [don, info, doc, alb, conv, per].map((r) => r.error).find((e) => e) ?? null
+    if (fallada) {
+      console.warn('ProductorDocuments:', fallada.message)
+      return { error: fallada.message }
+    }
 
     return {
-      donants: (donData as Donant[] | null) ?? [],
-      infos: (infoData as InfoTancament[] | null) ?? [],
-      docs: (docData as DocFila[] | null) ?? [],
-      albarans: (albData as AlbaranBandeja[] | null) ?? [],
-      convenis: (convData as ConveniFila[] | null) ?? [],
-      periodes: (perData as PeriodeFila[] | null) ?? [],
-      errDon: null,
+      error: null,
+      donants: (don.data as Donant[] | null) ?? [],
+      infos: (info.data as InfoTancament[] | null) ?? [],
+      docs: (doc.data as DocFila[] | null) ?? [],
+      albarans: (alb.data as AlbaranBandeja[] | null) ?? [],
+      convenis: (conv.data as ConveniFila[] | null) ?? [],
+      periodes: (per.data as PeriodeFila[] | null) ?? [],
     }
   }, [orgId])
 
+  type Carrega = Awaited<ReturnType<typeof carrega>>
+  const aplica = useCallback((r: Carrega) => {
+    if (r.error !== null) { setError(textError(t, r.error, 'c.load_error')); return }
+    setError(null)
+    setDonants(r.donants)
+    setInfos(r.infos)
+    setDocs(r.docs)
+    setAlbarans(r.albarans)
+    setConvenis(r.convenis)
+    setPeriodes(r.periodes)
+  }, [t])
+
   const refresca = useCallback(async () => {
-    const r = await carrega()
-    if (r.errDon) { setError(textError(t, r.errDon.message)); return }
-    setDonants(r.donants ?? [])
-    setInfos(r.infos ?? [])
-    setDocs(r.docs ?? [])
-    setAlbarans(r.albarans ?? [])
-    setConvenis(r.convenis ?? [])
-    setPeriodes(r.periodes ?? [])
-  }, [carrega, t])
+    aplica(await carrega())
+  }, [carrega, aplica])
 
   useEffect(() => {
     let viu = true
     void (async () => {
       const r = await carrega()
       if (!viu) return
-      if (r.errDon) { setError(textError(t, r.errDon.message)); setCarregant(false); return }
-      setDonants(r.donants ?? [])
-      setInfos(r.infos ?? [])
-      setDocs(r.docs ?? [])
-      setAlbarans(r.albarans ?? [])
-      setConvenis(r.convenis ?? [])
-      setPeriodes(r.periodes ?? [])
+      aplica(r)
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [carrega, t])
+  }, [carrega, aplica])
 
   const descarregador = useDescarregaDocument(refresca)
 
@@ -263,7 +267,7 @@ export default function ProductorDocuments() {
                   )}
                 </div>
 
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
                   {/* Una fila de TRANSACCIÓN (venta o maquila, el CT) no lleva importe: su
                       certificado no tiene ninguno, y «Valor de la donació: 0,00 €» afirmaba
                       una donación que no existe. */}

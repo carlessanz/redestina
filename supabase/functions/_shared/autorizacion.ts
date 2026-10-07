@@ -10,7 +10,8 @@
 //
 // Mismo interruptor que la base (`app_settings.roles_activos`): mientras esté apagado,
 // todo el mundo pasa, igual que hoy. Fail-open deliberado y simétrico con las
-// políticas (ver 20260730092000_funciones_sesion_y_rol.sql).
+// políticas (ver 20260730092000_funciones_sesion_y_rol.sql) — pero SOLO ante un valor
+// explícito o una fila ausente: un error de lectura falla cerrado (ver `rolesActivos`).
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -29,11 +30,34 @@ export interface Contexto {
   entidades: string[];
 }
 
-/** ¿Está encendido el modelo de roles? Ante la duda, apagado (todo el mundo pasa). */
+/**
+ * ¿Está encendido el modelo de roles?
+ *
+ * Mismo VALOR que `roles_activos()` en SQL: solo un `'true'` explícito lo enciende, y una
+ * fila ausente o `'false'` es el modo permisivo documentado (§4bis, fail-open deliberado).
+ *
+ * ⚠️ Pero un ERROR de lectura NO es «apagado»: es no saberlo. Hasta el 07-10-2026 un fallo
+ * de la consulta devolvía `false` y dejaba `exigirEquipo` abierto a cualquier cuenta con
+ * sesión —enviar WhatsApp, correo, priorizar, reenviar documentos—. Ante el error se falla
+ * CERRADO (como si estuviera encendido), con el mismo criterio que `modoTestActivo` (§8):
+ * la duda corta. El equipo sigue pasando, porque su rol se lee aparte.
+ */
 export async function rolesActivos(supabase: Cliente): Promise<boolean> {
-  const { data } = await supabase
-    .from("app_settings").select("value").eq("key", "roles_activos").maybeSingle();
-  return data?.value === "true";
+  try {
+    const { data, error } = await supabase
+      .from("app_settings").select("value").eq("key", "roles_activos").maybeSingle();
+    if (error) {
+      console.error("rolesActivos: lectura fallida, se trata como encendido:", error.message);
+      return true;
+    }
+    return data?.value === "true";
+  } catch (e) {
+    console.error(
+      "rolesActivos: lectura fallida, se trata como encendido:",
+      e instanceof Error ? e.message : String(e),
+    );
+    return true;
+  }
 }
 
 /** Resuelve la sesión y su contexto de rol. `null` = sin sesión válida. */

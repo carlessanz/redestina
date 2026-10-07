@@ -163,14 +163,6 @@ export default function AppShell() {
           <h1 className="min-w-0 flex-1 truncate text-sm font-semibold md:text-base">
             {handle.titleKey ? t(handle.titleKey) : ''}
           </h1>
-          {ctx?.degradat && (
-            <span
-              className="hidden rounded-full bg-muted px-2 py-0.5 text-xs text-muted-foreground sm:inline"
-              title={t('app.degraded_hint')}
-            >
-              {t('app.degraded')}
-            </span>
-          )}
           {esExtern && <CampanaAvisos />}
           <UserMenu />
         </header>

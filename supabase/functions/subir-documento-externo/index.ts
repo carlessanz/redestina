@@ -53,6 +53,7 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -144,13 +145,9 @@ async function rutaExterno(
 Deno.serve(async (req) => {
   const t0 = performance.now();
   const cors = corsPara(req);
-  const responder = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const responder = respondedor(cors);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
 
   const supabase = createClient(

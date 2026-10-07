@@ -1,9 +1,13 @@
 // Contexto de sesión de la app: quién eres, qué paneles tienes y cuál estás mirando.
 //
-// Una sola llamada a get_my_session_context() (§4bis) al entrar. Si la RPC todavía no
-// existe —porque la migración de roles no está desplegada— se cae a un contexto
-// degradado de equipo interno, que es exactamente como se ha comportado la app hasta
-// ahora. Así el despliegue del frontend y el de la base son independientes.
+// Una sola llamada a get_my_session_context() (§4bis) al entrar.
+//
+// 🔴 SI FALLA, NO HAY CONTEXTO: FAIL-CERRADO (07-10-2026). Antes se caía a un «contexto
+// degradado» que simulaba equipo interno con todos los permisos —el puente de cuando la
+// migración de roles aún no estaba desplegada—, así que un corte de red le enseñaba a
+// cualquier cuenta el panel del super_admin. Ahora el provider pinta una pantalla de error
+// con «Torna-ho a provar» y «Sortir», y no monta nada de la aplicación hasta tener un
+// contexto de verdad. Ver `resolContext()` en `lib/rols.ts`.
 //
 // EL PANEL ACTIVO SE DERIVA DE LA URL, no es estado. Antes era un `useState` que se
 // cambiaba a mano, y eso obligaba a mantenerlo en fase con la ruta desde tres sitios
@@ -18,10 +22,13 @@ import type { ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
 import {
-  contextDegradat, mapejaContext, rolDeLaRuta, rolInicial,
-  type ContextCru, type ContextSessio, type Organitzacio, type Rol,
+  resolContext, rolDeLaRuta, rolInicial,
+  type ContextSessio, type Organitzacio, type Rol,
 } from '../lib/rols'
 import { organitzacioActiva } from '../lib/rols'
+import { useT } from '../lib/i18n'
+import { Button } from '@/components/ui/button'
+import { AlertTriangle } from 'lucide-react'
 
 const CLAU_ROL = 'redestina-rol'
 
@@ -39,6 +46,9 @@ const Ctx = createContext<Valor | null>(null)
 export function AppContextProvider({ children }: { children: ReactNode }) {
   const [ctx, setCtx] = useState<ContextSessio | null>(null)
   const [carregant, setCarregant] = useState(true)
+  // La RPC del contexto ha fallado. Mientras valga `true` no se monta la aplicación.
+  const [errorCarrega, setErrorCarrega] = useState(false)
+  const [reintentant, setReintentant] = useState(false)
   // Último panel visitado. Ya no manda sobre nada mientras navegas: solo decide qué
   // panel abre `/panell` al entrar.
   const [preferit, setPreferit] = useState<Rol | null>(
@@ -80,25 +90,30 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     if (!usuari) {
       usuariCarregat.current = null
       primera.current = false
+      setErrorCarrega(false)
       setCtx(null)
       setCarregant(false)
       return
     }
 
     const { data, error } = await supabase.rpc('get_my_session_context')
-    let nou: ContextSessio
-    if (error || !data) {
-      // La RPC no está desplegada todavía (o ha fallado): se sigue como equipo.
-      if (error) console.warn('get_my_session_context:', error.message)
-      nou = contextDegradat(usuari.id, usuari.email ?? null)
-    } else {
-      nou = mapejaContext(data as ContextCru)
+    if (n !== darrera.current) return
+    const r = resolContext(data, error)
+    if (!r.ok) {
+      // Ni permisos de equipo ni el contexto anterior: el de antes podía ser de OTRA cuenta
+      // (esto también corre tras un SIGNED_IN de un usuario distinto).
+      console.warn('get_my_session_context:', error?.message ?? 'sense dades')
+      usuariCarregat.current = null
+      setCtx(null)
+      setErrorCarrega(true)
+      setCarregant(false)
+      return
     }
 
-    if (n !== darrera.current) return
     usuariCarregat.current = usuari.id
     primera.current = false
-    setCtx(nou)
+    setErrorCarrega(false)
+    setCtx(r.ctx)
     setCarregant(false)
   }, [])
 
@@ -142,7 +157,44 @@ export function AppContextProvider({ children }: { children: ReactNode }) {
     recarrega: carrega,
   }), [ctx, carregant, rolActiu, carrega])
 
+  const reintenta = useCallback(async () => {
+    setReintentant(true)
+    try { await carrega() } finally { setReintentant(false) }
+  }, [carrega])
+
+  if (errorCarrega && !carregant) {
+    return <ErrorCompte reintentant={reintentant} onReintenta={() => void reintenta()} />
+  }
+
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>
+}
+
+/**
+ * Pantalla de cuando no se ha podido leer quién eres. Va dentro del provider y no como
+ * ruta porque **nada** de la aplicación privada debe montarse sin contexto: una ruta más
+ * dejaría a `RoleGuard` decidir con `ctx = null`.
+ */
+function ErrorCompte({ reintentant, onReintenta }: { reintentant: boolean; onReintenta: () => void }) {
+  const { t } = useT()
+  return (
+    <div className="grid min-h-dvh place-items-center bg-primary px-4">
+      <div role="alert" className="w-full max-w-sm rounded-2xl bg-card p-6 text-center shadow-sm">
+        <AlertTriangle className="mx-auto size-8 text-error" aria-hidden />
+        <h1 className="mt-3 text-lg font-semibold">{t('app.ctx_error_title')}</h1>
+        <p className="mt-2 text-sm text-muted-foreground">{t('app.ctx_error_desc')}</p>
+        <Button className="mt-5 h-11 w-full whitespace-normal" disabled={reintentant} onClick={onReintenta}>
+          {reintentant ? t('app.ctx_error_retrying') : t('app.ctx_error_retry')}
+        </Button>
+        <Button
+          className="mt-2 h-11 w-full whitespace-normal"
+          variant="outline"
+          onClick={() => void supabase.auth.signOut({ scope: 'local' })}
+        >
+          {t('nav.logout')}
+        </Button>
+      </div>
+    </div>
+  )
 }
 
 export function useAppContext(): Valor {

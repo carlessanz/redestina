@@ -27,11 +27,13 @@ export default function LlistaPlans({ files, descarregador }: {
   const { t } = useT()
   const [substituits, setSubstituits] = useState<Set<string>>(new Set())
 
-  const ids = useMemo(() => [...new Set(files.map((d) => d.objeto_id))], [files])
-  const clau = ids.join(',')
+  // `clau` resume los ids: `files` es un array nuevo en cada render, y el efecto solo debe
+  // relanzarse cuando cambian los planes, no cuando cambia el array.
+  const clau = [...new Set(files.map((d) => d.objeto_id))].join(',')
 
   useEffect(() => {
-    if (ids.length === 0) return
+    if (clau === '') return
+    const ids = clau.split(',')
     let viu = true
     void supabase
       .from('planes_prevencion')
@@ -42,8 +44,6 @@ export default function LlistaPlans({ files, descarregador }: {
         if (viu) setSubstituits(new Set(((data ?? []) as { id: string }[]).map((p) => p.id)))
       })
     return () => { viu = false }
-    // `clau` resume `ids`: el array es nuevo en cada render.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clau])
 
   // El vigente primero y los sustituidos al final, cada grupo por fecha.

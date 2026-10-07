@@ -1,5 +1,5 @@
-// Cliente del cierre anual: los certificados de donación y lo que hace falta para llegar
-// a ellos (calcular, resumen, factura, excepción, 182).
+// Cliente del cierre anual: los certificados de donación (CD) y de transacción (CT), y lo
+// que hace falta para llegar a ellos (calcular, resumen, factura, excepción, 182).
 //
 // Igual que `albarans.ts`, todo es RPC y **ninguna escritura directa**: `authenticated` no
 // tiene INSERT ni UPDATE sobre `cierres_ejercicio`, `cierres_donante` ni
@@ -14,20 +14,17 @@
 import { supabase } from './supabase'
 import type { ResultatRpc } from './albarans'
 import type { BloqueigCierre, CierreDonante, CierrePeriodo } from '../types'
+import { bloqueja } from './tancamentFormat'
+import type { Fila182 } from './tancamentFormat'
 
-/** Fila de `datos_182()`. Es el retorno de una función, no una tabla: vive aquí. */
-export interface Fila182 {
-  nif: string | null
-  razon_social: string | null
-  codigo_postal: string | null
-  provincia: string | null
-  importe: number | null
-  kg: number | null
-  en_especie: boolean
-  certificado_numero: string | null
-  fecha: string | null
-  modo: string
-}
+// Lo puro (formato de importes, estilos, el CSV del 182…) vive en `tancamentFormat.ts`, sin
+// el cliente de Supabase, para poder probarlo desde Vitest (el patrón de
+// `campsFundacio`/`parametresFundacio`). Se reexporta aquí para que nadie cambie su import.
+export {
+  euros, eurKg, estilEstatDonant, estilEstatTancament, bloqueja, dataTancament,
+  exerciciDeNumero, csv182,
+} from './tancamentFormat'
+export type { Fila182 } from './tancamentFormat'
 
 /** Fila de `comparar_cierre_prueba()`. */
 export interface FilaComparacio {
@@ -42,6 +39,19 @@ export interface FilaComparacio {
   coincide: boolean | null
 }
 
+/**
+ * Lo que devuelve `calcular_cierre_transacciones()`, que desde `20270414100200` llama
+ * `calcular_cierre()` en la misma transacción: el cierre calcula los dos acumulados a la vez.
+ */
+export interface ResumCalculTransaccions {
+  generadors: number
+  linies: number
+  kg_total: number
+  /** Indicador interno del equipo: el CT no imprime ningún importe. */
+  valor_intern: number
+  bloquejats: number
+}
+
 /** Lo que devuelve `calcular_cierre()`. */
 export interface ResumCalcul {
   tancament: string
@@ -52,6 +62,8 @@ export interface ResumCalcul {
   kg_total: number
   valor_total: number
   bloquejats: number
+  /** Ausente en una base anterior a `20270414100200`. */
+  transaccions?: ResumCalculTransaccions | null
 }
 
 /** Lo que devuelve `emitir_resumen()`. El `token` es la única vez que existe en claro. */
@@ -300,6 +312,88 @@ export function marcarEnviat(cd: string): Promise<ResultatRpc<CierreDonante>> {
   return crida('marcar_enviado', { p_cd: cd }, 'tan.err_generic')
 }
 
+// --- Certificado de transacción (CT) ---------------------------------------
+//
+// Venta y maquila. Vive en la misma tabla que el CD (`cierres_donante`, `tipo =
+// 'transaccio'`) y reutiliza su motor, pero **no lleva importes, ni resumen, ni factura, ni
+// va al 182**: es la constancia de qué kilos se vendieron o se transformaron, sacados de los
+// albaranes OPE conciliados. Sus tres RPC existían desde la fase 5 y no las llamaba ninguna
+// pantalla.
+
+/** Un generador saltado por la emisión en bloque de los CT, con el motivo de la base. */
+export interface GeneradorSaltat {
+  cd: string
+  generador: string | null
+  codi: 'bloquejat' | 'sense_kg' | 'error'
+  motiu: string
+}
+
+export interface ResultatCertificatsTransaccio {
+  tancament: string
+  exercici: number
+  mode: 'prueba' | 'real'
+  emesos: number
+  ja_tenien: number
+  saltats: GeneradorSaltat[]
+}
+
+/** El CT de un generador. Consume un número de la serie `CT` (`P-CT` en prueba). */
+export function emetreCertificatTransaccio(cd: string): Promise<ResultatRpc<ResultatCertificat>> {
+  return crida('emitir_certificado_transaccion', { p_cd: cd }, 'tan.err_generic')
+}
+
+/**
+ * Todos los CT de un cierre `tancat`, de una vez. Mismo contrato y mismas guardas, en el
+ * mismo orden, que `emetreCertificatsTancament()`; y como aquella, un botón APARTE de
+ * cerrar. Nunca lanza: los saltados vienen dentro, con su motivo.
+ */
+export function emetreCertificatsTransaccioTancament(
+  cierre: string,
+): Promise<ResultatRpc<ResultatCertificatsTransaccio>> {
+  return crida('emitir_certificados_transaccion_cierre', { p_cierre: cierre }, 'tan.err_generic')
+}
+
+/** Versión siguiente del mismo CT, con motivo. No consume número (no existe serie `R-CT`). */
+export function rectificarCertificatTransaccio(
+  cd: string,
+  motiu: string,
+): Promise<ResultatRpc<ResultatCertificat>> {
+  return crida('rectificar_certificado_transaccion', { p_cd: cd, p_motivo: motiu }, 'tan.err_generic')
+}
+
+/** Lo que la escalera del ciclo guiado necesita del cierre de un generador. */
+export interface CertificatDelGenerador {
+  tipo: 'donacio' | 'transaccio'
+  certificado_numero: string | null
+  bloqueja: boolean
+}
+
+/**
+ * Los acumulados (CD y/o CT) de UN generador en UN cierre, para el último escalón de la
+ * pantalla guiada. `null` si no se han podido leer: entonces la escalera usa su
+ * aproximación de siempre en vez de afirmar que no hay certificado.
+ */
+export async function certificatsDelGenerador(
+  cierre: string,
+  productor: string,
+): Promise<CertificatDelGenerador[] | null> {
+  try {
+    const { data, error } = await supabase
+      .from('cierres_donante')
+      .select('tipo, certificado_numero, bloqueos')
+      .eq('cierre_id', cierre)
+      .eq('productor_id', productor)
+    if (error || !data) return null
+    return data.map((f) => ({
+      tipo: f.tipo as CertificatDelGenerador['tipo'],
+      certificado_numero: (f.certificado_numero as string | null) ?? null,
+      bloqueja: bloqueja(f.bloqueos as BloqueigCierre[] | null),
+    }))
+  } catch {
+    return null
+  }
+}
+
 // --- Informes -------------------------------------------------------------
 
 export function dades182(cierre: string): Promise<ResultatRpc<Fila182[]>> {
@@ -340,120 +434,6 @@ export function esborrarCostProducte(
     p_producto: producte,
     p_motivo: motiu,
   }, 'cost.err_generic')
-}
-
-// --- Presentación ---------------------------------------------------------
-
-/** Importe en euros. Siempre con los dos decimales: es una cifra fiscal. */
-export function euros(valor: number | string | null | undefined): string {
-  if (valor === null || valor === undefined || valor === '') return '—'
-  const n = Number(valor)
-  if (Number.isNaN(n)) return '—'
-  return n.toLocaleString('es-ES', {
-    style: 'currency', currency: 'EUR', minimumFractionDigits: 2, maximumFractionDigits: 2,
-  })
-}
-
-/** Coste por kilo: 4 decimales, porque 0,32 €/kg y 0,3175 €/kg no son lo mismo. */
-export function eurKg(valor: number | string | null | undefined): string {
-  if (valor === null || valor === undefined || valor === '') return '—'
-  const n = Number(valor)
-  if (Number.isNaN(n)) return '—'
-  return `${n.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })} €/kg`
-}
-
-/** Estado del donante → clase de token. El error es rojo; el coral no significa fallo. */
-export function estilEstatDonant(estat: string): string {
-  switch (estat) {
-    case 'declarat':
-    case 'enviat':
-    case 'certificat_emes':
-    case 'coincident':
-      return 'bg-exito-fondo text-exito'
-    // Ámbar y no rojo desde el 21-09-2026: una factura que no cuadra es algo que hay que
-    // hablar con el donante, pero ya no impide el certificado. Pintarlo de rojo diría que
-    // el circuito está parado cuando no lo está.
-    case 'discrepancia':
-    case 'resum_enviat':
-    case 'factura_pendent':
-    case 'factura_rebuda':
-      return 'bg-aviso-fondo text-aviso'
-    // Un certificado a demanda al que el anual dejó atrás: ni pendiente ni un problema.
-    case 'substituit':
-      return 'bg-muted text-muted-foreground'
-    default:
-      return 'bg-secondary text-secondary-foreground'
-  }
-}
-
-/** Estado del cierre → clase de token. */
-export function estilEstatTancament(estat: string): string {
-  switch (estat) {
-    case 'declarat': return 'bg-exito-fondo text-exito'
-    case 'tancat': return 'bg-secondary text-secondary-foreground'
-    case 'provisional': return 'bg-aviso-fondo text-aviso'
-    default: return 'bg-muted text-muted-foreground'
-  }
-}
-
-/** ¿Hay algún bloqueo que impida el certificado? Los demás solo avisan. */
-export function bloqueja(bloqueos: BloqueigCierre[] | null | undefined): boolean {
-  return (bloqueos ?? []).some((b) => b.bloqueja)
-}
-
-/** Fecha del ISO, sin hora. */
-export function dataTancament(iso: string | null | undefined): string {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric',
-  })
-}
-
-/**
- * El ejercicio que se lee en un número de serie (`P-RES-2026-0001` → 2026).
- *
- * Hace falta porque la política de `cierres_ejercicio` es **solo del equipo**
- * (20261109100000): el donante ve su fila de `cierres_donante` pero no la cabecera, así
- * que en su panel el año no puede salir de un `join`. Sale de su propio número, que es un
- * dato suyo, o de `documentos.ejercicio`, que también lo es.
- */
-export function exerciciDeNumero(numero: string | null | undefined): number | null {
-  if (!numero) return null
-  const m = /(?:^|-)((?:19|20)\d{2})-/.exec(numero)
-  return m ? Number(m[1]) : null
-}
-
-// --- Exportación del 182 --------------------------------------------------
-
-const COLUMNES_182: (keyof Fila182)[] = [
-  'nif', 'razon_social', 'codigo_postal', 'provincia', 'importe', 'kg',
-  'en_especie', 'certificado_numero', 'fecha', 'modo',
-]
-
-/** Una celda de CSV con `;`: comillas dobladas y entrecomillado si hace falta. */
-function cella(valor: unknown): string {
-  if (valor === null || valor === undefined) return ''
-  // Los números van con COMA decimal: el destino es un Excel en español, y un punto
-  // decimal ahí se lee como texto (o como millares, que es peor porque no avisa).
-  const text = typeof valor === 'number'
-    ? valor.toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2, useGrouping: false })
-    : String(valor)
-  return /[";\n\r]/.test(text) ? `"${text.replaceAll('"', '""')}"` : text
-}
-
-/**
- * El CSV del 182, con `;` y **con BOM**.
- *
- * Las dos cosas son por Excel en español y ninguna es opcional: sin `;` mete la fila
- * entera en la columna A, y sin el BOM `UTF-8` lee los acentos como mojibake —«Fundació»
- * sale «FundaciÃ³»— en un fichero que va a una gestoría. `\r\n` por lo mismo.
- */
-export function csv182(files: Fila182[], capceleres: Record<string, string>): string {
-  const linies = [
-    COLUMNES_182.map((c) => cella(capceleres[c] ?? c)).join(';'),
-    ...files.map((f) => COLUMNES_182.map((c) => cella(f[c])).join(';')),
-  ]
-  return `\uFEFF${linies.join('\r\n')}\r\n`
 }
 
 /** Descarga un texto como fichero. Sin dependencias: un blob y un `<a>` de un solo uso. */

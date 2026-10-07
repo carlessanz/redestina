@@ -6,6 +6,8 @@ import { useWhatsappActiu } from '../hooks/useAppContext'
 import DialegCorreu from './DialegCorreu'
 import type { DestinatariCorreu } from './DialegCorreu'
 import { pendentsPerTelefon } from '../lib/contactes'
+import { filtraCerca } from '../lib/cerca'
+import { useCerca } from '../hooks/useCerca'
 import type { Productor, ProductorLlistat } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -21,12 +23,6 @@ interface Props {
   onNew: () => void
 }
 
-function casa(p: Productor, q: string): boolean {
-  if (!q) return true
-  const campos = [p.name, p.empresa, p.phone, p.poblacion, p.email]
-  return campos.some((c) => (c ?? '').toLowerCase().includes(q))
-}
-
 export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
   const waActiu = useWhatsappActiu()
@@ -36,7 +32,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [unanswered, setUnanswered] = useState<Record<string, number>>({})
-  const [busqueda, setBusqueda] = useState('')
+  const { cerca, setCerca, q } = useCerca()
 
   useEffect(() => {
     let cancelled = false
@@ -73,8 +69,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
   }, [])
 
   const { test, resto } = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    const filtrados = producers.filter((p) => casa(p, q))
+    const filtrados = filtraCerca(producers, q, (p) => [p.name, p.empresa, p.phone, p.poblacion, p.email])
     const test: ProductorLlistat[] = []
     const resto: ProductorLlistat[] = []
     for (const p of filtrados) {
@@ -82,7 +77,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
       else resto.push(p)
     }
     return { test, resto }
-  }, [producers, busqueda])
+  }, [producers, q])
 
   function tabla(lista: ProductorLlistat[], marcarTest: boolean) {
     return (
@@ -157,7 +152,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
         <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_f')}</Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Input type="search" placeholder={t('prod.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+        <Input type="search" placeholder={t('prod.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{producers.length === 0 ? t('prod.empty') : t('prod.no_match')}</p>}

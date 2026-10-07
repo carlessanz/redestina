@@ -10,6 +10,7 @@ import { ArrowRight, PlusCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
+import { nombre } from '../../lib/format'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
 import { marcaLlegits } from '../../lib/avisos'
@@ -94,6 +95,15 @@ function useMevesOfertes(productorId: string | null) {
         // en la lista sin el ámbar de «et toca a tu», al revés que en el detalle.
         carregaPendents(),
       ])
+
+    // Los kilos y el REC deciden el estado que se pinta: sin ellos una oferta recogida
+    // saldría «Buscant sortida». Un fallo aquí es un fallo de carga, no «0 kg».
+    if (c?.error || a?.error) {
+      console.warn('MevesOfertes:', (c?.error ?? a?.error)?.message)
+      setErrorCarrega(true)
+      setCarregant(false)
+      return
+    }
 
     const kgs: Record<string, number> = {}
     const ns: Record<string, number> = {}
@@ -183,10 +193,8 @@ function useMevesOfertes(productorId: string | null) {
   return { ofertes, kg, destins, puntDe, carregant, errorCarrega }
 }
 
-/** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. */
-function fmtKg(n: number): string {
-  return new Intl.NumberFormat('ca-ES', { maximumFractionDigits: 0 }).format(n)
-}
+/** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. Sin decimales. */
+const fmtKg = (n: number) => nombre(n, 0)
 
 function FilaOferta({
   o, canalitzats, punt, ambCodi, foto,
@@ -388,7 +396,7 @@ export function ProductorInici() {
 
       {!carregant && !errorCarrega && !buit && (
         <>
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <Card><CardContent className="pt-6">
               <div className="text-3xl font-bold text-primary tabular-nums">{enCurs.length}</div>
               <p className="mt-1 text-sm text-muted-foreground">{t('pi.active_offers')}</p>

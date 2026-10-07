@@ -198,6 +198,34 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       ],
     },
     {
+      // Los mismos estados, en la pantalla del EQUIPO (`TancamentDetall.tsx`): el badge de
+      // cada donante y de cada generador con CT, y `substituit` de los certificados a demanda.
+      que: 'cierres_donante.estado (badge del equipo)',
+      prefijo: 'tan.ds_',
+      valores: [
+        'calculat', 'resum_enviat', 'factura_pendent', 'factura_rebuda', 'coincident',
+        'discrepancia', 'certificat_emes', 'enviat', 'declarat', 'substituit',
+      ],
+    },
+    {
+      // Los `codigo` de `bloqueos` que escriben `calcular_cierre()` (CD) y
+      // `calcular_cierre_transacciones()` (CT). Se componen en `components/equip/Bloquejos.tsx`.
+      // Al añadir un bloqueo nuevo en SQL, añadirlo aquí.
+      que: 'cierres_donante.bloqueos[].codigo',
+      prefijo: 'tan.bl_',
+      valores: [
+        'sense_conciliar', 'sense_cost', 'dades_fiscals', 'sense_rec',
+        'certificat_desactualitzat', 'sense_ope', 'sense_nif',
+      ],
+    },
+    {
+      // Los `codi` de los saltados de la emisión en bloque: `emitir_certificados_cierre()` y
+      // `emitir_certificados_transaccion_cierre()`. Se componen en `TancamentDetall.tsx`.
+      que: 'emisión en bloque · saltats[].codi',
+      prefijo: 'tan.skip_',
+      valores: ['bloquejat', 'sense_kg', 'error'],
+    },
+    {
       que: 'cierres_donante.estado (qué toca)',
       prefijo: 'mydoc.next_',
       valores: [

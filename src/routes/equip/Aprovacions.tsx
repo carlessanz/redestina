@@ -227,9 +227,9 @@ export default function Aprovacions() {
     | null
   >(null)
 
-  // Con el contexto degradado (RPC de sesión no desplegada) se asume que sí: es como se
-  // ha comportado la app siempre. La RPC revalida de todas formas y devuelve 42501.
-  const potAprovar = ctx?.potAprovar ?? true
+  // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
+  // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
+  const potAprovar = ctx?.potAprovar ?? false
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en dos cadenas

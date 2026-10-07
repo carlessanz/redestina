@@ -15,6 +15,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { filtraCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import { Badge } from '@/components/ui/badge'
@@ -39,7 +41,7 @@ export default function Albarans() {
   const [entitats, setEntitats] = useState<Noms>({})
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas va en UN literal (§7, deuda 46): partida, supabase-js pierde
@@ -101,13 +103,8 @@ export default function Albarans() {
   }, [productors, entitats])
 
   const grups = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    const casa = (f: AlbaranBandeja) => {
-      if (!q) return true
-      const camps = [f.numero_completo, f.tipo, f.id_excedente, f.producto, f.codigo_lote, contraparte(f)]
-      return camps.some((c) => (c ?? '').toLowerCase().includes(q))
-    }
-    const tots = files.filter(casa)
+    const tots = filtraCerca(files, q,
+      (f) => [f.numero_completo, f.tipo, f.id_excedente, f.producto, f.codigo_lote, contraparte(f)])
     return {
       tots,
       esborranys: tots.filter((f) => f.estado === 'borrador'),
@@ -118,7 +115,7 @@ export default function Albarans() {
       perConciliar: tots.filter((f) => f.estado === 'entregado' || f.estado === 'confirmado'),
       tancats: tots.filter((f) => f.estado === 'conciliado'),
     }
-  }, [files, cerca, contraparte])
+  }, [files, q, contraparte])
 
   function taula(llista: AlbaranBandeja[], buitKey: string) {
     if (llista.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>

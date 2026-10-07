@@ -179,6 +179,48 @@ export function propostaConciliacio(recId: string): Promise<ResultatRpc<Proposta
   return crida('propuesta_conciliacion', { p_rec: recId }, 'alb.err_generic')
 }
 
+/** Los dos umbrales de la conciliación, de `parametros_documentales` (los lee el equipo). */
+export interface ParamsConciliacio {
+  /** Días tras «entregat» a partir de los cuales se concilia sin confirmación (con motivo). */
+  terminiDies: number
+  toleranciaPct: number
+}
+
+/**
+ * Los umbrales con los que decide `conciliar_albaran()`. Ante cualquier fallo, los valores
+ * sembrados (7 días, 2 %): son solo para AVISAR antes de pulsar; quien decide sigue siendo
+ * la base, que vuelve a leerlos.
+ */
+export async function paramsConciliacio(): Promise<ParamsConciliacio> {
+  const perDefecte = { terminiDies: 7, toleranciaPct: 2 }
+  try {
+    const { data, error } = await supabase
+      .from('parametros_documentales')
+      .select('plazo_conciliar_sin_confirmacion_dias, tolerancia_conciliacion_pct')
+      .eq('id', 1)
+      .maybeSingle()
+    if (error || !data) return perDefecte
+    return {
+      terminiDies: Number(data.plazo_conciliar_sin_confirmacion_dias ?? perDefecte.terminiDies),
+      toleranciaPct: Number(data.tolerancia_conciliacion_pct ?? perDefecte.toleranciaPct),
+    }
+  } catch {
+    return perDefecte
+  }
+}
+
+/**
+ * Cuándo vence el plazo para conciliar SIN confirmación, o `null` si el albarán no se ha
+ * marcado entregado. Es la misma cuenta que hace `conciliar_albaran()`:
+ * `entregado_at + plazo días`. Pura, para poder probarla.
+ */
+export function venciment(entregadoAt: string | null | undefined, terminiDies: number): Date | null {
+  if (!entregadoAt) return null
+  const d = new Date(entregadoAt)
+  if (Number.isNaN(d.getTime())) return null
+  return new Date(d.getTime() + terminiDies * 86_400_000)
+}
+
 /** Los kilos que cuentan. `kgValidats` null = se valida lo confirmado (o lo entregado). */
 export function conciliarAlbara(
   id: string,

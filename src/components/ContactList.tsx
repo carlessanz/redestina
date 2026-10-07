@@ -5,6 +5,8 @@ import { supabase } from '../lib/supabase'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
 import { pendentsPerTelefon } from '../lib/contactes'
+import { casaCerca } from '../lib/cerca'
+import { useCerca } from '../hooks/useCerca'
 import type { WaContact } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,7 +30,7 @@ export default function ContactList({ contacts, loading, error, selectedPhone, o
   const [phone, setPhone] = useState('')
   const [saving, setSaving] = useState(false)
   const [formError, setFormError] = useState<string | null>(null)
-  const [busqueda, setBusqueda] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [unanswered, setUnanswered] = useState<Record<string, number>>({})
   const [tipo, setTipo] = useState<'tots' | 'productors' | 'receptors'>('tots')
   const [prodSet, setProdSet] = useState<Set<string>>(new Set())
@@ -74,17 +76,16 @@ export default function ContactList({ contacts, loading, error, selectedPhone, o
   // pendientes arriba), conservando el resto del orden.
   const filtrados = useMemo(() => {
     const norm = (p: string) => p.replace(/\D/g, '')
-    const q = busqueda.trim().toLowerCase()
     const qDigits = q.replace(/\D/g, '')
     let base = q
       ? contacts.filter((c) =>
-          (c.name ?? '').toLowerCase().includes(q) ||
+          casaCerca([c.name], q) ||
           (qDigits !== '' && c.phone.includes(qDigits)))
       : contacts
     if (tipo === 'productors') base = base.filter((c) => prodSet.has(norm(c.phone)))
     else if (tipo === 'receptors') base = base.filter((c) => entSet.has(norm(c.phone)))
     return [...base].sort((a, b) => (unanswered[b.phone] ?? 0) - (unanswered[a.phone] ?? 0))
-  }, [contacts, busqueda, unanswered, tipo, prodSet, entSet])
+  }, [contacts, q, unanswered, tipo, prodSet, entSet])
 
   async function handleSubmit(e: FormEvent) {
     e.preventDefault()
@@ -118,8 +119,8 @@ export default function ContactList({ contacts, loading, error, selectedPhone, o
           </Button>
         </div>
         <div className="space-y-2 px-3 pb-3">
-          <Input type="search" placeholder={t('msg.search_contact')} value={busqueda}
-            onChange={(e) => setBusqueda(e.target.value)} className="h-8" />
+          <Input type="search" placeholder={t('msg.search_contact')} value={cerca}
+            onChange={(e) => setCerca(e.target.value)} className="h-8" />
           <div className="flex gap-1">
             {(['tots', 'productors', 'receptors'] as const).map((f) => (
               <button key={f} type="button" onClick={() => setTipo(f)}

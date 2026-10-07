@@ -99,6 +99,19 @@ export interface PropsFirmaConveni {
   onFirmat?: () => void
 }
 
+// Los mismos mínimos que `enlace-publico` (firma): nombre y cargo ≥ 2, documento ≥ 5.
+// Sin ellos aquí, el botón se encendía con «a» o «123» y el servidor devolvía un 400 que
+// la pantalla solo sabía pintar como «alguna dada no quadra», sin decir cuál.
+const MIN_NOM = 2
+const MIN_DNI = 5
+
+/** Del campo que señala el 400 del servidor a la frase que dice qué corregir. */
+const ERROR_CAMP: Record<string, string> = {
+  nombre: 'sig.err_nom_curt',
+  carrec: 'sig.err_carrec_curt',
+  documento_identidad: 'sig.err_dni_curt',
+}
+
 export default function FirmaConveni(
   { token, tornar = '/panell', ample = false, onFirmat }: PropsFirmaConveni,
 ) {
@@ -114,6 +127,9 @@ export default function FirmaConveni(
   const [errorKey, setErrorKey] = useState<string | null>(null)
   const [fet, setFet] = useState<{ numero: string | null } | null>(null)
   const [enviant, setEnviant] = useState(false)
+  // Un rechazo de los DATOS al firmar se enseña junto al botón, no en la pantalla de
+  // «no podem obrir aquest enllaç»: el enlace está bien, lo que hay que corregir es un campo.
+  const [errorEnviament, setErrorEnviament] = useState<string | null>(null)
 
   const [org, setOrg] = useState<DadesOrganitzacio>(BUIDA)
   const [nom, setNom] = useState('')
@@ -183,6 +199,7 @@ export default function FirmaConveni(
   async function signa() {
     if (!token || !firma) return
     setEnviant(true)
+    setErrorEnviament(null)
     const res = await signaConveni(token, {
       dades: {
         raso_social: org.raso_social.trim(),
@@ -205,7 +222,14 @@ export default function FirmaConveni(
       web,
     })
     setEnviant(false)
-    if (!res.ok) { setErrorKey(res.motiuKey); return }
+    if (!res.ok) {
+      if (res.codi === 'dades_invalides' || res.codi.startsWith('falta_')) {
+        setErrorEnviament((res.camp && ERROR_CAMP[res.camp]) ?? res.motiuKey)
+        return
+      }
+      setErrorKey(res.motiuKey)
+      return
+    }
     setFet({ numero: res.data.numero })
     onFirmat?.()
   }
@@ -273,8 +297,11 @@ export default function FirmaConveni(
   const exigits = dades.obligatoris.length > 0 ? dades.obligatoris : OBLIGATORIS_PER_DEFECTE
   const falten = CAMPS.filter((c) => exigits.includes(c.clau) && org[c.clau].trim() === '')
   const calCodi = dades.calCodi && !codiValidat
+  const nomCurt = nom.trim().length < MIN_NOM
+  const carrecCurt = carrec.trim().length < MIN_NOM
+  const dniCurt = dni.trim().length < MIN_DNI
   const potSignar =
-    falten.length === 0 && dni.trim() !== '' && nom.trim() !== '' && carrec.trim() !== ''
+    falten.length === 0 && !nomCurt && !carrecCurt && !dniCurt
     && declaracio && acceptacio && firma !== null && !calCodi && !enviant
 
   // ── Las secciones, como variables ──
@@ -291,7 +318,7 @@ export default function FirmaConveni(
             {/* Nueve campos en una sola fila son nueve pantallazos de scroll. Con sitio van
                 de dos en dos desde `sm`, que es la mitad de alto por la misma información.
                 En la página pública se quedan en columna: ver la nota de la cabecera. */}
-            <div className={cn('grid gap-3', ample && 'sm:grid-cols-2')}>
+            <div className={cn('grid grid-cols-1 gap-3', ample && 'sm:grid-cols-2')}>
             {CAMPS.map((c) => (
               <div key={c.clau} className="space-y-1.5">
                 <Label htmlFor={`sig-${c.clau}`}>
@@ -348,22 +375,30 @@ export default function FirmaConveni(
           {/* ── 3. Quién firma ── */}
           <section className="space-y-3">
             <h2 className="text-base">{t('sig.signer_title')}</h2>
-            <div className={cn('grid gap-3', ample && 'sm:grid-cols-2')}>
+            <div className={cn('grid grid-cols-1 gap-3', ample && 'sm:grid-cols-2')}>
             <div className="space-y-1.5">
               <Label htmlFor="sig-nom">{t('sig.f_signer_name')} *</Label>
               <Input id="sig-nom" className="h-11" autoComplete="name"
                 value={nom} onChange={(e) => setNom(e.target.value)} />
+              {nom.trim() !== '' && nomCurt && (
+                <p className="text-xs text-error">{t('sig.err_nom_curt')}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sig-carrec">{t('sig.f_signer_role')} *</Label>
               <Input id="sig-carrec" className="h-11"
                 value={carrec} onChange={(e) => setCarrec(e.target.value)} />
+              {carrec.trim() !== '' && carrecCurt && (
+                <p className="text-xs text-error">{t('sig.err_carrec_curt')}</p>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="sig-dni">{t('sig.f_dni')} *</Label>
               <Input id="sig-dni" className="h-11"
                 value={dni} onChange={(e) => setDni(e.target.value)} />
-              <p className="text-xs text-muted-foreground">{t('sig.dni_hint')}</p>
+              {dni.trim() !== '' && dniCurt
+                ? <p className="text-xs text-error">{t('sig.err_dni_curt')}</p>
+                : <p className="text-xs text-muted-foreground">{t('sig.dni_hint')}</p>}
             </div>
             </div>
           </section>
@@ -456,13 +491,16 @@ export default function FirmaConveni(
               {enviant && <Loader2 className="size-4 animate-spin" />}
               {enviant ? t('c.sending') : t('sig.submit')}
             </Button>
+            {errorEnviament && !enviant && (
+              <p className="text-sm text-error" role="alert">{t(errorEnviament)}</p>
+            )}
             {/* Por qué el botón está gris. Un botón desactivado sin explicación es un
                 callejón: la persona no tiene forma de saber qué le falta. */}
             {!potSignar && !enviant && (
               <p className="text-xs text-muted-foreground">
                 {falten.length > 0
                   ? t('sig.missing_fields', { camps: falten.map((c) => t(c.label)).join(', ') })
-                  : dni.trim() === '' || nom.trim() === '' || carrec.trim() === ''
+                  : nomCurt || carrecCurt || dniCurt
                     ? t('sig.missing_signer')
                     : !declaracio || !acceptacio
                       ? t('sig.missing_checks')
@@ -507,7 +545,7 @@ export default function FirmaConveni(
            scroll anidado. `min-h-0` es lo que permite que un hijo de flex/grid encoja por
            debajo de su contenido — sin él, `overflow-y-auto` no llega a activarse nunca y
            la columna empuja el diálogo. */
-        <div className="grid gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:items-stretch">
+        <div className="grid grid-cols-1 gap-6 lg:min-h-0 lg:flex-1 lg:grid-cols-2 lg:items-stretch">
           <div className="space-y-6 lg:min-h-0 lg:overflow-y-auto lg:pr-2">
             {seccio_org}{seccio_firmant}
           </div>

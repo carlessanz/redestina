@@ -14,11 +14,13 @@
 import { describe, it, expect } from 'vitest'
 import {
   mapejaContext,
-  contextDegradat,
+  resolContext,
   rolInicial,
   rutaArrel,
   rolDeLaRuta,
   organitzacioActiva,
+  clauOrganitzacions,
+  organitzacionsDeClau,
   type ContextCru,
   type Organitzacio,
   type Rol,
@@ -57,7 +59,6 @@ describe('mapejaContext', () => {
     expect(ctx.rols).toEqual(['intern'])
     expect(ctx.esIntern).toBe(true)
     expect(ctx.potAprovar).toBe(true)
-    expect(ctx.degradat).toBe(false)
   })
 
   it('una membresía de productor da el panel de productor', () => {
@@ -125,10 +126,8 @@ describe('mapejaContext', () => {
   it('el interruptor de WhatsApp solo se apaga con un `false` explícito', () => {
     expect(mapejaContext(cru({ whatsapp_actiu: false })).whatsappActiu).toBe(false)
     expect(mapejaContext(cru({ whatsapp_actiu: true })).whatsappActiu).toBe(true)
-    // El contexto degradado es el de emergencia (no se ha podido leer la sesión): ahí
-    // tampoco se apaga nada, porque lo que no se sabe no puede dejar la app muda. Quien
-    // corta de verdad es el servidor.
-    expect(contextDegradat('u-1', 'a@b.cat').whatsappActiu).toBe(true)
+    // Una RPC vieja sin la clave no apaga nada: lo que no se sabe no deja la app muda.
+    expect(mapejaContext(cru()).whatsappActiu).toBe(true)
   })
 
   it('distingue «esperando validación» de «rechazado», que llegan los dos sin organizaciones', () => {
@@ -145,29 +144,43 @@ describe('mapejaContext', () => {
 })
 
 // ---------------------------------------------------------------------------
-// contextDegradat: el fallback que NO puede montarse sin sesión
+// resolContext: si la RPC falla, NO se concede nada (fail-cerrado, 07-10-2026)
 // ---------------------------------------------------------------------------
-describe('contextDegradat', () => {
-  // Es correcto dentro de la aplicación y catastrófico fuera: simula equipo interno, así que
-  // `AppContextProvider` vive dentro de `RequireSessio` (§6quater). Lo que se fija aquí es
-  // que sigue siendo exactamente eso —permisivo y marcado—, para que nadie lo «arregle»
-  // dejándolo a medias sin darse cuenta de para qué sirve.
-  it('se comporta como el equipo de siempre y se declara degradado', () => {
-    const ctx = contextDegradat('u-9', 'algu@example.com')
-    expect(ctx.degradat).toBe(true)
-    expect(ctx.rols).toEqual(['intern'])
-    expect(ctx.esIntern).toBe(true)
-    expect(ctx.potAprovar).toBe(true)
-    expect(ctx.esSuperAdmin).toBe(true)
+describe('resolContext', () => {
+  // Hasta el 07-10-2026 un fallo de `get_my_session_context()` montaba un contexto que
+  // simulaba al super_admin: un corte de red le enseñaba a cualquier cuenta el panel del
+  // equipo. Lo que se fija aquí es que un fallo no produce NINGÚN contexto, y por tanto
+  // ningún permiso ni ningún panel.
+  it('un error de la RPC no produce contexto', () => {
+    expect(resolContext(null, { message: 'Failed to fetch' })).toEqual({ ok: false })
+    expect(resolContext(cru({ es_intern: true, es_super_admin: true }), { message: 'x' })).toEqual({ ok: false })
   })
 
-  it('no inventa ninguna organización ni ningún registro pendiente', () => {
-    const ctx = contextDegradat('u-9', null)
-    expect(ctx.organitzacions).toEqual([])
-    expect(ctx.registrePendent).toBe(false)
-    expect(ctx.registreRebutjat).toBe(false)
-    expect(ctx.rolesActivos).toBe(false)
-    expect(ctx.email).toBeNull()
+  it('una respuesta vacía tampoco', () => {
+    expect(resolContext(null, null)).toEqual({ ok: false })
+    expect(resolContext(undefined, null)).toEqual({ ok: false })
+    expect(resolContext('ok', null)).toEqual({ ok: false })
+  })
+
+  it('una respuesta buena da el contexto de esa cuenta, y nada más', () => {
+    const r = resolContext(cru({ organizaciones: [org('productor', 'p-1', 'Can Test')] }), null)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.ctx.rols).toEqual(['productor'])
+    expect(r.ctx.esIntern).toBe(false)
+    expect(r.ctx.potAprovar).toBe(false)
+    expect(r.ctx.esSuperAdmin).toBe(false)
+  })
+
+  it('una fila a medias (sin las claves de permisos) no concede nada', () => {
+    const aMitges = { user_id: 'u-1', email: null, organizaciones: [] } as unknown
+    const r = resolContext(aMitges, null)
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    expect(r.ctx.rols).toEqual([])
+    expect(r.ctx.esIntern).toBe(false)
+    expect(r.ctx.potAprovar).toBe(false)
+    expect(r.ctx.esSuperAdmin).toBe(false)
   })
 })
 
@@ -318,5 +331,28 @@ describe('rolInicial: dispositivo, cuenta, y lo que queda', () => {
     }))
     expect(soloProductor.vistaDefecte).toBeNull()
     expect(rolInicial(soloProductor, null)).toBe('productor')
+  })
+})
+
+// La clave estable con la que los hooks del panel (ficha incompleta, diagnóstico pendiente)
+// dependen de las organizaciones sin relanzarse con cada render del contexto.
+describe('clauOrganitzacions / organitzacionsDeClau', () => {
+  it('ida y vuelta conservan tipo, id y orden', () => {
+    const orgs = [org('productor', 'p-1', 'Mas'), org('entidad', 'e-2', 'Menjador')]
+    const clau = clauOrganitzacions(orgs)
+    expect(clau).toBe('productor:p-1,entidad:e-2')
+    expect(organitzacionsDeClau(clau)).toEqual([
+      { tipo: 'productor', id: 'p-1' },
+      { tipo: 'entidad', id: 'e-2' },
+    ])
+  })
+  it('ninguna organización es la clave vacía, y al revés', () => {
+    expect(clauOrganitzacions([])).toBe('')
+    expect(organitzacionsDeClau('')).toEqual([])
+  })
+  it('la clave no depende de la identidad del array, solo del contenido', () => {
+    const a = [org('productor', 'p-1', 'Mas')]
+    const b = [org('productor', 'p-1', 'Un altre nom')]
+    expect(clauOrganitzacions(a)).toBe(clauOrganitzacions(b))
   })
 })

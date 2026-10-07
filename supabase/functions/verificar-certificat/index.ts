@@ -41,6 +41,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { corsPara } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
 
 // Sin tipos generados de la base (misma nota que `registro/index.ts`).
 // deno-lint-ignore no-explicit-any
@@ -163,16 +164,12 @@ function resumir(doc: FilaDocumento): Certificado {
 Deno.serve(async (req) => {
   const t0 = performance.now();
   const cors = corsPara(req, "GET, OPTIONS");
-  const responder = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const responder = respondedor(cors);
   // La única respuesta negativa que existe. Se usa para todo: código mal formado, código
   // desconocido, documento de otro tipo. Sin `code` y sin mensaje, a propósito.
   const noExiste = () => responder({ valid: false }, 404);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "GET") return responder({ error: "Method Not Allowed" }, 405);
 
   const ip = ipDe(req);

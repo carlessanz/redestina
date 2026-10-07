@@ -13,41 +13,13 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { esCuentaPermitida, modoTestActivo } from "../_shared/gate.ts";
-
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
-  .split(",").map((o) => o.trim()).filter(Boolean);
-
-function originPermitido(origin: string): boolean {
-  return ALLOWED_ORIGINS.some((patron) => {
-    if (!patron.includes("*")) return patron === origin;
-    const re = new RegExp(
-      "^" + patron.split("*").map((p) => p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
-        .join("[A-Za-z0-9-]+") + "$",
-    );
-    return re.test(origin);
-  });
-}
-
-function corsPara(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-}
-
-function json(body: unknown, status = 200, cors: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
-}
+import { corsPara, origenPorDefecto } from "../_shared/cors.ts";
+import { json, preflight } from "../_shared/http.ts";
+import { enmascararEmail } from "../_shared/enmascarar.ts";
 
 Deno.serve(async (req) => {
   const cors = corsPara(req);
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return json({ error: "Method Not Allowed" }, 405, cors);
 
   try {
@@ -63,11 +35,11 @@ Deno.serve(async (req) => {
       // correo nuestro a cualquier dirección con cuenta. La respuesta sigue siendo
       // el 200 genérico de siempre: no se revela si el correo existe ni si pasó.
       if ((await modoTestActivo(supabase)) && !(await esCuentaPermitida(supabase, email))) {
-        console.log("[recuperar-password] bloqueado por modo test:", email);
+        console.log("[recuperar-password] bloqueado por modo test:", enmascararEmail(email));
         return json({ ok: true }, 200, cors);
       }
 
-      const redirectTo = Deno.env.get("APP_URL") ?? ALLOWED_ORIGINS[0];
+      const redirectTo = Deno.env.get("APP_URL") ?? origenPorDefecto();
       const { data, error } = await supabase.auth.admin.generateLink({
         type: "recovery",
         email,

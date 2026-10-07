@@ -21,7 +21,7 @@ import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import { clauErrorInteres, manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
-import { dataCurta } from '../../lib/albarans'
+import { avuiLocal, avuiMadrid, dataCurta, kg as fmtKg, preu as fmtPreu } from '../../lib/format'
 import {
   desaFiltres, filtraMercat, llegeixFiltres, opcionsMercat, SENSE_FILTRES,
 } from '../../lib/filtresMercat'
@@ -35,7 +35,7 @@ import { HORES, QUARTS, hhmm } from '../../lib/franja'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
-import DetallOfertaReceptor, { kgFmt, preuDe } from '../../components/DetallOfertaReceptor'
+import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -47,11 +47,6 @@ import {
 
 /** Lo único que hace falta de la respuesta propia para contar su etapa. */
 type RespostaMeva = Pick<OfertaRespuesta, 'excedente_id' | 'estado' | 'aprovacio' | 'kg_solicitados'>
-
-/** Hoy en hora de Madrid, `AAAA-MM-DD`: la sesión del navegador puede ir en otra zona. */
-function avuiMadrid(): string {
-  return new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
-}
 
 /** `disponible_hasta` ya pasada: la oferta sigue publicada, pero no se puede pedir. */
 function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boolean {
@@ -117,7 +112,7 @@ export default function Mercat() {
     // Qué modalidades puede recibir (05-10-2026): una oferta «donació o venda» la ve una
     // empresa, pero solo puede pedir la venta. Si falla, no se filtra: la base decide igual.
     const cm = await supabase.rpc('modalitats_compatibles_meves')
-    setCompat(cm.error ? null : modalitatsDe(cm.data as unknown))
+    setCompat(cm.error ? null : modalitatsDe(cm.data))
     if (exc.error) { setErrorCarrega(true); setCarregant(false); return }
     setErrorCarrega(false)
     setOfertes((exc.data ?? []) as OfertaReceptor[])
@@ -188,7 +183,7 @@ export default function Mercat() {
     // Más de lo que hay no: la base también lo rechaza (`kg_maxim`), pero decirlo aquí
     // ahorra el viaje y el mensaje llega antes.
     if (obert.kg_total != null && nKg > Number(obert.kg_total)) {
-      toast.error(t('mk.max_kg', { n: kgFmt(obert.kg_total) }))
+      toast.error(t('mk.max_kg', { n: fmtKg(obert.kg_total) }))
       return
     }
     const ms = possibles(obert)
@@ -266,7 +261,7 @@ export default function Mercat() {
   const obertMotiu = obert ? motiuNoPot(obert) : null
   // El precio mínimo con coma y dos decimales, como lo escribe la gente; sin mínimo, sin cifra.
   const preuMinim = obert?.preu_minim != null
-    ? new Intl.NumberFormat('ca-ES', { minimumFractionDigits: 2, maximumFractionDigits: 2 }).format(Number(obert.preu_minim))
+    ? fmtPreu(obert.preu_minim)
     : null
 
   return (
@@ -328,7 +323,7 @@ export default function Mercat() {
           // producto, kg, modalidad, DÓNDE —la comarca, no el municipio (D3)— y precio si
           // hay. «Donació» va sin precio, a propósito.
           const detall = [
-            `${kgFmt(o.kg_total)} kg`,
+            `${fmtKg(o.kg_total)} kg`,
             textModalitats(compatibles(o), t) || null,
             o.comarca,
             preuDe(o),
@@ -411,7 +406,7 @@ export default function Mercat() {
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                   <div>
                     <Label htmlFor="mk-dia" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.dia_rec')}</Label>
-                    <Input id="mk-dia" type="date" value={diaRec} min={avuiIso()}
+                    <Input id="mk-dia" type="date" value={diaRec} min={avuiLocal()}
                       max={obert.disponible_hasta ?? undefined}
                       onChange={(e) => setDiaRec(e.target.value)} />
                   </div>
@@ -442,7 +437,7 @@ export default function Mercat() {
                       max={obert.kg_total != null ? String(obert.kg_total) : undefined}
                       value={kg} onChange={(e) => setKg(e.target.value)} />
                     {obert.kg_total != null && (
-                      <p className="mt-1 text-xs text-muted-foreground">{t('mk.max_kg', { n: kgFmt(obert.kg_total) })}</p>
+                      <p className="mt-1 text-xs text-muted-foreground">{t('mk.max_kg', { n: fmtKg(obert.kg_total) })}</p>
                     )}
                   </div>
                   {obertVenda && (
@@ -492,10 +487,4 @@ function horesDins(inici: string | null | undefined, fi: string | null | undefin
   const a = hhmm(inici) || '06:00'
   const b = hhmm(fi) || '22:45'
   return HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).filter((x) => x >= a && x <= b)
-}
-
-/** Hoy, «aaaa-mm-dd», en hora local. */
-function avuiIso(): string {
-  const d = new Date()
-  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`
 }

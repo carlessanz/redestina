@@ -13,6 +13,7 @@ import { Link, Navigate, useSearchParams } from 'react-router'
 import { Check, CheckCircle2 } from 'lucide-react'
 import { supabaseUrl } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { textError } from '../../lib/textError'
 import { cn } from '../../lib/utils'
 import { useSessio } from '../../hooks/useSessio'
 import type { TipusReceptor } from '../../lib/rols'
@@ -146,7 +147,8 @@ export default function Registre() {
       const clau = claus[dades?.code ?? '']
       // Si el servidor rechaza un campo que aquí no se ha validado, su mensaje dice cuál:
       // es más útil que un «ha habido un error» que no deja arreglar nada.
-      setError(clau ? t(clau) : (dades?.error ?? t('c.error')))
+      // `textError` deja pasar el texto legible y cambia el crudo de Postgres por el genérico.
+      setError(clau ? t(clau) : textError(t, dades?.error))
     } catch {
       setOcupat(false)
       setError(t('c.error'))

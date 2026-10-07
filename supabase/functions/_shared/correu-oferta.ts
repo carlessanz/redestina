@@ -21,6 +21,7 @@
 
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "./resend.ts";
 import { esEmailTest, modoTestActivo } from "./gate.ts";
+import type { ClienteSupabase } from "./cliente.ts";
 
 export type ResultatConfirmacio = "enviat" | "simulat" | "omes" | "error";
 
@@ -34,10 +35,9 @@ export async function confirmarOfertaPerCorreu(
   productor: { name?: string | null; email?: string | null },
   idExcedente: string,
   excedenteId: string,
-  // deno-lint-ignore no-explicit-any
-  datos: any,
-  // deno-lint-ignore no-explicit-any
-  supabase: any,
+  /** Las respuestas del alta: solo se lee el producto (o la familia, si no hay producto). */
+  datos: { producte?: unknown; familia?: unknown } | null | undefined,
+  supabase: ClienteSupabase,
   /** Qué función lo manda, para que `documento_envios` diga por dónde entró la oferta. */
   funcion: string,
   /**

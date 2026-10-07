@@ -19,6 +19,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import { filtraCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { supabase } from '../../lib/supabase'
 import FormulariNovaOferta from '../FormulariNovaOferta'
 import type { ResultatNovaOferta } from '../FormulariNovaOferta'
@@ -41,7 +43,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
   const { t } = useT()
   const [productors, setProductors] = useState<Fitxa[]>([])
   const [carregant, setCarregant] = useState(true)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [triat, setTriat] = useState('')
 
   useEffect(() => {
@@ -60,20 +62,19 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
       setCarregant(false)
     })()
     return () => { viu = false }
-  }, [obert])
+    // `setCerca` es el setter de un `useState` (estable): no relanza nada.
+  }, [obert, setCerca])
 
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    if (!q) return productors
-    return productors.filter((p) => p.nom.toLowerCase().includes(q))
-  }, [productors, cerca])
+    return filtraCerca(productors, q, (p) => [p.nom])
+  }, [productors, q])
 
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
       {/* 80 × 88, y sin cerrar al pinchar fuera: el cuestionario tiene catorce campos y un
           clic despistado a media alta sería caro. Mismo criterio que los otros asistidos. */}
       <DialogContent
-        className="flex h-[88vh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
+        className="flex h-[88dvh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
         showCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

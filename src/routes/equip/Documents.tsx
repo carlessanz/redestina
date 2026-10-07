@@ -42,10 +42,13 @@ import { toast } from 'sonner'
 import { Link, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { filtraCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { reenviarDocument } from '../../lib/documents'
 import { useConfirma } from '../../components/DialegConfirma'
-import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
+import { estilEstatAlbara } from '../../lib/albarans'
+import { dataCurta, dataHora, kg } from '../../lib/format'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
 import { Badge } from '@/components/ui/badge'
@@ -166,25 +169,6 @@ function senseResposta(d: Fila): boolean {
   return d.estado === 'error' && d.intentos === 0
 }
 
-function data(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleDateString('es-ES', { day: '2-digit', month: '2-digit', year: 'numeric' })
-}
-
-/** Con hora: de un correo importa el momento, no solo el día. */
-function dataHora(iso: string): string {
-  const d = new Date(iso)
-  return d.toLocaleString('es-ES', {
-    day: '2-digit', month: '2-digit', year: 'numeric', hour: '2-digit', minute: '2-digit',
-  })
-}
-
-function casa(d: Fila, q: string): boolean {
-  if (!q) return true
-  const camps = [d.numero_completo, d.tipo, d.subtipo, d.serie, String(d.ejercicio)]
-  return camps.some((c) => (c ?? '').toLowerCase().includes(q))
-}
-
 export default function Documents() {
   const { t } = useT()
   // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
@@ -197,7 +181,7 @@ export default function Documents() {
   const [enviaments, setEnviaments] = useState<Enviament[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [reenviant, setReenviant] = useState<string | null>(null)
   const { confirma, dialeg } = useConfirma()
 
@@ -302,16 +286,12 @@ export default function Documents() {
   const descarregador = useDescarregaDocument(refresca)
 
   const { tots, ambError } = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    const tots = documents.filter((d) => casa(d, q))
+    const tots = filtraCerca(documents, q, (d) => [d.numero_completo, d.tipo, d.subtipo, d.serie, String(d.ejercicio)])
     return { tots, ambError: tots.filter((d) => d.estado === 'error') }
-  }, [documents, cerca])
+  }, [documents, q])
 
   const { perConciliar, ambDiscrepancia } = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    const casaAlb = (a: AlbaranBandeja) => !q
-      || [a.numero_completo, a.tipo, a.id_excedente, a.producto].some((c) => (c ?? '').toLowerCase().includes(q))
-    const filtrats = albarans.filter(casaAlb)
+    const filtrats = filtraCerca(albarans, q, (a) => [a.numero_completo, a.tipo, a.id_excedente, a.producto])
     return {
       // Quien más lleva esperando, primero: es quien bloquea el cierre anual de su donante.
       perConciliar: filtrats
@@ -322,7 +302,7 @@ export default function Documents() {
         || (a.kg_confirmados != null && a.kg_neto != null
             && Number(a.kg_confirmados) !== Number(a.kg_neto))),
     }
-  }, [albarans, cerca])
+  }, [albarans, q])
 
   /** El número del documento asociado, si lo hay: ya está cargado, no hace falta un join. */
   const numeroPerDocument = useMemo(() => {
@@ -332,13 +312,11 @@ export default function Documents() {
   }, [documents])
 
   const enviamentsFiltrats = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    if (!q) return enviaments
-    return enviaments.filter((e) => [
+    return filtraCerca(enviaments, q, (e) => [
       e.destinatario, e.proposito, e.funcion,
       e.documento_id ? numeroPerDocument.get(e.documento_id) : null,
-    ].some((c) => (c ?? '').toLowerCase().includes(q)))
-  }, [enviaments, cerca, numeroPerDocument])
+    ])
+  }, [enviaments, q, numeroPerDocument])
 
   const enviamentsAmbError = useMemo(
     () => enviamentsFiltrats.filter((e) => e.estado === 'error').length,
@@ -395,7 +373,7 @@ export default function Documents() {
                     </Badge>
                   </TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                    {data(d.emitido_at)}
+                    {dataCurta(d.emitido_at)}
                   </TableCell>
                   <TableCell>
                     {/* `h-11` en móvil: son las acciones de la fila y 32 px es poco para
@@ -534,7 +512,7 @@ export default function Documents() {
                   <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
                     {dataHora(e.enviado_at ?? e.created_at)}
                   </TableCell>
-                  <TableCell className="font-medium break-all">{e.destinatario}</TableCell>
+                  <TableCell className="min-w-40 font-medium whitespace-normal break-all">{e.destinatario}</TableCell>
                   <TableCell>
                     <Badge variant="outline">
                       {CLAU_PROPOSIT[e.proposito] ? t(CLAU_PROPOSIT[e.proposito]) : e.proposito}
@@ -551,7 +529,7 @@ export default function Documents() {
                   <TableCell>
                     <Badge className={ESTIL_ENVIAMENT[e.estado]}>{t(CLAU_ENVIAMENT[e.estado])}</Badge>
                     {e.estado === 'error' && e.error && (
-                      <p className="mt-1 max-w-xs text-xs text-error">{e.error}</p>
+                      <p className="mt-1 max-w-xs text-xs whitespace-normal text-error">{e.error}</p>
                     )}
                   </TableCell>
                   <TableCell className="text-right">

@@ -122,10 +122,14 @@ export interface DadesEnllac {
 
 export type ResultatEnllac<T> =
   | { ok: true; data: T }
-  | { ok: false; codi: CodiEnllac; motiuKey: string }
+  | { ok: false; codi: CodiEnllac; motiuKey: string; camp?: string }
 
-function falla(codi: CodiEnllac): ResultatEnllac<never> {
-  return { ok: false, codi, motiuKey: MOTIU[codi] }
+/** `camp` es el campo que el servidor señala en un 400 (`dades_invalides`): sin él, la
+ *  pantalla solo puede decir «alguna dada no quadra» y la persona no sabe cuál. */
+function falla(codi: CodiEnllac, camp?: unknown): ResultatEnllac<never> {
+  return typeof camp === 'string' && camp
+    ? { ok: false, codi, motiuKey: MOTIU[codi], camp }
+    : { ok: false, codi, motiuKey: MOTIU[codi] }
 }
 
 /** El `code` del cuerpo si lo reconocemos; si no, se deduce del status HTTP. */
@@ -676,7 +680,7 @@ export async function signaConveni(
       }),
     })
     const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
-    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code))
+    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code), cos?.camp)
     const conv = (cos.conveni ?? cos.convenio ?? {}) as Record<string, unknown>
     return {
       ok: true,

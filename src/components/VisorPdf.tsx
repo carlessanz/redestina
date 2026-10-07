@@ -54,7 +54,7 @@ export default function VisorPdf({ pdf, onTancar, onDescarregar }: Props) {
           y sin quitarlo el 80 % de ancho no se aplica. `flex flex-col` + `min-h-0` en el
           iframe es lo que hace que el visor ocupe todo el alto que sobra bajo la cabecera. */}
       <DialogContent
-        className="flex h-[80vh] w-[80vw] max-w-none flex-col gap-3 p-4 sm:max-w-none"
+        className="flex h-[80dvh] w-[80vw] max-w-none flex-col gap-3 p-4 sm:max-w-none"
         showCloseButton
       >
         <DialogHeader className="shrink-0 pr-8">

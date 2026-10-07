@@ -36,6 +36,7 @@ import { createClient } from "@supabase/supabase-js";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { urlPublica } from "../_shared/url-publica.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
 
 const BUCKET = "documentos";
 const SEGUNDOS_FIRMA = 60;
@@ -99,13 +100,9 @@ function nombreExterno(doc: FilaExterno): string {
 
 Deno.serve(async (req) => {
   const cors = corsPara(req);
-  const responder = (body: unknown, status = 200) =>
-    new Response(JSON.stringify(body), {
-      status,
-      headers: { ...cors, "Content-Type": "application/json" },
-    });
+  const responder = respondedor(cors);
 
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: cors });
+  if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
 
   const supabase = createClient(

@@ -13,16 +13,6 @@ export interface MetaTestRecipient {
   created_at: string
 }
 
-// Devuelve los números de la lista como Set, para comprobar pertenencia en O(1).
-export async function cargarNumerosTest(): Promise<Set<string>> {
-  const { data, error } = await supabase.from('meta_test_recipients').select('phone')
-  if (error) {
-    console.error('meta_test_recipients select:', error.message)
-    return new Set()
-  }
-  return new Set((data ?? []).map((r) => r.phone))
-}
-
 // Lista completa (con etiqueta y fecha) para el gestor del Dashboard.
 export async function listarNumerosTest(): Promise<MetaTestRecipient[]> {
   const { data, error } = await supabase

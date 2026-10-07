@@ -30,6 +30,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import { avuiMadrid } from '../../lib/format'
 import { textError } from '../../lib/textError'
 import { calcularCertificatPeriode, emetreCertificatPeriode, bloqueja, euros } from '../../lib/tancament'
 import { calcularCertificatRecepcio, emetreCertificatRecepcio } from '../../lib/certificatRecepcio'
@@ -45,11 +46,6 @@ import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
-
-/** Hoy en hora de Madrid. `sv-SE` da `AAAA-MM-DD`, que es lo que espera un input de fecha. */
-function avui(): string {
-  return new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' })
-}
 
 /**
  * Lo que las dos pantallas necesitan del cálculo.
@@ -106,7 +102,7 @@ export default function DialegCertificatPeriode(
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
   const perfil = PERFIL[tipus]
-  const hoy = avui()
+  const hoy = avuiMadrid()
   const [desde, setDesde] = useState(`${hoy.slice(0, 4)}-01-01`)
   const [hasta, setHasta] = useState(hoy)
   const [calcul, setCalcul] = useState<Calcul | null>(null)

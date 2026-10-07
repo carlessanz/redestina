@@ -18,6 +18,7 @@ import type { ProducteCataleg } from '../lib/fotosProducte'
 import { classeIcona, fotoPrincipal } from '../lib/fotoOferta'
 import type { ClasseIcona, OfertaAmbFotos } from '../lib/fotoOferta'
 import { Button } from '@/components/ui/button'
+import { useConfirma } from './DialegConfirma'
 
 /** URLs firmadas de un conjunto de rutas de UN bucket, pedidas en UN lote. */
 export function useUrlsFotos(rutes: string[], bucket = BUCKET_FOTOS): Record<string, string> {
@@ -152,6 +153,7 @@ export function SelectorFotos({
   disabled?: boolean
 }) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   const input = useRef<HTMLInputElement>(null)
   const [pujant, setPujant] = useState(false)
   const urls = useUrlsFotos(rutes)
@@ -176,6 +178,12 @@ export function SelectorFotos({
   }
 
   async function treu(ruta: string) {
+    if (!(await confirma({
+      titol: t('foto.remove_t'),
+      descripcio: t('foto.remove_d'),
+      confirmar: t('foto.remove'),
+      destructiu: true,
+    }))) return
     // Primero se desenlaza y solo después se borra: al revés, un fallo al guardar dejaba la
     // oferta citando un fichero que ya no existe (la foto salía rota a las entidades).
     const ok = await onChange(rutes.filter((r) => r !== ruta))
@@ -185,6 +193,7 @@ export function SelectorFotos({
 
   return (
     <div className="space-y-2">
+      {dialeg}
       {/* `gap-4`: el aspa de quitar sobresale 8 px (`-right-2`); con `gap-2` tocaba la foto
           siguiente. Así queda el mismo aire a los dos lados. */}
       <div className="flex flex-wrap gap-4">
@@ -195,10 +204,15 @@ export function SelectorFotos({
               <span className="absolute bottom-1 left-1 rounded bg-background/90 px-1 text-xs">{t('foto.principal')}</span>
             )}
             {!disabled && (
+              // El botón mide 44 px en móvil (área táctil) y el círculo visible sigue siendo
+              // de 28: el hueco extra es transparente y centrado sobre él, así que con el
+              // `gap-4` llega justo al borde de la foto siguiente sin taparla.
               <button type="button" onClick={() => void treu(r)}
-                className="absolute -right-2 -top-2 flex size-7 items-center justify-center rounded-full border bg-background shadow"
+                className="absolute -right-4 -top-4 flex size-11 items-center justify-center md:-right-2 md:-top-2 md:size-7"
                 aria-label={t('foto.remove')}>
-                <X className="size-4" aria-hidden />
+                <span className="flex size-7 items-center justify-center rounded-full border bg-background shadow">
+                  <X className="size-4" aria-hidden />
+                </span>
               </button>
             )}
           </div>

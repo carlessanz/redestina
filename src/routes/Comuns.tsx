@@ -2,9 +2,9 @@
 //
 // La aplicación tiene ahora dos mitades. La pública (landing, accesos, registro) no sabe
 // nada de roles. La privada cuelga toda de RequireSessio, que es el único sitio donde se
-// monta AppContextProvider: ese contexto tiene un fallback que simula equipo interno
-// cuando la RPC falla, así que dejarlo montar sin sesión confirmada sería regalar el
-// panel del equipo a cualquiera que abriera la web.
+// monta AppContextProvider. Ese contexto es fail-cerrado desde el 07-10-2026 (si la RPC
+// falla no concede nada y enseña una pantalla de error), pero sigue sin tener sentido
+// montarlo sin sesión confirmada: no hay a quién preguntar.
 
 import { useEffect, useState } from 'react'
 import { Navigate, Outlet, useLocation } from 'react-router'
@@ -117,7 +117,7 @@ export function SenseAcces() {
     ? { Icona: Hourglass, classeIcona: 'text-primary', titol: 'noacc.pending_title', desc: 'noacc.pending_desc' }
     : rebutjat
       ? { Icona: ShieldX, classeIcona: 'text-destructive', titol: 'noacc.rejected_title', desc: 'noacc.rejected_desc' }
-      : { Icona: ShieldAlert, classeIcona: 'text-accent', titol: 'noacc.title', desc: 'noacc.desc' }
+      : { Icona: ShieldAlert, classeIcona: 'text-muted-foreground', titol: 'noacc.title', desc: 'noacc.desc' }
 
   return (
     <div className="grid min-h-dvh place-items-center bg-primary px-4">

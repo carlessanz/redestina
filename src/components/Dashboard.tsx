@@ -21,6 +21,7 @@ import { Link } from 'react-router'
 import { ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { nombre } from '../lib/format'
 import { getTestMode } from '../lib/settings'
 import { pendentsPerTelefon } from '../lib/contactes'
 import PendentsEquip from './equip/PendentsEquip'
@@ -51,7 +52,7 @@ function Kpi({ titulo, valor, sub, detalle, to }: {
         <CardContent>
           {/* `ca-ES` agrupa también los de cuatro cifras («2.240»); `es-ES` no. */}
           <div className="text-3xl font-bold leading-none text-primary">
-            {typeof valor === 'number' ? valor.toLocaleString('ca-ES', { maximumFractionDigits: 0 }) : valor}
+            {typeof valor === 'number' ? nombre(valor, 0) : valor}
           </div>
           <p className="mt-1 text-sm text-muted-foreground">{sub}</p>
           <ul className="mt-3 space-y-0.5 border-t pt-2 text-sm text-muted-foreground">
@@ -77,6 +78,10 @@ export default function Dashboard() {
   const [intakeActivas, setIntakeActivas] = useState(0)
   const [modeProves, setModeProves] = useState(false)
   const [loading, setLoading] = useState(true)
+  // Alguna consulta de las KPIs falló. Sin esto, un error salía como «0 ofertes», «0 kg»…
+  // que se lee como dato real. `pendentsPerTelefon()` no se cuenta: devuelve `{}` ante un
+  // error por diseño (lo comparte con el badge del menú).
+  const [errorCarrega, setErrorCarrega] = useState(false)
 
   const cargar = useCallback(async () => {
     setLoading(true)
@@ -110,6 +115,10 @@ export default function Dashboard() {
       supabase.from('intake_sessions').select('id', { count: 'exact', head: true }),
       getTestMode(),
     ])
+    const errors = [prod, ent, entOptIn, entEmail, exc, canal, rebuts, intake]
+      .map((r) => r.error).filter((e) => e !== null)
+    if (errors.length > 0) console.warn('Dashboard:', errors.map((e) => e.message).join(' · '))
+    setErrorCarrega(errors.length > 0)
     setProdPhones((prod.data ?? []).map((p) => p.phone))
     setEntitatsTotal(ent.count ?? 0)
     setEntitatsOptIn(entOptIn.count ?? 0)
@@ -187,7 +196,8 @@ export default function Dashboard() {
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">{t('dash.glance')}</h2>
-        {loading ? <p className="text-sm text-muted-foreground">{t('c.loading')}</p> : (
+        {errorCarrega && !loading && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+        {loading ? <p className="text-sm text-muted-foreground">{t('c.loading')}</p> : errorCarrega ? null : (
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <Kpi to="/equip/ofertes" titulo={t('dash.k_offers')} valor={kpis.ofertas.activas} sub={t('dash.active')} detalle={[
               { texto: `${kpis.ofertas.bloqueadas} ${t('dash.blocked')}` },
@@ -195,7 +205,7 @@ export default function Dashboard() {
               { texto: `${kpis.ofertas.canceladas} ${t('dash.cancelled')}` },
             ]} />
             <Kpi to="/equip/ofertes" titulo={t('dash.k_kg')} valor={kpis.kg.canalizados} sub={t('dash.channeled')} detalle={[
-              { texto: t('dash.pending_kg', { n: kpis.kg.pendientes.toLocaleString('ca-ES', { maximumFractionDigits: 0 }) }) },
+              { texto: t('dash.pending_kg', { n: nombre(kpis.kg.pendientes, 0) }) },
             ]} />
             <Kpi to="/equip/productors" titulo={t('dash.k_producers')} valor={kpis.productores.total} sub={t('dash.in_base')} detalle={[
               { texto: t('dash.with_mobile', { n: kpis.productores.conMovil }) },

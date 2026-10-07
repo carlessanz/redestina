@@ -18,6 +18,7 @@ import { textError } from '../lib/textError'
 import { creaUbicacio } from '../lib/ofertes'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
+import { useConfirma } from './DialegConfirma'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -33,6 +34,7 @@ export default function LlocsRecollida({
   idPrefix?: string
 }) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   const [ubicacions, setUbicacions] = useState<Ubicacio[]>([])
   const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
   /** Un fallo de lectura no es «no tens cap lloc»: se decía eso mismo. */
@@ -66,6 +68,12 @@ export default function LlocsRecollida({
   }
 
   async function esborra(u: Ubicacio) {
+    if (!(await confirma({
+      titol: t('org.place_delete_t', { x: u.alias ?? '—' }),
+      descripcio: t('org.place_delete_d'),
+      confirmar: t('c.delete'),
+      destructiu: true,
+    }))) return
     // `.select('id')`: un DELETE que la RLS no deja pasar no da error, borra cero filas, y
     // la pantalla quitaba el lugar de la lista aunque seguía existiendo.
     const { data, error } = await supabase.from('productor_ubicaciones').delete().eq('id', u.id).select('id')
@@ -78,6 +86,7 @@ export default function LlocsRecollida({
 
   return (
     <>
+      {dialeg}
       {errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
       {!errorCarrega && ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
       <ul className="space-y-2">

@@ -110,7 +110,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const { ctx } = useAppContext()
   // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a un técnico se le dejan
   // grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
-  const potAprovar = ctx?.potAprovar ?? true
+  const potAprovar = ctx?.potAprovar ?? false
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
   // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
@@ -154,6 +154,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   )
 
   const [editant, setEditant] = useState(false)
+  // Alguna de las lecturas de la ficha falló. Se conserva lo último que se leyó (no se pinta
+  // «sin canalizaciones» por un error de red) y se avisa encima.
+  const [errorCarrega, setErrorCarrega] = useState(false)
   const canalizados = canalizaciones.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(exc.kg_total ?? 0)
   const faltan = Math.max(0, total - canalizados)
@@ -190,16 +193,19 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // estado ha pasado a `bloqueada`, y leer `exc` justo después daría el valor anterior.
   const recargar = useCallback(async (): Promise<Excedente | null> => {
     const [e, c, a] = await Promise.all([
-      supabase.from('excedentes').select('*').eq('id', excedente.id).single(),
+      supabase.from('excedentes').select('*').eq('id', excedente.id).maybeSingle(),
       supabase.from('canalizaciones').select('*').eq('excedente_id', excedente.id).order('created_at', { ascending: true }),
       // ⚠️ La lista de columnas en UN literal (§7, deuda 46).
       supabase.from('albaranes')
         .select('id, tipo, numero_completo, estado, canalizacion_id, entregado_at')
         .eq('excedente_id', excedente.id),
     ])
+    const fallada = e.error ?? c.error ?? a.error
+    if (fallada) console.warn('OfferDetail.recargar:', fallada.message)
+    setErrorCarrega(fallada !== null)
     if (e.data) setExc(e.data)
-    setCanalizaciones(c.data ?? [])
-    setAlbarans((a.data as AlbaraDelRegistre[] | null) ?? [])
+    if (!c.error) setCanalizaciones(c.data ?? [])
+    if (!a.error) setAlbarans((a.data as AlbaraDelRegistre[] | null) ?? [])
     return e.data ?? null
   }, [excedente.id])
 
@@ -214,11 +220,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const albaraRec = useMemo(() => albarans.find((a) => a.tipo === 'REC') ?? null, [albarans])
 
   const recargarRespuestas = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from('oferta_respuestas')
       .select('*, entidades(nombre, poblacion)')
       .eq('excedente_id', excedente.id)
       .order('enviado_at', { ascending: false })
+    // Un error no vacía la lista: «ninguna respuesta» sería mentira.
+    if (error) { console.warn('OfferDetail.respostes:', error.message); setErrorCarrega(true); return }
     setRespuestas((data as RespuestaConEntidad[]) ?? [])
   }, [excedente.id])
 
@@ -584,10 +592,15 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     // Sin la canalización no se toca el estado de la oferta: la marcaría Coberta sin nada.
     if (errAlta || !alta || alta.length === 0) { toast.error(t('c.error')); return }
     const nuevoCanalizado = canalizados + kg_confirmados
-    if (total > 0 && nuevoCanalizado >= total) {
-      await supabase.from('excedentes').update({ estado: 'bloqueada' }).eq('id', excedente.id)
-    } else if (exc.estado === 'publicada') {
-      await supabase.from('excedentes').update({ estado: 'parcial' }).eq('id', excedente.id)
+    const nouEstat = total > 0 && nuevoCanalizado >= total
+      ? 'bloqueada'
+      : exc.estado === 'publicada' ? 'parcial' : null
+    if (nouEstat) {
+      // La canalización ya existe; si el estado no se mueve (RLS devuelve 0 filas sin error),
+      // se dice, en vez de dejar la oferta en «Publicada» con kilos ya asignados sin aviso.
+      const { data: fet, error: errEstat } = await supabase.from('excedentes')
+        .update({ estado: nouEstat }).eq('id', excedente.id).select('id')
+      if (errEstat || !fet || fet.length === 0) toast.error(t('c.error'))
     }
     form.reset()
     const nou = await recargar()
@@ -701,6 +714,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       <Button variant="ghost" size="sm" onClick={onBack} className="text-muted-foreground">
         <ArrowLeft className="size-4" /> {t('od.back')}
       </Button>
+      {errorCarrega && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
@@ -1021,10 +1035,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 <span>{c.kg_confirmados} kg</span>
                 <label className="flex items-center gap-1">
                   {t('od.reals')}
-                  <Input type="number" defaultValue={c.kg_reales ?? ''} className={`h-8 w-20 ${difiere ? 'border-accent' : ''}`}
+                  <Input type="number" defaultValue={c.kg_reales ?? ''} className={`h-8 w-20 ${difiere ? 'border-aviso' : ''}`}
                     onBlur={(ev) => ev.target.value && void guardarKgReales(c.id, Number(ev.target.value))} />
                 </label>
-                {difiere && <span className="text-xs text-accent">{t('od.differs')}</span>}
+                {difiere && <span className="text-xs text-aviso">{t('od.differs')}</span>}
                 {/* El albarán ya no es un texto que compone el panel con marcadores y sin
                     número: es una fila numerada de `albaranes` con su PDF. Aquí solo se
                     enlaza (checkpoint §12.4 y deuda 40, cerradas). */}

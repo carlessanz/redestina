@@ -15,7 +15,7 @@
 //    con el código postal, se ofrece el cambio como sugerencia; cambiarlo por su cuenta le
 //    borraría a alguien una corrección que había hecho a propósito.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 
@@ -47,20 +47,25 @@ export default function SuggerimentPoblacio({
         .from('codis_postals')
         .select('municipios(codi_ine, nom, comarca)')
         .eq('codi_postal', cp)
+        .overrideTypes<{ municipios: Municipi | null }[], { merge: false }>()
       if (!viu) return
-      const files = (data ?? []) as unknown as { municipios: Municipi | null }[]
+      const files = data ?? []
       setOpcions(files.map((f) => f.municipios).filter((m): m is Municipi => m !== null))
     })()
     return () => { viu = false }
   }, [cp])
 
+  // `onTria` viene del padre y cambia en cada render; depender de él relanzaría el efecto de
+  // abajo en bucle. Se guarda el último en una ref, que es lo que el efecto llama: lo que
+  // decide cuándo se rellena es el código postal y lo que hay escrito.
+  const onTriaRef = useRef(onTria)
+  useEffect(() => { onTriaRef.current = onTria })
+
   // Rellenar solo cuando NO hay duda y el campo está vacío. Con algo escrito, se sugiere.
   useEffect(() => {
     if (disabled) return
-    if (opcions.length === 1 && poblacio.trim() === '') onTria(opcions[0].nom)
-    // `onTria` viene del padre y cambia en cada render; depender de él relanzaría esto en
-    // bucle. Lo que decide es el código postal y lo que hay escrito.
-  }, [opcions, poblacio, disabled]) // eslint-disable-line react-hooks/exhaustive-deps
+    if (opcions.length === 1 && poblacio.trim() === '') onTriaRef.current(opcions[0].nom)
+  }, [opcions, poblacio, disabled])
 
   if (disabled || opcions.length === 0) return null
 

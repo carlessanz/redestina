@@ -3,6 +3,8 @@ import { Plus } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { useWhatsappActiu } from '../hooks/useAppContext'
+import { useCerca } from '../hooks/useCerca'
+import { filtraCerca } from '../lib/cerca'
 import DialegCorreu from './DialegCorreu'
 import type { DestinatariCorreu } from './DialegCorreu'
 import type { Entidad, EntidadLlistat } from '../types'
@@ -22,12 +24,6 @@ interface Props {
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 
-function casa(e: Entidad, q: string): boolean {
-  if (!q) return true
-  const campos = [e.nombre, e.poblacion, e.area_geografica, e.telefono, e.email, e.contacto, e.modalitat]
-  return campos.some((c) => (c ?? '').toLowerCase().includes(q))
-}
-
 export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
   const waActiu = useWhatsappActiu()
@@ -36,7 +32,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
   const [entidades, setEntidades] = useState<EntidadLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [busqueda, setBusqueda] = useState('')
+  const { cerca, setCerca, q } = useCerca()
 
   useEffect(() => {
     let cancelled = false
@@ -52,8 +48,8 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
 
   // Primero las entidades de prueba (pueden recibir), luego el resto — igual que productores.
   const { test, resto } = useMemo(() => {
-    const q = busqueda.trim().toLowerCase()
-    const filtradas = entidades.filter((e) => casa(e, q))
+    const filtradas = filtraCerca(entidades, q,
+      (e) => [e.nombre, e.poblacion, e.area_geografica, e.telefono, e.email, e.contacto, e.modalitat])
     const test: EntidadLlistat[] = []
     const resto: EntidadLlistat[] = []
     for (const e of filtradas) {
@@ -61,7 +57,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
       else resto.push(e)
     }
     return { test, resto }
-  }, [entidades, busqueda])
+  }, [entidades, q])
 
   function tabla(lista: EntidadLlistat[], marcarTest: boolean) {
     return (
@@ -137,7 +133,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
         <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_f')}</Button>
       </CardHeader>
       <CardContent className="space-y-6">
-        <Input type="search" placeholder={t('ent.search')} value={busqueda} onChange={(e) => setBusqueda(e.target.value)} />
+        <Input type="search" placeholder={t('ent.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{entidades.length === 0 ? t('ent.empty') : t('ent.no_match')}</p>}

@@ -24,6 +24,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { avuiMadrid } from '../../lib/format'
 import { textError } from '../../lib/textError'
 import { crearEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada } from '../../lib/albarans'
@@ -114,7 +115,7 @@ export default function DialegEspigolada(
   useEffect(() => {
     if (!obert) return
     setUbicacio(oferta.ubicacion_id ?? '')
-    setData(new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }))
+    setData(avuiMadrid())
     setVoluntaris('')
     setNotes('')
     setRefExterna('')
@@ -185,7 +186,7 @@ export default function DialegEspigolada(
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
       <DialogContent
-        className="flex h-[88vh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
+        className="flex h-[88dvh] w-[80vw] max-w-none flex-col gap-4 p-6 sm:max-w-none"
         showCloseButton
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}

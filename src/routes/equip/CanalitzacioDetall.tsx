@@ -30,7 +30,7 @@ import { textError } from '../../lib/textError'
 import { cn } from '../../lib/utils'
 import { FASES_EQUIP } from '../../lib/procesOferta'
 import {
-  escalaCanal, PASSOS_FASE_CLAUS, puntCanal,
+  clauPas, escalaCanal, PASSOS_FASE_CLAUS, puntCanal,
 } from '../../lib/passosCanalitzacio'
 import type { FetsCanal, PasCanal, PasEscala } from '../../lib/passosCanalitzacio'
 import {
@@ -41,6 +41,7 @@ import type { ConvenioTipo, Excedente } from '../../types'
 import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
+import { certificatsDelGenerador } from '../../lib/tancament'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useConfirma } from '../../components/DialegConfirma'
 import { supabase } from '../../lib/supabase'
@@ -60,6 +61,8 @@ import { Label } from '@/components/ui/label'
 interface Extra {
   oferta: { id: string; id_excedente: string | null; modalitat: string | null; producto: string | null }
   productor: { id: string; nom: string | null } | null
+  /** El cierre del ejercicio de la oferta (el real si lo hay), con su id para enlazarlo. */
+  exercici: { id: string; estado: string; modo: string } | null
   respostes: {
     id: string; entidad_id: string | null; entitat: string
     estado: string; aprovacio: string; kg_solicitados: number | null
@@ -112,7 +115,7 @@ export default function CanalitzacioDetall() {
   const { ctx } = useAppContext()
   // Contrasignar y aprobar exigen `pot_aprovar()` (§4bis): a un técnico se le dejan grises
   // CON el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
-  const potAprovar = ctx?.potAprovar ?? true
+  const potAprovar = ctx?.potAprovar ?? false
   const { confirma, dialeg: dialegConfirma } = useConfirma()
   /** Contrasignar estampa la firma de la Fundación y manda el PDF: no se deshace. */
   const confirmaContrasignar = () => confirma({
@@ -164,7 +167,18 @@ export default function CanalitzacioDetall() {
       return
     }
     const cru = r.data as unknown as FetsCanal & Extra
-    setFets({ ...cru, dadesProvisionals: provisionals })
+    // Los acumulados del generador en el cierre del ejercicio: es lo que dice si el último
+    // escalón (CD y/o CT) ya está emitido. La RPC del ciclo no lee el cierre, así que se
+    // piden aparte, como los datos provisionales. `null` = no se sabe, y la escalera usa
+    // entonces su aproximación de siempre.
+    const certificats = cru.exercici?.id && cru.productor?.id
+      ? await certificatsDelGenerador(cru.exercici.id, cru.productor.id)
+      : null
+    setFets({
+      ...cru,
+      dadesProvisionals: provisionals,
+      ...(certificats ? { certificats } : {}),
+    })
     setExtra(cru as unknown as Extra)
     setError(null)
     setCarregant(false)
@@ -315,7 +329,7 @@ export default function CanalitzacioDetall() {
                   {passos.map((p) => (
                     <div key={p.pas} className="rounded-md border p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{t(`canal.${p.pas}_t`)}</span>
+                        <span className="text-sm font-medium">{t(`canal.${clauPas(p)}_t`)}</span>
                         <Badge className={COLOR_ESTAT[p.estat]}>{t(`canalz.est_${p.estat}`)}</Badge>
                       </div>
                       {/* `_passa` está redactado como «todavía falta esto», así que en
@@ -327,7 +341,7 @@ export default function CanalitzacioDetall() {
                           tiene sentido mientras describe lo que falta. */}
                       {p.estat !== 'fet' && (
                         <p className="mt-1 text-sm text-muted-foreground">
-                          {t(`canal.${p.pas}_passa`)}
+                          {t(`canal.${clauPas(p)}_passa`)}
                         </p>
                       )}
                       {/* Un paso bloqueado dice POR QUÉ, y lo dice VISIBLE: en táctil no hay
@@ -360,7 +374,7 @@ export default function CanalitzacioDetall() {
                       )}
                       {p.estat === 'ara' && !p.motiuKey && (
                         <p className="mt-2 rounded-md bg-aviso-fondo p-2 text-sm text-aviso">
-                          {t(`canal.${p.pas}_toca`)}
+                          {t(`canal.${clauPas(p)}_toca`)}
                         </p>
                       )}
                     </div>
@@ -480,8 +494,12 @@ export default function CanalitzacioDetall() {
                         <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
                           <Link to="/equip/productes">{t('canalz.b_costos')}</Link>
                         </Button>
+                        {/* Al cierre CONCRETO de este ejercicio, si ya existe: ahí viven los
+                            certificados de donación y de transacción de este generador. */}
                         <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                          <Link to="/equip/tancament">{t('canalz.b_tancament')}</Link>
+                          <Link to={extra.exercici?.id ? `/equip/tancament/${extra.exercici.id}` : '/equip/tancament'}>
+                            {t('canalz.b_tancament')}
+                          </Link>
                         </Button>
                       </>
                     )}

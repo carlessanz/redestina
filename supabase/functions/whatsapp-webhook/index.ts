@@ -9,6 +9,7 @@ import { sendText } from "../_shared/whatsapp.ts";
 import { leerRespuesta, procesarIntake } from "../_shared/intake.ts";
 import { procesarRespuestaOferta } from "../_shared/respuestas.ts";
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
+import { igualesTiempoConstante } from "../_shared/http.ts";
 
 const encoder = new TextEncoder();
 
@@ -33,13 +34,8 @@ async function verifySignature(
     .join("");
   const received = header.slice("sha256=".length);
 
-  // Comparación en tiempo constante
-  if (expected.length !== received.length) return false;
-  let diff = 0;
-  for (let i = 0; i < expected.length; i++) {
-    diff |= expected.charCodeAt(i) ^ received.charCodeAt(i);
-  }
-  return diff === 0;
+  // Comparación en tiempo constante (`_shared/http.ts`).
+  return igualesTiempoConstante(expected, received);
 }
 
 /**
@@ -114,7 +110,13 @@ Deno.serve(async (req) => {
     const token = params.get("hub.verify_token");
     const challenge = params.get("hub.challenge");
 
-    if (mode === "subscribe" && token === Deno.env.get("WHATSAPP_VERIFY_TOKEN")) {
+    // Comparación en tiempo constante, como la firma del POST; y sin token configurado no
+    // se verifica nada (una cadena vacía no puede abrir la suscripción).
+    const esperado = Deno.env.get("WHATSAPP_VERIFY_TOKEN") ?? "";
+    if (
+      mode === "subscribe" && esperado !== "" && token !== null &&
+      igualesTiempoConstante(token, esperado)
+    ) {
       return new Response(challenge ?? "", {
         status: 200,
         headers: { "Content-Type": "text/plain" },

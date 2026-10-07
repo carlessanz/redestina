@@ -26,6 +26,9 @@ import { ArrowLeft, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { filtraCerca } from '../../lib/cerca'
+import { avuiMadrid } from '../../lib/format'
+import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { crearEspigolada, dataCurta, estilEstatAlbara, kg, repartirEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada, LotEspigolada } from '../../lib/albarans'
@@ -86,7 +89,7 @@ export function Espigolades() {
   const [files, setFiles] = useState<FilaEspigolada[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
 
   useEffect(() => {
     let viu = true
@@ -145,13 +148,9 @@ export function Espigolades() {
   // El buscador filtra en cliente sobre lo ya cargado, como los demás listados: son
   // jornadas de campo, no las 452 fichas del padrón.
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
-    if (!q) return files
-    return files.filter((f) => {
-      const camps = [f.productor, f.esp.ref_externa, f.esp.notas, f.esp.fecha, dataCurta(f.esp.fecha)]
-      return camps.some((c) => (c ?? '').toLowerCase().includes(q))
-    })
-  }, [files, cerca])
+    return filtraCerca(files, q,
+      (f) => [f.productor, f.esp.ref_externa, f.esp.notas, f.esp.fecha, dataCurta(f.esp.fecha)])
+  }, [files, q])
 
   return (
     <Card>
@@ -254,7 +253,7 @@ export function NovaEspigolada() {
 
   const [productor, setProductor] = useState('')
   const [ubicacio, setUbicacio] = useState('')
-  const [data, setData] = useState(() => new Date().toLocaleDateString('sv-SE', { timeZone: 'Europe/Madrid' }))
+  const [data, setData] = useState(() => avuiMadrid())
   const [voluntaris, setVoluntaris] = useState('')
   const [notes, setNotes] = useState('')
   const [refExterna, setRefExterna] = useState('')

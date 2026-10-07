@@ -54,12 +54,6 @@ export interface ContextSessio {
   registrePendent: boolean
   /** El equipo rechazó el alta y la cuenta no tiene ninguna otra membresía activa. */
   registreRebutjat: boolean
-  /**
-   * true cuando no se ha podido leer el contexto (la migración de roles aún no está
-   * desplegada, o la RPC falla). Se trata como equipo interno: es el comportamiento
-   * que la app ha tenido siempre, y con `roles_activos` apagado es además el correcto.
-   */
-  degradat: boolean
   /** Alguna de sus organizaciones tiene un convenio pendiente de firmar o devuelto. */
   conveni_pendent?: boolean
   /**
@@ -99,7 +93,7 @@ export interface ContextCru {
 export function mapejaContext(cru: ContextCru): ContextSessio {
   const organitzacions = cru.organizaciones ?? []
   const rols: Rol[] = []
-  if (cru.es_intern) rols.push('intern')
+  if (cru.es_intern === true) rols.push('intern')
   if (organitzacions.some((o) => o.tipo === 'productor')) rols.push('productor')
   if (organitzacions.some((o) => o.tipo === 'entidad')) rols.push('receptor')
 
@@ -109,9 +103,11 @@ export function mapejaContext(cru: ContextCru): ContextSessio {
     nombre: cru.nombre,
     idioma: cru.idioma ?? 'ca',
     rol: cru.rol,
-    esIntern: cru.es_intern,
-    potAprovar: cru.pot_aprovar,
-    esSuperAdmin: cru.es_super_admin,
+    // `=== true` y no el valor tal cual: una RPC que llegue sin la clave (o con un null)
+    // no concede nada. Los permisos se conceden explícitamente o no se conceden.
+    esIntern: cru.es_intern === true,
+    potAprovar: cru.pot_aprovar === true,
+    esSuperAdmin: cru.es_super_admin === true,
     rolesActivos: cru.roles_activos,
     organitzacions,
     rols,
@@ -121,32 +117,27 @@ export function mapejaContext(cru: ContextCru): ContextSessio {
     registrePendent: cru.registre_pendent ?? false,
     registreRebutjat: cru.registre_rebutjat ?? false,
     whatsappActiu: cru.whatsapp_actiu !== false,
-    degradat: false,
   }
 }
 
-/** Contexto de emergencia: la app se comporta como siempre (equipo interno). */
-export function contextDegradat(userId: string, email: string | null): ContextSessio {
-  return {
-    userId,
-    email,
-    nombre: null,
-    idioma: 'ca',
-    rol: 'admin',
-    esIntern: true,
-    potAprovar: true,
-    esSuperAdmin: true,
-    rolesActivos: false,
-    organitzacions: [],
-    rols: ['intern'],
-    vistaDefecte: null,
-    registrePendent: false,
-    registreRebutjat: false,
-    // Sin contexto no se puede saber, y lo que no se sabe no apaga nada: se deja como
-    // siempre ha estado. El servidor corta igual si el interruptor está apagado.
-    whatsappActiu: true,
-    degradat: true,
-  }
+/**
+ * Qué hacer con la respuesta de `get_my_session_context()`.
+ *
+ * 🔴 **FAIL-CERRADO.** Hasta el 07-10-2026, si la RPC fallaba se montaba un «contexto
+ * degradado» que simulaba equipo interno con todos los permisos (`esSuperAdmin` incluido):
+ * era el puente de cuando la migración de roles todavía no estaba desplegada, y se quedó
+ * puesto meses después de que dejara de hacer falta. Consecuencia: un corte de red o un
+ * error transitorio de la base le enseñaba a un productor el panel del equipo —sin datos,
+ * porque la RLS sigue cortando, pero con los botones y la navegación de un super_admin—.
+ *
+ * Ahora un fallo es un fallo: `{ ok: false }`, sin contexto y sin permisos, y quien lo
+ * consume enseña «no s'ha pogut carregar el teu compte» con un botón para reintentar.
+ */
+export type ResultatContext = { ok: true; ctx: ContextSessio } | { ok: false }
+
+export function resolContext(data: unknown, error: unknown): ResultatContext {
+  if (error || !data || typeof data !== 'object') return { ok: false }
+  return { ok: true, ctx: mapejaContext(data as ContextCru) }
 }
 
 /**
@@ -202,4 +193,26 @@ export function organitzacioActiva(ctx: ContextSessio, rol: Rol | null): Organit
   if (rol === 'productor') return ctx.organitzacions.find((o) => o.tipo === 'productor') ?? null
   if (rol === 'receptor') return ctx.organitzacions.find((o) => o.tipo === 'entidad') ?? null
   return null
+}
+
+/** Lo único que identifica una organización: su tipo de ficha y su id. */
+export type RefOrganitzacio = Pick<Organitzacio, 'tipo' | 'id'>
+
+/**
+ * Clave estable de un conjunto de organizaciones: `tipo:id,tipo:id`. `ctx.organitzacions`
+ * es un array NUEVO en cada render del contexto, así que un efecto que dependa de él se
+ * relanzaría con cada `SIGNED_IN` que supabase-js reemite; uno que dependa de esta cadena,
+ * solo cuando cambian de verdad. El efecto recupera la lista con `organitzacionsDeClau`.
+ */
+export function clauOrganitzacions(orgs: readonly RefOrganitzacio[]): string {
+  return orgs.map((o) => `${o.tipo}:${o.id}`).join(',')
+}
+
+/** La inversa de `clauOrganitzacions`. Una clave vacía es ninguna organización. */
+export function organitzacionsDeClau(clau: string): RefOrganitzacio[] {
+  if (clau === '') return []
+  return clau.split(',').map((parell) => {
+    const i = parell.indexOf(':')
+    return { tipo: parell.slice(0, i) as Organitzacio['tipo'], id: parell.slice(i + 1) }
+  })
 }

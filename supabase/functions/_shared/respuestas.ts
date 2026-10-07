@@ -21,8 +21,10 @@
 
 import { sendBotones, sendText } from "./whatsapp.ts";
 import { leerRespuesta } from "./intake.ts";
+import type { MensajeEntrante } from "./intake.ts";
 import { rolesDelTelefono } from "./organizacion.ts";
 import { ambPreu, modalitatsDe } from "./modalitats.ts";
+import { enmascararTelefono } from "./enmascarar.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -377,7 +379,7 @@ async function registrarDobleRol(
   try {
     const roles = await rolesDelTelefono(supabase, telefono);
     if (!roles.productor || !roles.entidad) {
-      console.log(`[respuestas] ${telefono}: ${motivo}`);
+      console.log(`[respuestas] ${enmascararTelefono(telefono)}: ${motivo}`);
       return;
     }
     const org = roles.mismaOrganizacion
@@ -445,8 +447,7 @@ async function rechazar(
 export async function procesarRespuestaOferta(
   supabase: Cliente,
   from: string,
-  // deno-lint-ignore no-explicit-any
-  message: any,
+  message: MensajeEntrante | null | undefined,
 ): Promise<boolean> {
   const { texto, id } = leerRespuesta(message);
 

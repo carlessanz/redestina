@@ -195,6 +195,15 @@
 //    `pendent` y `sense_rol` (§9): son cuentas que existen únicamente para que el arnés
 //    tenga qué medir.
 
+// AUDITORÍA DE FUNCIONES (07-10-2026, 20270414100400…101000). Tres cosas nuevas:
+//   1. «denegar» para cada función que se cerró (base de cálculo y snapshot del CT,
+//      `plan_datos`, `exigir_convenio`/`organizacion_de`, `convenio_vigente` sobre una ficha
+//      ajena, `ruta_documento`, y las dos de job) en `DOCUMENTAL_EXTERN` y en `equip`;
+//   2. «permitir» de `convenio_vigente` sobre la ficha PROPIA (marcadores `@meva_fitxa_*`);
+//   3. un CHECK GLOBAL en `super_admin`, `auditoria_funcions_obertes()`, que mira el catálogo
+//      entero y falla si aparece una `security definer` ejecutable por `anon` o una función
+//      de trigger ejecutable por la API fuera de `PERMITIDAS_ABIERTAS` (hoy vacía).
+
 import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const url = Deno.env.get("SUPABASE_URL") ?? Deno.env.get("VITE_SUPABASE_URL");
@@ -298,6 +307,9 @@ interface Check {
    *   · `@fitxa_amb_documents` → un productor con algún albarán fuera de borrador, o sea
    *                              una ficha que NO se puede borrar (20270328100200). Uuid
    *                              nulo si el fixture documental no está puesto.
+   *   · `@meva_fitxa_productor` / `@meva_fitxa_entitat` → la ficha propia de ese tipo,
+   *                              leída de la propia membresía (20270414100600: lo que
+   *                              `convenio_vigente()` sí responde a una cuenta externa).
    */
   args?: Record<string, unknown>;
   /**
@@ -343,7 +355,35 @@ interface Check {
    * `coste_kg` «para tenerlo a mano».
    */
   columnaAusente?: boolean;
+  /**
+   * Solo para `rpc`+`permitir` sobre una función que devuelve filas `{categoria, funcio}`
+   * (hoy, `auditoria_funcions_obertes()`, 20270414101000): la comprobación pasa si **todas**
+   * las filas están en esta lista, escritas como `"<categoria>:<funcio>"`. Una fila de más
+   * es FALLA y el detalle dice cuál. Es la forma de vigilar una propiedad GLOBAL del
+   * catálogo —«ninguna función abierta de más»— con la misma tabla PASS/FAIL que el resto.
+   */
+  listaPermitida?: readonly string[];
 }
+
+// Las funciones de `public` que pueden quedar abiertas de más A PROPÓSITO, en el formato
+// `"<categoria>:<funcio>"` de `auditoria_funcions_obertes()` (20270414101000):
+//
+//   · `definer_anon:<firma>`  — `security definer`, no de trigger, ejecutable por `anon`
+//                               (o PUBLIC): se puede llamar SIN SESIÓN con la publishable key.
+//   · `trigger_api:<firma>`   — función de trigger ejecutable por `anon` o `authenticated`.
+//
+// 🔴 HOY ESTÁ VACÍA, y así debe seguir salvo decisión explícita. La causa de los fallos de la
+//    auditoría del 07-10-2026 (A1/A2/M2/M3/A4/M1/B1/B9) fue el `alter default privileges …
+//    on functions` de Supabase, que concede EXECUTE a `anon` y `authenticated` a toda función
+//    nueva salvo `revoke` explícito. Las dos que salieron como `definer_anon`
+//    (`disparar_recordatorios_intake`, `marcar_excedentes_vencidos`) se cerraron en
+//    20270414100700; las 32 de trigger, en 20270414100900. Si mañana una migración crea una
+//    `security definer` y olvida `revoke execute … from public, anon`, este check sale en rojo
+//    con su nombre.
+//
+// Añadir aquí una entrada exige escribir al lado el motivo: qué hace la función sin sesión y
+// por qué eso es seguro (p. ej. una consulta pública de solo lectura que valida un token).
+const PERMITIDAS_ABIERTAS: readonly string[] = [];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
@@ -549,6 +589,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // más destructiva del circuito fiscal —N documentos con número legal y N correos a N
   // donantes— así que es la primera que tiene que cortar para cualquier cuenta externa.
   { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament" },
+  // Su espejo para los certificados de transacción (20270414100200): misma guarda.
+  { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats de transacció" },
+  // El helper de la conciliación en cascada (20270414100100) es interno: sin EXECUTE.
+  { tabla: "albarans_germans_rec", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta els germans d'un albarà (intern)" },
   // El puente que usa `subir-documento-externo` para decidir si alguien puede adjuntar un
   // fichero a un albarán o a un cierre. Dos afirmaciones distintas:
   //   - preguntar por OTRA persona se corta con 42501, aunque la respuesta fuera «no».
@@ -582,13 +626,45 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // firmar un convenio ajeno conociendo el uuid de su enlace.
   { tabla: "convenios_exigidos", op: "leer", esperado: "permitir", descripcion: "lee la matriz de convenios exigidos (catálogo)" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
+  // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
+  //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su
+  //    NOMBRE en el mensaje (rompe D3). Ahora `convenio_vigente()` solo responde por las
+  //    fichas propias (o al equipo); por una ajena —aquí, el uuid de ceros—, 42501. El caso
+  //    propio lo afirman los bloques `productor` y `receptor` con `@meva_fitxa_*`.
   {
     tabla: "convenio_vigente",
     op: "rpc",
-    esperado: "permitir",
+    esperado: "denegar",
     args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_valorizacion: "donacio", p_parte: "entrega" },
-    descripcion: "pot consultar si li cal conveni (respon false, sense error)",
+    descripcion: "NO consulta el conveni d'una organitzacio aliena",
   },
+  // `exigir_convenio()` y `organizacion_de()`: solo servidor y llamadas internas desde
+  // 20270414100600. La primera devolvía el nombre de la organización en el error.
+  {
+    tabla: "exigir_convenio",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_tipo: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_valorizacion: "venda", p_parte: "entrega" },
+    descripcion: "NO crida exigir_convenio (el missatge porta el nom de l'organitzacio)",
+  },
+  { tabla: "organizacion_de", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO resol l'organitzacio d'una fitxa" },
+  // --- Auditoría de funciones del 07-10-2026 (20270414100400…101000) ---
+  // La base de cálculo y el snapshot del certificado de transacción: lo mismo que
+  // `cierre_base()` (más abajo), en la hermana que se quedó fuera de 20270303100500.
+  { tabla: "cierre_base_transaccion", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "NO llegeix la base de calcul del certificat de transaccio" },
+  { tabla: "cierre_pendents_transaccion", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO llegeix les transaccions pendents de conciliar" },
+  { tabla: "cierre_datos_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un certificat de transaccio" },
+  // El snapshot del plan de prevención (nombre, NIF y respuestas de la organización).
+  { tabla: "plan_datos", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un pla de prevencio" },
+  // La ruta de un documento delata la organización propietaria del objeto.
+  { tabla: "ruta_documento", op: "rpc", esperado: "denegar", args: { p_objeto_tipo: "prova", p_objeto_id: null, p_tipo: "PROVA", p_numero_completo: "PROVA-1999-0001", p_version: 1, p_modo: "prueba", p_ejercicio: 1999 }, descripcion: "NO compon rutes de documents (nomes servidor)" },
+  // Las dos funciones de job (solo pg_cron). ⚠️ Si alguna vez volvieran a abrirse, este
+  // check las EJECUTARÍA de verdad: el aviso de recordatorios o el marcado de vencidas, lo
+  // mismo que hace su job. Es el precio de vigilarlas con una llamada real.
+  { tabla: "disparar_recordatorios_intake", op: "rpc", esperado: "denegar", descripcion: "NO dispara els recordatoris d'intake (nomes pg_cron)" },
+  { tabla: "marcar_excedentes_vencidos", op: "rpc", esperado: "denegar", descripcion: "NO marca ofertes vençudes (nomes pg_cron)" },
+  // La auditoría del catálogo es del equipo.
+  { tabla: "auditoria_funcions_obertes", op: "rpc", esperado: "denegar", descripcion: "NO consulta l'auditoria de funcions" },
   { tabla: "preparar_convenio", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "don_gen" }, descripcion: "NO prepara convenis" },
   { tabla: "enviar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO envia convenis a firmar" },
   { tabla: "contrafirmar_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO contrasigna cap conveni" },
@@ -1135,6 +1211,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Si algún día la de la tanda se relajara sin tocar la individual, este check es el
     // único sitio donde se vería —desde el panel las dos se ven igual de grises—.
     { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament (és de pot_aprovar)" },
+    { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats de transacció (és de pot_aprovar)" },
+    // Interno de la conciliación en cascada (20270414100100): ni el equipo lo llama.
+    { tabla: "albarans_germans_rec", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta els germans d'un albarà (intern)" },
     { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia a posteriori (és de pot_aprovar)" },
     // Consultar los datos del 182 sí: es una lectura, y la hace el equipo con la gestoría.
     { tabla: "datos_182", op: "rpc", esperado: "permitir", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar les dades del 182" },
@@ -1149,6 +1228,22 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierre_base", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "pot llegir la base de calcul del tancament" },
     { tabla: "cierre_base_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot llegir la base de calcul d'un periode" },
     { tabla: "cierre_pendents_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "pot llegir els pendents d'un periode" },
+    // --- Auditoría de funciones del 07-10-2026 (20270414100400…101000) ---
+    // La base de cálculo del CT sigue siendo del equipo (como la del CD); su snapshot y el
+    // del plan, en cambio, son solo del servidor, igual que `cierre_datos_certificado()`.
+    { tabla: "cierre_base_transaccion", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "pot llegir la base de calcul del certificat de transaccio" },
+    { tabla: "cierre_pendents_transaccion", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999 }, descripcion: "pot llegir les transaccions pendents de conciliar" },
+    { tabla: "cierre_datos_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot del CT (nomes servidor)" },
+    { tabla: "plan_datos", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un pla (nomes servidor)" },
+    // `convenio_vigente()` la usan las pantallas del equipo (Aprovacions, OfferDetail,
+    // CanalitzacioDetall) para avisar antes de aprobar: sobre cualquier ficha. Uuid de
+    // ceros → `false`, sin error.
+    { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_valorizacion: "donacio", p_parte: "entrega" }, descripcion: "pot consultar el conveni de qualsevol fitxa" },
+    { tabla: "exigir_convenio", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_valorizacion: "venda", p_parte: "entrega" }, descripcion: "NO crida exigir_convenio directament (nomes servidor i RPC internes)" },
+    { tabla: "organizacion_de", op: "rpc", esperado: "denegar", args: { p_tipo: "productor", p_ficha: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida organizacion_de directament" },
+    { tabla: "ruta_documento", op: "rpc", esperado: "denegar", args: { p_objeto_tipo: "prova", p_objeto_id: null, p_tipo: "PROVA", p_numero_completo: "PROVA-1999-0001", p_version: 1, p_modo: "prueba", p_ejercicio: 1999 }, descripcion: "NO compon rutes de documents (nomes servidor)" },
+    { tabla: "disparar_recordatorios_intake", op: "rpc", esperado: "denegar", descripcion: "NO dispara els recordatoris d'intake (nomes pg_cron)" },
+    { tabla: "marcar_excedentes_vencidos", op: "rpc", esperado: "denegar", descripcion: "NO marca ofertes vençudes (nomes pg_cron)" },
     // Certificado a demanda (CDP): el equipo lo LEE y no escribe nada. Calcular y emitir
     // son de `pot_aprovar()`, igual que en el cierre anual —y por el mismo motivo: los
     // dos documentos tienen el mismo efecto fiscal sobre el periodo que cubren—.
@@ -1268,6 +1363,19 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // --- CHECK GLOBAL del catálogo (20270414101000) ---
+    // No mira una función: mira TODAS las de `public`. Falla si alguna `security definer`
+    // (no de trigger) es ejecutable por `anon`, o si alguna de trigger lo es por `anon` o
+    // `authenticated`, y no está en `PERMITIDAS_ABIERTAS` (vacía; ver su comentario). Es la
+    // vigilancia del patrón que produjo la auditoría del 07-10-2026: una función nueva hereda
+    // EXECUTE para `anon` del `alter default privileges` de Supabase si nadie lo revoca.
+    {
+      tabla: "auditoria_funcions_obertes",
+      op: "rpc",
+      esperado: "permitir",
+      listaPermitida: PERMITIDAS_ABIERTAS,
+      descripcion: "cap funcio definer oberta a anon ni de trigger oberta a l'API (fora de la llista)",
+    },
     // --- El conveni signat EN PAPER (20270329100300) ---
     // Los dos con uuid de ceros, por el mismo motivo que `crear_espigolada` aquí abajo: lo
     // que se afirma es que la guarda de ROL deja pasar, no que la operación se complete.
@@ -1506,6 +1614,22 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot emetre en bloc els certificats (autoritza; el tancament no existeix)",
+    },
+    // El mismo criterio para la tanda de CT (20270414100200): uuid inventado, la guarda de
+    // rol pasa y cae con 22023 sin consumir ningún número de CT / P-CT.
+    {
+      tabla: "emitir_certificados_transaccion_cierre",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot emetre en bloc els certificats de transacció (autoritza; el tancament no existeix)",
+    },
+    {
+      tabla: "albarans_germans_rec",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_rec: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "NO consulta els germans d'un albarà (intern; ni el super_admin)",
     },
     // Certificado de donación a demanda (CDP). Todas sobre un uuid inventado o sobre el
     // ejercicio **1999**: la autorización pasa y la función falla después con 22023, sin
@@ -1756,6 +1880,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "veu l'exercici i el mode dels SEUS tancaments",
       requiereFixture: "algun cierres_donante de la seva ficha (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // `convenio_vigente()` SÍ responde por la ficha propia (20270414100600): la ajena la
+    // niega `DOCUMENTAL_EXTERN`. Responde true/false sin error; si la cuenta no tuviera
+    // ficha de productor, el uuid nulo daría 42501 y saldría FALLA, no saltada.
+    { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor", p_valorizacion: "donacio", p_parte: "entrega" }, descripcion: "pot consultar el conveni de la SEVA fitxa" },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
     // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
@@ -1956,6 +2084,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
     { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
+    // `convenio_vigente()` sobre la entidad PROPIA (20270414100600): es lo que
+    // `manifestar_interes()` comprueba por dentro, y tiene que seguir respondiendo.
+    { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "entidad", p_org: "@meva_fitxa_entitat", p_valorizacion: "donacio", p_parte: "recibe" }, descripcion: "pot consultar el conveni de la SEVA entitat" },
     ...DOCUMENTAL_EXTERN,
     // Albaranes (fase 3): la entidad ve SUS albaranes de entrega…
     {
@@ -2234,6 +2365,13 @@ async function resolverArgs(
     if (valor === "@meva_membresia") {
       const { data } = await cliente.from("membresias").select("id").limit(1).maybeSingle();
       salida[clave] = data?.id ?? UUID_NULO;
+    } else if (valor === "@meva_fitxa_productor" || valor === "@meva_fitxa_entitat") {
+      // La ficha PROPIA de ese tipo, por la membresía (que cada cuenta lee de sí misma).
+      // Uuid nulo si no tiene ninguna: el check correspondiente lleva `requiereFixture`.
+      const col = valor === "@meva_fitxa_productor" ? "productor_id" : "entidad_id";
+      const { data } = await cliente.from("membresias").select(col)
+        .not(col, "is", null).limit(1).maybeSingle();
+      salida[clave] = (data as Record<string, string> | null)?.[col] ?? UUID_NULO;
     } else if (valor === "@fitxa_amb_documents") {
       // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
       // se puede borrar (20270328100200). Se busca en vez de codificar `TEST-PROD-1` para
@@ -2400,6 +2538,21 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
         detalle: esperado
           ? `autoritza (${codigo} esperat)`
           : `ERROR NO ESPERADO ${codigo}: ${error.message.slice(0, 50)}`,
+      };
+    }
+    // Propiedad GLOBAL (auditoría del catálogo): cada fila tiene que estar en la lista
+    // permitida. Va antes que todo lo demás porque aquí 0 filas no es «sin datos», es el
+    // resultado bueno.
+    if (check.listaPermitida) {
+      const filas = (Array.isArray(data) ? data : []) as { categoria?: string; funcio?: string }[];
+      const sobran = filas
+        .map((f) => `${f.categoria ?? "?"}:${f.funcio ?? "?"}`)
+        .filter((clave) => !check.listaPermitida!.includes(clave));
+      return {
+        ok: check.esperado === "permitir" ? sobran.length === 0 : false,
+        detalle: sobran.length === 0
+          ? `cap fora de la llista (${filas.length} permeses)`
+          : `¡${sobran.length} oberta(es) de mes!: ${sobran.join(", ").slice(0, 200)}`,
       };
     }
     // La RPC ha hecho su trabajo: si deja rastro, se limpia ahora mismo. El arnés no

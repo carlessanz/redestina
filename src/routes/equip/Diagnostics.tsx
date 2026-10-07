@@ -17,6 +17,8 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
 import { useT } from '../../lib/i18n'
+import { casaCerca } from '../../lib/cerca'
+import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { ESTATS_DIAGNOSTIC, estilEstatDiagnostic } from '../../lib/diagnostic'
 import { diagnosticsEquip } from '../../lib/diagnosticApi'
@@ -40,7 +42,7 @@ export default function Diagnostics() {
   const [files, setFiles] = useState<DiagnosticEquip[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [cerca, setCerca] = useState('')
+  const { cerca, setCerca, q } = useCerca()
   const [estat, setEstat] = useState<string>(TOTS)
   const [paper, setPaper] = useState<string>(TOTS)
 
@@ -56,15 +58,12 @@ export default function Diagnostics() {
   }, [])
 
   const visibles = useMemo(() => {
-    const q = cerca.trim().toLowerCase()
     return files.filter((f) => {
       if (estat !== TOTS && f.estat !== estat) return false
       if (paper !== TOTS && f.tipo_org !== paper) return false
-      if (!q) return true
-      return (f.nom ?? '').toLowerCase().includes(q)
-        || (f.numero ?? '').toLowerCase().includes(q)
+      return casaCerca([f.nom, f.numero], q)
     })
-  }, [files, cerca, estat, paper])
+  }, [files, q, estat, paper])
 
   // Lo que de verdad queda por hacer. `sense_questionari` no entra: eso no es trabajo de
   // esta pantalla sino de la configuración, y contarlo aquí lo convertiría en una cifra que

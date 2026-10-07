@@ -12,60 +12,18 @@ import { createClient } from "@supabase/supabase-js";
 import { sendBotones, sendTemplate, sendText } from "../_shared/whatsapp.ts";
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
-
-// CORS restringido a los orígenes del panel; ya no '*'.
-// ALLOWED_ORIGIN admite varios separados por comas y '*' como comodín dentro de
-// un origen, porque los despliegues de Vercel no tienen URL estable. Ejemplo:
-//   http://localhost:5173,https://redestina-*-carlessanz-projects.vercel.app
-const ALLOWED_ORIGINS = (Deno.env.get("ALLOWED_ORIGIN") ?? "http://localhost:5173")
-  .split(",")
-  .map((o) => o.trim())
-  .filter(Boolean);
-
-function originPermitido(origin: string): boolean {
-  return ALLOWED_ORIGINS.some((patron) => {
-    if (!patron.includes("*")) return patron === origin;
-    const re = new RegExp(
-      "^" + patron.split("*").map((p) =>
-        p.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
-      ).join("[A-Za-z0-9-]+") + "$",
-    );
-    return re.test(origin);
-  });
-}
-
-// El navegador exige que Allow-Origin sea un origen concreto, no una lista:
-// se devuelve el del solicitante si está permitido y, si no, el primero
-// configurado (que hará fallar el CORS en el navegador, como debe ser).
-function corsPara(req: Request): Record<string, string> {
-  const origin = req.headers.get("origin") ?? "";
-  return {
-    "Access-Control-Allow-Origin": originPermitido(origin) ? origin : ALLOWED_ORIGINS[0],
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers":
-      "authorization, x-client-info, apikey, content-type",
-    "Access-Control-Allow-Methods": "POST, OPTIONS",
-  };
-}
+import { corsPara } from "../_shared/cors.ts";
+import { preflight, respondedor } from "../_shared/http.ts";
 
 // Ventana de servicio de WhatsApp: 24 h desde el último mensaje del contacto.
 const WINDOW_MS = 24 * 60 * 60 * 1000;
 
-function json(body: unknown, status = 200, cors: Record<string, string> = {}): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...cors, "Content-Type": "application/json" },
-  });
-}
-
 Deno.serve(async (req) => {
   const cors = corsPara(req);
   // Closure para no repetir las cabeceras CORS en cada return.
-  const responder = (body: unknown, status = 200) => json(body, status, cors);
+  const responder = respondedor(cors);
 
-  if (req.method === "OPTIONS") {
-    return new Response(null, { status: 204, headers: cors });
-  }
+  if (req.method === "OPTIONS") return preflight(cors);
 
   if (req.method !== "POST") {
     return responder({ error: "Method Not Allowed" }, 405);
