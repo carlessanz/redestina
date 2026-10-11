@@ -245,6 +245,12 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['bloquejat', 'sense_kg', 'error', 'sense_revisio'],
     },
     {
+      // `convenios.tipo` (CHECK de 20270420100000): el de col·laboració y los tres anteriores.
+      que: 'convenios.tipo',
+      prefijo: 'sig.model_',
+      valores: ['col_productor', 'col_receptor', 'don_gen', 'don_rec', 'com'],
+    },
+    {
       // Fase 4 de la revisión del 08-10-2026: `cierres_donante.revisio_estat`.
       que: 'cierres_donante.revisio_estat',
       prefijo: 'tan.rev_',

@@ -15,7 +15,7 @@
 // ⚠️ El formulario de dentro es el MISMO que la página pública: mismo texto compuesto por
 //    el servidor, misma huella, misma evidencia. Lo único distinto es el marco.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
@@ -42,11 +42,19 @@ export default function DialegFirmaAssistida(
   const [potDemanarCodi, setPotDemanarCodi] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
+  // UNA acuñación por apertura (ver `DialegFirmaConveni`): iniciar otra firma asistida revoca
+  // el enlace anterior, y si el efecto se repite la pantalla podía quedarse con el revocado.
+  const peticio = useRef<{ clau: string; p: ReturnType<typeof iniciarFirmaAssistida> } | null>(null)
+
   useEffect(() => {
-    if (!obert) { setToken(null); setPotDemanarCodi(false); setError(null); return }
+    if (!obert) { setToken(null); setPotDemanarCodi(false); setError(null); peticio.current = null; return }
     let viu = true
+    if (peticio.current?.clau !== conveniId) {
+      peticio.current = { clau: conveniId, p: iniciarFirmaAssistida(conveniId) }
+    }
+    const enCurs = peticio.current.p
     void (async () => {
-      const r = await iniciarFirmaAssistida(conveniId)
+      const r = await enCurs
       if (!viu) return
       if (!r.ok) {
         setError(textError(t, r))

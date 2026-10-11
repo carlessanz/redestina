@@ -1611,6 +1611,9 @@ convenio no puede quedar vigente con el papel «pendiente de adjuntar».
 **`convenios_exigidos`** — matriz oferta↔convenio **en tabla**, como `modalitat_receptor_compat`:
 `(valorizacion, parte, tipo_convenio)`. La donación exige `don_gen` a quien entrega y `don_rec` a
 quien recibe; venta y maquila exigen `com` a las dos partes. Cambiar la regla es un `insert`.
+🔴 **Desde el 11-10-2026 (`20270420100000`) la matriz pide UN convenio por papel**, el de
+col·laboració (`col_productor` a quien entrega, `col_receptor` a quien recibe) en las tres
+modalidades; los anteriores valen por `convenis_equivalents` para lo que valían (§6ter, fase 5).
 
 **`plantillas_documento.variante`** (`don_gen`·`don_rec`·`com` o null) — los tres modelos comparten
 el tipo `CONV`, y el índice `(tipo, idioma) where vigente` solo dejaba uno vigente: ahora es
@@ -2260,6 +2263,7 @@ funciones, no políticas:
 | `avaluar_regla` · `pregunta_aplica` · `diagnostic_falten` · `compondre_respostes` · `questionari_valid`… | Los helpers puros (`immutable`, sin tocar ninguna tabla). ⚠️ `avaluar_regla` es **la única** gramática de condiciones: la comparten `regles_pla` y el `aplica_a` de una pregunta condicional, porque dos implementaciones de «¿se cumple esto?» acabarían divergiendo — y entonces **una pregunta que la pantalla oculta contaría como obligatoria en el servidor** |
 | `calcular_cierre_transacciones` · `emitir_certificado_transaccion` · `cierre_base_transaccion` | El CT, sobre albaranes OPE conciliados. Como el CD, **se niega mientras `datos_provisionales` sea `true` — solo en modo real** (`20260921214526`); en prueba usa la serie `P-CT`. ⚠️ **Desde `20270414100400` `cierre_base_transaccion` y `cierre_pendents_transaccion` llevan la guarda de equipo** (`auth.uid() is not null and not es_intern()` → `42501`; conservan el GRANT a `authenticated` porque son la base de cálculo, como `cierre_base`): sin ella, una receptora o un productor leía todas las ventas y maquilas conciliadas de la plataforma con productor, entidad, kg y valor. `cierre_datos_certificado_transaccion` pasa a solo `service_role`, como sus hermanas. **Desde el 07-10-2026 el CT tiene pantalla**: tarjeta «Certificats de transacció» en `TancamentDetall` (§6ter) |
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
+| `conveni_cobreix_tot(tipo_org, org)` (`20270420100000`) | ¿Lo vigente de esta organización ya cubre TODAS las modalidades de su papel (un `col_*`, o los anteriores juntos)? La usa `signar_conveni_propi()` para la guarda de «ja tens un conveni vigent». Interna: sin EXECUTE para `authenticated` |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` (esta, desde `20270414100300`, exige el convenio **del generador** además del de la entidad). ⚠️ **Desde `20270414100600` `exigir_convenio()` y `organizacion_de()` son solo `service_role`** (y las llamadas internas de las funciones definer): el mensaje de la primera llevaba el NOMBRE de la organización —una receptora lo obtenía de un productor ajeno—, lo que rompe D3. `convenio_vigente()` sí la llama el navegador (`aprovarResposta.ts`, solo pantallas del equipo) y por eso lleva guarda de pertenencia: con sesión, o eres del equipo o la ficha es de `mis_productores()`/`mis_entidades()`; si no, `42501` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
 | `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **quince** filas `(cua, n, ref, detall)` (eran trece hasta la rebanada 1, que añadió `ofertes_per_validar`, y catorce hasta el 11-10-2026, que añadió `ofertes_modificades`), **siempre las quince** aunque `n` valga 0: `registres`, `convenis_contrasignar`, `ofertes_per_validar`, `respostes`, `missatges`, `ofertes_sense_enviar`, `ofertes_modificades` (ofertas editadas por el productor que el equipo no ha revisado; cuenta también en el badge de Ofertes), `ofertes_vencudes` (desde el 11-10-2026, «ofertes sense destí registrat»), `albarans_esborrany`, `albarans_conciliar`, `albarans_esperant`, `costos`, `tancament`, `documents_error` y `espigolades_per_convertir`. `albarans_esperant` solo se enseña como subtítulo, no como cola accionable. Una de ellas es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
@@ -3108,6 +3112,47 @@ estampa la firma de la apoderada) y el donante no veía nada antes. Ahora hay un
   `recol.*` y los `crec.*` vuelven a su valor.
 - E2E `tests/e2e/certificats.e2e.ts` (clon, solo escritorio: toca el cierre de prueba compartido,
   y lo deja como estaba con `reiniciar_cierre_prueba()`).
+
+### Revisión del cliente del 08-10-2026 — fase 5: el Conveni de col·laboració único (11-10-2026)
+
+Migración `20270420100000`. Una organización necesitaba hasta dos convenios —el de donación de su
+papel (`don_gen`/`don_rec`) y el comercial (`com`)—; ahora firma **uno**, el **Conveni de
+col·laboració**, uno por papel: `col_productor` y `col_receptor` (series `CONV-COL-PROD` y
+`CONV-COL-REC`), que cubren donació, venda y maquila.
+
+- **`convenios_exigidos` solo pide `col_*`.** Los convenios **anteriores siguen valiendo exactamente
+  para lo que valían** gracias a `convenis_equivalents` (`tipo_nou`, `tipo_antic`, `valorizacion`):
+  un `don_gen`/`don_rec` vigente cubre la donación y un `com` la venta y la maquila, ni más ni menos
+  —lo firmado con un texto de donación no pasa a autorizar una venta por cambiar de nombre—. La
+  equivalencia la aplican `convenio_vigente()` (y con ella `exigir_convenio()`),
+  `canalitzacio_assistida()`, `canalitzacions_actives()`, las vistas de la campaña y, en el cliente,
+  `src/lib/convenisEquivalents.ts` (puro, con prueba) en Nova oferta y el Mercat.
+- **Plantillas**: `CONV` variante `col_productor`/`col_receptor` en ca y es, derivadas de las de
+  donación con otro título y una cláusula que dice que cubren las tres modalidades; texto de
+  trabajo marcado como borrador (§12.77). Las seis anteriores, `vigente = false`. La cláusula del
+  albarán dice ya que en las donaciones lleva el valor de referencia (fase 3).
+- **`signar_conveni_propi()`** prepara el `col_*` del papel y **conserva la guarda de `d8b25d1`**
+  con la equivalencia: «ja tens un conveni vigent» solo si lo vigente ya cubre TODAS las modalidades
+  (`conveni_cobreix_tot()`). Con solo el `don_gen`, puede firmar el nuevo para vender. Nova oferta y
+  el Mercat enseñan ese caso con un botón «Signa el conveni» (el aviso general no sale: para esa
+  organización el convenio ya está «vigent»).
+- **Los convenios anteriores a medio firmar** (borrador o enviado, sin número ni escaneado) se
+  borran con sus enlaces, como `descartar_convenio_esborrany()`: si no, «Pendent de tu» pediría dos.
+- `registro`, la campaña de convenios, la canalización guiada y el registro en papel preparan el
+  tipo nuevo (en papel se pueden seguir registrando los anteriores). Los tres anteriores se nombran
+  «(anterior)» en la interfaz.
+- **Dos defectos reales que destapó el E2E**: (1) los diálogos que acuñan un enlace
+  (`DialegFirmaConveni`, `DialegAssistit`, `DialegFirmaAssistida`) lo acuñaban **dos veces** si el
+  efecto se repetía —`StrictMode`, o un cambio de `t`—, y como acuñar revoca el anterior la pantalla
+  podía quedarse con el revocado («Aquest enllaç s'ha anul·lat»): ahora una petición por apertura;
+  (2) el formulario de firma tenía **dos campos con `id="sig-carrec"`** (el cargo de la ficha y el de
+  quien firma): los de quien firma pasan a `sig-signant-*`.
+- Los frenos anti-abuso de `enlace-publico` (10 por IP cada 10 min, 50 evidencias por hora) se
+  pueden subir con `ANTIABUS_MAX_PER_IP` y `ANTIABUS_MAX_EVIDENCIES_HORA`, **que solo define el
+  clon** (`preparar-entorno.sh`): la batería E2E los agotaba.
+- E2E `tests/e2e/conveni.e2e.ts` (clon, solo escritorio).
+- ⚠️ Queda: el texto legal de la asesoría, y unificar los mínimos de la firma (`MIN_NOM`/`MIN_DNI`,
+  repetidos en `FirmaConveni.tsx` y `enlace-publico/convenio.ts`).
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -6754,8 +6799,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.280 pruebas en 51 ficheros** de Vitest: 1.279 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 4: +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
+   Referencia: **1.285 pruebas en 52 ficheros** de Vitest: 1.284 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
+   eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
    eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
    de `check:deno`). Tras la fase 2 eran **1.273 en 50**: 1.272 correctas y 1 saltada (11-10-2026,
    fase 2 de la revisión del 08-10-2026; tras la fase 1 eran 1.257: `tests/destiFinal.test.ts` y los casos
@@ -6791,8 +6837,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.243/1.243 correctas y 24 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
+   ✅ **Referencia HOY (clon local): 1.259/1.259 correctas y 29 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin
+   datos» porque la migración retira los convenios anteriores a medio firmar del clon—; tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
    porque las pruebas E2E dejan datos en el clon—; tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al
    equipo con uuid inventado, y las dos funciones internas sin EXECUTE: +16—; tras la fase 2 eran 1.202,
    tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras

@@ -850,7 +850,9 @@ export interface CierrePeriodoLinea {
 
 // --- Convenios y firma (fase 2, migraciones 20270111*) ---
 
-export type ConvenioTipo = 'don_gen' | 'don_rec' | 'com'
+// `col_*`: el Conveni de col·laboració único (fase 5, 12-10-2026). Los tres anteriores siguen
+// existiendo en los convenios firmados antes.
+export type ConvenioTipo = 'col_productor' | 'col_receptor' | 'don_gen' | 'don_rec' | 'com'
 export type ConvenioEstado =
   | 'esborrany' | 'pendent_firma' | 'firmat' | 'vigent' | 'retornat' | 'resolt' | 'substituit'
 

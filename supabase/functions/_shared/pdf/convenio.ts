@@ -17,7 +17,7 @@
 import { type Bloque, cuerpoATexto, esCuerpo, interpolarCuerpo } from "./bloques.ts";
 
 export type IdiomaConvenio = "ca" | "es";
-export type TipoConvenio = "don_gen" | "don_rec" | "com";
+export type TipoConvenio = "col_productor" | "col_receptor" | "don_gen" | "don_rec" | "com";
 
 export function idiomaConvenio(idioma: string | null | undefined): IdiomaConvenio {
   return idioma === "es" ? "es" : "ca";
@@ -181,11 +181,15 @@ export interface DiccionarioConvenio {
 const CA: DiccionarioConvenio = {
   titulo: "Conveni de col·laboració",
   subtitulo: {
+    col_productor: "Entitat productora: donació, venda i maquila",
+    col_receptor: "Entitat receptora: donació, compra i maquila",
     don_gen: "Donació d'aliments fora del circuit de venda habitual",
     don_rec: "Entitat receptora amb servei de distribució d'aliments",
     com: "Compravenda i maquila",
   },
   modelo: {
+    col_productor: "Conveni de col·laboració",
+    col_receptor: "Conveni de col·laboració",
     don_gen: "Conveni de donació de la part generadora",
     don_rec: "Conveni d'entitat receptora",
     com: "Conveni de compravenda i maquila",
@@ -278,11 +282,15 @@ const CA: DiccionarioConvenio = {
 const ES: DiccionarioConvenio = {
   titulo: "Convenio de colaboración",
   subtitulo: {
+    col_productor: "Entidad productora: donación, venta y maquila",
+    col_receptor: "Entidad receptora: donación, compra y maquila",
     don_gen: "Donación de alimentos fuera del circuito de venta habitual",
     don_rec: "Entidad receptora con servicio de distribución de alimentos",
     com: "Compraventa y maquila",
   },
   modelo: {
+    col_productor: "Convenio de colaboración",
+    col_receptor: "Convenio de colaboración",
     don_gen: "Convenio de donación de la parte generadora",
     don_rec: "Convenio de entidad receptora",
     com: "Convenio de compraventa y maquila",
@@ -377,7 +385,8 @@ export function diccionarioConvenio(idioma: string | null | undefined): Dicciona
 }
 
 export function tipoConvenio(valor: unknown): TipoConvenio {
-  return valor === "don_rec" || valor === "com" ? valor : "don_gen";
+  return valor === "col_productor" || valor === "col_receptor" || valor === "don_rec" || valor === "com"
+    ? valor : "don_gen";
 }
 
 // ---------------------------------------------------------------------------

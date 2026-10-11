@@ -86,9 +86,8 @@ interface Extra {
  *    misma—, esto deja de poder derivarse y hay que pedirlo a la base.
  */
 function conveniQueCalRebre(modalitat: string | null): ConvenioTipo | null {
-  if (modalitat === 'donacio') return 'don_rec'
-  if (modalitat === 'venda' || modalitat === 'maquila') return 'com'
-  return null
+  // Desde el Conveni de col·laboració único (fase 5), uno para todas las modalidades.
+  return modalitat ? 'col_receptor' : null
 }
 
 /**
@@ -98,9 +97,7 @@ function conveniQueCalRebre(modalitat: string | null): ConvenioTipo | null {
  * el botón volvía a salir, sin fin.
  */
 function conveniQueCalEntregar(modalitat: string | null): ConvenioTipo | null {
-  if (modalitat === 'donacio') return 'don_gen'
-  if (modalitat === 'venda' || modalitat === 'maquila') return 'com'
-  return null
+  return modalitat ? 'col_productor' : null
 }
 
 const COLOR_ESTAT: Record<PasEscala['estat'], string> = {

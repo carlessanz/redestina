@@ -11,6 +11,7 @@ import {
   diccionarioConvenio,
   idiomaConvenio,
   textoConvenioPla,
+  tipoConvenio,
 } from "../_shared/pdf/convenio.ts";
 import {
   APP_URL,
@@ -260,7 +261,7 @@ export async function getConvenio(
       idioma: conv.idioma,
       exercici: conv.ejercicio,
       roles_com: conv.roles_com ?? [],
-      model: t.modelo[conv.tipo === "don_rec" || conv.tipo === "com" ? conv.tipo : "don_gen"],
+      model: t.modelo[tipoConvenio(conv.tipo)],
       titol: plantilla?.titulo ?? null,
       plantilla_versio: plantilla?.version ?? null,
       organitzacio: org,

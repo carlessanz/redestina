@@ -22,7 +22,7 @@
 // ⚠️ **NO SE CIERRA AL PINCHAR FUERA.** Con los kilos tecleados y a media llamada, un clic
 //    despistado en el fondo sería caro. Solo el botón o Escape.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
@@ -55,16 +55,29 @@ export default function DialegAssistit(
   const [destinatari, setDestinatari] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  const peticio = useRef<{ clau: string; p: ReturnType<typeof enllacAssistit> } | null>(null)
+
   useEffect(() => {
-    if (!obert) { setToken(null); setDestinatari(null); setError(null); return }
+    if (!obert) { setToken(null); setDestinatari(null); setError(null); peticio.current = null; return }
     let viu = true
+    // UNA acuñación por apertura: si el efecto se repite con el diálogo abierto, se reutiliza
+    // la misma petición (acuñar otra revoca la anterior, y la pantalla podía quedarse con la
+    // revocada; ver `DialegFirmaConveni`).
+    const clau = `${que}:${objecteId}:${rolPart ?? ''}`
+    if (peticio.current?.clau !== clau) {
+      peticio.current = {
+        clau,
+        p: enllacAssistit(
+          que === 'albara' ? 'confirmacion_albaran' : 'subida_factura',
+          que === 'albara' ? 'albaran' : 'cierre_donante',
+          objecteId,
+          rolPart,
+        ),
+      }
+    }
+    const enCurs = peticio.current.p
     void (async () => {
-      const r = await enllacAssistit(
-        que === 'albara' ? 'confirmacion_albaran' : 'subida_factura',
-        que === 'albara' ? 'albaran' : 'cierre_donante',
-        objecteId,
-        rolPart,
-      )
+      const r = await enCurs
       if (!viu) return
       if (!r.ok) {
         // El mensaje de la base es el útil («aquest albarà no està entregat»): un «ha

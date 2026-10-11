@@ -377,24 +377,24 @@ export default function FirmaConveni(
             <h2 className="text-base">{t('sig.signer_title')}</h2>
             <div className={cn('grid grid-cols-1 gap-3', ample && 'sm:grid-cols-2')}>
             <div className="space-y-1.5">
-              <Label htmlFor="sig-nom">{t('sig.f_signer_name')} *</Label>
-              <Input id="sig-nom" className="h-11" autoComplete="name"
+              <Label htmlFor="sig-signant-nom">{t('sig.f_signer_name')} *</Label>
+              <Input id="sig-signant-nom" className="h-11" autoComplete="name"
                 value={nom} onChange={(e) => setNom(e.target.value)} />
               {nom.trim() !== '' && nomCurt && (
                 <p className="text-xs text-error">{t('sig.err_nom_curt')}</p>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="sig-carrec">{t('sig.f_signer_role')} *</Label>
-              <Input id="sig-carrec" className="h-11"
+              <Label htmlFor="sig-signant-carrec">{t('sig.f_signer_role')} *</Label>
+              <Input id="sig-signant-carrec" className="h-11"
                 value={carrec} onChange={(e) => setCarrec(e.target.value)} />
               {carrec.trim() !== '' && carrecCurt && (
                 <p className="text-xs text-error">{t('sig.err_carrec_curt')}</p>
               )}
             </div>
             <div className="space-y-1.5">
-              <Label htmlFor="sig-dni">{t('sig.f_dni')} *</Label>
-              <Input id="sig-dni" className="h-11"
+              <Label htmlFor="sig-signant-dni">{t('sig.f_dni')} *</Label>
+              <Input id="sig-signant-dni" className="h-11"
                 value={dni} onChange={(e) => setDni(e.target.value)} />
               {dni.trim() !== '' && dniCurt
                 ? <p className="text-xs text-error">{t('sig.err_dni_curt')}</p>

@@ -155,6 +155,8 @@ export interface Identificacion {
 }
 
 export const CONVENIO_TEXTO: Record<string, string> = {
+  col_productor: "Conveni de col·laboració · productora",
+  col_receptor: "Conveni de col·laboració · receptora",
   don_gen: "Conveni de donació · generador",
   don_rec: "Conveni de donació · receptor",
   com: "Conveni comercial",

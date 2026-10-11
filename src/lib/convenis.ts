@@ -333,7 +333,8 @@ export const ESTATS_CONVENI: ConvenioEstado[] = [
   'esborrany', 'pendent_firma', 'firmat', 'vigent', 'retornat', 'resolt', 'substituit',
 ]
 
-export const TIPUS_CONVENI: ConvenioTipo[] = ['don_gen', 'don_rec', 'com']
+/** Los nuevos primero: son los únicos que se preparan hoy. Los anteriores, para filtrar. */
+export const TIPUS_CONVENI: ConvenioTipo[] = ['col_productor', 'col_receptor', 'don_gen', 'don_rec', 'com']
 
 /**
  * Nombre de la organización de un convenio, venga de donde venga.

@@ -26,7 +26,7 @@
 //    por Escape, no al pinchar fuera: con nueve campos rellenados y un trazo hecho, un clic
 //    despistado en el fondo sería caro. Firmado ya, se cierra solo.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
@@ -62,13 +62,25 @@ export default function DialegFirmaConveni(
   const [token, setToken] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
 
+  // UNA acuñación por apertura (11-10-2026). Si el efecto se repite con el diálogo abierto
+  // —`StrictMode` en desarrollo, o un cambio de `t`—, se reutiliza la misma petición: acuñar
+  // otra REVOCA la anterior, y como las dos llegan a la base en cualquier orden, la pantalla
+  // podía quedarse con el token revocado («Aquest enllaç s'ha anul·lat»). Lo destapó el E2E.
+  const peticio = useRef<{ clau: string; p: ReturnType<typeof acunarEnllacConveni> } | null>(null)
+
   useEffect(() => {
-    if (!obert) { setToken(null); setError(null); return }
+    if (!obert) { setToken(null); setError(null); peticio.current = null; return }
     let viu = true
+    const clau = conveniId ?? `${tipusOrg}:${orgId}`
+    if (peticio.current?.clau !== clau) {
+      peticio.current = {
+        clau,
+        p: conveniId ? acunarEnllacConveni(conveniId) : signarConveniPropi(tipusOrg, orgId),
+      }
+    }
+    const enCurs = peticio.current.p
     void (async () => {
-      const r = conveniId
-        ? await acunarEnllacConveni(conveniId)
-        : await signarConveniPropi(tipusOrg, orgId)
+      const r = await enCurs
       if (!viu) return
       if (!r.ok) {
         // El mensaje del servidor es el útil («ja l'has signat, falta la contrasignatura»,

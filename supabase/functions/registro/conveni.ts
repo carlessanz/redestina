@@ -42,7 +42,8 @@ export async function prepararConveni(
 ): Promise<ConveniPreparat | null> {
   try {
     const tipoOrg = rol === "productor" ? "productor" : "entidad";
-    const tipo = rol === "productor" ? "don_gen" : "don_rec";
+    // El Conveni de col·laboració único (fase 5 de la revisión del 08-10-2026).
+    const tipo = rol === "productor" ? "col_productor" : "col_receptor";
 
     const { data: conv, error: errPrep } = await supabase.rpc("preparar_convenio", {
       p_tipo_org: tipoOrg,

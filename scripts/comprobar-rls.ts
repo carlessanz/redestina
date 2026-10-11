@@ -645,6 +645,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // tiene sesión, así que si `authenticated` pudiera llamarlas, cualquier cuenta podría
   // firmar un convenio ajeno conociendo el uuid de su enlace.
   { tabla: "convenios_exigidos", op: "leer", esperado: "permitir", descripcion: "lee la matriz de convenios exigidos (catálogo)" },
+  // El convenio único (20270420100000): lo que cubren los anteriores es catálogo, como la matriz.
+  { tabla: "convenis_equivalents", op: "leer", esperado: "permitir", descripcion: "llegeix les equivalències dels convenis anteriors (catàleg)" },
+  { tabla: "convenis_equivalents", op: "insertar", esperado: "denegar", descripcion: "NO escriu equivalències de convenis" },
+  { tabla: "conveni_cobreix_tot", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO executa la comprovació interna del conveni" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
   // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
   //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su

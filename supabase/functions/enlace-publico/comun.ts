@@ -29,8 +29,15 @@ export const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz
 // Lo que de verdad hace inviable enumerar enlaces no es ninguno de los tres: es que el
 // token son 256 bits. Los frenos están para el ruido y para no pagar consultas.
 const FINESTRA_MS = 10 * 60 * 1000;
-const MAX_PER_IP = 10;
-export const MAX_EVIDENCIES_HORA = 50;
+// Los dos topes se pueden subir con variables de entorno, y SOLO lo hace el clon local
+// (`supabase/.env.funciones-local`, 11-10-2026): la batería E2E abre más de diez enlaces en
+// diez minutos desde la misma IP. En producción no existen y valen 10 y 50.
+function tope(nom: string, perDefecte: number): number {
+  const v = Number(Deno.env.get(nom));
+  return Number.isFinite(v) && v > 0 ? v : perDefecte;
+}
+const MAX_PER_IP = tope("ANTIABUS_MAX_PER_IP", 10);
+export const MAX_EVIDENCIES_HORA = tope("ANTIABUS_MAX_EVIDENCIES_HORA", 50);
 
 const intentsPerIp = new Map<string, number[]>();
 

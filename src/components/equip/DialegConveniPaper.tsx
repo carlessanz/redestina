@@ -36,7 +36,9 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 
-const MODELS: ConvenioTipo[] = ['don_gen', 'don_rec', 'com']
+// El de col·laboració primero; los anteriores siguen, porque un papel firmado antes se
+// registra con el modelo que se firmó.
+const MODELS: ConvenioTipo[] = ['col_productor', 'col_receptor', 'don_gen', 'don_rec', 'com']
 
 /**
  * Qué modelo le toca por defecto a esta ficha.
@@ -47,7 +49,7 @@ const MODELS: ConvenioTipo[] = ['don_gen', 'don_rec', 'com']
  * es el caso normal y el papel que se registra es casi siempre ese.
  */
 function modelPerDefecte(tipusOrg: 'productor' | 'entidad'): ConvenioTipo {
-  return tipusOrg === 'productor' ? 'don_gen' : 'don_rec'
+  return tipusOrg === 'productor' ? 'col_productor' : 'col_receptor'
 }
 
 

@@ -29,6 +29,8 @@ import type { FiltresMercat } from '../../lib/filtresMercat'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
+import DialegFirmaConveni from '../../components/DialegFirmaConveni'
+import { convenisQueFalten, type Equivalencia } from '../../lib/convenisEquivalents'
 import { ambPreu, modalitatsDe, modalitatsOferta, textModalitats } from '../../lib/modalitats'
 import SelectorModalitat from '../../components/SelectorModalitat'
 import { HORES, QUARTS, hhmm } from '../../lib/franja'
@@ -55,7 +57,8 @@ function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boo
 
 export default function Mercat() {
   const { t } = useT()
-  const { bloqueja, tipusVigents, tallPassat } = useConveni()
+  const { bloqueja, tipusVigents, tallPassat, recarrega: recarregaConveni } = useConveni()
+  const [dlgConveni, setDlgConveni] = useState(false)
   const organitzacio = useOrganitzacio('entidad')
   const ctxUserId = useAppContext().ctx?.userId ?? null
   const [ofertes, setOfertes] = useState<OfertaReceptor[]>([])
@@ -64,6 +67,7 @@ export default function Mercat() {
   // modalidad a quien recibe (hoy donació → don_rec; venda y maquila → com). Se lee de la
   // tabla, que es catálogo legible, para que cambiar la regla no obligue a tocar esto.
   const [exigits, setExigits] = useState<Record<string, ConvenioTipo[]>>({})
+  const [equivalents, setEquivalents] = useState<Equivalencia[]>([])
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<OfertaReceptor | null>(null)
@@ -109,6 +113,9 @@ export default function Mercat() {
         : Promise.resolve({ data: [], error: null }),
       supabase.from('convenios_exigidos').select('valorizacion, tipo_convenio').eq('parte', 'recibe'),
     ])
+    // Los convenios anteriores siguen valiendo para lo que valían (fase 5 del 08-10-2026).
+    const eqs = await supabase.from('convenis_equivalents').select('tipo_nou, tipo_antic, valorizacion')
+    setEquivalents((eqs.data ?? []) as Equivalencia[])
     // Qué modalidades puede recibir (05-10-2026): una oferta «donació o venda» la ve una
     // empresa, pero solo puede pedir la venta. Si falla, no se filtra: la base decide igual.
     const cm = await supabase.rpc('modalitats_compatibles_meves')
@@ -162,7 +169,7 @@ export default function Mercat() {
   function possibles(o: OfertaReceptor): Modalitat[] {
     const ms = compatibles(o)
     if (!tallPassat) return ms
-    return ms.filter((m) => (exigits[m] ?? []).every((tipus) => tipusVigents.includes(tipus)))
+    return ms.filter((m) => convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents).length === 0)
   }
 
   function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
@@ -234,9 +241,10 @@ export default function Mercat() {
     if (!tallPassat) return null
     // Con varias modalidades basta con que UNA se pueda pedir (05-10-2026).
     const ms = compatibles(o)
-    const faltes = ms.map((m) => (exigits[m] ?? []).filter((tipus) => !tipusVigents.includes(tipus)))
+    const faltes = ms.map((m) => convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents))
     if (ms.length > 0 && faltes.some((f) => f.length === 0) && !bloqueja) return null
-    if (faltes.length > 0 && faltes.every((f) => f.includes('com'))) return 'mk.cal_conveni_com'
+    // Le falta para vender o maquilar pero no para recibir donaciones: el mensaje del `com`.
+    if (faltes.length > 0 && ms.every((m) => m !== 'donacio')) return 'mk.cal_conveni_com'
     return 'avis_conv.bloquejat_rec'
   }
 
@@ -271,6 +279,27 @@ export default function Mercat() {
         <p className="mt-1 text-sm text-muted-foreground">{t('mk.subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-2">
+        {/* Fase 5: tiene el convenio anterior de donación pero puede comprar o maquilar, y
+            para eso le falta el Conveni de col·laboració. El aviso general no sale (para él ya
+            está «vigent»): el botón para firmarlo va aquí. */}
+        {tallPassat && !bloqueja && entidadId && (compat ?? []).some((m) =>
+          convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents).length > 0) && (
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+            <p className="min-w-0 flex-1">{t('mk.col_falta')}</p>
+            <Button className="order-1 w-full sm:order-none sm:w-auto" onClick={() => setDlgConveni(true)}>
+              {t('pend.sign')}
+            </Button>
+          </div>
+        )}
+        {entidadId && (
+          <DialegFirmaConveni
+            obert={dlgConveni}
+            tipusOrg="entidad"
+            orgId={entidadId}
+            onTancar={() => setDlgConveni(false)}
+            onFirmat={() => { setDlgConveni(false); recarregaConveni() }}
+          />
+        )}
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && (
           <p className="text-sm text-destructive">{t('c.error')}</p>

@@ -33,6 +33,10 @@ URL_PUBLICA_STORAGE=$API_URL
 # Correo y WhatsApp SIMULADOS: solo "true" exacto enviaría, y sin claves no podría.
 RESEND_ENVIO_REAL=false
 WHATSAPP_ENVIO_REAL=false
+# Los frenos anti-abuso de enlace-publico, más altos: la batería E2E abre muchos enlaces
+# desde la misma IP. En producción no existen (valen 10 por IP y 50 evidencias por hora).
+ANTIABUS_MAX_PER_IP=1000
+ANTIABUS_MAX_EVIDENCIES_HORA=5000
 EOF
 
 cat > "$ENV_FRONTEND" <<EOF
