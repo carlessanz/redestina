@@ -3221,6 +3221,31 @@ Migración `20270421100000`.
   lugar no tiene contacto propio, y editar actividad y modalidades desde la ficha del equipo.
 - E2E `tests/e2e/organitzacio.e2e.ts` (clon, solo escritorio).
 
+### Revisión del cliente del 08-10-2026 — fase 8: tablero, canalización guiada y foto por WhatsApp (11-10-2026)
+
+Migración `20270422100000`.
+
+- **Indicadores con periodo** (`components/equip/IndicadorsPeriode`, `kpis_equip(desde, hasta)`):
+  año, mes o rango, en hora de Madrid. Kg canalizados (conciliados, D13), kg asignados,
+  canalizaciones y a cuántas entidades, ofertas nuevas y sus kg, y ofertas sin salida. `security
+  invoker` con guarda de equipo, como `pendents_equip()`. El bloque de «d'un cop d'ull» se queda.
+- **Badge de Ofertes** = por validar + modificadas + **publicadas sin enviar** (una oferta que crea
+  el equipo nace publicada y no marcaba nada).
+- **Colas del tablero**: todas con la fórmula «què ha passat → què falta → acció»; las cuatro que
+  no tenían segunda línea (mensajes, ofertas sin enviar, albaranes por emitir, PDF con error) ya la
+  tienen.
+- **Canalización guiada**: columna «Acció pendent» en el índice (qué toca y, si está bloqueado, por
+  qué). Y **la deuda 130 se cierra**: al aprobar un interés de una oferta con varias modalidades, la
+  pantalla pide la modalidad de esa entrega.
+- **La foto de la oferta por WhatsApp y por correo**: `whatsapp-send` (tipo `botones`) y
+  `enviar-email` aceptan `foto_excedente`; el servidor firma la foto principal del bucket
+  `fotos-ofertes` (`_shared/fotoOferta.ts`, 24 h en WhatsApp, 7 días en correo) y la pone como
+  cabecera de imagen del mensaje con botones o encima del texto del correo. La consola de
+  Mensajería registra `[imatge] …` y nunca la URL. Sin foto propia no se manda nada (el icono del
+  producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`; el envío real, a probar con un
+  número de prueba en producción.
+- E2E `tests/e2e/tauler.e2e.ts` (clon, escritorio).
+
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
 Revisión exhaustiva del código y de los flujos (informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
@@ -6614,12 +6639,6 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
 
-130. **La pantalla guiada no elige modalidad.** `/equip/canalitzacio/:id` aprueba con
-     `aprovarResposta()` sin `modalitat`: con una oferta de varias modalidades y una respuesta
-     que no la trae (llegó por WhatsApp o asistida sin elegir), la RPC responde
-     `cal_modalitat` y hay que aprobar desde Aprovacions o el detalle de la oferta, que sí
-     tienen selector. `canalitzacio_assistida()` devuelve todavía una sola `modalitat`.
-
 128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
      análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
      el albarán entregado o confirmado, y `conciliacion_retroactiva()` rechaza las ya conciliadas,
@@ -6860,14 +6879,15 @@ se va solo **cómo se llegó hasta aquí**.
 | 129 | Ningún documento salía por correo: `documentos.envio` se preparaba y no lo leía nadie | 28-09-2026 |
 | 106 | `excedentes.estado = 'cerrada'` no lo escribía nadie: ahora la escriben `registrar_desti_final()` y el trigger `canalizaciones_tanca_excedent` (desde `canalizaciones`, nunca desde el circuito legal) | `20270416100000` |
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
+| 130 | La pantalla guiada no elegía modalidad al aprobar un interés de una oferta con varias | 11-10-2026 (fase 8 de la revisión del 08-10-2026) |
 | 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.293 pruebas en 53 ficheros** de Vitest: 1.292 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
+   Referencia: **1.294 pruebas en 54 ficheros** de Vitest: 1.293 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
    eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
@@ -6905,8 +6925,8 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.311/1.311 correctas y 29 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
+   ✅ **Referencia HOY (clon local): 1.319/1.319 correctas y 29 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 8 —`kpis_equip`: +8—; tras la fase 7 eran 1.311, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
    eran 1.259, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin
    datos» porque la migración retira los convenios anteriores a medio firmar del clon—; tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
    porque las pruebas E2E dejan datos en el clon—; tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al

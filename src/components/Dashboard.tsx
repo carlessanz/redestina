@@ -26,6 +26,7 @@ import { getTestMode } from '../lib/settings'
 import { pendentsPerTelefon } from '../lib/contactes'
 import PendentsEquip from './equip/PendentsEquip'
 import ComFunciona from './equip/ComFunciona'
+import IndicadorsPeriode from './equip/IndicadorsPeriode'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface ExcRow { id: string; estado: string; kg_total: number | null }
@@ -193,6 +194,8 @@ export default function Dashboard() {
         <h2 className="text-lg font-semibold">{t('dash.how')}</h2>
         <ComFunciona />
       </section>
+
+      <IndicadorsPeriode />
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">{t('dash.glance')}</h2>

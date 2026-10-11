@@ -252,8 +252,10 @@ export async function sendBotones(
   to: string,
   texto: string,
   botones: Boton[],
+  /** Fase 8: una imagen como cabecera del mensaje (la foto de la oferta), por URL. */
+  opciones?: { imatge?: string | null },
 ): Promise<RespuestaMeta> {
-  const opciones = botones.slice(0, MAX_BOTONES).map((b) => ({
+  const opcionesBoton = botones.slice(0, MAX_BOTONES).map((b) => ({
     id: b.id,
     // Meta limita el título del botón a 20 caracteres.
     titulo: b.titulo.slice(0, 20),
@@ -263,9 +265,10 @@ export async function sendBotones(
     type: "interactive",
     interactive: {
       type: "button",
+      ...(opciones?.imatge ? { header: { type: "image", image: { link: opciones.imatge } } } : {}),
       body: { text: texto },
       action: {
-        buttons: opciones.map((o) => ({ type: "reply", reply: { id: o.id, title: o.titulo } })),
+        buttons: opcionesBoton.map((o) => ({ type: "reply", reply: { id: o.id, title: o.titulo } })),
       },
     },
   });
@@ -275,7 +278,9 @@ export async function sendBotones(
   // (deuda §12.107). Los recortes van aplicados a propósito: interesa lo que salió, no lo que
   // se quiso mandar.
   if (r.ok) {
-    await registrarSaliente(supabase, to, "interactive", texto, r.waMessageId, { opciones });
+    // Con imagen, la consola lo dice: la URL no se guarda (caduca y es una credencial).
+    await registrarSaliente(supabase, to, "interactive", opciones?.imatge ? `[imatge] ${texto}` : texto,
+      r.waMessageId, { opciones: opcionesBoton, ...(opciones?.imatge ? { imatge: true } : {}) });
   }
   else if (!r.desactivado) await registrarFallo(supabase, to, "interactive", texto, r);
   return r;

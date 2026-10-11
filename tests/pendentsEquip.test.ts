@@ -18,7 +18,8 @@ const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 
 // Las colas cuya fila del tablero lleva segunda línea (`pe.<cua>_sub`).
 const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'albarans_conciliar', 'espigolades_per_convertir']
+  'ofertes_vencudes', 'costos', 'albarans_conciliar', 'espigolades_per_convertir',
+  'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
 // equipo) y se enseña como segunda línea de `albarans_conciliar`. Sin clave propia, a propósito.
 const SENSE_FILA = ['albarans_esperant']

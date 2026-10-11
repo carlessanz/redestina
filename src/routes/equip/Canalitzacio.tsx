@@ -23,7 +23,7 @@ import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { lotsActius } from '../../lib/canalitzacio'
 import type { LotActiu } from '../../lib/canalitzacio'
-import { escalaCanal, PASSOS_FASE_CLAUS } from '../../lib/passosCanalitzacio'
+import { clauPas, escalaCanal, PASSOS_FASE_CLAUS } from '../../lib/passosCanalitzacio'
 import type { FetsCanal } from '../../lib/passosCanalitzacio'
 import type { ConvenioEstado, EstadoAlbaran, EstadoExcedente } from '../../types'
 import { Badge } from '@/components/ui/badge'
@@ -170,6 +170,7 @@ export default function Canalitzacio() {
                     <TableHead>{t('canalz.c_ref')}</TableHead>
                     <TableHead>{t('canalz.c_productor')}</TableHead>
                     <TableHead>{t('canalz.c_fase')}</TableHead>
+                    <TableHead>{t('canalz.c_accio')}</TableHead>
                     <TableHead className="text-right">{t('canalz.c_kg')}</TableHead>
                     <TableHead className="text-right">{t('canalz.c_pendents')}</TableHead>
                     <TableHead />
@@ -190,11 +191,18 @@ export default function Canalitzacio() {
                           <Badge variant={ara?.estat === 'bloquejat' ? 'outline' : 'secondary'}>
                             {t(PASSOS_FASE_CLAUS[ara?.fase ?? 5])}
                           </Badge>
-                          {ara && (
-                            <p className="mt-1 text-xs text-muted-foreground">
-                              {t(`canal.${ara.pas}_t`)}
-                            </p>
-                          )}
+                        </TableCell>
+                        {/* «Acció pendent» (fase 8 de la revisión del 08-10-2026): qué toca ahora,
+                            en su columna; si está bloqueado, por qué. */}
+                        <TableCell className="min-w-48 whitespace-normal">
+                          {ara ? (
+                            <>
+                              <p className="text-sm">{t(`canal.${clauPas(ara)}_t`)}</p>
+                              {ara.estat === 'bloquejat' && ara.motiuKey && (
+                                <p className="mt-1 text-xs text-aviso">{t(ara.motiuKey)}</p>
+                              )}
+                            </>
+                          ) : <span className="text-sm text-muted-foreground">{t('canalz.res_pendent')}</span>}
                         </TableCell>
                         <TableCell className="text-right tabular-nums">
                           {Number(l.kg_canalitzats ?? 0).toLocaleString('ca-ES')} / {Number(l.kg_total ?? 0).toLocaleString('ca-ES')}

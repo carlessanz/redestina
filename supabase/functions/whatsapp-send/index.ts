@@ -7,6 +7,7 @@
 // la plataforma valida la firma del JWT, y además aquí se comprueba que
 // corresponde a un usuario real.
 
+import { urlFotoOferta } from "../_shared/fotoOferta.ts";
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { sendBotones, sendTemplate, sendText } from "../_shared/whatsapp.ts";
@@ -207,7 +208,9 @@ Deno.serve(async (req) => {
     const r = type === "text"
       ? await sendText(supabase, to, input.body)
       : type === "botones"
-      ? await sendBotones(supabase, to, input.body, input.botones)
+      // Fase 8: la foto de la oferta como cabecera, si la oferta tiene (`foto_excedente`).
+      ? await sendBotones(supabase, to, input.body, input.botones,
+        { imatge: await urlFotoOferta(supabase, input.foto_excedente, 24 * 3600) })
       : await sendTemplate(
         supabase,
         to,

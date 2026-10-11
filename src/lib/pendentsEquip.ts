@@ -127,7 +127,9 @@ export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptado
     missatges: n('missatges'),
     // No baja al entrar en Ofertes: solo al validar o rechazar, porque la oferta se queda
     // parada hasta que alguien decide.
-    ofertes: n('ofertes_per_validar') + n('ofertes_modificades'),
+    // Y las que nadie ha enviado todavía (fase 8 de la revisión del 08-10-2026): una oferta
+    // creada por el equipo nace publicada y, sin esto, no marcaba nada en el menú.
+    ofertes: n('ofertes_per_validar') + n('ofertes_modificades') + n('ofertes_sense_enviar'),
     // Lo que espera al EQUIPO: borradores por emitir y REC por conciliar. Los que esperan
     // la confirmación de la otra parte (`albarans_esperant`) no cuentan aquí.
     albarans: n('albarans_esborrany') + n('albarans_conciliar'),

@@ -71,6 +71,8 @@ const FILES: readonly FilaCua[] = [
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
   'ofertes_vencudes', 'costos', 'espigolades_per_convertir',
+  // Fase 8: «què ha passat → què falta → acció» en todas las filas.
+  'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]
 
 export default function PendentsEquip() {

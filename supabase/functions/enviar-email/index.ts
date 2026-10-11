@@ -5,9 +5,10 @@
 // no está en ella, rechaza con 403 (tabla vacía = sin restricción). El envío en sí
 // vive en _shared/resend.ts.
 
+import { urlFotoOferta } from "../_shared/fotoOferta.ts";
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { bloquePreformateado, plantillaEmail, sendEmail } from "../_shared/resend.ts";
+import { bloquePreformateado, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { bustiaEquip, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
@@ -69,7 +70,12 @@ Deno.serve(async (req) => {
       nota?: string;
       idioma?: string;
     };
-    const contenido = typeof html === "string" ? html : bloquePreformateado(String(text));
+    // Fase 8: la foto de la oferta encima del texto, si la oferta tiene (`foto_excedente`).
+    // URL firmada de 7 días: la imagen se pinta desde la bandeja, no se adjunta.
+    const foto = await urlFotoOferta(supabase, input?.foto_excedente, 7 * 24 * 3600);
+    const contenido = (foto
+      ? `<p style="margin:0 0 16px"><img src="${escaparHtml(foto)}" alt="" width="520" style="display:block;max-width:100%;height:auto;border-radius:8px"></p>`
+      : "") + (typeof html === "string" ? html : bloquePreformateado(String(text)));
     const htmlFinal = plantillaEmail({
       titulo: opciones.titulo || subject,
       preheader: opciones.preheader,

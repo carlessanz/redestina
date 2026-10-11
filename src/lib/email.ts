@@ -5,6 +5,8 @@ import { supabase, supabaseUrl } from './supabase'
 export interface EmailPayload {
   to: string
   subject: string
+  /** Fase 8: la oferta cuya foto principal va encima del texto (la firma el servidor). */
+  foto_excedente?: string
   html?: string
   text?: string
   /**

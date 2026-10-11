@@ -657,6 +657,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "esborrar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra contactes d'una altra organització" },
   { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix un paper a una organització que no és seva" },
   { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
+  // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
+  { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
   // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
   //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su
@@ -1212,6 +1214,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Contactos: el equipo edita los de cualquier organización (id inventado → 22023/23503).
     { tabla: "desar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "afegeix contactes en nom d'una organització (org inventada → error de negoci)" },
     { tabla: "esborrar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "esborra contactes (id inventat → 22023)" },
+    { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     // Un papel nuevo lo pide el TITULAR; el equipo, no (lo aprueba después).
     { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix papers en nom d'una organització" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.

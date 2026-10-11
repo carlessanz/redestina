@@ -11,7 +11,11 @@ export type SendPayload =
    * webhook y el mensaje caía al intake, que le ofrecía publicar una oferta suya. Los `id`
    * son el contrato con `_shared/respuestas.ts`: solo consume los que empiezan por `accept:`.
    */
-  | { to: string; type: 'botones'; body: string; botones: { id: string; titulo: string }[] }
+  | {
+      to: string; type: 'botones'; body: string; botones: { id: string; titulo: string }[]
+      /** Fase 8: la oferta cuya foto principal va como cabecera (la firma el servidor). */
+      foto_excedente?: string
+    }
   | {
       to: string
       type: 'template'

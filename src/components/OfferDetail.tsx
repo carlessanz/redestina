@@ -483,6 +483,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       to: ent.telefono,
       type: 'botones',
       body: exc.texto_oferta,
+      // La foto del producto encima del texto, si la oferta tiene (fase 8).
+      foto_excedente: (exc.fotos?.length ?? 0) > 0 ? exc.id : undefined,
       botones: [
         { id: 'accept:si', titulo: "M'interessa" },
         { id: 'accept:no', titulo: 'Ara no' },
@@ -596,6 +598,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const r = await enviarEmail({
       to: email, subject: t('od.email_subject', { producto: exc.producto ?? '' }),
       text: exc.texto_oferta,
+      foto_excedente: (exc.fotos?.length ?? 0) > 0 ? exc.id : undefined,
       plantilla: {
         // El pie y el `lang` del correo, en el mismo idioma que el resto del texto.
         idioma: lang,

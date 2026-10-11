@@ -37,7 +37,8 @@ import {
   dadesFiscalsProvisionals, estatCanalitzacio, interesAssistit,
 } from '../../lib/canalitzacio'
 import { contrafirmarConveni, prepararConveni } from '../../lib/convenis'
-import type { ConvenioTipo, Excedente } from '../../types'
+import type { ConvenioTipo, Excedente, Modalitat } from '../../types'
+import SelectorModalitat from '../../components/SelectorModalitat'
 import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
@@ -60,7 +61,11 @@ import { Label } from '@/components/ui/label'
 
 /** Lo que la RPC devuelve además de los hechos del ciclo. */
 interface Extra {
-  oferta: { id: string; id_excedente: string | null; modalitat: string | null; producto: string | null }
+  oferta: {
+    id: string; id_excedente: string | null; modalitat: string | null; producto: string | null
+    /** Todas las modalidades de la oferta (la RPC las devuelve desde el 07-10-2026). */
+    modalitats?: string[] | null
+  }
   productor: { id: string; nom: string | null } | null
   /** El cierre del ejercicio de la oferta (el real si lo hay), con su id para enlazarlo. */
   exercici: { id: string; estado: string; modo: string } | null
@@ -139,6 +144,11 @@ export default function CanalitzacioDetall() {
   // Los tres actos asistidos, cada uno con su diálogo.
   const [dlgFirma, setDlgFirma] = useState<string | null>(null)
   const [dlgAlbara, setDlgAlbara] = useState<string | null>(null)
+  // La modalidad de cada entrega, cuando la oferta tiene varias (deuda 130, fase 8 de la
+  // revisión del 08-10-2026): sin ella la RPC respondía `cal_modalitat` y había que ir a
+  // Aprovacions o al detalle de la oferta.
+  const [modalitatAprova, setModalitatAprova] = useState<Record<string, Modalitat | ''>>({})
+
   // «Confirma la recollida» (fase 3): los datos del albarán de salida se leen al abrir.
   const [dlgRecollida, setDlgRecollida] = useState<{
     canalitzacio: string; kg: number | null; data: string | null; numero: string | null; esborrany: boolean
@@ -286,7 +296,7 @@ export default function CanalitzacioDetall() {
     }
     await fes(
       async () => {
-        const r = await aprovarResposta({ id: respostaId, kg })
+        const r = await aprovarResposta({ id: respostaId, kg, modalitat: modalitatAprova[respostaId] || null })
         // El `codi` viaja: `sense_conveni` se traduce a `od.conv_blocked`, como en Aprovacions.
         return r.ok ? { ok: true } : { ok: false, missatge: r.missatge, codi: r.codi }
       },
@@ -620,10 +630,17 @@ export default function CanalitzacioDetall() {
                                   <Badge className={vigent ? 'bg-exito-fondo text-exito' : 'bg-aviso-fondo text-aviso'}>
                                     {cv ? t(`conv.st_${cv.estado}`) : t('canalz.rec_sense_conveni')}
                                   </Badge>
+                                  {(extra.oferta.modalitats?.length ?? 0) > 1 && (
+                                    <SelectorModalitat id={`canalz-mod-${r.id}`} ambBuit
+                                      modalitats={(extra.oferta.modalitats ?? []) as Modalitat[]}
+                                      valor={modalitatAprova[r.id] ?? ''}
+                                      onCanvi={(m) => setModalitatAprova((x) => ({ ...x, [r.id]: m }))} />
+                                  )}
                                   <BotoAmbMotiu
                                     size="sm"
                                     className="h-11 whitespace-normal md:h-8"
-                                    disabled={ocupat || r.kg_solicitados == null || !vigent || !potAprovar}
+                                    disabled={ocupat || r.kg_solicitados == null || !vigent || !potAprovar
+                                      || ((extra.oferta.modalitats?.length ?? 0) > 1 && !modalitatAprova[r.id])}
                                     motiu={!potAprovar ? t('appr.need_approver') : !vigent ? t('canalz.rec_sense_conveni') : undefined}
                                     onClick={() => void aprovaInteres(r.id, r.entidad_id, Number(r.kg_solicitados ?? 0))}
                                   >
