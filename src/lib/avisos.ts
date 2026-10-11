@@ -13,14 +13,15 @@ import { supabase } from './supabase'
 
 export type TipusAvis =
   | 'oferta_validada' | 'oferta_rebutjada' | 'sortida_trobada' | 'interes_aprovat' | 'interes_rebutjat'
-  | 'oferta_sense_desti'
+  | 'oferta_sense_desti' | 'recollida_canviada' | 'kg_assignats_canviats' | 'recollida_confirmada'
+  | 'oferta_modificada' | 'oferta_enviada'
 
 export interface Avis {
   id: string
   destinatari_tipo: 'productor' | 'entidad'
   destinatari_id: string
   tipus: TipusAvis
-  objecte_tipo: 'excedente' | 'oferta_resposta'
+  objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion'
   objecte_id: string
   params: Record<string, unknown>
   llegit_at: string | null
@@ -80,6 +81,8 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
 
 /** A dónde lleva un aviso en la aplicación. */
 export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'>): string {
+  // `oferta_resposta` y `canalizacion` (una entrega sin interés previo, fase 2 del 08-10-2026)
+  // son del receptor: van a «Els meus interessos».
   return a.objecte_tipo === 'excedente' ? `/productor/ofertes/${a.objecte_id}` : '/receptor/interessos'
 }
 
@@ -96,6 +99,9 @@ export function varsAvis(a: Pick<Avis, 'params'>): Record<string, string | numbe
     entitat: String(p.entitat ?? ''),
     productor: String(p.productor ?? ''),
     motiu: String(p.motiu ?? ''),
+    kg_abans: fmt(p.kg_abans),
+    // «10/10 · 10:00» en hora de Madrid, como en el correo (`_shared/textAvis.ts`).
+    quan: quanAvis(p.recollida_at),
   }
 }
 
@@ -136,10 +142,24 @@ export interface Contrapart {
   gmaps_url: string | null
   kg: number | null
   modalitat: string | null
+  /** Fase 2 de la revisión del 08-10-2026: la recogida, para la lista y la ficha. */
+  data_hora_recollida: string | null
+  kg_aprovats: number | null
+  estat_recollida: 'pendent' | 'programada' | 'entregada' | 'confirmada' | 'conciliada' | null
 }
 
 export async function carregaContraparts(): Promise<Contrapart[]> {
   const { data, error } = await supabase.rpc('contraparts_canalitzacions')
   if (error) return []
   return (data ?? []) as Contrapart[]
+}
+
+/** La fecha y hora de una recogida para los avisos del panel: «10/10 · 10:00» (Madrid). */
+export function quanAvis(v: unknown): string {
+  if (v == null || v === '') return '—'
+  const d = new Date(String(v))
+  if (Number.isNaN(d.getTime())) return '—'
+  const dia = new Intl.DateTimeFormat('ca-ES', { timeZone: 'Europe/Madrid', day: '2-digit', month: '2-digit' }).format(d)
+  const hora = new Intl.DateTimeFormat('ca-ES', { timeZone: 'Europe/Madrid', hour: '2-digit', minute: '2-digit' }).format(d)
+  return `${dia} · ${hora}`
 }

@@ -53,6 +53,7 @@ const FILES: readonly FilaCua[] = [
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
+  { cua: 'ofertes_modificades', desti: '/equip/ofertes' },
   { cua: 'ofertes_vencudes', desti: '/equip/ofertes' },
   // F3. Va al listado de ofertas y NO a `/equip/espigolades`: la jornada todavía no
   // existe —crearla es justamente lo que falta—, y se crea desde la oferta, que es donde
@@ -68,8 +69,8 @@ const FILES: readonly FilaCua[] = [
 
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
-  'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_vencudes', 'costos',
-  'espigolades_per_convertir',
+  'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
+  'ofertes_vencudes', 'costos', 'espigolades_per_convertir',
 ]
 
 export default function PendentsEquip() {

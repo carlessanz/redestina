@@ -10,12 +10,14 @@
 // oficial: es lo que hace que la comarca de una oferta salga exacta (§4, `municipi_ine`).
 
 import { useEffect, useState } from 'react'
-import { Plus, Trash2 } from 'lucide-react'
+import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { creaUbicacio } from '../lib/ofertes'
+import type { DadesLloc } from '../lib/ofertes'
+import { Textarea } from '@/components/ui/textarea'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
 import { useConfirma } from './DialegConfirma'
@@ -23,7 +25,28 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
-interface Ubicacio { id: string; alias: string | null; municipio: string | null; gmaps_url: string | null }
+interface Ubicacio extends Partial<DadesLloc> {
+  id: string; alias: string | null; municipio: string | null; gmaps_url: string | null
+}
+
+/** El formulario: alta (`id` nulo) o edición de uno que ya existe. */
+interface FormLloc {
+  id: string | null
+  alias: string; maps: string; municipi: Municipi | null
+  direccion: string; contacto_nombre: string; contacto_telefono: string; horario: string; observaciones: string
+}
+
+const BUIT: Omit<FormLloc, 'id'> = {
+  alias: '', maps: '', municipi: null,
+  direccion: '', contacto_nombre: '', contacto_telefono: '', horario: '', observaciones: '',
+}
+
+/** Vacío → `null`: una columna en blanco no es lo mismo que un texto vacío. */
+const net = (v: string) => (v.trim() === '' ? null : v.trim())
+const extraDe = (f: FormLloc): DadesLloc => ({
+  direccion: net(f.direccion), contacto_nombre: net(f.contacto_nombre),
+  contacto_telefono: net(f.contacto_telefono), horario: net(f.horario), observaciones: net(f.observaciones),
+})
 
 export default function LlocsRecollida({
   productorId, potEditar = true, idPrefix = 'lloc',
@@ -36,14 +59,14 @@ export default function LlocsRecollida({
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
   const [ubicacions, setUbicacions] = useState<Ubicacio[]>([])
-  const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
+  const [llocNou, setLlocNou] = useState<FormLloc | null>(null)
   /** Un fallo de lectura no es «no tens cap lloc»: se decía eso mismo. */
   const [errorCarrega, setErrorCarrega] = useState(false)
 
   useEffect(() => {
     let viu = true
     void supabase.from('productor_ubicaciones')
-      .select('id, alias, municipio, gmaps_url').eq('productor_id', productorId).order('alias')
+      .select('id, alias, municipio, gmaps_url, direccion, contacto_nombre, contacto_telefono, horario, observaciones').eq('productor_id', productorId).order('alias')
       .then(({ data, error }) => {
         if (!viu) return
         setErrorCarrega(Boolean(error))
@@ -55,14 +78,27 @@ export default function LlocsRecollida({
   async function afegeix() {
     if (!llocNou) return
     if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
+    // Editar uno que ya existe: sus datos de contacto y condiciones (el municipio y el mapa
+    // no se tocan aquí: cambiarlos movería la comarca de las ofertas que ya lo usan).
+    if (llocNou.id) {
+      const canvis = { alias: llocNou.alias.trim(), ...extraDe(llocNou) }
+      const { data, error } = await supabase.from('productor_ubicaciones')
+        .update(canvis).eq('id', llocNou.id).select('id')
+      if (error || !data || data.length === 0) { toast.error(textError(t, error?.message)); return }
+      setUbicacions((u) => u.map((x) => (x.id === llocNou.id ? { ...x, ...canvis } : x)))
+      setLlocNou(null)
+      toast.success(t('org.place_saved'))
+      return
+    }
     const r = await creaUbicacio({
       productorId,
       alias: llocNou.alias.trim(),
       gmapsUrl: llocNou.maps.trim() || null,
       municipi: llocNou.municipi ? { codi_ine: llocNou.municipi.codi_ine, nom: llocNou.municipi.nom } : null,
+      extra: extraDe(llocNou),
     })
     if (!r.ok || !r.data) { toast.error(textError(t, r.error)); return }
-    setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null }])
+    setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null, ...extraDe(llocNou) }])
     setLlocNou(null)
     toast.success(t('org.place_added'))
   }
@@ -95,22 +131,40 @@ export default function LlocsRecollida({
             <div className="min-w-0">
               <p className="font-medium">{u.alias ?? '—'}</p>
               <p className="text-xs text-muted-foreground">
-                {u.municipio ?? '—'}
+                {[u.direccion, u.municipio ?? '—'].filter(Boolean).join(', ')}
                 {u.gmaps_url && <> · <a href={u.gmaps_url} target="_blank" rel="noreferrer" className="text-primary underline">{t('org.see_map')}</a></>}
               </p>
+              {(u.contacto_nombre || u.contacto_telefono || u.horario) && (
+                <p className="text-xs text-muted-foreground">
+                  {[u.contacto_nombre, u.contacto_telefono, u.horario].filter(Boolean).join(' · ')}
+                </p>
+              )}
+              {u.observaciones && <p className="text-xs text-muted-foreground">{u.observaciones}</p>}
             </div>
             {potEditar && (
-              <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => void esborra(u)}
-                aria-label={t('org.place_delete', { x: u.alias ?? '' })}>
-                <Trash2 className="size-4" aria-hidden />
-              </Button>
+              <div className="flex gap-1">
+                <Button variant="ghost" size="sm" className="h-11 md:h-8"
+                  aria-label={t('org.place_edit', { x: u.alias ?? '' })}
+                  onClick={() => setLlocNou({
+                    ...BUIT, id: u.id, alias: u.alias ?? '', maps: u.gmaps_url ?? '',
+                    direccion: u.direccion ?? '', contacto_nombre: u.contacto_nombre ?? '',
+                    contacto_telefono: u.contacto_telefono ?? '', horario: u.horario ?? '',
+                    observaciones: u.observaciones ?? '',
+                  })}>
+                  <Pencil className="size-4" aria-hidden />
+                </Button>
+                <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => void esborra(u)}
+                  aria-label={t('org.place_delete', { x: u.alias ?? '' })}>
+                  <Trash2 className="size-4" aria-hidden />
+                </Button>
+              </div>
             )}
           </li>
         ))}
       </ul>
       {potEditar && !llocNou && (
         <Button variant="outline" className="h-11 whitespace-normal md:h-9"
-          onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
+          onClick={() => setLlocNou({ ...BUIT, id: null })}>
           <Plus className="size-4" aria-hidden /> {t('po.place_add')}
         </Button>
       )}
@@ -121,17 +175,46 @@ export default function LlocsRecollida({
             <Input id={`${idPrefix}-nom`} value={llocNou.alias} placeholder={t('po.place_name_ph')}
               onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
           </div>
-          <div>
-            <Label htmlFor={`${idPrefix}-municipi`} className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
-            <SelectorMunicipi id={`${idPrefix}-municipi`} valor={llocNou.municipi?.codi_ine ?? null}
-              onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
-          </div>
+          {/* Municipio y mapa solo al dar de alta: cambiarlos después movería la comarca de
+              las ofertas que ya lo usan. */}
+          {!llocNou.id && (
+            <>
+              <div>
+                <Label htmlFor={`${idPrefix}-municipi`} className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
+                <SelectorMunicipi id={`${idPrefix}-municipi`} valor={llocNou.municipi?.codi_ine ?? null}
+                  onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
+              </div>
+              <div className="sm:col-span-2">
+                <Label htmlFor={`${idPrefix}-maps`} className="mb-1.5 block text-xs text-muted-foreground">
+                  {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
+                </Label>
+                <Input id={`${idPrefix}-maps`} type="url" inputMode="url" value={llocNou.maps} placeholder="https://maps.app.goo.gl/…"
+                  onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
+              </div>
+            </>
+          )}
+          {([
+            ['direccion', 'org.place_address', 300],
+            ['contacto_nombre', 'org.place_contact', 120],
+            ['contacto_telefono', 'org.place_phone', 40],
+            ['horario', 'org.place_hours', 200],
+          ] as const).map(([camp, clau, max]) => (
+            <div key={camp}>
+              <Label htmlFor={`${idPrefix}-${camp}`} className="mb-1.5 block text-xs text-muted-foreground">
+                {t(clau)} <span className="ml-1">{t('po.optional')}</span>
+              </Label>
+              <Input id={`${idPrefix}-${camp}`} value={llocNou[camp]} maxLength={max}
+                inputMode={camp === 'contacto_telefono' ? 'tel' : undefined}
+                onChange={(e) => setLlocNou((l) => (l ? { ...l, [camp]: e.target.value } : l))} />
+            </div>
+          ))}
           <div className="sm:col-span-2">
-            <Label htmlFor={`${idPrefix}-maps`} className="mb-1.5 block text-xs text-muted-foreground">
-              {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
+            <Label htmlFor={`${idPrefix}-observaciones`} className="mb-1.5 block text-xs text-muted-foreground">
+              {t('org.place_notes')} <span className="ml-1">{t('po.optional')}</span>
             </Label>
-            <Input id={`${idPrefix}-maps`} type="url" inputMode="url" value={llocNou.maps} placeholder="https://maps.app.goo.gl/…"
-              onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
+            <Textarea id={`${idPrefix}-observaciones`} value={llocNou.observaciones} maxLength={600}
+              placeholder={t('org.place_notes_ph')}
+              onChange={(e) => setLlocNou((l) => (l ? { ...l, observaciones: e.target.value } : l))} />
           </div>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
             <Button className="h-11 whitespace-normal md:h-9" onClick={() => void afegeix()}>{t('po.place_save')}</Button>

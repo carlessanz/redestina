@@ -582,6 +582,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "registrar_desti_final", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_destins: [] }, descripcion: "NO registra el destí d'una oferta que no és seva" },
   { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
   { tabla: "destins_finals", op: "leer", esperado: "permitir", descripcion: "ve el catàleg de destins (és catàleg)" },
+  // La ficha de la operación y «Ofertes per a tu» (20270417100000/100100, fase 2 de la
+  // revisión del 08-10-2026). La ficha devuelve `setof`: a quien no es parte, CERO filas.
+  { tabla: "operacio_detall", op: "rpc", esperado: "denegar", vacioEsDenegar: true, args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu la fitxa d'una operació que no és seva" },
+  { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» per una altra entitat" },
+  { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a revisats els canvis d'una oferta (és de l'equip)" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
@@ -1175,6 +1180,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "registra el destí d'una oferta en nom del productor (id inventat → 22023)",
     },
     { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
+    // Revisar los cambios de una oferta es del equipo (id inventado: autoriza y no toca nada).
+    { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "marca com a revisats els canvis d'una oferta" },
+    // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
+    { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» en nom d'una entitat" },
     // La foto del catálogo es SOLO del super_admin (20270405100000), ni siquiera de un admin.
     {
       tabla: "fixar_foto_producte",

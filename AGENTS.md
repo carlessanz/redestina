@@ -2164,6 +2164,10 @@ funciones, no políticas:
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
 | `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló. ⚠️ **Desde `20270416100000` solo por error o incidencia**: motivo obligatorio (`22023 cal_motiu`) y solo desde `borrador`/`pendent_validacio`/`publicada` **sin canalizaciones** (`22023 te_canalitzacions`); con kilos asignados lo que toca es registrar el destino del resto |
+| `operacio_detall(canalizacion)` (`20270417100000`) | **La ficha de una operación ya asignada** (fase 2 de la revisión del 08-10-2026): producto, kg sol·licitats / assignats (los de la canalización, lo vigente) / rebuts, fecha y hora, estado de la recogida (`pendent·programada·entregada·confirmada·conciliada`), la contraparte con persona y teléfono, y **el lugar de recogida completo** (dirección, contacto, teléfono, horario, observaciones y Maps de `productor_ubicaciones`). Solo para las partes y el equipo; devuelve `setof`, así que a cualquier otro le da cero filas. `security definer` porque la entidad no lee `productores` ni `productor_ubicaciones`: es D1 (tras aprobar, las partes se ven), y a la entidad no se le da una canalización anulada |
+| `contraparts_canalitzacions()` (recreada en `20270417100000`) | La de la rebanada 2 más `data_hora_recollida`, `kg_aprovats` y `estat_recollida`, y **sin las canalizaciones anuladas**. Cambió el `returns table`: se borró y recreó, con su `revoke`/`grant` |
+| `declinar_oferta(resposta)` (`20270417100100`) | «No m'interessa» desde «Ofertes per a tu»: una fila `pendent` pasa a `rebutjada`. Solo la entidad (ni el equipo); el permiso antes que la existencia (`42501` con uuid inventado). `22023 ja_resposta` si ya se contestó |
+| `marcar_canvis_revisats(excedente)` (`20270417100100`) | El equipo da por revisados los cambios de una oferta (`excedentes_canvis.revisat_at`), que es lo que vacía la cola `ofertes_modificades`. `es_intern()` |
 | `registrar_desti_final(excedente, destins jsonb)` (`20270416100000`) | **El destino final de los kilos** (fase 1 de la revisión del 08-10-2026, §6ter): sustituye TODOS los destinos externos de la oferta (`excedente_destins`) por la lista `[{desti, kg, receptor?, data?}]`. Titular o equipo; para un externo el permiso va antes que la existencia (`42501` con uuid inventado, como `fixar_fotos_oferta`), para el equipo un uuid inventado da `22023 oferta_inexistent`. Rechazos: `estat_no_admet_desti` (solo `publicada`/`parcial`/`bloqueada`/`no_colocada`), `desti_desconegut`, `kg_invalids`, `data_futura`, `massa_kg`. Sin kilos sin destino y sin recogidas en marcha → **`cerrada`** + `tancada_at`; con recogidas en marcha, `bloqueada` |
 | `desti_excedent(excedente)` (`20270416100000`) | `(kg_total, kg_redestina, kg_externs, kg_sense_desti)`. **`security invoker`**: agrega lo que quien pregunta ya lee. `kg_redestina` = `kg_confirmados` de las canalizaciones no anuladas (lo ASIGNADO, la misma cuenta que decide `parcial`/`bloqueada`; una merma al recoger se explica en la conciliación, no se pide como destino). La misma regla está en `src/lib/destiFinal.ts` |
 | `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo**: correo, teléfono o **NIF** exactos, o **nombre con similitud ≥ 0,65** (`pg_trgm`, D3 del plan de organización unificada, 22-09-2026). Devuelve `motius text[]` —no un único valor: con cuatro señales, nombrar cada combinación a mano habría sido dieciséis frases— y `similitud numeric`, que solo lleva valor cuando `nom_semblant` cuenta. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
@@ -2246,7 +2250,7 @@ funciones, no políticas:
 | `firmar_convenio_por_enlace` · `validar_codi_firma` | **Solo `service_role`**: quien firma no tiene sesión, lo que autoriza es el token. `PT403` si falta validar el código de la firma asistida |
 | `convenio_vigente(tipo_org, org, valorizacion, parte)` · `exigir_convenio(...)` | **`exigir_convenio` ya no es stub**: antes de `fecha_corte_convenios` avisa, después levanta `42501 sense_conveni`. Lo aplican `aprovar_resposta()` y `repartir_espigolada()` (esta, desde `20270414100300`, exige el convenio **del generador** además del de la entidad). ⚠️ **Desde `20270414100600` `exigir_convenio()` y `organizacion_de()` son solo `service_role`** (y las llamadas internas de las funciones definer): el mensaje de la primera llevaba el NOMBRE de la organización —una receptora lo obtenía de un productor ajeno—, lo que rompe D3. `convenio_vigente()` sí la llama el navegador (`aprovarResposta.ts`, solo pantallas del equipo) y por eso lleva guarda de pertenencia: con sesión, o eres del equipo o la ficha es de `mis_productores()`/`mis_entidades()`; si no, `42501` |
 | `data_tall_convenis()` (`20270316100000`) | Devuelve `fecha_corte_convenios` y **nada más** de `parametros_documentales`, que es del equipo. La necesita el panel externo para avisar con la misma fecha con la que corta la base. `authenticated` puede ejecutarla |
-| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **catorce** filas `(cua, n, ref, detall)` (medido en el clon el 07-10-2026; eran trece hasta la rebanada 1, que añadió `ofertes_per_validar`), **siempre las catorce** aunque `n` valga 0: `registres`, `convenis_contrasignar`, `ofertes_per_validar`, `respostes`, `missatges`, `ofertes_sense_enviar`, `ofertes_vencudes`, `albarans_esborrany`, `albarans_conciliar`, `albarans_esperant`, `costos`, `tancament`, `documents_error` y `espigolades_per_convertir`. `albarans_esperant` solo se enseña como subtítulo, no como cola accionable. Una de ellas es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
+| `pendents_equip()` (`20270323100000`, ampliada en `20260921221806`) | **La cola de trabajo del equipo en una sola llamada**: **quince** filas `(cua, n, ref, detall)` (eran trece hasta la rebanada 1, que añadió `ofertes_per_validar`, y catorce hasta el 11-10-2026, que añadió `ofertes_modificades`), **siempre las quince** aunque `n` valga 0: `registres`, `convenis_contrasignar`, `ofertes_per_validar`, `respostes`, `missatges`, `ofertes_sense_enviar`, `ofertes_modificades` (ofertas editadas por el productor que el equipo no ha revisado; cuenta también en el badge de Ofertes), `ofertes_vencudes` (desde el 11-10-2026, «ofertes sense destí registrat»), `albarans_esborrany`, `albarans_conciliar`, `albarans_esperant`, `costos`, `tancament`, `documents_error` y `espigolades_per_convertir`. `albarans_esperant` solo se enseña como subtítulo, no como cola accionable. Una de ellas es `espigolades_per_convertir` (ofertas publicadas con `producte_al_camp` y sin jornada). ⚠️ Cuenta solo `publicada` y **no `parcial`**, que encaja a propósito con la guarda: una oferta con canalizaciones ya no es convertible, así que contarla sería ofrecer un botón que la base va a rechazar. `security invoker`, como `missatges_sense_contestar()`: agrega solo lo que quien pregunta ya puede leer; `42501` a cualquier cuenta externa. Fechas en hora de Madrid, no `current_date` (la sesión de PostgREST va en UTC). ⚠️ Dos colas se calculan con `not exists` (`ofertes_sense_enviar`, `costos`) y contarían **al revés** si a alguien le faltara visibilidad: por eso no puede abrirse «total, son cifras» — a un externo le mentiría. Es la fuente única de los badges del menú y del tablero (§6ter) |
 | `progres_meves_ofertes()` (`20270323100000`) | El embudo de las ofertas **activas** de mis organizaciones productoras: `(excedente_id, n_enviades, n_interessades, n_per_aprovar)`. **Nunca devuelve `entidad_id`, nombre, teléfono ni precio**: la decisión del cliente es «cuántas, sin nombres». Puente `security definer` sobre `mis_productores()`; sin sesión, `42501`; sin ficha de productor, 0 filas (como los demás puentes). Con `service_role` responde `42501` por la guarda, aunque el EXECUTE lo tenga por los privilegios por defecto (el mismo matiz que `acunar_enllac_propi`) |
 | `acunar_enllac_assistit(proposito, objeto_tipo, objeto_id, rol_parte)` (`20260921160536`) | **La vía asistida de albaranes y facturas**: acuña un enlace `canal='asistido'` de 1 h para que el equipo conduzca la confirmación o la subida de factura **con la persona delante**. Al revés que casi todo el circuito documental, **exige sesión de equipo y `service_role` NO puede** (se le revoca el EXECUTE): un enlace asistido con `creado_por` nulo sería un acto conducido por nadie, que es justo lo que `evidencias.asistido_por` existe para impedir. ⚠️ El destinatario sale de **la ficha de la parte**, no del perfil de quien acuña —el equipo no es parte— y **puede quedar `null`**: eso es lo que cierra el hueco de que `marcar_entregado()` solo crea enlace `where d.email is not null`, dejando sin confirmación posible a una ficha sin correo. Sin parámetro `p_email`: un correo escrito a mano sería una afirmación falsa sobre a quién se escribió. `firma_convenio` **queda fuera** — ya está `iniciar_firma_asistida()` |
 | `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20260921160749`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
@@ -2978,6 +2982,40 @@ cuando la salida no la gestionó Redestina («trazabilidad del 100 %»).
   `publicada`, el Mercat sigue enseñando los kilos totales (no resta los externos). La cola del
   tablero lleva a `/equip/ofertes` sin filtro propio (fase 8 del plan).
 - E2E: `tests/e2e/desti-final.e2e.ts` contra el clon (§11).
+
+### Revisión del cliente del 08-10-2026 — fase 2: la ficha de la operación y los avisos (11-10-2026)
+
+Migraciones `20270417100000` (ficha) y `…100100` (avisos, cola y «no m'interessa»).
+
+- **La ficha de la operación** (`components/FitxaOperacio.tsx`, `operacio_detall()`, §4bis): una
+  para el receptor y el productor. Lo primero, en grande, la **cantidad asignada** y la recogida;
+  después la contraparte con persona y teléfono, y el **punto de recogida completo** —dirección,
+  contacto, teléfono, horario, observaciones y Maps— que sale de la ubicación del ofertante.
+  `productor_ubicaciones` gana `direccion`, `contacto_nombre`, `contacto_telefono`, `horario` y
+  `observaciones`, y `LlocsRecollida` deja editarlos (el municipio y el mapa solo al dar de alta:
+  cambiarlos movería la comarca de las ofertas que ya lo usan).
+- **Receptor** (`Interessos.tsx`): «Quantitat assignada» destacada y «Sol·licitats» debajo
+  (`puntInteres` recibe ya lo asignado, no lo pedido); al abrir un interés asignado manda la ficha
+  de la operación y la oferta original queda plegada debajo. Pestaña **«Ofertes per a tu»** con
+  las filas `pendent` de ofertas vivas (enviadas por WhatsApp, correo o el panel) y
+  **«No m'interessa»** (`declinar_oferta`). El **Històric** es solo lo recibido (ENT/OPE
+  confirmado o conciliado), sin «pendents de rebre», ordenado por recepción, con kg asignados y
+  recibidos, ofertante y la ficha.
+- **Productor**: cada oferta con salida dice, en la lista, en Inici y en el detalle, «Fundació X ·
+  250 kg · Recollida 10/10 · 10:00 · Recollida pendent» (`components/LiniesSortida.tsx`, de
+  `contraparts_canalitzacions()` en UNA llamada); en el detalle cada línea abre la ficha.
+- **Avisos nuevos** (CHECK `avisos.tipus`, `_shared/textAvis.ts`, `avis.t_*`): `recollida_canviada`
+  y `kg_assignats_canviats` a las dos partes (trigger en `canalizaciones`, solo si ya había un
+  valor), `recollida_confirmada` al productor (trigger en `albaranes` cuando el ENT/OPE queda
+  confirmado o conciliado), `oferta_modificada` a las entidades con interés vivo o entrega (trigger
+  en `excedentes_canvis`) y `oferta_enviada` al receptor cuando el equipo le propone una oferta por
+  el panel (`OfferDetail`, botón «Panell»). `avisos.objecte_tipo` admite `canalizacion` (una
+  entrega sin interés previo). `textAvis()` recibe el destinatario: los avisos de las dos partes
+  llevan a la pantalla de cada una. ⚠️ **`enviar-avis` antes que la migración**, como en la fase 1.
+- **Equipo**: cola nueva `ofertes_modificades` (15 colas; badge de Ofertes) y en el detalle de la
+  oferta `components/equip/CanvisOferta.tsx` con lo que cambió (antes → después) y «Marca com a
+  revisat». Los cambios del propio equipo no cuentan.
+- E2E: `tests/e2e/operacio.e2e.ts` contra el clon (§11).
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -5617,7 +5655,10 @@ SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run
 # (`docker exec … psql` como `postgres`). Si Playwright pide un navegador que no está
 # descargado, `PW_CHROMIUM_PATH` apunta a uno de la caché (`~/Library/Caches/ms-playwright`).
 # Tras una tanda que consuma numeración legal, `scripts/local/cargar-local.sh` deja el clon
-# como producción. Hoy: `desti-final.e2e.ts` (fase 1) y `vocabulari.e2e.ts` (fase 0).
+# como producción. Hoy: `desti-final.e2e.ts` (fase 1), `vocabulari.e2e.ts` (fase 0) y `operacio.e2e.ts`
+# (fase 2). `ajuda.ts` da `sqlCom(rol, sql)` para actuar COMO una cuenta (claims de su `sub`) y
+# `entidadDe`/`productorDe`; `compte()` acepta la etiqueta (`receptor-carles`, la receptora con
+# convenio vigente: `Menjador Social de Prova` está a propósito sin él).
 E2E_CLON=1 PW_CHROMIUM_PATH=… npx playwright test     # móvil y escritorio, contra el clon
 
 # Pruebas unitarias (Vitest 4). Corren en Node sobre los módulos de negocio, que son
@@ -6621,9 +6662,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.257 pruebas en 50 ficheros**: 1.256 correctas y **1 saltada a propósito** (11-10-2026,
-   fase 1 de la revisión del 08-10-2026: `tests/destiFinal.test.ts` y los casos nuevos de `procesOferta`
-   y `textAvis`). Antes, **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
+   Referencia: **1.273 pruebas en 50 ficheros**: 1.272 correctas y **1 saltada a propósito** (11-10-2026,
+   fase 2 de la revisión del 08-10-2026; tras la fase 1 eran 1.257: `tests/destiFinal.test.ts` y los casos
+   nuevos de `procesOferta` y `textAvis`). Antes, **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
    tras la revisión completa: +123 sobre 1.115, de `tests/http.test.ts`, `autorizacion.test.ts`,
    `crearOferta.test.ts`, `enmascarar.test.ts`, `cerca.test.ts`, `format.test.ts`, `textError.test.ts`,
    `tancamentFormat.test.ts`, `esborranyOferta.test.ts`, las 17 de la escalera y la comprobación inversa de
@@ -6655,8 +6696,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.179/1.179 correctas y 26 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada
+   ✅ **Referencia HOY (clon local): 1.202/1.202 correctas y 26 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras
+   la fase 1 eran 1.179, `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada
    e `excedente_destins` sin escritura en las siete cuentas externas, `destins_finals` legible, y dos
    checks del equipo—). **Pendiente de confirmar en producción al publicar.** La anterior:
    **1.156/1.156 correctas y 26 sin datos** (07-10-2026,

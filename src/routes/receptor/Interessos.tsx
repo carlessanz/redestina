@@ -29,6 +29,9 @@ import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
+import FitxaOperacio from '../../components/FitxaOperacio'
+import { declinaOferta } from '../../lib/operacio'
+import { toast } from 'sonner'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Link } from 'react-router'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -90,6 +93,8 @@ export function Interessos() {
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
+  const [pestanya, setPestanya] = useState<'interessos' | 'per_a_tu'>('interessos')
+  const [declinant, setDeclinant] = useState(false)
   const entidadId = organitzacio?.id ?? null
 
   const carrega = useCallback(async () => {
@@ -153,6 +158,32 @@ export function Interessos() {
   const llegenda = llegendaSimpleInteres()
   const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
 
+  // «Ofertes per a tu» (fase 2 de la revisión del 08-10-2026): las que el equipo le ha
+  // enviado —por WhatsApp, correo o el panel— y que todavía no ha contestado, mientras la
+  // oferta siga viva. Cuando tiene otro destino, deja de estar aquí y en la lista sale «No
+  // disponible». Las demás son SUS intereses.
+  const esPerATu = (f: AmbOferta) =>
+    f.estado === 'pendent' && ['publicada', 'parcial'].includes(f.excedentes?.estado ?? '')
+  const perATu = files.filter(esPerATu)
+  const visibles = pestanya === 'per_a_tu' ? perATu : files.filter((f) => !esPerATu(f))
+  /**
+   * Lo ASIGNADO, que es lo que la entidad va a recibir: el de la canalización (si el equipo
+   * lo cambió después de aprobar, manda ese), si no el aprobado. Antes `puntInteres` recibía
+   * lo pedido y «Aquests {kg} kg són per a tu» decía lo que no era.
+   */
+  const kgAssignat = (f: AmbOferta): number | null =>
+    f.aprovacio === 'aprovada' ? (contraparts[f.id]?.kg ?? f.kg_aprovats ?? f.kg_solicitados) : null
+
+  async function declina(f: AmbOferta) {
+    setDeclinant(true)
+    const r = await declinaOferta(f.id)
+    setDeclinant(false)
+    if (!r.ok) { toast.error(t('int.err_declina')); return }
+    toast.success(t('int.declinada'))
+    setObert(null)
+    await carrega()
+  }
+
   /**
    * Cuando el equipo no se la asignó, el porqué: sin él la entidad solo veía «No
    * disponible» y la leyenda la mandaba a abrirla para ver un motivo que no se pintaba.
@@ -170,17 +201,33 @@ export function Interessos() {
         <LlegendaEstats items={llegenda} ambPunt />
       </CardHeader>
       <CardContent className="space-y-2">
+        <div role="tablist" className="mb-2 flex flex-wrap gap-2">
+          {(['interessos', 'per_a_tu'] as const).map((p) => (
+            <Button key={p} role="tab" aria-selected={pestanya === p} type="button" size="sm"
+              variant={pestanya === p ? 'default' : 'outline'} className="h-11 md:h-9"
+              onClick={() => setPestanya(p)}>
+              {t(p === 'interessos' ? 'int.tab_meus' : 'int.tab_per_a_tu')}
+              {p === 'per_a_tu' && perATu.length > 0 && (
+                <span className="ml-1 rounded-full bg-coral px-1.5 text-xs text-coral-foreground">{perATu.length}</span>
+              )}
+            </Button>
+          ))}
+        </div>
+        {pestanya === 'per_a_tu' && (
+          <p className="text-sm text-muted-foreground">{t('int.per_a_tu_hint')}</p>
+        )}
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
-        {!carregant && !errorCarrega && files.length === 0 && (
-          <p className="text-sm text-muted-foreground">{t('int.empty')}</p>
+        {!carregant && !errorCarrega && visibles.length === 0 && (
+          <p className="text-sm text-muted-foreground">{t(pestanya === 'per_a_tu' ? 'int.per_a_tu_empty' : 'int.empty')}</p>
         )}
-        {!errorCarrega && files.map((f) => {
+        {!errorCarrega && visibles.map((f) => {
           const alb = f.canalizacion_id ? albarans[f.canalizacion_id] : undefined
+          const assignat = kgAssignat(f)
           const punt = puntInteres({
             estado: f.estado,
             aprovacio: f.aprovacio,
-            kg: f.kg_solicitados,
+            kg: assignat ?? f.kg_solicitados,
             ofertaEstado: f.excedentes?.estado ?? 'publicada',
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: f.motiu_aprovacio,
@@ -193,10 +240,13 @@ export function Interessos() {
           // La fecha de lo último que ha hecho la entidad: cuándo contestó o, si todavía
           // no lo ha hecho, cuándo le llegó la oferta.
           const data = diaMes(f.respondido_at ?? f.enviado_at)
-          // Pedido y aprobado por separado (05-10-2026): aprobar ya no pisa lo que se pidió.
-          const kgs = f.kg_aprovats != null && f.aprovacio === 'aprovada'
-            ? t('int.kg_sol_apr', { n: kg(f.kg_solicitados), m: kg(f.kg_aprovats) })
-            : f.kg_solicitados != null ? `${kg(f.kg_solicitados)} ${t('od.rs_kg')}` : null
+          // Lo asignado va aparte y destacado (revisión del 08-10-2026, §1.3): «Sol·licitats
+          // 150 · Aprovats 100» con la misma jerarquía no dejaba ver qué iba a recibir.
+          const kgs = assignat == null && f.kg_solicitados != null
+            ? `${kg(f.kg_solicitados)} ${t('od.rs_kg')}`
+            : assignat != null && f.kg_solicitados != null && f.kg_solicitados !== assignat
+              ? t('int.sollicitats', { n: kg(f.kg_solicitados) })
+              : null
           const qui = contraparts[f.id]
           const detall = [
             kgs,
@@ -219,6 +269,9 @@ export function Interessos() {
                     {/* Sin el código interno (E-AAMMDD-…): es del ERP y a la entidad no le dice
                         nada (revisión del 23-09-2026). */}
                     <div className="font-medium">{f.excedentes?.producto ?? '—'}</div>
+                    {assignat != null && (
+                      <div className="text-sm font-semibold">{t('int.assignada', { n: kg(assignat) })}</div>
+                    )}
                     {detall && <div className="text-xs text-muted-foreground">{detall}</div>}
                     {qui?.contrapart && (
                       <div className="text-xs text-muted-foreground">
@@ -251,7 +304,7 @@ export function Interessos() {
           const punt = puntInteres({
             estado: obert.estado,
             aprovacio: obert.aprovacio,
-            kg: obert.kg_solicitados,
+            kg: kgAssignat(obert) ?? obert.kg_solicitados,
             ofertaEstado: obert.excedentes.estado ?? 'publicada',
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: obert.motiu_aprovacio,
@@ -264,10 +317,25 @@ export function Interessos() {
             && ['publicada', 'parcial'].includes(obert.excedentes.estado)
           return (
             <DialogContent className="max-h-[85dvh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
-              <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              {/* Asignada: manda la FICHA DE LA OPERACIÓN (revisión del 08-10-2026, §1.3) —qué,
+                  cuánto, de quién, dónde y cuándo—, y la oferta original queda debajo como
+                  referencia. Antes se seguía enseñando la ficha original de la oferta. */}
+              <DialogHeader>
+                <DialogTitle>{t(obert.aprovacio === 'aprovada' && obert.canalizacion_id ? 'op.title' : 'mk.detail_title')}</DialogTitle>
+              </DialogHeader>
+              {obert.aprovacio === 'aprovada' && obert.canalizacion_id ? (
+                <>
+                  <FitxaOperacio canalizacionId={obert.canalizacion_id} />
+                  <details className="rounded-md border p-3">
+                    <summary className="cursor-pointer text-sm text-muted-foreground">{t('op.oferta_original')}</summary>
+                    <div className="mt-3"><DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} /></div>
+                  </details>
+                </>
+              ) : (
+                <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              )}
               {/* D1: una vez aprobada, quién la ofrece y dónde se recoge. */}
-              {contraparts[obert.id]?.contrapart && (
+              {!(obert.aprovacio === 'aprovada' && obert.canalizacion_id) && contraparts[obert.id]?.contrapart && (
                 <div className="space-y-1 rounded-md border p-3 text-sm">
                   <p className="text-xs text-muted-foreground">{t('int.d_contrapart')}</p>
                   <p className="font-medium">{contraparts[obert.id].contrapart}{contraparts[obert.id].municipi ? ` · ${contraparts[obert.id].municipi}` : ''}</p>
@@ -285,9 +353,15 @@ export function Interessos() {
               <DialogFooter className="items-center gap-2 sm:justify-between">
                 <BadgeEstat clase={est.clase}>{t(est.key)}</BadgeEstat>
                 {perDemanar && (
-                  <Button asChild className="h-11 md:h-9">
-                    <Link to="/receptor/mercat">{t('int.a_mercat')}</Link>
-                  </Button>
+                  <div className="flex flex-col gap-2 sm:flex-row">
+                    <Button variant="outline" className="h-11 md:h-9" disabled={declinant}
+                      onClick={() => void declina(obert)}>
+                      {t('int.no_minteressa')}
+                    </Button>
+                    <Button asChild className="h-11 md:h-9">
+                      <Link to="/receptor/mercat">{t('int.a_mercat')}</Link>
+                    </Button>
+                  </div>
                 )}
               </DialogFooter>
             </DialogContent>
@@ -307,6 +381,15 @@ export function Historic() {
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<CanalAmbOferta | null>(null)
   const entidadId = organitzacio?.id ?? null
+  // De quién vino cada entrega (D1): la contraparte de la canalización.
+  const [ofertants, setOfertants] = useState<Record<string, Contrapart>>({})
+  useEffect(() => {
+    void carregaContraparts().then((cs) => {
+      const m: Record<string, Contrapart> = {}
+      for (const c of cs) if (c.rol === 'entidad') m[c.canalizacion_id] = c
+      setOfertants(m)
+    })
+  }, [files])
 
   useEffect(() => {
     if (!entidadId) { setCarregant(false); return }
@@ -354,12 +437,16 @@ export function Historic() {
     return null
   }
 
-  // El título dice «rebudes»: cuenta lo que ha llegado, conciliado o ya confirmado por la
-  // entidad. Lo asignado y todavía sin recibir va aparte, o la cifra afirmaría kilos que
-  // nadie ha entregado — y lo ya confirmado no puede seguir contando como «pendent de rebre».
-  const totalKg = files.reduce((s, f) => s + (kgRebuts(f) ?? 0), 0)
-  const pendentKg = files.reduce((s, f) => s + (kgRebuts(f) == null ? Number(f.kg_confirmados ?? 0) : 0), 0)
-  const foto = useFotosOfertes(files.map((f) => f.excedentes ?? { producto: null }))
+  // El Històric es SOLO lo que ya ha llegado (revisión del 08-10-2026, §2.1): lo asignado y
+  // pendiente de recibir vive en «Els meus interessos», con su ficha. Ordenado por la fecha
+  // de recepción, la más reciente primero (§2.5).
+  const quanRebut = (f: CanalAmbOferta) =>
+    albarans[f.id]?.confirmado_at ?? f.data_hora_recollida ?? f.created_at
+  const rebudes = files
+    .filter((f) => estatEntrega(f) !== 'pendent')
+    .sort((a, b) => quanRebut(b).localeCompare(quanRebut(a)))
+  const totalKg = rebudes.reduce((s, f) => s + (kgRebuts(f) ?? 0), 0)
+  const foto = useFotosOfertes(rebudes.map((f) => f.excedentes ?? { producto: null }))
 
   /** Siempre una fecha, y nunca el código interno. ⚠️ La fecha sola no dice que haya
    *  llegado nada: `emitir_albaran()` escribe `data_hora_recollida` al EMITIR el albarán
@@ -372,11 +459,11 @@ export function Historic() {
     if (f.data_hora_recollida) return t('hist.planned_on', { date: dataCurta(f.data_hora_recollida) })
     return t('hist.assigned_on', { date: dataCurta(f.created_at) })
   }
-  /** Claves propias y no las del productor: aquí los kilos se RECIBEN. */
+  /** Asignados y recibidos, los dos (§2.3): la diferencia es justo lo que interesa ver. */
   const quants = (f: CanalAmbOferta) => {
     const rebuts = kgRebuts(f)
     return rebuts != null
-      ? t('hist.kg_reals', { n: kg(rebuts) })
+      ? t('hist.kg_assig_rebuts', { a: kg(f.kg_confirmados ?? 0), r: kg(rebuts) })
       : t('hist.kg_assignats', { n: kg(f.kg_confirmados ?? 0) })
   }
 
@@ -385,18 +472,16 @@ export function Historic() {
       <CardHeader>
         <CardTitle>{t('hist.title')}</CardTitle>
         {!errorCarrega && (
-          <p className="mt-1 text-sm text-muted-foreground">{pendentKg > 0
-            ? t('hist.subtitle_pending', { n: kg(totalKg), m: kg(pendentKg) })
-            : t('hist.subtitle', { n: kg(totalKg) })}</p>
+          <p className="mt-1 text-sm text-muted-foreground">{t('hist.subtitle', { n: kg(totalKg) })}</p>
         )}
       </CardHeader>
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
-        {!carregant && !errorCarrega && files.length === 0 && (
+        {!carregant && !errorCarrega && rebudes.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}
-        {!errorCarrega && files.map((f) => (
+        {!errorCarrega && rebudes.map((f) => (
           // Toda la fila abre el detalle, como en Interessos (28-09-2026).
           <button type="button" key={f.id} onClick={() => f.excedentes && setObert(f)}
             className="flex w-full flex-wrap items-center justify-between gap-3 rounded-lg border p-3 text-left text-sm hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
@@ -409,6 +494,11 @@ export function Historic() {
                   {quan(f)}
                   {f.excedentes ? ` · ${textModalitats(modalitatsOferta(f.excedentes), t)}` : ''}
                 </div>
+                {ofertants[f.id]?.contrapart && (
+                  <div className="text-xs text-muted-foreground">
+                    {t('int.ofereix', { nom: ofertants[f.id].contrapart! })}
+                  </div>
+                )}
               </div>
             </div>
             <span className="tabular-nums">{quants(f)}</span>
@@ -421,8 +511,14 @@ export function Historic() {
           const alb = albarans[obert.id]
           return (
             <DialogContent className="max-h-[85dvh] overflow-y-auto">
-              <DialogHeader><DialogTitle>{t('mk.detail_title')}</DialogTitle></DialogHeader>
-              <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+              <DialogHeader><DialogTitle>{t('op.title')}</DialogTitle></DialogHeader>
+              {/* La ficha de la operación —ofertante, punto concreto de recogida, kg asignados
+                  y recibidos, fecha y hora— y la oferta original como referencia (§2.2). */}
+              <FitxaOperacio canalizacionId={obert.id} />
+              <details className="rounded-md border p-3">
+                <summary className="cursor-pointer text-sm text-muted-foreground">{t('op.oferta_original')}</summary>
+                <div className="mt-3"><DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} /></div>
+              </details>
               {/* La entrega: lo que llegó, cuándo y con qué albarán. El PDF vive en
                   Documents, que es donde ya se descarga. */}
               <div className="space-y-1 rounded-md border p-3 text-sm">

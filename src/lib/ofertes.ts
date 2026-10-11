@@ -96,11 +96,26 @@ export function esBuit(v: unknown): boolean {
  * equipo las de cualquiera (`ubicaciones: gestio intern o propia`), que es lo mismo que
  * hace falta aquí. Devuelve la fila para añadirla al desplegable sin recargar.
  */
+/**
+ * Lo que hace de un lugar de recogida una ficha reutilizable: dirección, persona y teléfono
+ * de contacto, horario y observaciones (fase 2 de la revisión del 08-10-2026). Lo que el
+ * receptor ve en la ficha de la operación sale de aquí, sin teclearlo otra vez.
+ */
+export interface DadesLloc {
+  direccion: string | null
+  contacto_nombre: string | null
+  contacto_telefono: string | null
+  horario: string | null
+  observaciones: string | null
+}
+
 export async function creaUbicacio(args: {
   productorId: string
   alias: string
   gmapsUrl: string | null
   municipi: { codi_ine: string; nom: string } | null
+  /** La ficha completa del lugar (fase 2 de la revisión del 08-10-2026): opcional. */
+  extra?: DadesLloc
 }): Promise<Resultat<{ id: string; alias: string | null; municipio: string | null }>> {
   const { data, error } = await supabase
     .from('productor_ubicaciones')
@@ -110,6 +125,7 @@ export async function creaUbicacio(args: {
       gmaps_url: args.gmapsUrl,
       municipio: args.municipi?.nom ?? null,
       municipio_ine: args.municipi?.codi_ine ?? null,
+      ...(args.extra ?? {}),
     })
     .select('id, alias, municipio')
     .single()

@@ -16,8 +16,9 @@ export function comptes(): Compte[] {
   }
 }
 
+/** Por etiqueta (`receptor-carles`) o, si no, la primera con ese rol (`receptor`). */
 export function compte(rol: string): Compte | undefined {
-  return comptes().find((c) => c.rol === rol)
+  return comptes().find((c) => c.etiqueta === rol) ?? comptes().find((c) => c.rol === rol)
 }
 
 /** ¿Corremos contra el clon local? (`E2E_CLON=1`, ver `playwright.config.ts`). */
@@ -84,9 +85,35 @@ export async function passaCortina(page: Page): Promise<void> {
 export async function entra(page: Page, rol: string): Promise<void> {
   const c = compte(rol)!
   await passaCortina(page)
-  await page.goto(rol === 'equip' || rol === 'super_admin' ? '/admin' : '/login')
+  const esEquip = ['equip', 'super_admin'].includes(c.rol)
+  await page.goto(esEquip ? '/admin' : '/login')
   await page.locator('input[type="email"]').first().fill(c.email)
   await page.locator('input[type="password"]').first().fill(c.password)
   await page.locator('button[type="submit"]').first().click()
   await page.waitForURL((u) => !/\/(login|admin)$/.test(u.pathname), { timeout: 30_000 })
+}
+
+/** El `entidad_id` de la cuenta (por etiqueta o rol), por su membresía activa. */
+export function entidadDe(rol: string): string {
+  const c = compte(rol)!
+  return sql(`select m.entidad_id from membresias m join auth.users u on u.id = m.user_id
+               where u.email = '${c.email.replace(/'/g, "''")}' and m.entidad_id is not null and m.activo
+               limit 1`)
+}
+
+/**
+ * Ejecuta SQL COMO una cuenta (rol `authenticated` y su `sub` en los claims), en una
+ * transacción: es como llamar a una RPC desde su sesión, sin pasar por la pantalla. Sirve
+ * para preparar lo que en la vida real haría otra persona (el equipo aprobando, p. ej.).
+ */
+export function sqlCom(rol: string, consulta: string): string {
+  const c = compte(rol)!
+  const uid = sql(`select id from auth.users where email = '${c.email.replace(/'/g, "''")}'`)
+  const sortida = sql(`begin;
+    set local role authenticated;
+    select set_config('request.jwt.claims', '{"sub":"${uid}","role":"authenticated"}', true);
+    ${consulta};
+    commit;`)
+  // La última línea con contenido es el resultado de la consulta (antes van los de set_config).
+  return sortida.split('\n').filter((l) => l && !l.startsWith('{') && l !== 'BEGIN' && l !== 'COMMIT' && l !== 'SET').pop() ?? ''
 }

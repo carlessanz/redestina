@@ -75,3 +75,16 @@ describe('el ofertante no ve el código interno de la oferta', () => {
     }
   })
 })
+
+describe('los avisos que reciben las dos partes llevan a la pantalla de cada una (fase 2)', () => {
+  const amb = { ...PARAMS, excedente_id: 'exc-1', recollida_at: '2026-10-10T08:00:00Z', kg_abans: 150 }
+  for (const tipus of ['recollida_canviada', 'kg_assignats_canviats', 'oferta_modificada'] as const) {
+    it(tipus, () => {
+      expect(textAvis(tipus, amb, 'ca', 'resp-1', 'entidad').ruta).toBe('/receptor/interessos')
+      expect(textAvis(tipus, amb, 'ca', 'exc-1', 'productor').ruta).toBe('/productor/ofertes/exc-1')
+    })
+  }
+  it('la hora de la recogida se dice en hora de Madrid', () => {
+    expect(textAvis('recollida_canviada', amb, 'ca', 'x', 'entidad').cuerpo).toContain('10/10 · 10:00')
+  })
+})

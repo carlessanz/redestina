@@ -15,6 +15,10 @@
 
 import DialegEditaOferta from '../../components/DialegEditaOferta'
 import { carregaContraparts, marcaLlegits, useAvisos } from '../../lib/avisos'
+import type { Contrapart } from '../../lib/avisos'
+import LiniesSortida from '../../components/LiniesSortida'
+import FitxaOperacio from '../../components/FitxaOperacio'
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
@@ -122,13 +126,17 @@ export default function ProductorOfertaDetall() {
   }, [avisos, id])
   // D1: una vez aprobada, a quién va cada entrega.
   const [destins, setDestins] = useState<Record<string, string>>({})
+  /** Las salidas de ESTA oferta, con la recogida (fase 2 de la revisión del 08-10-2026). */
+  const [sortides, setSortides] = useState<Contrapart[]>([])
+  const [fitxa, setFitxa] = useState<string | null>(null)
   useEffect(() => {
     void carregaContraparts().then((cs) => {
       const m: Record<string, string> = {}
       for (const c of cs) if (c.rol === 'productor' && c.contrapart) m[c.canalizacion_id] = c.contrapart
       setDestins(m)
+      setSortides(cs.filter((c) => c.rol === 'productor' && c.excedente_id === id))
     })
-  }, [canalitzacions])
+  }, [canalitzacions, id])
   const [editant, setEditant] = useState(false)
 
   // El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35): este es
@@ -307,16 +315,16 @@ export default function ProductorOfertaDetall() {
           {canalitzacions.length === 0 && (
             <p className="text-sm text-muted-foreground">{t('po.no_channelings')}</p>
           )}
-          {canalitzacions.map((c) => (
-            <div key={c.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 text-sm">
-              <span>
-                {t('po.channeled_kg', { n: Number(c.kg_confirmados ?? 0).toLocaleString('ca-ES') })}
-                {destins[c.id] ? ` · ${destins[c.id]}` : ''}
-              </span>
-              {c.kg_reales != null && (
-                <span className="text-muted-foreground">{t('po.real_kg', { n: Number(c.kg_reales).toLocaleString('ca-ES') })}</span>
-              )}
-            </div>
+          {/* Receptor, kg, día y hora y estado de la recogida, sin tener que buscarlo (§4 y
+              §3.3 de la revisión del 08-10-2026). Cada línea abre la ficha de la operación:
+              con quién, dónde y el teléfono. Se actualiza sola al cambiar una canalización
+              (Realtime) y con el aviso `recollida_confirmada`. */}
+          <LiniesSortida sortides={sortides} onObre={setFitxa} />
+          {canalitzacions.filter((c) => c.kg_reales != null).map((c) => (
+            <p key={c.id} className="text-sm text-muted-foreground">
+              {destins[c.id] ? `${destins[c.id]}: ` : ''}
+              {t('po.real_kg', { n: Number(c.kg_reales).toLocaleString('ca-ES') })}
+            </p>
           ))}
         </CardContent>
       </Card>
@@ -338,6 +346,13 @@ export default function ProductorOfertaDetall() {
           {t('po.cancel_offer')}
         </Button>
       )}
+
+      <Dialog open={fitxa != null} onOpenChange={(v) => !v && setFitxa(null)}>
+        <DialogContent className="max-h-[85dvh] overflow-y-auto">
+          <DialogHeader><DialogTitle>{t('op.title')}</DialogTitle></DialogHeader>
+          {fitxa && <FitxaOperacio canalizacionId={fitxa} />}
+        </DialogContent>
+      </Dialog>
 
       {/* ⚠️ El botón de confirmar no repite «Cancel·lar oferta»: el de descartar de
           `DialegMotiu` ya dice «Cancel·lar» (`c.cancel`), y los dos se leían casi igual

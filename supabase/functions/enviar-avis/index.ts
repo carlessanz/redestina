@@ -133,7 +133,8 @@ async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca):
     whatsapp_activo: await whatsappActivo(supabase),
   });
 
-  const t = textAvis(aviso.tipus as TipusAvis, aviso.params ?? {}, idioma, aviso.objecte_id);
+  const t = textAvis(aviso.tipus as TipusAvis, aviso.params ?? {}, idioma, aviso.objecte_id,
+    aviso.destinatari_tipo === "entidad" ? "entidad" : "productor");
   const enllac = `${appUrl()}${t.ruta}`;
 
   // WhatsApp solo dentro de la ventana: fuera haría falta una plantilla aprobada.

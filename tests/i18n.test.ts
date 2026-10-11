@@ -152,6 +152,25 @@ describe('la convención de singular', () => {
 describe('las claves compuestas cubren todo el vocabulario de la base', () => {
   const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
     {
+      // CHECK de `avisos.tipus` (ampliado en 20270416100000 y 20270417100100). Se compone en
+      // `CampanaAvisos.tsx` (`avis.t_${tipus}`): el caso `od.ch_asistido` exacto —un tipo nuevo
+      // en la base que la campana pintaría como clave cruda—.
+      que: 'avisos.tipus',
+      prefijo: 'avis.t_',
+      valores: [
+        'oferta_validada', 'oferta_rebutjada', 'sortida_trobada', 'interes_aprovat',
+        'interes_rebutjat', 'oferta_sense_desti', 'recollida_canviada', 'kg_assignats_canviats',
+        'recollida_confirmada', 'oferta_modificada', 'oferta_enviada',
+      ],
+    },
+    {
+      // El estado de la recogida que calcula `operacio_detall()` (20270417100000). Se compone
+      // en `FitxaOperacio.tsx`.
+      que: 'operacio_detall.estat_recollida',
+      prefijo: 'op.estat_',
+      valores: ['pendent', 'programada', 'entregada', 'confirmada', 'conciliada'],
+    },
+    {
       // CHECK de `oferta_respuestas.canal`. Se compone en `Aprovacions.tsx` y `OfferDetail.tsx`.
       que: 'oferta_respuestas.canal',
       prefijo: 'od.ch_',

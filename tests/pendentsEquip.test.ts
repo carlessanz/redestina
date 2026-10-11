@@ -17,16 +17,18 @@ const bloque = FUENTE.match(/export type CuaEquip =([\s\S]*?)\n\n/)?.[1] ?? ''
 const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 
 // Las colas cuya fila del tablero lleva segunda línea (`pe.<cua>_sub`).
-const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_vencudes', 'costos',
-  'albarans_conciliar', 'espigolades_per_convertir']
+const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
+  'ofertes_vencudes', 'costos', 'albarans_conciliar', 'espigolades_per_convertir']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
 // equipo) y se enseña como segunda línea de `albarans_conciliar`. Sin clave propia, a propósito.
 const SENSE_FILA = ['albarans_esperant']
 
 describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () => {
-  it('lee las catorce colas del union CuaEquip', () => {
-    // 14 desde el 05-10-2026: `ofertes_per_validar`.
-    expect(CUES).toHaveLength(14)
+  it('lee las quince colas del union CuaEquip', () => {
+    // 14 desde el 05-10-2026 (`ofertes_per_validar`) y 15 desde el 11-10-2026
+    // (`ofertes_modificades`, fase 2 de la revisión del 08-10-2026).
+    expect(CUES).toHaveLength(15)
+    expect(CUES).toContain('ofertes_modificades')
     expect(CUES).toContain('ofertes_per_validar')
     expect(CUES).toContain('tancament')
     // F3. Es la que más fácil se queda fuera: la base la devuelve igual, y una cola que no

@@ -43,6 +43,9 @@ export type CuaEquip =
   | 'ofertes_per_validar'
   | 'respostes' | 'missatges'
   | 'ofertes_sense_enviar' | 'ofertes_vencudes'
+  // 11-10-2026 (fase 2 de la revisión del 08-10-2026): ofertas que el PRODUCTOR ha editado
+  // y que el equipo no ha revisado.
+  | 'ofertes_modificades'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
   // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
@@ -124,7 +127,7 @@ export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptado
     missatges: n('missatges'),
     // No baja al entrar en Ofertes: solo al validar o rechazar, porque la oferta se queda
     // parada hasta que alguien decide.
-    ofertes: n('ofertes_per_validar'),
+    ofertes: n('ofertes_per_validar') + n('ofertes_modificades'),
     // Lo que espera al EQUIPO: borradores por emitir y REC por conciliar. Los que esperan
     // la confirmación de la otra parte (`albarans_esperant`) no cuentan aquí.
     albarans: n('albarans_esborrany') + n('albarans_conciliar'),

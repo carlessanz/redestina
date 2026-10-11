@@ -12,12 +12,21 @@ export type TipusAvis =
   | "sortida_trobada"
   | "interes_aprovat"
   | "interes_rebutjat"
-  | "oferta_sense_desti";
+  | "oferta_sense_desti"
+  | "recollida_canviada"
+  | "kg_assignats_canviats"
+  | "recollida_confirmada"
+  | "oferta_modificada"
+  | "oferta_enviada";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
-  "oferta_sense_desti",
+  "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
+  "oferta_modificada", "oferta_enviada",
 ];
+
+/** A quién va el aviso: decide el enlace de los que reciben las dos partes (fase 2). */
+export type DestinatariAvis = "productor" | "entidad";
 
 export interface TextAvis {
   asunto: string;
@@ -42,12 +51,24 @@ function s(v: unknown): string {
   return v == null ? "" : String(v).trim();
 }
 
+/** «10/10 · 10:00», en hora de Madrid (la recogida es un momento local). Vacío si no hay. */
+export function quan(v: unknown, idioma: Idioma): string {
+  if (v == null || v === "") return "";
+  const d = new Date(String(v));
+  if (Number.isNaN(d.getTime())) return "";
+  const loc = idioma === "es" ? "es-ES" : "ca-ES";
+  const dia = new Intl.DateTimeFormat(loc, { timeZone: "Europe/Madrid", day: "2-digit", month: "2-digit" }).format(d);
+  const hora = new Intl.DateTimeFormat(loc, { timeZone: "Europe/Madrid", hour: "2-digit", minute: "2-digit" }).format(d);
+  return `${dia} · ${hora}`;
+}
+
 /** El texto de un aviso. `objecteId` es el de la fila: hace falta para el enlace. */
 export function textAvis(
   tipus: TipusAvis,
   params: Params,
   idioma: Idioma,
   objecteId: string,
+  destinatari: DestinatariAvis = "productor",
 ): TextAvis {
   const es = idioma === "es";
   const producte = s(params.producte) || (es ? "tu oferta" : "la teva oferta");
@@ -55,7 +76,72 @@ export function textAvis(
   // es de gestión interna del equipo (revisión del cliente del 08-10-2026, §3.5). El parámetro
   // se sigue guardando en `avisos.params` por trazabilidad.
 
+  // Los avisos que reciben LAS DOS partes llevan a su pantalla: el productor a la oferta, el
+  // receptor a «Els meus interessos».
+  const rutaParts = destinatari === "entidad"
+    ? "/receptor/interessos"
+    : `/productor/ofertes/${s(params.excedente_id) || objecteId}`;
+  const botoParts = destinatari === "entidad"
+    ? (es ? "Ver mis intereses" : "Veure els meus interessos")
+    : (es ? "Ver la oferta" : "Veure l’oferta");
+
   switch (tipus) {
+    case "recollida_canviada": {
+      const q = quan(params.recollida_at, idioma);
+      return {
+        asunto: es ? `Cambia la recogida de ${producte}` : `Canvia la recollida de ${producte}`,
+        titulo: es ? "Recogida modificada" : "Recollida modificada",
+        cuerpo: es
+          ? `La recogida de ${producte} ahora es ${q || "en otra fecha"}.`
+          : `La recollida de ${producte} ara és ${q || "en una altra data"}.`,
+        boton: botoParts,
+        ruta: rutaParts,
+      };
+    }
+    case "kg_assignats_canviats":
+      return {
+        asunto: es ? `Cambian los kilos de ${producte}` : `Canvien els quilos de ${producte}`,
+        titulo: es ? "Cantidad asignada modificada" : "Quantitat assignada modificada",
+        cuerpo: es
+          ? `La cantidad asignada de ${producte} pasa de ${kg(params.kg_abans, idioma)} a ${kg(params.kg, idioma)} kg.`
+          : `La quantitat assignada de ${producte} passa de ${kg(params.kg_abans, idioma)} a ${kg(params.kg, idioma)} kg.`,
+        boton: botoParts,
+        ruta: rutaParts,
+      };
+    case "recollida_confirmada": {
+      const entitat = s(params.entitat);
+      const q = quan(params.recollida_at, idioma);
+      return {
+        asunto: es ? `Recogida confirmada: ${producte}` : `Recollida confirmada: ${producte}`,
+        titulo: es ? "Salida confirmada" : "Sortida confirmada",
+        cuerpo: (es
+          ? `${entitat || "La entidad"} ha confirmado que ha recibido ${kg(params.kg, idioma)} kg de ${producte}`
+          : `${entitat || "L’entitat"} ha confirmat que ha rebut ${kg(params.kg, idioma)} kg de ${producte}`)
+          + (q ? ` (${q}).` : "."),
+        boton: botoParts,
+        ruta: rutaParts,
+      };
+    }
+    case "oferta_modificada":
+      return {
+        asunto: es ? `La oferta de ${producte} ha cambiado` : `L’oferta de ${producte} ha canviat`,
+        titulo: es ? "Oferta modificada" : "Oferta modificada",
+        cuerpo: es
+          ? `La entidad productora ha modificado la oferta de ${producte}. Revisa los datos antes de la recogida.`
+          : `L’entitat productora ha modificat l’oferta de ${producte}. Revisa’n les dades abans de la recollida.`,
+        boton: botoParts,
+        ruta: rutaParts,
+      };
+    case "oferta_enviada":
+      return {
+        asunto: es ? `Una oferta para ti: ${producte}` : `Una oferta per a tu: ${producte}`,
+        titulo: es ? "Oferta para ti" : "Oferta per a tu",
+        cuerpo: es
+          ? `El equipo de Redestina te propone ${kg(params.kg, idioma)} kg de ${producte}. Dinos si te interesa.`
+          : `L’equip de Redestina et proposa ${kg(params.kg, idioma)} kg de ${producte}. Digues-nos si t’interessa.`,
+        boton: es ? "Ver la oferta" : "Veure l’oferta",
+        ruta: "/receptor/interessos",
+      };
     case "oferta_validada":
       return {
         asunto: es ? `Tu oferta de ${producte} ya está publicada` : `La teva oferta de ${producte} ja està publicada`,

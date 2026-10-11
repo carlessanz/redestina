@@ -26,6 +26,7 @@ import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import ValidacioOferta from './equip/ValidacioOferta'
 import DestiFinal from './DestiFinal'
+import CanvisOferta from './equip/CanvisOferta'
 import { carregaDestins } from '../lib/ofertes'
 import DialegEditaOferta from './DialegEditaOferta'
 import SelectorModalitat from './SelectorModalitat'
@@ -329,7 +330,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Devuelve si quedó registrado. Si no, el envío YA ha salido, así que no se anuncia como
   // fallo: se avisa de que la respuesta habrá que marcarla a mano (sin fila, el webhook no
   // tiene dónde apuntarla).
-  async function registrarEnvio(ent: EntidadPuntuada, canal: 'whatsapp' | 'email'): Promise<boolean> {
+  async function registrarEnvio(ent: EntidadPuntuada, canal: 'whatsapp' | 'email' | 'panel'): Promise<boolean> {
     const { data, error } = await supabase.from('oferta_respuestas').upsert({
       excedente_id: excedente.id,
       entidad_id: ent.id,
@@ -512,6 +513,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     if (enviant === id) return
     setEnviant(id)
     try { await fn() } finally { setEnviant(null) }
+  }
+
+  /**
+   * Proponer la oferta desde la PLATAFORMA (fase 2 de la revisión del 08-10-2026): queda en
+   * «Ofertes per a tu» del receptor, con «M'interessa» y «No m'interessa», y el trigger
+   * `oferta_respuestas_avis_enviada` le avisa por su canal (`enviar-avis`, con los gates del
+   * modo test). No depende de que tenga WhatsApp o correo para quedar registrada.
+   */
+  async function enviarOfertaPanell(ent: EntidadPuntuada) {
+    if (!(await registrarEnvio(ent, 'panel'))) return
+    toast.success(t('od.sent_panel', { name: ent.nombre }))
   }
 
   async function enviarOferta(ent: EntidadPuntuada) {
@@ -785,6 +797,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             <ValidacioOferta excedenteId={exc.id} potAprovar={potAprovar} onFet={recargar} />
           )}
 
+          {/* Lo que el productor ha cambiado de la oferta y nadie del equipo ha revisado
+              (fase 2 de la revisión del 08-10-2026; cola `ofertes_modificades`). */}
+          <CanvisOferta excedenteId={exc.id} />
+
           {/* Qué ha pasado con el producto: el equipo lo registra en nombre del productor
               cuando se lo cuenta por teléfono (modelo asistido). Mismo componente y misma
               RPC que en el panel del productor. */}
@@ -957,6 +973,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   )}
                   <Button size="sm" variant="outline" title={t('od.force_email')} disabled={enviant === ent.id || !ofertaOberta}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</Button>
+                  <Button size="sm" variant="outline" title={t('od.force_panel')} disabled={enviant === ent.id || !ofertaOberta}
+                    onClick={() => void ambBloqueig(ent.id, () => enviarOfertaPanell(ent))}>{t('od.panel')}</Button>
                 </div>
               </div>
             )

@@ -13,7 +13,9 @@ import { useT } from '../../lib/i18n'
 import { dataCurta, nombre } from '../../lib/format'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
-import { marcaLlegits } from '../../lib/avisos'
+import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
+import type { Contrapart } from '../../lib/avisos'
+import LiniesSortida from '../../components/LiniesSortida'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaDestins } from '../../lib/ofertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
@@ -45,6 +47,8 @@ function useMevesOfertes(productorId: string | null) {
   const [externs, setExterns] = useState<Record<string, number>>({})
   /** Cuántos destinos (canalizaciones) tiene cada oferta: una oferta puede ir a varios. */
   const [destins, setDestins] = useState<Record<string, number>>({})
+  /** A quién va cada salida (D1), por oferta: la línea «Fundació X · 250 kg · 10/10 · 10:00». */
+  const [sortides, setSortides] = useState<Record<string, Contrapart[]>>({})
   const [recs, setRecs] = useState<Record<string, RecResum>>({})
   const [progres, setProgres] = useState<Record<string, ProgresOferta>>({})
   /** Los REC que esperan la confirmación de esta organización (`pendents_meus`). */
@@ -101,6 +105,11 @@ function useMevesOfertes(productorId: string | null) {
         carregaPendents(),
         carregaDestins(ids),
       ])
+    // Una sola llamada para todas las ofertas (§12.5: nunca una por oferta).
+    const cps = ids.length === 0 ? [] : await carregaContraparts()
+    const sx: Record<string, Contrapart[]> = {}
+    for (const c of cps) if (c.rol === 'productor') (sx[c.excedente_id] ??= []).push(c)
+    setSortides(sx)
 
     // Los kilos y el REC deciden el estado que se pinta: sin ellos una oferta recogida
     // saldría «Buscant sortida». Un fallo aquí es un fallo de carga, no «0 kg».
@@ -202,15 +211,19 @@ function useMevesOfertes(productorId: string | null) {
     }, 'productor')
   }, [kg, externs, progres, recs, recsPendents])
 
-  return { ofertes, kg, destins, puntDe, carregant, errorCarrega }
+  return { ofertes, kg, destins, sortides, puntDe, carregant, errorCarrega }
 }
 
 /** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. Sin decimales. */
 const fmtKg = (n: number) => nombre(n, 0)
 
 function FilaOferta({
-  o, canalitzats, punt, ambCodi, foto,
-}: { o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: FotoResolta }) {
+  o, canalitzats, punt, ambCodi, foto, sortides,
+}: {
+  o: Excedente; canalitzats: number; punt: PuntProces; ambCodi?: boolean; foto?: FotoResolta
+  /** «Fundació X · 250 kg · Recollida 10/10 · 10:00», sin entrar al detalle (§3.2). */
+  sortides?: Contrapart[]
+}) {
   const { t } = useT()
   const total = Number(o.kg_total ?? 0)
   const falten = Math.max(0, total - canalitzats)
@@ -235,6 +248,7 @@ function FilaOferta({
               {t('edit.fins')} {dataCurta(o.disponible_hasta)}
             </div>
           )}
+          {sortides && <LiniesSortida sortides={sortides} />}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
@@ -296,11 +310,12 @@ function CapOferta() {
  *    cuántos destinos, nunca cuáles (20270323100000); aquí se dice el número y basta.
  */
 function QuePassaAmbLesMeves({
-  ofertes, kg, destins, puntDe, foto,
+  ofertes, kg, destins, sortides, puntDe, foto,
 }: {
   ofertes: Excedente[]
   kg: Record<string, number>
   destins: Record<string, number>
+  sortides: Record<string, Contrapart[]>
   puntDe: (o: Excedente) => PuntProces
   foto: (o: Excedente) => FotoResolta
 }) {
@@ -347,6 +362,7 @@ function QuePassaAmbLesMeves({
                   : t('pi.split_none', { m: fmtKg(falten) })}
                 {nDestins > 1 ? ` · ${t('pi.n_destins', { n: nDestins })}` : ''}
               </p>
+              <LiniesSortida sortides={sortides[o.id] ?? []} />
               {toca && toca !== '—' && toca !== punt.claus.toca && (
                 <p className={cn(
                   'mt-1 flex items-start gap-1 text-sm',
@@ -379,7 +395,7 @@ export function ProductorInici() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, destins, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const { ofertes, kg, destins, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
@@ -429,7 +445,7 @@ export function ProductorInici() {
             </CardContent></Card>
           </div>
 
-          <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} puntDe={puntDe} foto={foto} />
+          <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} sortides={sortides} puntDe={puntDe} foto={foto} />
 
           <Button
             className="h-11 whitespace-normal md:h-9"
@@ -467,7 +483,7 @@ export function ProductorOfertes() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const { ofertes, kg, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   return (
@@ -494,7 +510,7 @@ export function ProductorOfertes() {
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('po.err_load')}</p>}
         {!carregant && !errorCarrega && ofertes.length === 0 && <CapOferta />}
         {ofertes.map((o) => (
-          <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} ambCodi
+          <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} sortides={sortides[o.id]} ambCodi
             foto={foto(o)} />
         ))}
       </CardContent>
