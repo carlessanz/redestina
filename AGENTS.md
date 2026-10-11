@@ -541,6 +541,8 @@ vitest.config.ts               Config de las pruebas, aparte de vite.config.ts (
 tsconfig.tests.json            Tipos de las pruebas: Node y Deno, que la app NO debe ver
 .githooks/pre-commit           Tipos + vitest + deno check antes de cada commit (§13)
 tests/                         Pruebas unitarias (Vitest). Módulos de negocio, no pantallas
+  pdf/                         Pruebas de DENO del renderizador (`*_test.ts`): las corre
+                               `deno test` dentro de `npm run check:deno`, no Vitest ni tsc
   e2e/                         Playwright (`*.e2e.ts`, `playwright.config.ts`): recorridos de
                                las rebanadas del 05-10-2026; se saltan sin credenciales (§11)
   deno.d.ts                    El global `Deno` declarado al mínimo, para que tsc compruebe
@@ -843,6 +845,13 @@ supabase/
     recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)
     _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5)
+    _shared/confirmacions.ts   PURO: los botones `conf:<enlace>:ok|dif` y los kilos de la
+                               confirmación de un albarán por WhatsApp (fase 3, 11-10-2026)
+    _shared/confirmacionsWhatsapp.ts  Lo consume el webhook ANTES de la respuesta de oferta y
+                               del intake; `recollides-programades` manda la pregunta
+    _shared/pdf/render/albara1p.ts  El albarán de UNA página (modelo de Espigoladors, fase 3):
+                               REC/ENT/OPE con `datos.format = 'albara-1p'`. Los antiguos
+                               (rec.ts, ent.ts, ope.ts) siguen pintando lo emitido antes
     _shared/gate.ts            Gate de envío: quién PUEDE recibir (es_test, cuenta) + modoTestActivo (§8)
     _shared/canal.ts           Política de canal: por dónde se contacta; el correo es el defecto (§8bis)
     _shared/organizacion.ts    organizaciones: preferencia de canal y doble rol real (§8bis, §12.16)
@@ -1403,7 +1412,7 @@ superficie de escritura son las RPC `security definer` y `service_role`.
 a la entidad · **OPE** venta o maquila) y `albaran_lineas`, donde viven **los kilos oficiales**
 (`kg_bruto` / `tara_kg` / `kg_neto`, y `kg_previstos` / `kg_confirmados` / `kg_validados`); solo
 `kg_validados` cuenta para indicadores y certificados (D13). **Sin ninguna columna de importe, a
-propósito** —en un albarán no hay dinero— y el arnés lo comprueba esperando `42703`. El número se
+propósito** —en un albarán no hay dinero— y el arnés lo comprueba esperando `42703`. ⚠️ Desde el 11-10-2026 el **PDF** del REC de donación sí imprime valor por kilo e importe (modelo de Espigoladors), calculados al renderizar desde el snapshot: la tabla sigue sin un euro (§6ter, fase 3). El número se
 pide al **emitir** (`siguiente_numero`), nunca en borrador: un borrador descartado no deja hueco en
 la serie. `partes` congela quién entrega y quién recibe, así que si luego cambia una ficha el
 albarán no cambia. Estados: `borrador → emitido → entregado → confirmado → conciliado`, con
@@ -2186,8 +2195,10 @@ funciones, no políticas:
 | `reiniciar_documentos_prova()` | Borra los documentos `modo='prueba'` y pone a 0 `PROVA`/`P-*` del ejercicio. Única excepción a la inmutabilidad |
 | `marcar_documento_generado(id, sha, bytes, paginas)` / `marcar_documento_error(id, err)` | Solo `service_role`. La `ruta` no se pasa: ya está fijada. `generado` es idempotente |
 | `emitir_albaran(id, recogida, lineas, idioma)` | Pide número, congela `partes`, emite el PDF. `es_intern()`; `22023` si no es borrador |
-| `marcar_entregado(id)` | Crea los enlaces de confirmación y **devuelve el token en claro**: es la única vez que existe (en la base solo está su hash). `es_intern()` |
-| `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`.** Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada. ⚠️ **Desde `20270414100000` un OPE lo confirman las DOS partes**: solo pasa a `confirmado` cuando confirma la última parte con enlace vivo (otro `rol_parte`, no usado, `activo` y no caducado); si solo hay un enlace —ficha sin correo— o el de la otra parte caducó o se revocó, pasa a `confirmado` como en REC/ENT. Los kg de la línea los fija la parte `recibe` (`entrega` solo escribe si `recibe` aún no confirmó); se conserva el rechazo más grave (`total` > `parcial` > `cap`) con los motivos encadenados; una parte que ya confirmó recibe `PT409`. En REC y ENT no cambia nada |
+| `marcar_entregado(id)` | Crea los enlaces de confirmación y **devuelve el token en claro**: es la única vez que existe (en la base solo está su hash). `es_intern()`. ⚠️ **Desde `20270418100100`** una parte **sin correo y con móvil** (`es_mobil()`, la regla de `esMovil()`) recibe un enlace `canal = 'whatsapp'` con `destinatario_telefono` y **sin token en la salida** (por WhatsApp no viaja: quedaría en la consola de Mensajería); `recollides-programades` le manda los botones. Sin correo ni móvil, ninguna fila: la vía es `confirmar_recollida()` |
+| `confirmar_recollida(canalizacion, kg_reals, data, observacions, foto)` (`20270418100100`) | **«Confirma la recollida» del equipo** (fase 3 de la revisión del 08-10-2026, §6ter). Solo `es_intern()` **con sesión** (la identidad es parte de la evidencia; permiso antes que existencia). En una transacción: emite y entrega el ENT/OPE si estaba en `borrador`/`emitido` (**consume numeración**), confirma por cada parte que falte con un enlace `asistido` acuñado y consumido al momento (`confirmar_part_assistida`, `asistido_por` = la cuenta), fija `kg_reales`, y cuando ya no queda ninguna salida del registro sin confirmar emite/entrega/confirma el **REC** con la suma de lo real; dentro de tolerancia concilia en cascada, fuera la deja en `albarans_conciliar`. Sin REC (venta/maquila pura) concilia la salida. Rechazos `22023`: `canalitzacio_inexistent`, `canalitzacio_anulada`, `sense_albara`, `ja_confirmada`, `kg_invalids`, `data_futura`, `foto_aliena`. Devuelve `{albara_id, albara, estat, rec, conciliat, fora_tolerancia, …}` |
+| `confirmar_part_assistida(…)` · `repartir_kg_linies(albaran, kg)` · `es_mobil(tel)` (`20270418100100`) | Internas de lo anterior. Las dos primeras **sin EXECUTE para `authenticated`** (el arnés lo vigila); `repartir_kg_linies` la usa también el webhook con `service_role` para repartir los kilos de WhatsApp entre las líneas (proporcional a lo previsto, residuo a la mayor) |
+| `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`**, salvo **una sesión de equipo sobre un enlace `asistido`** (desde `20270418100100`, la usa `confirmar_recollida()`): una función, un camino. Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada. ⚠️ **Desde `20270414100000` un OPE lo confirman las DOS partes**: solo pasa a `confirmado` cuando confirma la última parte con enlace vivo (otro `rol_parte`, no usado, `activo` y no caducado); si solo hay un enlace —ficha sin correo— o el de la otra parte caducó o se revocó, pasa a `confirmado` como en REC/ENT. Los kg de la línea los fija la parte `recibe` (`entrega` solo escribe si `recibe` aún no confirmó); se conserva el rechazo más grave (`total` > `parcial` > `cap`) con los motivos encadenados; una parte que ya confirmó recibe `PT409`. En REC y ENT no cambia nada |
 | `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
 | `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo. ⚠️ **Desde `20270414100100` sobre un REC exige motivo fuera de tolerancia (`22023 fora_de_tolerancia`) y concilia EN CASCADA** los ENT/OPE hermanos en `confirmado` (los obtiene `albarans_germans_rec(rec)`: mismo excedente o misma espigolada), con el motivo propagado o «Conciliat amb l'albarà de recepció <num>»; las canalizaciones quedan `conciliada` con `coste_kg` congelado. Todo o nada: si un hermano falla, falla el REC entero. Antes, conciliar un REC no tocaba las salidas y el cierre quedaba bloqueado por `sense_conciliar`. Un ENT/OPE se puede conciliar también por separado (UI `AlbaraDetall` desde el 07-10-2026) |
 | `albarans_germans_rec(rec)` (`20270414100100`) | Los ENT/OPE de un REC (mismo excedente o misma espigolada), con la condición de `propuesta_conciliacion()`. Interna: solo `service_role` |
@@ -2457,7 +2468,9 @@ Si Meta devuelve error, la función lo reenvía **tal cual** con su status HTTP.
 upsert del contacto → **upsert** del mensaje por `wa_message_id` → actualiza
 `last_inbound_at` → Realtime. Tras validar la firma **siempre responde 200**, para que Meta
 no reintente. **Orden exacto**: registra el mensaje → actualiza `last_inbound_at` →
-**interruptor `whatsapp_activo`** → gate `es_test` → ALTA/BAJA → respuesta a oferta → intake.
+**interruptor `whatsapp_activo`** → gate `es_test` → ALTA/BAJA → **confirmación de albarán**
+(desde el 11-10-2026: solo su id de botón `conf:<enlace>:ok|dif`, o un número cuando ese teléfono
+tiene exactamente un enlace con `wa_pas = 'kg'`) → respuesta a oferta → intake.
 **Gate `es_test`**: el mensaje se registra y abre la ventana, pero solo se **responde** (ALTA/BAJA,
 respuesta a oferta, intake) si el número es de un productor/entidad marcado `es_test`; si no, se
 deja en la consola para una persona (§8). **Con el interruptor apagado no se contesta a nadie**, y
@@ -3016,6 +3029,52 @@ Migraciones `20270417100000` (ficha) y `…100100` (avisos, cola y «no m'intere
   oferta `components/equip/CanvisOferta.tsx` con lo que cambió (antes → después) y «Marca com a
   revisat». Los cambios del propio equipo no cuentan.
 - E2E: `tests/e2e/operacio.e2e.ts` contra el clon (§11).
+
+### Revisión del cliente del 08-10-2026 — fase 3: confirmar la recogida y el albarán de una página (11-10-2026)
+
+Migraciones `20270418100000` (`albaran_datos` v2 y el neto del REC en la propuesta) y `…100100`
+(WhatsApp, `registrar_confirmacion` asistida y `confirmar_recollida`).
+
+- **El albarán de UNA página** (`_shared/pdf/render/albara1p.ts`): reproduce el «Albarà de recepció»
+  de Espigoladors que mandó el cliente —caja del título con número, logo, frase de trazabilidad de
+  las donaciones, caja de la parte, «Data d'elaboració», rótulo DONACIÓ/VENDA/MAQUILA/ESPIGOLAMENT,
+  tabla de 8 filas fijas con su total, nota legal y caja de firma con la confirmación—.
+  `albaran_datos()` marca los nuevos con `format: 'albara-1p'` y `generar-documento` ramifica por
+  él: **lo emitido antes sigue saliendo con `rec.ts`/`ent.ts`/`ope.ts`**. Con más de 8 líneas
+  (espigolada grande) pasa a más páginas. Captura del modelo y de la muestra en
+  `3. Claude Code/capturas/`.
+  🔴 **El REC de DONACIÓN lleva euros** (valor de referencia por kilo e importe), y es decisión del
+  cliente: es su modelo, art. 18 Llei 49/2002. El valor sale de `coalesce(excedentes.coste_kg,
+  costes_producto.coste_kg)` en el snapshot (`linies[].valor_kg`) y **el importe se calcula al
+  renderizar** (kilos validados, confirmados o netos × valor), así `emès` y `conciliat` no
+  discrepan. **Nunca en el ENT** —lo lee la entidad: sería el coste del donante— **ni en el
+  OPE**. `albaran_lineas` sigue sin columna de importe (el arnés lo vigila igual). La nota legal
+  sale de la plantilla `REC` si existe; si no, un texto de trabajo marcado «provisional».
+- **`propuesta_conciliacion()`** cuenta lo que confirmó quien entrega (`kg_confirmados` del REC):
+  antes lo ignoraba.
+- **«Confirma la recollida»** (`components/equip/DialegConfirmaRecollida.tsx`, en `AlbaraDetall` y
+  en la fase 5 de la canalización guiada): kilos reales (con la diferencia frente a lo asignado),
+  fecha y hora, observaciones y foto (se sube después como `foto_incidencia` del albarán ya
+  emitido). Una llamada, `confirmar_recollida()` (§4bis). Avisa antes si el albarán aún es un
+  borrador: confirmarlo consume número.
+- **WhatsApp como vía de confirmación**: `enlaces_token.canal` admite `whatsapp`, con
+  `destinatario_telefono`, `wa_pas` y `wa_preguntat_at`. `recollides-programades` (cada 15 min)
+  manda a cada enlace vivo sin pregunta los botones «Tot correcte» / «Hi ha diferències»
+  **solo con la ventana de 24 h abierta** —fuera de ella Meta exige una plantilla que no está
+  aprobada (`plantillas-meta.md §4`)— y con los gates de §8. El webhook registra con
+  `registrar_confirmacion()`; el PDF imprime «Confirmat per WhatsApp». Sin token: lo que autoriza
+  es que el botón llega desde el teléfono de la ficha.
+- **Cada parte firma lo suyo**: el acta de `enlace-publico` y el formulario dicen «he lliurat» /
+  «Confirma l'entrega» a quien entrega, y «he rebut» / «Confirma la recepció» a quien recibe
+  (antes el productor firmaba «he rebut»). «Pendent de tu» dice «Confirma l'entrega».
+- `AlbaraDetall`: transportista, matrícula y temperatura, plegados en «Dades addicionals».
+- Pruebas: `tests/confirmacions.test.ts` (Vitest), `tests/pdf/albara1p_test.ts` (Deno: una página,
+  euros solo en el REC de donación, varias páginas con 40 líneas), y E2E
+  `tests/e2e/recollida.e2e.ts` contra el clon (equipo confirma con 5 kg menos → todo conciliado y
+  PDF de 1 página; productor «Producte recollit»; receptora en Històric; la productora confirma
+  su entrega desde «Pendent de tu»).
+- ⚠️ **Queda para después**: la plantilla de Meta para preguntar fuera de la ventana, y el texto
+  legal del REC validado por la asesoría (§12.71).
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -6662,7 +6721,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.273 pruebas en 50 ficheros**: 1.272 correctas y **1 saltada a propósito** (11-10-2026,
+   Referencia: **1.277 pruebas en 51 ficheros** de Vitest: 1.276 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 3: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
+   de `check:deno`). Tras la fase 2 eran **1.273 en 50**: 1.272 correctas y 1 saltada (11-10-2026,
    fase 2 de la revisión del 08-10-2026; tras la fase 1 eran 1.257: `tests/destiFinal.test.ts` y los casos
    nuevos de `procesOferta` y `textAvis`). Antes, **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
    tras la revisión completa: +123 sobre 1.115, de `tests/http.test.ts`, `autorizacion.test.ts`,
@@ -6696,8 +6757,10 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.202/1.202 correctas y 26 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras
+   ✅ **Referencia HOY (clon local): 1.218/1.218 correctas y 26 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al
+   equipo con uuid inventado, y las dos funciones internas sin EXECUTE: +16—; tras la fase 2 eran 1.202,
+   tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras
    la fase 1 eran 1.179, `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada
    e `excedente_destins` sin escritura en las siete cuentas externas, `destins_finals` legible, y dos
    checks del equipo—). **Pendiente de confirmar en producción al publicar.** La anterior:

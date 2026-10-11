@@ -141,7 +141,9 @@ export default function PendentsDeTu({
                 {obrint === clau(p) && <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />}
                 {obrint === clau(p)
                   ? t('pend.opening')
-                  : esConveni ? t('pend.sign') : t('pend.confirm')}
+                  : esConveni ? t('pend.sign')
+                  // Quien entrega confirma la ENTREGA, no «l'albarà» (revisión del 08-10-2026).
+                  : p.rol_parte === 'entrega' ? t('pend.confirm_entrega') : t('pend.confirm')}
               </Button>
             </div>
           )

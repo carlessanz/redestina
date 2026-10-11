@@ -18,6 +18,13 @@ const CODIS: Record<string, string> = {
   // `cancelar_meva_oferta()` desde la fase 1 de la revisión del 08-10-2026.
   te_canalitzacions: 'po.err_te_canalitzacions',
   cal_motiu: 'po.err_cal_motiu',
+  // `confirmar_recollida()`, fase 3 de la revisión del 08-10-2026.
+  canalitzacio_inexistent: 'crec.err_inexistent',
+  canalitzacio_anulada: 'crec.err_anulada',
+  sense_albara: 'crec.err_sense_albara',
+  ja_confirmada: 'crec.err_ja_confirmada',
+  kg_invalids: 'crec.err_kg',
+  data_futura: 'crec.err_data_futura',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

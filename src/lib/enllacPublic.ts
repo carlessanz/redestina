@@ -118,6 +118,8 @@ export interface DadesEnllac {
    * saberlo. `false` para los enlaces por correo y para los del propio panel.
    */
   assistida: boolean
+  /** De qué parte es el enlace; `entrega` cambia los textos de «recepció» a «entrega». */
+  rolParte: 'entrega' | 'recibe' | null
 }
 
 export type ResultatEnllac<T> =
@@ -177,6 +179,7 @@ function normalitza(cos: Record<string, unknown>): DadesEnllac {
     // Ante la duda, NO asistida: afirmar que alguien del equipo acompañó el acto cuando
     // no consta es exactamente el error que la columna `asistido_por` existe para evitar.
     assistida: cos.assistida === true,
+    rolParte: cos.rol_parte === 'entrega' ? 'entrega' : cos.rol_parte === 'recibe' ? 'recibe' : null,
     albara: {
       id: text(alb.id) ?? '',
       tipo: text(alb.tipo) ?? '',

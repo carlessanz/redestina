@@ -7,6 +7,12 @@
 // estructura garantizaba que en tres meses divergieran; lo que cambia de verdad
 // —el título, las columnas y un par de bloques— es lo que cada renderizador aporta.
 //
+// ⚠️ ESTO VALE PARA LOS RENDERIZADORES ANTIGUOS (rec.ts, ent.ts, ope.ts), que siguen
+//    imprimiendo los albaranes emitidos antes del 11-10-2026. Los nuevos llevan
+//    `format: 'albara-1p'` y los pinta `albara1p.ts`, que reproduce el modelo de
+//    Espigoladors: el REC de DONACIÓN sí lleva valor de referencia por kilo e importe
+//    (art. 18 Llei 49/2002); el ENT y el OPE siguen sin un euro.
+//
 // ⚠️ NINGUNA CIFRA EN EUROS, EN NINGUNO DE LOS TRES. No es una convención de estilo: un
 //    albarán con importe es una factura a ojos de cualquiera que lo lea, y la donación
 //    a Espigoladors no la lleva. La garantía es estructural —`albaran_lineas` no tiene
@@ -264,6 +270,7 @@ export interface Diccionario {
   confirmat_enllac: string;
   confirmat_assistit: string;
   confirmat_panell: string;
+  confirmat_whatsapp: string;
   confirmacions: string;
   referencia: string;
   pendent_signatura: string;
@@ -340,6 +347,7 @@ const CA: Diccionario = {
   confirmat_enllac: "Confirmat des de l'enllaç",
   confirmat_assistit: "Confirmat amb acompanyament de l'equip",
   confirmat_panell: "Confirmat des del panell, amb sessió iniciada",
+  confirmat_whatsapp: "Confirmat per WhatsApp, des del telèfon de la fitxa",
   confirmacions: "Confirmacions registrades",
   referencia: "Referència",
   pendent_signatura: "Pendent de signatura",
@@ -432,6 +440,7 @@ const ES: Diccionario = {
   confirmat_enllac: "Confirmado desde el enlace",
   confirmat_assistit: "Confirmado con acompañamiento del equipo",
   confirmat_panell: "Confirmado desde el panel, con sesión iniciada",
+  confirmat_whatsapp: "Confirmado por WhatsApp, desde el teléfono de la ficha",
   confirmacions: "Confirmaciones registradas",
   referencia: "Referencia",
   pendent_signatura: "Pendiente de firma",
@@ -995,7 +1004,8 @@ function lineasConfirmacion(t: Diccionario, c: ConfirmacionAlbaran): [string, st
   // imprimía como «des de l'enllaç» —que es falso— en un documento legal.
   const via = c.canal === "asistido"
     ? t.confirmat_assistit
-    : c.canal === "panel" ? t.confirmat_panell : t.confirmat_enllac;
+    : c.canal === "panel" ? t.confirmat_panell
+    : c.canal === "whatsapp" ? t.confirmat_whatsapp : t.confirmat_enllac;
   const referencia = c.referencia ? ` · ${t.referencia} ${c.referencia}` : "";
   return [
     [t.nom_cognoms, (c.nombre ?? "").trim()],

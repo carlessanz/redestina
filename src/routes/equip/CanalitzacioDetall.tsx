@@ -48,6 +48,7 @@ import { supabase } from '../../lib/supabase'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import DialegAssistit from '../../components/equip/DialegAssistit'
+import DialegConfirmaRecollida from '../../components/equip/DialegConfirmaRecollida'
 import DialegEspigolada from '../../components/equip/DialegEspigolada'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import DialegFirmaAssistida from '../../components/equip/DialegFirmaAssistida'
@@ -141,6 +142,27 @@ export default function CanalitzacioDetall() {
   // Los tres actos asistidos, cada uno con su diálogo.
   const [dlgFirma, setDlgFirma] = useState<string | null>(null)
   const [dlgAlbara, setDlgAlbara] = useState<string | null>(null)
+  // «Confirma la recollida» (fase 3): los datos del albarán de salida se leen al abrir.
+  const [dlgRecollida, setDlgRecollida] = useState<{
+    canalitzacio: string; kg: number | null; data: string | null; numero: string | null; esborrany: boolean
+  } | null>(null)
+  const obreRecollida = async (albaraId: string) => {
+    const { data, error } = await supabase.from('albaranes')
+      .select('canalizacion_id, estado, numero_completo, recogida, albaran_lineas(kg_previstos)')
+      .eq('id', albaraId).maybeSingle()
+    const a = data as {
+      canalizacion_id: string | null; estado: string; numero_completo: string | null
+      recogida: { fecha_hora?: string } | null; albaran_lineas: { kg_previstos: number | null }[]
+    } | null
+    if (error || !a?.canalizacion_id) { toast.error(textError(t, error?.message ?? null)); return }
+    setDlgRecollida({
+      canalitzacio: a.canalizacion_id,
+      kg: a.albaran_lineas.reduce((x, l) => x + Number(l.kg_previstos ?? 0), 0) || null,
+      data: a.recogida?.fecha_hora ?? null,
+      numero: a.numero_completo,
+      esborrany: a.estado === 'borrador',
+    })
+  }
   const [dlgEspigolada, setDlgEspigolada] = useState(false)
 
   // El interés asistido: entidad y kilos, que es lo mínimo que la RPC necesita.
@@ -709,7 +731,10 @@ export default function CanalitzacioDetall() {
                                     // enviat» son el mismo acto (como en `AlbaraDetall`). Esta
                                     // pantalla no enseña los enlaces: la salida, si el correo no
                                     // sale, es la confirmación asistida.
+                                    const perWhatsapp = enllacos.filter((e) => e.canal === 'whatsapp').length
+                                    if (perWhatsapp > 0) toast.info(t('alb.delivered_wa', { n: perWhatsapp }))
                                     if (enllacos.length === 0) toast.warning(t('alb.delivered_0'))
+                                    else if (perWhatsapp === enllacos.length) { /* només WhatsApp: ja s'ha dit */ }
                                     else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
                                     else toast.warning(`${t('canalz.ok_entregat')} ${t('alb.mail_failed_assistit')}`)
                                     if (correu.enviats > 0 && correu.fallits > 0) toast.warning(t('alb.mail_failed_assistit'))
@@ -728,6 +753,15 @@ export default function CanalitzacioDetall() {
                                 onClick={() => setDlgAlbara(a.id)}
                               >
                                 {t('canalz.b_confirmacio_assistida')}
+                              </Button>
+                            )}
+                            {(a.tipo === 'ENT' || a.tipo === 'OPE')
+                              && ['borrador', 'emitido', 'entregado'].includes(a.estado) && (
+                              <Button
+                                size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                                onClick={() => void obreRecollida(a.id)}
+                              >
+                                {t('crec.btn')}
                               </Button>
                             )}
                             <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
@@ -769,6 +803,18 @@ export default function CanalitzacioDetall() {
           objecteId={dlgAlbara}
           onTancar={() => setDlgAlbara(null)}
           onFet={() => { setDlgAlbara(null); void carrega() }}
+        />
+      )}
+      {dlgRecollida && (
+        <DialegConfirmaRecollida
+          obert
+          canalitzacio={dlgRecollida.canalitzacio}
+          kgAssignats={dlgRecollida.kg}
+          dataPrevista={dlgRecollida.data}
+          descripcio={dlgRecollida.numero}
+          esborrany={dlgRecollida.esborrany}
+          onTancar={() => setDlgRecollida(null)}
+          onFet={() => void carrega()}
         />
       )}
       {dialegConfirma}

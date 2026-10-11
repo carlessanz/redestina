@@ -177,8 +177,8 @@ export default function FormulariConfirmacio(
   if (fet) {
     return (
       <div className="space-y-2">
-        <h2 className="text-lg font-semibold">{t('conf.done_title')}</h2>
-        <p className="text-sm">{t('conf.done_body')}</p>
+        <h2 className="text-lg font-semibold">{t(dades.rolParte === 'entrega' ? 'conf.done_title_entrega' : 'conf.done_title')}</h2>
+        <p className="text-sm">{t(dades.rolParte === 'entrega' ? 'conf.done_body_entrega' : 'conf.done_body')}</p>
         {dades.albara.numero_completo && (
           <p className="text-sm tabular-nums text-muted-foreground">{dades.albara.numero_completo}</p>
         )}
@@ -200,7 +200,7 @@ export default function FormulariConfirmacio(
       {/* En el diálogo el título lo pone su propia cabecera; el número del albarán no,
           que es lo que dice DE QUÉ entrega se está hablando. */}
       <div>
-        {!ample && <h2 className="text-lg font-semibold">{t('conf.title')}</h2>}
+        {!ample && <h2 className="text-lg font-semibold">{t(dades.rolParte === 'entrega' ? 'conf.title_entrega' : 'conf.title')}</h2>}
         <p className="mt-1 text-sm text-muted-foreground">
           {dades.albara.numero_completo ?? t('conf.no_number')}
           {dades.albara.entrega ? ` · ${dades.albara.entrega}` : ''}
@@ -230,7 +230,7 @@ export default function FormulariConfirmacio(
 
       {/* ── Kilos por línea ── */}
       <div className="space-y-3">
-        <h3 className="text-base">{t('conf.received')}</h3>
+        <h3 className="text-base">{t(dades.rolParte === 'entrega' ? 'conf.received_entrega' : 'conf.received')}</h3>
         {dades.linies.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('conf.no_lines')}</p>
         )}
@@ -351,7 +351,7 @@ export default function FormulariConfirmacio(
       <Button className="h-11 w-full whitespace-normal" disabled={!potEnviar}
         onClick={() => void envia()}>
         {enviant && <Loader2 className="size-4 animate-spin" />}
-        {enviant ? t('c.sending') : t('conf.submit')}
+        {enviant ? t('c.sending') : t(dades.rolParte === 'entrega' ? 'conf.submit_entrega' : 'conf.submit')}
       </Button>
       {nom.trim() === '' && (
         <p className="text-xs text-muted-foreground">{t('conf.who_required')}</p>

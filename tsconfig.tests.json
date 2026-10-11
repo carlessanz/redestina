@@ -14,5 +14,8 @@
     "allowImportingTsExtensions": true,
     "noEmit": true
   },
-  "include": ["tests", "vitest.config.ts", "cortina", "scripts/construir-cortina.d.mts"]
+  "include": ["tests", "vitest.config.ts", "cortina", "scripts/construir-cortina.d.mts"],
+  // `tests/pdf/` son pruebas de DENO (renderizan PDF con `npm:pdf-lib`): las corre
+  // `deno test` dentro de `npm run check:deno`, no tsc ni Vitest.
+  "exclude": ["tests/pdf"]
 }

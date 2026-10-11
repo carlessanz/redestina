@@ -41,6 +41,7 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import DialegAssistit from '../../components/equip/DialegAssistit'
+import DialegConfirmaRecollida from '../../components/equip/DialegConfirmaRecollida'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -222,6 +223,7 @@ export default function AlbaraDetall() {
   const [enllacosNous, setEnllacosNous] = useState<{ nom: string; url: string }[]>([])
   // La confirmación conducida por teléfono, con la persona al otro lado (§9).
   const [dlgAssistit, setDlgAssistit] = useState(false)
+  const [dlgRecollida, setDlgRecollida] = useState(false)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -376,10 +378,12 @@ export default function AlbaraDetall() {
     // El token en claro solo existe aquí. Se manda por correo a cada destinatario y,
     // además, se enseña como enlace copiable, porque el modelo de Redestina es asistido
     // (§1bis): hay confirmaciones que el dinamizador conduce por teléfono.
-    const nous = (res.data.enllacos ?? []).map((e) => ({
-      nom: e.nom || e.destinatari,
+    const nous = (res.data.enllacos ?? []).filter((e) => e.token).map((e) => ({
+      nom: e.nom || e.destinatari || '',
       url: `${window.location.origin}/confirmar/${e.token}`,
     }))
+    const perWhatsapp = (res.data.enllacos ?? []).filter((e) => e.canal === 'whatsapp').length
+    if (perWhatsapp > 0) toast.info(t('alb.delivered_wa', { n: perWhatsapp }))
     setEnllacosNous(nous)
     const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang)
     // Un solo aviso verde, no dos seguidos: «entregat» y «correu enviat» son el mismo acto.
@@ -629,7 +633,9 @@ export default function AlbaraDetall() {
       <Card>
         <CardHeader><CardTitle className="text-base">{t('alb.pickup')}</CardTitle></CardHeader>
         <CardContent className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          {(['fecha_hora', 'lugar', 'responsable_origen', 'quien_recoge', 'transportista', 'matricula', 'temperatura'] as const).map((camp) => (
+          {/* Lo imprescindible a la vista; transportista, matrícula y temperatura, plegados
+              (revisión del 08-10-2026: «que no estorbin»). Se despliegan solos si traen algo. */}
+          {(['fecha_hora', 'lugar', 'responsable_origen', 'quien_recoge'] as const).map((camp) => (
             <div key={camp} className="space-y-1.5">
               <Label htmlFor={`rec-${camp}`}>{t(`alb.pk_${camp}`)}</Label>
               <Input
@@ -641,6 +647,25 @@ export default function AlbaraDetall() {
               />
             </div>
           ))}
+          <details
+            className="sm:col-span-2"
+            open={Boolean(recollida.transportista || recollida.matricula || recollida.temperatura) || undefined}
+          >
+            <summary className="cursor-pointer text-sm font-medium text-muted-foreground">{t('alb.pk_extra')}</summary>
+            <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {(['transportista', 'matricula', 'temperatura'] as const).map((camp) => (
+                <div key={camp} className="space-y-1.5">
+                  <Label htmlFor={`rec-${camp}`}>{t(`alb.pk_${camp}`)}</Label>
+                  <Input
+                    id={`rec-${camp}`}
+                    value={recollida[camp] ?? ''}
+                    disabled={!esBorrador}
+                    onChange={(e) => setRecollida((p) => ({ ...p, [camp]: e.target.value }))}
+                  />
+                </div>
+              ))}
+            </div>
+          </details>
           {!esBorrador && (
             <p className="text-xs text-muted-foreground sm:col-span-2">{t('alb.frozen_hint')}</p>
           )}
@@ -838,6 +863,35 @@ export default function AlbaraDetall() {
           )}
         </CardContent>
       </Card>
+
+      {/* ── «Confirma la recollida» (fase 3 de la revisión del 08-10-2026) ──
+          En un albarán de salida (ENT/OPE) que todavía no está confirmado: el equipo lo
+          confirma por las partes con los kilos reales, y si cuadra se concilia. Es la
+          salida normal cuando quien recibe o quien lliura no tiene correo ni WhatsApp. */}
+      {(albara.tipo === 'ENT' || albara.tipo === 'OPE') && albara.canalizacion_id
+        && ['borrador', 'emitido', 'entregado'].includes(albara.estado) && (
+        <Card>
+          <CardHeader><CardTitle className="text-base">{t('crec.title')}</CardTitle></CardHeader>
+          <CardContent className="space-y-2">
+            <p className="text-sm text-muted-foreground">{t('crec.desc')}</p>
+            <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgRecollida(true)}>
+              {t('crec.btn')}
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+      {albara.canalizacion_id && (
+        <DialegConfirmaRecollida
+          obert={dlgRecollida}
+          canalitzacio={albara.canalizacion_id}
+          kgAssignats={linies.reduce((a, l) => a + Number(l.kg_previstos ?? 0), 0) || null}
+          dataPrevista={(albara.recogida as { fecha_hora?: string } | null)?.fecha_hora ?? null}
+          descripcio={albara.numero_completo}
+          esborrany={albara.estado === 'borrador'}
+          onTancar={() => setDlgRecollida(false)}
+          onFet={() => void carrega()}
+        />
+      )}
 
       {/* ── La vía asistida ──
           Hasta el 21-09-2026 este albarán solo se podía confirmar desde el enlace del

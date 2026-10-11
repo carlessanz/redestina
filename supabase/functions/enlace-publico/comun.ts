@@ -89,6 +89,8 @@ export interface Enlace {
   usado_at: string | null;
   estado: string;
   estado_efectivo: string;
+  /** De qué parte del albarán es el enlace (`entrega`/`recibe`); null en los antiguos. */
+  rol_parte?: string | null;
 }
 
 /** Hashea el token y pregunta a la base. `null` = ese token no existe. */

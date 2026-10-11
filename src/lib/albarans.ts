@@ -79,9 +79,13 @@ export interface LiniaEntrada {
 /** `marcar_entregado()` devuelve el token EN CLARO: es la única vez que existe. */
 export interface EnllacConfirmacio {
   id: string
-  destinatari: string
+  /** Null en los de WhatsApp: la parte no tiene correo (11-10-2026). */
+  destinatari: string | null
   nom: string | null
-  token: string
+  /** Solo en los de correo: por WhatsApp el token no viaja. */
+  token: string | null
+  canal?: 'email' | 'whatsapp' | null
+  telefon?: string | null
 }
 
 export interface ResultatEntregat {
@@ -172,6 +176,39 @@ export function emetreAlbara(
 /** La recogida se ha hecho: crea los enlaces de confirmación y devuelve sus tokens. */
 export function marcarEntregat(id: string): Promise<ResultatRpc<ResultatEntregat>> {
   return crida('marcar_entregado', { p_id: id }, 'alb.err_generic')
+}
+
+/** Lo que devuelve `confirmar_recollida()`. */
+export interface ResultatConfirmaRecollida {
+  albara_id: string
+  albara: string | null
+  estat: string
+  rec: { numero: string | null; estat: string } | null
+  conciliat: boolean
+  fora_tolerancia: boolean
+  diferencia_pct: number | null
+  kg_recepcio: number | null
+  kg_entregues: number | null
+}
+
+/**
+ * «Confirma la recollida» (equipo, 11-10-2026): emite y entrega el albarán de salida si
+ * hacía falta, confirma por las partes que falten con los kilos reales, confirma el REC
+ * cuando ya no le falta ninguna salida y concilia si cuadra. Consume numeración legal si
+ * el albarán estaba en borrador.
+ */
+export function confirmarRecollida(camps: {
+  canalitzacio: string
+  kgReals: number
+  data: string | null
+  observacions: string | null
+}): Promise<ResultatRpc<ResultatConfirmaRecollida>> {
+  return crida('confirmar_recollida', {
+    p_canalizacion: camps.canalitzacio,
+    p_kg_reals: camps.kgReals,
+    p_data: camps.data,
+    p_observacions: camps.observacions,
+  }, 'alb.err_generic')
 }
 
 /** Propuesta de conciliación de un REC: neto recibido, entregado y la diferencia. */
@@ -341,7 +378,9 @@ export async function enviaEnllacosConfirmacio(
   let enviats = 0
   let fallits = 0
   for (const e of enllacos) {
-    if (!e.destinatari) { fallits++; continue }
+    // Los de WhatsApp los manda el servidor (`recollides-programades`, con botones).
+    if (e.canal === 'whatsapp') continue
+    if (!e.destinatari || !e.token) { fallits++; continue }
     const r = await enviarEmail({
       to: e.destinatari,
       subject: t('alb.mail_subject', { num: numero ?? '' }),

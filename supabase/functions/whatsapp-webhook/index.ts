@@ -8,6 +8,7 @@ import { createClient } from "@supabase/supabase-js";
 import { sendText } from "../_shared/whatsapp.ts";
 import { leerRespuesta, procesarIntake } from "../_shared/intake.ts";
 import { procesarRespuestaOferta } from "../_shared/respuestas.ts";
+import { procesarConfirmacio } from "../_shared/confirmacionsWhatsapp.ts";
 import { esTelefonoTest, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
 import { igualesTiempoConstante } from "../_shared/http.ts";
 
@@ -288,6 +289,19 @@ Deno.serve(async (req) => {
                 "Si vols deixar de rebre missatges, escriu BAIXA.",
             );
             continue;
+          }
+
+          // Confirmación de un albarán (botones `conf:<enlace>:ok|dif`, o los kilos cuando
+          // se le han pedido). Va PRIMERO: solo consume su propio id de botón o un número
+          // cuando ese teléfono tiene exactamente una confirmación esperándolo, así que no
+          // puede robarle nada a la respuesta de oferta ni al intake.
+          try {
+            if (await procesarConfirmacio(supabase, from, message)) continue;
+          } catch (err) {
+            console.error(
+              "confirmacio:",
+              err instanceof Error ? err.message : String(err),
+            );
           }
 
           // Respuesta de una entidad a una oferta (sí/no). Tiene PRIORIDAD sobre

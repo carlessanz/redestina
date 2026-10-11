@@ -36,6 +36,7 @@ import { renderEnt } from "../_shared/pdf/render/ent.ts";
 import { renderOpe } from "../_shared/pdf/render/ope.ts";
 import { type LineaProva, renderProva } from "../_shared/pdf/render/prova.ts";
 import { renderRec } from "../_shared/pdf/render/rec.ts";
+import { renderAlbara1p } from "../_shared/pdf/render/albara1p.ts";
 import type { DatosCierre } from "../_shared/pdf/render/cierre.ts";
 import { renderRes } from "../_shared/pdf/render/res.ts";
 import { renderCd } from "../_shared/pdf/render/cd.ts";
@@ -381,6 +382,10 @@ async function renderizar(
       subtipo: doc.subtipo,
       confirmaciones,
     };
+    // El albarán de UNA PÁGINA (fase 3 de la revisión del 08-10-2026) para lo emitido desde
+    // `20270418100000`; lo anterior, sin `format`, con su renderizador de siempre (el
+    // snapshot de un documento ya emitido no cambia nunca).
+    if ((datos as { format?: string }).format === "albara-1p") return await renderAlbara1p(activos, op);
     if (tipoBase === "REC") return await renderRec(activos, op);
     if (tipoBase === "ENT") return await renderEnt(activos, op);
     return await renderOpe(activos, op);

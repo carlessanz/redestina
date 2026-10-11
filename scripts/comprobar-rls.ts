@@ -587,6 +587,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "operacio_detall", op: "rpc", esperado: "denegar", vacioEsDenegar: true, args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu la fitxa d'una operació que no és seva" },
   { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» per una altra entitat" },
   { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a revisats els canvis d'una oferta (és de l'equip)" },
+  // Confirmar la recogida (20270418100100, fase 3): solo el equipo, y el permiso va antes
+  // que la existencia. Las funciones internas del reparto no las ejecuta nadie con sesión.
+  { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és de l'equip)" },
+  { tabla: "confirmar_part_assistida", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_observacions: null, p_foto: null, p_data: null }, descripcion: "NO confirma cap part d'un albarà (funció interna)" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
@@ -1182,6 +1186,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
     // Revisar los cambios de una oferta es del equipo (id inventado: autoriza y no toca nada).
     { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "marca com a revisats els canvis d'una oferta" },
+    // «Confirma la recollida»: el equipo, con sesión (id inventado → 22023, la guarda deja
+    // pasar). En positivo se prueba en el E2E del clon: consume numeración legal.
+    { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
     { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» en nom d'una entitat" },
     // La foto del catálogo es SOLO del super_admin (20270405100000), ni siquiera de un admin.

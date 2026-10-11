@@ -115,20 +115,36 @@ async function cargarAlbaran(
 // La huella NO incluye los kilos que la persona escribe: eso no es lo aceptado, es lo
 // respondido, y va en `evidencias.payload` (que `registrar_confirmacion` guarda entero).
 
-const DECLARACION: Record<string, string> = {
-  ca:
-    "Declaro que he rebut el producte que consta en aquest albarà i que les dades que hi ha a continuació són correctes. " +
-    "Si els quilos rebuts no coincideixen amb els previstos, els corregeixo aquí i ho faig constar.",
-  es:
-    "Declaro que he recibido el producto que consta en este albarán y que los datos que figuran a continuación son correctos. " +
-    "Si los kilos recibidos no coinciden con los previstos, los corrijo aquí y lo hago constar.",
+// Dos declaraciones, una por parte (11-10-2026): hasta hoy quien ENTREGA (el productor, en
+// el REC y en el OPE) firmaba «he rebut el producte», que es falso. La parte la dice el
+// enlace (`rol_parte`); un enlace anterior sin ella se queda con la de quien recibe, que
+// era el único texto que había.
+const DECLARACION: Record<"recibe" | "entrega", Record<string, string>> = {
+  recibe: {
+    ca:
+      "Declaro que he rebut el producte que consta en aquest albarà i que les dades que hi ha a continuació són correctes. " +
+      "Si els quilos rebuts no coincideixen amb els previstos, els corregeixo aquí i ho faig constar.",
+    es:
+      "Declaro que he recibido el producto que consta en este albarán y que los datos que figuran a continuación son correctos. " +
+      "Si los kilos recibidos no coinciden con los previstos, los corrijo aquí y lo hago constar.",
+  },
+  entrega: {
+    ca:
+      "Declaro que he lliurat el producte que consta en aquest albarà i que les dades que hi ha a continuació són correctes. " +
+      "Si els quilos lliurats no coincideixen amb els previstos, els corregeixo aquí i ho faig constar.",
+    es:
+      "Declaro que he entregado el producto que consta en este albarán y que los datos que figuran a continuación son correctos. " +
+      "Si los kilos entregados no coinciden con los previstos, los corrijo aquí y lo hago constar.",
+  },
 };
 
 function actaConfirmacion(
   albaran: AlbaranPublico,
   lineas: LineaPublica[],
   codigoVerificacion: string | null,
+  rolParte?: string | null,
 ): string {
+  const declaracio = DECLARACION[rolParte === "entrega" ? "entrega" : "recibe"];
   const idioma = albaran.idioma === "es" ? "es" : "ca";
   const cabecera = idioma === "es"
     ? `Albarán ${albaran.numero_completo ?? albaran.id} · código de verificación ${codigoVerificacion ?? "—"}`
@@ -143,7 +159,7 @@ function actaConfirmacion(
       kg !== null && kg !== undefined ? `${kg} kg` : "",
     ].filter(Boolean).join(" · ");
   });
-  return [cabecera, "", DECLARACION[idioma], "", ...detalle].join("\n");
+  return [cabecera, "", declaracio[idioma], "", ...detalle].join("\n");
 }
 
 /**
@@ -349,7 +365,7 @@ export async function getAlbaran(
 
   const sha = await shaDatosVigente(supabase, albaran.id);
   const codigo = codigoDe(sha);
-  const texto = actaConfirmacion(albaran, lineas, codigo);
+  const texto = actaConfirmacion(albaran, lineas, codigo, enlace.rol_parte);
 
   const partes = (albaran.partes ?? {}) as {
     entrega?: { razon_social?: string | null } | null;
@@ -371,6 +387,8 @@ export async function getAlbaran(
     // assistida»: quien la conduce es el equipo, y la persona que la firma merece saber
     // con qué etiqueta va a quedar en la evidencia y en el PDF. Igual que en el convenio.
     assistida: enlace.canal === "asistido",
+    // De qué parte es: quien ENTREGA confirma una entrega, no una recepción (11-10-2026).
+    rol_parte: enlace.rol_parte ?? null,
     documento: {
       id: albaran.id,
       tipo: albaran.tipo,
@@ -503,7 +521,7 @@ export async function confirmarAlbaran(
 
   // --------------------------------------------------- la huella de lo aceptado
   const sha = await shaDatosVigente(supabase, albaran.id);
-  const texto = actaConfirmacion(albaran, lineas, codigoDe(sha));
+  const texto = actaConfirmacion(albaran, lineas, codigoDe(sha), enlace.rol_parte);
   const shaTexto = await sha256Hex(texto);
   const shaCliente = textNet(body.sha256_texto);
   if (shaCliente && shaCliente !== shaTexto) {

@@ -45,7 +45,11 @@ orquesta. Lo mismo con el bloque `[functions.<nombre>]` de `config.toml` (`verif
   cierres de prueba, además `destinatariosPrueba()` aunque `test_mode` esté apagado.
 - `sendEmail()` nunca lanza; el maquetado de correo es `plantillaEmail()`; `textoAHtml()` **escapa**, no le
   pases HTML. Un enlace con token va **solo por correo**, nunca por WhatsApp.
-- Los PDF legales **no llevan importes** (REC/ENT/OPE); las cifras en € solo en RES/CD/CT.
+- Los albaranes **no llevan importes**, con UNA excepción desde el 11-10-2026: el REC de
+  **donación** con formato `albara-1p` imprime el valor de referencia por kilo y el importe
+  (modelo de Espigoladors, art. 18 Llei 49/2002), calculado al renderizar. Nunca en ENT
+  (lo lee la entidad: sería el coste del donante) ni en OPE. Las cifras en € del cierre,
+  en RES/CD/CT.
 - La ruta de subida a Storage es **`documentos.ruta`, tal cual** (la decide SQL); la función no compone rutas.
 - Lista de columnas de un `.select()` en **un solo literal**, nunca concatenada.
 - Secretos por `Deno.env.get`, nunca en el código. Textos hacia WhatsApp en catalán; comentarios en castellano.
