@@ -98,7 +98,9 @@ test('el productor ve «Producte recollit»', async ({ page }) => {
 test('la receptora ve la entrega en su Històric', async ({ page }) => {
   await entra(page, RECEPTOR)
   await page.goto('/receptor/historic')
-  await expect(page.getByText('Carbassa').first()).toBeVisible()
+  // La fila, no el texto suelto: desde la fase 6 el filtro «Producte» tiene un <option>
+  // Carbassa</option> (oculto) que sería lo primero que encontraría `getByText`.
+  await expect(page.getByRole('button').filter({ hasText: 'Carbassa' }).first()).toBeVisible()
   await expect(page.getByText(/95 kg/).first()).toBeVisible()
 })
 
