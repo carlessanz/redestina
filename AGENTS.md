@@ -728,7 +728,8 @@ src/
                                la otra tabla de fichas (§12.28)
     FirmaConveni.tsx           EL formulario de firma del convenio. Uno solo, para la página
                                pública y para el diálogo; `ample` decide el reparto (§6quater)
-    DialegFirmaConveni.tsx     Firmar sin salir del panel: 80vw × 88vh, acuña el enlace al abrir
+    DialegFirmaConveni.tsx     Firmar sin salir del panel: 80vw × 88vh, acuña el enlace al abrir. Con `conveniId`
+                               firma ESE convenio (`acunar_enllac_propi`); sin él, el del papel (`signar_conveni_propi`)
     FormulariConfirmacio.tsx   EL formulario de confirmación del albarán. Uno solo, para
                                /confirmar/:token y para el diálogo asistido del equipo
     FormulariFactura.tsx       Ídem con la factura del donante (/factura/:token)
@@ -2219,7 +2220,7 @@ funciones, no políticas:
 | `editar_oferta(id, canvis, texto, actor)` (`20270410100000`) | **Solo `service_role`** (la llama `crear-oferta/editar` con el actor de la sesión). Lista blanca de campos, kg ≥ canalizado, D4 (revalidación si el productor cambia kg o modalidades) e historial en `excedentes_canvis` |
 | `validar_oferta(id)` · `rebutjar_oferta(id, motiu)` (`20270409100000`) | Sacan una oferta de `pendent_validacio`: a `publicada` (sale al Mercat) o a `cancelada` con el motivo en `motivo_no_colocada`. `pot_aprovar()` (`42501`); `22023` si no está pendiente o sin motivo. Guardan `validada_at`/`validada_per` |
 | `descartar_convenio_esborrany(id)` (`20270408100000`) | Borra un convenio en **`esborrany`** (sin número: no deja hueco en ninguna serie). Solo `pot_aprovar()` (`42501`); `22023` si no es borrador o si tiene `documentos_externos`. Borra antes sus `enlaces_token` (no debería tener). `pendent_firma` **no** se descarta: ya ha salido un enlace hacia alguien. Deja `raise log` con quién y qué. Botón «Descarta l'esborrany» en `ConveniDetall`. Existe porque `convenios` no tiene `grant delete` y la Fundació va a un único convenio por tipo de entidad (reunión del 05-10-2026) |
-| `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio` |
+| `signar_conveni_propi(tipo_org, org)` (`20270326100000`) | **De cero a la página de firma en una llamada**: prepara el convenio si no existe, lo pasa de `esborrany` a `pendent_firma` y acuña un enlace `canal='panel'` de 1 h, devolviendo el token en claro. Solo `soc_titular()`. El `tipo` se **deduce** (productor→`don_gen`, entidad→`don_rec`) y no entra por parámetro: recibirlo dejaría pedir `com` desde una pantalla que no sabe nada de esa matriz. ⚠️ **`enviado_at` se queda NULL** — significa «cuándo se le mandó por correo», y aquí no se mandó nada— pero `datos_org` **sí** se refresca al salir del borrador, como en `enviar_convenio`. 🔴 **Desde `20270415100000` (11-10-2026) se NIEGA (`22023`, «Ja tens un conveni vigent d'aquest tipus») si ya hay un convenio vigente de ese tipo y ninguno en marcha**: `preparar_convenio()` solo reutiliza `esborrany`/`pendent_firma`/`retornat`/`firmat`, así que con un vigente creaba otro, que al contrafirmarse sustituía al vigente y quemaba un número legal. Una renovación que el equipo ya dejó en marcha sí se puede firmar. **Esta RPC es solo para «el convenio por defecto de mi papel»** (la usa `AvisConveni`); firmar uno concreto que ya existe es `acunar_enllac_propi()` |
 | `pendents_meus()` | Qué tienen pendiente de firmar o confirmar las organizaciones de la cuenta, con el `estado_efectivo` del último enlace. **Nunca devuelve el token ni su hash.** Lo decide el estado del OBJETO (convenio en `pendent_firma`/`retornat`, albarán en `entregado`), no el del enlace |
 | `acunar_enllac_propi(proposito, objeto_tipo, objeto_id, rol_parte)` | Acuña un enlace `canal='panel'` (1 h) **para uno mismo** y devuelve el token en claro; el frontend abre `/signar` o `/confirmar`. Firma: solo `soc_titular()`. Confirmación: cualquier miembro activo. **Revoca el enlace activo anterior**, como `enviar_convenio`. El `grant execute` va **solo a `authenticated`** (y `revoke` de `public`/`anon`): el equipo tiene `enviar_convenio`/`marcar_entregado`. ⚠️ **Aun así `service_role` PUEDE ejecutarla** —conserva el EXECUTE del `alter default privileges` del bootstrap, que esta migración no revocó—, y lo que la corta es la guarda interna `auth.uid() is null → 42501`. Medido contra producción al publicar (14-09-2026): la denegación es real, pero la impone la función, no el GRANT |
 | `generar_token_enlace()` | El token de 32 bytes y su sha256, en un solo sitio. Solo `service_role` (la llaman funciones definer). Las tres RPC anteriores conservan su copia: están en migraciones aplicadas |
@@ -3488,6 +3489,19 @@ de verdad era lo **pendiente**, porque `enlaces_token` es invisible para un exte
 `state.tornar`. **No hay un segundo circuito de firma**: mismo texto compuesto por el
 servidor, misma huella, misma evidencia, y las páginas siguen siendo públicas —lo que
 autoriza es el token—. Con sesión enseñan además «Torna al panell».
+
+🔴 **«Pendent de tu» firma EL CONVENIO DE LA FILA, no «el del papel»** (bug del 08-10-2026, Mas
+de Prova SCP: `don_gen` vigente y `com` pendiente). El diálogo llamaba siempre a
+`signar_conveni_propi()`, que deduce `don_gen`/`don_rec`, así que firmar el `com` abría y
+firmaba un `don_gen` nuevo sobre el vigente (CONV-DON-GEN-2026-0005 a 0008, cuatro números
+legales quemados) y el `com` seguía pendiente: la persona leía «firmo, me lo aceptan, y me
+vuelve a pedir el convenio». Ahora `PendentsDeTu` pasa `conveniId` a `DialegFirmaConveni`, que
+usa `acunarEnllacConveni()` (`acunar_enllac_propi`, que admite cualquier tipo), y la base se
+niega a abrir un convenio encima de un vigente (§4bis). Solo `AvisConveni`, que no tiene un
+convenio concreto delante, sigue por el camino del papel. ⚠️ Queda sin cubrir un caso límite:
+`useConveni` mezcla tipos al calcular el estado, así que una organización SIN `don_gen` y con un
+`com` pendiente vería el aviso «pendent» y su botón prepararía/firmaría el `don_gen`. Es lo que
+le falta de verdad, pero el texto del aviso no lo dice.
 
 ⚠️ **Acuñar desde el panel REVOCA el enlace del correo.** Es el precio, y es aceptable
 porque quien acuña es esa misma persona y lo usa al momento; si lo pierde, el panel le da

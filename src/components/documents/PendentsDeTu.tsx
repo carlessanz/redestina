@@ -60,19 +60,21 @@ export default function PendentsDeTu({
 
   // FIRMAR UN CONVENIO SE HACE AQUÍ MISMO, en un diálogo, desde el 16-09-2026: salir a la
   // página pública sacaba de la aplicación y metía el convenio en una columna de 28rem.
-  // El diálogo acuña su propio enlace (`signar_conveni_propi`), así que este camino no
-  // necesita `acunarEnllacPropi` — y por eso no se llama antes de abrirlo: serían dos
-  // enlaces, y el segundo revocaría al primero.
+  // El diálogo acuña su propio enlace —el de ESTE convenio, `acunar_enllac_propi`—, así que
+  // este camino no llama a `acunarEnllacPropi` antes de abrirlo: serían dos enlaces, y el
+  // segundo revocaría al primero. ⚠️ Hasta el 08-10-2026 el diálogo firmaba «el convenio del
+  // papel» (`signar_conveni_propi`) y no el de la fila: con un `com` pendiente firmaba un
+  // `don_gen` nuevo y el `com` no se movía.
   //
   // ⚠️ La CONFIRMACIÓN DE ALBARÁN sigue navegando a `/confirmar/:token`. No es olvido: esa
   //    pantalla se abre sobre todo desde el correo y desde una finca, y llevarla a un
   //    diálogo es el mismo trabajo otra vez. Queda pendiente.
-  const [firmant, setFirmant] = useState<{ tipus: 'productor' | 'entidad'; org: string } | null>(null)
+  const [firmant, setFirmant] = useState<{ tipus: 'productor' | 'entidad'; org: string; conveni: string } | null>(null)
 
   async function obre(p: Pendent) {
     if (obrint) return
     if (p.proposito === 'firma_convenio') {
-      setFirmant({ tipus: p.tipo_org === 'entidad' ? 'entidad' : 'productor', org: p.org_id })
+      setFirmant({ tipus: p.tipo_org === 'entidad' ? 'entidad' : 'productor', org: p.org_id, conveni: p.objeto_id })
       return
     }
     setObrint(clau(p))
@@ -153,6 +155,8 @@ export default function PendentsDeTu({
           obert
           tipusOrg={firmant.tipus}
           orgId={firmant.org}
+          // El convenio de ESTA fila, no «el del papel»: puede ser un `com`.
+          conveniId={firmant.conveni}
           onTancar={() => setFirmant(null)}
           // Y la banda del convenio, el Mercat y los contadores del menú: todos dependen de
           // él y tienen su propia lectura (`refrescAvisos.ts`).

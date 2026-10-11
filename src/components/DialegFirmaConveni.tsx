@@ -12,6 +12,11 @@
 //    (`sha256_texto`) recalculada en el POST y la misma evidencia. Lo único distinto es el
 //    marco, y `ample` es lo que le dice que tiene sitio para dos columnas.
 //
+// ⚠️ CON `conveniId` SE FIRMA ESE CONVENIO, sin deducir nada (08-10-2026). Sin él, el diálogo
+//    prepara el del papel (`signar_conveni_propi()`: don_gen/don_rec). «Pendent de tu» tiene
+//    que pasarlo: su fila puede ser un `com`, y firmarlo por el camino del papel abría un
+//    `don_gen` nuevo sobre el vigente y dejaba el `com` pendiente para siempre.
+//
 // ⚠️ EL TOKEN SE ACUÑA AL ABRIR, no antes. `signar_conveni_propi()` prepara el convenio si
 //    hace falta, lo pasa a `pendent_firma` y devuelve el token en claro — que es la única
 //    vez que existe—. Acuñarlo al montar la pantalla gastaría un enlace (y revocaría el que
@@ -27,7 +32,7 @@ import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { textError } from '../lib/textError'
-import { signarConveniPropi } from '../lib/pendents'
+import { acunarEnllacConveni, signarConveniPropi } from '../lib/pendents'
 import FirmaConveni from './FirmaConveni'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -38,13 +43,20 @@ interface Props {
   /** La ficha de la que se firma el convenio, y de qué tipo es. */
   tipusOrg: 'productor' | 'entidad'
   orgId: string
+  /**
+   * El convenio CONCRETO que se firma, cuando ya existe y está pendiente (la fila de «Pendent
+   * de tu»). Sin él, el diálogo prepara y firma el convenio por defecto del papel
+   * (`don_gen`/`don_rec`), que es lo que quiere el aviso de «encara no tens conveni».
+   * Con un convenio pendiente de OTRO tipo hay que pasarlo: si no, se firma el equivocado.
+   */
+  conveniId?: string
   onTancar: () => void
   /** Tras firmar: el panel de detrás tiene que releer su estado de convenio. */
   onFirmat?: () => void
 }
 
 export default function DialegFirmaConveni(
-  { obert, tipusOrg, orgId, onTancar, onFirmat }: Props,
+  { obert, tipusOrg, orgId, conveniId, onTancar, onFirmat }: Props,
 ) {
   const { t } = useT()
   const [token, setToken] = useState<string | null>(null)
@@ -54,7 +66,9 @@ export default function DialegFirmaConveni(
     if (!obert) { setToken(null); setError(null); return }
     let viu = true
     void (async () => {
-      const r = await signarConveniPropi(tipusOrg, orgId)
+      const r = conveniId
+        ? await acunarEnllacConveni(conveniId)
+        : await signarConveniPropi(tipusOrg, orgId)
       if (!viu) return
       if (!r.ok) {
         // El mensaje del servidor es el útil («ja l'has signat, falta la contrasignatura»,
@@ -66,7 +80,7 @@ export default function DialegFirmaConveni(
       setToken(r.data.url_path.replace('/signar/', ''))
     })()
     return () => { viu = false }
-  }, [obert, tipusOrg, orgId, t])
+  }, [obert, tipusOrg, orgId, conveniId, t])
 
   return (
     <Dialog

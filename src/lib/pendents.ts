@@ -74,6 +74,7 @@ export interface EnllacPropi {
 export function clauErrorPendent(missatge: string | null | undefined): string {
   const m = missatge ?? ''
   if (m.includes('Ja has signat')) return 'pend.err_ja_signat'
+  if (m.includes('Ja tens un conveni vigent')) return 'pend.err_ja_vigent'
   if (m.includes('no esta pendent')) return 'pend.err_no_pendent'
   if (m.includes('Nomes el titular')) return 'pend.err_titular'
   if (m.includes('no es teu') || m.includes('no es teva')) return 'pend.err_no_teu'
@@ -97,6 +98,28 @@ export async function acunarEnllacPropi(p: Pendent): Promise<ResultatRpc<EnllacP
       p_objeto_tipo: p.objeto_tipo,
       p_objeto_id: p.objeto_id,
       p_rol_parte: p.rol_parte,
+    })
+    if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
+    return { ok: true, data: data as EnllacPropi }
+  } catch {
+    return { ok: false, missatge: 'pend.err_generic', codi: null }
+  }
+}
+
+/**
+ * El enlace de firma de UN CONVENIO CONCRETO que ya está pendiente (`pendent_firma` o
+ * `retornat`). Es lo que tiene que usar «Pendent de tu»: el convenio pendiente puede ser de
+ * cualquier tipo (un `com`, por ejemplo) y `signarConveniPropi()` solo sabe el del papel
+ * (`don_gen`/`don_rec`) — firmar con ella un `com` pendiente abría y firmaba un `don_gen`
+ * nuevo encima del vigente, y el `com` seguía pendiente (bug del 08-10-2026).
+ */
+export async function acunarEnllacConveni(conveniId: string): Promise<ResultatRpc<EnllacPropi>> {
+  try {
+    const { data, error } = await supabase.rpc('acunar_enllac_propi', {
+      p_proposito: 'firma_convenio',
+      p_objeto_tipo: 'convenio',
+      p_objeto_id: conveniId,
+      p_rol_parte: null,
     })
     if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
     return { ok: true, data: data as EnllacPropi }
