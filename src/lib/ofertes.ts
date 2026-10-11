@@ -7,6 +7,7 @@
 
 import { supabase, supabaseUrl } from './supabase'
 import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
+import { CODIS_DESTI } from './destiFinal'
 
 export type TipoCampo = 'familia' | 'producte' | 'text' | 'numero' | 'opcions' | 'ubicacio' | 'causa'
 
@@ -293,6 +294,69 @@ export async function cancelaOferta(excedenteId: string, motiu: string): Promise
   })
   if (error) return { ok: false, error: error.message }
   return { ok: true, data: data as Excedente }
+}
+
+/** Una fila de `excedente_destins` (fase 1 de la revisión del 08-10-2026). */
+export interface DestiRegistrat {
+  id: string
+  excedente_id: string
+  desti_codi: string
+  kg: number
+  receptor: string | null
+  data: string | null
+  origen: 'productor' | 'equip'
+}
+
+/** Una entrada del catálogo `destins_finals`. */
+export interface DestiCataleg { codi: string; ordre: number; nom_ca: string; nom_es: string }
+
+let cataleg: Promise<DestiCataleg[]> | null = null
+
+/** El catálogo de destinos, una vez por sesión (es estático). */
+export function carregaCatalegDestins(): Promise<DestiCataleg[]> {
+  if (!cataleg) {
+    cataleg = (async () => {
+      const { data, error } = await supabase
+        .from('destins_finals').select('codi, ordre, nom_ca, nom_es')
+        .eq('actiu', true).order('ordre')
+      if (error) { cataleg = null; throw error }
+      return (data ?? []) as DestiCataleg[]
+    })()
+  }
+  return cataleg
+}
+
+/** Los destinos externos ya registrados de unas ofertas (la RLS deja solo los propios). */
+export async function carregaDestins(excedenteIds: string[]): Promise<Resultat<DestiRegistrat[]>> {
+  if (excedenteIds.length === 0) return { ok: true, data: [] }
+  const { data, error } = await supabase
+    .from('excedente_destins')
+    .select('id, excedente_id, desti_codi, kg, receptor, data, origen')
+    .in('excedente_id', excedenteIds)
+    .order('created_at')
+  if (error) return { ok: false, error: error.message }
+  return { ok: true, data: (data ?? []) as DestiRegistrat[] }
+}
+
+/**
+ * Guarda TODOS los destinos externos de la oferta (sustituye los anteriores). Devuelve el
+ * estado en que queda: `cerrada` si ya no falta ningún kilo y no hay recogidas en marcha.
+ * `code` es el motivo del rechazo para traducirlo (`desti.err_<code>`).
+ */
+export async function registraDestiFinal(
+  excedenteId: string,
+  destins: { desti: string; kg: number; receptor?: string; data?: string }[],
+): Promise<Resultat<{ estado: string; kg_sense_desti: number }> & { code?: string }> {
+  const { data, error } = await supabase.rpc('registrar_desti_final', {
+    p_excedente: excedenteId,
+    p_destins: destins,
+  })
+  if (error) {
+    const code = CODIS_DESTI.find((c) => error.message.includes(c))
+    return { ok: false, error: error.message, code }
+  }
+  const r = data as { estado: string; kg_sense_desti: number }
+  return { ok: true, data: { estado: r.estado, kg_sense_desti: Number(r.kg_sense_desti) } }
 }
 
 /** El receptor muestra interés: cae en la misma cola de aprobación que WhatsApp. */

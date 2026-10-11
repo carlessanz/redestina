@@ -15,6 +15,7 @@ import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
 import { marcaLlegits } from '../../lib/avisos'
 import { carregaPendents } from '../../lib/pendents'
+import { carregaDestins } from '../../lib/ofertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import {
   estatSimpleOferta, llegendaSimpleOferta, ofertaEnCurs, puntOferta,
@@ -40,6 +41,8 @@ interface RecResum { id: string; estado: EstadoAlbaran; numero: string | null; d
 function useMevesOfertes(productorId: string | null) {
   const [ofertes, setOfertes] = useState<Excedente[]>([])
   const [kg, setKg] = useState<Record<string, number>>({})
+  /** Kilos con destino externo registrado, por oferta (fase 1 de la revisión del 08-10-2026). */
+  const [externs, setExterns] = useState<Record<string, number>>({})
   /** Cuántos destinos (canalizaciones) tiene cada oferta: una oferta puede ir a varios. */
   const [destins, setDestins] = useState<Record<string, number>>({})
   const [recs, setRecs] = useState<Record<string, RecResum>>({})
@@ -78,10 +81,12 @@ function useMevesOfertes(productorId: string | null) {
 
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). Sin `.eq()` de organización
     // en el albarán: la RLS ya devuelve solo lo suyo, y nunca los borradores.
-    const [c, a, p, pend] = ids.length === 0
-      ? [null, null, null, null]
+    const [c, a, p, pend, dx] = ids.length === 0
+      ? [null, null, null, null, null]
       : await Promise.all([
-        supabase.from('canalizaciones').select('excedente_id, kg_confirmados').in('excedente_id', ids),
+        // Sin las anuladas: es la misma cuenta que `desti_excedent()` en la base.
+        supabase.from('canalizaciones').select('excedente_id, kg_confirmados')
+          .in('excedente_id', ids).neq('estado', 'anulada'),
         // El REC de una ESPIGOLADA no cuelga de la oferta sino de la jornada
         // (`espigolada_id`): sin buscarlo también por ahí, una oferta convertida y ya
         // conciliada se quedaba en «Espera el contacte de l'equip» (28-09-2026).
@@ -94,6 +99,7 @@ function useMevesOfertes(productorId: string | null) {
         // Lo que espera SU confirmación: sin esto, una oferta con el REC por confirmar salía
         // en la lista sin el ámbar de «et toca a tu», al revés que en el detalle.
         carregaPendents(),
+        carregaDestins(ids),
       ])
 
     // Los kilos y el REC deciden el estado que se pinta: sin ellos una oferta recogida
@@ -131,6 +137,9 @@ function useMevesOfertes(productorId: string | null) {
       }
     }
 
+    const ext: Record<string, number> = {}
+    for (const d of dx?.data ?? []) ext[d.excedente_id] = (ext[d.excedente_id] ?? 0) + Number(d.kg)
+    setExterns(ext)
     setOfertes(files)
     setKg(kgs)
     setDestins(ns)
@@ -187,8 +196,11 @@ function useMevesOfertes(productorId: string | null) {
       albaraRec: recs[o.id] ?? null,
       motiu: o.motivo_no_colocada ?? null,
       pendentDeMi: recs[o.id] ? recsPendents.has(recs[o.id].id) : false,
+      id: o.id,
+      kgSenseDesti: Math.max(0, Number(o.kg_total ?? 0) - (kg[o.id] ?? 0) - (externs[o.id] ?? 0)),
+      destiReclamat: Boolean(o.desti_reclamat_at),
     }, 'productor')
-  }, [kg, progres, recs, recsPendents])
+  }, [kg, externs, progres, recs, recsPendents])
 
   return { ofertes, kg, destins, puntDe, carregant, errorCarrega }
 }

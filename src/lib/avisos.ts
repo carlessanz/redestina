@@ -13,6 +13,7 @@ import { supabase } from './supabase'
 
 export type TipusAvis =
   | 'oferta_validada' | 'oferta_rebutjada' | 'sortida_trobada' | 'interes_aprovat' | 'interes_rebutjat'
+  | 'oferta_sense_desti'
 
 export interface Avis {
   id: string

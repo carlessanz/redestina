@@ -174,7 +174,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
-| catálogos (categorías/unidades/motivos/destinos) | `productos`/`causas`/`factores_conversion` | 🟡 |
+| catálogos (categorías/unidades/motivos/destinos) | `productos`/`causas`/`factores_conversion` y, desde el 11-10-2026, `destins_finals` (destino final de los kilos de una oferta, §6ter) | 🟡 |
 | back office, cola de **aprobaciones**, Super Admin | `Aprovacions` con **tres colas** (registros, convenios por contrasignar, intereses), aprobando **desde la cola**; aprobar exige `pot_aprovar()` | 🟡 |
 | **alta de organización** (onboarding) | **registro público self-service** (`/registre` → Edge Function `registro`) con validación del equipo (§9) | 🟡 |
 | **roles y permisos** | RLS por rol y organización, encendida en producción (§4bis) | ✅ |
@@ -2163,7 +2163,9 @@ funciones, no políticas:
 | `aprovar_resposta(resposta, kg, preu, motiu)` | Aprobar y canalizar **en una transacción** (hoy `OfferDetail` hace 3-4 llamadas sueltas). Exige `pot_aprovar()` |
 | `actualizar_mi_productor(…)` / `actualizar_mi_entidad(…)` | Autoedición con **lista blanca**: nunca `es_test`, `activo`, `codigo`, `conveni`, `prioritat`, `estat`, `gestio` |
 | `actualizar_meu_canal(tipo, ficha, canal)` | Fija `organizaciones.canal_preferido` desde la ficha propia (`20270314100000`). **Es la única escritura de esa tabla**, que no tiene GRANT de UPDATE para nadie. `canal` null = volver a deducirlo. Pasa el titular **o el equipo** —al revés que las dos de arriba, y por eso: sobre las fichas el equipo tiene GRANT y edita desde `RecordDetail`, sobre `organizaciones` no tiene ninguno, y el modelo es asistido |
-| `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló |
+| `cancelar_meva_oferta(excedente, motiu)` | El productor cancela la suya. Editarla no: el `texto_oferta` ya circuló. ⚠️ **Desde `20270416100000` solo por error o incidencia**: motivo obligatorio (`22023 cal_motiu`) y solo desde `borrador`/`pendent_validacio`/`publicada` **sin canalizaciones** (`22023 te_canalitzacions`); con kilos asignados lo que toca es registrar el destino del resto |
+| `registrar_desti_final(excedente, destins jsonb)` (`20270416100000`) | **El destino final de los kilos** (fase 1 de la revisión del 08-10-2026, §6ter): sustituye TODOS los destinos externos de la oferta (`excedente_destins`) por la lista `[{desti, kg, receptor?, data?}]`. Titular o equipo; para un externo el permiso va antes que la existencia (`42501` con uuid inventado, como `fixar_fotos_oferta`), para el equipo un uuid inventado da `22023 oferta_inexistent`. Rechazos: `estat_no_admet_desti` (solo `publicada`/`parcial`/`bloqueada`/`no_colocada`), `desti_desconegut`, `kg_invalids`, `data_futura`, `massa_kg`. Sin kilos sin destino y sin recogidas en marcha → **`cerrada`** + `tancada_at`; con recogidas en marcha, `bloqueada` |
+| `desti_excedent(excedente)` (`20270416100000`) | `(kg_total, kg_redestina, kg_externs, kg_sense_desti)`. **`security invoker`**: agrega lo que quien pregunta ya lee. `kg_redestina` = `kg_confirmados` de las canalizaciones no anuladas (lo ASIGNADO, la misma cuenta que decide `parcial`/`bloqueada`; una merma al recoger se explica en la conciliación, no se pide como destino). La misma regla está en `src/lib/destiFinal.ts` |
 | `organitzacions_candidates(tipo, ficha)` | Qué organizaciones podrían ser la misma que la de esta ficha, calculado **al vuelo**: correo, teléfono o **NIF** exactos, o **nombre con similitud ≥ 0,65** (`pg_trgm`, D3 del plan de organización unificada, 22-09-2026). Devuelve `motius text[]` —no un único valor: con cuatro señales, nombrar cada combinación a mano habría sido dieciséis frases— y `similitud numeric`, que solo lleva valor cuando `nom_semblant` cuenta. `es_intern()`: enseña nombre, NIF, correo y teléfono de otra organización |
 | `enllacar_organitzacio(tipo, ficha, organitzacio)` | **Fusiona**: mueve la ficha —y sus convenios, solo los suyos— a esa organización y retira la que deja vacía. `pot_aprovar()`. Se niega con el motivo si el destino ya tiene ficha de ese tipo o si las dos traen convenio vigente del mismo tipo. Con `organitzacio` NULL **separa** la ficha en una organización nueva, que es el deshacer |
 | `aprovar_registre(membresia)` / `rebutjar_registre(membresia, motiu)` | Validan un alta del registro público (`20260731100000`). Exigen `pot_aprovar()` (42501), bloquean la fila con `for update` y solo actúan sobre `pendent` (22023). **Rechazar no borra nada**: queda la auditoría y la persona ve el motivo |
@@ -2931,6 +2933,51 @@ Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
 - ⬜ **La v2** (pregunta por producto del catálogo en el cuestionario de entidad) espera a D5.
 - ⬜ **H2, convenio único** (`col_productor`/`col_receptor`): espera el texto legal de la
   asesoría (`1. Fuentes/Convenis de colaboracio/`). No hay código.
+
+### Revisión del cliente del 08-10-2026 — fase 1: el destino final de los kilos (11-10-2026)
+
+Plan completo en `3. Claude Code/2026-10-11-plan-revision-avances-08-10.md` (12 fases). La fase 0
+(vocabulario) está en «Vocabulario fijado» más arriba. Migraciones `20270416100000` y `…100100`.
+
+**Qué pide la Fundació**: una oferta no puede acabar «Cancel·lada» sin más; cuando pasa la fecha,
+Redestina tiene que saber qué pasó con el producto, con **varios destinos y sus kilos**, también
+cuando la salida no la gestionó Redestina («trazabilidad del 100 %»).
+
+**El diseño, sin estados nuevos**:
+
+| Estado | Significa ahora | Lo escribe |
+|---|---|---|
+| `cerrada` | Todos los kilos tienen destino (Redestina + externos) | `registrar_desti_final()` y el trigger `canalizaciones_tanca_excedent` al conciliarse la última canalización |
+| `no_colocada` («Sense sortida») | Vencida con kilos sin destino: **falta decir qué pasó** | El job de vencidas (solo desde `borrador`/`publicada`) y el equipo a mano |
+| `cancelada` | Retirada por **error o incidencia**, con motivo | `cancelar_meva_oferta()` (sin canalizaciones), el equipo |
+
+- **`excedente_destins`** guarda los destinos externos (`destins_finals`: venda externa, donació
+  externa, transformació, alimentació animal, subproducte, compostatge, valorització energètica,
+  eliminació, altres). Sin GRANT de escritura: solo `registrar_desti_final()` (§4bis).
+- **El job de vencidas ya no toca `parcial`/`bloqueada`**: a esas, si les faltan kilos sin destino,
+  solo les pone `desti_reclamat_at` y avisa; la recogida en marcha sigue su curso. Una `publicada`
+  vencida pasa a `no_colocada`. Aviso nuevo **`oferta_sense_desti`** al productor, una sola vez
+  (`desti_reclamat_at`). ⚠️ **`enviar-avis` se publica ANTES que la migración** (si no, marca el
+  tipo desconocido como definitivo).
+- La cola `ofertes_vencudes` del tablero (misma clave) pasa a contar «ofertes sense destí registrat»:
+  `no_colocada` con kilos sin destino, o `publicada`/`parcial` vencidas con kilos sin destino.
+- **Relleno**: la migración pasa a `cerrada` las ofertas ya canalizadas y conciliadas del todo (dos en
+  el clon el 11-10-2026), que es lo que el trigger habría hecho.
+- **Interfaz**: `components/DestiFinal.tsx`, el mismo en el detalle del productor y en el del equipo
+  (modelo asistido). Banda roja cuando hay que pedirlo (`calDemanarDesti`), filas fijas con lo que
+  salió por Redestina y filas editables para el resto; `src/lib/destiFinal.ts` puro, con la misma
+  regla que `desti_excedent()`. En el modelo del proceso: «Sense sortida» le toca al productor y al
+  equipo mientras falte algún kilo y cuenta como «en curs» en Inici; `cerrada` sin REC es la variante
+  `tancada`/`desti` («Tancada amb destí»), y con REC conciliado el estado simple se llama ahora
+  **«Producte recollit»**; una `parcial` vencida con kilos sin destino lleva la nota
+  `proc.*_nota_desti`, sin cambiar de etapa.
+- **Venda ≠ donació** en el aviso `sortida_trobada` (correo/WhatsApp): en venta, «contacta amb
+  l'empresa per acordar la venda i després indica què ha passat amb els quilos»; en donación, el
+  equipo coordina la recogida.
+- ⚠️ **Lo que queda**: con un destino externo parcial registrado mientras la oferta sigue
+  `publicada`, el Mercat sigue enseñando los kilos totales (no resta los externos). La cola del
+  tablero lleva a `/equip/ofertes` sin filtro propio (fase 8 del plan).
+- E2E: `tests/e2e/desti-final.e2e.ts` contra el clon (§11).
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -5562,6 +5609,17 @@ E2E_CORTINA='…' npm run test:e2e                     # móvil 390 px y escrito
 E2E_CORTINA='…' E2E_ESCRIU=1 npm run test:e2e        # también el circuito que escribe
 SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run]  # cancela las [E2E] y borra fichas E2E-
 
+# CONTRA EL CLON LOCAL (11-10-2026): `E2E_CLON=1` levanta `npm run dev:local` en el puerto
+# 5174 SIN cortina (`REDESTINA_SENSE_CORTINA=1`, que el plugin de `vite.config.ts` solo acepta
+# en modo `supabase-local`; producción y `npm run dev` la ponen siempre). Las pruebas que
+# ESCRIBEN de verdad (`motiuSaltClon()` en `tests/e2e/ajuda.ts`) solo corren así, y comprueban
+# que el frontend del clon apunta a 127.0.0.1; preparan datos y disparan jobs con `sql()`
+# (`docker exec … psql` como `postgres`). Si Playwright pide un navegador que no está
+# descargado, `PW_CHROMIUM_PATH` apunta a uno de la caché (`~/Library/Caches/ms-playwright`).
+# Tras una tanda que consuma numeración legal, `scripts/local/cargar-local.sh` deja el clon
+# como producción. Hoy: `desti-final.e2e.ts` (fase 1) y `vocabulari.e2e.ts` (fase 0).
+E2E_CLON=1 PW_CHROMIUM_PATH=… npx playwright test     # móvil y escritorio, contra el clon
+
 # Pruebas unitarias (Vitest 4). Corren en Node sobre los módulos de negocio, que son
 # TypeScript puro: ni una referencia a `Deno.`, ni un import `npm:`/`jsr:`.
 npm test                      # vitest run
@@ -5828,6 +5886,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **11-10-2026: se cierra la 106** (`cerrada` ya la escribe alguien, fase 1 de la revisión del 08-10-2026): **53 vivas** y la siguiente entrada nueva sigue siendo la 140.
 ⚠️ **07-10-2026 (revisión completa): se abren la 131-139** —cinco son decisiones de producto o de
 política, no defectos (131, 132, 133, 134, 137)—: **54 vivas** (45 + 9; el recuento por `grep` no es fiable
 porque la lista de checkpoints de arriba usa la misma numeración, así que esta cifra es aritmética y no se
@@ -6213,13 +6272,6 @@ panel del equipo y en el externo).
     plegado— y no se repiten: son claves distintas. Lo que coincide es el TEXTO, y solo se vería
     en una cuenta que tuviera a la vez panel de equipo y de receptor, que hoy no existe (las de
     doble rol son productor+receptor).
-106. **`excedentes.estado = 'cerrada'` no lo escribe nadie.** El modelo del proceso (§6ter) deriva
-     la etapa «tancada» del REC conciliado, no de ese estado, y por eso la interfaz es correcta;
-     pero la columna sigue admitiéndolo y ninguna RPC lo produce: el productor no tiene ninguna
-     acción de cierre, y el equipo cierra conciliando el albarán. Decidido a propósito en el plan
-     de UX (15-09-2026): un trigger que lo escribiera tocaría una RPC del circuito legal por una
-     cifra decorativa. El día que se quiera la columna coherente, es `conciliar_albaran()` quien
-     debería escribirla.
 
 109. 🔴 **La pantalla guiada es una CONVENCIÓN, no una imposición.** `/equip/canalitzacio`
      (§6ter) llama a las RPC reales del circuito, así que salen exactamente los mismos
@@ -6391,7 +6443,7 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
-Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **46 de las 54** (aritmética del 07-10-2026: 41 + las 131, 132, 133, 134 y 137; no recontado). Se quedan
+Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
 donde están —con su número, que el código cita— pero conviene saber qué se está mirando antes de
 intentar arreglarlas. ⚠️ Aquí solo se indexa lo **abierto**: cuando una entrada se cierra sale
 también de esta tabla, y si la decisión que llevaba dentro sigue valiendo se sube a su sección
@@ -6418,7 +6470,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 91 | Las «últimas 9 cifras» están triplicadas (TS + dos migraciones) | SQL no puede importar TypeScript. Unificarlo exigiría una RPC, y entonces `coincidencies.ts` dejaría de ser probable desde Vitest. Con ~450 fichas no hay problema de rendimiento |
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
 | 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
-| 106 | `excedentes.estado = 'cerrada'` no lo escribe nadie | La etapa «tancada» se deriva del REC conciliado (§6ter), así que la interfaz es correcta. Un trigger que la escribiera tocaría una RPC del circuito legal por una cifra decorativa |
 | 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
 | 113 | Una línea del CR = una canalización, con un solo producto | El **total es exacto**; lo que se reparte mal es la atribución por producto. La alternativa rompe la clave única que comparten las tres tablas de cierre |
@@ -6461,7 +6512,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **85** entradas de §12 que están resueltas (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
+Las **86** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -6562,6 +6613,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 123 | El alta de oferta solo validaba en el servidor, con un mensaje genérico sin decir qué campo faltaba | 22-09-2026 |
 | 99 | Los paneles externos listaban el plan solo por su PDF, sin enlace al diagnóstico y con el plan sustituido pintado «Emès» | 28-09-2026 |
 | 129 | Ningún documento salía por correo: `documentos.envio` se preparaba y no lo leía nadie | 28-09-2026 |
+| 106 | `excedentes.estado = 'cerrada'` no lo escribía nadie: ahora la escriben `registrar_desti_final()` y el trigger `canalizaciones_tanca_excedent` (desde `canalizaciones`, nunca desde el circuito legal) | `20270416100000` |
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
 | 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
 
@@ -6569,7 +6621,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
+   Referencia: **1.257 pruebas en 50 ficheros**: 1.256 correctas y **1 saltada a propósito** (11-10-2026,
+   fase 1 de la revisión del 08-10-2026: `tests/destiFinal.test.ts` y los casos nuevos de `procesOferta`
+   y `textAvis`). Antes, **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
    tras la revisión completa: +123 sobre 1.115, de `tests/http.test.ts`, `autorizacion.test.ts`,
    `crearOferta.test.ts`, `enmascarar.test.ts`, `cerca.test.ts`, `format.test.ts`, `textError.test.ts`,
    `tancamentFormat.test.ts`, `esborranyOferta.test.ts`, las 17 de la escalera y la comprobación inversa de
@@ -6601,7 +6655,11 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY: 1.156/1.156 correctas y 26 sin datos, «Sin fallos de permisos»** (07-10-2026,
+   ✅ **Referencia HOY (clon local): 1.179/1.179 correctas y 26 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada
+   e `excedente_destins` sin escritura en las siete cuentas externas, `destins_finals` legible, y dos
+   checks del equipo—). **Pendiente de confirmar en producción al publicar.** La anterior:
+   **1.156/1.156 correctas y 26 sin datos** (07-10-2026,
    tras `20270414100000`…`20270414101100`; medida primero contra el clon local y **confirmada contra
    producción al publicar `0034a92`**, la misma cifra en las dos bases). Sube **104** sobre la anterior (1.052): **18** de
    la conciliación y el CT (`emitir_certificados_transaccion_cierre` y `albarans_germans_rec`, denegados a las

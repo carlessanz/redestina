@@ -25,6 +25,8 @@ import DialegMotiu from './DialegMotiu'
 import DialegEspigolada from './equip/DialegEspigolada'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import ValidacioOferta from './equip/ValidacioOferta'
+import DestiFinal from './DestiFinal'
+import { carregaDestins } from '../lib/ofertes'
 import DialegEditaOferta from './DialegEditaOferta'
 import SelectorModalitat from './SelectorModalitat'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
@@ -113,6 +115,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const potAprovar = ctx?.potAprovar ?? false
   const [exc, setExc] = useState<Excedente>(excedente)
   const [canalizaciones, setCanalizaciones] = useState<Canalizacion[]>([])
+  const [kgExterns, setKgExterns] = useState(0)
   // Los albaranes de este registro: el REC de la entrada y un ENT/OPE por canalización.
   // Los crea el TRIGGER `canalizaciones_crea_albaranes` al insertar la canalización, así
   // que aquí nunca se insertan: solo se enlazan. Si una canalización no tiene el suyo, el
@@ -158,6 +161,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // «sin canalizaciones» por un error de red) y se avisa encima.
   const [errorCarrega, setErrorCarrega] = useState(false)
   const canalizados = canalizaciones.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
+  // Para el destino final (fase 1 de la revisión del 08-10-2026): las anuladas no cuentan,
+  // igual que en `desti_excedent()`.
+  const vives = canalizaciones.filter((c) => c.estado !== 'anulada')
+  const kgVives = vives.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(exc.kg_total ?? 0)
   const faltan = Math.max(0, total - canalizados)
 
@@ -192,14 +199,16 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Devuelve el excedente recargado: quien acaba de aprobar necesita saber si con eso el
   // estado ha pasado a `bloqueada`, y leer `exc` justo después daría el valor anterior.
   const recargar = useCallback(async (): Promise<Excedente | null> => {
-    const [e, c, a] = await Promise.all([
+    const [e, c, a, dx] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', excedente.id).maybeSingle(),
       supabase.from('canalizaciones').select('*').eq('excedente_id', excedente.id).order('created_at', { ascending: true }),
       // ⚠️ La lista de columnas en UN literal (§7, deuda 46).
       supabase.from('albaranes')
         .select('id, tipo, numero_completo, estado, canalizacion_id, entregado_at')
         .eq('excedente_id', excedente.id),
+      carregaDestins([excedente.id]),
     ])
+    setKgExterns((dx.data ?? []).reduce((s, d) => s + Number(d.kg), 0))
     const fallada = e.error ?? c.error ?? a.error
     if (fallada) console.warn('OfferDetail.recargar:', fallada.message)
     setErrorCarrega(fallada !== null)
@@ -689,6 +698,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     vencuda: vencida,
     producteAlCamp: exc.producte_al_camp,
     espigoladaId: exc.espigolada_id,
+    id: exc.id,
+    kgSenseDesti: Math.max(0, total - kgVives - kgExterns),
+    destiReclamat: Boolean(exc.desti_reclamat_at),
   }, 'equip')
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)
@@ -772,6 +784,18 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {exc.estado === 'pendent_validacio' && (
             <ValidacioOferta excedenteId={exc.id} potAprovar={potAprovar} onFet={recargar} />
           )}
+
+          {/* Qué ha pasado con el producto: el equipo lo registra en nombre del productor
+              cuando se lo cuenta por teléfono (modelo asistido). Mismo componente y misma
+              RPC que en el panel del productor. */}
+          <DestiFinal
+            excedenteId={exc.id}
+            estado={exc.estado}
+            kgTotal={total}
+            destiReclamat={Boolean(exc.desti_reclamat_at)}
+            sortides={vives.map((c) => ({ entitat: nombrePorId(c.entidad_id), kg: Number(c.kg_confirmados ?? 0) }))}
+            onDesat={() => void recargar()}
+          />
           {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado) && (
             <>
               <Button variant="outline" className="h-11 md:h-9" onClick={() => setEditant(true)}>{t('edit.cta')}</Button>

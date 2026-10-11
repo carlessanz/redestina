@@ -11,10 +11,12 @@ export type TipusAvis =
   | "oferta_rebutjada"
   | "sortida_trobada"
   | "interes_aprovat"
-  | "interes_rebutjat";
+  | "interes_rebutjat"
+  | "oferta_sense_desti";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
+  "oferta_sense_desti",
 ];
 
 export interface TextAvis {
@@ -79,13 +81,24 @@ export function textAvis(
     }
     case "sortida_trobada": {
       const entitat = s(params.entitat);
+      // Venda ≠ donació (revisión del 08-10-2026, §5): en una venta Redestina pone en
+      // contacto a las partes y son ellas las que acuerdan la operación; en una donación la
+      // recogida la coordina el equipo.
+      const venda = s(params.modalitat) === "venda" || s(params.modalitat) === "maquila";
       return {
         asunto: es ? `Hemos encontrado salida para tu ${producte}` : `Hem trobat sortida per al teu ${producte}`,
         titulo: es ? "Salida encontrada" : "Sortida trobada",
         cuerpo: (es
           ? `Se han asignado ${kg(params.kg, idioma)} kg de ${producte}`
           : `S’han assignat ${kg(params.kg, idioma)} kg de ${producte}`)
-          + (entitat ? (es ? ` a ${entitat}.` : ` a ${entitat}.`) : "."),
+          + (entitat ? (es ? ` a ${entitat}.` : ` a ${entitat}.`) : ".")
+          + (venda
+            ? (es
+              ? `\n${entitat || "La empresa"} ha aceptado tu oferta. Contacta con ella para acordar la venta y, después, indica en Redestina qué ha pasado con los kilos.`
+              : `\n${entitat || "L’empresa"} ha acceptat la teva oferta. Contacta-hi per acordar la venda i, després, indica a Redestina què ha passat amb els quilos.`)
+            : (es
+              ? "\nEl equipo de Redestina coordina la recogida y te dirá día y hora."
+              : "\nL’equip de Redestina coordina la recollida i et dirà dia i hora.")),
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,
       };
@@ -114,6 +127,18 @@ export function textAvis(
         cuerpo: linies.join("\n"),
         boton: es ? "Ver mis intereses" : "Veure els meus interessos",
         ruta: "/receptor/interessos",
+      };
+    }
+    case "oferta_sense_desti": {
+      const quants = kg(params.kg, idioma);
+      return {
+        asunto: es ? `¿Qué ha pasado con tu ${producte}?` : `Què ha passat amb el teu ${producte}?`,
+        titulo: es ? "Oferta sin destino registrado" : "Oferta sense destí registrat",
+        cuerpo: es
+          ? `Ha pasado la fecha límite de tu oferta de ${producte} y todavía no hay destino registrado para ${quants} kg.\nIndica qué ha pasado finalmente con el producto (venta, donación, compostaje…) para cerrar la oferta.`
+          : `Ha passat la data límit de la teva oferta de ${producte} i encara no hi ha destí registrat per a ${quants} kg.\nIndica què ha passat finalment amb el producte (venda, donació, compostatge…) per tancar l’oferta.`,
+        boton: es ? "Indicar el destino" : "Indicar el destí",
+        ruta: `/productor/ofertes/${objecteId}`,
       };
     }
     case "interes_rebutjat": {

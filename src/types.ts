@@ -232,6 +232,10 @@ export interface Excedente {
   hora_recollida_inici?: string | null
   hora_recollida_fi?: string | null
   validada_at?: string | null
+  /** Cuándo pasó a `cerrada` (todos los kilos con destino). Fase 1, revisión del 08-10-2026. */
+  tancada_at?: string | null
+  /** Cuándo el job de vencidas pidió al productor el destino de lo que quedaba. */
+  desti_reclamat_at?: string | null
 }
 
 export interface Canalizacion {

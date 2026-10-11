@@ -15,6 +15,14 @@ function cortinaDev(): Plugin {
   return {
     name: 'redestina-cortina',
     configureServer(server) {
+      // Las E2E contra el CLON LOCAL (11-10-2026) no tienen la contraseña de la cortina, que
+      // es de producción. Sin cortina SOLO si se pide explícitamente y SOLO en el modo del
+      // clon (`npm run dev:local`, que solo habla con 127.0.0.1): `npm run dev` —que apunta a
+      // producción— la pone siempre, y en Vercel la pone `middleware.js`, que esto no toca.
+      if (server.config.mode === 'supabase-local' && process.env.REDESTINA_SENSE_CORTINA === '1') {
+        server.config.logger.warn('⚠️  Cortina desactivada (REDESTINA_SENSE_CORTINA=1, només el clon local).')
+        return
+      }
       server.middlewares.use(async (req, res, next) => {
         try {
           const cos = req.method === 'POST'

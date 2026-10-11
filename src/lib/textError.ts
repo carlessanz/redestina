@@ -15,6 +15,9 @@ type Traductor = (clau: string, params?: Record<string, string | number>) => str
 /** Códigos propios que llegan en `codi` o dentro del mensaje, con su texto. */
 const CODIS: Record<string, string> = {
   sense_conveni: 'od.conv_blocked',
+  // `cancelar_meva_oferta()` desde la fase 1 de la revisión del 08-10-2026.
+  te_canalitzacions: 'po.err_te_canalitzacions',
+  cal_motiu: 'po.err_cal_motiu',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

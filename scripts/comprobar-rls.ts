@@ -576,6 +576,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Las fotos de una oferta ajena (20270404100000/100100): el permiso va ANTES que la
   // existencia, así que con un id inventado también corta con 42501.
   { tabla: "fixar_fotos_oferta", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_fotos: [] }, descripcion: "NO canvia les fotos d'una oferta que no és seva" },
+  // El destino final de los kilos (20270416100000, revisión del 08-10-2026). Como en
+  // `fixar_fotos_oferta`, para un externo el permiso va antes que la existencia: un id
+  // inventado corta con 42501. Y `excedente_destins` no tiene GRANT de escritura para nadie.
+  { tabla: "registrar_desti_final", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_destins: [] }, descripcion: "NO registra el destí d'una oferta que no és seva" },
+  { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
+  { tabla: "destins_finals", op: "leer", esperado: "permitir", descripcion: "ve el catàleg de destins (és catàleg)" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
@@ -1159,6 +1165,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" },
       descripcion: "NO fija el coste por kilo (es de pot_aprovar)",
     },
+    // El destino final lo registra también el equipo, en nombre del productor (modelo
+    // asistido). Con un id inventado, la guarda de rol deja pasar y corta la existencia.
+    {
+      tabla: "registrar_desti_final",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_destins: [] },
+      descripcion: "registra el destí d'una oferta en nom del productor (id inventat → 22023)",
+    },
+    { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
     // La foto del catálogo es SOLO del super_admin (20270405100000), ni siquiera de un admin.
     {
       tabla: "fixar_foto_producte",
@@ -2191,6 +2207,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
 // la política está bien; si llegara, la fila se borra en el `finally`.
 const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   excedentes: { producto: "TEST-RLS", estado: "borrador" },
+  excedente_destins: { excedente_id: "00000000-0000-0000-0000-000000000000", desti_codi: "venda", kg: 1, origen: "productor" },
   canalizaciones: { kg_confirmados: 1 },
   oferta_respuestas: { telefono: "34600000000", canal: "panel" },
   usuario_roles: { rol: "super_admin" },

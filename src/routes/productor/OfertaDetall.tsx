@@ -24,7 +24,8 @@ import DialegMotiu from '../../components/DialegMotiu'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
-import { cancelaOferta } from '../../lib/ofertes'
+import { cancelaOferta, carregaDestins } from '../../lib/ofertes'
+import DestiFinal from '../../components/DestiFinal'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
@@ -46,7 +47,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
  * `canalizaciones` lleva `entidad_id` y `v_albaranes_bandeja` también, y al productor no le
  * toca saber a qué entidad va su producto (§4bis, «cuántas, sin nombres»).
  */
-type CanalitzacioMeva = Pick<Canalizacion, 'id' | 'kg_confirmados' | 'kg_reales'>
+type CanalitzacioMeva = Pick<Canalizacion, 'id' | 'kg_confirmados' | 'kg_reales' | 'estado'>
 interface RecMeu { id: string; estado: string; numero_completo: string | null; dias_esperando: number | null }
 
 /** Lo que `NovaOferta` deja al navegar aquí. Nada de esto sobrevive a una recarga. */
@@ -64,6 +65,8 @@ export default function ProductorOfertaDetall() {
   const [rec, setRec] = useState<RecMeu | null>(null)
   const [pendentDeMi, setPendentDeMi] = useState(false)
   const [progres, setProgres] = useState<ProgresOferta | null>(null)
+  /** Kilos con destino EXTERNO registrado (`excedente_destins`): entran en «falta destí». */
+  const [kgExterns, setKgExterns] = useState(0)
   const [carregant, setCarregant] = useState(true)
   /** Fallo al leer la oferta: no es lo mismo que «no existe o no es tuya». */
   const [errorCarrega, setErrorCarrega] = useState(false)
@@ -73,11 +76,13 @@ export default function ProductorOfertaDetall() {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     // Sin `.eq()` de organización en el albarán: la RLS ya devuelve solo lo suyo, igual
     // que en `productor/Documents.tsx`.
-    const [e, c] = await Promise.all([
+    const [e, c, dx] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', id).maybeSingle(),
-      supabase.from('canalizaciones').select('id, kg_confirmados, kg_reales').eq('excedente_id', id)
+      supabase.from('canalizaciones').select('id, kg_confirmados, kg_reales, estado').eq('excedente_id', id)
         .order('created_at', { ascending: true }),
+      carregaDestins([id]),
     ])
+    setKgExterns((dx.data ?? []).reduce((s, d) => s + Number(d.kg), 0))
     // El REC de una ESPIGOLADA cuelga de la jornada, no de la oferta: sin buscarlo por
     // `espigolada_id`, una oferta convertida y ya conciliada decía «Espera el contacte de
     // l'equip» (28-09-2026). Por eso va después de leer la oferta.
@@ -147,9 +152,14 @@ export default function ProductorOfertaDetall() {
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
   if (!oferta) return <p className="text-sm text-destructive">{t(errorCarrega ? 'po.err_load_one' : 'od.not_found')}</p>
 
-  const canalitzats = canalitzacions.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
+  // Las anuladas no cuentan: es la misma regla que `desti_excedent()` en la base.
+  const vives = canalitzacions.filter((c) => c.estado !== 'anulada')
+  const canalitzats = vives.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(oferta.kg_total ?? 0)
-  const cancelable = ['borrador', 'pendent_validacio', 'publicada', 'parcial'].includes(oferta.estado)
+  // Cancelar es para un error o una incidencia (revisión del 08-10-2026): con kilos ya
+  // asignados lo que toca es registrar el destino del resto, y la base lo rechaza igual.
+  const cancelable = ['borrador', 'pendent_validacio', 'publicada'].includes(oferta.estado) && vives.length === 0
+  const kgSenseDesti = Math.max(0, total - canalitzats - kgExterns)
 
   // La fecha se compara en día, no en instante: una oferta disponible «hasta el 23» sigue
   // valiendo el 23 entero.
@@ -179,6 +189,9 @@ export default function ProductorOfertaDetall() {
     // así que lo único que le toca es saberlo. `puntOferta` lo dice con una nota.
     producteAlCamp: oferta.producte_al_camp,
     espigoladaId: oferta.espigolada_id,
+    id: oferta.id,
+    kgSenseDesti,
+    destiReclamat: Boolean(oferta.desti_reclamat_at),
   }, 'productor')
 
   return (
@@ -237,6 +250,17 @@ export default function ProductorOfertaDetall() {
         />
       </div>
       <QueTocaAra punt={punt} />
+
+      {/* --- Qué ha pasado con el producto (fase 1 de la revisión del 08-10-2026). Va
+              justo debajo de «què toca» porque, cuando falta, es justo eso lo que toca. --- */}
+      <DestiFinal
+        excedenteId={oferta.id}
+        estado={oferta.estado}
+        kgTotal={total}
+        destiReclamat={Boolean(oferta.desti_reclamat_at)}
+        sortides={vives.map((c) => ({ entitat: destins[c.id] ?? null, kg: Number(c.kg_confirmados ?? 0) }))}
+        onDesat={() => void carrega()}
+      />
 
       {/* --- Las fotos: se pueden añadir o cambiar mientras la oferta sigue viva, que es
               cuando un receptor todavía las va a mirar. Van por RPC (`fixar_fotos_oferta`):

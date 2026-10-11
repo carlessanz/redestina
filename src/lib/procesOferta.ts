@@ -115,6 +115,16 @@ export interface FetsOferta {
   producteAlCamp?: boolean
   /** `excedentes.espigolada_id`: la jornada de la que este lote ya forma parte, si forma. */
   espigoladaId?: string | null
+  /** `excedentes.id`: hace falta para enlazar al formulario de destino de ESTA oferta. */
+  id?: string
+  /**
+   * Kilos a los que falta decir qué pasó (`desti_excedent()`: total − asignado por Redestina
+   * − destinos externos). Ausente = no se sabe, y se trata como «falta» (fase 1 de la
+   * revisión del 08-10-2026): ante la duda, pedir el destino es más barato que darlo por hecho.
+   */
+  kgSenseDesti?: number
+  /** `excedentes.desti_reclamat_at`: el job de vencidas ya le pidió el destino al productor. */
+  destiReclamat?: boolean
 }
 
 export interface FetsInteres {
@@ -208,6 +218,15 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
   function nota(index: number): { notaClau?: string; notaEnllac?: string } {
     // Cancelada o sin destino: la jornada ya no es la historia de este lote.
     if (index < 0) return {}
+    // Vencida con kilos sin destino pero con canalizaciones en marcha (fase 1 de la revisión
+    // del 08-10-2026): la etapa no cambia —la recogida sigue su curso—, pero hay que pedir qué
+    // pasó con lo que sobra. Va primero porque es lo único que pide una acción.
+    if (fets.destiReclamat && (fets.kgSenseDesti ?? 0) > 0 && fets.estado !== 'cerrada') {
+      return {
+        notaClau: `proc.${p}_nota_desti`,
+        notaEnllac: rol === 'productor' && fets.id ? `/productor/ofertes/${fets.id}#desti` : undefined,
+      }
+    }
     if (fets.espigoladaId) {
       return {
         // Cerrada, la jornada ya pasó: la nota del generador va en pasado (28-09-2026).
@@ -224,8 +243,13 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
   // 1. Las salidas ganan a todo.
   if (fets.estado === 'cancelada') return fes('cancellada', null, -1, { motiu }, false)
   if (fets.estado === 'no_colocada') {
-    return fes('sense_desti', null, -1, { motiu }, rol === 'productor',
-      rol === 'productor' ? '/productor/ofertes/nova' : undefined)
+    // «Sense sortida» ya no es un final: falta decir qué pasó con el producto (revisión del
+    // 08-10-2026, §2 y §3.4). Le toca al productor —el formulario está en el detalle de la
+    // oferta— y al equipo, que lo ve en la cola «ofertes sense destí registrat». Con todo
+    // registrado la oferta pasa a `cerrada`, así que aquí casi siempre falta algo.
+    const falta = (fets.kgSenseDesti ?? 1) > 0
+    return fes('sense_desti', null, -1, { motiu }, falta,
+      rol === 'productor' && falta && fets.id ? `/productor/ofertes/${fets.id}#desti` : undefined)
   }
 
   // 1bis. Esperando a que el equipo la valide (05-10-2026). No es una etapa nueva: sigue
@@ -237,9 +261,15 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
   }
 
   // 2. El papel manda sobre el estado del excedente.
-  if (rec?.estado === 'conciliado' || fets.estado === 'cerrada') {
+  if (rec?.estado === 'conciliado') {
     return fes('tancada', null, 4, { kg: fets.kgCanalitzats }, false,
       rol === 'productor' ? '/productor/documents' : undefined)
+  }
+  // Cerrada SIN recogida de Redestina: todos los kilos tienen un destino que se registró a
+  // mano (venta externa, compostaje…). Variante propia porque decir «recollida» o enviar a
+  // los albaranes sería falso.
+  if (fets.estado === 'cerrada') {
+    return fes('tancada', 'desti', 4, {}, false)
   }
   if (rec?.estado === 'confirmado') {
     return rol === 'productor'
@@ -435,7 +465,7 @@ export const FASES_EQUIP: readonly FaseEquip[] = [
  * ⚠️ El equipo NO lo usa: su listado necesita el estado exacto para operar.
  */
 export type EstatSimpleOferta =
-  'validacio' | 'buscant' | 'gestio' | 'sortida' | 'finalitzada' | 'cancellada' | 'sense_sortida'
+  'validacio' | 'buscant' | 'gestio' | 'sortida' | 'finalitzada' | 'tancada_desti' | 'cancellada' | 'sense_sortida'
 
 /** Los estados simples de un interés, tal como los ve la entidad receptora. */
 export type EstatSimpleInteres =
@@ -472,7 +502,11 @@ export function estatSimpleOferta(punt: PuntProces): { estat: EstatSimpleOferta;
   switch (punt.etapa) {
     case 'cancellada': return fes('cancellada', CLASSE_SIMPLE.ko)
     case 'sense_desti': return fes('sense_sortida', CLASSE_SIMPLE.ko)
-    case 'tancada': return fes('finalitzada', CLASSE_SIMPLE.tancat)
+    // «Producte recollit» si hubo recogida de Redestina; «Tancada amb destí» si todo se
+    // registró a mano (fase 1 de la revisión del 08-10-2026).
+    case 'tancada': return punt.variant === 'desti'
+      ? fes('tancada_desti', CLASSE_SIMPLE.tancat)
+      : fes('finalitzada', CLASSE_SIMPLE.tancat)
     case 'assignada':
     case 'recollida':
     case 'confirmada':
@@ -504,13 +538,13 @@ export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleIntere
 }
 
 export const ESTATS_SIMPLES_OFERTA: readonly EstatSimpleOferta[] =
-  ['validacio', 'buscant', 'gestio', 'sortida', 'finalitzada', 'cancellada', 'sense_sortida'] as const
+  ['validacio', 'buscant', 'gestio', 'sortida', 'finalitzada', 'tancada_desti', 'cancellada', 'sense_sortida'] as const
 export const ESTATS_SIMPLES_INTERES: readonly EstatSimpleInteres[] =
   ['per_respondre', 'interes_enviat', 'assignada', 'tancada', 'no_disponible', 'declinada'] as const
 
 const CLASSE_PER_ESTAT_OFERTA: Record<EstatSimpleOferta, string> = {
   validacio: CLASSE_SIMPLE.espera, buscant: CLASSE_SIMPLE.espera, gestio: CLASSE_SIMPLE.gestio, sortida: CLASSE_SIMPLE.fet,
-  finalitzada: CLASSE_SIMPLE.tancat, cancellada: CLASSE_SIMPLE.ko, sense_sortida: CLASSE_SIMPLE.ko,
+  finalitzada: CLASSE_SIMPLE.tancat, tancada_desti: CLASSE_SIMPLE.tancat, cancellada: CLASSE_SIMPLE.ko, sense_sortida: CLASSE_SIMPLE.ko,
 }
 const CLASSE_PER_ESTAT_INTERES: Record<EstatSimpleInteres, string> = {
   per_respondre: CLASSE_SIMPLE.toca, interes_enviat: CLASSE_SIMPLE.espera, assignada: CLASSE_SIMPLE.fet,
@@ -533,5 +567,7 @@ export function llegendaSimpleInteres(): { key: string; clase: string; descKey: 
 
 /** ¿Esta oferta sigue pidiendo atención, o ya es historia? Decide en qué sección de Inici va. */
 export function ofertaEnCurs(estat: EstatSimpleOferta): boolean {
-  return estat === 'buscant' || estat === 'gestio' || estat === 'sortida'
+  // «Sense sortida» sigue pidiendo atención desde la fase 1 de la revisión del 08-10-2026:
+  // falta decir qué pasó con el producto, y cuando se dice la oferta pasa a «Tancada amb destí».
+  return estat === 'buscant' || estat === 'gestio' || estat === 'sortida' || estat === 'sense_sortida'
 }

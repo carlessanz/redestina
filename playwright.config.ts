@@ -16,7 +16,12 @@
 import { defineConfig, devices } from '@playwright/test'
 
 const executablePath = process.env.PW_CHROMIUM_PATH || undefined
-const baseURL = process.env.E2E_BASE_URL ?? 'http://localhost:5173'
+// Con `E2E_CLON=1` (11-10-2026) las pruebas corren contra el CLON LOCAL de Supabase
+// (`npm run dev:local`, en otro puerto para no chocar con un `npm run dev` abierto) y sin
+// cortina: es donde pueden escribir de verdad —emitir albaranes, cerrar ofertas— sin tocar
+// producción. Sin la variable, todo sigue como antes (contra `npm run dev`).
+const CLON = process.env.E2E_CLON === '1'
+const baseURL = process.env.E2E_BASE_URL ?? (CLON ? 'http://localhost:5174' : 'http://localhost:5173')
 
 export default defineConfig({
   testDir: 'tests/e2e',
@@ -35,7 +40,9 @@ export default defineConfig({
     { name: 'escriptori', use: { ...devices['Desktop Chrome'] } },
   ],
   webServer: process.env.E2E_BASE_URL ? undefined : {
-    command: 'npm run dev -- --port 5173 --strictPort',
+    command: CLON
+      ? 'REDESTINA_SENSE_CORTINA=1 npm run dev:local -- --port 5174 --strictPort'
+      : 'npm run dev -- --port 5173 --strictPort',
     url: baseURL,
     reuseExistingServer: true,
     timeout: 120_000,

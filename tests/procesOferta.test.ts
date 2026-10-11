@@ -70,6 +70,7 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'vençuda', fets: { ...base, vencuda: true } },
     { nom: 'vençuda parcial', fets: { ...base, estado: 'parcial', vencuda: true, kgCanalitzats: 30 } },
     { nom: 'no col·locada', fets: { ...base, estado: 'no_colocada', motiu: 'Cap entitat' } },
+    { nom: 'sense destí, parcial reclamada', fets: { ...base, estado: 'parcial', kgCanalitzats: 30, kgSenseDesti: 70, destiReclamat: true } },
     { nom: 'cancel·lada', fets: { ...base, estado: 'cancelada', motiu: 'Pluja' } },
     // F3: producto todavía al campo, y ya convertido en jornada.
     { nom: 'al camp', fets: { ...base, producteAlCamp: true } },
@@ -153,10 +154,19 @@ describe('puntOferta: de qué estado sale qué etapa', () => {
     }
   })
 
-  it('`cerrada` cierra aunque no haya albarán', () => {
+  it('`cerrada` cierra aunque no haya albarán, como «tancada amb destí»', () => {
+    // Fase 1 de la revisión del 08-10-2026: sin REC conciliado, una oferta cerrada lo está
+    // porque todos sus kilos tienen un destino registrado a mano. Decir «recollida» o
+    // enviar a los albaranes sería falso.
     const p = puntOferta({ ...base, estado: 'cerrada', kgCanalitzats: 90 }, 'productor')
-    expect([p.etapa, p.index]).toEqual(['tancada', 4])
-    expect(p.vars.kg).toBe(90)
+    expect([p.etapa, p.index, p.variant]).toEqual(['tancada', 4, 'desti'])
+    expect(p.enllac).toBeUndefined()
+    expect(estatSimpleOferta(p).estat).toBe('tancada_desti')
+    // Con el REC conciliado manda el papel: «Producte recollit».
+    const r = puntOferta({ ...base, estado: 'cerrada', kgCanalitzats: 90, albaraRec: rec('conciliado') }, 'productor')
+    expect([r.etapa, r.variant]).toEqual(['tancada', null])
+    expect(r.vars.kg).toBe(90)
+    expect(estatSimpleOferta(r).estat).toBe('finalitzada')
   })
 
   it('las salidas ganan a todo y valen -1', () => {
@@ -363,6 +373,7 @@ describe('la nota del «producte al camp» (F3)', () => {
     for (const clau of [
       'proc.p_nota_camp', 'proc.e_nota_camp',
       'proc.p_nota_espigolada', 'proc.e_nota_espigolada', 'proc.p_nota_espigolada_fet',
+      'proc.p_nota_desti', 'proc.e_nota_desti',
     ]) {
       expect(DICTS.ca[clau], `falta ${clau} en ca`).toBeTruthy()
       expect(DICTS.es[clau], `falta ${clau} en es`).toBeTruthy()
@@ -413,7 +424,31 @@ describe('emToca dice la verdad sobre quién actúa', () => {
     expect(puntOferta({ ...base, albaraRec: rec('entregado') }, 'equip').emToca).toBe(false)
     expect(puntOferta({ ...base, albaraRec: rec('conciliado') }, 'equip').emToca).toBe(false)
     expect(puntOferta({ ...base, estado: 'cancelada' }, 'equip').emToca).toBe(false)
-    expect(puntOferta({ ...base, estado: 'no_colocada' }, 'equip').emToca).toBe(false)
+  })
+
+  // «Sense sortida» ya no es un final (fase 1 de la revisión del 08-10-2026): falta el
+  // destino y les toca a los dos —al productor en su detalle, al equipo en su cola—.
+  // Solo deja de tocar cuando ya no falta ningún kilo.
+  it('«sense sortida» pide el destino mientras falte algún kilo', () => {
+    const fets: FetsOferta = { ...base, estado: 'no_colocada', id: 'o1', kgSenseDesti: 40 }
+    const p = puntOferta(fets, 'productor')
+    expect(p.emToca).toBe(true)
+    expect(p.enllac).toBe('/productor/ofertes/o1#desti')
+    expect(puntOferta(fets, 'equip').emToca).toBe(true)
+    expect(puntOferta(fets, 'equip').enllac).toBeUndefined()
+    expect(puntOferta({ ...fets, kgSenseDesti: 0 }, 'productor').emToca).toBe(false)
+  })
+
+  it('una parcial vencida con kilos sin destino lleva la nota, sin cambiar de etapa', () => {
+    const fets: FetsOferta = { ...base, estado: 'parcial', kgCanalitzats: 60, id: 'o1', kgSenseDesti: 40, destiReclamat: true }
+    const sense = puntOferta({ ...fets, destiReclamat: false }, 'productor')
+    const amb = puntOferta(fets, 'productor')
+    expect([amb.etapa, amb.index]).toEqual([sense.etapa, sense.index])
+    expect(amb.notaClau).toBe('proc.p_nota_desti')
+    expect(amb.notaEnllac).toBe('/productor/ofertes/o1#desti')
+    expect(puntOferta(fets, 'equip').notaClau).toBe('proc.e_nota_desti')
+    // Con todo registrado, la nota calla.
+    expect(puntOferta({ ...fets, kgSenseDesti: 0 }, 'productor').notaClau).toBeUndefined()
   })
 
   it('el receptor solo actúa al pedir la oferta y al confirmar la entrega', () => {
@@ -500,7 +535,8 @@ describe('el estado SIMPLE de los paneles externos (revisión del 23-09-2026)', 
   it('«en curs» separa las dos secciones de Inici sin que ninguna oferta caiga en las dos', () => {
     for (const e of ESTATS_SIMPLES_OFERTA) {
       const enCurs = ofertaEnCurs(e)
-      expect(enCurs, e).toBe(e === 'buscant' || e === 'gestio' || e === 'sortida')
+      // «Sense sortida» sigue en curso: falta el destino (fase 1, revisión del 08-10-2026).
+      expect(enCurs, e).toBe(e === 'buscant' || e === 'gestio' || e === 'sortida' || e === 'sense_sortida')
     }
   })
 
