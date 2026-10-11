@@ -167,7 +167,10 @@ export default function AppSidebar({
           <SidebarGroup>
             <SidebarGroupContent>
               <SidebarMenu>
-                {ORGANITZACIO[0].items.map((item) => (
+                {ORGANITZACIO[0].items
+                  .filter((item) => !item.paper
+                    || (ctx?.organitzacions ?? []).some((o) => o.tipo === item.paper))
+                  .map((item) => (
                   <SidebarMenuItem key={item.to}>
                     <SidebarMenuButton
                       asChild

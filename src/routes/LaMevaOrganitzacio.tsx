@@ -29,6 +29,7 @@ import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import PerfilOrganitzacio from './PerfilOrganitzacio'
 import TargetaDiagnostic from '../components/TargetaDiagnostic'
+import TargetaPerfilRecepcio from '../components/TargetaPerfilRecepcio'
 import TriaPaper, { type Paper } from '../components/TriaPaper'
 
 /** El mismo vocabulario de `TriaPaper`; se conserva el alias local por legibilidad. */
@@ -77,10 +78,14 @@ export default function LaMevaOrganitzacio() {
   )
 }
 
-/** La tarjeta del diagnóstico de UN papel, con su organización resuelta desde el contexto. */
+/**
+ * La tarjeta de lo que se hace con ESTE papel: el diagnóstico operativo del productor o,
+ * desde la fase 9, el perfil de recepción del receptor (que ya no tiene diagnóstico).
+ */
 function Diagnostic({ tipus }: { tipus: Tipus }) {
   const { ctx } = useAppContext()
   const org = ctx?.organitzacions.find((o) => o.tipo === tipus) ?? null
+  if (tipus === 'entidad') return <TargetaPerfilRecepcio />
   return <TargetaDiagnostic tipusOrg={tipus} orgId={org?.id ?? null} mode="extern" />
 }
 

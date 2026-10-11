@@ -57,7 +57,8 @@ test('la receptora dice qué modalidades le interesan y cómo puede recibir', as
   sql(`update entidades set modalitats_interes = '{}', razon_social = coalesce(razon_social, nombre),
          nif = case when nif_valid(nif) then nif else '22222222J' end where id = '${ent}'`)
   await entra(page, RECEPTOR)
-  await page.goto('/organitzacio')
+  // Desde la fase 9 las preferencias viven en «El meu perfil de recepció».
+  await page.goto('/organitzacio/perfil-recepcio')
   const pref = page.getByTestId('preferencies-recepcio')
   await expect(pref.getByText(/Com podem oferir-te excedents|Cómo podemos ofrecerte excedentes/)).toBeVisible()
   await pref.getByRole('button', { name: /^Compra$/ }).click()
@@ -65,5 +66,6 @@ test('la receptora dice qué modalidades le interesan y cómo puede recibir', as
   await page.getByRole('button', { name: /^Desar$|^Guardar$/ }).first().click()
   await expect(page.getByText(/Desat|Guardado|desat/i).first()).toBeVisible()
   expect(sql(`select array_to_string(modalitats_interes, ',') from entidades where id = '${ent}'`)).toMatch(/venda/)
+  await page.goto('/organitzacio')
   await expect(page.getByTestId('rol-redestina')).toBeVisible()
 })

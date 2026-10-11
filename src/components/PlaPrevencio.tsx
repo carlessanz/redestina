@@ -243,7 +243,11 @@ export default function PlaPrevencio({
           </CardHeader>
           <CardContent className="space-y-5">
             {llista.length === 0 ? (
-              <p className="text-sm text-muted-foreground">{t('pla.empty')}</p>
+              // Desde la fase 9 el plan no se genera al guardar el diagnóstico: hasta que el
+              // equipo lo prepara, «vacío» quiere decir «sin preparar», no «sin medidas».
+              <p className="text-sm text-muted-foreground">
+                {t(pla.mesures?.generat_at ? 'pla.empty' : 'pla.no_generat')}
+              </p>
             ) : (
               grups.map((g) => (
                 <section key={g.bloc} className="space-y-2">
@@ -386,7 +390,7 @@ export default function PlaPrevencio({
                     {ocupat === 'generar'
                       ? <Loader2 className="size-4 animate-spin" aria-hidden />
                       : <RefreshCw className="size-4" aria-hidden />}
-                    {t('pla.regenerate')}
+                    {t(pla.mesures?.generat_at ? 'pla.regenerate' : 'pla.generate')}
                   </Button>
                 </>
               )}

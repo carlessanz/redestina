@@ -41,6 +41,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Info } from 'lucide-react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -49,11 +50,9 @@ import { refrescaAvisos } from '../lib/refrescAvisos'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../lib/validacio'
-import { CLAUS_PREFERENCIES, PERFIL_RECEPTOR, PREFERENCIES_RECEPCIO, TIPUS_EMPRESA } from '../lib/perfilReceptor'
-import type { CampPerfil } from '../lib/perfilReceptor'
+import { TIPUS_EMPRESA } from '../lib/perfilReceptor'
 import SelectorMunicipi from '../components/SelectorMunicipi'
 import LlocsRecollida from '../components/LlocsRecollida'
-import CampsPerfilReceptor from '../components/CampsPerfilReceptor'
 import ContactesOrganitzacio from '../components/ContactesOrganitzacio'
 import RolRedestina from '../components/RolRedestina'
 import XipsTria from '../components/XipsTria'
@@ -159,7 +158,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const waActiu = useWhatsappActiu()
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
-  const [perfil, setPerfil] = useState<Record<string, unknown>>({})
   const [canal, setCanal] = useState<Tria>('auto')
   const [canalDesat, setCanalDesat] = useState<Tria>('auto')
   const [carregant, setCarregant] = useState(true)
@@ -179,8 +177,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const correu = String(fila?.email ?? '').trim()
   const descripcio = OPCIONS.find((o) => o.valor === canal)?.descKey ?? 'perf.channel_auto_desc'
   const tipusReceptor = tipus === 'entidad' ? String(fila?.tipo_receptor ?? '') : ''
-  const campsPerfil: readonly CampPerfil[] = (PERFIL_RECEPTOR[tipusReceptor] ?? [])
-    .filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
   // El catálogo de actividades (fase 7): solo las que aplican a este papel.
   const [activitats, setActivitats] = useState<TipusActivitat[]>([])
   useEffect(() => { void carregaTipusActivitat().then((c) => setActivitats(activitatsPerPaper(c, tipus))) }, [tipus])
@@ -196,7 +192,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     // los datos de una organización con los campos de la otra.
     setCarregant(true)
     setFila(null)
-    setPerfil({})
     setErrors({})
     setCanal('auto')
     setCanalDesat('auto')
@@ -208,7 +203,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       setErrorCarrega(Boolean(error))
       const f = (data as Fila) ?? null
       setFila(f)
-      setPerfil(((f?.perfil_receptor as Record<string, unknown> | null) ?? {}))
 
 
       // La preferencia vive en la organización, no en la ficha (§4).
@@ -278,10 +272,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
       dades[c.clave] = c.tipus === 'tel' ? normalitzaTelefon(String(v ?? '')) || null : (v ?? null)
     }
     dades.tipus_activitat = Array.isArray(fila.tipus_activitat) ? fila.tipus_activitat : []
-    if (tipus === 'entidad') {
-      dades.perfil_receptor = perfil
-      dades.modalitats_interes = Array.isArray(fila.modalitats_interes) ? fila.modalitats_interes : []
-    }
     const { data, error } = await supabase.rpc(
       tipus === 'productor' ? 'actualitzar_fitxa_productor' : 'actualitzar_fitxa_entitat',
       { p_id: organitzacio.id, p_dades: dades },
@@ -428,30 +418,16 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           </section>
         ))}
 
-        {/* «Com podem oferir-te excedents?» (fase 7): lo que sirve para el matching, justo
-            después de los datos. Las modalidades que le interesan son su PREFERENCIA; las que
-            puede recibir las decide su tipo de entidad (el equipo). */}
+        {/* Las preferencias de recepción y las condiciones del tipo se editan desde la
+            fase 9 en «El meu perfil de recepció»: aquí solo el puntero, para que no haya dos
+            formularios del mismo dato. */}
         {tipus === 'entidad' && (
-          <section className="space-y-3 border-t border-border pt-6" data-testid="preferencies-recepcio">
-            <div>
-              <h3 className="text-base font-semibold">{t('org.sec_preferencies')}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t('org.h_preferencies')}</p>
-            </div>
-            <div>
-              <p id="po-mod-int-l" className="mb-1.5 text-xs text-muted-foreground">{t('org.f_modalitats_interes')}</p>
-              <XipsTria etiquetaId="po-mod-int-l" disabled={!potEditar}
-                opcions={[
-                  { valor: 'venda', text: t('org.mi_compra') },
-                  { valor: 'donacio', text: t('org.mi_donacio') },
-                  { valor: 'maquila', text: t('org.mi_maquila') },
-                ]}
-                triats={Array.isArray(fila?.modalitats_interes) ? fila.modalitats_interes as string[] : []}
-                onChange={(v) => setCamp('modalitats_interes', v)} />
-              <p className="mt-1 text-xs text-muted-foreground">{t('org.h_modalitats_interes')}</p>
-            </div>
-            <CampsPerfilReceptor tipusReceptor={tipusReceptor} camps={PREFERENCIES_RECEPCIO} perfil={perfil}
-              onChange={setPerfil} disabled={!potEditar} idPrefix="pref" />
-          </section>
+          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
+            {t('precep.a_la_fitxa')}{' '}
+            <Link to="/organitzacio/perfil-recepcio" className="font-medium text-primary underline-offset-4 hover:underline">
+              {t('precep.card_go')}
+            </Link>
+          </p>
         )}
 
         <section className="space-y-3 border-t border-border pt-6">
@@ -477,17 +453,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               <p className="mt-1 text-sm text-muted-foreground">{t('org.h_llocs')}</p>
             </div>
             <LlocsRecollida productorId={organitzacio.id} potEditar={potEditar} idPrefix="org-lloc" />
-          </section>
-        )}
-
-        {tipus === 'entidad' && campsPerfil.length > 0 && (
-          <section className="space-y-3 border-t border-border pt-6">
-            <div>
-              <h3 className="text-base font-semibold">{t(`org.sec_perfil_${tipusReceptor}`)}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t('org.h_perfil')}</p>
-            </div>
-            <CampsPerfilReceptor tipusReceptor={tipusReceptor} perfil={perfil}
-              onChange={setPerfil} disabled={!potEditar} />
           </section>
         )}
 

@@ -7,6 +7,10 @@
 // No se deducen de `useOrganitzacio()` porque un interno no tiene ninguna organización
 // propia — y el diagnóstico es, antes que nada, un servicio asistido (§1bis).
 //
+// 🔴 DESDE LA FASE 9 (revisión del 08-10-2026) EL DIAGNÓSTICO NO GENERA EL PLAN: es una
+//    ficha operativa viva. Se abre con la última versión guardada (`diagnostics_historial`)
+//    aunque el equipo ya haya emitido un plan y no quede borrador.
+//
 // 🔴 SE GUARDA SIEMPRE, COMPLETO O NO, y por eso hay dos botones y no uno. Doce preguntas no
 //    se contestan de una sentada: si «Desar» exigiera el cuestionario entero, lo tecleado se
 //    perdería cada vez que alguien se levanta. La base ya está construida así
@@ -34,13 +38,18 @@ import { FilaCasella } from './Casella'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import {
-  PASSOS_DIAGNOSTIC_CLAUS, agrupaPerSeccio, esBuit, obligatoriesQueFalten,
-  opcionsVisibles, prefillDesDeFitxa, progresDiagnostic, puntDiagnostic, textBilingue,
+  agrupaPerSeccio, esBuit, llistaDe, mesosValids, netejaRespostes, obligatoriesQueFalten,
+  opcionsProductes, opcionsVisibles, passosDiagnostic, prefillDesDeFitxa, progresDiagnostic,
+  puntDiagnostic, textBilingue,
 } from '../lib/diagnostic'
 import type { Respostes } from '../lib/diagnostic'
 import {
-  desarDiagnostic, diagnosticEstat, plaEsborrany, questionariVigent,
+  desarDiagnostic, diagnosticEstat, historialDiagnostic, plaEsborrany, questionariVigent,
 } from '../lib/diagnosticApi'
+import { carregaCataleg } from '../lib/fotosProducte'
+import { supabase } from '../lib/supabase'
+import { dataHora } from '../lib/format'
+import XipsTria from './XipsTria'
 import type { TipusOrg } from '../lib/diagnosticApi'
 import type {
   DiagnosticEstat, OpcioPregunta, PreguntaDiagnostic, QuestionariDiagnostic, SobreDiagnostic,
@@ -85,22 +94,37 @@ export default function FormulariDiagnostic({
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [desant, setDesant] = useState<null | 'parcial' | 'complet'>(null)
+  /** El catálogo y los lugares de la ficha: lo que necesitan los tipos de la fase 9. */
+  const [dades, setDades] = useState<DadesControls>({ cataleg: [], llocs: [] })
 
   const carrega = useCallback(async () => {
     setCarregant(true)
-    const [q, pla, est] = await Promise.all([
+    const [q, pla, est, hist, cataleg, llocs] = await Promise.all([
       questionariVigent(tipusOrg),
       plaEsborrany(tipusOrg, orgId),
       diagnosticEstat(tipusOrg, orgId),
+      historialDiagnostic(tipusOrg, orgId, 1),
+      carregaCataleg(),
+      tipusOrg === 'productor'
+        ? supabase.from('productor_ubicaciones').select('id, alias, municipio').eq('productor_id', orgId)
+        : Promise.resolve({ data: [] }),
     ])
     if (!q.ok) { setError(q.missatge); setCarregant(false); return }
     setError(null)
     setQuestionari(q.data)
     setEstat(est.ok ? est.data : null)
+    setDades({
+      cataleg: [...cataleg.values()],
+      llocs: ((llocs.data ?? []) as { id: string; alias: string | null; municipio: string | null }[]),
+    })
 
+    // La ficha viva: manda el borrador si lo hay; si no, la última versión guardada (el
+    // equipo puede haber emitido un plan y entonces ya no hay borrador).
     const sobre = pla.ok ? (pla.data?.respuestas as SobreDiagnostic | undefined) : undefined
-    const desades: Respostes = (sobre?.respostes_crues as Respostes | undefined) ?? {}
-    setNotes(typeof sobre?.notes === 'string' ? sobre.notes : '')
+    const darrera = hist.ok ? hist.data[0] : undefined
+    const desades: Respostes = (sobre?.respostes_crues as Respostes | undefined)
+      ?? darrera?.respostes ?? {}
+    setNotes(typeof sobre?.notes === 'string' ? sobre.notes : (darrera?.notes ?? ''))
 
     // La propuesta solo llena los huecos: lo que ya se contestó una vez manda siempre sobre
     // lo que diga la ficha. Al revés, corregir una respuesta y volver a entrar la
@@ -145,14 +169,13 @@ export default function FormulariDiagnostic({
     if (desant) return
     setDesant(mode)
     const r = await desarDiagnostic(
-      tipusOrg, orgId, respostes, notes.trim() === '' ? null : notes.trim(), lang)
+      tipusOrg, orgId, netejaRespostes(preguntes, respostes),
+      notes.trim() === '' ? null : notes.trim(), lang)
     setDesant(null)
     if (!r.ok) { toast.error(textError(t, r)); return }
 
     if (r.data.complet) {
-      toast.success(r.data.te_mesures
-        ? t('diag.saved_plan', { n: r.data.mesures_n })
-        : t('diag.saved_complete'))
+      toast.success(t('diag.saved_complete'))
     } else {
       toast.success(t('diag.saved_partial', { n: r.data.falten.length }))
     }
@@ -192,7 +215,7 @@ export default function FormulariDiagnostic({
       <Card>
         <CardHeader className="gap-3">
           <CardTitle>{textBilingue(questionari.titol, lang)}</CardTitle>
-          <PasosProces etapes={PASSOS_DIAGNOSTIC_CLAUS} actual={punt.index} />
+          <PasosProces etapes={passosDiagnostic(assistit ? 'equip' : 'org')} actual={punt.index} />
         </CardHeader>
         <CardContent className="space-y-3">
           <QueTocaAra punt={punt} compacte />
@@ -215,6 +238,9 @@ export default function FormulariDiagnostic({
 
           <p className="text-sm text-muted-foreground">
             {t('diag.progress', { n: progres.contestades, total: progres.total })}
+            {estat?.darrera_actualitzacio && (
+              <> · {t('diag.darrera', { data: dataHora(estat.darrera_actualitzacio) })}</>
+            )}
           </p>
         </CardContent>
       </Card>
@@ -231,6 +257,8 @@ export default function FormulariDiagnostic({
                 pregunta={p}
                 valor={respostes[p.id]}
                 opcions={opcionsVisibles(p, respostes)}
+                respostes={respostes}
+                dades={dades}
                 falta={falten.includes(p.id)}
                 proposat={proposats.has(p.id)}
                 onCanvi={(v) => respon(p.id, v)}
@@ -293,11 +321,13 @@ export default function FormulariDiagnostic({
 // ---------------------------------------------------------------------------
 
 function Pregunta({
-  pregunta, valor, opcions, falta, proposat, onCanvi,
+  pregunta, valor, opcions, respostes, dades, falta, proposat, onCanvi,
 }: {
   pregunta: PreguntaDiagnostic
   valor: unknown
   opcions: OpcioPregunta[]
+  respostes: Respostes
+  dades: DadesControls
   falta: boolean
   proposat: boolean
   onCanvi: (valor: unknown) => void
@@ -335,11 +365,14 @@ function Pregunta({
 
       {unSolControl
         ? <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
-        : (
-          <div role="group" aria-labelledby={`${id}-etiqueta`}>
-            <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
-          </div>
-        )}
+        : CONTROLS_FASE9.has(pregunta.tipus)
+          ? <ControlFitxaViva pregunta={pregunta} valor={valor} respostes={respostes} dades={dades}
+              id={id} onCanvi={onCanvi} />
+          : (
+            <div role="group" aria-labelledby={`${id}-etiqueta`}>
+              <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
+            </div>
+          )}
 
       {proposat && <p className="text-xs text-muted-foreground">{t('diag.prefilled')}</p>}
     </div>
@@ -455,5 +488,139 @@ function Control({
       value={typeof valor === 'string' ? valor : ''}
       onChange={(e) => onCanvi(e.target.value.trim() === '' ? undefined : e.target.value)}
     />
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Los tipos de la ficha viva (fase 9): productos, por producto, meses y lugares
+// ---------------------------------------------------------------------------
+
+interface DadesControls {
+  cataleg: { nombre: string; familia: string | null }[]
+  llocs: { id: string; alias: string | null; municipio: string | null }[]
+}
+
+const CONTROLS_FASE9: ReadonlySet<string> = new Set(['productes', 'per_producte_num', 'mesos', 'ubicacio'])
+
+const MESOS: Record<'ca' | 'es', string[]> = {
+  ca: ['gen', 'feb', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'des'],
+  es: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
+}
+
+function ControlFitxaViva({
+  pregunta, valor, respostes, dades, id, onCanvi,
+}: {
+  pregunta: PreguntaDiagnostic
+  valor: unknown
+  respostes: Respostes
+  dades: DadesControls
+  id: string
+  onCanvi: (valor: unknown) => void
+}) {
+  const { t, lang } = useT()
+  const etiquetaId = `${id}-etiqueta`
+
+  if (pregunta.tipus === 'productes') {
+    const opcions = opcionsProductes(pregunta, respostes, dades.cataleg)
+    const triats = llistaDe(respostes, pregunta.id)
+    if (opcions.length === 0) {
+      return (
+        <p className="text-sm text-muted-foreground">
+          {t(pregunta.opcions_de ? 'diag.marca_productes' : 'diag.marca_families')}
+        </p>
+      )
+    }
+    const max = pregunta.max ?? null
+    const ple = max !== null && triats.length >= max
+    return (
+      <div className="space-y-1">
+        <XipsTria
+          etiquetaId={etiquetaId}
+          opcions={opcions.map((n) => ({ valor: n, text: n, desactivat: ple && !triats.includes(n) }))}
+          triats={triats}
+          onChange={(v) => onCanvi(v.length === 0 ? undefined : (max ? v.slice(0, max) : v))}
+        />
+        {max !== null && <p className="text-xs text-muted-foreground">{t('diag.max_productes', { n: max })}</p>}
+      </div>
+    )
+  }
+
+  if (pregunta.tipus === 'ubicacio') {
+    if (dades.llocs.length === 0) {
+      return <p className="text-sm text-muted-foreground">{t('diag.sense_llocs')}</p>
+    }
+    const triats = Array.isArray(valor) ? (valor as string[]) : []
+    return (
+      <XipsTria
+        etiquetaId={etiquetaId}
+        opcions={dades.llocs.map((l) => ({ valor: l.id, text: l.alias || l.municipio || '—' }))}
+        triats={triats}
+        onChange={(v) => onCanvi(v.length === 0 ? undefined : v)}
+      />
+    )
+  }
+
+  // `per_producte_num` y `mesos`: una fila por producto de la pregunta de la que dependen.
+  const productes = pregunta.productes_de ? llistaDe(respostes, pregunta.productes_de) : null
+  if (productes !== null && productes.length === 0) {
+    return <p className="text-sm text-muted-foreground">{t('diag.marca_productes')}</p>
+  }
+  const mapa = valor && typeof valor === 'object' && !Array.isArray(valor)
+    ? (valor as Record<string, unknown>) : {}
+  const posa = (producte: string, v: unknown) => {
+    const seg = { ...mapa }
+    if (v === undefined) delete seg[producte]
+    else seg[producte] = v
+    onCanvi(Object.keys(seg).length === 0 ? undefined : seg)
+  }
+
+  if (pregunta.tipus === 'per_producte_num') {
+    const unitat = textBilingue(pregunta.unitat, lang)
+    return (
+      <div className="space-y-2" role="group" aria-labelledby={etiquetaId}>
+        {(productes ?? []).map((p, i) => (
+          <div key={p} className="flex flex-wrap items-center gap-2">
+            <label htmlFor={`${id}-${i}`} className="min-w-32 text-sm">{p}</label>
+            <Input
+              id={`${id}-${i}`}
+              type="number"
+              inputMode="decimal"
+              min={0}
+              className="max-w-40"
+              value={typeof mapa[p] === 'number' ? String(mapa[p]) : ''}
+              onChange={(e) => {
+                const v = e.target.value.trim()
+                posa(p, v === '' || !Number.isFinite(Number(v)) ? undefined : Number(v))
+              }}
+            />
+            {unitat && <span className="text-sm text-muted-foreground">{unitat}</span>}
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  // `mesos`
+  const opcionsMesos = MESOS[lang].map((m, i) => ({ valor: String(i + 1), text: m }))
+  const selector = (actuals: number[], onTria: (m: number[]) => void, etiq: string) => (
+    <XipsTria
+      etiquetaId={etiq}
+      opcions={opcionsMesos}
+      triats={actuals.map(String)}
+      onChange={(v) => onTria(mesosValids(v.map(Number)))}
+    />
+  )
+  if (productes === null) {
+    return selector(mesosValids(valor), (m) => onCanvi(m.length === 0 ? undefined : m), etiquetaId)
+  }
+  return (
+    <div className="space-y-3">
+      {productes.map((p, i) => (
+        <div key={p} className="space-y-1">
+          <p id={`${id}-${i}-l`} className="text-sm font-medium">{p}</p>
+          {selector(mesosValids(mapa[p]), (m) => posa(p, m.length === 0 ? undefined : m), `${id}-${i}-l`)}
+        </div>
+      ))}
+    </div>
   )
 }

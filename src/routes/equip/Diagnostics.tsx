@@ -16,6 +16,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router'
+import { dataCurta } from '../../lib/format'
 import { useT } from '../../lib/i18n'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
@@ -44,7 +45,6 @@ export default function Diagnostics() {
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
   const [estat, setEstat] = useState<string>(TOTS)
-  const [paper, setPaper] = useState<string>(TOTS)
 
   useEffect(() => {
     let viu = true
@@ -60,14 +60,15 @@ export default function Diagnostics() {
   const visibles = useMemo(() => {
     return files.filter((f) => {
       if (estat !== TOTS && f.estat !== estat) return false
-      if (paper !== TOTS && f.tipo_org !== paper) return false
       return casaCerca([f.nom, f.numero], q)
     })
-  }, [files, q, estat, paper])
+  }, [files, q, estat])
 
   // Lo que de verdad queda por hacer. `sense_questionari` no entra: eso no es trabajo de
   // esta pantalla sino de la configuración, y contarlo aquí lo convertiría en una cifra que
   // nadie puede bajar desde aquí.
+  // Desde la fase 9 el diagnóstico es del productor y el plan, un servicio: lo pendiente para
+  // el equipo es lo que no se ha empezado, lo que está a medias y el plan preparado sin emitir.
   const pendents = files.filter(
     (f) => f.estat === 'sense_comencar' || f.estat === 'incomplet' || f.estat === 'a_punt',
   ).length
@@ -79,7 +80,7 @@ export default function Diagnostics() {
         <p className="mt-1 text-sm text-muted-foreground">{t('diagl.subtitle')}</p>
       </CardHeader>
       <CardContent className="space-y-4">
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="diagl-cerca">{t('c.search')}</Label>
             <Input
@@ -96,17 +97,6 @@ export default function Diagnostics() {
                 {ESTATS_DIAGNOSTIC.map((e) => (
                   <SelectItem key={e} value={e}>{t(`diag.st_${e}`)}</SelectItem>
                 ))}
-              </SelectContent>
-            </Select>
-          </div>
-          <div className="space-y-1.5">
-            <Label htmlFor="diagl-paper">{t('diagl.f_role')}</Label>
-            <Select value={paper} onValueChange={setPaper}>
-              <SelectTrigger id="diagl-paper" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TOTS}>{t('diagl.all')}</SelectItem>
-                <SelectItem value="productor">{t('org.paper_productor')}</SelectItem>
-                <SelectItem value="entidad">{t('org.paper_receptor')}</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -131,7 +121,7 @@ export default function Diagnostics() {
                   <TableHeader>
                     <TableRow>
                       <TableHead>{t('diagl.c_org')}</TableHead>
-                      <TableHead>{t('diagl.c_role')}</TableHead>
+                      <TableHead>{t('diagl.c_updated')}</TableHead>
                       <TableHead>{t('diagl.c_status')}</TableHead>
                       <TableHead className="text-right">{t('diagl.c_missing')}</TableHead>
                       <TableHead className="text-right">{t('diagl.c_measures')}</TableHead>
@@ -151,8 +141,9 @@ export default function Diagnostics() {
                             <Badge variant="outline" className="ml-2">{t('diagl.test')}</Badge>
                           )}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          {t(f.tipo_org === 'productor' ? 'org.paper_productor' : 'org.paper_receptor')}
+                        {/* La ficha viva (fase 9): cuándo se actualizó por última vez. */}
+                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                          {dataCurta(f.darrera_actualitzacio)}
                         </TableCell>
                         <TableCell>
                           <Badge className={estilEstatDiagnostic(f.estat)}>

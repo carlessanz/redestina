@@ -24,7 +24,8 @@ import { clauOrganitzacions, organitzacionsDeClau } from '../lib/rols'
 
 /** Los estados en los que queda algo por hacer. `emes` está hecho; `sense_questionari`
  *  no es de la organización —es que no hay cuestionario vigente— y no se le puede pedir. */
-const PENDENTS: EstatDiagnostic[] = ['sense_comencar', 'incomplet', 'a_punt']
+// Desde la fase 9 `a_punt` ya no le toca a la organización: el plan lo prepara el equipo.
+const PENDENTS: EstatDiagnostic[] = ['sense_comencar', 'incomplet']
 
 export interface DiagnosticPendent {
   /** ¿Hay alguna organización con el diagnóstico a medias? */
@@ -57,7 +58,10 @@ export function useDiagnosticPendent(): DiagnosticPendent {
     void (async () => {
       // Como mucho dos organizaciones (productora y receptora): dos llamadas, no una lista.
       const resultats = await Promise.all(
-        organitzacionsDeClau(clau).map((o) => diagnosticEstat(o.tipo, o.id)),
+        // Solo la ficha de productor: el receptor ya no tiene diagnóstico (fase 9), tiene
+        // su perfil de recepción.
+        organitzacionsDeClau(clau).filter((o) => o.tipo === 'productor')
+          .map((o) => diagnosticEstat(o.tipo, o.id)),
       )
       if (!viu) return
 

@@ -12,7 +12,7 @@
 
 import {
   Apple, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
-  Home, LayoutDashboard, Leaf, Receipt,
+  Home, Inbox, LayoutDashboard, Leaf, Receipt,
   MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users, Workflow,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
@@ -62,6 +62,11 @@ export interface NavItem {
    * el título de la barra superior siguen diciendo el nombre completo.
    */
   labelBarraKey?: string
+  /**
+   * Solo para quien tiene ficha de ese papel (fase 9): el diagnóstico es del productor y el
+   * perfil de recepción, del receptor. Lo filtra `AppSidebar`.
+   */
+  paper?: 'productor' | 'entidad'
 }
 
 export interface NavGrup {
@@ -172,7 +177,10 @@ export const ORGANITZACIO: NavGrup[] = [
       // El diagnóstico de prevención (F2). Cuelga de la organización y no de un panel por
       // lo mismo que la ficha: una organización es una, y sus papeles son un detalle suyo
       // — con doble rol son dos diagnósticos, pero se entra por un solo sitio.
-      { to: '/organitzacio/diagnostic', labelKey: 'nav.my_diagnostic', icon: ClipboardList, barra: false },
+      { to: '/organitzacio/diagnostic', labelKey: 'nav.my_diagnostic', icon: ClipboardList, barra: false, paper: 'productor' },
+      // «El meu perfil de recepció» (fase 9): lo que el receptor necesita y puede recibir.
+      // Sustituye a su diagnóstico, que ya no existe.
+      { to: '/organitzacio/perfil-recepcio', labelKey: 'nav.perfil_recepcio', icon: Inbox, barra: false, paper: 'entidad' },
     ],
   },
 ]

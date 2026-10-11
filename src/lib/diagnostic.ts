@@ -46,6 +46,9 @@ export function esBuit(valor: unknown): boolean {
   if (valor === null || valor === undefined) return true
   if (typeof valor === 'string') return valor.trim() === ''
   if (Array.isArray(valor)) return valor.length === 0
+  // Desde la fase 9 SQL cuenta también el objeto vacío: las respuestas por producto son
+  // objetos `{producte: valor}`.
+  if (typeof valor === 'object') return Object.keys(valor as object).length === 0
   return false
 }
 
@@ -137,6 +140,92 @@ export function opcionsVisibles(pregunta: PreguntaDiagnostic, respostes: Respost
   return opcions.filter((o) => marcats.includes(o.valor) || triats.includes(o.valor))
 }
 
+// ---------------------------------------------------------------------------
+// 1bis. Los tipos de la ficha viva (fase 9): productos, por producto, meses, lugares
+// ---------------------------------------------------------------------------
+
+/** Lo contestado en una pregunta de lista, como array de cadenas (vacío si nada). */
+export function llistaDe(respostes: Respostes, id: string | null | undefined): string[] {
+  if (!id) return []
+  const v = respostes[id]
+  return Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string') : []
+}
+
+/**
+ * Los productos que se ofrecen en una pregunta `productes`.
+ *
+ * - Con `opcions_de`: lo contestado en esa otra pregunta («els principals, dels que has marcat»).
+ * - Con `familia_de`: el catálogo filtrado por las familias contestadas; sin ninguna
+ *   contestada, nada (la pantalla pide marcar primero las familias).
+ * - Sin ninguna de las dos: el catálogo entero.
+ *
+ * Siempre se añaden los que ya están marcados, para que desmarcar arriba no deje una
+ * respuesta escondida que no se puede quitar (el mismo criterio que `opcionsVisibles`).
+ */
+export function opcionsProductes(
+  pregunta: PreguntaDiagnostic,
+  respostes: Respostes,
+  cataleg: readonly { nombre: string; familia: string | null }[],
+): string[] {
+  const triats = llistaDe(respostes, pregunta.id)
+  let base: string[]
+  if (pregunta.opcions_de) {
+    base = llistaDe(respostes, pregunta.opcions_de)
+  } else if (pregunta.familia_de) {
+    const families = new Set(llistaDe(respostes, pregunta.familia_de))
+    base = cataleg.filter((p) => p.familia !== null && families.has(p.familia)).map((p) => p.nombre)
+  } else {
+    base = cataleg.map((p) => p.nombre)
+  }
+  const fora = [...base]
+  for (const t of triats) if (!fora.includes(t)) fora.push(t)
+  return fora
+}
+
+/**
+ * Quita de las respuestas por producto lo que ya no toca: un producto que ha salido de la
+ * lista de la que dependen (`productes_de`), un número vacío o un mes fuera de 1..12. Se
+ * aplica al guardar, para que lo impreso no cite un producto que ya no está.
+ */
+export function netejaRespostes(preguntes: PreguntaDiagnostic[], respostes: Respostes): Respostes {
+  const fora: Respostes = { ...respostes }
+  for (const p of preguntes) {
+    const v = fora[p.id]
+    if (v === undefined) continue
+    if (p.tipus === 'per_producte_num' || (p.tipus === 'mesos' && p.productes_de)) {
+      if (typeof v !== 'object' || v === null || Array.isArray(v)) { delete fora[p.id]; continue }
+      const valids = new Set(llistaDe(fora, p.productes_de))
+      const net: Record<string, unknown> = {}
+      for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+        if (!valids.has(k)) continue
+        if (p.tipus === 'per_producte_num') {
+          if (typeof x === 'number' && Number.isFinite(x)) net[k] = x
+        } else {
+          const mesos = mesosValids(x)
+          if (mesos.length > 0) net[k] = mesos
+        }
+      }
+      if (Object.keys(net).length === 0) delete fora[p.id]
+      else fora[p.id] = net
+    } else if (p.tipus === 'mesos') {
+      const mesos = mesosValids(v)
+      if (mesos.length === 0) delete fora[p.id]
+      else fora[p.id] = mesos
+    } else if (p.tipus === 'productes' && p.max && Array.isArray(v) && v.length > p.max) {
+      fora[p.id] = v.slice(0, p.max)
+    }
+  }
+  return fora
+}
+
+/** Los meses válidos de un valor, ordenados y sin repetir. */
+export function mesosValids(v: unknown): number[] {
+  if (!Array.isArray(v)) return []
+  const s = new Set<number>()
+  for (const m of v) if (typeof m === 'number' && Number.isInteger(m) && m >= 1 && m <= 12) s.add(m)
+  return [...s].sort((a, b) => a - b)
+}
+
 /** Las preguntas visibles ahora mismo, en el orden del cuestionario. */
 export function preguntesQueApliquen(
   preguntes: PreguntaDiagnostic[],
@@ -183,8 +272,11 @@ export function progresDiagnostic(
 export const SECCIONS_CONEGUDES: readonly string[] = [
   // Las de la versión 0 (siguen haciendo falta: los diagnósticos ya hechos las citan)…
   'planificacio', 'collita', 'conservacio', 'canalitzacio', 'seguiment',
-  // …y las cuatro de la versión 1 del productor (20270403100000), las de la revisión.
+  // …las cuatro de la versión 1 del productor (20270403100000), las de la revisión…
   'produccio', 'generacio', 'gestio', 'necessitats',
+  // …y las de la versión 2, el «Diagnòstic operatiu» (fase 9, 20270423100000).
+  'productes', 'temporalitat', 'excedents', 'previsio', 'gestio_actual', 'causes', 'sortides', 'ubicacio',
+  'logistica', 'relacio',
 ] as const
 
 export const BLOCS_MESURA: readonly BlocMesura[] = [
@@ -285,6 +377,14 @@ export function prefillPregunta(pregunta: PreguntaDiagnostic, brut: unknown): un
     return undefined
   }
   if (tipus === 'text') return typeof brut === 'string' ? brut : undefined
+  // `productes`: la ficha guarda nombres del catálogo (`productos_habituales`), que es
+  // justo lo que esta pregunta contesta. Solo cadenas no vacías.
+  if (tipus === 'productes') {
+    if (!Array.isArray(brut)) return undefined
+    const noms = brut.filter((v): v is string => typeof v === 'string' && v.trim() !== '')
+    return noms.length > 0 ? noms : undefined
+  }
+  if (tipus === 'per_producte_num' || tipus === 'mesos' || tipus === 'ubicacio') return undefined
 
   const valids = valorsOpcio(pregunta)
   if (valids.length === 0) return undefined
@@ -326,13 +426,29 @@ export function prefillDesDeFitxa(
 // exigir que existan en los dos idiomas (las claves se componen; `cobertura.test.ts` solo
 // ve literales).
 
-/** Las cuatro etapas del diagnóstico, en orden. */
-export type EtapaDiagnostic = 'comencar' | 'responent' | 'a_punt' | 'emes'
+/**
+ * Las etapas del diagnóstico, en orden.
+ *
+ * 🔴 Desde la fase 9 (revisión del 08-10-2026) la ORGANIZACIÓN solo recorre las tres
+ *    primeras: el diagnóstico es una ficha viva y ya no genera un plan. `a_punt` y `emes`
+ *    son del equipo, que prepara el plan de prevención cuando es un servicio contratado.
+ */
+export type EtapaDiagnostic = 'comencar' | 'responent' | 'complet' | 'a_punt' | 'emes'
 
-export const ETAPES_DIAGNOSTIC: readonly EtapaDiagnostic[] = [
-  'comencar', 'responent', 'a_punt', 'emes',
+export const ETAPES_DIAGNOSTIC_ORG: readonly EtapaDiagnostic[] = [
+  'comencar', 'responent', 'complet',
 ] as const
 
+export const ETAPES_DIAGNOSTIC: readonly EtapaDiagnostic[] = [
+  'comencar', 'responent', 'complet', 'a_punt', 'emes',
+] as const
+
+/** Los pasos que se pintan, según quién mira. */
+export function passosDiagnostic(rol: RolDiagnostic): string[] {
+  return (rol === 'org' ? ETAPES_DIAGNOSTIC_ORG : ETAPES_DIAGNOSTIC).map((e) => `diag.pas_${e}`)
+}
+
+/** Todas las claves de paso (para el test). */
 export const PASSOS_DIAGNOSTIC_CLAUS: readonly string[] =
   ETAPES_DIAGNOSTIC.map((e) => `diag.pas_${e}`)
 
@@ -353,7 +469,7 @@ export type PuntDiagnostic = Omit<PuntProces, 'etapa'> & { etapa: EtapaDiagnosti
 /** Lo mínimo que hace falta saber. Es un subconjunto de `DiagnosticEstat` a propósito:
  *  así la fila del listado del equipo (`DiagnosticEquip`) también sirve. */
 export interface FetsDiagnostic {
-  estat: 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'a_punt' | 'emes'
+  estat: 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'complet' | 'a_punt' | 'emes'
   faltenN: number
   mesuresN: number
   numero?: string | null
@@ -396,16 +512,27 @@ export function puntDiagnostic(fets: FetsDiagnostic, rol: RolDiagnostic): PuntDi
   })
 
   if (fets.estat === 'sense_questionari') return fes('sense_questionari', -1, false)
-  if (fets.estat === 'emes') return fes('emes', 3, false)
-  if (fets.estat === 'a_punt') return fes('a_punt', 2, true)
+  if (fets.estat === 'sense_comencar') return fes('comencar', 0, true)
   if (fets.estat === 'incomplet') return fes('responent', 1, true)
-  return fes('comencar', 0, true)
+  // Para la organización, contestado es el final: lo que pase con un plan es del equipo.
+  if (rol === 'org') return fes('complet', 2, false)
+  if (fets.estat === 'emes') return fes('emes', 4, false)
+  if (fets.estat === 'a_punt') return fes('a_punt', 3, true)
+  // `complet` visto por el equipo: no le toca nada salvo que la organización haya
+  // contratado el plan de prevención.
+  return fes('complet', 2, false)
+}
+
+/** El estado que se enseña a la ORGANIZACIÓN: los del plan son, para ella, «contestat». */
+export function estatPerOrganitzacio(estat: FetsDiagnostic['estat']): FetsDiagnostic['estat'] {
+  return estat === 'a_punt' || estat === 'emes' ? 'complet' : estat
 }
 
 /** El badge de estado. Mismo criterio que el resto: `aviso` = te toca, `exito` = hecho. */
 export function estilEstatDiagnostic(estat: FetsDiagnostic['estat']): string {
   switch (estat) {
     case 'emes': return 'bg-exito-fondo text-exito'
+    case 'complet': return 'bg-exito-fondo text-exito'
     case 'a_punt': return 'bg-aviso-fondo text-aviso'
     case 'incomplet': return 'bg-aviso-fondo text-aviso'
     case 'sense_comencar': return 'bg-secondary text-secondary-foreground'
@@ -413,9 +540,9 @@ export function estilEstatDiagnostic(estat: FetsDiagnostic['estat']): string {
   }
 }
 
-/** Los cinco estados, para los filtros del listado del equipo. */
+/** Los seis estados, para los filtros del listado del equipo. */
 export const ESTATS_DIAGNOSTIC: readonly FetsDiagnostic['estat'][] = [
-  'sense_comencar', 'incomplet', 'a_punt', 'emes', 'sense_questionari',
+  'sense_comencar', 'incomplet', 'complet', 'a_punt', 'emes', 'sense_questionari',
 ] as const
 
 // ---------------------------------------------------------------------------

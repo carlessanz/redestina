@@ -15,6 +15,9 @@ type Traductor = (clau: string, params?: Record<string, string | number>) => str
 /** Códigos propios que llegan en `codi` o dentro del mensaje, con su texto. */
 const CODIS: Record<string, string> = {
   sense_conveni: 'od.conv_blocked',
+  // `desar_diagnostic()`, fase 9 de la revisión del 08-10-2026.
+  massa_productes: 'diag.err_massa_productes',
+  ubicacio_aliena: 'diag.err_ubicacio_aliena',
   // `cancelar_meva_oferta()` desde la fase 1 de la revisión del 08-10-2026.
   te_canalitzacions: 'po.err_te_canalitzacions',
   cal_motiu: 'po.err_cal_motiu',

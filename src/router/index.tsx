@@ -50,6 +50,7 @@ import NovaOferta from '../routes/productor/NovaOferta'
 import ProductorOfertaDetall from '../routes/productor/OfertaDetall'
 import LaMevaOrganitzacio from '../routes/LaMevaOrganitzacio'
 import Diagnostic from '../routes/Diagnostic'
+import PerfilRecepcio from '../routes/PerfilRecepcio'
 import Diagnostics from '../routes/equip/Diagnostics'
 import DiagnosticDetall from '../routes/equip/DiagnosticDetall'
 import Mercat from '../routes/receptor/Mercat'
@@ -97,6 +98,12 @@ export const router = createBrowserRouter([
                 path: '/organitzacio/diagnostic',
                 element: <Diagnostic />,
                 handle: { titleKey: 'nav.my_diagnostic' },
+              },
+              // «El meu perfil de recepció» (fase 9): las preferencias del receptor.
+              {
+                path: '/organitzacio/perfil-recepcio',
+                element: <PerfilRecepcio />,
+                handle: { titleKey: 'nav.perfil_recepcio' },
               },
               {
                 path: '/equip',

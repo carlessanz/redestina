@@ -170,7 +170,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `plantilla_mensaje` (tabla) | plantillas en código (`plantillas-meta.md`, `plantillas.ts`) | 🟡 |
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
-| `diagnostico`/`plan_prevencion`/`plan_revision` | `planes_prevencion` con su PDF y cuestionario con reglas. **Productor: versión 1** con el contenido de la revisión del 23-09 (aún provisional); **receptor: versión 0** de trabajo | 🟡 |
+| `diagnostico`/`plan_prevencion`/`plan_revision` | **Diagnòstic operatiu** del productor (v2, ficha viva con `diagnostics_historial`, 11-10-2026); el receptor ya no tiene diagnóstico, tiene «El meu perfil de recepció». `planes_prevencion` con su PDF lo prepara **solo el equipo**; el expediente de prevención es la fase 11 | 🟡 |
 | `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
@@ -581,6 +581,7 @@ src/
                                Registre (/registre), RestablirClau (/restablir) y
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia por secciones, escrita por RPC con lista blanca (§6ter)
+  routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
   routes/equip/                Canalitzacio[Detall] (el ciclo guiado, §6ter) +
                                envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
@@ -728,6 +729,7 @@ src/
                                ficha del equipo): el patrón de FirmaConveni
     PlaPrevencio.tsx           Las medidas por bloque, la edición del equipo y la emisión
     TargetaDiagnostic.tsx      El estado y el botón, en la ficha y en el panel externo
+    TargetaPerfilRecepcio.tsx  La tarjeta que lleva al perfil de recepción del receptor (fase 9)
     AvisDiagnostic.tsx         La banda, en tono aviso: el diagnóstico NO bloquea operar
     equip/EditorDiagnostic.tsx El cuestionario, las medidas y las reglas, desde Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, el botón de separarla y
@@ -2255,8 +2257,8 @@ funciones, no políticas:
 | `auditoria_funcions_obertes()` (`20270414101000`) | Funciones de `public` abiertas de más: categoría `definer_anon` (`security definer`, no trigger, ejecutable por `anon`/PUBLIC) y `trigger_api` (de trigger, ejecutable por `anon`/`authenticated`). `security invoker`, solo equipo (`42501`). La vigila un check global del arnés contra `PERMITIDAS_ABIERTAS` (vacía; añadir una entrada exige escribir el motivo). Hoy devuelve 0 filas |
 | `questionari_vigent(tipo_org)` | El cuestionario que toca contestar. **`security invoker`**: la política de la tabla (`vigente or es_intern()`) ya dice lo que hay que decir, y una `definer` solo podría ampliar el alcance |
 | `publicar_questionari(tipo_org, titol, preguntes, provisional, vigent)` | La versión siguiente, retirando la anterior **en la misma transacción**. `pot_aprovar()`. Devuelve **`regles_orfes`**: las reglas que apuntan a una pregunta que ya no existe. **No bloquea** —una regla huérfana no dispara— pero quien publica tiene que verlo, o el plan siguiente saldría con menos medidas y nadie sabría por qué |
-| `desar_diagnostic(tipo_org, org, respostes, notes, idioma)` | Guarda **siempre**, completo o no —un cuestionario de doce preguntas no se contesta de una sentada—, compone el sobre autocontenido y, si no falta ninguna obligatoria, genera el plan. ⚠️ `p_respostes` es el mapa plano `{pregunta_id: valor}`: **el array con los textos lo compone el servidor**, porque si lo compusiera el cliente el texto congelado sería el que el navegador dijo haber enseñado (mismo criterio que `sha256_texto` en la firma de un convenio) |
-| `generar_pla_des_de_diagnostic(tipo_org, org, forcar)` | Evalúa `regles_pla` y escribe `mesures`. **Desduplica por `codi`** ganando la que la deja obligatoria y, a igualdad, la de `prioritat` menor. `22023 mesures_editades` si alguien ya ajustó la lista a mano: regenerar en silencio se llevaría por delante el criterio del técnico que estuvo delante de la persona |
+| `desar_diagnostic(tipo_org, org, respostes, notes, idioma)` | Guarda **siempre**, completo o no —un cuestionario de doce preguntas no se contesta de una sentada—, compone el sobre autocontenido. 🔴 **Desde `20270423100000` (fase 9) ya NO genera el plan**: guarda la versión en `diagnostics_historial`, deriva `productos_habituales`/`temporada` del productor y valida `max` y `ubicacio_aliena`. ⚠️ `p_respostes` es el mapa plano `{pregunta_id: valor}`: **el array con los textos lo compone el servidor**, porque si lo compusiera el cliente el texto congelado sería el que el navegador dijo haber enseñado (mismo criterio que `sha256_texto` en la firma de un convenio) |
+| `generar_pla_des_de_diagnostic(tipo_org, org, forcar)` | Evalúa `regles_pla` y escribe `mesures`. **Desduplica por `codi`** ganando la que la deja obligatoria y, a igualdad, la de `prioritat` menor. `22023 mesures_editades` si alguien ya ajustó la lista a mano: regenerar en silencio se llevaría por delante el criterio del técnico que estuvo delante de la persona · 🔴 **Desde la fase 9 (`20270423100000`) solo el equipo** (`es_intern()`; `42501` a cualquier externo), igual que `emitir_plan_basico()`: el Pla de Prevenció es un servicio que prepara Redestina |
 | `desar_mesures_pla(plan, mesures, observacions)` | El ajuste manual. Dos invariantes: **el texto de una medida del catálogo se relee del catálogo** —nadie reescribe el contenido de una medida en un documento con el sello de la Fundación— y **una obligatoria que produjeron las reglas no se puede quitar** (`22023 falten_obligatories`) |
 | `fixar_nivell_pla(plan, nivel)` | Subir a `personalitzat` exige `pot_aprovar()`; bajar a `basic`, no. El plan personalizado es un **servicio técnico**, no una casilla: si una organización pudiera declararlo desde su panel, estaría contratándose a sí misma algo que nadie ha prestado |
 | `diagnostic_estat(tipo_org, org)` · `diagnostics_equip()` | En qué punto está, en una llamada (`sense_questionari · sense_comencar · incomplet · a_punt · emes`, con `falten[]`), y la misma pregunta para toda la base. La segunda es `security invoker` con guarda de equipo, como `pendents_equip()` |
@@ -3245,6 +3247,47 @@ Migración `20270422100000`.
   producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`; el envío real, a probar con un
   número de prueba en producción.
 - E2E `tests/e2e/tauler.e2e.ts` (clon, escritorio).
+
+### Revisión del cliente del 08-10-2026 — fase 9: «Diagnòstic operatiu» y «El meu perfil de recepció» (11-10-2026)
+
+Migración `20270423100000`. Lo que pidió la Fundació (§6 y §3 del documento): **el diagnóstico no
+genera un plan** —«ara està redactat com si del diagnòstic et generés un pla»— y **el receptor no
+tiene diagnóstico**.
+
+- **Diagnòstic operatiu (productor)**: cuestionario **v2** (`publicar_questionari`, provisional) con
+  los bloques de la tabla del documento: famílies → productes concrets → principals (máx. 5) →
+  volum per producte → temporada (mesos per producte) → situacions, freqüència i volum d'excedent →
+  previsió i antelació → gestió actual → causes → sortides → ubicació → logística → suport. Cuatro
+  **tipos de pregunta nuevos** en el motor (`questionari_problemes`, `compondre_respostes`,
+  `diagnostic.ts`, `FormulariDiagnostic`): `productes` (catálogo filtrado por `familia_de` o
+  subconjunto de `opcions_de`, con `max`), `per_producte_num` (`productes_de` + `unitat`), `mesos`
+  (por producto si lleva `productes_de`) y `ubicacio` (lugares de la propia ficha; `22023
+  ubicacio_aliena` si no). `avaluar_regla('buit')` cuenta además el **objeto vacío**.
+- **Ficha viva**: `desar_diagnostic()` **ya no llama** a `generar_pla_des_de_diagnostic()`; guarda
+  cada versión en **`diagnostics_historial`** (solo lectura: equipo y la propia organización; sin
+  GRANT de escritura) y deriva en `productores` **`productos_habituales`** y **`temporada`** (jsonb
+  `{producte: [mesos]}`), solo con lo contestado. El formulario se abre con el borrador o, si el
+  equipo ya emitió un plan, con la última versión del historial. Al guardar se limpia lo que ya no
+  toca (`netejaRespostes`: productos fuera de su lista, meses fuera de 1..12).
+- **El plan es del equipo**: `generar_pla_des_de_diagnostic()` y `emitir_plan_basico()` pasan a
+  `es_intern()` (`42501` a cualquier externo; la guarda de emitir va antes de buscar el plan).
+  `diagnostic_estat()`/`diagnostics_equip()` ganan el estado **`complet`** (contestado, sin plan) y
+  `darrera_actualitzacio`; la bandeja del equipo lista **solo productores** (columna «Última
+  actualització» en vez del papel). En `PlaPrevencio` (solo pantallas del equipo) «Prepara el pla»
+  cuando aún no se ha generado. La organización ya no ve ningún plan en su diagnóstico: su escalera
+  acaba en «Contestat» (`puntDiagnostic(…, 'org')`, `estatPerOrganitzacio`), y la banda y la marca
+  del menú solo avisan de `sense_comencar`/`incomplet`.
+- **Receptor → «El meu perfil de recepció»** (`/organitzacio/perfil-recepcio`, `routes/PerfilRecepcio`):
+  modalidades que interesan, preferencias de recepción (fase 7) y las condiciones de su tipo; se
+  guarda con `actualitzar_fitxa_entitat` (solo esas claves). **Salen de «La meva organització»**
+  (queda un puntero) para no tener dos formularios del mismo dato. El menú filtra por papel
+  (`NavItem.paper`): el diagnóstico solo a quien tiene ficha de productor y el perfil de recepción
+  solo a quien tiene ficha de entidad; `/organitzacio/diagnostic` redirige al perfil a una receptora.
+  El cuestionario de `entidad` queda **retirado** (`vigente = false`) y sus planes emitidos pasan a
+  `substituit` (los PDF no se tocan). `TargetaDiagnostic` ya no se monta para entidades
+  (`TargetaPerfilRecepcio` en su lugar).
+- El PDF del plan (`render/pla.ts`) conoce las secciones de la v2.
+- E2E `tests/e2e/diagnostic.e2e.ts` (clon, escritorio) y `organitzacio.e2e.ts` ajustada.
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -6886,8 +6929,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.294 pruebas en 54 ficheros** de Vitest: 1.293 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
+   Referencia: **1.304 pruebas en 54 ficheros** de Vitest: 1.303 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
+   tras la fase 8 eran 1.294, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
    eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
@@ -6925,8 +6969,10 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.319/1.319 correctas y 29 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 8 —`kpis_equip`: +8—; tras la fase 7 eran 1.311, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
+   ✅ **Referencia HOY (clon local): 1.335/1.335 correctas y 31 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
+   datos» nuevas son la lectura del historial por el equipo, que no tiene fixture—; tras la fase 8
+   eran 1.319, tras la fase 8 —`kpis_equip`: +8—; tras la fase 7 eran 1.311, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
    eran 1.259, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin
    datos» porque la migración retira los convenios anteriores a medio firmar del clon—; tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
    porque las pruebas E2E dejan datos en el clon—; tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al

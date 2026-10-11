@@ -23,7 +23,8 @@ import { DICTS } from '../src/lib/i18n'
 import {
   BLOCS_MESURA, ETAPES_DIAGNOSTIC, ESTATS_DIAGNOSTIC, PASSOS_DIAGNOSTIC_CLAUS,
   SECCIONS_CONEGUDES, agrupaPerSeccio, avaluarCondicio, clauSeccio, esBuit,
-  estilEstatDiagnostic, mesuresPerBloc, obligatoriesQueFalten, opcionsVisibles, prefillDesDeFitxa,
+  estatPerOrganitzacio, estilEstatDiagnostic, mesosValids, mesuresPerBloc, netejaRespostes,
+  obligatoriesQueFalten, opcionsProductes, opcionsVisibles, passosDiagnostic, prefillDesDeFitxa,
   prefillPregunta, preguntaAplica, preguntesQueApliquen, progresDiagnostic,
   puntDiagnostic, textBilingue,
 } from '../src/lib/diagnostic'
@@ -50,6 +51,7 @@ describe('esBuit: las cuatro formas de «sin contestar» que declara avaluar_reg
     ['cadena vacía', ''],
     ['cadena en blanco', '   '],
     ['array vacío', []],
+    ['objeto vacío (respuesta por producto, fase 9)', {}],
   ])('%s cuenta como vacío', (_nom, valor) => {
     expect(esBuit(valor)).toBe(true)
   })
@@ -309,11 +311,31 @@ describe('el punto del proceso', () => {
   const fets = (estat: Parameters<typeof puntDiagnostic>[0]['estat']) =>
     puntDiagnostic({ estat, faltenN: 3, mesuresN: 5, numero: 'PLA-2026-0001' }, 'org')
 
-  it('cada estado cae en su paso de la escalera', () => {
+  it('la organización acaba en «contestat»: el plan es del equipo (fase 9)', () => {
     expect(fets('sense_comencar').index).toBe(0)
     expect(fets('incomplet').index).toBe(1)
+    expect(fets('complet').index).toBe(2)
     expect(fets('a_punt').index).toBe(2)
-    expect(fets('emes').index).toBe(3)
+    expect(fets('emes').index).toBe(2)
+    expect(fets('a_punt').claus.titol).toBe('diag.o_complet_t')
+    expect(passosDiagnostic('org')).toEqual(['diag.pas_comencar', 'diag.pas_responent', 'diag.pas_complet'])
+  })
+
+  it('el equipo ve también el plan', () => {
+    const e = (estat: Parameters<typeof puntDiagnostic>[0]['estat']) =>
+      puntDiagnostic({ estat, faltenN: 0, mesuresN: 2 }, 'equip')
+    expect(e('complet').index).toBe(2)
+    expect(e('complet').emToca).toBe(false)
+    expect(e('a_punt').index).toBe(3)
+    expect(e('a_punt').emToca).toBe(true)
+    expect(e('emes').index).toBe(4)
+    expect(passosDiagnostic('equip')).toHaveLength(5)
+  })
+
+  it('a la organización los estados del plan se le enseñan como contestado', () => {
+    expect(estatPerOrganitzacio('a_punt')).toBe('complet')
+    expect(estatPerOrganitzacio('emes')).toBe('complet')
+    expect(estatPerOrganitzacio('incomplet')).toBe('incomplet')
   })
 
   it('`sense_questionari` sale del camino y NO le toca a la organización', () => {
@@ -327,9 +349,11 @@ describe('el punto del proceso', () => {
 
   it('lo que está hecho ya no le toca a nadie', () => {
     expect(fets('emes').emToca).toBe(false)
+    expect(fets('complet').emToca).toBe(false)
     expect(fets('sense_comencar').emToca).toBe(true)
     expect(fets('incomplet').emToca).toBe(true)
-    expect(fets('a_punt').emToca).toBe(true)
+    // Desde la fase 9 un plan a punto ya no le toca a la organización.
+    expect(fets('a_punt').emToca).toBe(false)
   })
 
   it('las dos voces usan prefijos distintos', () => {
@@ -378,6 +402,7 @@ describe('claves i18n compuestas', () => {
 
   it('la banda solo tiene texto para lo que de verdad queda pendiente', () => {
     for (const e of ['sense_comencar', 'incomplet', 'a_punt']) existeix(`diag.banner_${e}`)
+    for (const e of ['sense_comencar', 'incomplet']) existeix(`diag.banner_go_${e}`)
   })
 
   it('la cuarteta de cada punto del proceso, en las dos voces', () => {
@@ -444,5 +469,61 @@ describe('opcionsVisibles: «dels que has marcat»', () => {
   it('una pregunta que no deriva de otra no cambia', () => {
     const altra = pregunta({ id: 'causes', tipus: 'multi', opcions: ['a', 'b'].map(op) })
     expect(opcionsVisibles(altra, { productes: ['a'] })).toHaveLength(2)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('los tipos de la ficha viva (fase 9)', () => {
+  const cataleg = [
+    { nombre: 'Tomàquet', familia: 'Horta Fruit' },
+    { nombre: 'Carbassó', familia: 'Horta Fruit' },
+    { nombre: 'Poma', familia: 'Fruita Dolça' },
+  ]
+  const productes = pregunta({ id: 'productes', tipus: 'productes', familia_de: 'families' })
+  const principals = pregunta({ id: 'principals', tipus: 'productes', opcions_de: 'productes', max: 2 })
+
+  it('el catálogo se filtra por las familias contestadas', () => {
+    expect(opcionsProductes(productes, { families: ['Horta Fruit'] }, cataleg)).toEqual(['Tomàquet', 'Carbassó'])
+    expect(opcionsProductes(productes, {}, cataleg)).toEqual([])
+  })
+
+  it('los principales salen de lo contestado arriba, y lo marcado no desaparece', () => {
+    expect(opcionsProductes(principals, { productes: ['Poma'] }, cataleg)).toEqual(['Poma'])
+    expect(opcionsProductes(principals, { productes: ['Poma'], principals: ['Tomàquet'] }, cataleg))
+      .toEqual(['Poma', 'Tomàquet'])
+  })
+
+  it('al guardar se quita lo que ya no toca', () => {
+    const volum = pregunta({ id: 'volum', tipus: 'per_producte_num', productes_de: 'principals' })
+    const temporada = pregunta({ id: 'temp', tipus: 'mesos', productes_de: 'principals' })
+    const r = netejaRespostes([principals, volum, temporada], {
+      principals: ['Tomàquet', 'Poma', 'Carbassó'],
+      volum: { Tomàquet: 1000, Pera: 50, Poma: 'molt' },
+      temp: { Tomàquet: [9, 6, 6, 13], Pera: [1] },
+    })
+    expect(r.principals).toEqual(['Tomàquet', 'Poma'])
+    expect(r.volum).toEqual({ Tomàquet: 1000 })
+    expect(r.temp).toEqual({ Tomàquet: [6, 9] })
+  })
+
+  it('una respuesta por producto que se queda vacía desaparece', () => {
+    const volum = pregunta({ id: 'volum', tipus: 'per_producte_num', productes_de: 'principals' })
+    expect(netejaRespostes([volum], { principals: ['Poma'], volum: { Pera: 3 } })).toEqual({ principals: ['Poma'] })
+  })
+
+  it('meses válidos: enteros de 1 a 12, ordenados y sin repetir', () => {
+    expect(mesosValids([12, 1, 1, 0, 7.5, '3'])).toEqual([1, 12])
+    expect(mesosValids('x')).toEqual([])
+  })
+
+  it('el prefill de productos acepta los nombres de la ficha', () => {
+    expect(prefillPregunta(productes, ['Poma', '', 3])).toEqual(['Poma'])
+    expect(prefillPregunta(pregunta({ id: 'u', tipus: 'ubicacio' }), ['x'])).toBeUndefined()
+  })
+
+  it('una obligatoria por producto con el objeto vacío cuenta como pendiente', () => {
+    const volum = pregunta({ id: 'volum', tipus: 'per_producte_num', productes_de: 'p', obligatoria: true })
+    expect(obligatoriesQueFalten([volum], { volum: {} })).toEqual(['volum'])
+    expect(obligatoriesQueFalten([volum], { volum: { Poma: 1 } })).toEqual([])
   })
 })

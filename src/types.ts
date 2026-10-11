@@ -1041,6 +1041,8 @@ export interface KgRebutsExercici {
 //    emitido con un cuestionario provisional lo dice IMPRESO.
 
 export type TipusPregunta = 'opcio' | 'multi' | 'boolea' | 'numero' | 'text'
+  // La ficha viva del productor (fase 9, 11-10-2026):
+  | 'productes' | 'per_producte_num' | 'mesos' | 'ubicacio'
 export type OperadorRegla = 'sempre' | '=' | '!=' | 'in' | 'conte' | '>=' | '<=' | 'buit'
 export type BlocMesura =
   | 'planificacio' | 'collita' | 'conservacio' | 'canalitzacio' | 'seguiment'
@@ -1079,6 +1081,16 @@ export interface PreguntaDiagnostic {
    * leyera, el diagnóstico contendría algo que la persona no ha dicho.
    */
   prefill?: string | null
+  /** `productes`: el catálogo se filtra por las familias contestadas en esta pregunta */
+  familia_de?: string | null
+  /** `productes`: las opciones son lo contestado en esta otra pregunta `productes` */
+  opcions_de?: string | null
+  /** `productes`: cuántos se pueden marcar como mucho */
+  max?: number | null
+  /** `per_producte_num` y `mesos`: una respuesta por cada producto contestado aquí */
+  productes_de?: string | null
+  /** `per_producte_num`: la unidad que se imprime al lado */
+  unitat?: TextBilingue | null
 }
 
 export interface QuestionariDiagnostic {
@@ -1182,7 +1194,7 @@ export interface SobreDiagnostic {
 }
 
 export type EstatDiagnostic =
-  | 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'a_punt' | 'emes'
+  | 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'complet' | 'a_punt' | 'emes'
 
 export interface DiagnosticEstat {
   estat: EstatDiagnostic
@@ -1200,6 +1212,8 @@ export interface DiagnosticEstat {
   mesures_editades: boolean
   questionari_id: string | null
   versio_questionari: number | null
+  /** La última vez que se guardó el diagnóstico (`diagnostics_historial`, fase 9) */
+  darrera_actualitzacio?: string | null
   /**
    * Ante la duda, `true`: decir que un documento está validado cuando no lo está es el único
    * error caro.
@@ -1222,4 +1236,5 @@ export interface DiagnosticEquip {
   emes_at: string | null
   versio_questionari: number | null
   provisional: boolean
+  darrera_actualitzacio?: string | null
 }

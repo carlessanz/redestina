@@ -88,11 +88,11 @@ export default function FitxaRegistre({ tabla }: Props) {
           {/* En qué punto está su diagnóstico de prevención, y el camino para hacerlo con
               ella delante (modelo asistido). Como `BadgeConveni`, no carga nada en el alta:
               sin `id` no hay a qué colgar un diagnóstico. */}
-          <TargetaDiagnostic
-            tipusOrg={esProductor ? 'productor' : 'entidad'}
-            orgId={id ?? null}
-            mode="equip"
-          />
+          {/* Desde la fase 9 solo el productor tiene diagnóstico: el receptor tiene su
+              perfil de recepción, que está en la propia ficha. */}
+          {esProductor && (
+            <TargetaDiagnostic tipusOrg="productor" orgId={id ?? null} mode="equip" />
+          )}
           {/* Sus certificados. En una entidad PRODUCTORA son los de donación (el anual y
               los de a demanda); en una RECEPTORA, los de recepción (`CR`, fase F4): los
               kilos que ha recibido en una ventana de fechas.

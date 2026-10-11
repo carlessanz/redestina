@@ -871,6 +871,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "diagnostic_estat", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta el diagnostic d'una altra organitzacio" },
   // La bandeja de diagnósticos de TODA la base es del equipo, como `pendents_equip()`.
   { tabla: "diagnostics_equip", op: "rpc", esperado: "denegar", descripcion: "NO veu els diagnostics de tota la base" },
+  // Fase 9 (20270423100000): el historial de la ficha viva no se escribe a mano (lo escribe
+  // `desar_diagnostic`), y el plan de prevención lo emite el equipo. La guarda de
+  // `emitir_plan_basico` va antes de buscar el plan, así que un uuid inventado da 42501.
+  { tabla: "diagnostics_historial", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial del diagnostic a ma" },
+  { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap pla de prevencio (es de l'equip)" },
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1140,6 +1145,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
     { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
+    { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
+    { tabla: "emitir_plan_basico", op: "rpc", esperado: "permitir", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot emetre el pla de prevencio (22023 si no existeix)" },
     // ⚠️ Con un uuid INEXISTENTE a propósito: la guarda de rol deja pasar (es del equipo, y
     //    el modelo es asistido), la RPC llega hasta el insert y la FK lo rechaza con `23503`.
     //    O sea que mide la autorizacion y **no escribe nada**.
@@ -1510,6 +1517,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     //    criterio que `borrar_ficha_completa()`.
     { tabla: "publicar_questionari", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "pot publicar un questionari (autoritza; 22023 per les preguntes buides)" },
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
+    { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
+    { tabla: "emitir_plan_basico", op: "rpc", esperado: "permitir", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot emetre el pla de prevencio (22023 si no existeix)" },
     { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
     { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot generar el pla en nom d'una organitzacio (22023 sense_esborrany)" },
     { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },

@@ -109,6 +109,43 @@ export async function plaEsborrany(
   }
 }
 
+/** Una versión guardada del diagnóstico (`diagnostics_historial`, fase 9). */
+export interface VersioDiagnostic {
+  id: string
+  respostes: Respostes
+  complet: boolean
+  falten: string[]
+  notes: string | null
+  versio_questionari: number | null
+  desat_at: string
+}
+
+/**
+ * Las versiones guardadas del diagnóstico de una organización, de la más reciente a la más
+ * antigua. Es la «ficha viva»: el formulario se abre con la última aunque el equipo ya haya
+ * emitido un plan (y por tanto ya no haya borrador). La RLS deja ver las propias y al equipo.
+ */
+export async function historialDiagnostic(
+  tipus: TipusOrg,
+  org: string,
+  limit = 20,
+): Promise<ResultatRpc<VersioDiagnostic[]>> {
+  try {
+    const columna = tipus === 'productor' ? 'productor_id' : 'entidad_id'
+    const { data, error } = await supabase
+      .from('diagnostics_historial')
+      .select('id, respostes, complet, falten, notes, versio_questionari, desat_at')
+      .eq('tipo_org', tipus)
+      .eq(columna, org)
+      .order('desat_at', { ascending: false })
+      .limit(limit)
+    if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
+    return { ok: true, data: (data ?? []) as VersioDiagnostic[] }
+  } catch {
+    return { ok: false, missatge: 'diag.err_generic', codi: null }
+  }
+}
+
 /** Un plan por su id: el vigente de una organización, para poder leerlo ya emitido. */
 export async function plaPerId(id: string): Promise<ResultatRpc<PlanPrevencion | null>> {
   try {

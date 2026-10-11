@@ -22,7 +22,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, ClipboardList } from 'lucide-react'
 import { useT } from '../lib/i18n'
-import { estilEstatDiagnostic } from '../lib/diagnostic'
+import { estatPerOrganitzacio, estilEstatDiagnostic } from '../lib/diagnostic'
 import { diagnosticEstat } from '../lib/diagnosticApi'
 import type { TipusOrg } from '../lib/diagnosticApi'
 import type { DiagnosticEstat } from '../types'
@@ -61,7 +61,10 @@ export default function TargetaDiagnostic({
     ? `/equip/diagnostics/${tipusOrg}/${orgId}`
     : '/organitzacio/diagnostic'
   const prefix = mode === 'equip' ? 'e' : 'o'
-  const fet = estat.estat === 'emes'
+  // A la organización los estados del plan (`a_punt`, `emes`) se le enseñan como
+  // «contestat»: desde la fase 9 el plan es cosa del equipo.
+  const e = mode === 'equip' ? estat.estat : estatPerOrganitzacio(estat.estat)
+  const fet = e === 'emes' || (mode === 'extern' && e === 'complet')
 
   return (
     // `py-0`: el `Card` de shadcn trae `py-6` y el contenido ya lleva su `py-4`; sumados
@@ -73,8 +76,8 @@ export default function TargetaDiagnostic({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{t('diag.card_t')}</span>
-              <Badge className={estilEstatDiagnostic(estat.estat)}>
-                {t(`diag.st_${estat.estat}`)}
+              <Badge className={estilEstatDiagnostic(e)}>
+                {t(`diag.st_${e}`)}
               </Badge>
               {/* Que el cuestionario sea texto de trabajo se dice también aquí: es lo que
                   determina si el PDF sale marcado como borrador. */}
@@ -83,7 +86,7 @@ export default function TargetaDiagnostic({
               )}
             </div>
             <p className="mt-1 text-sm text-muted-foreground">
-              {t(`diag.${prefix}_card_${estat.estat}`, {
+              {t(`diag.${prefix}_card_${e}`, {
                 n: estat.falten.length,
                 m: estat.mesures_n,
                 numero: estat.numero ?? '—',
@@ -98,7 +101,7 @@ export default function TargetaDiagnostic({
           className="h-11 shrink-0 whitespace-normal md:h-9"
         >
           <Link to={desti}>
-            {t(clauBoto(estat.estat))}
+            {t(clauBoto(e))}
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         </Button>
@@ -111,6 +114,6 @@ export default function TargetaDiagnostic({
 function clauBoto(estat: DiagnosticEstat['estat']): string {
   if (estat === 'incomplet') return 'diag.card_continue'
   if (estat === 'a_punt') return 'diag.card_emit'
-  if (estat === 'emes') return 'diag.card_open'
+  if (estat === 'emes' || estat === 'complet') return 'diag.card_open'
   return 'diag.card_do'
 }

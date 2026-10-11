@@ -6,7 +6,8 @@ import { cn } from '../lib/utils'
 export default function XipsTria({
   opcions, triats, onChange, disabled = false, etiquetaId,
 }: {
-  opcions: { valor: string; text: string }[]
+  /** `desactivat`: esta opción no se puede marcar ahora (p. ej. se ha llegado al máximo). */
+  opcions: { valor: string; text: string; desactivat?: boolean }[]
   triats: string[]
   onChange: (v: string[]) => void
   disabled?: boolean
@@ -20,12 +21,13 @@ export default function XipsTria({
           <button
             key={o.valor}
             type="button"
-            disabled={disabled}
+            disabled={disabled || (o.desactivat === true && !on)}
             aria-pressed={on}
             onClick={() => onChange(on ? triats.filter((x) => x !== o.valor) : [...triats, o.valor])}
             className={cn(
               'min-h-11 rounded-full border px-3 text-base md:min-h-9 md:text-sm',
               on ? 'border-primary bg-secondary text-secondary-foreground' : 'border-input bg-background',
+              'disabled:opacity-50',
             )}
           >
             {o.text}
