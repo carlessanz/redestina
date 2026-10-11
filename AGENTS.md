@@ -7039,7 +7039,7 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»**
+   ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
    datos» nuevas son la lectura del historial por el equipo, que no tiene fixture—; tras la fase 8
@@ -7051,7 +7051,7 @@ se va solo **cómo se llegó hasta aquí**.
    tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras
    la fase 1 eran 1.179, `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada
    e `excedente_destins` sin escritura en las siete cuentas externas, `destins_finals` legible, y dos
-   checks del equipo—). **Pendiente de confirmar en producción al publicar.** La anterior:
+   checks del equipo—). La anterior:
    **1.156/1.156 correctas y 26 sin datos** (07-10-2026,
    tras `20270414100000`…`20270414101100`; medida primero contra el clon local y **confirmada contra
    producción al publicar `0034a92`**, la misma cifra en las dos bases). Sube **104** sobre la anterior (1.052): **18** de
