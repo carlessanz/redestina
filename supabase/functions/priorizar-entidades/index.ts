@@ -106,7 +106,7 @@ Deno.serve(async (req) => {
     const porTelefono = new Map<string, { opt_in: boolean | null; last_inbound_at: string | null }>();
     for (const c of contactos ?? []) porTelefono.set(c.phone, c);
 
-    const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null }>();
+    const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null; area_geografica: string | null }>();
     for (const e of entidades ?? []) porId.set(e.id, e);
 
     // La preferencia de canal de la organización de cada entidad. Fail-soft: si no se
@@ -138,6 +138,18 @@ Deno.serve(async (req) => {
       ? new Set<string>()
       : sinPorModalitat.reduce((acc, sin) => new Set([...acc].filter((x) => sin.has(x))));
 
+    // La última vez que cada entidad RECIBIÓ algo (fase 6 de la revisión del 08-10-2026):
+    // una canalización conciliada. Para el filtro «última recepció» del panel; no puntúa.
+    const ultimaRecepcio = new Map<string, string>();
+    if (ids.length) {
+      const { data: rebudes } = await supabase.from("canalizaciones")
+        .select("entidad_id, conciliada_at").in("entidad_id", ids).not("conciliada_at", "is", null);
+      for (const r of (rebudes ?? []) as { entidad_id: string; conciliada_at: string }[]) {
+        const ant = ultimaRecepcio.get(r.entidad_id);
+        if (!ant || r.conciliada_at > ant) ultimaRecepcio.set(r.entidad_id, r.conciliada_at);
+      }
+    }
+
     const rankingConCanal = ranking.map((e) => {
       const ficha = porId.get(e.id);
       const contacto = ficha?.telefono ? porTelefono.get(ficha.telefono) : undefined;
@@ -156,6 +168,9 @@ Deno.serve(async (req) => {
         // Para el filtro «tipus d'entitat» del panel (reunión del 05-10-2026). No entra en
         // la puntuación: la compatibilidad de tipo ya la decide la matriz de modalidades.
         tipo_receptor: ficha?.tipo_receptor ?? null,
+        // Para los filtros «zona» y «última recepció» (fase 6). Tampoco puntúan.
+        comarca: ficha?.area_geografica ?? null,
+        ultima_recepcio: ultimaRecepcio.get(e.id) ?? null,
         canal: d.canal,
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,

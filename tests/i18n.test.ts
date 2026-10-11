@@ -245,6 +245,12 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['bloquejat', 'sense_kg', 'error', 'sense_revisio'],
     },
     {
+      // Las franjas del filtro «última recepció» del ranking (fase 6): `FRANGES_RECEPCIO`.
+      que: 'rankingEntitats.FRANGES_RECEPCIO',
+      prefijo: 'od.fr_',
+      valores: ['3m', '12m', 'mai'],
+    },
+    {
       // `convenios.tipo` (CHECK de 20270420100000): el de col·laboració y los tres anteriores.
       que: 'convenios.tipo',
       prefijo: 'sig.model_',

@@ -5,6 +5,9 @@ import { useT } from '../lib/i18n'
 import { useWhatsappActiu } from '../hooks/useAppContext'
 import { useCerca } from '../hooks/useCerca'
 import { filtraCerca } from '../lib/cerca'
+import BarraFiltres from './BarraFiltres'
+import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
+import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../lib/filtres'
 import DialegCorreu from './DialegCorreu'
 import type { DestinatariCorreu } from './DialegCorreu'
 import type { Entidad, EntidadLlistat } from '../types'
@@ -47,9 +50,15 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
   }, [])
 
   // Primero las entidades de prueba (pueden recibir), luego el resto — igual que productores.
+  // Zona (fase 6 de la revisión del 08-10-2026), además del buscador. El tipo de entidad
+  // llega con la fase 7: `v_entidades_llistat` todavía no trae `tipo_receptor`.
+  const fl = useFiltresLlistat('equip-entitats')
+  const dims = useMemo<Dimensio<EntidadLlistat>[]>(() => [
+    { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (e) => e.area_geografica },
+  ], [])
   const { test, resto } = useMemo(() => {
-    const filtradas = filtraCerca(entidades, q,
-      (e) => [e.nombre, e.poblacion, e.area_geografica, e.telefono, e.email, e.contacto, e.modalitat])
+    const filtradas = filtraLlistat(filtraCerca(entidades, q,
+      (e) => [e.nombre, e.poblacion, e.area_geografica, e.telefono, e.email, e.contacto, e.modalitat]), dims, fl.valors)
     const test: EntidadLlistat[] = []
     const resto: EntidadLlistat[] = []
     for (const e of filtradas) {
@@ -57,7 +66,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
       else resto.push(e)
     }
     return { test, resto }
-  }, [entidades, q])
+  }, [entidades, q, dims, fl.valors])
 
   function tabla(lista: EntidadLlistat[], marcarTest: boolean) {
     return (
@@ -134,6 +143,16 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
       </CardHeader>
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('ent.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
+        <BarraFiltres
+          id="ent"
+          desplegables={dims.map((d) => ({
+            clau: d.clau, etiquetaKey: d.etiquetaKey, opcions: opcionsDisponibles(entidades, dims, d.clau, fl.valors),
+          }))}
+          valors={fl.valors}
+          onValors={fl.setValors}
+          mostrant={test.length + resto.length}
+          total={entidades.length}
+        />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{entidades.length === 0 ? t('ent.empty') : t('ent.no_match')}</p>}

@@ -3154,6 +3154,35 @@ col·laboració**, uno por papel: `col_productor` y `col_receptor` (series `CONV
 - ⚠️ Queda: el texto legal de la asesoría, y unificar los mínimos de la firma (`MIN_NOM`/`MIN_DNI`,
   repetidos en `FirmaConveni.tsx` y `enlace-publico/convenio.ts`).
 
+### Revisión del cliente del 08-10-2026 — fase 6: filtros y orden comunes en los listados (11-10-2026)
+
+Sin migración. Una misma lógica de filtros en todos los listados:
+
+- **`src/lib/filtres.ts`** (puro, con prueba): un listado declara sus dimensiones (`Dimensio`:
+  zona, producto, modalidad, estado…) y un rango de fechas opcional; `filtraLlistat()` acota en
+  cliente lo que ya llegó, `opcionsDisponibles()` solo ofrece valores que dan resultado con los
+  demás filtros puestos (y conserva el elegido), y **`ordenaPerDisponibilitat()`**: primero lo que
+  sigue en marcha, la que se acaba antes arriba (sin fecha, al final del grupo); después lo
+  cerrado, lo más reciente arriba.
+- **`components/BarraFiltres.tsx`** + **`hooks/useFiltresLlistat.ts`**: desplegables nativos
+  (`text-base md:text-sm`), rango de fechas, «Neteja els filtres», «Mostrant N de M»; en móvil,
+  plegada detrás de «Filtres (n)». Se recuerda por pantalla y organización en `localStorage`
+  (comodidad, no estado). ⚠️ El hook usa actualizaciones funcionales: con `{ ...estat }`, «Neteja»
+  volvía a poner los filtros que acababa de quitar (lo destapó el E2E).
+- **Dónde**: «Les meves ofertes» (estado simple, producto, modalidad, fecha de alta; orden por
+  disponibilidad, también en lo «en marcha» de Inici), Ofertes del equipo (zona, tipo de producto,
+  producto, modalidad, fecha de alta, y «Ordena per» disponibilidad o más recientes), el Històric
+  del receptor (producto, modalidad, entidad productora, zona y fecha de recepción; el total de
+  kilos es el de lo filtrado), Entitats productores y receptores (zona). El Mercat conserva sus
+  filtros de la rebanada 0, que ya eran estos.
+- **Entitats prioritzades**: zona y **última recepción** (últimos 3 meses / último año / nunca),
+  además del tipo de entidad y el interés por producto; cada fila dice «Última recepció: …».
+  `priorizar-entidades` devuelve `comarca` y `ultima_recepcio` (la última canalización
+  conciliada). No puntúan. ⚠️ Redesplegar `priorizar-entidades`.
+- ⚠️ El tipo de entidad en el listado del equipo espera a la fase 7: `v_entidades_llistat` todavía
+  no trae `tipo_receptor`.
+- E2E `tests/e2e/filtres.e2e.ts` (lectura).
+
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
 Revisión exhaustiva del código y de los flujos (informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
@@ -6799,8 +6828,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.285 pruebas en 52 ficheros** de Vitest: 1.284 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
+   Referencia: **1.292 pruebas en 53 ficheros** de Vitest: 1.291 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
+   1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
    eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
    de `check:deno`). Tras la fase 2 eran **1.273 en 50**: 1.272 correctas y 1 saltada (11-10-2026,

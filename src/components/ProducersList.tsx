@@ -8,6 +8,9 @@ import type { DestinatariCorreu } from './DialegCorreu'
 import { pendentsPerTelefon } from '../lib/contactes'
 import { filtraCerca } from '../lib/cerca'
 import { useCerca } from '../hooks/useCerca'
+import BarraFiltres from './BarraFiltres'
+import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
+import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../lib/filtres'
 import type { Productor, ProductorLlistat } from '../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -68,8 +71,14 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
     return () => { cancelled = true; void supabase.removeChannel(channel) }
   }, [])
 
+  // Zona (fase 6 de la revisión del 08-10-2026), además del buscador.
+  const fl = useFiltresLlistat('equip-productors')
+  const dims = useMemo<Dimensio<ProductorLlistat>[]>(() => [
+    { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (p) => p.area_geografica },
+  ], [])
   const { test, resto } = useMemo(() => {
-    const filtrados = filtraCerca(producers, q, (p) => [p.name, p.empresa, p.phone, p.poblacion, p.email])
+    const filtrados = filtraLlistat(
+      filtraCerca(producers, q, (p) => [p.name, p.empresa, p.phone, p.poblacion, p.email]), dims, fl.valors)
     const test: ProductorLlistat[] = []
     const resto: ProductorLlistat[] = []
     for (const p of filtrados) {
@@ -77,7 +86,7 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
       else resto.push(p)
     }
     return { test, resto }
-  }, [producers, q])
+  }, [producers, q, dims, fl.valors])
 
   function tabla(lista: ProductorLlistat[], marcarTest: boolean) {
     return (
@@ -153,6 +162,14 @@ export default function ProducersList({ onSendMessage, onOpenDetail, onNew }: Pr
       </CardHeader>
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('prod.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
+        <BarraFiltres
+          id="prod"
+          desplegables={dims.map((d) => ({ clau: d.clau, etiquetaKey: d.etiquetaKey, opcions: opcionsDisponibles(producers, dims, d.clau, fl.valors) }))}
+          valors={fl.valors}
+          onValors={fl.setValors}
+          mostrant={test.length + resto.length}
+          total={producers.length}
+        />
         {loading && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
         {vacio && <p className="text-sm text-muted-foreground">{producers.length === 0 ? t('prod.empty') : t('prod.no_match')}</p>}

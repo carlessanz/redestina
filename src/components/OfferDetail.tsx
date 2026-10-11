@@ -8,7 +8,9 @@ import { sendWhatsApp } from '../lib/whatsapp'
 import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
-import { filtraRanking, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import { comarquesPresents, filtraRanking, FRANGES_RECEPCIO, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import type { FranjaRecepcio } from '../lib/rankingEntitats'
+import { dataCurta } from '../lib/format'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
@@ -130,6 +132,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const [filtreTipus, setFiltreTipus] = useState('')
   // C3 v1: solo las que dicen en su perfil que les interesa esta categoría de producto.
   const [nomesProducte, setNomesProducte] = useState(false)
+  // Zona y última recepción (fase 6 de la revisión del 08-10-2026).
+  const [filtreComarca, setFiltreComarca] = useState('')
+  const [filtreRecepcio, setFiltreRecepcio] = useState<FranjaRecepcio>('')
   const [mostrats, setMostrats] = useState(PAS_RANKING)
   const [copiado, setCopiado] = useState<string | null>(null)
   // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
@@ -293,7 +298,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const contactable = (e: EntidadPuntuada) => (!testMode || e.es_test) && e.canal !== 'cap'
     return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
   }, [ranking, testMode])
-  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, filtreTipus, nomesProducte), [rankingOrdenado, filtreTipus, nomesProducte])
+  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado,
+    { tipus: filtreTipus, nomesProducte, comarca: filtreComarca, recepcio: filtreRecepcio }),
+  [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio])
+  const comarquesDelRanking = useMemo(() => comarquesPresents(ranking), [ranking])
   const ambInteresProducte = useMemo(() => hiHaInteresProducte(ranking), [ranking])
   const tipusDelRanking = useMemo(() => tipusPresents(ranking), [ranking])
 
@@ -914,6 +922,30 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </select>
             </div>
           )}
+          {!cargandoRanking && !rankingError && ranking.length > 0 && (
+            <div className="flex flex-wrap items-center gap-2">
+              {comarquesDelRanking.length > 1 && (
+                <>
+                  <label htmlFor="od-filtre-zona" className="text-sm text-muted-foreground">{t('fl.d_comarca')}</label>
+                  <select id="od-filtre-zona"
+                    className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                    value={filtreComarca}
+                    onChange={(e) => { setFiltreComarca(e.target.value); setMostrats(PAS_RANKING) }}>
+                    <option value="">{t('fl.tots')}</option>
+                    {comarquesDelRanking.map((c) => <option key={c} value={c}>{c}</option>)}
+                  </select>
+                </>
+              )}
+              <label htmlFor="od-filtre-recepcio" className="text-sm text-muted-foreground">{t('od.f_recepcio')}</label>
+              <select id="od-filtre-recepcio"
+                className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                value={filtreRecepcio}
+                onChange={(e) => { setFiltreRecepcio(e.target.value as FranjaRecepcio); setMostrats(PAS_RANKING) }}>
+                <option value="">{t('fl.tots')}</option>
+                {FRANGES_RECEPCIO.map((f) => <option key={f} value={f}>{t(`od.fr_${f}`)}</option>)}
+              </select>
+            </div>
+          )}
           {!cargandoRanking && !rankingError && ambInteresProducte && (
             <FilaCasella checked={nomesProducte} onChange={(v) => { setNomesProducte(v); setMostrats(PAS_RANKING) }}>
               {t('od.f_producte')}
@@ -931,6 +963,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   <div>
                     <div className="font-medium">{ent.nombre}{ent.poblacion ? ` · ${ent.poblacion}` : ''}</div>
                     <div className="text-xs text-muted-foreground">{motivos.join(' · ') || t('od.no_match_ent')}</div>
+                    <div className="text-xs text-muted-foreground">
+                      {ent.ultima_recepcio ? t('od.ultima_recepcio', { data: dataCurta(ent.ultima_recepcio) }) : t('od.mai_rebut')}
+                    </div>
                     {/* Canal recomendado y por qué: que se vea antes de pulsar, no después. */}
                     <div className="text-xs">
                       <span className={`font-medium ${canalClases(ent.canal)}`}>{t(`od.canal_${ent.canal}`)}</span>

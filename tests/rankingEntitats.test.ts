@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { filtraRanking, hiHaInteresProducte, tipusPresents } from '../src/lib/rankingEntitats'
+import { comarquesPresents, dinsFranja, filtraRanking, hiHaInteresProducte, tipusPresents } from '../src/lib/rankingEntitats'
 import type { EntidadPuntuada } from '../src/lib/redestina'
 
 function ent(id: string, tipo_receptor: string | null, puntuacion = 1): EntidadPuntuada {
@@ -44,5 +44,24 @@ describe('filtro por interés en el producto (C3 v1)', () => {
     expect(filtraRanking(r, '', false).map((e) => e.id)).toEqual(['a', 'b', 'c'])
     expect(hiHaInteresProducte(r)).toBe(true)
     expect(hiHaInteresProducte(r.slice(1))).toBe(false)
+  })
+})
+
+describe('zona y última recepción (fase 6)', () => {
+  const ara = new Date('2026-10-11T12:00:00Z')
+  it('la franja de la última recepción', () => {
+    expect(dinsFranja('2026-09-01T00:00:00Z', '3m', ara)).toBe(true)
+    expect(dinsFranja('2026-01-01T00:00:00Z', '3m', ara)).toBe(false)
+    expect(dinsFranja('2026-01-01T00:00:00Z', '12m', ara)).toBe(true)
+    expect(dinsFranja(null, 'mai', ara)).toBe(true)
+    expect(dinsFranja('2026-09-01T00:00:00Z', 'mai', ara)).toBe(false)
+    expect(dinsFranja(null, '', ara)).toBe(true)
+  })
+  it('filtra por comarca y ofrece solo las presentes', () => {
+    const r = [
+      { id: 'a', comarca: 'Osona' }, { id: 'b', comarca: 'Maresme' }, { id: 'c', comarca: null },
+    ] as unknown as Parameters<typeof filtraRanking>[0]
+    expect(filtraRanking(r, { comarca: 'Osona' }).map((e) => e.id)).toEqual(['a'])
+    expect(comarquesPresents(r)).toEqual(['Maresme', 'Osona'])
   })
 })

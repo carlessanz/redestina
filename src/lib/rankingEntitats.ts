@@ -23,12 +23,44 @@ export const TIPUS_RECEPTOR = ['social', 'comercial', 'transformador', 'animal']
  * categoría; las que no han declarado nada quedan FUERA (no se sabe), y por eso es un
  * filtro opcional y no el orden.
  */
+/** Las tres franjas del filtro «última recepció» (fase 6 de la revisión del 08-10-2026). */
+export const FRANGES_RECEPCIO = ['3m', '12m', 'mai'] as const
+export type FranjaRecepcio = '' | typeof FRANGES_RECEPCIO[number]
+
+/** ¿La última recepción cae en la franja? `mai` = nunca ha recibido nada conciliado. */
+export function dinsFranja(ultima: string | null | undefined, franja: FranjaRecepcio, ara = new Date()): boolean {
+  if (!franja) return true
+  if (franja === 'mai') return !ultima
+  if (!ultima) return false
+  const mesos = franja === '3m' ? 3 : 12
+  const limit = new Date(ara)
+  limit.setMonth(limit.getMonth() - mesos)
+  return new Date(ultima) >= limit
+}
+
+export interface FiltresRanking {
+  tipus?: string
+  nomesProducte?: boolean
+  /** `''` = todas. */
+  comarca?: string
+  recepcio?: FranjaRecepcio
+}
+
 export function filtraRanking(
-  ranking: readonly EntidadPuntuada[], tipus: string, nomesProducte = false,
+  ranking: readonly EntidadPuntuada[], tipus: string | FiltresRanking, nomesProducte = false,
 ): EntidadPuntuada[] {
+  // La firma anterior (`tipus`, `nomesProducte`) se conserva: la usan las pruebas.
+  const f: FiltresRanking = typeof tipus === 'string' ? { tipus, nomesProducte } : tipus
   return ranking.filter((e) =>
-    (!tipus || (e.tipo_receptor ?? null) === tipus)
-    && (!nomesProducte || e.interessa_producte === true))
+    (!f.tipus || (e.tipo_receptor ?? null) === f.tipus)
+    && (!f.nomesProducte || e.interessa_producte === true)
+    && (!f.comarca || (e.comarca ?? null) === f.comarca)
+    && dinsFranja(e.ultima_recepcio, f.recepcio ?? ''))
+}
+
+/** Las comarcas que aparecen en el ranking, para no ofrecer una que da cero. */
+export function comarquesPresents(ranking: readonly EntidadPuntuada[]): string[] {
+  return [...new Set(ranking.map((e) => e.comarca).filter((x): x is string => !!x))].sort((a, b) => a.localeCompare(b, 'ca'))
 }
 
 /** ¿Hay alguna entidad que haya declarado interés por el producto? Si no, el filtro no se ofrece. */

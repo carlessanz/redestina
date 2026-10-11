@@ -20,6 +20,10 @@ import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { filtraCerca } from '../lib/cerca'
+import { categoriaDeFamilia } from '../lib/filtresMercat'
+import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../lib/filtres'
+import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
+import BarraFiltres from './BarraFiltres'
 import { kg as fmtKg } from '../lib/format'
 import { useCerca } from '../hooks/useCerca'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
@@ -119,8 +123,26 @@ export default function OffersList({ onOpen, accio }: Props) {
     }
   }, [load])
 
-  const filtra = useCallback((files: Excedente[]) => filtraCerca(files, q,
-    (o) => [o.id_excedente, o.producto, o.variedad, t(etiquetaEstatOferta(o.estado).key)]), [q, t])
+  // Filtros y orden comunes (fase 6): zona, tipo de producto, producto, modalidad y fecha
+  // de alta, más el orden «disponibilidad» o «más recientes». Se aplican a las cuatro
+  // pestañas por igual, después del buscador.
+  const f = useFiltresLlistat('equip-ofertes')
+  const [ordre, setOrdre] = useState<'disponibilitat' | 'recent'>('disponibilitat')
+  const dims = useMemo<Dimensio<Excedente>[]>(() => [
+    { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (o) => o.comarca },
+    { clau: 'categoria', etiquetaKey: 'fl.d_categoria', valor: (o) => categoriaDeFamilia(o.familia) },
+    { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => o.modalitat },
+  ], [])
+  const rang = useMemo(() => ({ data: (o: Excedente) => o.created_at, desDe: f.desDe, finsA: f.finsA }), [f.desDe, f.finsA])
+
+  const filtra = useCallback((files: Excedente[]) => {
+    const r = filtraLlistat(filtraCerca(files, q,
+      (o) => [o.id_excedente, o.producto, o.variedad, t(etiquetaEstatOferta(o.estado).key)]), dims, f.valors, rang)
+    return ordre === 'disponibilitat'
+      ? ordenaPerDisponibilitat(r, (o) => ACTIVOS.includes(o.estado))
+      : [...r].sort((a, b) => (b.created_at ?? '').localeCompare(a.created_at ?? ''))
+  }, [q, t, dims, f.valors, rang, ordre])
 
   // La miniatura, con la misma regla que el resto de listas (fotoOferta.ts): la foto
   // propia, la del producto o el icono de su familia. Firmada en lote para las dos pestañas.
@@ -215,6 +237,31 @@ export default function OffersList({ onOpen, accio }: Props) {
       </CardHeader>
       <CardContent className="space-y-4">
         <Input type="search" placeholder={t('off.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />
+        <BarraFiltres
+          id="off"
+          desplegables={dims.map((d) => ({
+            clau: d.clau, etiquetaKey: d.etiquetaKey,
+            opcions: opcionsDisponibles(totes, dims, d.clau, f.valors, rang),
+            text: d.clau === 'modalitat' ? (v: string) => t(`od.mod_${v}`)
+              : d.clau === 'categoria' ? (v: string) => t(v === 'altres' ? 'mk.f_other' : `pr.o_${v}`) : undefined,
+          }))}
+          valors={f.valors}
+          onValors={f.setValors}
+          rang={{ etiquetaKey: 'fl.r_alta', desDe: f.desDe, finsA: f.finsA, onCanvi: f.setRang }}
+          mostrant={grups.totes.length}
+          total={totes.length}
+          extra={(
+            <div className="min-w-0 space-y-1 md:w-44">
+              <label htmlFor="off-ordre" className="text-xs text-muted-foreground">{t('fl.ordre')}</label>
+              <select id="off-ordre" value={ordre}
+                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm"
+                onChange={(e) => setOrdre(e.target.value === 'recent' ? 'recent' : 'disponibilitat')}>
+                <option value="disponibilitat">{t('fl.o_disponibilitat')}</option>
+                <option value="recent">{t('fl.o_recent')}</option>
+              </select>
+            </div>
+          )}
+        />
         {loading && <CarregantSeccio files={5} ambCapcalera={false} />}
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 

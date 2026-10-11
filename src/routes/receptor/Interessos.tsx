@@ -11,6 +11,9 @@
 // final— los resuelve `puntInteres()` en UNA etapa, y debajo va qué toca hacer. La
 // traducción de estados a frases vive en `procesOferta.ts` y la comparten los tres paneles.
 
+import BarraFiltres from '../../components/BarraFiltres'
+import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
+import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
 import { modalitatsOferta, textModalitats } from '../../lib/modalitats'
@@ -442,9 +445,20 @@ export function Historic() {
   // de recepción, la más reciente primero (§2.5).
   const quanRebut = (f: CanalAmbOferta) =>
     albarans[f.id]?.confirmado_at ?? f.data_hora_recollida ?? f.created_at
-  const rebudes = files
+  const totes = files
     .filter((f) => estatEntrega(f) !== 'pendent')
     .sort((a, b) => quanRebut(b).localeCompare(quanRebut(a)))
+  // Filtros (fase 6 de la revisión del 08-10-2026): periodo, producto, modalidad, ofertante y
+  // zona. El total de arriba es el de lo filtrado: es lo que se está mirando.
+  const fl = useFiltresLlistat(entidadId ? `receptor-historic:${entidadId}` : null)
+  const dims: Dimensio<CanalAmbOferta>[] = [
+    { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (f) => f.excedentes?.producto },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (f) => f.excedentes?.modalitat },
+    { clau: 'ofertant', etiquetaKey: 'fl.d_ofertant', valor: (f) => ofertants[f.id]?.contrapart },
+    { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (f) => f.excedentes?.comarca },
+  ]
+  const rang = { data: (f: CanalAmbOferta) => quanRebut(f), desDe: fl.desDe, finsA: fl.finsA }
+  const rebudes = filtraLlistat(totes, dims, fl.valors, rang)
   const totalKg = rebudes.reduce((s, f) => s + (kgRebuts(f) ?? 0), 0)
   const foto = useFotosOfertes(rebudes.map((f) => f.excedentes ?? { producto: null }))
 
@@ -478,7 +492,22 @@ export function Historic() {
       <CardContent className="space-y-2">
         {carregant && <CarregantSeccio files={3} ambCapcalera={false} />}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
-        {!carregant && !errorCarrega && rebudes.length === 0 && (
+        {!carregant && !errorCarrega && totes.length > 0 && (
+          <BarraFiltres
+            id="hist"
+            desplegables={dims.map((d) => ({
+              clau: d.clau, etiquetaKey: d.etiquetaKey,
+              opcions: opcionsDisponibles(totes, dims, d.clau, fl.valors, rang),
+              text: d.clau === 'modalitat' ? (v: string) => t(`od.mod_${v}`) : undefined,
+            }))}
+            valors={fl.valors}
+            onValors={fl.setValors}
+            rang={{ etiquetaKey: 'fl.r_recepcio', desDe: fl.desDe, finsA: fl.finsA, onCanvi: fl.setRang }}
+            mostrant={rebudes.length}
+            total={totes.length}
+          />
+        )}
+        {!carregant && !errorCarrega && totes.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('hist.empty')}</p>
         )}
         {!errorCarrega && rebudes.map((f) => (

@@ -16,6 +16,9 @@ import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
 import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
 import LiniesSortida from '../../components/LiniesSortida'
+import BarraFiltres from '../../components/BarraFiltres'
+import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
+import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../../lib/filtres'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaDestins } from '../../lib/ofertes'
 import type { ProgresOferta } from '../../lib/progresOfertes'
@@ -401,7 +404,9 @@ export function ProductorInici() {
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
   // marcha —pide atención o se está gestionando—, abajo lo que ya es historia. Antes las
   // dos listaban las mismas ofertas y parecían hacer lo mismo.
-  const enCurs = ofertes.filter((o) => ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat))
+  // En marcha, por disponibilidad: la que se acaba antes, arriba (fase 6).
+  const enCurs = ordenaPerDisponibilitat(
+    ofertes.filter((o) => ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat)), () => true)
   const historic = ofertes.filter((o) => !ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat))
 
   // Los kilos canalizados, SIEMPRE con su año: «1.320 kg» sin fecha no dice si es de este
@@ -486,6 +491,21 @@ export function ProductorOfertes() {
   const { ofertes, kg, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
+  // Filtros y orden comunes (fase 6 de la revisión del 08-10-2026). El estado es el SIMPLE,
+  // el mismo del badge; la fecha, la de alta. Orden: en marcha por disponibilidad, y después
+  // las cerradas, la más reciente arriba.
+  const f = useFiltresLlistat(productorId ? `productor-ofertes:${productorId}` : null)
+  const dims: Dimensio<Excedente>[] = [
+    { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (o) => estatSimpleOferta(puntDe(o)).estat },
+    { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => o.modalitat },
+  ]
+  const rang = { data: (o: Excedente) => o.created_at, desDe: f.desDe, finsA: f.finsA }
+  const filtrades = ordenaPerDisponibilitat(
+    filtraLlistat(ofertes, dims, f.valors, rang),
+    (o) => ofertaEnCurs(estatSimpleOferta(puntDe(o)).estat))
+  const textEstat = (v: string) => t(`est.o_${v}`)
+
   return (
     <Card>
       {/* `flex-wrap` y el botón a lo ancho en móvil: con `shrink-0` de serie, en la misma
@@ -509,7 +529,22 @@ export function ProductorOfertes() {
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('po.err_load')}</p>}
         {!carregant && !errorCarrega && ofertes.length === 0 && <CapOferta />}
-        {ofertes.map((o) => (
+        {ofertes.length > 0 && (
+          <BarraFiltres
+            id="po"
+            desplegables={dims.map((d) => ({
+              clau: d.clau, etiquetaKey: d.etiquetaKey,
+              opcions: opcionsDisponibles(ofertes, dims, d.clau, f.valors, rang),
+              text: d.clau === 'estat' ? textEstat : d.clau === 'modalitat' ? (v: string) => t(`od.mod_${v}`) : undefined,
+            }))}
+            valors={f.valors}
+            onValors={f.setValors}
+            rang={{ etiquetaKey: 'fl.r_alta', desDe: f.desDe, finsA: f.finsA, onCanvi: f.setRang }}
+            mostrant={filtrades.length}
+            total={ofertes.length}
+          />
+        )}
+        {filtrades.map((o) => (
           <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} sortides={sortides[o.id]} ambCodi
             foto={foto(o)} />
         ))}
