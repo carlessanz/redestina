@@ -151,6 +151,8 @@ describe('la convención de singular', () => {
 // se comparan.
 describe('las claves compuestas cubren todo el vocabulario de la base', () => {
   const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
+    // El reparto por modalidad de «El meu impacte» (fase 10, `ImpacteBloc`).
+    { que: 'modalidades del impacto', prefijo: 'imp.mod_', valores: ['donacio', 'venda', 'maquila'] },
     {
       // CHECK de `avisos.tipus` (ampliado en 20270416100000 y 20270417100100). Se compone en
       // `CampanaAvisos.tsx` (`avis.t_${tipus}`): el caso `od.ch_asistido` exacto —un tipo nuevo

@@ -51,6 +51,7 @@ import ProductorOfertaDetall from '../routes/productor/OfertaDetall'
 import LaMevaOrganitzacio from '../routes/LaMevaOrganitzacio'
 import Diagnostic from '../routes/Diagnostic'
 import PerfilRecepcio from '../routes/PerfilRecepcio'
+import ReceptorImpacte from '../routes/receptor/Impacte'
 import Diagnostics from '../routes/equip/Diagnostics'
 import DiagnosticDetall from '../routes/equip/DiagnosticDetall'
 import Mercat from '../routes/receptor/Mercat'
@@ -175,6 +176,7 @@ export const router = createBrowserRouter([
                   { path: 'mercat', element: <Mercat />, handle: { titleKey: 'nav.market' } },
                   { path: 'interessos', element: <Interessos />, handle: { titleKey: 'nav.my_interests' } },
                   { path: 'historic', element: <Historic />, handle: { titleKey: 'nav.history' } },
+                  { path: 'impacte', element: <ReceptorImpacte />, handle: { titleKey: 'nav.impacte' } },
                   { path: 'documents', element: <ReceptorDocuments />, handle: { titleKey: 'nav.entity_documents' } },
                   { path: 'perfil', element: <Navigate to="/organitzacio" replace /> },
                 ],

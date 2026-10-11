@@ -152,6 +152,8 @@ const RECEPTOR: NavGrup[] = [
       { to: '/receptor/mercat', labelKey: 'nav.market', labelBarraKey: 'nav.market_barra', icon: Store, end: true, comptador: 'mercat_noves' },
       { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake, comptador: 'avisos_interessos' },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
+      // «El meu impacte» (fase 10). Fuera de la barra de móvil: ya va al límite (§2).
+      { to: '/receptor/impacte', labelKey: 'nav.impacte', icon: Leaf, barra: false },
       { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },
     ],
   },

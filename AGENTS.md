@@ -184,7 +184,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | móvil primero / responsive | responsive `md`, mensajería lista↔conversación | ✅ |
 | módulo de comunicación WhatsApp | Fase 1 + intake/opt-in/gates/recordatorios | ✅/excede |
 | valor económico | Coste por kilo que **declara el productor** en cada oferta (`excedentes.coste_kg`), partiendo del de **referencia** del producto (`costes_producto`, uno por producto, sin ejercicio, 27-09-2026); se congela en la canalización al conciliar; sin coste no hay cierre | ✅ |
-| vistas/indicadores (`v_kpi_subvencion`…) | `Dashboard` agrega en cliente | 🟡 |
+| vistas/indicadores (`v_kpi_subvencion`…) | `kpis_equip()` con periodo (fase 8) e **impacto** ambiental/social/económico por organización y global (`impacte_*`, factores provisionales en `factors_impacte`, fase 10) | 🟡 |
 
 **Brechas mayores pendientes** (orden aproximado de dependencia): ~~(1) roles y permisos~~
 **resuelta** (§4bis) → **(2) organización unificada multirol + `usuario`** — 🟡 **en curso, y más
@@ -3247,6 +3247,28 @@ Migración `20270422100000`.
   producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`; el envío real, a probar con un
   número de prueba en producción.
 - E2E `tests/e2e/tauler.e2e.ts` (clon, escritorio).
+
+### Revisión del cliente del 08-10-2026 — fase 10: «El meu impacte» (11-10-2026)
+
+Migración `20270424100000`.
+
+- **`factors_impacte`** (catálogo, lo lee cualquiera con sesión; sin GRANT de escritura): CO₂e,
+  agua y raciones **por kilo aprovechado**, sembrados **provisionales** con su fuente (FAO 2013 para
+  el CO₂e, huella hídrica media de fruta y hortaliza, ración de 400 g). Los fija solo el super_admin
+  con `fixar_factor_impacte()` desde Configuració (`components/equip/FactorsImpacte`).
+- **`impacte_receptor` / `impacte_productor` / `impacte_global(desde, hasta)`**, envoltorios de
+  `impacte_calcula(ambit, …)` (`security invoker`: agrega lo que quien pregunta ya puede leer, y
+  filtra por sus fichas; el global exige equipo). Kilos **conciliados** (D13) con la recogida en hora
+  de Madrid, como `kpis_equip`; por modalidad, entregas, contrapartes, CO₂e, agua, raciones y serie
+  mensual. **El valor en € (kg × `coste_kg` de las donaciones) nunca va al receptor**: expondría la
+  valoración del donante.
+- **Pantallas**: `/receptor/impacte` («El meu impacte», `barra: false`), bloque «El teu impacte» en
+  el Inici del productor (año en curso, compacto) e «Impacte de Redestina» en el tablero del equipo,
+  con su periodo. `components/ImpacteBloc` (cifras, kg por mes y por modalidad con `chart-*`) y
+  `ImpacteAmbPeriode`; el selector de periodo se extrae a `components/SelectorPeriode`, que ahora
+  usa también `IndicadorsPeriode`. Lo puro, en `src/lib/impacte.ts` (`tests/impacte.test.ts`).
+- E2E `tests/e2e/impacte.e2e.ts` (clon, lectura): la cifra de cada pantalla es la que da la base
+  para esa cuenta.
 
 ### Revisión del cliente del 08-10-2026 — fase 9: «Diagnòstic operatiu» y «El meu perfil de recepció» (11-10-2026)
 
@@ -6929,8 +6951,8 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.304 pruebas en 54 ficheros** de Vitest: 1.303 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
+   Referencia: **1.311 pruebas en 55 ficheros** de Vitest: 1.310 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 10: `tests/impacte.test.ts` y las claves `imp.mod_*`; tras la fase 9 eran 1.304, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
    tras la fase 8 eran 1.294, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
@@ -6969,8 +6991,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.335/1.335 correctas y 31 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
+   ✅ **Referencia HOY (clon local): 1.374/1.374 correctas y 29 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
+   dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
    datos» nuevas son la lectura del historial por el equipo, que no tiene fixture—; tras la fase 8
    eran 1.319, tras la fase 8 —`kpis_equip`: +8—; tras la fase 7 eran 1.311, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
    eran 1.259, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin

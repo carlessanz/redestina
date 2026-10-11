@@ -27,6 +27,7 @@ import { pendentsPerTelefon } from '../lib/contactes'
 import PendentsEquip from './equip/PendentsEquip'
 import ComFunciona from './equip/ComFunciona'
 import IndicadorsPeriode from './equip/IndicadorsPeriode'
+import ImpacteAmbPeriode from './ImpacteAmbPeriode'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface ExcRow { id: string; estado: string; kg_total: number | null }
@@ -196,6 +197,8 @@ export default function Dashboard() {
       </section>
 
       <IndicadorsPeriode />
+      {/* El impacto de toda la plataforma (fase 10), con su propio periodo. */}
+      <ImpacteAmbPeriode ambit="global" titolKey="imp.title_global" />
 
       <section className="space-y-3">
         <h2 className="text-lg font-semibold">{t('dash.glance')}</h2>

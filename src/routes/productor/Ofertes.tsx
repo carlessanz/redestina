@@ -9,6 +9,7 @@ import { Link, useNavigate } from 'react-router'
 import { ArrowRight, PlusCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
+import ImpacteBloc from '../../components/ImpacteBloc'
 import { useT } from '../../lib/i18n'
 import { dataCurta, nombre } from '../../lib/format'
 import { useOrganitzacio } from '../../hooks/useAppContext'
@@ -451,6 +452,13 @@ export function ProductorInici() {
           </div>
 
           <QuePassaAmbLesMeves ofertes={enCurs} kg={kg} destins={destins} sortides={sortides} puntDe={puntDe} foto={foto} />
+
+          {/* «El teu impacte» (fase 10): lo que han supuesto, este año, los kilos que han
+              encontrado salida por Redestina. */}
+          <section className="space-y-2">
+            <h2 className="text-lg font-semibold">{t('imp.title_productor', { any })}</h2>
+            <ImpacteBloc ambit="productor" desde={`${any}-01-01`} hasta={`${any}-12-31`} compacte />
+          </section>
 
           <Button
             className="h-11 whitespace-normal md:h-9"

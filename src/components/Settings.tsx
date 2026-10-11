@@ -17,6 +17,7 @@ import {
 } from '../lib/emailTest'
 import GestorWhitelist from './GestorWhitelist'
 import DadesFundacio from './equip/DadesFundacio'
+import FactorsImpacte from './equip/FactorsImpacte'
 import EditorDiagnostic from './equip/EditorDiagnostic'
 import { cn } from '../lib/utils'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
@@ -243,6 +244,9 @@ export default function Settings() {
           desbloquea la emisión con efecto fiscal. Va antes que las listas de prueba
           porque pesa más: sin esta fila rellenada no se puede certificar nada. */}
       <DadesFundacio />
+
+      {/* Los factores del impacto (fase 10): configuración del servicio, como lo anterior. */}
+      <FactorsImpacte />
 
       {/* El cuestionario, las medidas y las reglas del diagnóstico (F2). Va aquí y no en
           una pantalla propia por lo mismo que los datos de la Fundación: es configuración

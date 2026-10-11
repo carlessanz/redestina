@@ -659,6 +659,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
+  // Fase 10 (20270424100000): el impacto global es del equipo; los factores son catálogo
+  // (los lee cualquiera) y solo el super_admin los fija.
+  { tabla: "impacte_global", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu l'impacte de tota la plataforma" },
+  { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte (cataleg)", requiereFixture: "els factors sembrats (20270424100000)" },
+  { tabla: "factors_impacte", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap factor d'impacte" },
+  { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa cap factor d'impacte" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
   // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
   //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su
@@ -1222,6 +1228,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "afegeix contactes en nom d'una organització (org inventada → error de negoci)" },
     { tabla: "esborrar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "esborra contactes (id inventat → 22023)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
+    { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
+    { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
+    // Fijar un factor es del super_admin: un técnico, no.
+    { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa els factors d'impacte (super_admin)" },
     // Un papel nuevo lo pide el TITULAR; el equipo, no (lo aprueba después).
     { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix papers en nom d'una organització" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
@@ -1430,6 +1440,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // El super_admin fija los factores. Código inventado → 22023 factor_inexistent: la guarda dejó pasar.
+    { tabla: "fixar_factor_impacte", op: "rpc", esperado: "permitir", args: { p_codi: "x", p_valor: 1 }, descripcion: "pot fixar els factors d'impacte (22023 si el codi no existeix)" },
     // Aprobar un certificado en nombre del donante (fase 4): id inventado → 22023.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "aprova un certificat en nom del donant (id inventat → 22023)" },
     // --- CHECK GLOBAL del catálogo (20270414101000) ---
@@ -1831,6 +1843,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   productor: [
+    { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
     // El archivo que el equipo guarda de SU organización (20270329100000): convenios
     // firmados en papel, certificados de ejercicios anteriores, planes previos. La
@@ -2069,6 +2082,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // propiedad en sí no queda sin cubrir mientras haya otra cuenta receptora que sí
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
+    { tabla: "impacte_receptor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
     // --- Certificat de recepcio (CR): ve EL SEU. Mismo puente y misma regla que el del
     //     donante (`cierres_receptor_meus()`: los de prueba, solo si la ficha es es_test).
     {
