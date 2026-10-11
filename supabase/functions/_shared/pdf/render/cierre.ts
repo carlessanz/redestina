@@ -139,6 +139,8 @@ export interface DatosCierre {
   kg?: number | null;
   import?: number | null;
   excepcio_sense_factura?: boolean | null;
+  /** Fase 4 (11-10-2026): quién revisó las cifras antes de la firma. */
+  revisio?: { estat?: string | null; at?: string | null; per?: string | null; nota?: string | null } | null;
   excepcio_motiu?: string | null;
   rectificacions?: number | null;
   motiu_rectificacio?: string | null;
@@ -287,6 +289,8 @@ export interface DiccionarioCierre {
   quilos: string;
   factura_citada: string;
   factura_citada_sense: string;
+  revisio_ofertant: string;
+  revisio_equip: string;
   excepcio_titol: string;
   excepcio_text: string;
   signatura_titol: string;
@@ -395,6 +399,8 @@ const CA: DiccionarioCierre = {
   quilos: "Quilos donats",
   factura_citada: "Factura del donant",
   factura_citada_sense: "Certificat emès sense factura del donant",
+  revisio_ofertant: "Xifres revisades i aprovades pel donant el {data}.",
+  revisio_equip: "Xifres aprovades per l'equip de Redestina en nom del donant ({per}, {data}): {nota}",
   excepcio_titol: "Emès sense factura coincident",
   excepcio_text: "Motiu:",
   signatura_titol: "Signatura i segell",
@@ -515,6 +521,8 @@ const ES: DiccionarioCierre = {
   quilos: "Kilos donados",
   factura_citada: "Factura del donante",
   factura_citada_sense: "Certificado emitido sin factura del donante",
+  revisio_ofertant: "Cifras revisadas y aprobadas por el donante el {data}.",
+  revisio_equip: "Cifras aprobadas por el equipo de Redestina en nombre del donante ({per}, {data}): {nota}",
   excepcio_titol: "Emitido sin factura coincidente",
   excepcio_text: "Motivo:",
   signatura_titol: "Firma y sello",

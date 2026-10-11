@@ -28,7 +28,9 @@ import LlistaPlans from '../../components/documents/LlistaPlans'
 import DocumentsDeLEquip from '../../components/documents/DocumentsDeLEquip'
 import SegellRedestina from '../../components/documents/SegellRedestina'
 import CarregantSeccio from '../../components/CarregantSeccio'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Scale, Truck } from 'lucide-react'
+import TitolSeccio from '../../components/documents/TitolSeccio'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
 
 // `sha256_datos` entra en la lista por una sola cosa: es de donde sale el código de
 // verificación impreso, y sin él no se puede componer el sello (`SegellRedestina`).
@@ -194,9 +196,9 @@ export default function ReceptorDocuments() {
       {/* --- Lo que ha recibido este año, en kilos --- */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">
+          <TitolSeccio icona={Scale}>
             {t('entdoc.kg_title', { any: acumulat?.ejercicio ?? new Date().getFullYear() })}
-          </CardTitle>
+          </TitolSeccio>
           <p className="mt-1 text-sm text-muted-foreground">{t('entdoc.kg_hint')}</p>
         </CardHeader>
         <CardContent>
@@ -238,7 +240,7 @@ export default function ReceptorDocuments() {
       </Card>
 
       <Card>
-        <CardHeader><CardTitle className="text-base">{t('entdoc.alb_title')}</CardTitle></CardHeader>
+        <CardHeader><TitolSeccio icona={Truck}>{t('entdoc.alb_title')}</TitolSeccio></CardHeader>
         <CardContent>
           {albarans.length === 0
             ? <p className="text-sm text-muted-foreground">{t('entdoc.empty')}</p>

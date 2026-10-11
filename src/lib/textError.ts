@@ -19,12 +19,17 @@ const CODIS: Record<string, string> = {
   te_canalitzacions: 'po.err_te_canalitzacions',
   cal_motiu: 'po.err_cal_motiu',
   // `confirmar_recollida()`, fase 3 de la revisión del 08-10-2026.
-  canalitzacio_inexistent: 'crec.err_inexistent',
-  canalitzacio_anulada: 'crec.err_anulada',
-  sense_albara: 'crec.err_sense_albara',
-  ja_confirmada: 'crec.err_ja_confirmada',
-  kg_invalids: 'crec.err_kg',
-  data_futura: 'crec.err_data_futura',
+  canalitzacio_inexistent: 'recol.err_inexistent',
+  canalitzacio_anulada: 'recol.err_anulada',
+  sense_albara: 'recol.err_sense_albara',
+  ja_confirmada: 'recol.err_ja_confirmada',
+  kg_invalids: 'recol.err_kg',
+  data_futura: 'recol.err_data_futura',
+  // Revisión del certificado (fase 4).
+  no_pendent_revisio: 'rev.no_pendent_revisio',
+  certificat_bloquejat: 'rev.certificat_bloquejat',
+  sense_revisio: 'tan.err_sense_revisio',
+  cal_nota: 'tan.err_cal_nota',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

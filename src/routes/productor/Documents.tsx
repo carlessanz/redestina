@@ -20,7 +20,7 @@
 // rol vería también los de su otra ficha, y esta pantalla es la del productor.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Download, Eye, Loader2 } from 'lucide-react'
+import { AlertTriangle, Award, Download, Eye, Loader2, Truck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
@@ -33,6 +33,8 @@ import {
 } from '../../lib/tancament'
 import type { CierreDonante, Convenio, Documento } from '../../types'
 import PendentsDeTu from '../../components/documents/PendentsDeTu'
+import RevisioCertificat from '../../components/documents/RevisioCertificat'
+import TitolSeccio from '../../components/documents/TitolSeccio'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
 import TaulaAlbarans from '../../components/documents/TaulaAlbarans'
@@ -47,7 +49,7 @@ type Donant = Pick<
   CierreDonante,
   | 'id' | 'kg_total' | 'valor_total' | 'estado' | 'resumen_numero' | 'certificado_numero'
   | 'certificado_at' | 'factura_numero' | 'factura_fecha' | 'factura_importe' | 'calculado_at' | 'tipo'
->
+> & { revisio_estat: string | null }
 
 /** El año y el modo de cada fila, por `exercici_dels_meus_tancaments()` (20270406100000). */
 interface InfoTancament { cierre_donante_id: string; ejercicio: number; modo: 'real' | 'prueba' }
@@ -69,6 +71,10 @@ interface PeriodeFila {
   periodo_desde: string
   periodo_hasta: string
   modo: 'real' | 'prueba'
+  kg_total: number | null
+  valor_total: number | null
+  certificado_numero: string | null
+  revisio_estat: string | null
 }
 
 export default function ProductorDocuments() {
@@ -97,7 +103,7 @@ export default function ProductorDocuments() {
     const [don, info, doc, alb, conv, per] = await Promise.all([
       supabase
         .from('cierres_donante')
-        .select('id, tipo, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at')
+        .select('id, tipo, kg_total, valor_total, estado, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, calculado_at, revisio_estat')
         .order('created_at', { ascending: false }),
       // El año y el modo NO se leen de `cierres_ejercicio`, que es del equipo: los da esta
       // RPC, solo de las filas propias. Sin ella, un cierre recién calculado (sin número
@@ -125,7 +131,7 @@ export default function ProductorDocuments() {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('cierres_periodo')
-        .select('id, periodo_desde, periodo_hasta, modo')
+        .select('id, periodo_desde, periodo_hasta, modo, kg_total, valor_total, certificado_numero, revisio_estat')
         .order('periodo_hasta', { ascending: false }),
     ])
     const fallada = [don, info, doc, alb, conv, per].map((r) => r.error).find((e) => e) ?? null
@@ -239,7 +245,7 @@ export default function ProductorDocuments() {
       {/* --- El acumulado del año --- */}
       <Card>
         <CardHeader>
-          <CardTitle>{t('mydoc.title')}</CardTitle>
+          <TitolSeccio icona={Award}>{t('mydoc.title')}</TitolSeccio>
           <p className="mt-1 text-sm text-muted-foreground">{t('mydoc.subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -288,6 +294,15 @@ export default function ProductorDocuments() {
                 <p className="mt-3 text-sm text-muted-foreground">
                   {t(textSeguent(d))}
                 </p>
+                {/* Fase 4: revisar las cifras antes de la firma (solo donación). */}
+                {d.tipo !== 'transaccio' && (
+                  <RevisioCertificat
+                    tipus="anual" id={d.id} revisioEstat={d.revisio_estat}
+                    certificat={d.certificado_numero != null}
+                    kgTotal={d.kg_total} valorTotal={d.valor_total}
+                    quin={String(exercici ?? '')} onFet={() => void refresca()}
+                  />
+                )}
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* Cada documento, su pareja: mirarlo (lo frecuente) y guardarlo. El
@@ -331,7 +346,7 @@ export default function ProductorDocuments() {
       {/* --- Sus albaranes de recepción --- */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-base">{t('mydoc.rec_title')}</CardTitle>
+          <TitolSeccio icona={Truck}>{t('mydoc.rec_title')}</TitolSeccio>
           <p className="mt-1 text-sm text-muted-foreground">{t('mydoc.rec_hint')}</p>
         </CardHeader>
         <CardContent>
@@ -340,6 +355,23 @@ export default function ProductorDocuments() {
             : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador} />}
         </CardContent>
       </Card>
+
+      {/* --- Certificados a demanda que esperan su revisión (fase 4). --- */}
+      {periodes.filter((p) => p.revisio_estat === 'pendent_revisio' && !p.certificado_numero).map((p) => (
+        <Card key={p.id}>
+          <CardHeader>
+            <CardTitle className="text-base">{t('mydoc.cdp_title')}</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <RevisioCertificat
+              tipus="periode" id={p.id} revisioEstat={p.revisio_estat} certificat={false}
+              kgTotal={p.kg_total} valorTotal={p.valor_total}
+              quin={t('mydoc.cdp_period', { desde: dataTancament(p.periodo_desde), fins: dataTancament(p.periodo_hasta) })}
+              onFet={() => void refresca()}
+            />
+          </CardContent>
+        </Card>
+      ))}
 
       {/* --- Certificados a demanda: el mismo acumulado, pero de una ventana de fechas.
               Se emiten con `tipo = 'CD'`, así que lo que los distingue del anual es el

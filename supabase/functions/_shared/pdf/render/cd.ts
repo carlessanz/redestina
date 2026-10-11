@@ -262,6 +262,17 @@ export async function renderCd(
     m.parrafo(t.factura_citada_sense, { color: COLORES.verdeGris, tamano: 9.5, despues: 4 });
   }
 
+  // ----------------------------------------------------------- la revisión (fase 4)
+  // Lo emitido antes del 11-10-2026 no lleva `revisio` y no imprime nada.
+  const rev = datos.revisio;
+  if (rev?.estat === "aprovat_ofertant" || rev?.estat === "aprovat_equip") {
+    const data = fechaLarga(rev.at ?? null, t, lengua);
+    const linia = rev.estat === "aprovat_ofertant"
+      ? t.revisio_ofertant.replace("{data}", data)
+      : t.revisio_equip.replace("{data}", data).replace("{per}", rev.per ?? "—").replace("{nota}", rev.nota ?? "");
+    m.parrafo(linia, { color: COLORES.verdeGris, tamano: 9.5, despues: 4 });
+  }
+
   // ------------------------------------------------------ detalle por producto
   const detalle = (Array.isArray(datos.detall) ? datos.detall : []).filter((l) => l && l.producte);
   if (detalle.length > 0) {

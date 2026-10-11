@@ -242,7 +242,13 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       // `emitir_certificados_transaccion_cierre()`. Se componen en `TancamentDetall.tsx`.
       que: 'emisión en bloque · saltats[].codi',
       prefijo: 'tan.skip_',
-      valores: ['bloquejat', 'sense_kg', 'error'],
+      valores: ['bloquejat', 'sense_kg', 'error', 'sense_revisio'],
+    },
+    {
+      // Fase 4 de la revisión del 08-10-2026: `cierres_donante.revisio_estat`.
+      que: 'cierres_donante.revisio_estat',
+      prefijo: 'tan.rev_',
+      valores: ['pendent_revisio', 'aprovat_ofertant', 'aprovat_equip'],
     },
     {
       que: 'cierres_donante.estado (qué toca)',

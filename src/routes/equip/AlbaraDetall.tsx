@@ -871,11 +871,11 @@ export default function AlbaraDetall() {
       {(albara.tipo === 'ENT' || albara.tipo === 'OPE') && albara.canalizacion_id
         && ['borrador', 'emitido', 'entregado'].includes(albara.estado) && (
         <Card>
-          <CardHeader><CardTitle className="text-base">{t('crec.title')}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('recol.title')}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">{t('crec.desc')}</p>
+            <p className="text-sm text-muted-foreground">{t('recol.desc')}</p>
             <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgRecollida(true)}>
-              {t('crec.btn')}
+              {t('recol.btn')}
             </Button>
           </CardContent>
         </Card>

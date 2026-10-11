@@ -81,7 +81,7 @@ type Donant = Pick<
   | 'resumen_numero' | 'certificado_numero' | 'certificado_at' | 'factura_numero' | 'factura_fecha'
   | 'factura_importe' | 'excepcion_sin_factura' | 'excepcion_motivo' | 'recordatorios'
   | 'requiere_llamada' | 'rectificaciones' | 'enviado_at'
->
+> & { revisio_estat: string | null; revisio_nota: string | null }
 
 /** Una fila `transaccio` de `cierres_donante`: el CT de un generador. Sin importes. */
 type Generador = Pick<
@@ -264,6 +264,7 @@ export default function TancamentDetall() {
   const { id = '' } = useParams()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const [cap, setCap] = useState<Capcalera | null>(null)
   const [donants, setDonants] = useState<Donant[]>([])
@@ -280,6 +281,7 @@ export default function TancamentDetall() {
   const [facturaAssistida, setFacturaAssistida] = useState<Donant | null>(null)
   const [simula, setSimula] = useState<Donant | null>(null)
   const [rectifica, setRectifica] = useState<Donant | null>(null)
+  const [revisa, setRevisa] = useState<Donant | null>(null)
   const [rectificaCt, setRectificaCt] = useState<Generador | null>(null)
   const [reinici, setReinici] = useState(false)
 
@@ -303,7 +305,7 @@ export default function TancamentDetall() {
     // sus propias columnas, y se pintan en su propia tarjeta.
     const { data: donData } = await supabase
       .from('cierres_donante')
-      .select('id, productor_id, datos_fiscales, kg_total, valor_total, estado, bloqueos, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, excepcion_sin_factura, excepcion_motivo, recordatorios, requiere_llamada, rectificaciones, enviado_at')
+      .select('id, productor_id, datos_fiscales, kg_total, valor_total, estado, bloqueos, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, excepcion_sin_factura, excepcion_motivo, recordatorios, requiere_llamada, rectificaciones, enviado_at, revisio_estat, revisio_nota')
       .eq('cierre_id', id)
       .eq('tipo', 'donacio')
 
@@ -744,6 +746,20 @@ export default function TancamentDetall() {
     await refresca()
   }
 
+  /**
+   * Fase 4: el equipo aprueba las cifras en nombre del donante (modelo asistido), con una
+   * nota que sale impresa en el certificado.
+   */
+  async function aprovaEnNom(d: Donant, nota: string) {
+    setOcupat(true)
+    const { error } = await supabase.rpc('aprovar_certificat_equip', { p_id: d.id, p_tipus: 'anual', p_nota: nota })
+    setOcupat(false)
+    setRevisa(null)
+    if (error) { toast.error(textError(t, { missatge: error.message, codi: error.code })); return }
+    toast.success(t('tan.rev_ok'))
+    await refresca()
+  }
+
   async function rectificaCertificat(motiu: string) {
     if (!rectifica) return
     setOcupat(true)
@@ -1006,6 +1022,8 @@ export default function TancamentDetall() {
                       onCertificat={() => void certificat(d)}
                       onRectifica={() => setRectifica(d)}
                       onEnviat={() => void enviat(d)}
+                      esSuperAdmin={esSuperAdmin}
+                      onRevisa={() => setRevisa(d)}
                     />
                   ))}
                 </TableBody>
@@ -1202,6 +1220,17 @@ export default function TancamentDetall() {
       />
 
       <DialegMotiu
+        obert={revisa !== null}
+        onObert={(v) => { if (!v) setRevisa(null) }}
+        titol={t('tan.rev_title')}
+        descripcio={revisa ? t('tan.rev_desc', { kg: kg(revisa.kg_total), valor: euros(revisa.valor_total) }) : ''}
+        etiqueta={t('tan.f_rev_nota')}
+        confirmar={t('tan.a_rev_equip')}
+        ocupat={ocupat}
+        onConfirma={(nota) => { if (revisa) void aprovaEnNom(revisa, nota) }}
+      />
+
+      <DialegMotiu
         obert={rectificaCt !== null}
         onObert={(v) => { if (!v) setRectificaCt(null) }}
         titol={t('tan.ct_rect_title')}
@@ -1246,9 +1275,13 @@ function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 function FilaDonant({
   d, docs, esProva, provisionals, potAprovar, ocupat, descarregant, generant,
   onDescarrega, onMostra, onResum, onFactura, onFacturaAssistida, onSimula, onCertificat, onRectifica,
-  onEnviat,
+  onEnviat, esSuperAdmin, onRevisa,
 }: {
   d: Donant
+  /** En REAL firma el super_admin (fase 4); en prueba, quien pueda aprobar. */
+  esSuperAdmin: boolean
+  /** Aprobar las cifras en nombre del donante. */
+  onRevisa: () => void
   docs: DocFila[]
   esProva: boolean
   /** Sin datos fiscales reales, `emitir_certificado()` se niega: mejor decirlo antes. */
@@ -1304,12 +1337,17 @@ function FilaDonant({
    * factura» y era cierto; hoy sería mentira, y un botón gris con un motivo falso es peor
    * que un botón gris sin motivo.
    */
+  // Fase 4: en REAL, sin la revisión del donante no se firma, y firma el super_admin.
+  const senseRevisio = !esProva && d.revisio_estat !== 'aprovat_ofertant' && d.revisio_estat !== 'aprovat_equip'
   const motiuCertificat = bloquejat
     ? t('tan.why_blocked')
     : Number(d.kg_total) <= 0
       ? t('tan.why_no_kg')
       : bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
-        ? t('tan.why_provisional') : undefined
+        ? t('tan.why_provisional')
+        : senseRevisio
+          ? t('tan.why_sense_revisio')
+          : !esProva && !esSuperAdmin ? t('tan.why_super_admin') : undefined
 
   return (
     <TableRow>
@@ -1328,6 +1366,13 @@ function FilaDonant({
         <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
         {d.excepcion_sin_factura && (
           <Badge className="ml-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.exception')}</Badge>
+        )}
+        {/* La revisión del donante (fase 4): un eje aparte del estado del cierre. */}
+        {!teCertificat && d.revisio_estat && (
+          <Badge className={'ml-1 whitespace-normal ' + (d.revisio_estat === 'pendent_revisio'
+            ? 'bg-secondary text-secondary-foreground' : 'bg-exito-fondo text-exito')}>
+            {t(`tan.rev_${d.revisio_estat}`)}
+          </Badge>
         )}
         <p className="mt-1 text-xs text-muted-foreground">{t(punt.claus.toca, punt.vars)}</p>
       </TableCell>
@@ -1405,17 +1450,29 @@ function FilaDonant({
                   {t('tan.a_simulate')}
                 </Button>
               )}
+              {!teCertificat && d.revisio_estat === 'pendent_revisio' && (
+                <BotoAmbMotiu
+                  size="sm" variant="outline"
+                  className="h-11 whitespace-normal md:h-8"
+                  disabled={ocupat || !potAprovar}
+                  motiu={potAprovar ? undefined : t('tan.ct_need_approver')}
+                  onClick={onRevisa}
+                >
+                  {t('tan.a_rev_equip')}
+                </BotoAmbMotiu>
+              )}
               {!teCertificat && (
                 <BotoAmbMotiu
                   size="sm"
                   variant={ara === 'certificat' ? 'default' : 'outline'}
                   className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || bloquejat || Number(d.kg_total) <= 0
-                    || bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')}
+                    || bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
+                    || senseRevisio || (!esProva && !esSuperAdmin)}
                   motiu={motiuCertificat}
                   onClick={onCertificat}
                 >
-                  {t('tan.a_certificate')}
+                  {t(esProva ? 'tan.a_certificate' : 'tan.a_sign_emit')}
                 </BotoAmbMotiu>
               )}
               {teCertificat && (

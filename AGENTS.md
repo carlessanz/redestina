@@ -2197,6 +2197,7 @@ funciones, no políticas:
 | `emitir_albaran(id, recogida, lineas, idioma)` | Pide número, congela `partes`, emite el PDF. `es_intern()`; `22023` si no es borrador |
 | `marcar_entregado(id)` | Crea los enlaces de confirmación y **devuelve el token en claro**: es la única vez que existe (en la base solo está su hash). `es_intern()`. ⚠️ **Desde `20270418100100`** una parte **sin correo y con móvil** (`es_mobil()`, la regla de `esMovil()`) recibe un enlace `canal = 'whatsapp'` con `destinatario_telefono` y **sin token en la salida** (por WhatsApp no viaja: quedaría en la consola de Mensajería); `recollides-programades` le manda los botones. Sin correo ni móvil, ninguna fila: la vía es `confirmar_recollida()` |
 | `confirmar_recollida(canalizacion, kg_reals, data, observacions, foto)` (`20270418100100`) | **«Confirma la recollida» del equipo** (fase 3 de la revisión del 08-10-2026, §6ter). Solo `es_intern()` **con sesión** (la identidad es parte de la evidencia; permiso antes que existencia). En una transacción: emite y entrega el ENT/OPE si estaba en `borrador`/`emitido` (**consume numeración**), confirma por cada parte que falte con un enlace `asistido` acuñado y consumido al momento (`confirmar_part_assistida`, `asistido_por` = la cuenta), fija `kg_reales`, y cuando ya no queda ninguna salida del registro sin confirmar emite/entrega/confirma el **REC** con la suma de lo real; dentro de tolerancia concilia en cascada, fuera la deja en `albarans_conciliar`. Sin REC (venta/maquila pura) concilia la salida. Rechazos `22023`: `canalitzacio_inexistent`, `canalitzacio_anulada`, `sense_albara`, `ja_confirmada`, `kg_invalids`, `data_futura`, `foto_aliena`. Devuelve `{albara_id, albara, estat, rec, conciliat, fora_tolerancia, …}` |
+| `aprovar_certificat_ofertant(id, tipus)` · `aprovar_certificat_equip(id, tipus, nota)` (`20270419100000`) | **La revisión del certificado de donación** (fase 4 de la revisión del 08-10-2026, §6ter). `tipus` = `anual` (`cierres_donante`) o `periode` (`cierres_periodo`). La primera, el titular, por `cierres_donante_meus()`/`cierres_periodo_meus()` y con el permiso **antes** que la existencia; la segunda, `pot_aprovar()` con nota obligatoria (`cal_nota`). Las dos exigen `pendent_revisio` (`no_pendent_revisio`); la del titular, además, sin bloqueos (`certificat_bloquejat`). `certificat_revisio_snapshot()` es interna (sin EXECUTE para `authenticated`) |
 | `confirmar_part_assistida(…)` · `repartir_kg_linies(albaran, kg)` · `es_mobil(tel)` (`20270418100100`) | Internas de lo anterior. Las dos primeras **sin EXECUTE para `authenticated`** (el arnés lo vigila); `repartir_kg_linies` la usa también el webhook con `service_role` para repartir los kilos de WhatsApp entre las líneas (proporcional a lo previsto, residuo a la mayor) |
 | `registrar_confirmacion(enlace, payload, evidencia)` | **Solo `service_role`**, salvo **una sesión de equipo sobre un enlace `asistido`** (desde `20270418100100`, la usa `confirmar_recollida()`): una función, un camino. Usa SQLSTATE `PT404`/`PT409`/`PT410`, que PostgREST traduce a HTTP sin que la Edge Function traduzca nada. ⚠️ **Desde `20270414100000` un OPE lo confirman las DOS partes**: solo pasa a `confirmado` cuando confirma la última parte con enlace vivo (otro `rol_parte`, no usado, `activo` y no caducado); si solo hay un enlace —ficha sin correo— o el de la otra parte caducó o se revocó, pasa a `confirmado` como en REC/ENT. Los kg de la línea los fija la parte `recibe` (`entrega` solo escribe si `recibe` aún no confirmó); se conserva el rechazo más grave (`total` > `parcial` > `cap`) con los motivos encadenados; una parte que ya confirmó recibe `PT409`. En REC y ENT no cambia nada |
 | `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
@@ -3075,6 +3076,38 @@ Migraciones `20270418100000` (`albaran_datos` v2 y el neto del REC en la propues
   su entrega desde «Pendent de tu»).
 - ⚠️ **Queda para después**: la plantilla de Meta para preguntar fuera de la ventana, y el texto
   legal del REC validado por la asesoría (§12.71).
+
+### Revisión del cliente del 08-10-2026 — fase 4: el certificado se revisa antes de firmarse (11-10-2026)
+
+Migración `20270419100000`. Hasta hoy emitir el certificado de donación ERA firmarlo (la emisión
+estampa la firma de la apoderada) y el donante no veía nada antes. Ahora hay un paso en medio:
+
+- **`revisio_estat`** en `cierres_donante` y `cierres_periodo` (`pendent_revisio` →
+  `aprovat_ofertant` | `aprovat_equip`), **un eje aparte de `estado`**, que no se toca. Lo pone un
+  trigger: el anual cuando el cierre pasa a `tancat` y el donante tiene kilos y valor sin
+  bloqueos; el a demanda al calcularse. Si un recálculo cambia los kilos o el valor de uno ya
+  aprobado, **vuelve a «per revisar»**. Al entrar en revisión, aviso `certificat_per_revisar` al
+  donante (campana y correo; `avisos.objecte_tipo` admite `cierre_donante` y `cierre_periodo`).
+  ⚠️ El aviso va en un trigger `after update` **a secas**: `update of revisio_estat` no salta
+  cuando quien pone la columna es el trigger BEFORE.
+- **El donante aprueba** desde «Els meus certificats» (`components/documents/RevisioCertificat`,
+  en ámbar: le toca a él) con `aprovar_certificat_ofertant()`; **el equipo puede aprobar en su
+  nombre** con una nota (`aprovar_certificat_equip()`, `pot_aprovar()`), en `TancamentDetall`
+  («Aprova en nom del donant») y en el diálogo del certificado a demanda.
+- **En REAL, `emitir_certificado()`, `emitir_certificado_periodo()` y la tanda exigen la revisión
+  (`22023 sense_revisio`; la tanda lo salta con ese código) y que firme el `super_admin`**
+  (`42501`; el botón pasa a «Signa i emet»). **En prueba no se exige nada**: el ensayo se recorre
+  entero como antes.
+- **El PDF del CD imprime la revisión**: «Xifres revisades i aprovades pel donant el …» o
+  «aprovades per l'equip … en nom del donant (persona, data): nota» (`datos.revisio`, que añade
+  `certificat_revisio_snapshot()`; lo emitido antes no la lleva y no imprime nada).
+- «Els meus certificats» del productor y los documentos del receptor estrenan títulos con icono
+  (`components/documents/TitolSeccio`). Veure / Descarrega ya estaban.
+- ⚠️ **Corregido de paso**: la fase 3 había sobrescrito `crec.title`, `crec.desc` y `crec.err_kg`
+  —son del CERTIFICADO DE RECEPCIÓN— con los textos de «Confirma la recollida». Esos pasan a
+  `recol.*` y los `crec.*` vuelven a su valor.
+- E2E `tests/e2e/certificats.e2e.ts` (clon, solo escritorio: toca el cierre de prueba compartido,
+  y lo deja como estaba con `reiniciar_cierre_prueba()`).
 
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
@@ -6721,8 +6754,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.277 pruebas en 51 ficheros** de Vitest: 1.276 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 3: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
+   Referencia: **1.280 pruebas en 51 ficheros** de Vitest: 1.279 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 4: +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
+   eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
    de `check:deno`). Tras la fase 2 eran **1.273 en 50**: 1.272 correctas y 1 saltada (11-10-2026,
    fase 2 de la revisión del 08-10-2026; tras la fase 1 eran 1.257: `tests/destiFinal.test.ts` y los casos
    nuevos de `procesOferta` y `textAvis`). Antes, **1.239 pruebas en 49 ficheros**: 1.238 correctas y **1 saltada a propósito** (07-10-2026,
@@ -6757,8 +6791,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.218/1.218 correctas y 26 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al
+   ✅ **Referencia HOY (clon local): 1.243/1.243 correctas y 24 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
+   porque las pruebas E2E dejan datos en el clon—; tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al
    equipo con uuid inventado, y las dos funciones internas sin EXECUTE: +16—; tras la fase 2 eran 1.202,
    tras la fase 2 —`operacio_detall`, `declinar_oferta` y `marcar_canvis_revisats`: +23—; tras
    la fase 1 eran 1.179, `20270416100000`/`100100`: +23 del destino final —`registrar_desti_final` denegada

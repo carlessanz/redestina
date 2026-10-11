@@ -761,7 +761,7 @@ export default function CanalitzacioDetall() {
                                 size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
                                 onClick={() => void obreRecollida(a.id)}
                               >
-                                {t('crec.btn')}
+                                {t('recol.btn')}
                               </Button>
                             )}
                             <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">

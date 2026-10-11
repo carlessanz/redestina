@@ -14,14 +14,14 @@ import { supabase } from './supabase'
 export type TipusAvis =
   | 'oferta_validada' | 'oferta_rebutjada' | 'sortida_trobada' | 'interes_aprovat' | 'interes_rebutjat'
   | 'oferta_sense_desti' | 'recollida_canviada' | 'kg_assignats_canviats' | 'recollida_confirmada'
-  | 'oferta_modificada' | 'oferta_enviada'
+  | 'oferta_modificada' | 'oferta_enviada' | 'certificat_per_revisar'
 
 export interface Avis {
   id: string
   destinatari_tipo: 'productor' | 'entidad'
   destinatari_id: string
   tipus: TipusAvis
-  objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion'
+  objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion' | 'cierre_donante' | 'cierre_periodo'
   objecte_id: string
   params: Record<string, unknown>
   llegit_at: string | null
@@ -73,6 +73,8 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
   let interessos = 0
   for (const a of llista) {
     if (a.llegit_at) continue
+    // Los certificados por revisar no son de ninguna oferta: solo suenan en la campana.
+    if (a.objecte_tipo === 'cierre_donante' || a.objecte_tipo === 'cierre_periodo') continue
     if (a.destinatari_tipo === 'productor') ofertes++
     else interessos++
   }
@@ -83,6 +85,8 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
 export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'>): string {
   // `oferta_resposta` y `canalizacion` (una entrega sin interés previo, fase 2 del 08-10-2026)
   // son del receptor: van a «Els meus interessos».
+  // Un certificado por revisar (fase 4) va a «Els meus certificats» del productor.
+  if (a.objecte_tipo === 'cierre_donante' || a.objecte_tipo === 'cierre_periodo') return '/productor/documents'
   return a.objecte_tipo === 'excedente' ? `/productor/ofertes/${a.objecte_id}` : '/receptor/interessos'
 }
 
@@ -102,6 +106,8 @@ export function varsAvis(a: Pick<Avis, 'params'>): Record<string, string | numbe
     kg_abans: fmt(p.kg_abans),
     // «10/10 · 10:00» en hora de Madrid, como en el correo (`_shared/textAvis.ts`).
     quan: quanAvis(p.recollida_at),
+    exercici: String(p.exercici ?? ''),
+    valor: new Intl.NumberFormat('ca-ES', { style: 'currency', currency: 'EUR' }).format(Number(p.valor ?? 0)),
   }
 }
 

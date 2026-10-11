@@ -39,6 +39,8 @@ import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import Bloquejos from './Bloquejos'
 import { bloquejaProvisionals } from '../../lib/canalitzacio'
+import { supabase } from '../../lib/supabase'
+import { useAppContext } from '../../hooks/useAppContext'
 import type { BloqueigCierre } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -64,6 +66,8 @@ interface Calcul {
   /** Solo en recepción: el desglose que da sentido a sumar donación y compra en un papel. */
   kg_donacio?: number
   kg_compra?: number
+  /** Fase 4: solo en la donación. En REAL no se firma sin la revisión del donante. */
+  revisio_estat?: string | null
 }
 
 const PERFIL = {
@@ -107,6 +111,9 @@ export default function DialegCertificatPeriode(
   const [hasta, setHasta] = useState(hoy)
   const [calcul, setCalcul] = useState<Calcul | null>(null)
   const [ocupat, setOcupat] = useState(false)
+  const [nota, setNota] = useState('')
+  const { ctx } = useAppContext()
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   // Cambiar una fecha invalida el cálculo: si no, se emitiría una ventana distinta de la
   // que el equipo está viendo en pantalla.
@@ -156,14 +163,30 @@ export default function DialegCertificatPeriode(
     onTancar()
   }
 
+  /** El equipo aprueba en nombre del donante, con nota (se imprime en el certificado). */
+  async function aprovaEnNom() {
+    if (!calcul) return
+    setOcupat(true)
+    const { error } = await supabase.rpc('aprovar_certificat_equip', { p_id: calcul.id, p_tipus: 'periode', p_nota: nota })
+    setOcupat(false)
+    if (error) { toast.error(textError(t, { missatge: error.message, codi: error.code })); return }
+    toast.success(t('tan.rev_ok'))
+    setCalcul({ ...calcul, revisio_estat: 'aprovat_equip' })
+  }
+
   const senseKg = calcul !== null && Number(calcul.kg_total) <= 0
+  // Fase 4 (solo donación y en REAL): sin revisión no se firma, y firma el super_admin.
+  const senseRevisio = tipus === 'productor' && modo === 'real' && calcul !== null
+    && calcul.revisio_estat !== 'aprovat_ofertant' && calcul.revisio_estat !== 'aprovat_equip'
   const motiuEmetre = !calcul
     ? t('cdp.why_calc_first')
     : bloqueja(calcul.bloqueos)
       ? t('tan.why_blocked')
       : senseKg
         ? t('cdp.why_no_kg')
-        : bloquejaProvisionals(provisionals, modo) ? t('tan.why_provisional') : undefined
+        : bloquejaProvisionals(provisionals, modo) ? t('tan.why_provisional')
+          : senseRevisio ? t('tan.why_sense_revisio')
+            : tipus === 'productor' && modo === 'real' && !esSuperAdmin ? t('tan.why_super_admin') : undefined
 
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
@@ -233,6 +256,17 @@ export default function DialegCertificatPeriode(
                   })}
             </p>
             <Bloquejos llista={calcul.bloqueos} />
+            {senseRevisio && calcul.revisio_estat === 'pendent_revisio' && (
+              <div className="space-y-2 border-t pt-2">
+                <p className="text-sm text-muted-foreground">{t('cdp.rev_hint')}</p>
+                <Label htmlFor="cdp-nota">{t('tan.f_rev_nota')}</Label>
+                <Input id="cdp-nota" value={nota} onChange={(e) => setNota(e.target.value)} />
+                <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+                  disabled={ocupat || nota.trim() === ''} onClick={() => void aprovaEnNom()}>
+                  {t('tan.a_rev_equip')}
+                </Button>
+              </div>
+            )}
           </div>
         )}
 

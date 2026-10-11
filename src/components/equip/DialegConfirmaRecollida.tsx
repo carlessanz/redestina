@@ -70,7 +70,7 @@ export default function DialegConfirmaRecollida(
   const diferencia = kgValid && kgAssignats != null ? Math.round((kgNum - kgAssignats) * 100) / 100 : 0
 
   const confirma = async () => {
-    if (!kgValid) { setError(t('crec.err_kg')); return }
+    if (!kgValid) { setError(t('recol.err_kg')); return }
     setOcupat(true)
     setError(null)
     const r = await confirmarRecollida({
@@ -88,12 +88,12 @@ export default function DialegConfirmaRecollida(
       const p = await pujarDocumentExtern({
         fitxer: foto, objecteTipus: 'albaran', objecteId: r.data.albara_id, tipus: 'foto_incidencia',
       })
-      if (!p.ok) toast.warning(`${t('crec.foto_no')} ${t(p.motiuKey)}`)
+      if (!p.ok) toast.warning(`${t('recol.foto_no')} ${t(p.motiuKey)}`)
     }
     setOcupat(false)
-    if (r.data.conciliat) toast.success(t('crec.ok_conciliat', { num: r.data.albara ?? '' }))
-    else if (r.data.fora_tolerancia) toast.warning(t('crec.ok_fora', { num: r.data.albara ?? '' }))
-    else toast.success(t('crec.ok', { num: r.data.albara ?? '' }))
+    if (r.data.conciliat) toast.success(t('recol.ok_conciliat', { num: r.data.albara ?? '' }))
+    else if (r.data.fora_tolerancia) toast.warning(t('recol.ok_fora', { num: r.data.albara ?? '' }))
+    else toast.success(t('recol.ok', { num: r.data.albara ?? '' }))
     void refrescaComptadors()
     onFet?.()
     onTancar()
@@ -106,41 +106,41 @@ export default function DialegConfirmaRecollida(
         onInteractOutside={(e) => e.preventDefault()}
       >
         <DialogHeader>
-          <DialogTitle>{t('crec.title')}</DialogTitle>
-          <DialogDescription>{descripcio ? `${descripcio}. ` : ''}{t('crec.desc')}</DialogDescription>
+          <DialogTitle>{t('recol.title')}</DialogTitle>
+          <DialogDescription>{descripcio ? `${descripcio}. ` : ''}{t('recol.desc')}</DialogDescription>
         </DialogHeader>
 
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
           <div className="space-y-1.5">
-            <Label htmlFor="crec-kg">{t('crec.kg')}</Label>
+            <Label htmlFor="crec-kg">{t('recol.kg')}</Label>
             <Input id="crec-kg" inputMode="decimal" value={kg} onChange={(e) => setKg(e.target.value)} />
             {kgAssignats != null && (
               <p className={diferencia !== 0 ? 'text-xs text-aviso' : 'text-xs text-muted-foreground'}>
                 {diferencia !== 0
-                  ? t('crec.diferencia', { assignats: kgAssignats, dif: diferencia > 0 ? `+${diferencia}` : diferencia })
-                  : t('crec.assignats', { assignats: kgAssignats })}
+                  ? t('recol.diferencia', { assignats: kgAssignats, dif: diferencia > 0 ? `+${diferencia}` : diferencia })
+                  : t('recol.assignats', { assignats: kgAssignats })}
               </p>
             )}
           </div>
           <div className="space-y-1.5">
-            <Label htmlFor="crec-data">{t('crec.data')}</Label>
+            <Label htmlFor="crec-data">{t('recol.data')}</Label>
             <Input id="crec-data" type="datetime-local" value={data} onChange={(e) => setData(e.target.value)} />
-            {!esborrany && <p className="text-xs text-muted-foreground">{t('crec.data_ja_emes')}</p>}
+            {!esborrany && <p className="text-xs text-muted-foreground">{t('recol.data_ja_emes')}</p>}
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="crec-obs">{t('crec.obs')}</Label>
+            <Label htmlFor="crec-obs">{t('recol.obs')}</Label>
             <Textarea id="crec-obs" rows={3} value={obs} onChange={(e) => setObs(e.target.value)}
-              placeholder={t('crec.obs_ph')} />
+              placeholder={t('recol.obs_ph')} />
           </div>
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="crec-foto">{t('crec.foto')}</Label>
+            <Label htmlFor="crec-foto">{t('recol.foto')}</Label>
             <Input id="crec-foto" type="file" accept="image/jpeg,image/png,application/pdf"
               onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
           </div>
         </div>
 
         {esborrany && (
-          <p className="rounded-md bg-aviso-fondo px-3 py-2 text-sm text-aviso">{t('crec.avis_numeracio')}</p>
+          <p className="rounded-md bg-aviso-fondo px-3 py-2 text-sm text-aviso">{t('recol.avis_numeracio')}</p>
         )}
         {error && <p role="alert" className="text-sm text-error">{error}</p>}
 
@@ -148,7 +148,7 @@ export default function DialegConfirmaRecollida(
           <Button variant="outline" onClick={onTancar} disabled={ocupat}>{t('c.cancel')}</Button>
           <Button onClick={confirma} disabled={ocupat || !kgValid}>
             {ocupat && <Loader2 className="animate-spin" />}
-            {t('crec.go')}
+            {t('recol.go')}
           </Button>
         </DialogFooter>
       </DialogContent>

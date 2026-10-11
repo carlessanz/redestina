@@ -590,6 +590,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Confirmar la recogida (20270418100100, fase 3): solo el equipo, y el permiso va antes
   // que la existencia. Las funciones internas del reparto no las ejecuta nadie con sesión.
   { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és de l'equip)" },
+  // La revisión del certificado (20270419100000, fase 4): un externo solo aprueba lo suyo
+  // (permiso antes que existencia: id inventado → 42501), y nunca en nombre de otro.
+  { tabla: "aprovar_certificat_ofertant", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual" }, descripcion: "NO aprova un certificat que no és seu" },
+  { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova cap certificat en nom d'un altre (és de l'equip)" },
+  { tabla: "certificat_revisio_snapshot", op: "rpc", esperado: "denegar", args: { p_estat: null, p_at: null, p_per: null, p_nota: null }, descripcion: "NO executa el snapshot intern de la revisió" },
   { tabla: "confirmar_part_assistida", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_observacions: null, p_foto: null, p_data: null }, descripcion: "NO confirma cap part d'un albarà (funció interna)" },
   { tabla: "cierres_ejercicio", op: "leer", esperado: "denegar", descripcion: "NO ve los cierres de ejercicio" },
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
@@ -1189,6 +1194,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // «Confirma la recollida»: el equipo, con sesión (id inventado → 22023, la guarda deja
     // pasar). En positivo se prueba en el E2E del clon: consume numeración legal.
     { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: un técnico, no.
+    { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova certificats en nom del donant (és de pot_aprovar)" },
     { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
     { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» en nom d'una entitat" },
@@ -1396,6 +1403,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // Aprobar un certificado en nombre del donante (fase 4): id inventado → 22023.
+    { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "aprova un certificat en nom del donant (id inventat → 22023)" },
     // --- CHECK GLOBAL del catálogo (20270414101000) ---
     // No mira una función: mira TODAS las de `public`. Falla si alguna `security definer`
     // (no de trigger) es ejecutable por `anon`, o si alguna de trigger lo es por `anon` o

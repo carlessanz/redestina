@@ -17,12 +17,13 @@ export type TipusAvis =
   | "kg_assignats_canviats"
   | "recollida_confirmada"
   | "oferta_modificada"
-  | "oferta_enviada";
+  | "oferta_enviada"
+  | "certificat_per_revisar";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
-  "oferta_modificada", "oferta_enviada",
+  "oferta_modificada", "oferta_enviada", "certificat_per_revisar",
 ];
 
 /** A quién va el aviso: decide el enlace de los que reciben las dos partes (fase 2). */
@@ -132,6 +133,21 @@ export function textAvis(
         boton: botoParts,
         ruta: rutaParts,
       };
+    case "certificat_per_revisar": {
+      // Fase 4 de la revisión del 08-10-2026: el certificado se revisa antes de firmarse.
+      const any = s(params.exercici);
+      const euros = new Intl.NumberFormat(es ? "es-ES" : "ca-ES", { style: "currency", currency: "EUR" })
+        .format(Number(params.valor ?? 0));
+      return {
+        asunto: es ? `Revisa tu certificado de donación ${any}` : `Revisa el teu certificat de donació ${any}`,
+        titulo: es ? "Certificado por revisar" : "Certificat per revisar",
+        cuerpo: es
+          ? `Tenemos preparado tu certificado de donación ${any}: ${kg(params.kg, idioma)} kg, con un valor de ${euros}.\nRevísalo y apruébalo; después lo firmaremos y te lo enviaremos.`
+          : `Tenim preparat el teu certificat de donació ${any}: ${kg(params.kg, idioma)} kg, amb un valor de ${euros}.\nRevisa’l i aprova’l; després el signarem i te l’enviarem.`,
+        boton: es ? "Revisar el certificado" : "Revisar el certificat",
+        ruta: "/productor/documents",
+      };
+    }
     case "oferta_enviada":
       return {
         asunto: es ? `Una oferta para ti: ${producte}` : `Una oferta per a tu: ${producte}`,
