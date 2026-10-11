@@ -13,7 +13,7 @@
 import {
   Apple, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, Inbox, LayoutDashboard, Leaf, Receipt,
-  MessageSquare, Package, PlusCircle, Settings2, Sprout, Store, Truck, Users, Workflow,
+  MessageSquare, Package, PlusCircle, Settings2, ShieldCheck, Sprout, Store, Truck, Users, Workflow,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
@@ -121,6 +121,8 @@ const EQUIP: NavGrup[] = [
       // como su convenio. `barra: false` por el mismo motivo que el resto del equipo: son
       // ocho secciones y la barra de móvil admite cuatro (§2).
       { to: '/equip/diagnostics', labelKey: 'nav.diagnostics', icon: ClipboardList, barra: false },
+      // El Pla de Prevenció como expediente (fase 11): un servicio, aparte del diagnóstico.
+      { to: '/equip/plans', labelKey: 'nav.plans', icon: ShieldCheck, barra: false },
     ],
   },
   {
@@ -180,6 +182,8 @@ export const ORGANITZACIO: NavGrup[] = [
       // lo mismo que la ficha: una organización es una, y sus papeles son un detalle suyo
       // — con doble rol son dos diagnósticos, pero se entra por un solo sitio.
       { to: '/organitzacio/diagnostic', labelKey: 'nav.my_diagnostic', icon: ClipboardList, barra: false, paper: 'productor' },
+      // El expediente de prevención, en solo lectura (fase 11): sección DISTINTA del diagnóstico.
+      { to: '/organitzacio/pla', labelKey: 'nav.my_pla', icon: ShieldCheck, barra: false, paper: 'productor' },
       // «El meu perfil de recepció» (fase 9): lo que el receptor necesita y puede recibir.
       // Sustituye a su diagnóstico, que ya no existe.
       { to: '/organitzacio/perfil-recepcio', labelKey: 'nav.perfil_recepcio', icon: Inbox, barra: false, paper: 'entidad' },

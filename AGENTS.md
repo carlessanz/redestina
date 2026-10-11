@@ -170,7 +170,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `plantilla_mensaje` (tabla) | plantillas en código (`plantillas-meta.md`, `plantillas.ts`) | 🟡 |
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
-| `diagnostico`/`plan_prevencion`/`plan_revision` | **Diagnòstic operatiu** del productor (v2, ficha viva con `diagnostics_historial`, 11-10-2026); el receptor ya no tiene diagnóstico, tiene «El meu perfil de recepció». `planes_prevencion` con su PDF lo prepara **solo el equipo**; el expediente de prevención es la fase 11 | 🟡 |
+| `diagnostico`/`plan_prevencion`/`plan_revision` | **Diagnòstic operatiu** del productor (v2, ficha viva con `diagnostics_historial`, 11-10-2026); el receptor ya no tiene diagnóstico, tiene «El meu perfil de recepció». El **Pla de Prevenció es un expediente** (`expedients_prevencion` + visitas, procesos, cuantificación, objetivos, acciones, seguimiento trimestral y verificación anual; PDF `PLA` versionado, 12-10-2026); estructura provisional hasta el modelo PPPMA | 🟡 |
 | `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |
@@ -582,6 +582,7 @@ src/
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia por secciones, escrita por RPC con lista blanca (§6ter)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
+  routes/PlaOrganitzacio.tsx   «El meu pla de prevenció», solo lectura (fase 11, §6ter)
   routes/equip/                Canalitzacio[Detall] (el ciclo guiado, §6ter) +
                                envoltorios de las pantallas que ya existían + Aprovacions
                                + Documents (bandeja documental: 6 pestanyes, amb Enviaments)
@@ -730,6 +731,7 @@ src/
     PlaPrevencio.tsx           Las medidas por bloque, la edición del equipo y la emisión
     TargetaDiagnostic.tsx      El estado y el botón, en la ficha y en el panel externo
     TargetaPerfilRecepcio.tsx  La tarjeta que lleva al perfil de recepción del receptor (fase 9)
+    expedient/                 ExpedientVista y TaulaElements: el Pla de Prevenció como expediente (fase 11)
     AvisDiagnostic.tsx         La banda, en tono aviso: el diagnóstico NO bloquea operar
     equip/EditorDiagnostic.tsx El cuestionario, las medidas y las reglas, desde Configuració
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, el botón de separarla y
@@ -3247,6 +3249,42 @@ Migración `20270422100000`.
   producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`; el envío real, a probar con un
   número de prueba en producción.
 - E2E `tests/e2e/tauler.e2e.ts` (clon, escritorio).
+
+### Revisión del cliente del 08-10-2026 — fase 11: el Pla de Prevenció como expediente (12-10-2026)
+
+Migración `20270425100000`. La Fundació (§7): «hauria de funcionar com un expedient de seguiment de
+l'empresa, no com un únic formulari», en una sección DISTINTA de «El meu diagnòstic». Recorrido:
+diagnòstic → visita tècnica → quantificació → anàlisi de causes → pla d'accions → seguiment trimestral →
+verificació anual.
+
+- **Tablas**: `expedients_prevencion` (uno no cerrado por organización; nivel, estado
+  `obert`→`en_seguiment`→`verificat`→`tancat`, técnico, contexto, objetivos estratégicos, equipo, el plan
+  básico enlazado y su numeración `PLA`) y siete hijas: `pla_visites`, `pla_processos` (con puntos
+  críticos), `pla_quantificacio` (mes, producto, categoría `perdua|excedent|residu`, kg, destino, causa,
+  fuente `manual|redestina`), `pla_objectius`, `pla_accions`, `pla_seguiments` (`AAAA-Tn`) y
+  `pla_verificacions`. Lectura: equipo y la propia organización (`expedients_meus()`); **sin GRANT de
+  escritura**. Solo productores (`obrir_expedient` rechaza entidades: fase 9).
+- **RPC**: `obrir_expedient`, `verificar_expedient`, `tancar_expedient` y `exportar_expedient` son de
+  `pot_aprovar()`; `desar_expedient`, `desar_element_expedient` (genérica sobre la lista blanca
+  `columnes_element_expedient`, tipada con `jsonb_populate_record`), `esborrar_element_expedient` y
+  `volcar_quantificacio_redestina` del equipo. Un expediente `tancat` ya no se edita. Job
+  **`quantificacio-expedients`** (`15 5 1 * *`, `volcar_quantificacio_expedients()`, solo servidor): el
+  mes anterior de cada expediente abierto, desde canalizaciones conciliadas y `excedente_destins`.
+- **Evidencias**: `documentos_externos` con `objeto_tipo = 'expedient'` y `tipo = 'evidencia'`
+  (`subir-documento-externo` y `puc_veure_document_extern` las conocen; solo sube el equipo).
+- **Exportar**: `documentos` tipo `PLA` con `objeto_tipo = 'expedient'` (nuevo en el CHECK, en
+  `trg_documentos_objeto_existe`, `ruta_documento` y `documents_meus`), numerado en la serie `PLA` la
+  primera vez y versionado después; snapshot de `expedient_datos()` (`format: 'expedient'`, solo
+  servidor). `generar-documento` lo pinta con **`render/expedient.ts`** cuando `datos.format` es
+  `expedient` (el plan básico sigue con `render/pla.ts`). La comparativa anual y el avance de acciones
+  viven en `_shared/expedient.ts` con su copia `src/lib/expedient.ts` (`tests/expedient.test.ts` exige
+  que den lo mismo). ⚠️ Estructura **provisional** hasta el modelo PPPMA: el PDF lo dice.
+- **Pantallas**: `/equip/plans` (lista y «Obre l'expedient») y `/equip/plans/:id`
+  (`components/expedient/ExpedientVista` + `TaulaElements`, por pestañas); `/organitzacio/pla` («El meu pla
+  de prevenció», solo lectura, `paper: 'productor'`).
+- ⚠️ **Publicar**: redesplegar `generar-documento` (renderizador) y `subir-documento-externo`
+  (evidencias). Deuda **140**: el borrado de fichas no conoce los expedientes.
+- E2E `tests/e2e/pla-prevencio.e2e.ts` (clon, escritorio): abre, llena, exporta y la productora lo lee.
 
 ### Revisión del cliente del 08-10-2026 — fase 10: «El meu impacte» (11-10-2026)
 
@@ -6221,6 +6259,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **12-10-2026 (fases 8-11 de la revisión del 08-10-2026): se cerró la 130** (fase 8) **y se abre la
+140** (el borrado de una ficha no conoce los expedientes de prevención): siguen **53 vivas** y la siguiente
+entrada nueva es la 141.
 ⚠️ **11-10-2026: se cierra la 106** (`cerrada` ya la escribe alguien, fase 1 de la revisión del 08-10-2026): **53 vivas** y la siguiente entrada nueva sigue siendo la 140.
 ⚠️ **07-10-2026 (revisión completa): se abren la 131-139** —cinco son decisiones de producto o de
 política, no defectos (131, 132, 133, 134, 137)—: **54 vivas** (45 + 9; el recuento por `grep` no es fiable
@@ -6770,6 +6811,12 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      neto solo a las líneas de donación, así que podría inflarse. Lo señaló el trazado de flujos desde el
      código; no está reproducido en el clon. Reproducir antes de tocar nada.
 
+140. **`borrar_ficha_completa()` y `bloqueigs_esborrat_fitxa()` no conocen los expedientes de prevención**
+     (fase 11, `20270425100000`). La FK `expedients_prevencion.productor_id` es `restrict` a propósito: un
+     expediente con su PDF emitido es documentación. Hoy borrar una ficha con expediente falla con `23503`
+     (la «última red» de §4) en vez de con `bloqueig_esborrat: expedients` y su motivo. Arreglo: rama
+     `expedients` en las dos funciones (bloquea si tiene `numero_completo`; si no, arrastra el expediente).
+
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -6951,8 +6998,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.311 pruebas en 55 ficheros** de Vitest: 1.310 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 10: `tests/impacte.test.ts` y las claves `imp.mod_*`; tras la fase 9 eran 1.304, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
+   Referencia: **1.319 pruebas en 56 ficheros** de Vitest: 1.318 correctas y **1 saltada a propósito**
+   (12-10-2026, fase 11: `tests/expedient.test.ts` y las claves `exp.*` compuestas; tras la fase 10 eran
+   1.311, fase 10: `tests/impacte.test.ts` y las claves `imp.mod_*`; tras la fase 9 eran 1.304, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
    tras la fase 8 eran 1.294, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
@@ -6991,8 +7039,8 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.374/1.374 correctas y 29 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
+   ✅ **Referencia HOY (clon local): 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»**
+   (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
    datos» nuevas son la lectura del historial por el equipo, que no tiene fixture—; tras la fase 8
    eran 1.319, tras la fase 8 —`kpis_equip`: +8—; tras la fase 7 eran 1.311, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5

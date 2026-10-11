@@ -684,6 +684,8 @@ export type DocumentExternObjecte =
   | 'albaran' | 'cierre_donante' | 'convenio'
   /** Archivo de la organización: cuelga de la FICHA, no de una operación */
   | 'productor' | 'entidad'
+  /** Evidencias del expediente de prevención (fase 11) */
+  | 'expedient'
 
 export type DocumentExternTipus =
   | 'albaran_productor' | 'factura' | 'foto_incidencia'
@@ -693,6 +695,8 @@ export type DocumentExternTipus =
   | 'certificat_previ'
   /** Plan de prevención hecho fuera de la plataforma */
   | 'pla_previ'
+  /** Evidencia de una visita, una acción o un seguimiento del Pla de Prevenció (fase 11) */
+  | 'evidencia'
   | 'altre'
 
 export interface DocumentoExterno {

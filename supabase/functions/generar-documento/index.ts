@@ -43,6 +43,7 @@ import { renderCd } from "../_shared/pdf/render/cd.ts";
 import { renderCt } from "../_shared/pdf/render/ct.ts";
 import { renderCr } from "../_shared/pdf/render/cr.ts";
 import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
+import { type DatosExpedient, renderExpedient } from "../_shared/pdf/render/expedient.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
 import { enviaDocument } from "../_shared/envia-document.ts";
@@ -495,6 +496,15 @@ async function renderizar(
   // El plan de prevención (fase 5). No lleva firma ni envío: `plan_emet_document()` deja
   // `documentos.envio` a null a propósito, porque el plan se descarga —el panel lo espera
   // por polling—, no se manda por correo.
+  // El EXPEDIENTE de prevención (fase 11): mismo tipo `PLA`, otro snapshot. Lo decide el
+  // `format` del dato, no el tipo, para que el plan básico siga saliendo igual.
+  if (doc.tipo === "PLA" && (datos as { format?: string }).format === "expedient") {
+    return await renderExpedient(activos, {
+      datos: datos as unknown as DatosExpedient,
+      sha256Datos: doc.sha256_datos,
+      modo: doc.modo === "prueba" ? "prueba" : "real",
+    }, doc.idioma);
+  }
   if (doc.tipo === "PLA") {
     return await renderPla(activos, {
       datos: datos as DatosPlan,

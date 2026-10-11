@@ -665,6 +665,15 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte (cataleg)", requiereFixture: "els factors sembrats (20270424100000)" },
   { tabla: "factors_impacte", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap factor d'impacte" },
   { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa cap factor d'impacte" },
+  // Fase 11 (20270425100000): el expediente de prevención lo lleva el equipo. Sin GRANT de
+  // escritura para nadie; las RPC cortan antes de mirar si el expediente existe.
+  { tabla: "expedients_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea cap expedient de prevencio a ma" },
+  { tabla: "pla_visites", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap visita del pla a ma" },
+  { tabla: "obrir_expedient", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO obre cap expedient de prevencio" },
+  { tabla: "desar_element_expedient", op: "rpc", esperado: "denegar", args: { p_taula: "pla_visites", p_expedient: "00000000-0000-0000-0000-000000000000", p_id: null, p_dades: {} }, descripcion: "NO escriu cap element d'un expedient" },
+  { tabla: "exportar_expedient", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta cap pla de prevencio" },
+  { tabla: "verificar_expedient", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_any: 2026, p_resum: "x", p_conclusio: "x" }, descripcion: "NO verifica cap expedient" },
+  { tabla: "volcar_quantificacio_expedients", op: "rpc", esperado: "denegar", descripcion: "NO llança el bolcat mensual (nomes el servidor)" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
   // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
   //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su
@@ -1232,6 +1241,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
     // Fijar un factor es del super_admin: un técnico, no.
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa els factors d'impacte (super_admin)" },
+    // El expediente: el día a día es del equipo (uuid inventado → 22023); abrir, verificar y
+    // exportar es de `pot_aprovar()`, así que un técnico no.
+    { tabla: "desar_element_expedient", op: "rpc", esperado: "permitir", args: { p_taula: "pla_visites", p_expedient: "00000000-0000-0000-0000-000000000000", p_id: null, p_dades: {} }, descripcion: "pot escriure els elements d'un expedient (22023 si no existeix)" },
+    { tabla: "volcar_quantificacio_redestina", op: "rpc", esperado: "permitir", args: { p_expedient: "00000000-0000-0000-0000-000000000000", p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "pot importar la quantificacio de Redestina (22023 si no existeix)" },
+    { tabla: "obrir_expedient", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO obre expedients (es de l'admin)" },
+    { tabla: "exportar_expedient", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta el pla (es de l'admin)" },
+    { tabla: "expedients_prevencion", op: "leer", esperado: "permitir", descripcion: "veu els expedients de prevencio", requiereFixture: "algun expedient obert (fase 11)" },
     // Un papel nuevo lo pide el TITULAR; el equipo, no (lo aprueba después).
     { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix papers en nom d'una organització" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
@@ -1440,6 +1456,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // Abrir, verificar y exportar un expediente: uuid inventado → 22023 (la guarda dejó pasar).
+    { tabla: "obrir_expedient", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot obrir un expedient (22023 si la fitxa no existeix)" },
+    { tabla: "exportar_expedient", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot exportar el pla (22023 si no existeix)" },
+    { tabla: "verificar_expedient", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_any: 2026, p_resum: "x", p_conclusio: "x" }, descripcion: "pot verificar un expedient (22023 si no existeix)" },
     // El super_admin fija los factores. Código inventado → 22023 factor_inexistent: la guarda dejó pasar.
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "permitir", args: { p_codi: "x", p_valor: 1 }, descripcion: "pot fixar els factors d'impacte (22023 si el codi no existeix)" },
     // Aprobar un certificado en nombre del donante (fase 4): id inventado → 22023.

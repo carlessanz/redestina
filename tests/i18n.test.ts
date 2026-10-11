@@ -153,6 +153,11 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
   const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
     // El reparto por modalidad de «El meu impacte» (fase 10, `ImpacteBloc`).
     { que: 'modalidades del impacto', prefijo: 'imp.mod_', valores: ['donacio', 'venda', 'maquila'] },
+    // El expediente de prevención (fase 11): los CHECK de sus tablas, compuestos en la vista.
+    { que: 'expedients_prevencion.estat', prefijo: 'exp.estat_', valores: ['obert', 'en_seguiment', 'verificat', 'tancat'] },
+    { que: 'pla_visites.tipus', prefijo: 'exp.visita_', valores: ['diagnosi', 'seguiment', 'verificacio', 'altres'] },
+    { que: 'pla_accions.estat', prefijo: 'exp.accio_', valores: ['pendent', 'en_curs', 'feta', 'descartada'] },
+    { que: 'pla_quantificacio.categoria', prefijo: 'exp.cat_', valores: ['perdua', 'excedent', 'residu'] },
     {
       // CHECK de `avisos.tipus` (ampliado en 20270416100000 y 20270417100100). Se compone en
       // `CampanaAvisos.tsx` (`avis.t_${tipus}`): el caso `od.ch_asistido` exacto —un tipo nuevo
@@ -186,7 +191,7 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       prefijo: 'orgdoc.t_',
       valores: [
         'albaran_productor', 'factura', 'foto_incidencia',
-        'conveni_signat', 'certificat_previ', 'pla_previ', 'altre',
+        'conveni_signat', 'certificat_previ', 'pla_previ', 'evidencia', 'altre',
       ],
     },
     {

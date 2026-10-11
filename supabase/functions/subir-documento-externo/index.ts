@@ -4,7 +4,7 @@
 //
 //   POST /subir-documento-externo   multipart/form-data   (JWT de la sesión)
 //     fitxer       (File)   pdf, jpg o png, hasta 10 MB
-//     objeto_tipo  'albaran' | 'cierre_donante' | 'convenio' | 'productor' | 'entidad'
+//     objeto_tipo  'albaran' | 'cierre_donante' | 'convenio' | 'productor' | 'entidad' | 'expedient'
 //     objeto_id    uuid
 //     tipo         'albaran_productor' | 'factura' | 'foto_incidencia'
 //                  | 'conveni_signat' | 'certificat_previ' | 'pla_previ' | 'altre'
@@ -71,7 +71,8 @@ const MIMES: Record<string, string> = {
 // El mismo vocabulario que el CHECK de `documentos_externos` (20270329100000). Se valida
 // aquí para poder responder un 400 con el campo señalado, no un 23514 crudo de Postgres;
 // la autoridad sigue siendo la base.
-const OBJETOS = ["albaran", "cierre_donante", "convenio", "productor", "entidad"];
+// `expedient` desde la fase 11: las evidencias del Pla de Prevenció (solo las sube el equipo).
+const OBJETOS = ["albaran", "cierre_donante", "convenio", "productor", "entidad", "expedient"];
 const TIPOS = [
   "albaran_productor",
   "factura",
@@ -79,6 +80,7 @@ const TIPOS = [
   "conveni_signat",
   "certificat_previ",
   "pla_previ",
+  "evidencia",
   "altre",
 ];
 
@@ -98,6 +100,7 @@ const MOTIU_FORBIDDEN: Record<string, string> = {
   convenio: "Aquest conveni no és teu",
   productor: "Només l'equip pot arxivar documentació d'una fitxa",
   entidad: "Només l'equip pot arxivar documentació d'una fitxa",
+  expedient: "Només l'equip pot afegir evidències al pla de prevenció",
 };
 
 function textNet(v: unknown): string {
@@ -342,6 +345,22 @@ Deno.serve(async (req) => {
     if (ejerciciDemanat) ejercicio = ejerciciDemanat;
     // `modo` se queda en 'real' a propósito: una ficha no tiene ensayo del que colgar, y
     // archivarla bajo `proves/` la pondría donde `reiniciar_cierre_prueba()` borra.
+  }
+
+  if (objetoTipo === "expedient") {
+    // El expediente de prevención (fase 11): existe y su año es el de las evidencias que se
+    // suben (lo dice quien sube, como en la ficha), o el actual.
+    const { data: exp, error: errExp } = await supabase
+      .from("expedients_prevencion")
+      .select("id")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errExp) {
+      console.error("subir-documento-externo: expedient:", errExp.message);
+      return responder({ error: "Error consultant l'expedient", code: "error_bd" }, 500);
+    }
+    if (!exp) return responder({ error: "Aquest expedient no existeix", code: "no_existeix" }, 404);
+    if (ejerciciDemanat) ejercicio = ejerciciDemanat;
   }
 
   // ------------------------------------------------------------------ subida

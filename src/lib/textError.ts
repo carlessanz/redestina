@@ -17,6 +17,9 @@ const CODIS: Record<string, string> = {
   sense_conveni: 'od.conv_blocked',
   // `desar_diagnostic()`, fase 9 de la revisión del 08-10-2026.
   massa_productes: 'diag.err_massa_productes',
+  // El expediente de prevención, fase 11.
+  ja_te_expedient: 'exp.err_ja_te',
+  expedient_tancat: 'exp.err_tancat',
   ubicacio_aliena: 'diag.err_ubicacio_aliena',
   // `cancelar_meva_oferta()` desde la fase 1 de la revisión del 08-10-2026.
   te_canalitzacions: 'po.err_te_canalitzacions',

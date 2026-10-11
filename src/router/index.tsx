@@ -51,6 +51,9 @@ import ProductorOfertaDetall from '../routes/productor/OfertaDetall'
 import LaMevaOrganitzacio from '../routes/LaMevaOrganitzacio'
 import Diagnostic from '../routes/Diagnostic'
 import PerfilRecepcio from '../routes/PerfilRecepcio'
+import PlaOrganitzacio from '../routes/PlaOrganitzacio'
+import Plans from '../routes/equip/Plans'
+import PlaDetall from '../routes/equip/PlaDetall'
 import ReceptorImpacte from '../routes/receptor/Impacte'
 import Diagnostics from '../routes/equip/Diagnostics'
 import DiagnosticDetall from '../routes/equip/DiagnosticDetall'
@@ -100,6 +103,12 @@ export const router = createBrowserRouter([
                 element: <Diagnostic />,
                 handle: { titleKey: 'nav.my_diagnostic' },
               },
+              // El Pla de Prevenció de la organización, en solo lectura (fase 11).
+              {
+                path: '/organitzacio/pla',
+                element: <PlaOrganitzacio />,
+                handle: { titleKey: 'nav.my_pla' },
+              },
               // «El meu perfil de recepció» (fase 9): las preferencias del receptor.
               {
                 path: '/organitzacio/perfil-recepcio',
@@ -146,6 +155,8 @@ export const router = createBrowserRouter([
                   // valida antes de llamar a nada, para que una URL a mano no acabe en un
                   // `22023` de la RPC.
                   { path: 'diagnostics/:tipus/:id', element: <DiagnosticDetall />, handle: { titleKey: 'nav.diagnostics' } },
+                  { path: 'plans', element: <Plans />, handle: { titleKey: 'nav.plans', ample: true } },
+                  { path: 'plans/:id', element: <PlaDetall />, handle: { titleKey: 'nav.plans', ample: true } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],
