@@ -38,7 +38,7 @@ test.describe('productor', () => {
   test('una oferta abierta se puede editar (sin guardar)', async ({ page }) => {
     await entra(page, 'productor')
     await page.goto('/productor/ofertes')
-    const obrir = page.getByRole('link').filter({ hasText: /E-|kg/ }).first()
+    const obrir = page.getByRole('link').filter({ hasText: /kg/ }).first()
     test.skip(!(await obrir.isVisible().catch(() => false)), 'Aquesta compte no té cap oferta')
     await obrir.click()
     const edita = page.getByRole('button', { name: /Edita l’oferta|Edita la oferta/ })

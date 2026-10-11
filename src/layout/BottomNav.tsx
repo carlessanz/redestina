@@ -74,7 +74,7 @@ export default function BottomNav({
                     català (14-09-2026): productor pedía 347 px y receptor 334; con
                     `min-w-0`, los dos piden 320. */}
                 <span className="w-full truncate px-0.5 text-center text-nav font-medium leading-none">
-                  {t(item.labelKey)}
+                  {t(item.labelBarraKey ?? item.labelKey)}
                 </span>
               </NavLink>
             </li>

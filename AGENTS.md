@@ -254,6 +254,12 @@ Consecuencias: una entrada que no quepa se marca **`barra: false`** en `NavItem`
 el menú lateral (hoy, «Nova oferta» en productor —cabe dentro de Inici— e
 «Històric» en receptor); y **cualquier etiqueta nueva o traducción más larga rompe la barra**, así
 que al añadir una hay que medirla, no estimarla.
+⚠️ **Cuando no cabe, etiqueta corta solo para la barra: `labelBarraKey`** (11-10-2026). «Excedents
+disponibles» (el Mercat, revisión del cliente del 08-10-2026) mide ~118 px en catalán y ~125 en
+castellano con Inter a 11 px, y a 360 px cada una de las tres celdas del receptor da 116: en la
+barra dice «Excedents» (`nav.market_barra`) y el menú lateral y el título conservan el nombre
+completo. Medido con la fuente del repo (`generar-documento/activos/Inter-*.ttf`, `pdf-lib`).
+`tests/cobertura.test.ts` vigila que esas claves existan.
 
 ✅ **Y por debajo de 360 px ya no rompe: lo arregla `min-w-0`** (14-09-2026). Este párrafo decía que
 «`truncate` **no** lo arregla», y solo era cierto a medias: el `truncate` estaba puesto desde el
@@ -3088,6 +3094,22 @@ refrescan en cada cambio de ruta y con `refrescaComptadors()` tras cada acción.
 **Vocabulario fijado**: «oferta» (no «excedent») en la interfaz operativa; «Coberta» en vez de
 «Bloquejada» para los kg cubiertos —colisionaba con el bloqueo por convenio—; «interès» para lo
 que hace el receptor; «l'equip de Redestina» cuando actúa alguien. `design/DESIGN.md §5`.
+
+**Vocabulario de la revisión del cliente del 08-10-2026 (fase 0, 11-10-2026)**: el Mercat se llama
+«Excedents disponibles» también en el menú (no es un marketplace); las fases de la canalización
+guiada son Conveni · Entrada · **Cerca de receptors** · **Assignació** · **Recollida** ·
+**Tancament** (claves `fase.*` sin cambiar); tras asignar, el receptor lee «recollida pendent» y no
+«prepara't per rebre-la»; la tarjeta del detalle de oferta es «Canalitzacions assignades»; los
+documentos del ofertante y del receptor se titulan «Els meus certificats»; el CT se llama
+«Certificat d'aprofitament alimentari» (el `documentos.tipo` sigue siendo `CT`); «Cancel·lada» se
+describe como retirada por error o incidencia. **El ofertante ya no ve el código `E-…`**: ni en la
+lista, ni en el detalle, ni en el bloque de publicada, ni en los avisos (`textAvis.ts`; el código
+sigue en `avisos.params.ref` por trazabilidad y el equipo lo ve en su panel). Los campos del
+formulario de aprobación de `OfferDetail` llevan etiqueta y unidad (`od.f_kg_assignats`,
+`od.rs_preu_venda`): con solo placeholder, un precio por defecto de «2» no decía qué era.
+⚠️ **Transitorio hasta la fase 5 del plan** (`3. Claude Code/2026-10-11-plan-revision-avances-08-10.md`):
+`sig.model_don_gen` ya dice «Conveni de col·laboració», pero `sig.model_don_rec`/`sig.model_com` y el
+título del PDF del convenio (plantillas `CONV`) siguen con los nombres de los tres tipos actuales.
 
 ### «Productes»: el catálogo con icono, y qué enseña una oferta (27-09-2026, iconos desde el 29-09)
 

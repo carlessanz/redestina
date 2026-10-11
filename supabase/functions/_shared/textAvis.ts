@@ -49,8 +49,9 @@ export function textAvis(
 ): TextAvis {
   const es = idioma === "es";
   const producte = s(params.producte) || (es ? "tu oferta" : "la teva oferta");
-  const ref = s(params.ref);
-  const refTxt = ref ? ` (${ref})` : "";
+  // El código `E-…` (params.ref) ya no se imprime: estos avisos van al ofertante, y ese código
+  // es de gestión interna del equipo (revisión del cliente del 08-10-2026, §3.5). El parámetro
+  // se sigue guardando en `avisos.params` por trazabilidad.
 
   switch (tipus) {
     case "oferta_validada":
@@ -58,8 +59,8 @@ export function textAvis(
         asunto: es ? `Tu oferta de ${producte} ya está publicada` : `La teva oferta de ${producte} ja està publicada`,
         titulo: es ? "Oferta publicada" : "Oferta publicada",
         cuerpo: es
-          ? `El equipo de Redestina ha revisado tu oferta de ${producte}${refTxt} y ya la pueden ver las entidades.`
-          : `L’equip de Redestina ha revisat la teva oferta de ${producte}${refTxt} i ja la poden veure les entitats.`,
+          ? `El equipo de Redestina ha revisado tu oferta de ${producte} y ya la pueden ver las entidades.`
+          : `L’equip de Redestina ha revisat la teva oferta de ${producte} i ja la poden veure les entitats.`,
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,
       };
@@ -69,8 +70,8 @@ export function textAvis(
         asunto: es ? `No hemos publicado tu oferta de ${producte}` : `No hem publicat la teva oferta de ${producte}`,
         titulo: es ? "Oferta no publicada" : "Oferta no publicada",
         cuerpo: (es
-          ? `El equipo de Redestina no ha publicado tu oferta de ${producte}${refTxt}.`
-          : `L’equip de Redestina no ha publicat la teva oferta de ${producte}${refTxt}.`)
+          ? `El equipo de Redestina no ha publicado tu oferta de ${producte}.`
+          : `L’equip de Redestina no ha publicat la teva oferta de ${producte}.`)
           + (motiu ? `\n${es ? "Motivo" : "Motiu"}: ${motiu}` : ""),
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,
@@ -82,8 +83,8 @@ export function textAvis(
         asunto: es ? `Hemos encontrado salida para tu ${producte}` : `Hem trobat sortida per al teu ${producte}`,
         titulo: es ? "Salida encontrada" : "Sortida trobada",
         cuerpo: (es
-          ? `Se han asignado ${kg(params.kg, idioma)} kg de ${producte}${refTxt}`
-          : `S’han assignat ${kg(params.kg, idioma)} kg de ${producte}${refTxt}`)
+          ? `Se han asignado ${kg(params.kg, idioma)} kg de ${producte}`
+          : `S’han assignat ${kg(params.kg, idioma)} kg de ${producte}`)
           + (entitat ? (es ? ` a ${entitat}.` : ` a ${entitat}.`) : "."),
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,

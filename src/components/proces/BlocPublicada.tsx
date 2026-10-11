@@ -4,8 +4,8 @@
 // sin saber su referencia, sin saber qué pasa a continuación y sin un camino evidente para
 // publicar otra —que es lo normal en un día de recogida—. Aquí se dan las tres cosas.
 //
-// La referencia va en `<code>` y no en un `<p>`: es un identificador que alguien va a leer
-// por teléfono al equipo, así que se pinta en monoespaciada y seleccionable.
+// Lo que se enseña es «producto · kg», no el código `E-…`: ese código es de gestión interna
+// del equipo y el ofertante no lo necesita (revisión del cliente del 08-10-2026, §3.5).
 
 import { CheckCircle2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
@@ -20,7 +20,7 @@ export default function BlocPublicada({
   onInici,
   onAltra,
 }: {
-  /** El `id_excedente`, tal cual lo devuelve el servidor. */
+  /** Cómo reconoce el ofertante la oferta: «Producto · 400 kg». Nunca el `id_excedente`. */
   referencia: string
   /** El punto del proceso en el que queda: la etapa 1 vista por el productor. */
   punt: PuntProces
@@ -41,9 +41,7 @@ export default function BlocPublicada({
           </h2>
           <p className="text-sm text-muted-foreground">
             {t('proc.publicada_ref')}:{' '}
-            <code className="rounded bg-card px-1.5 py-0.5 text-sm text-foreground">
-              {referencia}
-            </code>
+            <span className="font-medium text-foreground">{referencia}</span>
           </p>
         </div>
       </div>

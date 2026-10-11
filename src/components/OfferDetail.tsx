@@ -990,17 +990,32 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   </div>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'pendent' && (
-                  <form className="flex flex-wrap items-center gap-1" onSubmit={(ev) => void aprovarRespuesta(ev, r)}>
-                    <Input name="kg" type="number" required defaultValue={r.kg_solicitados ?? ''}
-                      placeholder={t('od.kg_ph')} className="h-8 w-20" />
+                  // Cada campo con su etiqueta y su unidad a la vista (revisión del 08-10-2026,
+                  // §3.3): con solo un placeholder, un precio por defecto de «2» no decía si
+                  // eran euros, kilos o qué.
+                  <form className="flex flex-wrap items-end gap-2" onSubmit={(ev) => void aprovarRespuesta(ev, r)}>
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {t('od.f_kg_assignats')}
+                      <Input name="kg" type="number" required defaultValue={r.kg_solicitados ?? ''}
+                        placeholder={t('od.kg_ph')} className="h-8 w-24 text-base md:text-sm" />
+                    </label>
                     {mods.length > 1 && (
-                      <SelectorModalitat modalitats={mods} inicial={r.modalitat ?? null} ambBuit={!r.modalitat} />
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        {t('mod.entrega')}
+                        <SelectorModalitat modalitats={mods} inicial={r.modalitat ?? null} ambBuit={!r.modalitat} />
+                      </label>
                     )}
-                    <Input name="recollida" type="datetime-local" defaultValue={localDateTime(r.recollida_at)}
-                      aria-label={t('appr.recollida')} className="h-8 w-48" />
+                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                      {t('appr.recollida')}
+                      <Input name="recollida" type="datetime-local" defaultValue={localDateTime(r.recollida_at)}
+                        className="h-8 w-48 text-base md:text-sm" />
+                    </label>
                     {esVenda && (
-                      <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
-                        placeholder={t('od.rs_preu')} className="h-8 w-20" />
+                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
+                        {t('od.rs_preu_venda')}
+                        <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
+                          placeholder={t('od.rs_preu')} className="h-8 w-24 text-base md:text-sm" />
+                      </label>
                     )}
                     <BotoAmbMotiu size="sm" type="submit" disabled={!potAprovar}
                       motiu={potAprovar ? undefined : t('appr.need_approver')}>{t('od.approve')}</BotoAmbMotiu>

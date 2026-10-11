@@ -115,7 +115,9 @@ describe('el menú apunta a rutas que existen', () => {
   })
 
   it('las etiquetas del menú son claves definidas', () => {
-    const etiquetas = [...nav.matchAll(/\blabelKey:\s*'([^']+)'/g)].map((m) => m[1])
+    // También las cortas de la barra inferior (`labelBarraKey`), que no pasan por `t('…')`
+    // literal y por tanto no las ve el recorrido de claves usadas.
+    const etiquetas = [...nav.matchAll(/\b(?:labelKey|labelBarraKey):\s*'([^']+)'/g)].map((m) => m[1])
     expect(etiquetas.length).toBeGreaterThan(10)
     const faltan = etiquetas.filter((k) => !CLAVES_CA.has(k))
     expect(faltan, `Etiquetas de menú sin traducción:\n  ${faltan.join('\n  ')}`).toEqual([])

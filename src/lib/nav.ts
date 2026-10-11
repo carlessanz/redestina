@@ -55,6 +55,13 @@ export interface NavItem {
    * desbordamiento. Cuatro es el máximo real.
    */
   barra?: false
+  /**
+   * Etiqueta corta SOLO para la barra inferior de móvil. Existe por «Excedents disponibles»
+   * (revisión del 08-10-2026): medida con Inter a 11 px pide ~118 px en catalán y ~125 en
+   * castellano, y a 360 px cada una de las tres celdas del receptor da 116. El menú lateral y
+   * el título de la barra superior siguen diciendo el nombre completo.
+   */
+  labelBarraKey?: string
 }
 
 export interface NavGrup {
@@ -137,7 +144,7 @@ const PRODUCTOR: NavGrup[] = [
 const RECEPTOR: NavGrup[] = [
   {
     items: [
-      { to: '/receptor/mercat', labelKey: 'nav.market', icon: Store, end: true, comptador: 'mercat_noves' },
+      { to: '/receptor/mercat', labelKey: 'nav.market', labelBarraKey: 'nav.market_barra', icon: Store, end: true, comptador: 'mercat_noves' },
       { to: '/receptor/interessos', labelKey: 'nav.my_interests', icon: Handshake, comptador: 'avisos_interessos' },
       { to: '/receptor/historic', labelKey: 'nav.history', icon: History, barra: false },
       { to: '/receptor/documents', labelKey: 'nav.entity_documents', icon: Receipt, comptador: 'pendents_receptor' },

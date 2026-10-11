@@ -819,7 +819,7 @@ export default function Aprovacions() {
                     )}
                     {esVenda && (
                       <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {t('od.rs_preu')}
+                        {t('od.rs_preu_venda')}
                         <Input type="number" inputMode="decimal" step="0.01" min="0"
                           className="h-11 w-24 text-base md:h-9 md:text-sm"
                           value={valorPreu(f)}

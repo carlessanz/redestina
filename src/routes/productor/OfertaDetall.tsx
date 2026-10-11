@@ -23,6 +23,7 @@ import { supabase } from '../../lib/supabase'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
+import { dataCurta } from '../../lib/format'
 import { cancelaOferta } from '../../lib/ofertes'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
@@ -193,7 +194,7 @@ export default function ProductorOfertaDetall() {
           lo correcto — la enhorabuena es del momento, el resto de la pantalla es permanente. */}
       {arribada.publicada && (
         <BlocPublicada
-          referencia={oferta.id_excedente ?? '—'}
+          referencia={`${oferta.producto ?? '—'} · ${total.toLocaleString('ca-ES')} kg`}
           punt={punt}
           correuEnviat={arribada.correuEnviat === true}
           onInici={() => navigate('/productor/inici')}
@@ -203,12 +204,15 @@ export default function ProductorOfertaDetall() {
 
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          {/* El producto primero y la referencia debajo: es lo que el productor reconoce.
-              La referencia se queda porque es la que sale en WhatsApp y en los albaranes. */}
+          {/* El producto primero y la disponibilidad debajo: es lo que el productor reconoce.
+              El código `E-…` ya no se le enseña (revisión del 08-10-2026, §3.5): es de gestión
+              interna del equipo, que lo sigue viendo en su panel. */}
           <h1 className="text-xl font-bold">
             {oferta.producto}{oferta.variedad ? ` · ${oferta.variedad}` : ''}
           </h1>
-          <p className="text-xs text-muted-foreground"><code>{oferta.id_excedente}</code></p>
+          {oferta.disponible_hasta && (
+            <p className="text-xs text-muted-foreground">{t('edit.fins')} {dataCurta(oferta.disponible_hasta)}</p>
+          )}
           <div className="mt-1.5">
             <BadgeEstat clase={estatSimpleOferta(punt).clase} gran>{t(estatSimpleOferta(punt).key)}</BadgeEstat>
           </div>

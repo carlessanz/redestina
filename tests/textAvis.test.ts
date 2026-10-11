@@ -64,3 +64,14 @@ describe('textConfirmacioRecollida (rebanada 3)', () => {
     })
   }
 })
+
+describe('el ofertante no ve el código interno de la oferta', () => {
+  it('ningún aviso imprime el id_excedente (revisión del 08-10-2026, §3.5)', () => {
+    for (const tipus of TIPUS_AVIS) {
+      for (const idioma of ['ca', 'es'] as const) {
+        const tx = textAvis(tipus, PARAMS, idioma, 'x')
+        expect(`${tx.asunto} ${tx.titulo} ${tx.cuerpo}`).not.toContain('E-261005')
+      }
+    }
+  })
+})

@@ -10,7 +10,7 @@ import { ArrowRight, PlusCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
-import { nombre } from '../../lib/format'
+import { dataCurta, nombre } from '../../lib/format'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { carregaProgresOfertes, perOferta } from '../../lib/progresOfertes'
 import { marcaLlegits } from '../../lib/avisos'
@@ -216,7 +216,13 @@ function FilaOferta({
           <div className="font-medium">
             {o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}
           </div>
-          {ambCodi && <div className="text-xs text-muted-foreground"><code>{o.id_excedente ?? '—'}</code></div>}
+          {/* El código `E-…` es del equipo (gestión interna), no del ofertante: aquí va lo que
+              le sirve para reconocer la oferta (revisión del cliente del 08-10-2026, §3.5). */}
+          {ambCodi && o.disponible_hasta && (
+            <div className="text-xs text-muted-foreground">
+              {t('edit.fins')} {dataCurta(o.disponible_hasta)}
+            </div>
+          )}
         </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
