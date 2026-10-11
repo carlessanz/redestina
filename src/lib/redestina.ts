@@ -32,6 +32,10 @@ export interface EntidadPuntuada {
   /** Su comarca y la última vez que recibió algo (conciliado). Solo filtran (fase 6). */
   comarca?: string | null
   ultima_recepcio?: string | null
+  /** Fase 7: lo que hace y lo que dice que puede recibir. Solo filtran. */
+  tipus_activitat?: string[] | null
+  capacitat_maxima?: number | null
+  quantitat_habitual?: number | null
   /**
    * ¿Ha declarado en su perfil que le interesa esta categoría de producto? `null` = no ha
    * declarado ninguna (C3 v1, 05-10-2026). Un servidor anterior no lo manda.

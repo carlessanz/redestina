@@ -143,6 +143,7 @@ export default function Registre() {
         email_ja_registrat: 'reg.err_exists',
         dades_en_us: 'reg.err_dades',
         massa_solicituds: 'reg.err_massa',
+        nif_invalid: 'val.nif_control',
       }
       const clau = claus[dades?.code ?? '']
       // Si el servidor rechaza un campo que aquí no se ha validado, su mensaje dice cuál:

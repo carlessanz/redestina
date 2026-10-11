@@ -70,7 +70,13 @@ export interface WaMessage {
  * desde ese listado y es quien tiene que borrarla; esconderla la volvería inalcanzable.
  */
 export type ProductorLlistat = Productor & { rebutjada: boolean }
-export type EntidadLlistat = Entidad & { rebutjada: boolean }
+export type EntidadLlistat = Entidad & {
+  rebutjada: boolean
+  /** Fase 7 (20270421100000): qué hace y qué modalidades le interesan. */
+  tipo_receptor?: string | null
+  tipus_activitat?: string[] | null
+  modalitats_interes?: string[] | null
+}
 
 // --- Organización unificada (etapa 1, migración 20270310100000) ---
 //

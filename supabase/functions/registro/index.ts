@@ -357,6 +357,17 @@ Deno.serve(async (req) => {
           409,
         );
       }
+      // El NIF lo valida y lo hace único por organización un trigger (fase 7 de la revisión
+      // del 08-10-2026): sin esto, un NIF mal escrito o de otra organización salía «error intern».
+      if (/nif_invalid/.test(errFitxa?.message ?? "")) {
+        return responder({ error: "El NIF no és vàlid. Revisa'l.", code: "nif_invalid", camp: "nif" }, 400);
+      }
+      if (/nif_en_us/.test(errFitxa?.message ?? "")) {
+        return responder(
+          { error: "Aquest NIF ja consta en una altra organització. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "nif" },
+          409,
+        );
+      }
       console.error("[registro] insert ficha:", taula, errFitxa?.message);
       return responder({ error: "No s'ha pogut crear la fitxa", code: "error_intern" }, 500);
     }

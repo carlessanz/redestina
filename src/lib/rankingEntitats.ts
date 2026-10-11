@@ -44,6 +44,10 @@ export interface FiltresRanking {
   /** `''` = todas. */
   comarca?: string
   recepcio?: FranjaRecepcio
+  /** Fase 7: un tipo de actividad (`tipus_activitat`). */
+  activitat?: string
+  /** Fase 7: solo las que dicen poder recibir al menos estos kilos de una vez. */
+  capacitatMinima?: number
 }
 
 export function filtraRanking(
@@ -55,7 +59,9 @@ export function filtraRanking(
     (!f.tipus || (e.tipo_receptor ?? null) === f.tipus)
     && (!f.nomesProducte || e.interessa_producte === true)
     && (!f.comarca || (e.comarca ?? null) === f.comarca)
-    && dinsFranja(e.ultima_recepcio, f.recepcio ?? ''))
+    && dinsFranja(e.ultima_recepcio, f.recepcio ?? '')
+    && (!f.activitat || (e.tipus_activitat ?? []).includes(f.activitat))
+    && (!f.capacitatMinima || (e.capacitat_maxima != null && e.capacitat_maxima >= f.capacitatMinima)))
 }
 
 /** Las comarcas que aparecen en el ranking, para no ofrecer una que da cero. */
@@ -72,4 +78,14 @@ export function hiHaInteresProducte(ranking: readonly EntidadPuntuada[]): boolea
 export function tipusPresents(ranking: readonly EntidadPuntuada[]): string[] {
   const hi = new Set(ranking.map((e) => e.tipo_receptor).filter((x): x is string => !!x))
   return TIPUS_RECEPTOR.filter((t) => hi.has(t))
+}
+
+/** Los tipos de actividad que aparecen en el ranking (fase 7). */
+export function activitatsPresents(ranking: readonly EntidadPuntuada[]): string[] {
+  return [...new Set(ranking.flatMap((e) => e.tipus_activitat ?? []))].sort()
+}
+
+/** ¿Alguna ha declarado su capacidad? Si no, el filtro no se ofrece. */
+export function hiHaCapacitat(ranking: readonly EntidadPuntuada[]): boolean {
+  return ranking.some((e) => e.capacitat_maxima != null)
 }

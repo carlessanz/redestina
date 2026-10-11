@@ -50,11 +50,11 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
   }, [])
 
   // Primero las entidades de prueba (pueden recibir), luego el resto — igual que productores.
-  // Zona (fase 6 de la revisión del 08-10-2026), además del buscador. El tipo de entidad
-  // llega con la fase 7: `v_entidades_llistat` todavía no trae `tipo_receptor`.
+  // Zona y tipo de entidad (fases 6 y 7 de la revisión del 08-10-2026), además del buscador.
   const fl = useFiltresLlistat('equip-entitats')
   const dims = useMemo<Dimensio<EntidadLlistat>[]>(() => [
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (e) => e.area_geografica },
+    { clau: 'tipus', etiquetaKey: 'fl.d_tipus', valor: (e) => e.tipo_receptor },
   ], [])
   const { test, resto } = useMemo(() => {
     const filtradas = filtraLlistat(filtraCerca(entidades, q,
@@ -99,7 +99,11 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
                   </TableCell>
                   <TableCell className="text-muted-foreground">{e.poblacion ?? '—'}</TableCell>
                   <TableCell>
-                    {e.modalitat ? <Badge variant="outline">{e.modalitat}</Badge> : <span className="text-muted-foreground">—</span>}
+                    {/* «Modalitats» (fase 7): las que le interesan, que declara en su ficha;
+                        sin ellas, el texto antiguo del import. */}
+                    {(e.modalitats_interes ?? []).length > 0
+                      ? (e.modalitats_interes ?? []).map((m) => <Badge key={m} variant="outline" className="mr-1">{t(`org.mi_${m === 'venda' ? 'compra' : m}`)}</Badge>)
+                      : e.modalitat ? <Badge variant="outline">{e.modalitat}</Badge> : <span className="text-muted-foreground">—</span>}
                   </TableCell>
                   <TableCell className="whitespace-nowrap tabular-nums">{tel ? `+${tel}` : '—'}</TableCell>
                   <TableCell className="text-muted-foreground">
@@ -147,6 +151,7 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
           id="ent"
           desplegables={dims.map((d) => ({
             clau: d.clau, etiquetaKey: d.etiquetaKey, opcions: opcionsDisponibles(entidades, dims, d.clau, fl.valors),
+            text: d.clau === 'tipus' ? (v: string) => t(`org.tr_${v}`) : undefined,
           }))}
           valors={fl.valors}
           onValors={fl.setValors}

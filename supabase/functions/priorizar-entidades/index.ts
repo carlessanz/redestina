@@ -16,6 +16,12 @@ import { modalitatsDe } from "../_shared/modalitats.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
 
+/** Un número del perfil (jsonb), o null si no hay o no es un número. */
+function numeroOuNull(v: unknown): number | null {
+  const n = Number(v);
+  return v != null && v !== "" && Number.isFinite(n) ? n : null;
+}
+
 Deno.serve(async (req) => {
   const cors = corsPara(req);
   const json = respondedor(cors);
@@ -76,7 +82,7 @@ Deno.serve(async (req) => {
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
       // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
       // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
-      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor");
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat");
     if (entError) {
       console.error("entidades select:", entError.message);
       return json({ error: "Error consultando las entidades" }, 500);
@@ -106,7 +112,10 @@ Deno.serve(async (req) => {
     const porTelefono = new Map<string, { opt_in: boolean | null; last_inbound_at: string | null }>();
     for (const c of contactos ?? []) porTelefono.set(c.phone, c);
 
-    const porId = new Map<string, { telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null; area_geografica: string | null }>();
+    const porId = new Map<string, {
+      telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null;
+      area_geografica: string | null; tipus_activitat: string[] | null; perfil_receptor: Record<string, unknown> | null;
+    }>();
     for (const e of entidades ?? []) porId.set(e.id, e);
 
     // La preferencia de canal de la organización de cada entidad. Fail-soft: si no se
@@ -171,6 +180,10 @@ Deno.serve(async (req) => {
         // Para los filtros «zona» y «última recepció» (fase 6). Tampoco puntúan.
         comarca: ficha?.area_geografica ?? null,
         ultima_recepcio: ultimaRecepcio.get(e.id) ?? null,
+        // Fase 7: qué hace, y lo que dice que puede recibir (`perfil_receptor`). Solo filtran.
+        tipus_activitat: ficha?.tipus_activitat ?? [],
+        capacitat_maxima: numeroOuNull(ficha?.perfil_receptor?.capacitat_maxima),
+        quantitat_habitual: numeroOuNull(ficha?.perfil_receptor?.quantitat_habitual),
         canal: d.canal,
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,

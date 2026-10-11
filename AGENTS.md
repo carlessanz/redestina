@@ -3183,6 +3183,44 @@ Sin migración. Una misma lógica de filtros en todos los listados:
   no trae `tipo_receptor`.
 - E2E `tests/e2e/filtres.e2e.ts` (lectura).
 
+### Revisión del cliente del 08-10-2026 — fase 7: la ficha de la organización (11-10-2026)
+
+Migración `20270421100000`.
+
+- **Tipus d'activitat** (selección múltiple, separada de «Tipus d'empresa o entitat»): catálogo
+  `tipus_activitat` con las dos listas del documento y a qué papel aplica cada opción;
+  `productores.tipus_activitat` y `entidades.tipus_activitat` (`text[]`), validadas por las RPC de la
+  ficha (`tipus_activitat_desconegut`).
+- **Modalitats que m'interessen** del receptor (`entidades.modalitats_interes`, compra = `venda`):
+  su PREFERENCIA. La elegibilidad sigue en `tipo_receptor × modalitat_receptor_compat` (no hay una
+  segunda regla por tipo de entidad: si la Fundació decide que una SL no recibe donaciones, es una
+  fila en la matriz). El listado del equipo dice «Modalitats» y filtra por tipo de entidad.
+- **Com podem oferir-te excedents?** (receptor): `PREFERENCIES_RECEPCIO` en `perfilReceptor.ts`
+  —productos, cantidad habitual y periodo, capacidad máxima por recepción, frecuencia, si puede
+  recoger, zona máxima, conservación y equipamiento—, en el mismo `perfil_receptor`; el bloque propio
+  del tipo ya no repite esas claves. `priorizar-entidades` devuelve `tipus_activitat`,
+  `capacitat_maxima` y `quantitat_habitual`, y «Entitats prioritzades» filtra por actividad y por
+  «poden rebre N kg d'una vegada». ⚠️ Redesplegar `priorizar-entidades`.
+- **Persones de contacte**: `organizacion_contactos` (nombre, función, teléfono, correo, tipo
+  `general·administratiu·recollides·altres`), por organización, sin escritura directa: RPC
+  `desar_contacte_org()` y `esborrar_contacte_org()` (titular de alguna ficha de la organización,
+  `soc_titular_org()`, o el equipo). `components/ContactesOrganitzacio`.
+- **NIF válido y único por organización**: `nif_valid()` (la misma regla que `errorNif()` de
+  `validacio.ts`) y el trigger `*_nif` en las dos tablas de fichas, al insertar o cambiar el NIF:
+  `nif_invalid` o `nif_en_us` (otra organización). Las dos fichas de un doble rol lo comparten. El
+  registro los traduce. ⚠️ Una ficha con un NIF inválido de antes **no deja guardar** la ficha propia
+  hasta corregirlo (el cliente lo pide así); las de prueba de producción tienen NIF como `B00000001`.
+- **Raó social obligatoria**: en rojo en la ficha y en la banda de «fitxa incompleta»
+  (`CAMPS_NECESSARIS`). Es el nombre de convenios, albaranes y certificados.
+- **Rol a REDESTINA**: «Ofereixo excedents» / «Busco / rebo excedents». Marcar el otro papel
+  (`afegir_paper_organitzacio()`) crea la ficha hermana en la misma organización con los datos comunes
+  y una membresía **pendiente**, que el equipo valida en «Registres pendents» como un alta. Una
+  entidad nueva nace sin `tipo_receptor` (lo fija el equipo). Desmarcar no se ofrece.
+- `v_productores_llistat` y `v_entidades_llistat` añaden las columnas nuevas al final.
+- ⚠️ Queda: que la ficha de la operación use el contacto de recogidas de la organización cuando el
+  lugar no tiene contacto propio, y editar actividad y modalidades desde la ficha del equipo.
+- E2E `tests/e2e/organitzacio.e2e.ts` (clon, solo escritorio).
+
 ### Revisión completa del 07-10-2026: errores de flujo, certificado de transacción y auditoría
 
 Revisión exhaustiva del código y de los flujos (informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
@@ -6828,8 +6866,8 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.292 pruebas en 53 ficheros** de Vitest: 1.291 correctas y **1 saltada a propósito**
-   (11-10-2026, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
+   Referencia: **1.293 pruebas en 53 ficheros** de Vitest: 1.292 correctas y **1 saltada a propósito**
+   (11-10-2026, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
    eran 1.280, +3 de las claves compuestas `tan.rev_*` y `tan.skip_sense_revisio`; tras la fase 3
    eran 1.277: `tests/confirmacions.test.ts`), **más 4 de Deno** en `tests/pdf/` (`deno test`, dentro
@@ -6867,8 +6905,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
-   ✅ **Referencia HOY (clon local): 1.259/1.259 correctas y 29 sin datos, «Sin fallos de permisos»**
-   (11-10-2026, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin
+   ✅ **Referencia HOY (clon local): 1.311/1.311 correctas y 29 sin datos, «Sin fallos de permisos»**
+   (11-10-2026, tras la fase 7 —catálogo de actividades, contactos y «afegir paper»: +52—; tras la fase 5
+   eran 1.259, tras la fase 5 —`convenis_equivalents` y `conveni_cobreix_tot`: +16; cinco checks más «sin
    datos» porque la migración retira los convenios anteriores a medio firmar del clon—; tras la fase 4 —las dos RPC de revisión y el snapshot: +25; las «sin datos» bajan a 24
    porque las pruebas E2E dejan datos en el clon—; tras la fase 3 —`confirmar_recollida` denegada a las siete cuentas externas y permitida al
    equipo con uuid inventado, y las dos funciones internas sin EXECUTE: +16—; tras la fase 2 eran 1.202,

@@ -74,13 +74,32 @@ export const PERFIL_RECEPTOR: Record<string, readonly CampPerfil[]> = {
   ],
 }
 
+/**
+ * «Com podem oferir-te excedents?» (revisión del cliente del 08-10-2026, fase 7): las
+ * preferencias de recepción COMUNES a todo receptor, sea del tipo que sea. Es lo que sirve
+ * para el matching. Se guardan en el mismo `perfil_receptor`; los campos con la misma clave
+ * en el bloque propio del tipo ya no se repiten allí (`CLAUS_PREFERENCIES`).
+ */
+export const PREFERENCIES_RECEPCIO: readonly CampPerfil[] = [
+  { clau: 'productes_rebre', tipus: 'multi', opcions: PRODUCTES },
+  { clau: 'quantitat_habitual', tipus: 'numero', unitatKey: 'pr.u_kg' },
+  { clau: 'periode_quantitat', tipus: 'select', opcions: ['setmana', 'mes'] },
+  { clau: 'capacitat_maxima', tipus: 'numero', unitatKey: 'pr.u_kg_recepcio' },
+  { clau: 'frequencia', tipus: 'select', opcions: ['puntual', 'setmanal', 'quinzenal', 'mensual'] },
+  { clau: 'recollida_propia', tipus: 'sino' },
+  { clau: 'zona_max_km', tipus: 'numero', unitatKey: 'pr.u_km' },
+  { clau: 'conservacio', tipus: 'multi', opcions: ['cambra_frigorifica', 'congelador', 'magatzem_sec', 'nevera', 'cap'] },
+  { clau: 'equipament', tipus: 'multi', opcions: ['toro', 'transpalet', 'manual', 'moll_carrega', 'cap'] },
+]
+export const CLAUS_PREFERENCIES = new Set(PREFERENCIES_RECEPCIO.map((c) => c.clau))
+
 /** Los tipos de empresa o entidad, lista cerrada (y el check de la RPC los repite). */
 export const TIPUS_EMPRESA = ['cooperativa', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'] as const
 
 /** Todas las claves i18n que usa este módulo: para la prueba de cobertura. */
 export function clausPerfil(): string[] {
   const claus = new Set<string>()
-  for (const camps of Object.values(PERFIL_RECEPTOR)) {
+  for (const camps of [...Object.values(PERFIL_RECEPTOR), PREFERENCIES_RECEPCIO]) {
     for (const c of camps) {
       claus.add(`pr.${c.clau}`)
       for (const o of c.opcions ?? []) claus.add(`pr.o_${o}`)

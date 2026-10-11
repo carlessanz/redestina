@@ -25,7 +25,8 @@ import { useTicAvisos } from '../lib/refrescAvisos'
 import { clauOrganitzacions, organitzacionsDeClau } from '../lib/rols'
 
 /** Lo que el registro no pregunta y el convenio sí imprime. */
-export const CAMPS_NECESSARIS = ['nif', 'direccion', 'codigo_postal', 'poblacion'] as const
+// La raó social, desde la fase 7: es el nombre legal de los convenios y los certificados.
+export const CAMPS_NECESSARIS = ['razon_social', 'nif', 'direccion', 'codigo_postal', 'poblacion'] as const
 
 export function useFitxaIncompleta(): { falten: string[]; carregant: boolean } {
   const { ctx, rolActiu } = useAppContext()
@@ -51,10 +52,10 @@ export function useFitxaIncompleta(): { falten: string[]; carregant: boolean } {
       // `GenericStringError` y la fila se queda sin columnas.
       const [p, e] = await Promise.all([
         prods.length
-          ? supabase.from('productores').select('nif, direccion, codigo_postal, poblacion').in('id', prods)
+          ? supabase.from('productores').select('razon_social, nif, direccion, codigo_postal, poblacion').in('id', prods)
           : Promise.resolve({ data: [] }),
         ents.length
-          ? supabase.from('entidades').select('nif, direccion, codigo_postal, poblacion').in('id', ents)
+          ? supabase.from('entidades').select('razon_social, nif, direccion, codigo_postal, poblacion').in('id', ents)
           : Promise.resolve({ data: [] }),
       ])
       if (!viu) return

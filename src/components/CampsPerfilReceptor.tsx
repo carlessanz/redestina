@@ -21,8 +21,12 @@ import {
 } from '@/components/ui/select'
 
 export default function CampsPerfilReceptor({
-  tipusReceptor, perfil, onChange, disabled = false, idPrefix = 'pr',
+  tipusReceptor, perfil, onChange, disabled = false, idPrefix = 'pr', camps: campsFixats, excloure,
 }: {
+  /** Una lista propia en vez de la del tipo (las preferencias de recepción, fase 7). */
+  camps?: readonly CampPerfil[]
+  /** Claves que no se pintan aquí porque ya salen en otro bloque. */
+  excloure?: ReadonlySet<string>
   tipusReceptor: string | null | undefined
   perfil: Record<string, unknown>
   onChange: (perfil: Record<string, unknown>) => void
@@ -31,7 +35,8 @@ export default function CampsPerfilReceptor({
   idPrefix?: string
 }) {
   const { t } = useT()
-  const camps: readonly CampPerfil[] = PERFIL_RECEPTOR[tipusReceptor ?? ''] ?? []
+  const camps: readonly CampPerfil[] = (campsFixats ?? PERFIL_RECEPTOR[tipusReceptor ?? ''] ?? [])
+    .filter((c) => !excloure?.has(c.clau))
   if (camps.length === 0) return null
 
   function control(c: CampPerfil) {

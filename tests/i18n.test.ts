@@ -245,6 +245,12 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['bloquejat', 'sense_kg', 'error', 'sense_revisio'],
     },
     {
+      // `organizacion_contactos.tipus` (CHECK de 20270421100000).
+      que: 'organizacion_contactos.tipus',
+      prefijo: 'ct.t_',
+      valores: ['general', 'administratiu', 'recollides', 'altres'],
+    },
+    {
       // Las franjas del filtro «última recepció» del ranking (fase 6): `FRANGES_RECEPCIO`.
       que: 'rankingEntitats.FRANGES_RECEPCIO',
       prefijo: 'od.fr_',

@@ -8,7 +8,8 @@ import { sendWhatsApp } from '../lib/whatsapp'
 import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
-import { comarquesPresents, filtraRanking, FRANGES_RECEPCIO, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import { activitatsPresents, comarquesPresents, filtraRanking, FRANGES_RECEPCIO, hiHaCapacitat, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import { carregaTipusActivitat } from '../lib/organitzacio'
 import type { FranjaRecepcio } from '../lib/rankingEntitats'
 import { dataCurta } from '../lib/format'
 import { useT } from '../lib/i18n'
@@ -135,6 +136,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Zona y última recepción (fase 6 de la revisión del 08-10-2026).
   const [filtreComarca, setFiltreComarca] = useState('')
   const [filtreRecepcio, setFiltreRecepcio] = useState<FranjaRecepcio>('')
+  // Tipo de actividad y capacidad (fase 7).
+  const [filtreActivitat, setFiltreActivitat] = useState('')
+  const [nomesCapacitat, setNomesCapacitat] = useState(false)
+  const [nomsActivitat, setNomsActivitat] = useState<Record<string, string>>({})
+  useEffect(() => {
+    void carregaTipusActivitat().then((c) => setNomsActivitat(Object.fromEntries(c.map((a) => [a.codi, lang === 'es' ? a.nom_es : a.nom_ca]))))
+  }, [lang])
   const [mostrats, setMostrats] = useState(PAS_RANKING)
   const [copiado, setCopiado] = useState<string | null>(null)
   // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
@@ -298,9 +306,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     const contactable = (e: EntidadPuntuada) => (!testMode || e.es_test) && e.canal !== 'cap'
     return [...ranking].sort((a, b) => Number(contactable(b)) - Number(contactable(a)))
   }, [ranking, testMode])
-  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado,
-    { tipus: filtreTipus, nomesProducte, comarca: filtreComarca, recepcio: filtreRecepcio }),
-  [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio])
+  const kgOferta = Number(exc.kg_total ?? 0)
+  const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, {
+    tipus: filtreTipus, nomesProducte, comarca: filtreComarca, recepcio: filtreRecepcio,
+    activitat: filtreActivitat, capacitatMinima: nomesCapacitat ? kgOferta : undefined,
+  }),
+  [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio, filtreActivitat, nomesCapacitat, kgOferta])
+  const activitatsDelRanking = useMemo(() => activitatsPresents(ranking), [ranking])
+  const ambCapacitat = useMemo(() => hiHaCapacitat(ranking), [ranking])
   const comarquesDelRanking = useMemo(() => comarquesPresents(ranking), [ranking])
   const ambInteresProducte = useMemo(() => hiHaInteresProducte(ranking), [ranking])
   const tipusDelRanking = useMemo(() => tipusPresents(ranking), [ranking])
@@ -944,7 +957,24 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 <option value="">{t('fl.tots')}</option>
                 {FRANGES_RECEPCIO.map((f) => <option key={f} value={f}>{t(`od.fr_${f}`)}</option>)}
               </select>
+              {activitatsDelRanking.length > 0 && (
+                <>
+                  <label htmlFor="od-filtre-activitat" className="text-sm text-muted-foreground">{t('org.f_activitat_curt')}</label>
+                  <select id="od-filtre-activitat"
+                    className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                    value={filtreActivitat}
+                    onChange={(e) => { setFiltreActivitat(e.target.value); setMostrats(PAS_RANKING) }}>
+                    <option value="">{t('fl.tots')}</option>
+                    {activitatsDelRanking.map((a) => <option key={a} value={a}>{nomsActivitat[a] ?? a}</option>)}
+                  </select>
+                </>
+              )}
             </div>
+          )}
+          {!cargandoRanking && !rankingError && ambCapacitat && kgOferta > 0 && (
+            <FilaCasella checked={nomesCapacitat} onChange={(v) => { setNomesCapacitat(v); setMostrats(PAS_RANKING) }}>
+              {t('od.f_capacitat', { kg: kgOferta })}
+            </FilaCasella>
           )}
           {!cargandoRanking && !rankingError && ambInteresProducte && (
             <FilaCasella checked={nomesProducte} onChange={(v) => { setNomesProducte(v); setMostrats(PAS_RANKING) }}>

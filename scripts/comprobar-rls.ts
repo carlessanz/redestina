@@ -649,6 +649,14 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "convenis_equivalents", op: "leer", esperado: "permitir", descripcion: "llegeix les equivalències dels convenis anteriors (catàleg)" },
   { tabla: "convenis_equivalents", op: "insertar", esperado: "denegar", descripcion: "NO escriu equivalències de convenis" },
   { tabla: "conveni_cobreix_tot", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO executa la comprovació interna del conveni" },
+  // La ficha de la organización (20270421100000, fase 7).
+  { tabla: "tipus_activitat", op: "leer", esperado: "permitir", descripcion: "llegeix el catàleg de tipus d'activitat" },
+  { tabla: "tipus_activitat", op: "insertar", esperado: "denegar", descripcion: "NO escriu al catàleg de tipus d'activitat" },
+  { tabla: "organizacion_contactos", op: "insertar", esperado: "denegar", descripcion: "NO escriu contactes directament (només per RPC)" },
+  { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes a una organització que no és seva" },
+  { tabla: "esborrar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra contactes d'una altra organització" },
+  { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix un paper a una organització que no és seva" },
+  { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
   { tabla: "convenios", op: "insertar", esperado: "denegar", descripcion: "NO crea convenios a mano (van por RPC)" },
   // 🔴 Hasta 20270414100600 esto era un «permitir»: cualquier cuenta preguntaba por el
   //    convenio de cualquier organización, y `exigir_convenio()` le devolvía además su
@@ -1201,6 +1209,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: un técnico, no.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova certificats en nom del donant (és de pot_aprovar)" },
     { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },
+    // Contactos: el equipo edita los de cualquier organización (id inventado → 22023/23503).
+    { tabla: "desar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "afegeix contactes en nom d'una organització (org inventada → error de negoci)" },
+    { tabla: "esborrar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "esborra contactes (id inventat → 22023)" },
+    // Un papel nuevo lo pide el TITULAR; el equipo, no (lo aprueba después).
+    { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix papers en nom d'una organització" },
     // «No m'interessa» es SOLO de la entidad: tampoco el equipo contesta por ella.
     { tabla: "declinar_oferta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO respon «no m'interessa» en nom d'una entitat" },
     // La foto del catálogo es SOLO del super_admin (20270405100000), ni siquiera de un admin.

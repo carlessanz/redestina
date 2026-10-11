@@ -30,6 +30,12 @@ const CODIS: Record<string, string> = {
   certificat_bloquejat: 'rev.certificat_bloquejat',
   sense_revisio: 'tan.err_sense_revisio',
   cal_nota: 'tan.err_cal_nota',
+  // La ficha de la organización (fase 7).
+  nif_invalid: 'val.nif_control',
+  nif_en_us: 'org.err_nif_en_us',
+  ja_te_paper: 'org.err_ja_te_paper',
+  tipus_activitat_desconegut: 'org.err_activitat',
+  cal_nom: 'org.err_cal_nom',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */
