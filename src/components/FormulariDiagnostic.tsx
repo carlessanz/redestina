@@ -203,8 +203,17 @@ export default function FormulariDiagnostic({
     )
   }
 
+  // La organización no puede leer «Diagnòstic contestat» con 0 respuestas y obligatorias por
+  // contestar: pasa cuando el estado del servidor viene de un plan emitido con el cuestionario
+  // ANTERIOR (v1) y el vigente es otro (v2). Lo que le dice la pantalla es lo que ve en ella.
+  let estatServidor = estat?.estat ?? 'sense_comencar'
+  if (!assistit && falten.length > 0
+    && (estatServidor === 'complet' || estatServidor === 'a_punt' || estatServidor === 'emes')) {
+    estatServidor = progres.contestades === 0 ? 'sense_comencar' : 'incomplet'
+  }
+
   const punt = puntDiagnostic({
-    estat: estat?.estat ?? 'sense_comencar',
+    estat: estatServidor,
     faltenN: falten.length,
     mesuresN: estat?.mesures_n ?? 0,
     numero: estat?.numero ?? null,

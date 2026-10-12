@@ -3524,6 +3524,7 @@ lista, ni en el detalle, ni en el bloque de publicada, ni en los avisos (`textAv
 sigue en `avisos.params.ref` por trazabilidad y el equipo lo ve en su panel). Los campos del
 formulario de aprobación de `OfferDetail` llevan etiqueta y unidad (`od.f_kg_assignats`,
 `od.rs_preu_venda`): con solo placeholder, un precio por defecto de «2» no decía qué era.
+**Retoques tras la revisión en producción (12-10-2026)**: el certificado de transacción se llama «certificat d'aprofitament alimentari» en TODOS los textos de la interfaz (ca y es; los correos y el título del PDF `CT` conservan el nombre anterior); los motivos que escribe el job de vencidas («vencida sin cubrir») ya no se pintan en la etapa «Sense sortida» (`motiuVisible()` en `procesOferta.ts`); la receptora no ve el enlace «Obre el diagnòstic» en sus documentos (`LlistaPlans` con `ambDiagnostic={false}`); y el formulario del diagnóstico no dice «contestat» a la organización si faltan obligatorias del cuestionario vigente (plan emitido con la v1).
 ⚠️ **Transitorio hasta la fase 5 del plan** (`3. Claude Code/2026-10-11-plan-revision-avances-08-10.md`):
 `sig.model_don_gen` ya dice «Conveni de col·laboració», pero `sig.model_don_rec`/`sig.model_com` y el
 título del PDF del convenio (plantillas `CONV`) siguen con los nombres de los tres tipos actuales.
@@ -6998,7 +6999,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.319 pruebas en 56 ficheros** de Vitest: 1.318 correctas y **1 saltada a propósito**
+   Referencia: **1.321 pruebas en 56 ficheros** de Vitest: 1.320 correctas y **1 saltada a propósito**
    (12-10-2026, fase 11: `tests/expedient.test.ts` y las claves `exp.*` compuestas; tras la fase 10 eran
    1.311, fase 10: `tests/impacte.test.ts` y las claves `imp.mod_*`; tras la fase 9 eran 1.304, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
    tras la fase 8 eran 1.294, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran

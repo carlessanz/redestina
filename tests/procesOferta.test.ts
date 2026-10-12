@@ -35,8 +35,7 @@ import {
   llegendaSimpleOferta,
   ofertaEnCurs,
   puntInteres,
-  puntOferta,
-} from '../src/lib/procesOferta'
+  puntOferta, motiuVisible } from '../src/lib/procesOferta'
 import type { FetsInteres, FetsOferta, PuntProces, RolMira } from '../src/lib/procesOferta'
 import { DICTS } from '../src/lib/i18n'
 import { readFileSync } from 'node:fs'
@@ -595,5 +594,16 @@ describe('pendent de validació (05-10-2026)', () => {
   it('gana a los envíos: sin validar no se ha enviado a nadie', () => {
     const p = puntOferta({ ...base, estado: 'pendent_validacio', nEnviades: 3, nInteressades: 1 }, 'productor')
     expect(p.variant).toBe('validacio')
+  })
+})
+
+describe('motiuVisible', () => {
+  it('no enseña los motivos que escribe el job de vencidas', () => {
+    expect(motiuVisible('vencida sin cubrir')).toBe('')
+    expect(motiuVisible('Vencida sense destí registrat')).toBe('')
+  })
+  it('sí enseña el que escribió una persona', () => {
+    expect(motiuVisible('  Es va podrir  ')).toBe('Es va podrir')
+    expect(motiuVisible(null)).toBe('')
   })
 })

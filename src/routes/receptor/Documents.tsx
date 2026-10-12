@@ -282,7 +282,7 @@ export default function ReceptorDocuments() {
       )}
 
       {/* Sus PDF, con el sustituido marcado, y el enlace a la pantalla del diagnóstico. */}
-      <LlistaPlans files={docs.filter((d) => d.objeto_tipo === 'plan')} descarregador={descarregador} />
+      <LlistaPlans files={docs.filter((d) => d.objeto_tipo === 'plan')} descarregador={descarregador} ambDiagnostic={false} />
 
       {/* Lo que la Fundación guarda de esta organización y llegó de fuera: convenios
           firmados en papel, certificados de ejercicios anteriores, planes previos. Lo sube

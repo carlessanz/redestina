@@ -166,6 +166,18 @@ function claus(prefix: string): PuntProces['claus'] {
 }
 
 /**
+ * Los motivos que escribe el JOB de vencidas no se enseñan: lo que dicen ya lo dice la frase
+ * de la etapa («Ha passat la data límit…»), y el de antes del 11-10-2026 estaba en castellano
+ * dentro de una pantalla en catalán («vencida sin cubrir»). Un motivo escrito por una persona
+ * (cancelar, marcar como no colocada) sí se enseña.
+ */
+const MOTIUS_DEL_JOB = ['vencida sin cubrir', 'vencida sense destí registrat']
+export function motiuVisible(motiu: string | null | undefined): string {
+  const m = (motiu ?? '').trim()
+  return MOTIUS_DEL_JOB.includes(m.toLowerCase()) ? '' : m
+}
+
+/**
  * En qué punto está una oferta y qué toca hacer con ella.
  *
  * El orden de las comprobaciones ES la regla de negocio: las salidas ganan a todo (una
@@ -178,7 +190,7 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
   const p = rol === 'productor' ? 'p' : 'e'
   const rec = fets.albaraRec && REC_VIU.includes(fets.albaraRec.estado) ? fets.albaraRec : null
   const num = rec?.numero ?? '—'
-  const motiu = fets.motiu ?? ''
+  const motiu = motiuVisible(fets.motiu)
   const falten = Math.max(0, fets.kgTotal - fets.kgCanalitzats)
 
   const fes = (

@@ -19,10 +19,13 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import LlistaDocuments, { type DocFila } from './LlistaDocuments'
 import { Button } from '@/components/ui/button'
 
-export default function LlistaPlans({ files, descarregador }: {
+export default function LlistaPlans({ files, descarregador, ambDiagnostic = true }: {
   /** Los documentos de `objeto_tipo = 'plan'`. */
   files: DocFila[]
   descarregador: ReturnType<typeof useDescarregaDocument>
+  /** El enlace al diagnóstico: solo lo tiene quien ofrece producto. La receptora ya no tiene
+   *  diagnóstico (revisión del 08-10-2026, fase 9), tiene «El meu perfil de recepció». */
+  ambDiagnostic?: boolean
 }) {
   const { t } = useT()
   const [substituits, setSubstituits] = useState<Set<string>>(new Set())
@@ -60,14 +63,14 @@ export default function LlistaPlans({ files, descarregador }: {
       titolKey="mydoc.pla_title"
       buitKey="mydoc.pla_empty"
       substituit={(d) => substituits.has(d.objeto_id)}
-      accio={(
+      accio={ambDiagnostic ? (
         <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
           <Link to="/organitzacio/diagnostic">
             <ClipboardList className="mr-1 size-3.5" aria-hidden />
             {t('mydoc.pla_open')}
           </Link>
         </Button>
-      )}
+      ) : undefined}
     />
   )
 }
