@@ -5989,7 +5989,10 @@ SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run
 # descargado, `PW_CHROMIUM_PATH` apunta a uno de la caché (`~/Library/Caches/ms-playwright`).
 # Tras una tanda que consuma numeración legal, `scripts/local/cargar-local.sh` deja el clon
 # como producción. Hoy: `desti-final.e2e.ts` (fase 1), `vocabulari.e2e.ts` (fase 0) y `operacio.e2e.ts`
-# (fase 2). `ajuda.ts` da `sqlCom(rol, sql)` para actuar COMO una cuenta (claims de su `sub`) y
+# (fase 2). La tanda completa (`E2E_CLON=1 E2E_ESCRIU=1 npx playwright test`, 12-10-2026) son 96 pruebas:
+# las de las fases 0-11 más `retocs.e2e.ts` (lectura, vale también en producción) y `foto-oferta.e2e.ts`
+# (la foto de la oferta en WhatsApp y correo, con el envío SIMULADO: prueba el camino, no la entrega;
+# el envío real a un número de Meta se hace a mano). Salida: `scripts/data/e2e-clon.log`. `ajuda.ts` da `sqlCom(rol, sql)` para actuar COMO una cuenta (claims de su `sub`) y
 # `entidadDe`/`productorDe`; `compte()` acepta la etiqueta (`receptor-carles`, la receptora con
 # convenio vigente: `Menjador Social de Prova` está a propósito sin él).
 E2E_CLON=1 PW_CHROMIUM_PATH=… npx playwright test     # móvil y escritorio, contra el clon
