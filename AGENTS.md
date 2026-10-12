@@ -3246,8 +3246,10 @@ Migración `20270422100000`.
   `fotos-ofertes` (`_shared/fotoOferta.ts`, 24 h en WhatsApp, 7 días en correo) y la pone como
   cabecera de imagen del mensaje con botones o encima del texto del correo. La consola de
   Mensajería registra `[imatge] …` y nunca la URL. Sin foto propia no se manda nada (el icono del
-  producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`; el envío real, a probar con un
-  número de prueba en producción.
+  producto es SVG). ⚠️ Redesplegar `whatsapp-send` y `enviar-email`. ✅ **Envío real verificado el 12-10-2026**:
+  un WhatsApp con botones y la foto de una oferta real, desde producción a un número de prueba de Meta —
+  entregado y la foto vista en el móvil—. ⚠️ Los botones de una prueba así llevan ids `prova:*`, no `accept:*`:
+  una pulsación con `accept:` entraría en el diálogo de aceptación de una oferta real.
 - E2E `tests/e2e/tauler.e2e.ts` (clon, escritorio).
 
 ### Revisión del cliente del 08-10-2026 — fase 11: el Pla de Prevenció como expediente (12-10-2026)
