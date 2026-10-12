@@ -124,13 +124,13 @@ function textos(d: DocumentPerEnviar, l: Idioma, num: string, any: string): Text
     case "CT":
       return ca
         ? {
-          assumpte: `Certificat de transacció ${any} · ${num}`,
-          titol: "El teu certificat de transacció",
+          assumpte: `Certificat d’aprofitament alimentari ${any} · ${num}`,
+          titol: "El teu certificat d’aprofitament alimentari",
           cos: `T’adjuntem el certificat <strong>${num}</strong> de les operacions de venda i transformació fetes a través de Redestina el ${any}.`,
         }
         : {
-          assumpte: `Certificado de transacción ${any} · ${num}`,
-          titol: "Tu certificado de transacción",
+          assumpte: `Certificado de aprovechamiento alimentario ${any} · ${num}`,
+          titol: "Tu certificado de aprovechamiento alimentario",
           cos: `Te adjuntamos el certificado <strong>${num}</strong> de las operaciones de venta y transformación hechas a través de Redestina en ${any}.`,
         };
     case "CR":
