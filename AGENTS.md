@@ -6973,7 +6973,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      que una entidad que no la registra nunca no queda bloqueada. Lo que la empuja es el aviso
      `recollida_per_registrar` y la cola `albarans_esborrany` del equipo. Si se quiere el freno,
      hace falta un bloqueo por «recogida pasada hace > 48 h sin registrar» en `manifestar_interes()`.
-     Decisión de producto pendiente.
+     ✅ **Decidido el 17-10-2026 (Carles): de momento se queda SIN freno.** Lo que empuja al receptor es
+     el aviso y la cola del equipo; si se quiere el freno, es la propuesta de arriba.
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7041,6 +7042,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 131 | Si el receptor puede ver quién ofrece antes de aprobar (D3) | Cerrar las columnas de `excedentes` cambia lo que ve el receptor y el equipo; la revisión del 23-09 pide justo lo contrario que el criterio original. La propuesta técnica está en la entrada, pero no se aplica sin esa decisión |
 | 132 | Si el rol `tecnic` conserva escritura directa sobre `canalizaciones` y `excedentes` | Restringirla cambia lo que puede hacer el rol técnico en el día a día del equipo; es política de la Fundación, no solo ingeniería (misma raíz que la 109) |
 | 133 · 134 | Qué frenos añadir a `recuperar-password` y `registro`, y si el alta debe verificar la titularidad del correo | Cada freno es comportamiento nuevo para personas reales (límites, esperas, verificación) y Turnstile está descartado por §7 |
+| 141 | Si un receptor que no registra la recogida debe quedar bloqueado para pedir ofertas nuevas | ✅ Decidido el 17-10-2026: **de momento, sin freno**. Se revisa si en la práctica hay recogidas que nadie registra |
 | 137 | Si se cambian los privilegios por defecto de funciones de `public` | Afecta a cómo se escriben todas las migraciones futuras; el arnés ya vigila el síntoma |
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
