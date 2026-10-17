@@ -43,6 +43,7 @@ const PUNTS: { nom: string; punt: PuntProces }[] = [
     { nom: `REC/${estado}`, punt: seguentPasAlbara({ tipo: 'REC' as const, estado, diesEntregat: 4, motiu: 'Error' }) },
     { nom: `ENT/${estado}`, punt: seguentPasAlbara({ tipo: 'ENT' as const, estado, diesEntregat: 4, motiu: 'Error' }) },
     { nom: `OPE/${estado}`, punt: seguentPasAlbara({ tipo: 'OPE' as const, estado, diesEntregat: 4, motiu: 'Error' }) },
+    { nom: `ENT-recollida/${estado}`, punt: seguentPasAlbara({ tipo: 'ENT' as const, estado, fluxRecollida: true }) },
   ])),
   ...CONVENI_TOTS.map((estado) => ({
     nom: `conveni/${estado}`,
@@ -68,6 +69,15 @@ describe('seguentPasAlbara', () => {
     }
     expect(seguentPasAlbara({ tipo: 'REC', estado: 'anulado' }).index).toBe(-1)
     expect(seguentPasAlbara({ tipo: 'REC', estado: 'rectificado' }).index).toBe(-1)
+  })
+
+  // 17-10-2026: un borrador de una recogida no se emite a mano (lo emite la validación del
+  // admin, `20270428100000`), así que su «què toca» no puede decir «emet» ni pedírselo a quien mira.
+  it('el borrador de una recogida espera la validación, no se emite', () => {
+    const p = seguentPasAlbara({ tipo: 'ENT', estado: 'borrador', fluxRecollida: true })
+    expect(p.claus.toca).toBe('alb.next_borrador_validacio')
+    expect(p.emToca).toBe(false)
+    expect(seguentPasAlbara({ tipo: 'REC', estado: 'borrador' }).claus.toca).toBe('alb.next_borrador')
   })
 
   // La divergencia que importa: no es un matiz de redacción, es qué botón existe.

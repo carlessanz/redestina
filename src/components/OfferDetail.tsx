@@ -20,6 +20,8 @@ import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../lib/aprovarResposta'
 import { etiquetaEstatOferta, PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
+import { estatValidacio } from '../lib/registreRecollida'
+import type { DatesValidacio } from '../lib/registreRecollida'
 import { refrescaComptadors } from '../lib/pendentsEquip'
 import { useAppContext } from '../hooks/useAppContext'
 import PasosProces from './proces/PasosProces'
@@ -737,6 +739,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     id: exc.id,
     kgSenseDesti: Math.max(0, total - kgVives - kgExterns),
     destiReclamat: Boolean(exc.desti_reclamat_at),
+    // Recogidas registradas por la entidad que esperan la validación de un admin (17-10-2026).
+    // `canalizaciones` se lee con `*`, así que las fechas nuevas ya llegan en la fila.
+    nRecollidesPerValidar: vives.filter((c) =>
+      estatValidacio(c as unknown as DatesValidacio) === 'pendent_validacio').length,
   }, 'equip')
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)

@@ -6,12 +6,13 @@
 // (`operacio_detall()`), y aquí solo cambia de quién se habla —la contraparte—.
 
 import { useCallback, useEffect, useState } from 'react'
-import { AlertTriangle, MapPin, Phone, User } from 'lucide-react'
+import { AlertTriangle, Clock, MapPin, Phone, Undo2, User } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { kg } from '../lib/format'
 import { quanAvis } from '../lib/avisos'
 import { carregaOperacio } from '../lib/operacio'
 import type { Operacio } from '../lib/operacio'
+import { estatValidacio } from '../lib/registreRecollida'
 import CarregantSeccio from './CarregantSeccio'
 import RegistraRecollida from './RegistraRecollida'
 
@@ -19,6 +20,8 @@ import RegistraRecollida from './RegistraRecollida'
 const CLASSE: Record<string, string> = {
   pendent: 'bg-aviso-fondo text-aviso',
   programada: 'bg-aviso-fondo text-aviso',
+  // Registrada por el receptor, esperando al equipo: neutro, no le toca a quien mira.
+  registrada: 'bg-secondary text-secondary-foreground',
   entregada: 'bg-muted text-foreground',
   confirmada: 'bg-exito-fondo text-exito',
   conciliada: 'border border-input bg-background text-muted-foreground',
@@ -52,6 +55,15 @@ export default function FitxaOperacio(
     ? { titol: t('op.ofertant'), nom: op.productor_nom, contacte: op.productor_contacte, telefon: op.productor_telefon }
     : { titol: t('op.receptor'), nom: op.entitat_nom, contacte: op.entitat_contacte, telefon: op.entitat_telefon }
 
+  // 17-10-2026: el registro del receptor espera la validación de un admin antes de que se
+  // generen los albaranes, y el admin puede devolverlo con un motivo.
+  const validacio = estatValidacio(op)
+  const assignats = op.kg_assignats != null ? Number(op.kg_assignats) : null
+  const declarats = op.kg_declarats ?? op.incidencia_recollida?.kg_reals ?? op.kg_rebuts ?? null
+  const difDeclarada = declarats != null && assignats != null
+    ? Math.round((Number(declarats) - assignats) * 100) / 100 : null
+  const motiuReceptor = op.incidencia_recollida?.descripcion ?? null
+
   const fila = (etiqueta: string, valor: React.ReactNode) => (valor == null || valor === '' ? null : (
     <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[10rem_1fr]">
       <dt className="text-xs text-muted-foreground">{etiqueta}</dt>
@@ -84,8 +96,43 @@ export default function FitxaOperacio(
 
       {/* 17-10-2026: el receptor cierra la recogida. Lo que se ha registrado, y si hay una
           diferencia que el equipo tiene que revisar. */}
-      {op.pot_registrar && <RegistraRecollida op={op} onFet={recarrega} />}
-      {op.recollida_registrada_at && (
+      {/* Devuelto por el equipo: le toca otra vez al receptor (ámbar), con el porqué. */}
+      {validacio === 'retornada' && (
+        <div className="space-y-1 rounded-lg bg-aviso-fondo p-3 text-sm" data-testid="recollida-retornada">
+          <p className="flex items-center gap-1.5 font-medium text-aviso">
+            <Undo2 className="size-4 shrink-0" aria-hidden />{t('op.retornada_t')}
+          </p>
+          {op.motiu_retorn && <p>{t('op.retornada_motiu', { motiu: op.motiu_retorn })}</p>}
+          <p className="text-muted-foreground">
+            {t(op.rol === 'entidad' ? 'op.retornada_tu' : 'op.retornada', { entitat: op.entitat_nom ?? '' })}
+          </p>
+        </div>
+      )}
+      {op.pot_registrar && validacio !== 'pendent_validacio' && <RegistraRecollida op={op} onFet={recarrega} />}
+      {/* Registrada y esperando al equipo: todavía no hay albaranes. Neutro: no es de quien mira. */}
+      {validacio === 'pendent_validacio' && (
+        <div className="space-y-1 rounded-lg bg-secondary p-3 text-sm text-secondary-foreground" data-testid="recollida-pendent-validacio">
+          <p className="flex items-center gap-1.5 font-medium">
+            <Clock className="size-4 shrink-0" aria-hidden />
+            {t(op.rol === 'entidad' ? 'op.pendent_validacio_tu' : 'op.pendent_validacio', {
+              kg: kg(declarats), entitat: op.entitat_nom ?? '',
+            })}
+          </p>
+          {difDeclarada != null && difDeclarada !== 0 && (
+            <p className="text-aviso">
+              {t('op.pendent_validacio_dif', {
+                assignats: kg(assignats),
+                dif: difDeclarada > 0 ? `+${kg(difDeclarada)}` : kg(difDeclarada),
+              })}
+            </p>
+          )}
+          {motiuReceptor && <p className="text-muted-foreground">«{motiuReceptor}»</p>}
+          <p className="text-muted-foreground">
+            {t(op.rol === 'entidad' ? 'op.pendent_validacio_nota_tu' : 'op.pendent_validacio_nota')}
+          </p>
+        </div>
+      )}
+      {op.recollida_registrada_at && validacio !== 'pendent_validacio' && validacio !== 'retornada' && (
         <p className="text-sm text-muted-foreground" data-testid="recollida-registrada">
           {t(op.rol === 'entidad' ? 'op.registrada_tu' : 'op.registrada', {
             quan: quanAvis(op.recollida_real_at ?? op.recollida_registrada_at),
@@ -94,7 +141,8 @@ export default function FitxaOperacio(
           })}
         </p>
       )}
-      {op.incidencia_recollida && op.estat_recollida !== 'conciliada' && (
+      {op.incidencia_recollida && op.estat_recollida !== 'conciliada'
+        && validacio !== 'pendent_validacio' && validacio !== 'retornada' && (
         <div className="space-y-1 rounded-lg bg-aviso-fondo p-3 text-sm" data-testid="incidencia-recollida">
           <p className="flex items-center gap-1.5 font-medium text-aviso">
             <AlertTriangle className="size-4 shrink-0" aria-hidden />{t('op.incidencia_t')}

@@ -30,12 +30,20 @@
 //    `src/lib/aprovarResposta.ts` que usa `OfferDetail`. Dos copias de las mismas sesenta
 //    líneas acabarían divergiendo justo en la comprobación de convenios (§12.19, §12.78).
 //
-// ⚠️ Las tres colas son independientes a propósito: si una migración todavía no está
+// 4. RECOLLIDES PER VALIDAR (17-10-2026, regla de Carles). El receptor registra los kilos
+//    que se ha llevado y eso ya NO genera los albaranes: los genera un admin al validarlo
+//    aquí (`validar_recollida()`), tal cual o corrigiendo los kilos con motivo, o lo devuelve
+//    al receptor con un motivo (`retornar_recollida()`). Validar emite el albarán de salida y
+//    el de recepción con número legal, los envía y los concilia: no se deshace, y el diálogo
+//    lo dice antes de pulsar.
+//
+// ⚠️ Las cuatro colas son independientes a propósito: si una migración todavía no está
 //    aplicada, su consulta falla por tabla o columna inexistente y esa sección se queda
-//    vacía, pero las otras dos siguen funcionando igual.
+//    vacía, pero las otras siguen funcionando igual.
 
 import { useCallback, useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useLocation, useNavigate } from 'react-router'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -59,6 +67,11 @@ import { ambPreu, modalitatsOferta } from '../../lib/modalitats'
 import type { Modalitat } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+import { Textarea } from '@/components/ui/textarea'
+import { retornaRecollida, validaRecollida } from '../../lib/operacio'
+import type { ResultatValidaRecollida } from '../../lib/operacio'
+import { clauErrorValidacio, estatValidacio, llegeixKg, validacioCalMotiu } from '../../lib/registreRecollida'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -159,6 +172,49 @@ type ConveniPendent = Pick<
   entidades: { id: string; nombre: string | null; poblacion: string | null } | null
 }
 
+/**
+ * Una recogida que el receptor ha registrado y espera la validación de un admin. Es la fila
+ * de `canalizaciones` con la oferta y las dos partes embebidas por sus FK.
+ */
+interface RecollidaPendent {
+  id: string
+  excedente_id: string | null
+  kg_confirmados: number | null
+  kg_reales: number | null
+  kg_declarats: number | null
+  resultat_recollida: 'coincideix' | 'menys' | 'mes' | null
+  incidencia_recollida: { resultat?: string; kg_reals?: number; descripcion?: string | null } | null
+  /** Lo que escribió el receptor al registrar, también cuando los kilos coinciden. */
+  observacions_recollida: string | null
+  data_hora_recollida: string | null
+  recollida_real_at: string | null
+  recollida_registrada_at: string | null
+  recollida_validada_at: string | null
+  recollida_retornada_at: string | null
+  valorizacion: string | null
+  entidades: { nombre: string | null } | null
+  excedentes: {
+    id_excedente: string | null
+    producto: string | null
+    productores: { name: string | null; empresa: string | null } | null
+  } | null
+}
+
+/** Lo que declaró el receptor: la columna nueva, y si no, lo que dejó la incidencia o los reales. */
+function kgDeclarats(r: RecollidaPendent): number | null {
+  const v = r.kg_declarats ?? r.incidencia_recollida?.kg_reals ?? r.kg_reales
+  return v == null ? null : Number(v)
+}
+
+/** Coincideix / menys / més, por la columna nueva o, si falta, por los números. */
+function resultatDe(r: RecollidaPendent): 'coincideix' | 'menys' | 'mes' {
+  if (r.resultat_recollida) return r.resultat_recollida
+  const d = kgDeclarats(r)
+  const a = r.kg_confirmados != null ? Number(r.kg_confirmados) : null
+  if (d == null || a == null || Math.abs(d - a) < 0.001) return 'coincideix'
+  return d < a ? 'menys' : 'mes'
+}
+
 const TIPUS_RECEPTOR = ['social', 'animal', 'transformador', 'comercial']
 
 /**
@@ -179,6 +235,10 @@ const TEXTOS_MOTIU = {
     titol: 'od.reject_appr', descripcio: 'appr.rej_desc',
     etiqueta: 'appr.rej_reason', confirmar: 'od.reject_appr',
   },
+  recollida: {
+    titol: 'vrec.ret_t', descripcio: 'vrec.ret_desc',
+    etiqueta: 'vrec.ret_motiu', confirmar: 'vrec.ret_go',
+  },
 } as const
 
 function quan(iso: string): string {
@@ -190,6 +250,7 @@ function quan(iso: string): string {
 export default function Aprovacions() {
   const { t } = useT()
   const navigate = useNavigate()
+  const location = useLocation()
   const { ctx } = useAppContext()
   const { confirma, dialeg } = useConfirma()
   const [files, setFiles] = useState<Fila[]>([])
@@ -212,7 +273,14 @@ export default function Aprovacions() {
   const [carregantConv, setCarregantConv] = useState(true)
   // Qué cola no se pudo leer. Sin esto, un fallo de carga se pintaba como «No hi ha res per
   // aprovar»: la mentira en verde que más cuesta detectar.
-  const [errCarrega, setErrCarrega] = useState<{ resp?: boolean; reg?: boolean; conv?: boolean }>({})
+  const [errCarrega, setErrCarrega] = useState<{ resp?: boolean; reg?: boolean; conv?: boolean; rec?: boolean }>({})
+  const [recollides, setRecollides] = useState<RecollidaPendent[]>([])
+  const [carregantRec, setCarregantRec] = useState(true)
+  /** El diálogo de «Valida i genera els albarans»: la fila, lo tecleado y, al acabar, el resultado. */
+  const [validant, setValidant] = useState<{
+    fila: RecollidaPendent; kg: string; motiu: string; intentat: boolean
+    error: string | null; fet: ResultatValidaRecollida | null
+  } | null>(null)
   /** Id de la fila que se está resolviendo, para no dejar pulsar dos veces. */
   const [ocupat, setOcupat] = useState<string | null>(null)
   /** El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35). */
@@ -224,6 +292,7 @@ export default function Aprovacions() {
     | { tipus: 'registre'; registre: Registre }
     | { tipus: 'conveni'; conveni: ConveniPendent }
     | { tipus: 'resposta'; fila: Fila }
+    | { tipus: 'recollida'; recollida: RecollidaPendent }
     | null
   >(null)
 
@@ -327,10 +396,44 @@ export default function Aprovacions() {
     setCarregantConv(false)
   }, [])
 
+  const carregaRecollides = useCallback(async () => {
+    // ⚠️ Lista de columnas en UN literal (§7, deuda 46). La productora va por la FK de la
+    // oferta (`excedentes.productor_id → productores`), y la receptora por la de la canalización.
+    const { data, error } = await supabase
+      .from('canalizaciones')
+      .select('id, excedente_id, kg_confirmados, kg_reales, kg_declarats, resultat_recollida, incidencia_recollida, observacions_recollida, data_hora_recollida, recollida_real_at, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, valorizacion, entidades(nombre), excedentes(id_excedente, producto, productores(name, empresa))')
+      .not('recollida_registrada_at', 'is', null)
+      .is('recollida_validada_at', null)
+      .neq('estado', 'anulada')
+      .order('recollida_registrada_at', { ascending: true })
+    if (error) {
+      // Migración de la validación sin aplicar (columnas nuevas): la sección se queda vacía
+      // y las otras tres siguen vivas.
+      console.warn('recollides per validar:', error.message)
+      setErrCarrega((e) => ({ ...e, rec: true }))
+      setRecollides([])
+      setCarregantRec(false)
+      return
+    }
+    setErrCarrega((e) => ({ ...e, rec: false }))
+    // Una devuelta al receptor que todavía no ha vuelto a registrar no es del equipo: se
+    // filtra aquí por las fechas, sin suponer qué deja la base al devolverla.
+    const totes = (data as unknown as RecollidaPendent[]) ?? []
+    setRecollides(totes.filter((r) => estatValidacio(r) === 'pendent_validacio'))
+    setCarregantRec(false)
+  }, [])
+
+  // El tablero enlaza aquí con `#recollides`: se baja a esa cola cuando ya está pintada.
+  useEffect(() => {
+    if (location.hash !== '#recollides' || carregantRec) return
+    document.getElementById('recollides')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }, [location.hash, carregantRec])
+
   useEffect(() => {
     void carrega()
     void carregaRegistres()
     void carregaConvenis()
+    void carregaRecollides()
     const canal = supabase
       .channel('aprovacions-pendents')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'oferta_respuestas' },
@@ -339,12 +442,15 @@ export default function Aprovacions() {
       // recargar. Si no está aplicada, simplemente no llega ningún evento.
       .on('postgres_changes', { event: '*', schema: 'public', table: 'membresias' },
         () => void carregaRegistres())
+      // `canalizaciones` sí está en la publicación: un registro nuevo del receptor aparece solo.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'canalizaciones' },
+        () => void carregaRecollides())
       // `convenios` NO está en la publicación de Realtime (decisión D del plan: en las
       // tablas documentales se consulta, no se suscribe), así que esa cola se refresca al
       // entrar y después de cada acción. Con un puñado de contrafirmas al día es de sobra.
       .subscribe()
     return () => { void supabase.removeChannel(canal) }
-  }, [carrega, carregaRegistres, carregaConvenis])
+  }, [carrega, carregaRegistres, carregaConvenis, carregaRecollides])
 
   /** Los dos errores que las RPC lanzan a propósito tienen texto propio. */
   function textErrorRegistre(err: { code?: string; message: string }): string {
@@ -550,6 +656,63 @@ export default function Aprovacions() {
     if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('conv.returned'))
     void carregaConvenis()
+  }
+
+  /** El texto de un rechazo de validar/retornar: por su código; si no, el de siempre. */
+  function textErrorValidacio(r: { missatge: string; codi: string | null }): string {
+    const clau = clauErrorValidacio(r.missatge, r.codi)
+    return clau ? t(clau) : textError(t, r)
+  }
+
+  function obreValidacio(r: RecollidaPendent) {
+    const d = kgDeclarats(r)
+    setValidant({
+      fila: r, kg: d != null ? String(d).replace('.', ',') : '', motiu: '',
+      intentat: false, error: null, fet: null,
+    })
+  }
+
+  async function validar() {
+    if (!validant || validant.fet) return
+    const r = validant.fila
+    const kgText = llegeixKg(validant.kg)
+    const declarats = kgDeclarats(r)
+    const assignats = r.kg_confirmados != null ? Number(r.kg_confirmados) : null
+    const kgFinal = validant.kg.trim() === '' ? declarats : kgText
+    const calMotiu = validacioCalMotiu({ kg: kgFinal, kgAssignats: assignats, kgDeclarats: declarats })
+    setValidant((v) => (v ? { ...v, intentat: true, error: null } : v))
+    if (kgFinal == null || kgFinal <= 0) return
+    if (calMotiu && validant.motiu.trim() === '') return
+    setOcupat(r.id)
+    const res = await validaRecollida({
+      canalitzacio: r.id,
+      // Null = lo que declaró el receptor; solo se manda si el admin lo ha corregido.
+      kg: declarats != null && Math.abs(kgFinal - declarats) < 0.001 ? null : kgFinal,
+      motiu: validant.motiu.trim() || null,
+    })
+    setOcupat(null)
+    if (!res.ok) {
+      setValidant((v) => (v ? { ...v, error: textErrorValidacio(res) } : v))
+      return
+    }
+    // Se queda abierto con los números emitidos: es lo que hay que poder decir después.
+    setValidant((v) => (v ? { ...v, fet: res.data } : v))
+    setRecollides((prev) => prev.filter((x) => x.id !== r.id))
+    toast.success(t('vrec.ok'))
+    void carregaRecollides()
+    void refrescaComptadors()
+  }
+
+  async function retornarRecollida(r: RecollidaPendent, motiu: string) {
+    setOcupat(r.id)
+    const res = await retornaRecollida({ canalitzacio: r.id, motiu })
+    setOcupat(null)
+    setMotiuDe(null)
+    if (!res.ok) { toast.error(textErrorValidacio(res)); return }
+    toast.success(t('vrec.ret_ok'))
+    setRecollides((prev) => prev.filter((x) => x.id !== r.id))
+    void carregaRecollides()
+    void refrescaComptadors()
   }
 
   return (
@@ -850,6 +1013,94 @@ export default function Aprovacions() {
         </CardContent>
       </Card>
 
+      {/* ── 4. Recollides per validar ── */}
+      <Card id="recollides" className="scroll-mt-20">
+        <CardHeader>
+          <CardTitle>{t('vrec.title')} ({recollides.length})</CardTitle>
+          <p className="mt-1 text-sm text-muted-foreground">{t('vrec.subtitle')}</p>
+          {!potAprovar && (
+            <p className="mt-1 text-sm text-aviso">{t('vrec.need_admin')}</p>
+          )}
+        </CardHeader>
+        <CardContent className="space-y-2">
+          {carregantRec && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
+          {errCarrega.rec && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+          {!carregantRec && !errCarrega.rec && recollides.length === 0 && (
+            <p className="text-sm text-muted-foreground">{t('vrec.empty')}</p>
+          )}
+          {recollides.map((r) => {
+            const assignats = r.kg_confirmados != null ? Number(r.kg_confirmados) : null
+            const declarats = kgDeclarats(r)
+            const dif = declarats != null && assignats != null ? Math.round((declarats - assignats) * 100) / 100 : null
+            const ambDif = dif != null && dif !== 0
+            const productora = r.excedentes?.productores?.empresa || r.excedentes?.productores?.name || '—'
+            const quanRecollida = r.recollida_real_at ?? r.data_hora_recollida
+            const motiuReceptor = r.incidencia_recollida?.descripcion ?? r.observacions_recollida ?? null
+            const bloquejat = !potAprovar || ocupat === r.id
+            return (
+              <div key={r.id} className="rounded-lg border p-3" data-testid="recollida-per-validar">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1 space-y-1">
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="font-medium">{r.excedentes?.producto ?? '—'}</span>
+                      {r.excedente_id && (
+                        <Link to={`/equip/ofertes/${r.excedente_id}`} className="text-xs text-primary hover:underline">
+                          <code>{r.excedentes?.id_excedente ?? t('vrec.oferta')}</code>
+                        </Link>
+                      )}
+                      {r.valorizacion && <Badge variant="outline">{t(`od.mod_${r.valorizacion}`)}</Badge>}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {t('vrec.parts', { entrega: productora, rep: r.entidades?.nombre ?? '—' })}
+                    </div>
+                    <div className={ambDif ? 'text-sm font-medium tabular-nums text-aviso' : 'text-sm tabular-nums'}>
+                      {t('vrec.kg', {
+                        a: assignats != null ? kgFmt(assignats) : '—',
+                        d: declarats != null ? kgFmt(declarats) : '—',
+                      })}
+                      {ambDif && ` · ${t('vrec.dif', { dif: dif! > 0 ? `+${kgFmt(dif!)}` : kgFmt(dif!) })}`}
+                    </div>
+                    <div className="text-xs text-muted-foreground">
+                      {[
+                        t(`vrec.res_${resultatDe(r)}`),
+                        quanRecollida ? t('vrec.quan', { quan: quan(quanRecollida) }) : null,
+                        r.recollida_registrada_at ? t('vrec.registrada', { quan: quan(r.recollida_registrada_at) }) : null,
+                      ].filter(Boolean).join(' · ')}
+                    </div>
+                    {motiuReceptor && (
+                      <p className="text-sm whitespace-normal">
+                        {t(resultatDe(r) === 'coincideix' ? 'vrec.obs_receptor' : 'vrec.motiu_receptor', { motiu: motiuReceptor })}
+                      </p>
+                    )}
+                  </div>
+                  <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+                    <BotoAmbMotiu size="sm" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                      disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
+                      onClick={() => obreValidacio(r)}>
+                      {t('vrec.go')}
+                    </BotoAmbMotiu>
+                    <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                      disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
+                      onClick={() => setMotiuDe({ tipus: 'recollida', recollida: r })}>
+                      {t('vrec.ret_go')}
+                    </BotoAmbMotiu>
+                  </div>
+                </div>
+              </div>
+            )
+          })}
+        </CardContent>
+      </Card>
+
+      <DialegValidacio
+        estat={validant}
+        ocupat={ocupat !== null}
+        kgFmt={kgFmt}
+        onCanvi={(c) => setValidant((v) => (v ? { ...v, ...c } : v))}
+        onTancar={() => setValidant(null)}
+        onConfirma={() => void validar()}
+      />
+
       {/* Enlazar fusiona dos organizaciones y desde aquí no se deshace, así que se dice lo
           que va a pasar antes de hacerlo — y con un diálogo propio, no `window.confirm`. */}
       <Dialog open={enllacDe !== null} onOpenChange={(v) => { if (!v) setEnllacDe(null) }}>
@@ -887,11 +1138,12 @@ export default function Aprovacions() {
         descripcio={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].descripcio)}
         etiqueta={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].etiqueta)}
         confirmar={t(TEXTOS_MOTIU[motiuDe?.tipus ?? 'registre'].confirmar)}
-        destructiu={motiuDe?.tipus !== 'conveni'}
+        destructiu={motiuDe?.tipus !== 'conveni' && motiuDe?.tipus !== 'recollida'}
         ocupat={ocupat !== null}
         onConfirma={(m) => {
           if (!motiuDe) return
           if (motiuDe.tipus === 'conveni') void retornar(motiuDe.conveni, m)
+          else if (motiuDe.tipus === 'recollida') void retornarRecollida(motiuDe.recollida, m)
           else if (motiuDe.tipus === 'resposta') void rebutjarFila(motiuDe.fila, m)
           else void rebutjarRegistre(motiuDe.registre, m)
         }}
@@ -902,3 +1154,109 @@ export default function Aprovacions() {
   )
 }
 
+/**
+ * «Valida i genera els albarans». Los kilos salen prellenados con lo que declaró el receptor
+ * y se pueden corregir; el motivo es obligatorio si hay diferencia con lo asignado o si se
+ * corrige lo declarado (la base lo exige igual: `cal_motiu_validacio`). Al acabar se queda
+ * abierto con los números emitidos.
+ *
+ * ⚠️ No se cierra al pinchar fuera: con un motivo escrito y a media llamada, un clic
+ *    despistado sería caro (mismo criterio que los diálogos asistidos).
+ */
+function DialegValidacio({
+  estat, ocupat, kgFmt, onCanvi, onTancar, onConfirma,
+}: {
+  estat: {
+    fila: RecollidaPendent; kg: string; motiu: string; intentat: boolean
+    error: string | null; fet: ResultatValidaRecollida | null
+  } | null
+  ocupat: boolean
+  kgFmt: (n: number) => string
+  onCanvi: (c: { kg?: string; motiu?: string }) => void
+  onTancar: () => void
+  onConfirma: () => void
+}) {
+  const { t } = useT()
+  const r = estat?.fila ?? null
+  const assignats = r?.kg_confirmados != null ? Number(r.kg_confirmados) : null
+  const declarats = r ? kgDeclarats(r) : null
+  const kgFinal = estat ? (estat.kg.trim() === '' ? declarats : llegeixKg(estat.kg)) : null
+  const calMotiu = validacioCalMotiu({ kg: kgFinal, kgAssignats: assignats, kgDeclarats: declarats })
+  const errKg = estat?.intentat && (kgFinal == null || kgFinal <= 0)
+  const errMotiu = estat?.intentat && calMotiu && (estat?.motiu.trim() ?? '') === ''
+  const dif = kgFinal != null && assignats != null ? Math.round((kgFinal - assignats) * 100) / 100 : null
+  const venda = r?.valorizacion === 'venda' || r?.valorizacion === 'maquila'
+  const fet = estat?.fet ?? null
+
+  return (
+    <Dialog open={estat !== null} onOpenChange={(v) => { if (!v && !ocupat) onTancar() }}>
+      <DialogContent className="max-h-[85dvh] overflow-y-auto"
+        onInteractOutside={(e) => e.preventDefault()}>
+        <DialogHeader>
+          <DialogTitle>{t('vrec.dlg_t')}</DialogTitle>
+          <DialogDescription>
+            {r ? t('vrec.dlg_desc', {
+              producte: r.excedentes?.producto ?? '—', entitat: r.entidades?.nombre ?? '—',
+            }) : ''}
+          </DialogDescription>
+        </DialogHeader>
+
+        {fet ? (
+          <div className="space-y-2 rounded-lg bg-exito-fondo p-3 text-sm text-exito" data-testid="validacio-feta">
+            <p className="font-medium">{t(fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}</p>
+            {fet.albara && <p>{t('vrec.fet_sortida', { num: fet.albara })}</p>}
+            {fet.rec?.numero && <p>{t('vrec.fet_rec', { num: fet.rec.numero })}</p>}
+            {fet.esperant_altres && <p>{t('vrec.fet_esperant')}</p>}
+          </div>
+        ) : r && (
+          <div className="space-y-4">
+            <p className="text-sm tabular-nums">
+              {t('vrec.kg', {
+                a: assignats != null ? kgFmt(assignats) : '—',
+                d: declarats != null ? kgFmt(declarats) : '—',
+              })}
+            </p>
+            <div className="grid grid-cols-1 gap-4">
+              <div className="space-y-1.5">
+                <Label htmlFor="vrec-kg">{t('vrec.f_kg')}</Label>
+                <Input id="vrec-kg" inputMode="decimal" className="text-base md:text-sm"
+                  value={estat!.kg} onChange={(e) => onCanvi({ kg: e.target.value })}
+                  aria-invalid={errKg || undefined} />
+                {dif != null && dif !== 0 && (
+                  <p className="text-xs text-aviso">
+                    {t('vrec.dif_assignats', { a: kgFmt(assignats!), dif: dif > 0 ? `+${kgFmt(dif)}` : kgFmt(dif) })}
+                  </p>
+                )}
+                {errKg && <p role="alert" className="text-sm text-error">{t('rrec.err_kg')}</p>}
+              </div>
+              <div className="space-y-1.5">
+                <Label htmlFor="vrec-motiu">{t(calMotiu ? 'vrec.f_motiu_obl' : 'vrec.f_motiu')}</Label>
+                <Textarea id="vrec-motiu" rows={3} value={estat!.motiu}
+                  onChange={(e) => onCanvi({ motiu: e.target.value })}
+                  aria-invalid={errMotiu || undefined}
+                  placeholder={t('vrec.f_motiu_ph')} />
+                {errMotiu && <p role="alert" className="text-sm text-error">{t('vrec.err_cal_motiu')}</p>}
+              </div>
+            </div>
+            {/* Lo que va a pasar, antes de pulsar: documentos con número legal que se envían. */}
+            <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+              {t(venda ? 'vrec.avis_venda' : 'vrec.avis', { kg: kgFinal != null ? kgFmt(kgFinal) : '—' })}
+            </p>
+            {estat!.error && <p role="alert" className="text-sm text-error">{estat!.error}</p>}
+          </div>
+        )}
+
+        <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
+          <Button variant="outline" className="h-11 md:h-9" disabled={ocupat} onClick={onTancar}>
+            {t(fet ? 'c.close' : 'c.cancel')}
+          </Button>
+          {!fet && (
+            <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={onConfirma}>
+              {ocupat && <Loader2 className="size-4 animate-spin" />}{t('vrec.dlg_go')}
+            </Button>
+          )}
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
+}

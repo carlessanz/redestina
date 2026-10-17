@@ -333,38 +333,14 @@ if (!dryRun) {
 // ---------------------------------------------------------------------------
 // 5. El albarán de la canalización aprobada
 // ---------------------------------------------------------------------------
-// El trigger `canalizaciones_crea_albaranes` ya dejó el ENT (y el REC del registro) en
-// BORRADOR al insertar la canalización. Emitirlo es lo que le da número, congela las
-// partes y encarga el PDF (`albaran_emet_document` → trigger de encolado).
+// El trigger `canalizaciones_crea_albaranes` deja el ENT (y el REC del registro) en BORRADOR
+// al insertar la canalización, y AHÍ SE QUEDAN (17-10-2026, `20270428100000`): los albaranes
+// de una recogida solo se emiten cuando el receptor la registra y un admin la valida
+// (`validar_recollida`). `emitir_albaran` los rechaza con `recollida_no_validada`, así que
+// este fixture ya no emite nada.
 
-paso("Emisión del albarán de entrega");
-
-if (dryRun) {
-  console.log("  [dry-run] emitiría el ENT de la canalización aprobada");
-} else if (!canalizacion) {
-  console.log("  sin canalización aprobada: nada que emitir");
-} else {
-  const admin = await sesion("superadmin");
-  const { data: albarans } = await admin.from("albaranes")
-    .select("id, tipo, estado, numero_completo")
-    .eq("canalizacion_id", canalizacion);
-
-  for (const a of albarans ?? []) {
-    if (a.estado !== "borrador") {
-      console.log(`  ${a.tipo} ${a.numero_completo ?? ""}: ya estaba ${a.estado}`);
-      continue;
-    }
-    const { data, error } = await admin.rpc("emitir_albaran", {
-      p_id: a.id,
-      p_recogida: { fecha_hora: new Date().toISOString() },
-      p_lineas: null,
-      p_idioma: "ca",
-    });
-    if (error) throw new Error(`emitir ${a.tipo}: ${error.message}`);
-    const emitido = Array.isArray(data) ? data[0] : data;
-    console.log(`  ${a.tipo} emitido: ${emitido.numero_completo}`);
-  }
-}
+paso("Albarán de entrega");
+console.log("  queda en borrador: se emitirá cuando un admin valide la recogida registrada");
 
 // ---------------------------------------------------------------------------
 // Resumen
@@ -373,8 +349,6 @@ if (dryRun) {
 paso("Resumen");
 console.log("  Tres respuestas de entidad: una aprobada y canalizada, una pendiente de");
 console.log("  aprobar en la cola y una rechazada con su motivo.");
-console.log("  El albarán de entrega de la aprobada queda emitido, con número y con su");
-console.log("  documento encargado. El PDF lo genera la Edge Function `generar-documento`,");
-console.log("  así que si el secreto `documentos_secret` no está puesto, el documento se");
-console.log("  queda en «pendent» y no es un fallo del fixture.");
+console.log("  El albarán de entrega de la aprobada queda en borrador, sin número: se emite");
+console.log("  cuando la receptora registra la recogida y un admin la valida.");
 if (dryRun) console.log("\n  (dry-run: no se ha escrito nada)");

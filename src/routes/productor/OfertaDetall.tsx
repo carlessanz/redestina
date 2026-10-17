@@ -29,6 +29,7 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { cancelaOferta, carregaDestins } from '../../lib/ofertes'
+import { carregaRecollidesPerValidar } from '../../lib/operacio'
 import DestiFinal from '../../components/DestiFinal'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
@@ -68,6 +69,7 @@ export default function ProductorOfertaDetall() {
   const [canalitzacions, setCanalitzacions] = useState<CanalitzacioMeva[]>([])
   const [rec, setRec] = useState<RecMeu | null>(null)
   const [pendentDeMi, setPendentDeMi] = useState(false)
+  const [perValidar, setPerValidar] = useState(0)
   const [progres, setProgres] = useState<ProgresOferta | null>(null)
   /** Kilos con destino EXTERNO registrado (`excedente_destins`): entran en «falta destí». */
   const [kgExterns, setKgExterns] = useState(0)
@@ -80,12 +82,15 @@ export default function ProductorOfertaDetall() {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     // Sin `.eq()` de organización en el albarán: la RLS ya devuelve solo lo suyo, igual
     // que en `productor/Documents.tsx`.
-    const [e, c, dx] = await Promise.all([
+    const [e, c, dx, pv] = await Promise.all([
       supabase.from('excedentes').select('*').eq('id', id).maybeSingle(),
       supabase.from('canalizaciones').select('id, kg_confirmados, kg_reales, estado').eq('excedente_id', id)
         .order('created_at', { ascending: true }),
       carregaDestins([id]),
+      // Recogidas registradas por la entidad que esperan la validación del equipo (17-10-2026).
+      carregaRecollidesPerValidar([id]),
     ])
+    setPerValidar(pv[id] ?? 0)
     setKgExterns((dx.data ?? []).reduce((s, d) => s + Number(d.kg), 0))
     // El REC de una ESPIGOLADA cuelga de la jornada, no de la oferta: sin buscarlo por
     // `espigolada_id`, una oferta convertida y ya conciliada decía «Espera el contacte de
@@ -192,6 +197,7 @@ export default function ProductorOfertaDetall() {
     motiu: oferta.motivo_no_colocada ?? null,
     vencuda,
     pendentDeMi,
+    nRecollidesPerValidar: perValidar,
     // F3. Aquí NO hay ningún botón, y no es un olvido: quien avisa de que tiene un campo
     // sin cosechar no decide qué se hace con él —el destino lo elige el equipo (§6ter)—,
     // así que lo único que le toca es saberlo. `puntOferta` lo dice con una nota.

@@ -51,6 +51,8 @@ const FILES: readonly FilaCua[] = [
   { cua: 'convenis_contrasignar', desti: '/equip/aprovacions', nomesAdmin: true },
   { cua: 'ofertes_per_validar', desti: '/equip/ofertes?tab=validar', nomesAdmin: true },
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
+  // 17-10-2026: la cuarta cola de Aprovacions; el ancla baja directamente a ella.
+  { cua: 'recollides_per_validar', desti: '/equip/aprovacions#recollides', nomesAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_modificades', desti: '/equip/ofertes' },
@@ -70,7 +72,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'espigolades_per_convertir',
+  'ofertes_vencudes', 'costos', 'espigolades_per_convertir', 'recollides_per_validar',
   // Fase 8: «què ha passat → què falta → acció» en todas las filas.
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]

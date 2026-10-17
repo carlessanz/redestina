@@ -17,6 +17,8 @@ export type TipusAvis =
   | 'oferta_modificada' | 'oferta_enviada' | 'certificat_per_revisar'
   // 20270426100000: pasada la hora de recogida, se pide al receptor que registre los kilos.
   | 'recollida_per_registrar'
+  // 17-10-2026: un admin devuelve al receptor el registro de la recogida, con un motivo.
+  | 'recollida_retornada'
 
 export interface Avis {
   id: string
@@ -108,6 +110,8 @@ export function varsAvis(a: Pick<Avis, 'params'>): Record<string, string | numbe
     productor: String(p.productor ?? ''),
     motiu: String(p.motiu ?? ''),
     kg_abans: fmt(p.kg_abans),
+    // Lo que declaró el receptor al registrar la recogida (`recollida_retornada`).
+    kg_decl: fmt(p.kg_declarats),
     // «10/10 · 10:00» en hora de Madrid, como en el correo (`_shared/textAvis.ts`).
     quan: quanAvis(p.recollida_at),
     exercici: String(p.exercici ?? ''),
@@ -166,7 +170,7 @@ export interface Contrapart {
   /** Fase 2 de la revisión del 08-10-2026: la recogida, para la lista y la ficha. */
   data_hora_recollida: string | null
   kg_aprovats: number | null
-  estat_recollida: 'pendent' | 'programada' | 'entregada' | 'confirmada' | 'conciliada' | null
+  estat_recollida: 'pendent' | 'programada' | 'registrada' | 'entregada' | 'confirmada' | 'conciliada' | null
 }
 
 export async function carregaContraparts(): Promise<Contrapart[]> {

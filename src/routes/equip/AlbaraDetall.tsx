@@ -16,7 +16,7 @@
 // lo lea. Si algún día aparece aquí un campo de euros, está mal.
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Link, useNavigate, useParams } from 'react-router'
 import { AlertTriangle, ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
@@ -34,6 +34,8 @@ import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
 import { diferenciaKg, incidenciesDiferencia, llegeixIncidencia } from '../../lib/incidenciaRecollida'
 import type { IncidenciaDiferencia } from '../../lib/incidenciaRecollida'
+import { estatValidacio } from '../../lib/registreRecollida'
+import type { DatesValidacio } from '../../lib/registreRecollida'
 import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
@@ -209,6 +211,11 @@ export default function AlbaraDetall() {
   // La diferencia de kilos que declaró la entidad receptora al registrar la recogida
   // (17-10-2026). Mientras exista, el albarán no se concilia solo.
   const [incidencies, setIncidencies] = useState<IncidenciaFila[]>([])
+  // 17-10-2026 (regla de Carles): los albaranes de una recogida —no de una espigolada— solo
+  // se emiten cuando un admin valida lo que registró el receptor (`validar_recollida()`). Aquí
+  // se decide si este albarán es de ese flujo, y si su recogida ya espera en la cola.
+  const [fluxRecollida, setFluxRecollida] = useState(false)
+  const [recollidaPerValidar, setRecollidaPerValidar] = useState(false)
 
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -312,6 +319,30 @@ export default function AlbaraDetall() {
       setIncidencies(desCanal.map((x) => ({ ...x.inc, entitat: x.entidad ? (noms[x.entidad] ?? null) : null })))
     } else {
       setIncidencies(incidenciesDiferencia(fila.incidencias).map((i) => ({ ...i, entitat: null })))
+    }
+
+    // ¿Es un albarán del flujo de recogida? ENT/OPE de una canalización que no viene de una
+    // espigolada, o REC de una oferta (no de una jornada). La base lo impone igual
+    // (`recollida_no_validada`); esto solo lo dice antes de pulsar.
+    type CanalValidacio = DatesValidacio & { id: string; excedentes: { espigolada_id: string | null } | null }
+    const consultaVal = fila.tipo !== 'REC' && fila.canalizacion_id
+      ? supabase.from('canalizaciones')
+        .select('id, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
+        .eq('id', fila.canalizacion_id)
+      : fila.tipo === 'REC' && fila.excedente_id && !fila.espigolada_id
+        ? supabase.from('canalizaciones')
+          .select('id, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
+          .eq('excedente_id', fila.excedente_id).neq('estado', 'anulada')
+        : null
+    if (consultaVal) {
+      const { data: cv, error: errVal } = await consultaVal
+      const canals = (cv as unknown as CanalValidacio[] | null) ?? []
+      // Si la lectura falla (migración sin aplicar), no se apaga nada: manda la base.
+      setFluxRecollida(!errVal && canals.length > 0 && canals.every((c) => !c.excedentes?.espigolada_id))
+      setRecollidaPerValidar(!errVal && canals.some((c) => estatValidacio(c) === 'pendent_validacio'))
+    } else {
+      setFluxRecollida(false)
+      setRecollidaPerValidar(false)
     }
 
     if (llistaEnllacos.length) {
@@ -555,6 +586,7 @@ export default function AlbaraDetall() {
     estado: albara.estado,
     diesEntregat,
     motiu: albara.motivo_anulacion,
+    fluxRecollida,
   })
   const foraDeCami = punt.index < 0
 
@@ -564,8 +596,10 @@ export default function AlbaraDetall() {
   // esta pantalla tenía; esto solo la pone en palabras.
   const inactiu = albara.estado === 'anulado' || albara.estado === 'rectificado'
 
+  // Un borrador de una recogida no se emite desde aquí: lo emite la validación del admin.
+  const emetPerValidacio = esBorrador && fluxRecollida
   const motiuEmetre = esBorrador
-    ? undefined
+    ? (emetPerValidacio ? t('alb.why_emit_validacio') : undefined)
     : t(inactiu ? 'alb.why_inactive' : 'alb.why_already_emitted')
 
   const motiuEntregar = albara.estado === 'emitido'
@@ -882,8 +916,8 @@ export default function AlbaraDetall() {
           <div className="flex flex-wrap gap-2">
             <BotoAmbMotiu
               className="h-11 whitespace-normal md:h-9"
-              variant={esBorrador ? 'default' : 'outline'}
-              disabled={ocupat || !esBorrador}
+              variant={esBorrador && !emetPerValidacio ? 'default' : 'outline'}
+              disabled={ocupat || !esBorrador || emetPerValidacio}
               motiu={motiuEmetre}
               onClick={() => void emet()}
             >
@@ -935,6 +969,20 @@ export default function AlbaraDetall() {
             </div>
           </div>
 
+          {/* El porqué del «Emet» gris, visible también en táctil (el tooltip no existe ahí). */}
+          {emetPerValidacio && (
+            <p className="text-sm text-muted-foreground" data-testid="emet-per-validacio">
+              {t(recollidaPerValidar ? 'alb.emit_validacio_pendent' : 'alb.emit_validacio')}
+              {recollidaPerValidar && (
+                <>
+                  {' '}
+                  <Link to="/equip/aprovacions#recollides" className="text-primary hover:underline">
+                    {t('alb.emit_validacio_cua')}
+                  </Link>
+                </>
+              )}
+            </p>
+          )}
           {!potAprovar && (
             <p className="text-xs text-muted-foreground">{t('alb.need_approver')}</p>
           )}
@@ -951,9 +999,14 @@ export default function AlbaraDetall() {
           <CardHeader><CardTitle className="text-base">{t('recol.title')}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-muted-foreground">{t('recol.desc')}</p>
-            <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgRecollida(true)}>
+            {/* Desde el 17-10-2026 confirmar la recogida en nombre de las partes también emite
+                los albaranes: es de admin (`confirmar_recollida()` lo exige), como validar. */}
+            <BotoAmbMotiu className="h-11 whitespace-normal md:h-9" disabled={!potAprovar}
+              motiu={potAprovar ? undefined : t('recol.need_admin')}
+              onClick={() => setDlgRecollida(true)}>
               {t('recol.btn')}
-            </Button>
+            </BotoAmbMotiu>
+            {!potAprovar && <p className="text-xs text-muted-foreground">{t('recol.need_admin')}</p>}
           </CardContent>
         </Card>
       )}

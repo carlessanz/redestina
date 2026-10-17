@@ -75,6 +75,8 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'al camp', fets: { ...base, producteAlCamp: true } },
     { nom: 'al camp + interès', fets: { ...base, producteAlCamp: true, nEnviades: 2, nInteressades: 1 } },
     { nom: 'ja és espigolada', fets: { ...base, estado: 'borrador', producteAlCamp: true, espigoladaId: 'e1' } },
+    // 17-10-2026: la entidad registró la recogida y el equipo todavía no la ha validado.
+    { nom: 'recollida per validar', fets: { ...base, estado: 'bloqueada', kgCanalitzats: 100, nRecollidesPerValidar: 2 } },
   ]
   for (const rol of rols) {
     for (const c of combinacions) fora.push({ nom: `${rol}/${c.nom}`, punt: puntOferta(c.fets, rol) })
@@ -95,6 +97,9 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'coberta sense ella', fets: { estado: 'acceptada', aprovacio: 'pendent', ofertaEstado: 'bloqueada' } },
     { nom: 'rebuda i ja coberta', fets: { estado: 'pendent', aprovacio: 'pendent', ofertaEstado: 'cerrada' } },
     { nom: 'declinada', fets: { estado: 'rebutjada', aprovacio: 'pendent', ofertaEstado: 'publicada' } },
+    // 17-10-2026: registrada y esperando al equipo, y devuelta por el equipo.
+    { nom: 'registrada per validar', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 40, recollida: 'registrada', kgDeclarats: 38 } },
+    { nom: 'retornada', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 40, recollida: 'retornada', motiuRetorn: 'Falta el pes' } },
   ]
   for (const c of interessos) fora.push({ nom: `receptor/${c.nom}`, punt: puntInteres(c.fets) })
   return fora
@@ -203,6 +208,21 @@ describe('«vençuda» solo desplaza las dos primeras etapas, y solo para el equ
   })
 })
 
+describe('puntOferta: recogidas registradas pendientes de validar (17-10-2026)', () => {
+  it('sin REC y con registros por validar: «recollida» por validar, le toca al equipo', () => {
+    const f: FetsOferta = { ...base, estado: 'bloqueada', kgCanalitzats: 100, nRecollidesPerValidar: 1 }
+    const e = puntOferta(f, 'equip')
+    expect([e.etapa, e.index, e.variant, e.emToca, e.enllac]).toEqual(['recollida', 2, 'validacio', true, '/equip/aprovacions#recollides'])
+    const p = puntOferta(f, 'productor')
+    expect([p.etapa, p.variant, p.emToca]).toEqual(['recollida', 'validacio', false])
+    expect(estatSimpleOferta(p).estat).toBe('sortida')
+  })
+  it('con el REC ya emitido manda el albarán', () => {
+    const p = puntOferta({ ...base, estado: 'bloqueada', albaraRec: rec('conciliado'), nRecollidesPerValidar: 1 }, 'equip')
+    expect(p.etapa).toBe('tancada')
+  })
+})
+
 describe('puntInteres: la lectura del receptor', () => {
   const b: FetsInteres = { estado: 'pendent', aprovacio: 'pendent', ofertaEstado: 'publicada' }
 
@@ -248,6 +268,26 @@ describe('puntInteres: la lectura del receptor', () => {
     // Conciliada, la incidencia ya está revisada: manda el cierre.
     const tancada = puntInteres({ ...ap, kg: 35, albaraEnt: { estado: 'conciliado', numero: 'ENT-1' } })
     expect([tancada.etapa, tancada.variant]).toEqual(['tancada', null])
+  })
+
+  it('registrada y pendiente de validar: espera al equipo, sin albaranes', () => {
+    const ap: FetsInteres = { ...b, estado: 'acceptada', aprovacio: 'aprovada', kg: 40 }
+    const p = puntInteres({ ...ap, recollida: 'registrada', kgDeclarats: 38 })
+    expect([p.etapa, p.index, p.variant, p.emToca]).toEqual(['entrega', 3, 'validacio', false])
+    expect(p.vars.kg).toBe(38)
+    expect(estatSimpleInteres(p).estat).toBe('assignada')
+    // Gana al ENT entregado del circuito anterior: a la entidad ya no le pide nada.
+    const ambEnt = puntInteres({ ...ap, recollida: 'registrada', albaraEnt: { estado: 'entregado', numero: 'ENT-1' } })
+    expect(ambEnt.variant).toBe('validacio')
+    // Validada y conciliada, manda el albarán.
+    const tancada = puntInteres({ ...ap, recollida: 'registrada', albaraEnt: { estado: 'conciliado', numero: 'ENT-1' } })
+    expect(tancada.etapa).toBe('tancada')
+  })
+
+  it('retornada por el equipo: vuelve a «Assignada», le toca y dice el motivo', () => {
+    const p = puntInteres({ ...b, estado: 'acceptada', aprovacio: 'aprovada', kg: 40, recollida: 'retornada', motiuRetorn: 'Falta el pes' })
+    expect([p.etapa, p.index, p.variant, p.emToca]).toEqual(['assignada', 2, 'retornada', true])
+    expect(p.vars.motiu).toBe('Falta el pes')
   })
 
   it('las tres salidas, y su orden de precedencia', () => {
@@ -468,9 +508,10 @@ describe('emToca dice la verdad sobre quién actúa', () => {
 
   it('el receptor actúa al pedir la oferta, al registrar la recogida y al confirmar la entrega', () => {
     // Desde el 17-10-2026 la recogida la cierra el receptor: con el interés asignado, le toca
-    // registrar los kilos reales (que es lo que genera los albaranes).
+    // registrar los kilos reales, y volver a hacerlo si el equipo se lo devuelve. Registrada y
+    // pendiente de validar, ya no le toca: es del equipo.
     const ambToca = PUNTS.filter((p) => p.nom.startsWith('receptor/') && p.punt.emToca)
-    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/assignada', 'receptor/ent entregat', 'receptor/rebuda'])
+    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/assignada', 'receptor/ent entregat', 'receptor/rebuda', 'receptor/retornada'])
   })
 
   it('cada punto con enlace apunta a la ruta del panel que lo mira', () => {

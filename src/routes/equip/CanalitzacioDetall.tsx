@@ -771,12 +771,14 @@ export default function CanalitzacioDetall() {
                             )}
                             {(a.tipo === 'ENT' || a.tipo === 'OPE')
                               && ['borrador', 'emitido', 'entregado'].includes(a.estado) && (
-                              <Button
+                              <BotoAmbMotiu
                                 size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                                disabled={!potAprovar}
+                                motiu={potAprovar ? undefined : t('recol.need_admin')}
                                 onClick={() => void obreRecollida(a.id)}
                               >
                                 {t('recol.btn')}
-                              </Button>
+                              </BotoAmbMotiu>
                             )}
                             <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
                               <Link to={`/equip/albarans/${a.id}`}>{t('canalz.b_obre')}</Link>

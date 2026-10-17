@@ -131,3 +131,46 @@ describe('recollida_confirmada: los kg que registra el receptor (17-10-2026)', (
     }
   })
 })
+
+describe('recollida_per_registrar y recollida_retornada: el equipo valida el registro (17-10-2026)', () => {
+  const BASE = { producte: 'Carbassó', kg: 200, kg_declarats: 180, motiu: 'Falta la foto del pes', excedente_id: 'exc-1' }
+  it('recollida_per_registrar no promete que registrar genera los albaranes', () => {
+    const ca = textAvis('recollida_per_registrar', BASE, 'ca', 'x', 'entidad')
+    const es = textAvis('recollida_per_registrar', BASE, 'es', 'x', 'entidad')
+    expect(ca.cuerpo).not.toContain('amb això es generen')
+    expect(es.cuerpo).not.toContain('con eso se generan')
+    expect(ca.cuerpo).toContain('L’equip de Redestina ho revisarà i, llavors, es generaran els albarans.')
+    expect(es.cuerpo).toContain('El equipo de Redestina lo revisará y, entonces, se generarán los albaranes.')
+  })
+  it('recollida_retornada en catalán: producto, kg declarados, motivo y qué hacer', () => {
+    const t = textAvis('recollida_retornada', BASE, 'ca', 'resp-1', 'entidad')
+    expect(t.asunto).toBe('Torna a registrar la recollida de Carbassó')
+    expect(t.titulo).toBe('Recollida per tornar a registrar')
+    expect(t.cuerpo).toBe(
+      'L’equip de Redestina ha revisat el registre de la recollida de Carbassó (180 kg declarats) i necessita que el tornis a registrar.\n'
+      + 'Motiu: Falta la foto del pes\n'
+      + 'Entra a la fitxa de l’operació i registra de nou els quilos que t’has endut.')
+    expect(t.boton).toBe('Registrar la recollida')
+    expect(t.ruta).toBe('/receptor/interessos')
+  })
+  it('recollida_retornada en castellano', () => {
+    const t = textAvis('recollida_retornada', BASE, 'es', 'resp-1', 'entidad')
+    expect(t.asunto).toBe('Vuelve a registrar la recogida de Carbassó')
+    expect(t.titulo).toBe('Recogida por volver a registrar')
+    expect(t.cuerpo).toBe(
+      'El equipo de Redestina ha revisado el registro de la recogida de Carbassó (180 kg declarados) y necesita que lo vuelvas a registrar.\n'
+      + 'Motivo: Falta la foto del pes\n'
+      + 'Entra en la ficha de la operación y registra de nuevo los kilos que te has llevado.')
+    expect(t.boton).toBe('Registrar la recogida')
+    expect(t.ruta).toBe('/receptor/interessos')
+  })
+  it('recollida_retornada sin motivo ni kg declarados no deja huecos ni marcadores', () => {
+    for (const idioma of ['ca', 'es'] as const) {
+      const t = textAvis('recollida_retornada', { producte: 'Carbassó' }, idioma, 'x', 'entidad')
+      expect(t.cuerpo).not.toMatch(/Motiu|Motivo|declarats|declarados/)
+      for (const v of [t.asunto, t.titulo, t.cuerpo, t.boton]) {
+        expect(v).not.toMatch(/\{[a-z_]+\}|undefined|null|NaN|—|\(\s*\)/)
+      }
+    }
+  })
+})

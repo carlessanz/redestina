@@ -19,12 +19,14 @@ export type TipusAvis =
   | "oferta_modificada"
   | "oferta_enviada"
   | "certificat_per_revisar"
-  | "recollida_per_registrar";
+  | "recollida_per_registrar"
+  | "recollida_retornada";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
   "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
+  "recollida_retornada",
 ];
 
 /** A quién va el aviso: decide el enlace de los que reciben las dos partes (fase 2). */
@@ -147,7 +149,9 @@ export function textAvis(
     }
     case "recollida_per_registrar": {
       // 17-10-2026: a la hora de recogida ya no se emite nada; se le pide al receptor que
-      // registre los kilos reales, que es lo que genera los albaranes.
+      // registre los kilos reales. Desde el mismo día el registro lo valida el equipo, y
+      // solo entonces se generan los albaranes: el texto no puede prometer que registrar
+      // los genera.
       const q = quan(params.recollida_at, idioma);
       return {
         asunto: es ? `Registra la recogida de ${producte}` : `Registra la recollida de ${producte}`,
@@ -156,11 +160,36 @@ export function textAvis(
           ? `Ya ha pasado la hora de recogida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`
           : `Ja ha passat l’hora de recollida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`)
           + (es
-            ? "\nCuando lo hayas recogido, entra en Redestina y registra los kilos que te has llevado: con eso se generan los albaranes."
-            : "\nQuan l’hagis recollit, entra a Redestina i registra els quilos que t’has endut: amb això es generen els albarans.")
+            ? "\nCuando lo hayas recogido, entra en Redestina y registra los kilos que te has llevado. El equipo de Redestina lo revisará y, entonces, se generarán los albaranes."
+            : "\nQuan l’hagis recollit, entra a Redestina i registra els quilos que t’has endut. L’equip de Redestina ho revisarà i, llavors, es generaran els albarans.")
           + (es
             ? "\nSi no has podido ir o no tienes acceso al panel, avisa al equipo de Redestina."
             : "\nSi no hi has pogut anar o no tens accés al panell, avisa l’equip de Redestina."),
+        boton: es ? "Registrar la recogida" : "Registrar la recollida",
+        ruta: "/receptor/interessos",
+      };
+    }
+    case "recollida_retornada": {
+      // 17-10-2026: el equipo revisa los kilos que declara el receptor y, si no cuadran, le
+      // devuelve el registro con un motivo para que lo vuelva a hacer. Va a la entidad.
+      const motiu = s(params.motiu);
+      const declarats = params.kg_declarats != null && params.kg_declarats !== ""
+        && Number.isFinite(Number(params.kg_declarats));
+      return {
+        asunto: es ? `Vuelve a registrar la recogida de ${producte}` : `Torna a registrar la recollida de ${producte}`,
+        titulo: es ? "Recogida por volver a registrar" : "Recollida per tornar a registrar",
+        cuerpo: (es
+          ? `El equipo de Redestina ha revisado el registro de la recogida de ${producte}`
+          : `L’equip de Redestina ha revisat el registre de la recollida de ${producte}`)
+          + (declarats
+            ? (es
+              ? ` (${kg(params.kg_declarats, idioma)} kg declarados) y necesita que lo vuelvas a registrar.`
+              : ` (${kg(params.kg_declarats, idioma)} kg declarats) i necessita que el tornis a registrar.`)
+            : (es ? " y necesita que lo vuelvas a registrar." : " i necessita que el tornis a registrar."))
+          + (motiu ? `\n${es ? "Motivo" : "Motiu"}: ${motiu}` : "")
+          + (es
+            ? "\nEntra en la ficha de la operación y registra de nuevo los kilos que te has llevado."
+            : "\nEntra a la fitxa de l’operació i registra de nou els quilos que t’has endut."),
         boton: es ? "Registrar la recogida" : "Registrar la recollida",
         ruta: "/receptor/interessos",
       };

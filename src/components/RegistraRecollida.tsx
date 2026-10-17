@@ -1,15 +1,16 @@
 // «Registra la recollida» (17-10-2026): el receptor, después de recoger, dice cuántos kilos
-// se ha llevado. Con eso la base genera los dos albaranes —ofertant → Espigoladors y
-// Espigoladors → receptor— por los kilos reales (`registrar_recollida()`, 20270426100000).
+// se ha llevado (`registrar_recollida()`). Desde la regla de Carles del mismo día, eso NO
+// genera los albaranes: el registro queda «pendent de validació de l'equip» y es un admin
+// quien lo valida en Aprovacions —y entonces se emiten los dos, ofertant → Espigoladors y
+// Espigoladors → receptor— o se lo devuelve con un motivo.
 //
 // Va DENTRO de la ficha de la operación y no en un diálogo propio: la ficha ya se abre en
 // un diálogo (Interessos, Històric), y uno dentro de otro en un móvil es difícil de cerrar.
 //
-// ⚠️ No pide nada al ofertante: el REC se confirma por la declaración del receptor y la
-//    evidencia lo dice así. Si los kilos no coinciden con lo asignado, se registra igual,
-//    pero como incidencia: la operación no se cierra hasta que la revise el equipo.
-// ⚠️ Confirmar EMITE los albaranes y consume números de la serie legal. El texto lo dice
-//    antes de pulsar, y el botón se bloquea mientras la llamada está en marcha.
+// ⚠️ No pide nada al ofertante: el REC se confirma por la declaración del receptor, validada
+//    por el equipo. Si los kilos no coinciden con lo asignado, el motivo es obligatorio.
+// ⚠️ Registrar NO gasta ningún número de la serie legal: el texto ya no puede decir que se
+//    generan albaranes al pulsar (lo dijo hasta el 17-10-2026).
 
 import { useState } from 'react'
 import { Loader2, PackageCheck } from 'lucide-react'
@@ -92,10 +93,10 @@ export default function RegistraRecollida({ op, onFet }: { op: Operacio; onFet: 
       setError(clau ? t(clau) : textError(t, r))
       return
     }
-    const num = r.data.albara ?? ''
-    if (r.data.en_revisio) toast.warning(t('rrec.ok_revisio', { num }))
-    else if (r.data.esperant_altres) toast.success(t('rrec.ok_esperant', { num }))
-    else toast.success(t(venda ? 'rrec.ok_venda' : 'rrec.ok', { num, rec: r.data.rec?.numero ?? '' }))
+    // Lo que ha quedado registrado, y que ahora le toca al equipo. Sin números de albarán:
+    // todavía no existen.
+    const kgDecl = r.data?.kg_declarats ?? kgFinal
+    toast.success(t(ambDiferencia ? 'rrec.ok_diferencia' : 'rrec.ok', { kg: fmtKg(kgDecl) }))
     setObert(false)
     onFet()
   }
@@ -172,7 +173,8 @@ export default function RegistraRecollida({ op, onFet }: { op: Operacio; onFet: 
         </div>
       </div>
 
-      {/* Lo que va a pasar, dicho antes de pulsar: se emiten documentos con número legal. */}
+      {/* Lo que va a pasar, dicho antes de pulsar: se registra y lo revisa el equipo; los
+          albaranes salen cuando un admin lo valida. */}
       {kgFinal != null && (
         <p className="rounded-md bg-muted/60 px-3 py-2 text-sm">
           {t(venda ? 'rrec.resum_venda' : 'rrec.resum', { kg: fmtKg(kgFinal), entitat: op.entitat_nom ?? '' })}

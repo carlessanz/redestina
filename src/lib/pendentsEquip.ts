@@ -46,6 +46,9 @@ export type CuaEquip =
   // 11-10-2026 (fase 2 de la revisión del 08-10-2026): ofertas que el PRODUCTOR ha editado
   // y que el equipo no ha revisado.
   | 'ofertes_modificades'
+  // 17-10-2026: recogidas que el receptor ha registrado y un admin tiene que validar para que
+  // se generen los albaranes (la 16.ª cola).
+  | 'recollides_per_validar'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
   // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
@@ -121,9 +124,9 @@ export function buidaComptadors(): void {
 export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptador, number>> {
   const n = (cua: CuaEquip) => p.find((x) => x.cua === cua)?.n ?? 0
   return {
-    // Las tres colas de la pantalla Aprovacions, sumadas: el desglose va en el tablero
+    // Las cuatro colas de la pantalla Aprovacions, sumadas: el desglose va en el tablero
     // y en el título de cada cola, no en el badge.
-    aprovacions: n('registres') + n('convenis_contrasignar') + n('respostes'),
+    aprovacions: n('registres') + n('convenis_contrasignar') + n('respostes') + n('recollides_per_validar'),
     missatges: n('missatges'),
     // No baja al entrar en Ofertes: solo al validar o rechazar, porque la oferta se queda
     // parada hasta que alguien decide.

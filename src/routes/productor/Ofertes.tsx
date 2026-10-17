@@ -22,6 +22,7 @@ import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../../lib/filtres'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaDestins } from '../../lib/ofertes'
+import { carregaRecollidesPerValidar } from '../../lib/operacio'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import {
   estatSimpleOferta, llegendaSimpleOferta, ofertaEnCurs, puntOferta,
@@ -57,6 +58,8 @@ function useMevesOfertes(productorId: string | null) {
   const [progres, setProgres] = useState<Record<string, ProgresOferta>>({})
   /** Los REC que esperan la confirmación de esta organización (`pendents_meus`). */
   const [recsPendents, setRecsPendents] = useState<Set<string>>(new Set())
+  /** Recogidas registradas por el receptor que esperan la validación del equipo (17-10-2026). */
+  const [perValidar, setPerValidar] = useState<Record<string, number>>({})
   const [carregant, setCarregant] = useState(true)
   /** Un fallo de carga NO es «no tienes ofertas»: antes se pintaba el estado vacío. */
   const [errorCarrega, setErrorCarrega] = useState(false)
@@ -89,8 +92,8 @@ function useMevesOfertes(productorId: string | null) {
 
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46). Sin `.eq()` de organización
     // en el albarán: la RLS ya devuelve solo lo suyo, y nunca los borradores.
-    const [c, a, p, pend, dx] = ids.length === 0
-      ? [null, null, null, null, null]
+    const [c, a, p, pend, dx, pv] = ids.length === 0
+      ? [null, null, null, null, null, {}]
       : await Promise.all([
         // Sin las anuladas: es la misma cuenta que `desti_excedent()` en la base.
         supabase.from('canalizaciones').select('excedente_id, kg_confirmados')
@@ -108,6 +111,7 @@ function useMevesOfertes(productorId: string | null) {
         // en la lista sin el ámbar de «et toca a tu», al revés que en el detalle.
         carregaPendents(),
         carregaDestins(ids),
+        carregaRecollidesPerValidar(ids),
       ])
     // Una sola llamada para todas las ofertas (§12.5: nunca una por oferta).
     const cps = ids.length === 0 ? [] : await carregaContraparts()
@@ -157,6 +161,7 @@ function useMevesOfertes(productorId: string | null) {
     setKg(kgs)
     setDestins(ns)
     setRecs(rs)
+    setPerValidar(pv ?? {})
     // La RPC «nunca lanza»: sin ella se pierde el matiz «en gestió», no la pantalla.
     setProgres(p && p.ok ? perOferta(p.data) : {})
     setRecsPendents(new Set(pend && pend.ok
@@ -212,8 +217,9 @@ function useMevesOfertes(productorId: string | null) {
       id: o.id,
       kgSenseDesti: Math.max(0, Number(o.kg_total ?? 0) - (kg[o.id] ?? 0) - (externs[o.id] ?? 0)),
       destiReclamat: Boolean(o.desti_reclamat_at),
+      nRecollidesPerValidar: perValidar[o.id] ?? 0,
     }, 'productor')
-  }, [kg, externs, progres, recs, recsPendents])
+  }, [kg, externs, progres, recs, recsPendents, perValidar])
 
   return { ofertes, kg, destins, sortides, puntDe, carregant, errorCarrega }
 }

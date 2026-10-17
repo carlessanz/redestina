@@ -34,6 +34,8 @@ import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
 import FitxaOperacio from '../../components/FitxaOperacio'
 import { declinaOferta } from '../../lib/operacio'
+import { estatValidacio } from '../../lib/registreRecollida'
+import type { DatesValidacio } from '../../lib/registreRecollida'
 import { toast } from 'sonner'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Link } from 'react-router'
@@ -97,6 +99,11 @@ export function Interessos() {
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   // Las canalizaciones con una diferencia de kilos en revisión del equipo (17-10-2026).
   const [ambIncidencia, setAmbIncidencia] = useState<Set<string>>(new Set())
+  // El registro de cada recogida frente a la validación del equipo (17-10-2026): por
+  // canalización, si espera al equipo o si el equipo lo ha devuelto (y por qué).
+  const [validacions, setValidacions] = useState<Record<string, {
+    estat: 'registrada' | 'retornada'; kgDeclarats: number | null; motiu: string | null
+  }>>({})
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
@@ -122,11 +129,12 @@ export function Interessos() {
         .from('v_albaranes_bandeja')
         .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
         .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE']),
+      // ⚠️ Las columnas de la validación (17-10-2026) en el mismo literal: si la migración no
+      // está aplicada, esta lectura falla sola y la pantalla sigue como antes.
       supabase
         .from('canalizaciones')
-        .select('id')
-        .eq('entidad_id', entidadId)
-        .not('incidencia_recollida', 'is', null),
+        .select('id, incidencia_recollida, kg_declarats, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, motiu_retorn')
+        .eq('entidad_id', entidadId),
     ])
     // Un fallo de carga no es «todavía no has pedido nada»: se dice.
     if (resp.error || alb.error) { setErrorCarrega(true); setCarregant(false); return }
@@ -136,7 +144,18 @@ export function Interessos() {
     // que los une, porque el albarán cuelga de la canalización y no de la respuesta.
     setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
     // Si esta lectura falla, sin marca: la frase vuelve a la de siempre, que no miente.
-    setAmbIncidencia(new Set(((inc.data as { id: string }[] | null) ?? []).map((c) => c.id)))
+    type CanalVal = DatesValidacio & {
+      id: string; incidencia_recollida: unknown; kg_declarats: number | null; motiu_retorn: string | null
+    }
+    const canals = inc.error ? [] : ((inc.data as unknown as CanalVal[] | null) ?? [])
+    setAmbIncidencia(new Set(canals.filter((c) => c.incidencia_recollida != null).map((c) => c.id)))
+    const vals: typeof validacions = {}
+    for (const c of canals) {
+      const e = estatValidacio(c)
+      if (e === 'pendent_validacio') vals[c.id] = { estat: 'registrada', kgDeclarats: c.kg_declarats, motiu: null }
+      else if (e === 'retornada') vals[c.id] = { estat: 'retornada', kgDeclarats: c.kg_declarats, motiu: c.motiu_retorn }
+    }
+    setValidacions(vals)
     setFiles(resp.data ?? [])
     setCarregant(false)
   }, [entidadId])
@@ -203,9 +222,16 @@ export function Interessos() {
    * disponible» y la leyenda la mandaba a abrirla para ver un motivo que no se pintaba.
    * Con `{motiu}` vacío el texto acaba en espacio; se recorta.
    */
-  const passaAmbMotiu = (punt: PuntProces): string | null => (punt.etapa === 'no_assignada'
-    ? t(punt.claus.passa, punt.vars).replace(/\s+/g, ' ').trim()
-    : null)
+  const passaAmbMotiu = (punt: PuntProces): string | null => (
+    punt.etapa === 'no_assignada' || punt.variant === 'retornada'
+      ? t(punt.claus.passa, punt.vars).replace(/\s+/g, ' ').trim()
+      : null)
+
+  /** Lo que `puntInteres()` necesita saber de la validación de la recogida de esta fila. */
+  const fetsValidacio = (canalizacionId: string | null) => {
+    const v = canalizacionId ? validacions[canalizacionId] : undefined
+    return v ? { recollida: v.estat, kgDeclarats: v.kgDeclarats, motiuRetorn: v.motiu } : {}
+  }
 
   return (
     <Card>
@@ -246,6 +272,7 @@ export function Interessos() {
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: f.motiu_aprovacio,
             incidencia: f.canalizacion_id ? ambIncidencia.has(f.canalizacion_id) : false,
+            ...fetsValidacio(f.canalizacion_id),
           })
           // Una línea que resuelve a «—» no se pinta: un hueco con su margen se lee como un
           // fallo de carga. Mismo criterio que `QueTocaAra`.
@@ -324,6 +351,7 @@ export function Interessos() {
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: obert.motiu_aprovacio,
             incidencia: obert.canalizacion_id ? ambIncidencia.has(obert.canalizacion_id) : false,
+            ...fetsValidacio(obert.canalizacion_id),
           })
           const est = estatSimpleInteres(punt)
           const toca = t(punt.claus.toca, punt.vars).trim()

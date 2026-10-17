@@ -94,3 +94,72 @@ export function clauErrorBase(missatge: string | null | undefined, codi: string 
   for (const [c, clau] of Object.entries(ERRORS_BASE)) if (m === c || m.includes(c)) return clau
   return null
 }
+
+// ---------------------------------------------------------------------------------------
+// La validación del equipo (17-10-2026, regla de Carles): registrar la recogida ya NO genera
+// los albaranes. Lo que declara el receptor queda «pendent de validació de l'equip» hasta que
+// un admin (`pot_aprovar()`) lo valida —y entonces se emiten y se concilian— o lo devuelve al
+// receptor con un motivo para que lo vuelva a registrar.
+// ---------------------------------------------------------------------------------------
+
+/** En qué punto está el registro de una recogida, visto desde sus fechas. */
+export type EstatValidacio = 'sense_registre' | 'pendent_validacio' | 'validada' | 'retornada'
+
+export interface DatesValidacio {
+  recollida_registrada_at?: string | null
+  recollida_validada_at?: string | null
+  recollida_retornada_at?: string | null
+}
+
+/**
+ * Lo deduce de las tres fechas de la canalización, sin suponer qué deja la base al retornar:
+ * si borra `recollida_registrada_at`, o si lo conserva y solo escribe `recollida_retornada_at`,
+ * sale lo mismo. Un registro POSTERIOR a la devolución vuelve a estar pendiente.
+ */
+export function estatValidacio(c: DatesValidacio): EstatValidacio {
+  if (c.recollida_validada_at) return 'validada'
+  const reg = c.recollida_registrada_at ? new Date(c.recollida_registrada_at).getTime() : null
+  const ret = c.recollida_retornada_at ? new Date(c.recollida_retornada_at).getTime() : null
+  if (reg != null && (ret == null || reg > ret)) return 'pendent_validacio'
+  if (ret != null) return 'retornada'
+  return 'sense_registre'
+}
+
+/**
+ * Los kilos que valida el equipo: lo que escribe, o lo declarado si lo deja vacío. Y si hace
+ * falta motivo: con diferencia frente a lo asignado, o si corrige lo que declaró el receptor
+ * (la base lo exige igual: `cal_motiu_validacio`).
+ */
+export function validacioCalMotiu(e: {
+  kg: number | null
+  kgAssignats: number | null
+  kgDeclarats: number | null
+}): boolean {
+  if (e.kg == null) return false
+  const difAssignats = e.kgAssignats != null && Math.abs(e.kg - e.kgAssignats) > 0.001
+  const canviDeclarats = e.kgDeclarats != null && Math.abs(e.kg - e.kgDeclarats) > 0.001
+  return difAssignats || canviDeclarats
+}
+
+/** Los rechazos de `validar_recollida()` y `retornar_recollida()`, con su texto. */
+//
+// ⚠️ El ORDEN importa (se busca por `includes()`): `cal_motiu_validacio` antes que `cal_motiu`.
+export const ERRORS_VALIDACIO: [string, string][] = [
+  ['cal_motiu_validacio', 'vrec.err_cal_motiu'],
+  ['cal_motiu', 'vrec.err_cal_motiu_retorn'],
+  ['no_registrada', 'vrec.err_no_registrada'],
+  ['ja_validada', 'vrec.err_ja_validada'],
+  ['kg_invalids', 'rrec.err_kg'],
+  ['motiu_llarg', 'rrec.err_motiu_llarg'],
+  ['albara_ja_confirmat', 'vrec.err_albara_ja_confirmat'],
+  ['sense_albara', 'rrec.err_sense_albara'],
+  ['canalitzacio_anulada', 'rrec.err_anulada'],
+  ['canalitzacio_inexistent', 'vrec.err_inexistent'],
+]
+
+export function clauErrorValidacio(missatge: string | null | undefined, codi: string | null | undefined): string | null {
+  if (codi === '42501') return 'vrec.err_permis'
+  const m = missatge ?? ''
+  for (const [c, clau] of ERRORS_VALIDACIO) if (m === c || m.includes(c)) return clau
+  return null
+}

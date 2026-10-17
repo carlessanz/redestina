@@ -170,6 +170,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
         'recollida_confirmada', 'oferta_modificada', 'oferta_enviada', 'certificat_per_revisar',
         // 20270426100000: a la hora de recogida se pide al receptor que la registre.
         'recollida_per_registrar',
+        // 17-10-2026: un admin devuelve el registro de la recogida al receptor.
+        'recollida_retornada',
       ],
     },
     {
@@ -177,7 +179,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       // en `FitxaOperacio.tsx`.
       que: 'operacio_detall.estat_recollida',
       prefijo: 'op.estat_',
-      valores: ['pendent', 'programada', 'entregada', 'confirmada', 'conciliada'],
+      // `registrada` (17-10-2026): declarada por el receptor, pendiente de validar por el equipo.
+      valores: ['pendent', 'programada', 'registrada', 'entregada', 'confirmada', 'conciliada'],
     },
     {
       // CHECK de `oferta_respuestas.canal`. Se compone en `Aprovacions.tsx` y `OfferDetail.tsx`.

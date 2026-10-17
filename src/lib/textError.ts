@@ -17,6 +17,11 @@ type Traductor = (clau: string, params?: Record<string, string | number>) => str
 // ⚠️ El ORDEN importa: se busca por `includes()` en este orden, así que un código que
 // contiene a otro va ANTES (`cal_motiu_incidencia` antes que `cal_motiu`).
 const CODIS: Record<string, string> = {
+  // `emitir_albaran()` sobre un albarán de una recogida sin validar (17-10-2026). Contiene a
+  // `recollida`, no a ningún otro código de la lista, pero va arriba igual por si acaso.
+  recollida_no_validada: 'alb.err_recollida_no_validada',
+  // `validar_recollida()`: antes que `cal_motiu`, que lo contiene.
+  cal_motiu_validacio: 'vrec.err_cal_motiu',
   // `conciliar_albaran()` con una incidencia de recogida y sin motivo (17-10-2026).
   cal_motiu_incidencia: 'alb.err_cal_motiu_incidencia',
   sense_conveni: 'od.conv_blocked',

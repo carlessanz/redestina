@@ -54,6 +54,12 @@ export interface FetsAlbara {
   /** Días desde que se marcó entregado; es lo que decide si hay que llamar. */
   diesEntregat?: number | null
   motiu?: string | null
+  /**
+   * Es un borrador de una recogida (ENT/OPE de una canalización, o el REC de su oferta, sin
+   * espigolada). Desde `20270428100000` ese borrador no se emite a mano: lo emite la
+   * validación del admin, así que «emet l'albarà» sería un consejo que la base rechaza.
+   */
+  fluxRecollida?: boolean
 }
 
 /**
@@ -75,7 +81,9 @@ export function seguentPasAlbara(a: FetsAlbara): PuntProces {
 
   switch (a.estado) {
     case 'borrador':
-      return punt('borrador', index, titol, 'alb.next_borrador', {}, true)
+      return a.fluxRecollida
+        ? punt('borrador', index, titol, 'alb.next_borrador_validacio', {}, false)
+        : punt('borrador', index, titol, 'alb.next_borrador', {}, true)
     case 'emitido':
       return punt('emitido', index, titol, 'alb.next_emitido', {}, true)
     case 'entregado':

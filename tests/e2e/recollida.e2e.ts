@@ -5,21 +5,22 @@
 // hay serie de prueba para ellos. Tras la tanda, `scripts/local/cargar-local.sh` devuelve el
 // clon a la copia de producción.
 //
-// Desde el 17-10-2026 (20270426100000) los albaranes NO se emiten a la hora de recogida: se
-// generan cuando alguien registra los kilos reales. Recorridos:
+// Desde el 17-10-2026 los albaranes NO se emiten a la hora de recogida, ni tampoco al
+// registrar los kilos: los genera un ADMIN al validar lo que registró el receptor (regla de
+// Carles). Recorridos:
 //   1. El job de la hora de recogida ya no emite: deja los albaranes en borrador y avisa a
-//      la receptora (`recollida_per_registrar`, una sola vez).
-//   2. El equipo «Confirma la recollida» con 5 kg menos: emite los dos albaranes y concilia
-//      (la vía asistida, para una entidad sin panel). El PDF nuevo sale en UNA página (si las
-//      funciones locales están sirviendo).
-//   3. La receptora registra la recogida desde la ficha de la operación con «Coincideixen»:
-//      se generan REC y ENT por los mismos kilos y se cierran solos, sin que la productora
-//      confirme nada; la productora ve «Producte recollit».
-//   4. La receptora registra «N'he recollit menys» con motivo: los albaranes salen por los
-//      kilos reales pero la operación queda en revisión del equipo (no se concilia sola).
+//      la receptora (`recollida_per_registrar`, una sola vez). «Emet» está gris en el albarán.
+//   2. El equipo (admin) «Confirma la recollida» con 5 kg menos: emite los dos albaranes y
+//      concilia (la vía asistida, para una entidad sin panel). El PDF nuevo sale en UNA página
+//      (si las funciones locales están sirviendo).
+//   3. La receptora registra «Coincideixen»: NO sale ningún número; queda pendiente de
+//      validación. El admin la valida desde Aprovacions y entonces salen REC y ENT, conciliados.
+//   4. La receptora registra «N'he recollit menys» con motivo: sin números. Validar sin motivo
+//      se rechaza (`cal_motiu_validacio`); el admin la retorna con motivo, la receptora la
+//      vuelve a registrar y el admin la valida con motivo: albaranes por lo real, conciliados.
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { compte, entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -71,6 +72,9 @@ test('el equipo confirma la recogida con 5 kg menos y queda conciliada', async (
   expect(ent).toMatch(/^[0-9a-f-]{36}$/)
   await entra(page, 'super_admin')
   await page.goto(`/equip/albarans/${ent}`)
+  // Un borrador de una recogida no se emite desde aquí: lo emite la validación del admin.
+  await expect(page.getByRole('button', { name: /^Emet$|^Emitir$|^Emite$/ }).first()).toBeDisabled()
+  await expect(page.getByTestId('emet-per-validacio')).toBeVisible()
   await page.getByRole('button', { name: /^Confirma la recollida$|^Confirma la recogida$/ }).first().click()
   const dlg = page.getByRole('dialog')
   await dlg.getByLabel(/Quilos reals|Kilos reales/).fill('95')
@@ -119,26 +123,56 @@ test('la receptora ve la entrega en su Històric', async ({ page }) => {
   await expect(page.getByText(/95 kg/).first()).toBeVisible()
 })
 
-test('la receptora registra la recogida («coincideixen») y se generan los dos albaranes', async ({ page }) => {
+test('la receptora registra «coincideixen»: no sale ningún número, queda pendiente de validar', async ({ page }) => {
   await entra(page, RECEPTOR)
   await page.goto('/receptor/interessos')
   await page.getByRole('button').filter({ hasText: 'Bleda' }).first().click()
   const fitxa = page.getByTestId('fitxa-operacio')
   await fitxa.getByRole('button', { name: /^Registra la recollida$|^Registra la recogida$/ }).click()
   await expect(fitxa.getByRole('radio', { name: /Coincideixen: 50 kg|Coinciden: 50 kg/ })).toHaveAttribute('aria-checked', 'true')
-  await expect(fitxa.getByText(/entitat productora → Espigoladors|entidad productora → Espigoladors/)).toBeVisible()
-  await fitxa.getByRole('button', { name: /Confirma i genera els albarans|Confirma y genera los albaranes/ }).click()
+  // El texto ya no promete albaranes al pulsar: los genera la validación del equipo.
+  await expect(fitxa.getByText(/Quan l’equip de Redestina ho validi|Cuando el equipo de Redestina lo valide/)).toBeVisible()
+  await fitxa.getByRole('button', { name: /^Registra els quilos$|^Registra los kilos$/ }).click()
   await expect(page.getByText(/Recollida registrada|Recogida registrada/).first()).toBeVisible()
-  await expect(fitxa.getByTestId('recollida-registrada')).toBeVisible()
+  await expect(fitxa.getByTestId('recollida-pendent-validacio')).toBeVisible()
+  await expect(fitxa.getByTestId('recollida-pendent-validacio'))
+    .toContainText(/Pendent de validació de l’equip|Pendiente de validación del equipo/)
+  // Ya no ofrece el formulario.
+  await expect(fitxa.getByRole('button', { name: /^Registra la recollida$|^Registra la recogida$/ })).toHaveCount(0)
+
+  // Ningún número legal gastado.
+  expect(sql(`select string_agg(tipo || ':' || estado || ':' || coalesce(numero_completo, '-'), ',' order by tipo) from albaranes where excedente_id = '${oferta2}' and estado <> 'anulado'`))
+    .toBe('ENT:borrador:-,REC:borrador:-')
+  expect(sql(`select (recollida_registrada_at is not null)::text || ',' || (recollida_validada_at is null)::text from canalizaciones where excedente_id = '${oferta2}'`))
+    .toBe('true,true')
+})
+
+/**
+ * El código de la oferta (`id_excedente`), que cada fila de la cola enseña. Se filtra por él y
+ * no por el producto: en el clon quedan recogidas de pasadas anteriores con el mismo nombre.
+ */
+const codiOferta = (oferta: string) => sql(`select id_excedente from excedentes where id = '${oferta}'`)
+
+test('el admin valida desde Aprovacions y entonces salen los dos albaranes, conciliados', async ({ page }) => {
+  await entra(page, 'super_admin')
+  await page.goto('/equip/aprovacions#recollides')
+  const fila = page.getByTestId('recollida-per-validar').filter({ hasText: codiOferta(oferta2) })
+  await expect(fila).toBeVisible()
+  await expect(fila).toContainText(/Declarats: 50 kg|Declarados: 50 kg/)
+  await fila.getByRole('button', { name: /Valida i genera els albarans|Valida y genera los albaranes/ }).click()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByLabel(/Quilos que es validen|Kilos que se validan/)).toHaveValue('50')
+  await expect(dlg.getByText(/número legal/)).toBeVisible()
+  await dlg.getByRole('button', { name: /Valida i genera els albarans|Valida y genera los albaranes/ }).click()
+  const fet = dlg.getByTestId('validacio-feta')
+  await expect(fet).toBeVisible()
+  await expect(fet).toContainText(/ENT-\d{4}-\d+/)
+  await expect(fet).toContainText(/REC-\d{4}-\d+/)
 
   expect(sql(`select string_agg(tipo || ':' || estado, ',' order by tipo) from albaranes where excedente_id = '${oferta2}' and estado <> 'anulado'`))
     .toBe('ENT:conciliado,REC:conciliado')
   expect(sql(`select string_agg(tipo || '=' || l.kg_validados, ',' order by tipo) from albaran_lineas l join albaranes a on a.id = l.albaran_id where a.excedente_id = '${oferta2}'`))
     .toBe('ENT=50.00,REC=50.00')
-  // Nadie le ha pedido nada a la productora: el REC lo confirma la declaración de la receptora.
-  expect(sql(`select count(*) from evidencias e join enlaces_token t on t.id = e.enlace_id
-               where t.objeto_id in (select id from albaranes where excedente_id = '${oferta2}')
-                 and t.canal = 'panel' and e.asistido_por is null`)).toBe('2')
   expect(sql(`select count(*) from enlaces_token t join albaranes a on a.id = t.objeto_id
                where a.excedente_id = '${oferta2}' and t.estado = 'activo'`)).toBe('0')
 })
@@ -150,7 +184,7 @@ test('la productora ve «Producte recollit» sin haber confirmado nada', async (
     .filter({ hasText: /Producte recollit|Producto recogido/ }).first()).toBeVisible()
 })
 
-test('la receptora registra menos kilos: albaranes por lo real y la operación en revisión', async ({ page }) => {
+test('la receptora registra menos kilos: sin números, pendiente de validar', async ({ page }) => {
   await entra(page, RECEPTOR)
   await page.goto('/receptor/interessos')
   await page.getByRole('button').filter({ hasText: 'Pastanaga' }).first().click()
@@ -160,42 +194,79 @@ test('la receptora registra menos kilos: albaranes por lo real y la operación e
   await fitxa.getByLabel(/Quilos recollits|Kilos recogidos/).fill('35')
   await expect(fitxa.getByText(/diferència -5 kg|diferencia -5 kg/)).toBeVisible()
   // Sin motivo no deja: es obligatorio cuando los kilos no coinciden.
-  await fitxa.getByRole('button', { name: /Confirma i genera els albarans|Confirma y genera los albaranes/ }).click()
+  await fitxa.getByRole('button', { name: /^Registra els quilos$|^Registra los kilos$/ }).click()
   await expect(fitxa.getByText(/és obligatori quan els quilos no coincideixen|es obligatorio cuando los kilos no coinciden/)).toBeVisible()
   await fitxa.getByLabel(/Què ha passat|Qué ha pasado/).fill('Una caixa en mal estat')
-  await fitxa.getByRole('button', { name: /Confirma i genera els albarans|Confirma y genera los albaranes/ }).click()
-  await expect(page.getByText(/l’equip la revisarà|el equipo la revisará/).first()).toBeVisible()
-  await expect(fitxa.getByTestId('incidencia-recollida')).toBeVisible()
+  await fitxa.getByRole('button', { name: /^Registra els quilos$|^Registra los kilos$/ }).click()
+  await expect(page.getByText(/abans de generar els albarans|antes de generar los albaranes/).first()).toBeVisible()
+  const pendent = fitxa.getByTestId('recollida-pendent-validacio')
+  await expect(pendent).toBeVisible()
+  await expect(pendent).toContainText(/diferència -5 kg|diferencia -5 kg/)
+  await expect(pendent).toContainText(/Una caixa en mal estat/)
 
-  expect(sql(`select string_agg(tipo || ':' || estado, ',' order by tipo) from albaranes where excedente_id = '${oferta3}' and estado <> 'anulado'`))
-    .toBe('ENT:confirmado,REC:confirmado')
-  // El job de conciliación no la cierra: la revisa el equipo.
-  sql(`select conciliacions_automatiques()`)
-  expect(sql(`select string_agg(tipo || ':' || estado, ',' order by tipo) from albaranes where excedente_id = '${oferta3}' and estado <> 'anulado'`))
-    .toBe('ENT:confirmado,REC:confirmado')
-  expect(sql(`select incidencia_recollida->>'resultat' from canalizaciones where excedente_id = '${oferta3}'`)).toBe('menys')
+  expect(sql(`select string_agg(tipo || ':' || estado || ':' || coalesce(numero_completo, '-'), ',' order by tipo) from albaranes where excedente_id = '${oferta3}' and estado <> 'anulado'`))
+    .toBe('ENT:borrador:-,REC:borrador:-')
+  expect(sql(`select coalesce(kg_declarats::text, '') from canalizaciones where excedente_id = '${oferta3}'`)).toBe('35.00')
 })
 
-test('el equipo ve la incidencia en el albarán y no puede conciliarlo sin motivo', async ({ page }) => {
-  const rec = sql(`select id from albaranes where tipo = 'REC' and excedente_id = '${oferta3}' and estado = 'confirmado'`)
-  expect(rec).toMatch(/^[0-9a-f-]{36}$/)
-  // La base lo rechaza sin motivo (`cal_motiu_incidencia`), aunque cuadre con la tolerancia.
-  expect(() => sqlCom('super_admin', `select conciliar_albaran('${rec}', null, null, null)`))
-    .toThrow(/cal_motiu_incidencia/)
+test('validar con diferencia sin motivo se rechaza, y un técnico no puede validar', () => {
+  const canal = sql(`select id from canalizaciones where excedente_id = '${oferta3}'`)
+  expect(() => sqlCom('super_admin', `select validar_recollida('${canal}', null, null)`))
+    .toThrow(/cal_motiu_validacio/)
+  // Sigue sin albaranes: el rechazo no ha gastado ningún número.
+  expect(sql(`select count(*) from albaranes where excedente_id = '${oferta3}' and numero_completo is not null`)).toBe('0')
+  if (compte('equip')) {
+    expect(() => sqlCom('equip', `select validar_recollida('${canal}', null, 'prova')`)).toThrow(/42501|no_autoritzat|permission|permís|admin/i)
+  }
+})
 
+test('el admin la retorna con motivo y la receptora la vuelve a registrar', async ({ page }) => {
   await entra(page, 'super_admin')
-  await page.goto(`/equip/albarans/${rec}`)
-  const banda = page.getByTestId('incidencia-albara')
-  await expect(banda).toBeVisible()
-  await expect(banda.getByText(/Incidència de recollida|Incidencia de recogida/)).toBeVisible()
-  await expect(banda.getByText(/Assignats: 40 kg → reals: 35 kg|Asignados: 40 kg → reales: 35 kg/)).toBeVisible()
-  await expect(banda.getByText(/Una caixa en mal estat/)).toBeVisible()
-
-  await page.getByRole('button', { name: /^Concilia$|^Conciliar$/ }).first().click()
+  await page.goto('/equip/aprovacions#recollides')
+  const fila = page.getByTestId('recollida-per-validar').filter({ hasText: codiOferta(oferta3) })
+  await expect(fila).toBeVisible()
+  await expect(fila).toContainText(/Una caixa en mal estat/)
+  await fila.getByRole('button', { name: /^Retorna al receptor$|^Devuelve al receptor$/ }).click()
   const dlg = page.getByRole('dialog')
-  await expect(dlg.getByText(/ha declarat una diferència de quilos|ha declarado una diferencia de kilos/)).toBeVisible()
-  const conciliar = dlg.getByRole('button', { name: /^Concilia$|^Conciliar$/ })
-  await expect(conciliar).toBeDisabled()
-  await dlg.getByLabel(/^Motiu$|^Motivo$/).fill('Revisat amb l’entitat: una caixa malmesa')
-  await expect(conciliar).toBeEnabled()
+  await dlg.getByLabel(/Motiu|Motivo/).fill('Falta la foto del pes')
+  await dlg.getByRole('button', { name: /^Retorna al receptor$|^Devuelve al receptor$/ }).click()
+  await expect(page.getByText(/Recollida retornada al receptor|Recogida devuelta al receptor/).first()).toBeVisible()
+  await expect(fila).toHaveCount(0)
+  expect(sql(`select count(*) from avisos where tipus = 'recollida_retornada' and (params->>'excedente_id') = '${oferta3}'`)).toBe('1')
+})
+
+// Prueba aparte y no un segundo `entra()`: con la sesión del admin puesta, /login redirige al
+// panel y no hay formulario. Cada prueba estrena su navegador.
+test('la receptora ve el motivo del retorno y la vuelve a registrar', async ({ page }) => {
+  await entra(page, RECEPTOR)
+  await page.goto('/receptor/interessos')
+  await page.getByRole('button').filter({ hasText: 'Pastanaga' }).first().click()
+  const fitxa = page.getByTestId('fitxa-operacio')
+  await expect(fitxa.getByTestId('recollida-retornada')).toContainText(/Falta la foto del pes/)
+  await fitxa.getByRole('button', { name: /^Registra la recollida$|^Registra la recogida$/ }).click()
+  await fitxa.getByRole('radio', { name: /N’he recollit menys|He recogido menos/ }).click()
+  await fitxa.getByLabel(/Quilos recollits|Kilos recogidos/).fill('38')
+  await fitxa.getByLabel(/Què ha passat|Qué ha pasado/).fill('Pesat de nou: 38 kg')
+  await fitxa.getByRole('button', { name: /^Registra els quilos$|^Registra los kilos$/ }).click()
+  await expect(fitxa.getByTestId('recollida-pendent-validacio')).toBeVisible()
+})
+
+test('el admin la valida con motivo: albaranes por lo real y conciliados', async ({ page }) => {
+  await entra(page, 'super_admin')
+  await page.goto('/equip/aprovacions#recollides')
+  const fila = page.getByTestId('recollida-per-validar').filter({ hasText: codiOferta(oferta3) })
+  await expect(fila).toContainText(/Declarats: 38 kg|Declarados: 38 kg/)
+  await fila.getByRole('button', { name: /Valida i genera els albarans|Valida y genera los albaranes/ }).click()
+  const dlg = page.getByRole('dialog')
+  // Con diferencia frente a lo asignado, el motivo es obligatorio también aquí.
+  await dlg.getByRole('button', { name: /Valida i genera els albarans|Valida y genera los albaranes/ }).click()
+  await expect(dlg.getByText(/és obligatori si els quilos no coincideixen|es obligatorio si los kilos no coinciden/)).toBeVisible()
+  await dlg.getByLabel(/Motiu|Motivo/).fill('Revisat amb l’entitat per telèfon')
+  await dlg.getByRole('button', { name: /Valida i genera els albarans|Valida y genera los albaranes/ }).click()
+  await expect(dlg.getByTestId('validacio-feta')).toBeVisible()
+
+  expect(sql(`select string_agg(tipo || ':' || estado, ',' order by tipo) from albaranes where excedente_id = '${oferta3}' and estado <> 'anulado'`))
+    .toBe('ENT:conciliado,REC:conciliado')
+  expect(sql(`select string_agg(tipo || '=' || l.kg_validados, ',' order by tipo) from albaran_lineas l join albaranes a on a.id = l.albaran_id where a.excedente_id = '${oferta3}'`))
+    .toBe('ENT=38.00,REC=38.00')
 })

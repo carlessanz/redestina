@@ -591,11 +591,16 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // que la existencia. Las funciones internas del reparto no las ejecuta nadie con sesión.
   { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és de l'equip)" },
   // Registrar la recogida (20270426100000): solo la entidad receptora de ESA canalización, y el
-  // permiso va antes que la existencia (uuid inventado → 42501). En positivo lo prueba el E2E
-  // del clon: emite albaranes con numeración legal. Las dos internas, sin EXECUTE para nadie.
+  // permiso va antes que la existencia (uuid inventado → 42501). Desde 20270428100000 solo
+  // guarda la declaración: los albaranes los emite `validar_recollida()` (un admin). Las dos
+  // internas, sin EXECUTE para nadie.
   { tabla: "registrar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra la recollida d'una operació que no és seva" },
   { tabla: "confirmar_part_declarada", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_user: "00000000-0000-0000-0000-000000000000", p_nom: "arnes", p_carrec: "arnes", p_data: null, p_incidencia: null, p_extra: null }, descripcion: "NO confirma cap part per declaració (funció interna)" },
   { tabla: "rec_te_incidencia_recollida", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO executa la consulta interna d'incidències" },
+  // Validar o retornar una recogida (20270428100000) es de un admin (`pot_aprovar()`), con
+  // sesión; el permiso va antes que la existencia (uuid inventado → 42501).
+  { tabla: "validar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida cap recollida (és d'un admin)" },
+  { tabla: "retornar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna cap recollida (és d'un admin)" },
   // La revisión del certificado (20270419100000, fase 4): un externo solo aprueba lo suyo
   // (permiso antes que existencia: id inventado → 42501), y nunca en nombre de otro.
   { tabla: "aprovar_certificat_ofertant", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual" }, descripcion: "NO aprova un certificat que no és seu" },
@@ -1233,9 +1238,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "excedente_destins", op: "insertar", esperado: "denegar", descripcion: "NO escriu destins directament (només per RPC)" },
     // Revisar los cambios de una oferta es del equipo (id inventado: autoriza y no toca nada).
     { tabla: "marcar_canvis_revisats", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "marca com a revisats els canvis d'una oferta" },
-    // «Confirma la recollida»: el equipo, con sesión (id inventado → 22023, la guarda deja
-    // pasar). En positivo se prueba en el E2E del clon: consume numeración legal.
-    { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    // «Confirma la recollida» y validar/retornar la del receptor son de un ADMIN desde
+    // 20270428100000 (`pot_aprovar()`): un técnico, no. El permiso va antes que la existencia.
+    { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és d'un admin des de 20270428100000)" },
+    { tabla: "validar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida cap recollida (és d'un admin)" },
+    { tabla: "retornar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna cap recollida (és d'un admin)" },
     // El registro del receptor NO es del equipo: el equipo tiene «Confirma la recollida».
     { tabla: "registrar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra la recollida en nom del receptor (té «Confirma la recollida»)" },
     { tabla: "confirmar_part_declarada", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_user: "00000000-0000-0000-0000-000000000000", p_nom: "arnes", p_carrec: "arnes", p_data: null, p_incidencia: null, p_extra: null }, descripcion: "NO confirma cap part per declaració (funció interna)" },
@@ -1473,6 +1480,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "permitir", args: { p_codi: "x", p_valor: 1 }, descripcion: "pot fixar els factors d'impacte (22023 si el codi no existeix)" },
     // Aprobar un certificado en nombre del donante (fase 4): id inventado → 22023.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "aprova un certificat en nom del donant (id inventat → 22023)" },
+    // La recogida la valida un admin (20270428100000). Con un id inventado la guarda de rol
+    // deja pasar y corta la existencia (22023 canalitzacio_inexistent). En positivo NO se
+    // prueba aquí: validar emite albaranes con numeración legal (lo hace el E2E del clon).
+    { tabla: "validar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "valida una recollida (id inventat → 22023)" },
+    { tabla: "retornar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "retorna una recollida al receptor (id inventat → 22023)" },
+    { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
     // --- CHECK GLOBAL del catálogo (20270414101000) ---
     // No mira una función: mira TODAS las de `public`. Falla si alguna `security definer`
     // (no de trigger) es ejecutable por `anon`, o si alguna de trigger lo es por `anon` o

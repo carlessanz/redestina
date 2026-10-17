@@ -125,6 +125,11 @@ export interface FetsOferta {
   kgSenseDesti?: number
   /** `excedentes.desti_reclamat_at`: el job de vencidas ya le pidió el destino al productor. */
   destiReclamat?: boolean
+  /**
+   * Canalizaciones de esta oferta cuya recogida ha registrado el receptor y espera a que un
+   * admin la valide (17-10-2026): todavía sin albaranes. Ausente = 0.
+   */
+  nRecollidesPerValidar?: number
 }
 
 export interface FetsInteres {
@@ -140,6 +145,16 @@ export interface FetsInteres {
    * conciliar, la entrega no está «confirmada» a secas: está en revisión del equipo.
    */
   incidencia?: boolean
+  /**
+   * El registro de la recogida frente a la validación del equipo (17-10-2026):
+   * `registrada` = la entidad ya ha declarado los kilos y espera a un admin (sin albaranes
+   * todavía); `retornada` = un admin se lo ha devuelto y le toca volver a registrarlo.
+   */
+  recollida?: 'registrada' | 'retornada' | null
+  /** Lo que declaró la entidad al registrar. */
+  kgDeclarats?: number | null
+  /** Por qué se lo devolvió el equipo. */
+  motiuRetorn?: string | null
 }
 
 export const ETAPES_OFERTA: readonly EtapaOferta[] = [
@@ -305,6 +320,16 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
       : fes('recollida', 'emes', 2, { num }, true, '/equip/albarans')
   }
 
+  // 2bis. Sin REC todavía, pero alguna entidad ya ha registrado la recogida (17-10-2026): los
+  // albaranes salen cuando un admin lo valida. Es la etapa «recollida» —el producto ya ha
+  // salido— con su variante, y al equipo le toca validarla.
+  const perValidar = fets.nRecollidesPerValidar ?? 0
+  if (!rec && perValidar > 0) {
+    return rol === 'productor'
+      ? fes('recollida', 'validacio', 2, { n: perValidar }, false)
+      : fes('recollida', 'validacio', 2, { n: perValidar }, true, '/equip/aprovacions#recollides')
+  }
+
   // 3. Todavía en reparto: aquí sí importa que se haya pasado la fecha.
   if (rol === 'equip' && fets.vencuda === true) {
     const index = fets.estado === 'parcial' || fets.estado === 'bloqueada' ? 1 : 0
@@ -400,12 +425,22 @@ export function puntInteres(fets: FetsInteres): PuntProces {
   if (ent?.estado === 'confirmado') {
     return fes('confirmada', fets.incidencia ? 'incidencia' : null, 4, {}, false)
   }
+  // Registrada por la entidad y esperando a que un admin la valide (17-10-2026): los
+  // albaranes todavía no existen. Gana al albarán entregado del circuito anterior, que ya no
+  // le pide nada a la entidad.
+  if (fets.recollida === 'registrada') {
+    return fes('entrega', 'validacio', 3, { kg: fets.kgDeclarats ?? fets.kg ?? 0 }, false)
+  }
   if (ent?.estado === 'entregado') {
     return fes('entrega', 'entregat', 3, { num }, true, '/receptor/documents')
   }
   if (ent?.estado === 'emitido') return fes('entrega', 'emes', 3, { num }, false)
+  // El equipo le ha devuelto el registro: vuelve a «Assignada», le toca otra vez, y se dice por qué.
+  if (fets.recollida === 'retornada') {
+    return fes('assignada', 'retornada', 2, { kg: fets.kg ?? 0, motiu: fets.motiuRetorn ?? '' }, true)
+  }
   // Desde el 17-10-2026 el receptor cierra la recogida: después de recoger registra los
-  // kilos reales y con eso se generan los albaranes. Le toca a él.
+  // kilos reales y el equipo los valida antes de generar los albaranes. Le toca a él.
   return fes('assignada', null, 2, { kg: fets.kg ?? 0 }, true)
 }
 
