@@ -674,6 +674,8 @@ src/
                                cargar desde Vitest — sin separarlo, estas claves no tendrían red
     progresOfertes.ts          progres_meves_ofertes(): cuántas entidades interesadas por oferta,
                                SIN nombres, para el panel del productor (§6ter)
+    registreRecollida.ts       PURO: la validación de «Registra la recollida» (la regla de la RPC) y la
+                               traducción de sus rechazos (17-10-2026)
     aprovarResposta.ts         comprovaConvenis() + aprovarResposta() + rebutjarResposta(): la
                                aprobación de un interés, compartida por OfferDetail y Aprovacions
     albarans.ts                Envoltorios de las RPC de albaranes; nunca lanzan (§4bis)
@@ -760,6 +762,8 @@ src/
                                Històric añade la entrega: kilos, fecha y albarán)
     CampsPerfilReceptor.tsx    Los campos del perfil de cada tipo de receptor (`perfil_receptor`). Uno
                                solo para la ficha propia y la del equipo
+    RegistraRecollida.tsx      «Registra la recollida» del receptor, dentro de la ficha de la operación
+                               (`registrar_recollida()`, 17-10-2026, §6ter)
     LlocsRecollida.tsx         Los lugares de recogida de una productora: lista, alta y baja. Uno solo
                                para la ficha propia y la del equipo
     SelectorMunicipi.tsx       Elegir municipio de la lista oficial (INE), con búsqueda y comarca;
@@ -2210,7 +2214,7 @@ funciones, no políticas:
 | `propuesta_conciliacion(rec)` | Contrasta el neto del REC con la suma de los ENT confirmados y dice si cae dentro de la tolerancia |
 | `conciliar_albaran(id, kg_validados, motivo, destino_final)` | Fija los kilos oficiales. Exige confirmación **o** plazo vencido con motivo. ⚠️ **Desde `20270414100100` sobre un REC exige motivo fuera de tolerancia (`22023 fora_de_tolerancia`) y concilia EN CASCADA** los ENT/OPE hermanos en `confirmado` (los obtiene `albarans_germans_rec(rec)`: mismo excedente o misma espigolada), con el motivo propagado o «Conciliat amb l'albarà de recepció <num>»; las canalizaciones quedan `conciliada` con `coste_kg` congelado. Todo o nada: si un hermano falla, falla el REC entero. Antes, conciliar un REC no tocaba las salidas y el cierre quedaba bloqueado por `sense_conciliar`. Un ENT/OPE se puede conciliar también por separado (UI `AlbaraDetall` desde el 07-10-2026) |
 | `albarans_germans_rec(rec)` (`20270414100100`) | Los ENT/OPE de un REC (mismo excedente o misma espigolada), con la condición de `propuesta_conciliacion()`. Interna: solo `service_role` |
-| `conciliacions_automatiques()` (`20270414100100`) | Job (solo `service_role`). Tres ramas: (1) REC `confirmado` con todas sus salidas confirmadas y dentro de tolerancia → concilia el REC, que arrastra las salidas (incluye el REC de una espigolada); (2) ENT/OPE `confirmado` cuyo REC ya está `conciliado` —el caso que antes se quedaba colgado—; (3) OPE `confirmado` sin REC vivo (venta o maquila puras). Ya no cuenta enlaces usados: con `registrar_confirmacion` de dos partes, un OPE `confirmado` ya significa que confirmaron todas |
+| `conciliacions_automatiques()` (`20270414100100`; desde `20270426100000` salta lo que tiene una incidencia de recogida) | Job (solo `service_role`). Tres ramas: (1) REC `confirmado` con todas sus salidas confirmadas y dentro de tolerancia → concilia el REC, que arrastra las salidas (incluye el REC de una espigolada); (2) ENT/OPE `confirmado` cuyo REC ya está `conciliado` —el caso que antes se quedaba colgado—; (3) OPE `confirmado` sin REC vivo (venta o maquila puras). Ya no cuenta enlaces usados: con `registrar_confirmacion` de dos partes, un OPE `confirmado` ya significa que confirmaron todas |
 | `anular_albaran` / `rectificar_albaran` | `pot_aprovar()`. El rectificativo usa serie `R-<tipo>` y deja el original en `rectificado` |
 | `crear_espigolada(productor, ubicacion, fecha, voluntarios, notas, lineas, ref_externa, excedente)` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()`. ⚠️ **Con `p_excedente` CONVIERTE una oferta** (`20260921221806`, §6ter): no crea ningún excedente, **reutiliza ese** —`origen` a `espigolament`, `espigolada_id` a la jornada, `estado` a `borrador` hasta el reparto— y crea el REC con su línea. Se niega con `22023` y un código legible en `oferta_inexistent` · `productor_no_coincideix` · `sense_producte_al_camp` · `ja_es_espigolada` · `ja_te_canalitzacions` · `ja_te_albarans` · `massa_linies`. Toma `for update` sobre la oferta **antes de insertar nada**: sin ese bloqueo, dos conversiones simultáneas pasarían las guardas a la vez y crearían dos jornadas del mismo producto, que es la duplicación que esta fase existe para impedir. ⚠️ **La firma de siete argumentos se retiró en la misma migración**: `create or replace` no puede cambiar el número de argumentos, así que habrían convivido dos y cualquier llamada de siete sería **ambigua (42725)** |
 | `fijar_coste_producto(producto, coste, motivo)` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto(producto, motivo)` (`es_super_admin()`) | El coste **de referencia** y las taras. **Sin ejercicio desde `20270405100200`** (drop de las firmas viejas con `p_ejercicio`): un coste por producto que se actualiza cuando hace falta |
@@ -2246,7 +2250,9 @@ funciones, no políticas:
 | `preparar_conveni_en_paper(tipo_org, org, tipo)` · `registrar_conveni_en_paper(conveni, data_firma, referencia, signant_nom, signant_carrec, notes)` (`20270329100300`) | El convenio firmado **fuera de la plataforma** (§4). **`es_super_admin()`**, no `pot_aprovar()`: decide si una organización puede operar sin haber firmado aquí, y eso no se amplía en silencio al equipo. Son **dos llamadas y el orden es la garantía**: primero el borrador (para tener el `id` del que colgará el PDF), después el escaneado, y solo entonces la validación, que se niega con `falta_escanejat`. ⚠️ **`service_role` NO tiene el EXECUTE**: no hay ningún job que declare convenios vigentes, y con `auth.uid()` nulo las guardas lo dejarían pasar. ⚠️ No pasa por `preparar_convenio` para marcar el origen: aquella es idempotente y sobre un borrador que ya existiera el origen se quedaría en `plataforma` sin que nada lo dijera |
 | `preparar_convenio` · `enviar_convenio` · `contrafirmar_convenio` · `retornar_convenio` · `resolver_convenio` · `iniciar_firma_asistida` | El ciclo del convenio. `enviar_convenio` devuelve **el token en claro** (única vez que existe) y reenviar **revoca el anterior**. ⚠️ `preparar_convenio` la puede pedir además **el titular de esa organización** (`20270326100000`), no solo el equipo: es idempotente —si ya hay uno en marcha lo devuelve— así que abrirla no multiplica borradores |
 | `marcar_avisos_llegits(ids, objecte_tipo)` · `marcar_mercat_vist()` · `contraparts_canalitzacions()` (`20270410100000`) | Avisos y D1 (§6ter, rebanada 2). Las tres solo de lo propio (`mis_productores()`/`mis_entidades()`/`auth.uid()`). `crear_avis()` y `disparar_avisos_pendents()` solo `service_role` |
-| `programar_albarans_recollida()` · `recordar_confirmacions_recollida()` · `conciliacions_automatiques()` (`20270412100000`) | Los jobs de la recogida programada (§6ter, rebanada 3). **Solo `service_role`** (`42501` con sesión). Devuelven los tokens en claro las dos primeras: la única vez que existen |
+| `programar_albarans_recollida()` (⚠️ desde `20270426100000` ya no emite: crea el aviso `recollida_per_registrar` y devuelve `[]`) · `recordar_confirmacions_recollida()` · `conciliacions_automatiques()` (`20270412100000`) | Los jobs de la recogida programada (§6ter, rebanada 3). **Solo `service_role`** (`42501` con sesión). Devuelven los tokens en claro las dos primeras: la única vez que existen |
+| `registrar_recollida(canalizacion, resultat, kg_reals, data, observacions)` (`20270426100000`) | **«Registra la recollida» del RECEPTOR** (§6ter, «La recogida la cierra el receptor»). Solo una cuenta con membresía activa en la entidad de esa canalización (`42501` también con uuid inventado; el equipo tampoco: tiene `confirmar_recollida()`). `resultat` ∈ `coincideix` (= los kg asignados) · `menys` · `mes` (estos dos con motivo). Autoriza con la sesión y **después actúa como el servidor** (vacía `request.jwt.claims`/`request.jwt.claim.sub` en la transacción y los repone al salir), porque reutiliza `emitir_albaran`/`marcar_entregado`/`registrar_confirmacion`/`conciliar_albaran`, que solo admiten equipo o servidor; la identidad queda en `canalizaciones.recollida_registrada_per` y en las evidencias. Emite la salida con los kg reales, confirma la parte del receptor (y en OPE la del ofertante, declarada), emite y confirma el REC cuando no falta ninguna salida, concilia si coincide y deja incidencia si no. Rechazos `22023`: `canalitzacio_anulada`, `ja_registrada`, `resultat_invalid`, `kg_no_coincideixen`, `kg_invalids`, `kg_zero`, `kg_no_menys`, `kg_no_mes`, `falta_motiu_diferencia`, `motiu_llarg`, `data_futura`, `data_anterior`, `sense_albara`. Devuelve `{albara_id, albara, tipus, estat, rec, kg_reals, kg_assignats, conciliat, en_revisio, esperant_altres}` |
+| `confirmar_part_declarada(…)` · `rec_te_incidencia_recollida(rec)` (`20270426100000`) | Internas de lo anterior y del job de conciliación. Sin EXECUTE para `authenticated` (el arnés lo vigila); la primera además exige modo servidor (`42501` con sesión) |
 | `bloqueig_per_albara(tipo, org)` · `comprova_hora_recollida(ex, quan)` (`20270412100000`) | El bloqueo de 48 h (G1) y la regla de la hora de recogida. La primera solo responde por lo propio a un externo |
 | `editar_oferta(id, canvis, texto, actor)` (`20270410100000`) | **Solo `service_role`** (la llama `crear-oferta/editar` con el actor de la sesión). Lista blanca de campos, kg ≥ canalizado, D4 (revalidación si el productor cambia kg o modalidades) e historial en `excedentes_canvis` |
 | `validar_oferta(id)` · `rebutjar_oferta(id, motiu)` (`20270409100000`) | Sacan una oferta de `pendent_validacio`: a `publicada` (sale al Mercat) o a `cancelada` con el motivo en `motivo_no_colocada`. `pot_aprovar()` (`42501`); `22023` si no está pendiente o sin motivo. Guardan `validada_at`/`validada_per` |
@@ -2915,7 +2921,9 @@ Migración `20270412100000_recollida_programada.sql` y Edge Function nueva
   puede cambiar al aprobar (Aprovacions y detalle de oferta, `datetime-local`):
   `aprovar_resposta(…, p_recollida)` la escribe en **`canalizaciones.data_hora_recollida`**
   (la del equipo solo se exige que no sea pasada: puede salirse de la franja si lo ha hablado).
-- **Emisión automática (D3)**: pg_cron `recollides-programades` (cada 15 min) → Edge Function
+- 🔁 **Sustituida el 17-10-2026** (`20270426100000`, «La recogida la cierra el receptor», más abajo):
+  el job ya no emite; los albaranes se generan al registrar los kilos reales. Lo que sigue es histórico.
+  **Emisión automática (D3)**: pg_cron `recollides-programades` (cada 15 min) → Edge Function
   → `programar_albarans_recollida()` (solo `service_role`): para cada albarán en borrador cuya
   recogida ha llegado, rellena las líneas con los kilos previstos (el REC con la suma de las
   canalizaciones, no el `kg_total` publicado), **emite y marca entregado** y devuelve los
@@ -3084,6 +3092,63 @@ Migraciones `20270418100000` (`albaran_datos` v2 y el neto del REC en la propues
   su entrega desde «Pendent de tu»).
 - ⚠️ **Queda para después**: la plantilla de Meta para preguntar fuera de la ventana, y el texto
   legal del REC validado por la asesoría (§12.71).
+
+### La recogida la cierra el receptor (17-10-2026)
+
+Migración `20270426100000_registrar_recollida_receptor.sql`. Pedido de Carles para cerrar el flujo
+de principio a fin: (1) el ofertante publica y el equipo valida; (2) el receptor muestra interés y
+el equipo lo aprueba; (3) el receptor va a recoger; (4) **después, el receptor registra los kilos
+reales** —«coincideixen», «menys» o «més»—; (5) **con esa cantidad se generan los dos albaranes**,
+REC (ofertante → Espigoladors) y ENT (Espigoladors → receptor), por los mismos kilos. **Sin segunda
+confirmación del ofertante**; una diferencia se registra como incidencia y la revisa el equipo.
+
+- **`registrar_recollida(canalizacion, resultat, kg_reals, data, observacions)`** (§4bis), desde
+  **la ficha de la operación** del receptor (`components/RegistraRecollida.tsx`, dentro de
+  `FitxaOperacio`: Interessos e Històric; no es un diálogo porque la ficha ya va dentro de uno).
+  Solo una cuenta con membresía activa en la entidad receptora de ESA canalización (permiso antes
+  que existencia: `42501`). En UNA transacción: emite y entrega la salida (ENT/OPE) con los kilos
+  REALES (`kg_neto`; `kg_previstos` se queda con lo asignado), confirma la parte `recibe` con un
+  enlace `canal='panel'` acuñado y consumido al momento (`creado_por` = la cuenta, sin
+  `asistido_por`), y cuando ya no falta ninguna salida del registro emite y confirma el **REC** con
+  la suma de lo real **por declaración del receptor** (rol `entrega`, cargo «Recollida declarada
+  per <entitat>», que es lo que imprime el PDF). En un OPE, las dos partes, igual. Revoca cualquier
+  enlace de correo o WhatsApp que quedara vivo. Con varias entidades sobre una misma oferta, el REC
+  lo cierra la última que registra (`esperant_altres`).
+- **«Coincideixen»** → `propuesta_conciliacion()` dentro de tolerancia → **concilia en cascada**: los
+  PDF definitivos (versión `conciliat`) salen con los kilos reales y la oferta pasa a `cerrada`.
+  **«Menys»/«Més»** exigen motivo (`falta_motiu_diferencia`) y guardan la incidencia en
+  `canalizaciones.incidencia_recollida` y en `albaranes.incidencias` (ENT y REC): los albaranes
+  salen por lo real pero **no se concilian**; quedan en la cola `albarans_conciliar` y el equipo
+  los concilia a mano con motivo desde `AlbaraDetall`. `conciliacions_automatiques()` salta todo
+  REC con una salida con incidencia (`rec_te_incidencia_recollida()`), y las ramas 2 y 3 también.
+  Cero kilos no se registra (`kg_zero`): no se recogió, es cosa del equipo, y no se gasta número.
+- **El job de la hora de recogida YA NO EMITE** (D3 de la rebanada 3, sustituida a petición de
+  Carles: «los albaranes se deberían generar en el punto 4, no antes»). `programar_albarans_recollida()`
+  ahora solo crea, una vez por canalización (`registre_demanat_at`), el aviso nuevo
+  **`recollida_per_registrar`** a la entidad, y devuelve `[]`, así que `recollides-programades` no
+  manda ningún enlace. Ningún número legal se gasta con kilos previstos y al ofertante no le llega
+  nada que confirmar. La migración marca como ya avisadas las recogidas de hace más de 2 días.
+  ⚠️ **Una entidad sin panel** (solo WhatsApp/correo) no puede registrar: recibe el aviso, que le
+  dice que avise al equipo, y el equipo usa **«Confirma la recollida»** (`confirmar_recollida()`,
+  que ya emitía desde borrador). La cola `albarans_esborrany` del tablero es donde se ven.
+- **Lo que ya estaba en marcha sigue funcionando**: un ENT/REC emitidos por el job antiguo
+  (`entregado`, con enlaces) también se cierran con el registro del receptor —los enlaces vivos se
+  revocan— o por el camino de siempre (enlace del correo, «Pendent de tu», WhatsApp).
+- **`operacio_detall()`** gana `pot_registrar` (la misma condición que la RPC), `recollida_real_at`,
+  `recollida_registrada_at`, `incidencia_recollida`, `rec_numero` y `rec_estat`. La ficha enseña
+  «Has registrat la recollida: X kg» y, con incidencia, la banda ámbar «Diferència en revisió»; al
+  productor le añade «Si no hi estàs d'acord, digues-l'hi» y el número del REC.
+- **El proceso del receptor** (`procesOferta.ts`): «Assignada» pasa a `emToca = true` («Quan l'hagis
+  recollit, registra els quilos a la fitxa de l'operació»).
+- Lógica pura de la validación en `src/lib/registreRecollida.ts` (la misma regla que la RPC, para
+  avisar bajo el campo), con `tests/registreRecollida.test.ts`.
+- **Probado** contra una réplica de la base (las 175 migraciones sobre PostgreSQL 16 con un shim de
+  Supabase) en todos los casos —coincideix, menys, més, varias entidades, OPE, albaranes ya
+  entregados por el job antiguo, permisos de las tres cuentas ajenas y del equipo, y el job— y en
+  el navegador con el frontend real servido contra PostgREST. E2E `tests/e2e/recollida.e2e.ts`
+  reescrita para el flujo nuevo (clon).
+- ⚠️ **Publicar**: `enviar-avis` **antes** que la migración (tipo de aviso nuevo, como en las fases
+  1 y 2). `recollides-programades` no cambia.
 
 ### Revisión del cliente del 08-10-2026 — fase 4: el certificado se revisa antes de firmarse (11-10-2026)
 
@@ -6265,6 +6330,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **17-10-2026 (la recogida la cierra el receptor): se abre la 141** (el bloqueo de 48 h ya no actúa
+sobre las recogidas nuevas, decisión de producto): **54 vivas** y la siguiente entrada nueva es la 142.
 ⚠️ **12-10-2026 (fases 8-11 de la revisión del 08-10-2026): se cerró la 130** (fase 8) **y se abre la
 140** (el borrado de una ficha no conoce los expedientes de prevención): siguen **53 vivas** y la siguiente
 entrada nueva es la 141.
@@ -6823,6 +6890,14 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      (la «última red» de §4) en vez de con `bloqueig_esborrat: expedients` y su motivo. Arreglo: rama
      `expedients` en las dos funciones (bloquea si tiene `numero_completo`; si no, arrastra el expediente).
 
+
+141. **Sin emisión a la hora de recogida, el bloqueo de 48 h (G1) ya no actúa sobre las recogidas
+     nuevas** (17-10-2026, `20270426100000`). `bloqueig_per_albara()` cuenta albaranes `entregado`
+     con enlace sin usar, y ahora los albaranes no se emiten hasta que se registra la recogida, así
+     que una entidad que no la registra nunca no queda bloqueada. Lo que la empuja es el aviso
+     `recollida_per_registrar` y la cola `albarans_esborrany` del equipo. Si se quiere el freno,
+     hace falta un bloqueo por «recogida pasada hace > 48 h sin registrar» en `manifestar_interes()`.
+     Decisión de producto pendiente.
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7004,8 +7079,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.321 pruebas en 56 ficheros** de Vitest: 1.320 correctas y **1 saltada a propósito**
-   (12-10-2026, fase 11: `tests/expedient.test.ts` y las claves `exp.*` compuestas; tras la fase 10 eran
+   Referencia: **1.334 pruebas en 57 ficheros** de Vitest: 1.333 correctas y **1 saltada a propósito**
+   (17-10-2026, la recogida la cierra el receptor: `tests/registreRecollida.test.ts` y el aviso nuevo; tras la fase 11 eran
+   1.321 en 56; 12-10-2026, fase 11: `tests/expedient.test.ts` y las claves `exp.*` compuestas; tras la fase 10 eran
    1.311, fase 10: `tests/impacte.test.ts` y las claves `imp.mod_*`; tras la fase 9 eran 1.304, fase 9: los tipos de la ficha viva y las etapas nuevas en `tests/diagnostic.test.ts`;
    tras la fase 8 eran 1.294, fase 8: `tests/periode.test.ts`; tras la fase 7 eran 1.293, fase 7: el vocabulario `ct.t_*`; tras la fase 6 eran 1.292, fase 6: `tests/filtres.test.ts`, el ranking y las franjas `od.fr_*`; tras la fase 5 eran
    1.285, fase 5: `tests/convenisEquivalents.test.ts` y el vocabulario `sig.model_*`; tras la fase 4
@@ -7045,6 +7121,9 @@ se va solo **cómo se llegó hasta aquí**.
 2. `npm run build` si el cambio toca `src/`: `tsc` ya va en `check`, pero el empaquetado no.
 3. `deno run -A scripts/comprobar-rls.ts` si el cambio toca datos, políticas o roles, y
    `deno run -A scripts/prueba-numeracion.ts` si toca la numeración documental.
+   ⚠️ **17-10-2026**: `20270426100000` añade 2 checks en `DOCUMENTAL_EXTERN` + `rec_te_incidencia_recollida` y 2 en el
+   bloque del equipo (`registrar_recollida` y `confirmar_part_declarada`, todos `denegar`): la cifra de abajo sube
+   con ellos y se fija al publicar.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin

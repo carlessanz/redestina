@@ -218,6 +218,8 @@ describe('puntInteres: la lectura del receptor', () => {
     const p = puntInteres({ ...b, estado: 'acceptada', aprovacio: 'aprovada', kg: 40 })
     expect([p.etapa, p.index]).toEqual(['assignada', 2])
     expect(p.vars.kg).toBe(40)
+    // Le toca al receptor: registrar los kilos cuando haya recogido (17-10-2026).
+    expect(p.emToca).toBe(true)
   })
 
   it('el ENT cuenta el resto del camino', () => {
@@ -450,9 +452,11 @@ describe('emToca dice la verdad sobre quién actúa', () => {
     expect(puntOferta({ ...fets, kgSenseDesti: 0 }, 'productor').notaClau).toBeUndefined()
   })
 
-  it('el receptor solo actúa al pedir la oferta y al confirmar la entrega', () => {
+  it('el receptor actúa al pedir la oferta, al registrar la recogida y al confirmar la entrega', () => {
+    // Desde el 17-10-2026 la recogida la cierra el receptor: con el interés asignado, le toca
+    // registrar los kilos reales (que es lo que genera los albaranes).
     const ambToca = PUNTS.filter((p) => p.nom.startsWith('receptor/') && p.punt.emToca)
-    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/ent entregat', 'receptor/rebuda'])
+    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/assignada', 'receptor/ent entregat', 'receptor/rebuda'])
   })
 
   it('cada punto con enlace apunta a la ruta del panel que lo mira', () => {

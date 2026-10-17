@@ -394,7 +394,9 @@ export function puntInteres(fets: FetsInteres): PuntProces {
     return fes('entrega', 'entregat', 3, { num }, true, '/receptor/documents')
   }
   if (ent?.estado === 'emitido') return fes('entrega', 'emes', 3, { num }, false)
-  return fes('assignada', null, 2, { kg: fets.kg ?? 0 }, false)
+  // Desde el 17-10-2026 el receptor cierra la recogida: después de recoger registra los
+  // kilos reales y con eso se generan los albaranes. Le toca a él.
+  return fes('assignada', null, 2, { kg: fets.kg ?? 0 }, true)
 }
 
 // --- Etiqueta de estado y leyenda ------------------------------------------------------

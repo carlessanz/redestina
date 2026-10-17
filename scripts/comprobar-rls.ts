@@ -590,6 +590,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Confirmar la recogida (20270418100100, fase 3): solo el equipo, y el permiso va antes
   // que la existencia. Las funciones internas del reparto no las ejecuta nadie con sesión.
   { tabla: "confirmar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "NO confirma cap recollida (és de l'equip)" },
+  // Registrar la recogida (20270426100000): solo la entidad receptora de ESA canalización, y el
+  // permiso va antes que la existencia (uuid inventado → 42501). En positivo lo prueba el E2E
+  // del clon: emite albaranes con numeración legal. Las dos internas, sin EXECUTE para nadie.
+  { tabla: "registrar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra la recollida d'una operació que no és seva" },
+  { tabla: "confirmar_part_declarada", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_user: "00000000-0000-0000-0000-000000000000", p_nom: "arnes", p_carrec: "arnes", p_data: null, p_incidencia: null, p_extra: null }, descripcion: "NO confirma cap part per declaració (funció interna)" },
+  { tabla: "rec_te_incidencia_recollida", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO executa la consulta interna d'incidències" },
   // La revisión del certificado (20270419100000, fase 4): un externo solo aprueba lo suyo
   // (permiso antes que existencia: id inventado → 42501), y nunca en nombre de otro.
   { tabla: "aprovar_certificat_ofertant", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual" }, descripcion: "NO aprova un certificat que no és seu" },
@@ -1230,6 +1236,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // «Confirma la recollida»: el equipo, con sesión (id inventado → 22023, la guarda deja
     // pasar). En positivo se prueba en el E2E del clon: consume numeración legal.
     { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    // El registro del receptor NO es del equipo: el equipo tiene «Confirma la recollida».
+    { tabla: "registrar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra la recollida en nom del receptor (té «Confirma la recollida»)" },
+    { tabla: "confirmar_part_declarada", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_rol: "recibe", p_kg: 1, p_user: "00000000-0000-0000-0000-000000000000", p_nom: "arnes", p_carrec: "arnes", p_data: null, p_incidencia: null, p_extra: null }, descripcion: "NO confirma cap part per declaració (funció interna)" },
     // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: un técnico, no.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova certificats en nom del donant (és de pot_aprovar)" },
     { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },

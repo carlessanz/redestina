@@ -5,14 +5,15 @@
 // a quién va, cuánto y cuándo. UNA ficha para los dos paneles: la base decide qué ve cada uno
 // (`operacio_detall()`), y aquí solo cambia de quién se habla —la contraparte—.
 
-import { useEffect, useState } from 'react'
-import { MapPin, Phone, User } from 'lucide-react'
+import { useCallback, useEffect, useState } from 'react'
+import { AlertTriangle, MapPin, Phone, User } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { kg } from '../lib/format'
 import { quanAvis } from '../lib/avisos'
 import { carregaOperacio } from '../lib/operacio'
 import type { Operacio } from '../lib/operacio'
 import CarregantSeccio from './CarregantSeccio'
+import RegistraRecollida from './RegistraRecollida'
 
 /** Las clases del estado de la recogida, sin colores fuera de los tokens (§2bis). */
 const CLASSE: Record<string, string> = {
@@ -23,7 +24,9 @@ const CLASSE: Record<string, string> = {
   conciliada: 'border border-input bg-background text-muted-foreground',
 }
 
-export default function FitxaOperacio({ canalizacionId }: { canalizacionId: string }) {
+export default function FitxaOperacio(
+  { canalizacionId, onCanvi }: { canalizacionId: string; onCanvi?: () => void },
+) {
   const { t } = useT()
   const [op, setOp] = useState<Operacio | null | undefined>(undefined)
 
@@ -32,6 +35,13 @@ export default function FitxaOperacio({ canalizacionId }: { canalizacionId: stri
     void carregaOperacio(canalizacionId).then((o) => { if (viu) setOp(o) })
     return () => { viu = false }
   }, [canalizacionId])
+
+  // Tras registrar la recogida: la ficha se relee (estado, kilos, albaranes) y quien la
+  // contiene refresca su lista.
+  const recarrega = useCallback(() => {
+    void carregaOperacio(canalizacionId).then((o) => setOp(o))
+    onCanvi?.()
+  }, [canalizacionId, onCanvi])
 
   if (op === undefined) return <CarregantSeccio files={2} ambCapcalera={false} />
   if (op === null) return <p className="text-sm text-muted-foreground">{t('op.err')}</p>
@@ -72,6 +82,38 @@ export default function FitxaOperacio({ canalizacionId }: { canalizacionId: stri
         </div>
       </div>
 
+      {/* 17-10-2026: el receptor cierra la recogida. Lo que se ha registrado, y si hay una
+          diferencia que el equipo tiene que revisar. */}
+      {op.pot_registrar && <RegistraRecollida op={op} onFet={recarrega} />}
+      {op.recollida_registrada_at && (
+        <p className="text-sm text-muted-foreground" data-testid="recollida-registrada">
+          {t(op.rol === 'entidad' ? 'op.registrada_tu' : 'op.registrada', {
+            quan: quanAvis(op.recollida_real_at ?? op.recollida_registrada_at),
+            kg: kg(op.kg_rebuts),
+            entitat: op.entitat_nom ?? '',
+          })}
+        </p>
+      )}
+      {op.incidencia_recollida && op.estat_recollida !== 'conciliada' && (
+        <div className="space-y-1 rounded-lg bg-aviso-fondo p-3 text-sm" data-testid="incidencia-recollida">
+          <p className="flex items-center gap-1.5 font-medium text-aviso">
+            <AlertTriangle className="size-4 shrink-0" aria-hidden />{t('op.incidencia_t')}
+          </p>
+          <p>
+            {t(op.incidencia_recollida.resultat === 'mes' ? 'op.incidencia_mes' : 'op.incidencia_menys', {
+              kg: kg(op.incidencia_recollida.kg_reals),
+              assignats: kg(op.incidencia_recollida.kg_assignats),
+            })}
+          </p>
+          {op.incidencia_recollida.descripcion && (
+            <p className="text-muted-foreground">«{op.incidencia_recollida.descripcion}»</p>
+          )}
+          <p className="text-muted-foreground">
+            {t(op.rol === 'productor' ? 'op.incidencia_productor' : 'op.incidencia_revisio')}
+          </p>
+        </div>
+      )}
+
       <dl className="space-y-2">
         {fila(t('op.producte'), [op.producte, op.varietat].filter(Boolean).join(' · '))}
         {fila(t('op.modalitat'), op.modalitat ? t(`od.mod_${op.modalitat}`) : null)}
@@ -111,6 +153,8 @@ export default function FitxaOperacio({ canalizacionId }: { canalizacionId: stri
       <dl className="space-y-2">
         {fila(t('op.condicions'), op.condicions)}
         {fila(t('op.albara'), op.albara_numero)}
+        {/* El de recepción (ofertant → Espigoladors) es del ofertante y del equipo. */}
+        {op.rol !== 'entidad' && fila(t('op.albara_rec'), op.rec_numero)}
       </dl>
     </div>
   )

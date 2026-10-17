@@ -167,7 +167,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: [
         'oferta_validada', 'oferta_rebutjada', 'sortida_trobada', 'interes_aprovat',
         'interes_rebutjat', 'oferta_sense_desti', 'recollida_canviada', 'kg_assignats_canviats',
-        'recollida_confirmada', 'oferta_modificada', 'oferta_enviada',
+        'recollida_confirmada', 'oferta_modificada', 'oferta_enviada', 'certificat_per_revisar',
+        // 20270426100000: a la hora de recogida se pide al receptor que la registre.
+        'recollida_per_registrar',
       ],
     },
     {

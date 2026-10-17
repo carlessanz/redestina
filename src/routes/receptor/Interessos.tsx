@@ -328,7 +328,7 @@ export function Interessos() {
               </DialogHeader>
               {obert.aprovacio === 'aprovada' && obert.canalizacion_id ? (
                 <>
-                  <FitxaOperacio canalizacionId={obert.canalizacion_id} />
+                  <FitxaOperacio canalizacionId={obert.canalizacion_id} onCanvi={() => void carrega()} />
                   <details className="rounded-md border p-3">
                     <summary className="cursor-pointer text-sm text-muted-foreground">{t('op.oferta_original')}</summary>
                     <div className="mt-3"><DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} /></div>

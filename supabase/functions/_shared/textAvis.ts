@@ -18,12 +18,13 @@ export type TipusAvis =
   | "recollida_confirmada"
   | "oferta_modificada"
   | "oferta_enviada"
-  | "certificat_per_revisar";
+  | "certificat_per_revisar"
+  | "recollida_per_registrar";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
-  "oferta_modificada", "oferta_enviada", "certificat_per_revisar",
+  "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
 ];
 
 /** A quién va el aviso: decide el enlace de los que reciben las dos partes (fase 2). */
@@ -121,6 +122,26 @@ export function textAvis(
           + (q ? ` (${q}).` : "."),
         boton: botoParts,
         ruta: rutaParts,
+      };
+    }
+    case "recollida_per_registrar": {
+      // 17-10-2026: a la hora de recogida ya no se emite nada; se le pide al receptor que
+      // registre los kilos reales, que es lo que genera los albaranes.
+      const q = quan(params.recollida_at, idioma);
+      return {
+        asunto: es ? `Registra la recogida de ${producte}` : `Registra la recollida de ${producte}`,
+        titulo: es ? "Registra la recogida" : "Registra la recollida",
+        cuerpo: (es
+          ? `Ya ha pasado la hora de recogida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`
+          : `Ja ha passat l’hora de recollida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`)
+          + (es
+            ? "\nCuando lo hayas recogido, entra en Redestina y registra los kilos que te has llevado: con eso se generan los albaranes."
+            : "\nQuan l’hagis recollit, entra a Redestina i registra els quilos que t’has endut: amb això es generen els albarans.")
+          + (es
+            ? "\nSi no has podido ir o no tienes acceso al panel, avisa al equipo de Redestina."
+            : "\nSi no hi has pogut anar o no tens accés al panell, avisa l’equip de Redestina."),
+        boton: es ? "Registrar la recogida" : "Registrar la recollida",
+        ruta: "/receptor/interessos",
       };
     }
     case "oferta_modificada":
