@@ -7198,7 +7198,8 @@ se va solo **cómo se llegó hasta aquí**.
    bloque del equipo (`registrar_recollida` y `confirmar_part_declarada`, todos `denegar`). Contra el clon, con
    `20270427100000` aplicada (no cambia permisos), da **1.455/1.455 y 28 sin datos**. Con `20270428100000` (+19: `validar_recollida`
    y `retornar_recollida` denegadas a externos y al técnico, permitidas al super_admin con uuid inventado; `confirmar_recollida` pasa a
-   denegar al técnico) da **1.474/1.474 y 28 sin datos** en el clon; la de producción se fija al publicar.
+   denegar al técnico) da **1.474/1.474 y 28 sin datos** en el clon, y **la misma cifra contra producción** tras publicar `6285ad5`
+   el 17-10-2026 (las tres migraciones `20270426100000`…`20270428100000` y `enviar-avis`).
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
