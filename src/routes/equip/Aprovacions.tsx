@@ -938,7 +938,12 @@ export default function Aprovacions() {
             return (
               <div key={f.id} className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
+                  {/* `basis-80`, no `flex-1` a secas: con base 0 el texto nunca obliga a
+                      saltar de línea y los controles —que no encogen— se lo comían entero
+                      (25 px a 1360 px con el menú abierto, una palabra por línea). Con una
+                      base de 20rem, si no caben los dos, los controles bajan a otra línea
+                      (§2, regla 4). `min-w-0` deja que en móvil encoja por debajo. */}
+                  <div className="min-w-0 flex-1 basis-80">
                     <div className="font-medium">
                       {f.entidades?.nombre ?? '—'}
                       {f.entidades?.poblacion ? ` · ${f.entidades.poblacion}` : ''}
@@ -955,7 +960,7 @@ export default function Aprovacions() {
                       {t('appr.progres', { n: kgFmt(faltenDe(f)), m: kgFmt(total) })}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-end justify-end gap-2">
+                  <div className="flex flex-wrap items-end gap-2">
                     {/* `text-base md:text-sm`: en iOS un control por debajo de 16px amplía
                         la página al enfocarlo y no lo deshace (§2, regla 1 de móvil). */}
                     <label className="flex flex-col gap-1 text-xs text-muted-foreground">

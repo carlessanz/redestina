@@ -407,6 +407,13 @@ dos con la página en esos mismos 0 px):
    4 px. Mismo arreglo (`w-full sm:w-auto` en el botón, la fila ya era `flex-wrap`): 170-191 px.
    ⚠️ **Corolario**: una fila con texto y botón **no se audita con `scrollWidth`**. Hay que mirar
    el ancho que le queda al párrafo, o mirarla.
+   ⚠️ **Y `flex-1` a secas tampoco salva un `flex-wrap`** (17-10-2026, cola de intereses de
+   Aprovacions): `flex-1` es `flex: 1 1 0%`, así que para decidir el salto de línea el texto
+   cuenta como **0 px** y nunca obliga a bajar a los controles. A 1360 px con el menú abierto,
+   los campos y botones (~944 px, que no encogen) dejaban al texto **25 px y 400 px de alto**,
+   una palabra por línea. Lo que lo arregla es una **base mínima** en el bloque de texto
+   (`min-w-0 flex-1 basis-80`): si texto y controles no caben juntos, los controles bajan a su
+   propia línea (texto a 981 px, 2 líneas), y en móvil `min-w-0` lo deja encoger sin desbordar.
 5. 🔴 **`grid ... sm:grid-cols-2` SIN `grid-cols-1` deja la columna de móvil en `auto`, y la
    dimensiona el contenido más ancho** (22-09-2026). Sin el breakpoint, `grid` a secas no
    declara ninguna plantilla de columnas, así que la única columna es `auto` —o sea
