@@ -1211,7 +1211,10 @@ function DialegValidacio({
             <p className="font-medium">{t(fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}</p>
             {fet.albara && <p>{t('vrec.fet_sortida', { num: fet.albara })}</p>}
             {fet.rec?.numero && <p>{t('vrec.fet_rec', { num: fet.rec.numero })}</p>}
-            {fet.esperant_altres && <p>{t('vrec.fet_esperant')}</p>}
+            {/* «Es generarà» solo si el REC aún no tiene número: en una oferta del flujo
+                anterior el REC ya puede estar emitido (o conciliado) y la base devuelve igualmente
+                `esperant_altres` porque queda otra entrega por validar. */}
+            {fet.esperant_altres && !fet.rec?.numero && <p>{t('vrec.fet_esperant')}</p>}
           </div>
         ) : r && (
           <div className="space-y-4">
