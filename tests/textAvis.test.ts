@@ -88,3 +88,46 @@ describe('los avisos que reciben las dos partes llevan a la pantalla de cada una
     expect(textAvis('recollida_canviada', amb, 'ca', 'x', 'entidad').cuerpo).toContain('10/10 · 10:00')
   })
 })
+
+describe('recollida_confirmada: los kg que registra el receptor (17-10-2026)', () => {
+  const BASE = { producte: 'Carbassó', entitat: 'Menjador Social', kg: 180 }
+  it('con diferencia dice lo recogido, lo asignado y que lo revisa el equipo (ca)', () => {
+    const t = textAvis('recollida_confirmada', { ...BASE, kg_assignats: 200, diferencia: true }, 'ca', 'x')
+    expect(t.cuerpo).toContain('Menjador Social ha registrat que ha recollit 180 kg de Carbassó, respecte als 200 kg assignats.')
+    expect(t.cuerpo).toContain('L’equip de Redestina revisa la diferència.')
+    expect(t.asunto).toContain('amb diferència')
+    expect(t.titulo).toBe('Recollida amb diferència')
+  })
+  it('con diferencia dice lo recogido, lo asignado y que lo revisa el equipo (es)', () => {
+    const t = textAvis('recollida_confirmada', { ...BASE, kg_assignats: 12000, diferencia: true }, 'es', 'x')
+    expect(t.cuerpo).toContain('Menjador Social ha registrado que ha recogido 180 kg de Carbassó, frente a los 12.000 kg asignados.')
+    expect(t.cuerpo).toContain('El equipo de Redestina revisa la diferencia.')
+    expect(t.asunto).toContain('con diferencia')
+    expect(t.titulo).toBe('Recogida con diferencia')
+  })
+  it('sin diferencia, el texto de siempre aunque lleve kg_assignats', () => {
+    for (const idioma of ['ca', 'es'] as const) {
+      const t = textAvis('recollida_confirmada', { ...BASE, kg: 200, kg_assignats: 200, diferencia: false }, idioma, 'x')
+      expect(t.cuerpo).not.toMatch(/diferència|diferencia|assignats|asignados/)
+      expect(t.titulo).toBe(idioma === 'es' ? 'Salida confirmada' : 'Sortida confirmada')
+    }
+  })
+  it('params antiguos (sin kg_assignats ni diferencia): el texto de siempre', () => {
+    expect(textAvis('recollida_confirmada', BASE, 'ca', 'x').cuerpo)
+      .toBe('Menjador Social ha confirmat que ha rebut 180 kg de Carbassó.')
+    expect(textAvis('recollida_confirmada', BASE, 'es', 'x').cuerpo)
+      .toBe('Menjador Social ha confirmado que ha recibido 180 kg de Carbassó.')
+  })
+  it('diferencia sin kg_assignats no inventa la cifra', () => {
+    const t = textAvis('recollida_confirmada', { ...BASE, diferencia: true }, 'ca', 'x')
+    expect(t.cuerpo).toBe('Menjador Social ha confirmat que ha rebut 180 kg de Carbassó.')
+  })
+  it('con la hora de recogida, sin marcadores sueltos', () => {
+    for (const idioma of ['ca', 'es'] as const) {
+      const t = textAvis('recollida_confirmada',
+        { ...BASE, kg_assignats: 200, diferencia: true, recollida_at: '2026-10-10T08:00:00Z' }, idioma, 'x')
+      expect(t.cuerpo).toContain('(10/10 · 10:00).')
+      for (const v of [t.asunto, t.titulo, t.cuerpo]) expect(v).not.toMatch(/\{[a-z_]+\}|undefined|null|NaN|—/)
+    }
+  })
+})

@@ -87,6 +87,8 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     { nom: 'ent emès', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', albaraEnt: { estado: 'emitido', numero: 'ENT-2026-00001' } } },
     { nom: 'ent entregat', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', albaraEnt: { estado: 'entregado', numero: 'ENT-2026-00001' } } },
     { nom: 'ent confirmat', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', albaraEnt: { estado: 'confirmado', numero: 'ENT-2026-00001' } } },
+    // 17-10-2026: la entidad registró la recogida con una diferencia de kilos.
+    { nom: 'ent confirmat amb incidència', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', incidencia: true, albaraEnt: { estado: 'confirmado', numero: 'ENT-2026-00001' } } },
     { nom: 'ent conciliat', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'cerrada', kg: 40, albaraEnt: { estado: 'conciliado', numero: 'ENT-2026-00001' } } },
     { nom: 'no assignada', fets: { estado: 'acceptada', aprovacio: 'rebutjada', ofertaEstado: 'parcial', motiu: 'Massa lluny' } },
     { nom: 'retirada', fets: { estado: 'acceptada', aprovacio: 'pendent', ofertaEstado: 'cancelada' } },
@@ -234,6 +236,18 @@ describe('puntInteres: la lectura del receptor', () => {
       const p = puntInteres({ ...ap, albaraEnt: { estado, numero: 'ENT-1' } })
       expect([p.etapa, p.index, p.variant, p.emToca], estado).toEqual([etapa, index, variant, emToca])
     }
+  })
+
+  it('con una diferencia de kilos declarada, la entrega confirmada está en revisión', () => {
+    const ap: FetsInteres = { ...b, estado: 'acceptada', aprovacio: 'aprovada', incidencia: true }
+    const p = puntInteres({ ...ap, albaraEnt: { estado: 'confirmado', numero: 'ENT-1' } })
+    expect([p.etapa, p.index, p.variant, p.emToca]).toEqual(['confirmada', 4, 'incidencia', false])
+    expect(p.claus.titol).toBe('proc.r_confirmada_incidencia_t')
+    // El estado simple no cambia: sigue siendo una entrega asignada y en marcha.
+    expect(estatSimpleInteres(p).estat).toBe('assignada')
+    // Conciliada, la incidencia ya está revisada: manda el cierre.
+    const tancada = puntInteres({ ...ap, kg: 35, albaraEnt: { estado: 'conciliado', numero: 'ENT-1' } })
+    expect([tancada.etapa, tancada.variant]).toEqual(['tancada', null])
   })
 
   it('las tres salidas, y su orden de precedencia', () => {

@@ -39,6 +39,10 @@ export default function Albarans() {
   const [files, setFiles] = useState<AlbaranBandeja[]>([])
   const [productors, setProductors] = useState<Noms>({})
   const [entitats, setEntitats] = useState<Noms>({})
+  // Canalizaciones y ofertas con una diferencia de kilos declarada por la receptora
+  // (17-10-2026): sus albaranes llevan la marca «Incidència» hasta que se concilian.
+  const [incidencies, setIncidencies] = useState<{ canals: Set<string>; ofertes: Set<string> }>(
+    { canals: new Set(), ofertes: new Set() })
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
@@ -72,13 +76,14 @@ export default function Albarans() {
       const idsProd = [...new Set(llista.map((f) => f.productor_id).filter((v): v is string => !!v))]
       const idsEnt = [...new Set(llista.map((f) => f.entidad_id).filter((v): v is string => !!v))]
 
-      const [prod, ent] = await Promise.all([
+      const [prod, ent, inc] = await Promise.all([
         idsProd.length
           ? supabase.from('productores').select('id, name, empresa').in('id', idsProd)
           : Promise.resolve({ data: [] }),
         idsEnt.length
           ? supabase.from('entidades').select('id, nombre').in('id', idsEnt)
           : Promise.resolve({ data: [] }),
+        supabase.from('canalizaciones').select('id, excedente_id').not('incidencia_recollida', 'is', null),
       ])
       if (!viu) return
 
@@ -90,6 +95,11 @@ export default function Albarans() {
       for (const e of (ent.data ?? []) as { id: string; nombre: string | null }[]) {
         mapaEnt[e.id] = e.nombre || '—'
       }
+      const ambInc = (inc.data ?? []) as { id: string; excedente_id: string | null }[]
+      setIncidencies({
+        canals: new Set(ambInc.map((c) => c.id)),
+        ofertes: new Set(ambInc.map((c) => c.excedente_id).filter((v): v is string => !!v)),
+      })
       setProductors(mapaProd)
       setEntitats(mapaEnt)
       setCarregant(false)
@@ -101,6 +111,13 @@ export default function Albarans() {
     if (f.tipo === 'REC') return f.productor_id ? (productors[f.productor_id] ?? '—') : '—'
     return f.entidad_id ? (entitats[f.entidad_id] ?? '—') : '—'
   }, [productors, entitats])
+
+  /** ¿Este albarán espera la revisión de una diferencia declarada por la receptora? */
+  const teIncidencia = (f: AlbaranBandeja): boolean => {
+    if (f.estado === 'conciliado' || f.estado === 'anulado' || f.estado === 'rectificado') return false
+    if (f.tipo === 'REC') return !f.espigolada_id && !!f.excedente_id && incidencies.ofertes.has(f.excedente_id)
+    return !!f.canalizacion_id && incidencies.canals.has(f.canalizacion_id)
+  }
 
   const grups = useMemo(() => {
     const tots = filtraCerca(files, q,
@@ -150,6 +167,9 @@ export default function Albarans() {
                   <Badge className={estilEstatAlbara(f.estado)}>{t(`alb.st_${f.estado}`)}</Badge>
                   {f.rechazo !== 'cap' && (
                     <Badge className="ml-1 bg-error-fondo text-error">{t(`alb.rj_${f.rechazo}`)}</Badge>
+                  )}
+                  {teIncidencia(f) && (
+                    <Badge className="ml-1 bg-aviso-fondo text-aviso">{t('alb.inc_badge')}</Badge>
                   )}
                 </TableCell>
                 <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">

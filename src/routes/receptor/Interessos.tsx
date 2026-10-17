@@ -65,6 +65,8 @@ interface CanalAmbOferta {
   id: string
   kg_confirmados: number | null
   kg_reales: number | null
+  /** La diferencia que declaró la entidad al registrar la recogida (17-10-2026). */
+  incidencia_recollida: Record<string, unknown> | null
   data_hora_recollida: string | null
   created_at: string
   // La oferta, con las columnas de `OfertaReceptor`: la fila abre su detalle (28-09-2026).
@@ -93,6 +95,8 @@ export function Interessos() {
   const organitzacio = useOrganitzacio('entidad')
   const [files, setFiles] = useState<AmbOferta[]>([])
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
+  // Las canalizaciones con una diferencia de kilos en revisión del equipo (17-10-2026).
+  const [ambIncidencia, setAmbIncidencia] = useState<Set<string>>(new Set())
   const [carregant, setCarregant] = useState(true)
   const [errorCarrega, setErrorCarrega] = useState(false)
   const [obert, setObert] = useState<AmbOferta | null>(null)
@@ -107,7 +111,7 @@ export function Interessos() {
     // `ENT`/`R-ENT` en donación y `OPE`/`R-OPE` en venta o maquila: una entrega rectificada
     // sigue siendo la entrega de ese interés, y mirar solo el original dejaría la etapa
     // colgada en «Assignada» para siempre.
-    const [resp, alb] = await Promise.all([
+    const [resp, alb, inc] = await Promise.all([
       supabase
         .from('oferta_respuestas')
         .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, recollida_at, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
@@ -118,6 +122,11 @@ export function Interessos() {
         .from('v_albaranes_bandeja')
         .select('id, numero_completo, estado, canalizacion_id, confirmado_at, kg_confirmados')
         .in('tipo', ['ENT', 'R-ENT', 'OPE', 'R-OPE']),
+      supabase
+        .from('canalizaciones')
+        .select('id')
+        .eq('entidad_id', entidadId)
+        .not('incidencia_recollida', 'is', null),
     ])
     // Un fallo de carga no es «todavía no has pedido nada»: se dice.
     if (resp.error || alb.error) { setErrorCarrega(true); setCarregant(false); return }
@@ -126,6 +135,8 @@ export function Interessos() {
     // El interés aprobado y su albarán de entrega comparten `canalizacion_id`: es lo único
     // que los une, porque el albarán cuelga de la canalización y no de la respuesta.
     setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
+    // Si esta lectura falla, sin marca: la frase vuelve a la de siempre, que no miente.
+    setAmbIncidencia(new Set(((inc.data as { id: string }[] | null) ?? []).map((c) => c.id)))
     setFiles(resp.data ?? [])
     setCarregant(false)
   }, [entidadId])
@@ -234,6 +245,7 @@ export function Interessos() {
             ofertaEstado: f.excedentes?.estado ?? 'publicada',
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: f.motiu_aprovacio,
+            incidencia: f.canalizacion_id ? ambIncidencia.has(f.canalizacion_id) : false,
           })
           // Una línea que resuelve a «—» no se pinta: un hueco con su margen se lee como un
           // fallo de carga. Mismo criterio que `QueTocaAra`.
@@ -311,6 +323,7 @@ export function Interessos() {
             ofertaEstado: obert.excedentes.estado ?? 'publicada',
             albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
             motiu: obert.motiu_aprovacio,
+            incidencia: obert.canalizacion_id ? ambIncidencia.has(obert.canalizacion_id) : false,
           })
           const est = estatSimpleInteres(punt)
           const toca = t(punt.claus.toca, punt.vars).trim()
@@ -403,7 +416,7 @@ export function Historic() {
     void Promise.all([
       supabase
         .from('canalizaciones')
-        .select('id, kg_confirmados, kg_reales, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, kg_confirmados, kg_reales, incidencia_recollida, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('created_at', { ascending: false })
         .overrideTypes<CanalAmbOferta[], { merge: false }>(),
@@ -422,22 +435,25 @@ export function Historic() {
   }, [entidadId])
 
   /**
-   * ¿Ha llegado ya? `kg_reales` solo lo escribe la CONCILIACIÓN, así que una entrega que la
-   * entidad ya confirmó seguía saliendo «pendent de confirmar» hasta que el equipo
-   * conciliara. Lo decide el albarán: confirmado o conciliado = recibida.
+   * ¿Ha llegado ya, y está cerrada? Lo decide SOLO el albarán de entrega: conciliado =
+   * cerrada, confirmado = recibida (pendiente de que el equipo concilie). `kg_reales` no
+   * sirve para esto: desde el 17-10-2026 lo escribe el REGISTRO de la recogida, no la
+   * conciliación, así que una entrega con una diferencia en revisión salía como cerrada.
    */
   const estatEntrega = (f: CanalAmbOferta): 'conciliada' | 'confirmada' | 'pendent' => {
     const alb = albarans[f.id]
-    if (f.kg_reales != null || alb?.estado === 'conciliado') return 'conciliada'
+    if (alb?.estado === 'conciliado') return 'conciliada'
     if (alb?.estado === 'confirmado') return 'confirmada'
     return 'pendent'
   }
-  /** Los kilos recibidos: los reales si ya se concilió; los que confirmó la entidad si no. */
+  /** Diferencia de kilos declarada y todavía sin conciliar: el equipo la está revisando. */
+  const enRevisio = (f: CanalAmbOferta): boolean =>
+    f.incidencia_recollida != null && estatEntrega(f) !== 'conciliada'
+  /** Los kilos recibidos: los reales cuando constan (registro o conciliación); si no, los
+   *  que confirmó la entidad en el albarán. */
   const kgRebuts = (f: CanalAmbOferta): number | null => {
-    const e = estatEntrega(f)
-    if (e === 'conciliada') return Number(f.kg_reales ?? albarans[f.id]?.kg_confirmados ?? f.kg_confirmados ?? 0)
-    if (e === 'confirmada') return Number(albarans[f.id]?.kg_confirmados ?? f.kg_confirmados ?? 0)
-    return null
+    if (estatEntrega(f) === 'pendent') return null
+    return Number(f.kg_reales ?? albarans[f.id]?.kg_confirmados ?? f.kg_confirmados ?? 0)
   }
 
   // El Històric es SOLO lo que ya ha llegado (revisión del 08-10-2026, §2.1): lo asignado y
@@ -530,7 +546,12 @@ export function Historic() {
                 )}
               </div>
             </div>
-            <span className="tabular-nums">{quants(f)}</span>
+            <div className="flex flex-wrap items-center gap-2">
+              {enRevisio(f) && (
+                <BadgeEstat clase="bg-aviso-fondo text-aviso">{t('op.incidencia_t')}</BadgeEstat>
+              )}
+              <span className="tabular-nums">{quants(f)}</span>
+            </div>
           </button>
         ))}
       </CardContent>

@@ -131,10 +131,13 @@ export default function PendentsEquip() {
             // que concordar con ella («1 alta per validar», no «1 altes»; §7, `<clau>_1`).
             : t(`pe.${f.cua}`, { n })
 
-          // La única cola con subtítulo variable: cuántos esperan a la otra parte.
+          // La única cola con subtítulo variable: qué incluye (desde el 17-10-2026, también
+          // las recogidas con diferencia de kilos, que esperan al equipo) y cuántos esperan
+          // a la otra parte.
           const esperant = f.cua === 'albarans_conciliar' ? quants('albarans_esperant') : 0
-          const sub = esperant > 0
-            ? t('pe.albarans_conciliar_sub', { m: esperant })
+          const sub = f.cua === 'albarans_conciliar'
+            ? [t('pe.albarans_conciliar_rev'), esperant > 0 ? t('pe.albarans_conciliar_sub', { m: esperant }) : null]
+              .filter(Boolean).join(' ')
             : AMB_SUBTITOL.includes(f.cua) ? t(`pe.${f.cua}_sub`, { n }) : null
 
           const desti = esTancament && ref ? `/equip/tancament/${ref}` : f.desti

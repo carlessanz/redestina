@@ -13,7 +13,12 @@ import { DICTS } from './i18n'
 type Traductor = (clau: string, params?: Record<string, string | number>) => string
 
 /** Códigos propios que llegan en `codi` o dentro del mensaje, con su texto. */
+//
+// ⚠️ El ORDEN importa: se busca por `includes()` en este orden, así que un código que
+// contiene a otro va ANTES (`cal_motiu_incidencia` antes que `cal_motiu`).
 const CODIS: Record<string, string> = {
+  // `conciliar_albaran()` con una incidencia de recogida y sin motivo (17-10-2026).
+  cal_motiu_incidencia: 'alb.err_cal_motiu_incidencia',
   sense_conveni: 'od.conv_blocked',
   // `desar_diagnostic()`, fase 9 de la revisión del 08-10-2026.
   massa_productes: 'diag.err_massa_productes',

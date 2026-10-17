@@ -134,6 +134,12 @@ export interface FetsInteres {
   ofertaEstado: EstadoExcedente
   albaraEnt?: { estado: EstadoAlbaran; numero: string | null } | null
   motiu?: string | null
+  /**
+   * La entidad declaró una diferencia de kilos al registrar la recogida
+   * (`canalizaciones.incidencia_recollida`, 17-10-2026). Con el albarán confirmado y sin
+   * conciliar, la entrega no está «confirmada» a secas: está en revisión del equipo.
+   */
+  incidencia?: boolean
 }
 
 export const ETAPES_OFERTA: readonly EtapaOferta[] = [
@@ -389,7 +395,11 @@ export function puntInteres(fets: FetsInteres): PuntProces {
   if (ent?.estado === 'conciliado') {
     return fes('tancada', null, 5, { kg: fets.kg ?? 0 }, false, '/receptor/historic')
   }
-  if (ent?.estado === 'confirmado') return fes('confirmada', null, 4, {}, false)
+  // Con una diferencia declarada, el equipo la revisa antes de conciliar: no es lo mismo que
+  // «confirmada, el equipo tancarà l'operació», y la entidad tiene que saber que la miran.
+  if (ent?.estado === 'confirmado') {
+    return fes('confirmada', fets.incidencia ? 'incidencia' : null, 4, {}, false)
+  }
   if (ent?.estado === 'entregado') {
     return fes('entrega', 'entregat', 3, { num }, true, '/receptor/documents')
   }

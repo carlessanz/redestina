@@ -18,6 +18,12 @@ describe('textError', () => {
     expect(textError(t, 'ERROR sense_conveni')).toBe('T(od.conv_blocked)')
   })
 
+  it('un código que contiene a otro gana el más largo (`cal_motiu_incidencia` ≠ `cal_motiu`)', () => {
+    expect(textError(t, { missatge: 'cal_motiu_incidencia: aquest albarà té una incidència de recollida', codi: '22023' }))
+      .toBe('T(alb.err_cal_motiu_incidencia)')
+    expect(textError(t, { missatge: 'cal_motiu', codi: '22023' })).toBe('T(po.err_cal_motiu)')
+  })
+
   it('sin mensaje, el respaldo (por defecto `c.error`)', () => {
     expect(textError(t, null)).toBe('T(c.error)')
     expect(textError(t, undefined)).toBe('T(c.error)')

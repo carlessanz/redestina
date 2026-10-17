@@ -15,6 +15,8 @@ export type TipusAvis =
   | 'oferta_validada' | 'oferta_rebutjada' | 'sortida_trobada' | 'interes_aprovat' | 'interes_rebutjat'
   | 'oferta_sense_desti' | 'recollida_canviada' | 'kg_assignats_canviats' | 'recollida_confirmada'
   | 'oferta_modificada' | 'oferta_enviada' | 'certificat_per_revisar'
+  // 20270426100000: pasada la hora de recogida, se pide al receptor que registre los kilos.
+  | 'recollida_per_registrar'
 
 export interface Avis {
   id: string
@@ -98,6 +100,8 @@ export function varsAvis(a: Pick<Avis, 'params'>): Record<string, string | numbe
     producte: String(p.producte ?? ''),
     ref: String(p.ref ?? ''),
     kg: fmt(p.kg),
+    // Lo asignado, para el aviso de recogida confirmada con diferencia (17-10-2026).
+    kg_assig: fmt(p.kg_assignats),
     kg_sol: fmt(p.kg_sol),
     kg_apr: fmt(p.kg_apr),
     entitat: String(p.entitat ?? ''),
@@ -116,6 +120,17 @@ export function esParcial(a: Pick<Avis, 'tipus' | 'params'>): boolean {
   return a.tipus === 'interes_aprovat'
     && a.params?.kg_sol != null && a.params?.kg_apr != null
     && Number(a.params.kg_sol) !== Number(a.params.kg_apr)
+}
+
+/**
+ * La clave del texto de un aviso en el panel: `avis.t_<tipus>`, o su variante cuando los
+ * parámetros cambian lo que hay que decir (aprobado por menos de lo pedido; recogida
+ * confirmada con una diferencia de kilos, que el equipo revisa).
+ */
+export function clauAvis(a: Pick<Avis, 'tipus' | 'params'>): string {
+  if (esParcial(a)) return 'avis.t_interes_aprovat_parcial'
+  if (a.tipus === 'recollida_confirmada' && a.params?.diferencia === true) return 'avis.t_recollida_confirmada_dif'
+  return `avis.t_${a.tipus}`
 }
 
 /** Las ofertas nuevas del Mercat desde la última visita (`perfiles.mercat_vist_at`). */

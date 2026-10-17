@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -32,6 +32,8 @@ import {
 } from '../../lib/albarans'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
+import { diferenciaKg, incidenciesDiferencia, llegeixIncidencia } from '../../lib/incidenciaRecollida'
+import type { IncidenciaDiferencia } from '../../lib/incidenciaRecollida'
 import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
@@ -111,6 +113,11 @@ interface EnllacFila {
    * de evidencia vale menos que un hueco (§4).
    */
   rol_parte: 'entrega' | 'recibe' | null
+}
+
+/** Una incidencia de recogida con la entidad que la declaró (si se sabe). */
+interface IncidenciaFila extends IncidenciaDiferencia {
+  entitat: string | null
 }
 
 const BUIDA: LiniaForm = {
@@ -199,6 +206,9 @@ export default function AlbaraDetall() {
   const [evidencies, setEvidencies] = useState<EvidenciaFila[]>([])
   const [productes, setProductes] = useState<string[]>([])
   const [caixes, setCaixes] = useState<{ codigo: string; nombre: string }[]>([])
+  // La diferencia de kilos que declaró la entidad receptora al registrar la recogida
+  // (17-10-2026). Mientras exista, el albarán no se concilia solo.
+  const [incidencies, setIncidencies] = useState<IncidenciaFila[]>([])
 
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -272,6 +282,37 @@ export default function AlbaraDetall() {
     setExterns((ext.data as DocumentoExterno[] | null) ?? [])
     const llistaEnllacos = (enl.data as EnllacFila[] | null) ?? []
     setEnllacos(llistaEnllacos)
+
+    // La incidencia de recogida sale de la CANALIZACIÓN, que es donde guarda quién y cuándo:
+    // la del ENT/OPE es la de su canalización; la del REC, la de cualquiera de las
+    // canalizaciones de su oferta (con varias entidades, puede haber más de una). Si no se
+    // encuentra ahí, la que lleve el propio albarán en `incidencias`.
+    const consultaInc = fila.tipo !== 'REC' && fila.canalizacion_id
+      ? supabase.from('canalizaciones').select('id, entidad_id, incidencia_recollida')
+        .eq('id', fila.canalizacion_id)
+      : fila.tipo === 'REC' && fila.excedente_id && !fila.espigolada_id
+        ? supabase.from('canalizaciones').select('id, entidad_id, incidencia_recollida')
+          .eq('excedente_id', fila.excedente_id).not('incidencia_recollida', 'is', null)
+        : null
+    const desCanal: { inc: IncidenciaDiferencia; entidad: string | null }[] = []
+    if (consultaInc) {
+      const { data: cs } = await consultaInc
+      for (const c of (cs as { id: string; entidad_id: string | null; incidencia_recollida: unknown }[] | null) ?? []) {
+        const inc = llegeixIncidencia(c.incidencia_recollida)
+        if (inc) desCanal.push({ inc, entidad: c.entidad_id })
+      }
+    }
+    if (desCanal.length) {
+      const ids = [...new Set(desCanal.map((x) => x.entidad).filter((v): v is string => !!v))]
+      const { data: ents } = ids.length
+        ? await supabase.from('entidades').select('id, nombre').in('id', ids)
+        : { data: [] }
+      const noms = Object.fromEntries(((ents as { id: string; nombre: string | null }[] | null) ?? [])
+        .map((e) => [e.id, e.nombre]))
+      setIncidencies(desCanal.map((x) => ({ ...x.inc, entitat: x.entidad ? (noms[x.entidad] ?? null) : null })))
+    } else {
+      setIncidencies(incidenciesDiferencia(fila.incidencias).map((i) => ({ ...i, entitat: null })))
+    }
 
     if (llistaEnllacos.length) {
       const { data: ev } = await supabase.from('evidencias')
@@ -586,6 +627,42 @@ export default function AlbaraDetall() {
         </div>
         <QueTocaAra punt={punt} compacte />
       </div>
+
+      {/* La diferencia que declaró la entidad receptora al registrar la recogida. En tono
+          aviso: no está roto, espera que el equipo lo revise y lo concilie con motivo. */}
+      {incidencies.length > 0 && (
+        <div className="space-y-2 rounded-lg bg-aviso-fondo p-3 text-sm text-aviso" data-testid="incidencia-albara">
+          <p className="flex items-center gap-2 font-medium">
+            <AlertTriangle className="size-4 shrink-0" aria-hidden />{t('alb.inc_t')}
+          </p>
+          {incidencies.map((i, n) => {
+            const d = diferenciaKg(i)
+            return (
+              <div key={n} className="space-y-0.5">
+                <p>
+                  {t(i.resultat === 'mes' ? 'alb.inc_declara_mes' : 'alb.inc_declara_menys', {
+                    entitat: i.entitat ?? t('alb.inc_entitat'),
+                  })}
+                </p>
+                <p className="tabular-nums">
+                  {t('alb.inc_kg', {
+                    a: kg(i.kg_assignats),
+                    r: kg(i.kg_reals),
+                    d: d == null ? '—' : `${d > 0 ? '+' : ''}${kg(d)}`,
+                  })}
+                </p>
+                {i.descripcion && <p>{t('alb.inc_motiu', { m: i.descripcion })}</p>}
+                {i.registrada_at && (
+                  <p>{t('alb.inc_quan', { d: dataCurta(i.registrada_at) })}</p>
+                )}
+              </div>
+            )
+          })}
+          <p className="font-medium">
+            {t(albara.estado === 'conciliado' ? 'alb.inc_revisada' : 'alb.inc_pendent')}
+          </p>
+        </div>
+      )}
 
       {albara.motivo_rechazo && (
         <p className="rounded-md bg-error-fondo p-3 text-sm text-error">
@@ -1093,6 +1170,7 @@ export default function AlbaraDetall() {
       <DialegConciliar
         obert={dialegConciliar} onObert={setDialegConciliar}
         tipus={albara.tipo}
+        ambIncidencia={incidencies.length > 0}
         confirmat={albara.confirmado_at != null}
         venc={venciment(albara.entregado_at, terminiDies)}
         proposta={proposta} linies={linies} ocupat={ocupat}
@@ -1181,11 +1259,14 @@ function DialegRectificar({
 // ayuda a nadie.
 // ---------------------------------------------------------------------------
 function DialegConciliar({
-  obert, onObert, tipus, confirmat, venc, proposta, linies, ocupat, onConfirma,
+  obert, onObert, tipus, ambIncidencia, confirmat, venc, proposta, linies, ocupat, onConfirma,
 }: {
   obert: boolean
   onObert: (v: boolean) => void
   tipus: string
+  /** La entidad receptora declaró una diferencia de kilos: la base exige motivo
+   *  (`cal_motiu_incidencia`) aunque cuadre con la tolerancia. */
+  ambIncidencia: boolean
   /** `albaranes.confirmado_at` no nulo. En un OPE, cuando han confirmado las dos partes. */
   confirmat: boolean
   /** Cuándo vence el plazo para conciliar sin confirmación (`null` = no consta entregado). */
@@ -1221,7 +1302,7 @@ function DialegConciliar({
   const terminiVencut = venc != null && venc.getTime() < ara
   // Sin confirmación y sin plazo vencido la base lo rechaza: no hay motivo que lo arregle.
   const esperant = !confirmat && !terminiVencut
-  const motiuObligatori = fora || !confirmat
+  const motiuObligatori = fora || !confirmat || ambIncidencia
   const potConfirmar = !ocupat && !esperant && (!motiuObligatori || motiu.trim() !== '')
 
   // Las salidas que se conciliarán con el REC (las confirmadas) y las que se quedan.
@@ -1265,6 +1346,10 @@ function DialegConciliar({
           )}
           {!confirmat && terminiVencut && (
             <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.rc_no_confirm')}</p>
+          )}
+
+          {ambIncidencia && (
+            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.rc_incidencia')}</p>
           )}
 
           {/* La cascada (REC): qué se concilia con él y qué se queda esperando. */}

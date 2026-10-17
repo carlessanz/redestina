@@ -175,3 +175,27 @@ test('la receptora registra menos kilos: albaranes por lo real y la operación e
     .toBe('ENT:confirmado,REC:confirmado')
   expect(sql(`select incidencia_recollida->>'resultat' from canalizaciones where excedente_id = '${oferta3}'`)).toBe('menys')
 })
+
+test('el equipo ve la incidencia en el albarán y no puede conciliarlo sin motivo', async ({ page }) => {
+  const rec = sql(`select id from albaranes where tipo = 'REC' and excedente_id = '${oferta3}' and estado = 'confirmado'`)
+  expect(rec).toMatch(/^[0-9a-f-]{36}$/)
+  // La base lo rechaza sin motivo (`cal_motiu_incidencia`), aunque cuadre con la tolerancia.
+  expect(() => sqlCom('super_admin', `select conciliar_albaran('${rec}', null, null, null)`))
+    .toThrow(/cal_motiu_incidencia/)
+
+  await entra(page, 'super_admin')
+  await page.goto(`/equip/albarans/${rec}`)
+  const banda = page.getByTestId('incidencia-albara')
+  await expect(banda).toBeVisible()
+  await expect(banda.getByText(/Incidència de recollida|Incidencia de recogida/)).toBeVisible()
+  await expect(banda.getByText(/Assignats: 40 kg → reals: 35 kg|Asignados: 40 kg → reales: 35 kg/)).toBeVisible()
+  await expect(banda.getByText(/Una caixa en mal estat/)).toBeVisible()
+
+  await page.getByRole('button', { name: /^Concilia$|^Conciliar$/ }).first().click()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.getByText(/ha declarat una diferència de quilos|ha declarado una diferencia de kilos/)).toBeVisible()
+  const conciliar = dlg.getByRole('button', { name: /^Concilia$|^Conciliar$/ })
+  await expect(conciliar).toBeDisabled()
+  await dlg.getByLabel(/^Motiu$|^Motivo$/).fill('Revisat amb l’entitat: una caixa malmesa')
+  await expect(conciliar).toBeEnabled()
+})

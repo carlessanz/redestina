@@ -10,7 +10,7 @@
 import { Bell } from 'lucide-react'
 import { useNavigate } from 'react-router'
 import { useT } from '../lib/i18n'
-import { esParcial, marcaLlegits, rutaAvis, useAvisos, varsAvis } from '../lib/avisos'
+import { clauAvis, marcaLlegits, rutaAvis, useAvisos, varsAvis } from '../lib/avisos'
 import { dataCurta } from '../lib/albarans'
 import { cn } from '../lib/utils'
 import { Button } from '@/components/ui/button'
@@ -49,7 +49,7 @@ export default function CampanaAvisos() {
           <DropdownMenuItem key={a.id} className="flex flex-col items-start gap-0.5 whitespace-normal py-2"
             onSelect={() => { void marcaLlegits({ ids: [a.id] }); navigate(rutaAvis(a)) }}>
             <span className={cn('text-sm', !a.llegit_at && 'font-semibold')}>
-              {t(esParcial(a) ? 'avis.t_interes_aprovat_parcial' : `avis.t_${a.tipus}`, varsAvis(a))}
+              {t(clauAvis(a), varsAvis(a))}
             </span>
             <span className="text-xs text-muted-foreground">{dataCurta(a.created_at)}</span>
           </DropdownMenuItem>

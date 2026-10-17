@@ -113,6 +113,27 @@ export function textAvis(
     case "recollida_confirmada": {
       const entitat = s(params.entitat);
       const q = quan(params.recollida_at, idioma);
+      // 17-10-2026: los kg reales los registra el receptor y pueden no coincidir con lo
+      // asignado. Con `diferencia` y `kg_assignats` se dice, y que la revisa el equipo; sin
+      // ellos (avisos anteriores) se mantiene el texto de siempre.
+      const assignats = Number(params.kg_assignats);
+      const ambDiferencia = (params.diferencia === true || params.diferencia === "true")
+        && params.kg_assignats != null && params.kg_assignats !== "" && Number.isFinite(assignats);
+      if (ambDiferencia) {
+        return {
+          asunto: es ? `Recogida registrada con diferencia: ${producte}` : `Recollida registrada amb diferència: ${producte}`,
+          titulo: es ? "Recogida con diferencia" : "Recollida amb diferència",
+          cuerpo: (es
+            ? `${entitat || "La entidad"} ha registrado que ha recogido ${kg(params.kg, idioma)} kg de ${producte}, frente a los ${kg(assignats, idioma)} kg asignados`
+            : `${entitat || "L’entitat"} ha registrat que ha recollit ${kg(params.kg, idioma)} kg de ${producte}, respecte als ${kg(assignats, idioma)} kg assignats`)
+            + (q ? ` (${q}).` : ".")
+            + (es
+              ? "\nEl equipo de Redestina revisa la diferencia."
+              : "\nL’equip de Redestina revisa la diferència."),
+          boton: botoParts,
+          ruta: rutaParts,
+        };
+      }
       return {
         asunto: es ? `Recogida confirmada: ${producte}` : `Recollida confirmada: ${producte}`,
         titulo: es ? "Salida confirmada" : "Sortida confirmada",
