@@ -28,6 +28,7 @@ import { AlertTriangle, ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import AvisCorreuDesactivat from '../../components/AvisCorreuDesactivat'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -855,6 +856,9 @@ export default function TancamentDetall() {
       <Button asChild variant="ghost" size="sm" className="h-11 -ml-2 md:h-9">
         <Link to="/equip/tancament"><ArrowLeft className="mr-1 size-4" />{t('c.back')}</Link>
       </Button>
+
+      {/* Con el correo apagado (§8) se emite igual, pero ningún PDF sale por correo. */}
+      <AvisCorreuDesactivat />
 
       {esProva && (
         <div className="flex items-start gap-2 rounded-md border border-aviso bg-aviso-fondo p-3 text-sm text-aviso">

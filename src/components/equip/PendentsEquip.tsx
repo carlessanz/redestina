@@ -20,7 +20,7 @@
 import { Link } from 'react-router'
 import { CheckCircle2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { useComptadorsEquip } from '../../hooks/useComptadorsEquip'
 import type { CuaEquip, PendentEquip } from '../../lib/pendentsEquip'
 import { Badge } from '@/components/ui/badge'
@@ -85,7 +85,9 @@ export default function PendentsEquip() {
   const quants = (cua: CuaEquip) => pendents.find((p) => p.cua === cua)?.n ?? 0
   const fila = (cua: CuaEquip): PendentEquip | undefined => pendents.find((p) => p.cua === cua)
 
-  const visibles = FILES.filter((f) => quants(f.cua) > 0)
+  // La cola de mensajes lleva a Missatgeria, que con WhatsApp apagado no existe (§8).
+  const canals = useCanals()
+  const visibles = FILES.filter((f) => quants(f.cua) > 0 && (f.cua !== 'missatges' || canals.whatsapp))
 
   // ⚠️ `carregat` sin una sola fila NO es «no hay nada pendiente»: es que la RPC falló o
   // todavía no está desplegada (§11: la base va antes que el frontend, pero entre las dos

@@ -14,7 +14,8 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { useAppContext, useWhatsappActiu } from '../hooks/useAppContext'
+import { useAppContext, useCanals, useWhatsappActiu } from '../hooks/useAppContext'
+import { motiuCanal } from '../lib/canals'
 import { textError } from '../lib/textError'
 import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import DialegCorreu from './DialegCorreu'
@@ -72,6 +73,7 @@ export default function RecordDetail({
   const { confirma, dialeg } = useConfirma()
   const { tria, dialeg: dialegTria } = useTria()
   const waActiu = useWhatsappActiu()
+  const motiuEmail = motiuCanal(useCanals(), 'email')
   const { ctx } = useAppContext()
   // Borrar exige `es_super_admin()` (§4bis): a los demás se les deja gris con el motivo.
   const potEsborrar = ctx?.esSuperAdmin ?? false
@@ -367,9 +369,10 @@ export default function RecordDetail({
               </Button>
             )}
             {emailKey && emailValor && !esNuevo && (
-              <Button variant="outline" onClick={() => setCorreuObert(true)}>
+              <BotoAmbMotiu variant="outline" onClick={() => setCorreuObert(true)}
+                disabled={!!motiuEmail} motiu={motiuEmail ? t(motiuEmail) : undefined}>
                 <Mail className="size-4" /> {t('c.email_action')}
-              </Button>
+              </BotoAmbMotiu>
             )}
             <Button onClick={() => void guardar()} disabled={guardando}>
               {guardando ? t('c.saving') : t('c.save')}

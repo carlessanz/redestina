@@ -676,6 +676,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte (cataleg)", requiereFixture: "els factors sembrats (20270424100000)" },
   { tabla: "factors_impacte", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap factor d'impacte" },
   { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa cap factor d'impacte" },
+  // Interruptores de notificaciones (27-10-2026): solo el super_admin.
+  { tabla: "fixar_notificacions", op: "rpc", esperado: "denegar", args: { p_actives: true }, descripcion: "NO toca l'interruptor general de notificacions" },
+  { tabla: "fixar_canal_notificacio", op: "rpc", esperado: "denegar", args: { p_canal: "email", p_actiu: true }, descripcion: "NO toca cap canal de notificació" },
+  // Consentimientos RGPD: nadie escribe directo (los guarda el alta con service_role).
+  { tabla: "consentiments", op: "insertar", esperado: "denegar", descripcion: "NO escriu consentiments directament" },
   // Fase 11 (20270425100000): el expediente de prevención lo lleva el equipo. Sin GRANT de
   // escritura para nadie; las RPC cortan antes de mirar si el expediente existe.
   { tabla: "expedients_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea cap expedient de prevencio a ma" },
@@ -1257,6 +1262,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
     // Fijar un factor es del super_admin: un técnico, no.
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "denegar", args: { p_codi: "x", p_valor: 1 }, descripcion: "NO fixa els factors d'impacte (super_admin)" },
+    { tabla: "fixar_notificacions", op: "rpc", esperado: "denegar", args: { p_actives: true }, descripcion: "NO toca l'interruptor general (és del super_admin)" },
+    { tabla: "fixar_canal_notificacio", op: "rpc", esperado: "denegar", args: { p_canal: "email", p_actiu: true }, descripcion: "NO toca cap canal (és del super_admin)" },
+    { tabla: "consentiments", op: "insertar", esperado: "denegar", descripcion: "NO escriu consentiments directament" },
     // El expediente: el día a día es del equipo (uuid inventado → 22023); abrir, verificar y
     // exportar es de `pot_aprovar()`, así que un técnico no.
     { tabla: "desar_element_expedient", op: "rpc", esperado: "permitir", args: { p_taula: "pla_visites", p_expedient: "00000000-0000-0000-0000-000000000000", p_id: null, p_dades: {} }, descripcion: "pot escriure els elements d'un expedient (22023 si no existeix)" },
@@ -1478,6 +1486,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "verificar_expedient", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_any: 2026, p_resum: "x", p_conclusio: "x" }, descripcion: "pot verificar un expedient (22023 si no existeix)" },
     // El super_admin fija los factores. Código inventado → 22023 factor_inexistent: la guarda dejó pasar.
     { tabla: "fixar_factor_impacte", op: "rpc", esperado: "permitir", args: { p_codi: "x", p_valor: 1 }, descripcion: "pot fixar els factors d'impacte (22023 si el codi no existeix)" },
+    // Con un canal inventado: la guarda de ROL deja pasar y la validación corta con 22023
+    // antes de escribir. Así se prueba sin tocar ningún interruptor de producción.
+    { tabla: "fixar_canal_notificacio", op: "rpc", esperado: "permitir", args: { p_canal: "fax", p_actiu: true }, descripcion: "pot tocar els canals (22023 canal_desconegut)" },
     // Aprobar un certificado en nombre del donante (fase 4): id inventado → 22023.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "aprova un certificat en nom del donant (id inventat → 22023)" },
     // La recogida la valida un admin (20270428100000). Con un id inventado la guarda de rol

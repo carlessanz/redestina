@@ -23,7 +23,8 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
+import { motiuCanal } from '../../lib/canals'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
@@ -94,6 +95,9 @@ export default function ConveniDetall() {
   const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
+  // Con el correo apagado (§8) el enlace se puede abrir, pero no mandar.
+  const canals = useCanals()
+  const motiuEmail = motiuCanal(canals, 'email')
   const { confirma, dialeg: dialegConfirma } = useConfirma()
 
   const [conv, setConv] = useState<Fila | null>(null)
@@ -232,7 +236,9 @@ export default function ConveniDetall() {
     // Estampa la firma de la Fundación, lo deja vigente y manda el PDF por correo.
     if (!(await confirma({
       titol: t('conv.countersign_confirm_t'),
-      descripcio: t('conv.countersign_confirm'),
+      // Con el correo apagado (§8) se contrafirma igual, pero el PDF no sale: se dice antes.
+      descripcio: canals.email ? t('conv.countersign_confirm')
+        : `${t('conv.countersign_confirm')} ${t('canal.doc_no_envia')}`,
       confirmar: t('conv.countersign'),
     }))) return
     setOcupat(true)
@@ -475,10 +481,11 @@ export default function ConveniDetall() {
                   {t('conv.link_open')}
                 </a>
               </Button>
-              <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat}
+              <BotoAmbMotiu className="h-11 whitespace-normal md:h-9" disabled={ocupat || !!motiuEmail}
+                motiu={motiuEmail ? t(motiuEmail) : undefined}
                 onClick={() => void mandaCorreu()}>
                 {t('conv.link_mail')}
-              </Button>
+              </BotoAmbMotiu>
             </div>
           </CardContent>
         </Card>

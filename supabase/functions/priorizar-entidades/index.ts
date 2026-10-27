@@ -11,7 +11,7 @@ import type { EntidadPriorizable, ExcedenteContexto } from "../_shared/priorizac
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
-import { modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
+import { canalsActius, modoTestActivo } from "../_shared/gate.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
@@ -133,7 +133,9 @@ Deno.serve(async (req) => {
     // Y el interruptor global (§8): con WhatsApp apagado no es un canal viable para nadie,
     // así que `decidirCanal` devolverá `email` (o `cap` sin correo) y el panel obedece sin
     // tener que consultar `app_settings`, que un externo ni siquiera puede leer.
-    const waActivo = await whatsappActivo(supabase);
+    // Desde el 27-10-2026, también el correo y el general: con todo apagado, `cap` para todas.
+    const canals = await canalsActius(supabase);
+    const waActivo = canals.whatsapp;
 
     // Y `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
     // Con VARIAS modalidades (05-10-2026) a una entidad le falta el papel solo si no tiene el
@@ -169,6 +171,8 @@ Deno.serve(async (req) => {
         last_inbound_at: contacto?.last_inbound_at,
         canal_preferido: preferencias.get(e.id) ?? null,
         whatsapp_activo: waActivo,
+        email_activo: canals.email,
+        notificacions_actives: canals.notificacions,
       });
       return {
         ...e,
@@ -203,6 +207,7 @@ Deno.serve(async (req) => {
       contexto,
       modo_test: modoTest,
       whatsapp_actiu: waActivo,
+      email_actiu: canals.email,
       modalitat: excedente.modalitat ?? null,
       modalitats,
       ranking: rankingConCanal,

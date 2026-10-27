@@ -585,7 +585,8 @@ src/
   hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
   routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés»
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
-                               Registre (/registre), RestablirClau (/restablir) y
+                               Registre (/registre), RestablirClau (/restablir),
+                               Privacitat (/privacitat, 27-10-2026) y
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia por secciones, escrita por RPC con lista blanca (§6ter)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
@@ -784,7 +785,14 @@ src/
     RecordDetail.tsx           Ficha CRUD genérica (editar/crear/borrar) de productor o entidad
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
-    Settings.tsx               Configuración: modo test, WhatsApp, idioma, **las dades de la Fundació** y las whitelists de prueba (§8)
+    Settings.tsx               Configuració POR PESTAÑAS (`?tab=`, 27-10-2026): General, Notificacions, Fundació,
+                               Impacte y Diagnòstic (§6ter)
+    configuracio/              Interruptor (la tarjeta Activat/Desactivat), SeccioGeneral (modo test,
+                               validación, idioma) y SeccioNotificacions (los tres interruptores, §8)
+    FormulariAlta.tsx          EL formulario de alta con cuenta y casillas RGPD: `/registre` y el alta
+                               asistida (`mode`), patrón de FirmaConveni (§9)
+    equip/DialegAltaAssistida.tsx  «Nova organització amb compte» (§9)
+    AvisCorreuDesactivat.tsx   La banda de «el correu està apagat» en cierre y certificados (§8)
 scripts/
   import-ara.ts                Importación idempotente de los 5 CSV maestros
   crear-usuario.ts             Alta de cuentas por la Admin API (no envía correos)
@@ -855,8 +863,11 @@ supabase/
                                `validacio.ts` (puro): `fotosValides()` y `veuCostReferencia()`
     enlace-publico/            `index.ts` solo enruta (254 líneas; era 2.195): `comun.ts` (cliente, token,
                                anti-abuso, URL firmada, base64), `albaran.ts`, `factura.ts`, `convenio.ts`
-    registro/                  `index.ts` (anti-abuso, orden de pasos, compensación) + `validacio.ts`,
+    registro/                  `index.ts` (anti-abuso) + `alta.ts` (orden de pasos, compensación y
+                               consentimientos RGPD; lo comparte `alta-assistida`) + `validacio.ts`,
                                `deteccio.ts` (duplicados), `conveni.ts`, `cliente.ts` y `coincidencies.ts`
+    alta-assistida/            POST (JWT + pot_aprovar): el alta de una organización con cuenta, ya aprobada
+    _shared/textosRgpd.ts      Las tres declaraciones RGPD y su huella; copia en `src/lib/textosRgpd.ts`
     recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)
     _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5)
@@ -1124,15 +1135,29 @@ Clave/valor de **configuración no secreta** que gestiona el equipo desde **Conf
 diferencia de `app_config`, solo `service_role` para secretos). RLS: `authenticated`
 select/insert/update, y `service_role`. Hoy guarda **`test_mode`** (`'true'`/`'false'`, default
 `'true'`): el **modo test global** (§8), y **`whatsapp_activo`** (`'true'`/`'false'`, default
-`'true'`, `20270317100000`): el **interruptor global de WhatsApp** (§8). Los leen las Edge Functions
-(`modoTestActivo`, `whatsappActivo`) y los togglea `src/lib/settings.ts` desde la página
-Configuración.
+`'true'`, `20270317100000`): el **interruptor global de WhatsApp** (§8). Desde el 27-10-2026
+(`20270429100000`) también **`notificacions_actives`** (el general) y **`email_activo`** (el canal de
+correo), y los tres se escriben **solo por RPC** (`fixar_notificacions`, `fixar_canal_notificacio`,
+§4bis), ya no por upsert. Los leen las Edge Functions (`modoTestActivo`, `canalsActius`) y los
+togglea `src/lib/settings.ts` desde Configuració › Notificacions.
 
 ⚠️ **Los dos son fail-safe, pero en sentidos CONTRARIOS, y es deliberado.** En `test_mode` la duda
 —fila ausente, error de lectura, valor raro— debe **cortar** un envío a quien no es de prueba; en
 `whatsapp_activo` la duda no puede dejar la plataforma **muda**, así que solo un `'false'` explícito
 lo apaga. Confundirlos al copiar el patrón invierte la garantía sin que nada falle. Escribir exige
 `es_super_admin()` (`20260730095000:147-156`), igual para los dos.
+
+**`consentiments`** (`20270429100100`, 27-10-2026) — los consentimientos RGPD de las altas, **solo
+inserción**: `user_id`, `organizacion_id`, `tipus` (`privacitat` · `comunicacions_plataforma` ·
+`comunicacions_espigoladors`), `valor`, `versio_text`, **`sha256_text`** (huella del texto que compone
+el SERVIDOR, `_shared/textosRgpd.ts`), `idioma`, `origen` (`registre` · `alta_assistida`),
+`registrat_per` (quién del equipo lo declaró), `ip`, `user_agent`. Un check impide guardar una
+privacidad no aceptada. Sin GRANT de escritura: la escriben `registro` y `alta-assistida` con
+`service_role`. RLS de lectura: la propia cuenta o `es_intern()`. Vista `v_consentiments_vigents`
+(`security_invoker`): el último valor por persona y tipo.
+⚠️ **No condiciona ningún envío operativo**: los avisos del servicio los gobiernan los interruptores
+(§8); esto es para comunicaciones informativas o de marketing, que hoy no existen.
+`documento_envios.estado` admite además **`desactivat`**: un correo cortado por un interruptor.
 
 ### Sistema documental (fase 1)
 
@@ -2226,6 +2251,8 @@ funciones, no políticas:
 | `crear_espigolada(productor, ubicacion, fecha, voluntarios, notas, lineas, ref_externa, excedente)` / `repartir_espigolada` | La jornada y sus lotes. `repartir_espigolada` es el único camino que **no** pasa por `aprovar_resposta()`, así que llama por su cuenta a `exigir_convenio()`. ⚠️ **Con `p_excedente` CONVIERTE una oferta** (`20260921221806`, §6ter): no crea ningún excedente, **reutiliza ese** —`origen` a `espigolament`, `espigolada_id` a la jornada, `estado` a `borrador` hasta el reparto— y crea el REC con su línea. Se niega con `22023` y un código legible en `oferta_inexistent` · `productor_no_coincideix` · `sense_producte_al_camp` · `ja_es_espigolada` · `ja_te_canalitzacions` · `ja_te_albarans` · `massa_linies`. Toma `for update` sobre la oferta **antes de insertar nada**: sin ese bloqueo, dos conversiones simultáneas pasarían las guardas a la vez y crearían dos jornadas del mismo producto, que es la duplicación que esta fase existe para impedir. ⚠️ **La firma de siete argumentos se retiró en la misma migración**: `create or replace` no puede cambiar el número de argumentos, así que habrían convivido dos y cualquier llamada de siete sería **ambigua (42725)** |
 | `fijar_coste_producto(producto, coste, motivo)` / `fijar_tipo_caja` (`pot_aprovar()`) · `borrar_coste_producto(producto, motivo)` (`es_super_admin()`) | El coste **de referencia** y las taras. **Sin ejercicio desde `20270405100200`** (drop de las firmas viejas con `p_ejercicio`): un coste por producto que se actualiza cuando hace falta |
 | `fixar_foto_producte(producto, foto, foto_mini, credit)` (`20270405100000`) | La foto del catálogo. **Solo `es_super_admin()`**, comprobado antes que la existencia. Las dos rutas a null = quitarla. Devuelve las rutas anteriores: los ficheros los retira el cliente |
+| `fixar_notificacions(actives)` · `fixar_canal_notificacio(canal, actiu)` (`20270429100000`) | Los interruptores de notificaciones (§8). **Solo `es_super_admin()` con sesión** (`42501`; `service_role` sin EXECUTE). La primera con `false` pone a `'false'` las tres claves en la misma transacción; con `true` solo enciende el general. La segunda (`email`/`whatsapp`) se niega a encender un canal con el general apagado (`22023 notificacions_desactivades`); un canal desconocido es `22023 canal_desconegut`, que es lo que usa el arnés |
+| `notificacions_actives()` · `email_activo()` · `whatsapp_activo()` | Los helpers, ya EFECTIVOS (canal = general Y canal). Fail-safe encendido. `whatsapp_activo()` cambió de significado el 27-10-2026: antes leía solo su clave |
 | `fixar_fotos_oferta(excedente, fotos, foto_producte default null)` | Las fotos de una oferta publicada y, desde `20270405100100`, la casilla «foto del producte». `p_fotos` null = no tocar las fotos. El productor de la oferta o el equipo |
 | `albarans_de_les_meves_orgs()` | Puente: REC→productor, ENT→entidad, OPE→las dos. **Sin borradores** |
 | `exigir_convenio(tipo, org)` | **Stub** en la fase 3: solo devuelve aviso. La fase 2 lo convierte en bloqueo tras la fecha de corte |
@@ -4239,7 +4266,11 @@ el mismo módulo del que el intake saca sus pasos. El alta llama a `POST /crear-
 Realtime ya cableado.
 
 Navegación anterior (barra superior de 6 secciones en `App.tsx`): retirada. **Configuració** (`Settings.tsx`)
-reúne el interruptor del **modo test** (§8), el de WhatsApp, el idioma, —desde el 21-09-2026— las
+va **por pestañas desde el 27-10-2026** (submenú horizontal, `?tab=` como en Albarans): **General** (modo
+test, validación de ofertas, idioma), **Notificacions** (los tres interruptores de §8, las whitelists y
+«Com es decideix a qui s'envia»), **Fundació**, **Impacte** y **Diagnòstic**. ⚠️ El contenedor de las
+pestañas lleva `min-w-0` (es hijo flex del `Tabs`): sin él, a 320 px se pasaba 4 px (medido). Antes
+reunía en una sola página el interruptor del **modo test** (§8), el de WhatsApp, el idioma, —desde el 21-09-2026— las
 **dades de la Fundació** (`DadesFundacio`, §12.10: es lo que desbloquea el certificado real) y
 —desde el 15-09-2026— las **dos whitelists de prueba** (`GestorWhitelist`), que antes ocupaban media pantalla del tablero. El
 **Dashboard** (`Dashboard.tsx`) es la landing tras el login y desde el 15-09-2026 es una **cola de
@@ -4422,6 +4453,7 @@ aplicación entera sin que nada hubiera cambiado.
 | `/` | **Landing pública** (`routes/public/Landing.tsx`): hero, «Com funciona» (los 4 momentos, con copy propio `land.*`), «Per a qui» y pie. Con sesión redirige a `/panell` |
 | `/login` | Acceso de **productores y entidades**, con enlace al registro y los accesos de prueba |
 | `/admin` | Acceso del **equipo**, con el copy de siempre. **No se enlaza desde lo público** |
+| `/privacitat` | La **política de privacidad** (27-10-2026), pública, enlazada desde las casillas RGPD del alta y el pie de la portada. Texto de trabajo con «PROVISIONAL — pendent de validació per l'assessoria» visible; cambiarlo es subir `VERSIO_RGPD` |
 | `/registre` | Alta self-service por rol, **y desde el 16-09-2026 por los dos a la vez** (§9): el selector era un `Tabs` —que por definición deja elegir uno— y son dos conmutadores con `aria-pressed`. Sin `@radix-ui/react-checkbox`: son dos opciones y una dependencia no se paga por eso |
 | `/restablir` | Contraseña nueva tras un enlace de recuperación |
 | `/confirmar/:token` | **Confirmación de un albarán sin sesión** (fase 3). Móvil primero: se abre desde una finca. Lo que autoriza es el token, no una cuenta (§9) |
@@ -4801,6 +4833,42 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
 > número pasa a producción con el interruptor en `true`, enviaría a TODOS** — revisar lista y flujo
 > antes. Afecta a TODO: intake, recordatorios, ALTA/BAJA y ofertas a entidades. Para volver a
 > simular: `supabase secrets set WHATSAPP_ENVIO_REAL=false`. El webhook siempre recibe.
+
+### Interruptores de notificaciones: el general, el correo y WhatsApp (27-10-2026)
+
+**Tres interruptores en Configuració › Notificacions, solo para el super_admin**: el **general**
+(`notificacions_actives`), el **correo** (`email_activo`) y el de **WhatsApp** de abajo. El canal
+EFECTIVO es «general Y canal», y así lo devuelven todos los helpers (SQL `email_activo()`/`whatsapp_activo()`,
+Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
+- **Apagar el general apaga los dos canales; encenderlo no los enciende**: se activan uno a uno.
+  Lo impone la base (`fixar_notificacions`, `fixar_canal_notificacio`, §4bis), no la pantalla.
+- **Cortan TODA comunicación operativa**, automática o pulsada por alguien (también el super_admin):
+  ofertas, avisos, recordatorios, documentos con su PDF, enlaces de firma y de confirmación, el código
+  de la firma asistida, la confirmación de oferta y los mensajes manuales.
+- 🔴 **No cortan lo TRANSACCIONAL**: el acceso y la bienvenida al aprobar o crear un alta
+  (`enviar-acceso`) y la recuperación de contraseña. Es una opción explícita de `sendEmail(…, traza,
+  { transaccional: true })` que pasan **solo** esas dos funciones; `enviar-email` no puede, porque su
+  propósito viene del cliente. Los gates de prueba (§8) siguen aplicando.
+- **Un solo punto de corte por canal**: `sendEmail()` (correo) y `enviar()` (WhatsApp). Cortado,
+  devuelve `ok:false`, `status 503`, `desactivado:true` y el código `email_desactivat` o
+  `notificacions_desactivades` —nunca un simulado, por lo mismo que §8 explica del de WhatsApp— y lo
+  traza en `documento_envios` con estado **`desactivat`**. Sin `traza`, falla cerrado.
+- **Por llamador**: `enviar-avis` marca el aviso y **no lo reintenta** (al reactivar no sale una
+  avalancha; el aviso sigue en la campana); `recollides-programades` con el correo apagado **no
+  renueva los tokens** (`recordar_confirmacions_recollida`), porque dejaría muerto el enlace que la
+  persona ya tiene; `generar-documento` genera el PDF y lo deja `desactivat` (se reenvía después desde
+  Documents); `enlace-publico` `enviar_codi` responde 503; `decidirCanal()` recibe `email_activo` y
+  `notificacions_actives` y devuelve `cap` con el motivo del interruptor, no «sense_canal».
+- **La interfaz**: un apartado de un canal apagado desaparece (Missatgeria es WhatsApp: menú, barra,
+  ruta —que vuelve al tablero—, KPI y cola del tablero, con `NavItem.requereix` y `filtraPerCanals`);
+  un botón que envía se queda gris con el motivo (`BotoAmbMotiu`, `motiuCanal()` de `lib/canals.ts`):
+  «Correu» y «Enviar» de la oferta, «Envia un correu», enviar el enlace del convenio, la tanda de la
+  campaña, «Reenvia». Emitir documentos no se bloquea (acto legal): `AvisCorreuDesactivat` avisa en el
+  cierre y en el certificado a demanda, y la contrafirma lo dice en su confirmación. «Marcar entregat»
+  sigue funcionando y dice que los enlaces no se han enviado. Aprobar un alta no cambia (transaccional).
+  En el panel externo, el menú de la persona y la ficha solo ofrecen los canales encendidos.
+- ✅ **Probado en el clon** (27-10-2026): reglas de la RPC, `enviar-email` → 503 y traza `desactivat`,
+  `enviar-acceso` sale (simulado) con todo apagado, y la E2E `tests/e2e/notificacions.e2e.ts`.
 
 ### Interruptor global `whatsapp_activo` (14-09-2026)
 
@@ -5379,6 +5447,28 @@ identidad del generador por dos vías que no eran evidentes: `id_excedente` tien
 `recogida.lugar` (la finca) más `responsable_origen` (la persona en origen) salían tanto impresos
 como en el JSON público. Los tres se tapan en ENT y el lugar se sustituye por el municipio. Si se
 añade algún campo nuevo al snapshot, hay que preguntarse si nombra al donante.
+
+### RGPD en el alta y alta asistida (27-10-2026)
+
+**`/registre` pide, junto a la contraseña, aceptar la política de privacidad (obligatoria) y dos
+consentimientos opcionales**: comunicaciones informativas de la plataforma y de la Fundació
+Espigoladors. El texto de cada casilla es el de `_shared/textosRgpd.ts` (copia en `src/lib`, la
+vigila `tests/notificacions.test.ts`); el servidor lo **recompone en el idioma de la pantalla** y guarda
+su huella en `consentiments` (§4), nunca el texto del cliente. `validar()` devuelve `400` con
+`camp = 'accepta_privacitat'` si falta, y solo `true` exacto vale. **No condicionan ninguna
+notificación operativa** (§8): esas tienen como base el servicio.
+
+**Alta asistida**: «Nova organització amb compte» (listados de productoras y receptoras, y
+Aprovacions; `pot_aprovar()`) abre `DialegAltaAssistida` con el mismo `FormulariAlta` en modo
+`assistit` —contraseña inicial, casillas en tercera persona («la persona ha acceptat…»), casilla de
+usuario de prueba y «envia-li l'accés ara»— contra la Edge Function **`alta-assistida`** (JWT y
+`pot_aprovar`). **Función propia y no una rama de `registro`** (dos regímenes de autorización en una
+función es donde se esconde el fallo), pero el alta es **la misma**: `registro/alta.ts`
+(`executarAlta`), con los mismos pasos, duplicados y compensación. Diferencias: la membresía nace
+`aprovada` y `activo` con `aprovat_per`, y los consentimientos `origen = 'alta_assistida'` con
+`registrat_per`. El acceso lo manda después `enviar-acceso`, transaccional.
+⚠️ Los consentimientos se guardan **antes** de las fichas: si fallan, solo se deshacen la
+organización y la cuenta, y no quedan convenios ni enlaces de una ficha borrada.
 
 ### Registro self-service (`registro`, 31-07-2026)
 
@@ -6041,6 +6131,10 @@ supabase functions deploy recuperar-password --no-verify-jwt     # login públic
 supabase functions deploy crear-oferta         # con verify_jwt (alta desde el panel del productor)
 supabase functions deploy registro --no-verify-jwt               # registro público self-service (§9)
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
+supabase functions deploy alta-assistida       # con verify_jwt (alta asistida, 27-10-2026; importa ../registro/)
+# ⚠️ 27-10-2026: `_shared/resend.ts`, `gate.ts` y `canal.ts` cambiaron (interruptores de §8): hay que
+#    redesplegar TODAS las que los importan, y `registro` (alta.ts). Tras `generar-documento`, el
+#    documento de prueba de siempre.
 supabase functions deploy generar-documento --no-verify-jwt      # la llama el trigger por pg_net
 supabase functions deploy descargar-documento # con verify_jwt (URL firmada de 60 s)
 supabase functions deploy reenviar-documento  # con verify_jwt (equipo: reenviar un documento)
@@ -6406,6 +6500,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **27-10-2026 (interruptores de notificaciones y RGPD): se abren la 142 y la 143**: **56 vivas**
+(aritmética) y la siguiente entrada nueva es la 144.
 ⚠️ **17-10-2026 (la recogida la cierra el receptor): se abre la 141** (el bloqueo de 48 h ya no actúa
 sobre las recogidas nuevas, decisión de producto): **54 vivas** y la siguiente entrada nueva es la 142.
 ⚠️ **12-10-2026 (fases 8-11 de la revisión del 08-10-2026): se cerró la 130** (fase 8) **y se abre la
@@ -6975,6 +7071,15 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      hace falta un bloqueo por «recogida pasada hace > 48 h sin registrar» en `manifestar_interes()`.
      ✅ **Decidido el 17-10-2026 (Carles): de momento se queda SIN freno.** Lo que empuja al receptor es
      el aviso y la cola del equipo; si se quiere el freno, es la propuesta de arriba.
+
+142. **Los consentimientos RGPD no tienen pantalla ni exportación** (27-10-2026). Se guardan en el alta
+     (`consentiments`), pero nadie puede verlos ni cambiarlos después —ni la persona en su ficha ni el
+     equipo—, ni exportar quién acepta las comunicaciones de Espigoladors. Las cuentas anteriores no
+     tienen ninguna fila. Hace falta una sección en la ficha y un listado/CSV para el equipo.
+143. **Con WhatsApp apagado, los mensajes que entran se registran pero nadie los ve** (27-10-2026).
+     El webhook sigue guardando los entrantes (§5), y Missatgeria desaparece con el canal (§8). Es lo
+     pedido —«no deben aparecer los apartados»—, pero si alguien escribe mientras está apagado, el
+     equipo solo lo verá al reactivarlo.
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7157,7 +7262,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.392 pruebas en 58 ficheros** de Vitest: 1.391 correctas y **1 saltada a propósito**
+   Referencia: **1.418 pruebas en 60 ficheros** de Vitest: 1.417 correctas y **1 saltada a propósito**
+   (27-10-2026, los interruptores de notificaciones y el RGPD: `tests/notificacions.test.ts` y
+   `tests/registroValidacio.test.ts`; antes **1.392 en 58**)
    (17-10-2026, la validación del admin antes de emitir: `registreRecollida`, `procesOferta`, `pendentsEquip`, `seguentPas`;
    antes **1.348**)
    (17-10-2026, la incidencia de recogida del lado del equipo: `tests/incidenciaRecollida.test.ts`, `textAvis` y
@@ -7209,6 +7316,10 @@ se va solo **cómo se llegó hasta aquí**.
    y `retornar_recollida` denegadas a externos y al técnico, permitidas al super_admin con uuid inventado; `confirmar_recollida` pasa a
    denegar al técnico) da **1.474/1.474 y 28 sin datos** en el clon, y **la misma cifra contra producción** tras publicar `6285ad5`
    el 17-10-2026 (las tres migraciones `20270426100000`…`20270428100000` y `enviar-avis`).
+   ⚠️ **27-10-2026**: `20270429100000`/`100100` añaden 25 checks (`fixar_notificacions`,
+   `fixar_canal_notificacio` y el insert en `consentiments`, denegados a las siete cuentas externas y al
+   equipo; `fixar_canal_notificacio` permitido al super_admin con un canal inventado → `22023`). Contra
+   el clon da **1.499/1.499 y 28 sin datos**. Producción, al publicar.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin

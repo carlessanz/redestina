@@ -1,112 +1,29 @@
-import { useEffect, useState } from 'react'
-import { ShieldCheck, ShieldAlert, Loader2, MessageCircle, MessageCircleOff } from 'lucide-react'
-import { toast } from 'sonner'
+// Configuració del equipo, por pestañas (27-10-2026): un submenú horizontal en vez de una
+// página larga. Cada pestaña es un componente de `configuracio/` o un bloque que ya existía.
+//
+// La pestaña vive en la URL (`?tab=notificacions`), como en Albarans: es lo que deja que un
+// aviso o un enlace lleven a la sección exacta. Un valor desconocido cae en «General».
+
+import { useSearchParams } from 'react-router'
 import { useT } from '../lib/i18n'
-import { useConfirma } from './DialegConfirma'
-import type { Lang } from '../lib/i18n'
-import {
-  fitxesSenseCorreuAmbTelefon, getTestMode, getWhatsappActiu, setTestMode, setWhatsappActiu,
-  getValidacioOfertes, setValidacioOfertes,
-} from '../lib/settings'
 import { useAppContext } from '../hooks/useAppContext'
-import {
-  anadirNumeroTest, borrarNumeroTest, listarNumerosTest, type MetaTestRecipient,
-} from '../lib/metaTest'
-import {
-  anadirEmailTest, borrarEmailTest, listarEmailsTest, type EmailTestRecipient,
-} from '../lib/emailTest'
-import GestorWhitelist from './GestorWhitelist'
 import DadesFundacio from './equip/DadesFundacio'
 import FactorsImpacte from './equip/FactorsImpacte'
 import EditorDiagnostic from './equip/EditorDiagnostic'
-import { cn } from '../lib/utils'
-import BotoAmbMotiu from './proces/BotoAmbMotiu'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import SeccioGeneral from './configuracio/SeccioGeneral'
+import SeccioNotificacions from './configuracio/SeccioNotificacions'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+
+const PESTANYES = ['general', 'notificacions', 'fundacio', 'impacte', 'diagnostic'] as const
 
 export default function Settings() {
-  const { t, lang, setLang } = useT()
-  const { confirma, dialeg } = useConfirma()
-  const { ctx, recarrega } = useAppContext()
-  // Escribir en `app_settings` exige `es_super_admin()`. Al resto del equipo se le deja
-  // el interruptor gris CON el motivo, en vez de dejarle pulsar y que no se guarde nada.
+  const { t } = useT()
+  const { ctx } = useAppContext()
+  const [params, setParams] = useSearchParams()
+  const tabParam = params.get('tab')
+  const tab = (PESTANYES as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'general'
+  // Los interruptores de `app_settings` solo los escribe el super_admin.
   const potCanviar = ctx?.esSuperAdmin ?? false
-  const motiu = potCanviar ? undefined : t('set.only_super')
-  // Las listas de prueba, en cambio, las escribe `pot_aprovar()` (admin o super_admin).
-  const motiuLlistes = (ctx?.potAprovar ?? false) ? undefined : t('wl.no_perm')
-  const [testMode, setTest] = useState<boolean | null>(null)
-  const [waActiu, setWaActiu] = useState<boolean | null>(null)
-  const [validacio, setValidacio] = useState<boolean | null>(null)
-  const [saving, setSaving] = useState(false)
-  // Las dos whitelists del entorno de pruebas (§4, §8). Vivían en el Tauler y ocupaban
-  // media pantalla de la landing del equipo: no son trabajo del día, son el ajuste que
-  // acompaña al modo de pruebas de aquí arriba.
-  const [lista, setLista] = useState<MetaTestRecipient[]>([])
-  const [listaEmail, setListaEmail] = useState<EmailTestRecipient[]>([])
-
-  useEffect(() => {
-    void getTestMode().then(setTest)
-    void getWhatsappActiu().then(setWaActiu)
-    void getValidacioOfertes().then(setValidacio)
-    void listarNumerosTest().then(setLista)
-    void listarEmailsTest().then(setListaEmail)
-  }, [])
-
-  async function cambiarTestMode(activo: boolean) {
-    if (activo === testMode || saving) return
-    // Apagarlo es sensible: pasa a enviarse a TODOS. Confirmación explícita.
-    if (!activo && !(await confirma({
-      titol: t('set.confirm_off_t'),
-      descripcio: t('set.confirm_off'),
-      confirmar: t('set.turn_off'),
-      destructiu: true,
-    }))) return
-    setSaving(true)
-    const error = await setTestMode(activo)
-    setSaving(false)
-    if (error) { toast.error(t(error)); return }
-    setTest(activo)
-    toast.success(activo ? t('set.saved_on') : t('set.saved_off'))
-  }
-
-  /**
-   * Apagar WhatsApp es la decisión más grande de esta pantalla, así que antes de pedir
-   * confirmación se cuenta lo que cuesta: las fichas con teléfono y sin correo quedan
-   * incontactables. Que ese número salga DESPUÉS de pulsar no serviría de nada.
-   */
-  async function cambiarWhatsapp(activo: boolean) {
-    if (activo === waActiu || saving) return
-    if (!activo) {
-      setSaving(true)
-      const n = await fitxesSenseCorreuAmbTelefon()
-      setSaving(false)
-      if (!(await confirma({
-        titol: t('set.wa_confirm_off_t'),
-        descripcio: t('set.wa_confirm_off', { productors: n.productors, entitats: n.entitats }),
-        confirmar: t('set.turn_off'),
-        destructiu: true,
-      }))) return
-    }
-    setSaving(true)
-    const error = await setWhatsappActiu(activo)
-    setSaving(false)
-    if (error) { toast.error(t(error)); return }
-    setWaActiu(activo)
-    // El interruptor viaja en el contexto de sesión: sin recargarlo, el resto de la
-    // aplicación (botones, banners) seguiría pintando el estado anterior.
-    await recarrega()
-    toast.success(activo ? t('set.wa_saved_on') : t('set.wa_saved_off'))
-  }
-
-  /** El interruptor de validación previa de ofertas (05-10-2026). Sin confirmación: es reversible. */
-  async function cambiarValidacio(activa: boolean) {
-    if (activa === validacio || saving) return
-    setSaving(true)
-    const error = await setValidacioOfertes(activa)
-    setSaving(false)
-    if (error) { toast.error(t(error)); return }
-    setValidacio(activa)
-    toast.success(activa ? t('set.val_saved_on') : t('set.val_saved_off'))
-  }
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -115,221 +32,31 @@ export default function Settings() {
         <p className="mt-1 text-sm text-muted-foreground">{t('set.subtitle')}</p>
       </div>
 
-      {/* Modo test: la garantía de no enviar a usuarios que no sean de prueba. */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.test_mode')}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {testMode === null ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> {t('c.loading')}
-            </p>
-          ) : (
-            <>
-              <div className={cn('flex items-start gap-3 rounded-lg border p-3',
-                testMode ? 'border-exito/30 bg-exito-fondo' : 'border-error/30 bg-error-fondo')}>
-                {testMode
-                  ? <ShieldCheck className="mt-0.5 size-5 shrink-0 text-exito" />
-                  : <ShieldAlert className="mt-0.5 size-5 shrink-0 text-error" />}
-                <div className="text-sm">
-                  <div className={cn('font-semibold', testMode ? 'text-exito' : 'text-error')}>
-                    {testMode ? t('set.test_on') : t('set.test_off')}
-                  </div>
-                  <p className="mt-0.5 text-muted-foreground">
-                    {testMode ? t('set.test_on_desc') : t('set.test_off_desc')}
-                  </p>
-                </div>
-              </div>
+      <Tabs value={tab} onValueChange={(v) => setParams(v === 'general' ? {} : { tab: v }, { replace: true })}>
+        {/* Cinco etiquetas no caben a 320 px: la lista scrollea sola en vez de empujar la
+            página entera hacia la derecha. `min-w-0` porque es hijo de un flex (el `Tabs`):
+            sin él, `min-width:auto` lo ensancha hasta su contenido y el scroll no actúa —
+            medido a 320 px, 292 > 288 (§2, regla 4)—. Sin `-mx-1`, que también desbordaba. */}
+        <div className="min-w-0 overflow-x-auto pb-1">
+          <TabsList variant="line" className="w-max">
+            <TabsTrigger value="general">{t('set.tab_general')}</TabsTrigger>
+            <TabsTrigger value="notificacions">{t('set.tab_notificacions')}</TabsTrigger>
+            <TabsTrigger value="fundacio">{t('set.tab_fundacio')}</TabsTrigger>
+            <TabsTrigger value="impacte">{t('set.tab_impacte')}</TabsTrigger>
+            <TabsTrigger value="diagnostic">{t('set.tab_diagnostic')}</TabsTrigger>
+          </TabsList>
+        </div>
 
-              <div className="inline-flex rounded-md border p-0.5">
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarTestMode(true)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    testMode ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.on')}
-                </BotoAmbMotiu>
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarTestMode(false)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    !testMode ? 'bg-error text-white hover:bg-error hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.off')}
-                </BotoAmbMotiu>
-              </div>
-
-              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
-              <p className="text-xs text-muted-foreground">{t('set.test_help')}</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Validación previa de las ofertas que publica el productor (05-10-2026). */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.val_title')}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {validacio === null ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> {t('c.loading')}
-            </p>
-          ) : (
-            <>
-              <p className="text-sm text-muted-foreground">{validacio ? t('set.val_on_desc') : t('set.val_off_desc')}</p>
-              <div className="inline-flex rounded-md border p-0.5">
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarValidacio(true)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    validacio ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.on')}
-                </BotoAmbMotiu>
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarValidacio(false)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    !validacio ? 'bg-aviso text-white hover:bg-aviso hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.off')}
-                </BotoAmbMotiu>
-              </div>
-              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* WhatsApp: el canal entero, encendido o apagado. */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.wa_title')}</CardTitle></CardHeader>
-        <CardContent className="space-y-4">
-          {waActiu === null ? (
-            <p className="flex items-center gap-2 text-sm text-muted-foreground">
-              <Loader2 className="size-4 animate-spin" /> {t('c.loading')}
-            </p>
-          ) : (
-            <>
-              <div className={cn('flex items-start gap-3 rounded-lg border p-3',
-                waActiu ? 'border-exito/30 bg-exito-fondo' : 'border-aviso/30 bg-aviso-fondo')}>
-                {waActiu
-                  ? <MessageCircle className="mt-0.5 size-5 shrink-0 text-exito" />
-                  : <MessageCircleOff className="mt-0.5 size-5 shrink-0 text-aviso" />}
-                <div className="text-sm">
-                  <div className={cn('font-semibold', waActiu ? 'text-exito' : 'text-aviso')}>
-                    {waActiu ? t('set.wa_on') : t('set.wa_off')}
-                  </div>
-                  <p className="mt-0.5 text-muted-foreground">
-                    {waActiu ? t('set.wa_on_desc') : t('set.wa_off_desc')}
-                  </p>
-                </div>
-              </div>
-
-              <div className="inline-flex rounded-md border p-0.5">
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarWhatsapp(true)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    waActiu ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.on')}
-                </BotoAmbMotiu>
-                <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={saving || !potCanviar} motiu={motiu}
-                  onClick={() => void cambiarWhatsapp(false)}
-                  className={cn('rounded px-4 font-medium disabled:opacity-60',
-                    !waActiu ? 'bg-aviso text-white hover:bg-aviso hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                  {t('set.off')}
-                </BotoAmbMotiu>
-              </div>
-
-              {!potCanviar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
-              <p className="text-xs text-muted-foreground">{t('set.wa_help')}</p>
-            </>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Los datos de la Fundación: lo que encabeza todos los documentos y lo que
-          desbloquea la emisión con efecto fiscal. Va antes que las listas de prueba
-          porque pesa más: sin esta fila rellenada no se puede certificar nada. */}
-      <DadesFundacio />
-
-      {/* Los factores del impacto (fase 10): configuración del servicio, como lo anterior. */}
-      <FactorsImpacte />
-
-      {/* El cuestionario, las medidas y las reglas del diagnóstico (F2). Va aquí y no en
-          una pantalla propia por lo mismo que los datos de la Fundación: es configuración
-          del servicio, no trabajo del día a día. */}
-      <EditorDiagnostic />
-
-      {/* Las listas de prueba: la segunda barrera técnica del entorno de test. */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('set.lists_title')}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{t('set.lists_help')}</p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Con WhatsApp apagado (§8) la lista de Meta no decide nada: se atenúa y se dice,
-              en vez de esconderla —sigue siendo el estado que hay que dejar bien antes de
-              volver a encender el canal—. */}
-          <div className={cn('space-y-2', waActiu === false && 'opacity-60')}>
-            {waActiu === false && <p className="text-xs text-aviso">{t('dash.wa_off')}</p>}
-            <GestorWhitelist
-              titulo={t('dash.meta_title')} ayuda={t('dash.meta_help')}
-              items={lista.map((r) => ({ clave: r.phone, etiqueta: r.etiqueta }))}
-              placeholderClave={t('dash.ph_phone')} placeholderEtiqueta={t('dash.ph_label')} max={5}
-              addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
-              deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
-              onAdd={async (c, e) => {
-                const err = await anadirNumeroTest(c, e)
-                if (!err) setLista(await listarNumerosTest())
-                return err ? t(err) : null
-              }}
-              onDelete={async (c) => {
-                const err = await borrarNumeroTest(c)
-                setLista(await listarNumerosTest())
-                return err ? t(err) : null
-              }}
-            />
-          </div>
-          <GestorWhitelist
-            titulo={t('dash.email_title')} ayuda={t('dash.email_help')}
-            items={listaEmail.map((r) => ({ clave: r.email, etiqueta: r.etiqueta }))}
-            placeholderClave={t('dash.ph_email')} placeholderEtiqueta={t('dash.ph_label')} max={20}
-            addLabel={t('c.add')} noneLabel={t('dash.none_yet')}
-            deleteLabel={t('c.delete')} motiuBloqueig={motiuLlistes}
-            onAdd={async (c, e) => {
-              const err = await anadirEmailTest(c, e)
-              if (!err) setListaEmail(await listarEmailsTest())
-              return err ? t(err) : null
-            }}
-            onDelete={async (c) => {
-              const err = await borrarEmailTest(c)
-              setListaEmail(await listarEmailsTest())
-              return err ? t(err) : null
-            }}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Idioma */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.language')}</CardTitle></CardHeader>
-        <CardContent>
-          <div className="inline-flex rounded-md border p-0.5">
-            {(['ca', 'es'] as Lang[]).map((l) => (
-              <button key={l} type="button" onClick={() => setLang(l)}
-                className={cn('rounded px-4 py-1.5 text-sm font-semibold transition-colors',
-                  lang === l ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-muted')}>
-                {l === 'ca' ? 'Català' : 'Castellano'}
-              </button>
-            ))}
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Cómo se decide a quién se envía (para que quede claro). */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.sending_title')}</CardTitle></CardHeader>
-        <CardContent className="space-y-1.5 text-sm text-muted-foreground">
-          <p>{t('set.sending_1')}</p>
-          <p>{t('set.sending_2')}</p>
-          <p>{t('set.sending_3b')}</p>
-        </CardContent>
-      </Card>
-
-      {dialeg}
+        <TabsContent value="general" className="pt-4"><SeccioGeneral potCanviar={potCanviar} /></TabsContent>
+        <TabsContent value="notificacions" className="pt-4"><SeccioNotificacions potCanviar={potCanviar} /></TabsContent>
+        {/* Los datos de la Fundación: lo que encabeza todos los documentos y lo que
+            desbloquea la emisión con efecto fiscal. */}
+        <TabsContent value="fundacio" className="pt-4"><DadesFundacio /></TabsContent>
+        {/* Los factores del impacto (fase 10). */}
+        <TabsContent value="impacte" className="pt-4"><FactorsImpacte /></TabsContent>
+        {/* El cuestionario, las medidas y las reglas del diagnóstico (F2). */}
+        <TabsContent value="diagnostic" className="pt-4"><EditorDiagnostic /></TabsContent>
+      </Tabs>
     </div>
   )
 }

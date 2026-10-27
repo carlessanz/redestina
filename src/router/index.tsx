@@ -18,6 +18,7 @@ import Landing from '../routes/public/Landing'
 import LoginUsuaris from '../routes/public/LoginUsuaris'
 import LoginEquip from '../routes/public/LoginEquip'
 import Registre from '../routes/public/Registre'
+import Privacitat from '../routes/public/Privacitat'
 import RestablirClau from '../routes/public/RestablirClau'
 import Dashboard from '../components/Dashboard'
 import Settings from '../components/Settings'
@@ -78,6 +79,8 @@ export const router = createBrowserRouter([
       // «autoriza» es conocer el código, igual que en `/confirmar` lo hace el token.
       { path: '/verificar/:codi', element: <Verificar /> },
       { path: '/restablir', element: <RestablirClau /> },
+      // La política de privacidad (27-10-2026): la enlazan las casillas RGPD del alta.
+      { path: '/privacitat', element: <Privacitat /> },
 
       // ── Privada ──
       {

@@ -43,7 +43,7 @@ import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
 import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { certificatsDelGenerador } from '../../lib/tancament'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { useConfirma } from '../../components/DialegConfirma'
 import { supabase } from '../../lib/supabase'
 import PasosProces from '../../components/proces/PasosProces'
@@ -116,6 +116,7 @@ export default function CanalitzacioDetall() {
   const { t, lang } = useT()
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
+  const canals = useCanals()
   // Contrasignar y aprobar exigen `pot_aprovar()` (§4bis): a un técnico se le dejan grises
   // CON el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
   const potAprovar = ctx?.potAprovar ?? false
@@ -740,14 +741,15 @@ export default function CanalitzacioDetall() {
                                     // Hasta el 28-09-2026 aquí se DESCARTABAN los enlaces: el
                                     // token solo existe en esta respuesta, y nadie lo enviaba.
                                     const enllacos = r.data.enllacos ?? []
-                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, enllacos, t, lang)
+                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, enllacos, t, lang, canals.email)
                                     // UN aviso, no dos verdes seguidos: «entregat» y «correu
                                     // enviat» son el mismo acto (como en `AlbaraDetall`). Esta
                                     // pantalla no enseña los enlaces: la salida, si el correo no
                                     // sale, es la confirmación asistida.
                                     const perWhatsapp = enllacos.filter((e) => e.canal === 'whatsapp').length
                                     if (perWhatsapp > 0) toast.info(t('alb.delivered_wa', { n: perWhatsapp }))
-                                    if (enllacos.length === 0) toast.warning(t('alb.delivered_0'))
+                                    if (correu.desactivat) toast.warning(`${t('canalz.ok_entregat')} ${t('canal.links_no_enviats')}`)
+                                    else if (enllacos.length === 0) toast.warning(t('alb.delivered_0'))
                                     else if (perWhatsapp === enllacos.length) { /* només WhatsApp: ja s'ha dit */ }
                                     else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
                                     else toast.warning(`${t('canalz.ok_entregat')} ${t('alb.mail_failed_assistit')}`)

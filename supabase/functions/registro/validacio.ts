@@ -38,6 +38,13 @@ export interface Dades {
   firmarAra: boolean;
   /** Correo de quien firmará, si no es quien registra. */
   emailSignant: string | null;
+  // --- RGPD (27-10-2026): la privacidad es obligatoria; las dos comunicaciones, no.
+  // Separadas de las notificaciones operativas: no condicionan ningún envío del servicio.
+  acceptaPrivacitat: boolean;
+  comunicacionsPlataforma: boolean;
+  comunicacionsEspigoladors: boolean;
+  /** Idioma en que se enseñaron las declaraciones: el servidor las recompone en ese. */
+  idioma: "ca" | "es";
 }
 
 export type Validacio = { ok: true; dades: Dades } | { ok: false; camp: string; error: string };
@@ -163,11 +170,22 @@ export function validar(body: Record<string, unknown>): Validacio {
     };
   }
 
+  // Sin privacidad aceptada no hay alta. Solo `true` exacto: una casilla que llega como
+  // "true" o 1 desde una pantalla rota no puede valer como consentimiento.
+  if (body.accepta_privacitat !== true) {
+    return { ok: false, camp: "accepta_privacitat", error: "Cal acceptar la politica de privacitat" };
+  }
+  const idioma = body.idioma === "es" ? "es" : "ca";
+
   return {
     ok: true,
     dades: {
       rols, nomOrganitzacio, nomPersona, email, password, telefon, poblacio, tipoReceptor,
       nif, domicili, codiPostal, representant, carrec, firmarAra, emailSignant,
+      acceptaPrivacitat: true,
+      comunicacionsPlataforma: body.comunicacions_plataforma === true,
+      comunicacionsEspigoladors: body.comunicacions_espigoladors === true,
+      idioma,
     },
   };
 }

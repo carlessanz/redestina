@@ -1,8 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Plus } from 'lucide-react'
+import { Plus, UserPlus } from 'lucide-react'
+import DialegAltaAssistida from './equip/DialegAltaAssistida'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import { useWhatsappActiu } from '../hooks/useAppContext'
+import { useAppContext, useCanals, useWhatsappActiu } from '../hooks/useAppContext'
+import { motiuCanal } from '../lib/canals'
+import BotoAmbMotiu from './proces/BotoAmbMotiu'
 import { useCerca } from '../hooks/useCerca'
 import { filtraCerca } from '../lib/cerca'
 import BarraFiltres from './BarraFiltres'
@@ -30,6 +33,11 @@ const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Props) {
   const { t } = useT()
   const waActiu = useWhatsappActiu()
+  // El alta asistida crea una cuenta ya aprobada: solo quien puede aprobar (§4bis).
+  const potAprovar = useAppContext().ctx?.potAprovar ?? false
+  const [altaObert, setAltaObert] = useState(false)
+  // Con el correo apagado (§8) «Correu» se queda gris con el motivo: envía, no lleva a ningún apartado.
+  const motiuEmail = motiuCanal(useCanals(), 'email')
   // Un solo diálogo para toda la tabla: la fila solo dice a quién se escribe.
   const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
   const [entidades, setEntidades] = useState<EntidadLlistat[]>([])
@@ -118,11 +126,11 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
                         <Button size="sm" disabled={!tel} title={tel ? undefined : t('ent.no_phone')}
                           onClick={() => tel && onSendMessage(tel, e.nombre)}>{t('c.message')}</Button>
                       )}
-                      <Button variant="outline" size="sm" disabled={!e.email}
-                        title={e.email ? undefined : t('correu.no_email')}
+                      <BotoAmbMotiu variant="outline" size="sm" disabled={!e.email || !!motiuEmail}
+                        motiu={motiuEmail ? t(motiuEmail) : e.email ? undefined : t('correu.no_email')}
                         onClick={() => setCorreuA({ email: e.email, nom: e.nombre, tipus: 'entidad', id: e.id })}>
                         {t('c.email_action')}
-                      </Button>
+                      </BotoAmbMotiu>
                     </div>
                   </TableCell>
                 </TableRow>
@@ -143,7 +151,15 @@ export default function EntitiesList({ onSendMessage, onOpenDetail, onNew }: Pro
           <CardTitle>{t('ent.title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('ent.subtitle')}</p>
         </div>
-        <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_f')}</Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {/* Una organización CON cuenta (alta asistida, 27-10-2026). «Nova» crea solo la ficha. */}
+          <BotoAmbMotiu variant="outline" onClick={() => setAltaObert(true)} disabled={!potAprovar}
+            motiu={potAprovar ? undefined : t('appr.need_approver')}>
+            <UserPlus className="size-4" /> {t('alta.open')}
+          </BotoAmbMotiu>
+          <Button onClick={onNew}><Plus className="size-4" /> {t('c.new_f')}</Button>
+        </div>
+        <DialegAltaAssistida obert={altaObert} onTancar={() => setAltaObert(false)} rolInicial="receptor" />
       </CardHeader>
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('ent.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />

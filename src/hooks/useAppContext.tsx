@@ -21,6 +21,7 @@ import { createContext, useCallback, useContext, useEffect, useMemo, useRef, use
 import type { ReactNode } from 'react'
 import { useLocation } from 'react-router'
 import { supabase } from '../lib/supabase'
+import type { Canals } from '../lib/canals'
 import {
   resolContext, rolDeLaRuta, rolInicial,
   type ContextSessio, type Organitzacio, type Rol,
@@ -226,6 +227,18 @@ export function useOrganitzacio(tipus: 'productor' | 'entidad'): Organitzacio | 
  * que decide de verdad es el servidor; esto es para no enseñar botones que van a fallar.
  */
 export function useWhatsappActiu(): boolean {
+  return useCanals().whatsapp
+}
+
+/**
+ * Los tres interruptores de notificaciones (§8), ya EFECTIVOS: con el general apagado,
+ * `email` y `whatsapp` son falsos. Fail-safe encendido, igual que `useWhatsappActiu`.
+ */
+export function useCanals(): Canals {
   const { ctx } = useAppContext()
-  return ctx?.whatsappActiu ?? true
+  return {
+    notificacions: ctx?.notificacionsActives ?? true,
+    email: ctx?.emailActiu ?? true,
+    whatsapp: ctx?.whatsappActiu ?? true,
+  }
 }

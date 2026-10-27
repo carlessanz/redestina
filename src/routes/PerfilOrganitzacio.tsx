@@ -47,7 +47,7 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { refrescaAvisos } from '../lib/refrescAvisos'
-import { useWhatsappActiu } from '../hooks/useAppContext'
+import { useCanals } from '../hooks/useAppContext'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from '../lib/validacio'
 import { TIPUS_EMPRESA } from '../lib/perfilReceptor'
@@ -155,7 +155,11 @@ function errorDe(c: Camp, valor: string): string | null {
 
 export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'entidad' }) {
   const { t, lang } = useT()
-  const waActiu = useWhatsappActiu()
+  // Los interruptores de Configuració (§8): un canal apagado no se ofrece como preferencia
+  // nueva. La que ya estaba guardada se sigue enseñando —con su aviso— para no cambiarla
+  // a escondidas; vuelve a valer cuando se reactive el canal.
+  const canals = useCanals()
+  const waActiu = canals.whatsapp
   const organitzacio = useOrganitzacio(tipus)
   const [fila, setFila] = useState<Fila | null>(null)
   const [canal, setCanal] = useState<Tria>('auto')
@@ -456,6 +460,7 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           </section>
         )}
 
+        {(canals.email || canals.whatsapp) && (
         <section className="space-y-3 border-t border-border pt-6">
           <div>
             <h3 className="text-base font-semibold">{t('perf.channel_title')}</h3>
@@ -478,7 +483,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                {OPCIONS.map((o) => (
+                {OPCIONS.filter((o) => (o.valor !== 'whatsapp' || canals.whatsapp || canal === 'whatsapp')
+                  && (o.valor !== 'email' || canals.email || canal === 'email')).map((o) => (
                   <SelectItem key={o.valor} value={o.valor} className="text-base md:text-sm">
                     {t(o.labelKey)}
                   </SelectItem>
@@ -512,7 +518,17 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
               </AlertDescription>
             </Alert>
           )}
+
+          {canal === 'email' && !canals.email && (
+            <Alert className="border-aviso/30 bg-aviso-fondo text-aviso">
+              <Info />
+              <AlertDescription className="text-aviso">
+                <p>{t('perf.channel_mail_off')}</p>
+              </AlertDescription>
+            </Alert>
+          )}
         </section>
+        )}
       </CardContent>
     </Card>
   )

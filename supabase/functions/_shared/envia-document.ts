@@ -54,6 +54,8 @@ export type ResultatEnviament =
   | "bloquejat_prova"
   | "bloquejat_mode_test"
   | "fora_llista_test"
+  /** Los interruptores de Configuració lo cortaron (§8). El PDF existe; se reenvía después. */
+  | "desactivat"
   | "error";
 
 /** Base64 por trozos: `String.fromCharCode(...bytes)` de golpe revienta la pila. */
@@ -120,6 +122,7 @@ export async function enviaDocument(
       objetoId: doc.objeto_id,
       funcion,
     });
+    if (r.desactivado) return "desactivat";
     if (!r.ok) return "error";
     return r.simulado ? "simulat" : adjunt ? "enviat" : "enviat_sense_adjunt";
   } catch (e) {

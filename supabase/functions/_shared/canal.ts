@@ -57,6 +57,13 @@ export interface DatosContacto {
    * cualquier llamada que no lo pase.
    */
   whatsapp_activo?: boolean;
+  /** El canal de correo EFECTIVO (`email_activo` y el general, §8). Ausente = activo. */
+  email_activo?: boolean;
+  /**
+   * El interruptor general de notificaciones. **Ausente = activo.** Apagado, no hay canal
+   * para nadie, sea cual sea la ficha: `cap` con su motivo.
+   */
+  notificacions_actives?: boolean;
 }
 
 /**
@@ -76,6 +83,8 @@ export type MotivoCanal =
   | "sense_correu"
   | "sense_canal"
   | "whatsapp_desactivat"
+  | "email_desactivat"
+  | "notificacions_desactivades"
   | "preferencia_whatsapp"
   | "preferencia_email";
 
@@ -118,13 +127,15 @@ export function ventanaAbierta(lastInboundAt: string | null | undefined, ahora =
 export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCanal {
   const telefono = (d.telefono ?? "").trim();
   const email = (d.email ?? "").trim();
-  const emailPosible = email.includes("@");
+  // Con el correo apagado, una ficha con correo no tiene ese canal: el motivo lo dice.
+  const emailDesactivat = d.email_activo === false || d.notificacions_actives === false;
+  const emailPosible = email.includes("@") && !emailDesactivat;
 
   let whatsappPosible = false;
   let motivoWhatsapp: MotivoCanal | null = null;
   let motivoWa: MotivoCanal = "sense_telefon";
 
-  if (d.whatsapp_activo === false) {
+  if (d.whatsapp_activo === false || d.notificacions_actives === false) {
     // El interruptor global va ANTES que el teléfono: con WhatsApp apagado da igual qué
     // ficha tenga la organización, el canal no existe. Lo que sigue es la cascada de
     // siempre, así que una preferencia de WhatsApp cae a correo marcada como incumplida
@@ -150,6 +161,17 @@ export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCana
   const preferido: CanalPreferido = d.canal_preferido ?? null;
   const base = { motivoWhatsapp, whatsappPosible, emailPosible, preferido };
 
+  // Sin ningún canal porque los interruptores lo han cortado: el motivo es el interruptor,
+  // no la ficha. Decir «sense_canal» mandaría al equipo a completar una ficha que está bien.
+  const motiuTall: MotivoCanal | null = d.notificacions_actives === false
+    ? "notificacions_desactivades"
+    : (emailDesactivat && d.whatsapp_activo === false)
+    ? "notificacions_desactivades"
+    : (emailDesactivat && email.includes("@") && !whatsappPosible)
+    ? "email_desactivat"
+    : null;
+  const senseCanal: MotivoCanal = motiuTall ?? "sense_canal";
+
   // --- La preferencia, cuando la hay: elige ENTRE LOS VIABLES ----------------
   // Va antes que la regla por defecto, y solo puede mover la decisión hacia un canal
   // que el bloque de arriba ya ha declarado posible. Nunca inventa uno.
@@ -164,7 +186,7 @@ export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCana
     if (emailPosible) {
       return { ...base, canal: "email", motivo: motivoWhatsapp!, preferenciaRespetada: false };
     }
-    return { ...base, canal: "cap", motivo: "sense_canal", preferenciaRespetada: false };
+    return { ...base, canal: "cap", motivo: senseCanal, preferenciaRespetada: false };
   }
 
   if (preferido === "email") {
@@ -174,9 +196,14 @@ export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCana
     // Pidió correo y no hay correo en la ficha. `sense_correu` existía en el
     // vocabulario desde el principio y hasta hoy no lo producía nadie: este es su caso.
     if (whatsappPosible) {
-      return { ...base, canal: "whatsapp", motivo: "sense_correu", preferenciaRespetada: false };
+      return {
+        ...base,
+        canal: "whatsapp",
+        motivo: emailDesactivat ? "email_desactivat" : "sense_correu",
+        preferenciaRespetada: false,
+      };
     }
-    return { ...base, canal: "cap", motivo: "sense_canal", preferenciaRespetada: false };
+    return { ...base, canal: "cap", motivo: senseCanal, preferenciaRespetada: false };
   }
 
   // --- Sin preferencia: la regla de siempre (§8bis) --------------------------
@@ -188,5 +215,5 @@ export function decidirCanal(d: DatosContacto, ahora = Date.now()): DecisionCana
     // ha sido WhatsApp, que es lo que el equipo necesita saber.
     return { ...base, canal: "email", motivo: motivoWhatsapp!, preferenciaRespetada: null };
   }
-  return { ...base, canal: "cap", motivo: "sense_canal", preferenciaRespetada: null };
+  return { ...base, canal: "cap", motivo: senseCanal, preferenciaRespetada: null };
 }

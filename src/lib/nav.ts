@@ -67,6 +67,12 @@ export interface NavItem {
    * perfil de recepción, del receptor. Lo filtra `AppSidebar`.
    */
   paper?: 'productor' | 'entidad'
+  /**
+   * Solo si ese canal de notificaciones está encendido (27-10-2026, §8). Missatgeria es la
+   * consola de WhatsApp: con WhatsApp apagado no hay nada que hacer ahí. Lo filtran
+   * `AppSidebar` y la barra inferior con `filtraPerCanals`, y la ruta lo comprueba también.
+   */
+  requereix?: 'email' | 'whatsapp'
 }
 
 export interface NavGrup {
@@ -95,7 +101,7 @@ const EQUIP: NavGrup[] = [
       // Junto a Ofertes porque es el otro origen: una jornada crea registros y un REC.
       { to: '/equip/espigolades', labelKey: 'nav.espigolades', icon: Leaf },
       { to: '/equip/aprovacions', labelKey: 'nav.approvals', icon: ClipboardCheck, comptador: 'aprovacions' },
-      { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges' },
+      { to: '/equip/missatgeria', labelKey: 'nav.messaging', icon: MessageSquare, comptador: 'missatges', requereix: 'whatsapp' },
       { to: '/equip/albarans', labelKey: 'nav.albarans', icon: Truck, comptador: 'albarans' },
     ],
   },

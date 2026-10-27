@@ -9,7 +9,7 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import type { Lang } from '../lib/i18n'
-import { useAppContext } from '../hooks/useAppContext'
+import { useAppContext, useCanals } from '../hooks/useAppContext'
 import { useCanalPropi } from '../hooks/useCanalPropi'
 import type { TriaCanal } from '../hooks/useCanalPropi'
 import { cn } from '../lib/utils'
@@ -29,6 +29,10 @@ export default function UserMenu() {
   const { t, lang, setLang } = useT()
   const { ctx, organitzacio } = useAppContext()
   const { canal, desa, disponible, desant } = useCanalPropi()
+  // Los interruptores de Configuració (§8): solo se ofrecen los canales encendidos. Con uno
+  // solo, no hay nada que elegir; con ninguno, la sección no se pinta.
+  const canals = useCanals()
+  const dosCanals = canals.email && canals.whatsapp
 
   // ── Las notificaciones, como DOS casillas y no como una lista de tres ──
   //
@@ -102,7 +106,7 @@ export default function UserMenu() {
 
         {/* Las notificaciones solo las ve quien tiene organización: el equipo opera en
             nombre de otros y no tiene canal propio que elegir. */}
-        {disponible && (
+        {disponible && (canals.email || canals.whatsapp) && (
           <>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">
@@ -110,24 +114,29 @@ export default function UserMenu() {
             </DropdownMenuLabel>
             {/* `onSelect` prevenido: un menú que se cierra al marcar la primera casilla
                 obliga a volver a abrirlo para marcar la segunda. */}
-            <DropdownMenuCheckboxItem
-              checked={waMarcat}
-              disabled={desant}
-              onSelect={(e) => e.preventDefault()}
-              onCheckedChange={() => void commutaCanal('whatsapp')}
-            >
-              {t('perf.channel_wa')}
-            </DropdownMenuCheckboxItem>
-            <DropdownMenuCheckboxItem
-              checked={mailMarcat}
-              disabled={desant}
-              onSelect={(e) => e.preventDefault()}
-              onCheckedChange={() => void commutaCanal('email')}
-            >
-              {t('perf.channel_mail')}
-            </DropdownMenuCheckboxItem>
+            {canals.whatsapp && (
+              <DropdownMenuCheckboxItem
+                checked={dosCanals ? waMarcat : true}
+                disabled={desant || !dosCanals}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={() => void commutaCanal('whatsapp')}
+              >
+                {t('perf.channel_wa')}
+              </DropdownMenuCheckboxItem>
+            )}
+            {canals.email && (
+              <DropdownMenuCheckboxItem
+                checked={dosCanals ? mailMarcat : true}
+                disabled={desant || !dosCanals}
+                onSelect={(e) => e.preventDefault()}
+                onCheckedChange={() => void commutaCanal('email')}
+              >
+                {t('perf.channel_mail')}
+              </DropdownMenuCheckboxItem>
+            )}
             <p className="px-2 py-1.5 text-xs text-muted-foreground">
-              {t(canal === 'auto' || canal === 'telefon' ? 'perf.channel_both_hint' : 'perf.channel_one_hint')}
+              {t(!dosCanals ? 'perf.channel_only_one'
+                : canal === 'auto' || canal === 'telefon' ? 'perf.channel_both_hint' : 'perf.channel_one_hint')}
             </p>
           </>
         )}

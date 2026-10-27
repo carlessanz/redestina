@@ -374,9 +374,15 @@ export async function enviaEnllacosConfirmacio(
   enllacos: EnllacConfirmacio[],
   t: (clau: string, params?: Record<string, string | number>) => string,
   idioma: 'ca' | 'es',
-): Promise<{ enviats: number; fallits: number }> {
+  /**
+   * El canal de correo efectivo (§8). Apagado no se manda nada: «Marcar entregat» sigue
+   * siendo válido, y la salida es la confirmación asistida o el enlace copiable.
+   */
+  correuActiu = true,
+): Promise<{ enviats: number; fallits: number; desactivat: boolean }> {
   let enviats = 0
   let fallits = 0
+  if (!correuActiu) return { enviats, fallits, desactivat: true }
   for (const e of enllacos) {
     // Los de WhatsApp los manda el servidor (`recollides-programades`, con botones).
     if (e.canal === 'whatsapp') continue
@@ -398,5 +404,5 @@ export async function enviaEnllacosConfirmacio(
     if (r.ok) enviats++
     else fallits++
   }
-  return { enviats, fallits }
+  return { enviats, fallits, desactivat: false }
 }

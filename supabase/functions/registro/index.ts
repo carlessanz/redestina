@@ -68,17 +68,17 @@
 //      · `deteccio.ts`      — las consultas que deciden si la organización ya existe
 //      · `coincidencies.ts` — la regla de esa decisión, pura y con pruebas
 //      · `conveni.ts`       — el convenio que se prepara dentro del alta
-//    Aquí quedan el anti-abuso, el orden de los pasos y su compensación.
+//      · `alta.ts`          — (27-10-2026) el orden de los pasos y su compensación, más los
+//                             consentimientos RGPD; lo comparte la función `alta-assistida`
+//    Aquí queda el anti-abuso, que es lo propio de la puerta pública.
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { notaPaperNou, type TipusFitxa } from "./coincidencies.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
 import type { Cliente } from "./cliente.ts";
-import { patroLike, textNet, validar } from "./validacio.ts";
-import { decidirCoincidencia } from "./deteccio.ts";
-import { type ConveniPreparat, prepararConveni } from "./conveni.ts";
+import { textNet, validar } from "./validacio.ts";
+import { executarAlta } from "./alta.ts";
 
 // ---------------------------------------------------------------------------
 // Anti-abuso
@@ -121,19 +121,6 @@ Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return preflight(cors);
   if (req.method !== "POST") return responder({ error: "Method Not Allowed" }, 405);
 
-  // Fuera del try: la compensación del catch necesita saber qué se llegó a crear.
-  let supabase: Cliente = null;
-  let userId: string | null = null;
-  let organitzacioId: string | null = null;
-  // Antes era una ficha y una tabla; con el doble papel son hasta dos, y la compensación
-  // tiene que poder deshacer las dos. Se van apilando a medida que se crean.
-  const creades: { taula: "productores" | "entidades"; id: string }[] = [];
-  const desferFitxes = async () => {
-    for (const f of [...creades].reverse()) {  // copia: `reverse()` muta, y el array se sigue usando
-      await supabase!.from(f.taula).delete().eq("id", f.id);
-    }
-  };
-
   try {
     const body = await req.json().catch(() => ({})) as Record<string, unknown>;
 
@@ -156,7 +143,7 @@ Deno.serve(async (req) => {
     if (!v.ok) return responder({ error: v.error, code: "dades_invalides", camp: v.camp }, 400);
     const d = v.dades;
 
-    supabase = createClient(
+    const supabase: Cliente = createClient(
       Deno.env.get("SUPABASE_URL")!,
       Deno.env.get("SB_SECRET_KEY")!,
     );
@@ -176,289 +163,17 @@ Deno.serve(async (req) => {
       );
     }
 
-    // -----------------------------------------------------------------------
-    // Prechecks: fallar aquí es limpio; fallar después obliga a compensar.
-    // -----------------------------------------------------------------------
-    const { data: perfils } = await supabase
-      .from("perfiles").select("id").ilike("email", patroLike(d.email)).limit(1);
-    if ((perfils ?? []).length > 0) {
-      return responder(
-        { error: "Aquest correu ja te compte. Prova d'iniciar sessio.", code: "email_ja_registrat" },
-        409,
-      );
-    }
-
-    // ¿Esta organización ya existe? (etapa 2). Sustituye al precheck que solo miraba
-    // `productores` —y que solo existía porque allí `email` y `phone` son UNIQUE y el
-    // insert habría reventado con 23505 con la cuenta de Auth ya creada—. El 23505 se
-    // sigue capturando abajo por la carrera entre esta consulta y el insert.
-    // ⚠️ SE DECIDE UNA VEZ POR PAPEL, no una vez por alta, y el resultado se combina con
-    //    la regla más estricta: si CUALQUIERA de los dos papeles ya está cubierto, el alta
-    //    entera se deniega. No se puede partir —«te doy la ficha de productor y la de
-    //    entidad no»— porque la persona ha pedido las dos y quedarse a medias sin decirlo
-    //    sería peor que rechazar: acabaría con media organización y sin saber por qué.
-    const tipusRols: TipusFitxa[] = d.rols.map((r) => r === "productor" ? "productor" : "entidad");
-    const t0 = performance.now();
-    const decisions = [];
-    for (const tr of tipusRols) decisions.push(await decidirCoincidencia(supabase, d, tr));
-    const decisio = decisions.find((x) => x.cas === "duplicat")
-      ?? decisions.find((x) => x.cas === "paper_nou")
-      ?? decisions[0];
-    console.log(JSON.stringify({
-      fn: "registro",
-      pas: "coincidencies",
-      cas: decisio.cas,
-      // Los papeles con los que ha casado, no el correo ni el teléfono: esto es un log de
-      // una función pública y lo que se busca aquí es entender una decisión, no reconstruir
-      // los datos de quien la provocó.
-      fitxes: decisio.cas === "paper_nou"
-        ? decisio.fitxes.map((f) => f.tipus)
-        : decisio.cas === "duplicat"
-        ? [decisio.fitxa.tipus]
-        : [],
-      // Y por qué casaron, que es lo que separa un 409 de una revisión del equipo: sin
-      // esto, un `paper_nou` que en realidad viene de una centralita compartida no se
-      // distingue de uno que viene del correo. Son etiquetas, no datos de nadie.
-      motius: decisio.cas === "paper_nou"
-        ? [...new Set(decisio.fitxes.flatMap((f) => f.per))]
-        : decisio.cas === "duplicat"
-        ? decisio.fitxa.per
-        : [],
-      ms: Math.round((performance.now() - t0) * 10) / 10,
-    }));
-
-    if (decisio.cas === "duplicat") {
-      return responder(
-        {
-          error: decisio.camp === "email"
-            ? "Aquest correu ja consta en una fitxa. Contacta amb l'equip de Redestina."
-            : "Aquest telefon ja consta en una fitxa. Contacta amb l'equip de Redestina.",
-          code: "dades_en_us",
-          camp: decisio.camp,
-        },
-        409,
-      );
-    }
-
-    // -----------------------------------------------------------------------
-    // 1. Cuenta de Auth. `email_confirm: true` porque el mailer nativo está apagado
-    //    (§9) y sin esto la cuenta quedaría sin poder iniciar sesión nunca.
-    // -----------------------------------------------------------------------
-    const { data: creada, error: errCrear } = await supabase.auth.admin.createUser({
-      email: d.email,
-      password: d.password,
-      email_confirm: true,
-      user_metadata: { nombre: d.nomPersona },
+    // Los pasos del alta, su orden y su compensación viven en `alta.ts`, que comparte el
+    // alta asistida del equipo. `executarAlta` nunca lanza: lo que se crea a medias lo
+    // deshace ella.
+    const r = await executarAlta(supabase, d, {
+      origen: "registre",
+      ip,
+      userAgent: req.headers.get("user-agent"),
     });
-    if (errCrear || !creada?.user) {
-      const codi = (errCrear as unknown as { code?: string } | null)?.code ?? "";
-      const missatge = errCrear?.message ?? "";
-      // Carrera con el precheck de arriba, o cuenta creada por otra vía.
-      if (codi === "email_exists" || /already been registered|already exists/i.test(missatge)) {
-        return responder(
-          { error: "Aquest correu ja te compte. Prova d'iniciar sessio.", code: "email_ja_registrat" },
-          409,
-        );
-      }
-      console.error("[registro] createUser:", missatge);
-      return responder({ error: "No s'ha pogut crear el compte", code: "error_intern" }, 500);
-    }
-    userId = creada.user.id as string;
-
-    // -----------------------------------------------------------------------
-    // 2. La organización, SIEMPRE — también en el caso «papel nuevo».
-    //
-    //    ⚠️ Esto antes era `if (decisio.cas === "alta")`, con la idea de que una ficha que
-    //    parece el papel nuevo de una organización que ya consta naciera SIN organización,
-    //    para no fabricar una segunda identidad de la misma. **Esa idea ya no se puede
-    //    cumplir**: desde `20270313100000` la columna es `not null` y el trigger
-    //    `*_estrena_organizacion` le pone una en el BEFORE INSERT. O sea que la identidad
-    //    provisional se crea igual; lo único que cambiaba era que la creaba el trigger, sin
-    //    `creada_por` y sin que la compensación de más abajo supiera de ella — si fallaba la
-    //    membresía, la ficha se borraba y esa organización quedaba huérfana.
-    //
-    //    Crearla aquí siempre no cambia el modelo: la ficha sigue teniendo identidad propia
-    //    hasta que alguien la enlace, y el equipo lo hace con `enllacar_organitzacio()`
-    //    desde Aprovacions, que fusiona las dos (§12.28). Lo que marca el caso es la nota.
-    //    Nunca corta el alta: si falla, la ficha nace con la del trigger.
-    // -----------------------------------------------------------------------
-    {
-      const { data: org, error: errOrg } = await supabase
-        .from("organizaciones").insert({ creada_por: userId }).select("id").single();
-      if (errOrg || !org) {
-        console.warn("[registro] organizacion no creada:", errOrg?.code, errOrg?.message);
-      } else {
-        organitzacioId = org.id as string;
-      }
-    }
-
-    // -----------------------------------------------------------------------
-    // 3. Ficha de la organización.
-    // -----------------------------------------------------------------------
-    // La nota del caso «papel nuevo» va en el comentario de la ficha: es lo que ve el
-    // equipo cuando entra desde la cola de «Registres pendents» a completarla (§6quater).
-    const nota = decisio.cas === "paper_nou"
-      ? notaPaperNou(decisio.fitxes, new Date().toISOString())
-      : null;
-
-    // Los convenios que se llegan a preparar, uno por papel. Se acumulan aquí porque el
-    // bucle de abajo crea ficha, membresía y convenio de cada uno en la misma vuelta.
-    const convenis: ConveniPreparat[] = [];
-
-    for (const rol of d.rols) {
-    const taula: "productores" | "entidades" = rol === "productor" ? "productores" : "entidades";
-    const fila: Record<string, unknown> = rol === "productor"
-      ? {
-        name: d.nomPersona,
-        empresa: d.nomOrganitzacio,
-        email: d.email,
-        phone: d.telefon,
-        poblacion: d.poblacio,
-        nif: d.nif,
-        direccion: d.domicili,
-        codigo_postal: d.codiPostal,
-        organizacion_id: organitzacioId,
-        comentario: nota,
-        // es_test = false: una organización que se registra sola NO recibe envíos
-        // mientras el modo test esté activo (§8). Lo marca el equipo si toca.
-        es_test: false,
-      }
-      : {
-        nombre: d.nomOrganitzacio,
-        contacto: d.nomPersona,
-        email: d.email,
-        telefono: d.telefon,
-        poblacion: d.poblacio,
-        nif: d.nif,
-        direccion: d.domicili,
-        codigo_postal: d.codiPostal,
-        tipo_receptor: d.tipoReceptor,
-        organizacion_id: organitzacioId,
-        comentarios: nota,
-        // opt_in = false: el consentimiento de WhatsApp se recoge aparte (§12.3).
-        opt_in: false,
-        es_test: false,
-        // `estat` se deja NULL a propósito: la priorización excluye a las entidades
-        // sin estado (_shared/priorizacion.ts), así que una ficha recién registrada
-        // no puede colarse en un ranking hasta que el equipo la revise.
-      };
-
-    const { data: fitxa, error: errFitxa } = await supabase
-      .from(taula).insert(fila).select("id").single();
-
-    if (errFitxa || !fitxa) {
-      await desferFitxes();
-      await esborrarOrganitzacio(supabase, organitzacioId);
-      await esborrarUsuari(supabase, userId);
-      if (errFitxa?.code === "23505") {
-        const camp = /phone/i.test(errFitxa.message ?? "") ? "telefon" : "email";
-        return responder(
-          { error: "Aquestes dades ja consten en una fitxa. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp },
-          409,
-        );
-      }
-      // El NIF lo valida y lo hace único por organización un trigger (fase 7 de la revisión
-      // del 08-10-2026): sin esto, un NIF mal escrito o de otra organización salía «error intern».
-      if (/nif_invalid/.test(errFitxa?.message ?? "")) {
-        return responder({ error: "El NIF no és vàlid. Revisa'l.", code: "nif_invalid", camp: "nif" }, 400);
-      }
-      if (/nif_en_us/.test(errFitxa?.message ?? "")) {
-        return responder(
-          { error: "Aquest NIF ja consta en una altra organització. Contacta amb l'equip de Redestina.", code: "dades_en_us", camp: "nif" },
-          409,
-        );
-      }
-      console.error("[registro] insert ficha:", taula, errFitxa?.message);
-      return responder({ error: "No s'ha pogut crear la fitxa", code: "error_intern" }, 500);
-    }
-    const fitxaId = fitxa.id as string;
-    creades.push({ taula, id: fitxaId });
-
-    // -----------------------------------------------------------------------
-    // 4. Membresía PENDIENTE. Es la pieza que da (o no da) acceso.
-    // -----------------------------------------------------------------------
-    const { error: errMembresia } = await supabase.from("membresias").insert({
-      user_id: userId,
-      tipo: rol === "productor" ? "productor" : "entidad",
-      productor_id: rol === "productor" ? fitxaId : null,
-      entidad_id: rol === "receptor" ? fitxaId : null,
-      // Quien registra la organización es su titular: es quien podrá editar la ficha
-      // (soc_titular) cuando el equipo apruebe.
-      rol_org: "titular",
-      activo: false,
-      aprovacio: "pendent",
-    });
-
-    if (errMembresia) {
-      await desferFitxes();
-      await esborrarOrganitzacio(supabase, organitzacioId);
-      await esborrarUsuari(supabase, userId);
-      console.error("[registro] insert membresia:", errMembresia.message);
-      return responder({ error: "No s'ha pogut completar el registre", code: "error_intern" }, 500);
-    }
-
-    // Un convenio por papel: el generador firma `don_gen` y la receptora `don_rec`, que
-    // es lo que dice `convenios_exigidos`. Fuera del camino de compensación, como antes.
-    const c = await prepararConveni(supabase, d, rol, fitxaId);
-    if (c) convenis.push(c);
-    }
-
-    // -----------------------------------------------------------------------
-    // 5. El convenio en borrador y su enlace de firma (§3.2.4). Fuera del camino
-    //    de compensación: si falla, el alta sigue siendo válida (ver cabecera).
-    // -----------------------------------------------------------------------
-
-    // `revisio_equip` solo dice que el alta necesita una mirada antes de activarse; NO
-    // dice con qué organización ha coincidido ni qué papeles tiene. Que exista una ficha
-    // con ese correo ya lo revela el 409 de arriba (enumeración aceptada a propósito,
-    // §9); describir la otra ficha sería contar algo que quien registra no ha probado ser.
-    return responder({
-      ok: true,
-      // `conveni` en singular se mantiene para quien ya lo leía; `convenis` es el que
-      // dice la verdad cuando la organización estrena los dos papeles.
-      conveni: convenis[0] ?? null,
-      convenis,
-      revisio_equip: decisio.cas === "paper_nou",
-      ...(decisio.cas === "paper_nou"
-        ? {
-          missatge:
-            "Ja tenim dades d'aquesta organitzacio. L'equip revisara la sol·licitud abans d'activar l'acces.",
-        }
-        : {}),
-    }, 200);
+    return responder(r.body, r.status);
   } catch (err) {
-    // Cualquier cosa no prevista: se intenta dejar la base como estaba, en orden
-    // inverso al de creación. Si la compensación también falla queda en el log con
-    // todos los ids, que es lo que hace falta para limpiarlo a mano.
     console.error("[registro] error:", err instanceof Error ? err.message : String(err));
-    if (supabase) {
-      for (const f of [...creades].reverse()) {
-        const { error } = await supabase.from(f.taula).delete().eq("id", f.id);
-        if (error) console.error("[registro] residuo ficha:", f.taula, f.id, error.message);
-      }
-    }
-    if (supabase) await esborrarOrganitzacio(supabase, organitzacioId);
-    if (supabase && userId) await esborrarUsuari(supabase, userId);
     return responder({ error: "Error intern", code: "error_intern" }, 500);
   }
 });
-
-/**
- * Compensación: borra la organización recién creada. Nunca lanza, y **solo puede borrar la
- * que acaba de crear esta petición**: si la ficha no llegó a existir, la fila de
- * `organizaciones` no la referencia nadie. No se llama nunca con la organización de una
- * coincidencia, porque en el caso «papel nuevo» esta función no crea ninguna.
- */
-async function esborrarOrganitzacio(supabase: Cliente, id: string | null): Promise<void> {
-  if (!id) return;
-  const { error } = await supabase.from("organizaciones").delete().eq("id", id);
-  if (error) console.error("[registro] residuo organizacion:", id, error.message);
-}
-
-/** Compensación: borra la cuenta de Auth recién creada. Nunca lanza. */
-async function esborrarUsuari(supabase: Cliente, userId: string): Promise<void> {
-  const { error } = await supabase.auth.admin.deleteUser(userId);
-  if (error) {
-    console.error("[registro] NO se pudo compensar el alta de auth:", userId, error.message);
-  }
-}

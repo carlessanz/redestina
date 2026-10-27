@@ -23,6 +23,9 @@ import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { useCanals } from '../../hooks/useAppContext'
+import { motiuCanal } from '../../lib/canals'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
@@ -63,6 +66,8 @@ function clauDe(f: FitxaIncompleta): string {
 
 export default function CampanyaConvenis() {
   const { t, lang } = useT()
+  // La tanda manda el enlace de firma por correo: con el correo apagado (§8) no se ofrece.
+  const motiuEmail = motiuCanal(useCanals(), 'email')
   const [fitxes, setFitxes] = useState<FitxaIncompleta[]>([])
   const [resum, setResum] = useState<CampanyaFila[]>([])
   const [dataCorte, setDataCorte] = useState<string | null>(null)
@@ -333,11 +338,12 @@ export default function CampanyaConvenis() {
               disabled={enviant || enviables.length === 0} onClick={triaTanda}>
               {t('camp.pick_batch', { n: TANDA })}
             </Button>
-            <Button className="h-11 whitespace-normal md:h-9"
-              disabled={enviant || triades.size === 0} onClick={() => void enviaTanda()}>
+            <BotoAmbMotiu className="h-11 whitespace-normal md:h-9"
+              disabled={enviant || triades.size === 0 || !!motiuEmail}
+              motiu={motiuEmail ? t(motiuEmail) : undefined} onClick={() => void enviaTanda()}>
               {enviant && <Loader2 className="size-4 animate-spin" />}
               {t('camp.send_batch', { n: triades.size })}
-            </Button>
+            </BotoAmbMotiu>
             {progres && (
               <span className="text-sm tabular-nums text-muted-foreground">
                 {t('camp.progress', { done: progres.fetes, total: progres.total })}

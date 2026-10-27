@@ -128,6 +128,11 @@ describe('mapejaContext', () => {
     expect(mapejaContext(cru({ whatsapp_actiu: true })).whatsappActiu).toBe(true)
     // Una RPC vieja sin la clave no apaga nada: lo que no se sabe no deja la app muda.
     expect(mapejaContext(cru()).whatsappActiu).toBe(true)
+    // Los otros dos interruptores (27-10-2026): ausentes valen como encendidos; false, no.
+    expect(mapejaContext(cru()).emailActiu).toBe(true)
+    expect(mapejaContext(cru()).notificacionsActives).toBe(true)
+    expect(mapejaContext(cru({ email_actiu: false })).emailActiu).toBe(false)
+    expect(mapejaContext(cru({ notificacions_actives: false })).notificacionsActives).toBe(false)
   })
 
   it('distingue «esperando validación» de «rechazado», que llegan los dos sin organizaciones', () => {

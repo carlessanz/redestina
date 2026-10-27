@@ -189,6 +189,9 @@ export default function Landing() {
           >
             {t('land.foot_web')}
           </a>
+          <Link to="/privacitat" className="text-sm text-primary-foreground underline underline-offset-4 transition-opacity hover:opacity-80">
+            {t('priv.title')}
+          </Link>
           <p className="text-xs text-primary-foreground/60">{t('login.foot')}</p>
         </div>
       </footer>

@@ -17,7 +17,8 @@ import type { LucideIcon } from 'lucide-react'
 import { cn } from '../lib/utils'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
-import { useAppContext } from '../hooks/useAppContext'
+import { useAppContext, useCanals } from '../hooks/useAppContext'
+import { filtraPerCanals } from '../lib/canals'
 import { ORGANITZACIO, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
@@ -59,6 +60,8 @@ export default function AppSidebar({
 }: Props) {
   const { t } = useT()
   const { ctx, rolActiu, organitzacio } = useAppContext()
+  // Las entradas de un canal apagado (Missatgeria con WhatsApp apagado, §8) no se pintan.
+  const canals = useCanals()
   const { setOpenMobile, isMobile } = useSidebar()
   const location = useLocation()
 
@@ -130,7 +133,7 @@ export default function AppSidebar({
                   )}
                   <SidebarGroupContent>
                     <SidebarMenu>
-                      {grup.items.map((item) => {
+                      {filtraPerCanals(grup.items, canals).map((item) => {
                         const actiu = item.end
                           ? location.pathname === item.to
                           : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)

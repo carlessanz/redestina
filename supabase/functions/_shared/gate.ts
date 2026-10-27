@@ -94,9 +94,45 @@ export async function modoTestActivo(supabase: Cliente): Promise<boolean> {
  * es solo la lectura del interruptor.
  */
 export async function whatsappActivo(supabase: Cliente): Promise<boolean> {
+  return (await canalsActius(supabase)).whatsapp;
+}
+
+/** El canal de correo, efectivo (general y `email_activo`). Mismo fail-safe encendido. */
+export async function emailActivo(supabase: Cliente): Promise<boolean> {
+  return (await canalsActius(supabase)).email;
+}
+
+export interface CanalsActius {
+  /** El interruptor general (`notificacions_actives`). */
+  notificacions: boolean;
+  /** Correo efectivo: general Y `email_activo`. */
+  email: boolean;
+  /** WhatsApp efectivo: general Y `whatsapp_activo`. */
+  whatsapp: boolean;
+}
+
+/** Lo que se lee de `app_settings`, convertido a los tres canales EFECTIVOS. Puro. */
+export function resolCanals(files: { key: string; value: string | null }[]): CanalsActius {
+  const v = (k: string) => files.find((f) => f.key === k)?.value !== "false";
+  const notificacions = v("notificacions_actives");
+  return {
+    notificacions,
+    email: notificacions && v("email_activo"),
+    whatsapp: notificacions && v("whatsapp_activo"),
+  };
+}
+
+/**
+ * Los tres interruptores de notificaciones (§8), ya EFECTIVOS: apagar el general apaga los
+ * dos canales aunque sus claves digan otra cosa. Una sola consulta y **sin caché**, por lo
+ * mismo que `whatsappActivo`: una caché dejaría a los isolates calientes enviando después de
+ * apagar. Fail-safe ENCENDIDO: si la lectura falla, se devuelve todo encendido.
+ */
+export async function canalsActius(supabase: Cliente): Promise<CanalsActius> {
   const { data } = await supabase
-    .from("app_settings").select("value").eq("key", "whatsapp_activo").maybeSingle();
-  return data?.value !== "false";
+    .from("app_settings").select("key, value")
+    .in("key", ["notificacions_actives", "email_activo", "whatsapp_activo"]);
+  return resolCanals((data ?? []) as { key: string; value: string | null }[]);
 }
 
 /**

@@ -21,7 +21,7 @@ import { bustiaEquip, enLlistaCorreuTest, esEmailTest, modoTestActivo } from "..
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { textConfirmacioRecollida } from "../_shared/textAvis.ts";
 import { exigirSecreto, json } from "../_shared/http.ts";
-import { esTelefonoTest, whatsappActivo } from "../_shared/gate.ts";
+import { canalsActius, esTelefonoTest, whatsappActivo } from "../_shared/gate.ts";
 import { ventanaAbierta } from "../_shared/canal.ts";
 import { enviaPreguntaConfirmacio } from "../_shared/confirmacionsWhatsapp.ts";
 import type { ClienteSupabase } from "../_shared/cliente.ts";
@@ -85,9 +85,15 @@ Deno.serve(async (req) => {
   if (rechazo) return rechazo;
   const supabase = createClient(Deno.env.get("SUPABASE_URL")!, Deno.env.get("SB_SECRET_KEY")!);
 
+  // Con el correo apagado (§8) NO se renuevan los tokens: `recordar_confirmacions_recollida`
+  // deja muerto el enlace anterior y devuelve el nuevo para mandarlo, y sin correo ese nuevo
+  // no llegaría a nadie. Se renovará en la primera pasada con el correo encendido.
+  const canals = await canalsActius(supabase);
   const [prog, rec] = await Promise.all([
     supabase.rpc("programar_albarans_recollida"),
-    supabase.rpc("recordar_confirmacions_recollida"),
+    canals.email
+      ? supabase.rpc("recordar_confirmacions_recollida")
+      : Promise.resolve({ data: [], error: null }),
   ]);
   if (prog.error) console.error("programar_albarans_recollida:", prog.error.message);
   if (rec.error) console.error("recordar_confirmacions_recollida:", rec.error.message);

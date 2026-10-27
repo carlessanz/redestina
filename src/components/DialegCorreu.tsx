@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { enviarEmail } from '../lib/email'
+import { motiuTallServidor } from '../lib/canals'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -81,7 +82,9 @@ export default function DialegCorreu({
       return
     }
     const data = r.data as { code?: string } | null
-    if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: destinatari.nom ?? email }))
+    const tall = motiuTallServidor(data?.code)
+    if (tall) toast.error(t(tall))
+    else if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: destinatari.nom ?? email }))
     else if (data?.code === 'no_test_recipient') toast.error(t('od.email_no_test', { email }))
     else toast.error(t('od.no_send_email'))
   }

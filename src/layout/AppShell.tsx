@@ -12,7 +12,8 @@ import { useEffect, useState } from 'react'
 import { Outlet, useLocation, useMatches } from 'react-router'
 import { cn } from '../lib/utils'
 import { useT } from '../lib/i18n'
-import { useAppContext } from '../hooks/useAppContext'
+import { useAppContext, useCanals } from '../hooks/useAppContext'
+import { filtraPerCanals } from '../lib/canals'
 import { itemsPlans, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import { buidaComptadors, refrescaComptadors } from '../lib/pendentsEquip'
@@ -55,7 +56,9 @@ export default function AppShell() {
   // `rolActiu` es siempre el de la URL —las tres únicas ramas hijas de AppShell son
   // /equip, /productor y /receptor—, así que nunca pasa de 4.
   const grups = navPerRol(rolActiu)
-  const items = itemsPlans(grups)
+  // Sin las entradas de un canal apagado (§8): la barra inferior obedece igual que el menú.
+  const canals = useCanals()
+  const items = filtraPerCanals(itemsPlans(grups), canals)
   // La barra inferior reparte el ancho a partes iguales: a 360 px, cinco entradas
   // desbordan hasta 94 px con las etiquetas en catalán (medido). Las marcadas
   // `barra: false` se quedan solo en el menú lateral. Ver el comentario de `NavItem`.

@@ -22,7 +22,7 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
 import {
@@ -195,6 +195,7 @@ export default function AlbaraDetall() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { ctx } = useAppContext()
+  const canals = useCanals()
   const potAprovar = ctx?.potAprovar ?? false
   const { confirma, dialeg: dialegConfirma } = useConfirma()
 
@@ -457,7 +458,14 @@ export default function AlbaraDetall() {
     const perWhatsapp = (res.data.enllacos ?? []).filter((e) => e.canal === 'whatsapp').length
     if (perWhatsapp > 0) toast.info(t('alb.delivered_wa', { n: perWhatsapp }))
     setEnllacosNous(nous)
-    const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang)
+    const correu = await enviaEnllacosConfirmacio(albara.numero_completo ?? null, res.data.enllacos ?? [], t, lang, canals.email)
+    // Con el correo apagado (§8) no sale nada: se dice, y los enlaces quedan para copiar.
+    if (correu.desactivat) {
+      toast.warning(`${t('alb.delivered', { n: nous.length })} ${t('canal.links_no_enviats')}`)
+      void refrescaComptadors()
+      await carrega()
+      return
+    }
     // Un solo aviso verde, no dos seguidos: «entregat» y «correu enviat» son el mismo acto.
     // Si no ha salido NINGÚN correo, el aviso es ámbar y uno solo: un verde «Entregat»
     // seguido de un ámbar se leía como éxito.

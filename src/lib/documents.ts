@@ -334,7 +334,7 @@ export async function pujarDocumentExtern(camps: {
 export type CodiReenviament =
   | 'unauthorized' | 'forbidden' | 'no_existeix' | 'sense_fitxer' | 'enviat_fa_poc'
   | 'no_s_envia' | 'bloquejat_prova' | 'bloquejat_mode_test' | 'fora_llista_test'
-  | 'error_envio' | 'xarxa' | 'desconegut'
+  | 'error_envio' | 'desactivat' | 'xarxa' | 'desconegut'
 
 const MOTIU_REENVIAMENT: Record<CodiReenviament, string> = {
   unauthorized: 'doc.err_sessio',
@@ -347,6 +347,8 @@ const MOTIU_REENVIAMENT: Record<CodiReenviament, string> = {
   bloquejat_mode_test: 'doc.resend_err_mode_test',
   fora_llista_test: 'doc.resend_err_llista',
   error_envio: 'doc.resend_err_envio',
+  // Las notificaciones o el correo están apagados en Configuració (§8).
+  desactivat: 'canal.motiu_email',
   xarxa: 'doc.err_xarxa',
   desconegut: 'doc.resend_err_generic',
 }

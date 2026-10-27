@@ -23,7 +23,8 @@ import { etiquetaEstatOferta, PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/pro
 import { estatValidacio } from '../lib/registreRecollida'
 import type { DatesValidacio } from '../lib/registreRecollida'
 import { refrescaComptadors } from '../lib/pendentsEquip'
-import { useAppContext } from '../hooks/useAppContext'
+import { useAppContext, useCanals } from '../hooks/useAppContext'
+import { algunCanal, motiuCanal, motiuTallServidor } from '../lib/canals'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import DialegMotiu from './DialegMotiu'
@@ -116,6 +117,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const { t, lang } = useT()
   const { confirma, dialeg } = useConfirma()
   const { ctx } = useAppContext()
+  // Los interruptores de notificaciones (§8): un canal apagado deja su botón gris con el motivo.
+  const canals = useCanals()
+  const motiuEmail = motiuCanal(canals, 'email')
   // Aprobar y rechazar un interés exigen `pot_aprovar()` (§4bis): a un técnico se le dejan
   // grises con el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
   const potAprovar = ctx?.potAprovar ?? false
@@ -615,7 +619,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     })
     if (r.ok) { await trasEnviar(ent, 'email', r.simulat, 'od.sent_email'); return }
     const data = r.data as { code?: string } | null
-    if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: ent.nombre }))
+    const tall = motiuTallServidor(data?.code)
+    if (tall) toast.error(t(tall))
+    else if (data?.code === 'no_test_user') toast.error(t('od.not_test_toast', { name: ent.nombre }))
     else if (data?.code === 'no_test_recipient') toast.error(t('od.email_no_test', { email }))
     else toast.error(t('od.no_send_email'))
   }
@@ -1036,17 +1042,18 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                       Los tres se bloquean mientras esa fila tiene un envío en curso, y el
                       pulsado lo dice: el toast llega cuando contesta el servidor, y hasta
                       entonces la única señal de que se ha pulsado es esta. */}
-                  <BotoAmbMotiu size="sm" disabled={enviant === ent.id || !ofertaOberta}
-                    motiu={ofertaOberta ? undefined : t('od.send_closed')}
+                  <BotoAmbMotiu size="sm" disabled={enviant === ent.id || !ofertaOberta || !algunCanal(canals)}
+                    motiu={!ofertaOberta ? t('od.send_closed') : !algunCanal(canals) ? t('canal.motiu_notificacions') : undefined}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOferta(ent))}>
                     {enviant === ent.id ? t('od.sending') : t('od.send')}
                   </BotoAmbMotiu>
-                  {whatsappActiu && (
+                  {whatsappActiu && canals.whatsapp && (
                     <Button size="sm" variant="outline" title={t('od.force_wa')} disabled={enviant === ent.id || !ofertaOberta}
                       onClick={() => void ambBloqueig(ent.id, () => enviarOfertaWhatsApp(ent))}>{t('od.whatsapp')}</Button>
                   )}
-                  <Button size="sm" variant="outline" title={t('od.force_email')} disabled={enviant === ent.id || !ofertaOberta}
-                    onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</Button>
+                  <BotoAmbMotiu size="sm" variant="outline" disabled={enviant === ent.id || !ofertaOberta || !!motiuEmail}
+                    title={t('od.force_email')} motiu={motiuEmail ? t(motiuEmail) : undefined}
+                    onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</BotoAmbMotiu>
                   <Button size="sm" variant="outline" title={t('od.force_panel')} disabled={enviant === ent.id || !ofertaOberta}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaPanell(ent))}>{t('od.panel')}</Button>
                 </div>

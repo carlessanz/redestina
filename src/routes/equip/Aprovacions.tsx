@@ -43,7 +43,8 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useLocation, useNavigate } from 'react-router'
-import { Loader2 } from 'lucide-react'
+import { Loader2, UserPlus } from 'lucide-react'
+import DialegAltaAssistida from '../../components/equip/DialegAltaAssistida'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -299,6 +300,7 @@ export default function Aprovacions() {
   // Sin contexto, no: los permisos se conceden explícitamente o no se conceden (fail-cerrado,
   // 07-10-2026). La RPC revalida de todas formas y devuelve 42501.
   const potAprovar = ctx?.potAprovar ?? false
+  const [altaObert, setAltaObert] = useState(false)
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46): estaba partida en dos cadenas
@@ -719,8 +721,19 @@ export default function Aprovacions() {
     <div className="space-y-6">
       <Card>
         <CardHeader>
-          <CardTitle>{t('appr.reg_title')} ({registres.length})</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{t('appr.reg_subtitle')}</p>
+          <div className="flex flex-wrap items-start justify-between gap-2">
+            <div className="min-w-0">
+              <CardTitle>{t('appr.reg_title')} ({registres.length})</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">{t('appr.reg_subtitle')}</p>
+            </div>
+            {/* El alta asistida (27-10-2026): una organización con cuenta, ya aprobada. */}
+            <BotoAmbMotiu variant="outline" className="w-full whitespace-normal sm:w-auto" onClick={() => setAltaObert(true)}
+              disabled={!potAprovar} motiu={potAprovar ? undefined : t('appr.need_approver')}>
+              <UserPlus className="size-4" /> {t('alta.open')}
+            </BotoAmbMotiu>
+          </div>
+          <DialegAltaAssistida obert={altaObert} onTancar={() => setAltaObert(false)}
+            onCreada={() => void carregaRegistres()} />
         </CardHeader>
         <CardContent className="space-y-2">
           {carregantReg && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}

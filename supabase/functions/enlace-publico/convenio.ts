@@ -735,6 +735,14 @@ export async function enviarCodi(
     objetoId: enlace.objeto_id,
     funcion: "enlace-publico",
   });
+  if (envio.desactivado) {
+    // Las notificaciones o el correo están apagados desde Configuració (§8): no es una
+    // avería, y el código (operativo, parte de la firma) no sale. El hash no se escribe.
+    return responder({
+      error: "Ara mateix no s'envien correus des de Redestina. Parla amb l'equip.",
+      code: (envio.data as { code?: string }).code ?? "email_desactivat",
+    }, 503);
+  }
   if (!envio.ok) {
     console.error("enlace-publico: codi no enviat:", envio.status, envio.data);
     return responder({ error: "No s'ha pogut enviar el codi.", code: "error_email" }, 502);

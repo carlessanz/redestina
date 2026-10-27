@@ -19,7 +19,7 @@
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { decidirCanal, ventanaAbierta } from "../_shared/canal.ts";
-import { enLlistaCorreuTest, bustiaEquip, modoTestActivo, whatsappActivo } from "../_shared/gate.ts";
+import { enLlistaCorreuTest, bustiaEquip, canalsActius, modoTestActivo } from "../_shared/gate.ts";
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { sendText } from "../_shared/whatsapp.ts";
@@ -124,13 +124,19 @@ async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca):
     ? await supabase.from("wa_contacts").select("opt_in, last_inbound_at").eq("phone", telefono.replace(/\D/g, "")).maybeSingle()
     : { data: null };
   const prefs = await preferenciasDeCanal(supabase, tipo, [ficha.id]);
+  // Los interruptores de Configuració (§8). Con los dos canales cortados el aviso queda
+  // marcado y NO se reintenta: al reactivar no sale una avalancha de avisos viejos, y el
+  // aviso sigue en la campana del panel.
+  const canals = await canalsActius(supabase);
   const decision = decidirCanal({
     telefono,
     email: ficha.email,
     opt_in: contacto?.opt_in ?? false,
     last_inbound_at: contacto?.last_inbound_at ?? null,
     canal_preferido: prefs.get(ficha.id) ?? null,
-    whatsapp_activo: await whatsappActivo(supabase),
+    whatsapp_activo: canals.whatsapp,
+    email_activo: canals.email,
+    notificacions_actives: canals.notificacions,
   });
 
   const t = textAvis(aviso.tipus as TipusAvis, aviso.params ?? {}, idioma, aviso.objecte_id,
@@ -160,6 +166,11 @@ async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca):
       { to: ficha.email, subject: t.asunto, html, text: `${t.cuerpo}\n\n${enllac}`, replyTo: await bustiaEquip(supabase) },
       { supabase, proposito: "avis", objetoTipo: aviso.objecte_tipo, objetoId: aviso.objecte_id, funcion: "enviar-avis" },
     );
+    if (r.desactivado) {
+      const code = (r.data as { code?: string }).code ?? "email_desactivat";
+      await marca("cap", code);
+      return json({ ok: false, motiu: code });
+    }
     await marca("email", r.ok ? null : `resend_${r.status}`);
     return json({ ok: r.ok, canal: "email", simulat: r.simulado ?? false });
   }

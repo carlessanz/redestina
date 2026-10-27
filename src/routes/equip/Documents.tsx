@@ -42,6 +42,9 @@ import { toast } from 'sonner'
 import { Link, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { useCanals } from '../../hooks/useAppContext'
+import { motiuCanal } from '../../lib/canals'
+import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -93,7 +96,7 @@ interface Enviament {
   id: string
   documento_id: string | null
   destinatario: string
-  estado: 'pendent' | 'enviat' | 'simulat' | 'error'
+  estado: 'pendent' | 'enviat' | 'simulat' | 'error' | 'desactivat'
   proposito: string
   funcion: string | null
   error: string | null
@@ -122,6 +125,7 @@ const ESTIL_ENVIAMENT: Record<Enviament['estado'], string> = {
   pendent: 'bg-aviso-fondo text-aviso',
   simulat: 'bg-secondary text-secondary-foreground',
   error: 'bg-error-fondo text-error',
+  desactivat: 'bg-aviso-fondo text-aviso',
 }
 
 const CLAU_ENVIAMENT: Record<Enviament['estado'], string> = {
@@ -129,6 +133,8 @@ const CLAU_ENVIAMENT: Record<Enviament['estado'], string> = {
   pendent: 'doc.se_pendent',
   simulat: 'doc.se_simulat',
   error: 'doc.se_error',
+  // Cortado por un interruptor de Configuració (§8): no ha fallado, se puede reenviar.
+  desactivat: 'doc.se_desactivat',
 }
 
 /**
@@ -171,6 +177,8 @@ function senseResposta(d: Fila): boolean {
 
 export default function Documents() {
   const { t } = useT()
+  // «Reenvia» manda un correo: con el correo apagado (§8) se queda gris con el motivo.
+  const motiuEmail = motiuCanal(useCanals(), 'email')
   // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
   // «Tots» dejaba los fallidos mezclados con el resto.
   const [params] = useSearchParams()
@@ -405,18 +413,19 @@ export default function Documents() {
                         {esperant ? t('doc.generating') : t('doc.download')}
                       </Button>
                       {TIPUS_ENVIABLES.has(d.tipo) && d.estado === 'emitido' && (
-                        <Button
+                        <BotoAmbMotiu
                           size="sm"
                           variant="outline"
                           className="h-11 whitespace-normal md:h-8"
-                          disabled={reenviant === d.id}
+                          disabled={reenviant === d.id || !!motiuEmail}
+                          motiu={motiuEmail ? t(motiuEmail) : undefined}
                           onClick={() => void reenvia(d.id, d.numero_completo, null)}
                         >
                           {reenviant === d.id
                             ? <Loader2 className="size-4 animate-spin" />
                             : <Send className="size-4" aria-hidden />}
                           {t('doc.resend')}
-                        </Button>
+                        </BotoAmbMotiu>
                       )}
                     </div>
                   </TableCell>
@@ -536,18 +545,19 @@ export default function Documents() {
                     {/* Solo los correos de un documento: el resto (accesos, avisos) no se
                         reenvían desde aquí, cada uno tiene su propia pantalla. */}
                     {e.proposito === 'document' && e.documento_id && (
-                      <Button
+                      <BotoAmbMotiu
                         size="sm"
                         variant="outline"
                         className="h-11 whitespace-normal md:h-8"
-                        disabled={reenviant === e.documento_id}
+                        disabled={reenviant === e.documento_id || !!motiuEmail}
+                        motiu={motiuEmail ? t(motiuEmail) : undefined}
                         onClick={() => void reenvia(e.documento_id!, numero ?? null, e.destinatario)}
                       >
                         {reenviant === e.documento_id
                           ? <Loader2 className="size-4 animate-spin" />
                           : <Send className="size-4" aria-hidden />}
                         {t('doc.resend')}
-                      </Button>
+                      </BotoAmbMotiu>
                     )}
                   </TableCell>
                 </TableRow>

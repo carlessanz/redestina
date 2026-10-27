@@ -192,7 +192,11 @@ Deno.serve(async (req) => {
         html,
         text: `Accés a Redestina: ${enlace}\n\nCodi alternatiu: ${codi} (caduca en 1 hora). `
           + `Escriu-lo a ${redirectTo}/login amb el teu correu.`,
-      }, { supabase, proposito: "acces", funcion: "enviar-acceso" });
+      }, { supabase, proposito: "acces", funcion: "enviar-acceso" }, {
+        // Transaccional (§8): el acceso y la bienvenida al aprobar un alta salen aunque las
+        // notificaciones estén apagadas. Sin esto, apagarlas dejaría a la gente sin entrar.
+        transaccional: true,
+      });
       resultado.email = r.ok ? (r.simulado ? "simulat" : "enviat") : `error: ${JSON.stringify(r.data)}`;
     }
 

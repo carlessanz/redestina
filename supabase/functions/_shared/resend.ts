@@ -14,6 +14,7 @@
 // prueba, solo la persona que lo recibe.
 
 import type { ClienteSupabase } from "./cliente.ts";
+import { canalsActius } from "./gate.ts";
 
 // Los secretos se leen DENTRO de las funciones, no en el cuerpo del módulo. Mismo motivo
 // que en `_shared/whatsapp.ts`: escrito como `const X = Deno.env.get(...)` a nivel de
@@ -108,6 +109,22 @@ export interface EmailResult {
   data: unknown;
   /** `true` si no se contactó con Resend (`RESEND_ENVIO_REAL` apagado). */
   simulado?: boolean;
+  /**
+   * `true` si lo cortó un interruptor de Configuració (general o de correo, §8). Es
+   * `ok:false` y NO un simulado, a propósito: con `ok:true` un recordatorio avanzaría su
+   * contador y un aviso quedaría marcado como enviado sin haber salido.
+   */
+  desactivado?: boolean;
+}
+
+export interface OpcionsEnviament {
+  /**
+   * Correo TRANSACCIONAL: acceso y bienvenida al aprobar un alta, recuperar la contraseña.
+   * No lo cortan los interruptores de notificaciones. Lo pasan SOLO `enviar-acceso` y
+   * `recuperar-password`; `enviar-email` no puede pasarlo nunca (su propósito viene del
+   * cliente y no puede servir para saltarse el corte).
+   */
+  transaccional?: boolean;
 }
 
 type Cliente = ClienteSupabase;
@@ -159,7 +176,7 @@ async function registrarEnvio(
     | { id?: unknown; message?: unknown; error?: { message?: unknown } | null }
     | null
     | undefined;
-  const estado = !r.ok ? "error" : r.simulado ? "simulat" : "enviat";
+  const estado = r.desactivado ? "desactivat" : !r.ok ? "error" : r.simulado ? "simulat" : "enviat";
   try {
     const { error } = await traza.supabase.from("documento_envios").insert({
       documento_id: traza.documentoId ?? null,
@@ -171,7 +188,11 @@ async function registrarEnvio(
       canal: "email",
       estado,
       proveedor_id: typeof datos?.id === "string" ? datos.id : null,
-      error: r.ok ? null : String(datos?.error?.message ?? datos?.message ?? `HTTP ${r.status}`)
+      error: r.ok ? null : String(
+        r.desactivado
+          ? (r.data as { code?: unknown }).code
+          : datos?.error?.message ?? datos?.message ?? `HTTP ${r.status}`,
+      )
         .slice(0, 500),
       enviado_at: estado === "enviat" ? new Date().toISOString() : null,
     });
@@ -199,10 +220,38 @@ async function registrarEnvio(
  * indistinguible de un acierto desde el panel (deuda §12.25). El registro nunca cambia
  * el resultado: si la fila no se puede escribir, el correo ya se ha mandado igual.
  */
-export async function sendEmail(payload: EmailPayload, traza?: TrazaEnvio): Promise<EmailResult> {
+export async function sendEmail(
+  payload: EmailPayload,
+  traza?: TrazaEnvio,
+  opcions: OpcionsEnviament = {},
+): Promise<EmailResult> {
+  if (!opcions.transaccional) {
+    const tall = await tallNotificacions(traza);
+    if (tall) {
+      console.warn(`[resend] correo no enviado a ${traza?.proposito ?? "?"}: ${tall}`);
+      const r: EmailResult = { ok: false, status: 503, desactivado: true, data: { code: tall, error: tall } };
+      if (traza) await registrarEnvio(traza, payload.to, r);
+      return r;
+    }
+  }
   const r = await enviarResend(payload);
   if (traza) await registrarEnvio(traza, payload.to, r);
   return r;
+}
+
+/**
+ * ¿Lo corta un interruptor? Devuelve el código, o null si puede salir. Sin `traza` no hay
+ * cliente con el que leer los interruptores, y entonces **falla cerrado**: un correo
+ * operativo que no se puede comprobar no sale.
+ */
+async function tallNotificacions(
+  traza?: TrazaEnvio,
+): Promise<"notificacions_desactivades" | "email_desactivat" | null> {
+  if (!traza) return "notificacions_desactivades";
+  const c = await canalsActius(traza.supabase);
+  if (!c.notificacions) return "notificacions_desactivades";
+  if (!c.email) return "email_desactivat";
+  return null;
 }
 
 async function enviarResend(payload: EmailPayload): Promise<EmailResult> {

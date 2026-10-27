@@ -65,6 +65,13 @@ export interface ContextSessio {
    * estaba, que es lo correcto mientras la migración no esté aplicada.
    */
   whatsappActiu: boolean
+  /**
+   * Correo EFECTIVO (general y `email_activo`, 27-10-2026). Mismo fail-safe encendido.
+   * `whatsappActiu` también es efectivo desde esa fecha: con el general apagado, los dos son falsos.
+   */
+  emailActiu: boolean
+  /** El interruptor general de notificaciones (`notificacions_actives`). */
+  notificacionsActives: boolean
 }
 
 /** Forma cruda que devuelve la RPC (snake_case, como en la base). */
@@ -88,6 +95,9 @@ export interface ContextCru {
   conveni_pendent?: boolean
   /** Interruptor global de WhatsApp (20270317100000); sin esa migración llega `undefined`. */
   whatsapp_actiu?: boolean
+  /** 20270429100000; sin esa migración llegan `undefined` y valen como encendidos. */
+  email_actiu?: boolean
+  notificacions_actives?: boolean
 }
 
 export function mapejaContext(cru: ContextCru): ContextSessio {
@@ -117,6 +127,8 @@ export function mapejaContext(cru: ContextCru): ContextSessio {
     registrePendent: cru.registre_pendent ?? false,
     registreRebutjat: cru.registre_rebutjat ?? false,
     whatsappActiu: cru.whatsapp_actiu !== false,
+    emailActiu: cru.email_actiu !== false,
+    notificacionsActives: cru.notificacions_actives !== false,
   }
 }
 

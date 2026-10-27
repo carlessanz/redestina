@@ -30,6 +30,7 @@
 import { useState } from 'react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
+import AvisCorreuDesactivat from '../AvisCorreuDesactivat'
 import { avuiMadrid } from '../../lib/format'
 import { textError } from '../../lib/textError'
 import { calcularCertificatPeriode, emetreCertificatPeriode, bloqueja, euros } from '../../lib/tancament'
@@ -195,6 +196,7 @@ export default function DialegCertificatPeriode(
           <DialogTitle>{t(perfil.titolKey)}</DialogTitle>
           <DialogDescription>{t(perfil.descKey)}</DialogDescription>
         </DialogHeader>
+        <AvisCorreuDesactivat />
 
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div>

@@ -21,6 +21,7 @@ import { Link } from 'react-router'
 import { ShieldCheck } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useCanals } from '../hooks/useAppContext'
 import { nombre } from '../lib/format'
 import { getTestMode } from '../lib/settings'
 import { pendentsPerTelefon } from '../lib/contactes'
@@ -68,6 +69,7 @@ function Kpi({ titulo, valor, sub, detalle, to }: {
 
 export default function Dashboard() {
   const { t } = useT()
+  const canals = useCanals()
   const [prodPhones, setProdPhones] = useState<(string | null)[]>([])
   const [entitatsTotal, setEntitatsTotal] = useState(0)
   const [entitatsOptIn, setEntitatsOptIn] = useState(0)
@@ -220,10 +222,11 @@ export default function Dashboard() {
               { texto: t('dash.with_optin', { n: kpis.entidades.conOptIn }) },
               { texto: t('dash.with_email', { n: kpis.entidades.conEmail }) },
             ]} />
-            <Kpi to="/equip/missatgeria" titulo={t('dash.k_messages')} valor={kpis.mensajes.recibidos} sub={t('dash.received')} detalle={[
+            {/* La consola de mensajes es WhatsApp: con WhatsApp apagado no se ofrece (§8). */}
+            {canals.whatsapp && <Kpi to="/equip/missatgeria" titulo={t('dash.k_messages')} valor={kpis.mensajes.recibidos} sub={t('dash.received')} detalle={[
               { texto: t('dash.unanswered', { n: kpis.mensajes.sinContestar }) },
               { texto: t('dash.sessions', { n: kpis.mensajes.intakeActivas }) },
-            ]} />
+            ]} />}
           </div>
         )}
       </section>

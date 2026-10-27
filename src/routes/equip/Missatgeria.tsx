@@ -8,15 +8,25 @@
 //   · el `h-dvh` desaparece de aquí: lo pone el shell (ruta marcada `fullBleed`)
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import type { WaContact } from '../../types'
+import { useCanals } from '../../hooks/useAppContext'
 import ContactList from '../../components/ContactList'
 import Conversation from '../../components/Conversation'
 
+// Con WhatsApp apagado (o todas las notificaciones, §8) esta consola no existe: el menú ya no
+// la enseña, y un enlace guardado o un marcador vuelven al tablero en vez de abrir una
+// pantalla donde nada funciona.
 export default function Missatgeria() {
+  const canals = useCanals()
+  if (!canals.whatsapp) return <Navigate to="/equip/tauler" replace />
+  return <ConsolaMissatgeria />
+}
+
+function ConsolaMissatgeria() {
   const { t } = useT()
   const { phone } = useParams<{ phone?: string }>()
   const navigate = useNavigate()

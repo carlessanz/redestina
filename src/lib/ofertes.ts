@@ -225,7 +225,7 @@ export async function carregaCamps(
  * correo o el modo test lo bloquea; `simulat` = `RESEND_ENVIO_REAL` apagado. Ninguno hace
  * fallar el alta: la oferta ya está creada y su referencia va en la misma respuesta.
  */
-export type ConfirmacioEmail = 'enviat' | 'simulat' | 'omes' | 'error'
+export type ConfirmacioEmail = 'enviat' | 'simulat' | 'omes' | 'desactivat' | 'error'
 
 export async function creaOferta(
   productorId: string,

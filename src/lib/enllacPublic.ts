@@ -30,7 +30,7 @@ export type CodiEnllac =
   | 'sense_carpeta' | 'error_storage' | 'error_bd' | 'cos_invalid' | 'base64_invalid'
   // Solo en la firma de un convenio (fase 2), por el mismo motivo: la función es una.
   | 'codi_incorrecte' | 'codi_caducat' | 'sense_codi' | 'no_cal_codi' | 'sense_correu'
-  | 'no_test_user' | 'error_email'
+  | 'no_test_user' | 'error_email' | 'email_desactivat' | 'notificacions_desactivades'
   | 'falta_declaracio' | 'falta_acceptacio' | 'falta_signatura'
   | 'xarxa' | 'desconegut_client'
 
@@ -69,6 +69,9 @@ const MOTIU: Record<CodiEnllac, string> = {
   sense_correu: 'sig.err_sense_correu',
   no_test_user: 'sig.err_no_test_user',
   error_email: 'sig.err_email',
+  // Los interruptores de Configuració (§8): no es una avería, alguien ha apagado el correo.
+  email_desactivat: 'sig.err_correu_desactivat',
+  notificacions_desactivades: 'sig.err_correu_desactivat',
   falta_declaracio: 'sig.err_declaracio',
   falta_acceptacio: 'sig.err_acceptacio',
   falta_signatura: 'sig.err_signatura',

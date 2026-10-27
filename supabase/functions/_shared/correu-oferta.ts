@@ -23,7 +23,7 @@ import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "./resend.ts";
 import { esEmailTest, modoTestActivo } from "./gate.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 
-export type ResultatConfirmacio = "enviat" | "simulat" | "omes" | "error";
+export type ResultatConfirmacio = "enviat" | "simulat" | "omes" | "desactivat" | "error";
 
 /**
  * Confirma por correo una oferta recién registrada.
@@ -72,6 +72,7 @@ export async function confirmarOfertaPerCorreu(
     objetoId: excedenteId,
     funcion,
   });
+  if (r.desactivado) return "desactivat";
   if (!r.ok) return "error";
   return r.simulado ? "simulat" : "enviat";
 }
