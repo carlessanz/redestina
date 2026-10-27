@@ -4,6 +4,12 @@ import { sendText } from "./whatsapp.ts";
 import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
 import { ambPreu, etiquetaModalitats, modalitatsDe, principal } from "./modalitats.ts";
 import { llegeixHorari } from "./franja.ts";
+import { componerTextoOferta, textCaixes, textoEnvasos } from "./textOferta.ts";
+import { TEXT_ERROR_INTAKE, textAgraimentIntake, textSenseConveniIntake } from "./textIntake.ts";
+
+// El texto de la oferta vive en `textOferta.ts` (módulo hoja, 27-10-2026); se reexporta para
+// que quien lo importaba de aquí no cambie nada.
+export { componerTextoOferta, textCaixes, textoEnvasos };
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -145,110 +151,6 @@ export async function generarId(
   const { data: previas } = await supabase
     .from("excedentes").select("id_excedente").like("id_excedente", `${prefijo}-%`);
   return `${prefijo}-${(previas?.length ?? 0) + 1}`;
-}
-
-/**
- * Texto que se publica en el grupo de canalizaciones.
- * Reproduce el formato que el equipo usa hoy a mano, emojis incluidos.
- */
-export function componerTextoOferta(campos: {
-  producte: string;
-  /** Solo cuando es cierto se imprime la línea: el silencio significa «ja està collit». */
-  producteAlCamp?: boolean;
-  productor: string;
-  municipi: string;
-  /** Sin enlace de Maps no se imprime el bloque entero (ver más abajo). */
-  ubicacio?: string;
-  quantitat: string;
-  disponible: string;
-  /** Campo libre y opcional del panel: sin respuesta, no se imprime la línea. */
-  horari?: string;
-  modalitat: string;
-  preu?: string;
-  causa: string;
-  /** Formato de entrega y retorno, ya compuestos (`textoEnvasos`). Sin nada, no se imprime. */
-  envasos?: string;
-  /** Solo cuando el productor lo lleva: el silencio significa «cal venir a buscar-lo». */
-  transportPropi?: boolean;
-  /**
-   * `responsable` y `observacions` SIEMPRE se imprimen, aunque estén vacías —al revés que
-   * `ubicacio`/`horari`/`envasos` de aquí arriba—, y es una decisión distinta y ya tomada
-   * (`tests/oferta.test.ts`, «un campo vacío deja su etiqueta, no borra la línea»): son
-   * texto libre que alguien podría haber escrito, y una etiqueta vacía se lee como «no hi
-   * ha», mientras que una línea que desaparece se lee como un fallo. No tocar sin revisar
-   * ese test.
-   */
-  responsable: string;
-  observacions: string;
-}): string {
-  const lineas = [
-    "📢 *OFERTA DISPONIBLE*",
-    "",
-    `🌿 PRODUCTE: ${campos.producte}`,
-  ];
-  // Va pegada al producto, y no al final con las observaciones, porque califica QUÉ se
-  // ofrece: la entidad tiene que saber que todavía no está collit **antes** de decir que
-  // le interesa, no cuando llegue a la finca.
-  //
-  // ⚠️ Solo se imprime cuando es cierto, igual que el `preu mínim` de más abajo. Una línea
-  //    «PRODUCTE AL CAMP: no» en el caso normal —que es la inmensa mayoría de las ofertas—
-  //    sería ruido en un mensaje que se lee en un móvil, y esa asimetría es deliberada: el
-  //    silencio significa «ja està collit», que es lo que la oferta ya daba a entender
-  //    antes de que este campo existiera.
-  if (campos.producteAlCamp) {
-    lineas.push("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)");
-  }
-  lineas.push(
-    `👩‍🌾 PRODUCTOR: ${campos.productor}`,
-    `📍 MUNICIPI: ${campos.municipi}`,
-  );
-  // Sin enlace de Maps no hay nada que poner bajo la etiqueta: un guion suelto en su
-  // propia línea no dice nada y ocupa sitio en un mensaje que se lee en el móvil (mismo
-  // criterio que `producte_al_camp`/`preu_minim`, deuda §12.122).
-  if (campos.ubicacio) {
-    lineas.push(`🗺️ UBICACIÓ:`, campos.ubicacio);
-  }
-  lineas.push(`📦 QUANTITAT: ${campos.quantitat}`, `📅 DISPONIBLE: ${campos.disponible}`);
-  if (campos.horari) lineas.push(`⏰ HORARI RECOLLIDA: ${campos.horari}`);
-  lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
-  // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
-  if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
-  lineas.push(`🔴 CAUSA: ${campos.causa}`);
-  if (campos.envasos) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
-  // Misma asimetría que `producte_al_camp`: solo se dice cuando cambia lo que hay que hacer.
-  if (campos.transportPropi) lineas.push("🚚 TRANSPORT: el porta la productora");
-  lineas.push(
-    `👥 RESPONSABLE: ${campos.responsable}`,
-    `📝 OBSERVACIONS: ${campos.observacions}`,
-    "",
-    "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
-  );
-  return lineas.join("\n");
-}
-
-/** «1 caixa», «3 caixes», «1 palet», «2 palets». */
-export function textCaixes(n: number, format: unknown): string {
-  const palet = format === "palet";
-  return `${n} ${palet ? (n === 1 ? "palet" : "palets") : (n === 1 ? "caixa" : "caixes")}`;
-}
-
-/** El formato de entrega en palabras, para el texto de la oferta. */
-const ETIQUETA_FORMAT: Record<string, string> = {
-  caixes: "Caixes",
-  palet: "Palet",
-  envasos_propis: "Cal portar envasos propis",
-  altres: "Altres (vegeu observacions)",
-};
-
-/**
- * La línea ENVASOS: formato de entrega y, si aplica, si hay que devolverlos. Vacía si no se
- * preguntó (producto en el campo) — y entonces la línea no se imprime.
- */
-export function textoEnvasos(format: unknown, retorn: unknown): string {
-  const f = ETIQUETA_FORMAT[String(format ?? "")] ?? "";
-  const r = String(retorn ?? "");
-  const ret = r === "Sí" ? "cal retornar-los" : r === "No" ? "no cal retornar-los" : "";
-  return [f, ret].filter(Boolean).join(" · ");
 }
 
 /**
@@ -451,41 +353,21 @@ export async function crearExcedenteDesdeSesion(
   const cobertes = await modalitatsAmbConveni(supabase, productor.id, modalitats);
   if (cobertes.length === 0) {
     await supabase.from("intake_sessions").delete().eq("id", sesion.id);
-    await sendText(
-      supabase, sesion.telefono,
-      modalitats.length === 1 && modalitats[0] === "donacio"
-        ? "No podem publicar l'oferta: per a donacions cal tenir vigent el conveni de donació. " +
-          "Demana'l a l'equip de Redestina i torna-ho a provar."
-        : "No podem publicar l'oferta: cal tenir vigent el conveni de col·laboració per a " +
-          "alguna de les modalitats triades. Demana'l a l'equip de Redestina.",
-    );
+    await sendText(supabase, sesion.telefono, textSenseConveniIntake(modalitats));
     return;
   }
 
   const r = await crearExcedente(supabase, sesion.datos_parciales, productor, "intake");
 
   if (!r.ok) {
-    await sendText(
-      supabase, sesion.telefono,
-      // La sesión se queda en el último paso: volver a escribir las observaciones reintenta
-      // el alta. Antes decía «ho revisem i et diem alguna cosa», y no avisaba a nadie.
-      "No hem pogut registrar l'oferta per un error tècnic. D'aquí a uns minuts, torna a " +
-        "escriure les observacions per tornar-ho a provar, o escriu *Stop* per cancel·lar-la.",
-    );
+    // La sesión se queda en el último paso: volver a escribir las observaciones reintenta
+    // el alta. Antes decía «ho revisem i et diem alguna cosa», y no avisaba a nadie.
+    await sendText(supabase, sesion.telefono, TEXT_ERROR_INTAKE);
     return;
   }
 
   await supabase.from("intake_sessions").delete().eq("id", sesion.id);
-  await sendText(
-    supabase, sesion.telefono,
-    `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${r.idExcedente}. ` +
-      (r.estado === "pendent_validacio"
-        // Desde el 05-10-2026 una oferta nueva espera a que el equipo la revise antes de
-        // salir al Mercat. Decir «la farem arribar» sin más sería prometer algo que todavía
-        // no ha pasado.
-        ? "L'equip de Redestina la revisarà i, un cop validada, la farà arribar a les entitats que la puguin aprofitar."
-        : "L'equip de Redestina la farà arribar a les entitats que la puguin aprofitar."),
-  );
+  await sendText(supabase, sesion.telefono, textAgraimentIntake(producto, r.idExcedente ?? "", r.estado));
 
   // Y por correo, si la ficha lo tiene (deuda §12.94). No sustituye al WhatsApp de arriba:
   // ese contesta la conversación en curso, y este deja el registro buscable de la referencia

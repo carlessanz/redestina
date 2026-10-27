@@ -25,6 +25,15 @@ import type { MensajeEntrante } from "./intake.ts";
 import { rolesDelTelefono } from "./organizacion.ts";
 import { ambPreu, modalitatsDe } from "./modalitats.ts";
 import { enmascararTelefono } from "./enmascarar.ts";
+import {
+  avisKgExcessius, BOTONS_OFERTA, BOTONS_PREU, formatKg, TEXT_REBUIG, TEXT_REPETEIX_PREU,
+  textConfirmaPreu, textGracies, textKgNoEntes, textMaxim, textNoDisponible, textPendentResposta,
+  textPreguntaKg, textPreuRebutjat, textQuinaOferta,
+} from "./textRespostes.ts";
+
+// Los textos del diálogo viven en `textRespostes.ts` (módulo hoja, 27-10-2026); estos tres
+// se reexportan porque ya los importaban de aquí las pruebas.
+export { avisKgExcessius, formatKg, textMaxim };
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -243,12 +252,6 @@ export function clasificar(texto: string): "acceptada" | "rebutjada" | null {
   return "acceptada";
 }
 
-// Botones de confirmación del preu mínim.
-const BOTONS_PREU = [
-  { id: "accept:preu_si", titulo: "Sí, accepto" },
-  { id: "accept:preu_no", titulo: "No" },
-];
-
 /**
  * Primer número del texto: "200", "150,5", "uns 300 kg", "1.500".
  *
@@ -297,48 +300,12 @@ export function parseNumero(texto: string | null): number | null {
 // no estar, y **un tope inventado rechazaría una petición legítima**. Con la oferta ya
 // cubierta el número entra igual y lo ve el equipo al aprobar, que es donde estaba antes.
 
-/** El trozo « El màxim són N kg.» que acompaña a la pregunta, o nada si no se sabe. */
-export function textMaxim(disp: number): string {
-  if (disp <= 0) return "";
-  return disp === 1 ? " El màxim és 1 kg." : ` El màxim són ${formatKg(disp)} kg.`;
-}
-
-/** El aviso de pasarse, o `null` si el número cabe (o si no hay tope que aplicar). */
-export function avisKgExcessius(kg: number, disp: number): string | null {
-  if (disp <= 0 || kg <= disp) return null;
-  const max = formatKg(disp);
-  return `D'aquesta oferta en queden ${max} kg i n'has demanat ${formatKg(kg)}. ` +
-    `Escriu un número igual o inferior a ${max}. Si els vols tots, escriu ${max}.`;
-}
-
-/** Sin decimales cuando no hacen falta, y con coma: «300», «212,5». */
-export function formatKg(n: number): string {
-  return (Number.isInteger(n) ? String(n) : String(Number(n.toFixed(2)))).replace(".", ",");
-}
-
-/** «0,80 €/kg», igual que en el texto de la oferta. */
-function eurKg(n: number): string {
-  return `${n.toFixed(2).replace(".", ",")} €/kg`;
-}
-
-/** «de Tomàquet» / «d'Albercoc». */
-function de(nom: string): string {
-  return /^[aeiouàèéíòóúh]/i.test(nom.trim()) ? `d'${nom}` : `de ${nom}`;
-}
-
 /** De qué oferta se habla, para que la pregunta no sea anónima: «de Tomàquet (E-…)». */
 async function quinaOferta(supabase: Cliente, excedenteId: string): Promise<string> {
   const { data } = await supabase
     .from("excedentes").select("producto, id_excedente").eq("id", excedenteId).maybeSingle();
-  if (!data?.producto) return "";
-  return ` ${de(String(data.producto))}${data.id_excedente ? ` (${data.id_excedente})` : ""}`;
+  return textQuinaOferta(data?.producto, data?.id_excedente);
 }
-
-/** Los dos botones con los que se envía la oferta (`OfferDetail`). */
-const BOTONS_OFERTA = [
-  { id: "accept:si", titulo: "M'interessa" },
-  { id: "accept:no", titulo: "Ara no" },
-];
 
 /** Cuánto tiempo, tras enviar la oferta, un mensaje que no se entiende repite la pregunta. */
 const HORES_REPETIR_PREGUNTA = 48;
@@ -417,12 +384,7 @@ async function finalizarAceptacion(
   if (nota) cambios.mensaje_respuesta = nota;
   const { error } = await supabase.from("oferta_respuestas").update(cambios).eq("id", filaId);
   if (error) console.error("oferta_respuestas finalizar:", error.message);
-  await sendText(
-    supabase, from,
-    resposta ??
-      `Perfecte, hem registrat que en vols ${formatKg(kg)} kg. L'equip de Redestina ho ` +
-        "confirmarà i coordinarà la recollida. 🚚",
-  );
+  await sendText(supabase, from, resposta ?? textGracies(kg));
 }
 
 /** Marca la fila 'rebutjada' y cierra el diálogo. */
@@ -438,10 +400,7 @@ async function rechazar(
     respondido_at: new Date().toISOString(),
     mensaje_respuesta: texto,
   }).eq("id", filaId);
-  await sendText(
-    supabase, from,
-    "D'acord, gràcies per contestar. Ho tindrem en compte per a properes ofertes. 🙌",
-  );
+  await sendText(supabase, from, TEXT_REBUIG);
 }
 
 export async function procesarRespuestaOferta(
@@ -500,11 +459,7 @@ export async function procesarRespuestaOferta(
       fila.dialeg_pas === "preu" || clasificar(texto ?? "") !== null;
     if (!responde) return false;
     await supabase.from("oferta_respuestas").update({ dialeg_pas: "fet" }).eq("id", fila.id);
-    await sendText(
-      supabase, from,
-      `Aquesta oferta${await quinaOferta(supabase, fila.excedente_id)} ja no està disponible: ` +
-        "s'ha repartit o s'ha retirat. Gràcies igualment!",
-    );
+    await sendText(supabase, from, textNoDisponible(await quinaOferta(supabase, fila.excedente_id)));
     return true;
   }
 
@@ -523,11 +478,7 @@ export async function procesarRespuestaOferta(
       return true;
     }
     if (kg === null || kg <= 0) {
-      await sendText(
-        supabase,
-        from,
-        `No t'he entès. Escriu quants kg en vols (p. ex. 200), o *NO* si ja no la vols.${textMaxim(disp)}`,
-      );
+      await sendText(supabase, from, textKgNoEntes(disp));
       return true;
     }
     // Pasarse NO avanza el diálogo: se repite la pregunta con el tope. El paso sigue
@@ -548,11 +499,7 @@ export async function procesarRespuestaOferta(
       await supabase.from("oferta_respuestas")
         .update({ kg_solicitados: kg, dialeg_pas: "preu", dialeg_dades: marcaDialogo(fila.dialeg_dades) })
         .eq("id", fila.id);
-      await sendBotones(
-        supabase, from,
-        `El preu mínim d'aquesta oferta és ${eurKg(Number(exc.preu_minim))}. Hi estàs d'acord?`,
-        BOTONS_PREU,
-      );
+      await sendBotones(supabase, from, textConfirmaPreu(Number(exc.preu_minim)), BOTONS_PREU);
       return true;
     }
     await finalizarAceptacion(supabase, from, fila.id, kg, null, null);
@@ -564,9 +511,7 @@ export async function procesarRespuestaOferta(
     const acepta = id === "accept:preu_si" || clasificar(texto ?? "") === "acceptada";
     const rechaza = id === "accept:preu_no" || clasificar(texto ?? "") === "rebutjada";
     if (!acepta && !rechaza) {
-      await sendBotones(
-        supabase, from, "Tria una opció: hi estàs d'acord amb el preu mínim?", BOTONS_PREU,
-      );
+      await sendBotones(supabase, from, TEXT_REPETEIX_PREU, BOTONS_PREU);
       return true;
     }
     const { data: f2 } = await supabase
@@ -582,8 +527,7 @@ export async function procesarRespuestaOferta(
       await finalizarAceptacion(
         supabase, from, fila.id, kg, null,
         "L'entitat no accepta el preu mínim (a revisar per l'equip).",
-        `D'acord. Hem apuntat que en vols ${formatKg(kg)} kg però que no acceptes el preu mínim. ` +
-          "L'equip de Redestina ho revisarà.",
+        textPreuRebutjat(kg),
       );
     }
     return true;
@@ -611,9 +555,7 @@ export async function procesarRespuestaOferta(
     const recent = enviado !== null && Date.now() - enviado <= HORES_REPETIR_PREGUNTA * 3600_000;
     if (!recent || !(texto ?? "").trim()) return false;
     await sendBotones(
-      supabase, from,
-      `Tens pendent de resposta l'oferta${await quinaOferta(supabase, fila.excedente_id)}. T'interessa?`,
-      BOTONS_OFERTA,
+      supabase, from, textPendentResposta(await quinaOferta(supabase, fila.excedente_id)), BOTONS_OFERTA,
     );
     return true;
   }
@@ -630,11 +572,6 @@ export async function procesarRespuestaOferta(
   await supabase.from("oferta_respuestas")
     .update({ dialeg_pas: "kg", mensaje_respuesta: texto, dialeg_dades: marcaDialogo(fila.dialeg_dades) })
     .eq("id", fila.id);
-  await sendText(
-    supabase,
-    from,
-    `Perfecte! Quants kg${await quinaOferta(supabase, fila.excedente_id)} en vols?${textMaxim(disp)} ` +
-      "Escriu només el número.",
-  );
+  await sendText(supabase, from, textPreguntaKg(await quinaOferta(supabase, fila.excedente_id), disp));
   return true;
 }

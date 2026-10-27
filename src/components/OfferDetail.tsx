@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
-import { ArrowLeft, Copy, Check } from 'lucide-react'
+import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { sendWhatsApp } from '../lib/whatsapp'
@@ -12,10 +12,11 @@ import { activitatsPresents, comarquesPresents, filtraRanking, FRANGES_RECEPCIO,
 import { carregaTipusActivitat } from '../lib/organitzacio'
 import type { FranjaRecepcio } from '../lib/rankingEntitats'
 import { dataCurta } from '../lib/format'
+import BotoCopiar from './BotoCopiar'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
-import { textoRecollidaConfirmada } from '../lib/textos'
+import { textRecollidaGrup } from '../lib/missatgesOferta'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
 import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../lib/aprovarResposta'
@@ -49,15 +50,6 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 interface Props {
   excedente: Excedente
   onBack: () => void
-}
-
-// HTML para el portapapeles: cada línea en su propio <div> (el formato nativo de
-// los editores rich-text, incluido WhatsApp Web). Es más fiable que un único <div>
-// con <br>, que WhatsApp aplana al pegar perdiendo los saltos. Las líneas vacías
-// llevan <br> para no colapsarse.
-function textoAHtmlPortapapeles(texto: string): string {
-  const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-  return texto.split('\n').map((l) => `<div>${l === '' ? '<br>' : esc(l)}</div>`).join('')
 }
 
 /** Lo justo para enlazar: número para enseñar, canalización para casar la fila. */
@@ -150,7 +142,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     void carregaTipusActivitat().then((c) => setNomsActivitat(Object.fromEntries(c.map((a) => [a.codi, lang === 'es' ? a.nom_es : a.nom_ca]))))
   }, [lang])
   const [mostrats, setMostrats] = useState(PAS_RANKING)
-  const [copiado, setCopiado] = useState<string | null>(null)
   // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
   // (p. ej. si el intake dejó una fecha parseada o el usuario la edita).
   const [fecha, setFecha] = useState<string>(excedente.disponible_hasta ?? '')
@@ -187,34 +178,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const kgVives = vives.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
   const total = Number(exc.kg_total ?? 0)
   const faltan = Math.max(0, total - canalizados)
-
-  const copiar = useCallback((texto: string, id: string) => {
-    const marcar = () => {
-      setCopiado(id)
-      toast.success(t('od.copied'))
-      setTimeout(() => setCopiado(null), 1500)
-    }
-    // Se copia text/plain (con los saltos de línea reales) y, además, text/html
-    // con <br>: algunos destinos (WhatsApp Web, correo, documentos) colapsan el
-    // salto de línea suelto al pegar solo texto plano, y con la versión HTML lo
-    // conservan. Si el navegador no soporta ClipboardItem, se cae a writeText.
-    const html = textoAHtmlPortapapeles(texto)
-    try {
-      if ('write' in navigator.clipboard && typeof ClipboardItem !== 'undefined') {
-        const item = new ClipboardItem({
-          'text/plain': new Blob([texto], { type: 'text/plain' }),
-          'text/html': new Blob([html], { type: 'text/html' }),
-        })
-        void navigator.clipboard.write([item]).then(marcar, () => {
-          void navigator.clipboard.writeText(texto).then(marcar)
-        })
-        return
-      }
-    } catch {
-      // Navegador sin ClipboardItem: se usa el fallback de abajo.
-    }
-    void navigator.clipboard.writeText(texto).then(marcar)
-  }, [t])
 
   // Devuelve el excedente recargado: quien acaba de aprobar necesita saber si con eso el
   // estado ha pasado a `bloqueada`, y leer `exc` justo después daría el valor anterior.
@@ -905,10 +868,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         <Card>
           <CardHeader className="flex flex-row items-center justify-between">
             <CardTitle className="text-base">{t('od.offer_text')}</CardTitle>
-            <Button variant="outline" size="sm" onClick={() => copiar(exc.texto_oferta ?? '', 'oferta')}>
-              {copiado === 'oferta' ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {t('od.copy_group')}
-            </Button>
+            <BotoCopiar text={exc.texto_oferta ?? ''} etiqueta={t('od.copy_group')} />
           </CardHeader>
           <CardContent>
             <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-sm">{exc.texto_oferta}</pre>
@@ -1222,14 +1182,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 </Link>
               </Button>
             )}
-            <Button variant="outline" size="sm"
-              onClick={() => copiar(textoRecollidaConfirmada({
-                entitat: canalizaciones.map((c) => nombrePorId(c.entidad_id)).join(', '),
-                dataHora: '', kgRecollits: String(canalizados), kgFalten: String(faltan), comentaris: '',
-              }), 'recollida')}>
-              {copiado === 'recollida' ? <Check className="size-4" /> : <Copy className="size-4" />}
-              {t('od.copy_recollida')}
-            </Button>
+            {/* La fecha y los comentarios salían en blanco: ahora se toman de las entregas. */}
+            <BotoCopiar etiqueta={t('od.copy_recollida')}
+              text={textRecollidaGrup(canalizaciones, total, nombrePorId, lang)} />
           </CardHeader>
         </Card>
       )}

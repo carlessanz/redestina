@@ -22,6 +22,7 @@
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "./resend.ts";
 import { esEmailTest, modoTestActivo } from "./gate.ts";
 import type { ClienteSupabase } from "./cliente.ts";
+import { textCorreuOfertaRegistrada, textPlaCorreuOfertaRegistrada } from "./textOfertaRegistrada.ts";
 
 export type ResultatConfirmacio = "enviat" | "simulat" | "omes" | "desactivat" | "error";
 
@@ -51,20 +52,20 @@ export async function confirmarOfertaPerCorreu(
   if ((await modoTestActivo(supabase)) && !(await esEmailTest(supabase, destino))) return "omes";
 
   const producte = String(datos?.producte ?? datos?.familia ?? "").trim();
+  // El texto vive en `textOfertaRegistrada.ts` (módulo hoja): el panel lo enseña igual.
+  const c = textCorreuOfertaRegistrada(productor.name, idExcedente, producte, estado);
   const r = await sendEmail({
     to: destino,
-    subject: `Oferta registrada: ${idExcedente}`,
+    subject: c.assumpte,
     html: plantillaEmail({
-      titulo: "Hem registrat la teva oferta",
-      preheader: `Referència ${idExcedente}`,
-      cuerpoHtml: `<p>Hola ${escaparHtml(productor.name ?? "")},</p>` +
-        `<p>Hem registrat la teva oferta${producte ? ` de ${escaparHtml(producte)}` : ""} ` +
-        `amb la referència <strong>${escaparHtml(idExcedente)}</strong>.</p>` +
-        (estado === "pendent_validacio"
-          ? `<p>L'equip de Redestina la revisarà i, un cop validada, buscarà qui la pugui aprofitar. En pots seguir l'estat al teu panell, a «Les meves ofertes».</p>`
-          : `<p>L'equip de Redestina buscarà qui la pugui aprofitar. En pots seguir l'estat al teu panell, a «Les meves ofertes».</p>`),
-      boton: { texto: "Veure les meves ofertes", url: `${appUrl()}/productor/ofertes` },
+      titulo: c.titol,
+      preheader: c.preheader,
+      cuerpoHtml: `<p>${escaparHtml(c.salutacio)}</p>` +
+        `<p>${escaparHtml(c.registrat)} <strong>${escaparHtml(c.referencia)}</strong>.</p>` +
+        `<p>${escaparHtml(c.seguiment)}</p>`,
+      boton: { texto: c.boto, url: `${appUrl()}${c.ruta}` },
     }),
+    text: textPlaCorreuOfertaRegistrada(c, appUrl()),
   }, {
     supabase,
     proposito: "oferta_confirmacio",

@@ -23,7 +23,7 @@ import { enLlistaCorreuTest, bustiaEquip, canalsActius, modoTestActivo } from ".
 import { preferenciasDeCanal } from "../_shared/organizacion.ts";
 import { appUrl, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { sendText } from "../_shared/whatsapp.ts";
-import { TIPUS_AVIS, textAvis } from "../_shared/textAvis.ts";
+import { formatTextAvisCorreu, formatWhatsappAvis, TIPUS_AVIS, textAvis } from "../_shared/textAvis.ts";
 import type { TipusAvis } from "../_shared/textAvis.ts";
 import { exigirSecreto, json } from "../_shared/http.ts";
 import type { ClienteSupabase } from "../_shared/cliente.ts";
@@ -145,7 +145,7 @@ async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca):
 
   // WhatsApp solo dentro de la ventana: fuera haría falta una plantilla aprobada.
   if (decision.canal === "whatsapp" && telefono && ventanaAbierta(contacto?.last_inbound_at ?? null)) {
-    const r = await sendText(supabase, telefono.replace(/\D/g, ""), `*${t.titulo}*\n\n${t.cuerpo}\n\n${enllac}`);
+    const r = await sendText(supabase, telefono.replace(/\D/g, ""), formatWhatsappAvis(t, appUrl()));
     if (r.ok) { await marca("whatsapp", null); return json({ ok: true, canal: "whatsapp" }); }
     // Si falla, se intenta por correo: el aviso no se pierde por un canal.
   }
@@ -163,7 +163,7 @@ async function enviarAviso(supabase: ClienteSupabase, aviso: any, marca: Marca):
       idioma,
     });
     const r = await sendEmail(
-      { to: ficha.email, subject: t.asunto, html, text: `${t.cuerpo}\n\n${enllac}`, replyTo: await bustiaEquip(supabase) },
+      { to: ficha.email, subject: t.asunto, html, text: formatTextAvisCorreu(t, appUrl()), replyTo: await bustiaEquip(supabase) },
       { supabase, proposito: "avis", objetoTipo: aviso.objecte_tipo, objetoId: aviso.objecte_id, funcion: "enviar-avis" },
     );
     if (r.desactivado) {

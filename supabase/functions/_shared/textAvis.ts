@@ -367,3 +367,18 @@ export function textConfirmacioRecollida(
       : "L’enllaç és personal i caduca al cap de 15 dies.",
   };
 }
+
+/**
+ * El WhatsApp de un aviso, EXACTAMENTE como lo manda `enviar-avis` (27-10-2026). Existe para
+ * que el panel del equipo pueda enseñar y copiar el mismo texto cuando las notificaciones
+ * están apagadas y hay que avisar a mano: si `enviar-avis` lo compusiera por su cuenta, las
+ * dos versiones divergirían en semanas (R4 del plan de gestión autónoma).
+ */
+export function formatWhatsappAvis(t: TextAvis, appUrl: string): string {
+  return `*${t.titulo}*\n\n${t.cuerpo}\n\n${appUrl}${t.ruta}`;
+}
+
+/** El texto plano del correo de un aviso (lo que `enviar-avis` pasa como `text`). */
+export function formatTextAvisCorreu(t: TextAvis, appUrl: string): string {
+  return `${t.cuerpo}\n\n${appUrl}${t.ruta}`;
+}

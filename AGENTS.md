@@ -708,12 +708,22 @@ src/
                                oficial vuelto legible («l'Ametlla del Vallès»)
     crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
+    copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
+                               línea, que es lo que WhatsApp conserva al pegar). Salió de OfferDetail
+    missatgesOferta.ts         PURO: los mensajes del ciclo de una oferta para avisar a mano
+                               (27-10-2026): el WhatsApp EXACTO de cada aviso —con `textAvis` y
+                               `formatWhatsappAvis` del servidor— y los compuestos (la oferta, el
+                               alta, lo que contesta el bot, RECOLLIDA CONFIRMADA), con su correo y
+                               si salió. `tests/missatgesOferta.test.ts`
   components/
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
     TriaPaper.tsx              El conmutador «productora / receptora» del doble rol. Estaba
                                copiado TRES veces y una copia ya había divergido (sin icono y
                                sin reparto a partes iguales): dos botones distintos para la
                                misma elección en dos pantallas seguidas
+    BotoCopiar.tsx             El botón de copiar de toda la aplicación (icono ✓ y aviso «Copiat»)
+    MissatgeACopiar.tsx        Un mensaje del ciclo: a quién va, si salió, el WhatsApp y el correo
+                               plegado; con `nomesLectura` para los paneles de ofertante y receptor
     DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
                                mensajería cuando WhatsApp está apagado (§8)
     documents/                 Las piezas que comparten los dos paneles externos:
@@ -857,7 +867,11 @@ supabase/
                                porque no lleva ningún importe
     _shared/whatsapp.ts        Graph API + interruptor de envío (texto/plantilla/interactivos)
     _shared/intake.ts          Motor conversacional (máquina de estados)
-    _shared/oferta.ts          crearExcedente(): id_excedente + texto "OFERTA DISPONIBLE"
+    _shared/oferta.ts          crearExcedente(): id_excedente; reexporta el texto de `textOferta.ts`
+    _shared/textOferta.ts      HOJA: el texto "OFERTA DISPONIBLE" (`componerTextoOferta`, envasos, cajas)
+    _shared/textIntake.ts      HOJA: lo que contesta el bot al cerrar el intake
+    _shared/textRespostes.ts   HOJA: lo que contesta el bot a un interés (kg, precio, gracias, no)
+    _shared/textOfertaRegistrada.ts  HOJA: el correo «oferta registrada» (y su texto plano)
     _shared/camposOferta.ts    Los 14 pasos, compartidos por el intake y el panel (§6bis)
     crear-oferta/index.ts      GET /campos (descriptor) + POST (alta desde el panel del productor);
                                `validacio.ts` (puro): `fotosValides()` y `veuCostReferencia()`
@@ -870,7 +884,8 @@ supabase/
     _shared/textosRgpd.ts      Las tres declaraciones RGPD y su huella; copia en `src/lib/textosRgpd.ts`
     recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)
-    _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5)
+    _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5);
+                               los textos, de `textRespostes.ts`
     _shared/confirmacions.ts   PURO: los botones `conf:<enlace>:ok|dif` y los kilos de la
                                confirmación de un albarán por WhatsApp (fase 3, 11-10-2026)
     _shared/confirmacionsWhatsapp.ts  Lo consume el webhook ANTES de la respuesta de oferta y
@@ -3562,6 +3577,23 @@ Lo que se cambió en las pantallas y la lógica del circuito; las migraciones, e
   `enlace-publico`, `registro` y `recordatorios-documentales`). 5 `eslint-disable` retirados y 9 de los 14
   `as unknown as` de `src/`.
 
+### El equipo gestiona el ciclo solo y avisa a mano (27-10-2026, en curso)
+
+Plan en cinco fases (`docs/Plan gestió autònoma superadmin (2026-10-27).md`, fuera de git): con
+las notificaciones apagadas (§8), el super_admin lleva una oferta de punta a punta en nombre de
+las partes —convenio, interés, aprobación, recogida, albaranes— con **las mismas filas y los
+mismos documentos** que si lo hicieran ellas, y en cada paso copia el WhatsApp (o el correo) que
+la plataforma habría mandado. Ofertante y receptor siguen viendo en su panel la oferta, la
+canalización y su estado.
+
+- ✅ **Fase 0, cimientos**: los textos que manda el servidor salen a módulos hoja que el panel
+  importa (§7); `src/lib/missatgesOferta.ts` compone los mensajes de una oferta (de cada fila de
+  `avisos`, el texto exacto de `enviar-avis`; los demás, de los datos) y `MissatgeACopiar` los
+  pinta. `OfferDetail` copia con `BotoCopiar`, y RECOLLIDA CONFIRMADA lleva ya la fecha (hora de
+  Madrid) y los comentarios de las entregas vivas: salían en blanco.
+- ⬜ Fase 1, convenio declarado · ⬜ Fase 2, interés y aprobación con paridad · ⬜ Fase 3, recogida
+  y albaranes en nombre del receptor · ⬜ Fase 4, mensajes en los tres paneles.
+
 ### La meva organització con listas cerradas (27-09-2026)
 
 Revisión funcional del 23-09: la ficha tiene que servir al ERP, así que **lo que se cruza va en
@@ -4653,6 +4685,17 @@ dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si falta
   suelto sobre `productores` o `entidades` vuelve a tener los tres comportamientos de
   antes, así que no se usa. Ver §4 «Borrado de una ficha» y §4bis.
 - **Secretos**: nunca en el código. Env vars, siempre.
+- 🔴 **Los módulos «hoja» de `_shared/` se IMPORTAN desde `src/`, no se copian** (27-10-2026).
+  Un módulo hoja no usa `Deno.` ni importa nada que no sea otro módulo hoja (ni el cliente de
+  Supabase, ni WhatsApp, ni Resend), así que el navegador lo puede cargar: el panel importa
+  directamente `textAvis.ts`, `textOferta.ts`, `textRespostes.ts`, `textIntake.ts`,
+  `textOfertaRegistrada.ts`… para enseñar y copiar EXACTAMENTE el texto que el servidor manda (R4
+  del plan de gestión autónoma). La lista vive en `tests/puresa.test.ts`, que falla si un hoja
+  importa algo de fuera o si `src/` importa de `supabase/functions/` un módulo que no está en ella.
+  ⚠️ Cambia la convención anterior —copia en `src/lib` + test de paridad (`modalitats.ts`,
+  `franja.ts`, `textosRgpd.ts`, `expedient.ts`)—: esas copias se quedan como están, pero lo nuevo
+  se importa. Si un texto necesita un dato de la base, se le pasa por parámetro: no se mete red en
+  un hoja.
 - **Sin servicios externos nuevos** (10-09-2026). Cualquier capacidad nueva —generación de PDF, firma
   electrónica, almacenamiento de ficheros, colas, notificaciones— se resuelve con **librerías npm dentro
   del stack** (Edge Functions de Deno con `npm:`, React) y con lo que ya da Supabase (Storage, `pg_cron`,
@@ -7293,7 +7336,9 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.429 pruebas en 60 ficheros** de Vitest: 1.428 correctas y **1 saltada a propósito**
+   Referencia: **1.477 pruebas en 62 ficheros** de Vitest: 1.476 correctas y **1 saltada a propósito**
+   (27-10-2026, los mensajes para avisar a mano: `tests/puresa.test.ts` y `tests/missatgesOferta.test.ts`;
+   antes **1.429 en 60**)
    (27-10-2026, el modo test en `enviar()` y `sendEmail()` y el comodín escapado; antes **1.418**)
    (27-10-2026, los interruptores de notificaciones y el RGPD: `tests/notificacions.test.ts` y
    `tests/registroValidacio.test.ts`; antes **1.392 en 58**)
