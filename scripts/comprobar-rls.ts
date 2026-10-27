@@ -601,6 +601,15 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // sesión; el permiso va antes que la existencia (uuid inventado → 42501).
   { tabla: "validar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida cap recollida (és d'un admin)" },
   { tabla: "retornar_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO retorna cap recollida (és d'un admin)" },
+  // Gestión autónoma del equipo (20270430100000/100100/100200): el convenio declarado es del
+  // super_admin; el envío manual, la hora y la recogida en nombre del receptor, del equipo.
+  // Las dos internas (`comprova_interes`, `registrar_recollida_escriu`), sin EXECUTE.
+  { tabla: "declarar_conveni", op: "rpc", esperado: "denegar", args: { p_tipo_org: "entidad", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "col_receptor", p_signant_nom: "arnes", p_signant_carrec: "arnes" }, descripcion: "NO dona per vigent cap conveni sense signar (només super_admin)" },
+  { tabla: "registrar_envio_manual", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO registra cap enviament manual d'una oferta (és de l'equip)" },
+  { tabla: "registrar_recollida_assistida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra cap recollida en nom del receptor (és d'un admin)" },
+  { tabla: "fixar_hora_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_quan: "2030-01-01T10:00:00Z" }, descripcion: "NO fixa l'hora de cap recollida (és de l'equip)" },
+  { tabla: "comprova_interes", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO executa la comprovació interna d'un interès" },
+  { tabla: "registrar_recollida_escriu", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix", p_kg_reals: null, p_data: null, p_observacions: null, p_per: "00000000-0000-0000-0000-000000000000", p_origen: "equip" }, descripcion: "NO executa l'escriptura interna d'una recollida" },
   // La revisión del certificado (20270419100000, fase 4): un externo solo aprueba lo suyo
   // (permiso antes que existencia: id inventado → 42501), y nunca en nombre de otro.
   { tabla: "aprovar_certificat_ofertant", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual" }, descripcion: "NO aprova un certificat que no és seu" },
@@ -1254,6 +1263,15 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Aprobar un certificado en nombre del donante es de `pot_aprovar()`: un técnico, no.
     { tabla: "aprovar_certificat_equip", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual", p_nota: "arnes" }, descripcion: "NO aprova certificats en nom del donant (és de pot_aprovar)" },
     { tabla: "repartir_kg_linies", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO executa el repartiment intern de quilos" },
+    // Gestión autónoma (20270430100000…100200). El convenio declarado es del super_admin y la
+    // recogida en nombre del receptor de un admin: un técnico, no. El envío manual y la hora
+    // de recogida, sí (id inventado: la guarda deja pasar y corta la existencia, 22023).
+    { tabla: "declarar_conveni", op: "rpc", esperado: "denegar", args: { p_tipo_org: "entidad", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "col_receptor", p_signant_nom: "arnes", p_signant_carrec: "arnes" }, descripcion: "NO dona per vigent cap conveni (només super_admin)" },
+    { tabla: "registrar_recollida_assistida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "NO registra recollides en nom del receptor (és d'un admin)" },
+    { tabla: "registrar_envio_manual", op: "rpc", esperado: "permitir", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000" }, descripcion: "registra un enviament manual (oferta inventada → 22023)" },
+    { tabla: "fixar_hora_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_quan: "2030-01-01T10:00:00Z" }, descripcion: "fixa l'hora d'una recollida (id inventat → 22023)" },
+    { tabla: "comprova_interes", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO executa la comprovació interna d'un interès" },
+    { tabla: "registrar_recollida_escriu", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix", p_kg_reals: null, p_data: null, p_observacions: null, p_per: "00000000-0000-0000-0000-000000000000", p_origen: "equip" }, descripcion: "NO executa l'escriptura interna d'una recollida" },
     // Contactos: el equipo edita los de cualquier organización (id inventado → 22023/23503).
     { tabla: "desar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "afegeix contactes en nom d'una organització (org inventada → error de negoci)" },
     { tabla: "esborrar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "esborra contactes (id inventat → 22023)" },
@@ -1497,6 +1515,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "validar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000" }, descripcion: "valida una recollida (id inventat → 22023)" },
     { tabla: "retornar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "retorna una recollida al receptor (id inventat → 22023)" },
     { tabla: "confirmar_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg_reals: 1 }, descripcion: "confirma una recollida en nom de les parts (id inventat → 22023)" },
+    // Gestión autónoma (20270430100000/100200). Declarar un convenio con un tipo que no es el
+    // del papel corta con 22023 DESPUÉS de la guarda de rol: autoriza sin escribir nada.
+    { tabla: "declarar_conveni", op: "rpc", esperado: "permitir", args: { p_tipo_org: "entidad", p_org: "00000000-0000-0000-0000-000000000000", p_tipo: "fax", p_signant_nom: "arnes", p_signant_carrec: "arnes" }, descripcion: "pot donar per vigent un conveni (tipus inventat → 22023)" },
+    { tabla: "registrar_recollida_assistida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix" }, descripcion: "registra una recollida en nom del receptor (id inventat → 22023)" },
     // --- CHECK GLOBAL del catálogo (20270414101000) ---
     // No mira una función: mira TODAS las de `public`. Falla si alguna `security definer`
     // (no de trigger) es ejecutable por `anon`, o si alguna de trigger lo es por `anon` o

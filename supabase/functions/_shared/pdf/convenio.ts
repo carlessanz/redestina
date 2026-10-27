@@ -81,6 +81,20 @@ export interface EvidenciaConvenio {
   created_at?: string | null;
 }
 
+/**
+ * Un convenio DECLARADO (`origen = 'declarat'`, 20270430100000): vigente sin firma ni papel.
+ * La página de evidencias dice eso, y nada más.
+ */
+export interface DeclaracioConvenio {
+  /** Quién del equipo lo dio por vigente. */
+  per?: string | null;
+  data?: string | null;
+  /** A quién atribuye la representación de la organización. */
+  signant?: string | null;
+  carrec?: string | null;
+  referencia?: string | null;
+}
+
 export interface DatosConvenio {
   tipus?: string | null;
   subtipus?: string | null;
@@ -95,6 +109,9 @@ export interface DatosConvenio {
   fundacio?: FundacionConvenio | null;
   dades_provisionals?: boolean | null;
   evidencies?: EvidenciaConvenio[] | null;
+  /** `plataforma` (firma con evidencias), `paper` (no emite PDF) o `declarat`. */
+  origen?: string | null;
+  declaracio?: DeclaracioConvenio | null;
 }
 
 // ---------------------------------------------------------------------------
@@ -163,6 +180,14 @@ export interface DiccionarioConvenio {
   ev_sense: string;
   ev_nota_titol: string;
   ev_nota: string;
+  declarat_titol: string;
+  declarat_text: (d: { per: string; data: string; organitzacio: string; signant: string; carrec: string; referencia: string }) => string;
+  declarat_per: string;
+  declarat_data: string;
+  declarat_signant: string;
+  declarat_referencia: string;
+  declarat_firma: string;
+  declarat_nota: string;
   esborrany_titol: string;
   esborrany_avis: string;
   esborrany_marca: string;
@@ -256,6 +281,16 @@ const CA: DiccionarioConvenio = {
   ev_nota_titol: "Què acredita aquesta pàgina",
   ev_nota:
     "És una signatura electrònica simple: acredita qui va firmar, quan, des d'on i —per l'empremta SHA-256— quin text exacte va acceptar. El document d'identitat és el que la persona va declarar; el sistema no el verifica contra cap registre oficial.",
+  declarat_titol: "Conveni donat per vigent per declaració",
+  declarat_text: (d) =>
+    `Aquest conveni no porta signatura electrònica ni escanejat. L'equip de Redestina (${d.per}) l'ha donat per vigent el ${d.data} en nom de ${d.organitzacio}, segons la declaració de ${d.signant}${d.carrec ? ` (${d.carrec})` : ""}${d.referencia ? `. Referència: ${d.referencia}` : ""}.`,
+  declarat_per: "Donat per vigent per",
+  declarat_data: "Data",
+  declarat_signant: "Representació declarada",
+  declarat_referencia: "Referència",
+  declarat_firma: "Declarat per l'equip, sense signatura",
+  declarat_nota:
+    "No hi ha IP, empremta del text ni traç de signatura perquè ningú de l'organització ha signat a la plataforma. Quan l'organització el signi des del seu panell, el nou conveni substituirà aquest.",
   esborrany_titol: "Esborrany de treball · sense valor contractual",
   esborrany_avis:
     "El text d'aquest conveni encara no l'ha validat l'assessoria jurídica de la Fundació Espigoladors. S'imprimeix perquè el document es pugui llegir i provar, però NO té valor contractual i no s'ha d'enviar a firmar.",
@@ -357,6 +392,16 @@ const ES: DiccionarioConvenio = {
   ev_nota_titol: "Qué acredita esta página",
   ev_nota:
     "Es una firma electrónica simple: acredita quién firmó, cuándo, desde dónde y —por la huella SHA-256— qué texto exacto aceptó. El documento de identidad es el que la persona declaró; el sistema no lo verifica contra ningún registro oficial.",
+  declarat_titol: "Convenio dado por vigente por declaración",
+  declarat_text: (d) =>
+    `Este convenio no lleva firma electrónica ni escaneado. El equipo de Redestina (${d.per}) lo ha dado por vigente el ${d.data} en nombre de ${d.organitzacio}, según la declaración de ${d.signant}${d.carrec ? ` (${d.carrec})` : ""}${d.referencia ? `. Referencia: ${d.referencia}` : ""}.`,
+  declarat_per: "Dado por vigente por",
+  declarat_data: "Fecha",
+  declarat_signant: "Representación declarada",
+  declarat_referencia: "Referencia",
+  declarat_firma: "Declarado por el equipo, sin firma",
+  declarat_nota:
+    "No hay IP, huella del texto ni trazo de firma porque nadie de la organización ha firmado en la plataforma. Cuando la organización lo firme desde su panel, el nuevo convenio sustituirá a este.",
   esborrany_titol: "Borrador de trabajo · sin valor contractual",
   esborrany_avis:
     "El texto de este convenio todavía no lo ha validado la asesoría jurídica de la Fundació Espigoladors. Se imprime para que el documento se pueda leer y probar, pero NO tiene valor contractual y no debe enviarse a firmar.",

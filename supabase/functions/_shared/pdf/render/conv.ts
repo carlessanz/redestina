@@ -309,10 +309,11 @@ async function pintarFirmas(
   }
 
   m.espacio(10);
-  m.titulo(t.signatures, 2);
   // El bloque entero no se parte: dos firmas repartidas entre dos páginas no se leen
-  // como una firma conjunta.
-  m.asegurar(alto + 70);
+  // como una firma conjunta. Y el título va CON el bloque: asegurado después, el título
+  // se quedaba solo al pie de una página y las firmas pasaban a la siguiente.
+  m.asegurar(alto + 110);
+  m.titulo(t.signatures, 2);
 
   const y = m.y;
   const mitad = m.anchoUtil / 2;
@@ -388,6 +389,8 @@ async function pintarFirmas(
     [fir.cargo ?? org.carrec ?? "", false],
     [org.raso_social ?? org.nom ?? "", false],
     [fechaLargaConvenio(datos.firmat_at, t, lengua), false],
+    // Un convenio declarado no tiene trazo: se dice debajo del nombre (20270430100000).
+    [datos.origen === "declarat" ? t.declarat_firma : "", true],
   ]);
   const derecha = escribir(m.x + mitad, [
     [t.signa_fundacio, true],
@@ -418,6 +421,36 @@ async function pintarEvidencias(
   _lengua: IdiomaConvenio,
 ): Promise<void> {
   m.saltoPagina();
+
+  // DECLARADO (20270430100000): nadie firmó aquí. La página dice exactamente eso —quién del
+  // equipo, cuándo, en nombre de quién— y no pinta campos de firma vacíos que harían pensar
+  // que se perdió una evidencia.
+  if (datos.origen === "declarat") {
+    const d = datos.declaracio ?? {};
+    const org = datos.organitzacio ?? {};
+    const data = fechaHoraConvenio(d.data ?? datos.contrafirmat_at ?? null);
+    m.titulo(t.declarat_titol, 1);
+    m.parrafo(t.declarat_text({
+      per: d.per ?? "—",
+      data,
+      organitzacio: org.raso_social ?? org.nom ?? "—",
+      signant: d.signant ?? datos.firmant?.nombre ?? "—",
+      carrec: d.carrec ?? datos.firmant?.cargo ?? "",
+      referencia: d.referencia ?? "",
+    }), { tamano: 10, despues: 10 });
+    m.campos(
+      paresLlenos([
+        [t.declarat_per, d.per],
+        [t.declarat_data, data],
+        [t.declarat_signant, [d.signant, d.carrec].filter(Boolean).join(" · ") || null],
+        [t.declarat_referencia, d.referencia],
+      ]),
+      { anchoEtiqueta: 170, tamano: 9.5, despues: 8 },
+    );
+    m.caja(t.declarat_nota, { titulo: t.ev_nota_titol, fondo: COLORES.crema });
+    return;
+  }
+
   m.titulo(t.evidencies_titol, 1);
   m.parrafo(t.evidencies_intro, { color: COLORES.verdeGris, tamano: 9.5, despues: 10 });
 

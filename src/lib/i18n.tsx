@@ -385,6 +385,7 @@ const ca: Dict = {
   // `tests/cobertura.test.ts` no la veu: qui la vigila és `tests/i18n.test.ts`.
   'od.ch_whatsapp': 'WhatsApp', 'od.ch_email': 'Correu', 'od.ch_panel': 'Panell',
   'od.ch_asistido': 'Assistit',
+  'od.ch_manual': 'Enviada a mà',
   'od.sense_conveni': 'Li falta el conveni per rebre aquesta oferta: es pot enviar, però aprovar-la fallarà fins que el signi.',
   'od.not_found': 'Aquesta oferta no existeix o no hi tens accés.',
   'od.rs_accept': 'Marcar acceptada', 'od.rs_reject': 'Marcar rebutjada',
@@ -3475,6 +3476,7 @@ const es: Dict = {
   'od.rs_pendent': 'Sin respuesta', 'od.rs_acceptada': 'Interesada', 'od.rs_rebutjada': 'No interesada',
   'od.ch_whatsapp': 'WhatsApp', 'od.ch_email': 'Email', 'od.ch_panel': 'Panel',
   'od.ch_asistido': 'Asistido',
+  'od.ch_manual': 'Enviada a mano',
   'od.sense_conveni': 'Le falta el convenio para recibir esta oferta: se puede enviar, pero aprobarla fallará hasta que lo firme.',
   'od.not_found': 'Esta oferta no existe o no tienes acceso.',
   'od.rs_accept': 'Marcar aceptada', 'od.rs_reject': 'Marcar rechazada',

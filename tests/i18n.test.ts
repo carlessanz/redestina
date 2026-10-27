@@ -186,7 +186,7 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       // CHECK de `oferta_respuestas.canal`. Se compone en `Aprovacions.tsx` y `OfferDetail.tsx`.
       que: 'oferta_respuestas.canal',
       prefijo: 'od.ch_',
-      valores: ['whatsapp', 'email', 'panel', 'asistido'],
+      valores: ['whatsapp', 'email', 'panel', 'asistido', 'manual'],
     },
     {
       // CHECK de `documentos_externos.tipo` (ampliado en `20270329100000`). Se compone en

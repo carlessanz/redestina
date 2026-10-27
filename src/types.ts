@@ -280,7 +280,8 @@ export interface OfertaRespuesta {
   entidad_id: string | null
   /** E.164 sin '+'; casa la respuesta entrante con la fila pendiente */
   telefono: string | null
-  canal: 'whatsapp' | 'email'
+  /** `manual`: el equipo la copió y la pegó a mano (20270430100100) */
+  canal: 'whatsapp' | 'email' | 'panel' | 'asistido' | 'manual'
   /** Respuesta de la ENTIDAD */
   estado: 'pendent' | 'acceptada' | 'rebutjada'
   kg_solicitados: number | null
@@ -883,8 +884,13 @@ export interface Convenio {
    * De dónde viene la firma. `paper` = se firmó fuera y lo registró el super_admin
    * (20270329100300): vale igual para operar, pero **no consume número de serie** —las
    * series numeran lo que Redestina emite— y por eso lleva `referencia_paper` en su lugar.
+   * `declarat` = el super_admin lo dio por vigente sin firma ni papel (20270430100000): SÍ
+   * consume número, y su PDF lo declara.
    */
-  origen: 'plataforma' | 'paper'
+  origen: 'plataforma' | 'paper' | 'declarat'
+  /** Quién del equipo lo declaró y cuándo (solo `origen = 'declarat'`) */
+  declarat_per?: string | null
+  declarat_at?: string | null
   /** La referencia impresa en el papel. Solo en `origen = 'paper'`, donde sustituye al número */
   referencia_paper: string | null
   estado: ConvenioEstado
@@ -892,7 +898,7 @@ export interface Convenio {
   /** Copia congelada de la ficha en el momento de firmar */
   datos_org: Record<string, unknown>
   /** Quién firmó. ⚠️ SIN documento de identidad: eso vive solo en `evidencias` */
-  firmante: { nombre?: string; cargo?: string; email?: string } | null
+  firmante: { nombre?: string; cargo?: string; email?: string; declarat?: boolean; referencia?: string; notes?: string } | null
   enlace_id: string | null
   enviado_at: string | null
   firmado_at: string | null
