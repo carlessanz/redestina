@@ -1713,7 +1713,9 @@ excluye cuando `modo = 'real'`.
 el donante ve su fila por `cierres_donante_meus()` —los cierres de **prueba** solo si su ficha es
 `es_test`, para que un donante real no se encuentre en su panel un acumulado sin valor fiscal—.
 Series `P-RES`/`P-CD` en prueba; `reiniciar_cierre_prueba()` las devuelve a 0 **sin tocar
-canalizaciones ni albaranes**.
+canalizaciones ni albaranes**. ⚠️ Desde `20270430100400` (deuda 145) no a 0 a secas: al **último número
+que siga vivo** en esa serie y año, porque puede haber varios cierres de prueba del mismo ejercicio y
+reiniciar uno no puede dejar el contador por debajo de los documentos del otro.
 
 ⚠️ **El 28-09-2026 se retiró a mano un cierre REAL de 2026** abierto el 21-09 y nunca calculado
 (0 donantes, 0 documentos, series `RES`/`CD`/`CT` de 2026 a 0): un `delete` con esas mismas
@@ -6672,9 +6674,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-⚠️ **27-10-2026 (gestión autónoma): se abre la 145** (el reinicio del cierre de prueba deja la serie en 0
-con documentos vivos) y la 109 queda a medias (la pantalla ya no tiene atajos; los GRANT siguen): **58 vivas**
-(aritmética) y la siguiente entrada nueva es la 146.
+⚠️ **27-10-2026 (gestión autónoma): se abre y se cierra la 145** (el reinicio del cierre de prueba dejaba la
+serie en 0 con documentos vivos de otro cierre; `20270430100400`) y la 109 queda a medias (la pantalla ya no
+tiene atajos; los GRANT siguen): **57 vivas** (aritmética) y la siguiente entrada nueva es la 146.
 ⚠️ **27-10-2026 (interruptores de notificaciones y RGPD): se abren la 142, la 143 y la 144**: **57 vivas**
 (aritmética) y la siguiente entrada nueva es la 145.
 ⚠️ **17-10-2026 (la recogida la cierra el receptor): se abre la 141** (el bloqueo de 48 h ya no actúa
@@ -7267,13 +7269,6 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `nif_en_us` al insertar, y `scripts/import-ara.ts` es anterior: un NIF mal escrito en el CSV, o el
      mismo NIF en dos organizaciones, hace fallar esa fila. Revisar los CSV (o vaciar el NIF inválido
      en el script) antes de importar.
-145. **`reiniciar_cierre_prueba(cierre)` pone a 0 las series `P-RES`/`P-CD` del año aunque OTRO cierre de
-     prueba del mismo ejercicio conserve sus documentos** (`20270322100000`). Borra los documentos de ESE cierre
-     y deja el contador a cero, así que la siguiente emisión en el otro cierre pide `P-CD-2026-0001` otra vez y
-     muere con `23505 documentos_numero_version_uidx`. Pasa en producción: hay dos cierres de prueba de 2026
-     (`42e45d82…`, con `P-CD-2026-0001` emitido el 21-09, y `a4723ddf…`) y la serie está a 0. Lo destapó
-     `tests/e2e/certificats.e2e.ts` el 27-10-2026 al recargar el clon. Arreglo: reiniciar al máximo número
-     que siga existiendo en esa serie y año, no a 0 (es solo de prueba: no toca nada fiscal).
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7451,6 +7446,7 @@ se va solo **cómo se llegó hasta aquí**.
 | 124 | Los dos botones del diálogo de cancelar una oferta se leían casi igual («Cancel·lar» / «Cancel·lar oferta»), en `OfferDetail.tsx` y en `OfertaDetall.tsx` del productor | 22-09-2026 |
 | 130 | La pantalla guiada no elegía modalidad al aprobar un interés de una oferta con varias | 11-10-2026 (fase 8 de la revisión del 08-10-2026) |
 | 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
+| 145 | `reiniciar_cierre_prueba()` ponía a 0 `P-RES`/`P-CD`/`P-CT` del año aunque otro cierre de prueba conservara sus documentos: la siguiente emisión chocaba con `23505`. Ahora deja el último número vivo | `20270430100400` |
 
 ## 13. Al terminar cualquier cambio
 
@@ -7528,6 +7524,8 @@ se va solo **cómo se llegó hasta aquí**.
    **contra producción, tras publicar `3907281`, 1.556/1.556 y 28 sin datos**: el mismo total (1.584), con
    otros datos. Después el clon se recargó con un volcado de ese día (183 migraciones), así que ahora
    coinciden.
+   Con `20270430100400` (deuda 145, sin checks nuevos) el clon da 1.555/1.555 y 29 sin datos: el mismo
+   total, con los datos que dejan las E2E.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
