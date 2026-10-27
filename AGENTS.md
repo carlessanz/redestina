@@ -4869,6 +4869,10 @@ Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
   En el panel externo, el menú de la persona y la ficha solo ofrecen los canales encendidos.
 - ✅ **Probado en el clon** (27-10-2026): reglas de la RPC, `enviar-email` → 503 y traza `desactivat`,
   `enviar-acceso` sale (simulado) con todo apagado, y la E2E `tests/e2e/notificacions.e2e.ts`.
+- ✅ **Publicado el 27-10-2026** (`7a5f9b2`): migraciones, las 20 funciones (17 con bundle nuevo,
+  `alta-assistida` nueva) y el frontend. En producción los tres interruptores quedan **encendidos**; CORS de
+  `alta-assistida` correcto, `registro` rechaza un alta sin privacidad y `generar-documento` sigue generando
+  (PDF de prueba de 123.610 bytes, retirado después).
 
 ### Interruptor global `whatsapp_activo` (14-09-2026)
 
@@ -7319,7 +7323,8 @@ se va solo **cómo se llegó hasta aquí**.
    ⚠️ **27-10-2026**: `20270429100000`/`100100` añaden 25 checks (`fixar_notificacions`,
    `fixar_canal_notificacio` y el insert en `consentiments`, denegados a las siete cuentas externas y al
    equipo; `fixar_canal_notificacio` permitido al super_admin con un canal inventado → `22023`). Contra
-   el clon da **1.499/1.499 y 28 sin datos**. Producción, al publicar.
+   el clon da **1.499/1.499 y 28 sin datos**, y **la misma cifra contra producción** tras publicar `7a5f9b2` el
+   27-10-2026 (las dos migraciones `20270429100000`/`100100`, las 20 funciones y el frontend).
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
