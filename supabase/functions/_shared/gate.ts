@@ -6,6 +6,18 @@
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
 
+/**
+ * El correo como patrón LITERAL de `ilike`: igualdad sin distinguir mayúsculas, sin comodines.
+ *
+ * 🔴 Hasta el 27-10-2026 el correo iba tal cual, y en `ilike` el `_` vale por CUALQUIER
+ *    carácter y el `%` por cualquier tira: `joan_puig@x.cat` casaba con `joan.puig@x.cat`. O sea
+ *    que un correo real podía pasar por «de prueba» y recibir un envío con el modo test activo.
+ *    Con la importación masiva de productores y receptoras, eso deja de ser teórico.
+ */
+export function patroLiteral(valor: string): string {
+  return valor.replace(/[\\%_]/g, (c) => "\\" + c);
+}
+
 /** ¿El teléfono es de un productor o entidad marcado es_test? */
 export async function esTelefonoTest(supabase: Cliente, to: string): Promise<boolean> {
   const [prod, ent] = await Promise.all([
@@ -24,9 +36,10 @@ export async function esTelefonoTest(supabase: Cliente, to: string): Promise<boo
  * resolver.
  */
 export async function esEmailTest(supabase: Cliente, email: string): Promise<boolean> {
+  const patro = patroLiteral(email);
   const [ent, prod] = await Promise.all([
-    supabase.from("entidades").select("id").ilike("email", email).eq("es_test", true).limit(1),
-    supabase.from("productores").select("id").ilike("email", email).eq("es_test", true).limit(1),
+    supabase.from("entidades").select("id").ilike("email", patro).eq("es_test", true).limit(1),
+    supabase.from("productores").select("id").ilike("email", patro).eq("es_test", true).limit(1),
   ]);
   return (ent.data ?? []).length > 0 || (prod.data ?? []).length > 0;
 }
@@ -45,7 +58,7 @@ export async function esEmailTest(supabase: Cliente, email: string): Promise<boo
  */
 export async function esCuentaPermitida(supabase: Cliente, email: string): Promise<boolean> {
   const { data: perfil } = await supabase
-    .from("perfiles").select("id").ilike("email", email).maybeSingle();
+    .from("perfiles").select("id").ilike("email", patroLiteral(email)).maybeSingle();
   if (!perfil) return false;
 
   const { data: roles } = await supabase

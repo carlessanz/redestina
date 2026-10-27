@@ -146,7 +146,8 @@ Deno.serve(async (req) => {
           perfil.telefono,
           `El teu codi d'accés a Redestina és ${codi}. Caduca en 1 hora. ` +
             `Entra a ${redirectTo}/login, escriu el teu correu i el codi.`,
-          { bodyConsola: "[codi d'accés enviat · ocult]" },
+          // Transaccional: lo filtra `esCuentaPermitida` arriba, no el modo test de `enviar()`.
+          { bodyConsola: "[codi d'accés enviat · ocult]", transaccional: true },
         );
         resultado.whatsapp = r.ok ? "enviat" : `error: ${JSON.stringify(r.data)}`;
         // Respaldo: si WhatsApp falla (ventana cerrada, número fuera de la lista de

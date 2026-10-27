@@ -114,6 +114,19 @@ export async function fitxesSenseCorreuAmbTelefon(): Promise<{ productors: numbe
 }
 
 /**
+ * Cuántas fichas EMPEZARÍAN a recibir notificaciones al abrir el modo test a todos: las que no
+ * son de prueba. Es la cifra que hay que ver antes de pulsar, sobre todo después de una
+ * importación masiva. Ante un error, ceros (como las de abajo).
+ */
+export async function fitxesNoProva(): Promise<{ productors: number; entitats: number }> {
+  const [prod, ent] = await Promise.all([
+    supabase.from('productores').select('id', { count: 'exact', head: true }).eq('es_test', false),
+    supabase.from('entidades').select('id', { count: 'exact', head: true }).eq('es_test', false),
+  ])
+  return { productors: prod.count ?? 0, entitats: ent.count ?? 0 }
+}
+
+/**
  * La simétrica para el correo: las fichas con correo y SIN teléfono se quedan sin vía al
  * apagarlo. Mismo criterio ante un error (ceros).
  */

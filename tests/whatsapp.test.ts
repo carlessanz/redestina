@@ -91,7 +91,7 @@ describe('whatsapp · sin la fila del interruptor', () => {
   })
 
   it('el envío NO se corta y cae en el modo simulado de siempre', async () => {
-    const { cliente } = crearCliente({ app_settings: [] })
+    const { cliente } = crearCliente({ app_settings: [{ key: 'test_mode', value: 'false' }] })
     const r = await sendText(cliente, '34612345678', 'hola') as {
       ok: boolean; desactivado?: boolean; simulado?: boolean; waMessageId: string | null
     }
@@ -102,7 +102,7 @@ describe('whatsapp · sin la fila del interruptor', () => {
   })
 
   it('y entonces sí registra el saliente en wa_messages', async () => {
-    const { cliente, escrituras } = crearCliente({ app_settings: [] })
+    const { cliente, escrituras } = crearCliente({ app_settings: [{ key: 'test_mode', value: 'false' }] })
     await sendText(cliente, '34612345678', 'hola')
     expect(escrituras.map((e) => e.tabla)).toEqual(['wa_messages'])
   })
@@ -123,7 +123,7 @@ describe('whatsapp · sin la fila del interruptor', () => {
 // error—, así que el registro tiene que decir lo que salió; si dijera lo que se pretendía,
 // serviría para todo menos para el caso que hay que diagnosticar.
 describe('whatsapp · el registro de un interactivo guarda sus opciones', () => {
-  const ENVIA_DE_VERDAD = { app_settings: [{ key: 'whatsapp_activo', value: 'true' }] }
+  const ENVIA_DE_VERDAD = { app_settings: [{ key: 'whatsapp_activo', value: 'true' }, { key: 'test_mode', value: 'false' }] }
 
   // Sin `WHATSAPP_ENVIO_REAL` el envío cae en el modo simulado: no sale a la red y se
   // registra igual, que es justo lo que hace falta para mirar lo que se registró.
@@ -175,5 +175,51 @@ describe('whatsapp · el registro de un interactivo guarda sus opciones', () => 
     const raw = rawRegistrado(escrituras) as { opciones: { id: string; titulo: string }[] }
     expect(raw.opciones[0]).toEqual({ id: 'si', titulo: 'Sí' })
     expect(raw.opciones[1].titulo).toHaveLength(20)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// El modo test, también en la única puerta hacia Meta (27-10-2026)
+// ---------------------------------------------------------------------------
+// Cada llamador ya lo comprueba; esto es la red para el día que uno nuevo se olvide. Antes de
+// una importación masiva, lo que importa es que un móvil que no es de prueba NO reciba nada.
+describe('whatsapp · modo test activo', () => {
+  const original = (globalThis as Record<string, unknown>).Deno
+  beforeAll(() => {
+    ;(globalThis as Record<string, unknown>).Deno = { env: { get: () => undefined } }
+  })
+  afterAll(() => {
+    if (original === undefined) delete (globalThis as Record<string, unknown>).Deno
+    else (globalThis as Record<string, unknown>).Deno = original
+  })
+  const base = (esTest: boolean) => ({
+    app_settings: [{ key: 'test_mode', value: 'true' }],
+    productores: [{ id: 'p1', phone: '34612345678', es_test: esTest }],
+  })
+
+  for (const { nombre, enviar } of ENVIOS) {
+    it(`${nombre} a un móvil que NO es de prueba: no sale y no se registra`, async () => {
+      const { cliente, escrituras } = crearCliente(base(false))
+      const r = await enviar(cliente) as { ok: boolean; desactivado?: boolean; data: { code?: string } }
+      expect(r.ok).toBe(false)
+      expect(r.desactivado).toBe(true)
+      expect(r.data.code).toBe('no_test_user')
+      expect(escrituras).toEqual([])
+    })
+  }
+
+  it('a un móvil de prueba sale (simulado)', async () => {
+    const { cliente } = crearCliente(base(true))
+    expect((await sendText(cliente, '34612345678', 'hola')).ok).toBe(true)
+  })
+
+  it('sin la fila de test_mode, fail-safe: se trata como activo y no sale', async () => {
+    const { cliente } = crearCliente({ productores: [{ id: 'p1', phone: '34612345678', es_test: false }] })
+    expect((await sendText(cliente, '34612345678', 'hola')).ok).toBe(false)
+  })
+
+  it('lo transaccional (código de acceso) no pasa por este gate', async () => {
+    const { cliente } = crearCliente(base(false))
+    expect((await sendText(cliente, '34612345678', 'codi', { transaccional: true })).ok).toBe(true)
   })
 })

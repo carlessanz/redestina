@@ -29,9 +29,12 @@ export class Consulta {
     return this
   }
 
-  /** `ilike` sin comodines, que es como lo usa el gate: igualdad sin distinguir mayúsculas. */
+  /**
+   * `ilike` como lo usa el gate: patrón LITERAL (comodines escapados con `\`, `patroLiteral`),
+   * o sea igualdad sin distinguir mayúsculas. Se quita el escape antes de comparar.
+   */
   ilike(columna: string, valor: unknown) {
-    const v = String(valor).toLowerCase()
+    const v = String(valor).replace(/\\(.)/g, '$1').toLowerCase()
     this.filtros.push((f) => String(f[columna] ?? '').toLowerCase() === v)
     return this
   }

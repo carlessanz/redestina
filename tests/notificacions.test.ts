@@ -15,6 +15,7 @@ import { decidirCanal } from '../supabase/functions/_shared/canal'
 import { sendEmail } from '../supabase/functions/_shared/resend'
 import * as srvRgpd from '../supabase/functions/_shared/textosRgpd'
 import * as webRgpd from '../src/lib/textosRgpd'
+import { crearCliente } from './soporte/clienteFalso'
 import { algunCanal, filtraPerCanals, motiuCanal, motiuTallServidor } from '../src/lib/canals'
 
 const fila = (key: string, value: string) => ({ key, value })
@@ -68,19 +69,17 @@ describe('decidirCanal con los interruptores', () => {
   })
 })
 
-// Un cliente de Supabase mínimo: lee `app_settings` y captura lo que se inserta.
-function clientFals(settings: { key: string; value: string }[]) {
-  const inserts: Record<string, unknown>[] = []
-  // `as never`: un doble mínimo, no un cliente entero (solo lo que `sendEmail` toca).
-  const client = {
-    from(taula: string) {
-      return {
-        select: () => ({ in: () => Promise.resolve({ data: taula === 'app_settings' ? settings : [] }) }),
-        insert: (fila: Record<string, unknown>) => { inserts.push(fila); return Promise.resolve({ error: null }) },
-      }
-    },
-  } as never
-  return { client, inserts }
+// El doble de cliente de siempre (`soporte/clienteFalso`): `app_settings` y las fichas, con
+// `test_mode` apagado salvo donde se prueba el modo test.
+function clientFals(settings: { key: string; value: string }[], extra: Record<string, Record<string, unknown>[]> = {}) {
+  const { cliente, escrituras } = crearCliente({
+    app_settings: settings.some((f) => f.key === 'test_mode') ? settings : [{ key: 'test_mode', value: 'false' }, ...settings],
+    ...extra,
+  })
+  const inserts = new Proxy([] as Record<string, unknown>[], {
+    get: (_t, k) => (escrituras.filter((e) => e.tabla === 'documento_envios').map((e) => e.valores) as Record<string, unknown>[])[k as never],
+  })
+  return { client: cliente, inserts }
 }
 
 describe('sendEmail y los interruptores', () => {
@@ -113,6 +112,34 @@ describe('sendEmail y los interruptores', () => {
     const r = await sendEmail(payload)
     expect(r.ok).toBe(false)
     expect(r.desactivado).toBe(true)
+  })
+
+  it('con el modo test activo, un correo que NO es de prueba no sale (no_test_user)', async () => {
+    const { client, inserts } = clientFals([{ key: 'test_mode', value: 'true' }],
+      { productores: [{ id: 'p', email: 'a@b.cat', es_test: false }] })
+    const r = await sendEmail(payload, { supabase: client, proposito: 'oferta' })
+    expect(r.ok).toBe(false)
+    expect((r.data as { code: string }).code).toBe('no_test_user')
+    expect(inserts[0]?.estado).toBe('desactivat')
+  })
+
+  it('con el modo test activo, a una ficha de prueba sí sale', async () => {
+    const { client } = clientFals([{ key: 'test_mode', value: 'true' }],
+      { entidades: [{ id: 'e', email: 'A@b.cat', es_test: true }] })
+    expect((await sendEmail(payload, { supabase: client, proposito: 'oferta' })).ok).toBe(true)
+  })
+
+  it('con el modo test activo, al buzón del equipo sí sale', async () => {
+    const { client } = clientFals([{ key: 'test_mode', value: 'true' }],
+      { parametros_documentales: [{ id: 1, email_equipo: 'a@b.cat' }] })
+    expect((await sendEmail(payload, { supabase: client, proposito: 'recordatori_equip' })).ok).toBe(true)
+  })
+
+  it('un _ en el correo no hace pasar por prueba a otro correo (comodín escapado)', async () => {
+    const { client } = clientFals([{ key: 'test_mode', value: 'true' }],
+      { productores: [{ id: 'p', email: 'joan.puig@b.cat', es_test: true }] })
+    const r = await sendEmail({ ...payload, to: 'joan_puig@b.cat' }, { supabase: client, proposito: 'oferta' })
+    expect(r.ok).toBe(false)
   })
 
   it('con todo encendido, sale (simulado)', async () => {

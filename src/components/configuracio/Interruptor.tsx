@@ -33,12 +33,18 @@ interface Props {
   motiu?: string
   /** Solo el «Activat» gris (p. ej. un canal con el general apagado). */
   motiuActivar?: string
+  /** Solo el «Desactivat» gris (p. ej. abrir el modo test a todos con el general apagado). */
+  motiuDesactivar?: string
+  /** Etiquetas de los dos botones, si no son «Activat / Desactivat». */
+  etiquetaOn?: string
+  etiquetaOff?: string
   ajuda?: ReactNode
   children?: ReactNode
 }
 
 export default function Interruptor({
-  titol, actiu, estat, descripcio, onCanvia, bloquejat = false, motiu, motiuActivar, ajuda, children,
+  titol, actiu, estat, descripcio, onCanvia, bloquejat = false, motiu, motiuActivar, motiuDesactivar,
+  etiquetaOn, etiquetaOff, ajuda, children,
 }: Props) {
   const { t } = useT()
   const toOff = estat?.toOff ?? 'aviso'
@@ -73,26 +79,28 @@ export default function Interruptor({
               <p className="text-sm text-muted-foreground">{descripcio}</p>
             ) : null}
 
-            <div className="inline-flex rounded-md border p-0.5">
+            <div className="inline-flex max-w-full flex-wrap rounded-md border p-0.5">
               <BotoAmbMotiu type="button" variant="ghost" size="sm"
                 disabled={bloquejat || (!!motiuActivar && !actiu)} motiu={motiu ?? motiuActivar}
                 onClick={() => onCanvia(true)}
                 className={cn('rounded px-4 font-medium disabled:opacity-60',
                   actiu ? 'bg-exito text-white hover:bg-exito hover:text-white' : 'text-muted-foreground hover:bg-muted')}>
-                {t('set.on')}
+                {etiquetaOn ?? t('set.on')}
               </BotoAmbMotiu>
-              <BotoAmbMotiu type="button" variant="ghost" size="sm" disabled={bloquejat} motiu={motiu}
+              <BotoAmbMotiu type="button" variant="ghost" size="sm"
+                disabled={bloquejat || (!!motiuDesactivar && !!actiu)} motiu={motiu ?? motiuDesactivar}
                 onClick={() => onCanvia(false)}
                 className={cn('rounded px-4 font-medium disabled:opacity-60',
                   !actiu
                     ? toOff === 'error' ? 'bg-error text-white hover:bg-error hover:text-white' : 'bg-aviso text-white hover:bg-aviso hover:text-white'
                     : 'text-muted-foreground hover:bg-muted')}>
-                {t('set.off')}
+                {etiquetaOff ?? t('set.off')}
               </BotoAmbMotiu>
             </div>
 
             {motiu && <p className="text-xs text-aviso">{motiu}</p>}
             {!motiu && motiuActivar && !actiu && <p className="text-xs text-aviso">{motiuActivar}</p>}
+            {!motiu && motiuDesactivar && actiu && <p className="text-xs text-aviso">{motiuDesactivar}</p>}
             {ajuda && <div className="text-xs text-muted-foreground">{ajuda}</div>}
             {children}
           </>

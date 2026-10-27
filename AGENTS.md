@@ -4266,9 +4266,10 @@ el mismo módulo del que el intake saca sus pasos. El alta llama a `POST /crear-
 Realtime ya cableado.
 
 Navegación anterior (barra superior de 6 secciones en `App.tsx`): retirada. **Configuració** (`Settings.tsx`)
-va **por pestañas desde el 27-10-2026** (submenú horizontal, `?tab=` como en Albarans): **General** (modo
-test, validación de ofertas, idioma), **Notificacions** (los tres interruptores de §8, las whitelists y
-«Com es decideix a qui s'envia»), **Fundació**, **Impacte** y **Diagnòstic**. ⚠️ El contenedor de las
+va **por pestañas desde el 27-10-2026** (submenú horizontal, `?tab=` como en Albarans): **General**
+(validación de ofertas, idioma), **Notificacions** (los tres interruptores de §8, el **modo test** como
+«Destinataris» —«Només usuaris de prova» / «Tots els usuaris»—, las whitelists y «Com es decideix a qui
+s'envia»), **Fundació**, **Impacte** y **Diagnòstic**. ⚠️ El contenedor de las
 pestañas lleva `min-w-0` (es hijo flex del `Tabs`): sin él, a 320 px se pasaba 4 px (medido). Antes
 reunía en una sola página el interruptor del **modo test** (§8), el de WhatsApp, el idioma, —desde el 21-09-2026— las
 **dades de la Fundació** (`DadesFundacio`, §12.10: es lo que desbloquea el certificado real) y
@@ -4954,7 +4955,7 @@ inexistente (`404`) → ventana/opt-in (`409`/`403`). Un destinatario existente 
 
 **Modo test global + gate `es_test`** — **fuente de verdad de la app** para permitir el envío,
 **independiente de la fase de Meta**. Un interruptor global, **`app_settings.test_mode`** (default
-`'true'`, editable desde **Configuración**, §6ter), decide si se aplica el gate: con el **modo test
+`'true'`, editable desde **Configuració › Notificacions** como «Destinataris», §6ter), decide si se aplica el gate: con el **modo test
 ACTIVADO** solo se envía a los usuarios `es_test`; **apagado**, a todos (producción). `es_test` (bool en
 `productores` y `entidades`, `20260723110000_es_test.sql`) marca quién puede recibir; se edita por ficha
 (CRUD) y decide los listados y los botones del panel. El gate vive en `_shared/gate.ts` (`modoTestActivo`,
@@ -4970,6 +4971,27 @@ Se arrancó con `test_mode='true'` y `es_test=true` a quienes ya estaban en las 
 
 ⚠️ `esEmailTest` mira **productores y entidades** (antes solo entidades): con el correo como canal por
 defecto (§8bis), mirar solo una tabla dejaba sin poder recibir nada a un productor de prueba sin WhatsApp.
+
+🔴 **Revisado entero el 27-10-2026, antes de una importación masiva de productores y receptoras.**
+- **Los quince puntos de envío aplican el gate**: `whatsapp-send`, `enviar-email`, `enviar-avis` (la
+  ficha `es_test`), el webhook, `intake-recordatorios`, `recollides-programades` (correo y WhatsApp),
+  `recordatorios-documentales` (enlaces y facturas), `generar-documento`/`reenviar-documento`
+  (`envia-document.ts`), la confirmación de oferta (`correu-oferta.ts`, también la del intake),
+  `enlace-publico` (código de firma y aviso de rechazo) y, transaccionales, `enviar-acceso` y
+  `recuperar-password` (`esCuentaPermitida`).
+- 🔴 **Y ahora también en las dos únicas puertas de salida**, como red para el envío que se olvide del
+  gate: `enviar()` (WhatsApp) y `sendEmail()` (correo) devuelven `ok:false` con `no_test_user` si el
+  modo test está activo y el destinatario no es `es_test`. Pasan el buzón del equipo (`bustiaEquip`) y
+  lo **transaccional** (`sendText(…, { transaccional: true })` del código de acceso,
+  `sendEmail(…, { transaccional: true })`), que filtra `esCuentaPermitida`.
+- 🔴 **Fallo cerrado ese día**: `esEmailTest` y `esCuentaPermitida` pasaban el correo a `ilike` sin
+  escapar, y el `_` vale por cualquier carácter: `joan_puig@x.cat` casaba con una ficha de prueba
+  `joan.puig@x.cat`, o sea que un correo real podía pasar por «de prueba». Ahora `patroLiteral()`.
+- **Insertar fichas no dispara nada**: los únicos triggers de `productores`/`entidades` son
+  organización, municipio y NIF. Ningún job actúa sobre una ficha sin ofertas, enlaces ni avisos.
+  `import-ara.ts` no escribe `es_test` ni `opt_in`, así que las fichas importadas nacen `false`.
+- **Abrir a todos** («Tots els usuaris») exige el general encendido y pide confirmar con la cifra de
+  fichas que no son de prueba (`fitxesNoProva()`); volver a «solo prueba» no pide nada.
 
 **Gate de cuenta** (`esCuentaPermitida`) — los correos de **acceso** y de **recuperación de contraseña**
 no van a un productor ni a un receptor, sino a alguien con credenciales de la plataforma, así que `es_test`
@@ -6504,8 +6526,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
-⚠️ **27-10-2026 (interruptores de notificaciones y RGPD): se abren la 142 y la 143**: **56 vivas**
-(aritmética) y la siguiente entrada nueva es la 144.
+⚠️ **27-10-2026 (interruptores de notificaciones y RGPD): se abren la 142, la 143 y la 144**: **57 vivas**
+(aritmética) y la siguiente entrada nueva es la 145.
 ⚠️ **17-10-2026 (la recogida la cierra el receptor): se abre la 141** (el bloqueo de 48 h ya no actúa
 sobre las recogidas nuevas, decisión de producto): **54 vivas** y la siguiente entrada nueva es la 142.
 ⚠️ **12-10-2026 (fases 8-11 de la revisión del 08-10-2026): se cerró la 130** (fase 8) **y se abre la
@@ -7084,6 +7106,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      El webhook sigue guardando los entrantes (§5), y Missatgeria desaparece con el canal (§8). Es lo
      pedido —«no deben aparecer los apartados»—, pero si alguien escribe mientras está apagado, el
      equipo solo lo verá al reactivarlo.
+144. **El trigger del NIF rechaza filas de la importación masiva** (27-10-2026, visto al revisar el
+     import). `productores_nif`/`entidades_nif` (fase 7, `20270421100000`) levantan `nif_invalid` y
+     `nif_en_us` al insertar, y `scripts/import-ara.ts` es anterior: un NIF mal escrito en el CSV, o el
+     mismo NIF en dos organizaciones, hace fallar esa fila. Revisar los CSV (o vaciar el NIF inválido
+     en el script) antes de importar.
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7266,7 +7293,8 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.418 pruebas en 60 ficheros** de Vitest: 1.417 correctas y **1 saltada a propósito**
+   Referencia: **1.429 pruebas en 60 ficheros** de Vitest: 1.428 correctas y **1 saltada a propósito**
+   (27-10-2026, el modo test en `enviar()` y `sendEmail()` y el comodín escapado; antes **1.418**)
    (27-10-2026, los interruptores de notificaciones y el RGPD: `tests/notificacions.test.ts` y
    `tests/registroValidacio.test.ts`; antes **1.392 en 58**)
    (17-10-2026, la validación del admin antes de emitir: `registreRecollida`, `procesOferta`, `pendentsEquip`, `seguentPas`;

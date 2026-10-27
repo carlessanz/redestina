@@ -1,47 +1,26 @@
-// Configuració › General: el modo test, la validación previa de ofertas y el idioma.
+// Configuració › General: la validación previa de ofertas y el idioma. (El modo test pasó a
+// Notificacions el 27-10-2026: decide a quién se envía, que es parte de las notificaciones.)
 
 import { useEffect, useState } from 'react'
-import { ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import type { Lang } from '../../lib/i18n'
 import { cn } from '../../lib/utils'
-import { getTestMode, getValidacioOfertes, setTestMode, setValidacioOfertes } from '../../lib/settings'
-import { useConfirma } from '../DialegConfirma'
+import { getValidacioOfertes, setValidacioOfertes } from '../../lib/settings'
 import Interruptor from './Interruptor'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
   const { t, lang, setLang } = useT()
-  const { confirma, dialeg } = useConfirma()
   // Escribir en `app_settings` exige `es_super_admin()`. Al resto del equipo se le deja
   // el interruptor gris CON el motivo, en vez de dejarle pulsar y que no se guarde nada.
   const motiu = potCanviar ? undefined : t('set.only_super')
-  const [testMode, setTest] = useState<boolean | null>(null)
   const [validacio, setValidacio] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
 
   useEffect(() => {
-    void getTestMode().then(setTest)
     void getValidacioOfertes().then(setValidacio)
   }, [])
-
-  async function cambiarTestMode(activo: boolean) {
-    if (activo === testMode || saving) return
-    // Apagarlo es sensible: pasa a enviarse a TODOS. Confirmación explícita.
-    if (!activo && !(await confirma({
-      titol: t('set.confirm_off_t'),
-      descripcio: t('set.confirm_off'),
-      confirmar: t('set.turn_off'),
-      destructiu: true,
-    }))) return
-    setSaving(true)
-    const error = await setTestMode(activo)
-    setSaving(false)
-    if (error) { toast.error(t(error)); return }
-    setTest(activo)
-    toast.success(activo ? t('set.saved_on') : t('set.saved_off'))
-  }
 
   /** El interruptor de validación previa de ofertas (05-10-2026). Sin confirmación: es reversible. */
   async function cambiarValidacio(activa: boolean) {
@@ -56,21 +35,8 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
 
   return (
     <div className="space-y-6">
-      {/* Modo test: la garantía de no enviar a usuarios que no sean de prueba. */}
-      <Interruptor
-        titol={t('set.test_mode')}
-        actiu={testMode}
-        estat={{
-          on: t('set.test_on'), onDesc: t('set.test_on_desc'),
-          off: t('set.test_off'), offDesc: t('set.test_off_desc'),
-          iconaOn: ShieldCheck, iconaOff: ShieldAlert, toOff: 'error',
-        }}
-        onCanvia={(a) => void cambiarTestMode(a)}
-        bloquejat={saving || !potCanviar}
-        motiu={motiu}
-        ajuda={t('set.test_help')}
-      />
-
+      {/* El modo test vive en la pestaña Notificacions desde el 27-10-2026: decide A QUIÉN se
+          envía, y es el tercer paso de «notificaciones → canal → destinatarios». */}
       {/* Validación previa de las ofertas que publica el productor (05-10-2026). */}
       <Interruptor
         titol={t('set.val_title')}
@@ -97,7 +63,6 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
         </CardContent>
       </Card>
 
-      {dialeg}
     </div>
   )
 }

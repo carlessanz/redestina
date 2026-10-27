@@ -14,7 +14,7 @@
 // prueba, solo la persona que lo recibe.
 
 import type { ClienteSupabase } from "./cliente.ts";
-import { canalsActius } from "./gate.ts";
+import { bustiaEquip, canalsActius, esEmailTest, modoTestActivo } from "./gate.ts";
 
 // Los secretos se leen DENTRO de las funciones, no en el cuerpo del módulo. Mismo motivo
 // que en `_shared/whatsapp.ts`: escrito como `const X = Deno.env.get(...)` a nivel de
@@ -226,7 +226,7 @@ export async function sendEmail(
   opcions: OpcionsEnviament = {},
 ): Promise<EmailResult> {
   if (!opcions.transaccional) {
-    const tall = await tallNotificacions(traza);
+    const tall = await tallNotificacions(traza, payload.to);
     if (tall) {
       console.warn(`[resend] correo no enviado a ${traza?.proposito ?? "?"}: ${tall}`);
       const r: EmailResult = { ok: false, status: 503, desactivado: true, data: { code: tall, error: tall } };
@@ -245,12 +245,22 @@ export async function sendEmail(
  * operativo que no se puede comprobar no sale.
  */
 async function tallNotificacions(
-  traza?: TrazaEnvio,
-): Promise<"notificacions_desactivades" | "email_desactivat" | null> {
+  traza: TrazaEnvio | undefined,
+  to: string,
+): Promise<"notificacions_desactivades" | "email_desactivat" | "no_test_user" | null> {
   if (!traza) return "notificacions_desactivades";
   const c = await canalsActius(traza.supabase);
   if (!c.notificacions) return "notificacions_desactivades";
   if (!c.email) return "email_desactivat";
+  // 🔴 EL MODO TEST, TAMBIÉN AQUÍ (27-10-2026): la misma red que en `enviar()` de WhatsApp.
+  //    Cada llamador ya lo comprueba antes; esto es lo que impide que un envío nuevo que se
+  //    olvide del gate escriba a todo el import. Pasan las fichas `es_test` y el buzón del
+  //    equipo (los avisos internos: firma de convenio, recordatorios, rechazos).
+  if (await modoTestActivo(traza.supabase)) {
+    const destino = to.trim().toLowerCase();
+    const equip = (await bustiaEquip(traza.supabase))?.toLowerCase() ?? null;
+    if (destino !== equip && !(await esEmailTest(traza.supabase, to.trim()))) return "no_test_user";
+  }
   return null;
 }
 

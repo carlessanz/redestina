@@ -183,7 +183,7 @@ export default function Dashboard() {
             <p className="text-sm font-medium text-aviso">{t('dash.test_banner')}</p>
           </div>
           <Link
-            to="/equip/configuracio"
+            to="/equip/configuracio?tab=notificacions"
             className="inline-flex min-h-11 shrink-0 items-center text-sm font-medium text-aviso underline md:min-h-0"
           >
             {t('dash.test_banner_cta')}

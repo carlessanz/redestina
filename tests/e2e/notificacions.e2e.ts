@@ -6,7 +6,8 @@ import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
 import { entra, motiuSaltClon, sql } from './ajuda'
 
-const encen = () => sql(`update app_settings set value = 'true' where key in ('notificacions_actives','email_activo','whatsapp_activo')`)
+// También `test_mode`: el estado seguro es «solo usuarios de prueba», y así se deja siempre.
+const encen = () => sql(`update app_settings set value = 'true' where key in ('notificacions_actives','email_activo','whatsapp_activo','test_mode')`)
 const valors = () => Object.fromEntries(
   sql(`select key || '=' || value from app_settings where key in ('notificacions_actives','email_activo','whatsapp_activo')`)
     .split('\n').map((l) => l.split('=')),
@@ -83,4 +84,29 @@ test('Configuració a 320 px: las pestañas scrollean solas y nada desborda', as
       && !['auto', 'scroll', 'hidden'].includes(getComputedStyle(e).overflowX))
     .map((e) => `${e.tagName}.${String(e.className).slice(0, 90)} ${e.scrollWidth}>${e.clientWidth} :: ${(e.textContent ?? '').slice(0, 40)}`))
   expect(desborden).toEqual([])
+})
+
+test('destinatarios: con el general apagado no se puede abrir a todos, y abrirlo pide confirmar', async ({ page }) => {
+  await entra(page, 'super_admin')
+  await page.goto('/equip/configuracio?tab=notificacions')
+  const dest = targeta(page, /Destinataris de les notificacions|Destinatarios de las notificaciones/)
+  await expect(dest).toBeVisible()
+  const tots = dest.getByRole('button', { name: /^Tots els usuaris$|^Todos los usuarios$/ })
+  // Con el general apagado, «Tots» queda gris.
+  sql(`update app_settings set value = 'false' where key in ('notificacions_actives','email_activo','whatsapp_activo')`)
+  await page.reload()
+  await expect(tots).toBeDisabled()
+  // Encendido: abrirlo a todos pide confirmación con la cifra; se cancela y sigue en prueba.
+  encen()
+  await page.reload()
+  await tots.click()
+  await expect(page.getByRole('dialog')).toContainText(/no són de prova|no son de prueba/)
+  await page.getByRole('dialog').getByRole('button', { name: /Cancel/ }).click()
+  expect(sql(`select value from app_settings where key = 'test_mode'`)).toBe('true')
+  // Y confirmado, se abre; volver a «solo prueba» no pide nada.
+  await tots.click()
+  await page.getByRole('dialog').getByRole('button', { name: /^Tots els usuaris$|^Todos los usuarios$/ }).click()
+  await expect.poll(() => sql(`select value from app_settings where key = 'test_mode'`)).toBe('false')
+  await dest.getByRole('button', { name: /^Només usuaris de prova$|^Solo usuarios de prueba$/ }).click()
+  await expect.poll(() => sql(`select value from app_settings where key = 'test_mode'`)).toBe('true')
 })

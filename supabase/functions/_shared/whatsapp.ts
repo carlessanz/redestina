@@ -17,7 +17,7 @@
 //
 // No cambia el comportamiento en Deno: el entorno del isolate no cambia durante su vida, asi
 // que da igual cuando se pregunte.
-import { whatsappActivo } from "./gate.ts";
+import { esTelefonoTest, modoTestActivo, whatsappActivo } from "./gate.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 
 function apiVersion(): string {
@@ -89,6 +89,7 @@ interface CuerpoGraph {
 async function enviar(
   supabase: ClienteSupabase,
   payload: Record<string, unknown>,
+  opciones: { transaccional?: boolean } = {},
 ): Promise<RespuestaMeta> {
   if (!(await whatsappActivo(supabase))) {
     const destino = payload.to ?? "?";
@@ -103,6 +104,25 @@ async function enviar(
         error: "WhatsApp està desactivat des de Configuració.",
       },
     };
+  }
+  // 🔴 EL MODO TEST, TAMBIÉN AQUÍ (27-10-2026). Cada llamador ya lo comprueba antes, pero
+  //    esta es la ÚNICA puerta hacia Meta: si mañana un envío nuevo se olvida del gate, con el
+  //    modo test activo seguirá sin salir a quien no sea `es_test`. Antes de una importación
+  //    masiva de productores y receptoras, una red que no dependa de que nadie se acuerde.
+  //    Lo transaccional (el código de acceso de `enviar-acceso`) lo filtra su propio gate
+  //    de cuenta, que deja pasar al equipo aunque su móvil no sea de ninguna ficha de prueba.
+  if (!opciones.transaccional && (await modoTestActivo(supabase))) {
+    const to = String(payload.to ?? "");
+    if (!to || !(await esTelefonoTest(supabase, to))) {
+      console.warn(`[mode_test] no s'envia a ${to || "?"}: no és usuari de prova`);
+      return {
+        ok: false,
+        status: 403,
+        waMessageId: null,
+        desactivado: true,
+        data: { code: "no_test_user", error: "Amb el mode test actiu només s'envia a usuaris de prova." },
+      };
+    }
   }
   if (!envioReal()) {
     // Modo PoC: no se contacta con Meta. Se devuelve una respuesta simulada para
@@ -212,9 +232,10 @@ export async function sendText(
    * acceso: `wa_messages` lo lee cualquier miembro del equipo desde Mensajería, así que
    * un código enviado tal cual quedaría publicado ahí.
    */
-  opciones?: { bodyConsola?: string },
+  opciones?: { bodyConsola?: string; transaccional?: boolean },
 ): Promise<RespuestaMeta> {
-  const r = await enviar(supabase, { to, type: "text", text: { body, preview_url: false } });
+  const r = await enviar(supabase, { to, type: "text", text: { body, preview_url: false } },
+    { transaccional: opciones?.transaccional });
   const cuerpo = opciones?.bodyConsola ?? body;
   if (r.ok) await registrarSaliente(supabase, to, "text", cuerpo, r.waMessageId, r.data);
   else if (!r.desactivado) await registrarFallo(supabase, to, "text", cuerpo, r);

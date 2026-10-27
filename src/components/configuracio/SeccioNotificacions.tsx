@@ -11,14 +11,15 @@
 // «¿y si apago esto, la gente podrá entrar?» es la primera que se hace quien lo pulsa.
 
 import { useEffect, useState } from 'react'
-import { Bell, BellOff, Mail, MailX, MessageCircle, MessageCircleOff } from 'lucide-react'
+import { Bell, BellOff, Mail, MailX, MessageCircle, MessageCircleOff, ShieldAlert, ShieldCheck } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { cn } from '../../lib/utils'
 import { useAppContext } from '../../hooks/useAppContext'
 import type { Canal, Canals } from '../../lib/canals'
 import {
-  fitxesSenseCorreuAmbTelefon, fitxesSenseTelefonAmbCorreu, fixarCanal, fixarNotificacions, getCanals,
+  fitxesNoProva, fitxesSenseCorreuAmbTelefon, fitxesSenseTelefonAmbCorreu, fixarCanal, fixarNotificacions,
+  getCanals, getTestMode, setTestMode,
 } from '../../lib/settings'
 import {
   anadirNumeroTest, borrarNumeroTest, listarNumerosTest, type MetaTestRecipient,
@@ -39,6 +40,8 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
   // Las listas de prueba las escribe `pot_aprovar()` (admin o super_admin).
   const motiuLlistes = (ctx?.potAprovar ?? false) ? undefined : t('wl.no_perm')
   const [canals, setCanals] = useState<Canals | null>(null)
+  // El tercer paso: A QUIÉN (27-10-2026; antes vivía en General). `true` = solo usuarios de prueba.
+  const [testMode, setTest] = useState<boolean | null>(null)
   const [saving, setSaving] = useState(false)
   // Las dos whitelists del entorno de pruebas (§4, §8): van aquí porque son la otra mitad
   // de «a quién y por dónde se envía».
@@ -47,6 +50,7 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
 
   useEffect(() => {
     void getCanals().then(setCanals)
+    void getTestMode().then(setTest)
     void listarNumerosTest().then(setLista)
     void listarEmailsTest().then(setListaEmail)
   }, [])
@@ -102,6 +106,32 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
       : (actiu ? 'set.mail_saved_on' : 'set.mail_saved_off')))
   }
 
+  /**
+   * Abrir el modo test a todos es la decisión más cara de esta pestaña (más aún tras una
+   * importación masiva): se cuenta antes cuántas fichas empezarían a recibir. Volver a «solo
+   * prueba» no pide confirmación: siempre es la dirección segura.
+   */
+  async function canviaTestMode(nomesProva: boolean) {
+    if (nomesProva === testMode || saving) return
+    if (!nomesProva) {
+      setSaving(true)
+      const n = await fitxesNoProva()
+      setSaving(false)
+      if (!(await confirma({
+        titol: t('set.confirm_off_t'),
+        descripcio: t('set.dest_confirm_all', { productors: n.productors, entitats: n.entitats }),
+        confirmar: t('set.dest_all'),
+        destructiu: true,
+      }))) return
+    }
+    setSaving(true)
+    const error = await setTestMode(nomesProva)
+    setTest(await getTestMode())
+    setSaving(false)
+    if (error) { toast.error(t(error)); return }
+    toast.success(nomesProva ? t('set.saved_on') : t('set.saved_off'))
+  }
+
   const bloquejat = saving || !potCanviar
   // Con el general apagado, encender un canal no se ofrece: la base lo rechazaría.
   const motiuCanal = canals && !canals.notificacions ? t('canal.motiu_notificacions') : undefined
@@ -150,6 +180,27 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
         motiu={motiu}
         motiuActivar={motiuCanal}
         ajuda={<p>{t('set.wa_help')}</p>}
+      />
+
+      {/* 3.º DESTINATARIOS: solo usuarios de prueba o todos, para los dos canales. Es lo que
+          permite probar las notificaciones antes de abrirlas a todo el mundo, y la garantía
+          de que una importación masiva no recibe nada. Abrirlo a todos exige el general
+          encendido; volver a «solo prueba» se puede siempre. */}
+      <Interruptor
+        titol={t('set.dest_title')}
+        actiu={testMode}
+        estat={{
+          on: t('set.test_on'), onDesc: t('set.test_on_desc'),
+          off: t('set.test_off'), offDesc: t('set.test_off_desc'),
+          iconaOn: ShieldCheck, iconaOff: ShieldAlert, toOff: 'error',
+        }}
+        etiquetaOn={t('set.dest_only_test')}
+        etiquetaOff={t('set.dest_all')}
+        onCanvia={(a) => void canviaTestMode(a)}
+        bloquejat={bloquejat}
+        motiu={motiu}
+        motiuDesactivar={motiuCanal}
+        ajuda={<p>{t('set.test_help')}</p>}
       />
 
       {/* Las listas de prueba: la segunda barrera técnica del entorno de test. */}
