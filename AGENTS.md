@@ -3606,6 +3606,11 @@ Lo que se cambió en las pantallas y la lógica del circuito; las migraciones, e
 
 ### El equipo gestiona el ciclo solo y avisa a mano (27-10-2026)
 
+✅ **Publicado el 27-10-2026** (`3907281`): las migraciones `20270430100000`…`100300`, seis funciones
+(`crear-oferta`, `enlace-publico`, `enviar-avis`, `generar-documento`, `recollides-programades` y
+`whatsapp-webhook`, las que empaquetan un módulo cambiado) y el frontend. El PDF de prueba sale (6 páginas,
+123.618 bytes) y el arnés da 1.556/1.556 contra producción.
+
 Plan en cinco fases (`docs/Plan gestió autònoma superadmin (2026-10-27).md`, fuera de git): con
 las notificaciones apagadas (§8), el super_admin lleva una oferta de punta a punta en nombre de
 las partes —convenio, interés, aprobación, recogida, albaranes— con **las mismas filas y los
@@ -6206,6 +6211,8 @@ crea Docker lleva «Redestina» en el nombre (`supabase_db_Redestina`, la red
   ficheros de los buckets, los 8 jobs, las políticas de Storage, las extensiones y el historial
   de migraciones (`scripts/local/recompte.ts comparar`: «Ninguna diferencia»);
 - el arnés de permisos: 1.052/1.052 y 26 sin datos, la misma cifra (§13).
+✅ **Refrescado el 27-10-2026** con un volcado de ese día (183 migraciones, tras publicar `3907281`): las 67
+tablas cuadran con producción y los ficheros se copiaron con `copiar-storage.ts`.
 
 **Qué es distinto a propósito**:
 - `app_config` **no se copia**: son los secretos de producción, y con ellos los jobs locales
@@ -7517,7 +7524,10 @@ se va solo **cómo se llegó hasta aquí**.
    `fixar_hora_recollida` y las dos internas—, seis en el bloque del técnico y dos permitidos al super_admin con
    un tipo o un uuid inventados). Contra el clon da **1.549/1.549 y 28 sin datos**.
    `20270430100300` añade uno más en `DOCUMENTAL_EXTERN` (`avisos_de_oferta` sobre una oferta ajena, vacío
-   = rechazo, ×7 cuentas). Con las fases 1-5 y el clon reconstruido da **1.558/1.558 y 26 sin datos**.
+   = rechazo, ×7 cuentas). Con las fases 1-5 y el clon reconstruido da **1.558/1.558 y 26 sin datos**, y
+   **contra producción, tras publicar `3907281`, 1.556/1.556 y 28 sin datos**: el mismo total (1.584), con
+   otros datos. Después el clon se recargó con un volcado de ese día (183 migraciones), así que ahora
+   coinciden.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin
