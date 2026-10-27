@@ -30,6 +30,10 @@ export interface Avis {
   params: Record<string, unknown>
   llegit_at: string | null
   created_at: string
+  /** Por dónde salió (`whatsapp`/`email`), `cap` si no salió (interruptores o gates), null si
+   *  todavía no se ha intentado. Desde la gestión autónoma la campana marca los que no salieron. */
+  canal_enviat: 'whatsapp' | 'email' | 'cap' | null
+  enviat_at: string | null
 }
 
 let avisos: Avis[] = []
@@ -43,7 +47,7 @@ export async function carregaAvisos(fitxes: string[]): Promise<void> {
   if (fitxes.length === 0) { avisos = []; avisa(); return }
   const { data, error } = await supabase
     .from('avisos')
-    .select('id, destinatari_tipo, destinatari_id, tipus, objecte_tipo, objecte_id, params, llegit_at, created_at')
+    .select('id, destinatari_tipo, destinatari_id, tipus, objecte_tipo, objecte_id, params, llegit_at, created_at, canal_enviat, enviat_at')
     .in('destinatari_id', fitxes)
     .order('created_at', { ascending: false })
     .limit(30)

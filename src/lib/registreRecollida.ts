@@ -163,3 +163,67 @@ export function clauErrorValidacio(missatge: string | null | undefined, codi: st
   for (const [c, clau] of ERRORS_VALIDACIO) if (m === c || m.includes(c)) return clau
   return null
 }
+
+// ---------------------------------------------------------------------------------------
+// El modo ASISTIDO (27-10-2026, gestión autónoma, fase 3): el equipo registra la recogida en
+// nombre de la receptora (`registrar_recollida_assistida()`) y la valida en la misma llamada.
+// El formulario es el MISMO que ve la receptora y la regla de los kilos también; cambia qué
+// se manda y qué rechazos puede haber.
+// ---------------------------------------------------------------------------------------
+
+/**
+ * Lo que va a la RPC asistida a partir del texto del formulario. Con diferencia, el motivo
+ * es a la vez lo que guarda el registro (`p_observacions`, como el motivo de la receptora) y
+ * el de la validación (`p_motiu`): un solo campo, porque es un solo hecho y teclearlo dos
+ * veces solo serviría para que dijeran cosas distintas. Sin diferencia, el texto es una
+ * observación y la validación no pide motivo.
+ */
+export function campsAssistit(e: Pick<EntradaRegistre, 'resultat' | 'observacions'>): {
+  observacions: string | null
+  motiu: string | null
+} {
+  const text = e.observacions.trim() || null
+  return e.resultat === 'coincideix'
+    ? { observacions: text, motiu: null }
+    : { observacions: text, motiu: text }
+}
+
+/**
+ * La validación del modo asistido: la misma que la de la receptora (`validaRegistre`) — con
+ * diferencia, el motivo es obligatorio también aquí (la base: `cal_motiu`).
+ */
+export function validaRegistreAssistit(e: EntradaRegistre): ErrorRegistre | null {
+  return validaRegistre(e)
+}
+
+/**
+ * Los rechazos de `registrar_recollida_assistida()` y `fixar_hora_recollida()`.
+ *
+ * ⚠️ El ORDEN importa (se busca por `includes()`): `cal_motiu_validacio` antes que
+ *    `cal_motiu`, y las dos antes que las listas del registro y de la validación, donde
+ *    `cal_motiu` significa otra cosa (el motivo de retornar).
+ */
+export const ERRORS_ASSISTIT: [string, string][] = [
+  ['cal_motiu_validacio', 'vrec.err_cal_motiu'],
+  ['cal_motiu', 'rrec.err_motiu'],
+  ['foto_aliena', 'rrec.err_foto_aliena'],
+  ['hora_passada', 'rrec.err_hora_passada'],
+  ['cal_hora', 'rrec.err_cal_hora'],
+  ['canalitzacio_inexistent', 'vrec.err_inexistent'],
+  ['ja_validada', 'vrec.err_ja_validada'],
+  ['albara_ja_confirmat', 'vrec.err_albara_ja_confirmat'],
+]
+
+export function clauErrorAssistit(missatge: string | null | undefined, codi: string | null | undefined): string | null {
+  if (codi === '42501') return 'recol.need_admin'
+  const m = missatge ?? ''
+  for (const [c, clau] of ERRORS_ASSISTIT) if (m === c || m.includes(c)) return clau
+  // Lo demás son los mismos rechazos que tiene la receptora al registrar.
+  return clauErrorBase(m, null)
+}
+
+/** Los rechazos de fijar la hora: los suyos y los del registro que comparte. */
+export function clauErrorHora(missatge: string | null | undefined, codi: string | null | undefined): string | null {
+  if (codi === '42501') return 'rrec.err_hora_permis'
+  return clauErrorAssistit(missatge, null)
+}

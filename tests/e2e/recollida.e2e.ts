@@ -10,9 +10,10 @@
 // Carles). Recorridos:
 //   1. El job de la hora de recogida ya no emite: deja los albaranes en borrador y avisa a
 //      la receptora (`recollida_per_registrar`, una sola vez). «Emet» está gris en el albarán.
-//   2. El equipo (admin) «Confirma la recollida» con 5 kg menos: emite los dos albaranes y
-//      concilia (la vía asistida, para una entidad sin panel). El PDF nuevo sale en UNA página
-//      (si las funciones locales están sirviendo).
+//   2. El equipo (admin), desde el ciclo guiado, «Registra la recollida (en nom de X)» con 5 kg
+//      menos: el mismo formulario que la receptora, que registra y valida en una llamada
+//      (`registrar_recollida_assistida`, 27-10-2026); emite los dos albaranes y concilia. El PDF
+//      nuevo sale en UNA página (si las funciones locales están sirviendo).
 //   3. La receptora registra «Coincideixen»: NO sale ningún número; queda pendiente de
 //      validación. El admin la valida desde Aprovacions y entonces salen REC y ENT, conciliados.
 //   4. La receptora registra «N'he recollit menys» con motivo: sin números. Validar sin motivo
@@ -67,7 +68,7 @@ test('a la hora de recogida ya no se emite nada: se pide el registro a la recept
   expect(sql(`select count(*) from avisos where tipus = 'recollida_per_registrar' and (params->>'excedente_id') = '${oferta1}'`)).toBe('1')
 })
 
-test('el equipo confirma la recogida con 5 kg menos y queda conciliada', async ({ page }) => {
+test('el equipo registra la recogida en nombre de la receptora con 5 kg menos y queda conciliada', async ({ page }) => {
   const ent = sql(`select id from albaranes where tipo = 'ENT' and excedente_id = '${oferta1}' and estado = 'borrador'`)
   expect(ent).toMatch(/^[0-9a-f-]{36}$/)
   await entra(page, 'super_admin')
@@ -75,13 +76,24 @@ test('el equipo confirma la recogida con 5 kg menos y queda conciliada', async (
   // Un borrador de una recogida no se emite desde aquí: lo emite la validación del admin.
   await expect(page.getByRole('button', { name: /^Emet$|^Emitir$|^Emite$/ }).first()).toBeDisabled()
   await expect(page.getByTestId('emet-per-validacio')).toBeVisible()
-  await page.getByRole('button', { name: /^Confirma la recollida$|^Confirma la recogida$/ }).first().click()
+  // El ciclo guiado: la fase de la recogida está abierta (le toca registrar).
+  await page.goto(`/equip/canalitzacio/${oferta1}`)
+  const entrega = page.getByTestId('entrega-canalitzacio').first()
+  await entrega.getByRole('button', { name: /Registra la recollida \(en nom de|Registra la recogida \(en nombre de/ }).click()
   const dlg = page.getByRole('dialog')
-  await dlg.getByLabel(/Quilos reals|Kilos reales/).fill('95')
-  await expect(dlg.getByText(/diferència -5 kg|diferencia -5 kg/)).toBeVisible()
-  await dlg.getByLabel(/Observacions|Observaciones/).fill('Una caixa en mal estat')
-  await dlg.getByRole('button', { name: /^Confirma$/ }).click()
-  await expect(page.getByText(/confirmada i conciliada|confirmada y conciliada/).first()).toBeVisible()
+  // Arriba, la ficha de la operación; debajo, el formulario de la receptora en modo asistido.
+  await expect(dlg.getByTestId('fitxa-operacio')).toBeVisible()
+  const form = dlg.getByTestId('registra-recollida')
+  await form.getByRole('radio', { name: /N’he recollit menys|He recogido menos/ }).click()
+  await form.getByLabel(/Quilos recollits|Kilos recogidos/).fill('95')
+  await expect(form.getByText(/diferència -5 kg|diferencia -5 kg/)).toBeVisible()
+  // Sin motivo no deja: con diferencia es obligatorio también para el equipo.
+  await form.getByRole('button', { name: /^Registra i valida$|^Registra y valida$/ }).click()
+  await expect(form.getByText(/és obligatori quan els quilos no coincideixen|es obligatorio cuando los kilos no coinciden/)).toBeVisible()
+  await form.getByLabel(/Motiu de la diferència|Motivo de la diferencia/).fill('Una caixa en mal estat')
+  await form.getByRole('button', { name: /^Registra i valida$|^Registra y valida$/ }).click()
+  await expect(page.getByText(/registrada, validada i conciliada|registrada, validada y conciliada/).first()).toBeVisible()
+  await expect(dlg.getByText(/ja està validada|ya está validada/)).toBeVisible()
 
   expect(sql(`select string_agg(tipo || ':' || estado, ',' order by tipo) from albaranes where excedente_id = '${oferta1}' and estado <> 'anulado'`))
     .toBe('ENT:conciliado,REC:conciliado')

@@ -583,6 +583,8 @@ src/
   hooks/use-mobile.ts          Hook del breakpoint (lo usa el sidebar de shadcn)
   hooks/useInstalacio.ts       ¿Se puede instalar la PWA, y cómo? (automática o manual iOS; §2)
   hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
+  hooks/useMissatgesOferta.ts  Los mensajes de una oferta (`missatgesOferta.ts` + `avisos_de_oferta()`); con
+                               `perspectiva` productor/entidad solo pide los avisos (§6ter, gestión autónoma)
   routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés»
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
                                Registre (/registre), RestablirClau (/restablir),
@@ -670,10 +672,11 @@ src/
                                exercici, donant
     canalitzacio.ts            Cliente de la pantalla guiada; nunca lanza, como albarans.ts
     passosCanalitzacio.ts      EL CICLO ENTERO de una canalización para la pantalla guiada
-                               del equipo: 21 pasos sobre las seis fases de FASES_EQUIP, con
-                               qué los bloquea (incluye `oferta_validar` y `ent_conciliar`, y
-                               venta/maquila sin REC que terminan en el CT). Puro, y con su
-                               propio test porque sus claves se componen (cobertura.test.ts no las ve)
+                               del equipo: 17 pasos sobre las seis fases de FASES_EQUIP (desde el
+                               27-10-2026; eran 21), con qué los bloquea. La recogida son cuatro:
+                               `recollida_hora`, `recollida_registrar`, `albarans` y `conciliar`,
+                               medidos por canalización viva. Puro, y con su propio test porque
+                               sus claves se componen (cobertura.test.ts no las ve)
     pendentsEquip.ts           La cola de trabajo del equipo (`pendents_equip()`) en un store
                                de módulo; alimenta los badges del menú Y el tablero (§6ter)
     conversioEspigolada.ts     Los siete rechazos de la conversión, traducidos POR SU CÓDIGO.
@@ -708,6 +711,7 @@ src/
                                oficial vuelto legible («l'Ametlla del Vallès»)
     crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
+    conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
                                línea, que es lo que WhatsApp conserva al pegar). Salió de OfferDetail
     missatgesOferta.ts         PURO: los mensajes del ciclo de una oferta para avisar a mano
@@ -721,7 +725,8 @@ src/
                                copiado TRES veces y una copia ya había divergido (sin icono y
                                sin reparto a partes iguales): dos botones distintos para la
                                misma elección en dos pantallas seguidas
-    BotoCopiar.tsx             El botón de copiar de toda la aplicación (icono ✓ y aviso «Copiat»)
+    BotoCopiar.tsx             El botón de copiar de toda la aplicación (icono ✓ y aviso «Copiat»);
+                               `onCopiat` para «Copia i marca com a enviada»
     MissatgeACopiar.tsx        Un mensaje del ciclo: a quién va, si salió, el WhatsApp y el correo
                                plegado; con `nomesLectura` para los paneles de ofertante y receptor
     DialegCorreu.tsx           «Envia un correu» desde una ficha o un listado; sustituye a la
@@ -803,6 +808,15 @@ src/
                                asistida (`mode`), patrón de FirmaConveni (§9)
     equip/DialegAltaAssistida.tsx  «Nova organització amb compte» (§9)
     AvisCorreuDesactivat.tsx   La banda de «el correu està apagat» en cierre y certificados (§8)
+    MissatgesDelPunt.tsx       Los mensajes de un paso (por fase y destinatario), en los tres paneles
+    CampsRecollida.tsx         Día y hora de recogida dentro de la franja: Mercat e interés asistido
+    equip/DialegConveniDeclarat.tsx  «Dona'l per vigent»: el convenio declarado (§4, gestión autónoma)
+    equip/FormulariInteresAssistit.tsx  «Registra l'interès» con las mismas guardas que el Mercat
+    equip/FormulariAprovacio.tsx  Aprobar o rechazar un interés: OfferDetail, Aprovacions y ciclo guiado
+    equip/DialegRegistraRecollida.tsx  La recogida en nombre de la receptora (o validarla), desde el ciclo y el albarán
+    equip/DialegConciliar.tsx  Conciliar un albarán; el mismo en AlbaraDetall y en la fase 5 del ciclo guiado
+    equip/fases/               Las seis fases del ciclo guiado (Conveni, Entrada, Distribucio, Aprovacio,
+                               Recollida, Tancament) y AccionsConveni, que comparten la 1 y la 4
 scripts/
   import-ara.ts                Importación idempotente de los 5 CSV maestros
   crear-usuario.ts             Alta de cuentas por la Admin API (no envía correos)
@@ -869,7 +883,7 @@ supabase/
     _shared/intake.ts          Motor conversacional (máquina de estados)
     _shared/oferta.ts          crearExcedente(): id_excedente; reexporta el texto de `textOferta.ts`
     _shared/textOferta.ts      HOJA: el texto "OFERTA DISPONIBLE" (`componerTextoOferta`, envasos, cajas)
-    _shared/textIntake.ts      HOJA: lo que contesta el bot al cerrar el intake
+    _shared/textIntake.ts      HOJA: lo que contesta el bot al cerrar el intake, y `de()` («d’Alvocat»)
     _shared/textRespostes.ts   HOJA: lo que contesta el bot a un interés (kg, precio, gracias, no)
     _shared/textOfertaRegistrada.ts  HOJA: el correo «oferta registrada» (y su texto plano)
     _shared/camposOferta.ts    Los 14 pasos, compartidos por el intake y el panel (§6bis)
@@ -2338,6 +2352,8 @@ funciones, no políticas:
 | `manifestar_interes_assistit(excedente, entidad, kg, preu, caixes)` (`20260921160749`) | El interés de una entidad conducido por el equipo (`canal='asistido'`). **Función nueva, no se relajó `manifestar_interes()`**: una sola función con dos regímenes de autorización es donde se esconde el fallo. Conserva las tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta, `modalitat_receptor_compat` y precio mínimo |
 | `comprova_interes(excedente, entidad, kg, preu, modalitat, recollida)` (`20270430100100`) | **Las guardas de un interés en un solo sitio** (estado, compatibilidad, `cal_modalitat`, `exigir_convenio`, `kg_maxim`, precio mínimo, `comprova_hora_recollida`). Interna (`security invoker`, sin EXECUTE). La comparten `manifestar_interes()` y `manifestar_interes_assistit()`, que desde `20270430100100` acepta además **`p_recollida`** (firma de 7 argumentos: la de 6 se borró) y tiene **las mismas comprobaciones que el receptor** salvo la pertenencia y el bloqueo de 48 h |
 | `registrar_envio_manual(excedente, entidad)` (`20270430100100`) | La oferta enviada **a mano** (el equipo copia el texto y lo pega en el WhatsApp de la entidad): fila `pendent` con **`canal = 'manual'`**, sin que salga nada. `es_intern()`. `22023 oferta_no_disponible` si no está `publicada`/`parcial`; `ja_resposta` si la entidad ya mostró interés o está aprobada (no se pisa). Reenviar sobre una rechazada la devuelve a `pendent` (mover `aprovacio` exige `pot_aprovar()`, trigger) |
+| `avisos_de_oferta(excedente)` (`20270430100300`) | Los avisos de una oferta, de sus respuestas y de sus canalizaciones en una llamada, para componer los mensajes de cada paso (`src/lib/missatgesOferta.ts`). **`security invoker` sin guarda de rol, a propósito**: la RLS de `avisos` ya da al equipo todo y a cada organización lo suyo, así que sirve a los tres paneles |
+| `avisos_sense_enviar_per_oferta()` (`20270430100300`) | Cuántos avisos de cada oferta **no salieron** (`canal_enviat = 'cap'`), en una llamada: la columna «Missatges per enviar» del índice del ciclo guiado. `security invoker`, como la anterior |
 | `canalitzacio_assistida(excedente)` · `canalitzacions_actives(limit)` (`20260921160920`) | Las lecturas de la pantalla guiada. ⚠️ Son `security definer`, así que **podrían** devolver lo que el GRANT por columnas protege: por eso **no leen `enlaces_token` en absoluto** —lo pendiente lo dice el estado del OBJETO (§6ter)—. Y devuelven **hechos, no el paso**: qué toca lo calcula `passosCanalitzacio.ts`, y calcularlo dos veces garantiza que diverjan |
 
 > 🔴 **EL CORTE ESTÁ ENCENDIDO desde el 16-09-2026**: `fecha_corte_convenios = 2026-09-16`,
@@ -3127,7 +3143,10 @@ Migraciones `20270418100000` (`albaran_datos` v2 y el neto del REC en la propues
   sale de la plantilla `REC` si existe; si no, un texto de trabajo marcado «provisional».
 - **`propuesta_conciliacion()`** cuenta lo que confirmó quien entrega (`kg_confirmados` del REC):
   antes lo ignoraba.
-- **«Confirma la recollida»** (`components/equip/DialegConfirmaRecollida.tsx`, en `AlbaraDetall` y
+- 🔁 **Sustituido el 27-10-2026** por «Registra la recollida en nom de l'entitat»
+  (`components/equip/DialegRegistraRecollida.tsx`, `registrar_recollida_assistida()`; §6ter, gestión
+  autónoma): `DialegConfirmaRecollida` ya no existe. Lo que sigue es histórico.
+  **«Confirma la recollida»** (`components/equip/DialegConfirmaRecollida.tsx`, en `AlbaraDetall` y
   en la fase 5 de la canalización guiada): kilos reales (con la diferencia frente a lo asignado),
   fecha y hora, observaciones y foto (se sube después como `foto_incidencia` del albarán ya
   emitido). Una llamada, `confirmar_recollida()` (§4bis). Avisa antes si el albarán aún es un
@@ -3585,7 +3604,7 @@ Lo que se cambió en las pantallas y la lógica del circuito; las migraciones, e
   `enlace-publico`, `registro` y `recordatorios-documentales`). 5 `eslint-disable` retirados y 9 de los 14
   `as unknown as` de `src/`.
 
-### El equipo gestiona el ciclo solo y avisa a mano (27-10-2026, en curso)
+### El equipo gestiona el ciclo solo y avisa a mano (27-10-2026)
 
 Plan en cinco fases (`docs/Plan gestió autònoma superadmin (2026-10-27).md`, fuera de git): con
 las notificaciones apagadas (§8), el super_admin lleva una oferta de punta a punta en nombre de
@@ -3599,13 +3618,46 @@ canalización y su estado.
   `avisos`, el texto exacto de `enviar-avis`; los demás, de los datos) y `MissatgeACopiar` los
   pinta. `OfferDetail` copia con `BotoCopiar`, y RECOLLIDA CONFIRMADA lleva ya la fecha (hora de
   Madrid) y los comentarios de las entregas vivas: salían en blanco.
-- 🟡 **Fases 1-3, capa de datos** (`20270430100000`…`100200`, §4bis): `declarar_conveni()` (convenio
+- ✅ **Fases 1-3, capa de datos** (`20270430100000`…`100200`, §4bis): `declarar_conveni()` (convenio
   vigente sin firma, con PDF que lo declara); `comprova_interes()` compartida por el interés del receptor y el
   asistido (que gana la hora de recogida) y `registrar_envio_manual()` (`canal = 'manual'`);
   `registrar_recollida_assistida()` (registrar + validar en una transacción, con el mismo código que el
   receptor) y `fixar_hora_recollida()`. `canalitzacio_assistida()` devuelve además el origen del convenio, el
-  interés con modalidad y hora, y el estado de la recogida. Faltan las pantallas.
-- ⬜ Fase 4, mensajes en los tres paneles.
+  interés con modalidad y hora, y el estado de la recogida. `tests/e2e/paritat-assistida.e2e.ts` compara, sobre
+  dos ofertas gemelas, el camino propio y el asistido: mismas filas, mismos albaranes y líneas, y solo cambia
+  quién lo hizo.
+- ✅ **Fase 1, pantallas**: «Dona'l per vigent» (`components/equip/DialegConveniDeclarat`, molde de
+  `DialegConveniPaper`) en la ficha (`DocumentacioOrganitzacio`), en `ConveniDetall` (solo `col_*`), en las fases
+  1 y 4 del ciclo guiado y como acción del aviso de después del alta asistida. Precarga quién firma del último
+  convenio con firmante (o la persona de contacto) y avisa antes si faltan NIF o domicilio; los rechazos, por su
+  código (`src/lib/conveniDeclarat.ts`, con prueba). `BadgeConveni` lo pinta verde con «declarat (sense
+  signatura)»; en el panel externo, `LlistaConvenis` ofrece al titular «Signa’l electrònicament».
+- ✅ **Fase 2, pantallas**: `components/equip/FormulariInteresAssistit` (entidad, kilos, modalidad entre las
+  compatibles, precio si es venta o maquila, `components/CampsRecollida` —día y hora dentro de la franja, el mismo
+  del Mercat— y cajas) en el ciclo guiado y en `OfferDetail`; `components/equip/FormulariAprovacio` en
+  `OfferDetail`, `Aprovacions` y el ciclo guiado; y «Copia i marca com a enviada» por entidad. 🔴 **Se retiraron
+  los tres atajos de `OfferDetail`** que rompían la paridad (deuda 109): marcar una respuesta «acceptada» a mano,
+  el alta directa de canalizaciones y teclear los kilos reales. Lo aprobado se enseña con `kg_aprovats`.
+- ✅ **Fase 4, mensajes en los tres paneles**: `hooks/useMissatgesOferta` (con `avisos_de_oferta()`) y
+  `components/MissatgesDelPunt`. En `OfferDetail`, «Missatges de l’oferta (n)», plegado salvo que alguno no haya
+  salido, con «Copia el WhatsApp» y el correo plegado. En el panel del ofertante (detalle de su oferta) y de la
+  receptora (ficha de la operación y diálogo del interés), **solo los avisos y solo en lectura** («El que t’hem
+  dit»): el `texto_oferta` lleva «PRODUCTOR: …» (D3) y el agradecimiento del alta el código `E-…`, que ellos no
+  ven, así que el hook ni los pide fuera del equipo (`perspectiva`). La campana marca en ámbar los avisos que no
+  salieron (`canal_enviat = 'cap'`). `tests/e2e/missatges.e2e.ts` lo recorre con las notificaciones apagadas.
+- ✅ **Fases 3 y 5, la recogida y el ciclo guiado sin enlaces**: «Registra la recollida (en nom de X)»
+  (`components/equip/DialegRegistraRecollida`) monta la ficha de la operación y el MISMO `RegistraRecollida` de
+  la receptora con `mode="assistit"` (motivo obligatorio con diferencia, foto opcional que se sube después
+  sobre el albarán emitido, «Registra i valida»), que llama a `registrar_recollida_assistida()`; si la receptora
+  ya registró, lo que se abre es validarla. Sale en la fase 5 del ciclo guiado y en `AlbaraDetall` («Registra la
+  recollida en nom de l'entitat» / «Valida la recollida»), que además ya no borra `kg_previstos`, `familia` ni
+  `causa` al editar líneas. `DialegConfirmaRecollida` se retiró, y `confirmarRecollida` de `albarans.ts` con él
+  (la RPC se queda como envoltorio). La escalera pasa a 17 pasos y el ciclo guiado se partió en
+  `components/equip/fases/` (§6ter, «La canalización asistida»); el índice gana la columna «Missatges per
+  enviar» (`avisos_sense_enviar_per_oferta()`). `tests/e2e/recollida.e2e.ts` registra desde el ciclo guiado y
+  `tests/e2e/gestio-autonoma.e2e.ts` recorre el convenio declarado y el interés desde las pantallas.
+- De paso: el agradecimiento del alta y los avisos en catalán apostrofan el producto («d’Alvocat»): decían «de
+  Alvocat». `de()` vive ahora en `_shared/textIntake.ts` (hoja) y `intake.ts` la reexporta.
 
 ### La meva organització con listas cerradas (27-09-2026)
 
@@ -3846,6 +3898,14 @@ ese día no lo hacía, y esta frase decía que sí. Ver «Envío de documentos p
 puerta a los tres actos que no la tenían, que quedaran registrados como **asistidos** y no como
 otra cosa, y orquestarlo para que el atajo deje de ser el camino cómodo.
 
+🔁 **Desde el 27-10-2026 son 17 pasos, y las fases 2, 3, 5 y 6 ya no mandan a otra pantalla**
+(gestión autónoma, fases 3 y 5 del plan; ver la sección «El equipo gestiona el ciclo solo» más
+abajo). La pantalla es solo el orquestador (`CanalitzacioDetall`, 269 líneas: carga, escalera y
+punto) y cada fase vive en `components/equip/fases/` con sus acciones y su `MissatgesDelPunt`.
+⚠️ **Al recargar tras una acción se congela qué fase está abierta**: una fase sin paso pendiente
+se pliega sola, y plegarse desmontaba el diálogo que el equipo tenía abierto dentro, con su
+resultado. Lo que sigue en esta sección describe la escalera de 21 pasos y las fases de antes.
+
 **Seis fases, 21 pasos** (07-10-2026; eran 19). La escalera reutiliza `FASES_EQUIP` (`procesOferta.ts`) —`conveni ·
 entrada · distribucio · aprovacio · lliurament · tancament`— en vez de inventar un segundo
 vocabulario para el mismo proceso. Los pasos y lo que los bloquea viven en
@@ -3872,9 +3932,19 @@ cierre del ejercicio con desempate determinista (`calculado_at desc nulls last, 
 | **5 · lliurament** | `marcar_entregado` y la **confirmación asistida** (diálogo). Emitir y conciliar enlazan a `AlbaraDetall` |
 | **6 · tancament** | Enlaces a Costos y Tancament, y el certificado **explicado como bloqueado** |
 
-⚠️ **Lo que NO se hace aquí es deliberado.** Emitir un albarán con sus líneas, conciliar y el
-cierre anual tienen sus pantallas con sus editores; esta enlaza a ellas. Un segundo editor de
-líneas es un segundo sitio donde el número de kilos puede acabar siendo otro.
+🔁 **La tabla es la del 21-09-2026.** Desde el 27-10-2026: la fase 2 valida la oferta y la convierte en
+espigolada ahí mismo; la 3 lleva el texto para copiar y las diez primeras entidades con «Copia i marca
+com a enviada»; la 4, `FormulariInteresAssistit` y `FormulariAprovacio`, más «Dona'l per vigent»; la 5,
+la hora (`fixar_hora_recollida()`), «Registra la recollida (en nom de X)» (`DialegRegistraRecollida`: la
+ficha de la operación y el MISMO `RegistraRecollida` de la receptora en modo asistido, o validar si ella
+ya registró), los albaranes que salen solos y «Concilia» (`DialegConciliar`, extraído de `AlbaraDetall`);
+y la 6, el coste de referencia y el destino final (`DestiFinal`). Solo el cierre anual sigue en su
+pantalla: es del ejercicio, no del lote.
+
+⚠️ **Lo que NO se hace aquí es deliberado.** Emitir un albarán con sus líneas y el cierre anual
+tienen sus pantallas con sus editores; esta enlaza a ellas. Un segundo editor de líneas es un segundo
+sitio donde el número de kilos puede acabar siendo otro. 🔁 Conciliar sí se hace aquí desde el
+27-10-2026, con el mismo diálogo (`DialegConciliar`) que la ficha del albarán.
 
 ⚠️ **El certificado REAL está bloqueado, y no por código.** `emitir_certificado()` se niega
 mientras `parametros_documentales.datos_provisionales` sea `true`, y hoy lo es: es material de
@@ -6171,6 +6241,19 @@ npm run dev:local
 eval "$(bash scripts/local/entorno-local.sh)"; deno run -A --node-modules-dir=none scripts/comprobar-rls.ts
 ```
 
+🔴 **El volcado tiene que ser de las mismas migraciones que el clon** (27-10-2026). `cargar-local.sh`
+vacía `public` entero antes de cargar, así que con un volcado más viejo que el esquema se lleva también lo
+que sembraron las migraciones posteriores (la matriz de convenios, las plantillas `col_*`, los catálogos de
+destinos, actividades e impacto, el cuestionario v2…) y el volcado no lo repone: queda el esquema de hoy con
+los datos de antes. Pasó ese día (volcado del 07-10, 160 migraciones, sobre 183). Desde entonces el script se
+niega si el volcado tiene menos migraciones que el clon; lo que toca es **volcar producción otra vez**
+(`volcar-produccion.sh`, en la sesión del token). Si ya ha pasado, se arregla volviendo a pasar las
+migraciones posteriores con `psql` sentencia a sentencia, sin `ON_ERROR_STOP` (lo que ya existe falla y
+sigue; las siembras y los rellenos vuelven), que es como se recuperó: 28 errores, todos de «ya existe».
+⚠️ **Y el servidor de funciones del clon se cae por memoria** (`exit 137`) cuando se generan varios PDF a la
+vez: si las E2E empiezan a fallar en lo que llama a una función, mirar `scripts/data/funciones-local.log` y
+volver a lanzar `funciones-local.sh`.
+
 ⚠️ **Probar una migración nueva**: `supabase migration up` (sin `--linked`) la aplica al clon; y
 `supabase db reset` (sin `--linked`) reconstruye el clon desde cero, después de lo cual hay que
 repetir los pasos 4 y 5. **Nunca `--linked`** con `db reset`: el repo está enlazado a producción.
@@ -6307,7 +6390,7 @@ SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run
 # (`docker exec … psql` como `postgres`). Si Playwright pide un navegador que no está
 # descargado, `PW_CHROMIUM_PATH` apunta a uno de la caché (`~/Library/Caches/ms-playwright`).
 # Tras una tanda que consuma numeración legal, `scripts/local/cargar-local.sh` deja el clon
-# como producción. Hoy: `desti-final.e2e.ts` (fase 1), `vocabulari.e2e.ts` (fase 0) y `operacio.e2e.ts`
+# como producción — con un volcado AL DÍA: con uno más viejo que las migraciones se niega (§11). Hoy: `desti-final.e2e.ts` (fase 1), `vocabulari.e2e.ts` (fase 0) y `operacio.e2e.ts`
 # (fase 2). La tanda completa (`E2E_CLON=1 E2E_ESCRIU=1 npx playwright test`, 12-10-2026) son 96 pruebas:
 # las de las fases 0-11 más `retocs.e2e.ts` (lectura, vale también en producción) y `foto-oferta.e2e.ts`
 # (la foto de la oferta en WhatsApp y correo, con el envío SIMULADO: prueba el camino, no la entrega;
@@ -6582,6 +6665,9 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **27-10-2026 (gestión autónoma): se abre la 145** (el reinicio del cierre de prueba deja la serie en 0
+con documentos vivos) y la 109 queda a medias (la pantalla ya no tiene atajos; los GRANT siguen): **58 vivas**
+(aritmética) y la siguiente entrada nueva es la 146.
 ⚠️ **27-10-2026 (interruptores de notificaciones y RGPD): se abren la 142, la 143 y la 144**: **57 vivas**
 (aritmética) y la siguiente entrada nueva es la 145.
 ⚠️ **17-10-2026 (la recogida la cierra el receptor): se abre la 141** (el bloqueo de 48 h ya no actúa
@@ -6987,6 +7073,13 @@ panel del equipo y en el externo).
      listado de los que pasaron por el circuito. Cerrarlo es revocar esos GRANT y reescribir `OfferDetail` y
      `Aprovacions` para que pasen por RPC: ~2 días. ⚠️ Mientras tanto, «se generan los mismos
      documentos» es una frase con condición, y así hay que decirla.
+     🟡 **Desde el 27-10-2026 (gestión autónoma, fase 2) la PANTALLA ya no ofrece ningún atajo**:
+     `marcarRespuesta`, el alta directa de canalizaciones y `guardarKgReales` se retiraron de
+     `OfferDetail`, sustituidos por el interés asistido, `FormulariAprovacio` y la recogida asistida, que
+     pasan por las mismas RPC que la organización (`tests/e2e/paritat-assistida.e2e.ts` lo compara fila a
+     fila). Quedan dos escrituras directas que no rompen la paridad —registrar el envío por WhatsApp o
+     correo (`registrarEnvio`) y rechazar un interés (`rebutjarResposta`)— y, sobre todo, **los GRANT**:
+     cualquier cuenta del equipo puede seguir escribiendo esas tablas por la API. Eso es la 132.
 
 110. **El arnés se quedó sin ninguna cuenta que ejercite el aislamiento del doble rol**
      (21-09-2026, `scripts/escenari-demo.ts`, §9). Decisión de producto: cada cuenta de
@@ -7167,6 +7260,13 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `nif_en_us` al insertar, y `scripts/import-ara.ts` es anterior: un NIF mal escrito en el CSV, o el
      mismo NIF en dos organizaciones, hace fallar esa fila. Revisar los CSV (o vaciar el NIF inválido
      en el script) antes de importar.
+145. **`reiniciar_cierre_prueba(cierre)` pone a 0 las series `P-RES`/`P-CD` del año aunque OTRO cierre de
+     prueba del mismo ejercicio conserve sus documentos** (`20270322100000`). Borra los documentos de ESE cierre
+     y deja el contador a cero, así que la siguiente emisión en el otro cierre pide `P-CD-2026-0001` otra vez y
+     muere con `23505 documentos_numero_version_uidx`. Pasa en producción: hay dos cierres de prueba de 2026
+     (`42e45d82…`, con `P-CD-2026-0001` emitido el 21-09, y `a4723ddf…`) y la serie está a 0. Lo destapó
+     `tests/e2e/certificats.e2e.ts` el 27-10-2026 al recargar el clon. Arreglo: reiniciar al máximo número
+     que siga existiendo en esa serie y año, no a 0 (es solo de prueba: no toca nada fiscal).
 ## 12bis. Decisiones con precio conocido, y lo que espera a otro
 
 Índice de las entradas **vivas** de §12 que **no son defectos pendientes**: **45 de las 53** (aritmética del 11-10-2026: la 106, que era una decisión, se cerró con la fase 1 de la revisión del 08-10-2026; no recontado). Se quedan
@@ -7196,7 +7296,7 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 91 | Las «últimas 9 cifras» están triplicadas (TS + dos migraciones) | SQL no puede importar TypeScript. Unificarlo exigiría una RPC, y entonces `coincidencies.ts` dejaría de ser probable desde Vitest. Con ~450 fichas no hay problema de rendimiento |
 | 83 | `albaran_rec_id` guarda el OPE en las líneas de transacción | Renombrarlo obligaría a reescribir también el circuito de donaciones |
 | 98 | `nav.entity_documents` dice «Documents», igual que el menú del equipo | Son claves distintas y `cobertura.test.ts` lo permite; el texto solo coincidiría en una cuenta con panel de equipo **y** de receptor, que hoy no existe |
-| 109 | La pantalla guiada llama a las RPC reales, pero los atajos de `OfferDetail` siguen abiertos | «Salen los mismos documentos» es cierto **cuando se usa la pantalla**. Cerrarlo es revocar GRANT y reescribir dos pantallas: ~2 días |
+| 109 | La pantalla guiada llama a las RPC reales; los atajos de `OfferDetail` se retiraron el 27-10-2026, pero los GRANT siguen | «Salen los mismos documentos» es cierto **desde cualquier pantalla**; por la API, no. Cerrarlo es revocar GRANT (la 132) |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
 | 113 | Una línea del CR = una canalización, con un solo producto | El **total es exacto**; lo que se reparte mal es la atribución por producto. La alternativa rompe la clave única que comparten las tres tablas de cierre |
 | 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
@@ -7349,9 +7449,10 @@ se va solo **cómo se llegó hasta aquí**.
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.477 pruebas en 62 ficheros** de Vitest: 1.476 correctas y **1 saltada a propósito**
-   (27-10-2026, los mensajes para avisar a mano: `tests/puresa.test.ts` y `tests/missatgesOferta.test.ts`;
-   antes **1.429 en 60**)
+   Referencia: **1.530 pruebas en 63 ficheros** de Vitest: 1.529 correctas y **1 saltada a propósito**
+   (27-10-2026, gestión autónoma: el convenio declarado, la escalera de 17 pasos, la recogida asistida y el
+   apóstrofo de los avisos; antes **1.477 en 62**, con los mensajes para avisar a mano —`tests/puresa.test.ts`
+   y `tests/missatgesOferta.test.ts`—, y antes **1.429 en 60**)
    (27-10-2026, el modo test en `enviar()` y `sendEmail()` y el comodín escapado; antes **1.418**)
    (27-10-2026, los interruptores de notificaciones y el RGPD: `tests/notificacions.test.ts` y
    `tests/registroValidacio.test.ts`; antes **1.392 en 58**)
@@ -7415,6 +7516,8 @@ se va solo **cómo se llegó hasta aquí**.
    cuentas externas —`declarar_conveni`, `registrar_envio_manual`, `registrar_recollida_assistida`,
    `fixar_hora_recollida` y las dos internas—, seis en el bloque del técnico y dos permitidos al super_admin con
    un tipo o un uuid inventados). Contra el clon da **1.549/1.549 y 28 sin datos**.
+   `20270430100300` añade uno más en `DOCUMENTAL_EXTERN` (`avisos_de_oferta` sobre una oferta ajena, vacío
+   = rechazo, ×7 cuentas). Con las fases 1-5 y el clon reconstruido da **1.558/1.558 y 26 sin datos**.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin

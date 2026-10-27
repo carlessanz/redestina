@@ -78,3 +78,25 @@ describe('localDateTime (rebanada 3)', () => {
     expect(new Date(v).toISOString()).toBe('2026-10-07T08:30:00.000Z')
   })
 })
+
+describe('horesDins e isoRecollida (interés asistido, 27-10-2026)', () => {
+  it('sin franja, de 06:00 a 22:45 por cuartos', () => {
+    const h = web.horesDins(null, null)
+    expect(h[0]).toBe('06:00')
+    expect(h.at(-1)).toBe('22:45')
+    expect(h).toHaveLength(17 * 4)
+  })
+  it('con franja, solo lo de dentro, extremos incluidos', () => {
+    expect(web.horesDins('09:00:00', '10:00:00')).toEqual(['09:00', '09:15', '09:30', '09:45', '10:00'])
+  })
+  it('isoRecollida: sin día u hora, null', () => {
+    expect(web.isoRecollida('', '09:00')).toBeNull()
+    expect(web.isoRecollida('2026-10-30', '')).toBeNull()
+    expect(web.isoRecollida('no', '09:00')).toBeNull()
+  })
+  it('isoRecollida: hora local, la misma que componía el Mercat', () => {
+    expect(web.isoRecollida('2026-10-30', '09:15')).toBe(new Date('2026-10-30T09:15:00').toISOString())
+    // Ida y vuelta con el campo de la aprobación (`datetime-local`).
+    expect(web.localDateTime(web.isoRecollida('2026-10-30', '09:15'))).toBe('2026-10-30T09:15')
+  })
+})

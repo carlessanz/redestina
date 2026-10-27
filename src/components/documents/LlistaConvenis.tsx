@@ -9,7 +9,9 @@
 //
 // Ni una columna de dinero: un convenio no lleva importes, y esto lo ven las dos partes.
 
+import { useState } from 'react'
 import { useT } from '../../lib/i18n'
+import DialegFirmaConveni from '../DialegFirmaConveni'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { estilEstatConveni } from '../../lib/convenis'
 import { docVigent } from '../../lib/documentsPanell'
@@ -37,14 +39,28 @@ type DocFila = Pick<
   'id' | 'objeto_id' | 'objeto_tipo' | 'tipo' | 'subtipo' | 'numero_completo' | 'estado' | 'vigente' | 'ejercicio'
 >
 
+/**
+ * Firmar de verdad un convenio que el equipo dio por vigente sin firma (gestión autónoma,
+ * fase 1). Solo el titular, como cualquier firma desde el panel (`soc_titular()`).
+ */
+export interface SignarDeclarat {
+  tipusOrg: 'productor' | 'entidad'
+  orgId: string
+  titular: boolean
+  /** Tras firmar: la pantalla relee sus convenios. */
+  onFirmat?: () => void
+}
+
 export default function LlistaConvenis({
-  files, docs, descarregador,
+  files, docs, descarregador, signar,
 }: {
   files: ConveniFila[]
   docs: DocFila[]
   descarregador: ReturnType<typeof useDescarregaDocument>
+  signar?: SignarDeclarat
 }) {
   const { t } = useT()
+  const [dlgFirma, setDlgFirma] = useState(false)
 
   return (
     <Card>
@@ -78,6 +94,9 @@ export default function LlistaConvenis({
                     // papel) ni PDF de Redestina, a propósito (§4). Lo que acredita es el
                     // escaneado, que está en «Documentació aportada per l'equip».
                     const paper = c.origen === 'paper'
+                    // Declarado por el equipo, sin firma: es vigente (verde) y lo dice. El
+                    // titular lo puede firmar de verdad; la contrafirma lo sustituirá.
+                    const declarat = c.origen === 'declarat' && c.estado === 'vigent'
                     return (
                       <TableRow key={c.id}>
                         <TableCell className="font-medium">{t(`sig.model_${c.tipo}`)}</TableCell>
@@ -94,6 +113,11 @@ export default function LlistaConvenis({
                                 {t('mydoc.conv_provisional')}
                               </span>
                             )}
+                            {declarat && (
+                              <span className="text-xs text-muted-foreground">
+                                {t('conv.origen_declarat')}
+                              </span>
+                            )}
                           </div>
                         </TableCell>
                         <TableCell className="whitespace-nowrap text-muted-foreground">
@@ -102,7 +126,16 @@ export default function LlistaConvenis({
                         <TableCell>
                           {/* Leer el convenio es lo habitual —lo que hay que consultar es
                               qué se firmó—, así que «Veure» va delante. */}
-                          <div className="flex justify-end gap-2">
+                          <div className="flex flex-wrap justify-end gap-2">
+                            {declarat && signar?.titular && (
+                              <Button
+                                size="sm"
+                                className="h-11 whitespace-normal md:h-8"
+                                onClick={() => setDlgFirma(true)}
+                              >
+                                {t('mydoc.conv_signa_declarat')}
+                              </Button>
+                            )}
                             {doc
                               ? (
                                 <>
@@ -149,6 +182,17 @@ export default function LlistaConvenis({
             </div>
           )}
       </CardContent>
+      {/* SIN `conveniId`: va por `signar_conveni_propi()`, que prepara el de col·laboració de
+          su papel y deja firmar encima de un declarado (no cuenta en `conveni_cobreix_tot`). */}
+      {signar && (
+        <DialegFirmaConveni
+          obert={dlgFirma}
+          tipusOrg={signar.tipusOrg}
+          orgId={signar.orgId}
+          onTancar={() => setDlgFirma(false)}
+          onFirmat={() => { setDlgFirma(false); signar.onFirmat?.() }}
+        />
+      )}
     </Card>
   )
 }

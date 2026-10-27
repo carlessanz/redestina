@@ -18,6 +18,9 @@ import { carregaContraparts, marcaLlegits, useAvisos } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
 import LiniesSortida from '../../components/LiniesSortida'
 import FitxaOperacio from '../../components/FitxaOperacio'
+import MissatgesDelPunt from '../../components/MissatgesDelPunt'
+import BotoCopiar from '../../components/BotoCopiar'
+import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useCallback, useEffect, useState } from 'react'
 import { useLocation, useNavigate, useParams } from 'react-router'
@@ -143,6 +146,11 @@ export default function ProductorOfertaDetall() {
     })
   }, [canalitzacions, id])
   const [editant, setEditant] = useState(false)
+  // Lo que la plataforma le dijo sobre esta oferta (gestión autónoma, fase 4): el texto
+  // íntegro de los avisos que le dirigió, hayan salido o no. Solo lectura.
+  const { missatges } = useMissatgesOferta(
+    id, `${oferta?.estado ?? ''}|${canalitzacions.map((c) => c.estado).join(',')}`, 'productor',
+  )
 
   // El motivo se pide con diálogo propio, nunca con `window.prompt` (deuda §12.35): este es
   // el panel del productor, o sea el público con más probabilidad de abrirlo desde el
@@ -264,6 +272,7 @@ export default function ProductorOfertaDetall() {
         />
       </div>
       <QueTocaAra punt={punt} />
+      <MissatgesDelPunt missatges={missatges} destinatari="productor" nomesLectura nomesAvisos />
 
       {/* --- Qué ha pasado con el producto (fase 1 de la revisión del 08-10-2026). Va
               justo debajo de «què toca» porque, cuando falta, es justo eso lo que toca. --- */}
@@ -305,6 +314,8 @@ export default function ProductorOfertaDetall() {
             <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-sm">
               {oferta.texto_oferta}
             </pre>
+            {/* El texto es suyo: lo puede pasar a su propio grupo o a quien quiera. */}
+            <BotoCopiar text={oferta.texto_oferta} className="mt-2 w-full sm:w-auto" />
           </CardContent>
         </Card>
       )}

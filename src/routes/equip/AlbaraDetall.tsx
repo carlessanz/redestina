@@ -45,7 +45,8 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import DialegAssistit from '../../components/equip/DialegAssistit'
-import DialegConfirmaRecollida from '../../components/equip/DialegConfirmaRecollida'
+import DialegRegistraRecollida from '../../components/equip/DialegRegistraRecollida'
+import DialegConciliar from '../../components/equip/DialegConciliar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -70,6 +71,11 @@ interface LiniaForm {
   tara_kg: string
   kg_neto: string
   lote_origen: string
+  // Lo que el editor no enseña pero la línea ya tenía: lo que se aprobó (`kg_previstos`) y de
+  // dónde viene el producto. Sin llevarlos de vuelta, emitir o rectificar los dejaba en null.
+  kg_previstos: string
+  familia: string
+  causa: string
 }
 
 interface DocFila {
@@ -125,6 +131,7 @@ interface IncidenciaFila extends IncidenciaDiferencia {
 const BUIDA: LiniaForm = {
   id: null, producto: '', variedad: '', num_cajas: '', tipo_caja: '',
   kg_bruto: '', tara_kg: '', kg_neto: '', lote_origen: '',
+  kg_previstos: '', familia: '', causa: '',
 }
 
 function aForm(l: AlbaranLinea): LiniaForm {
@@ -138,6 +145,9 @@ function aForm(l: AlbaranLinea): LiniaForm {
     tara_kg: l.tara_kg != null ? String(l.tara_kg) : '',
     kg_neto: l.kg_neto != null ? String(l.kg_neto) : (l.kg_previstos != null ? String(l.kg_previstos) : ''),
     lote_origen: l.lote_origen ?? '',
+    kg_previstos: l.kg_previstos != null ? String(l.kg_previstos) : '',
+    familia: l.familia ?? '',
+    causa: l.causa ?? '',
   }
 }
 
@@ -160,6 +170,9 @@ function aEntrada(l: LiniaForm, ordre: number): LiniaEntrada {
     tara_kg: num(l.tara_kg),
     kg_neto: num(l.kg_neto),
     lote_origen: l.lote_origen || null,
+    kg_previstos: num(l.kg_previstos),
+    familia: l.familia || null,
+    causa: l.causa || null,
   }
 }
 
@@ -241,7 +254,7 @@ export default function AlbaraDetall() {
   const [enllacosNous, setEnllacosNous] = useState<{ nom: string; url: string }[]>([])
   // La confirmación conducida por teléfono, con la persona al otro lado (§9).
   const [dlgAssistit, setDlgAssistit] = useState(false)
-  const [dlgRecollida, setDlgRecollida] = useState(false)
+  const [dlgRecollida, setDlgRecollida] = useState<string | null>(null)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -997,39 +1010,34 @@ export default function AlbaraDetall() {
         </CardContent>
       </Card>
 
-      {/* ── «Confirma la recollida» (fase 3 de la revisión del 08-10-2026) ──
-          En un albarán de salida (ENT/OPE) que todavía no está confirmado: el equipo lo
-          confirma por las partes con los kilos reales, y si cuadra se concilia. Es la
-          salida normal cuando quien recibe o quien lliura no tiene correo ni WhatsApp. */}
-      {(albara.tipo === 'ENT' || albara.tipo === 'OPE') && albara.canalizacion_id
+      {/* ── «Registra la recollida (en nom de X)» (27-10-2026, gestión autónoma, fase 3) ──
+          En un albarán de salida (ENT/OPE) de una recogida que todavía no está confirmado: el
+          equipo la registra en nombre de la entidad con el MISMO formulario que ella, y se
+          valida en la misma llamada; si la entidad ya la registró, lo que se abre es validar.
+          Sustituye a «Confirma la recollida», que confirmaba por otro camino. Las espigoladas
+          no pasan por aquí: no hay receptora que registre nada. */}
+      {(albara.tipo === 'ENT' || albara.tipo === 'OPE') && albara.canalizacion_id && fluxRecollida
         && ['borrador', 'emitido', 'entregado'].includes(albara.estado) && (
         <Card>
-          <CardHeader><CardTitle className="text-base">{t('recol.title')}</CardTitle></CardHeader>
+          <CardHeader><CardTitle className="text-base">{t('rrec.as_card_t')}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
-            <p className="text-sm text-muted-foreground">{t('recol.desc')}</p>
-            {/* Desde el 17-10-2026 confirmar la recogida en nombre de las partes también emite
-                los albaranes: es de admin (`confirmar_recollida()` lo exige), como validar. */}
-            <BotoAmbMotiu className="h-11 whitespace-normal md:h-9" disabled={!potAprovar}
+            <p className="text-sm text-muted-foreground">{t(recollidaPerValidar ? 'rrec.as_card_validar' : 'rrec.as_card')}</p>
+            {/* Genera los albaranes: es de admin (`registrar_recollida_assistida()` y
+                `validar_recollida()` lo exigen). */}
+            <BotoAmbMotiu className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={!potAprovar}
               motiu={potAprovar ? undefined : t('recol.need_admin')}
-              onClick={() => setDlgRecollida(true)}>
-              {t('recol.btn')}
+              onClick={() => setDlgRecollida(albara.canalizacion_id)}>
+              {t(recollidaPerValidar ? 'rrec.as_btn_validar' : 'rrec.as_btn')}
             </BotoAmbMotiu>
             {!potAprovar && <p className="text-xs text-muted-foreground">{t('recol.need_admin')}</p>}
           </CardContent>
         </Card>
       )}
-      {albara.canalizacion_id && (
-        <DialegConfirmaRecollida
-          obert={dlgRecollida}
-          canalitzacio={albara.canalizacion_id}
-          kgAssignats={linies.reduce((a, l) => a + Number(l.kg_previstos ?? 0), 0) || null}
-          dataPrevista={(albara.recogida as { fecha_hora?: string } | null)?.fecha_hora ?? null}
-          descripcio={albara.numero_completo}
-          esborrany={albara.estado === 'borrador'}
-          onTancar={() => setDlgRecollida(false)}
-          onFet={() => void carrega()}
-        />
-      )}
+      <DialegRegistraRecollida
+        canalitzacio={dlgRecollida}
+        onTancar={() => setDlgRecollida(null)}
+        onFet={() => void carrega()}
+      />
 
       {/* ── La vía asistida ──
           Hasta el 21-09-2026 este albarán solo se podía confirmar desde el enlace del
@@ -1295,185 +1303,6 @@ function DialegRectificar({
           <Button className="whitespace-normal" disabled={ocupat || motiu.trim() === ''}
             onClick={() => onConfirma(form, motiu.trim())}>
             {t('alb.rectify')}
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Conciliar.
-//
-// En un REC, la propuesta del servidor con su semáforo: verde = la diferencia cabe en la
-// tolerancia; rojo = no cabe, y entonces el motivo es obligatorio (la base lo exige desde
-// `20270414100100`, `fora_de_tolerancia`) y hay que decir qué pasó con los kilos que no
-// llegaron (`destino_final`). Y avisa de la CASCADA: conciliar el REC concilia también sus
-// salidas ya confirmadas, con el mismo motivo.
-//
-// En un ENT o un OPE no hay propuesta —no hay nada con qué contrastar—: se validan sus
-// propios kilos.
-//
-// En los tres, la misma regla del plazo, que es la de `conciliar_albaran()`: sin
-// confirmación, solo con el plazo vencido y con motivo. Antes de vencer, el botón se
-// apaga diciendo hasta cuándo: rellenar el formulario para que la base lo rechace no
-// ayuda a nadie.
-// ---------------------------------------------------------------------------
-function DialegConciliar({
-  obert, onObert, tipus, ambIncidencia, confirmat, venc, proposta, linies, ocupat, onConfirma,
-}: {
-  obert: boolean
-  onObert: (v: boolean) => void
-  tipus: string
-  /** La entidad receptora declaró una diferencia de kilos: la base exige motivo
-   *  (`cal_motiu_incidencia`) aunque cuadre con la tolerancia. */
-  ambIncidencia: boolean
-  /** `albaranes.confirmado_at` no nulo. En un OPE, cuando han confirmado las dos partes. */
-  confirmat: boolean
-  /** Cuándo vence el plazo para conciliar sin confirmación (`null` = no consta entregado). */
-  venc: Date | null
-  proposta: PropostaConciliacio | null
-  linies: AlbaranLinea[]
-  ocupat: boolean
-  onConfirma: (kgValidats: { linea_id: string; kg: number }[], motiu: string, desti: string) => void
-}) {
-  const { t } = useT()
-  const [valors, setValors] = useState<Record<string, string>>({})
-  const [motiu, setMotiu] = useState('')
-  const [desti, setDesti] = useState('')
-
-  useEffect(() => {
-    if (!obert) return
-    const inicial: Record<string, string> = {}
-    for (const l of linies) {
-      const v = l.kg_confirmados ?? l.kg_neto ?? l.kg_previstos
-      inicial[l.id] = v != null ? String(v) : ''
-    }
-    setValors(inicial)
-    setMotiu('')
-    setDesti('')
-  }, [obert, linies])
-
-  const esRec = tipus === 'REC'
-  if (esRec && !proposta) return null
-
-  const fora = esRec && proposta != null && !proposta.dins_tolerancia
-  // `Date.now()` en el render: es un aviso, no una regla; la que decide es la de la base.
-  const ara = Date.now()
-  const terminiVencut = venc != null && venc.getTime() < ara
-  // Sin confirmación y sin plazo vencido la base lo rechaza: no hay motivo que lo arregle.
-  const esperant = !confirmat && !terminiVencut
-  const motiuObligatori = fora || !confirmat || ambIncidencia
-  const potConfirmar = !ocupat && !esperant && (!motiuObligatori || motiu.trim() !== '')
-
-  // Las salidas que se conciliarán con el REC (las confirmadas) y las que se quedan.
-  const sortides = proposta?.entregues ?? []
-  const nCascada = sortides.filter((e) => e.estat === 'confirmado').length
-  const nEsperen = sortides.filter((e) => e.estat === 'emitido' || e.estat === 'entregado').length
-
-  return (
-    <Dialog open={obert} onOpenChange={onObert}>
-      <DialogContent className="max-h-[85dvh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{t('alb.reconcile')}</DialogTitle>
-          <DialogDescription>
-            {t(esRec ? 'alb.reconcile_desc' : 'alb.rc_sortida_desc')}
-          </DialogDescription>
-        </DialogHeader>
-
-        <div className="space-y-3 text-sm">
-          {/* El semáforo, solo en el REC. `exito` y `error` son tokens; el coral no
-              significa fallo. */}
-          {esRec && proposta && (
-            <div className={`rounded-md p-3 ${fora ? 'bg-error-fondo text-error' : 'bg-exito-fondo text-exito'}`}>
-              <p className="font-medium">
-                {fora
-                  ? t('alb.out_of_tolerance', { pct: proposta.diferencia_pct ?? 0, tol: proposta.tolerancia_pct })
-                  : t('alb.in_tolerance', { tol: proposta.tolerancia_pct })}
-              </p>
-              <p>{t('alb.prop_reception', { kg: kg(proposta.kg_recepcio) })}</p>
-              <p>{t('alb.prop_delivered', { kg: kg(proposta.kg_entregues) })}</p>
-              <p>{t('alb.prop_diff', { kg: kg(proposta.diferencia) })}</p>
-            </div>
-          )}
-
-          {/* El plazo: o se espera, o se concilia con motivo. Lo que dice la base. */}
-          {esperant && (
-            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">
-              {venc
-                ? t('alb.rc_wait_deadline', { d: dataCurta(venc.toISOString()) })
-                : t('alb.rc_wait_no_date')}
-            </p>
-          )}
-          {!confirmat && terminiVencut && (
-            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.rc_no_confirm')}</p>
-          )}
-
-          {ambIncidencia && (
-            <p className="rounded-md bg-aviso-fondo p-3 text-aviso">{t('alb.rc_incidencia')}</p>
-          )}
-
-          {/* La cascada (REC): qué se concilia con él y qué se queda esperando. */}
-          {esRec && (
-            <div className="rounded-md bg-secondary p-3 text-secondary-foreground">
-              <p>{t('alb.rc_cascade', { n: nCascada })}</p>
-              {nEsperen > 0 && <p className="mt-1">{t('alb.rc_cascade_pending', { n: nEsperen })}</p>}
-            </div>
-          )}
-          {tipus === 'ENT' && (
-            <p className="rounded-md bg-secondary p-3 text-secondary-foreground">{t('alb.rc_ent_hint')}</p>
-          )}
-
-          {esRec && sortides.length > 0 && (
-            <div className="space-y-1">
-              <p className="font-medium">{t('alb.prop_entries')}</p>
-              {sortides.map((e, i) => (
-                <p key={`${e.albara ?? i}`} className="text-muted-foreground">
-                  {e.albara ?? '—'} · {e.entitat ?? '—'} · {kg(e.kg)} kg · {t(`alb.st_${e.estat}`)}
-                </p>
-              ))}
-            </div>
-          )}
-
-          <div className="space-y-2">
-            <p className="font-medium">{t('alb.validated_kg')}</p>
-            {linies.map((l) => (
-              <div key={l.id} className="space-y-1.5">
-                <Label htmlFor={`cv-${l.id}`}>{l.producto ?? t('alb.ln_product')}</Label>
-                <Input
-                  id={`cv-${l.id}`} type="number" inputMode="decimal" step="0.01"
-                  value={valors[l.id] ?? ''}
-                  onChange={(e) => setValors((p) => ({ ...p, [l.id]: e.target.value }))}
-                />
-              </div>
-            ))}
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="cv-desti">{t('alb.final_destination')}</Label>
-            <Input id="cv-desti" value={desti} placeholder={t('alb.final_destination_ph')}
-              onChange={(e) => setDesti(e.target.value)} />
-          </div>
-
-          <div className="space-y-1.5">
-            <Label htmlFor="cv-motiu">{t('alb.reason')}</Label>
-            <Textarea id="cv-motiu" rows={3} value={motiu} onChange={(e) => setMotiu(e.target.value)} />
-            {motiuObligatori && motiu.trim() === '' && (
-              <p className="text-xs text-muted-foreground">{t('alb.reason_required')}</p>
-            )}
-          </div>
-        </div>
-
-        <DialogFooter>
-          <Button variant="outline" onClick={() => onObert(false)} disabled={ocupat}>{t('c.cancel')}</Button>
-          <Button className="whitespace-normal" disabled={!potConfirmar}
-            onClick={() => onConfirma(
-              linies
-                .map((l) => ({ linea_id: l.id, kg: num(valors[l.id] ?? '') }))
-                .filter((x): x is { linea_id: string; kg: number } => x.kg !== null),
-              motiu, desti,
-            )}>
-            {t('alb.reconcile')}
           </Button>
         </DialogFooter>
       </DialogContent>

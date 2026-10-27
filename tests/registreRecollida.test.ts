@@ -3,8 +3,9 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  clauErrorBase, clauErrorValidacio, diferenciaKg, ERRORS_BASE, ERRORS_VALIDACIO, estatValidacio,
-  kgDelRegistre, llegeixKg, validacioCalMotiu, validaRegistre,
+  campsAssistit, clauErrorAssistit, clauErrorBase, clauErrorHora, clauErrorValidacio, diferenciaKg,
+  ERRORS_ASSISTIT, ERRORS_BASE, ERRORS_VALIDACIO, estatValidacio,
+  kgDelRegistre, llegeixKg, validacioCalMotiu, validaRegistre, validaRegistreAssistit,
 } from '../src/lib/registreRecollida'
 import { DICTS } from '../src/lib/i18n'
 
@@ -124,6 +125,51 @@ describe('clauErrorValidacio: los rechazos de validar y retornar', () => {
     for (const [, clau] of ERRORS_VALIDACIO) {
       expect((DICTS.ca as Record<string, string>)[clau], clau).toBeTruthy()
       expect((DICTS.es as Record<string, string>)[clau], clau).toBeTruthy()
+    }
+  })
+})
+
+// 27-10-2026 (gestión autónoma, fase 3): el equipo registra en nombre de la receptora y valida
+// en la misma llamada (`registrar_recollida_assistida()`, 20270430100200).
+describe('el modo asistido', () => {
+  it('con diferencia, el motivo es obligatorio también aquí', () => {
+    expect(validaRegistreAssistit({ ...base, resultat: 'menys', kg: '80' })).toBe('rrec.err_motiu')
+    expect(validaRegistreAssistit({ ...base, resultat: 'menys', kg: '80', observacions: 'Caixes malmeses' })).toBeNull()
+    expect(validaRegistreAssistit({ ...base, resultat: 'coincideix' })).toBeNull()
+  })
+  it('el motivo de la diferencia va a las observaciones Y a la validación, una sola vez tecleado', () => {
+    expect(campsAssistit({ resultat: 'menys', observacions: ' Una caixa ' }))
+      .toEqual({ observacions: 'Una caixa', motiu: 'Una caixa' })
+  })
+  it('sin diferencia, el texto es una observación y la validación no pide motivo', () => {
+    expect(campsAssistit({ resultat: 'coincideix', observacions: 'Tot bé' }))
+      .toEqual({ observacions: 'Tot bé', motiu: null })
+    expect(campsAssistit({ resultat: 'coincideix', observacions: '  ' }))
+      .toEqual({ observacions: null, motiu: null })
+  })
+  it('los rechazos propios se traducen, y cal_motiu_validacio no se confunde con cal_motiu', () => {
+    expect(clauErrorAssistit('cal_motiu', '22023')).toBe('rrec.err_motiu')
+    expect(clauErrorAssistit('cal_motiu_validacio', '22023')).toBe('vrec.err_cal_motiu')
+    expect(clauErrorAssistit('foto_aliena', '22023')).toBe('rrec.err_foto_aliena')
+    expect(clauErrorAssistit('canalitzacio_inexistent', '22023')).toBe('vrec.err_inexistent')
+    expect(clauErrorAssistit('lo que sea', '42501')).toBe('recol.need_admin')
+  })
+  it('y los del registro, los mismos que tiene la receptora', () => {
+    expect(clauErrorAssistit('ja_registrada', '22023')).toBe('rrec.err_ja_registrada')
+    expect(clauErrorAssistit('kg_no_menys', '22023')).toBe('rrec.err_no_menys')
+    expect(clauErrorAssistit('otra cosa', null)).toBeNull()
+  })
+  it('fijar la hora: pasada, sin hora y ya registrada', () => {
+    expect(clauErrorHora('hora_passada: la recollida no pot ser en el passat', '22023')).toBe('rrec.err_hora_passada')
+    expect(clauErrorHora('cal_hora', '22023')).toBe('rrec.err_cal_hora')
+    expect(clauErrorHora('ja_registrada', '22023')).toBe('rrec.err_ja_registrada')
+    expect(clauErrorHora('x', '42501')).toBe('rrec.err_hora_permis')
+  })
+  it('cada clave existe en los dos idiomas', () => {
+    const claus = new Set([...ERRORS_ASSISTIT.map(([, c]) => c), 'recol.need_admin', 'rrec.err_hora_permis'])
+    for (const k of claus) {
+      expect((DICTS.ca as Record<string, string>)[k], `${k} ca`).toBeTruthy()
+      expect((DICTS.es as Record<string, string>)[k], `${k} es`).toBeTruthy()
     }
   })
 })

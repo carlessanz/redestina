@@ -15,6 +15,8 @@ import type { Operacio } from '../lib/operacio'
 import { estatValidacio } from '../lib/registreRecollida'
 import CarregantSeccio from './CarregantSeccio'
 import RegistraRecollida from './RegistraRecollida'
+import MissatgesDelPunt from './MissatgesDelPunt'
+import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
 
 /** Las clases del estado de la recogida, sin colores fuera de los tokens (§2bis). */
 const CLASSE: Record<string, string> = {
@@ -45,6 +47,15 @@ export default function FitxaOperacio(
     void carregaOperacio(canalizacionId).then((o) => setOp(o))
     onCanvi?.()
   }, [canalizacionId, onCanvi])
+
+  // A la receptora, el texto íntegro de lo que la plataforma le dijo sobre esta oferta
+  // (gestión autónoma, fase 4). Solo en su panel: el productor lo ve en el detalle de su
+  // oferta, y el equipo en el suyo, con botón de copiar.
+  const { missatges } = useMissatgesOferta(
+    op?.rol === 'entidad' ? op.excedente_id : null,
+    `${op?.estat_recollida ?? ''}|${op?.recollida_registrada_at ?? ''}`,
+    'entidad',
+  )
 
   if (op === undefined) return <CarregantSeccio files={2} ambCapcalera={false} />
   if (op === null) return <p className="text-sm text-muted-foreground">{t('op.err')}</p>
@@ -204,6 +215,10 @@ export default function FitxaOperacio(
         {/* El de recepción (ofertant → Espigoladors) es del ofertante y del equipo. */}
         {op.rol !== 'entidad' && fila(t('op.albara_rec'), op.rec_numero)}
       </dl>
+
+      {op.rol === 'entidad' && (
+        <MissatgesDelPunt missatges={missatges} destinatari="entidad" nomesLectura nomesAvisos />
+      )}
     </div>
   )
 }

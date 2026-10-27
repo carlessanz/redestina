@@ -17,7 +17,7 @@ interface Props {
 }
 
 /** El estado de un mensaje en una línea: si salió, por dónde y cuándo, o por qué no. */
-function useEstat(m: Missatge): { text: string; to: 'exito' | 'aviso' | 'neutre' } {
+function useEstat(m: Missatge, nomesLectura: boolean): { text: string; to: 'exito' | 'aviso' | 'neutre' } {
   const { t } = useT()
   if (m.estat === 'enviat') {
     const data = m.enviatAt ? dataHora(m.enviatAt) : ''
@@ -27,6 +27,8 @@ function useEstat(m: Missatge): { text: string; to: 'exito' | 'aviso' | 'neutre'
     }
   }
   if (m.estat === 'no_enviat') {
+    // A la organización no se le habla de interruptores ni de «avisar a mà»: eso es del equipo.
+    if (nomesLectura) return { text: t('msg.estat_no_enviat_lectura'), to: 'aviso' }
     const tall = motiuTallServidor(m.motiuNoEnviat)
     return { text: tall ? `${t('msg.estat_no_enviat')} ${t(tall)}` : t('msg.estat_no_enviat'), to: 'aviso' }
   }
@@ -36,11 +38,12 @@ function useEstat(m: Missatge): { text: string; to: 'exito' | 'aviso' | 'neutre'
 
 export default function MissatgeACopiar({ missatge: m, nomesLectura = false, className }: Props) {
   const { t } = useT()
-  const estat = useEstat(m)
+  const estat = useEstat(m, nomesLectura)
   // A ofertante y receptor no se les dice «text per enviar a mà»: eso es del equipo.
   const ambEstat = !(nomesLectura && m.estat === 'compost')
   return (
-    <div className={cn('min-w-0 space-y-2 rounded-lg border bg-card p-3', className)}>
+    <div className={cn('min-w-0 space-y-2 rounded-lg border bg-card p-3', className)}
+      data-testid="missatge" data-estat={m.estat} data-clau={m.clau}>
       {(!nomesLectura || ambEstat) && (
         <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-xs">
           {!nomesLectura && (

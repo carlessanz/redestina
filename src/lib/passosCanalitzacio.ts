@@ -26,12 +26,23 @@
 //    (`trg_canalizaciones_crea_albaranes`) solo crea la entrada del generador en donación:
 //    en venta y maquila la mercancía va del generador al comprador con el OPE. Hasta hoy
 //    la escalera solo sabía de donación y dejaba los cuatro pasos del REC en «ara» para
-//    siempre en una venta. Ahora salen `fet` con su motivo (`bl_sense_rec_venda`), el coste
+//    siempre en una venta. Ahora el paso de los albaranes no pide REC (variante
+//    `albarans_venda`), el coste
 //    por kilo no frena nada —el CT no lleva importes— y el último escalón es el
 //    **certificado de transacción** (CT), no el de donación. Una oferta con varias
 //    modalidades puede necesitar los dos: lo dicen los albaranes de salida (ENT u OPE), que
 //    son la modalidad real de cada entrega; la de la oferta solo vale mientras no hay
 //    ninguno.
+//
+// ⚠️ **LA RECOGIDA SON CUATRO PASOS, NO OCHO** (27-10-2026, gestión autónoma, fase 3). Desde
+//    que los albaranes de una recogida los genera la VALIDACIÓN (`validar_recollida`,
+//    17-10-2026), nadie los emite, marca entregados ni confirma a mano: «Registra la
+//    recollida» —la receptora desde su ficha, o el equipo en su nombre con
+//    `registrar_recollida_assistida`— y la validación hacen todo eso en una transacción. Los
+//    ocho pasos `rec_*`/`ent_*` describían un circuito que ya no existe y pedían al equipo
+//    «emet el REC» sobre un borrador que la base no le deja emitir (`recollida_no_validada`).
+//    Quedan: la hora (informativa: NO bloquea registrar), el registro, los albaranes (que
+//    salen solos) y la conciliación (que normalmente también).
 //
 // ⚠️ **`pendent_validacio` ES UN PASO** (`oferta_validar`), no «publicada». La oferta está
 //    dada de alta pero no sale al Mercat hasta que el equipo la valida, así que distribuirla
@@ -58,8 +69,7 @@ export type PasCanal =
   // 4 · aprovacio
   | 'interes' | 'conv_rec' | 'aprovar'
   // 5 · lliurament
-  | 'rec_emetre' | 'rec_entregat' | 'rec_confirmar' | 'rec_conciliar'
-  | 'ent_emetre' | 'ent_entregat' | 'ent_confirmar' | 'ent_conciliar'
+  | 'recollida_hora' | 'recollida_registrar' | 'albarans' | 'conciliar'
   // 6 · tancament
   | 'cost' | 'tancament' | 'certificat'
 
@@ -69,8 +79,7 @@ const FASE_DE: Record<PasCanal, number> = {
   oferta_alta: 1, oferta_publicar: 1, oferta_validar: 1,
   distribuir: 2,
   interes: 3, conv_rec: 3, aprovar: 3,
-  rec_emetre: 4, rec_entregat: 4, rec_confirmar: 4, rec_conciliar: 4,
-  ent_emetre: 4, ent_entregat: 4, ent_confirmar: 4, ent_conciliar: 4,
+  recollida_hora: 4, recollida_registrar: 4, albarans: 4, conciliar: 4,
   cost: 5, tancament: 5, certificat: 5,
 }
 
@@ -80,8 +89,7 @@ export const PASSOS_CANAL: readonly PasCanal[] = [
   'oferta_alta', 'oferta_publicar', 'oferta_validar',
   'distribuir',
   'interes', 'conv_rec', 'aprovar',
-  'rec_emetre', 'rec_entregat', 'rec_confirmar', 'rec_conciliar',
-  'ent_emetre', 'ent_entregat', 'ent_confirmar', 'ent_conciliar',
+  'recollida_hora', 'recollida_registrar', 'albarans', 'conciliar',
   'cost', 'tancament', 'certificat',
 ] as const
 
@@ -146,6 +154,39 @@ export interface AlbaraCanal {
   estado: EstadoAlbaran
   numero: string | null
   canalizacion_id: string | null
+  /**
+   * Un REC `confirmado` cuyo neto no cuadra con sus salidas dentro de la tolerancia
+   * (`propuesta_conciliacion`): no se concilia solo y hay que hacerlo con motivo. La RPC lo
+   * devuelve desde `20270430100000`; ausente o null = no se sabe o no aplica.
+   */
+  fora_tolerancia?: boolean | null
+  conciliado_at?: string | null
+}
+
+/**
+ * Una canalización del lote. Lo que no sea `id` es opcional porque el índice solo tiene un
+ * resumen (`canalitzacions_actives`): ahí estos campos no vienen, y **ausente significa «no
+ * se sabe»**, no «falta». Por eso la hora solo cuenta como pendiente con un `null` explícito,
+ * que es lo que manda la ficha cuando de verdad no hay hora.
+ */
+export interface CanalitzacioCanal {
+  id: string
+  kg_conciliados: number | null
+  coste_kg: number | null
+  estado?: string | null
+  entidad_id?: string | null
+  entitat?: string | null
+  kg_confirmados?: number | null
+  valorizacion?: string | null
+  data_hora_recollida?: string | null
+  /** La receptora (o el equipo en su nombre) ha registrado los kilos. Se borra al retornar. */
+  recollida_registrada_at?: string | null
+  /** Un admin la validó: desde ese momento hay albaranes. */
+  recollida_validada_at?: string | null
+  recollida_retornada_at?: string | null
+  kg_declarats?: number | null
+  resultat_recollida?: string | null
+  incidencia?: boolean | null
 }
 
 export interface FetsCanal {
@@ -163,7 +204,7 @@ export interface FetsCanal {
   }
   conveni_gen: ConveniCanal | null
   respostes: RespostaCanal[]
-  canalitzacions: { id: string; kg_conciliados: number | null; coste_kg: number | null }[]
+  canalitzacions: CanalitzacioCanal[]
   albarans: AlbaraCanal[]
   /** Productos del lote sin coste del ejercicio. > 0 bloquea el cierre (`sense_cost`). */
   cost_falten: number
@@ -211,16 +252,54 @@ function rec(f: FetsCanal): AlbaraCanal | null {
   return f.albarans.find((a) => a.tipo === 'REC' && VIU.includes(a.estado)) ?? null
 }
 
-/** Los de salida: ENT en donación, OPE en venta o maquila. Puede haber varios. */
-function sortides(f: FetsCanal): AlbaraCanal[] {
-  return f.albarans.filter((a) => (a.tipo === 'ENT' || a.tipo === 'OPE') && VIU.includes(a.estado))
+/** Las canalizaciones que cuentan: una anulada ya no es una entrega. */
+export function canalitzacionsVives(f: Pick<FetsCanal, 'canalitzacions'>): CanalitzacioCanal[] {
+  return f.canalitzacions.filter((c) => c.estado !== 'anulada')
 }
 
-/** El menos avanzado de los de salida: la escalera va al ritmo del que va más atrás. */
+/**
+ * La salida (ENT u OPE) de una canalización. El borrador SÍ cuenta aquí, con avance 0: es
+ * el albarán que la validación va a emitir, y saltárselo haría que una entrega sin validar
+ * desapareciera del cálculo y la escalera fuera al ritmo de las demás.
+ */
+function sortidaDe(f: FetsCanal, canalitzacio: string): AlbaraCanal | null {
+  return f.albarans
+    .filter((a) => (a.tipo === 'ENT' || a.tipo === 'OPE') && a.canalizacion_id === canalitzacio
+      && a.estado !== 'anulado' && a.estado !== 'rectificado')
+    .sort((a, b) => avanc(b) - avanc(a))[0] ?? null
+}
+
+/**
+ * El avance de las salidas, al ritmo de la que va más atrás. Por canalización viva —no por
+ * albarán suelto—, y si algún albarán de salida no casa con ninguna (el resumen del índice),
+ * cuenta también.
+ */
 function avancSortides(f: FetsCanal): number {
-  const s = sortides(f)
-  if (s.length === 0) return 0
-  return Math.min(...s.map((a) => avanc(a)))
+  const vives = canalitzacionsVives(f)
+  const perCanal = vives.map((c) => avanc(sortidaDe(f, c.id)))
+  const solts = f.albarans
+    .filter((a) => (a.tipo === 'ENT' || a.tipo === 'OPE') && VIU.includes(a.estado)
+      && !vives.some((c) => c.id === a.canalizacion_id))
+    .map((a) => avanc(a))
+  const tots = [...perCanal, ...solts]
+  return tots.length === 0 ? 0 : Math.min(...tots)
+}
+
+/**
+ * ¿Está registrada la recogida de esta canalización? Lo dice el registro (de la receptora o
+ * del equipo) o la validación; y, para las del circuito anterior al 17-10-2026, que su
+ * salida ya esté confirmada: entonces la confirmaron por el enlace y no hay nada que
+ * registrar.
+ */
+export function recollidaRegistrada(f: FetsCanal, c: CanalitzacioCanal): boolean {
+  return Boolean(c.recollida_registrada_at || c.recollida_validada_at)
+    || c.kg_conciliados != null
+    || avanc(sortidaDe(f, c.id)) >= 3
+}
+
+/** Registrada y esperando la validación de un admin: los albaranes todavía no existen. */
+export function recollidaPerValidar(c: CanalitzacioCanal): boolean {
+  return Boolean(c.recollida_registrada_at) && !c.recollida_validada_at
 }
 
 const CONVENI_FET: ConvenioEstado[] = ['firmat', 'vigent']
@@ -249,7 +328,7 @@ export function certificatsDelLot(f: FetsCanal): { donacio: boolean; transaccio:
 }
 
 /**
- * La escalera entera: los 21 pasos con su estado.
+ * La escalera entera: los 17 pasos con su estado.
  *
  * Primero se decide, paso a paso, si está HECHO y si algo lo BLOQUEA —las dos cosas son
  * propiedades del paso, no de dónde esté el cursor—. Después, el primero que no está hecho
@@ -273,8 +352,14 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
   const r = rec(f)
   const aRec = avanc(r)
   const aSort = avancSortides(f)
-  const totConciliat = f.canalitzacions.length > 0
-    && f.canalitzacions.every((c) => c.kg_conciliados != null)
+  const vives = canalitzacionsVives(f)
+  const totConciliat = vives.length > 0 && vives.every((c) => c.kg_conciliados != null)
+  // La hora solo falta con un `null` EXPLÍCITO: en el índice el campo no viene (ver
+  // `CanalitzacioCanal`), y decir «fixa l'hora» de un lote que quizá ya la tiene es inventar.
+  const ambHora = vives.every((c) => c.data_hora_recollida !== null || recollidaRegistrada(f, c))
+  const registrades = vives.every((c) => recollidaRegistrada(f, c))
+  const recollidesPerValidar = vives.some((c) => recollidaPerValidar(c))
+  const foraTolerancia = r?.estado === 'confirmado' && r.fora_tolerancia === true
 
   const cancellada = f.oferta.estado === 'cancelada' || f.oferta.estado === 'no_colocada'
   const perValidar = f.oferta.estado === 'pendent_validacio'
@@ -350,38 +435,38 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
         }
 
       // ── 5 · lliurament ──
-      // En venta y maquila puras no hay REC: los cuatro pasos de la entrada no le tocan,
-      // y se dice por qué en vez de dejarlos esperando un documento que no existirá nunca.
-      case 'rec_emetre':
-        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
-        return { fet: aRec >= 1 }
-      case 'rec_entregat':
-        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
-        return { fet: aRec >= 2 }
-      case 'rec_confirmar':
-        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
-        return { fet: aRec >= 3 }
-      case 'rec_conciliar':
-        if (senseRec) return { fet: true, motiu: 'canal.bl_sense_rec_venda' }
+      // Una espigolada no tiene receptora que registre nada: la jornada ya pesó el producto
+      // y sus albaranes los emite el equipo desde la ficha. Hora y registro no le tocan.
+      case 'recollida_hora':
+        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
+        if (vives.length === 0) return { fet: false, bloqueig: 'canal.bl_sense_canalitzacions' }
+        return { fet: ambHora }
+      case 'recollida_registrar':
+        if (espigolada) return { fet: true, motiu: 'canal.bl_espigolada' }
+        if (vives.length === 0) return { fet: false, bloqueig: 'canal.bl_sense_canalitzacions' }
+        // La hora NO bloquea: es informativa, y una recogida que ya se hizo se registra
+        // tenga o no hora acordada.
+        return { fet: registrades }
+      case 'albarans': {
+        // Qué dicen los textos depende de por qué faltan: en venta no hay REC; si alguien ya
+        // registró, lo que falta es validar; en una espigolada los emite el equipo a mano.
+        const clau = espigolada ? 'albarans_espigolada'
+          : recollidesPerValidar ? 'albarans_validar'
+            : senseRec ? 'albarans_venda' : undefined
         return {
-          fet: aRec >= 4,
-          // Conciliar el REC contrasta su neto con la suma de los ENT confirmados: sin
-          // ellos no hay con qué contrastar.
-          bloqueig: aRec >= 3 && aSort < 3 && sortides(f).length > 0
-            ? 'canal.bl_falten_confirmacions'
-            : undefined,
+          fet: vives.length > 0 && aSort >= 3 && (senseRec || aRec >= 3),
+          bloqueig: vives.length === 0 ? 'canal.bl_sense_canalitzacions' : undefined,
+          clau,
         }
-      case 'ent_emetre':
-        return { fet: aSort >= 1, bloqueig: f.canalitzacions.length === 0 ? 'canal.bl_sense_canalitzacions' : undefined }
-      case 'ent_entregat':
-        return { fet: aSort >= 2 }
-      case 'ent_confirmar':
-        return { fet: aSort >= 3 }
-      case 'ent_conciliar':
-        // Los kilos oficiales de cada entrega. En donación lo normal es que lleguen solos
-        // al conciliar el REC (arrastra las salidas confirmadas, `20270414100100`); en venta
-        // y maquila se concilia cada OPE. Sin salidas no hay nada que conciliar todavía.
-        return { fet: sortides(f).length > 0 && aSort >= 4 }
+      }
+      case 'conciliar':
+        // Normalmente llega sola: validar concilia (`validar_recollida`). Lo que queda aquí
+        // es un REC fuera de tolerancia, que hay que conciliar con motivo, o una salida
+        // confirmada por el circuito anterior que la conciliación automática no recogió.
+        return {
+          fet: totConciliat && (senseRec || aRec >= 4),
+          bloqueig: foraTolerancia ? 'canal.bl_fora_tolerancia' : undefined,
+        }
 
       // ── 6 · tancament ──
       case 'cost':

@@ -19,6 +19,8 @@
 import { supabase } from './supabase'
 import { enviarEmail } from './email'
 import type { ResultatRpc } from './albarans'
+import { errorConveniDeclarat, tipusConveniDeclarat } from './conveniDeclarat'
+import type { ErrorDeclarat } from './conveniDeclarat'
 import type { Convenio, ConvenioEstado, ConvenioTipo } from '../types'
 
 export type { ResultatRpc }
@@ -245,6 +247,58 @@ export function registrarConveniEnPaper(camps: {
     p_signant_carrec: camps.signantCarrec ?? null,
     p_notes: camps.notes ?? null,
   }, 'conv.err_generic')
+}
+
+// ---------------------------------------------------------------------------
+// El convenio DECLARADO (gestión autónoma, fase 1; 20270430100000)
+// ---------------------------------------------------------------------------
+// El super_admin lo da por vigente con los datos de la ficha, sin firma ni escaneado. Una
+// sola RPC y una sola transacción: prepara el convenio si no existe, lo numera en su serie
+// (al revés que el papel, consume número: es lo que emite la plataforma) y emite el PDF
+// contrafirmado, cuya página de evidencias dice que fue declarado y por quién.
+
+export type ResultatDeclarat =
+  | { ok: true; conveni: Convenio }
+  | { ok: false; error: ErrorDeclarat }
+
+/**
+ * Da por vigente el Conveni de col·laboració de una organización. **Nunca lanza**.
+ *
+ * El tipo no se pide: sale del papel (`col_productor` / `col_receptor`), que es lo único que
+ * la RPC acepta. El error se devuelve ya traducido a clave, con los campos de la ficha que
+ * faltan cuando es `falta_dades_fitxa` (vienen en el `details` del error, no en el mensaje).
+ */
+export async function declararConveni(args: {
+  tipusOrg: 'productor' | 'entidad'
+  org: string
+  signantNom: string
+  signantCarrec: string
+  /** `aaaa-mm-dd`; sin ella, hoy (en hora de Madrid, lo decide la base). */
+  dataFirma?: string | null
+  referencia?: string | null
+  notes?: string | null
+}): Promise<ResultatDeclarat> {
+  try {
+    const { data, error } = await supabase.rpc('declarar_conveni', {
+      p_tipo_org: args.tipusOrg,
+      p_org: args.org,
+      p_tipo: tipusConveniDeclarat(args.tipusOrg),
+      p_signant_nom: args.signantNom.trim(),
+      p_signant_carrec: args.signantCarrec.trim(),
+      p_data_firma: args.dataFirma || null,
+      p_referencia: args.referencia?.trim() || null,
+      p_notes: args.notes?.trim() || null,
+    })
+    if (error) {
+      return {
+        ok: false,
+        error: errorConveniDeclarat({ missatge: error.message, detall: error.details, codi: error.code }),
+      }
+    }
+    return { ok: true, conveni: data as Convenio }
+  } catch {
+    return { ok: false, error: errorConveniDeclarat({}) }
+  }
 }
 
 /** El enlace que no se manda: lo abre el dinamizador con el firmante delante (§3.2.5). */

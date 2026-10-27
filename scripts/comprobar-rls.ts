@@ -610,6 +610,9 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "fixar_hora_recollida", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_quan: "2030-01-01T10:00:00Z" }, descripcion: "NO fixa l'hora de cap recollida (és de l'equip)" },
   { tabla: "comprova_interes", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO executa la comprovació interna d'un interès" },
   { tabla: "registrar_recollida_escriu", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix", p_kg_reals: null, p_data: null, p_observacions: null, p_per: "00000000-0000-0000-0000-000000000000", p_origen: "equip" }, descripcion: "NO executa l'escriptura interna d'una recollida" },
+  // Los avisos de una oferta (20270430100300) son `security invoker`: la RLS de `avisos` le
+  // deja a una organización solo los suyos, así que de una oferta ajena no le llega nada.
+  { tabla: "avisos_de_oferta", op: "rpc", esperado: "denegar", vacioEsDenegar: true, args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu cap avís d'una oferta que no és seva" },
   // La revisión del certificado (20270419100000, fase 4): un externo solo aprueba lo suyo
   // (permiso antes que existencia: id inventado → 42501), y nunca en nombre de otro.
   { tabla: "aprovar_certificat_ofertant", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_tipus: "anual" }, descripcion: "NO aprova un certificat que no és seu" },

@@ -23,6 +23,7 @@ import type { Paso } from "./camposOferta.ts";
 import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 import { enmascararTelefono } from "./enmascarar.ts";
+import { de } from "./textIntake.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
 const CADUCIDAD_HORAS = 12;
@@ -128,13 +129,9 @@ async function referenciaCost(supabase: Cliente, producte: string): Promise<numb
   return data?.coste_kg != null ? Number(data.coste_kg) : null;
 }
 
-/**
- * «de Tomàquet» / «d'Albercoc»: la preposición apostrofada ante vocal o h, como se escribe.
- * Sin esto el bot decía «de Horta Fulla» o «de Enciam» (4 familias y muchos productos).
- */
-export function de(nom: string): string {
-  return /^[aeiouàèéíòóúh]/i.test(nom.trim()) ? `d'${nom}` : `de ${nom}`;
-}
+// `de()` («de Tomàquet» / «d'Albercoc») vive en `textIntake.ts`, que es «hoja»: la usa
+// también el agradecimiento que el panel enseña para copiar.
+export { de };
 
 /** «0,60 €/kg»: como se lee en català. */
 export function eurKg(n: number): string {

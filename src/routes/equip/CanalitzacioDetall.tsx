@@ -11,20 +11,28 @@
 //    `documentos_encola_generacion` llama a `generar-documento` y este manda el correo por
 //    Resend. No hay que construir ni un PDF ni un correo; hay que no saltarse el camino.
 //
-// ⚠️ **LO QUE NO SE HACE AQUÍ, Y ES DELIBERADO.** Emitir un albarán con sus líneas,
-//    conciliar y el cierre anual tienen sus pantallas, con sus editores. Esta enlaza a
+// ⚠️ **LO QUE NO SE HACE AQUÍ, Y ES DELIBERADO.** Editar las líneas de un albarán (las de una
+//    espigolada) y el cierre anual tienen sus pantallas, con sus editores. Esta enlaza a
 //    ellas en vez de duplicarlas: un segundo editor de líneas es un segundo sitio donde el
-//    número de kilos puede acabar siendo otro.
+//    número de kilos puede acabar siendo otro. Desde el 27-10-2026 todo lo demás —firmar o
+//    declarar convenios, validar la oferta, mandarla a mano, el interés, aprobar, la hora y el
+//    registro de la recogida, conciliar, el coste por kilo y el destino final— se hace aquí.
+//
+// 🧩 **ORQUESTADOR** (27-10-2026, gestión autónoma, fase 5). Esta pantalla carga el lote,
+//    calcula la escalera y pinta el punto y los pasos; cada fase es un componente de
+//    `components/equip/fases/` con sus acciones y sus «Missatges d'aquest pas». Los mensajes
+//    se leen UNA vez aquí (`useMissatgesOferta`) y se vuelven a leer tras cada acción.
 //
 // ⚠️ **LA PANTALLA ES UNA CONVENCIÓN, NO UNA IMPOSICIÓN** (deuda §12.109). `authenticated`
-//    conserva escritura directa sobre `oferta_respuestas` y `canalizaciones`, así que los
-//    atajos de `OfferDetail` siguen existiendo. «Salen los mismos documentos» es cierto
-//    **cuando se usa esta pantalla**.
+//    conserva escritura directa sobre `oferta_respuestas` y `canalizaciones`. Desde el
+//    27-10-2026 `OfferDetail` ya no usa los atajos del alta de canalización, el marcado
+//    manual de respuestas ni los kilos reales tecleados (registra el interés y aprueba con
+//    los mismos formularios que aquí), pero el GRANT sigue abierto: «salen los mismos
+//    documentos» es cierto **cuando se usan las pantallas**.
 
 import { useCallback, useEffect, useState } from 'react'
 import { Link, useParams } from 'react-router'
 import { ChevronDown, Loader2 } from 'lucide-react'
-import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { cn } from '../../lib/utils'
@@ -32,78 +40,26 @@ import { FASES_EQUIP } from '../../lib/procesOferta'
 import {
   clauPas, escalaCanal, PASSOS_FASE_CLAUS, puntCanal,
 } from '../../lib/passosCanalitzacio'
-import type { FetsCanal, PasCanal, PasEscala } from '../../lib/passosCanalitzacio'
-import {
-  dadesFiscalsProvisionals, estatCanalitzacio, interesAssistit,
-} from '../../lib/canalitzacio'
-import { contrafirmarConveni, prepararConveni } from '../../lib/convenis'
-import type { ConvenioTipo, Excedente, Modalitat } from '../../types'
-import SelectorModalitat from '../../components/SelectorModalitat'
-import { enviaEnllacosConfirmacio, marcarEntregat } from '../../lib/albarans'
-import { aprovarResposta, comprovaConvenis } from '../../lib/aprovarResposta'
+import type { FetsCanal, PasEscala } from '../../lib/passosCanalitzacio'
+import { dadesFiscalsProvisionals, estatCanalitzacio } from '../../lib/canalitzacio'
+import type { Excedente } from '../../types'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { certificatsDelGenerador } from '../../lib/tancament'
-import { useAppContext, useCanals } from '../../hooks/useAppContext'
-import { useConfirma } from '../../components/DialegConfirma'
+import { useAppContext } from '../../hooks/useAppContext'
+import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { supabase } from '../../lib/supabase'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
-import DialegAssistit from '../../components/equip/DialegAssistit'
-import DialegConfirmaRecollida from '../../components/equip/DialegConfirmaRecollida'
-import DialegEspigolada from '../../components/equip/DialegEspigolada'
-import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
-import DialegFirmaAssistida from '../../components/equip/DialegFirmaAssistida'
+import FaseConveni from '../../components/equip/fases/Conveni'
+import FaseEntrada from '../../components/equip/fases/Entrada'
+import FaseDistribucio from '../../components/equip/fases/Distribucio'
+import FaseAprovacio from '../../components/equip/fases/Aprovacio'
+import FaseRecollida from '../../components/equip/fases/Recollida'
+import FaseTancament from '../../components/equip/fases/Tancament'
+import type { ContextFase, ExtraCanal } from '../../components/equip/fases/tipus'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
-import { Input } from '@/components/ui/input'
-import { Label } from '@/components/ui/label'
-
-/** Lo que la RPC devuelve además de los hechos del ciclo. */
-interface Extra {
-  oferta: {
-    id: string; id_excedente: string | null; modalitat: string | null; producto: string | null
-    /** Todas las modalidades de la oferta (la RPC las devuelve desde el 07-10-2026). */
-    modalitats?: string[] | null
-  }
-  productor: { id: string; nom: string | null } | null
-  /** El cierre del ejercicio de la oferta (el real si lo hay), con su id para enlazarlo. */
-  exercici: { id: string; estado: string; modo: string } | null
-  respostes: {
-    id: string; entidad_id: string | null; entitat: string
-    estado: string; aprovacio: string; kg_solicitados: number | null
-    /** El convenio que ESTA receptora necesita para esta modalidad, si lo tiene. */
-    conveni_rec: { id: string; estado: string; numero: string | null } | null
-  }[]
-  albarans: { id: string; tipo: string; estado: string; numero: string | null }[]
-  conveni_gen: { id: string } | null
-}
-
-/**
- * Qué convenio le exige a la RECEPTORA la modalidad de esta oferta.
- *
- * Es la fila `parte = 'recibe'` de `convenios_exigidos`: donación pide `don_rec`, y venta y
- * maquila piden el comercial. Se deriva aquí, y no se pregunta, porque la RPC del ciclo ya
- * devuelve el convenio que le toca a cada entidad: lo único que falta para poder prepararlo
- * desde esta pantalla es su TIPO, y la modalidad del lote lo determina sin ambigüedad.
- *
- * ⚠️ Si algún día la matriz deja de ser una función de la modalidad —dos convenios para una
- *    misma—, esto deja de poder derivarse y hay que pedirlo a la base.
- */
-function conveniQueCalRebre(modalitat: string | null): ConvenioTipo | null {
-  // Desde el Conveni de col·laboració único (fase 5), uno para todas las modalidades.
-  return modalitat ? 'col_receptor' : null
-}
-
-/**
- * Lo mismo por el lado de quien ENTREGA (`parte = 'entrega'`): donación pide `don_gen`, y
- * venta y maquila el comercial. Hasta el 28-09-2026 el botón preparaba SIEMPRE `don_gen`,
- * así que en una venta creaba un convenio que la RPC del ciclo no mira (busca el `com`) y
- * el botón volvía a salir, sin fin.
- */
-function conveniQueCalEntregar(modalitat: string | null): ConvenioTipo | null {
-  return modalitat ? 'col_productor' : null
-}
 
 const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
   fet: 'bg-exito-fondo text-exito',
@@ -112,78 +68,39 @@ const COLOR_ESTAT: Record<PasEscala['estat'], string> = {
   pendent: 'bg-secondary text-secondary-foreground',
 }
 
+/** Una fase por índice de `FASES_EQUIP`, en su orden. */
+const FASES: ((p: { c: ContextFase }) => React.ReactNode)[] = [
+  FaseConveni, FaseEntrada, FaseDistribucio, FaseAprovacio, FaseRecollida, FaseTancament,
+]
+
 export default function CanalitzacioDetall() {
-  const { t, lang } = useT()
+  const { t } = useT()
   const { id } = useParams<{ id: string }>()
   const { ctx } = useAppContext()
-  const canals = useCanals()
-  // Contrasignar y aprobar exigen `pot_aprovar()` (§4bis): a un técnico se le dejan grises
-  // CON el motivo, como en Aprovacions, en vez de dejarle chocar contra un 42501.
+  // Contrasignar, aprobar, registrar la recogida y fijar costes exigen `pot_aprovar()`
+  // (§4bis): a un técnico se le dejan grises CON el motivo, en vez de chocar con un 42501.
   const potAprovar = ctx?.potAprovar ?? false
-  const { confirma, dialeg: dialegConfirma } = useConfirma()
-  /** Contrasignar estampa la firma de la Fundación y manda el PDF: no se deshace. */
-  const confirmaContrasignar = () => confirma({
-    titol: t('conv.countersign_confirm_t'),
-    descripcio: t('conv.countersign_confirm'),
-    confirmar: t('canalz.b_contrasignar'),
-  })
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const [fets, setFets] = useState<FetsCanal | null>(null)
-  const [extra, setExtra] = useState<Extra | null>(null)
+  const [extra, setExtra] = useState<ExtraCanal | null>(null)
   /**
    * La fila entera de la oferta (F3). `canalitzacio_assistida()` devuelve de ella cuatro
-   * campos, y la conversión en espigolada necesita más —`producte_al_camp`,
-   * `espigolada_id`, la finca y lo que declaró— así que se pide aparte en vez de ensanchar
-   * una RPC del circuito para una pantalla.
+   * campos, y la conversión en espigolada, la distribución y el destino final necesitan más
+   * —`producte_al_camp`, `espigolada_id`, el texto, `desti_reclamat_at`— así que se pide
+   * aparte en vez de ensanchar una RPC del circuito para una pantalla.
    */
   const [oferta, setOferta] = useState<Excedente | null>(null)
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [ocupat, setOcupat] = useState(false)
   const [obertes, setObertes] = useState<Record<number, boolean>>({})
-
-  // Los tres actos asistidos, cada uno con su diálogo.
-  const [dlgFirma, setDlgFirma] = useState<string | null>(null)
-  const [dlgAlbara, setDlgAlbara] = useState<string | null>(null)
-  // La modalidad de cada entrega, cuando la oferta tiene varias (deuda 130, fase 8 de la
-  // revisión del 08-10-2026): sin ella la RPC respondía `cal_modalitat` y había que ir a
-  // Aprovacions o al detalle de la oferta.
-  const [modalitatAprova, setModalitatAprova] = useState<Record<string, Modalitat | ''>>({})
-
-  // «Confirma la recollida» (fase 3): los datos del albarán de salida se leen al abrir.
-  const [dlgRecollida, setDlgRecollida] = useState<{
-    canalitzacio: string; kg: number | null; data: string | null; numero: string | null; esborrany: boolean
-  } | null>(null)
-  const obreRecollida = async (albaraId: string) => {
-    const { data, error } = await supabase.from('albaranes')
-      .select('canalizacion_id, estado, numero_completo, recogida, albaran_lineas(kg_previstos)')
-      .eq('id', albaraId).maybeSingle()
-    const a = data as {
-      canalizacion_id: string | null; estado: string; numero_completo: string | null
-      recogida: { fecha_hora?: string } | null; albaran_lineas: { kg_previstos: number | null }[]
-    } | null
-    if (error || !a?.canalizacion_id) { toast.error(textError(t, error?.message ?? null)); return }
-    setDlgRecollida({
-      canalitzacio: a.canalizacion_id,
-      kg: a.albaran_lineas.reduce((x, l) => x + Number(l.kg_previstos ?? 0), 0) || null,
-      data: a.recogida?.fecha_hora ?? null,
-      numero: a.numero_completo,
-      esborrany: a.estado === 'borrador',
-    })
-  }
-  const [dlgEspigolada, setDlgEspigolada] = useState(false)
-
-  // El interés asistido: entidad y kilos, que es lo mínimo que la RPC necesita.
-  const [entitats, setEntitats] = useState<{ id: string; nombre: string }[]>([])
-  const [entitatTriada, setEntitatTriada] = useState('')
-  const [kgInteres, setKgInteres] = useState('')
-  // En venta y maquila la RPC exige precio ≥ `preu_minim`; sin este campo el interés
-  // asistido de esas modalidades fallaba SIEMPRE («El preu ha de ser com a mínim…»).
-  const [preuInteres, setPreuInteres] = useState('')
+  // Sube tras cada carga: es lo que hace releer los mensajes (un aviso nace con la acción).
+  const [versio, setVersio] = useState(0)
+  // Hasta la primera carga no se piden (`null`): si no, se leerían dos veces al entrar.
+  const { missatges } = useMissatgesOferta(versio > 0 ? id : null, versio, 'equip')
 
   const carrega = useCallback(async () => {
     if (!id) return
-    setCarregant(true)
     const [r, provisionals, exc] = await Promise.all([
       estatCanalitzacio(id),
       dadesFiscalsProvisionals(),
@@ -196,7 +113,7 @@ export default function CanalitzacioDetall() {
       setCarregant(false)
       return
     }
-    const cru = r.data as unknown as FetsCanal & Extra
+    const cru = r.data as unknown as FetsCanal & ExtraCanal
     // Los acumulados del generador en el cierre del ejercicio: es lo que dice si el último
     // escalón (CD y/o CT) ya está emitido. La RPC del ciclo no lee el cierre, así que se
     // piden aparte, como los datos provisionales. `null` = no se sabe, y la escalera usa
@@ -209,44 +126,13 @@ export default function CanalitzacioDetall() {
       dadesProvisionals: provisionals,
       ...(certificats ? { certificats } : {}),
     })
-    setExtra(cru as unknown as Extra)
+    setExtra(cru)
     setError(null)
     setCarregant(false)
+    setVersio((v) => v + 1)
   }, [id, t])
 
   useEffect(() => { void carrega() }, [carrega])
-
-  // Las entidades solo hacen falta para el interés asistido, así que se piden una vez y
-  // aparte: traerlas con el ciclo cargaría 119 filas en cada refresco del estado.
-  useEffect(() => {
-    let viu = true
-    void (async () => {
-      const { data } = await supabase
-        .from('entidades')
-        .select('id, nombre')
-        .order('nombre')
-        .limit(500)
-      if (viu && data) setEntitats(data as { id: string; nombre: string }[])
-    })()
-    return () => { viu = false }
-  }, [])
-
-  /**
-   * `avisat: true` = la acción ya ha dado su propio aviso (marcar entregado junta en uno
-   * solo «entregat» y «correu enviat»): no se apila otro verde encima.
-   */
-  async function fes(
-    accio: () => Promise<{ ok: boolean; missatge?: string; codi?: string | null; avisat?: boolean }>,
-    okKey: string,
-  ) {
-    setOcupat(true)
-    const r = await accio()
-    setOcupat(false)
-    if (!r.ok) { toast.error(textError(t, r)); return }
-    if (!r.avisat) toast.success(t(okKey))
-    void refrescaComptadors()
-    await carrega()
-  }
 
   if (carregant) {
     return (
@@ -259,63 +145,36 @@ export default function CanalitzacioDetall() {
     return <p className="text-sm text-error">{error ?? t('c.error')}</p>
   }
 
-  // Copia no nula tras la guarda: TypeScript no estrecha el estado dentro de las
-  // funciones declaradas más abajo, y pasarlo por argumento a todas sería peor.
-  const ex = extra
-  const esVenda = ex.oferta.modalitat === 'venda' || ex.oferta.modalitat === 'maquila'
-
   const escala = escalaCanal(fets)
   const punt = puntCanal(fets)
-
-  /**
-   * Por qué NO se puede convertir en espigolada (F3). Las mismas dos razones que anticipa
-   * `OfferDetail`, y por lo mismo: la oferta ya tiene una entrada, así que la jornada
-   * crearía un segundo REC con los mismos kilos. **La autoridad sigue siendo la RPC**
-   * (`ja_te_canalitzacions` / `ja_te_albarans`, 22023); esto solo evita el choque.
-   */
-  const motiuNoConvertible = fets.canalitzacions.length > 0
-    ? t('conv_esp.no_canalitzacions')
-    : fets.albarans.some((a) => a.estado !== 'anulado')
-      ? t('conv_esp.no_albarans')
-      : null
   const perFase = FASES_EQUIP.map((_, i) => escala.filter((p) => p.fase === i))
 
-  /** Un paso concreto, para decidir si su botón está vivo. */
-  const pas = (p: PasCanal) => escala.find((x) => x.pas === p)!
+  // Abierta si alguien la abrió o la cerró a mano; si no, si tiene un paso pendiente.
+  const ambAra = (i: number) => perFase[i].some((p) => p.estat === 'ara' || p.estat === 'bloquejat')
+  const esOberta = (i: number) => obertes[i] ?? ambAra(i)
 
-  async function aprovaInteres(respostaId: string, entitatId: string | null, kg: number) {
-    // El mismo aviso previo que `Aprovacions` y `OfferDetail`: la base va a rechazar con
-    // `42501 sense_conveni` desde la fecha de corte, y enterarse con un error a mitad es
-    // peor que saberlo antes (§12.78).
-    if (entitatId) {
-      const falta = await comprovaConvenis(
-        { modalitat: ex.oferta.modalitat, productor_id: ex.productor?.id ?? null },
-        entitatId,
-        t,
-      )
-      if (falta) { toast.error(`${t('od.conv_blocked')} · ${falta}`); return }
-    }
-    await fes(
-      async () => {
-        const r = await aprovarResposta({ id: respostaId, kg, modalitat: modalitatAprova[respostaId] || null })
-        // El `codi` viaja: `sense_conveni` se traduce a `od.conv_blocked`, como en Aprovacions.
-        return r.ok ? { ok: true } : { ok: false, missatge: r.missatge, codi: r.codi }
-      },
-      'canalz.ok_aprovat',
-    )
+  const c: ContextFase = {
+    fets, extra, oferta, escala, missatges, potAprovar, esSuperAdmin,
+    // Antes de recargar se congela qué fase está abierta: la acción que acaba de cerrar una
+    // fase la dejaría sin paso pendiente, se plegaría sola y se llevaría por delante el
+    // diálogo que el equipo tiene abierto dentro (con su resultado).
+    onCanvi: () => {
+      setObertes(Object.fromEntries(FASES_EQUIP.map((_, i) => [i, esOberta(i)])))
+      void refrescaComptadors()
+      void carrega()
+    },
   }
 
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-2">
-        <div>
+        <div className="min-w-0">
           <h1 className="text-2xl font-bold tabular-nums">{extra.oferta.id_excedente ?? '—'}</h1>
           <p className="mt-1 text-sm text-muted-foreground">
             {extra.productor?.nom ?? '—'}
             {extra.oferta.producto ? ` · ${extra.oferta.producto}` : ''}
-            {/* Traducida, no el valor interno: hasta hoy salía «donacio» tal cual,
-                sin acento, cuando el resto de la interfaz ya tiene esta clave
-                (`Mercat.tsx`) para lo mismo (deuda §12.122). */}
+            {/* Traducida, no el valor interno: hasta el 22-09-2026 salía «donacio» tal cual
+                (deuda §12.122). */}
             {extra.oferta.modalitat ? ` · ${t(`od.mod_${extra.oferta.modalitat}`)}` : ''}
           </p>
         </div>
@@ -330,8 +189,8 @@ export default function CanalitzacioDetall() {
 
       {FASES_EQUIP.map((fase, i) => {
         const passos = perFase[i]
-        const ambAra = passos.some((p) => p.estat === 'ara' || p.estat === 'bloquejat')
-        const obert = obertes[i] ?? ambAra
+        const obert = esOberta(i)
+        const Fase = FASES[i]
         return (
           <Collapsible
             key={fase.clau}
@@ -359,16 +218,13 @@ export default function CanalitzacioDetall() {
                   {passos.map((p) => (
                     <div key={p.pas} className="rounded-md border p-3">
                       <div className="flex flex-wrap items-center justify-between gap-2">
-                        <span className="text-sm font-medium">{t(`canal.${clauPas(p)}_t`)}</span>
+                        <span className="min-w-0 text-sm font-medium">{t(`canal.${clauPas(p)}_t`)}</span>
                         <Badge className={COLOR_ESTAT[p.estat]}>{t(`canalz.est_${p.estat}`)}</Badge>
                       </div>
                       {/* `_passa` está redactado como «todavía falta esto», así que en
-                          cuanto el paso está `fet` se vuelve una afirmación FALSA: «Ja hi ha
-                          canalització, però encara no hi ha el document» con el REC ya
-                          emitido, o «Algun producte no té cost» con el coste ya fijado
-                          (deuda §12.119, medido en el navegador el 22-09-2026). El badge
-                          verde de arriba ya dice que está hecho; el texto narrativo solo
-                          tiene sentido mientras describe lo que falta. */}
+                          cuanto el paso está `fet` se vuelve una afirmación FALSA (deuda
+                          §12.119, medido en el navegador el 22-09-2026). El badge verde ya
+                          dice que está hecho; el texto solo vale mientras describe lo que falta. */}
                       {p.estat !== 'fet' && (
                         <p className="mt-1 text-sm text-muted-foreground">
                           {t(`canal.${clauPas(p)}_passa`)}
@@ -383,8 +239,8 @@ export default function CanalitzacioDetall() {
                         )}>
                           <p>{t(p.motiuKey)}</p>
                           {/* Un bloqueo que solo se nombra obliga a buscar dónde se arregla.
-                              El del convenio del generador se arregla UNA fila más arriba, en
-                              la fase 1, así que el aviso la abre y lleva hasta ella. */}
+                              El del convenio del generador se arregla en la fase 1, así que
+                              el aviso la abre y lleva hasta ella. */}
                           {p.motiuKey === 'canal.bl_sense_conveni_gen' && (
                             <Button
                               size="sm"
@@ -410,432 +266,14 @@ export default function CanalitzacioDetall() {
                     </div>
                   ))}
 
-                  {/* El «producte al camp» cambia lo que significa la fase 2, así que se
-                      dice antes de enseñar el botón: la entrada de este lote la produce una
-                      jornada de campo, no un albarán tecleado. */}
-                  {i === 1 && oferta?.producte_al_camp && (
-                    <div className="rounded-md bg-secondary p-2 text-sm text-secondary-foreground">
-                      <p>{t(oferta.espigolada_id ? 'conv_esp.done_hint' : 'conv_esp.banner')}</p>
-                      {/* En táctil no hay hover, así que el tooltip del botón gris no
-                          existe para media aplicación: el motivo va también escrito. */}
-                      {!oferta.espigolada_id && motiuNoConvertible && (
-                        <p className="mt-1">{motiuNoConvertible}</p>
-                      )}
-                    </div>
-                  )}
-
-                  {/* ── Las acciones de cada fase ── */}
-                  <div className="flex flex-wrap gap-2">
-                    {i === 0 && (
-                      <>
-                        {!fets.conveni_gen && extra.productor && conveniQueCalEntregar(extra.oferta.modalitat) && (
-                          <Button
-                            className="h-11 whitespace-normal md:h-9"
-                            disabled={ocupat}
-                            onClick={() => void fes(
-                              async () => {
-                                const r = await prepararConveni(
-                                  'productor', extra.productor!.id, conveniQueCalEntregar(extra.oferta.modalitat)!,
-                                )
-                                return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
-                              },
-                              'canalz.ok_preparat',
-                            )}
-                          >
-                            {t('canalz.b_preparar')}
-                          </Button>
-                        )}
-                        {fets.conveni_gen && pas('conv_gen_firmar').estat !== 'fet' && (
-                          <Button
-                            className="h-11 whitespace-normal md:h-9"
-                            onClick={() => setDlgFirma(fets.conveni_gen!.id)}
-                          >
-                            {t('canalz.b_firma_assistida')}
-                          </Button>
-                        )}
-                        {fets.conveni_gen?.estado === 'firmat' && (
-                          <BotoAmbMotiu
-                            className="h-11 whitespace-normal md:h-9"
-                            disabled={ocupat || !potAprovar}
-                            motiu={potAprovar ? undefined : t('conv.need_approver')}
-                            onClick={async () => {
-                              if (!(await confirmaContrasignar())) return
-                              void fes(
-                              async () => {
-                                const r = await contrafirmarConveni(fets.conveni_gen!.id)
-                                return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
-                              },
-                              'canalz.ok_contrasignat',
-                              )
-                            }}
-                          >
-                            {t('canalz.b_contrasignar')}
-                          </BotoAmbMotiu>
-                        )}
-                        {fets.conveni_gen && (
-                          <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                            <Link to={`/equip/convenis/${fets.conveni_gen.id}`}>{t('canalz.b_veure_conveni')}</Link>
-                          </Button>
-                        )}
-                      </>
-                    )}
-
-                    {(i === 1 || i === 2) && (
-                      <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                        <Link to={`/equip/ofertes/${extra.oferta.id}`}>{t('canalz.b_obre_oferta')}</Link>
-                      </Button>
-                    )}
-
-                    {/* F3, fase 2 (l'entrada): si el lote declara producto SIN COSECHAR,
-                        la entrada no es un albarán que alguien teclea, es una jornada de
-                        campo. Y si ya lo es, se enlaza a ella. */}
-                    {i === 1 && oferta?.espigolada_id && (
-                      <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                        <Link to={`/equip/espigolades/${oferta.espigolada_id}`}>
-                          {t('conv_esp.open')}
-                        </Link>
-                      </Button>
-                    )}
-                    {i === 1 && oferta?.producte_al_camp && !oferta.espigolada_id && (
-                      <BotoAmbMotiu
-                        className="h-11 whitespace-normal md:h-9"
-                        disabled={Boolean(motiuNoConvertible)}
-                        motiu={motiuNoConvertible ?? undefined}
-                        onClick={() => setDlgEspigolada(true)}
-                      >
-                        {t('conv_esp.cta')}
-                      </BotoAmbMotiu>
-                    )}
-
-                    {i === 3 && (
-                      <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                        <Link to="/equip/aprovacions">{t('canalz.b_cua_aprovacions')}</Link>
-                      </Button>
-                    )}
-
-                    {i === 4 && (
-                      <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                        <Link to="/equip/albarans">{t('canalz.b_albarans')}</Link>
-                      </Button>
-                    )}
-
-                    {i === 5 && (
-                      <>
-                        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                          <Link to="/equip/productes">{t('canalz.b_costos')}</Link>
-                        </Button>
-                        {/* Al cierre CONCRETO de este ejercicio, si ya existe: ahí viven los
-                            certificados de donación y de transacción de este generador. */}
-                        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
-                          <Link to={extra.exercici?.id ? `/equip/tancament/${extra.exercici.id}` : '/equip/tancament'}>
-                            {t('canalz.b_tancament')}
-                          </Link>
-                        </Button>
-                      </>
-                    )}
-                  </div>
-
-                  {/* ── Fase 4: el interés asistido ──
-                      La entidad dice por teléfono cuántos kilos quiere y el equipo lo
-                      registra. NO es un `insert` a `oferta_respuestas`: pasa por
-                      `manifestar_interes_assistit`, que conserva las tres comprobaciones
-                      que los atajos se saltan (estado, compatibilidad y precio mínimo). */}
-                  {i === 3 && (
-                    <div className="space-y-2 rounded-md border p-3">
-                      <p className="text-sm font-medium">{t('canalz.interes_title')}</p>
-                      <p className="text-xs text-muted-foreground">{t('canalz.interes_hint')}</p>
-                      <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                        <div className="sm:col-span-2">
-                          <Label htmlFor="cd-interes-entitat" className="mb-1 block text-xs text-muted-foreground">
-                            {t('canalz.interes_entitat')}
-                          </Label>
-                          <select
-                            id="cd-interes-entitat"
-                            name="entitat"
-                            className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
-                            value={entitatTriada}
-                            onChange={(e) => setEntitatTriada(e.target.value)}
-                          >
-                            <option value="">—</option>
-                            {entitats.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-                          </select>
-                        </div>
-                        <div>
-                          <Label htmlFor="cd-interes-kg" className="mb-1 block text-xs text-muted-foreground">
-                            {t('canalz.interes_kg')}
-                          </Label>
-                          <Input
-                            id="cd-interes-kg"
-                            name="kg"
-                            type="number" min="0" step="0.01"
-                            value={kgInteres}
-                            onChange={(e) => setKgInteres(e.target.value)}
-                          />
-                        </div>
-                        {esVenda && (
-                          <div>
-                            <Label htmlFor="cd-interes-preu" className="mb-1 block text-xs text-muted-foreground">
-                              {t('canalz.interes_preu')}
-                            </Label>
-                            <Input
-                              id="cd-interes-preu"
-                              name="preu"
-                              type="number" min="0" step="0.01" inputMode="decimal"
-                              placeholder={oferta?.preu_minim != null ? String(oferta.preu_minim) : undefined}
-                              value={preuInteres}
-                              onChange={(e) => setPreuInteres(e.target.value)}
-                            />
-                          </div>
-                        )}
-                      </div>
-                      <Button
-                        className="h-11 whitespace-normal md:h-9"
-                        disabled={ocupat || !entitatTriada || kgInteres.trim() === '' || (esVenda && preuInteres.trim() === '')}
-                        onClick={() => void fes(
-                          async () => {
-                            const r = await interesAssistit(
-                              ex.oferta.id, entitatTriada, Number(kgInteres),
-                              esVenda && preuInteres.trim() !== '' ? Number(preuInteres) : null, null,
-                            )
-                            if (r.ok) { setEntitatTriada(''); setKgInteres(''); setPreuInteres('') }
-                            return r.ok ? { ok: true } : { ok: false, missatge: r.missatge }
-                          },
-                          'canalz.ok_interes',
-                        )}
-                      >
-                        {t('canalz.b_interes_assistit')}
-                      </Button>
-
-                      {/* Los intereses que esperan decisión, aprobables desde aquí.
-                          Y con EL CONVENIO DE CADA UNA al lado: `aprovar_resposta()` lo exige
-                          desde la fecha de corte (42501 `sense_conveni`), así que un botón de
-                          aprobar sin decir que falta el convenio manda a chocar contra la
-                          base. Los botones que lo resuelven viven aquí, en la misma fila:
-                          mandar a otra pantalla es perder el hilo del lote. */}
-                      {extra.respostes
-                        .filter((r) => r.estado === 'acceptada' && r.aprovacio === 'pendent')
-                        .map((r) => {
-                          const cv = r.conveni_rec
-                          const vigent = cv?.estado === 'vigent'
-                          const tipusCal = conveniQueCalRebre(extra.oferta.modalitat)
-                          return (
-                            <div key={r.id} className="rounded-md border p-2">
-                              <div className="flex flex-wrap items-center justify-between gap-2">
-                                <span className="text-sm">
-                                  {r.entitat}
-                                  {r.kg_solicitados != null && (
-                                    <span className="tabular-nums"> · {Number(r.kg_solicitados).toLocaleString('ca-ES', { maximumFractionDigits: 2 })} kg</span>
-                                  )}
-                                </span>
-                                <span className="flex flex-wrap items-center gap-2">
-                                  <Badge className={vigent ? 'bg-exito-fondo text-exito' : 'bg-aviso-fondo text-aviso'}>
-                                    {cv ? t(`conv.st_${cv.estado}`) : t('canalz.rec_sense_conveni')}
-                                  </Badge>
-                                  {(extra.oferta.modalitats?.length ?? 0) > 1 && (
-                                    <SelectorModalitat id={`canalz-mod-${r.id}`} ambBuit
-                                      modalitats={(extra.oferta.modalitats ?? []) as Modalitat[]}
-                                      valor={modalitatAprova[r.id] ?? ''}
-                                      onCanvi={(m) => setModalitatAprova((x) => ({ ...x, [r.id]: m }))} />
-                                  )}
-                                  <BotoAmbMotiu
-                                    size="sm"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    disabled={ocupat || r.kg_solicitados == null || !vigent || !potAprovar
-                                      || ((extra.oferta.modalitats?.length ?? 0) > 1 && !modalitatAprova[r.id])}
-                                    motiu={!potAprovar ? t('appr.need_approver') : !vigent ? t('canalz.rec_sense_conveni') : undefined}
-                                    onClick={() => void aprovaInteres(r.id, r.entidad_id, Number(r.kg_solicitados ?? 0))}
-                                  >
-                                    {t('canalz.b_aprova')}
-                                  </BotoAmbMotiu>
-                                </span>
-                              </div>
-
-                              {/* Sin convenio vigente: qué falta y el botón que lo resuelve. */}
-                              {!vigent && (
-                                <div className="mt-2 rounded-md bg-aviso-fondo p-2">
-                                  <p className="text-sm text-aviso">{t('canalz.rec_conveni_cal')}</p>
-                                  <div className="mt-2 flex flex-wrap gap-2">
-                                    {!cv && r.entidad_id && tipusCal && (
-                                      <Button
-                                        size="sm"
-                                        className="h-11 whitespace-normal md:h-8"
-                                        disabled={ocupat}
-                                        onClick={() => void fes(
-                                          async () => {
-                                            const res = await prepararConveni('entidad', r.entidad_id!, tipusCal)
-                                            return res.ok ? { ok: true } : { ok: false, missatge: res.missatge }
-                                          },
-                                          'canalz.ok_preparat',
-                                        )}
-                                      >
-                                        {t('canalz.b_preparar')}
-                                      </Button>
-                                    )}
-                                    {cv && cv.estado !== 'firmat' && (
-                                      <Button
-                                        size="sm"
-                                        className="h-11 whitespace-normal md:h-8"
-                                        onClick={() => setDlgFirma(cv.id)}
-                                      >
-                                        {t('canalz.b_firma_assistida')}
-                                      </Button>
-                                    )}
-                                    {cv?.estado === 'firmat' && (
-                                      <BotoAmbMotiu
-                                        size="sm"
-                                        className="h-11 whitespace-normal md:h-8"
-                                        disabled={ocupat || !potAprovar}
-                                        motiu={potAprovar ? undefined : t('conv.need_approver')}
-                                        onClick={async () => {
-                                          if (!(await confirmaContrasignar())) return
-                                          void fes(
-                                          async () => {
-                                            const res = await contrafirmarConveni(cv.id)
-                                            return res.ok ? { ok: true } : { ok: false, missatge: res.missatge }
-                                          },
-                                          'canalz.ok_contrasignat',
-                                          )
-                                        }}
-                                      >
-                                        {t('canalz.b_contrasignar')}
-                                      </BotoAmbMotiu>
-                                    )}
-                                    {cv && (
-                                      <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                                        <Link to={`/equip/convenis/${cv.id}`}>{t('canalz.b_veure_conveni')}</Link>
-                                      </Button>
-                                    )}
-                                  </div>
-                                </div>
-                              )}
-                            </div>
-                          )
-                        })}
-                    </div>
-                  )}
-
-                  {/* ── Fase 5: los albaranes, uno a uno ── */}
-                  {i === 4 && extra.albarans.length > 0 && (
-                    <div className="space-y-2">
-                      {extra.albarans.map((a) => (
-                        <div key={a.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
-                          <span className="text-sm tabular-nums">
-                            {a.tipo} · {a.numero ?? t('canalz.sense_numero')} · {t(`alb.st_${a.estado}`)}
-                          </span>
-                          <span className="flex flex-wrap gap-2">
-                            {a.estado === 'emitido' && (
-                              <Button
-                                size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
-                                disabled={ocupat}
-                                onClick={async () => {
-                                  // Manda correo a las partes: se pregunta antes (como en `AlbaraDetall`).
-                                  if (!(await confirma({
-                                    titol: t('alb.deliver_confirm_t'),
-                                    descripcio: t('alb.deliver_confirm'),
-                                    confirmar: t('alb.mark_delivered'),
-                                  }))) return
-                                  void fes(
-                                  async () => {
-                                    const r = await marcarEntregat(a.id)
-                                    if (!r.ok) return { ok: false, missatge: r.missatge }
-                                    // Hasta el 28-09-2026 aquí se DESCARTABAN los enlaces: el
-                                    // token solo existe en esta respuesta, y nadie lo enviaba.
-                                    const enllacos = r.data.enllacos ?? []
-                                    const correu = await enviaEnllacosConfirmacio(a.numero ?? null, enllacos, t, lang, canals.email)
-                                    // UN aviso, no dos verdes seguidos: «entregat» y «correu
-                                    // enviat» son el mismo acto (como en `AlbaraDetall`). Esta
-                                    // pantalla no enseña los enlaces: la salida, si el correo no
-                                    // sale, es la confirmación asistida.
-                                    const perWhatsapp = enllacos.filter((e) => e.canal === 'whatsapp').length
-                                    if (perWhatsapp > 0) toast.info(t('alb.delivered_wa', { n: perWhatsapp }))
-                                    if (correu.desactivat) toast.warning(`${t('canalz.ok_entregat')} ${t('canal.links_no_enviats')}`)
-                                    else if (enllacos.length === 0) toast.warning(t('alb.delivered_0'))
-                                    else if (perWhatsapp === enllacos.length) { /* només WhatsApp: ja s'ha dit */ }
-                                    else if (correu.enviats > 0) toast.success(t('alb.delivered_mail', { n: correu.enviats }))
-                                    else toast.warning(`${t('canalz.ok_entregat')} ${t('alb.mail_failed_assistit')}`)
-                                    if (correu.enviats > 0 && correu.fallits > 0) toast.warning(t('alb.mail_failed_assistit'))
-                                    return { ok: true, avisat: true }
-                                  },
-                                  'canalz.ok_entregat',
-                                  )
-                                }}
-                              >
-                                {t('canalz.b_entregat')}
-                              </Button>
-                            )}
-                            {a.estado === 'entregado' && (
-                              <Button
-                                size="sm" className="h-11 whitespace-normal md:h-8"
-                                onClick={() => setDlgAlbara(a.id)}
-                              >
-                                {t('canalz.b_confirmacio_assistida')}
-                              </Button>
-                            )}
-                            {(a.tipo === 'ENT' || a.tipo === 'OPE')
-                              && ['borrador', 'emitido', 'entregado'].includes(a.estado) && (
-                              <BotoAmbMotiu
-                                size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
-                                disabled={!potAprovar}
-                                motiu={potAprovar ? undefined : t('recol.need_admin')}
-                                onClick={() => void obreRecollida(a.id)}
-                              >
-                                {t('recol.btn')}
-                              </BotoAmbMotiu>
-                            )}
-                            <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                              <Link to={`/equip/albarans/${a.id}`}>{t('canalz.b_obre')}</Link>
-                            </Button>
-                          </span>
-                        </div>
-                      ))}
-                    </div>
-                  )}
+                  {/* ── Las acciones y los mensajes de la fase ── */}
+                  <Fase c={c} />
                 </div>
               </CollapsibleContent>
             </div>
           </Collapsible>
         )
       })}
-
-      {dlgFirma && (
-        <DialegFirmaAssistida
-          obert
-          conveniId={dlgFirma}
-          onTancar={() => setDlgFirma(null)}
-          onFirmat={() => { setDlgFirma(null); void carrega() }}
-        />
-      )}
-      {oferta && (
-        <DialegEspigolada
-          obert={dlgEspigolada}
-          oferta={oferta}
-          productorNom={extra.productor?.nom ?? null}
-          onTancar={() => setDlgEspigolada(false)}
-          onCreada={() => { setDlgEspigolada(false); void refrescaComptadors(); void carrega() }}
-        />
-      )}
-      {dlgAlbara && (
-        <DialegAssistit
-          obert
-          que="albara"
-          objecteId={dlgAlbara}
-          onTancar={() => setDlgAlbara(null)}
-          onFet={() => { setDlgAlbara(null); void carrega() }}
-        />
-      )}
-      {dlgRecollida && (
-        <DialegConfirmaRecollida
-          obert
-          canalitzacio={dlgRecollida.canalitzacio}
-          kgAssignats={dlgRecollida.kg}
-          dataPrevista={dlgRecollida.data}
-          descripcio={dlgRecollida.numero}
-          esborrany={dlgRecollida.esborrany}
-          onTancar={() => setDlgRecollida(null)}
-          onFet={() => void carrega()}
-        />
-      )}
-      {dialegConfirma}
     </div>
   )
 }

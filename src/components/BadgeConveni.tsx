@@ -16,6 +16,7 @@ import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
+import { useTicAvisos } from '../lib/refrescAvisos'
 import { estilEstatConveni } from '../lib/convenis'
 import { ORDRE_CONVENI as ORDRE } from '../lib/documentsPanell'
 import type { Convenio, ConvenioEstado, ConvenioTipo } from '../types'
@@ -25,7 +26,8 @@ interface Fila {
   id: string
   tipo: ConvenioTipo
   estado: ConvenioEstado
-  /** `paper` = se firmó fuera y lo registró el super_admin (20270329100300) */
+  /** `paper` = se firmó fuera y lo registró el super_admin (20270329100300); `declarat` = lo
+   * dio por vigente el super_admin sin firma ni escaneado (20270430100000) */
   origen: Convenio['origen']
   /** La referencia del papel. Sustituye al número: un convenio en papel no gasta serie */
   referencia_paper: string | null
@@ -50,6 +52,8 @@ export default function BadgeConveni({
   const { t } = useT()
   const [files, setFiles] = useState<Fila[]>([])
   const [carregat, setCarregat] = useState(false)
+  // Se vuelve a leer tras declarar o registrar un convenio desde la misma ficha.
+  const tic = useTicAvisos()
 
   useEffect(() => {
     if (!orgId) { setFiles([]); setCarregat(true); return }
@@ -65,7 +69,7 @@ export default function BadgeConveni({
         setCarregat(true)
       })
     return () => { viu = false }
-  }, [orgId, tipusOrg])
+  }, [orgId, tipusOrg, tic])
 
   if (!carregat) return null
 
@@ -99,6 +103,9 @@ export default function BadgeConveni({
             {esPaperVigent(f) && f.referencia_paper
               ? ` · ${t('conv.paper_ref_short', { num: f.referencia_paper })}`
               : ''}
+            {/* Declarado por el equipo (20270430100000): verde igual, porque es vigente de
+                verdad, y el texto dice que no lleva firma. */}
+            {f.estado === 'vigent' && f.origen === 'declarat' ? ` · ${t('conv.origen_declarat')}` : ''}
           </Badge>
         </Link>
       ))}

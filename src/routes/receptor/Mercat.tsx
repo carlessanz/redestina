@@ -21,7 +21,7 @@ import { useOrganitzacio } from '../../hooks/useAppContext'
 import { useConveni } from '../../hooks/useConveni'
 import { clauErrorInteres, manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
-import { avuiLocal, avuiMadrid, dataCurta, kg as fmtKg, preu as fmtPreu } from '../../lib/format'
+import { avuiMadrid, dataCurta, kg as fmtKg, preu as fmtPreu } from '../../lib/format'
 import {
   desaFiltres, filtraMercat, llegeixFiltres, opcionsMercat, SENSE_FILTRES,
 } from '../../lib/filtresMercat'
@@ -31,9 +31,10 @@ import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta
 import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
 import DialegFirmaConveni from '../../components/DialegFirmaConveni'
 import { convenisQueFalten, type Equivalencia } from '../../lib/convenisEquivalents'
-import { ambPreu, modalitatsDe, modalitatsOferta, textModalitats } from '../../lib/modalitats'
+import { ambPreu, modalitatsDe, modalitatsPossibles, textModalitats } from '../../lib/modalitats'
 import SelectorModalitat from '../../components/SelectorModalitat'
-import { HORES, QUARTS, hhmm } from '../../lib/franja'
+import { isoRecollida } from '../../lib/franja'
+import CampsRecollida from '../../components/CampsRecollida'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
@@ -162,14 +163,13 @@ export default function Mercat() {
 
   /** Las modalidades de la oferta que esta entidad puede recibir (05-10-2026). */
   function compatibles(o: OfertaReceptor): Modalitat[] {
-    const ms = modalitatsOferta(o)
-    return compat ? ms.filter((m) => compat.includes(m)) : ms
+    return modalitatsPossibles(o, compat)
   }
   /** Y de esas, las que puede pedir hoy: desde el corte, solo las que tienen su convenio. */
   function possibles(o: OfertaReceptor): Modalitat[] {
-    const ms = compatibles(o)
-    if (!tallPassat) return ms
-    return ms.filter((m) => convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents).length === 0)
+    return modalitatsPossibles(o, compat, tallPassat
+      ? (m) => convenisQueFalten(m, exigits[m] ?? [], tipusVigents, equivalents).length === 0
+      : undefined)
   }
 
   function obre(o: OfertaReceptor, m: 'detall' | 'interes') {
@@ -197,7 +197,7 @@ export default function Mercat() {
     const triada = modalitat || (ms.length === 1 ? ms[0] : '')
     if (ms.length > 1 && !triada) { toast.error(t('mk.need_mode')); return }
     if ((diaRec && !horaRec) || (!diaRec && horaRec)) { toast.error(t('mk.need_dia_hora')); return }
-    const recollida = diaRec && horaRec ? new Date(`${diaRec}T${horaRec}:00`).toISOString() : null
+    const recollida = isoRecollida(diaRec, horaRec)
     setEnviant(true)
     const r = await manifestaInteres({
       excedenteId: obert.id,
@@ -432,25 +432,9 @@ export default function Mercat() {
                 )}
                 {/* Cuándo la recoge: el día hasta la disponibilidad, la hora dentro de la
                     franja que dio la productora (por cuartos). */}
-                <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                  <div>
-                    <Label htmlFor="mk-dia" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.dia_rec')}</Label>
-                    <Input id="mk-dia" type="date" value={diaRec} min={avuiLocal()}
-                      max={obert.disponible_hasta ?? undefined}
-                      onChange={(e) => setDiaRec(e.target.value)} />
-                  </div>
-                  <div>
-                    <Label htmlFor="mk-hora" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.hora_rec')}</Label>
-                    <select id="mk-hora" value={horaRec} onChange={(e) => setHoraRec(e.target.value)}
-                      className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm">
-                      <option value="">—</option>
-                      {horesDins(obert.hora_recollida_inici, obert.hora_recollida_fi).map((h) => (
-                        <option key={h} value={h}>{h}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <p className="text-xs text-muted-foreground sm:col-span-2">{t('mk.rec_help')}</p>
-                </div>
+                <CampsRecollida idPrefix="mk" dia={diaRec} hora={horaRec} onDia={setDiaRec} onHora={setHoraRec}
+                  disponibleFins={obert.disponible_hasta} inici={obert.hora_recollida_inici} fi={obert.hora_recollida_fi}
+                  ajuda={t('mk.rec_help')} />
                 {obertMods.length > 1 && (
                   <div>
                     <Label htmlFor="mk-mode" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.mode_q')}</Label>
@@ -509,11 +493,4 @@ export default function Mercat() {
       </Dialog>
     </Card>
   )
-}
-
-/** Las horas por cuartos dentro de la franja (o de 06 a 22 si la oferta no tiene). */
-function horesDins(inici: string | null | undefined, fi: string | null | undefined): string[] {
-  const a = hhmm(inici) || '06:00'
-  const b = hhmm(fi) || '22:45'
-  return HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).filter((x) => x >= a && x <= b)
 }

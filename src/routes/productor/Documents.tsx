@@ -25,6 +25,7 @@ import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useOrganitzacio } from '../../hooks/useAppContext'
+import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
@@ -240,7 +241,11 @@ export default function ProductorDocuments() {
       <PendentsDeTu tipusOrg="productor" tornarA="/productor/documents" />
 
       {/* --- Sus convenios --- */}
-      <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador} />
+      <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador}
+        signar={orgId ? {
+          tipusOrg: 'productor', orgId, titular: org?.rol_org === 'titular',
+          onFirmat: () => { refrescaAvisos(); void refresca() },
+        } : undefined} />
 
       {/* --- El acumulado del año --- */}
       <Card>

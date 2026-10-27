@@ -27,6 +27,7 @@ import { dataCurta } from '../../lib/albarans'
 import type { DocumentExternTipus, DocumentoExterno } from '../../types'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import DialegConveniPaper from './DialegConveniPaper'
+import DialegConveniDeclarat from './DialegConveniDeclarat'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -70,6 +71,7 @@ export default function DocumentacioOrganitzacio({
   const [fitxer, setFitxer] = useState<File | null>(null)
   const [pujant, setPujant] = useState(false)
   const [dialeg, setDialeg] = useState(false)
+  const [dialegDeclarat, setDialegDeclarat] = useState(false)
   const [descarregant, setDescarregant] = useState<string | null>(null)
 
   /**
@@ -199,6 +201,18 @@ export default function DocumentacioOrganitzacio({
             onClick={() => setDialeg(true)}
           >
             {t('conv.paper_open')}
+          </BotoAmbMotiu>
+          {/* Sin papel ni firma: lo da por vigente el super_admin con los datos de la ficha,
+              y el PDF lo dice (gestión autónoma, fase 1). */}
+          <BotoAmbMotiu
+            size="sm"
+            variant="outline"
+            className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+            disabled={!esSuperAdmin}
+            motiu={t('cdecl.need_super')}
+            onClick={() => setDialegDeclarat(true)}
+          >
+            {t('cdecl.open')}
           </BotoAmbMotiu>
         </div>
       </CardHeader>
@@ -371,6 +385,14 @@ export default function DocumentacioOrganitzacio({
         orgId={orgId}
         nom={nom}
         onTancar={() => setDialeg(false)}
+        onFet={() => void carrega()}
+      />
+      <DialegConveniDeclarat
+        obert={dialegDeclarat}
+        tipusOrg={tipusOrg}
+        orgId={orgId}
+        nom={nom}
+        onTancar={() => setDialegDeclarat(false)}
         onFet={() => void carrega()}
       />
     </Card>

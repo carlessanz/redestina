@@ -3,9 +3,19 @@
 // asistida, el mensaje que el productor habría recibido si la hubiera dictado él (R4 del
 // plan de gestión autónoma: un solo texto, no una copia). Lo vigila `tests/puresa.test.ts`.
 
+/**
+ * «de Tomàquet» / «d'Albercoc»: la preposición apostrofada ante vocal o h, como se escribe.
+ * Sin esto el bot decía «de Horta Fulla» o «de Enciam» (4 familias y muchos productos). Vive
+ * aquí y no en `intake.ts` porque aquel no es «hoja»; `intake.ts` la reexporta.
+ */
+export function de(nom: string): string {
+  return /^[aeiouàèéíòóúh]/i.test(nom.trim()) ? `d'${nom}` : `de ${nom}`;
+}
+
 /** El agradecimiento con la referencia, según la oferta quede publicada o por validar. */
 export function textAgraimentIntake(producto: string, idExcedente: string, estado?: string | null): string {
-  return `Gràcies! Hem registrat la teva oferta de ${producto} amb la referència ${idExcedente}. ` +
+  // Apostrofado desde el 27-10-2026: decía «la teva oferta de Alvocat».
+  return `Gràcies! Hem registrat la teva oferta ${de(producto)} amb la referència ${idExcedente}. ` +
     (estado === "pendent_validacio"
       // Desde el 05-10-2026 una oferta nueva espera a que el equipo la revise antes de
       // salir al Mercat. Decir «la farem arribar» sin más sería prometer algo que todavía

@@ -174,3 +174,12 @@ describe('recollida_per_registrar y recollida_retornada: el equipo valida el reg
     }
   })
 })
+
+describe('el producto, apostrofado en catalán (27-10-2026)', () => {
+  it('«d’Alvocat» y «de Tomàquet», y en castellano siempre «de»', () => {
+    const p = { producte: 'Alvocat', kg: 60, entitat: 'Menjador', modalitat: 'donacio' }
+    expect(textAvis('interes_aprovat', p, 'ca', 'x').cuerpo).toContain('kg d’Alvocat')
+    expect(textAvis('interes_aprovat', { ...p, producte: 'Tomàquet' }, 'ca', 'x').cuerpo).toContain('kg de Tomàquet')
+    expect(textAvis('interes_aprovat', p, 'es', 'x').cuerpo).toContain('kg de Alvocat')
+  })
+})

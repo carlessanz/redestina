@@ -33,6 +33,8 @@ import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
 import FitxaOperacio from '../../components/FitxaOperacio'
+import MissatgesDelPunt from '../../components/MissatgesDelPunt'
+import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { declinaOferta } from '../../lib/operacio'
 import { estatValidacio } from '../../lib/registreRecollida'
 import type { DatesValidacio } from '../../lib/registreRecollida'
@@ -90,6 +92,16 @@ function albaraPerCanalitzacio(files: AlbaraEnt[]): Record<string, AlbaraEnt> {
     }
   }
   return per
+}
+
+/**
+ * Lo que la plataforma le dijo a la receptora sobre una oferta que todavía no tiene asignada
+ * (gestión autónoma, fase 4): el texto íntegro de los avisos, hayan salido o no. Componente
+ * aparte porque el hook no puede vivir dentro del diálogo, que se monta y desmonta.
+ */
+function MissatgesInteres({ excedenteId, versio }: { excedenteId: string; versio: string }) {
+  const { missatges } = useMissatgesOferta(excedenteId, versio, 'entidad')
+  return <MissatgesDelPunt missatges={missatges} destinatari="entidad" nomesLectura nomesAvisos />
 }
 
 export function Interessos() {
@@ -376,7 +388,10 @@ export function Interessos() {
                   </details>
                 </>
               ) : (
-                <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+                <>
+                  <DetallOfertaReceptor oferta={obert.excedentes} foto={foto(obert.excedentes, true)} />
+                  <MissatgesInteres excedenteId={obert.excedentes.id} versio={`${obert.estado}|${obert.aprovacio}`} />
+                </>
               )}
               {/* D1: una vez aprobada, quién la ofrece y dónde se recoge. */}
               {!(obert.aprovacio === 'aprovada' && obert.canalizacion_id) && contraparts[obert.id]?.contrapart && (

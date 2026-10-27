@@ -41,6 +41,7 @@ import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
+import DialegConveniDeclarat from '../../components/equip/DialegConveniDeclarat'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -52,7 +53,7 @@ type Fila = Pick<
   | 'id' | 'tipo' | 'tipo_org' | 'productor_id' | 'entidad_id' | 'numero_completo' | 'estado'
   | 'idioma' | 'roles_com' | 'datos_org' | 'firmante' | 'enviado_at' | 'firmado_at'
   | 'contrafirmado_at' | 'devuelto_at' | 'motivo_devolucion' | 'resuelto_at'
-  | 'fecha_efecto_resolucion' | 'motivo_resolucion' | 'created_at'
+  | 'fecha_efecto_resolucion' | 'motivo_resolucion' | 'created_at' | 'origen'
 >
 
 type DocFila = Pick<
@@ -115,6 +116,8 @@ export default function ConveniDetall() {
   const [correu, setCorreu] = useState('')
 
   const [dialegRetorn, setDialegRetorn] = useState(false)
+  /** «Dona'l per vigent» (convenio declarado, gestión autónoma fase 1). */
+  const [dialegDeclarat, setDialegDeclarat] = useState(false)
   const [dialegResol, setDialegResol] = useState(false)
   const [dataEfecte, setDataEfecte] = useState('')
 
@@ -128,7 +131,7 @@ export default function ConveniDetall() {
     // ⚠️ Lista de columnas en UN literal (§7, deuda 46).
     const { data } = await supabase
       .from('convenios')
-      .select('id, tipo, tipo_org, productor_id, entidad_id, numero_completo, estado, idioma, roles_com, datos_org, firmante, enviado_at, firmado_at, contrafirmado_at, devuelto_at, motivo_devolucion, resuelto_at, fecha_efecto_resolucion, motivo_resolucion, created_at')
+      .select('id, tipo, tipo_org, productor_id, entidad_id, numero_completo, estado, idioma, roles_com, datos_org, firmante, enviado_at, firmado_at, contrafirmado_at, devuelto_at, motivo_devolucion, resuelto_at, fecha_efecto_resolucion, motivo_resolucion, created_at, origen')
       .eq('id', id)
       .maybeSingle()
 
@@ -358,7 +361,12 @@ export default function ConveniDetall() {
                 {conv.roles_com.length > 0 ? ` · ${conv.roles_com.map((r) => t(`conv.role_${r}`)).join(', ')}` : ''}
               </p>
             </div>
-            <Badge className={estilEstatConveni(conv.estado)}>{t(`conv.st_${conv.estado}`)}</Badge>
+            {/* Un declarado vigente se pinta VERDE como cualquier vigente —habilita a operar
+                igual—; lo que cambia es el texto, que dice de dónde viene. */}
+            <Badge className={estilEstatConveni(conv.estado)}>
+              {t(`conv.st_${conv.estado}`)}
+              {conv.origen === 'declarat' ? ` · ${t('conv.origen_declarat')}` : ''}
+            </Badge>
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -408,6 +416,17 @@ export default function ConveniDetall() {
                 </Button>
               </div>
               <p className="text-xs text-muted-foreground">{t('conv.send_hint')}</p>
+              {/* Sin nadie que firme: el super_admin lo da por vigente con los datos de la
+                  ficha. Solo el de col·laboració, que es el único que la base declara. */}
+              {(conv.estado === 'esborrany' || conv.estado === 'pendent_firma')
+                && (conv.tipo === 'col_productor' || conv.tipo === 'col_receptor')
+                && (conv.productor_id || conv.entidad_id) && (
+                <BotoAmbMotiu variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                  disabled={ocupat || !(ctx?.esSuperAdmin ?? false)} motiu={t('cdecl.need_super')}
+                  onClick={() => setDialegDeclarat(true)}>
+                  {t('cdecl.open')}
+                </BotoAmbMotiu>
+              )}
               {conv.estado === 'esborrany' && (
                 <BotoAmbMotiu variant="ghost" className="h-11 whitespace-normal text-destructive md:h-9"
                   disabled={ocupat || !potAprovar} motiu={motiuRol}
@@ -625,6 +644,16 @@ export default function ConveniDetall() {
 
       {/* El visor de PDF. Una sola vez por pantalla. */}
       {descarregador.visor}
+      {(conv.productor_id || conv.entidad_id) && (
+        <DialegConveniDeclarat
+          obert={dialegDeclarat}
+          tipusOrg={conv.productor_id ? 'productor' : 'entidad'}
+          orgId={(conv.productor_id ?? conv.entidad_id)!}
+          nom={nomFitxa}
+          onTancar={() => setDialegDeclarat(false)}
+          onFet={() => { void refrescaComptadors(); void carrega() }}
+        />
+      )}
       {dialegConfirma}
     </div>
   )

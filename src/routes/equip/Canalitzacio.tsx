@@ -21,7 +21,7 @@ import { useT } from '../../lib/i18n'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
-import { lotsActius } from '../../lib/canalitzacio'
+import { avisosSenseEnviarPerOferta, lotsActius } from '../../lib/canalitzacio'
 import type { LotActiu } from '../../lib/canalitzacio'
 import { clauPas, escalaCanal, PASSOS_FASE_CLAUS } from '../../lib/passosCanalitzacio'
 import type { FetsCanal } from '../../lib/passosCanalitzacio'
@@ -107,6 +107,8 @@ function fetsDeLaFila(l: LotActiu): FetsCanal {
 export default function Canalitzacio() {
   const { t } = useT()
   const [files, setFiles] = useState<LotActiu[]>([])
+  // Los avisos que no salieron, por oferta: a quién hay que avisar a mano. `null` = no se sabe.
+  const [perEnviar, setPerEnviar] = useState<Record<string, number> | null>(null)
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
@@ -115,9 +117,10 @@ export default function Canalitzacio() {
 
   const carrega = useCallback(async () => {
     setCarregant(true)
-    const r = await lotsActius()
+    const [r, avisos] = await Promise.all([lotsActius(), avisosSenseEnviarPerOferta()])
     if (!r.ok) { setError(textError(t, r)) }
     else { setFiles(r.data ?? []); setError(null) }
+    setPerEnviar(avisos)
     setCarregant(false)
   }, [t])
 
@@ -173,6 +176,7 @@ export default function Canalitzacio() {
                     <TableHead>{t('canalz.c_accio')}</TableHead>
                     <TableHead className="text-right">{t('canalz.c_kg')}</TableHead>
                     <TableHead className="text-right">{t('canalz.c_pendents')}</TableHead>
+                    <TableHead className="text-right whitespace-normal">{t('cfase.c_missatges')}</TableHead>
                     <TableHead />
                   </TableRow>
                 </TableHeader>
@@ -211,6 +215,15 @@ export default function Canalitzacio() {
                           {l.n_per_aprovar > 0 && (
                             <Badge className="bg-aviso-fondo text-aviso">{l.n_per_aprovar}</Badge>
                           )}
+                        </TableCell>
+                        {/* Lo que la plataforma no pudo mandar (interruptores o gates): se
+                            copia desde «Missatges d'aquest pas» de cada fase. */}
+                        <TableCell className="text-right tabular-nums">
+                          {perEnviar === null
+                            ? <span className="text-muted-foreground">—</span>
+                            : (perEnviar[l.excedente_id] ?? 0) > 0 && (
+                              <Badge className="bg-aviso-fondo text-aviso">{perEnviar[l.excedente_id]}</Badge>
+                            )}
                         </TableCell>
                         <TableCell className="text-right">
                           <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-8">

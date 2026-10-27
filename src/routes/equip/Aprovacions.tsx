@@ -51,7 +51,6 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
-import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../../lib/aprovarResposta'
 import { kgPerOferta } from '../../lib/ofertes'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { FilaCasella } from '../../components/Casella'
@@ -62,9 +61,7 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import { Badge } from '@/components/ui/badge'
-import SelectorModalitat from '../../components/SelectorModalitat'
-import { localDateTime } from '../../lib/franja'
-import { ambPreu, modalitatsOferta } from '../../lib/modalitats'
+import FormulariAprovacio from '../../components/equip/FormulariAprovacio'
 import type { Modalitat } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -232,10 +229,6 @@ const TEXTOS_MOTIU = {
     titol: 'conv.return_title', descripcio: 'conv.return_desc',
     etiqueta: 'conv.return_label', confirmar: 'conv.return',
   },
-  resposta: {
-    titol: 'od.reject_appr', descripcio: 'appr.rej_desc',
-    etiqueta: 'appr.rej_reason', confirmar: 'od.reject_appr',
-  },
   recollida: {
     titol: 'vrec.ret_t', descripcio: 'vrec.ret_desc',
     etiqueta: 'vrec.ret_motiu', confirmar: 'vrec.ret_go',
@@ -258,12 +251,6 @@ export default function Aprovacions() {
   const [carregant, setCarregant] = useState(true)
   /** Kg ya canalizados por oferta, para decir cuántos faltan antes de aprobar. */
   const [kgCanalitzats, setKgCanalitzats] = useState<Record<string, number>>({})
-  /**
-   * Lo que el equipo ha tecleado encima de lo que pidió la entidad, por fila. Es una capa
-   * y no el valor: mientras no se toque el campo manda `kg_solicitados`, así que un
-   * refresco de Realtime no pisa lo escrito ni lo escrito congela lo que llega.
-   */
-  const [edicions, setEdicions] = useState<Record<string, { kg?: string; preu?: string; modalitat?: Modalitat | ''; recollida?: string }>>({})
   const [registres, setRegistres] = useState<Registre[]>([])
   const [perfils, setPerfils] = useState<Record<string, Perfil>>({})
   /** Qué altas se aprueban marcándolas como usuario de prueba. Por id de membresía. */
@@ -292,7 +279,6 @@ export default function Aprovacions() {
   const [motiuDe, setMotiuDe] = useState<
     | { tipus: 'registre'; registre: Registre }
     | { tipus: 'conveni'; conveni: ConveniPendent }
-    | { tipus: 'resposta'; fila: Fila }
     | { tipus: 'recollida'; recollida: RecollidaPendent }
     | null
   >(null)
@@ -554,85 +540,6 @@ export default function Aprovacions() {
   /** Lo que falta por cubrir de esa oferta. Es contra lo que se avisa al canalizar de más. */
   function faltenDe(f: Fila): number {
     return Math.max(0, Number(f.excedentes?.kg_total ?? 0) - (kgCanalitzats[f.excedente_id] ?? 0))
-  }
-
-  /** Lo que hay hoy en los dos campos: lo tecleado si se ha tocado, y si no lo que pidió. */
-  function valorKg(f: Fila): string {
-    return edicions[f.id]?.kg ?? (f.kg_solicitados != null ? String(f.kg_solicitados) : '')
-  }
-  function valorPreu(f: Fila): string {
-    const teclejat = edicions[f.id]?.preu
-    if (teclejat !== undefined) return teclejat
-    // Si la entidad no dijo precio, se parte del mínimo del productor, que es el suelo.
-    const defecte = f.preu_ofert ?? f.excedentes?.preu_minim
-    return defecte != null ? String(defecte) : ''
-  }
-
-  function modsDe(f: Fila): Modalitat[] {
-    return f.excedentes ? modalitatsOferta(f.excedentes as { modalitat: Modalitat | null; modalitats: Modalitat[] | null }) : []
-  }
-  /** La modalidad de esta entrega: la elegida aquí, la que pidió el receptor o la única. */
-  function valorModalitat(f: Fila): Modalitat | '' {
-    const e = edicions[f.id]?.modalitat
-    if (e !== undefined) return e
-    const ms = modsDe(f)
-    if (f.modalitat && ms.includes(f.modalitat)) return f.modalitat
-    return ms.length === 1 ? ms[0] : ''
-  }
-
-  /**
-   * Aprobar desde la cola. Es la misma operación del detalle de la oferta —las dos llaman a
-   * `aprovarResposta()`— con los mismos dos avisos delante: canalizar más de lo que falta,
-   * y aprobar sin convenio vigente. Lo que cambia es de dónde salen los kg.
-   */
-  async function aprovarFila(f: Fila) {
-    const kg = Number(valorKg(f) || 0)
-    if (!f.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
-    const modalitat = valorModalitat(f)
-    if (!modalitat) { toast.error(t('appr.cal_modalitat')); return }
-    if (kg > faltenDe(f) && !(await confirma({
-      titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: kgFmt(faltenDe(f)) }),
-    }))) return
-
-    const falta = await comprovaConvenis(
-      { modalitat, productor_id: f.excedentes?.productor_id ?? null },
-      f.entidad_id, t,
-    )
-    if (falta && !(await confirma({
-      titol: t('od.conv_missing_t'),
-      descripcio: t('od.conv_missing', { parts: falta }),
-    }))) return
-
-    const preuText = valorPreu(f)
-    setOcupat(f.id)
-    const res = await aprovarResposta({
-      id: f.id, kg, preu: preuText !== '' && modalitat !== 'donacio' ? Number(preuText) : null, modalitat,
-      // Solo si el equipo la ha cambiado: si no, vale la que pidió la entidad.
-      recollida: edicions[f.id]?.recollida ? new Date(edicions[f.id]!.recollida!).toISOString() : null,
-    })
-    setOcupat(null)
-    if (!res.ok) {
-      toast.error(textError(t, res))
-      return
-    }
-    toast.success(t('od.approved'))
-    // La fila se va de la cola al momento: esperar al refresco de Realtime deja el botón
-    // pulsable un instante más, que es como se aprueba dos veces la misma cosa.
-    setFiles((prev) => prev.filter((x) => x.id !== f.id))
-    void carrega()
-    void refrescaComptadors()
-  }
-
-  async function rebutjarFila(f: Fila, motiu: string) {
-    setOcupat(f.id)
-    const res = await rebutjarResposta({ id: f.id, motiu })
-    setOcupat(null)
-    setMotiuDe(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    toast.success(t('od.rejected_ok'))
-    setFiles((prev) => prev.filter((x) => x.id !== f.id))
-    void refrescaComptadors()
   }
 
   async function contrafirmar(c: ConveniPendent) {
@@ -943,11 +850,7 @@ export default function Aprovacions() {
             <p className="text-sm text-muted-foreground">{t('appr.empty')}</p>
           )}
           {files.map((f) => {
-            const mods = modsDe(f)
-            const modTriada = valorModalitat(f)
-            const esVenda = modTriada ? modTriada !== 'donacio' : ambPreu(mods)
             const total = Number(f.excedentes?.kg_total ?? 0)
-            const bloquejat = !potAprovar || ocupat === f.id
             return (
               <div key={f.id} className="rounded-lg border p-3">
                 <div className="flex flex-wrap items-start justify-between gap-3">
@@ -973,57 +876,35 @@ export default function Aprovacions() {
                       {t('appr.progres', { n: kgFmt(faltenDe(f)), m: kgFmt(total) })}
                     </div>
                   </div>
-                  <div className="flex flex-wrap items-end gap-2">
-                    {/* `text-base md:text-sm`: en iOS un control por debajo de 16px amplía
-                        la página al enfocarlo y no lo deshace (§2, regla 1 de móvil). */}
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      {t('od.rs_kg')}
-                      <Input type="number" inputMode="numeric" min="0"
-                        className="h-11 w-24 text-base md:h-9 md:text-sm"
-                        value={valorKg(f)}
-                        onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], kg: e.target.value } }))} />
-                    </label>
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      {t('appr.recollida')}
-                      <Input type="datetime-local"
-                        className="h-11 w-48 text-base md:h-9 md:text-sm"
-                        value={edicions[f.id]?.recollida ?? localDateTime(f.recollida_at)}
-                        onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], recollida: e.target.value } }))} />
-                    </label>
-                    {mods.length > 1 && (
-                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {t('mod.entrega')}
-                        <SelectorModalitat modalitats={mods} valor={modTriada} ambBuit
-                          className="h-11 md:h-9"
-                          onCanvi={(m) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], modalitat: m } }))} />
-                      </label>
-                    )}
-                    {esVenda && (
-                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {t('od.rs_preu_venda')}
-                        <Input type="number" inputMode="decimal" step="0.01" min="0"
-                          className="h-11 w-24 text-base md:h-9 md:text-sm"
-                          value={valorPreu(f)}
-                          onChange={(e) => setEdicions((p) => ({ ...p, [f.id]: { ...p[f.id], preu: e.target.value } }))} />
-                      </label>
-                    )}
-                    <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-9"
-                      disabled={bloquejat} motiu={potAprovar ? undefined : t('appr.need_approver')}
-                      onClick={() => void aprovarFila(f)}>
-                      {t('od.approve')}
-                    </BotoAmbMotiu>
-                    <BotoAmbMotiu size="sm" variant="outline" className="h-11 whitespace-normal md:h-9"
-                      disabled={bloquejat} motiu={potAprovar ? undefined : t('appr.need_approver')}
-                      onClick={() => setMotiuDe({ tipus: 'resposta', fila: f })}>
-                      {t('od.reject_appr')}
-                    </BotoAmbMotiu>
+                  {/* El mismo formulario que el detalle de la oferta y el ciclo guiado
+                      (`FormulariAprovacio`): kilos, modalidad, hora de recogida y precio,
+                      con lo que pidió la entidad precargado. */}
+                  <FormulariAprovacio
+                    resposta={f}
+                    oferta={{
+                      modalitat: f.excedentes?.modalitat ?? null,
+                      modalitats: f.excedentes?.modalitats ?? null,
+                      productor_id: f.excedentes?.productor_id ?? null,
+                      preu_minim: f.excedentes?.preu_minim ?? null,
+                    }}
+                    faltan={faltenDe(f)}
+                    potAprovar={potAprovar}
+                    idPrefix={`appr-${f.id}`}
+                    onFet={() => {
+                      // La fila se va de la cola al momento: esperar al refresco de Realtime
+                      // deja el botón pulsable un instante más, que es como se aprueba dos veces.
+                      setFiles((prev) => prev.filter((x) => x.id !== f.id))
+                      void carrega()
+                      void refrescaComptadors()
+                    }}
+                  >
                     {/* El detalle sigue a un clic: aquí no caben el resto de respuestas ni
                         el ranking de entidades, y a veces son justo lo que hay que mirar. */}
                     <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-9"
                       onClick={() => navigate(`/equip/ofertes/${f.excedente_id}`)}>
                       {t('appr.open')}
                     </Button>
-                  </div>
+                  </FormulariAprovacio>
                 </div>
               </div>
             )
@@ -1162,7 +1043,6 @@ export default function Aprovacions() {
           if (!motiuDe) return
           if (motiuDe.tipus === 'conveni') void retornar(motiuDe.conveni, m)
           else if (motiuDe.tipus === 'recollida') void retornarRecollida(motiuDe.recollida, m)
-          else if (motiuDe.tipus === 'resposta') void rebutjarFila(motiuDe.fila, m)
           else void rebutjarRegistre(motiuDe.registre, m)
         }}
       />

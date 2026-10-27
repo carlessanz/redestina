@@ -51,7 +51,15 @@ export default function CampanaAvisos() {
             <span className={cn('text-sm', !a.llegit_at && 'font-semibold')}>
               {t(clauAvis(a), varsAvis(a))}
             </span>
-            <span className="text-xs text-muted-foreground">{dataCurta(a.created_at)}</span>
+            <span className="text-xs text-muted-foreground">
+              {dataCurta(a.created_at)}
+              {/* Con las notificaciones apagadas, esto solo lo ha visto aquí: se dice. */}
+              {a.canal_enviat === 'cap' && (
+                <span className="ml-2 inline-flex items-center gap-1 text-aviso">
+                  <span className="size-1.5 rounded-full bg-aviso" aria-hidden />{t('avis.no_enviat')}
+                </span>
+              )}
+            </span>
           </DropdownMenuItem>
         ))}
         {noLlegits > 0 && (

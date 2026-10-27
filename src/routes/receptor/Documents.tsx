@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
+import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kgRebutsExercici } from '../../lib/certificatRecepcio'
 import { codiVerificacio } from '../../lib/codiVerificacio'
@@ -191,7 +192,11 @@ export default function ReceptorDocuments() {
       {/* Lo único de esta pantalla que le pide algo. El resto es archivo. */}
       <PendentsDeTu tipusOrg="entidad" tornarA="/receptor/documents" />
 
-      <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador} />
+      <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador}
+        signar={orgId ? {
+          tipusOrg: 'entidad', orgId, titular: org?.rol_org === 'titular',
+          onFirmat: () => { refrescaAvisos(); void refresca() },
+        } : undefined} />
 
       {/* --- Lo que ha recibido este año, en kilos --- */}
       <Card>

@@ -47,6 +47,11 @@ export interface AltaFeta {
   email: string
   /** Solo en `assistit`: si hay que mandar el acceso ahora. */
   enviaAcces: boolean
+  /**
+   * Los convenios en borrador que el alta ha preparado (uno por papel). Con ellos el alta
+   * asistida ofrece darlos por vigentes al momento (gestión autónoma, fase 1).
+   */
+  convenis: { id: string; tipo: string }[]
 }
 
 interface Props {
@@ -131,10 +136,13 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
         }),
       })
       const dades = (await res.json().catch(() => null)) as
-        { code?: string; error?: string; revisio_equip?: boolean; camp?: string } | null
+        { code?: string; error?: string; revisio_equip?: boolean; camp?: string; convenis?: { id: string; tipo: string }[] } | null
       setOcupat(false)
       if (res.ok) {
-        onFet({ revisio: dades?.revisio_equip === true, email: email.trim(), enviaAcces: assistit && enviaAcces })
+        onFet({
+          revisio: dades?.revisio_equip === true, email: email.trim(), enviaAcces: assistit && enviaAcces,
+          convenis: (Array.isArray(dades?.convenis) ? dades?.convenis ?? [] : []).filter((c) => c && typeof c.id === 'string'),
+        })
         return
       }
       const claus: Record<string, string> = {

@@ -160,6 +160,67 @@ export async function validaRecollida(camps: {
   }
 }
 
+/**
+ * «Registra la recollida» EN NOMBRE de la receptora (27-10-2026, gestión autónoma, fase 3):
+ * `registrar_recollida_assistida()` registra con el mismo código que el receptor y valida con
+ * el mismo `validar_recollida()`, en una transacción. Sale lo mismo que en el camino del
+ * usuario —ENT/OPE, REC cuando no falta ninguna salida, conciliación con los kilos reales— y
+ * la evidencia dice que lo hizo el equipo. Solo un admin (`pot_aprovar()`).
+ *
+ * `motiu` es el de la diferencia: va a `p_observacions` (lo que guarda el registro, como el
+ * motivo de la receptora) y a `p_motiu` (el de la validación). Sin diferencia, las
+ * observaciones van solas y la validación no pide motivo.
+ *
+ * ⚠️ No pasa `p_foto`: la base exige que la foto ya esté subida a un albarán de ESA entrega, y
+ *    antes de validar el albarán es un borrador sin ejercicio, sin carpeta donde subirla. Se
+ *    sube después, sobre el albarán emitido (el mismo criterio de siempre). Nunca lanza.
+ */
+export async function registraRecollidaAssistida(camps: {
+  canalitzacio: string
+  resultat: ResultatRecollida
+  kgReals: number | null
+  data: string | null
+  observacions: string | null
+  motiu: string | null
+}): Promise<ResultatCrida<ResultatValidaRecollida & { registrada_per?: string }>> {
+  try {
+    const { data, error } = await supabase.rpc('registrar_recollida_assistida', {
+      p_canalizacion: camps.canalitzacio,
+      p_resultat: camps.resultat,
+      p_kg_reals: camps.kgReals,
+      p_data: camps.data,
+      p_observacions: camps.observacions,
+      p_motiu: camps.motiu,
+    })
+    if (error) return { ok: false, missatge: error.message || 'c.error', codi: error.code ?? null }
+    const d = (data && typeof data === 'object' ? data : {}) as ResultatValidaRecollida & { registrada_per?: string }
+    return { ok: true, data: d }
+  } catch {
+    return { ok: false, missatge: 'c.error', codi: null }
+  }
+}
+
+/**
+ * La hora de una entrega, desde el ciclo guiado (`fixar_hora_recollida()`). Cambiarla avisa a
+ * las dos partes (`recollida_canviada`) y vuelve a pedir el registro a la hora nueva.
+ * `quan` en ISO con zona. Nunca lanza.
+ */
+export async function fixaHoraRecollida(
+  canalitzacio: string,
+  quan: string,
+): Promise<ResultatCrida<null>> {
+  try {
+    const { error } = await supabase.rpc('fixar_hora_recollida', {
+      p_canalizacion: canalitzacio,
+      p_quan: quan,
+    })
+    if (error) return { ok: false, missatge: error.message || 'c.error', codi: error.code ?? null }
+    return { ok: true, data: null }
+  } catch {
+    return { ok: false, missatge: 'c.error', codi: null }
+  }
+}
+
 /** «Retorna al receptor» (admin): el registro vuelve a la entidad con un motivo. Nunca lanza. */
 export async function retornaRecollida(camps: {
   canalitzacio: string

@@ -6,6 +6,11 @@
 //    prueba comprueba que cada tipo tiene texto en los dos idiomas y que no queda ningún
 //    marcador sin rellenar.
 
+// «de Tomàquet» / «d’Alvocat» en catalán (27-10-2026: decía «de Alvocat»). Otra «hoja».
+// Con el apóstrofo tipográfico, como el resto de los avisos (el bot usa el recto).
+import { de } from "./textIntake.ts";
+const deProducte = (nom: string) => de(nom).replace(/^d'/, "d’");
+
 export type TipusAvis =
   | "oferta_validada"
   | "oferta_rebutjada"
@@ -93,22 +98,22 @@ export function textAvis(
     case "recollida_canviada": {
       const q = quan(params.recollida_at, idioma);
       return {
-        asunto: es ? `Cambia la recogida de ${producte}` : `Canvia la recollida de ${producte}`,
+        asunto: es ? `Cambia la recogida de ${producte}` : `Canvia la recollida ${deProducte(producte)}`,
         titulo: es ? "Recogida modificada" : "Recollida modificada",
         cuerpo: es
           ? `La recogida de ${producte} ahora es ${q || "en otra fecha"}.`
-          : `La recollida de ${producte} ara és ${q || "en una altra data"}.`,
+          : `La recollida ${deProducte(producte)} ara és ${q || "en una altra data"}.`,
         boton: botoParts,
         ruta: rutaParts,
       };
     }
     case "kg_assignats_canviats":
       return {
-        asunto: es ? `Cambian los kilos de ${producte}` : `Canvien els quilos de ${producte}`,
+        asunto: es ? `Cambian los kilos de ${producte}` : `Canvien els quilos ${deProducte(producte)}`,
         titulo: es ? "Cantidad asignada modificada" : "Quantitat assignada modificada",
         cuerpo: es
           ? `La cantidad asignada de ${producte} pasa de ${kg(params.kg_abans, idioma)} a ${kg(params.kg, idioma)} kg.`
-          : `La quantitat assignada de ${producte} passa de ${kg(params.kg_abans, idioma)} a ${kg(params.kg, idioma)} kg.`,
+          : `La quantitat assignada ${deProducte(producte)} passa de ${kg(params.kg_abans, idioma)} a ${kg(params.kg, idioma)} kg.`,
         boton: botoParts,
         ruta: rutaParts,
       };
@@ -127,7 +132,7 @@ export function textAvis(
           titulo: es ? "Recogida con diferencia" : "Recollida amb diferència",
           cuerpo: (es
             ? `${entitat || "La entidad"} ha registrado que ha recogido ${kg(params.kg, idioma)} kg de ${producte}, frente a los ${kg(assignats, idioma)} kg asignados`
-            : `${entitat || "L’entitat"} ha registrat que ha recollit ${kg(params.kg, idioma)} kg de ${producte}, respecte als ${kg(assignats, idioma)} kg assignats`)
+            : `${entitat || "L’entitat"} ha registrat que ha recollit ${kg(params.kg, idioma)} kg ${deProducte(producte)}, respecte als ${kg(assignats, idioma)} kg assignats`)
             + (q ? ` (${q}).` : ".")
             + (es
               ? "\nEl equipo de Redestina revisa la diferencia."
@@ -141,7 +146,7 @@ export function textAvis(
         titulo: es ? "Salida confirmada" : "Sortida confirmada",
         cuerpo: (es
           ? `${entitat || "La entidad"} ha confirmado que ha recibido ${kg(params.kg, idioma)} kg de ${producte}`
-          : `${entitat || "L’entitat"} ha confirmat que ha rebut ${kg(params.kg, idioma)} kg de ${producte}`)
+          : `${entitat || "L’entitat"} ha confirmat que ha rebut ${kg(params.kg, idioma)} kg ${deProducte(producte)}`)
           + (q ? ` (${q}).` : "."),
         boton: botoParts,
         ruta: rutaParts,
@@ -154,11 +159,11 @@ export function textAvis(
       // los genera.
       const q = quan(params.recollida_at, idioma);
       return {
-        asunto: es ? `Registra la recogida de ${producte}` : `Registra la recollida de ${producte}`,
+        asunto: es ? `Registra la recogida de ${producte}` : `Registra la recollida ${deProducte(producte)}`,
         titulo: es ? "Registra la recogida" : "Registra la recollida",
         cuerpo: (es
           ? `Ya ha pasado la hora de recogida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`
-          : `Ja ha passat l’hora de recollida de ${kg(params.kg, idioma)} kg de ${producte}${q ? ` (${q})` : ""}.`)
+          : `Ja ha passat l’hora de recollida de ${kg(params.kg, idioma)} kg ${deProducte(producte)}${q ? ` (${q})` : ""}.`)
           + (es
             ? "\nCuando lo hayas recogido, entra en Redestina y registra los kilos que te has llevado. El equipo de Redestina lo revisará y, entonces, se generarán los albaranes."
             : "\nQuan l’hagis recollit, entra a Redestina i registra els quilos que t’has endut. L’equip de Redestina ho revisarà i, llavors, es generaran els albarans.")
@@ -176,11 +181,11 @@ export function textAvis(
       const declarats = params.kg_declarats != null && params.kg_declarats !== ""
         && Number.isFinite(Number(params.kg_declarats));
       return {
-        asunto: es ? `Vuelve a registrar la recogida de ${producte}` : `Torna a registrar la recollida de ${producte}`,
+        asunto: es ? `Vuelve a registrar la recogida de ${producte}` : `Torna a registrar la recollida ${deProducte(producte)}`,
         titulo: es ? "Recogida por volver a registrar" : "Recollida per tornar a registrar",
         cuerpo: (es
           ? `El equipo de Redestina ha revisado el registro de la recogida de ${producte}`
-          : `L’equip de Redestina ha revisat el registre de la recollida de ${producte}`)
+          : `L’equip de Redestina ha revisat el registre de la recollida ${deProducte(producte)}`)
           + (declarats
             ? (es
               ? ` (${kg(params.kg_declarats, idioma)} kg declarados) y necesita que lo vuelvas a registrar.`
@@ -196,11 +201,11 @@ export function textAvis(
     }
     case "oferta_modificada":
       return {
-        asunto: es ? `La oferta de ${producte} ha cambiado` : `L’oferta de ${producte} ha canviat`,
+        asunto: es ? `La oferta de ${producte} ha cambiado` : `L’oferta ${deProducte(producte)} ha canviat`,
         titulo: es ? "Oferta modificada" : "Oferta modificada",
         cuerpo: es
           ? `La entidad productora ha modificado la oferta de ${producte}. Revisa los datos antes de la recogida.`
-          : `L’entitat productora ha modificat l’oferta de ${producte}. Revisa’n les dades abans de la recollida.`,
+          : `L’entitat productora ha modificat l’oferta ${deProducte(producte)}. Revisa’n les dades abans de la recollida.`,
         boton: botoParts,
         ruta: rutaParts,
       };
@@ -225,28 +230,28 @@ export function textAvis(
         titulo: es ? "Oferta para ti" : "Oferta per a tu",
         cuerpo: es
           ? `El equipo de Redestina te propone ${kg(params.kg, idioma)} kg de ${producte}. Dinos si te interesa.`
-          : `L’equip de Redestina et proposa ${kg(params.kg, idioma)} kg de ${producte}. Digues-nos si t’interessa.`,
+          : `L’equip de Redestina et proposa ${kg(params.kg, idioma)} kg ${deProducte(producte)}. Digues-nos si t’interessa.`,
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: "/receptor/interessos",
       };
     case "oferta_validada":
       return {
-        asunto: es ? `Tu oferta de ${producte} ya está publicada` : `La teva oferta de ${producte} ja està publicada`,
+        asunto: es ? `Tu oferta de ${producte} ya está publicada` : `La teva oferta ${deProducte(producte)} ja està publicada`,
         titulo: es ? "Oferta publicada" : "Oferta publicada",
         cuerpo: es
           ? `El equipo de Redestina ha revisado tu oferta de ${producte} y ya la pueden ver las entidades.`
-          : `L’equip de Redestina ha revisat la teva oferta de ${producte} i ja la poden veure les entitats.`,
+          : `L’equip de Redestina ha revisat la teva oferta ${deProducte(producte)} i ja la poden veure les entitats.`,
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,
       };
     case "oferta_rebutjada": {
       const motiu = s(params.motiu);
       return {
-        asunto: es ? `No hemos publicado tu oferta de ${producte}` : `No hem publicat la teva oferta de ${producte}`,
+        asunto: es ? `No hemos publicado tu oferta de ${producte}` : `No hem publicat la teva oferta ${deProducte(producte)}`,
         titulo: es ? "Oferta no publicada" : "Oferta no publicada",
         cuerpo: (es
           ? `El equipo de Redestina no ha publicado tu oferta de ${producte}.`
-          : `L’equip de Redestina no ha publicat la teva oferta de ${producte}.`)
+          : `L’equip de Redestina no ha publicat la teva oferta ${deProducte(producte)}.`)
           + (motiu ? `\n${es ? "Motivo" : "Motiu"}: ${motiu}` : ""),
         boton: es ? "Ver la oferta" : "Veure l’oferta",
         ruta: `/productor/ofertes/${objecteId}`,
@@ -263,7 +268,7 @@ export function textAvis(
         titulo: es ? "Salida encontrada" : "Sortida trobada",
         cuerpo: (es
           ? `Se han asignado ${kg(params.kg, idioma)} kg de ${producte}`
-          : `S’han assignat ${kg(params.kg, idioma)} kg de ${producte}`)
+          : `S’han assignat ${kg(params.kg, idioma)} kg ${deProducte(producte)}`)
           + (entitat ? (es ? ` a ${entitat}.` : ` a ${entitat}.`) : ".")
           + (venda
             ? (es
@@ -286,7 +291,7 @@ export function textAvis(
       const linies = [
         es
           ? `Te hemos asignado ${kg(apr, idioma)} kg de ${producte}.`
-          : `T’hem assignat ${kg(apr, idioma)} kg de ${producte}.`,
+          : `T’hem assignat ${kg(apr, idioma)} kg ${deProducte(producte)}.`,
       ];
       if (diferents) {
         linies.push(es
@@ -309,7 +314,7 @@ export function textAvis(
         titulo: es ? "Oferta sin destino registrado" : "Oferta sense destí registrat",
         cuerpo: es
           ? `Ha pasado la fecha límite de tu oferta de ${producte} y todavía no hay destino registrado para ${quants} kg.\nIndica qué ha pasado finalmente con el producto (venta, donación, compostaje…) para cerrar la oferta.`
-          : `Ha passat la data límit de la teva oferta de ${producte} i encara no hi ha destí registrat per a ${quants} kg.\nIndica què ha passat finalment amb el producte (venda, donació, compostatge…) per tancar l’oferta.`,
+          : `Ha passat la data límit de la teva oferta ${deProducte(producte)} i encara no hi ha destí registrat per a ${quants} kg.\nIndica què ha passat finalment amb el producte (venda, donació, compostatge…) per tancar l’oferta.`,
         boton: es ? "Indicar el destino" : "Indicar el destí",
         ruta: `/productor/ofertes/${objecteId}`,
       };

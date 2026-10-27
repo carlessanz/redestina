@@ -1,5 +1,4 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { ArrowLeft } from 'lucide-react'
 import { toast } from 'sonner'
@@ -17,9 +16,10 @@ import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
 import { textRecollidaGrup } from '../lib/missatgesOferta'
+import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
+import MissatgesDelPunt from './MissatgesDelPunt'
 import { PLANTILLA_OFERTA, PLANTILLA_OFERTA_APROVADA } from '../lib/plantillas'
 import { construirComponentsOferta } from '../lib/ofertaTemplate'
-import { aprovarResposta, comprovaConvenis, rebutjarResposta } from '../lib/aprovarResposta'
 import { etiquetaEstatOferta, PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import { estatValidacio } from '../lib/registreRecollida'
 import type { DatesValidacio } from '../lib/registreRecollida'
@@ -36,9 +36,10 @@ import DestiFinal from './DestiFinal'
 import CanvisOferta from './equip/CanvisOferta'
 import { carregaDestins } from '../lib/ofertes'
 import DialegEditaOferta from './DialegEditaOferta'
-import SelectorModalitat from './SelectorModalitat'
+import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
+import FormulariAprovacio from './equip/FormulariAprovacio'
+import { registrarEnviamentManual } from '../lib/canalitzacio'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
-import { localDateTime } from '../lib/franja'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
 import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
@@ -156,10 +157,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // sí, y eso lo ve la persona. El bloqueo es por fila, no global: mandar la misma oferta a
   // dos entidades a la vez es legítimo.
   const [enviant, setEnviant] = useState<string | null>(null)
-  // Los dos motivos que antes se pedían con `window.prompt` (deuda §12.35). Van con estado
-  // porque el de rechazo lo abre la fila de una respuesta concreta, no un botón suelto.
-  const [rebutjant, setRebutjant] = useState<RespuestaConEntidad | null>(null)
+  // El motivo de «no col·locada» se pide con diálogo propio, no con `window.prompt` (§12.35).
   const [noColocada, setNoColocada] = useState(false)
+  // La entidad que se preselecciona en «Registra l'interès» (desde una fila «pendent»).
+  const [entitatInteres, setEntitatInteres] = useState('')
   // F3: el diálogo que convierte esta oferta en jornada de espigueo.
   const [convertint, setConvertint] = useState(false)
   // Productor y municipi para las variables de la plantilla oferta_excedent.
@@ -357,76 +358,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     else toast.success(t(clauExit, { name: ent.nombre }))
   }
 
-  // Marcado manual (imprescindible para el email, que no tiene respuesta automática).
-  async function marcarRespuesta(id: string, estado: 'pendent' | 'acceptada' | 'rebutjada') {
-    const { data, error } = await supabase.from('oferta_respuestas').update({
-      estado,
-      respondido_at: estado === 'pendent' ? null : new Date().toISOString(),
-    }).eq('id', id).select('id')
-    // Un UPDATE que la RLS no deja pasar no da error: devuelve cero filas (§12.48).
-    if (error || !data || data.length === 0) toast.error(t('c.error'))
-    await recargarRespuestas()
-  }
-
-  /**
-   * Aprobar una aceptación y convertirla en canalización.
-   *
-   * La operación entera —la comprobación previa de convenios y la RPC transaccional— vive
-   * en `src/lib/aprovarResposta.ts`, porque el equipo también aprueba desde la cola de
-   * Aprovacions y dos copias de esto acabarían divergiendo justo en la comprobación
-   * (§12.19, §12.78). Aquí queda lo que es de esta pantalla: los dos diálogos y el refresco.
-   */
-  async function aprovarRespuesta(e: FormEvent<HTMLFormElement>, r: RespuestaConEntidad) {
-    e.preventDefault()
-    const fd = new FormData(e.currentTarget)
-    const kg = Number(fd.get('kg') || 0)
-    // Antes decía «L'oferta no té text generat», que no tenía nada que ver con esto.
-    if (!r.entidad_id || !kg) { toast.error(t('appr.need_kg')); return }
-    // Aviso no bloqueante si se canaliza más de lo que falta por cubrir.
-    if (kg > faltan && !(await confirma({
-      titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: kgCa(faltan) }),
-    }))) return
-
-    // La modalidad de ESTA entrega: la del selector si la oferta tiene varias, si no la
-    // que pidió el receptor, si no la única de la oferta (05-10-2026, D2).
-    const modalitat = String(fd.get('modalitat') ?? '') || r.modalitat || (mods.length === 1 ? mods[0] : null)
-    const falta = await comprovaConvenis({ modalitat, productor_id: exc.productor_id }, r.entidad_id, t)
-    if (falta && !(await confirma({
-      titol: t('od.conv_missing_t'),
-      descripcio: t('od.conv_missing', { parts: falta }),
-    }))) return
-
-    const preuRaw = String(fd.get('preu') ?? '')
-    // Una entrega en donación no lleva precio aunque la oferta también se ofrezca en venta.
-    const preu = preuRaw !== '' && modalitat !== 'donacio' ? Number(preuRaw) : null
-    const recRaw = String(fd.get('recollida') ?? '')
-    const res = await aprovarResposta({
-      id: r.id, kg, preu, modalitat,
-      // Solo si se ha cambiado: si no, vale la que pidió la entidad.
-      recollida: recRaw && recRaw !== localDateTime(r.recollida_at) ? new Date(recRaw).toISOString() : null,
-    })
-    if (!res.ok) {
-      toast.error(textError(t, res))
-      return
-    }
-    toast.success(t('od.approved'))
-    const nou = await recargar()
-    await recargarRespuestas()
-    avisaSiCoberta(nou)
-    // Aprobar vacía una fila de la cola de Aprovacions: el badge del menú tiene que bajar
-    // sin esperar a la próxima navegación.
-    void refrescaComptadors()
-  }
-
-  async function rebutjarAprovacio(r: RespuestaConEntidad, motiu: string) {
-    const res = await rebutjarResposta({ id: r.id, motiu })
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    await recargarRespuestas()
-    toast.success(t('od.rejected_ok'))
-    void refrescaComptadors()
-  }
-
   /**
    * Envía la oferta por WhatsApp. Devuelve si salió, para que el envío automático
    * (`enviarOferta`) pueda caer al correo cuando no.
@@ -518,6 +449,28 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     toast.success(t('od.sent_panel', { name: ent.nombre }))
   }
 
+  /**
+   * «Copia i marca com a enviada» (gestión autónoma, fase 2): el equipo le pasa el texto de la
+   * oferta a la entidad por su cuenta y aquí queda la fila `pendent` con `canal = 'manual'`.
+   * No sale nada: con las notificaciones apagadas, es como consta a quién se le ofreció.
+   */
+  async function marcaEnviadaAMa(ent: EntidadPuntuada) {
+    const r = await registrarEnviamentManual(excedente.id, ent.id)
+    await recargarRespuestas()
+    if (!r.ok) { toast.error(textError(t, r)); return }
+    toast.success(t('manual.ok_nom', { name: ent.nombre }))
+  }
+
+  /** Tras aprobar o rechazar un interés: recargar y decir si la oferta ha quedado cubierta. */
+  async function trasAprovacio() {
+    const nou = await recargar()
+    await recargarRespuestas()
+    avisaSiCoberta(nou)
+    // Aprobar vacía una fila de la cola de Aprovacions: el badge del menú tiene que bajar
+    // sin esperar a la próxima navegación.
+    void refrescaComptadors()
+  }
+
   async function enviarOferta(ent: EntidadPuntuada) {
     if (testMode && !ent.es_test) { toast.error(t('od.not_test_toast', { name: ent.nombre })); return }
     if (ent.canal === 'cap') { toast.error(t('od.no_channel', { name: ent.nombre })); return }
@@ -589,48 +542,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     else toast.error(t('od.no_send_email'))
   }
 
-  async function altaCanalizacion(e: FormEvent<HTMLFormElement>) {
-    e.preventDefault()
-    const form = e.currentTarget
-    const fd = new FormData(form)
-    const entidad_id = String(fd.get('entidad') || '')
-    const kg_confirmados = Number(fd.get('kg') || 0)
-    if (!entidad_id || !kg_confirmados) return
-    if (kg_confirmados > faltan && !(await confirma({
-      titol: t('od.over_alloc_t'),
-      descripcio: t('od.over_alloc', { n: kgCa(faltan) }),
-    }))) return
-    const { data: alta, error: errAlta } = await supabase.from('canalizaciones').insert({
-      excedente_id: excedente.id, entidad_id, kg_confirmados,
-      caixes_entregades: Number(fd.get('caixes') || 0) || null,
-      comentarios: String(fd.get('comentarios') || '') || null,
-    }).select('id')
-    // Sin la canalización no se toca el estado de la oferta: la marcaría Coberta sin nada.
-    if (errAlta || !alta || alta.length === 0) { toast.error(t('c.error')); return }
-    const nuevoCanalizado = canalizados + kg_confirmados
-    const nouEstat = total > 0 && nuevoCanalizado >= total
-      ? 'bloqueada'
-      : exc.estado === 'publicada' ? 'parcial' : null
-    if (nouEstat) {
-      // La canalización ya existe; si el estado no se mueve (RLS devuelve 0 filas sin error),
-      // se dice, en vez de dejar la oferta en «Publicada» con kilos ya asignados sin aviso.
-      const { data: fet, error: errEstat } = await supabase.from('excedentes')
-        .update({ estado: nouEstat }).eq('id', excedente.id).select('id')
-      if (errEstat || !fet || fet.length === 0) toast.error(t('c.error'))
-    }
-    form.reset()
-    const nou = await recargar()
-    avisaSiCoberta(nou)
-    void refrescaComptadors()
-  }
-
-  async function guardarKgReales(canalId: string, kgReales: number) {
-    const { data, error } = await supabase.from('canalizaciones')
-      .update({ kg_reales: kgReales }).eq('id', canalId).select('id')
-    if (error || !data || data.length === 0) toast.error(t('c.error'))
-    await recargar()
-  }
-
   async function marcarNoColocada(motivo: string) {
     const { data, error } = await supabase.from('excedentes')
       .update({ estado: 'no_colocada', motivo_no_colocada: motivo }).eq('id', excedente.id).select('id')
@@ -683,6 +594,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const diesEsperant = albaraRec?.entregado_at
     ? Math.floor((Date.now() - new Date(albaraRec.entregado_at).getTime()) / 86_400_000)
     : null
+
+  // Los mensajes del ciclo (gestión autónoma, fase 4): lo que la plataforma mandó o habría
+  // mandado, para copiarlo cuando las notificaciones están apagadas. Se vuelven a leer cuando
+  // cambia algo que puede crear un aviso: el estado, las respuestas o las entregas.
+  const firmaMissatges = [
+    exc.estado,
+    ...respuestas.map((r) => `${r.id}:${r.estado}:${r.aprovacio}`),
+    ...canalizaciones.map((c) => `${c.id}:${c.estado}:${c.data_hora_recollida ?? ''}:${c.kg_confirmados ?? ''}`),
+  ].join('|')
+  const { missatges } = useMissatgesOferta(exc.id, firmaMissatges)
+  const perEnviar = missatges.filter((m) => m.estat === 'no_enviat' || m.estat === 'pendent').length
 
   // Dónde está la oferta y qué toca. Lo decide `procesOferta.ts`, el mismo módulo que lo
   // cuenta en el panel del productor: las dos pantallas no pueden discrepar sobre el punto
@@ -843,6 +765,27 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           )}
         </CardContent>
       </Card>
+
+      {/* Los mensajes de la oferta, con el texto exacto para copiar. Plegados: abiertos solo
+          si alguno no ha salido, que es cuando hay que avisar a mano. */}
+      {missatges.length > 0 && (
+        <Card>
+          <CardContent className="pt-6">
+            <details open={perEnviar > 0}>
+              <summary className="cursor-pointer font-titulos text-base font-semibold">
+                {t('msg.titol_oferta', { n: missatges.length })}
+                {perEnviar > 0 && (
+                  <span className="ml-2 text-sm font-normal text-aviso">{t('msg.per_enviar', { n: perEnviar })}</span>
+                )}
+              </summary>
+              <p className="mt-1 text-xs text-muted-foreground">{t('msg.ajuda')}</p>
+              <div className="mt-3">
+                <MissatgesDelPunt missatges={missatges} senseTitol />
+              </div>
+            </details>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Las fotos del producto (20270404100000). El equipo las puede cambiar: en el modelo
           asistido es a menudo quien las recibe por WhatsApp y las sube. */}
@@ -1016,6 +959,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaEmail(ent))}>{t('od.email')}</BotoAmbMotiu>
                   <Button size="sm" variant="outline" title={t('od.force_panel')} disabled={enviant === ent.id || !ofertaOberta}
                     onClick={() => void ambBloqueig(ent.id, () => enviarOfertaPanell(ent))}>{t('od.panel')}</Button>
+                  {/* Sin pasar por ningún canal: el texto se copia y se pega a mano, y la
+                      entidad consta como destinataria (`canal = 'manual'`). */}
+                  <BotoCopiar text={exc.texto_oferta ?? ''} etiqueta={t('manual.copy_mark')}
+                    className="whitespace-normal"
+                    disabled={enviant === ent.id || !ofertaOberta}
+                    onCopiat={() => void ambBloqueig(ent.id, () => marcaEnviadaAMa(ent))} />
                 </div>
               </div>
             )
@@ -1041,10 +990,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {respuestas.map((r) => {
             const nombre = r.entidades?.nombre ?? r.telefono ?? '—'
             const cuando = r.respondido_at ?? r.enviado_at
-            const esVenda = ambPreu(mods)
             return (
               <div key={r.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-2.5 text-sm">
-                <div className="flex items-center gap-2.5">
+                <div className="flex min-w-0 flex-1 basis-64 items-center gap-2.5">
                   <span className={`rounded-full px-2 py-0.5 text-xs font-medium ${estadoRespuestaClases(r.estado)}`}>
                     {t(`od.rs_${r.estado}`)}
                   </span>
@@ -1064,51 +1012,30 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     </div>
                   </div>
                 </div>
-                {r.estado === 'pendent' && (
-                  <div className="flex items-center gap-1">
-                    <Button size="sm" variant="outline"
-                      onClick={() => void marcarRespuesta(r.id, 'acceptada')}>{t('od.rs_accept')}</Button>
-                    <Button size="sm" variant="outline"
-                      onClick={() => void marcarRespuesta(r.id, 'rebutjada')}>{t('od.rs_reject')}</Button>
-                  </div>
+                {/* Sin respuesta todavía: la entidad lo dice por teléfono o por correo y el
+                    equipo lo registra con el mismo formulario que el Mercat (abajo). Antes
+                    aquí se marcaba «acceptada» a pelo, sin kilos ni modalidad ni hora. */}
+                {r.estado === 'pendent' && r.entidad_id && ofertaOberta && (
+                  <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                    onClick={() => {
+                      setEntitatInteres(r.entidad_id!)
+                      document.getElementById('od-interes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                    }}>
+                    {t('canalz.b_interes_assistit')}
+                  </Button>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'pendent' && (
-                  // Cada campo con su etiqueta y su unidad a la vista (revisión del 08-10-2026,
-                  // §3.3): con solo un placeholder, un precio por defecto de «2» no decía si
-                  // eran euros, kilos o qué.
-                  <form className="flex flex-wrap items-end gap-2" onSubmit={(ev) => void aprovarRespuesta(ev, r)}>
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      {t('od.f_kg_assignats')}
-                      <Input name="kg" type="number" required defaultValue={r.kg_solicitados ?? ''}
-                        placeholder={t('od.kg_ph')} className="h-8 w-24 text-base md:text-sm" />
-                    </label>
-                    {mods.length > 1 && (
-                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {t('mod.entrega')}
-                        <SelectorModalitat modalitats={mods} inicial={r.modalitat ?? null} ambBuit={!r.modalitat} />
-                      </label>
-                    )}
-                    <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                      {t('appr.recollida')}
-                      <Input name="recollida" type="datetime-local" defaultValue={localDateTime(r.recollida_at)}
-                        className="h-8 w-48 text-base md:text-sm" />
-                    </label>
-                    {esVenda && (
-                      <label className="flex flex-col gap-1 text-xs text-muted-foreground">
-                        {t('od.rs_preu_venda')}
-                        <Input name="preu" type="number" step="0.01" defaultValue={r.preu_ofert ?? exc.preu_minim ?? ''}
-                          placeholder={t('od.rs_preu')} className="h-8 w-24 text-base md:text-sm" />
-                      </label>
-                    )}
-                    <BotoAmbMotiu size="sm" type="submit" disabled={!potAprovar}
-                      motiu={potAprovar ? undefined : t('appr.need_approver')}>{t('od.approve')}</BotoAmbMotiu>
-                    <BotoAmbMotiu size="sm" variant="outline" type="button" disabled={!potAprovar}
-                      motiu={potAprovar ? undefined : t('appr.need_approver')}
-                      onClick={() => setRebutjant(r)}>{t('od.reject_appr')}</BotoAmbMotiu>
-                  </form>
+                  <FormulariAprovacio
+                    resposta={r}
+                    oferta={exc}
+                    faltan={faltan}
+                    potAprovar={potAprovar}
+                    idPrefix={`od-apr-${r.id}`}
+                    onFet={() => void trasAprovacio()}
+                  />
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'aprovada' && (
-                  <span className="text-xs font-medium text-primary">{t('od.approved_kg', { n: r.kg_solicitados ?? 0 })}</span>
+                  <span className="text-xs font-medium text-primary">{t('od.approved_kg', { n: kgCa(Number(r.kg_aprovats ?? r.kg_solicitados ?? 0)) })}</span>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'rebutjada' && (
                   <span className="text-xs text-error">
@@ -1118,6 +1045,21 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </div>
             )
           })}
+
+          {/* «Registra l'interès»: el mismo formulario asistido del ciclo guiado, con las
+              mismas guardas que el Mercat. Sustituye al alta directa de canalizaciones que
+              había aquí abajo, que se saltaba modalidad, convenio, precio y hora (§12.109). */}
+          {ofertaOberta && (
+            <div id="od-interes" className="scroll-mt-20 pt-2">
+              <FormulariInteresAssistit
+                key={entitatInteres}
+                oferta={exc}
+                idPrefix="od-interes"
+                entitatInicial={entitatInteres}
+                onFet={() => { setEntitatInteres(''); void recargarRespuestas(); void refrescaComptadors() }}
+              />
+            </div>
+          )}
         </CardContent>
       </Card>
 
@@ -1131,11 +1073,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               <div key={c.id} className="flex flex-wrap items-center gap-3 border-b pb-2 text-sm">
                 <span className="font-medium">{nombrePorId(c.entidad_id)}</span>
                 <span>{c.kg_confirmados} kg</span>
-                <label className="flex items-center gap-1">
-                  {t('od.reals')}
-                  <Input type="number" defaultValue={c.kg_reales ?? ''} className={`h-8 w-20 ${difiere ? 'border-aviso' : ''}`}
-                    onBlur={(ev) => ev.target.value && void guardarKgReales(c.id, Number(ev.target.value))} />
-                </label>
+                {/* Los kilos reales ya no se teclean aquí: los fija la recogida (registrada y
+                    validada) y la base protege la columna. Se enseñan, nada más. */}
+                {c.kg_reales != null && (
+                  <span className={difiere ? 'text-aviso' : 'text-muted-foreground'}>
+                    {t('od.reals')} {kgCa(Number(c.kg_reales))} kg
+                  </span>
+                )}
                 {difiere && <span className="text-xs text-aviso">{t('od.differs')}</span>}
                 {/* El albarán ya no es un texto que compone el panel con marcadores y sin
                     número: es una fila numerada de `albaranes` con su PDF. Aquí solo se
@@ -1152,20 +1096,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </div>
             )
           })}
-          <form className="flex flex-wrap items-center gap-2 pt-2" onSubmit={altaCanalizacion}>
-            {/* `text-base md:text-sm`: iOS Safari amplía la página al enfocar un control
-                con menos de 16px y no deshace el zoom (§2, regla 1 de móvil). Los
-                `<select>` nativos no lo heredan de shadcn: hay que repetirlo a mano. */}
-            <select name="entidad" required defaultValue=""
-              className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm">
-              <option value="" disabled>{t('od.entity_ph')}</option>
-              {ranking.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-            </select>
-            <Input name="kg" type="number" placeholder={t('od.kg_ph')} required className="w-24" />
-            <Input name="caixes" type="number" placeholder={t('od.boxes_ph')} className="w-24" />
-            <Input name="comentarios" type="text" placeholder={t('od.comments_ph')} className="w-40" />
-            <Button type="submit">{t('c.add')}</Button>
-          </form>
         </CardContent>
       </Card>
 
@@ -1215,20 +1145,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         productorNom={datosOferta.productor}
         onTancar={() => setConvertint(false)}
         onCreada={() => { setConvertint(false); void recargar(); void refrescaComptadors() }}
-      />
-
-      <DialegMotiu
-        obert={rebutjant !== null}
-        onObert={(v) => { if (!v) setRebutjant(null) }}
-        titol={t('od.reject_appr')}
-        etiqueta={t('od.reject_reason')}
-        confirmar={t('od.reject_appr')}
-        destructiu
-        onConfirma={(m) => {
-          const r = rebutjant
-          setRebutjant(null)
-          if (r) void rebutjarAprovacio(r, m)
-        }}
       />
 
       <DialegMotiu

@@ -59,3 +59,31 @@ describe('modalitats · navegador', () => {
     expect(web.textModalitats([], t)).toBe('')
   })
 })
+
+describe('modalitats · lo que una entidad puede pedir (27-10-2026)', () => {
+  const oferta = { modalitat: 'donacio' as const, modalitats: ['donacio', 'venda', 'maquila'] as ('donacio' | 'venda' | 'maquila')[] }
+  it('sin compat conocida, todas las de la oferta', () => {
+    expect(web.modalitatsPossibles(oferta, null)).toEqual(['donacio', 'venda', 'maquila'])
+  })
+  it('filtra por lo que el tipo de receptor admite', () => {
+    expect(web.modalitatsPossibles(oferta, ['venda'])).toEqual(['venda'])
+    expect(web.modalitatsPossibles(oferta, [])).toEqual([])
+  })
+  it('y después por lo que puede pedir hoy (el convenio)', () => {
+    expect(web.modalitatsPossibles(oferta, ['donacio', 'venda'], (m) => m !== 'venda')).toEqual(['donacio'])
+  })
+  it('una oferta de una sola modalidad', () => {
+    expect(web.modalitatsPossibles({ modalitat: 'venda', modalitats: null }, ['donacio', 'venda'])).toEqual(['venda'])
+  })
+  it('modalitatsDelTipus lee la matriz y respeta el orden canónico', () => {
+    const matriu = [
+      { modalitat: 'maquila', tipo_receptor: 'social' },
+      { modalitat: 'donacio', tipo_receptor: 'social' },
+      { modalitat: 'venda', tipo_receptor: 'comercial' },
+    ]
+    expect(web.modalitatsDelTipus('social', matriu)).toEqual(['donacio', 'maquila'])
+    expect(web.modalitatsDelTipus('comercial', matriu)).toEqual(['venda'])
+    expect(web.modalitatsDelTipus(null, matriu)).toEqual([])
+    expect(web.modalitatsDelTipus('animal', matriu)).toEqual([])
+  })
+})

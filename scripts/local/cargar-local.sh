@@ -34,6 +34,18 @@ DOCS="$(grep -E '^DOCUMENTOS_SECRET=' "$ENV_FUNCIONES" | cut -d= -f2-)"
 RECS="$(grep -E '^RECORDATORIOS_SECRET=' "$ENV_FUNCIONES" | cut -d= -f2-)"
 [ -n "$DOCS" ] && [ -n "$RECS" ] || morir "Los secretos locales están vacíos en supabase/.env.funciones-local."
 
+# 27-10-2026: el volcado tiene que ser de las MISMAS migraciones que el esquema local. El TRUNCATE
+# de abajo se lleva también lo que sembraron las migraciones posteriores al volcado (catálogos,
+# plantillas, la matriz de convenios…), y el volcado no lo trae: el clon queda con el esquema de
+# hoy y los datos de antes. Pasó con un volcado de 160 migraciones sobre un esquema de 183.
+if [ -f "$DIR_VOLCADO/recompte-produccion.json" ] && [ "${VOLCAT_ANTIC:-}" != "1" ]; then
+  MIG_VOLCAT="$(grep -oE '"migracions": *[0-9]+' "$DIR_VOLCADO/recompte-produccion.json" | grep -oE '[0-9]+$' || true)"
+  MIG_LOCAL="$(psql_local -tA -c 'select count(*) from supabase_migrations.schema_migrations')"
+  if [ -n "$MIG_VOLCAT" ] && [ "$MIG_VOLCAT" -lt "$MIG_LOCAL" ]; then
+    morir "El volcado es de $MIG_VOLCAT migraciones y el clon tiene $MIG_LOCAL: perdería lo que sembraron las $((MIG_LOCAL - MIG_VOLCAT)) más nuevas. Vuelca producción otra vez (volcar-produccion.sh) o, si de verdad lo quieres, VOLCAT_ANTIC=1 y después vuelve a pasar esas migraciones."
+  fi
+fi
+
 {
   cat <<'SQL'
 -- Sin los NOTICE de cada tabla que arrastra el TRUNCATE: los avisos de verdad son WARNING.

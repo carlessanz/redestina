@@ -42,3 +42,27 @@ export function localDateTime(iso: string | null | undefined): string {
   const p = (n: number) => String(n).padStart(2, '0')
   return `${d.getFullYear()}-${p(d.getMonth() + 1)}-${p(d.getDate())}T${p(d.getHours())}:${p(d.getMinutes())}`
 }
+
+/**
+ * Las horas por cuartos dentro de la franja de una oferta (o de 06:00 a 22:45 si no tiene).
+ * Es lo que ofrece el desplegable de la hora de recogida, en el Mercat y en el interés
+ * asistido del equipo: las dos pantallas tienen que ofrecer las mismas horas, porque la base
+ * (`comprova_hora_recollida`) rechaza las que caen fuera de la franja.
+ */
+export function horesDins(inici: string | null | undefined, fi: string | null | undefined): string[] {
+  const a = hhmm(inici) || '06:00'
+  const b = hhmm(fi) || '22:45'
+  return HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).filter((x) => x >= a && x <= b)
+}
+
+/**
+ * El instante de recogida a partir del día (`aaaa-mm-dd`) y la hora (`hh:mm`) que se eligen
+ * en pantalla, en hora LOCAL del navegador y como ISO. Sin los dos, `null` (no se dice).
+ * Es exactamente lo que el Mercat componía a mano: si cambiara aquí, el receptor y el equipo
+ * guardarían la misma hora con un desfase.
+ */
+export function isoRecollida(dia: string, hora: string): string | null {
+  if (!dia || !hora) return null
+  const d = new Date(`${dia}T${hora}:00`)
+  return Number.isNaN(d.getTime()) ? null : d.toISOString()
+}

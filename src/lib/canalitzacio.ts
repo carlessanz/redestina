@@ -70,6 +70,18 @@ export function lotsActius(limit = 200): Promise<ResultatRpc<LotActiu[]>> {
 }
 
 /**
+ * Los avisos que NO salieron, por oferta (`avisos_sense_enviar_per_oferta()`,
+ * 20270430100300): con las notificaciones apagadas, a quién hay que avisar a mano. Una sola
+ * llamada para todo el índice. Ante un error devuelve `null` —no se sabe—, nunca un mapa vacío
+ * que se leería como «nada pendiente».
+ */
+export async function avisosSenseEnviarPerOferta(): Promise<Record<string, number> | null> {
+  const r = await crida<{ excedente_id: string; n: number }[]>('avisos_sense_enviar_per_oferta', {}, 'c.error')
+  if (!r.ok) return null
+  return Object.fromEntries((r.data ?? []).map((x) => [x.excedente_id, Number(x.n)]))
+}
+
+/**
  * El estado entero de un lote en un viaje.
  *
  * `dadesProvisionals` NO viene de aquí: es de `parametros_documentales`, que el equipo sí
@@ -132,24 +144,61 @@ export async function dadesFiscalsProvisionals(): Promise<boolean> {
  * El interés de una entidad, conducido por el equipo (`canal = 'asistido'`).
  *
  * ⚠️ Es una función distinta de `manifestar_interes()`, no la misma relajada: una sola
- *    función con dos regímenes de autorización es donde se esconde el fallo. Conserva las
- *    tres comprobaciones que los atajos de `OfferDetail` se saltan — estado de la oferta,
- *    `modalitat_receptor_compat` y precio mínimo.
+ *    función con dos regímenes de autorización es donde se esconde el fallo. Pero desde
+ *    `20270430100100` las DOS llaman a `comprova_interes()`, así que el equipo pasa por las
+ *    mismas guardas que el receptor: estado de la oferta, compatibilidad y modalidad
+ *    (`cal_modalitat`), convenio, `kg_maxim`, precio mínimo y la hora dentro de la franja.
+ *    Los rechazos los traduce `clauErrorInteres()` de `ofertes.ts`, igual que en el Mercat.
  */
-export function interesAssistit(
+export function interesAssistit(args: {
+  excedenteId: string
+  entitatId: string
+  kg: number
+  preu?: number | null
+  caixes?: number | null
+  /** La modalidad de la entrega, si la oferta tiene varias (sin ella: `cal_modalitat`). */
+  modalitat?: string | null
+  /** Cuándo la recoge (ISO), dentro de la disponibilidad y la franja. */
+  recollida?: string | null
+}): Promise<ResultatRpc<Record<string, unknown>>> {
+  return crida('manifestar_interes_assistit', {
+    p_excedente: args.excedenteId,
+    p_entidad: args.entitatId,
+    p_kg: args.kg,
+    p_preu: args.preu ?? null,
+    p_caixes: args.caixes ?? null,
+    p_modalitat: args.modalitat ?? null,
+    p_recollida: args.recollida ?? null,
+  }, 'canalz.err_interes')
+}
+
+/** Los rechazos de `registrar_envio_manual()`, por su código (20270430100100). */
+const MOTIU_ENVIAMENT_MANUAL: Record<string, string> = {
+  oferta_no_disponible: 'manual.err_no_disponible',
+  ja_resposta: 'manual.err_ja_resposta',
+  entitat_inexistent: 'manual.err_entitat',
+}
+
+/**
+ * «Copia i marca com a enviada»: deja constancia de que la oferta se le ha mandado A MANO a
+ * esta entidad (`canal = 'manual'`, fila `pendent`). No sale nada: el texto ya lo ha copiado
+ * quien pulsa. Con `manual` no salta el aviso `oferta_enviada` (ese es solo del canal
+ * `panel`), que es lo correcto: a la entidad ya se le ha dicho.
+ *
+ * Nunca lanza. Un rechazo conocido vuelve como CLAVE i18n en `missatge`, que `textError()`
+ * traduce; lo demás, el texto de la base.
+ */
+export async function registrarEnviamentManual(
   excedenteId: string,
   entitatId: string,
-  kg: number | null,
-  preu: number | null,
-  caixes: number | null,
 ): Promise<ResultatRpc<Record<string, unknown>>> {
-  return crida('manifestar_interes_assistit', {
+  const r = await crida<Record<string, unknown>>('registrar_envio_manual', {
     p_excedente: excedenteId,
     p_entidad: entitatId,
-    p_kg: kg,
-    p_preu: preu,
-    p_caixes: caixes,
-  }, 'canalz.err_interes')
+  }, 'c.error')
+  if (r.ok) return r
+  const codi = Object.keys(MOTIU_ENVIAMENT_MANUAL).find((c) => r.missatge === c || r.missatge.startsWith(`${c}:`))
+  return codi ? { ok: false, missatge: MOTIU_ENVIAMENT_MANUAL[codi], codi: r.codi } : r
 }
 
 /** El enlace que el equipo abre con la persona delante. Devuelve el token EN CLARO. */
