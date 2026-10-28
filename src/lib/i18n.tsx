@@ -403,7 +403,7 @@ const ca: Dict = {
   'od.conv_producer': "l'entitat productora", 'od.conv_entity': "l'entitat",
   'od.conv_missing_t': 'Aprovar sense conveni vigent?',
   'od.conv_missing': 'Falta el conveni vigent de: {parts}.',
-  'od.conv_blocked': 'No es pot aprovar: falta el conveni vigent. Envia\u2019l des de la fitxa de l\u2019organització.',
+  'od.conv_blocked': 'Falta el conveni vigent d\u2019alguna de les parts (l\u2019entitat productora o l\u2019entitat receptora). Mira-ho a Convenis o a la fitxa de cada organització.',
   'od.approved_kg': 'Canalitzada · {n} kg', 'od.rejected_appr': 'Rebutjada per l’equip',
   'od.over_alloc_t': 'Canalitzar més kg dels que falten?',
   'od.over_alloc': 'En falten {n}.',
