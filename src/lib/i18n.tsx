@@ -3567,7 +3567,7 @@ const es: Dict = {
   'od.conv_producer': 'la entidad productora', 'od.conv_entity': 'la entidad',
   'od.conv_missing_t': '¿Aprobar sin convenio vigente?',
   'od.conv_missing': 'Falta el convenio vigente de: {parts}.',
-  'od.conv_blocked': 'No se puede aprobar: falta el convenio vigente. Envíalo desde la ficha de la organización.',
+  'od.conv_blocked': 'Falta el convenio vigente de alguna de las partes (la entidad productora o la receptora). Míralo en Convenios o en la ficha de cada organización.',
   'od.approved_kg': 'Canalizada · {n} kg', 'od.rejected_appr': 'Rechazada por el equipo',
   'od.over_alloc_t': '¿Canalizar más kg de los que faltan?',
   'od.over_alloc': 'Faltan {n}.',
