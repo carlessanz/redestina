@@ -124,7 +124,19 @@ export default function FormulariAprovacio({
       recollida: recollida && recollida !== recollidaInicial ? new Date(recollida).toISOString() : null,
     })
     setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
+    if (!res.ok) {
+      // El rechazo por convenio dice a quién le falta: el de la entidad que se aprueba o el de
+      // la productora que entrega (27-10-2026: el aviso genérico mandaba a mirar la ficha de
+      // la receptora cuando el que faltaba era el de la productora).
+      if (res.codi === 'sense_conveni') {
+        const qui = await comprovaConvenis(
+          { modalitat: triada || oferta.modalitat, productor_id: oferta.productor_id },
+          resposta.entidad_id, t,
+        )
+        if (qui) { toast.error(t('od.conv_missing', { parts: qui })); return }
+      }
+      toast.error(textError(t, res)); return
+    }
     toast.success(t('od.approved'))
     onFet('aprovada')
   }
