@@ -758,3 +758,5 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      y por ahí nace una ficha activa sin NIF. Arreglo: `revoke insert` a `authenticated` y quitar las dos
      políticas en una migración posterior, cuando 1B esté publicada (el registro y el alta asistida
      escriben con `service_role`, no les afecta); el arnés pasará esos `insertar` a «denegar».
+     **1B se publicó el 02-11-2026 (`c67e12f`)**: el frontend vigente ya no inserta directo, así que la
+     condición se cumple y la migración de cierre se puede hacer.

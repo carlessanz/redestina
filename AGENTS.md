@@ -54,7 +54,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
   registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A publicada el
-  02-11-2026, `3ec6dba`; 1C publicada el 02-11-2026, `a07dd6a`; 1B en `main`, sin publicar**).
+  02-11-2026, `3ec6dba`; 1C publicada el 02-11-2026, `a07dd6a`; 1B publicada el 02-11-2026, `c67e12f`**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -599,7 +599,7 @@ los expedientes) · **142** (consentimientos sin exportación; la pantalla la di
 import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
 (`v_productores_llistat`/`v_entidades_llistat` sin consumidor desde 1C; borrarlas es una
 migración aparte) · **150** (el INSERT directo de fichas del equipo sigue abierto por RLS y se salta
-las reglas de `crear_entitat`; cerrarlo cuando 1B esté publicada).
+las reglas de `crear_entitat`; 1B ya está publicada, así que se puede cerrar).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -619,7 +619,7 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1.559 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.634/1.634 y 23 sin datos (1.643 al publicar 1B); clon 1.637/1.637 y 29
+   **Referencia: producción 1.643/1.643 y 23 sin datos (tras publicar 1B); clon 1.637/1.637 y 29
    (total 1.666 = 1.648 de 1A + 9 de 1C + 9 de 1B; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
