@@ -92,8 +92,8 @@
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
    contacto denegado). **Clon: 1.617/1.617 y 31 sin datos (total 1.648)**; las dos «sin datos»
    nuevas son `fitxa_estat_hist` leída por el equipo, vacía hasta el primer cambio de estado.
-   Producción sigue en 1.556/1.556 y 28 hasta publicar 1A; al publicarla, la cifra esperada es el
-   total 1.648.
+   **Producción, tras publicar `3ec6dba` el 02-11-2026: 1.625/1.625 y 23 sin datos**, el mismo total
+   (1.648). Tiene menos «sin datos» que el clon porque sus fichas de prueba tienen más filas propias.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin

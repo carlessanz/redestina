@@ -53,8 +53,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
-  registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A hecha en el clon, sin
-  publicar**).
+  registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A publicada el
+  02-11-2026, `3ec6dba`**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -592,8 +592,8 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1.532 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.617/1.617 y 31 sin datos (total 1.648, con los 64 checks de 1A);
-   producción 1.556/1.556 y 28 antes de 1A, por medir al publicarla. «Sin fallos de permisos».** Una
+   **Referencia: producción 1.625/1.625 y 23 sin datos; clon 1.617/1.617 y 31 (mismo total,
+   1.648, con los 64 checks de 1A; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

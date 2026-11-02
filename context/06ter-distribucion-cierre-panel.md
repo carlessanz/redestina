@@ -1656,7 +1656,7 @@ hasta que el panel la normalice.
   (`modalitats_compatibles_meves()` filtra `e.activo`); las que ya tienen relación con ella siguen
   (deuda 148).
 - **Selectores del equipo**: `FormulariInteresAssistit`, `fases/Distribucio` y `Espigolades` piden
-  solo `entidades.activo`. `priorizar-entidades` también (⚠️ redesplegarla al publicar 1A).
+  solo `entidades.activo`. `priorizar-entidades` también (redesplegada el 02-11-2026).
 - **Errores**: `entitat_inactiva`, `falta_nif`, `falta_rao_social` (y los ya existentes `nif_invalid`,
   `ja_te_paper`) tienen clave en `textError.ts`; `clauErrorInteres()` reconoce `entitat_inactiva`.
 - E2E: `tests/e2e/entitats-estat.e2e.ts` (7 pruebas, clon y escritorio; deja las fichas como estaban).

@@ -109,5 +109,5 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
   Airtable · **P8** «1 convenio» va al plan 3 · **P9** activar exige solo NIF válido y razón social
   (1A, trigger) · **P10** el listado muestra solo las activas por defecto (1C; `cerca_entitats` ya
   admite `p_nomes_actives`).
-- **1A hecha en el clon el 02-11-2026, sin publicar**: migración `20270501100000`, `priorizar-entidades`
-  y frontend.
+- **1A publicada el 02-11-2026 (`3ec6dba`)**: migración `20270501100000` aplicada con
+  `aplicar-migracion.ts`, `priorizar-entidades` redesplegada y frontend por el push.
