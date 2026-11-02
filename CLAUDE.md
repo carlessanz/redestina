@@ -95,7 +95,7 @@ con el `git push`** — antes lo hacía el branching—, así que si no las desp
 ## Carpeta del proyecto de consultoría (fuera del repo)
 
 La documentación del proyecto vive en `/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/`
-(Google Drive, carpeta sincronizada; antes estaba en `~/Documents/Claude/Projects/Redestina/`, que ya no se usa),
+(Google Drive, carpeta sincronizada; la ubicación anterior, dentro de `~/Documents`, ya no se usa),
 accesible desde Claude Code por `additionalDirectories` en `.claude/settings.local.json`.
 Está organizada así: `0. Documentación vigente/` = documentos vigentes (producto y funcional, flujos,
 técnica y WhatsApp, demo y formación, Single Market 2028), `1. Fuentes/` = memoria de subvención,

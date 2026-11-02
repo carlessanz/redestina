@@ -68,9 +68,9 @@ para la contraseña, que es lo que permite enseñarla sin repartir credenciales.
 
 **Dos documentos vigentes no tienen copia en `docs/` y viven solo en `0. Documentación vigente/` de la carpeta del
 proyecto de consultoría** (§ abajo), así que no se encuentran buscando en el repo: **`Definición de
-Producto REDESTINA 2026.md`**, la capa estratégica que enmarca al resto —principios, cinco líneas,
+producto REDESTINA v3.md`** (en `1. Producto y funcional/`), la capa estratégica que enmarca al resto —principios, cinco líneas,
 propuesta de valor por actor, Lean Canvas, recorridos por rol, alcance del MVP y trazabilidad con la
-subvención ARC (expediente TER/4617/2024)—, y **`Flujo de usuarios REDESTINA.md`**, los recorridos
+subvención ARC (expediente TER/4617/2024)—, y **`Flujo de usuarios REDESTINA v4.md`** (en `2. Flujos/`), los recorridos
 objetivo por rol paso a paso. Jerarquía cuando se solapan: la Definición de Producto manda en **el
 porqué y el para quién**, el funcional en **el qué**, y la automatización y la guía técnica en **el
 cómo sobre este repo**.
