@@ -95,7 +95,8 @@
    contacto denegado). **Clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
    `estat_acces_org`, `desactivar_acces_org`, `concedir_acces_org` y `revertir_acces_org` denegadas a las
    siete externas; el técnico lee el estado y nada más; el super_admin lee y desactiva; concedir y revertir,
-   solo `service_role`). En producción, al publicar 1D, se espera 1.683/1.683 y 23.** Antes,
+   solo `service_role`). Producción, tras publicar `b6685b1` (1D) el 02-11-2026: 1.683/1.683 y 23 sin
+   datos.** Antes,
    **clon, tras cerrar la 150: 1.641/1.641 y 29 sin datos (total 1.670; +4: `insertar` en `productores` y
    `entidades` denegado al técnico y al super_admin)**; tras 1B, 1.637/1.637 y 29 (total 1.666; 1B añadió 9: `crear_entitat`
    denegado a las siete externas, permitido con `22023` al técnico y al super_admin)**; antes de 1B,

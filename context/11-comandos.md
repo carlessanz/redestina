@@ -170,7 +170,7 @@ supabase functions deploy crear-oferta         # con verify_jwt (alta desde el p
 supabase functions deploy registro --no-verify-jwt               # registro público self-service (§9)
 supabase functions deploy enviar-acceso        # con verify_jwt (enlace mágico / código de acceso)
 supabase functions deploy donar-acces          # con verify_jwt («Dona-li accés», plan 1 1D, 02-11-2026)
-supabase functions delete alta-assistida       # retirada en 1D: se borra del remoto al publicar 1D (una vez)
+# alta-assistida: retirada en 1D y borrada del remoto el 02-11-2026 (`functions delete`); ya no existe
 # ⚠️ 27-10-2026: `_shared/resend.ts`, `gate.ts` y `canal.ts` cambiaron (interruptores de §8): hay que
 #    redesplegar TODAS las que los importan, y `registro` (alta.ts). Tras `generar-documento`, el
 #    documento de prueba de siempre.
