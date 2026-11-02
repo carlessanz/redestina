@@ -416,7 +416,7 @@ export default function CampanyaConvenis() {
                           <TableCell>
                             <div className="flex justify-end">
                               <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                                <Link to={`/equip/${f.tipo_org === 'productor' ? 'productors' : 'entitats'}/${f.org_id}`}>
+                                <Link to={`/equip/entitats/${f.org_id}`}>
                                   {t('camp.open_record')}
                                 </Link>
                               </Button>

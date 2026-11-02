@@ -4,7 +4,7 @@
 // **estado** dice qué hay que hacer hoy (contrafirmar lo firmado, insistir en lo pendiente),
 // el **modelo** separa a quien dona de quien recibe y de quien compra, y la **comarca** es
 // como se reparten los dinamizadores. Se filtra en cliente, sobre lo ya cargado, igual que
-// `OffersList` y `ProducersList`: son cientos de filas, no cientos de miles (deuda §12.5).
+// `OffersList` y `Entitats`: son cientos de filas, no cientos de miles (deuda §12.5).
 //
 // La comarca no está en `convenios`: sale de la ficha (`area_geografica`), que se pide
 // **solo de los ids que salen en pantalla**, como en `Albarans`. Traerse las 343 fichas

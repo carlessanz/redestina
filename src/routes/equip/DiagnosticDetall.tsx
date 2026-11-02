@@ -76,7 +76,7 @@ export default function DiagnosticDetall() {
     return <p className="text-sm text-destructive">{t('diagd.bad_url')}</p>
   }
 
-  const tornar = tipusOrg === 'productor' ? '/equip/productors' : '/equip/entitats'
+  const tornar = '/equip/entitats' // la ficha única (1C) resuelve el id de ficha
 
   return (
     <div className="space-y-4">

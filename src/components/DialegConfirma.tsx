@@ -2,7 +2,7 @@
 //
 // POR QUÉ EXISTE (deuda §12.35). Quedaban ocho `window.confirm()` y el argumento para
 // tolerarlos era que su bloqueo se comporta como «cancelar», que es el lado seguro. Eso es
-// cierto y no basta: en `RecordDetail` y en `Conversation` ese diálogo es la puerta de un
+// cierto y no basta: en `useEsborrarFitxa` y en `Conversation` ese diálogo es la puerta de un
 // borrado irreversible, así que si el navegador integrado lo bloquea —los de WhatsApp e
 // Instagram lo hacen, y son muy probables en este público— no pasa nada **y la persona no
 // recibe ninguna señal de por qué**. Es exactamente el fallo que motivó retirar `prompt()`:

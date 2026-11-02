@@ -22,9 +22,10 @@ import Privacitat from '../routes/public/Privacitat'
 import RestablirClau from '../routes/public/RestablirClau'
 import Dashboard from '../components/Dashboard'
 import Settings from '../components/Settings'
-import { Entitats, Ofertes, Productors } from '../routes/equip/Llistats'
+import { Ofertes } from '../routes/equip/Llistats'
+import Entitats from '../routes/equip/Entitats'
+import EntitatDetall, { RedireccioFitxa } from '../routes/equip/EntitatDetall'
 import OfertaDetall from '../routes/equip/OfertaDetall'
-import FitxaRegistre from '../routes/equip/FitxaRegistre'
 import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
 import Albarans from '../routes/equip/Albarans'
@@ -131,12 +132,17 @@ export const router = createBrowserRouter([
                   { path: 'ofertes', element: <Ofertes />, handle: { titleKey: 'nav.offers', ample: true } },
                   { path: 'ofertes/:id', element: <OfertaDetall />, handle: { titleKey: 'nav.offers' } },
                   { path: 'aprovacions', element: <Aprovacions />, handle: { titleKey: 'nav.approvals' } },
-                  { path: 'productors', element: <Productors />, handle: { titleKey: 'nav.producers', ample: true } },
-                  { path: 'productors/nou', element: <FitxaRegistre tabla="productores" />, handle: { titleKey: 'nav.producers' } },
-                  { path: 'productors/:id', element: <FitxaRegistre tabla="productores" />, handle: { titleKey: 'nav.producers' } },
-                  { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entities', ample: true } },
-                  { path: 'entitats/nova', element: <FitxaRegistre tabla="entidades" />, handle: { titleKey: 'nav.entities' } },
-                  { path: 'entitats/:id', element: <FitxaRegistre tabla="entidades" />, handle: { titleKey: 'nav.entities' } },
+                  // Las rutas de antes de 1C (plan 1, D1): el listado de productores es el de
+                  // entidades filtrado por papel; una ficha de productor es la de su organización
+                  // (`EntitatDetall` resuelve un id de ficha y redirige).
+                  { path: 'productors', element: <Navigate to="/equip/entitats?rol=ofertant" replace /> },
+                  { path: 'productors/nou', element: <Navigate to="/equip/entitats/nova?rol=ofertant" replace /> },
+                  { path: 'productors/:id', element: <RedireccioFitxa /> },
+                  { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entitats', ample: true } },
+                  // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
+                  // ficha de antes se resuelve y redirige. El alta, con un papel.
+                  { path: 'entitats/nova', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
+                  { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },
                   { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans', ample: true } },

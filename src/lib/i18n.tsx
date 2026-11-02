@@ -11,13 +11,13 @@ const ca: Dict = {
   // comunes
   'c.save': 'Desar', 'c.saving': 'Desant…', 'c.delete': 'Esborrar', 'c.cancel': 'Cancel·lar',
   'c.ok': 'D’acord',
-  'c.add': 'Afegir', 'c.new_f': 'Nova', 'c.detail': 'Detall', 'c.message': 'Missatge',
+  'c.add': 'Afegir', 'c.detail': 'Detall', 'c.message': 'Missatge',
   'c.back': 'Enrere', 'c.loading': 'Carregant…', 'c.none': '—', 'c.search': 'Cercar',
   'c.send': 'Enviar', 'c.sending': 'Enviant…', 'c.yes': 'Sí', 'c.no': 'No',
   // nav
   'c.error': 'Hi ha hagut un error',
-  'nav.dashboard': 'Tauler', 'nav.offers': 'Ofertes', 'nav.producers': 'Entitats productores',
-  'nav.entities': 'Entitats receptores', 'nav.messaging': 'Missatgeria', 'nav.settings': 'Configuració',
+  'nav.dashboard': 'Tauler', 'nav.offers': 'Ofertes',
+ 'nav.messaging': 'Missatgeria', 'nav.settings': 'Configuració',
   'nav.logout': 'Sortir',
   // navegació per rol
   'nav.main': 'Navegació principal', 'nav.profile': 'El meu compte',
@@ -267,30 +267,30 @@ const ca: Dict = {
   'off.st_validation': 'Per validar',
   'off.st_draft': 'Esborrany', 'off.st_cancelled': 'Cancel·lada', 'off.st_uncoll': 'No col·locada', 'off.st_closed': 'Tancada',
   // producers
-  'prod.title': 'Entitats productores',
-  'prod.subtitle': 'A dalt, les fitxes de prova (amb el mode de proves actiu, són les úniques que reben missatges); a baix, la resta.',
-  'prod.search': 'Cercar per nom, empresa, telèfon, població o correu…',
-  'prod.empty': 'No hi ha entitats productores.', 'prod.no_match': 'Cap entitat productora coincideix amb la cerca.',
-  'prod.c_name': 'Nom', 'prod.c_email': 'Correu', 'prod.c_phone': 'Telèfon', 'prod.c_actions': 'Accions',
-  'prod.unanswered': '{n} sense contestar', 'prod.no_phone': 'Sense telèfon mòbil',
+
+
+
+
+
+
   // entities
-  'ent.title': 'Entitats receptores', 'ent.subtitle': 'A dalt, les entitats de prova (amb el mode de proves actiu, són les úniques que reben missatges); a baix, la resta.',
-  'ent.search': 'Cercar per nom, població, àrea, telèfon, correu o contacte…',
-  'ent.empty': 'No hi ha entitats receptores.', 'ent.no_match': 'Cap entitat coincideix amb la cerca.',
-  'ent.c_name': 'Nom', 'ent.c_town': 'Població', 'ent.c_phone': 'Telèfon', 'ent.c_email': 'Correu',
-  'ent.c_modality': 'Modalitats', 'ent.c_prio': 'Prio.', 'ent.c_actions': 'Accions', 'ent.no_phone': 'Sense telèfon',
+
+
+
+
+
   // record detail (CRUD)
-  'rec.new': 'Nou {x}', 'rec.new_f': 'Nova {x}', 'rec.alta': 'Alta d’una fitxa nova',
-  'rec.editing': 'Editant {x}', 'rec.delete_x': 'Esborrar {x}',
+
+  'rec.editing': 'Editant {x}',
   'rec.confirm_delete_t': 'Esborrar «{name}»?',
   'rec.confirm_delete': 'És irreversible.',
-  'rec.name_required': 'El nom és obligatori.',
+
   'rec.err_unique': 'Ja existeix una fitxa amb aquest telèfon, correu o nom (han de ser únics).',
   'rec.created': 'Fitxa creada.', 'rec.saved': 'Canvis desats.', 'rec.deleted': 'Fitxa esborrada.',
-  'rec.producer': 'entitat productora', 'rec.entity': 'entitat receptora',
-  'rec.dual_delete_desc': 'Aquesta organització té doble rol: també és entitat {role}. Vols esborrar només aquesta fitxa o les dues? És irreversible.',
+
+
   'rec.dual_only_producer': 'Només la fitxa productora', 'rec.dual_only_entity': 'Només la fitxa receptora',
-  'rec.dual_both': 'Esborrar les dues', 'rec.role_productora': 'productora', 'rec.role_receptora': 'receptora',
+  'rec.dual_both': 'Esborrar les dues',
   'rec.delete_accounts': '⚠️ {n} comptes d’usuari entren amb aquestes fitxes. Si les esborres, es quedaran sense panell i no podran accedir.', 'rec.dual_deleted': 'Fitxes esborrades (productora i receptora).',
   'rec.blocked': 'No es pot esborrar:',
   'rec.block_albarans': 'té albarans emesos, entregats o conciliats',
@@ -946,7 +946,7 @@ const ca: Dict = {
   'org.place_in_use': 'Aquest lloc el fa servir alguna oferta i no es pot esborrar.', 'org.place_delete': 'Esborrar {x}', 'org.see_map': 'veure el mapa',
   'org.f_nom_comercial': 'Nom comercial', 'org.f_rao_social': 'Raó social',
   'org.h_rao_social': 'El nom legal, si és diferent del comercial.',
-  'org.f_tipus_empresa': 'Tipus d’empresa', 'org.f_tipus_entitat': 'Tipus d’empresa o entitat',
+  'org.f_tipus_entitat': 'Tipus d’empresa o entitat',
   'org.f_persona_contacte': 'Persona de contacte', 'org.f_telefon': 'Telèfon', 'org.f_telefon2': 'Un altre telèfon',
   'org.f_horari': 'Horari i disponibilitat', 'org.f_municipi': 'Municipi', 'org.f_area': 'Àrea geogràfica',
   'org.h_area': 'Surt sola del municipi (la comarca). No cal escriure-la.',
@@ -1006,7 +1006,6 @@ const ca: Dict = {
   'fl.d_estat': 'Estat',
   'fl.d_ofertant': 'Entitat productora',
   'fl.d_tipus': 'Tipus d’entitat',
-  
   'fl.r_alta': 'Data d’alta',
   'fl.r_recepcio': 'Data de recepció',
   'fl.ordre': 'Ordena per',
@@ -3187,18 +3186,74 @@ const ca: Dict = {
   'manual.err_no_disponible': 'Aquesta oferta ja no admet interessos (està coberta, tancada o encara no s’ha publicat).',
   'manual.err_ja_resposta': 'Aquesta entitat ja ha mostrat interès: no es torna a enviar per no perdre el que va demanar.',
   'manual.err_entitat': 'Aquesta entitat no existeix.',
+  // La ficha única «Entitat» del equipo (plan 1, rebanada 1C, 02-11-2026).
+  'ef.title_nova': 'Nova entitat', 'ef.tornar': 'Entitats',
+  'ef.sub_nova': 'Dona d’alta una organització amb un paper. L’altre paper s’afegeix després des de la fitxa.',
+  'ef.paper': 'Paper', 'ef.paper_ofertant': 'Ofertant', 'ef.paper_receptor': 'Receptor',
+  'ef.sec_contacte': 'Contacte i accés',
+  'ef.h_contacte': 'Una sola persona de contacte per entitat: és qui pot tenir accés a la plataforma.',
+  'ef.sec_ofertant': 'Com a ofertant', 'ef.sec_receptor': 'Com a receptor',
+  'ef.sec_diagnostic': 'Diagnòstic operatiu', 'ef.sec_documentacio': 'Documentació',
+  'ef.sec_intern': 'Gestió interna REDESTINA',
+  'ef.h_intern': 'Només ho veu l’equip. L’organització no veu aquest bloc.',
+  'ef.f_contacte2': 'Contacte secundari (sense accés)',
+  'ef.h_contacte2': 'Una altra persona a qui trucar. No té compte a la plataforma.',
+  'ef.f_telefon3': 'Telèfon del contacte secundari', 'ef.f_email2': 'Correu del contacte secundari',
+  'ef.altra_fitxa': 'A la fitxa de {rol} hi diu «{x}». Si el canvies, les dues fitxes quedaran amb el valor nou.',
+  'rec.dual_delete_q': 'Aquesta organització té doble rol. Vols esborrar només un paper o els dos? És irreversible.',
+  'ef.estat_activa': 'Activa', 'ef.estat_inactiva': 'Inactiva',
+  'ef.btn_activa': 'Activa-la', 'ef.btn_desactiva': 'Desactiva-la',
+  'ef.h_rols': 'Cada paper s’activa o es desactiva per separat. Activar exigeix NIF vàlid i raó social.',
+  'ef.afegeix_ofertant': 'Afegeix el paper d’ofertant', 'ef.afegeix_receptor': 'Afegeix el paper de receptor',
+  'ef.confirm_afegeix_t': 'Afegir el paper de {rol}?',
+  'ef.confirm_afegeix_d': 'Es crearà la fitxa amb les dades comunes (raó social, NIF, contacte, adreça), sense compte. L’estat serà el mateix que el de l’altra fitxa.',
+  'ef.confirm_desactiva_t': 'Desactivar el paper de {rol}?',
+  'ef.confirm_desactiva_d': 'Deixarà d’operar amb aquest paper. Es pot tornar a activar.',
+  'ef.desactiva_org': 'Desactiva l’entitat',
+  'ef.confirm_desactiva_org_t': 'Desactivar «{name}»?',
+  'ef.confirm_desactiva_org_d': 'Es desactivaran tots els seus papers: no veurà ofertes noves ni entrarà a la priorització. Es pot tornar a activar amb el NIF.',
+  'ef.estat_canviat': 'Estat actualitzat.', 'ef.paper_afegit': 'Paper afegit.',
+  'ef.compte': 'Compte a la plataforma',
+  'ef.compte_cap': 'Sense accés', 'ef.compte_pendent': 'Registre pendent de validar',
+  'ef.compte_activa': 'Accés actiu', 'ef.compte_desactivada': 'Accés desactivat',
+  'ef.h_compte': 'L’accés es dona des d’Aprovacions (registre) o amb «Nova organització amb compte».',
+  'ef.consentiments': 'Consentiments RGPD',
+  'ef.cons_cap': 'Cap consentiment registrat: el compte és anterior al registre amb consentiments, o no en té.',
+  'ef.cons_privacitat': 'Política de privacitat', 'ef.cons_comunicacions_plataforma': 'Comunicacions de la plataforma',
+  'ef.cons_comunicacions_espigoladors': 'Comunicacions d’Espigoladors',
+  'ef.cons_acceptat': 'Acceptat', 'ef.cons_rebutjat': 'No acceptat',
+  'ef.cons_origen_registre': 'registre', 'ef.cons_origen_alta_assistida': 'alta assistida',
+  'ef.esborra': 'Esborra l’entitat', 'ef.nom_obligatori': 'Cal el nom comercial.',
+  'ef.cap_canvi': 'No hi ha res per desar.',
+  'ef.conveni_ofertant': 'Conveni com a ofertant', 'ef.conveni_receptor': 'Conveni com a receptor',
+  'ef.err_paper': 'Tria un paper.',
+  // El listado «Entitats» del equipo (plan 1, rebanada 1C).
+  'nav.entitats': 'Entitats',
+  'el.title': 'Entitats',
+  'el.subtitle': 'Totes les organitzacions, ofertants i receptores. Per defecte, només les actives; a dalt, les de prova.',
+  'el.search': 'Cercar per nom, raó social, NIF, contacte, població, comarca, telèfon o correu…',
+  'el.empty': 'No hi ha cap entitat.', 'el.no_match': 'Cap entitat coincideix amb la cerca o els filtres.',
+  'el.c_name': 'Nom', 'el.c_rols': 'Papers', 'el.c_nif': 'NIF', 'el.c_town': 'Població',
+ 'el.c_compte': 'Compte', 'el.c_conveni': 'Conveni', 'el.c_activitat': 'Darrera activitat',
+  'el.c_actions': 'Accions', 'el.nova': 'Nova entitat', 'el.no_phone': 'Sense telèfon',
+  'el.unanswered': '{n} sense contestar',
+  'el.conveni_cap': 'Sense conveni', 'el.conveni_part': 'Només {rol}',
+  'el.activitat_mai': 'Cap',
+  'fl.d_rol': 'Paper', 'fl.d_compte': 'Compte',
+  'fl.v_ofertant': 'Ofertant', 'fl.v_receptor': 'Receptor',
+  'fl.v_activa': 'Activa', 'fl.v_inactiva': 'Inactiva',
 }
 
 // Español
 const es: Dict = {
   'c.save': 'Guardar', 'c.saving': 'Guardando…', 'c.delete': 'Borrar', 'c.cancel': 'Cancelar',
   'c.ok': 'De acuerdo',
-  'c.add': 'Añadir', 'c.new_f': 'Nueva', 'c.detail': 'Detalle', 'c.message': 'Mensaje',
+  'c.add': 'Añadir', 'c.detail': 'Detalle', 'c.message': 'Mensaje',
   'c.back': 'Atrás', 'c.loading': 'Cargando…', 'c.none': '—', 'c.search': 'Buscar',
   'c.send': 'Enviar', 'c.sending': 'Enviando…', 'c.yes': 'Sí', 'c.no': 'No',
   'c.error': 'Ha habido un error',
-  'nav.dashboard': 'Panel', 'nav.offers': 'Ofertas', 'nav.producers': 'Entidades productoras',
-  'nav.entities': 'Entidades receptoras', 'nav.messaging': 'Mensajería', 'nav.settings': 'Configuración',
+  'nav.dashboard': 'Panel', 'nav.offers': 'Ofertas',
+ 'nav.messaging': 'Mensajería', 'nav.settings': 'Configuración',
   'nav.logout': 'Salir',
   // navegación por rol
   'nav.main': 'Navegación principal', 'nav.profile': 'Mi cuenta',
@@ -3436,28 +3491,28 @@ const es: Dict = {
   'off.st_published': 'Publicada', 'off.st_partial': 'Parcial', 'off.st_blocked': 'Cubierta',
   'off.st_validation': 'Por validar',
   'off.st_draft': 'Borrador', 'off.st_cancelled': 'Cancelada', 'off.st_uncoll': 'No colocada', 'off.st_closed': 'Cerrada',
-  'prod.title': 'Entidades productoras',
-  'prod.subtitle': 'Arriba, las fichas de prueba (con el modo de pruebas activo, son las únicas que reciben mensajes); abajo, el resto.',
-  'prod.search': 'Buscar por nombre, empresa, teléfono, población o email…',
-  'prod.empty': 'No hay entidades productoras.', 'prod.no_match': 'Ninguna entidad productora coincide con la búsqueda.',
-  'prod.c_name': 'Nombre', 'prod.c_email': 'Email', 'prod.c_phone': 'Teléfono', 'prod.c_actions': 'Acciones',
-  'prod.unanswered': '{n} sin contestar', 'prod.no_phone': 'Sin teléfono móvil',
-  'ent.title': 'Entidades receptoras', 'ent.subtitle': 'Arriba, las entidades de prueba (con el modo de pruebas activo, son las únicas que reciben mensajes); abajo, el resto.',
-  'ent.search': 'Buscar por nombre, población, área, teléfono, email o contacto…',
-  'ent.empty': 'No hay entidades receptoras.', 'ent.no_match': 'Ninguna entidad coincide con la búsqueda.',
-  'ent.c_name': 'Nombre', 'ent.c_town': 'Población', 'ent.c_phone': 'Teléfono', 'ent.c_email': 'Email',
-  'ent.c_modality': 'Modalidades', 'ent.c_prio': 'Prio.', 'ent.c_actions': 'Acciones', 'ent.no_phone': 'Sin teléfono',
-  'rec.new': 'Nuevo {x}', 'rec.new_f': 'Nueva {x}', 'rec.alta': 'Alta de una ficha nueva',
-  'rec.editing': 'Editando {x}', 'rec.delete_x': 'Borrar {x}',
+
+
+
+
+
+
+
+
+
+
+
+
+  'rec.editing': 'Editando {x}',
   'rec.confirm_delete_t': '¿Borrar «{name}»?',
   'rec.confirm_delete': 'Es irreversible.',
-  'rec.name_required': 'El nombre es obligatorio.',
+
   'rec.err_unique': 'Ya existe una ficha con ese teléfono, email o nombre (deben ser únicos).',
   'rec.created': 'Ficha creada.', 'rec.saved': 'Cambios guardados.', 'rec.deleted': 'Ficha borrada.',
-  'rec.producer': 'entidad productora', 'rec.entity': 'entidad receptora',
-  'rec.dual_delete_desc': 'Esta organización tiene doble rol: también es entidad {role}. ¿Quieres borrar solo esta ficha o las dos? Es irreversible.',
+
+
   'rec.dual_only_producer': 'Solo la ficha productora', 'rec.dual_only_entity': 'Solo la ficha receptora',
-  'rec.dual_both': 'Borrar las dos', 'rec.role_productora': 'productora', 'rec.role_receptora': 'receptora',
+  'rec.dual_both': 'Borrar las dos',
   'rec.delete_accounts': '⚠️ {n} cuentas de usuario entran con estas fichas. Si las borras, se quedarán sin panel y no podrán acceder.', 'rec.dual_deleted': 'Fichas borradas (productora y receptora).',
   'rec.blocked': 'No se puede borrar:',
   'rec.block_albarans': 'tiene albaranes emitidos, entregados o conciliados',
@@ -4077,7 +4132,7 @@ const es: Dict = {
   'org.place_in_use': 'Este lugar lo usa alguna oferta y no se puede borrar.', 'org.place_delete': 'Borrar {x}', 'org.see_map': 'ver el mapa',
   'org.f_nom_comercial': 'Nombre comercial', 'org.f_rao_social': 'Razón social',
   'org.h_rao_social': 'El nombre legal, si es distinto del comercial.',
-  'org.f_tipus_empresa': 'Tipo de empresa', 'org.f_tipus_entitat': 'Tipo de empresa o entidad',
+  'org.f_tipus_entitat': 'Tipo de empresa o entidad',
   'org.f_persona_contacte': 'Persona de contacto', 'org.f_telefon': 'Teléfono', 'org.f_telefon2': 'Otro teléfono',
   'org.f_horari': 'Horario y disponibilidad', 'org.f_municipi': 'Municipio', 'org.f_area': 'Área geográfica',
   'org.h_area': 'Sale sola del municipio (la comarca). No hace falta escribirla.',
@@ -4137,7 +4192,6 @@ const es: Dict = {
   'fl.d_estat': 'Estado',
   'fl.d_ofertant': 'Entidad productora',
   'fl.d_tipus': 'Tipo de entidad',
-  
   'fl.r_alta': 'Fecha de alta',
   'fl.r_recepcio': 'Fecha de recepción',
   'fl.ordre': 'Ordenar por',
@@ -6280,6 +6334,62 @@ const es: Dict = {
   'manual.err_no_disponible': 'Esta oferta ya no admite intereses (está cubierta, cerrada o todavía no se ha publicado).',
   'manual.err_ja_resposta': 'Esta entidad ya ha mostrado interés: no se vuelve a enviar para no perder lo que pidió.',
   'manual.err_entitat': 'Esta entidad no existe.',
+  // La ficha única «Entitat» del equipo (plan 1, rebanada 1C, 02-11-2026).
+  'ef.title_nova': 'Nueva entidad', 'ef.tornar': 'Entidades',
+  'ef.sub_nova': 'Da de alta una organización con un papel. El otro papel se añade después desde la ficha.',
+  'ef.paper': 'Papel', 'ef.paper_ofertant': 'Ofertante', 'ef.paper_receptor': 'Receptor',
+  'ef.sec_contacte': 'Contacto y acceso',
+  'ef.h_contacte': 'Una sola persona de contacto por entidad: es quien puede tener acceso a la plataforma.',
+  'ef.sec_ofertant': 'Como ofertante', 'ef.sec_receptor': 'Como receptor',
+  'ef.sec_diagnostic': 'Diagnóstico operativo', 'ef.sec_documentacio': 'Documentación',
+  'ef.sec_intern': 'Gestión interna REDESTINA',
+  'ef.h_intern': 'Solo lo ve el equipo. La organización no ve este bloque.',
+  'ef.f_contacte2': 'Contacto secundario (sin acceso)',
+  'ef.h_contacte2': 'Otra persona a la que llamar. No tiene cuenta en la plataforma.',
+  'ef.f_telefon3': 'Teléfono del contacto secundario', 'ef.f_email2': 'Correo del contacto secundario',
+  'ef.altra_fitxa': 'En la ficha de {rol} pone «{x}». Si lo cambias, las dos fichas quedarán con el valor nuevo.',
+  'rec.dual_delete_q': 'Esta organización tiene doble rol. ¿Quieres borrar solo un papel o los dos? Es irreversible.',
+  'ef.estat_activa': 'Activa', 'ef.estat_inactiva': 'Inactiva',
+  'ef.btn_activa': 'Actívala', 'ef.btn_desactiva': 'Desactívala',
+  'ef.h_rols': 'Cada papel se activa o se desactiva por separado. Activar exige NIF válido y razón social.',
+  'ef.afegeix_ofertant': 'Añade el papel de ofertante', 'ef.afegeix_receptor': 'Añade el papel de receptor',
+  'ef.confirm_afegeix_t': '¿Añadir el papel de {rol}?',
+  'ef.confirm_afegeix_d': 'Se creará la ficha con los datos comunes (razón social, NIF, contacto, dirección), sin cuenta. El estado será el mismo que el de la otra ficha.',
+  'ef.confirm_desactiva_t': '¿Desactivar el papel de {rol}?',
+  'ef.confirm_desactiva_d': 'Dejará de operar con este papel. Se puede volver a activar.',
+  'ef.desactiva_org': 'Desactiva la entidad',
+  'ef.confirm_desactiva_org_t': '¿Desactivar «{name}»?',
+  'ef.confirm_desactiva_org_d': 'Se desactivarán todos sus papeles: no verá ofertas nuevas ni entrará en la priorización. Se puede volver a activar con el NIF.',
+  'ef.estat_canviat': 'Estado actualizado.', 'ef.paper_afegit': 'Papel añadido.',
+  'ef.compte': 'Cuenta en la plataforma',
+  'ef.compte_cap': 'Sin acceso', 'ef.compte_pendent': 'Registro pendiente de validar',
+  'ef.compte_activa': 'Acceso activo', 'ef.compte_desactivada': 'Acceso desactivado',
+  'ef.h_compte': 'El acceso se da desde Aprobaciones (registro) o con «Nueva organización con cuenta».',
+  'ef.consentiments': 'Consentimientos RGPD',
+  'ef.cons_cap': 'Ningún consentimiento registrado: la cuenta es anterior al registro con consentimientos, o no tiene.',
+  'ef.cons_privacitat': 'Política de privacidad', 'ef.cons_comunicacions_plataforma': 'Comunicaciones de la plataforma',
+  'ef.cons_comunicacions_espigoladors': 'Comunicaciones de Espigoladors',
+  'ef.cons_acceptat': 'Aceptado', 'ef.cons_rebutjat': 'No aceptado',
+  'ef.cons_origen_registre': 'registro', 'ef.cons_origen_alta_assistida': 'alta asistida',
+  'ef.esborra': 'Borra la entidad', 'ef.nom_obligatori': 'Hace falta el nombre comercial.',
+  'ef.cap_canvi': 'No hay nada que guardar.',
+  'ef.conveni_ofertant': 'Convenio como ofertante', 'ef.conveni_receptor': 'Convenio como receptor',
+  'ef.err_paper': 'Elige un papel.',
+  // El listado «Entitats» del equipo (plan 1, rebanada 1C).
+  'nav.entitats': 'Entidades',
+  'el.title': 'Entidades',
+  'el.subtitle': 'Todas las organizaciones, ofertantes y receptoras. Por defecto, solo las activas; arriba, las de prueba.',
+  'el.search': 'Buscar por nombre, razón social, NIF, contacto, población, comarca, teléfono o correo…',
+  'el.empty': 'No hay ninguna entidad.', 'el.no_match': 'Ninguna entidad coincide con la búsqueda o los filtros.',
+  'el.c_name': 'Nombre', 'el.c_rols': 'Papeles', 'el.c_nif': 'NIF', 'el.c_town': 'Población',
+ 'el.c_compte': 'Cuenta', 'el.c_conveni': 'Convenio', 'el.c_activitat': 'Última actividad',
+  'el.c_actions': 'Acciones', 'el.nova': 'Nueva entidad', 'el.no_phone': 'Sin teléfono',
+  'el.unanswered': '{n} sin contestar',
+  'el.conveni_cap': 'Sin convenio', 'el.conveni_part': 'Solo {rol}',
+  'el.activitat_mai': 'Ninguna',
+  'fl.d_rol': 'Papel', 'fl.d_compte': 'Cuenta',
+  'fl.v_ofertant': 'Ofertante', 'fl.v_receptor': 'Receptor',
+  'fl.v_activa': 'Activa', 'fl.v_inactiva': 'Inactiva',
 }
 
 /**

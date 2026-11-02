@@ -658,9 +658,8 @@ export default function Aprovacions() {
             const correu = perfil?.email || (esProductor ? r.productores?.email : r.entidades?.email)
             const tel = perfil?.telefono || (esProductor ? r.productores?.phone : r.entidades?.telefono)
             const tipusReceptor = r.entidades?.tipo_receptor
-            const ruta = fitxa
-              ? `/equip/${esProductor ? 'productors' : 'entitats'}/${fitxa.id}`
-              : null
+            // La ficha única (1C): el id de ficha lo resuelve `EntitatDetall`.
+            const ruta = fitxa ? `/equip/entitats/${fitxa.id}` : null
             const persona = [perfil?.nombre, correu, tel ? `+${tel}` : null]
               .filter(Boolean).join(' · ')
             const context = [

@@ -109,7 +109,7 @@ export default function DialegConveniDeclarat({ obert, tipusOrg, orgId, nom, onT
     return () => { viu = false }
   }, [obert, tipusOrg, orgId])
 
-  const rutaFitxa = tipusOrg === 'productor' ? `/equip/productors/${orgId}` : `/equip/entitats/${orgId}`
+  const rutaFitxa = `/equip/entitats/${orgId}` // la ficha única (1C) resuelve el id de ficha
   const falten = error?.codi === 'falta_dades_fitxa' ? error.camps : faltenFitxa
   const complet = textSignantValid(signant) && textSignantValid(carrec) && dataFirma !== ''
     && referencia.length <= LIMITS_DECLARAT.referenciaMax && notes.length <= LIMITS_DECLARAT.notesMax

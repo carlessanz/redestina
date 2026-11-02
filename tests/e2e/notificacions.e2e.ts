@@ -58,7 +58,7 @@ test('apagar el general apaga los canales; encenderlo no los enciende', async ({
 test('con el correo apagado, «Correu» de los listados queda gris', async ({ page }) => {
   sql(`update app_settings set value = 'false' where key = 'email_activo'`)
   await entra(page, 'super_admin')
-  await page.goto('/equip/productors')
+  await page.goto('/equip/entitats')
   const boto = page.getByRole('button', { name: /^Correu$|^Correo$/ }).first()
   await expect(boto).toBeVisible()
   await expect(boto).toBeDisabled()

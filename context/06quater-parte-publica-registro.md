@@ -197,6 +197,16 @@ Dos límites que **no se pueden relajar**:
    contraseñas **se cae del bundle**. Verificado con `grep` sobre `dist/`, no por confianza: la
    contraprueba con el flag encendido sí las encuentra.
 
+### Las rutas de las fichas del equipo desde 1C (02-11-2026)
+
+`/equip/entitats` (listado único; `?rol=ofertant|receptor` fija el filtro de papel),
+`/equip/entitats/nova[?rol=…]` (alta con un papel) y `/equip/entitats/:id` con el **id de la
+organización**. Compatibilidad: `/equip/productors` → `/equip/entitats?rol=ofertant`,
+`/equip/productors/nou` → `/equip/entitats/nova?rol=ofertant`, `/equip/productors/:id`
+(`RedireccioFitxa`) → `/equip/entitats/:id`, y `EntitatDetall` resuelve un id de **ficha**
+(`productores.id` o `entidades.id`, los de todos los enlaces de antes) a su organización con
+`replace`. Los 14 enlaces del código pasan el id de ficha tal cual.
+
 ### Aprovacions: tres colas, y se aprueba desde la cola
 
 `src/routes/equip/Aprovacions.tsx` tiene **«Registres pendents»** (altas del registro público:

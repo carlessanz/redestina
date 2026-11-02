@@ -1,16 +1,13 @@
-// Envoltorios de ruta de los tres listados del equipo. Los componentes originales
-// (OffersList, ProducersList, EntitiesList) conservan sus props tal cual: aquí solo se
-// traduce «abrir detalle» a una navegación.
+// Envoltorio de ruta del listado de ofertas del equipo (`OffersList` conserva sus props: aquí
+// solo se traduce «abrir detalle» a una navegación). Los de productores y entidades se
+// fundieron en `routes/equip/Entitats.tsx` (plan 1, 1C).
 
 import { useState } from 'react'
 import { useNavigate } from 'react-router'
 import { useT } from '../../lib/i18n'
 import DialegNovaOfertaAssistida from '../../components/equip/DialegNovaOfertaAssistida'
 import { Button } from '@/components/ui/button'
-import { assegurarContacte } from '../../lib/contactes'
 import OffersList from '../../components/OffersList'
-import ProducersList from '../../components/ProducersList'
-import EntitiesList from '../../components/EntitiesList'
 
 export function Ofertes() {
   const navigate = useNavigate()
@@ -35,31 +32,5 @@ export function Ofertes() {
         onCreada={(r) => { setNova(false); navigate(`/equip/ofertes/${r.id}`) }}
       />
     </>
-  )
-}
-
-export function Productors() {
-  const navigate = useNavigate()
-  return (
-    <ProducersList
-      onOpenDetail={(p) => navigate(`/equip/productors/${p.id}`)}
-      onNew={() => navigate('/equip/productors/nou')}
-      onSendMessage={(phone, name) => {
-        void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))
-      }}
-    />
-  )
-}
-
-export function Entitats() {
-  const navigate = useNavigate()
-  return (
-    <EntitiesList
-      onOpenDetail={(e) => navigate(`/equip/entitats/${e.id}`)}
-      onNew={() => navigate('/equip/entitats/nova')}
-      onSendMessage={(phone, name) => {
-        void assegurarContacte(phone, name).then(() => navigate(`/equip/missatgeria/${phone}`))
-      }}
-    />
   )
 }

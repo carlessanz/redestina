@@ -1,7 +1,7 @@
 // «Sin contestar»: los mensajes entrantes posteriores al último saliente de ese teléfono.
 //
 // POR QUÉ IMPORTA: este contador es lo único que le dice al equipo que alguien está
-// esperando respuesta. Lo usan el badge de `ProducersList`, el orden de `ContactList` (los
+// esperando respuesta. Lo usan el badge de `Entitats`, el orden de `ContactList` (los
 // pendientes arriba) y el contador del menú en `AppShell`. Si contara de menos, una
 // conversación se quedaría sin responder sin que nadie lo viera — y el fallo sería
 // silencioso, porque un cero es un resultado perfectamente normal.

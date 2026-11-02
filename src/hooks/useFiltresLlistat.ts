@@ -8,14 +8,22 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { desaFiltresLlistat, llegeixFiltresDesats, type ValorsFiltre } from '../lib/filtres'
 
-export function useFiltresLlistat(clau: string | null) {
-  const [estat, setEstat] = useState(() => llegeixFiltresDesats(clau))
+/**
+ * `perDefecte`: los filtros con los que abre la pantalla cuando no hay nada recordado (P10 del
+ * plan 1: «Entitats» abre con solo las activas). Quitarlos vale para la sesión; al volver,
+ * se vuelve a abrir con ellos.
+ */
+export function useFiltresLlistat(clau: string | null, perDefecte?: ValorsFiltre) {
+  const ambDefecte = (f: ReturnType<typeof llegeixFiltresDesats>) =>
+    (perDefecte && Object.keys(f.valors).length === 0 && !f.desDe && !f.finsA ? { ...f, valors: perDefecte } : f)
+  const [estat, setEstat] = useState(() => ambDefecte(llegeixFiltresDesats(clau)))
   // Cambiar de organización (o de pantalla) recupera lo suyo, sin volver a guardarlo.
   const carregat = useRef(clau)
   useEffect(() => {
     if (carregat.current === clau) return
     carregat.current = clau
-    setEstat(llegeixFiltresDesats(clau))
+    setEstat(ambDefecte(llegeixFiltresDesats(clau)))
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- `perDefecte` es una constante de la pantalla
   }, [clau])
   useEffect(() => { if (carregat.current === clau) desaFiltresLlistat(clau, estat) }, [clau, estat])
 

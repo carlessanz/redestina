@@ -2,7 +2,7 @@
 // la lista declarativa de `lib/perfilReceptor.ts`.
 //
 // UN SOLO COMPONENTE para los dos sitios donde se editan: la ficha de la propia organización
-// (`PerfilOrganitzacio`) y la del equipo (`RecordDetail`, 28-09-2026). Estaba escrito dentro
+// (`PerfilOrganitzacio`) y la del equipo (`EntitatDetall`; antes `RecordDetail`, 28-09-2026). Estaba escrito dentro
 // de la primera, y copiarlo en la segunda habría dado dos formularios del mismo dato que
 // acabarían guardándolo distinto.
 //

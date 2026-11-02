@@ -571,7 +571,8 @@ Migración `20270421100000`.
   entidad nueva nace sin `tipo_receptor` (lo fija el equipo). Desmarcar no se ofrece.
 - `v_productores_llistat` y `v_entidades_llistat` añaden las columnas nuevas al final.
 - ⚠️ Queda: que la ficha de la operación use el contacto de recogidas de la organización cuando el
-  lugar no tiene contacto propio, y editar actividad y modalidades desde la ficha del equipo.
+  lugar no tiene contacto propio. (Editar actividad y modalidades desde la ficha del equipo: hecho
+  en 1C, 02-11-2026.)
 - E2E `tests/e2e/organitzacio.e2e.ts` (clon, solo escritorio).
 
 ### Revisión del cliente del 08-10-2026 — fase 8: tablero, canalización guiada y foto por WhatsApp (11-10-2026)
@@ -1648,6 +1649,65 @@ cuando la respuesta es una fecha reconocible (§6bis); si no lo es, queda `null`
 hasta que el panel la normalice.
 
 
+
+### La ficha única «Entitat» y el listado «Entitats» (plan 1, rebanada 1C, 02-11-2026)
+
+Decisiones D1 y D8 del plan 1 (`3. Claude Code/2026-11-02-plan-1-crm-entitats.md`), y las
+propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
+
+- **`src/lib/campsFitxa.ts`, la única definición de campos.** Por campo: `clau`, `columnes` (en
+  `productores` y/o `entidades`: con las dos es un campo COMÚN), `bloc`, `tipus`, `labelKey`, `veu`
+  (`tots`·`equip`), `edita` (`tots`·`equip`·`ningu`), `obligatori`. Bloques: `identitat` · `rols` ·
+  `contacte` · `adreca` · `ofertant` · `receptor` · `diagnostic` · `documentacio` · `intern`.
+  `GESTIONATS_PER_COMPONENT` (`activo`, `perfil_receptor`) y `NO_ES_MOSTRA` (`id`, `organizacion_id`,
+  `created_at`, `temporada`). `tests/campsFitxa.test.ts`: cada columna real de las dos tablas (lista
+  a mano en el test) clasificada una sola vez; `edita: tots` por tabla = lista blanca de la RPC del
+  actor, leída del SQL de la última migración; etiquetas en ca y es. **Es lo que cierra 1.6 por
+  construcción.** Internos (solo equipo): `codigo`, `data_alta`, `es_test`, `opt_in`, `conveni` (papel),
+  `visitado`, `familia`, `prioritat`, `estat` (papel), `gestio`, `modalitat` (papel), `comentari`;
+  `tipo_receptor` y `productos_habituales` los ve el actor y los edita el equipo; `poblacion` y
+  `area_geografica` son derivados (nadie). `contacto2` se rotula «Contacte secundari (sense accés)»
+  (D3: un dato, no una persona con cuenta).
+- **`components/fitxa/BlocCamps`**: los campos de un bloque, con los controles de siempre
+  (`SelectorMunicipi`, `TIPUS_EMPRESA`, `XipsTria` para actividad y modalidades, `boolnull`…); ids
+  `<prefijo>-<clau>` (`ed-nif` en el equipo, `po-entidad-nif` en el actor). Con doble rol, un campo
+  común enseña el valor de la ficha de productor y, si la de entidad dice otra cosa, lo pone junto al
+  campo (`valorComu()`, `data-testid="ed-<clau>-altra"`); solo se iguala si se cambia.
+  `tipus_activitat` es común: se enseña la unión y cada ficha guarda las de su papel
+  (`activitatsPerPaper`).
+- **`routes/equip/EntitatDetall.tsx`** (`/equip/entitats/:orgId`; un id de ficha redirige): carga
+  `v_organizaciones` + las fichas; cabecera con chips de papel (gris si inactivo), prueba, y
+  Missatge/Correu; bloques en este orden: Dades de l'organització · Rol a REDESTINA (`BlocRols`:
+  «Activa-la»/«Desactiva-la» por papel, «Afegeix el paper de…», «Desactiva l'entitat», por las RPC de
+  1A y solo `pot_aprovar()`) · Contacte i accés (estado de la cuenta `compte_estat`, `CanalPreferit`)
+  · Adreça · Com a ofertant (+ `LlocsRecollida`) · Com a receptor (+ `CampsPerfilReceptor`) ·
+  Diagnòstic operatiu (`TargetaDiagnostic` equipo) · Documentació (por papel: `BadgeConveni`,
+  `CertificatsFitxa`; y `DocumentacioOrganitzacio` debajo) · Gestió interna REDESTINA (campos
+  internos, `Consentiments` RGPD de las cuentas de la organización —solo lectura; cierra la parte
+  «pantalla» de la deuda 142—, `EnllacOrganitzacio`, «Esborra l'entitat» con `useEsborrarFitxa`).
+  **Guarda solo lo que cambia** y solo lo valida (un NIF heredado inválido ya no bloquea guardar otro
+  campo); un campo común cambiado se escribe en las dos fichas; `productores.name` vacío no se
+  escribe. **`activo` no es campo**: el alta no lo manda y la columna toma su `default true`
+  (deuda 147 cerrada). Alta `/equip/entitats/nova?rol=` con un papel (Dades, Contacte, Adreça y lo
+  del papel); el otro se añade desde «Rols». «Nova organització amb compte» (`DialegAltaAssistida`)
+  sigue en el listado hasta 1D.
+- **`routes/PerfilOrganitzacio.tsx`** (actor): los mismos bloques con `veu: tots` para la tabla de la
+  pestaña (`campsDeTaula`), por `actualitzar_fitxa_*`; `modalitats_interes` y `perfil_receptor` siguen
+  en «El meu perfil de recepció» (puntero). `RolRedestina`, `LlocsRecollida` y `CanalPreferit` como
+  antes. Sigue una pestaña por papel (`LaMevaOrganitzacio`).
+- **`routes/equip/Entitats.tsx`** sobre `v_entitats_llistat`: Nom (+ persona de contacte), Papers
+  (chips, tachado el inactivo), NIF, Població/comarca, Compte, Conveni («Sí» / «Només ofertant» /
+  «Sense conveni»), Darrera activitat, acciones; badges prueba, inactiva, alta rebutjada, sense
+  contestar. Filtros `BarraFiltres`: Paper (aparte de `filtraLlistat`: una organización cuenta en los
+  dos), Estat (**por defecto `activa`**, `useFiltresLlistat(clau, perDefecte)`; «Mostrant N de M»),
+  Zona, Tipus d'entitat, Compte. Menú: una entrada «Entitats» (`nav.entitats`), sin badge.
+- Retirados: `FitxaRegistre`, `RecordDetail`, `lib/crudCampos`, `ProducersList`, `EntitiesList`, y
+  39 claves i18n (`prod.*`/`ent.*` de listado, `rec.new*`, `nav.producers/entities`…).
+- E2E `tests/e2e/fitxa-unica.e2e.ts` (5 pruebas, clon y escritorio): el listado abre con las
+  activas y una desactivada deja de salir; las rutas viejas redirigen; doble rol en una ficha y un
+  campo común escrito en las dos; **1.6**: el actor ve lo que cambió el equipo, no ve «Gestió
+  interna», y el equipo ve lo que cambió el actor. Deja la ficha de productor de Carles con NIF
+  válido y razón social (antes no se podía reactivar).
 
 ### Estado de las fichas en los paneles (plan 1, rebanada 1A, 02-11-2026)
 

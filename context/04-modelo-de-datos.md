@@ -1165,6 +1165,18 @@ nueva, comprueba que es accesible**:
 
 
 
+### El listado «Entitats» (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
+
+- **`v_entitats_llistat`** (`security_invoker`): una fila por organización con ficha (las
+  organizaciones vacías no salen). Lo de `v_organizaciones` más `es_test` (alguna ficha), `rebutjada`
+  (alguna membresía rechazada), `modalitats_interes` y `prioritat` de la entidad, `conveni_productor`
+  / `conveni_entitat` (existe `convenios.estado = 'vigent'` de esa ficha) y `darrera_activitat`
+  (`greatest` de la última oferta del productor y de la última respuesta o canalización de la
+  entidad). `anon` nada; `authenticated` SELECT, y la RLS de las tablas de debajo decide: el equipo
+  todas, un actor la suya (arnés: 9 checks).
+- `v_productores_llistat` y `v_entidades_llistat` **se conservan sin consumidor** (§7, compatibles
+  hacia atrás; deuda 149).
+
 ### Estado de las fichas y búsqueda (plan 1, rebanada 1A, `20270501100000`, 02-11-2026)
 
 - **`entidades.activo`** (`boolean not null default true`): ya existía en `productores`. Las fichas de

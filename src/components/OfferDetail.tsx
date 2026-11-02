@@ -679,7 +679,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {(datosOferta.productor || exc.comarca) && (
             <p className="mt-1 text-sm text-muted-foreground">
               {datosOferta.productor && exc.productor_id
-                ? <Link to={`/equip/productors/${exc.productor_id}`} className="font-medium text-primary hover:underline">{datosOferta.productor}</Link>
+                ? <Link to={`/equip/entitats/${exc.productor_id}`} className="font-medium text-primary hover:underline">{datosOferta.productor}</Link>
                 : datosOferta.productor}
               {datosOferta.productor && exc.comarca ? ' · ' : ''}
               {exc.comarca}

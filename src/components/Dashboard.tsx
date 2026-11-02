@@ -114,7 +114,7 @@ export default function Dashboard() {
       supabase.from('canalizaciones').select('excedente_id, kg_confirmados'),
       supabase.from('wa_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound'),
       // Los «sin contestar» los agrega `missatges_sense_contestar()`, la misma RPC que ya
-      // usan `ProducersList`, `ContactList` y el badge del menú. La regla no se reimplementa.
+      // usan `Entitats`, `ContactList` y el badge del menú. La regla no se reimplementa.
       pendentsPerTelefon(),
       supabase.from('intake_sessions').select('id', { count: 'exact', head: true }),
       getTestMode(),
@@ -215,10 +215,10 @@ export default function Dashboard() {
             <Kpi to="/equip/ofertes" titulo={t('dash.k_kg')} valor={kpis.kg.canalizados} sub={t('dash.channeled')} detalle={[
               { texto: t('dash.pending_kg', { n: nombre(kpis.kg.pendientes, 0) }) },
             ]} />
-            <Kpi to="/equip/productors" titulo={t('dash.k_producers')} valor={kpis.productores.total} sub={t('dash.in_base')} detalle={[
+            <Kpi to="/equip/entitats?rol=ofertant" titulo={t('dash.k_producers')} valor={kpis.productores.total} sub={t('dash.in_base')} detalle={[
               { texto: t('dash.with_mobile', { n: kpis.productores.conMovil }) },
             ]} />
-            <Kpi to="/equip/entitats" titulo={t('dash.k_entities')} valor={kpis.entidades.total} sub={t('dash.receivers')} detalle={[
+            <Kpi to="/equip/entitats?rol=receptor" titulo={t('dash.k_entities')} valor={kpis.entidades.total} sub={t('dash.receivers')} detalle={[
               { texto: t('dash.with_optin', { n: kpis.entidades.conOptIn }) },
               { texto: t('dash.with_email', { n: kpis.entidades.conEmail }) },
             ]} />

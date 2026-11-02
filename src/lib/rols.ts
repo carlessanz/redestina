@@ -193,7 +193,7 @@ const PREFIX_ROL: Record<string, Rol> = {
  * (`/panell`, `/sense-acces`).
  *
  * Se compara el **primer segmento entero**, no un `startsWith`: si algún día hubiera una
- * ruta `/productors` (el listado del equipo vive hoy en `/equip/productors`, pero nada
+ * ruta `/productors` (el listado del equipo vive hoy en `/equip/entitats`, pero nada
  * impide que se mueva), un prefijo la confundiría con el panel del productor.
  */
 export function rolDeLaRuta(pathname: string): Rol | null {

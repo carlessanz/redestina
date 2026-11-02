@@ -625,7 +625,7 @@ export function EspigoladaDetall() {
           {origen.productor && (
             <p>
               {t('esp.producer')}:{' '}
-              <Link className="font-medium text-primary hover:underline" to={`/equip/productors/${espigolada.productor_id}`}>
+              <Link className="font-medium text-primary hover:underline" to={`/equip/entitats/${espigolada.productor_id}`}>
                 {origen.productor}
               </Link>
             </p>

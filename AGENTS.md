@@ -54,7 +54,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
   registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A publicada el
-  02-11-2026, `3ec6dba`**).
+  02-11-2026, `3ec6dba`; 1C en `main`, sin publicar**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -169,7 +169,11 @@ activa si lo está algún papel (D7). Pasar a activa exige NIF válido y razón 
 inactiva no entra en el Mercat (`modalitats_compatibles_meves()`; la rama de historial sigue), ni
 en `priorizar-entidades`, ni en los selectores del equipo, y `comprova_interes()` la rechaza con
 `entitat_inactiva`. **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva (P6) pero
-sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146).
+sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146). **1C (`20270501200000`)**:
+vista `v_entitats_llistat` (`security_invoker`, una fila por organización: lo de `v_organizaciones`
+más `es_test`, `rebutjada`, `modalitats_interes`, `conveni_productor/entitat` y
+`darrera_activitat`) para el listado «Entitats»; `v_productores_llistat`/`v_entidades_llistat`
+quedan sin uso (deuda 149).
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
@@ -344,7 +348,7 @@ texto libre ≤400; ubicación por Maps o `location`; convenio comprobado al fin
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · productors · entitats · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
+| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · entitats[/nova · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
 | Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo agregado, alta con el cuestionario del intake |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
@@ -382,8 +386,23 @@ Lo que manda hoy, en una línea cada uno:
   Els meus documents con «Pendent de tu» (firmar y confirmar desde el panel, diálogo
   `DialegFirmaConveni`); verificación pública del sello (`/verificar/:codi`); doble rol = todos
   los paneles en el menú, el activo se deriva de la URL, `useOrganitzacio(tipus)` y `key` por
-  tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats productores/
-  receptores», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
+  tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats»/«ofertant»/
+  «receptor», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
+- **Ficha única «Entitat» (plan 1, 1C, 02-11-2026, D1+D8)**: `lib/campsFitxa.ts` es **la única
+  definición de campos** (tabla, bloque, quién ve, quién edita; `tests/campsFitxa.test.ts` exige
+  que toda columna de las dos fichas esté clasificada y que `edita: tots` coincida con la lista
+  blanca de las RPC del actor, leída del SQL: cierra 1.6). `EntitatDetall` (`/equip/entitats/:orgId`;
+  un id de ficha redirige) pinta una ficha por organización —Identitat · Rols (activar/desactivar/
+  añadir papel por las RPC de 1A; `activo` no es campo, deuda 147 cerrada) · Contacte i accés
+  (estado de la cuenta, canal) · Adreça · Com a ofertant · Com a receptor · Diagnòstic ·
+  Documentació por papel · Gestió interna (consentiments RGPD, solo equipo)— y guarda **solo lo
+  que cambia**, en las dos fichas si el campo es común (si difieren, lo dice junto al campo).
+  `PerfilOrganitzacio` pinta los mismos bloques con `veu: tots` por sus RPC (P5: el actor edita
+  `telefono2/3`, `email2`, `contacto2` y la logística). Listado `Entitats` sobre
+  `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`; alta con un
+  papel en `/equip/entitats/nova` (el buscador previo es 1B). `components/fitxa/`,
+  `hooks/useEsborrarFitxa`. Retirados `RecordDetail`, `crudCampos`, `FitxaRegistre`,
+  `ProducersList`, `EntitiesList`.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -394,7 +413,9 @@ error no concede nada; pantalla «No s'ha pogut carregar»); `carregant` solo en
 accesos de prueba tras `VITE_ACCESSOS_TEST` y `AccesAmbCodi`) · `/admin` (equipo, no enlazado)
 · `/registre` (uno o los dos papeles) · `/restablir` · `/privacitat` · `/confirmar/:token` ·
 `/signar/:token` · `/factura/:token` · `/verificar/:codi` · `/panell` (raíz por rol) ·
-`/sense-acces`. `RoleGuard` redirige a `/panell`. Aprovacions: cuatro colas (registros,
+`/sense-acces`. `RoleGuard` redirige a `/panell`. Redirecciones de 1C: `/equip/productors[/nou]`
+→ `/equip/entitats[/nova]?rol=ofertant`; `/equip/productors/:id` y un id de ficha en
+`/equip/entitats/:id` → la organización. Aprovacions: cuatro colas (registros,
 convenios por contrasignar, intereses, recogidas por validar); aprobar un alta manda el acceso
 por correo (`enviar-acceso`, casilla «usuari de prova» antes).
 
@@ -422,7 +443,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501100000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501200000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -560,7 +581,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (60 vivas; la siguiente entrada nueva es la 149; los números no se renumeran ni
+**Deuda abierta (60 vivas; la siguiente entrada nueva es la 150; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -569,10 +590,11 @@ ofreciendo la factura) · **128** (canalización conciliada sin coste no se pued
 · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code splitting,
 chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz; CT sin «enviat») ·
 **139** (verificar el REC con varias modalidades) · **140** (`borrar_ficha_completa` no conoce
-los expedientes) · **142** (consentimientos sin pantalla ni exportación) · **143** (entrantes
-con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del import) ·
-**146** (`organizacion_contactos` sin uso, pendiente de borrar) · **147** (una ficha nueva desde
-`RecordDetail` nace con `activo=false`).
+los expedientes) · **142** (consentimientos sin exportación; la pantalla la dio 1C) · **143**
+(entrantes con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del
+import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
+(`v_productores_llistat`/`v_entidades_llistat` sin consumidor desde 1C; borrarlas es una
+migración aparte).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -588,12 +610,13 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.533 pruebas de Vitest en 64
-   ficheros (1.532 correctas, 1 saltada a propósito) + 9 de Deno.**
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.548 pruebas de Vitest en 65
+   ficheros (1.547 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.625/1.625 y 23 sin datos; clon 1.617/1.617 y 31 (mismo total,
-   1.648, con los 64 checks de 1A; la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: clon 1.628/1.628 y 29 sin datos (total 1.657 = 1.648 de 1A + 9 de 1C);
+   producción 1.625/1.625 y 23 antes de publicar 1C (la diferencia son datos). «Sin fallos de
+   permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

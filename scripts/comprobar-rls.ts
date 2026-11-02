@@ -1294,6 +1294,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // activar, desactivar y añadir un papel son de `pot_aprovar()` (admin en adelante).
     { tabla: "cerca_entitats", op: "rpc", esperado: "permitir", args: { p_q: "B0000" }, descripcion: "cerca entitats per NIF", requiereFixture: "fitxes amb NIF B0000… (fitxes de prova)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
+    // Plan 1, 1C (20270501200000): el listado «Entitats», una fila por organización.
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu el llistat d'entitats (totes)", requiereFixture: "alguna organització amb fitxa" },
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
     { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa fitxes (és de l'admin)" },
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva fitxes (és de l'admin)" },
@@ -1526,6 +1528,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // existencia con 22023 (`fitxa_inexistent`, `organitzacio_inexistent`) sin escribir nada.
     { tabla: "cerca_entitats", op: "rpc", esperado: "permitir", args: { p_q: "B0000" }, descripcion: "cerca entitats per NIF", requiereFixture: "fitxes amb NIF B0000… (fitxes de prova)" },
     { tabla: "activar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una fitxa (22023 si no existeix)" },
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu el llistat d'entitats (totes)", requiereFixture: "alguna organització amb fitxa" },
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una fitxa (22023 si no existeix)" },
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
@@ -2028,6 +2031,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
     { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
+    // 1C: la vista del listado es `security_invoker`: solo su organización.
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio al llistat (security_invoker)" },
     // 🔴 Y NO las lee directamente (20270324100000). Hasta esa migración sí podía: la
     //    política de SELECT traía desde `20260730098000` la rama
     //    `excedente_id in (select excedents_dels_meus_productors())`, y con el GRANT por
@@ -2278,6 +2283,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "siguiente_numero", op: "rpc", esperado: "denegar", args: { p_serie: "PROVA", p_ejercicio: 1999 }, descripcion: "NO puede pedir un número de serie" },
     { tabla: "organizaciones", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio" },
     { tabla: "v_organizaciones", op: "leer", esperado: "permitir", descripcion: "veu qui es la seva organitzacio" },
+    // 1C: la vista del listado es `security_invoker`: solo su organización.
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu la seva organitzacio al llistat (security_invoker)" },
     // `convenio_vigente()` sobre la entidad PROPIA (20270414100600): es lo que
     // `manifestar_interes()` comprueba por dentro, y tiene que seguir respondiendo.
     { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "entidad", p_org: "@meva_fitxa_entitat", p_valorizacion: "donacio", p_parte: "recibe" }, descripcion: "pot consultar el conveni de la SEVA entitat" },
@@ -2351,6 +2358,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
     { tabla: "organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "denegar", descripcion: "no ve ninguna entidad del listado (1C)" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],
@@ -2376,6 +2384,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierres_periodo", op: "leer", esperado: "denegar", descripcion: "no ve ningún certificado a demanda" },
     { tabla: "organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
+    { tabla: "v_entitats_llistat", op: "leer", esperado: "denegar", descripcion: "no ve ninguna entidad del listado (1C)" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     ...DOCUMENTAL_EXTERN,
   ],

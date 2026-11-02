@@ -345,7 +345,7 @@ export default function ConveniDetall() {
                 {nomFitxa && (conv.productor_id || conv.entidad_id)
                   ? (
                     <Link className="hover:underline"
-                      to={conv.productor_id ? `/equip/productors/${conv.productor_id}` : `/equip/entitats/${conv.entidad_id}`}>
+                      to={`/equip/entitats/${conv.productor_id ?? conv.entidad_id}`}>
                       {nomFitxa}
                     </Link>
                   )

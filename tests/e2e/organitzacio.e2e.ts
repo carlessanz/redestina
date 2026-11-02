@@ -26,6 +26,9 @@ test('el productor marca dos actividades y guarda; la ficha ya no ofrece persone
   expect(sql(`select array_length(tipus_activitat, 1) from productores where id = '${prod}'`)).toBe('2')
 
   await expect(page.getByTestId('contactes-org')).toHaveCount(0)
+  // 1C (D8): la ficha del actor sale de `campsFitxa`; el bloque interno es solo del equipo.
+  await expect(page.getByTestId('po-productor-identitat')).toBeVisible()
+  await expect(page.getByTestId('bloc-intern')).toHaveCount(0)
 })
 
 test('un NIF mal escrito y una raó social vacía salen en rojo y no se guardan', async ({ page }) => {

@@ -58,7 +58,10 @@ src/
                                Registre (/registre), RestablirClau (/restablir),
                                Privacitat (/privacitat, 27-10-2026) y
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
-  routes/PerfilOrganitzacio.tsx  Ficha propia por secciones, escrita por RPC con lista blanca (§6ter)
+  routes/PerfilOrganitzacio.tsx  Ficha propia: los bloques de `campsFitxa` con `veu: tots`, por RPC con lista blanca (§6ter)
+  routes/equip/Entitats.tsx    El listado «Entitats» (una fila por organización, `v_entitats_llistat`; 1C)
+  routes/equip/EntitatDetall.tsx  La ficha ÚNICA por organización del equipo y el alta con un papel (1C)
+  hooks/useEsborrarFitxa.tsx   Borrar una organización (`borrar_ficha_completa`, diálogo de doble rol)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
   routes/PlaOrganitzacio.tsx   «El meu pla de prevenció», solo lectura (fase 11, §6ter)
   routes/equip/                Canalitzacio[Detall] (el ciclo guiado, §6ter) +
@@ -177,7 +180,8 @@ src/
                                a `entidades.perfil_receptor`, y los tipos de empresa
     municipis.ts               El nomenclátor (`municipios`) cargado una vez por sesión, y el nombre
                                oficial vuelto legible («l'Ametlla del Vallès»)
-    crudCampos.ts              Definiciones de campos para el CRUD (claves i18n f.*)
+    campsFitxa.ts              PURO, con test: LA definición de campos de la ficha de una organización
+                               (tabla, bloque, quién ve, quién edita; plan 1 1C, D8). Sustituye a `crudCampos.ts`
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
@@ -263,9 +267,9 @@ src/
     Dashboard.tsx              Tablero = cola de trabajo: Pendent de l'equip, Com funciona, KPIs (§6ter)
     OffersList.tsx             Ofertas con kg en vivo (Realtime) + buscador; pestañas Actives/Tancades/Totes
     OfferDetail.tsx            Detalle: priorización, canalizaciones, opt-in, cierre, cancelar
-    ProducersList.tsx          Tabla de productores: buscador, separación Meta, detalle/nuevo/enviar
-    EntitiesList.tsx           Tabla de entidades: buscador, badge "Meta", detalle/nueva/enviar
-    RecordDetail.tsx           Ficha CRUD genérica (editar/crear/borrar) de productor o entidad
+    fitxa/                     Los bloques de la ficha única (1C): BlocCamps (los campos de un bloque,
+                               para el equipo y para el actor), BlocRols (activar/desactivar/añadir papel),
+                               CanalPreferit, Consentiments (RGPD, solo equipo)
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
     Settings.tsx               Configuració POR PESTAÑAS (`?tab=`, 27-10-2026): General, Notificacions, Fundació,

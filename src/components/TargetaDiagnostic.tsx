@@ -1,7 +1,7 @@
 // El estado del diagnóstico de una organización, y el botón que lo mueve.
 //
 // Dos sitios, un componente, y por eso `mode`:
-//   · `equip`  → en el slot `avisos` de la ficha (`FitxaRegistre`), junto a `BadgeConveni`.
+//   · `equip`  → en el bloque «Diagnòstic» de la ficha del equipo (`EntitatDetall`).
 //   · `extern` → encima de la ficha propia, en `/organitzacio`.
 //
 // Lo que cambia entre los dos no es el dato sino la VOZ y el destino: al equipo se le habla
@@ -15,7 +15,7 @@
 //    incompleta, el convenio que falta desde la fecha de corte—, y gastarlo aquí devaluaría
 //    la única señal que dice «esto te impide trabajar».
 //
-// ⚠️ Y NO CARGA NADA SI FALTA EL `orgId`: en el alta de una ficha (`/equip/productors/nou`)
+// ⚠️ Y NO CARGA NADA SI FALTA EL `orgId`: en el alta de una ficha (`/equip/entitats/nova`)
 //    todavía no hay a qué colgar un diagnóstico, igual que `CertificatsFitxa`.
 
 import { useEffect, useState } from 'react'

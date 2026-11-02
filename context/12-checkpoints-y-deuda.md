@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **02-11-2026 (plan 1, rebanada 1C): se cierra la 147 y se abre la 149**; la 142 queda a medias (la
+pantalla sí, la exportación no): siguen **60 vivas** y la siguiente entrada nueva es la 150.
 ⚠️ **02-11-2026 (plan 1, rebanada 1A): se abren la 146, la 147 y la 148**: **60 vivas** (aritmética) y la
 siguiente entrada nueva es la 149.
 ⚠️ **27-10-2026 (gestión autónoma): se abre y se cierra la 145** (el reinicio del cierre de prueba dejaba la
@@ -713,10 +715,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      ✅ **Decidido el 17-10-2026 (Carles): de momento se queda SIN freno.** Lo que empuja al receptor es
      el aviso y la cola del equipo; si se quiere el freno, es la propuesta de arriba.
 
-142. **Los consentimientos RGPD no tienen pantalla ni exportación** (27-10-2026). Se guardan en el alta
-     (`consentiments`), pero nadie puede verlos ni cambiarlos después —ni la persona en su ficha ni el
-     equipo—, ni exportar quién acepta las comunicaciones de Espigoladors. Las cuentas anteriores no
-     tienen ninguna fila. Hace falta una sección en la ficha y un listado/CSV para el equipo.
+142. **Los consentimientos RGPD no tienen exportación** (27-10-2026; a medias desde 1C, 02-11-2026).
+     Se guardan en el alta (`consentiments`). Desde 1C el equipo los ve en «Gestió interna» de la ficha
+     (`components/fitxa/Consentiments`, solo lectura); la persona sigue sin verlos en la suya y no hay
+     listado/CSV de quién acepta las comunicaciones de Espigoladors. Las cuentas anteriores no tienen
+     ninguna fila.
 143. **Con WhatsApp apagado, los mensajes que entran se registran pero nadie los ve** (27-10-2026).
      El webhook sigue guardando los entrantes (§5), y Missatgeria desaparece con el canal (§8). Es lo
      pedido —«no deben aparecer los apartados»—, pero si alguien escribe mientras está apagado, el
@@ -732,14 +735,18 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `desar_contacte_org()`/`esborrar_contacte_org()` ya no se ejecutan con sesión (solo
      `service_role`). La tabla y sus filas se conservan a propósito (P6: no se borra nada en 1A).
      Arreglo: cuando el plan lo cierre, pasar lo útil al contacto de la ficha y borrar tabla y RPC.
-147. **Una ficha nueva desde `RecordDetail` nace con `activo=false`** (02-11-2026, visto en 1A; es
-     anterior). El formulario genérico del equipo guarda los booleanos sin marcar como `false`, así
-     que un productor dado de alta desde el panel nace inactivo. Con `entidades.activo` no se añadió
-     el campo a `ENTIDAD_CAMPOS` para no repetirlo en entidades (nacerían inactivas). Se resuelve en
-     1C con `campsFitxa.ts` (D8) y el alta con búsqueda previa.
+147. ~~**Una ficha nueva desde `RecordDetail` nace con `activo=false`**~~ (02-11-2026, visto en 1A;
+     **cerrada en 1C el mismo día**). El formulario genérico guardaba los booleanos sin marcar como
+     `false`. Desde 1C `activo` no es un campo de la ficha (`GESTIONATS_PER_COMPONENT`): el alta no lo
+     manda y la columna toma su `default true`; se cambia en «Rols» por `activar_fitxa()` /
+     `desactivar_fitxa()`, con rastro.
 148. **La entidad inactiva sigue viendo las ofertas que ya se le enviaron** (02-11-2026, 1A; decisión
      pendiente). Lo que se apaga es la rama del Mercat (`modalitats_compatibles_meves()`); la de
      historial (`excedents_amb_interes_meu()`) sigue, y esa incluye las respuestas `pendent` de un envío
      por correo o WhatsApp, no solo el interés que mostró. No puede hacer nada con ellas
      (`comprova_interes()` la corta con `entitat_inactiva`, con texto traducido), pero las ve. Si se
      quiere esconderlas, filtrar en esa función las `pendent` de una entidad inactiva.
+149. **`v_productores_llistat` y `v_entidades_llistat` se quedan sin consumidor** (02-11-2026, plan 1
+     1C). El listado único lee `v_entitats_llistat`; las dos vistas de antes se conservan por la regla
+     de compatibilidad hacia atrás (§7: el frontend vigente sigue sirviéndose mientras se publica).
+     Arreglo: `drop view` en una migración posterior, cuando 1C lleve publicada un tiempo.

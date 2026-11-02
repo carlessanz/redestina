@@ -13,7 +13,7 @@
 import {
   Apple, Building2, Calculator, ClipboardCheck, ClipboardList, FileSignature, FileText, FolderOpen, Handshake, History,
   Home, Inbox, LayoutDashboard, Leaf, Receipt,
-  MessageSquare, Package, PlusCircle, Settings2, ShieldCheck, Sprout, Store, Truck, Users, Workflow,
+  MessageSquare, Package, PlusCircle, Settings2, ShieldCheck, Sprout, Store, Truck, Workflow,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import type { Rol } from './rols'
@@ -117,8 +117,8 @@ const EQUIP: NavGrup[] = [
   {
     titolKey: 'nav.grp_base',
     items: [
-      { to: '/equip/productors', labelKey: 'nav.producers', icon: Users },
-      { to: '/equip/entitats', labelKey: 'nav.entities', icon: Building2 },
+      // Una sola entrada desde 1C (plan 1, D1): el listado «Entitats» cubre los dos papeles.
+      { to: '/equip/entitats', labelKey: 'nav.entitats', icon: Building2 },
       // Papeleo POR ORGANIZACIÓN (la campaña va por fichas), no una etapa de la oferta.
       // Sin badge: los «per contrasignar» ya suman en Aprovacions.
       { to: '/equip/convenis', labelKey: 'nav.convenis', icon: FileSignature },

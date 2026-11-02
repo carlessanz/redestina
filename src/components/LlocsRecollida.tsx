@@ -2,7 +2,7 @@
 // alta y la baja.
 //
 // UN SOLO COMPONENTE para la ficha propia (`PerfilOrganitzacio`) y la del equipo
-// (`FitxaRegistre`, 28-09-2026), con el mismo criterio que `CampsPerfilReceptor`. Carga y
+// (`EntitatDetall` desde 1C; antes `FitxaRegistre`, 28-09-2026), con el mismo criterio que `CampsPerfilReceptor`. Carga y
 // guarda por su cuenta: cada lugar es una fila propia, no un campo de la ficha, así que no
 // espera al «Desar» de nadie.
 //

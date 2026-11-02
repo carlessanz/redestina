@@ -126,6 +126,44 @@ export interface OrganizacioVista {
   compte_estat: CompteEstat
 }
 
+/**
+ * Una fila de `v_entitats_llistat` (1C, 20270501200000): el listado «Entitats» del equipo, una
+ * por organización, con lo que `v_organizaciones` no trae (prueba, alta rechazada, convenio
+ * vigente por papel, última actividad).
+ */
+export interface EntitatLlistat {
+  id: string
+  nom_comercial: string | null
+  razon_social: string | null
+  nif: string | null
+  persona_contacte: string | null
+  email: string | null
+  telefono: string | null
+  poblacion: string | null
+  comarca: string | null
+  municipio_ine: string | null
+  productor_id: string | null
+  entidad_id: string | null
+  es_generadora: boolean
+  es_receptora: boolean
+  productor_activo: boolean | null
+  entidad_activo: boolean | null
+  activa: boolean
+  tipo_receptor: string | null
+  tipus_activitat: string[]
+  te_compte: boolean
+  compte_estat: CompteEstat
+  canal_preferido: 'whatsapp' | 'email' | 'telefon' | null
+  created_at: string
+  es_test: boolean
+  rebutjada: boolean
+  modalitats_interes: string[]
+  prioritat: number | null
+  conveni_productor: boolean
+  conveni_entitat: boolean
+  darrera_activitat: string | null
+}
+
 /** Estado de la cuenta de una organización, derivado de `membresias` (1A). */
 export type CompteEstat = 'cap' | 'pendent' | 'activa' | 'desactivada'
 

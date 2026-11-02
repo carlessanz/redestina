@@ -453,6 +453,16 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 
 
 
+### La lista blanca del actor, ampliada (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
+
+`actualitzar_fitxa_entitat()` acepta además `telefono2`, `telefono3`, `email2`, `contacto2`,
+`productes_frescos[_txt]`, `transport_plataforma[_txt]` y `descarrega_toro[_txt]` (P5: son datos de la
+organización; los tres booleanos admiten `null`, otro tipo da `22023 logistica_invalida`). Siguen
+fuera `tipo_receptor`, `estat`, `prioritat`, `es_test`, `activo`… **La lista blanca y `campsFitxa.ts`
+no pueden separarse**: `tests/campsFitxa.test.ts` lee las claves `d ? '…'` de la última migración
+que define cada RPC y las compara con `edita: 'tots'`. Al ampliar una, se amplía la otra en el mismo
+cambio. `actualizar_meu_canal()` la usa también la ficha del equipo (ya admitía `es_intern()`).
+
 ### RPC del estado de las fichas (plan 1, rebanada 1A, `20270501100000`, 02-11-2026)
 
 | RPC | Quién | Qué |
