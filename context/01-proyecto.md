@@ -111,3 +111,6 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
   admite `p_nomes_actives`).
 - **1A publicada el 02-11-2026 (`3ec6dba`)**: migración `20270501100000` aplicada con
   `aplicar-migracion.ts`, `priorizar-entidades` redesplegada y frontend por el push.
+- **1C publicada el 02-11-2026 (`a07dd6a`)**: migración `20270501200000` aplicada con
+  `aplicar-migracion.ts` (`scripts/data/publicar-1c.sh`), ninguna función, frontend por el push
+  (`version.json` = `a07dd6a8cd5c`). Arnés en producción 1.634/1.634 y 23 sin datos.
