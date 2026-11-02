@@ -142,9 +142,13 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
   del dominio), `alta-assistida` borrada del remoto (404) y el frontend (`version.json` = `b6685b181024`).
   Ninguna otra función cambió (huellas: 19 iguales). Arnés en producción 1.683/1.683 y 23 sin datos.
   Detalle en §4bis, §6ter y §9.
-- **1F en `main`, sin publicar (02-11-2026)**: el CRM mínimo (D4). Migración `20270502100000`
+- **1F publicada el 02-11-2026 (`0082ac5`)**: el CRM mínimo (D4). Migración `20270502100000`
   (`notes_internes`, `afegir_nota_interna` de `es_intern()`, `esborrar_nota_interna` del super_admin,
   `v_entitats_llistat` con el último contacto), bloque de notas en «Gestió interna» de la ficha y columna
   «Darrer contacte» en el listado. Probada en el clon (arnés 1.711/1.711 y 31 sin datos; E2E `crm.e2e.ts`
-  8/8). Para publicar: la migración con `aplicar-migracion.ts` y el frontend por el push; **ninguna Edge
-  Function**. Detalle en §4, §4bis, §6ter y §8.
+  8/8). Publicado (`scripts/data/publicar-1f.sh`): la migración con `aplicar-migracion.ts` (antes: última
+  `20270501500000`, sin `notes_internes`; después: RLS y una política, `authenticated` solo SELECT, `anon`
+  nada, las dos RPC sin `anon`, la vista con las dos columnas y `security_invoker`,
+  `auditoria_funcions_obertes()` en 0, 14 organizaciones y 13 filas del listado sin cambios) y el frontend
+  por el push (`version.json` = `0082ac5b2c8c`); **ninguna Edge Function** (CORS de las doce y endpoints
+  públicos, iguales). Arnés en producción 1.717/1.717 y 25 sin datos. Detalle en §4, §4bis, §6ter y §8.

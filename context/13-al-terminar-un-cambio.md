@@ -97,7 +97,8 @@
    leer e insertar en `notes_internes`, `afegir_nota_interna` y `esborrar_nota_interna` denegadas a las
    siete externas —leer = 0 filas—; el técnico lee, añade con `22023` y no borra ni inserta directo; el
    super_admin lee, añade y borra con `22023`. Las dos lecturas del equipo salen «sin datos» mientras el
-   clon no tenga ninguna nota: de ahí 29 → 31).** Antes, **clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
+   clon no tenga ninguna nota: de ahí 29 → 31). Producción, tras publicar `0082ac5` (1F) el 02-11-2026:
+   1.717/1.717 y 25 sin datos (las mismas dos lecturas sin notas: 23 → 25).** Antes, **clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
    `estat_acces_org`, `desactivar_acces_org`, `concedir_acces_org` y `revertir_acces_org` denegadas a las
    siete externas; el técnico lee el estado y nada más; el super_admin lee y desactiva; concedir y revertir,
    solo `service_role`). Producción, tras publicar `b6685b1` (1D) el 02-11-2026: 1.683/1.683 y 23 sin
