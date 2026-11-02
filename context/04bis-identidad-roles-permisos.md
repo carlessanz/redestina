@@ -556,3 +556,10 @@ el autor del cambio tiene que quedar en el historial.
 - **`kpis_equip()`**: claves nuevas `entitats_actives`, `ofertants_actius` y `receptors_actius` (foto de
   hoy). `entitats_receptores` no se filtra por `activo`: es un hecho del periodo, y filtrarla por el
   estado de hoy falsearía periodos pasados.
+
+## Familias de RPC que el canónico ya no enumera (movidas de `AGENTS.md` el 02-11-2026, 1E)
+
+Para que `AGENTS.md` quepa en su tope de 48 KB, estas familias se citan allí solo por su nombre. La
+lista, tal como estaba:
+
+- cierre y certificados (`abrir_/calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`, `*_transaccion*`, `*_periodo`, `*_recepcio`, `rectificar_*`, `reiniciar_*_prova`, `cierre_base*` solo equipo); diagnóstico y plan (`questionari_vigent`, `publicar_questionari`, `desar_diagnostic`, `generar_pla_des_de_diagnostic` y `emitir_plan_basico` solo equipo, `desar_mesures_pla`, `fixar_nivell_pla`, `diagnostic_estat`, expedientes `obrir_/desar_/verificar_/tancar_/exportar_expedient`, `desar_element_expedient`); equipo (`pendents_equip()` 16 colas, `kpis_equip`, `canalitzacio_assistida`, `canalitzacions_actives`, `avisos_de_oferta`, `avisos_sense_enviar_per_oferta`, `progres_meves_ofertes`, `pendents_meus`, `missatges_sense_contestar`, `kg_rebuts_exercici`, `impacte_*`); interruptores (`fixar_notificacions`, `fixar_canal_notificacio`, `fixar_factor_impacte`, `fijar_coste_producto`); jobs solo `service_role` (`programar_albarans_recollida`, `recordar_confirmacions_recollida`, `conciliacions_automatiques`, `volcar_quantificacio_expedients`, `disparar_recordatorios_intake`, `marcar_excedentes_vencidos`, `congelar_un_cierre`).

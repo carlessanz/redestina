@@ -299,7 +299,9 @@ src/
     equip/fases/               Las seis fases del ciclo guiado (Conveni, Entrada, Distribucio, Aprovacio,
                                Recollida, Tancament) y AccionsConveni, que comparten la 1 y la 4
 scripts/
-  import-ara.ts                Importación idempotente de los 5 CSV maestros
+  import-ara.ts                HISTÓRICO: importación de julio (CSV por posición), borrada el 16-09
+  import-ara-2026.ts           Organizaciones del ARA 2026 como inactivas + informe y cruce con Airtable (§6.1)
+  ara2026/nucli.ts             Núcleo PURO de lo anterior (mapeo, NIF, doble rol, Airtable); tests/importAra2026
   crear-usuario.ts             Alta de cuentas por la Admin API (no envía correos)
   set-config.ts                Escribe una clave en app_config con la service key (p. ej. recordatorios_secret)
   comprobar-rls.ts             Arnés de RLS: matriz (cuenta, tabla, operación) → PASS/FAIL (§4bis)

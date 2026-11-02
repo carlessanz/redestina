@@ -195,8 +195,9 @@ export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
   productores: [
     'id', 'organizacion_id', 'created_at',
     'temporada', // la escribe el diagnóstico operativo (20270423100000); se ve en «Diagnòstic»
+    'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
   ],
-  entidades: ['id', 'organizacion_id', 'created_at'],
+  entidades: ['id', 'organizacion_id', 'created_at', 'ref_externa'],
 }
 
 /** Columnas que el actor puede escribir por su RPC, además de los campos `edita: 'tots'`. */

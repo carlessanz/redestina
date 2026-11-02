@@ -1165,6 +1165,15 @@ nueva, comprueba que es accesible**:
 
 
 
+### Origen de las fichas importadas (plan 1, rebanada 1E, `20270503100000`, 02-11-2026)
+
+- **`productores.ref_externa`** y **`entidades.ref_externa`** (texto, nullable, sin default; índice
+  **único parcial** `where ref_externa is not null`): `ARA26:<hoja>:<línea del CSV>` en las fichas que
+  carga `scripts/import-ara-2026.ts` (§6.1), que las reencuentra por ahí en la segunda pasada. Las
+  fichas creadas en el panel la dejan a `null`. GRANT de tabla de siempre (legible por RLS, escribible
+  solo por el equipo); la interfaz no la enseña (`NO_ES_MOSTRA` en `campsFitxa.ts`). El plan la daba
+  por puesta en 1A; 1A no la añadió.
+
 ### Notas internas: el CRM mínimo (plan 1, rebanada 1F, `20270502100000`, 02-11-2026)
 
 D4: un hilo cronológico por organización, **solo del equipo**, sin «próxima acción» ni cola.

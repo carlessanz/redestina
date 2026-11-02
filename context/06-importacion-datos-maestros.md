@@ -78,3 +78,75 @@ Peculiaridades verificadas de los datos, todas manejadas por el script:
 - `productos_habituales` queda **vacío**: la columna Producte no existe en este export.
   Reimportar cuando se reexporte el Excel ARA con esa columna.
 
+
+## 6.1 Importación del ARA 2026 (plan 1, rebanada 1E, 02-11-2026)
+
+**Script `scripts/import-ara-2026.ts`** (Deno) sobre el núcleo puro **`scripts/ara2026/nucli.ts`**
+(probado en `tests/importAra2026.test.ts`, CSV sintéticos). `import-ara.ts` se conserva como
+**histórico** (la carga de julio, borrada el 16-09): no se vuelve a ejecutar.
+
+```bash
+eval "$(bash scripts/local/entorno-local.sh)"      # el clon
+deno run -A --node-modules-dir=none scripts/import-ara-2026.ts --dry-run   # siempre primero
+deno run -A --node-modules-dir=none scripts/import-ara-2026.ts             # carga
+```
+
+Fuera de esta máquina (`SUPABASE_URL` que no sea `127.0.0.1`/`localhost`) solo corre con `--dry-run`
+salvo `--produccio` explícito: **la carga en producción es otra sesión, con el informe del dry-run
+delante y la aprobación de Carles** (fecha límite 31-12-2026).
+
+**Entrada**: `scripts/data/2026/{prod_actius,prod_inactius,prod_potencials,sda,sda_inactius}.csv`
+(fuera de git), exportados del `DATOS_ARA_2026_.xlsm` con `scripts/data/2026/exportar-ara.py`
+(biblioteca estándar, valores en caché, macros sin ejecutar). Opcional `airtable.csv` (copia del
+`Datos AIRTABLE.csv` de `1. Fuentes/`) para el cruce. **Salida**: `informe-<fecha>[-dry-run][-N].md`
+y `cruce-airtable-<fecha>.md` en la misma carpeta (datos personales: nunca a Drive ni a git; una
+pasada no pisa el informe de otra del mismo día).
+
+**Decisiones aplicadas** (D2 y §1E del plan, y las que tomó la sesión donde el plan no decía nada):
+
+| Tema | Decisión |
+| --- | --- |
+| Estado | Todo `activo = false`, `es_test = false`. Activar exige NIF válido y razón social (trigger 1A); la razón social **no** se rellena desde el Excel (la columna «Empresa» es el nombre comercial y a veces una persona). |
+| Origen | `ref_externa = 'ARA26:<hoja>:<línea del CSV>'` (cabecera = línea 1), columna nueva en las dos fichas (`20270503100000`, índice único parcial). 1A no la había añadido. |
+| Mapeo | **Por cabecera normalizada** (minúsculas, sin acentos, espacios colapsados) y, si se repite, **por ocurrencia**; si falta una cabecera esperada el script se para. Las columnas sin cabecera se nombran por su ocurrencia de la cabecera vacía. |
+| Prod | `Nom` (`Productor/a` en potencials; la 2.ª columna sin cabecera en inactius) → `name` (o `Empresa` si falta); `Empresa`, `Comentari`, `Visitat`, `Conveni` tal cual; `Tipo Empresa` (en potencials, «Producte» #0: `Potencial`/`Pot.NoContac`) → `tipo_empresa`; `Producte` (#1 en potencials) → `productos_habituales[]`; `C.P.` #1 de potencials = área. **«Movils» y «Fix» son texto libre con teléfonos y correos** (en actius «Fix» trae sobre todo correos): de las dos salen los teléfonos (el primero libre → `phone`, el resto → `telefono_alt`) y el correo (el primero libre → `email`). Un tipo que es un correo cuenta como correo. |
+| SDA | `nom`/`NOM ` → `nombre`; **«Telefon» #0 (el de la entidad) → `telefono`; «Telèfon» #1 (el de la persona de «Contactes») → `telefono2`; «Telèfon 2» → `telefono3`** (con «Contacte 2» y «Mail 2»); «Mail» → `email`; capacidades → `*_txt` + booleano solo si es concluyente. `tipo_receptor` desde `Familia` (análisis 21-09, §6.2: SDA/Xarxa/Cuines/BDA/Centre Social/Ajuntament → social; Animal → animal; E.I. → transformador; Ind. Agroalimentària → comercial). |
+| Lo que no tiene columna | Va a un bloque **«[ARA 2026 · hoja · línia N]»** al final de `comentario`/`comentarios`: NIF inválido o repetido (con el valor original, para corregirlo al activar), motivo de baja (inactius), fecha de alta que no es fecha (`FITXAT`, un año en productores), código que no lo parece (`??`, `-`), coordenadas, teléfonos sobrantes o no reconocibles de las entidades, correos sobrantes o ya usados, y del SDA: Observacions, càmera frigorífica, neveres, beneficiaris, personal (`Treballador/es` o `Personal contractat`), voluntaris, voluntaris per espigolar y curs. **No se importan** las columnas mensuales 2019-2026 ni `Saldo`. |
+| Fechas | ISO tal cual; número de serie de Excel (`43795`, celdas sin formato de fecha) → ISO; año suelto: en `entidades.data_alta` (texto) se guarda, en `productores.data_alta` (date) va a la nota. |
+| NIF | Normalizado como el trigger; **inválido** → sin NIF + informe + nota; **repetido** entre filas del mismo papel → lo conserva la primera en el orden `prod_actius → prod_inactius → prod_potencials → sda → sda_inactius` (cierra §12.144); **ya en la base** en una ficha no importada → no se crea («ja existeix»). |
+| Doble rol | Primera fila de Prod + primera de SDA con el mismo NIF → una organización, dos fichas. Sin NIF nunca se juntan; los nombres repetidos solo se listan. |
+| Únicos | `productores.phone` y `.email` son UNIQUE: el número ya usado va a `telefono_alt` y el correo a la nota (informe «en uso»). |
+| Municipio | `municipio_ine` solo si el nombre (sin artículo: «Prat de Llobregat, el» = «El Prat de Llobregat») casa con **un** municipio del catálogo; el trigger rellena entonces `poblacion` y `area_geografica` (= comarca). Si no, se conserva el texto del Excel. |
+| Idempotencia | La segunda pasada encuentra la ficha por `ref_externa` y **solo rellena huecos** (nunca `activo`, nunca pisa lo corregido). Una ref que ya existe con **otro nombre** (la exportación cambió de orden) no se toca y va al informe. |
+| Ubicaciones | **No** se crean `productor_ubicaciones` (14 pares de coordenadas útiles): quedan en la nota (§12.153). |
+
+**Medido en el clon el 02-11-2026** (dry-run = carga; segunda pasada: 721 sin cambios):
+
+| Hoja | Filas CSV | Sin nombre | Creadas | Sin NIF | NIF inválido | NIF repetido | Tel. sin extraer |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| prod_actius | 353 | 6 | 347 | 172 | 21 | 0 | 6 |
+| prod_inactius | 28 | 0 | 28 | 12 | 0 | 0 | 0 |
+| prod_potencials | 176 | 1 | 175 | 174 | 0 | 1 | 7 |
+| sda | 114 | 0 | 114 | 46 | 21 | 14 | 3 |
+| sda_inactius | 57 | 0 | 57 | 41 | 7 | 3 | 1 |
+
+550 productores + 171 entidades = 721 fichas en **720 organizaciones** (1 doble rol, por NIF);
+0 «ja existeix»; 0 errores; 26 teléfonos ya usados por otro productor; 566 filas con municipio casado
+y 110 sin casar. El arnés no cambia de cifra (1.711/1.711 y 31 sin datos): una ficha externa nueva
+no añade comprobaciones. `cerca_entitats` las encuentra por NIF (exacto y prefijo) y por nombre;
+ninguna sale en «Nova oferta assistida» ni en `priorizar-entidades` (comprobado con sesión de equipo).
+
+**Cruce con Airtable (solo informe, nada se carga).** El CSV de transacciones (`;`) llega roto: las
+celdas multilínea son filas sueltas. Se agrupa por registro (línea que empieza por `E-2026-NNN` y sus
+continuaciones) y solo se fía de la línea de inicio: el ofertante sale de «Nombre transacción»; receptor
+y destino, solo si esa línea trae sus 28 campos en su sitio. 36 registros (35 enteros), 34 códigos sin
+registro (solo «Mensaje comercial»), 19 ofertantes y 4 receptores. Regla §4: **solo la coincidencia
+exacta normalizada se propone casar, y la confirma Carles**; parecidos (trigramas ≥ 0,40 o un nombre
+que contiene al otro) → «revisar»; lo que no está → «crear inactivo» (receptor `comercial` salvo
+entidad social; `animal` si todo fue a alimentación animal). Resultado: casar 6 · revisar 11 · crear 6.
+
+**Pendiente para la carga en producción** (decide Carles): aprobar el informe del dry-run contra
+producción; confirmar el cruce de Airtable (las 6 exactas, las 11 dudosas, y si se crean las 6 que solo
+están en Airtable); pedir la exportación de «Ofertantes»/«Receptores» de Airtable para casar por
+teléfono o correo (P7); si el `.xlsm` del 21-09 es el definitivo (riesgo del plan, §7); y si se quieren
+las coordenadas como `productor_ubicaciones`.

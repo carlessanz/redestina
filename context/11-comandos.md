@@ -224,8 +224,12 @@ supabase secrets set --env-file .secrets.env
 # vigente sigue sirviéndose durante esa ventana—: añadir sí, renombrar o borrar exige dos
 # publicaciones.
 
-deno run -A scripts/import-ara.ts --dry-run   # analizar sin escribir
-deno run -A scripts/import-ara.ts             # importar los CSV maestros
+deno run -A scripts/import-ara.ts --dry-run   # HISTÓRICO (carga de julio, borrada el 16-09): no se usa
+deno run -A scripts/import-ara.ts             # HISTÓRICO
+# ARA 2026 (1E, §6.1): contra el clon; fuera de él solo --dry-run salvo --produccio (con aprobación).
+eval "$(bash scripts/local/entorno-local.sh)"
+deno run -A --node-modules-dir=none scripts/import-ara-2026.ts --dry-run
+deno run -A --node-modules-dir=none scripts/import-ara-2026.ts
 
 # Arnés de RLS: matriz de permisos por cuenta (§4bis). Abre sesión de verdad con cada
 # cuenta de scripts/data/cuentas-prueba.json contra el proyecto remoto.

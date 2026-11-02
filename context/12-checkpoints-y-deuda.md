@@ -729,11 +729,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      El webhook sigue guardando los entrantes (§5), y Missatgeria desaparece con el canal (§8). Es lo
      pedido —«no deben aparecer los apartados»—, pero si alguien escribe mientras está apagado, el
      equipo solo lo verá al reactivarlo.
-144. **El trigger del NIF rechaza filas de la importación masiva** (27-10-2026, visto al revisar el
-     import). `productores_nif`/`entidades_nif` (fase 7, `20270421100000`) levantan `nif_invalid` y
-     `nif_en_us` al insertar, y `scripts/import-ara.ts` es anterior: un NIF mal escrito en el CSV, o el
-     mismo NIF en dos organizaciones, hace fallar esa fila. Revisar los CSV (o vaciar el NIF inválido
-     en el script) antes de importar.
+144. ~~**El trigger del NIF rechaza filas de la importación masiva**~~ (27-10-2026; **cerrada el
+     02-11-2026 por 1E**). `productores_nif`/`entidades_nif` levantan `nif_invalid` y `nif_en_us` al
+     insertar, y `scripts/import-ara.ts` era anterior. El importador nuevo (`import-ara-2026.ts`) valida
+     el NIF como el trigger antes de insertar: el inválido entra vacío y el repetido lo conserva la
+     primera fila, los dos con nota e informe (§6.1); 0 errores en la carga del clon.
 
 146. **`organizacion_contactos` se queda sin uso** (02-11-2026, plan 1 1A, D3 + P6). Un contacto por
      ficha: la sección «Persones de contacte» y `components/ContactesOrganitzacio` se retiraron, y
@@ -779,3 +779,7 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      que no hay nadie real afectado. 🔴 **Condición para apagar el modo test.** Arreglo: una pantalla tras
      el login que exija la privacidad si la cuenta no tiene fila en `consentiments`, con una RPC que la
      guarde con `origen` propio y la huella de `textosRgpd`.
+153. **La importación del ARA 2026 no crea `productor_ubicaciones`** (02-11-2026, plan 1 1E). Las columnas
+     «Coord»/«Coord 2» de Prod traen 14 pares numéricos útiles y mucho texto («Visitat, varies finques»);
+     se guardan en la nota «ARA 2026» del comentario, no como lugar de recogida. Arreglo, si se quiere:
+     crearlas al activar la ficha, o una pasada del importador que lea la nota.

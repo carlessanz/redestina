@@ -8,8 +8,8 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.595 pruebas en 68 ficheros** de Vitest: 1.594 correctas y **1 saltada a propósito**
-   (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
+   Referencia: **1.617 pruebas en 69 ficheros** de Vitest: 1.616 correctas y **1 saltada a propósito**
+   (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `acc.estat_*`). Antes, **1.560 en 66** (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
    paridad del alta con `crear_entitat()`). Antes, **1.548 en 65** (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
@@ -97,7 +97,8 @@
    leer e insertar en `notes_internes`, `afegir_nota_interna` y `esborrar_nota_interna` denegadas a las
    siete externas —leer = 0 filas—; el técnico lee, añade con `22023` y no borra ni inserta directo; el
    super_admin lee, añade y borra con `22023`. Las dos lecturas del equipo salen «sin datos» mientras el
-   clon no tenga ninguna nota: de ahí 29 → 31). Producción, tras publicar `0082ac5` (1F) el 02-11-2026:
+   clon no tenga ninguna nota: de ahí 29 → 31). **Tras cargar el ARA 2026 en el clon (1E, 721 fichas inactivas): la misma cifra, 1.711/1.711 y 31
+   sin datos** —una ficha externa nueva no añade checks ni cambia lo que ve cada cuenta de prueba—. Producción, tras publicar `0082ac5` (1F) el 02-11-2026:
    1.717/1.717 y 25 sin datos (las mismas dos lecturas sin notas: 23 → 25).** Antes, **clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
    `estat_acces_org`, `desactivar_acces_org`, `concedir_acces_org` y `revertir_acces_org` denegadas a las
    siete externas; el técnico lee el estado y nada más; el super_admin lee y desactiva; concedir y revertir,

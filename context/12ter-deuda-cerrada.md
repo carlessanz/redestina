@@ -113,3 +113,4 @@ se va solo **cómo se llegó hasta aquí**.
 | 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
 | 145 | `reiniciar_cierre_prueba()` ponía a 0 `P-RES`/`P-CD`/`P-CT` del año aunque otro cierre de prueba conservara sus documentos: la siguiente emisión chocaba con `23505`. Ahora deja el último número vivo | `20270430100400` |
 | 150 | El equipo podía insertar fichas directo por REST (políticas `alta intern`) y saltarse las reglas de `crear_entitat()`: una ficha activa sin NIF | `20270501400000` |
+| 144 | El trigger del NIF hacía fallar las filas de la importación masiva con un NIF mal escrito o repetido | 02-11-2026 (`import-ara-2026.ts`, 1E) |

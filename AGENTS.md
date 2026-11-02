@@ -53,8 +53,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
-  registro de entidades** (2026-11-02, rebanadas 1A-1F; **1A, 1C, 1B, 1D y 1F publicadas el
-  02-11-2026**, 1F en `0082ac5`; queda 1E).
+  registro de entidades** (2026-11-02, rebanadas 1A-1F; **1A-1D y 1F publicadas el 02-11-2026**;
+  **1E hecha y cargada solo en el clon**: la carga en producción es otra sesión, antes del 31-12).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -135,7 +135,7 @@ src/
   lib/ (módulos PUROS con test: procesOferta, passosCanalitzacio, seguentPas, validacio, format,
         cerca, filtres, missatgesOferta, destiFinal, registreRecollida, diagnostic, i18n…)
   types.ts · index.css
-scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · fixtures crear-*.ts ·
+scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
           autorizacion, resend; 20 funciones: whatsapp-send/webhook, crear-oferta, registro,
@@ -154,7 +154,8 @@ Sin FK con `productores`: unidas por teléfono.
 **Fichas**: `productores` y `entidades` (dos tablas, con `es_test`, `activo`, `nif` validado por
 trigger `*_nif` —`nif_invalid`/`nif_en_us`—, `razon_social`, `municipio_ine` → trigger rellena
 `poblacion` y `area_geografica` = comarca, `tipus_activitat[]`, `perfil_receptor` jsonb,
-`tipo_receptor` social·animal·transformador·comercial, `modalitats_interes`), ambas colgando de
+`tipo_receptor` social·animal·transformador·comercial, `modalitats_interes`, `ref_externa` =
+origen de la importación, 1E), ambas colgando de
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
@@ -293,21 +294,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
   `afegir_nota_interna` (`es_intern()` con sesión, autor `auth.uid()`), `esborrar_nota_interna`
   (`es_super_admin()`);
-  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); cierre y certificados (`abrir_/
-  calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`,
-  `*_transaccion*`, `*_periodo`, `*_recepcio`, `rectificar_*`, `reiniciar_*_prova`,
-  `cierre_base*` solo equipo); diagnóstico y plan (`questionari_vigent`, `publicar_questionari`,
-  `desar_diagnostic`, `generar_pla_des_de_diagnostic` y `emitir_plan_basico` solo equipo,
-  `desar_mesures_pla`, `fixar_nivell_pla`, `diagnostic_estat`, expedientes `obrir_/desar_/
-  verificar_/tancar_/exportar_expedient`, `desar_element_expedient`); equipo (`pendents_equip()`
-  16 colas, `kpis_equip`, `canalitzacio_assistida`, `canalitzacions_actives`,
-  `avisos_de_oferta`, `avisos_sense_enviar_per_oferta`, `progres_meves_ofertes`,
-  `pendents_meus`, `missatges_sense_contestar`, `kg_rebuts_exercici`, `impacte_*`); interruptores
-  (`fixar_notificacions`, `fixar_canal_notificacio`, `fixar_factor_impacte`,
-  `fijar_coste_producto`); jobs solo `service_role` (`programar_albarans_recollida`,
-  `recordar_confirmacions_recollida`, `conciliacions_automatiques`,
-  `volcar_quantificacio_expedients`, `disparar_recordatorios_intake`,
-  `marcar_excedentes_vencidos`, `congelar_un_cierre`).
+  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); y las de cierre y certificados, diagnóstico y
+  plan, equipo, interruptores y jobs (solo `service_role`), con su nombre, en el detalle (§4bis, «Familias»).
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
   `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`.
 - **Edge Functions**: `service_role` ignora RLS, así que `_shared/autorizacion.ts`
@@ -333,10 +321,15 @@ precio) → intake. Recordatorio de intake a los 10 min por `pg_cron` → `pg_ne
 
 ## 6. Datos maestros
 
-Catálogos por migración (`20260721120300_seed_catalogos.sql`); fichas por
-`scripts/import-ara.ts` (CSV en `scripts/data/`, nunca en git; idempotente; cabecera desplazada,
-teléfonos en texto libre). 🔴 **Los datos importados se borraron el 16-09-2026**: en la base
-quedan 6 productores + 8 entidades de prueba, la ficha «Compte de proves de l'arnes»
+Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas: **`scripts/import-ara-2026.ts`**
+(1E; núcleo puro `scripts/ara2026/nucli.ts`; decisiones y cifras en el detalle, §6.1): las cinco hojas
+del ARA 2026 en CSV en `scripts/data/2026/` (nunca en git), mapeo **por cabecera**, **todo inactivo**
+(D2) con `ref_externa = ARA26:<hoja>:<línea>`, NIF inválido o repetido → sin NIF y nota «ARA 2026» en
+el comentario, doble rol solo por NIF, segunda pasada solo rellena huecos; informe y cruce con Airtable
+(solo informe: la coincidencia exacta la confirma Carles) en la misma carpeta; fuera del clon solo
+`--dry-run` salvo `--produccio`. `import-ara.ts` es histórico. **El clon lleva las 721 importadas**
+(550 + 171, 720 organizaciones); refrescarlo desde producción las quita. 🔴 **En producción, los
+datos importados se borraron el 16-09-2026**: quedan 6 productores + 8 entidades de prueba, la ficha «Compte de proves de l'arnes»
 (`TEST-PENDENT-ARNES`, **no aprobar nunca**: sostiene 73 checks) y
 `tecnologia@espigoladors.com` en la whitelist de correo. Las cifras históricas de este documento
 describen el import, no la base de hoy.
@@ -450,7 +443,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270502100000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270503100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -592,7 +585,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (62 vivas; la siguiente entrada nueva es la 153; los números no se renumeran ni
+**Deuda abierta (62 vivas; la siguiente entrada nueva es la 154; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -602,10 +595,10 @@ ofreciendo la factura) · **128** (canalización conciliada sin coste no se pued
 chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz; CT sin «enviat») ·
 **139** (verificar el REC con varias modalidades) · **140** (`borrar_ficha_completa` no conoce
 los expedientes) · **142** (consentimientos sin exportación; la pantalla la dio 1C) · **143**
-(entrantes con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del
-import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
+(entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
 (dos vistas sin consumidor desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
-· **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test).
+· **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test)
+· **153** (el ARA 2026 no crea `productor_ubicaciones`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -621,11 +614,11 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.595 pruebas de Vitest en 68
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.617 pruebas de Vitest en 69
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.711/1.711 y 31 sin datos (tras 1F, +36); producción 1.717/1.717 y 25
+   **Referencia: clon 1.711/1.711 y 31 sin datos (tras 1F, +36; igual con el ARA 2026 cargado, 1E); producción 1.717/1.717 y 25
    (tras 1F; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
