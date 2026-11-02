@@ -1650,6 +1650,36 @@ hasta que el panel la normalice.
 
 
 
+### «Dona-li accés»: el acceso se da sobre la ficha que ya existe (plan 1, rebanada 1D, 02-11-2026)
+
+D5 + P1. Hasta 1D, la única forma de que una organización tuviera cuenta desde el equipo era «Nova
+organització amb compte» (`alta-assistida`), que **siempre creaba una organización nueva** con contraseña
+inicial puesta por el equipo. Desde 1D el alta del equipo es siempre sin acceso («Nova entitat», 1B) y el
+acceso se da después:
+
+- **Bloque «Contacte i accés» de `EntitatDetall`** (`components/fitxa/AccesEntitat.tsx`): el estado por
+  `estat_acces_org()` (§4bis) —«Sense accés» · «Pendent de validar» · «Accés enviat» (con la fecha) ·
+  «Accés actiu» (con el último acceso) · «Desactivat»—, con el correo de la cuenta **enmascarado**
+  (`data-testid="compte-estat"`, `data-estat`). Botones con `BotoAmbMotiu`: «Dona-li accés» (sin cuenta o
+  desactivada), «Torna a enviar» y «Desactiva l'accés» (con el acceso dado; desactivar pide confirmación).
+  Con un registro pendiente no sale nada: se decide en Aprovacions. Gris con motivo, en este orden: sin
+  `pot_aprovar` (el técnico ve el estado pero no da ni quita acceso), organización inactiva, sin correo,
+  correo cambiado sin desar, correo apagado (`motiuCanal`, §8). Desactivar solo depende del permiso. La
+  decisión, pura y con test, en `src/lib/accesEntitat.ts`.
+- **«Nova entitat»**: casilla «Dona-li accés a la plataforma ara» (`data-testid="ne-acces"`, apagada por
+  defecto, solo con `pot_aprovar`, gris si no hay correo o el correo está apagado). Tras `crear_entitat()`
+  llama a `donarAcces()` y abre la ficha; **un fallo del acceso no deshace el alta**: se dice en un aviso
+  (`acc.e_alta_feta` + el motivo) y el acceso se da después desde la ficha.
+- `src/lib/acces.ts`: `donarAcces(orgId, email)` → `{ok, codi, compteNou}`, nunca lanza.
+- **Retirado**: «Nova organització amb compte» del listado `Entitats` y de `Aprovacions`,
+  `DialegAltaAssistida`, el modo `assistit` de `FormulariAlta` (contraseña inicial, `es_test`,
+  «envia-li l'accés ara») y sus claves `alta.*` y `cdecl.toast_alta/toast_accio`.
+- E2E `tests/e2e/acces.e2e.ts` (clon, `E2E_ESCRIU`, móvil y escritorio, 10 pruebas): 401/403 de la API,
+  correo apagado (409 y sin cuenta creada), modo test con ficha no `es_test` (403), y el camino entero:
+  «Nova entitat» con la casilla → «Accés enviat» → correo en el Mailpit del clon → `/restablir` →
+  contraseña → «La meva organització» → «Accés actiu» → desactivar (`/sense-acces`) → reactivar sin
+  crear otra cuenta.
+
 ### «Nova entitat» en dos pasos (plan 1, rebanada 1B, 02-11-2026)
 
 D6 del plan 1, P2 (ampliada) y la migración `20270501300000` (§4bis). `routes/equip/NovaEntitat.tsx`
@@ -1723,7 +1753,7 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
   campo); un campo común cambiado se escribe en las dos fichas; `productores.name` vacío no se
   escribe. **`activo` no es campo**: el alta no lo manda y la columna toma su `default true`
   (deuda 147 cerrada). El alta de un papel que vivía aquí (`esNova`) la sustituyó 1B: ver abajo.
-  «Nova organització amb compte» (`DialegAltaAssistida`) sigue en el listado hasta 1D.
+  «Nova organització amb compte» (`DialegAltaAssistida`) siguió en el listado hasta 1D, que la retiró.
 - **`routes/PerfilOrganitzacio.tsx`** (actor): los mismos bloques con `veu: tots` para la tabla de la
   pestaña (`campsDeTaula`), por `actualitzar_fitxa_*`; `modalitats_interes` y `perfil_receptor` siguen
   en «El meu perfil de recepció» (puntero). `RolRedestina`, `LlocsRecollida` y `CanalPreferit` como

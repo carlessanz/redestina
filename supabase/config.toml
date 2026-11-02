@@ -222,14 +222,14 @@ verify_jwt = true
 import_map = "./functions/enviar-acceso/deno.json"
 entrypoint = "./functions/enviar-acceso/index.ts"
 
-# Alta asistida (27-10-2026): el equipo crea una organización con su cuenta, ya aprobada.
-# Con JWT y además `pot_aprovar` dentro (exigirEquipo + potAprovar). Comparte el alta
-# entera con `registro` (registro/alta.ts).
-[functions.alta-assistida]
+# «Dona-li accés» (plan 1, 1D): cuenta + membresía titular sobre una ficha que ya existe y
+# correo para poner la contraseña. Con JWT y además `pot_aprovar` dentro. Sustituye a
+# `alta-assistida` (retirada en 1D).
+[functions.donar-acces]
 enabled = true
 verify_jwt = true
-import_map = "./functions/alta-assistida/deno.json"
-entrypoint = "./functions/alta-assistida/index.ts"
+import_map = "./functions/donar-acces/deno.json"
+entrypoint = "./functions/donar-acces/index.ts"
 
 # Sistema documental (§4). Genera el PDF de un documento ya emitido y lo sube al bucket
 # privado. No verifica JWT porque la llaman el trigger de encolado y el job de reintento

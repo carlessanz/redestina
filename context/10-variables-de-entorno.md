@@ -54,6 +54,10 @@
 - `URL_PUBLICA_STORAGE` — **solo en el clon local** (`supabase/.env.funciones-local`, §11): el
   origen público con el que `descargar-documento` y `enlace-publico` reescriben las URLs firmadas,
   que dentro de Docker salen con `http://kong:8000`. En producción no existe y no se crea.
+- `MAILPIT_URL` — **solo en el clon local** (`http://supabase_inbucket_Redestina:8025`, lo escribe
+  `scripts/local/preparar-entorno.sh`; plan 1 1D, 02-11-2026): `donar-acces` copia ahí el correo de
+  acceso cuando el envío sale simulado, para que el E2E lea el enlace (`_shared/bustiaLocal.ts`). En
+  producción no existe y no se crea.
 - `SUPABASE_URL` (la inyecta Supabase automáticamente)
 
 **Redirect URLs de Auth** (Management API, no config push): `site_url` = APP_URL y `uri_allow_list`

@@ -36,6 +36,7 @@ import BlocCamps from '../../components/fitxa/BlocCamps'
 import BlocRols from '../../components/fitxa/BlocRols'
 import CanalPreferit, { type TriaCanal } from '../../components/fitxa/CanalPreferit'
 import Consentiments from '../../components/fitxa/Consentiments'
+import AccesEntitat from '../../components/fitxa/AccesEntitat'
 import CampsPerfilReceptor from '../../components/CampsPerfilReceptor'
 import BadgeConveni from '../../components/BadgeConveni'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
@@ -269,7 +270,6 @@ export default function EntitatDetall() {
   const camps = (bloc: Parameters<typeof campsDelBloc>[0]) => campsDelBloc(bloc, 'equip', rols)
   const blocProps = { valors, onChange: setCamp, veu: 'equip' as const, potEditar: true, errors, idPrefix: 'ed', discrepancies }
   const tipusReceptor = (valors.tipo_receptor as string | null) ?? null
-  const compteKey = org ? `ef.compte_${org.compte_estat}` : 'ef.compte_cap'
   const Seccio = ({ titol, ajuda, children, testid }: { titol: string; ajuda?: string; children: React.ReactNode; testid?: string }) => (
     <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
       <div>
@@ -337,11 +337,10 @@ export default function EntitatDetall() {
             <BlocCamps {...blocProps} camps={camps('contacte')} />
             {org && (
               <>
-                <div className="text-sm">
-                  <span className="text-muted-foreground">{t('ef.compte')}: </span>
-                  <Badge variant="outline" data-testid="compte-estat">{t(compteKey)}</Badge>
-                  <p className="mt-1 text-xs text-muted-foreground">{t('ef.h_compte')}</p>
-                </div>
+                <AccesEntitat orgId={org.id} correu={correu}
+                  correuCanviat={correu.toLowerCase() !== String(inicial.email ?? '').trim().toLowerCase()}
+                  entitatActiva={Boolean(org.activa)} potAprovar={potAprovar} motiuCorreu={motiuEmail}
+                  onCanviat={recarrega} />
                 <CanalPreferit canal={canal} onChange={setCanal} potEditar telefon={telefon} correu={correu} id="ed-canal" />
               </>
             )}

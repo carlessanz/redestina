@@ -365,6 +365,46 @@ identidad del generador por dos vías que no eran evidentes: `id_excedente` tien
 como en el JSON público. Los tres se tapan en ENT y el lugar se sustituye por el municipio. Si se
 añade algún campo nuevo al snapshot, hay que preguntarse si nombra al donante.
 
+### «Dona-li accés»: `donar-acces` (plan 1, rebanada 1D, 02-11-2026)
+
+D5 + P1: el acceso se da **sobre una organización que ya existe**, nunca creando otra, y la persona
+pone su propia contraseña. `POST /functions/v1/donar-acces` (`verify_jwt = true`) con
+`{ organizacion_id, email? }` → `{ ok, compte_nou, email: '···@domini', correu: 'enviat'|'simulat' }`.
+
+- **Autorización**: `exigirEquipo()` (401 sin sesión o cuenta desactivada; 403 si no es equipo) y
+  después `rolesActivos() && !ctx.potAprovar` → 403 `forbidden`: el `tecnic` no da acceso (crear una
+  cuenta aprobada es aprobar un alta). `SB_SECRET_KEY` solo dentro de la función.
+- **Prechecks antes de crear nada**: organización (404 `organitzacio_inexistent`) con alguna ficha activa
+  (409 `entitat_inactiva`); el correo, el del body o el único de las fichas activas (400 `falta_correu`,
+  `correus_diferents`, `correu_invalid`); **interruptor de correo** apagado → 409 `correu_desactivat`
+  (este correo **no es transaccional**, §8); **modo test** encendido y alguna ficha activa sin `es_test` →
+  403 `no_test_user`; cuenta del equipo (409 `compte_equip`), registro pendiente (409
+  `registre_pendent`), otra cuenta activa en la organización (409 `altre_compte_actiu`, D3: un contacto
+  con acceso; antes hay que desactivar).
+- **Pasos**: A `auth.admin.createUser` (si no hay cuenta; `email_confirm: true`, contraseña aleatoria de
+  32 bytes que no se guarda) → B `concedir_acces_org()` (§4bis; vuelve a comprobar todo en una
+  transacción y devuelve la foto de lo anterior) → C `generateLink({type:'recovery'})` → D `sendEmail()`
+  **sin `transaccional`** (segunda barrera del interruptor y del modo test), con traza
+  `documento_envios` `proposito = 'acces_entitat'`, `objeto_tipo = 'organizacion'`. **Compensación**: si
+  falla C o D, `revertir_acces_org(foto)` y, si la cuenta la creó esta petición, `auth.admin.deleteUser`;
+  el correo que no sale da 409 `correu_desactivat`, 403 `no_test_user` o 502 `correu_no_enviat`. Un
+  `23505` del correo de `productores` → 409 `dades_en_us`. Logs con `enmascararEmail`, nunca el enlace.
+- **«Torna a enviar»** es la misma llamada: con la cuenta activa y el mismo correo, B no cambia nada y se
+  repiten C y D (si la organización ganó un papel, B le añade la membresía que falta).
+- **Correo** (`donar-acces/correu.ts`, puro): «Benvingut/da a REDESTINA · Estableix la teva contrasenya»
+  (ca/es por `perfiles.idioma`), `plantillaEmail()` con botón al enlace, datos escapados, **sin código
+  de seis cifras** (es un enlace de recuperación, no un acceso mágico). El enlace lleva a `/restablir`.
+- **Consentimientos: ninguno.** Nadie acepta la privacidad por la persona (P3); aceptarla en el primer
+  acceso es la **deuda 152**, condición para apagar el modo test.
+- **Mailpit del clon**: si el envío sale `simulado` y existe `MAILPIT_URL` (solo en
+  `supabase/.env.funciones-local`), `_shared/bustiaLocal.ts` copia el correo al Mailpit del stack, y el
+  E2E lee el enlace en `127.0.0.1:55324/api/v1/…`. En producción no existe la variable y el envío es real.
+- **Retirada de `alta-assistida`**: la función, su bloque de `config.toml`, `DialegAltaAssistida` y el
+  modo `assistit` de `FormulariAlta`. `registro/alta.ts` no se tocó (sería redesplegar la función
+  pública): su rama `alta_assistida` queda muerta (**deuda 151**). `textosRgpd` conserva los textos
+  `ASSISTITS` (reproducen la huella de consentimientos guardados) y `consentiments.origen` sigue
+  admitiendo `alta_assistida` por las filas históricas.
+
 ### RGPD en el alta y alta asistida (27-10-2026)
 
 **`/registre` pide, junto a la contraseña, aceptar la política de privacidad (obligatoria) y dos
@@ -375,7 +415,8 @@ su huella en `consentiments` (§4), nunca el texto del cliente. `validar()` devu
 `camp = 'accepta_privacitat'` si falta, y solo `true` exacto vale. **No condicionan ninguna
 notificación operativa** (§8): esas tienen como base el servicio.
 
-**Alta asistida**: «Nova organització amb compte» (listados de productoras y receptoras, y
+**Alta asistida (RETIRADA el 02-11-2026, plan 1 1D; lo vigente es «Dona-li accés», abajo)**:
+«Nova organització amb compte» (listados de productoras y receptoras, y
 Aprovacions; `pot_aprovar()`) abre `DialegAltaAssistida` con el mismo `FormulariAlta` en modo
 `assistit` —contraseña inicial, casillas en tercera persona («la persona ha acceptat…»), casilla de
 usuario de prueba y «envia-li l'accés ara»— contra la Edge Function **`alta-assistida`** (JWT y

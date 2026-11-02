@@ -217,6 +217,8 @@ enlaza a la ficha para poder **completarla antes** de aprobar (una entidad nueva
 `estat = null` y hasta que se rellene no entra en la priorización). Los botones llaman a
 `aprovar_registre` / `rebutjar_registre` (§4bis). El contador del menú **suma las tres colas** y
 sale del mismo store que el tablero (`pendentsEquip.ts`); el desglose va en el título de cada cola.
+Desde la rebanada 1D del plan 1 (02-11-2026) Aprovacions ya no ofrece «Nova organització amb compte»:
+el equipo da de alta sin cuenta («Nova entitat») y el acceso se da desde la ficha (§6ter, «Dona-li accés»).
 
 **Desde el 15-09-2026 la cola de intereses se aprueba ahí mismo**, sin ir al detalle de la oferta:
 cada fila dice «Falten {n} de {m} kg», trae los kg prellenados (y el precio en `venda`/`maquila`) y

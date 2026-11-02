@@ -33,6 +33,9 @@ URL_PUBLICA_STORAGE=$API_URL
 # Correo y WhatsApp SIMULADOS: solo "true" exacto enviaría, y sin claves no podría.
 RESEND_ENVIO_REAL=false
 WHATSAPP_ENVIO_REAL=false
+# El buzón de pruebas: los correos SIMULADOS de donar-acces se copian al Mailpit del stack
+# (_shared/bustiaLocal.ts) y los E2E los leen en 127.0.0.1:55324. En producción no existe.
+MAILPIT_URL=http://supabase_inbucket_Redestina:8025
 # Los frenos anti-abuso de enlace-publico, más altos: la batería E2E abre muchos enlaces
 # desde la misma IP. En producción no existen (valen 10 por IP y 50 evidencias por hora).
 ANTIABUS_MAX_PER_IP=1000

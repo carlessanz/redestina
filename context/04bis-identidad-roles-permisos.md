@@ -453,6 +453,29 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 
 
 
+### El acceso a la plataforma de una entidad que ya existe (plan 1, rebanada 1D, `20270501500000`, 02-11-2026)
+
+D5 + P1: **el alta del equipo es siempre sin acceso** (`crear_entitat`), y el acceso se da después,
+**sobre la organización que ya existe**, con un correo para que la persona ponga su contraseña. Lo hace
+la Edge Function `donar-acces` (§9) con cuatro RPC:
+
+| RPC | Quién | Qué hace |
+| --- | --- | --- |
+| `concedir_acces_org(p_org, p_user, p_email, p_per) → jsonb` | **solo `service_role`** (con sesión, `42501`) | En una transacción, con `for update` sobre las fichas activas: vuelve a comprobar los invariantes (`organitzacio_inexistent`, `correu_invalid`, `entitat_inactiva`, `perfil_inexistent`, `compte_equip`, `registre_pendent`, `compte_en_altra_org`, `altre_compte_actiu`, todos `22023`), escribe el correo en las fichas activas si cambia, crea o reactiva la membresía **titular · aprovada · activa · `aprovat_per`** en **cada ficha activa** y pone `perfiles.activo = true`. Devuelve una **foto** de lo anterior (`correus`, `noves`, `reactivades`, `perfil_activo`, `canvis`) |
+| `revertir_acces_org(p_foto jsonb)` | **solo `service_role`** | Deshace lo que dice la foto: la compensación de `donar-acces` si falla el enlace o el correo |
+| `desactivar_acces_org(p_org) → jsonb` | `pot_aprovar()` (técnico y externos, `42501`; existencia, `22023`) | `membresias.activo = false` en todas las fichas de la organización; `perfiles.activo = false` de cada cuenta que se queda sin otra membresía activa **y no tiene `usuario_roles`** (nunca desactiva una cuenta del equipo). Reactivar = «Dona-li accés» otra vez |
+| `estat_acces_org(p_org) → table(estat, compte_email, enviat_at, darrer_acces_at)` | `es_intern()` | El estado para la ficha: `sense` · `pendent` (registro por validar) · `enviat` (no ha entrado) · `actiu` · `desactivat`. **El correo sale enmascarado** (`···@domini`); `enviat_at` es el último `documento_envios` con `proposito = 'acces_entitat'` y `darrer_acces_at`, `auth.users.last_sign_in_at`. La pantalla no consulta `auth` |
+
+**Desviación del plan**: el plan ponía la lectura del estado dentro de la función; como RPC sale igual
+de enmascarada, el frontend sigue sin tocar `auth` y el arnés puede comprobar quién la lee.
+`concedir_` y `revertir_`: `revoke` de `public, anon, authenticated` y `grant` a `service_role`;
+`desactivar_` y `estat_`: `revoke` de `public, anon, service_role` y `grant authenticated`.
+`auditoria_funcions_obertes()` sigue en 0.
+
+Arnés (+36): las cuatro denegadas a las siete cuentas externas (`DOCUMENTAL_EXTERN`); el técnico lee el
+estado (`22023` con uuid inventado) pero no desactiva; el super_admin lee y desactiva; `concedir_` y
+`revertir_` denegadas a todo `authenticated`.
+
 ### `crear_entitat()`: el alta de una entidad (plan 1, rebanada 1B, `20270501300000`, 02-11-2026)
 
 `crear_entitat(p_dades jsonb) returns jsonb` (`{organizacion_id, productor_id, entidad_id}`),

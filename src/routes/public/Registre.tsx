@@ -73,10 +73,8 @@ export default function Registre() {
           <p className="text-sm text-muted-foreground">{t('reg.subtitle')}</p>
         </CardHeader>
         <CardContent>
-          {/* El formulario es el mismo del alta asistida del equipo (`FormulariAlta`), con
-              las casillas RGPD junto a la contraseña (27-10-2026). */}
+          {/* `FormulariAlta`, con las casillas RGPD junto a la contraseña (27-10-2026). */}
           <FormulariAlta
-            mode="public"
             rolsInicials={rolsDeLaUrl(params.get('rol'))}
             onFet={(r) => { setRevisio(r.revisio); setFet(true) }}
           />

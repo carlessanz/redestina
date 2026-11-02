@@ -11,10 +11,10 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Plus, UserPlus } from 'lucide-react'
+import { Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { useAppContext, useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
+import { useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import { assegurarContacte, pendentsPerTelefon } from '../../lib/contactes'
 import { filtraCerca } from '../../lib/cerca'
@@ -22,7 +22,6 @@ import { useCerca } from '../../hooks/useCerca'
 import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { dataCurta } from '../../lib/format'
-import DialegAltaAssistida from '../../components/equip/DialegAltaAssistida'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
@@ -45,10 +44,6 @@ export default function Entitats() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const waActiu = useWhatsappActiu()
-  // El alta asistida crea una cuenta ya aprobada: solo quien puede aprobar (§4bis). Se queda
-  // hasta que 1D la sustituya por «Dona-li accés» sobre la ficha.
-  const potAprovar = useAppContext().ctx?.potAprovar ?? false
-  const [altaObert, setAltaObert] = useState(false)
   // Con el correo apagado (§8) «Correu» se queda gris con el motivo.
   const motiuEmail = motiuCanal(useCanals(), 'email')
   const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
@@ -234,17 +229,11 @@ export default function Entitats() {
           <p className="mt-1 text-sm text-muted-foreground">{t('el.subtitle')}</p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
-          {/* Una organización CON cuenta (alta asistida, 27-10-2026). «Nova entitat» crea solo la ficha. */}
-          <BotoAmbMotiu variant="outline" onClick={() => setAltaObert(true)} disabled={!potAprovar}
-            motiu={potAprovar ? undefined : t('appr.need_approver')}>
-            <UserPlus className="size-4" /> {t('alta.open')}
-          </BotoAmbMotiu>
+          {/* Sin cuenta (D5): el acceso se da después desde la ficha, «Dona-li accés» (1D). */}
           <Button onClick={() => navigate(`/equip/entitats/nova${fl.valors.rol ? `?rol=${fl.valors.rol}` : ''}`)}>
             <Plus className="size-4" /> {t('el.nova')}
           </Button>
         </div>
-        <DialegAltaAssistida obert={altaObert} onTancar={() => setAltaObert(false)}
-          rolInicial={fl.valors.rol === 'receptor' ? 'receptor' : 'productor'} />
       </CardHeader>
       <CardContent className="space-y-6">
         <Input type="search" placeholder={t('el.search')} value={cerca} onChange={(e) => setCerca(e.target.value)} />

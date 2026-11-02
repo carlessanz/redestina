@@ -18,7 +18,8 @@
 //
 // Activar y añadir un papel son de `pot_aprovar()` (1A): a un técnico se le enseñan grises con
 // el motivo. Dar de alta, como antes de 1B, lo puede cualquiera del equipo. La casilla «Dona-li
-// accés a la plataforma ara» llega con 1D (`donar-acces`); hasta entonces no se enseña.
+// accés a la plataforma ara» (1D) solo la ve quien puede aprobar: tras el alta llama a
+// `donar-acces` con el correo del contacto; si falla, el alta queda hecha y se dice.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -29,7 +30,10 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { cn } from '../../lib/utils'
 import { errorNif } from '../../lib/validacio'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
+import { motiuCanal } from '../../lib/canals'
+import { donarAcces } from '../../lib/acces'
+import { clauErrorAcces } from '../../lib/accesEntitat'
 import { activitatsPerPaper, carregaTipusActivitat, type TipusActivitat } from '../../lib/organitzacio'
 import { campsAlta } from '../../lib/campsFitxa'
 import {
@@ -136,6 +140,11 @@ export default function NovaEntitat() {
   )
   const [valors, setValors] = useState<ValorsAlta>({})
   const [esTest, setEsTest] = useState(false)
+  // «Dona-li accés a la plataforma ara» (1D): apagada por defecto (D5: el alta es sin acceso).
+  const [ambAcces, setAmbAcces] = useState(false)
+  const motiuCorreu = motiuCanal(useCanals(), 'email')
+  const correuAlta = String(valors.email ?? '').trim()
+  const motiuAcces = motiuCorreu ?? (correuAlta ? null : 'acc.m_sense_correu')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [desant, setDesant] = useState(false)
   const [cataleg, setCataleg] = useState<TipusActivitat[]>([])
@@ -186,6 +195,12 @@ export default function NovaEntitat() {
     }
     const org = (data as { organizacion_id: string } | null)?.organizacion_id
     toast.success(t('rec.created'))
+    if (org && ambAcces && !motiuAcces) {
+      // El alta ya está hecha: un fallo aquí no la deshace, se dice y el acceso se da desde la ficha.
+      const r = await donarAcces(org, correuAlta)
+      if (r.ok) toast.success(t('acc.ok_donat', { email: correuAlta }))
+      else toast.warning(`${t('acc.e_alta_feta')} ${t(clauErrorAcces(r.codi))}`)
+    }
     navigate(org ? `${LLISTA}/${org}` : LLISTA, { replace: true })
   }
 
@@ -357,6 +372,14 @@ export default function NovaEntitat() {
             )}
 
             <FilaCasella checked={esTest} onChange={setEsTest}>{t('ne.es_test')}</FilaCasella>
+            {potAprovar && (
+              <div data-testid="ne-acces">
+                <FilaCasella checked={ambAcces && !motiuAcces} onChange={setAmbAcces} disabled={!!motiuAcces}>
+                  {t('ne.dona_acces')}
+                </FilaCasella>
+                <p className="ml-8 text-xs text-muted-foreground">{t(motiuAcces ?? 'ne.h_dona_acces')}</p>
+              </div>
+            )}
 
             <div className="flex flex-wrap justify-between gap-2 border-t border-border pt-4">
               <Button variant="ghost" onClick={() => setPas(1)}>

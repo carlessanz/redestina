@@ -53,8 +53,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
-  registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A publicada el
-  02-11-2026, `3ec6dba`; 1C publicada el 02-11-2026, `a07dd6a`; 1B publicada el 02-11-2026, `c67e12f`**).
+  registro de entidades** (2026-11-02, rebanadas 1A-1F; **1A, 1C y 1B publicadas el 02-11-2026**;
+  **1D hecha en el clon, por publicar**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -139,7 +139,7 @@ scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · 
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
           autorizacion, resend; 20 funciones: whatsapp-send/webhook, crear-oferta, registro,
-          alta-assistida, enviar-email/acceso/avis, generar/descargar/reenviar-documento,
+          donar-acces, enviar-email/acceso/avis, generar/descargar/reenviar-documento,
           enlace-publico, subir-documento-externo, priorizar-entidades, recordatorios-*,
           recollides-programades, recuperar-password, verificar-certificat, limpiar-documentos-prueba)
 docs/ (ignorado por git)
@@ -286,7 +286,9 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
   `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` —1B: alta con uno o dos papeles en una
   transacción, `es_intern()`; nace activa, así que exige NIF válido, razón social y `tipo_receptor`—, `activar_/desactivar_fitxa`,
-  `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—,
+  `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
+  `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
+  `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); cierre y certificados (`abrir_/
   calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`,
   `*_transaccion*`, `*_periodo`, `*_recepcio`, `rectificar_*`, `reiniciar_*_prova`,
@@ -379,10 +381,8 @@ Lo que manda hoy, en una línea cada uno:
 - **Gestión autónoma del super_admin** (27-10-2026, publicado `3907281`): convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
-  los atajos de `OfferDetail` se retiraron. **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos
-  en 6 fases (`passosCanalitzacio.ts`, `components/equip/fases/`); llama a las RPC reales, así
-  que salen los mismos documentos que por el camino propio
-  (`tests/e2e/paritat-assistida.e2e.ts`).
+  **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
+  `components/equip/fases/`) sobre las RPC reales (`tests/e2e/paritat-assistida.e2e.ts`).
 - Otros: «Productes» con icono propio y coste de referencia; espigoladas (alta manual y
   conversión desde oferta); documentación de la organización (archivo previo, convenio en papel);
   Els meus documents con «Pendent de tu» (firmar y confirmar desde el panel, diálogo
@@ -390,17 +390,13 @@ Lo que manda hoy, en una línea cada uno:
   los paneles en el menú, el activo se deriva de la URL, `useOrganitzacio(tipus)` y `key` por
   tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats»/«ofertant»/
   «receptor», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
-- **Ficha única «Entitat» (plan 1, 1C, 02-11-2026, D1+D8)**: `lib/campsFitxa.ts` es **la única
-  definición de campos** (tabla, bloque, quién ve, quién edita; `tests/campsFitxa.test.ts` exige
-  que toda columna de las dos fichas esté clasificada y que `edita: tots` coincida con la lista
-  blanca de las RPC del actor, leída del SQL: cierra 1.6). `EntitatDetall` (`/equip/entitats/:orgId`;
-  un id de ficha redirige) pinta una ficha por organización —Identitat · Rols (activar/desactivar/
-  añadir papel por las RPC de 1A; `activo` no es campo, deuda 147 cerrada) · Contacte i accés
-  (estado de la cuenta, canal) · Adreça · Com a ofertant · Com a receptor · Diagnòstic ·
-  Documentació por papel · Gestió interna (consentiments RGPD, solo equipo)— y guarda **solo lo
-  que cambia**, en las dos fichas si el campo es común (si difieren, lo dice junto al campo).
-  `PerfilOrganitzacio` pinta los mismos bloques con `veu: tots` por sus RPC (P5: el actor edita
-  `telefono2/3`, `email2`, `contacto2` y la logística). Listado `Entitats` sobre
+- **Ficha única «Entitat» (1C, D1+D8)**: `lib/campsFitxa.ts` es **la única definición de campos**
+  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` exige toda columna clasificada y
+  `edita: tots` = lista blanca de las RPC del actor, leída del SQL). `EntitatDetall`
+  (`/equip/entitats/:orgId`) pinta una ficha por organización —Identitat · Rols · Contacte i accés ·
+  Adreça · Com a ofertant · Com a receptor · Diagnòstic · Documentació · Gestió interna— y guarda
+  **solo lo que cambia**, en las dos fichas si el campo es común. `PerfilOrganitzacio` pinta los
+  mismos bloques con `veu: tots` por sus RPC (P5). Listado `Entitats` sobre
   `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`.
 - **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).
   1 «Qui és?»: `cerca_entitats` al teclear → una inactiva se activa (NIF y razón social si faltan), una
@@ -408,6 +404,10 @@ Lo que manda hoy, en una línea cada uno:
   `CLAUS_ALTA` de `campsFitxa` (paridad con el SQL en `tests/campsFitxa.test.ts`). `components/fitxa/`,
   `hooks/useEsborrarFitxa`. Retirados `RecordDetail`, `crudCampos`, `FitxaRegistre`,
   `ProducersList`, `EntitiesList`.
+- **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
+  (`fitxa/AccesEntitat`, `lib/accesEntitat.ts`: estado, dar, reenviar y desactivar, con motivo) o con
+  la casilla de «Nova entitat» (si falla, el alta se queda). Retirados `DialegAltaAssistida` y el modo
+  `assistit` de `FormulariAlta`.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -448,7 +448,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501400000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501500000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -462,7 +462,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   comunicación operativa (un solo punto por canal: `sendEmail()` y `enviar()`, que devuelven
   `ok:false` 503 `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un
   simulado); no cortan lo **transaccional** (`enviar-acceso`, `recuperar-password`, con
-  `{transaccional:true}`). La interfaz esconde el apartado de un canal apagado (Missatgeria) y
+  `{transaccional:true}`). El correo de `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria) y
   deja gris lo que envía (`BotoAmbMotiu`, `motiuCanal()`). En producción los tres encendidos.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
 - **Reglas de envío** en `whatsapp-send`: `exigirEquipo` 401 → campos 400 → interruptor 503 →
@@ -508,8 +508,10 @@ distingue: `190` token caducado (nuevo secreto + redesplegar); `100/33` token si
   `/login` con `verifyOtp`). `registro` público: crea cuenta + ficha + membresía **pendiente**,
   deduplica por correo/teléfono exactos (principales deniegan `409`, secundarias → revisión),
   anti-abuso proporcionado, no manda correo (aprobar sí). RGPD: privacidad obligatoria + dos
-  consentimientos (`consentiments`, huella del texto del servidor); `alta-assistida` reutiliza
-  `registro/alta.ts`.
+  consentimientos (`consentiments`, huella del texto del servidor).
+- `donar-acces` (1D, JWT + `pot_aprovar`; sustituye a `alta-assistida`): cuenta si no la hay →
+  `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
+  409; modo test, solo `es_test`. Sin consentimientos (deuda 152).
 - Firma por enlace: el servidor compone y hashea el texto (`409 document_canviat`); tres vías
   —correo, asistida (segundo factor solo si la persona pide el código), panel— y el PDF las
   distingue; mínimos `MIN_NOM`/`MIN_DNI` en cliente y servidor. Confirmación de albarán:
@@ -529,7 +531,7 @@ Edge Functions: `WHATSAPP_TOKEN`, `WHATSAPP_PHONE_ID`, `WHATSAPP_VERIFY_TOKEN`,
 `WHATSAPP_APP_SECRET`, `WHATSAPP_API_VERSION`, `WHATSAPP_ENVIO_REAL`, `ALLOWED_ORIGIN` (varios
 orígenes, `*` dentro de uno; **redesplegar al cambiarlo**), `RECORDATORIOS_SECRET`,
 `DOCUMENTOS_SECRET` (y en `app_config`), `RESEND_API_KEY`, `RESEND_ENVIO_REAL`, `RESEND_FROM`,
-`APP_URL`, `SB_SECRET_KEY`, `URL_PUBLICA_STORAGE` (solo clon), `ANTIABUS_*` (solo clon). Auth:
+`APP_URL`, `SB_SECRET_KEY`, `URL_PUBLICA_STORAGE`, `ANTIABUS_*` y `MAILPIT_URL` (solo clon). Auth:
 `site_url` y `uri_allow_list` por Management API (matcher de GoTrue con `/**`; el de las
 funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
@@ -586,7 +588,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (60 vivas; la siguiente entrada nueva es la 151; los números no se renumeran ni
+**Deuda abierta (62 vivas; la siguiente entrada nueva es la 153; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -598,8 +600,8 @@ chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz;
 los expedientes) · **142** (consentimientos sin exportación; la pantalla la dio 1C) · **143**
 (entrantes con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del
 import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
-(`v_productores_llistat`/`v_entidades_llistat` sin consumidor desde 1C; borrarlas es una
-migración aparte).
+(dos vistas sin consumidor desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
+· **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -615,12 +617,12 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.560 pruebas de Vitest en 66
-   ficheros (1.559 correctas, 1 saltada a propósito) + 9 de Deno.**
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.587 pruebas de Vitest en 67
+   ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.647/1.647 y 23 sin datos (tras cerrar la 150); clon
-   1.641/1.641 y 29 (total 1.670 = 1.648 de 1A + 9 de 1C + 9 de 1B + 4 de la 150; la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: clon 1.677/1.677 y 29 sin datos (tras 1D, +36); producción 1.647/1.647 y 23
+   (1.683 al publicar 1D; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

@@ -31,6 +31,11 @@ Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
   (`enviar-acceso`) y la recuperación de contraseña. Es una opción explícita de `sendEmail(…, traza,
   { transaccional: true })` que pasan **solo** esas dos funciones; `enviar-email` no puede, porque su
   propósito viene del cliente. Los gates de prueba (§8) siguen aplicando.
+- **El correo de «Dona-li accés» (`donar-acces`, plan 1 1D, 02-11-2026) NO es transaccional**, por
+  decisión del plan (§4 de 1D): con el correo apagado la función contesta 409 `correu_desactivat` **antes
+  de crear nada**, y el botón sale gris con el motivo (`motiuCanal`). Con el modo test encendido solo da
+  acceso a organizaciones cuyas fichas activas sean todas `es_test` (403 `no_test_user`). `sendEmail()` lo
+  vuelve a mirar al enviar, y si entonces corta, se deshace todo (§9).
 - **Un solo punto de corte por canal**: `sendEmail()` (correo) y `enviar()` (WhatsApp). Cortado,
   devuelve `ok:false`, `status 503`, `desactivado:true` y el código `email_desactivat` o
   `notificacions_desactivades` —nunca un simulado, por lo mismo que §8 explica del de WhatsApp— y lo

@@ -129,3 +129,12 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
   y el GRANT de INSERT de `productores`/`entidades`; el alta solo nace por `crear_entitat()` (o con
   `service_role`). Solo base de datos: ni funciones ni frontend. Aplicada en producción (sin políticas
   INSERT ni GRANT de INSERT; UPDATE intacto); arnés en producción 1.647/1.647 y 23 sin datos.
+- **1D hecha en el clon el 02-11-2026, pendiente de publicar**: «Dona-li accés» sobre la ficha que ya
+  existe (D5, **P1 cerrada**: se retiran `alta-assistida`, `DialegAltaAssistida` y el modo `assistit` de
+  `FormulariAlta`). Edge Function `donar-acces` (JWT + `pot_aprovar`, correo no transaccional, modo test,
+  compensación) y migración `20270501500000` (`concedir_/revertir_acces_org` solo `service_role`,
+  `desactivar_acces_org` de `pot_aprovar()`, `estat_acces_org` del equipo, correo enmascarado; esta
+  última es RPC y no parte de la función: desviación del plan). Bloque «Contacte i accés» en la ficha y
+  casilla en «Nova entitat». **P3 queda fuera** (deuda 152, condición para apagar el modo test) y la
+  rama muerta de `registro/alta.ts` es la deuda 151. Para publicar: la migración, `functions deploy
+  donar-acces`, `functions delete alta-assistida` y el push. Detalle en §4bis, §6ter y §9.

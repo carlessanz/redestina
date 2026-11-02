@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **02-11-2026 (plan 1, rebanada 1D): se abren la 151 y la 152**: **62 vivas** y la siguiente entrada nueva
+es la 153.
 ⚠️ **02-11-2026 (tras publicar 1B): se cierra la 150** (`20270501400000`): **60 vivas** y la siguiente
 entrada nueva sigue siendo la 151.
 ⚠️ **02-11-2026 (plan 1, rebanada 1B): se abre la 150**: **61 vivas** y la siguiente entrada nueva es la 151.
@@ -762,3 +764,18 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      políticas en una migración posterior, cuando 1B esté publicada (el registro y el alta asistida
      escriben con `service_role`, no les afecta); el arnés pasará esos `insertar` a «denegar».
      **1B se publicó el 02-11-2026 (`c67e12f`)** y el cierre se hizo esa misma noche.
+151. **La rama `alta_assistida` de `registro/alta.ts` queda muerta** (02-11-2026, plan 1 1D, P1). 1D retiró
+     la función `alta-assistida`, su diálogo y el modo `assistit` de `FormulariAlta`, pero no tocó
+     `registro/alta.ts` (`executarAlta` con `origen = 'alta_assistida'`, `registrat_per`, membresía
+     aprobada): cambiarlo obliga a redesplegar `registro`, la función pública, y 1D no la publica. Los
+     textos `ASSISTITS` de `textosRgpd` y el valor `alta_assistida` de `consentiments.origen` se quedan a
+     propósito (reproducen la huella de los consentimientos ya guardados). Arreglo: quitar la rama y sus
+     opciones la próxima vez que se toque y se redespliegue `registro`.
+152. **Nadie acepta la privacidad de quien recibe acceso por «Dona-li accés»** (02-11-2026, plan 1 1D, P3).
+     `donar-acces` no guarda ningún consentimiento: nadie los acepta por la persona, y aceptar la política
+     de privacidad (y ofrecer los dos consentimientos opcionales) en el **primer acceso** es otra pieza de
+     seguridad —pantalla de bloqueo + registro con la huella del texto del servidor— que no entró en 1D.
+     Mientras el modo test esté encendido, `donar-acces` solo da acceso a organizaciones `es_test`, así
+     que no hay nadie real afectado. 🔴 **Condición para apagar el modo test.** Arreglo: una pantalla tras
+     el login que exija la privacidad si la cuenta no tiene fila en `consentiments`, con una RPC que la
+     guarde con `origen` propio y la huella de `textosRgpd`.

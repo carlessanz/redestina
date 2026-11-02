@@ -185,6 +185,8 @@ src/
                                (tabla, bloque, quién ve, quién edita; plan 1 1C, D8). Sustituye a `crudCampos.ts`
     novaEntitat.ts             PURO, con test: el alta en dos pasos (1B): «parece un NIF», qué ofrecer
                                al elegir un resultado, obligatorios del alta y carga de `crear_entitat()`
+    accesEntitat.ts            PURO, con test: «Contacte i accés» (1D): del estado de la cuenta
+                               (`estat_acces_org()`), qué botones salen y su motivo; códigos de `donar-acces`
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
@@ -272,16 +274,17 @@ src/
     OfferDetail.tsx            Detalle: priorización, canalizaciones, opt-in, cierre, cancelar
     fitxa/                     Los bloques de la ficha única (1C): BlocCamps (los campos de un bloque,
                                para el equipo y para el actor), BlocRols (activar/desactivar/añadir papel),
-                               CanalPreferit, Consentiments (RGPD, solo equipo)
+                               CanalPreferit, Consentiments (RGPD, solo equipo), AccesEntitat (1D:
+                               estado de la cuenta y «Dona-li accés» / «Torna a enviar» / «Desactiva l'accés»)
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
     Settings.tsx               Configuració POR PESTAÑAS (`?tab=`, 27-10-2026): General, Notificacions, Fundació,
                                Impacte y Diagnòstic (§6ter)
     configuracio/              Interruptor (la tarjeta Activat/Desactivat), SeccioGeneral (modo test,
                                validación, idioma) y SeccioNotificacions (los tres interruptores, §8)
-    FormulariAlta.tsx          EL formulario de alta con cuenta y casillas RGPD: `/registre` y el alta
-                               asistida (`mode`), patrón de FirmaConveni (§9)
-    equip/DialegAltaAssistida.tsx  «Nova organització amb compte» (§9)
+    FormulariAlta.tsx          EL formulario de alta con cuenta y casillas RGPD de `/registre`, patrón de
+                               FirmaConveni (§9). El modo `assistit` y `equip/DialegAltaAssistida.tsx` se
+                               retiraron en 1D (P1): el equipo da de alta sin cuenta y da el acceso después
     AvisCorreuDesactivat.tsx   La banda de «el correu està apagat» en cierre y certificados (§8)
     MissatgesDelPunt.tsx       Los mensajes de un paso (por fase y destinatario), en los tres paneles
     CampsRecollida.tsx         Día y hora de recogida dentro de la franja: Mercat e interés asistido
@@ -367,9 +370,15 @@ supabase/
     enlace-publico/            `index.ts` solo enruta (254 líneas; era 2.195): `comun.ts` (cliente, token,
                                anti-abuso, URL firmada, base64), `albaran.ts`, `factura.ts`, `convenio.ts`
     registro/                  `index.ts` (anti-abuso) + `alta.ts` (orden de pasos, compensación y
-                               consentimientos RGPD; lo comparte `alta-assistida`) + `validacio.ts`,
-                               `deteccio.ts` (duplicados), `conveni.ts`, `cliente.ts` y `coincidencies.ts`
-    alta-assistida/            POST (JWT + pot_aprovar): el alta de una organización con cuenta, ya aprobada
+                               consentimientos RGPD; su rama `alta_assistida` quedó muerta en 1D, deuda 151)
+                               + `validacio.ts`, `deteccio.ts` (duplicados), `conveni.ts`, `cliente.ts` y `coincidencies.ts`
+    donar-acces/               POST (JWT + pot_aprovar, plan 1 1D): da acceso a una organización que YA existe:
+                               cuenta (si no la hay) → `concedir_acces_org()` → enlace de recuperación →
+                               correo para poner la contraseña; compensación con `revertir_acces_org()`.
+                               `correu.ts` (puro, con test): qué correo, el texto ca/es, los rechazos.
+                               Sustituye a `alta-assistida/` (retirada en 1D)
+    _shared/bustiaLocal.ts     Solo el clon: copia un correo simulado al Mailpit del stack (`MAILPIT_URL`)
+                               para que el E2E lea el enlace. Sin `MAILPIT_URL` (producción) no hace nada
     _shared/textosRgpd.ts      Las tres declaraciones RGPD y su huella; copia en `src/lib/textosRgpd.ts`
     recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)

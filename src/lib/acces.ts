@@ -1,4 +1,4 @@
-// Enviar a alguien el enlace de acceso a su panel.
+// Enviar a alguien el enlace de acceso a su panel, y dar acceso a una entidad (`donarAcces`, 1D).
 //
 // POR QUÉ EXISTE (16-09-2026). Al aprobar un alta del registro público **no se avisaba a
 // nadie**: la persona se enteraba de que ya podía entrar entrando a probar. Es la deuda 27,
@@ -58,5 +58,40 @@ export async function enviarAcces(email: string): Promise<ResultatAcces> {
     return { ok: true, codi: null, canal: dades?.canal ?? 'email' }
   } catch {
     return { ok: false, codi: 'xarxa', canal: null }
+  }
+}
+
+export interface ResultatDonarAcces {
+  ok: boolean
+  /** Código del servidor cuando no se ha dado: `correu_desactivat`, `no_test_user`… */
+  codi: string | null
+  /** Se ha creado una cuenta nueva (si no, ya existía y solo se ha reenviado o reactivado). */
+  compteNou: boolean
+}
+
+/**
+ * «Dona-li accés» / «Torna a enviar» (plan 1, 1D): `donar-acces` crea la cuenta si no la hay, la
+ * hace titular de las fichas activas de la organización y manda el correo para poner la
+ * contraseña. `email` es el de la ficha tal como está guardada. Nunca lanza, como `enviarAcces`:
+ * el alta de «Nova entitat» ya ha ocurrido cuando se llama desde allí.
+ */
+export async function donarAcces(organizacionId: string, email: string): Promise<ResultatDonarAcces> {
+  try {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) return { ok: false, codi: 'unauthorized', compteNou: false }
+
+    const res = await fetch(`${supabaseUrl}/functions/v1/donar-acces`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${session.access_token}`,
+      },
+      body: JSON.stringify({ organizacion_id: organizacionId, email }),
+    })
+    const dades = (await res.json().catch(() => null)) as { code?: string; compte_nou?: boolean } | null
+    if (!res.ok) return { ok: false, codi: dades?.code ?? `http_${res.status}`, compteNou: false }
+    return { ok: true, codi: null, compteNou: dades?.compte_nou === true }
+  } catch {
+    return { ok: false, codi: 'xarxa', compteNou: false }
   }
 }

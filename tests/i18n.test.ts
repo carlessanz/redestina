@@ -153,6 +153,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
   const COMPUESTAS: { que: string; prefijo: string; valores: string[] }[] = [
     // El reparto por modalidad de «El meu impacte» (fase 10, `ImpacteBloc`).
     { que: 'modalidades del impacto', prefijo: 'imp.mod_', valores: ['donacio', 'venda', 'maquila'] },
+    // El estado de la cuenta de una entitat (plan 1, 1D): `estat_acces_org()`.
+    { que: 'estat_acces_org().estat', prefijo: 'acc.estat_', valores: ['sense', 'pendent', 'enviat', 'actiu', 'desactivat'] },
     // El expediente de prevención (fase 11): los CHECK de sus tablas, compuestos en la vista.
     { que: 'expedients_prevencion.estat', prefijo: 'exp.estat_', valores: ['obert', 'en_seguiment', 'verificat', 'tancat'] },
     { que: 'pla_visites.tipus', prefijo: 'exp.visita_', valores: ['diagnosi', 'seguiment', 'verificacio', 'altres'] },

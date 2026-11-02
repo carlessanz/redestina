@@ -1,12 +1,10 @@
-// EL formulario de alta de una organización con su cuenta. Uno solo para dos sitios, con el
-// patrón de `FirmaConveni` (27-10-2026):
-//   · `public`   — `/registre`: la persona se da de alta sola y espera a que el equipo valide.
-//   · `assistit` — el diálogo «Nova organització amb compte» del equipo: la cuenta nace
-//                  APROBADA y las casillas RGPD dicen «la persona ha acceptat…», porque las
-//                  declara el equipo en su nombre (modelo asistido, §1bis).
+// EL formulario de alta de una organización con su cuenta: `/registre`, donde la persona se da
+// de alta sola y espera a que el equipo valide. Llama a la función pública `registro` (con
+// anti-abuso), que ejecuta el alta de `registro/alta.ts`.
 //
-// Los dos llaman al MISMO alta en el servidor (`registro/alta.ts`), por dos puertas:
-// `registro` (pública, con anti-abuso) y `alta-assistida` (con sesión y `pot_aprovar`).
+// Hasta el 02-11-2026 tenía además un modo para el diálogo «Nova organització amb compte» del
+// equipo (`alta-assistida`). Se retiró con la rebanada 1D del plan 1 (P1): el equipo da de alta
+// en «Nova entitat», sin cuenta, y el acceso después con «Dona-li accés».
 //
 // RGPD. La privacidad es obligatoria; las dos comunicaciones (plataforma y Espigoladors),
 // opcionales y sin marcar. El texto de cada casilla es EXACTAMENTE el que el servidor
@@ -17,7 +15,7 @@ import { useState } from 'react'
 import type { FormEvent } from 'react'
 import { Link } from 'react-router'
 import { Check } from 'lucide-react'
-import { supabase, supabaseUrl } from '../lib/supabase'
+import { supabaseUrl } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { cn } from '../lib/utils'
@@ -45,26 +43,17 @@ export interface AltaFeta {
   /** El alta coincide con una organización que ya consta: el equipo la revisará. */
   revisio: boolean
   email: string
-  /** Solo en `assistit`: si hay que mandar el acceso ahora. */
-  enviaAcces: boolean
-  /**
-   * Los convenios en borrador que el alta ha preparado (uno por papel). Con ellos el alta
-   * asistida ofrece darlos por vigentes al momento (gestión autónoma, fase 1).
-   */
-  convenis: { id: string; tipo: string }[]
 }
 
 interface Props {
-  mode: 'public' | 'assistit'
   rolsInicials: RolRegistre[]
   onFet: (r: AltaFeta) => void
   /** Prefijo de los `id` de los campos, para que dos formularios no compartan ids. */
   idPrefix?: string
 }
 
-export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'reg' }: Props) {
+export default function FormulariAlta({ rolsInicials, onFet, idPrefix = 'reg' }: Props) {
   const { t, lang } = useT()
-  const assistit = mode === 'assistit'
   const id = (s: string) => `${idPrefix}-${s}`
 
   const [rols, setRols] = useState<RolRegistre[]>(rolsInicials)
@@ -82,9 +71,6 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
   const [consentiments, setConsentiments] = useState<Record<TipusConsentiment, boolean>>({
     privacitat: false, comunicacions_plataforma: false, comunicacions_espigoladors: false,
   })
-  // Solo del alta asistida.
-  const [esTest, setEsTest] = useState(false)
-  const [enviaAcces, setEnviaAcces] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
 
@@ -110,15 +96,9 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
     setError(null)
 
     try {
-      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
-      if (assistit) {
-        const { data: { session } } = await supabase.auth.getSession()
-        if (!session) { setOcupat(false); setError(t('c.error')); return }
-        headers.Authorization = `Bearer ${session.access_token}`
-      }
-      const res = await fetch(`${supabaseUrl}/functions/v1/${assistit ? 'alta-assistida' : 'registro'}`, {
+      const res = await fetch(`${supabaseUrl}/functions/v1/registro`, {
         method: 'POST',
-        headers,
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           rols,
           nom_organitzacio: organitzacio.trim(),
@@ -132,17 +112,14 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
           comunicacions_espigoladors: consentiments.comunicacions_espigoladors,
           // El idioma en que se han leído las declaraciones: el servidor las recompone en ese.
           idioma: lang,
-          ...(assistit ? { es_test: esTest } : { web: parany }),
+          web: parany,
         }),
       })
       const dades = (await res.json().catch(() => null)) as
-        { code?: string; error?: string; revisio_equip?: boolean; camp?: string; convenis?: { id: string; tipo: string }[] } | null
+        { code?: string; error?: string; revisio_equip?: boolean; camp?: string } | null
       setOcupat(false)
       if (res.ok) {
-        onFet({
-          revisio: dades?.revisio_equip === true, email: email.trim(), enviaAcces: assistit && enviaAcces,
-          convenis: (Array.isArray(dades?.convenis) ? dades?.convenis ?? [] : []).filter((c) => c && typeof c.id === 'string'),
-        })
+        onFet({ revisio: dades?.revisio_equip === true, email: email.trim() })
         return
       }
       const claus: Record<string, string> = {
@@ -150,7 +127,6 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
         dades_en_us: 'reg.err_dades',
         massa_solicituds: 'reg.err_massa',
         nif_invalid: 'val.nif_control',
-        forbidden: 'appr.need_approver',
       }
       const clau = dades?.camp === 'accepta_privacitat' ? 'rgpd.err_privacitat' : claus[dades?.code ?? '']
       // Si el servidor rechaza un campo que aquí no se ha validado, su mensaje dice cuál.
@@ -218,42 +194,39 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
       <div className="grid gap-2">
         <Label htmlFor={id('per')}>{t('reg.person')}</Label>
         <Input id={id('per')} value={persona} onChange={(e) => { setPersona(e.target.value); setError(null) }}
-          autoComplete={assistit ? 'off' : 'name'} required />
+          autoComplete="name" required />
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor={id('tel')}>{t('reg.phone')}</Label>
         <Input id={id('tel')} type="tel" inputMode="tel" value={telefon}
           onChange={(e) => { setTelefon(e.target.value); setError(null) }}
-          autoComplete={assistit ? 'off' : 'tel'} required />
+          autoComplete="tel" required />
         <p className="text-xs text-muted-foreground">{t('reg.phone_hint')}</p>
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor={id('em')}>{t('login.email')}</Label>
-        <Input id={id('em')} name={assistit ? undefined : 'email'} type="email" value={email}
+        <Input id={id('em')} name="email" type="email" value={email}
           onChange={(e) => { setEmail(e.target.value); setError(null) }}
-          autoComplete={assistit ? 'off' : 'username'} required />
+          autoComplete="username" required />
       </div>
 
       <div className="grid gap-2">
-        <Label htmlFor={id('pw')}>{t(assistit ? 'alta.pw_inicial' : 'login.password')}</Label>
+        <Label htmlFor={id('pw')}>{t('login.password')}</Label>
         <div className="relative">
-          {/* En el alta asistida, `autoComplete="off"`: el gestor de contraseñas de quien está
-              delante es el del equipo, y no debe guardar la de otra persona. */}
-          <Input id={id('pw')} name={assistit ? undefined : 'new-password'} type={verPassword ? 'text' : 'password'} value={password}
+          <Input id={id('pw')} name="new-password" type={verPassword ? 'text' : 'password'} value={password}
             onChange={(e) => { setPassword(e.target.value); setError(null) }}
-            autoComplete={assistit ? 'off' : 'new-password'} required className="pr-9" />
+            autoComplete="new-password" required className="pr-9" />
           <BotoUll vist={verPassword} onToggle={() => setVerPassword((v) => !v)} />
         </div>
-        {assistit && <p className="text-xs text-muted-foreground">{t('alta.pw_help')}</p>}
       </div>
 
       <div className="grid gap-2">
         <Label htmlFor={id('pw2')}>{t('reg.pw_confirm')}</Label>
-        <Input id={id('pw2')} name={assistit ? undefined : 'confirm-password'} type={verPassword ? 'text' : 'password'} value={password2}
+        <Input id={id('pw2')} name="confirm-password" type={verPassword ? 'text' : 'password'} value={password2}
           onChange={(e) => { setPassword2(e.target.value); setError(null) }}
-          autoComplete={assistit ? 'off' : 'new-password'} required
+          autoComplete="new-password" required
           aria-invalid={password2 !== '' && password !== password2} />
         {password2 !== '' && password !== password2 && (
           <p className="text-xs text-error">{t('reg.pw_mismatch')}</p>
@@ -264,36 +237,27 @@ export default function FormulariAlta({ mode, rolsInicials, onFet, idPrefix = 'r
       <fieldset className="grid gap-1 rounded-md border p-3">
         <legend className="px-1 text-sm font-medium">{t('rgpd.title')}</legend>
         <FilaCasella checked={consentiments.privacitat} onChange={(v) => marca('privacitat', v)}>
-          {textConsentiment('privacitat', lang, assistit)}{' '}
+          {textConsentiment('privacitat', lang)}{' '}
           <Link to="/privacitat" target="_blank" rel="noopener noreferrer" className="font-medium text-primary underline">
             {t('rgpd.llegeix')}
           </Link>
         </FilaCasella>
         <FilaCasella checked={consentiments.comunicacions_plataforma} onChange={(v) => marca('comunicacions_plataforma', v)}>
-          {textConsentiment('comunicacions_plataforma', lang, assistit)}
+          {textConsentiment('comunicacions_plataforma', lang)}
         </FilaCasella>
         <FilaCasella checked={consentiments.comunicacions_espigoladors} onChange={(v) => marca('comunicacions_espigoladors', v)}>
-          {textConsentiment('comunicacions_espigoladors', lang, assistit)}
+          {textConsentiment('comunicacions_espigoladors', lang)}
         </FilaCasella>
         {/* Que no se confunda con los avisos del servicio: esos llegan igual (§8). */}
         <p className="text-xs text-muted-foreground">{t('rgpd.no_operatives')}</p>
       </fieldset>
 
-      {assistit && (
-        <div className="grid gap-1">
-          <FilaCasella checked={esTest} onChange={setEsTest}>{t('alta.es_test')}</FilaCasella>
-          <FilaCasella checked={enviaAcces} onChange={setEnviaAcces}>{t('alta.envia_acces')}</FilaCasella>
-        </div>
-      )}
-
       {/* Trampa para robots: una persona no ve este campo y por tanto no lo rellena. */}
-      {!assistit && (
-        <input type="text" name="web" value={parany} onChange={(e) => setParany(e.target.value)}
-          tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
-      )}
+      <input type="text" name="web" value={parany} onChange={(e) => setParany(e.target.value)}
+        tabIndex={-1} autoComplete="off" aria-hidden="true" className="hidden" />
 
       <Button type="submit" disabled={ocupat} className="whitespace-normal">
-        {ocupat ? t('reg.submitting') : t(assistit ? 'alta.submit' : 'reg.submit')}
+        {ocupat ? t('reg.submitting') : t('reg.submit')}
       </Button>
       {error && <p className="text-sm text-destructive">{error}</p>}
     </form>

@@ -693,6 +693,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Plan 1, rebanada 1B (20270501300000): el alta de una entidad es del equipo.
   { tabla: "crear_entitat", op: "rpc", esperado: "denegar", args: { p_dades: { rols: ["productor"] } }, descripcion: "NO dona d'alta entitats (és de l'equip)" },
   { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
+  // Plan 1, rebanada 1D (20270501500000): dar y quitar acceso es del equipo, y el estado de la
+  // cuenta solo lo lee el equipo. Las dos del servidor no las ejecuta ninguna sesión.
+  { tabla: "estat_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu l'estat d'accés d'una entitat" },
+  { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés a cap entitat" },
+  { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
+  { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
   // Fase 10 (20270424100000): el impacto global es del equipo; los factores son catálogo
@@ -1309,6 +1315,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Deuda 150 (20270501400000): ni el equipo inserta fichas directo; solo `crear_entitat()`.
     { tabla: "productores", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
+    // Plan 1, 1D (20270501500000): el técnico ve el estado de la cuenta, pero dar y quitar
+    // acceso es de `pot_aprovar()` (crear una cuenta aprobada es aprobar un alta).
+    { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
+    { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
+    { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
+    { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1543,6 +1555,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
     { tabla: "productores", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
+    // Plan 1, 1D (20270501500000): con un id inventado, 22023 `organitzacio_inexistent`.
+    { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
+    { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
+    { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
+    { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
     { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3; tampoc el super_admin)" },
