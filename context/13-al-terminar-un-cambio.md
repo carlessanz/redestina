@@ -8,8 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.548 pruebas en 65 ficheros** de Vitest: 1.547 correctas y **1 saltada a propósito**
-   (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
+   Referencia: **1.560 pruebas en 66 ficheros** de Vitest: 1.559 correctas y **1 saltada a propósito**
+   (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
+   paridad del alta con `crear_entitat()`). Antes, **1.548 en 65** (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
    en `i18n.test.ts` al retirar el bloque `ct.t_` de los contactos). Antes, **1.530 en 63**
    (27-10-2026, gestión autónoma: el convenio declarado, la escalera de 17 pasos, la recogida asistida y el
    apóstrofo de los avisos; antes **1.477 en 62**, con los mensajes para avisar a mano —`tests/puresa.test.ts`
@@ -90,9 +91,12 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon: 1.628/1.628 y 29 sin datos (total 1.657; 1C añadió 9, `v_entitats_llistat`)**; las dos «sin datos»
+   contacto denegado). **Clon, tras 1B: 1.637/1.637 y 29 sin datos (total 1.666; 1B añadió 9: `crear_entitat`
+   denegado a las siete externas, permitido con `22023` al técnico y al super_admin)**; antes de 1B,
+   1.628/1.628 y 29 (total 1.657; 1C añadió 9, `v_entitats_llistat`); las dos «sin datos»
    nuevas son `fitxa_estat_hist` leída por el equipo, vacía hasta el primer cambio de estado.
-   **Producción, tras publicar `a07dd6a` (1C) el 02-11-2026: 1.634/1.634 y 23 sin datos**, el mismo
+   **Producción, tras publicar `a07dd6a` (1C) el 02-11-2026: 1.634/1.634 y 23 sin datos** (al publicar
+   1B deben ser 1.643/1.643 y 23), el mismo
    total (1.657); tras `3ec6dba` (1A) eran 1.625/1.625 y 23. Tiene menos «sin datos» que el clon
    porque sus fichas de prueba tienen más filas propias.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—

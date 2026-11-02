@@ -56,6 +56,12 @@ const CODIS: Record<string, string> = {
   falta_rao_social: 'org.err_falta_rao_social',
   entitat_inactiva: 'org.err_entitat_inactiva',
   tipus_activitat_desconegut: 'org.err_activitat',
+  // El alta de una entidad (plan 1, 1B, `crear_entitat()`). `cal_nom_comercial` va ANTES
+  // que `cal_nom`, que lo contiene.
+  cal_nom_comercial: 'ef.nom_obligatori',
+  cal_tipus_receptor: 'ne.err_cal_tipus_receptor',
+  cal_paper: 'ef.err_paper',
+  dades_en_us: 'rec.err_unique',
   cal_nom: 'org.err_cal_nom',
 }
 

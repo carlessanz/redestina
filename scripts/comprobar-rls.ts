@@ -690,6 +690,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
   { tabla: "fitxa_estat_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial d'estats de les fitxes" },
   { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial d'estats" },
+  // Plan 1, rebanada 1B (20270501300000): el alta de una entidad es del equipo.
+  { tabla: "crear_entitat", op: "rpc", esperado: "denegar", args: { p_dades: { rols: ["productor"] } }, descripcion: "NO dona d'alta entitats (és de l'equip)" },
   { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1301,6 +1303,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva fitxes (és de l'admin)" },
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva organitzacions (és de l'admin)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers en nom d'una organització (és de l'admin)" },
+    // Plan 1, 1B (20270501300000): el técnico SÍ da de alta (como el alta directa de antes).
+    // Sin papeles, la guarda deja pasar y la RPC corta con 22023 `cal_paper` sin escribir nada.
+    { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1532,6 +1537,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una fitxa (22023 si no existeix)" },
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
+    { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
     { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3; tampoc el super_admin)" },

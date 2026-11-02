@@ -10,7 +10,8 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync, readdirSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  BLOCS, CAMPS_FITXA, GESTIONATS_PER_COMPONENT, NO_ES_MOSTRA, campsDelBloc, campsDeTaula,
+  BLOCS, CAMPS_FITXA, CLAUS_ALTA, GESTIONATS_PER_COMPONENT, NO_ES_MOSTRA, OBLIGATORIS_ALTA, campsAlta,
+  campsDelBloc, campsDeTaula,
   clausFitxa, columnesEditablesActor, mateixValor, normalitzaValor, rolDe, valorComu,
   type CampFitxa, type Taula,
 } from '../src/lib/campsFitxa'
@@ -54,7 +55,7 @@ function classificacio(taula: Taula): string[] {
  * lista blanca de lo que el actor puede escribir. Se lee el SQL como texto, igual que
  * `cobertura.test.ts` lee el router: importar nada no haría falta y montar una base, menos.
  */
-function llistaBlancaRpc(nom: string): string[] {
+function llistaBlancaRpc(nom: string, patro = /d \? '([a-z_0-9]+)'/g): string[] {
   const dir = join(RAIZ, 'supabase', 'migrations')
   const fitxers = readdirSync(dir).filter((f) => f.endsWith('.sql')).sort()
   const re = new RegExp(`create or replace function public\\.${nom}\\s*\\(`, 'i')
@@ -69,7 +70,7 @@ function llistaBlancaRpc(nom: string): string[] {
   const fi = cos.indexOf('$$;', cos.indexOf('$$') + 2)
   const funcio = cos.slice(0, fi)
   const claus = new Set<string>()
-  for (const m of funcio.matchAll(/d \? '([a-z_0-9]+)'/g)) claus.add(m[1])
+  for (const m of funcio.matchAll(patro)) claus.add(m[1])
   return [...claus].sort()
 }
 
@@ -113,6 +114,31 @@ describe('campsFitxa: paridad con las RPC del actor (1.6)', () => {
   })
   it('actualitzar_fitxa_entitat acepta exactamente lo que el actor puede editar', () => {
     expect(llistaBlancaRpc('actualitzar_fitxa_entitat')).toEqual(columnesEditablesActor('entidades'))
+  })
+})
+
+// 1B (20270501300000): el alta lee `d->>'clau'` / `d->'clau'` / `d ? 'clau'` con las claves
+// de la ficha. Si se añade un campo al alta en un lado y no en el otro, esto falla.
+describe('campsFitxa: el alta y crear_entitat() (1B)', () => {
+  it('crear_entitat acepta exactamente los campos del alta, más rols y es_test', () => {
+    const claus = llistaBlancaRpc('crear_entitat', /\bd(?:->>|->| \? )'([a-z_0-9]+)'/g)
+    expect(claus).toEqual([...CLAUS_ALTA, 'rols', 'es_test'].sort())
+  })
+  it('cada campo del alta existe en la ficha y lo edita el equipo', () => {
+    for (const k of CLAUS_ALTA) {
+      const c = CAMPS_FITXA.find((x) => x.clau === k)
+      expect(c, k).toBeDefined()
+      expect(c?.edita, k).not.toBe('ningu')
+    }
+    for (const k of OBLIGATORIS_ALTA) expect(CLAUS_ALTA, k).toContain(k)
+  })
+  it('campsAlta solo da el tipo de receptor si es receptor', () => {
+    const ofertant = campsAlta('receptor', { ofertant: true, receptor: false }).map((c) => c.clau)
+    expect(ofertant).toEqual([])
+    const receptor = campsAlta('receptor', { ofertant: false, receptor: true }).map((c) => c.clau)
+    expect(receptor).toEqual(['tipo_receptor'])
+    expect(campsAlta('identitat', { ofertant: true, receptor: true }).map((c) => c.clau))
+      .toEqual(['nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat'])
   })
 })
 

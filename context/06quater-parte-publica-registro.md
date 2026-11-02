@@ -200,7 +200,7 @@ Dos límites que **no se pueden relajar**:
 ### Las rutas de las fichas del equipo desde 1C (02-11-2026)
 
 `/equip/entitats` (listado único; `?rol=ofertant|receptor` fija el filtro de papel),
-`/equip/entitats/nova[?rol=…]` (alta con un papel) y `/equip/entitats/:id` con el **id de la
+`/equip/entitats/nova[?rol=…]` («Nova entitat» en dos pasos desde 1B: `NovaEntitat`) y `/equip/entitats/:id` con el **id de la
 organización**. Compatibilidad: `/equip/productors` → `/equip/entitats?rol=ofertant`,
 `/equip/productors/nou` → `/equip/entitats/nova?rol=ofertant`, `/equip/productors/:id`
 (`RedireccioFitxa`) → `/equip/entitats/:id`, y `EntitatDetall` resuelve un id de **ficha**

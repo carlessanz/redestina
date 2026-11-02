@@ -54,7 +54,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
   registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A publicada el
-  02-11-2026, `3ec6dba`; 1C publicada el 02-11-2026, `a07dd6a`**).
+  02-11-2026, `3ec6dba`; 1C publicada el 02-11-2026, `a07dd6a`; 1B en `main`, sin publicar**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -283,7 +283,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `acunar_enllac_assistit`, `preparar_/registrar_conveni_en_paper`, `declarar_conveni`,
   `descartar_convenio_esborrany`, `firmar_convenio_por_enlace` solo servidor); organización
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
-  `cerca_entitats` —equipo, NIF y nombre, D6—, `activar_/desactivar_fitxa`,
+  `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` —1B: alta con uno o dos papeles en una
+  transacción, `es_intern()`; nace activa, así que exige NIF válido, razón social y `tipo_receptor`—, `activar_/desactivar_fitxa`,
   `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—,
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); cierre y certificados (`abrir_/
   calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`,
@@ -399,8 +400,11 @@ Lo que manda hoy, en una línea cada uno:
   que cambia**, en las dos fichas si el campo es común (si difieren, lo dice junto al campo).
   `PerfilOrganitzacio` pinta los mismos bloques con `veu: tots` por sus RPC (P5: el actor edita
   `telefono2/3`, `email2`, `contacto2` y la logística). Listado `Entitats` sobre
-  `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`; alta con un
-  papel en `/equip/entitats/nova` (el buscador previo es 1B). `components/fitxa/`,
+  `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`.
+- **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).
+  1 «Qui és?»: `cerca_entitats` al teclear → una inactiva se activa (NIF y razón social si faltan), una
+  activa abre su ficha, al que le falta un papel se le añade; 2 «És nova» → `crear_entitat()` con
+  `CLAUS_ALTA` de `campsFitxa` (paridad con el SQL en `tests/campsFitxa.test.ts`). `components/fitxa/`,
   `hooks/useEsborrarFitxa`. Retirados `RecordDetail`, `crudCampos`, `FitxaRegistre`,
   `ProducersList`, `EntitiesList`.
 
@@ -443,7 +447,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501200000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501300000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -581,7 +585,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (60 vivas; la siguiente entrada nueva es la 150; los números no se renumeran ni
+**Deuda abierta (61 vivas; la siguiente entrada nueva es la 151; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -594,7 +598,8 @@ los expedientes) · **142** (consentimientos sin exportación; la pantalla la di
 (entrantes con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del
 import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
 (`v_productores_llistat`/`v_entidades_llistat` sin consumidor desde 1C; borrarlas es una
-migración aparte).
+migración aparte) · **150** (el INSERT directo de fichas del equipo sigue abierto por RLS y se salta
+las reglas de `crear_entitat`; cerrarlo cuando 1B esté publicada).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -610,12 +615,12 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.548 pruebas de Vitest en 65
-   ficheros (1.547 correctas, 1 saltada a propósito) + 9 de Deno.**
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.560 pruebas de Vitest en 66
+   ficheros (1.559 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.634/1.634 y 23 sin datos; clon 1.628/1.628 y 29 (mismo total,
-   1.657 = 1.648 de 1A + 9 de 1C; la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: producción 1.634/1.634 y 23 sin datos (1.643 al publicar 1B); clon 1.637/1.637 y 29
+   (total 1.666 = 1.648 de 1A + 9 de 1C + 9 de 1B; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

@@ -25,6 +25,7 @@ import Settings from '../components/Settings'
 import { Ofertes } from '../routes/equip/Llistats'
 import Entitats from '../routes/equip/Entitats'
 import EntitatDetall, { RedireccioFitxa } from '../routes/equip/EntitatDetall'
+import NovaEntitat from '../routes/equip/NovaEntitat'
 import OfertaDetall from '../routes/equip/OfertaDetall'
 import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
@@ -139,9 +140,10 @@ export const router = createBrowserRouter([
                   { path: 'productors/nou', element: <Navigate to="/equip/entitats/nova?rol=ofertant" replace /> },
                   { path: 'productors/:id', element: <RedireccioFitxa /> },
                   { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entitats', ample: true } },
+                  // «Nova entitat» en dos pasos (plan 1, 1B): buscar antes de dar de alta.
+                  { path: 'entitats/nova', element: <NovaEntitat />, handle: { titleKey: 'nav.entitats' } },
                   // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
-                  // ficha de antes se resuelve y redirige. El alta, con un papel.
-                  { path: 'entitats/nova', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
+                  // ficha de antes se resuelve y redirige.
                   { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },

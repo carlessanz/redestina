@@ -60,7 +60,8 @@ src/
                                Confirmar (/confirmar/:token, sin sesión) — §6quater
   routes/PerfilOrganitzacio.tsx  Ficha propia: los bloques de `campsFitxa` con `veu: tots`, por RPC con lista blanca (§6ter)
   routes/equip/Entitats.tsx    El listado «Entitats» (una fila por organización, `v_entitats_llistat`; 1C)
-  routes/equip/EntitatDetall.tsx  La ficha ÚNICA por organización del equipo y el alta con un papel (1C)
+  routes/equip/EntitatDetall.tsx  La ficha ÚNICA por organización del equipo (1C)
+  routes/equip/NovaEntitat.tsx  «Nova entitat» en dos pasos: buscar (cerca_entitats) y dar de alta (crear_entitat) (1B)
   hooks/useEsborrarFitxa.tsx   Borrar una organización (`borrar_ficha_completa`, diálogo de doble rol)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
   routes/PlaOrganitzacio.tsx   «El meu pla de prevenció», solo lectura (fase 11, §6ter)
@@ -182,6 +183,8 @@ src/
                                oficial vuelto legible («l'Ametlla del Vallès»)
     campsFitxa.ts              PURO, con test: LA definición de campos de la ficha de una organización
                                (tabla, bloque, quién ve, quién edita; plan 1 1C, D8). Sustituye a `crudCampos.ts`
+    novaEntitat.ts             PURO, con test: el alta en dos pasos (1B): «parece un NIF», qué ofrecer
+                               al elegir un resultado, obligatorios del alta y carga de `crear_entitat()`
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por

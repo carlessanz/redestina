@@ -114,3 +114,11 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
 - **1C publicada el 02-11-2026 (`a07dd6a`)**: migración `20270501200000` aplicada con
   `aplicar-migracion.ts` (`scripts/data/publicar-1c.sh`), ninguna función, frontend por el push
   (`version.json` = `a07dd6a8cd5c`). Arnés en producción 1.634/1.634 y 23 sin datos.
+- **1B en `main`, sin publicar (02-11-2026)**: «Nova entitat» en dos pasos y `crear_entitat()`
+  (migración `20270501300000`). Decisiones aplicadas: **D6** (el buscador es el paso 1); **P2
+  ampliada** (toda alta del panel por la RPC, con uno o dos papeles: un solo camino); **la entidad
+  nace activa**, así que el alta exige NIF válido y razón social (coherente con D2/P9) y, si es
+  receptor, `tipo_receptor`; el alta la puede hacer el técnico (como antes), activar y añadir papel
+  siguen siendo de `pot_aprovar()`; **P1** a medias por diseño (§7 del plan: «Nova organització amb
+  compte» se queda hasta 1D, y la casilla «Dona-li accés» no se enseña hasta entonces). Publicar:
+  la migración y el frontend; ninguna Edge Function. Detalle en §4bis y §6ter.

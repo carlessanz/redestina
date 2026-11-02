@@ -5,9 +5,8 @@
 //   · `/equip/entitats/:id` — `id` es el de la ORGANIZACIÓN. Si llega el id de una ficha
 //     (`productores.id` o `entidades.id`: los enlaces y marcadores de antes de 1C), se
 //     resuelve su organización y se redirige con `replace`.
-//   · `/equip/entitats/nova?rol=ofertant|receptor` — el alta con UN papel (identidad,
-//     contacto, dirección); el otro se añade después desde «Rols». El buscador previo por NIF
-//     y nombre y el alta con doble rol son la rebanada 1B.
+//   · El alta (`/equip/entitats/nova`) ya no vive aquí: es `NovaEntitat` (rebanada 1B), con
+//     el buscador previo por NIF y nombre y uno o los dos papeles por `crear_entitat()`.
 //
 // ESCRITURA. El equipo escribe directo en las tablas (RLS `gestio intern`, §4bis), y SOLO LAS
 // COLUMNAS QUE HAN CAMBIADO: así un dato heredado que hoy no pasaría una validación (un NIF
@@ -17,7 +16,7 @@
 // campo: se cambia en «Rols» por RPC (deuda §12.147: el alta ya no lo manda).
 
 import { useEffect, useMemo, useState } from 'react'
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
+import { Navigate, useNavigate, useParams } from 'react-router'
 import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
@@ -48,14 +47,9 @@ import DialegCorreu from '../../components/DialegCorreu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Label } from '@/components/ui/label'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 
 type Fila = Record<string, unknown>
-type Paper = 'productor' | 'entidad'
 
 const LLISTA = '/equip/entitats'
 const COLS_ORG = 'id, nombre, nif, email, telefono, poblacion, productor_id, entidad_id, es_generadora, es_receptora, tipo_receptor, canal_preferido, created_at, activa, productor_activo, entidad_activo, razon_social, nom_comercial, persona_contacte, municipio_ine, comarca, tipus_activitat, te_compte, compte_estat'
@@ -78,16 +72,12 @@ export function RedireccioFitxa() {
 export default function EntitatDetall() {
   const { t } = useT()
   const { id } = useParams<{ id: string }>()
-  const [params] = useSearchParams()
   const navigate = useNavigate()
   const { ctx } = useAppContext()
   const waActiu = useWhatsappActiu()
   const motiuEmail = motiuCanal(useCanals(), 'email')
   const potAprovar = ctx?.potAprovar ?? false
   const potEsborrar = ctx?.esSuperAdmin ?? false
-
-  const esNova = id === undefined
-  const [paperNou, setPaperNou] = useState<Paper | ''>(params.get('rol') === 'receptor' ? 'entidad' : params.get('rol') === 'ofertant' ? 'productor' : '')
 
   const [org, setOrg] = useState<OrganizacioVista | null>(null)
   const [prod, setProd] = useState<Fila | null>(null)
@@ -100,7 +90,7 @@ export default function EntitatDetall() {
   const [canal, setCanal] = useState<TriaCanal>('auto')
   const [canalDesat, setCanalDesat] = useState<TriaCanal>('auto')
   const [errors, setErrors] = useState<Record<string, string>>({})
-  const [carregant, setCarregant] = useState(!esNova)
+  const [carregant, setCarregant] = useState(true)
   const [errCarrega, setErrCarrega] = useState(false)
   const [noTrobada, setNoTrobada] = useState(false)
   const [desant, setDesant] = useState(false)
@@ -113,11 +103,8 @@ export default function EntitatDetall() {
 
   const { esborra, ocupat: esborrant, error: errorEsborrat, dialegs } = useEsborrarFitxa(() => navigate(LLISTA))
 
-  // Qué papeles tiene (o tendrá, en el alta).
-  const rols = useMemo(() => ({
-    ofertant: esNova ? paperNou === 'productor' : prod !== null,
-    receptor: esNova ? paperNou === 'entidad' : ent !== null,
-  }), [esNova, paperNou, prod, ent])
+  // Qué papeles tiene.
+  const rols = useMemo(() => ({ ofertant: prod !== null, receptor: ent !== null }), [prod, ent])
   const taules = useMemo<Taula[]>(() => [
     ...(rols.ofertant ? ['productores' as const] : []),
     ...(rols.receptor ? ['entidades' as const] : []),
@@ -212,15 +199,14 @@ export default function EntitatDetall() {
       const col = c.columnes[taula]
       if (!col || !potEditar(c, 'equip')) continue
       let nou = normalitzaValor(c, valors[c.clau])
-      const abans = esNova ? undefined : normalitzaValor(c, inicial[c.clau])
+      const abans = normalitzaValor(c, inicial[c.clau])
       if (c.tipus === 'xips_activitat') nou = activitatsDe(taula, nou as string[])
-      if (!esNova && mateixValor(nou, abans)) continue
-      if (esNova && (nou == null || (Array.isArray(nou) && nou.length === 0 && c.tipus !== 'xips_activitat'))) continue
+      if (mateixValor(nou, abans)) continue
       // `productores.name` es `not null`: vacío no se escribe (la RPC del actor hace lo mismo).
       if (taula === 'productores' && col === 'name' && nou == null) continue
       out[col] = nou
     }
-    if (taula === 'entidades' && (esNova || JSON.stringify(perfil) !== JSON.stringify(perfilInicial))) out.perfil_receptor = perfil
+    if (taula === 'entidades' && JSON.stringify(perfil) !== JSON.stringify(perfilInicial)) out.perfil_receptor = perfil
     return out
   }
 
@@ -231,12 +217,11 @@ export default function EntitatDetall() {
       if (!taules.some((tb) => c.columnes[tb]) || !potEditar(c, 'equip')) continue
       // Solo lo que ha cambiado: un dato heredado que hoy no pasaría (un NIF del import con la
       // letra mal) no puede impedir guardar otro campo. Si se toca, sí se valida.
-      if (!esNova && mateixValor(normalitzaValor(c, valors[c.clau]), normalitzaValor(c, inicial[c.clau]))) continue
+      if (mateixValor(normalitzaValor(c, valors[c.clau]), normalitzaValor(c, inicial[c.clau]))) continue
       const e = errorDe(c, String(valors[c.clau] ?? ''))
       if (e) nous[c.clau] = e
     }
     if (!String(valors.nom_comercial ?? '').trim()) nous.nom_comercial = 'ef.nom_obligatori'
-    if (esNova && !paperNou) { toast.error(t('ef.err_paper')); return }
     setErrors(nous)
     if (Object.keys(nous).length > 0) {
       toast.error(t('org.fix_errors'))
@@ -245,20 +230,6 @@ export default function EntitatDetall() {
     }
 
     setDesant(true)
-    if (esNova) {
-      const taula: Taula = paperNou === 'productor' ? 'productores' : 'entidades'
-      const dades = canvisDe(taula)
-      // `name` no admite null: la persona de contacto o, si no hay, el nombre comercial.
-      if (taula === 'productores' && dades.name == null) dades.name = dades.empresa
-      const { data, error } = await supabase.from(taula).insert(dades).select('id, organizacion_id')
-      setDesant(false)
-      if (error) { toast.error(error.code === '23505' ? t('rec.err_unique') : textError(t, error.message)); return }
-      const creada = (data as { organizacion_id: string }[] | null)?.[0]
-      toast.success(t('rec.created'))
-      navigate(creada ? `${LLISTA}/${creada.organizacion_id}` : LLISTA, { replace: true })
-      return
-    }
-
     let canvis = 0
     for (const taula of taules) {
       const dades = canvisDe(taula)
@@ -291,7 +262,7 @@ export default function EntitatDetall() {
   }
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
-  if (!esNova && (errCarrega || noTrobada || !org)) {
+  if (errCarrega || noTrobada || !org) {
     return <p className="text-sm text-destructive">{t(errCarrega ? 'c.load_error' : 'rec.not_found')}</p>
   }
 
@@ -319,7 +290,7 @@ export default function EntitatDetall() {
         <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
           <div className="min-w-0">
             <CardTitle className="flex flex-wrap items-center gap-2">
-              <span>{esNova ? t('ef.title_nova') : nom || '—'}</span>
+              <span>{nom || '—'}</span>
               {org?.es_generadora && (
                 <Badge className={org.productor_activo ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'}>
                   {t('ef.paper_ofertant')}{org.productor_activo ? '' : ` · ${t('ef.estat_inactiva').toLowerCase()}`}
@@ -333,17 +304,15 @@ export default function EntitatDetall() {
               {Boolean(valors.es_test) && <Badge variant="secondary">{t('badge.test')}</Badge>}
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">
-              {esNova
-                ? t('ef.sub_nova')
-                : [org?.razon_social, org?.nif].filter(Boolean).join(' · ') || t('rec.editing', { x: t('ef.tornar').toLowerCase() })}
+              {[org?.razon_social, org?.nif].filter(Boolean).join(' · ') || t('rec.editing', { x: t('ef.tornar').toLowerCase() })}
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
             {/* Con WhatsApp apagado (§8) desaparece; el correo ocupa su sitio. */}
-            {waActiu && telefon && !esNova && (
+            {waActiu && telefon && (
               <Button variant="outline" onClick={enviaMissatge}><MessageCircle className="size-4" /> {t('c.message')}</Button>
             )}
-            {correu && !esNova && (
+            {correu && (
               <BotoAmbMotiu variant="outline" onClick={() => setCorreuObert(true)} disabled={!!motiuEmail}
                 motiu={motiuEmail ? t(motiuEmail) : undefined}>
                 <Mail className="size-4" /> {t('c.email_action')}
@@ -353,19 +322,6 @@ export default function EntitatDetall() {
           </div>
         </CardHeader>
         <CardContent className="space-y-6">
-          {esNova && (
-            <div className="max-w-xs">
-              <Label htmlFor="ed-paper" className="mb-1.5 block text-xs text-muted-foreground">{t('ef.paper')}</Label>
-              <Select value={paperNou || undefined} onValueChange={(v) => setPaperNou(v as Paper)}>
-                <SelectTrigger id="ed-paper" className="w-full text-base md:text-sm"><SelectValue placeholder="—" /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="productor">{t('ef.paper_ofertant')}</SelectItem>
-                  <SelectItem value="entidad">{t('ef.paper_receptor')}</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          )}
-
           <Seccio titol={t('org.sec_identitat')} testid="bloc-identitat">
             <BlocCamps {...blocProps} camps={camps('identitat')} activitats={activitats}
               placeholderNom={String(valors.persona_contacte ?? '') || undefined} />

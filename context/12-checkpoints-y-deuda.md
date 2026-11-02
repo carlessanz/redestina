@@ -129,6 +129,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **02-11-2026 (plan 1, rebanada 1B): se abre la 150**: **61 vivas** y la siguiente entrada nueva es la 151.
 ⚠️ **02-11-2026 (plan 1, rebanada 1C): se cierra la 147 y se abre la 149**; la 142 queda a medias (la
 pantalla sí, la exportación no): siguen **60 vivas** y la siguiente entrada nueva es la 150.
 ⚠️ **02-11-2026 (plan 1, rebanada 1A): se abren la 146, la 147 y la 148**: **60 vivas** (aritmética) y la
@@ -750,3 +751,10 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      1C). El listado único lee `v_entitats_llistat`; las dos vistas de antes se conservan por la regla
      de compatibilidad hacia atrás (§7: el frontend vigente sigue sirviéndose mientras se publica).
      Arreglo: `drop view` en una migración posterior, cuando 1C lleve publicada un tiempo.
+150. **El INSERT directo de fichas del equipo sigue abierto** (02-11-2026, plan 1 1B). Desde 1B el panel
+     da de alta solo por `crear_entitat()`, que exige NIF válido, razón social y `tipo_receptor` porque
+     la ficha nace activa; pero las políticas `alta intern` de `productores` y `entidades` siguen dejando
+     a cualquiera del equipo insertar directo (lo necesita el frontend de 1C mientras se publica 1B, §7),
+     y por ahí nace una ficha activa sin NIF. Arreglo: `revoke insert` a `authenticated` y quitar las dos
+     políticas en una migración posterior, cuando 1B esté publicada (el registro y el alta asistida
+     escriben con `service_role`, no les afecta); el arnés pasará esos `insertar` a «denegar».

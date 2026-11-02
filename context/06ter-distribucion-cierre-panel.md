@@ -1650,6 +1650,40 @@ hasta que el panel la normalice.
 
 
 
+### «Nova entitat» en dos pasos (plan 1, rebanada 1B, 02-11-2026)
+
+D6 del plan 1, P2 (ampliada) y la migración `20270501300000` (§4bis). `routes/equip/NovaEntitat.tsx`
+en `/equip/entitats/nova[?rol=ofertant|receptor]` (`/equip/productors/nou` redirige aquí); la lógica
+pura en `lib/novaEntitat.ts` (`tests/novaEntitat.test.ts`).
+
+- **Paso 1, «Qui és?».** Un campo «NIF o nom» (`#ne-cerca`, combobox ARIA hecho a mano: lista
+  `role=listbox` bajo el campo, flechas y Enter; **sin `cmdk`**, ninguna dependencia nueva) que llama a
+  `cerca_entitats` a partir de 3 caracteres con 250 ms de espera (`potCercar` colapsa espacios como la
+  RPC). Cada resultado: nombre, «Mateix NIF» si coincide exacto, chips de papel (tachado el inactivo),
+  Activa/Inactiva, y razón social · NIF · población. Al elegir uno (`accionsResultat`):
+  - con algún papel **inactivo** → «Activa-la»: diálogo que pide NIF y razón social **solo si faltan**
+    (vacío → «Cal el NIF per activar-la», validado en pantalla y otra vez por el trigger), los escribe
+    en las fichas de la organización (las dos si tiene doble rol: comparten NIF) y llama a
+    `activar_fitxa` por cada papel elegido; abre la ficha;
+  - **activa** → «Aquesta entitat ja és activa» y «Obre la fitxa»;
+  - sin el otro papel → «Afegeix el paper d'ofertant/de receptor» (`afegir_paper_org_equip`, con
+    confirmación) y abre la ficha.
+  Activar y añadir son de `pot_aprovar()`: al técnico le salen grises con el motivo (`BotoAmbMotiu`).
+  Debajo, siempre, **«És nova: dona-la d'alta»**, que lleva al paso 2 el NIF limpio si lo tecleado
+  tiene forma de NIF/NIE/CIF (`semblaNif`) o, si no, el nombre (`prellenaAlta`).
+- **Paso 2, «Dades de l'entitat».** Papeles como dos conmutadores con `aria-pressed` (uno o los dos;
+  `?rol=` preselecciona) y los bloques de la ficha pintados con el mismo `BlocCamps`, filtrados a
+  `CLAUS_ALTA` (`campsAlta()`): Identitat (nom comercial, raó social, NIF, forma jurídica, activitat),
+  Contacte (persona, correu, telèfon: D3, el único contacto), Adreça (sin los derivados) y, si es
+  receptor, `tipo_receptor`. Casilla «Entitat de proves» (`es_test`). Obligatorios (`errorsAlta`): nom
+  comercial, raó social, NIF válido y, si es receptor, su tipo; el teléfono se guarda en E.164. Los
+  errores del servidor van al campo (`campDelError`: `nif_en_us`, `falta_nif`…). Al crear, abre la
+  ficha de la organización. **La casilla «Dona-li accés a la plataforma ara» no se enseña hasta 1D.**
+- `EntitatDetall` ya no tiene modo alta. Claves `ne.*` (ca/es); se retiraron `ef.sub_nova` y `ef.paper`.
+- E2E `tests/e2e/entitats.e2e.ts` (clon, móvil y escritorio; crea y borra sus organizaciones): los
+  cuatro casos del paso 1 —inactiva sin NIF / con NIF (y aparece en «Nova oferta assistida»), activa
+  por NIF, añadir papel, nueva con NIF llevado al alta— más el alta con doble rol y el NIF repetido.
+
 ### La ficha única «Entitat» y el listado «Entitats» (plan 1, rebanada 1C, 02-11-2026)
 
 Decisiones D1 y D8 del plan 1 (`3. Claude Code/2026-11-02-plan-1-crm-entitats.md`), y las
@@ -1688,9 +1722,8 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
   **Guarda solo lo que cambia** y solo lo valida (un NIF heredado inválido ya no bloquea guardar otro
   campo); un campo común cambiado se escribe en las dos fichas; `productores.name` vacío no se
   escribe. **`activo` no es campo**: el alta no lo manda y la columna toma su `default true`
-  (deuda 147 cerrada). Alta `/equip/entitats/nova?rol=` con un papel (Dades, Contacte, Adreça y lo
-  del papel); el otro se añade desde «Rols». «Nova organització amb compte» (`DialegAltaAssistida`)
-  sigue en el listado hasta 1D.
+  (deuda 147 cerrada). El alta de un papel que vivía aquí (`esNova`) la sustituyó 1B: ver abajo.
+  «Nova organització amb compte» (`DialegAltaAssistida`) sigue en el listado hasta 1D.
 - **`routes/PerfilOrganitzacio.tsx`** (actor): los mismos bloques con `veu: tots` para la tabla de la
   pestaña (`campsDeTaula`), por `actualitzar_fitxa_*`; `modalitats_interes` y `perfil_receptor` siguen
   en «El meu perfil de recepció» (puntero). `RolRedestina`, `LlocsRecollida` y `CanalPreferit` como

@@ -453,6 +453,40 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 
 
 
+### `crear_entitat()`: el alta de una entidad (plan 1, rebanada 1B, `20270501300000`, 02-11-2026)
+
+`crear_entitat(p_dades jsonb) returns jsonb` (`{organizacion_id, productor_id, entidad_id}`),
+`security definer`, `revoke` de `public`, `anon` **y `service_role`** (ningún job da de alta; la
+importación de 1E escribe con su script). Es el paso 2 de «Nova entitat» (§6ter). Decisiones aplicadas:
+
+- **P2, ampliada: TODA alta del panel pasa por la RPC, con uno o con dos papeles.** El plan la pedía
+  «si hay doble rol»; con un papel también, para que haya un solo camino y las reglas vivan en el
+  servidor y no solo en la pantalla. Crea la primera ficha (el trigger `*_estrena_organizacion` estrena
+  la organización) y cuelga la segunda de ella; un fallo de cualquiera deshace las dos.
+- **Nace activa, así que se le exige lo que a una que se activa** (D2, P9): NIF presente y válido
+  (`falta_nif`, `nif_invalid`, mismos códigos que el trigger de 1A, que solo mira los UPDATE de
+  `activo`) y razón social (`falta_rao_social`). El NIF repetido lo corta el trigger del NIF al
+  insertar (`nif_en_us`). Un correo o teléfono que ya tiene otra ficha de productor (índices únicos)
+  da `22023 dades_en_us`.
+- **Un receptor necesita `tipo_receptor`** (`cal_tipus_receptor`): sin él no ve ninguna oferta del
+  Mercat (`modalitat_receptor_compat`) y nada se lo diría. Decisión de 1B (en 1C el alta no lo pedía).
+- **Permiso `es_intern()` con sesión** (el técnico también), el mismo que el alta directa de antes
+  (RLS `alta intern`); activar una ficha que ya existe y añadir un papel siguen siendo de
+  `pot_aprovar()` (1A). Externos: `42501`.
+- Claves de `p_dades`: `rols` (`productor`/`entidad`), `es_test` y las de `CLAUS_ALTA` de
+  `src/lib/campsFitxa.ts` (`nom_comercial`, `razon_social`, `nif`, `tipus_empresa`, `tipus_activitat`,
+  `persona_contacte`, `email`, `telefon`, `direccion`, `codigo_postal`, `municipio_ine`,
+  `tipo_receptor`), **las mismas claves que la ficha**, que la RPC reparte a las columnas de cada tabla.
+  `tests/campsFitxa.test.ts` las lee del SQL y exige que coincidan. Las actividades se reparten por
+  papel con `tipus_activitat.aplica` (las `ambdos`, en las dos); una que no aplica a ningún papel
+  elegido da `tipus_activitat_desconegut`.
+- Deja una fila en `fitxa_estat_hist` por ficha (activa, `per = auth.uid()`): quién la dio de alta.
+- ⚠️ **El INSERT directo de fichas sigue abierto** por RLS (`alta intern`) para el frontend de 1C hasta
+  que se publique 1B, y se salta estas reglas: deuda §12.150.
+
+Arnés: `crear_entitat` denegado a las siete cuentas externas (`DOCUMENTAL_EXTERN`) y permitido
+—con `rols: []`, `22023 cal_paper`, sin escribir nada— al técnico y al super_admin: **+9**.
+
 ### La lista blanca del actor, ampliada (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 `actualitzar_fitxa_entitat()` acepta además `telefono2`, `telefono3`, `email2`, `contacto2`,

@@ -233,6 +233,27 @@ export function columnesEditablesActor(taula: Taula): string[] {
   return [...cols, ...EDITABLES_PER_COMPONENT[taula]].sort()
 }
 
+/**
+ * Los campos del ALTA de una entidad (plan 1, rebanada 1B): lo mínimo para crearla, con las
+ * mismas claves que la ficha. Es exactamente lo que acepta la RPC `crear_entitat(p_dades)`
+ * (`tests/campsFitxa.test.ts` lo compara con el SQL), que además recibe `rols` y `es_test`.
+ * Lo demás se completa después en la ficha.
+ */
+export const CLAUS_ALTA: readonly string[] = [
+  'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat',
+  'persona_contacte', 'email', 'telefon',
+  'direccion', 'codigo_postal', 'municipio_ine',
+  'tipo_receptor',
+]
+
+/** Lo que el alta exige: nace activa (NIF y razón social, P9) y, si es receptor, su tipo. */
+export const OBLIGATORIS_ALTA: readonly string[] = ['nom_comercial', 'razon_social', 'nif', 'tipo_receptor']
+
+/** Los campos del alta de un bloque, para los papeles elegidos. */
+export function campsAlta(bloc: Bloc, rols: { ofertant: boolean; receptor: boolean }): CampFitxa[] {
+  return campsDelBloc(bloc, 'equip', rols).filter((c) => CLAUS_ALTA.includes(c.clau))
+}
+
 /** Todas las claves i18n que usa este módulo: para la prueba de cobertura. */
 export function clausFitxa(): string[] {
   const claus = new Set<string>()
