@@ -63,6 +63,12 @@ const CODIS: Record<string, string> = {
   cal_paper: 'ef.err_paper',
   dades_en_us: 'rec.err_unique',
   cal_nom: 'org.err_cal_nom',
+  // Las notas internas (plan 1, 1F, `afegir_nota_interna()` / `esborrar_nota_interna()`).
+  canal_nota_desconegut: 'ni.err_canal',
+  nota_buida: 'ni.err_buida',
+  nota_massa_llarga: 'ni.err_massa_llarga',
+  nota_futura: 'ni.err_futura',
+  nota_inexistent: 'ni.err_inexistent',
 }
 
 /** Códigos que algunas Edge Functions y envoltorios devuelven COMO mensaje. */

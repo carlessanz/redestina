@@ -187,6 +187,8 @@ src/
                                al elegir un resultado, obligatorios del alta y carga de `crear_entitat()`
     accesEntitat.ts            PURO, con test: «Contacte i accés» (1D): del estado de la cuenta
                                (`estat_acces_org()`), qué botones salen y su motivo; códigos de `donar-acces`
+    notesInternes.ts           PURO, con test: notas internas (1F): canales (paridad con el CHECK),
+                               «fa 3 dies» por días locales, qué fecha se manda y el tope de 2.000
     textos.ts                  RECOLLIDA CONFIRMADA y albarán (los compone el panel)
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
@@ -275,7 +277,8 @@ src/
     fitxa/                     Los bloques de la ficha única (1C): BlocCamps (los campos de un bloque,
                                para el equipo y para el actor), BlocRols (activar/desactivar/añadir papel),
                                CanalPreferit, Consentiments (RGPD, solo equipo), AccesEntitat (1D:
-                               estado de la cuenta y «Dona-li accés» / «Torna a enviar» / «Desactiva l'accés»)
+                               estado de la cuenta y «Dona-li accés» / «Torna a enviar» / «Desactiva l'accés»),
+                               NotesInternes (1F: el hilo de notas del equipo en «Gestió interna»)
     ContactList.tsx            Sidebar de contactos + alta manual
     Conversation.tsx           Hilo de mensajes + composer + Realtime
     Settings.tsx               Configuració POR PESTAÑAS (`?tab=`, 27-10-2026): General, Notificacions, Fundació,

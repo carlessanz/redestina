@@ -155,6 +155,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'modalidades del impacto', prefijo: 'imp.mod_', valores: ['donacio', 'venda', 'maquila'] },
     // El estado de la cuenta de una entitat (plan 1, 1D): `estat_acces_org()`.
     { que: 'estat_acces_org().estat', prefijo: 'acc.estat_', valores: ['sense', 'pendent', 'enviat', 'actiu', 'desactivat'] },
+    // Las notas internas (plan 1, 1F): el CHECK de `notes_internes.canal`, en la ficha y en el listado.
+    { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     // El expediente de prevención (fase 11): los CHECK de sus tablas, compuestos en la vista.
     { que: 'expedients_prevencion.estat', prefijo: 'exp.estat_', valores: ['obert', 'en_seguiment', 'verificat', 'tancat'] },
     { que: 'pla_visites.tipus', prefijo: 'exp.visita_', valores: ['diagnosi', 'seguiment', 'verificacio', 'altres'] },

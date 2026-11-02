@@ -162,6 +162,9 @@ export interface EntitatLlistat {
   conveni_productor: boolean
   conveni_entitat: boolean
   darrera_activitat: string | null
+  /** La nota interna más reciente (1F, `notes_internes`); null para quien no es del equipo. */
+  darrer_contacte_at: string | null
+  darrer_contacte_canal: string | null
 }
 
 /** Estado de la cuenta de una organización, derivado de `membresias` (1A). */

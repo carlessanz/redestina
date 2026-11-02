@@ -8,8 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.587 pruebas en 67 ficheros** de Vitest: 1.586 correctas y **1 saltada a propósito**
-   (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
+   Referencia: **1.595 pruebas en 68 ficheros** de Vitest: 1.594 correctas y **1 saltada a propósito**
+   (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
+   compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `acc.estat_*`). Antes, **1.560 en 66** (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
    paridad del alta con `crear_entitat()`). Antes, **1.548 en 65** (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
    en `i18n.test.ts` al retirar el bloque `ct.t_` de los contactos). Antes, **1.530 en 63**
@@ -92,7 +93,11 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
+   contacto denegado). **Clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
+   leer e insertar en `notes_internes`, `afegir_nota_interna` y `esborrar_nota_interna` denegadas a las
+   siete externas —leer = 0 filas—; el técnico lee, añade con `22023` y no borra ni inserta directo; el
+   super_admin lee, añade y borra con `22023`. Las dos lecturas del equipo salen «sin datos» mientras el
+   clon no tenga ninguna nota: de ahí 29 → 31).** Antes, **clon, tras 1D (`20270501500000`): 1.677/1.677 y 29 sin datos (total 1.706; +36:
    `estat_acces_org`, `desactivar_acces_org`, `concedir_acces_org` y `revertir_acces_org` denegadas a las
    siete externas; el técnico lee el estado y nada más; el super_admin lee y desactiva; concedir y revertir,
    solo `service_role`). Producción, tras publicar `b6685b1` (1D) el 02-11-2026: 1.683/1.683 y 23 sin

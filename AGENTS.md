@@ -53,8 +53,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
-  registro de entidades** (2026-11-02, rebanadas 1A-1F; **1A, 1C, 1B y 1D publicadas el
-  02-11-2026**, 1D en `b6685b1`).
+  registro de entidades** (2026-11-02, rebanadas 1A-1F; 1A, 1C, 1B y 1D publicadas el
+  02-11-2026; **1F en `main` sin publicar**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -94,8 +94,8 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
   `fullBleed` (Mensajería) y `ample` (listados anchos). `CarregantSeccio` como esqueleto con alto.
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false` para lo que no
   cabe, `labelBarraKey` para etiqueta corta; `li` con `min-w-0`). Medir, no estimar.
-- **PWA instalable sin service worker** (`selfDestroying`): el SW con precache escondía los
-  despliegues tras la cortina. `/version.json` + `useVersioNova` avisan de versión nueva.
+- **PWA instalable sin service worker** (`selfDestroying`; el porqué, en el detalle).
+  `/version.json` + `useVersioNova` avisan de versión nueva.
   Aviso de instalación solo en móvil (dispositivo, no ancho) para productor y receptor.
 - **Siete reglas de móvil medidas** (detalle en `context/02-stack.md`): controles ≥16 px
   (`text-base md:text-sm`, también en `SelectTrigger` y `<select>`); `Button` trae
@@ -172,8 +172,10 @@ en `priorizar-entidades`, ni en los selectores del equipo, y `comprova_interes()
 sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146). **1C (`20270501200000`)**:
 vista `v_entitats_llistat` (`security_invoker`, una fila por organización: lo de `v_organizaciones`
 más `es_test`, `rebutjada`, `modalitats_interes`, `conveni_productor/entitat` y
-`darrera_activitat`) para el listado «Entitats»; `v_productores_llistat`/`v_entidades_llistat`
-quedan sin uso (deuda 149).
+`darrera_activitat`) para el listado «Entitats». **1F (`20270502100000`)**: `notes_internes`
+(CRM D4: organización en cascada, `data`, `canal`, `autor`, `text` ≤2.000): solo inserción por
+RPC, sin UPDATE; lectura `es_intern()` (un externo, 0
+filas sin error); la vista suma `darrer_contacte_at/_canal`.
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
@@ -284,11 +286,13 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `acunar_enllac_assistit`, `preparar_/registrar_conveni_en_paper`, `declarar_conveni`,
   `descartar_convenio_esborrany`, `firmar_convenio_por_enlace` solo servidor); organización
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
-  `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` —1B: alta con uno o dos papeles en una
-  transacción, `es_intern()`; nace activa, así que exige NIF válido, razón social y `tipo_receptor`—, `activar_/desactivar_fitxa`,
+  `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` (1B, `es_intern()`: NIF válido, razón social y
+  `tipo_receptor`), `activar_/desactivar_fitxa`,
   `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
   `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
-  `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`);
+  `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
+  `afegir_nota_interna` (`es_intern()` con sesión, autor `auth.uid()`), `esborrar_nota_interna`
+  (`es_super_admin()`);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); cierre y certificados (`abrir_/
   calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`,
   `*_transaccion*`, `*_periodo`, `*_recepcio`, `rectificar_*`, `reiniciar_*_prova`,
@@ -335,8 +339,7 @@ teléfonos en texto libre). 🔴 **Los datos importados se borraron el 16-09-202
 quedan 6 productores + 8 entidades de prueba, la ficha «Compte de proves de l'arnes»
 (`TEST-PENDENT-ARNES`, **no aprobar nunca**: sostiene 73 checks) y
 `tecnologia@espigoladors.com` en la whitelist de correo. Las cifras históricas de este documento
-describen el import, no la base de hoy. El trigger del NIF rechazará filas del CSV con NIF
-inválido o repetido (deuda 144).
+describen el import, no la base de hoy.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
@@ -391,8 +394,8 @@ Lo que manda hoy, en una línea cada uno:
   tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats»/«ofertant»/
   «receptor», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
 - **Ficha única «Entitat» (1C, D1+D8)**: `lib/campsFitxa.ts` es **la única definición de campos**
-  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` exige toda columna clasificada y
-  `edita: tots` = lista blanca de las RPC del actor, leída del SQL). `EntitatDetall`
+  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` lo cruza con las columnas y las
+  listas blancas del SQL). `EntitatDetall`
   (`/equip/entitats/:orgId`) pinta una ficha por organización —Identitat · Rols · Contacte i accés ·
   Adreça · Com a ofertant · Com a receptor · Diagnòstic · Documentació · Gestió interna— y guarda
   **solo lo que cambia**, en las dos fichas si el campo es común. `PerfilOrganitzacio` pinta los
@@ -401,13 +404,13 @@ Lo que manda hoy, en una línea cada uno:
 - **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).
   1 «Qui és?»: `cerca_entitats` al teclear → una inactiva se activa (NIF y razón social si faltan), una
   activa abre su ficha, al que le falta un papel se le añade; 2 «És nova» → `crear_entitat()` con
-  `CLAUS_ALTA` de `campsFitxa` (paridad con el SQL en `tests/campsFitxa.test.ts`). `components/fitxa/`,
-  `hooks/useEsborrarFitxa`. Retirados `RecordDetail`, `crudCampos`, `FitxaRegistre`,
-  `ProducersList`, `EntitiesList`.
+  `CLAUS_ALTA` de `campsFitxa` (paridad con el SQL en `tests/campsFitxa.test.ts`).
 - **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
   (`fitxa/AccesEntitat`, `lib/accesEntitat.ts`: estado, dar, reenviar y desactivar, con motivo) o con
-  la casilla de «Nova entitat» (si falla, el alta se queda). Retirados `DialegAltaAssistida` y el modo
-  `assistit` de `FormulariAlta`.
+  la casilla de «Nova entitat» (si falla, el alta se queda).
+- **Notas internas (1F)**: «Gestió interna» de `EntitatDetall` (`fitxa/NotesInternes`,
+  `lib/notesInternes.ts`): una línea para añadir y el hilo con lo último arriba, sin edición;
+  borra el super_admin. «Darrer contacte» en el listado.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -418,9 +421,8 @@ error no concede nada; pantalla «No s'ha pogut carregar»); `carregant` solo en
 accesos de prueba tras `VITE_ACCESSOS_TEST` y `AccesAmbCodi`) · `/admin` (equipo, no enlazado)
 · `/registre` (uno o los dos papeles) · `/restablir` · `/privacitat` · `/confirmar/:token` ·
 `/signar/:token` · `/factura/:token` · `/verificar/:codi` · `/panell` (raíz por rol) ·
-`/sense-acces`. `RoleGuard` redirige a `/panell`. Redirecciones de 1C: `/equip/productors[/nou]`
-→ `/equip/entitats[/nova]?rol=ofertant`; `/equip/productors/:id` y un id de ficha en
-`/equip/entitats/:id` → la organización. Aprovacions: cuatro colas (registros,
+`/sense-acces`. `RoleGuard` redirige a `/panell`. Las rutas de antes de 1C redirigen a la
+organización. Aprovacions: cuatro colas (registros,
 convenios por contrasignar, intereses, recogidas por validar); aprobar un alta manda el acceso
 por correo (`enviar-acceso`, casilla «usuari de prova» antes).
 
@@ -448,7 +450,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501500000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270502100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -464,6 +466,8 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   simulado); no cortan lo **transaccional** (`enviar-acceso`, `recuperar-password`, con
   `{transaccional:true}`). El correo de `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria) y
   deja gris lo que envía (`BotoAmbMotiu`, `motiuCanal()`). En producción los tres encendidos.
+- 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
+  documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
 - **Reglas de envío** en `whatsapp-send`: `exigirEquipo` 401 → campos 400 → interruptor 503 →
   gate `es_test` 403 `no_test_user` → `meta_test_recipients` 403 → contacto 404 → ventana 24 h
@@ -538,7 +542,7 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 ## 10bis · 10ter. Nombres retirados
 
 `pdApp-wp` → `P0MA` → `Redestina` (10-09-2026). No crear repos con los nombres viejos (rompería
-las redirecciones). `Poma` es la manzana del catálogo: sustituciones sensibles a mayúsculas. El
+las redirecciones). El
 próximo cambio de dominio exige 308. Verificar CORS leyendo la cabecera
 `Access-Control-Allow-Origin` del preflight, no el código de estado.
 
@@ -560,8 +564,8 @@ git config core.hooksPath .githooks            # una vez por clon
   (`postgres/postgres`), Studio `55323`. Se arranca y para con la skill `supabase-local`; se monta
   o refresca con `scripts/local/` (volcar → preparar-entorno → cargar-local → copiar-storage); el
   volcado tiene que tener al menos las migraciones del clon. Correo y WhatsApp simulados; jobs
-  contra las funciones locales; `roles_activos` y `test_mode` encendidos. El servidor de funciones
-  se cae por memoria (`exit 137`) generando varios PDF a la vez: relanzarlo.
+  contra las funciones locales; `roles_activos` y `test_mode` encendidos (detalle y fallos conocidos en el
+  fichero de §11).
 - **Producción, con token temporal**: `bash scripts/sesion-supabase-temporal.sh` en la terminal
   del usuario (PAT `Redestina - Admin - Producción`); dentro, `deno run -A
   scripts/aplicar-migracion.ts <f> [--dry-run]`, `supabase functions deploy <f>
@@ -617,12 +621,12 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.587 pruebas de Vitest en 67
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.595 pruebas de Vitest en 68
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.677/1.677 y 29 sin datos (tras 1D, +36); producción 1.683/1.683 y 23
-   (la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: clon 1.711/1.711 y 31 sin datos (tras 1F, +36); producción 1.683/1.683 y 23
+   (tras 1D; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

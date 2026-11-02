@@ -699,6 +699,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés a cap entitat" },
   { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
   { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
+  // Plan 1, rebanada 1F (20270502100000): las notas internas son del equipo y un externo ni
+  // sabe que existen: el `select` le da 0 filas SIN error, y no escribe ni borra.
+  { tabla: "notes_internes", op: "leer", esperado: "denegar", descripcion: "NO veu cap nota interna (0 files, sense error)" },
+  { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes internes" },
+  { tabla: "afegir_nota_interna", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "NO afegeix notes internes" },
+  { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
   // Fase 10 (20270424100000): el impacto global es del equipo; los factores son catálogo
@@ -1321,6 +1327,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
+    // Plan 1, 1F (20270502100000): el técnico lee y AÑADE notas internas (uuid inventado →
+    // 22023 `organitzacio_inexistent`: la guarda dejó pasar), pero no las borra ni escribe directo.
+    { tabla: "notes_internes", op: "leer", esperado: "permitir", descripcion: "veu les notes internes", requiereFixture: "alguna nota interna (afegir_nota_interna)" },
+    { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
+    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
+    { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes (és del super_admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1558,6 +1570,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Plan 1, 1D (20270501500000): con un id inventado, 22023 `organitzacio_inexistent`.
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
+    // Plan 1, 1F (20270502100000): con ids inventados, 22023 (`organitzacio_inexistent`,
+    // `nota_inexistent`): la guarda dejó pasar sin escribir ni borrar nada.
+    { tabla: "notes_internes", op: "leer", esperado: "permitir", descripcion: "veu les notes internes", requiereFixture: "alguna nota interna (afegir_nota_interna)" },
+    { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
+    { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
+    { tabla: "esborrar_nota_interna", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar una nota interna (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
@@ -2429,6 +2447,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // Plan 1, 1A: el historial solo lo escribe el trigger `trg_fitxa_estat()`; sin GRANT de
   // escritura, el insert tiene que morir en 42501 aunque la fila sea válida.
   fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
+  notes_internes: { organizacion_id: "00000000-0000-0000-0000-000000000000", canal: "telefon", text: "arnes" },
   // Deuda 150 (20270501400000): las fichas solo nacen por RPC. Filas válidas (inactivas y de
   // prueba) para que lo que corte sea el GRANT y no un `not null` o el trigger del NIF.
   productores: { name: "TEST-RLS", es_test: true, activo: false },

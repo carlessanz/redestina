@@ -37,6 +37,7 @@ import BlocRols from '../../components/fitxa/BlocRols'
 import CanalPreferit, { type TriaCanal } from '../../components/fitxa/CanalPreferit'
 import Consentiments from '../../components/fitxa/Consentiments'
 import AccesEntitat from '../../components/fitxa/AccesEntitat'
+import NotesInternes from '../../components/fitxa/NotesInternes'
 import CampsPerfilReceptor from '../../components/CampsPerfilReceptor'
 import BadgeConveni from '../../components/BadgeConveni'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
@@ -408,6 +409,8 @@ export default function EntitatDetall() {
             {org && (
               <>
                 <Consentiments organitzacioId={org.id} />
+                {/* El CRM mínimo (1F, D4): el hilo de contactos del equipo con la entidad. */}
+                <NotesInternes orgId={org.id} potEsborrar={potEsborrar} />
                 {/* Con quién comparte organización, que es donde se deshace un enlace equivocado. */}
                 <EnllacOrganitzacio tipus={org.productor_id ? 'productor' : 'entidad'}
                   fitxa={org.productor_id ?? org.entidad_id} potAprovar={potAprovar} onCanviat={recarrega} />

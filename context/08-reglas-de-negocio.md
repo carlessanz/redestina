@@ -16,6 +16,14 @@
 > antes. Afecta a TODO: intake, recordatorios, ALTA/BAJA y ofertas a entidades. Para volver a
 > simular: `supabase secrets set WHATSAPP_ENVIO_REAL=false`. El webhook siempre recibe.
 
+### Las notas internas nunca salen por ningún canal (plan 1, rebanada 1F, 02-11-2026)
+
+🔴 `notes_internes` (§4) es el CRM del equipo: lo que se habla por teléfono, en una visita o por
+WhatsApp con una entidad. **No sale por ningún canal**: ni correo, ni WhatsApp, ni documento, ni aviso,
+ni la ficha del actor («La meva organització»). Ninguna Edge Function ni plantilla la lee, y la RLS
+(`es_intern()`) se lo esconde a cualquier cuenta externa. Si un día una función necesitara leerla (con
+`service_role`, que se salta la RLS), es una decisión de negocio que cambia esta regla, no un detalle.
+
 ### Interruptores de notificaciones: el general, el correo y WhatsApp (27-10-2026)
 
 **Tres interruptores en Configuració › Notificacions, solo para el super_admin**: el **general**

@@ -1650,6 +1650,26 @@ hasta que el panel la normalice.
 
 
 
+### Notas internas en «Gestió interna» y «Darrer contacte» (plan 1, rebanada 1F, 02-11-2026)
+
+D4, el CRM mínimo:
+
+- **Bloque «Gestió interna REDESTINA» de `EntitatDetall`** (`components/fitxa/NotesInternes.tsx`): un
+  formulario de una línea —canal (por defecto Telèfon), fecha (hoy por defecto, sin futuro) y texto— y
+  el hilo debajo, **lo más reciente arriba**: «fa 3 dies · WhatsApp · Nom» (la fecha completa en el
+  `title`). Sin edición; el super_admin ve la papelera (con confirmación). Fecha de hoy → no se manda
+  `p_data` (la RPC pone `now()` y el orden del día es el de escritura); otro día → ese día a las 12:00
+  locales.
+- **Listado «Entitats»**: columna «Darrer contacte» (`darrer_contacte_at`/`_canal` de
+  `v_entitats_llistat`), «fa 3 dies · WhatsApp» o «Cap».
+- `lib/notesInternes.ts` (puro, `tests/notesInternes.test.ts`): `CANALS_NOTA` (paridad con el CHECK y la
+  RPC, leída del SQL), `faTemps()` por días de calendario locales (avui · ahir · fa N dies/mesos/anys),
+  `dataPerEnviar()`, `textValid()`. Claves `ni.*` (ca/es) y `ni.canal_*` declarada en `tests/i18n.test.ts`;
+  los cinco códigos de error, en `textError.ts`.
+- La ficha del actor (`PerfilOrganitzacio`) **no pinta el bloque** (es de `EntitatDetall`, rutas del
+  equipo) y, si pidiera la tabla, le llegarían 0 filas. E2E `tests/e2e/crm.e2e.ts` (clon, móvil y
+  escritorio, 8/8).
+
 ### «Dona-li accés»: el acceso se da sobre la ficha que ya existe (plan 1, rebanada 1D, 02-11-2026)
 
 D5 + P1. Hasta 1D, la única forma de que una organización tuviera cuenta desde el equipo era «Nova

@@ -1165,6 +1165,26 @@ nueva, comprueba que es accesible**:
 
 
 
+### Notas internas: el CRM mínimo (plan 1, rebanada 1F, `20270502100000`, 02-11-2026)
+
+D4: un hilo cronológico por organización, **solo del equipo**, sin «próxima acción» ni cola.
+
+- **`notes_internes`** (`id`, `organizacion_id` → `organizaciones` **`on delete cascade`** —cuando
+  `borrar_ficha_completa()` retira una organización vacía, sus notas se van con ella—, `data` timestamptz
+  `default now()` = cuándo fue el contacto, `canal` CHECK `telefon · whatsapp · email · visita · reunio ·
+  altres`, `autor` → `perfiles` **`on delete set null`**, `text` CHECK 1–2.000 caracteres tras `btrim`,
+  `created_at`). Índice `(organizacion_id, data desc, created_at desc)`.
+- **Solo inserción.** Nadie tiene UPDATE (una nota se corrige escribiendo otra); el INSERT es por
+  `afegir_nota_interna()` y el DELETE por `esborrar_nota_interna()` (super_admin), §4bis.
+- **Dos capas**: `revoke all` a `anon` **y** a `authenticated`, `grant select` a `authenticated` con la
+  política `notes_internes_llegir` = `(select es_intern())`. Un externo que hace `select` recibe **0 filas
+  sin error** (no puede saber que hay notas suyas); `anon`, `42501`.
+- **`v_entitats_llistat`** suma al final `darrer_contacte_at` y `darrer_contacte_canal` (la nota más
+  reciente por `data desc, created_at desc`, `left join lateral`). Sigue `security_invoker`, así que a un
+  actor le salen `null`.
+- 🔴 **Las notas nunca salen por ningún canal** (§8): ninguna Edge Function, plantilla, documento ni
+  la ficha del actor las lee.
+
 ### El listado «Entitats» (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 - **`v_entitats_llistat`** (`security_invoker`): una fila por organización con ficha (las

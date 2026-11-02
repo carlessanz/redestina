@@ -7,7 +7,8 @@
 // «Mostrant N de M» lo dice; quitarlo enseña las inactivas (las importadas de 1E entrarán así).
 // `?rol=ofertant|receptor` en la URL fija el papel (es a donde redirigen `/equip/productors` y
 // las tarjetas del tablero). Como los listados de siempre: arriba las de prueba, buscador en
-// cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila.
+// cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila. «Darrer
+// contacte» es la nota interna más reciente (1F, `notes_internes`).
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
@@ -22,6 +23,7 @@ import { useCerca } from '../../hooks/useCerca'
 import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { dataCurta } from '../../lib/format'
+import { faTemps } from '../../lib/notesInternes'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
@@ -34,7 +36,7 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 
-const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat'
+const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat, darrer_contacte_at, darrer_contacte_canal'
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 const PER_DEFECTE = { estat: 'activa' }
@@ -140,6 +142,7 @@ export default function Entitats() {
               <TableHead>{t('el.c_compte')}</TableHead>
               <TableHead>{t('el.c_conveni')}</TableHead>
               <TableHead>{t('el.c_activitat')}</TableHead>
+              <TableHead>{t('el.c_contacte')}</TableHead>
               <TableHead className="text-right">{t('el.c_actions')}</TableHead>
             </TableRow>
           </TableHeader>
@@ -149,6 +152,7 @@ export default function Entitats() {
               const sense = tel ? (unanswered[tel] ?? 0) : 0
               const conv = conveni(e)
               const nom = e.nom_comercial || e.razon_social || e.persona_contacte || '—'
+              const contacte = e.darrer_contacte_at ? faTemps(e.darrer_contacte_at) : null
               return (
                 <TableRow key={e.id} data-testid="entitat-fila">
                   <TableCell className="font-medium">
@@ -188,6 +192,14 @@ export default function Entitats() {
                   <TableCell className={conv.ok ? 'text-exito' : 'text-aviso'}>{conv.text}</TableCell>
                   <TableCell className="whitespace-nowrap text-muted-foreground">
                     {e.darrera_activitat ? dataCurta(e.darrera_activitat) : t('el.activitat_mai')}
+                  </TableCell>
+                  {/* La nota interna más reciente (1F): «fa 3 dies · WhatsApp». */}
+                  <TableCell className="whitespace-nowrap text-muted-foreground" data-testid="darrer-contacte"
+                    title={e.darrer_contacte_at ? dataCurta(e.darrer_contacte_at) : undefined}>
+                    {contacte
+                      ? [t(contacte.clau, { n: contacte.n }),
+                        e.darrer_contacte_canal && t(`ni.canal_${e.darrer_contacte_canal}`)].filter(Boolean).join(' · ')
+                      : t('el.contacte_mai')}
                   </TableCell>
                   <TableCell>
                     <div className="flex justify-end gap-2">

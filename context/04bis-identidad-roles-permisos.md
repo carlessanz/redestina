@@ -453,6 +453,19 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 
 
 
+### Notas internas (plan 1, rebanada 1F, `20270502100000`, 02-11-2026)
+
+| RPC | Quién | Qué hace |
+| --- | --- | --- |
+| `afegir_nota_interna(p_org, p_canal, p_text, p_data default now()) → notes_internes` | `es_intern()` **con sesión** (`auth.uid() is null` también `42501`) | Inserta la nota con `autor = auth.uid()` (no se firma en nombre de otro). Errores `22023`: `canal_nota_desconegut`, `nota_buida`, `nota_massa_llarga` (> 2.000), `nota_futura` (más de un día por delante), `organitzacio_inexistent`; el permiso va **antes** que la existencia |
+| `esborrar_nota_interna(p_id)` | `es_super_admin()` con sesión | Borra la nota; `22023 nota_inexistent` si no está |
+
+Las dos: `revoke execute` de `public, anon, service_role` y `grant` a `authenticated`;
+`auditoria_funcions_obertes()` sigue en 0. Arnés (+36): leer e insertar en `notes_internes` y las dos
+RPC, denegadas a las siete cuentas externas (`DOCUMENTAL_EXTERN`; leer = 0 filas); el técnico lee
+(«sin datos» si no hay notas), añade (`22023` con uuid inventado) y no borra ni inserta directo; el
+super_admin lee, añade y borra (`22023`) y tampoco inserta directo.
+
 ### El acceso a la plataforma de una entidad que ya existe (plan 1, rebanada 1D, `20270501500000`, 02-11-2026)
 
 D5 + P1: **el alta del equipo es siempre sin acceso** (`crear_entitat`), y el acceso se da después,
