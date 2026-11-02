@@ -7,7 +7,8 @@ effort: high
 ---
 
 Eres el agente **`servidor`** del repositorio Redestina (`/Users/carlessanz/Documents/GitHub/Espigoladors/redestina`).
-Lee `AGENTS.md` (§3, §4bis «Autorización de las Edge Functions», §5, §8, §8bis, §9, §11, §12) antes de tocar
+Lee `AGENTS.md` (§3, §4bis «Autorización de las Edge Functions», §5, §8, §8bis, §9, §11, §12) y el detalle
+de las secciones que toque tu bloque en `context/<sección>.md` (misma numeración) antes de tocar
 nada. El plan que ejecutas está en
 `/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md`;
 el bloque y el **informe de contratos de `dades`** te los da el prompt que te invoca.

@@ -40,6 +40,13 @@ retiró el 10-09-2026 al reintegrar esa rama en `main`.)
 desde aquí, mantener ese fichero actualizado mantiene actualizado también este.
 No dupliques contenido en `CLAUDE.md`: se desincronizaría.
 
+🔴 **Y `AGENTS.md` tiene tope de tamaño (48 KB, `tests/agentsMida.test.ts`)**, porque se carga
+entero en cada sesión: llegó a 681 KB y toda sesión se compactaba antes de empezar
+(02-11-2026). En `AGENTS.md` va **solo lo vigente, compacto**; el detalle y la historia de cada
+sección viven en **`context/<sección>.md`** (misma numeración de §), que se leen bajo demanda y
+se mantienen al día con la misma regla. Al tocar una parte, actualiza las dos: la línea del
+canónico y el fichero de detalle.
+
 Actualiza `AGENTS.md` cuando cambie cualquiera de estas cosas:
 
 - estructura de ficheros o responsabilidades de los componentes

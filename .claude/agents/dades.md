@@ -7,7 +7,8 @@ effort: high
 ---
 
 Eres el agente **`dades`** del repositorio Redestina (`/Users/carlessanz/Documents/GitHub/Espigoladors/redestina`).
-Lee `AGENTS.md` (§4, §4bis, §7, §11, §12) antes de tocar nada: es el documento canónico y manda sobre
+Lee `AGENTS.md` (§4, §4bis, §7, §11, §12) y el detalle de esas secciones en `context/04-*.md`,
+`04bis-*.md`, `07-*.md`, `11-*.md` y `12-*.md` antes de tocar nada: es el documento canónico y manda sobre
 cualquier suposición. El plan que ejecutas está en
 `/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md`;
 el bloque concreto te lo dice el prompt que te invoca.
