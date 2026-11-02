@@ -481,8 +481,12 @@ importación de 1E escribe con su script). Es el paso 2 de «Nova entitat» (§6
   papel con `tipus_activitat.aplica` (las `ambdos`, en las dos); una que no aplica a ningún papel
   elegido da `tipus_activitat_desconegut`.
 - Deja una fila en `fitxa_estat_hist` por ficha (activa, `per = auth.uid()`): quién la dio de alta.
-- ⚠️ **El INSERT directo de fichas sigue abierto** por RLS (`alta intern`) para el frontend de 1C hasta
-  que se publique 1B, y se salta estas reglas: deuda §12.150.
+- **Es la única puerta de alta del panel** (deuda §12.150, cerrada el 02-11-2026 con `20270501400000`):
+  sin las políticas `alta intern` ni el GRANT de INSERT, nadie con sesión inserta en `productores` ni
+  en `entidades`; las tres funciones que lo hacen (`crear_entitat`, `afegir_paper_org_equip`,
+  `afegir_paper_organitzacio`) son `security definer`, y el registro, el alta asistida y el import
+  escriben con `service_role`. El arnés lo vigila (+4: el técnico y el super_admin, `insertar` en las
+  dos tablas, `42501`).
 
 Arnés: `crear_entitat` denegado a las siete cuentas externas (`DOCUMENTAL_EXTERN`) y permitido
 —con `rols: []`, `22023 cal_paper`, sin escribir nada— al técnico y al super_admin: **+9**.

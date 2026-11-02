@@ -240,7 +240,8 @@ de tabla; `authenticated` nace con **SELECT y nada más** en una tabla nueva (lo
 privileges` de escritura y TRUNCATE están revocados) —una tabla escribible desde el panel
 necesita su `grant` explícito además de su política—. Escritura directa solo en `wa_contacts`,
 `productores`, `entidades`, `canalizaciones`, `oferta_respuestas`, `productor_ubicaciones`,
-whitelists y `app_settings` (con políticas por rol); `excedentes` solo UPDATE; nunca INSERT en
+whitelists y `app_settings` (con políticas por rol); en las dos fichas solo UPDATE y DELETE
+(**el alta, solo por RPC**: deuda 150 cerrada); `excedentes` solo UPDATE; nunca INSERT en
 `wa_messages` ni `excedentes`; nunca escritura en `usuario_roles`/`membresias`. Comprobar una
 tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 
@@ -447,7 +448,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501300000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501400000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -585,7 +586,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (61 vivas; la siguiente entrada nueva es la 151; los números no se renumeran ni
+**Deuda abierta (60 vivas; la siguiente entrada nueva es la 151; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -598,8 +599,7 @@ los expedientes) · **142** (consentimientos sin exportación; la pantalla la di
 (entrantes con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del
 import) · **146** (`organizacion_contactos` sin uso, pendiente de borrar) · **149**
 (`v_productores_llistat`/`v_entidades_llistat` sin consumidor desde 1C; borrarlas es una
-migración aparte) · **150** (el INSERT directo de fichas del equipo sigue abierto por RLS y se salta
-las reglas de `crear_entitat`; 1B ya está publicada, así que se puede cerrar).
+migración aparte).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -619,8 +619,8 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1.559 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.643/1.643 y 23 sin datos (tras publicar 1B); clon 1.637/1.637 y 29
-   (total 1.666 = 1.648 de 1A + 9 de 1C + 9 de 1B; la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: producción 1.647/1.647 y 23 sin datos (tras cerrar la 150); clon
+   1.641/1.641 y 29 (total 1.670 = 1.648 de 1A + 9 de 1C + 9 de 1B + 4 de la 150; la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

@@ -1306,6 +1306,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Plan 1, 1B (20270501300000): el técnico SÍ da de alta (como el alta directa de antes).
     // Sin papeles, la guarda deja pasar y la RPC corta con 22023 `cal_paper` sin escribir nada.
     { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
+    // Deuda 150 (20270501400000): ni el equipo inserta fichas directo; solo `crear_entitat()`.
+    { tabla: "productores", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
+    { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1538,6 +1541,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
     { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },
+    { tabla: "productores", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
+    { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
     { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3; tampoc el super_admin)" },
@@ -2407,6 +2412,10 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // Plan 1, 1A: el historial solo lo escribe el trigger `trg_fitxa_estat()`; sin GRANT de
   // escritura, el insert tiene que morir en 42501 aunque la fila sea válida.
   fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
+  // Deuda 150 (20270501400000): las fichas solo nacen por RPC. Filas válidas (inactivas y de
+  // prueba) para que lo que corte sea el GRANT y no un `not null` o el trigger del NIF.
+  productores: { name: "TEST-RLS", es_test: true, activo: false },
+  entidades: { nombre: "TEST-RLS", es_test: true, activo: false },
   // Los tres del sistema documental de la fase 3. Se rellenan lo justo para que lo que
   // corte sea el permiso y no un `not null`: si cortara un check, la comprobación no
   // diría nada sobre RLS.

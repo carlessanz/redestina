@@ -125,3 +125,7 @@ por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
   `authenticated` la ejecuta, `auditoria_funcions_obertes()` en 0) y el frontend (`version.json` =
   `c67e12f05fe3`); ninguna Edge Function. Arnés en producción 1.643/1.643 y 23 sin datos. Detalle en
   §4bis y §6ter.
+- **Deuda 150 cerrada tras publicar 1B (02-11-2026, `20270501400000`)**: fuera las políticas `alta intern`
+  y el GRANT de INSERT de `productores`/`entidades`; el alta solo nace por `crear_entitat()` (o con
+  `service_role`). Solo base de datos: ni funciones ni frontend. Aplicada en producción (sin políticas
+  INSERT ni GRANT de INSERT; UPDATE intacto); arnés en producción 1.647/1.647 y 23 sin datos.

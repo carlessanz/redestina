@@ -91,12 +91,14 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras 1B: 1.637/1.637 y 29 sin datos (total 1.666; 1B añadió 9: `crear_entitat`
+   contacto denegado). **Clon, tras cerrar la 150: 1.641/1.641 y 29 sin datos (total 1.670; +4: `insertar` en `productores` y
+   `entidades` denegado al técnico y al super_admin)**; tras 1B, 1.637/1.637 y 29 (total 1.666; 1B añadió 9: `crear_entitat`
    denegado a las siete externas, permitido con `22023` al técnico y al super_admin)**; antes de 1B,
    1.628/1.628 y 29 (total 1.657; 1C añadió 9, `v_entitats_llistat`); las dos «sin datos»
    nuevas son `fitxa_estat_hist` leída por el equipo, vacía hasta el primer cambio de estado.
    **Producción, tras publicar `a07dd6a` (1C) el 02-11-2026: 1.634/1.634 y 23 sin datos** ; **tras publicar `c67e12f` (1B)
-   el 02-11-2026: 1.643/1.643 y 23 sin datos** (+9, `crear_entitat`), el mismo
+   el 02-11-2026: 1.643/1.643 y 23 sin datos** (+9, `crear_entitat`); **tras cerrar la 150
+   (`20270501400000`) esa misma noche: 1.647/1.647 y 23 sin datos** (+4), el mismo
    total (1.657); tras `3ec6dba` (1A) eran 1.625/1.625 y 23. Tiene menos «sin datos» que el clon
    porque sus fichas de prueba tienen más filas propias.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
