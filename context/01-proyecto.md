@@ -91,3 +91,23 @@ sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Library/Cloud
 (acceso por `additionalDirectories` en `.claude/settings.local.json`; reglas en `CLAUDE.md`,
 sección «Carpeta del proyecto de consultoría»). Nada con credenciales ni datos personales sale de `docs/`.
 
+
+
+### Plan 1 — CRM y registro de entidades: decisiones (02-11-2026)
+
+Plan en `3. Claude Code/2026-11-02-plan-1-crm-entitats.md`. Decisiones de §1 (cerradas) y propuestas
+por defecto de §8 que se aplican, con la rebanada donde toman cuerpo:
+
+- **D1** una sola «Entitat» en la interfaz; las dos tablas se quedan. **D2** lo importado nace inactivo
+  y activar exige NIF (1A pone la regla; 1F, el import). **D3** un contacto por ficha: se retira
+  «Persones de contacte» (1A). **D4** CRM mínimo. **D5** sin acceso por defecto. **D6** búsqueda por
+  NIF y por nombre (`cerca_entitats`, 1A). **D7** activo por papel; la organización, si lo está alguno
+  (1A). **D8** `campsFitxa.ts` como lista única de campos (1C).
+- **P1** unificar los flujos de alta · **P2** RPC si hay doble papel · **P3** consentimiento RGPD en el
+  primer acceso · **P4** sin correo de bienvenida · **P5** la persona ve y edita sus campos extra ·
+  **P6** no se borra `organizacion_contactos` (1A la deja sin uso; deuda 146) · **P7** exportación para
+  Airtable · **P8** «1 convenio» va al plan 3 · **P9** activar exige solo NIF válido y razón social
+  (1A, trigger) · **P10** el listado muestra solo las activas por defecto (1C; `cerca_entitats` ya
+  admite `p_nomes_actives`).
+- **1A hecha en el clon el 02-11-2026, sin publicar**: migración `20270501100000`, `priorizar-entidades`
+  y frontend.

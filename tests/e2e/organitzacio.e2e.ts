@@ -13,11 +13,10 @@ test.beforeEach(({}, info) => {
   test.skip(info.project.name !== 'escriptori', 'Edita les fitxes de prova compartides: només a escriptori')
 })
 
-test('el productor marca dos actividades, añade un contacto de recogidas y guarda', async ({ page }) => {
+// D3 (plan 1, 1A): ya no hay «Persones de contacte»; el contacto es el de la ficha.
+test('el productor marca dos actividades y guarda; la ficha ya no ofrece persones de contacte', async ({ page }) => {
   const prod = productorDe('productor')
-  const org = sql(`select organizacion_id from productores where id = '${prod}'`)
   sql(`update productores set tipus_activitat = '{}', razon_social = coalesce(razon_social, 'Mas de Prova SCP') where id = '${prod}'`)
-  sql(`delete from organizacion_contactos where organizacion_id = '${org}' and nom = 'Persona Recollides E2E'`)
   await entra(page, 'productor')
   await page.goto('/organitzacio')
   await page.getByRole('button', { name: 'Productor agrícola' }).click()
@@ -26,15 +25,7 @@ test('el productor marca dos actividades, añade un contacto de recogidas y guar
   await expect(page.getByText(/Desat|Guardado|desat/i).first()).toBeVisible()
   expect(sql(`select array_length(tipus_activitat, 1) from productores where id = '${prod}'`)).toBe('2')
 
-  const ct = page.getByTestId('contactes-org')
-  await ct.getByRole('button', { name: /Afegeix una persona|Añadir una persona/ }).click()
-  await ct.getByLabel(/Nom i cognoms|Nombre y apellidos/).fill('Persona Recollides E2E')
-  await ct.getByLabel(/Tipus de contacte|Tipo de contacto/).selectOption('recollides')
-  await ct.getByLabel(/^Telèfon$|^Teléfono$/).fill('600 111 222')
-  await ct.getByRole('button', { name: /^Desar$|^Guardar$/ }).click()
-  await expect(ct.getByText('Persona Recollides E2E')).toBeVisible()
-  expect(sql(`select tipus || '|' || telefon from organizacion_contactos where organizacion_id = '${org}' and nom = 'Persona Recollides E2E'`))
-    .toBe('recollides|34600111222')
+  await expect(page.getByTestId('contactes-org')).toHaveCount(0)
 })
 
 test('un NIF mal escrito y una raó social vacía salen en rojo y no se guardan', async ({ page }) => {

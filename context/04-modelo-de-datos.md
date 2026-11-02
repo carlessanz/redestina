@@ -1163,3 +1163,26 @@ Los GRANT están en `20260721120200_grants_data_api.sql`, que además fija
 nueva, comprueba que es accesible**:
 `select has_table_privilege('authenticated','public.X','SELECT')`.
 
+
+
+### Estado de las fichas y búsqueda (plan 1, rebanada 1A, `20270501100000`, 02-11-2026)
+
+- **`entidades.activo`** (`boolean not null default true`): ya existía en `productores`. Las fichas de
+  prueba nacen activas; las de una importación nacerán inactivas (D2, rebanada 1F).
+- **D7**: la organización está activa si lo está alguno de sus papeles (`v_organizaciones.activa`).
+- **Activar exige NIF válido y razón social** (P9). Lo hace cumplir el trigger `trg_fitxa_estat()`
+  (`before update of activo`, en las dos tablas), así que ni una escritura directa del equipo se lo
+  salta. Orden de los errores, todos `22023`: `falta_nif` (`nif_valid('')` da `true`, por eso tiene
+  su comprobación propia) → `nif_invalid` → `falta_rao_social`. Desactivar no exige nada.
+- **`fitxa_estat_hist`** (`tipus`, `productor_id`/`entidad_id` con `on delete cascade`, `activo`, `per`
+  → `perfiles` `set null`, `at`): una fila por cambio real, escrita solo por el trigger. RLS: la lee
+  `es_intern()`; `authenticated` solo tiene SELECT.
+- **`v_organizaciones`** (sigue `security_invoker`): columnas nuevas al final, en este orden: `activa`,
+  `productor_activo`, `entidad_activo`, `razon_social`, `nom_comercial`
+  (`coalesce(p.empresa, e.nombre, p.name)`), `persona_contacte`, `municipio_ine`, `comarca`
+  (`area_geografica`), `tipus_activitat` (unión ordenada), `te_compte` y `compte_estat`
+  (`activa`·`pendent`·`desactivada`·`cap`, por las membresías y el `perfiles.activo`; una
+  rechazada cuenta como `cap`). La cuenta es independiente de la ficha: desactivar la ficha no toca
+  la cuenta.
+- **El Mercat**: `modalitats_compatibles_meves()` añade `and e.activo`, que vacía la rama del Mercat
+  de la política de `excedentes` para una entidad inactiva. Las ramas de historial no cambian.

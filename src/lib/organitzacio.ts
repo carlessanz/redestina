@@ -25,37 +25,9 @@ export function activitatsPerPaper(cat: readonly TipusActivitat[], paper: 'produ
   return cat.filter((a) => a.aplica === paper || a.aplica === 'ambdos')
 }
 
-export const TIPUS_CONTACTE = ['general', 'administratiu', 'recollides', 'altres'] as const
-export type TipusContacte = typeof TIPUS_CONTACTE[number]
-
-export interface Contacte {
-  id: string
-  organizacion_id: string
-  nom: string
-  carrec: string | null
-  telefon: string | null
-  email: string | null
-  tipus: TipusContacte
-  es_principal: boolean
-}
-
-export async function carregaContactes(org: string): Promise<{ ok: true; data: Contacte[] } | { ok: false; missatge: string }> {
-  const { data, error } = await supabase.from('organizacion_contactos')
-    .select('id, organizacion_id, nom, carrec, telefon, email, tipus, es_principal')
-    .eq('organizacion_id', org).order('created_at')
-  if (error) return { ok: false, missatge: error.message }
-  return { ok: true, data: (data ?? []) as Contacte[] }
-}
-
-export async function desaContacte(id: string | null, org: string, dades: Partial<Contacte>): Promise<{ ok: boolean; missatge?: string }> {
-  const { error } = await supabase.rpc('desar_contacte_org', { p_id: id, p_organizacion: org, p_dades: dades })
-  return error ? { ok: false, missatge: error.message } : { ok: true }
-}
-
-export async function esborraContacte(id: string): Promise<{ ok: boolean; missatge?: string }> {
-  const { error } = await supabase.rpc('esborrar_contacte_org', { p_id: id })
-  return error ? { ok: false, missatge: error.message } : { ok: true }
-}
+// D3 (plan 1, 02-11-2026): un solo contacto por entidad, el de la ficha. Las «Persones de
+// contacte» (`organizacion_contactos`) se retiraron de la pantalla y sus RPC ya no las puede
+// ejecutar `authenticated` (20270501100000); la tabla se conserva hasta decidir P6.
 
 /** Estrenar el otro papel: ficha hermana y membresía pendiente de validar por el equipo. */
 export async function afegeixPaper(tipusActual: 'productor' | 'entidad', id: string): Promise<{ ok: boolean; missatge?: string }> {

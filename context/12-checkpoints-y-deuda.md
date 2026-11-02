@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **02-11-2026 (plan 1, rebanada 1A): se abren la 146, la 147 y la 148**: **60 vivas** (aritmética) y la
+siguiente entrada nueva es la 149.
 ⚠️ **27-10-2026 (gestión autónoma): se abre y se cierra la 145** (el reinicio del cierre de prueba dejaba la
 serie en 0 con documentos vivos de otro cierre; `20270430100400`) y la 109 queda a medias (la pantalla ya no
 tiene atajos; los GRANT siguen): **57 vivas** (aritmética) y la siguiente entrada nueva es la 146.
@@ -724,3 +726,20 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `nif_en_us` al insertar, y `scripts/import-ara.ts` es anterior: un NIF mal escrito en el CSV, o el
      mismo NIF en dos organizaciones, hace fallar esa fila. Revisar los CSV (o vaciar el NIF inválido
      en el script) antes de importar.
+
+146. **`organizacion_contactos` se queda sin uso** (02-11-2026, plan 1 1A, D3 + P6). Un contacto por
+     ficha: la sección «Persones de contacte» y `components/ContactesOrganitzacio` se retiraron, y
+     `desar_contacte_org()`/`esborrar_contacte_org()` ya no se ejecutan con sesión (solo
+     `service_role`). La tabla y sus filas se conservan a propósito (P6: no se borra nada en 1A).
+     Arreglo: cuando el plan lo cierre, pasar lo útil al contacto de la ficha y borrar tabla y RPC.
+147. **Una ficha nueva desde `RecordDetail` nace con `activo=false`** (02-11-2026, visto en 1A; es
+     anterior). El formulario genérico del equipo guarda los booleanos sin marcar como `false`, así
+     que un productor dado de alta desde el panel nace inactivo. Con `entidades.activo` no se añadió
+     el campo a `ENTIDAD_CAMPOS` para no repetirlo en entidades (nacerían inactivas). Se resuelve en
+     1C con `campsFitxa.ts` (D8) y el alta con búsqueda previa.
+148. **La entidad inactiva sigue viendo las ofertas que ya se le enviaron** (02-11-2026, 1A; decisión
+     pendiente). Lo que se apaga es la rama del Mercat (`modalitats_compatibles_meves()`); la de
+     historial (`excedents_amb_interes_meu()`) sigue, y esa incluye las respuestas `pendent` de un envío
+     por correo o WhatsApp, no solo el interés que mostró. No puede hacer nada con ellas
+     (`comprova_interes()` la corta con `entitat_inactiva`, con texto traducido), pero las ve. Si se
+     quiere esconderlas, filtrar en esa función las `pendent` de una entidad inactiva.

@@ -60,6 +60,20 @@ describe('textError', () => {
     expect(textError(t, { missatge: rpc })).toBe(rpc)
   })
 
+  it('estado de las fichas (plan 1, 1A): los cinco códigos tienen texto en los dos idiomas', () => {
+    const casos: [string, string][] = [
+      ['entitat_inactiva: aquesta entitat no esta activa', 'org.err_entitat_inactiva'],
+      ['falta_nif: cal el NIF per activar la fitxa', 'org.err_falta_nif'],
+      ['nif_invalid: el NIF B00000002 no es valid', 'val.nif_control'],
+      ['falta_rao_social: cal la rao social per activar la fitxa', 'org.err_falta_rao_social'],
+      ['ja_te_paper', 'org.err_ja_te_paper'],
+    ]
+    for (const [missatge, clau] of casos) {
+      expect(textError(t, { missatge, codi: '22023' }), missatge).toBe(`T(${clau})`)
+      expect(esClau(clau), clau).toBe(true)
+    }
+  })
+
   it('`esClau` solo reconoce claves que existen', () => {
     expect(esClau('c.error')).toBe(true)
     expect(esClau('c.no_existeix_mai')).toBe(false)

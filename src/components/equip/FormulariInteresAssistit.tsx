@@ -67,7 +67,8 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
     let viu = true
     void (async () => {
       const [ents, mat] = await Promise.all([
-        supabase.from('entidades').select('id, nombre, tipo_receptor').order('nombre').limit(500),
+        // Solo las activas (1A): `comprova_interes()` rechaza una inactiva con `entitat_inactiva`.
+        supabase.from('entidades').select('id, nombre, tipo_receptor').eq('activo', true).order('nombre').limit(500),
         supabase.from('modalitat_receptor_compat').select('modalitat, tipo_receptor'),
       ])
       if (!viu) return

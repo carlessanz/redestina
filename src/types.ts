@@ -109,6 +109,47 @@ export interface OrganizacioVista {
   tipo_receptor: string | null
   canal_preferido: 'whatsapp' | 'email' | 'telefon' | null
   created_at: string
+  // --- 1A (20270501100000) ---
+  /** DERIVADA (D7): activa si lo está alguno de sus papeles; no hay columna propia */
+  activa: boolean
+  productor_activo: boolean | null
+  entidad_activo: boolean | null
+  razon_social: string | null
+  nom_comercial: string | null
+  persona_contacte: string | null
+  municipio_ine: string | null
+  /** `area_geografica` de la ficha (la escribe el trigger del municipio) */
+  comarca: string | null
+  /** Unión de las actividades de sus dos fichas */
+  tipus_activitat: string[]
+  te_compte: boolean
+  compte_estat: CompteEstat
+}
+
+/** Estado de la cuenta de una organización, derivado de `membresias` (1A). */
+export type CompteEstat = 'cap' | 'pendent' | 'activa' | 'desactivada'
+
+/** Una fila de `cerca_entitats()` (D6): solo equipo. */
+export interface ResultatCercaEntitat {
+  organizacion_id: string
+  nom_comercial: string | null
+  razon_social: string | null
+  nif: string | null
+  persona_contacte: string | null
+  poblacion: string | null
+  comarca: string | null
+  productor_id: string | null
+  entidad_id: string | null
+  es_generadora: boolean
+  es_receptora: boolean
+  productor_activo: boolean | null
+  entidad_activo: boolean | null
+  activa: boolean
+  te_compte: boolean
+  compte_estat: CompteEstat
+  /** Por qué sale: NIF idéntico, NIF que empieza por lo escrito, o nombre */
+  coincidencia: 'nif_exacte' | 'nif' | 'nom'
+  similitud: number
 }
 
 export interface ProductorUbicacion {
@@ -160,6 +201,8 @@ export interface Entidad {
   opt_in: boolean | null
   /** Usuario de prueba: solo estos reciben WhatsApp/email (fuente de verdad, §8) */
   es_test: boolean
+  /** La ficha opera (Mercat, priorización, interés). Activar exige NIF y razón social (1A) */
+  activo: boolean
   /** La organización de la que esta ficha es el papel de receptora (§1bis, brecha 2) */
   organizacion_id: string | null
   created_at: string

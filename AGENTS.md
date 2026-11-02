@@ -53,7 +53,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: sistema documental (2026-09-10, ejecutado), organización
   unificada (2026-09-22), revisión del 08-10 (2026-10-11, fases 0-11 hechas) y **plan 1 CRM y
-  registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución).
+  registro de entidades** (2026-11-02, rebanadas 1A-1F, en ejecución; **1A hecha en el clon, sin
+  publicar**).
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -157,9 +158,18 @@ trigger `*_nif` —`nif_invalid`/`nif_en_us`—, `razon_social`, `municipio_ine`
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
-(lugares de recogida con dirección, contacto, horario). `organizacion_contactos` (personas de
-contacto; RPC `desar_/esborrar_contacte_org`). **Solo quedan fichas de prueba** en producción
-(§6).
+(lugares de recogida con dirección, contacto, horario). **Solo quedan fichas de prueba** en
+producción (§6).
+
+**Estado de las fichas (plan 1, 1A, `20270501100000`)**: `activo` en las dos; la organización está
+activa si lo está algún papel (D7). Pasar a activa exige NIF válido y razón social (trigger
+`trg_fitxa_estat`: `falta_nif`·`nif_invalid`·`falta_rao_social`, P9) y todo cambio deja fila en
+`fitxa_estat_hist` (solo la lee el equipo). `v_organizaciones` añade `activa`, `*_activo`,
+`nom_comercial`, `persona_contacte`, `comarca`, `tipus_activitat` y `compte_estat`. Una entidad
+inactiva no entra en el Mercat (`modalitats_compatibles_meves()`; la rama de historial sigue), ni
+en `priorizar-entidades`, ni en los selectores del equipo, y `comprova_interes()` la rechaza con
+`entitat_inactiva`. **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva (P6) pero
+sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146).
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
@@ -269,6 +279,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `acunar_enllac_assistit`, `preparar_/registrar_conveni_en_paper`, `declarar_conveni`,
   `descartar_convenio_esborrany`, `firmar_convenio_por_enlace` solo servidor); organización
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
+  `cerca_entitats` —equipo, NIF y nombre, D6—, `activar_/desactivar_fitxa`,
+  `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—,
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); cierre y certificados (`abrir_/
   calcular_/cerrar_cierre`, `emitir_resumen`, `emitir_certificado*`, `emitir_certificados_cierre`,
   `*_transaccion*`, `*_periodo`, `*_recepcio`, `rectificar_*`, `reiniciar_*_prova`,
@@ -410,7 +422,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270430100400`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270501100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -548,7 +560,7 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (57 vivas; la siguiente entrada nueva es la 146; los números no se renumeran ni
+**Deuda abierta (60 vivas; la siguiente entrada nueva es la 149; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
@@ -558,11 +570,14 @@ ofreciendo la factura) · **128** (canalización conciliada sin coste no se pued
 chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz; CT sin «enviat») ·
 **139** (verificar el REC con varias modalidades) · **140** (`borrar_ficha_completa` no conoce
 los expedientes) · **142** (consentimientos sin pantalla ni exportación) · **143** (entrantes
-con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del import).
+con WhatsApp apagado no los ve nadie) · **144** (el trigger del NIF rechaza filas del import) ·
+**146** (`organizacion_contactos` sin uso, pendiente de borrar) · **147** (una ficha nueva desde
+`RecordDetail` nace con `activo=false`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
-(backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido). Resto: 4, 10, 12,
+(backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
+inactiva sigue viendo las ofertas que ya se le enviaron). Resto: 4, 10, 12,
 17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
 95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
 
@@ -577,8 +592,8 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1.532 correctas, 1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: producción 1.556/1.556 y 28 sin datos; clon 1.555/1.555 y 29 sin datos (mismo
-   total, 1.584; la diferencia son datos que dejan las E2E), «Sin fallos de permisos».** Una
+   **Referencia: clon 1.617/1.617 y 31 sin datos (total 1.648, con los 64 checks de 1A);
+   producción 1.556/1.556 y 28 antes de 1A, por medir al publicarla. «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

@@ -422,6 +422,8 @@ export function clauErrorInteres(missatge: string | null | undefined): {
       minimumFractionDigits: decimals, maximumFractionDigits: decimals || 2,
     }).format(n)
   }
+  // 1A: una entidad inactiva no muestra interés (ni desde el Mercat ni en asistido).
+  if (m.startsWith('entitat_inactiva')) return { clau: 'org.err_entitat_inactiva' }
   if (m.includes('sense_conveni')) return { clau: 'mk.err_sense_conveni' }
   if (m.startsWith('cal_modalitat')) return { clau: 'mk.err_cal_modalitat' }
   if (m.startsWith('albara_pendent')) return { clau: 'mk.err_albara_pendent' }

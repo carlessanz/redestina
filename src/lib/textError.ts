@@ -50,6 +50,11 @@ const CODIS: Record<string, string> = {
   nif_invalid: 'val.nif_control',
   nif_en_us: 'org.err_nif_en_us',
   ja_te_paper: 'org.err_ja_te_paper',
+  // Estado de las fichas (plan 1, rebanada 1A): activar exige NIF y razón social, y una
+  // entidad inactiva no puede mostrar interés (`comprova_interes()`).
+  falta_nif: 'org.err_falta_nif',
+  falta_rao_social: 'org.err_falta_rao_social',
+  entitat_inactiva: 'org.err_entitat_inactiva',
   tipus_activitat_desconegut: 'org.err_activitat',
   cal_nom: 'org.err_cal_nom',
 }

@@ -88,6 +88,18 @@ export default function Mercat() {
 
   const entidadId = organitzacio?.id ?? null
 
+  // 1A (20270501100000): una entidad INACTIVA no ve ofertas nuevas —la RLS del mercado la deja
+  // fuera—, así que el Mercat vacío necesita decir por qué. Su propia ficha la puede leer.
+  // `null` = no se sabe (no se avisa: decide la base).
+  const [inactiva, setInactiva] = useState<boolean | null>(null)
+  useEffect(() => {
+    if (!entidadId) { setInactiva(null); return }
+    let viu = true
+    void supabase.from('entidades').select('activo').eq('id', entidadId).maybeSingle()
+      .then(({ data }) => { if (viu) setInactiva(data ? data.activo === false : null) })
+    return () => { viu = false }
+  }, [entidadId])
+
   // Zona y tipo de producto (reunión del 05-10-2026). Por defecto, sin filtro: se ve todo lo
   // que la RLS deja ver. Recordado por entidad en este navegador (`filtresMercat.ts`).
   const [filtres, setFiltres] = useState<FiltresMercat>(SENSE_FILTRES)
@@ -304,7 +316,10 @@ export default function Mercat() {
         {!carregant && errorCarrega && (
           <p className="text-sm text-destructive">{t('c.error')}</p>
         )}
-        {!carregant && !errorCarrega && ofertes.length === 0 && (
+        {!carregant && inactiva === true && (
+          <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso" data-testid="mercat-inactiva">{t('mk.entitat_inactiva')}</p>
+        )}
+        {!carregant && !errorCarrega && ofertes.length === 0 && inactiva !== true && (
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}
         {!carregant && !errorCarrega && ofertes.length > 0 && (opcions.comarques.length > 1 || opcions.categories.length > 1 || ambFiltre) && (

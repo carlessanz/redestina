@@ -53,7 +53,6 @@ import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon } from 
 import { TIPUS_EMPRESA } from '../lib/perfilReceptor'
 import SelectorMunicipi from '../components/SelectorMunicipi'
 import LlocsRecollida from '../components/LlocsRecollida'
-import ContactesOrganitzacio from '../components/ContactesOrganitzacio'
 import RolRedestina from '../components/RolRedestina'
 import XipsTria from '../components/XipsTria'
 import { activitatsPerPaper, carregaTipusActivitat, type TipusActivitat } from '../lib/organitzacio'
@@ -440,14 +439,6 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
             <p className="mt-1 text-sm text-muted-foreground">{t('org.h_rol')}</p>
           </div>
           <RolRedestina tipus={tipus} fitxaId={organitzacio.id} potEditar={potEditar} />
-        </section>
-
-        <section className="space-y-3 border-t border-border pt-6">
-          <div>
-            <h3 className="text-base font-semibold">{t('org.sec_contactes')}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{t('org.h_contactes')}</p>
-          </div>
-          <ContactesOrganitzacio orgId={(fila?.organizacion_id as string | null) ?? null} potEditar={potEditar} />
         </section>
 
         {tipus === 'productor' && (

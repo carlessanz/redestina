@@ -556,6 +556,8 @@ Migración `20270421100000`.
   `general·administratiu·recollides·altres`), por organización, sin escritura directa: RPC
   `desar_contacte_org()` y `esborrar_contacte_org()` (titular de alguna ficha de la organización,
   `soc_titular_org()`, o el equipo). `components/ContactesOrganitzacio`.
+  ⚠️ **Retirado el 02-11-2026 (plan 1 1A, D3: un contacto por ficha)**: la sección y el componente ya
+  no existen y las dos RPC solo las ejecuta `service_role`; la tabla se conserva (P6, deuda 146).
 - **NIF válido y único por organización**: `nif_valid()` (la misma regla que `errorNif()` de
   `validacio.ts`) y el trigger `*_nif` en las dos tablas de fichas, al insertar o cambiar el NIF:
   `nif_invalid` o `nif_en_us` (otra organización). Las dos fichas de un doble rol lo comparten. El
@@ -1645,3 +1647,16 @@ con `disponible_hasta` vencida >24 h y kg sin cubrir. Ahora el intake **rellena*
 cuando la respuesta es una fecha reconocible (§6bis); si no lo es, queda `null` y el job no actúa
 hasta que el panel la normalice.
 
+
+
+### Estado de las fichas en los paneles (plan 1, rebanada 1A, 02-11-2026)
+
+- **Mercat**: si la entidad está inactiva, aviso `mk.entitat_inactiva` (`data-testid="mercat-inactiva"`)
+  en lugar del «no hay ofertas». Las ofertas nuevas desaparecen por RLS
+  (`modalitats_compatibles_meves()` filtra `e.activo`); las que ya tienen relación con ella siguen
+  (deuda 148).
+- **Selectores del equipo**: `FormulariInteresAssistit`, `fases/Distribucio` y `Espigolades` piden
+  solo `entidades.activo`. `priorizar-entidades` también (⚠️ redesplegarla al publicar 1A).
+- **Errores**: `entitat_inactiva`, `falta_nif`, `falta_rao_social` (y los ya existentes `nif_invalid`,
+  `ja_te_paper`) tienen clave en `textError.ts`; `clauErrorInteres()` reconoce `entitat_inactiva`.
+- E2E: `tests/e2e/entitats-estat.e2e.ts` (7 pruebas, clon y escritorio; deja las fichas como estaban).

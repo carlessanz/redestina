@@ -8,7 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.530 pruebas en 63 ficheros** de Vitest: 1.529 correctas y **1 saltada a propósito**
+   Referencia: **1.533 pruebas en 64 ficheros** de Vitest: 1.532 correctas y **1 saltada a propósito**
+   (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
+   en `i18n.test.ts` al retirar el bloque `ct.t_` de los contactos). Antes, **1.530 en 63**
    (27-10-2026, gestión autónoma: el convenio declarado, la escalera de 17 pasos, la recogida asistida y el
    apóstrofo de los avisos; antes **1.477 en 62**, con los mensajes para avisar a mano —`tests/puresa.test.ts`
    y `tests/missatgesOferta.test.ts`—, y antes **1.429 en 60**)
@@ -82,6 +84,16 @@
    coinciden.
    Con `20270430100400` (deuda 145, sin checks nuevos) el clon da 1.555/1.555 y 29 sin datos: el mismo
    total, con los datos que dejan las E2E.
+   **Plan 1, rebanada 1A (`20270501100000`, 02-11-2026): +64 checks.** Siete en `DOCUMENTAL_EXTERN`
+   (×7 cuentas: `cerca_entitats`, `activar_fitxa`, `desactivar_fitxa`, `desactivar_organitzacio`,
+   `afegir_paper_org_equip`, y leer e insertar en `fitxa_estat_hist`, todo denegado), siete nuevos en
+   el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
+   papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
+   super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
+   contacto denegado). **Clon: 1.617/1.617 y 31 sin datos (total 1.648)**; las dos «sin datos»
+   nuevas son `fitxa_estat_hist` leída por el equipo, vacía hasta el primer cambio de estado.
+   Producción sigue en 1.556/1.556 y 28 hasta publicar 1A; al publicarla, la cifra esperada es el
+   total 1.648.
    ✅ **Referencia HOY: 1.432/1.432 correctas y 28 sin datos, «Sin fallos de permisos»** —la misma cifra en el clon y en producción, confirmada al publicar `497a7fa` el 12-10-2026—
    (12-10-2026, tras la fase 11 —el expediente de prevención: +58—; tras la fase 10 eran 1.374, tras la fase 10 —factores e impacto: +39; las «sin datos» bajan a 29 porque las E2E
    dejan historial de diagnóstico en el clon—; tras la fase 9 eran 1.335, tras la fase 9 —`diagnostics_historial` y `emitir_plan_basico`: +16; las dos «sin

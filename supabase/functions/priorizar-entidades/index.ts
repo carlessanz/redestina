@@ -82,7 +82,10 @@ Deno.serve(async (req) => {
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
       // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
       // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
-      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat");
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, estat, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat")
+      // Solo las activas (plan 1, 1A): una entidad importada inactiva (D2) no se prioriza ni
+      // recibe la oferta hasta que el equipo la active con su NIF.
+      .eq("activo", true);
     if (entError) {
       console.error("entidades select:", entError.message);
       return json({ error: "Error consultando las entidades" }, 500);

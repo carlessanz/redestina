@@ -679,6 +679,17 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes a una organització que no és seva" },
   { tabla: "esborrar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra contactes d'una altra organització" },
   { tabla: "afegir_paper_organitzacio", op: "rpc", esperado: "denegar", args: { p_tipo_actual: "productor", p_id_actual: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO afegeix un paper a una organització que no és seva" },
+  // Plan 1, rebanada 1A (20270501100000): estado de las fichas y búsqueda. Todo es del
+  // equipo; un externo no busca, no activa ni desactiva, no añade papeles por la puerta del
+  // equipo y no ve el historial de estados. Los contactos (D3) ya no se escriben desde el
+  // panel: las dos RPC de arriba dan «permission denied for function» a cualquiera.
+  { tabla: "cerca_entitats", op: "rpc", esperado: "denegar", args: { p_q: "B0000" }, descripcion: "NO cerca entitats (és de l'equip)" },
+  { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap fitxa" },
+  { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap fitxa" },
+  { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
+  { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
+  { tabla: "fitxa_estat_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial d'estats de les fitxes" },
+  { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial d'estats" },
   { tabla: "tipus_activitat_valid", op: "rpc", esperado: "denegar", args: { p_valors: [], p_papel: "productor" }, descripcion: "NO executa la validació interna d'activitats" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1275,9 +1286,19 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_hora_recollida", op: "rpc", esperado: "permitir", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_quan: "2030-01-01T10:00:00Z" }, descripcion: "fixa l'hora d'una recollida (id inventat → 22023)" },
     { tabla: "comprova_interes", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO executa la comprovació interna d'un interès" },
     { tabla: "registrar_recollida_escriu", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_resultat: "coincideix", p_kg_reals: null, p_data: null, p_observacions: null, p_per: "00000000-0000-0000-0000-000000000000", p_origen: "equip" }, descripcion: "NO executa l'escriptura interna d'una recollida" },
-    // Contactos: el equipo edita los de cualquier organización (id inventado → 22023/23503).
-    { tabla: "desar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "afegeix contactes en nom d'una organització (org inventada → error de negoci)" },
-    { tabla: "esborrar_contacte_org", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "esborra contactes (id inventat → 22023)" },
+    // Contactos: retirados del panel en el plan 1 (D3, 20270501100000). Las dos RPC ya no
+    // se ejecutan con sesión, tampoco del equipo: «permission denied for function».
+    { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3)" },
+    { tabla: "esborrar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra contactes (retirats, D3)" },
+    // Plan 1, 1A: el técnico BUSCA (antes de dar de alta) y ve el historial de estados, pero
+    // activar, desactivar y añadir un papel son de `pot_aprovar()` (admin en adelante).
+    { tabla: "cerca_entitats", op: "rpc", esperado: "permitir", args: { p_q: "B0000" }, descripcion: "cerca entitats per NIF", requiereFixture: "fitxes amb NIF B0000… (fitxes de prova)" },
+    { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
+    { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
+    { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa fitxes (és de l'admin)" },
+    { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva fitxes (és de l'admin)" },
+    { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva organitzacions (és de l'admin)" },
+    { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers en nom d'una organització (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1501,6 +1522,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     },
   ],
   super_admin: [
+    // Plan 1, 1A (20270501100000): con ids inventados la guarda de rol deja pasar y corta la
+    // existencia con 22023 (`fitxa_inexistent`, `organitzacio_inexistent`) sin escribir nada.
+    { tabla: "cerca_entitats", op: "rpc", esperado: "permitir", args: { p_q: "B0000" }, descripcion: "cerca entitats per NIF", requiereFixture: "fitxes amb NIF B0000… (fitxes de prova)" },
+    { tabla: "activar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una fitxa (22023 si no existeix)" },
+    { tabla: "desactivar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una fitxa (22023 si no existeix)" },
+    { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
+    { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
+    { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },
+    { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
+    { tabla: "desar_contacte_org", op: "rpc", esperado: "denegar", args: { p_id: null, p_organizacion: "00000000-0000-0000-0000-000000000000", p_dades: { nom: "arnes" } }, descripcion: "NO afegeix contactes (retirats, D3; tampoc el super_admin)" },
     // Abrir, verificar y exportar un expediente: uuid inventado → 22023 (la guarda dejó pasar).
     { tabla: "obrir_expedient", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot obrir un expedient (22023 si la fitxa no existeix)" },
     { tabla: "exportar_expedient", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot exportar el pla (22023 si no existeix)" },
@@ -2358,6 +2389,9 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   canalizaciones: { kg_confirmados: 1 },
   oferta_respuestas: { telefono: "34600000000", canal: "panel" },
   usuario_roles: { rol: "super_admin" },
+  // Plan 1, 1A: el historial solo lo escribe el trigger `trg_fitxa_estat()`; sin GRANT de
+  // escritura, el insert tiene que morir en 42501 aunque la fila sea válida.
+  fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
   // Los tres del sistema documental de la fase 3. Se rellenan lo justo para que lo que
   // corte sea el permiso y no un `not null`: si cortara un check, la comprobación no
   // diría nada sobre RLS.

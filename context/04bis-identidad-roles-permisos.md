@@ -451,3 +451,24 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 (10 segundos). **Nivel 1**, `scripts/sql/rls-emergencia.sql`, que vive **fuera** de
 `supabase/migrations/` para que `db push` no lo aplique nunca.
 
+
+
+### RPC del estado de las fichas (plan 1, rebanada 1A, `20270501100000`, 02-11-2026)
+
+| RPC | Quién | Qué |
+| --- | --- | --- |
+| `cerca_entitats(p_q, p_nomes_actives=false, p_limit=10)` | `es_intern()` con sesión | Busca organizaciones por NIF (normalizado, prefijo; exacto primero) y por nombre (contiene o `similarity ≥ 0.4` sobre `nom_comercial`, `razon_social`, `nombre`). Menos de 3 caracteres = vacío. Devuelve ficha(s), estado y `compte_estat` (D6). |
+| `activar_fitxa(p_tipus, p_id)` / `desactivar_fitxa(…)` | `pot_aprovar()` con sesión | `{tipus,id,activo,canviat}`; idempotentes. `fitxa_inexistent`, `tipus_desconegut`; las reglas de activar las pone el trigger. |
+| `desactivar_organitzacio(p_org)` | `pot_aprovar()` | Desactiva los dos papeles; devuelve cuántos. `organitzacio_inexistent`. |
+| `afegir_paper_org_equip(p_org, p_paper)` | `pot_aprovar()` | Crea la ficha hermana con los datos comunes, `es_test` y `activo` de la existente, sin membresía; el NIF solo se copia si es válido. `paper_desconegut`, `organitzacio_inexistent`, `ja_te_paper`, `organitzacio_buida`, `dades_en_us`. |
+
+Las cuatro: `revoke … from public, anon, service_role` + `grant … to authenticated` (piden sesión).
+La guarda es `auth.uid() is null or not …` → `42501`: aquí `service_role` tampoco entra, porque
+el autor del cambio tiene que quedar en el historial.
+
+- **Revocadas de `authenticated`**: `desar_contacte_org()` y `esborrar_contacte_org()` (D3, deuda 146).
+- **`comprova_interes()`**: su primera comprobación es ahora `entitat_inactiva` (22023), así que la
+  rechazan por igual `manifestar_interes()` y `manifestar_interes_assistit()`.
+- **`kpis_equip()`**: claves nuevas `entitats_actives`, `ofertants_actius` y `receptors_actius` (foto de
+  hoy). `entitats_receptores` no se filtra por `activo`: es un hecho del periodo, y filtrarla por el
+  estado de hoy falsearía periodos pasados.

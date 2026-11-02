@@ -562,7 +562,8 @@ export function EspigoladaDetall() {
 
   useEffect(() => {
     let viu = true
-    void supabase.from('entidades').select('id, nombre').order('nombre').then(({ data }) => {
+    // Solo las activas (1A), como los demás selectores de entidad del equipo.
+    void supabase.from('entidades').select('id, nombre').eq('activo', true).order('nombre').then(({ data }) => {
       if (viu) setEntitats((data as { id: string; nombre: string }[] | null) ?? [])
     })
     return () => { viu = false }

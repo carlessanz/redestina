@@ -44,7 +44,8 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
         priorizarEntidades(id),
         // Para mandarla a una entidad que la priorización no propone (la ha pedido por
         // teléfono, o está fuera de las diez primeras).
-        supabase.from('entidades').select('id, nombre').order('nombre').limit(500),
+        // Solo las activas (1A): una inactiva no puede mostrar interés.
+        supabase.from('entidades').select('id, nombre').eq('activo', true).order('nombre').limit(500),
       ])
       if (!viu) return
       if (r.ok) setRanking(r.ranking)
