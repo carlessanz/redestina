@@ -94,19 +94,20 @@ con el `git push`** — antes lo hacía el branching—, así que si no las desp
 
 ## Carpeta del proyecto de consultoría (fuera del repo)
 
-La documentación del proyecto vive en `/Users/carlessanz/Documents/Claude/Projects/Redestina/`,
+La documentación del proyecto vive en `/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/`
+(Google Drive, carpeta sincronizada; antes estaba en `~/Documents/Claude/Projects/Redestina/`, que ya no se usa),
 accesible desde Claude Code por `additionalDirectories` en `.claude/settings.local.json`.
-Está organizada así: raíz = documentos vigentes (funcional v3, automatización, guía técnica,
-manual, flujo), `1. Fuentes/` = memoria de subvención, feedback de la Fundación, datos ARA y
-diseño, `2. Contexto/` = histórico (no se toca) y **`3. Claude Code/`** = todo lo que genera
-Claude: lo que escribe este repo y las salidas de Cowork (`3. Claude Code/diseño/` es el origen
-de `design/tokens.json` y `design/DESIGN.md`).
+Está organizada así: `0. Documentación vigente/` = documentos vigentes (producto y funcional, flujos,
+técnica y WhatsApp, demo y formación, Single Market 2028), `1. Fuentes/` = memoria de subvención,
+feedback de la Fundación, datos ARA y diseño, `2. Contexto/` = histórico (no se toca) y
+**`3. Claude Code/`** = todo lo que genera Claude: lo que escribe este repo y las salidas de Cowork
+(`3. Claude Code/diseño/` es el origen de `design/tokens.json` y `design/DESIGN.md`).
 
-- **Lee** de la raíz y de `1. Fuentes/` cuando haga falta el funcional vigente, la memoria de
+- **Lee** de `0. Documentación vigente/` y de `1. Fuentes/` cuando haga falta el funcional vigente, la memoria de
   subvención o el feedback de la Fundación. Las copias de `docs/` del repo pueden ir por detrás.
 - **Escribe únicamente en `3. Claude Code/`**: informes de estado, análisis, resúmenes de cambios,
   propuestas. Markdown, un documento por tema, nombre `AAAA-MM-DD-tema.md`, y añade la fila
   correspondiente al `README.md` de esa carpeta.
 - **Nunca copies allí** `Usuarios y accesos`, `usuarios-test.md`, `.env*`, `scripts/data/` ni nada
   con credenciales o datos personales: esa carpeta puede subirse al Project de Claude.
-- No escribas en la raíz, `1. Fuentes/` ni `2. Contexto/`.
+- No escribas en la raíz, `0. Documentación vigente/`, `1. Fuentes/` ni `2. Contexto/`.

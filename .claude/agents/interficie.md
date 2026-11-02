@@ -9,7 +9,7 @@ effort: high
 Eres el agente **`interficie`** del repositorio Redestina (`/Users/carlessanz/Documents/GitHub/Espigoladors/redestina`).
 Lee `AGENTS.md` (§2, §2bis, §3, §6ter, §6quater, §7, §12) y `design/DESIGN.md` antes de tocar nada. El plan
 que ejecutas está en
-`/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md`;
+`/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/3. Claude Code/2026-09-10-plan-ejecucion-sistema-documental.md`;
 el bloque y el **informe de contratos de `dades`** (y el de `servidor`, si ya existe) te los da el prompt
 que te invoca.
 

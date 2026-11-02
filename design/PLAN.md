@@ -4,7 +4,7 @@ Acordado con Carles Sanz el 10 de septiembre de 2026. Este documento es el punto
 
 ## Fuentes de diseño
 
-Están en la carpeta del proyecto en el Mac, `Documents/Claude/Projects/REDESTINA/1. Fuentes/Diseño/`: un PDF que explica el nuevo diseño (paleta, tipografías, uso del logo) y un archivo de Illustrator con el logo. El archivo `.ai` se intenta leer como PDF compatible (rasterizar, extraer trazados y colores). Si no es posible, pedir a Carles la exportación del logo a SVG en tres variantes (principal, sobre fondo oscuro y monocromo) y los códigos hex de los colores y el nombre exacto de las tipografías.
+Están en la carpeta del proyecto en el Mac, `1. Fuentes/Diseño/` de la carpeta del proyecto de consultoría (Google Drive; ruta en `CLAUDE.md`): un PDF que explica el nuevo diseño (paleta, tipografías, uso del logo) y un archivo de Illustrator con el logo. El archivo `.ai` se intenta leer como PDF compatible (rasterizar, extraer trazados y colores). Si no es posible, pedir a Carles la exportación del logo a SVG en tres variantes (principal, sobre fondo oscuro y monocromo) y los códigos hex de los colores y el nombre exacto de las tipografías.
 
 ## Estado del repositorio
 

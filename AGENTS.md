@@ -44,7 +44,7 @@ funcional Redestina 2026.md` (**v3**, septiembre 2026, con el feedback de la Fun
 receptores, un registro repartido en varias operaciones con valorización propia, formulario mínimo
 con campos dinámicos, coste por kilo en donaciones, mapa en el match, exportación a Excel y catálogos
 maestros) y su **versión adaptada al estado real** en `docs/Documento funcional Redestina 2026 —
-adaptado.md` (ambos fuera de git; copia vigente del funcional en la raíz de la carpeta del proyecto
+adaptado.md` (ambos fuera de git; copia vigente del funcional en `0. Documentación vigente/` de la carpeta del proyecto
 de consultoría); su resumen y la correspondencia objetivo↔construido están en **§1bis**. En el código
 la tabla sigue siendo `excedentes` y los textos dicen «excedent»: el rename de vocabulario es brecha
 pendiente (ver el adaptado, §0).
@@ -66,7 +66,7 @@ que estén fuera de git no es un detalle, es el motivo de que existan ahí.
 ⚠️ La guía de prueba **no las repite**: cita las cuentas por su correo y manda a `usuarios-test.md`
 para la contraseña, que es lo que permite enseñarla sin repartir credenciales.
 
-**Dos documentos vigentes no tienen copia en `docs/` y viven solo en la raíz de la carpeta del
+**Dos documentos vigentes no tienen copia en `docs/` y viven solo en `0. Documentación vigente/` de la carpeta del
 proyecto de consultoría** (§ abajo), así que no se encuentran buscando en el repo: **`Definición de
 Producto REDESTINA 2026.md`**, la capa estratégica que enmarca al resto —principios, cinco líneas,
 propuesta de valor por actor, Lean Canvas, recorridos por rol, alcance del MVP y trazabilidad con la
@@ -93,7 +93,7 @@ propios, una organización con campos suyos, deduplicación que no dependa de co
 exactos—. Análisis del estado real por consumidor y fases propuestas, sin código todavía.
 
 La **documentación generada para la consultoría** (informes, análisis, propuestas) no va a `docs/`
-sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Documents/Claude/Projects/Redestina/3. Claude Code/`
+sino a la carpeta del proyecto, fuera del repo: `/Users/carlessanz/Library/CloudStorage/GoogleDrive-hola@carlessanz.com/Mi unidad/02-Proyectos/04-Espigoladors/03-Redestina/3. Claude Code/`
 (acceso por `additionalDirectories` en `.claude/settings.local.json`; reglas en `CLAUDE.md`,
 sección «Carpeta del proyecto de consultoría»). Nada con credenciales ni datos personales sale de `docs/`.
 
