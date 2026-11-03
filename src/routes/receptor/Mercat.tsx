@@ -325,7 +325,7 @@ export default function Mercat() {
         )}
         {!carregant && !errorCarrega && ofertes.length > 0 && (opcions.comarques.length > 1 || opcions.categories.length > 1 || ambFiltre) && (
           <div className="flex flex-wrap items-end gap-2 pb-1">
-            <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+            <div className="min-w-0 flex-1 basis-48 space-y-1 sm:flex-none sm:basis-auto">
               <Label htmlFor="mk-f-zona" className="text-xs text-muted-foreground">{t('mk.f_zone')}</Label>
               {/* Una comarca recordada que hoy ya no tiene ofertas se sigue ofreciendo: si no,
                   el desplegable no podría enseñar el valor elegido. */}
@@ -336,7 +336,7 @@ export default function Mercat() {
                 opcions={[...new Set([...opcions.comarques, ...(filtres.comarca ? [filtres.comarca] : [])])]
                   .map((c) => ({ valor: c, text: c }))} />
             </div>
-            <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
+            <div className="min-w-0 flex-1 basis-48 space-y-1 sm:flex-none sm:basis-auto">
               <Label htmlFor="mk-f-tipus" className="text-xs text-muted-foreground">{t('mk.f_type')}</Label>
               <Desplegable id="mk-f-tipus" mida="sm" className="sm:w-48"
                 value={filtres.categoria}

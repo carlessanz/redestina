@@ -634,11 +634,12 @@ export default function FormulariNovaOferta(
           }
           // Cada punta («de hh:mm», «a hh:mm») va en un bloque que no se parte: en un móvil
           // estrecho la fila salta entre las dos puntas, nunca entre la hora y sus minutos.
-          // Los minutos no tienen opción vacía: sin hora se leen «--» y están apagados.
+          // Los minutos no tienen opción vacía: sin hora se leen «--» y están apagados. «De» y
+          // «a» con el mismo ancho mínimo, para que en móvil las dos filas queden alineadas.
           return (
             <div id={id} role="group" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
               <span className="flex items-center gap-1.5">
-                <span className="text-muted-foreground">{t('po.franja_de')}</span>
+                <span className="min-w-6 text-muted-foreground">{t('po.franja_de')}</span>
                 <Desplegable aria-label={t('po.franja_h_inici')} className="w-18" aria-invalid={invalid}
                   value={hi ?? ''} onChange={(v) => posa('inici', v, mi)} buit="--" opcions={OPCIONS_HORES} />
                 <span aria-hidden>:</span>
@@ -647,7 +648,7 @@ export default function FormulariNovaOferta(
                   opcions={OPCIONS_QUARTS} />
               </span>
               <span className="flex items-center gap-1.5">
-                <span className="text-muted-foreground">{t('po.franja_a')}</span>
+                <span className="min-w-6 text-muted-foreground">{t('po.franja_a')}</span>
                 <Desplegable aria-label={t('po.franja_h_fi')} className="w-18" aria-invalid={invalid}
                   value={hf ?? ''} onChange={(v) => posa('fi', v, mf)} buit="--" opcions={OPCIONS_HORES} />
                 <span aria-hidden>:</span>

@@ -21,10 +21,18 @@ test.beforeEach(({}, info) => {
 })
 
 test('el super_admin dona per vigent el conveni d’una receptora des de la seva fitxa', async ({ page }) => {
-  const ent = sql(`select id from entidades where nombre = 'Obrador de Prova' limit 1`)
-  test.skip(!ent, 'el clon no té l’Obrador de Prova')
-  test.skip(sql(`select count(*) from convenios where entidad_id = '${ent}' and tipo = 'col_receptor' and estado = 'vigent'`) !== '0',
-    'ja té el conveni de col·laboració vigent (recarrega el clon)')
+  // Una receptora de prueba que se pueda declarar: sin el convenio ya vigente, ni firmado por
+  // ella a falta de contrafirma, ni devuelto (`declarar_conveni` niega esos tres), y con NIF y
+  // domicilio. Antes era siempre el Obrador de Prova, y un convenio que firmó en otra prueba y
+  // nadie contrafirmó (26-10-2026) la dejaba fallando en `ja_signat`. Cada pasada consume una.
+  // El Menjador Social de Prova queda fuera: otras pruebas lo quieren sin convenio.
+  const ent = sql(`select e.id from entidades e
+    where e.es_test and e.activo and e.nif is not null and coalesce(btrim(e.direccion), '') <> ''
+      and e.id <> '${entidadDe(RECEPTOR)}' and e.nombre <> 'Menjador Social de Prova'
+      and not exists (select 1 from convenios c where c.entidad_id = e.id and c.tipo = 'col_receptor'
+                        and c.estado in ('vigent', 'firmat', 'retornat'))
+    order by e.nombre like '%de Prova%' desc, e.nombre limit 1`)
+  test.skip(!ent, 'cap receptora de prova sense conveni de col·laboració (recarrega el clon)')
 
   await entra(page, 'super_admin')
   await page.goto(`/equip/entitats/${ent}`)

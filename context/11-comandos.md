@@ -275,6 +275,10 @@ SUPABASE_URL=… SB_SECRET_KEY=… deno run -A scripts/limpiar-e2e.ts [--dry-run
 # el envío real a un número de Meta se hace a mano). Salida: `scripts/data/e2e-clon.log`. `ajuda.ts` da `sqlCom(rol, sql)` para actuar COMO una cuenta (claims de su `sub`) y
 # `entidadDe`/`productorDe`; `compte()` acepta la etiqueta (`receptor-carles`, la receptora con
 # convenio vigente: `Menjador Social de Prova` está a propósito sin él).
+# `gestio-autonoma.e2e.ts` declara el convenio de la primera receptora de prueba que se deje (sin él
+# vigente, firmado ni devuelto; nunca el Menjador ni `receptor-carles`): antes era siempre el Obrador
+# de Prova, y un convenio que firmó el 26-10-2026 y nadie contrafirmó la dejaba en `ja_signat`
+# (contrafirmado en el clon el 03-11-2026). Cada pasada consume una; recargar el clon las devuelve.
 E2E_CLON=1 PW_CHROMIUM_PATH=… npx playwright test     # móvil y escritorio, contra el clon
 
 # Pruebas unitarias (Vitest 4). Corren en Node sobre los módulos de negocio, que son
