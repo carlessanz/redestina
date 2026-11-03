@@ -50,11 +50,15 @@ function exerciciDe(f: Fila): number {
 }
 
 export default function DocumentacioOrganitzacio({
-  tipusOrg, orgId, nom,
+  tipusOrg, orgId, nom, titol, onCompte,
 }: {
   tipusOrg: 'productor' | 'entidad'
   orgId: string
   nom?: string | null
+  /** El rótulo, si no es el de siempre (con doble rol, dice de qué papel es). */
+  titol?: string
+  /** Cuántos papeles hay, para el contador de la pestaña de la ficha. */
+  onCompte?: (n: number) => void
 }) {
   const { t } = useT()
   const { ctx } = useAppContext()
@@ -128,7 +132,8 @@ export default function DocumentacioOrganitzacio({
     totes.sort((a, b) => (a.fecha ?? a.created_at) < (b.fecha ?? b.created_at) ? 1 : -1)
     setFiles(totes)
     setCarregant(false)
-  }, [orgId, tipusOrg])
+    onCompte?.(totes.length)
+  }, [orgId, tipusOrg, onCompte])
 
   useEffect(() => { void carrega() }, [carrega])
 
@@ -171,7 +176,7 @@ export default function DocumentacioOrganitzacio({
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <CardTitle className="text-base">{t('orgdoc.title')}</CardTitle>
+          <CardTitle className="text-base">{titol ?? t('orgdoc.title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('orgdoc.subtitle')}</p>
         </div>
         {/* 🔴 `w-full sm:w-auto` en los dos botones, y NO basta con `whitespace-normal`:

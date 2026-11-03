@@ -1773,6 +1773,41 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
   campo); un campo común cambiado se escribe en las dos fichas; `productores.name` vacío no se
   escribe. **`activo` no es campo**: el alta no lo manda y la columna toma su `default true`
   (deuda 147 cerrada). El alta de un papel que vivía aquí (`esNova`) la sustituyó 1B: ver abajo.
+- **Pestañas (03-11-2026, Taula mestra 1.3, 1.5, 2.9, 7.1 y 7.2).** Carles esperaba la ficha en
+  apartados, como pedía su Excel, y era una sola tarjeta larga y estrecha; además había dos bloques
+  de documentos que confundían, y «Documentació de l'organització» salía vacía (solo lista
+  `documentos_externos`, que sube el equipo). Ahora la ruta es `ample`, la cabecera (nombre, chips,
+  prueba, razón social · NIF, Missatge · Correu · **un solo Desa**) queda fuera y debajo van seis
+  pestañas de `ui/tabs` (`variant="line"`, barra que se desliza en móvil como Configuració):
+  - **Dades de l'entitat**: Identitat · Rol a REDESTINA · Adreça.
+  - **Contacte i accés**: campos de contacto · `AccesEntitat` · `CanalPreferit`.
+  - **Operativa**: Com a ofertant (+ `LlocsRecollida`) · Com a receptor.
+  - **Diagnòstic i perfil**: `TargetaDiagnostic` (ofertante) · **Perfil de recepció**
+    (`CampsPerfilReceptor`, que antes iba dentro de «Com a receptor»; el tipo se elige en Operativa).
+  - **Documentació**: Convenis (`BadgeConveni` por papel) · **Albarans** (nuevo en la ficha:
+    `components/fitxa/AlbaransFitxa.tsx` lee `v_albaranes_bandeja` **filtrado por la ficha** —el
+    equipo lo ve todo por RLS—: REC del ofertante, ENT/OPE del receptor; reutiliza `TaulaAlbarans` y
+    `useDescarregaDocument`) · Certificats (`CertificatsFitxa`) y, debajo, las tarjetas de
+    `DocumentacioOrganitzacio`, rebautizadas **«Arxiu extern»** (con doble rol, «· com a ofertant/
+    receptor») y con el subtítulo que dice que lo que emite Redestina está arriba.
+  - **Gestió interna**: `NotesInternes` arriba · campos internos · `Consentiments` ·
+    `EnllacOrganitzacio` · «Esborra l'entitat» al final.
+  Con un solo papel, lo del otro no sale. Todas las pestañas van **montadas** (`forceMount` +
+  `data-[state=inactive]:hidden`): lo escrito sigue al cambiar de pestaña y «Desa» guarda lo de todas.
+  `PESTANYA_DE_BLOC` dice dónde cae cada bloque de `campsFitxa`; con él, un **punto** (`bg-aviso`,
+  `data-testid="pendent-<pestanya>"`) marca la pestaña con cambios sin guardar y, si la validación
+  falla, la ficha **salta a la pestaña del primer error** y le lleva el foco cuando deja de estar
+  oculto. La activa va en `?pestanya=` (sin parámetro = Dades; un id de ficha que redirige la
+  conserva) y la barra la trae a la vista en móvil. Contadores: Documentació = albaranes + archivo
+  externo; Gestió interna = notas (los bloques los dan por `onCompte`). `BlocCamps` acepta
+  `tresColumnes` (`lg:grid-cols-3`) y aquí lo usa siempre.
+  - De paso: `Seccio` vivía **dentro** del componente, así que cada render era un tipo nuevo y React
+    desmontaba todo lo de dentro a cada tecla; ahora es de módulo.
+  - E2E: `pestanya(page, nom)` en `tests/e2e/ajuda.ts`, o `?pestanya=` en el `goto`
+    (`fitxa-unica`, `crm`, `acces`, `gestio-autonoma`, que además acota «Dona'l per vigent» a
+    `doc-entidad`: con doble rol, el primero era el del ofertante).
+  - Fuera: la ficha del actor (`PerfilOrganitzacio`) no cambia; los campos de CRM que el Excel pide y
+    no hay (responsable, propera acció, seguiments) y la biblioteca de convenios (7.6) siguen fuera.
   «Nova organització amb compte» (`DialegAltaAssistida`) siguió en el listado hasta 1D, que la retiró.
 - **`routes/PerfilOrganitzacio.tsx`** (actor): los mismos bloques con `veu: tots` para la tabla de la
   pestaña (`campsDeTaula`), por `actualitzar_fitxa_*`; `modalitats_interes` y `perfil_receptor` siguen

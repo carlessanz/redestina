@@ -16,7 +16,7 @@
 
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
-import { compte, entra, motiuSaltClon, sql, sqlCom } from './ajuda'
+import { compte, entra, motiuSaltClon, pestanya, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -174,6 +174,7 @@ test('«Nova entitat» con «Dona-li accés»: el correo llega, la persona pone 
 
   await page.waitForURL((u) => /^\/equip\/entitats\/[0-9a-f-]{36}$/.test(u.pathname))
   orgFelic = new URL(page.url()).pathname.split('/').pop() as string
+  await pestanya(page, 'contacte')
   await expect(page.getByTestId('compte-estat')).toHaveAttribute('data-estat', 'enviat')
   await expect(page.getByTestId('acces-entitat')).toContainText(/···@example\.com/)
   expect(sql(`select count(*) || '|' || bool_and(m.activo and m.aprovacio = 'aprovada' and m.rol_org = 'titular')
@@ -199,7 +200,7 @@ test('«Nova entitat» con «Dona-li accés»: el correo llega, la persona pone 
 
 test('el equipo ve «Accés actiu», lo desactiva y lo devuelve', async ({ page, browser }) => {
   await entra(page, 'super_admin')
-  await page.goto(`/equip/entitats/${orgFelic}`)
+  await page.goto(`/equip/entitats/${orgFelic}?pestanya=contacte`)
   await expect(page.getByTestId('compte-estat')).toHaveAttribute('data-estat', 'actiu')
 
   await page.getByTestId('acces-entitat').getByRole('button', { name: /^Desactiva l’accés$|^Desactivar el acceso$/ }).click()

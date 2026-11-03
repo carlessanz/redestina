@@ -391,11 +391,10 @@ Lo que manda hoy, en una línea cada uno:
   tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats»/«ofertant»/
   «receptor», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
 - **Ficha única «Entitat» (1C, D1+D8)**: `lib/campsFitxa.ts` es **la única definición de campos**
-  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` lo cruza con las columnas y las
-  listas blancas del SQL). `EntitatDetall`
-  (`/equip/entitats/:orgId`) pinta una ficha por organización —Identitat · Rols · Contacte i accés ·
-  Adreça · Com a ofertant · Com a receptor · Diagnòstic · Documentació · Gestió interna— y guarda
-  **solo lo que cambia**, en las dos fichas si el campo es común. `PerfilOrganitzacio` pinta los
+  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` lo cruza con el SQL). `EntitatDetall`
+  (`/equip/entitats/:orgId`, `ample`) pinta una ficha por organización en **seis pestañas**
+  (Dades · Contacte i accés · Operativa · Diagnòstic i perfil · Documentació por tipo · Gestió
+  interna; `?pestanya=`) y guarda **solo lo que cambia**, en las dos fichas si es común. `PerfilOrganitzacio` pinta los
   mismos bloques con `veu: tots` por sus RPC (P5). Listado `Entitats` sobre
   `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`.
 - **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).

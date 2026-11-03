@@ -41,10 +41,12 @@ export interface PropsBlocCamps {
   discrepancies?: Record<string, { rol: 'ofertant' | 'receptor'; valor: unknown }>
   /** Texto que se sugiere en «nom comercial» cuando está vacío (la persona de contacto). */
   placeholderNom?: string
+  /** Pantalla ancha (la ficha del equipo, `ample`): tres columnas desde `lg`. */
+  tresColumnes?: boolean
 }
 
 export default function BlocCamps({
-  camps, valors, onChange, veu, potEditar: potEditarTot, errors = {}, idPrefix, activitats = [], discrepancies = {}, placeholderNom,
+  camps, valors, onChange, veu, potEditar: potEditarTot, errors = {}, idPrefix, activitats = [], discrepancies = {}, placeholderNom, tresColumnes = false,
 }: PropsBlocCamps) {
   const { t, lang } = useT()
   const idDe = (c: CampFitxa) => `${idPrefix}-${c.clau}`
@@ -184,13 +186,13 @@ export default function BlocCamps({
   const esXips = (c: CampFitxa) => c.tipus === 'xips_activitat' || c.tipus === 'xips_modalitats'
 
   return (
-    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+    <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2${tresColumnes ? ' lg:grid-cols-3' : ''}`}>
       {camps.map((c) => {
         const ctrl = control(c)
         if (ctrl === null) return null
         const altre = discrepancies[c.clau]
         return (
-          <div key={c.clau} className={c.ample === 'full' ? 'sm:col-span-2' : undefined}>
+          <div key={c.clau} className={c.ample === 'full' ? (tresColumnes ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2') : undefined}>
             {esXips(c)
               ? <p id={`${idDe(c)}-l`} className="mb-1.5 text-xs text-muted-foreground">{t(c.labelKey)}</p>
               : <Label htmlFor={idDe(c)} className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>}

@@ -11,7 +11,7 @@
 //      equipo; el actor no ve «Gestió interna».
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, sql, sqlCom } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, pestanya, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 const RECEPTOR = 'receptor-carles'
@@ -81,9 +81,13 @@ test('la ficha única enseña los dos papeles y un campo común se escribe en la
   await page.goto(`/equip/entitats/${org}`)
   await expect(page.getByTestId('rols-productor')).toBeVisible()
   await expect(page.getByTestId('rols-entidad')).toBeVisible()
+  // Una pestaña por apartado (Taula mestra 1.3): lo de cada papel en «Operativa».
+  await pestanya(page, 'operativa')
   await expect(page.getByTestId('bloc-ofertant')).toBeVisible()
   await expect(page.getByTestId('bloc-receptor')).toBeVisible()
+  await pestanya(page, 'intern')
   await expect(page.getByTestId('bloc-intern')).toBeVisible()
+  await pestanya(page, 'contacte')
   await page.locator('#ed-telefon2').fill(TEL)
   await page.getByRole('button', { name: /^Desar$|^Guardar$/ }).first().click()
   await expect(page.getByText(/Canvis desats|Cambios guardados/).first()).toBeVisible()

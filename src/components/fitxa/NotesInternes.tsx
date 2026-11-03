@@ -33,11 +33,13 @@ interface Nota {
   autor: { nombre: string | null } | null
 }
 
-export default function NotesInternes({ orgId, potEsborrar, onCanviat }: {
+export default function NotesInternes({ orgId, potEsborrar, onCanviat, onCompte }: {
   orgId: string
   /** Solo el super_admin borra (la RPC lo vuelve a comprobar). */
   potEsborrar: boolean
   onCanviat?: () => void
+  /** Cuántas notas hay, para el contador de la pestaña de la ficha. */
+  onCompte?: (n: number) => void
 }) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
@@ -56,7 +58,8 @@ export default function NotesInternes({ orgId, potEsborrar, onCanviat }: {
     if (error) { setErrCarrega(true); return }
     setErrCarrega(false)
     setNotes((data ?? []) as unknown as Nota[])
-  }, [orgId])
+    onCompte?.((data ?? []).length)
+  }, [orgId, onCompte])
   useEffect(() => { void carrega() }, [carrega])
 
   async function afegeix(e: React.FormEvent) {

@@ -123,6 +123,23 @@ export function sqlCom(rol: string, consulta: string): string {
  * `selectOption` solo sirve para `<select>` nativos. Por valor (string, el `data-valor` de la
  * opción), por texto o por posición (la 0 es la opción vacía si la hay, como en el nativo).
  */
+/**
+ * La ficha de una entidad del equipo va por pestañas (03-11-2026) y las que no tocan están
+ * ocultas: antes de mirar o tocar un bloque, se abre la suya. Ir directo con
+ * `/equip/entitats/<org>?pestanya=<nom>` hace lo mismo sin el clic.
+ */
+const NOMS_PESTANYA = {
+  dades: /^Dades de l’entitat|^Datos de la entidad/,
+  contacte: /^Contacte i accés|^Contacto y acceso/,
+  operativa: /^Operativa/,
+  diagnostic: /^Diagnòstic i perfil|^Diagnóstico y perfil/,
+  documentacio: /^Documentaci[óo]/,
+  intern: /^Gesti[óo]n? interna/,
+} as const
+export async function pestanya(page: Page, nom: keyof typeof NOMS_PESTANYA): Promise<void> {
+  await page.getByRole('tab', { name: NOMS_PESTANYA[nom] }).click()
+}
+
 export async function tria(
   control: Locator,
   opcio: string | { text: string | RegExp } | { index: number },

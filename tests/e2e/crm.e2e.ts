@@ -78,7 +78,7 @@ test.afterAll(() => {
 
 test('el tècnic afegeix dues notes i el fil les ordena', async ({ page }) => {
   await entra(page, 'equip')
-  await page.goto(`/equip/entitats/${org}`)
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
   const bloc = page.getByTestId('notes-internes')
   await expect(bloc).toBeVisible({ timeout: 20_000 })
   await expect(bloc).toContainText(/Encara no hi ha cap nota|Todavía no hay ninguna nota/)
@@ -146,7 +146,7 @@ test('la compte de l’entitat no veu les notes ni per pantalla ni per API', asy
 
 test('el super_admin esborra una nota', async ({ page }) => {
   await entra(page, 'super_admin')
-  await page.goto(`/equip/entitats/${org}`)
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
   const bloc = page.getByTestId('notes-internes')
   await expect(bloc.getByTestId('nota')).toHaveCount(2, { timeout: 20_000 })
   await bloc.getByTestId('nota').nth(0).getByRole('button', { name: /Esborra la nota|Borra la nota/ }).click()

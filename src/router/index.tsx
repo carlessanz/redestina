@@ -144,7 +144,7 @@ export const router = createBrowserRouter([
                   { path: 'entitats/nova', element: <NovaEntitat />, handle: { titleKey: 'nav.entitats' } },
                   // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
                   // ficha de antes se resuelve y redirige.
-                  { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
+                  { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats', ample: true } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
                   { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },
                   { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans', ample: true } },
