@@ -69,7 +69,9 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
 // para que ninguna tabla necesite scroll horizontal. `wrap-anywhere` y no `break-words`: en una tabla
 // de ancho automático solo `overflow-wrap: anywhere` deja encoger la columna por debajo de un código
 // largo sin espacios (E-…-1793652249346-A); parte solo si no cabe. Los badges de shadcn traen
-// `whitespace-nowrap`: dentro de una celda también parten. `whitespace-nowrap`, donde haga falta.
+// `whitespace-nowrap`: dentro de una celda también parten, pero solo entre palabras (`wrap-normal`):
+// con el `anywhere` heredado una columna de estado se encogía hasta partir «Vige|nt».
+// `whitespace-nowrap`, donde haga falta.
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
@@ -88,7 +90,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-normal wrap-anywhere [&_[data-slot=badge]]:whitespace-normal [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "p-2 align-middle whitespace-normal wrap-anywhere [&_[data-slot=badge]]:whitespace-normal [&_[data-slot=badge]]:wrap-normal [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}

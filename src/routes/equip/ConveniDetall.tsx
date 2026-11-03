@@ -402,15 +402,15 @@ export default function ConveniDetall() {
             <div className="space-y-2">
               <div className="space-y-1.5">
                 <Label htmlFor="conv-correu">{t('conv.f_email')}</Label>
-                <Input id="conv-correu" type="email" className="h-11 md:h-9"
+                <Input id="conv-correu" type="email" className="h-11 md:h-8"
                   value={correu} onChange={(e) => setCorreu(e.target.value)} />
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat}
+                <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat}
                   onClick={() => void envia()}>
                   {ocupat && <Loader2 className="size-4 animate-spin" />}{t('conv.send')}
                 </Button>
-                <Button variant="outline" className="h-11 whitespace-normal md:h-9" disabled={ocupat}
+                <Button variant="outline" className="h-11 whitespace-normal md:h-8" disabled={ocupat}
                   onClick={() => void firmaAssistida()}>
                   {t('conv.assisted')}
                 </Button>
@@ -421,14 +421,14 @@ export default function ConveniDetall() {
               {(conv.estado === 'esborrany' || conv.estado === 'pendent_firma')
                 && (conv.tipo === 'col_productor' || conv.tipo === 'col_receptor')
                 && (conv.productor_id || conv.entidad_id) && (
-                <BotoAmbMotiu variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                <BotoAmbMotiu variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                   disabled={ocupat || !(ctx?.esSuperAdmin ?? false)} motiu={t('cdecl.need_super')}
                   onClick={() => setDialegDeclarat(true)}>
                   {t('cdecl.open')}
                 </BotoAmbMotiu>
               )}
               {conv.estado === 'esborrany' && (
-                <BotoAmbMotiu variant="ghost" className="h-11 whitespace-normal text-destructive md:h-9"
+                <BotoAmbMotiu variant="ghost" className="h-11 whitespace-normal text-destructive md:h-8"
                   disabled={ocupat || !potAprovar} motiu={motiuRol}
                   onClick={() => void descarta()}>
                   {t('conv.discard')}
@@ -441,12 +441,12 @@ export default function ConveniDetall() {
             <div className="flex flex-wrap gap-2">
               {potContrafirmar && (
                 <>
-                  <BotoAmbMotiu className="h-11 whitespace-normal md:h-9"
+                  <BotoAmbMotiu className="h-11 whitespace-normal md:h-8"
                     disabled={ocupat || !potAprovar} motiu={motiuRol}
                     onClick={() => void contrafirma()}>
                     {ocupat && <Loader2 className="size-4 animate-spin" />}{t('conv.countersign')}
                   </BotoAmbMotiu>
-                  <BotoAmbMotiu variant="outline" className="h-11 whitespace-normal md:h-9"
+                  <BotoAmbMotiu variant="outline" className="h-11 whitespace-normal md:h-8"
                     disabled={ocupat || !potAprovar} motiu={motiuRol}
                     onClick={() => setDialegRetorn(true)}>
                     {t('conv.return')}
@@ -454,7 +454,7 @@ export default function ConveniDetall() {
                 </>
               )}
               {potResoldre && (
-                <BotoAmbMotiu variant="destructive" className="h-11 whitespace-normal md:h-9"
+                <BotoAmbMotiu variant="destructive" className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || !potAprovar} motiu={motiuRol}
                   onClick={() => setDialegResol(true)}>
                   {t('conv.resolve')}
@@ -495,12 +495,12 @@ export default function ConveniDetall() {
                 )
             )}
             <div className="flex flex-wrap gap-2">
-              <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+              <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
                 <a href={urlSignatura(enllacNou.token)} target="_blank" rel="noopener noreferrer">
                   {t('conv.link_open')}
                 </a>
               </Button>
-              <BotoAmbMotiu className="h-11 whitespace-normal md:h-9" disabled={ocupat || !!motiuEmail}
+              <BotoAmbMotiu className="h-11 whitespace-normal md:h-8" disabled={ocupat || !!motiuEmail}
                 motiu={motiuEmail ? t(motiuEmail) : undefined}
                 onClick={() => void mandaCorreu()}>
                 {t('conv.link_mail')}

@@ -28,7 +28,7 @@ export default function CampanaAvisos() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" className="relative size-11 md:size-9"
+        <Button variant="ghost" size="icon" className="relative size-11 md:size-8"
           aria-label={noLlegits > 0 ? t('avis.campana_n', { n: noLlegits }) : t('avis.campana')}>
           <Bell className="size-5" />
           {noLlegits > 0 && (

@@ -178,7 +178,7 @@ export default function CanalitzacioDetall() {
             {extra.oferta.modalitat ? ` · ${t(`od.mod_${extra.oferta.modalitat}`)}` : ''}
           </p>
         </div>
-        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
           <Link to="/equip/canalitzacio">{t('canalz.back')}</Link>
         </Button>
       </div>

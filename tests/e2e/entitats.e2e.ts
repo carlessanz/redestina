@@ -13,7 +13,7 @@
 //   5. Un NIF que ya tiene otra organización no se da de alta dos veces: el error sale en el campo.
 
 import { expect, test, type Page } from '@playwright/test'
-import { entra, motiuSaltClon, sql, sqlCom } from './ajuda'
+import { entra, motiuSaltClon, sql, sqlCom, opcionsDe } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -81,8 +81,8 @@ async function productorsOfertaAssistida(page: Page, nom: string): Promise<numbe
   await page.getByRole('button', { name: /^Nova oferta assistida$|^Nueva oferta asistida$/ }).first().click()
   const sel = page.locator('#dnoa-productor')
   await expect(sel).toBeVisible()
-  await expect.poll(async () => sel.locator('option').count()).toBeGreaterThan(1)
-  return sel.locator('option', { hasText: nom }).count()
+  await expect.poll(async () => (await opcionsDe(sel)).length).toBeGreaterThan(1)
+  return (await opcionsDe(sel)).filter((o) => o.includes(nom)).length
 }
 
 test('una inactiva: sin NIF no se activa; con NIF se activa y aparece en «Nova oferta assistida»', async ({ page }) => {

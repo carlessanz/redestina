@@ -48,7 +48,7 @@ export default function AccionsConveni({
   const [declarat, setDeclarat] = useState(false)
   const { confirma, dialeg } = useConfirma()
   const mida = petit ? 'sm' as const : 'default' as const
-  const classe = petit ? 'h-11 whitespace-normal md:h-8' : 'h-11 whitespace-normal md:h-9'
+  const classe = petit ? 'h-11 whitespace-normal md:h-8' : 'h-11 whitespace-normal md:h-8'
 
   async function prepara() {
     if (!tipusCal) return

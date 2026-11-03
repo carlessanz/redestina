@@ -60,7 +60,7 @@ export default function RevisioCertificat({ tipus, id, revisioEstat, certificat,
     <div className="mt-3 space-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso" data-testid="revisio-pendent">
       <p className="font-medium">{t('rev.title')}</p>
       <p>{t('rev.body', { kg: kg(kgTotal), valor: euros(valorTotal), quin })}</p>
-      <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={ocupat} onClick={() => void aprova()}>
+      <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={ocupat} onClick={() => void aprova()}>
         {ocupat && <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />}
         {t('rev.go')}
       </Button>

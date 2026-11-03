@@ -209,7 +209,7 @@ function FormulariValidacio({ op, onFet }: { op: Operacio; onFet: () => void }) 
       </p>
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       <div className="flex justify-end">
-        <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={ocupat} onClick={() => void valida()}>
+        <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={ocupat} onClick={() => void valida()}>
           {ocupat && <Loader2 className="size-4 animate-spin" />}{t('vrec.dlg_go')}
         </Button>
       </div>

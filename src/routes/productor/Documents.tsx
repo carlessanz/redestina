@@ -319,7 +319,7 @@ export default function ProductorDocuments() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-11 whitespace-normal md:h-9"
+                        className="h-11 whitespace-normal md:h-8"
                         disabled={descarregador.ocupat === doc.id}
                         onClick={() => void descarregador.mostra(doc.id)}
                       >
@@ -329,7 +329,7 @@ export default function ProductorDocuments() {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="h-11 whitespace-normal md:h-9"
+                        className="h-11 whitespace-normal md:h-8"
                         disabled={descarregador.ocupat === doc.id}
                         onClick={() => void descarregador.descarrega(doc.id)}
                       >

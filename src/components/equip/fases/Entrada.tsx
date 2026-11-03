@@ -49,17 +49,17 @@ export default function FaseEntrada({ c }: { c: ContextFase }) {
       )}
 
       <div className="flex flex-wrap gap-2">
-        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
           <Link to={`/equip/ofertes/${extra.oferta.id}`}>{t('canalz.b_obre_oferta')}</Link>
         </Button>
         {oferta?.espigolada_id && (
-          <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+          <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
             <Link to={`/equip/espigolades/${oferta.espigolada_id}`}>{t('conv_esp.open')}</Link>
           </Button>
         )}
         {oferta?.producte_al_camp && !oferta.espigolada_id && (
           <BotoAmbMotiu
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             disabled={Boolean(motiuNoConvertible)}
             motiu={motiuNoConvertible ?? undefined}
             onClick={() => setDlgEspigolada(true)}

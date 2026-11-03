@@ -40,6 +40,7 @@ import { PASSOS_ALBARA_CLAUS, seguentPasAlbara } from '../../lib/seguentPas'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
+import Desplegable from '../../components/Desplegable'
 import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
@@ -658,7 +659,7 @@ export default function AlbaraDetall() {
   return (
     <div className="space-y-4">
       <div className="flex flex-wrap items-center gap-2">
-        <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={() => navigate('/equip/albarans')}>
+        <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => navigate('/equip/albarans')}>
           <ArrowLeft className="size-4" />{t('c.back')}
         </Button>
         <h1 className="text-xl tabular-nums">{albara.numero_completo ?? t('alb.no_number')}</h1>
@@ -814,17 +815,13 @@ export default function AlbaraDetall() {
                 <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-prod-${i}`}>{t('alb.ln_product')}</Label>
-                    {/* ⚠️ `text-base md:text-sm` obligatorio en un `<select>` estilado a mano:
-                        iOS amplía la página al enfocarlo y no lo deshace (§2, regla 1). */}
-                    <select
+                    <Desplegable
                       id={`ln-prod-${i}`}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                       value={l.producto}
-                      onChange={(e) => actualitza(i, 'producto', e.target.value)}
-                    >
-                      <option value="">{t('c.none')}</option>
-                      {productes.map((p) => <option key={p} value={p}>{p}</option>)}
-                    </select>
+                      onChange={(v) => actualitza(i, 'producto', v)}
+                      buit={t('c.none')}
+                      opcions={productes.map((p) => ({ valor: p, text: p }))}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-var-${i}`}>{t('alb.ln_variety')}</Label>
@@ -838,15 +835,13 @@ export default function AlbaraDetall() {
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-caixa-${i}`}>{t('alb.ln_boxtype')}</Label>
-                    <select
+                    <Desplegable
                       id={`ln-caixa-${i}`}
-                      className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                       value={l.tipo_caja}
-                      onChange={(e) => actualitza(i, 'tipo_caja', e.target.value)}
-                    >
-                      <option value="">{t('c.none')}</option>
-                      {caixes.map((c) => <option key={c.codigo} value={c.codigo}>{c.nombre}</option>)}
-                    </select>
+                      onChange={(v) => actualitza(i, 'tipo_caja', v)}
+                      buit={t('c.none')}
+                      opcions={caixes.map((c) => ({ valor: c.codigo, text: c.nombre }))}
+                    />
                   </div>
                   <div className="space-y-1.5">
                     <Label htmlFor={`ln-brut-${i}`}>{t('alb.ln_gross')}</Label>
@@ -871,7 +866,7 @@ export default function AlbaraDetall() {
                   </div>
                   {form.length > 1 && (
                     <div className="sm:col-span-2">
-                      <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-9"
+                      <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-8"
                         onClick={() => setForm((p) => p.filter((_, j) => j !== i))}>
                         {t('alb.ln_remove')}
                       </Button>
@@ -879,7 +874,7 @@ export default function AlbaraDetall() {
                   )}
                 </div>
               ))}
-              <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+              <Button variant="outline" className="h-11 whitespace-normal md:h-8"
                 onClick={() => setForm((p) => [...p, { ...BUIDA }])}>
                 {t('alb.ln_add')}
               </Button>
@@ -945,7 +940,7 @@ export default function AlbaraDetall() {
         <CardContent className="space-y-3">
           <div className="flex flex-wrap gap-2">
             <BotoAmbMotiu
-              className="h-11 whitespace-normal md:h-9"
+              className="h-11 whitespace-normal md:h-8"
               variant={esBorrador && !emetPerValidacio ? 'default' : 'outline'}
               disabled={ocupat || !esBorrador || emetPerValidacio}
               motiu={motiuEmetre}
@@ -954,7 +949,7 @@ export default function AlbaraDetall() {
               {ocupat && esBorrador && <Loader2 className="size-4 animate-spin" />}{t('alb.emit')}
             </BotoAmbMotiu>
             <BotoAmbMotiu
-              className="h-11 whitespace-normal md:h-9"
+              className="h-11 whitespace-normal md:h-8"
               variant={albara.estado === 'emitido' ? 'default' : 'outline'}
               disabled={ocupat || albara.estado !== 'emitido'}
               motiu={motiuEntregar}
@@ -963,7 +958,7 @@ export default function AlbaraDetall() {
               {t('alb.mark_delivered')}
             </BotoAmbMotiu>
             <BotoAmbMotiu
-              className="h-11 whitespace-normal md:h-9"
+              className="h-11 whitespace-normal md:h-8"
               variant={potConciliar ? 'default' : 'outline'}
               disabled={ocupat || !potConciliar}
               motiu={motiuConciliar}
@@ -980,7 +975,7 @@ export default function AlbaraDetall() {
             <div className="flex flex-wrap gap-2">
               <BotoAmbMotiu
                 variant="outline"
-                className="h-11 whitespace-normal md:h-9"
+                className="h-11 whitespace-normal md:h-8"
                 disabled={ocupat || !potRectificar}
                 motiu={motiuRectificar}
                 onClick={() => setDialegRectificar(true)}
@@ -989,7 +984,7 @@ export default function AlbaraDetall() {
               </BotoAmbMotiu>
               <BotoAmbMotiu
                 variant="destructive"
-                className="h-11 whitespace-normal md:h-9"
+                className="h-11 whitespace-normal md:h-8"
                 disabled={ocupat || !potAnullar}
                 motiu={motiuAnullar}
                 onClick={() => setDialegAnullar(true)}
@@ -1033,7 +1028,7 @@ export default function AlbaraDetall() {
             <p className="text-sm text-muted-foreground">{t(recollidaPerValidar ? 'rrec.as_card_validar' : 'rrec.as_card')}</p>
             {/* Genera los albaranes: es de admin (`registrar_recollida_assistida()` y
                 `validar_recollida()` lo exigen). */}
-            <BotoAmbMotiu className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={!potAprovar}
+            <BotoAmbMotiu className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={!potAprovar}
               motiu={potAprovar ? undefined : t('recol.need_admin')}
               onClick={() => setDlgRecollida(albara.canalizacion_id)}>
               {t(recollidaPerValidar ? 'rrec.as_btn_validar' : 'rrec.as_btn')}
@@ -1060,7 +1055,7 @@ export default function AlbaraDetall() {
           <CardHeader><CardTitle className="text-base">{t('canalz.b_confirmacio_assistida')}</CardTitle></CardHeader>
           <CardContent className="space-y-2">
             <p className="text-sm text-muted-foreground">{t('alb.assisted_hint')}</p>
-            <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgAssistit(true)}>
+            <Button className="h-11 whitespace-normal md:h-8" onClick={() => setDlgAssistit(true)}>
               {t('canalz.b_confirmacio_assistida')}
             </Button>
           </CardContent>
@@ -1151,15 +1146,12 @@ export default function AlbaraDetall() {
           <div className="grid grid-cols-1 gap-3 rounded-md border border-input p-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ex-tipus">{t('alb.ex_type')}</Label>
-              {/* ⚠️ `text-base md:text-sm` obligatorio en un `<select>` estilado a mano (§2). */}
-              <select
+              <Desplegable
                 id="ex-tipus"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                 value={tipusExtern}
-                onChange={(e) => setTipusExtern(e.target.value as TipusExtern)}
-              >
-                {TIPUS_EXTERN.map((tp) => <option key={tp} value={tp}>{t(`alb.ex_${tp}`)}</option>)}
-              </select>
+                onChange={(v) => setTipusExtern(v as TipusExtern)}
+                opcions={TIPUS_EXTERN.map((tp) => ({ valor: tp, text: t(`alb.ex_${tp}`) }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ex-num">{t('alb.ex_number')}</Label>
@@ -1184,7 +1176,7 @@ export default function AlbaraDetall() {
                   if (f) void puja(f)
                 }}
               />
-              <Button className="h-11 w-full whitespace-normal md:h-9" disabled={pujant}
+              <Button className="h-11 w-full whitespace-normal md:h-8" disabled={pujant}
                 onClick={() => fitxer.current?.click()}>
                 {pujant
                   ? <Loader2 className="mr-1 size-4 animate-spin" aria-hidden />

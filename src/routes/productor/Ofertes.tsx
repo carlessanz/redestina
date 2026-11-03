@@ -301,7 +301,7 @@ function CapOferta() {
         <h2 className="font-titulos text-lg font-semibold">{t('pi.empty_title')}</h2>
         <p className="max-w-prose text-sm text-muted-foreground">{t('pi.empty_desc')}</p>
         <Button
-          className="h-11 whitespace-normal md:h-9"
+          className="h-11 whitespace-normal md:h-8"
           onClick={() => navigate('/productor/ofertes/nova')}
         >
           <PlusCircle className="size-4" /> {t('pi.empty_cta')}
@@ -467,7 +467,7 @@ export function ProductorInici() {
           </section>
 
           <Button
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             onClick={() => navigate('/productor/ofertes/nova')}
           >
             <PlusCircle className="size-4" /> {t('nav.new_offer')}
@@ -533,7 +533,7 @@ export function ProductorOfertes() {
           <LlegendaEstats items={llegendaSimpleOferta()} ambPunt />
         </div>
         <Button
-          className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+          className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
           onClick={() => navigate('/productor/ofertes/nova')}
         >
           <PlusCircle className="size-4" /> {t('nav.new_offer')}

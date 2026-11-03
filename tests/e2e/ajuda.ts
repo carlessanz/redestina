@@ -2,7 +2,7 @@
 
 import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
-import type { Page } from '@playwright/test'
+import type { Locator, Page } from '@playwright/test'
 
 export interface Compte { etiqueta: string; email: string; password: string; rol: string }
 
@@ -116,4 +116,34 @@ export function sqlCom(rol: string, consulta: string): string {
     commit;`)
   // La última línea con contenido es el resultado de la consulta (antes van los de set_config).
   return sortida.split('\n').filter((l) => l && !l.startsWith('{') && l !== 'BEGIN' && l !== 'COMMIT' && l !== 'SET').pop() ?? ''
+}
+
+/**
+ * Elige una opción de un `Desplegable` (el Select de Radix, `components/Desplegable.tsx`):
+ * `selectOption` solo sirve para `<select>` nativos. Por valor (string, el `data-valor` de la
+ * opción), por texto o por posición (la 0 es la opción vacía si la hay, como en el nativo).
+ */
+export async function tria(
+  control: Locator,
+  opcio: string | { text: string | RegExp } | { index: number },
+): Promise<void> {
+  await control.click()
+  const llista = control.page().getByRole('listbox')
+  const op = typeof opcio === 'string'
+    ? llista.locator(`[data-valor="${opcio}"]`)
+    : 'text' in opcio
+      ? llista.getByRole('option', { name: opcio.text })
+      : llista.getByRole('option').nth(opcio.index)
+  await op.click()
+  await llista.waitFor({ state: 'hidden' })
+}
+
+/** Los textos de las opciones de un `Desplegable` (abre la lista y la vuelve a cerrar). */
+export async function opcionsDe(control: Locator): Promise<string[]> {
+  await control.click()
+  const llista = control.page().getByRole('listbox')
+  const textos = await llista.getByRole('option').allTextContents()
+  await control.page().keyboard.press('Escape')
+  await llista.waitFor({ state: 'hidden' })
+  return textos
 }

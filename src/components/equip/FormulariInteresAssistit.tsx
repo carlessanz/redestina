@@ -28,6 +28,7 @@ import { interesAssistit } from '../../lib/canalitzacio'
 import type { Excedente, Modalitat } from '../../types'
 import SelectorModalitat from '../SelectorModalitat'
 import CampsRecollida from '../CampsRecollida'
+import Desplegable from '../Desplegable'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -137,16 +138,14 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
           <Label htmlFor={`${idPrefix}-entitat`} className="mb-1.5 block text-xs text-muted-foreground">
             {t('canalz.interes_entitat')}
           </Label>
-          <select
+          <Desplegable
             id={`${idPrefix}-entitat`}
             name="entitat"
-            className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm"
             value={entitat}
-            onChange={(e) => canviaEntitat(e.target.value)}
-          >
-            <option value="">—</option>
-            {entitats.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-          </select>
+            onChange={canviaEntitat}
+            buit="—"
+            opcions={entitats.map((e) => ({ valor: e.id, text: e.nombre }))}
+          />
         </div>
         <div>
           <Label htmlFor={`${idPrefix}-kg`} className="mb-1.5 block text-xs text-muted-foreground">
@@ -170,7 +169,7 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
           <div>
             <Label htmlFor={`${idPrefix}-mode`} className="mb-1.5 block text-xs text-muted-foreground">{t('mod.entrega')}</Label>
             <SelectorModalitat id={`${idPrefix}-mode`} name="modalitat" modalitats={mods} valor={triada} ambBuit
-              className="h-11 w-full md:h-9" onCanvi={setModalitat} />
+              className="h-11 w-full md:h-8" onCanvi={setModalitat} />
           </div>
         )}
         {ambPreuTriat && (
@@ -197,7 +196,7 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
         ajuda={t('canalz.interes_rec_help')} />
 
       <Button
-        className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+        className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
         disabled={ocupat || !entitat || kg.trim() === '' || senseCompat || (ambPreuTriat && preu.trim() === '')}
         onClick={() => void registra()}
       >

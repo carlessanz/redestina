@@ -65,16 +65,22 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   correos es clara** (§9bis). Nada de `brightness-0 invert` ni
   filtros sobre el logo: se elige la variante. Zona de respeto, tamaños mínimos y prohibiciones en
   `design/DESIGN.md §4`.
-- 🔴 **El `SelectTrigger` de shadcn NO trae `text-base md:text-sm`, y un comentario del repo
-  afirmaba que sí** (22-09-2026). Solo lo traen `Input` y `Textarea`: `ui/select.tsx` es
-  `text-sm` a secas. Ese comentario —en `Convenis.tsx`— es la razón de que una pantalla nueva
-  copiara el patrón desnudo, así que **cualquier `SelectTrigger` fuera de `ui/` tiene que
-  repetirlo**, igual que un `<select>` nativo (si no, iOS amplía la página al enfocarlo y no la
-  devuelve).
-  ⚠️ **Y nace `w-fit` con `whitespace-nowrap`**, así que dentro de una celda de rejilla puede
-  crecer más que la celda: en `/registre` el desplegable salía del ancho de un `option` mientras
-  los campos vecinos eran full-width. Los once de fuera de `ui/` llevan ya `w-full`, que **no
-  puede desbordar su celda**.
+- 🔴 **Desplegables: `components/Desplegable`, nunca un `<select>` nativo** (03-11-2026). Carles
+  vio los filtros de «Entitats» con el `<select>` del sistema —borde azul, flecha propia, alto
+  distinto por navegador— y lo encontró feo. `Desplegable` envuelve el `Select` de shadcn con la
+  API del nativo (`value`/`onChange(string)`, o `defaultValue` + `name` en un formulario leído con
+  `FormData`), `buit` para la opción vacía elegible («Tots») —Radix no admite un ítem con valor
+  `''`, va con un centinela que no sale del componente— y `placeholder` para la que no se puede
+  elegir («— Tria —»); se abre debajo (`position="popper"`). Las E2E eligen con `tria()` y leen
+  las opciones con `opcionsDe()` (`tests/e2e/ajuda.ts`), por el `data-valor` de cada opción.
+  Historia: hasta el 22-09-2026 el `SelectTrigger` de shadcn **no** traía `text-base md:text-sm`
+  (iOS amplía la página al enfocar un control de menos de 16 px) y nacía `w-fit` con
+  `whitespace-nowrap` (en `/registre` desbordaba su celda); se repetía a mano en cada uso. Desde
+  el 03-11-2026 la base `ui/select.tsx` trae el tamaño de texto y `Desplegable` el `w-full min-w-0`.
+- **Controles compactos** (03-11-2026, «todo es demasiado grande»): `ui/input` y el trigger de
+  `ui/select` miden 32 px en escritorio y 40 en móvil (`sm`: 28/36); `ui/button` `default` 32/40,
+  `sm` 28/36, `lg` 36/44, iconos 32/40; `ui/card` padding 20 px. Las alturas a mano `md:h-9` de
+  todo `src/` pasaron a `md:h-8` en el mismo cambio; las de móvil (`h-11`, 44 px de dedo) se quedan.
 - 🔴 **`{n}` está reservado para CONTADORES** (22-09-2026). Es el parámetro que dispara la
   variante `<clau>_1` del singular (§7), así que usarlo para un número de documento —
   `t('seg.alt_num', { n: 'CR-2026-0001' })`— hace que cualquiera que audite singulares vea esa
@@ -83,7 +89,7 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   diccionario, y `tests/i18n.test.ts` protege la paridad de marcadores.
 - 🔴 **Ningún control de formulario se estila a mano** (16-09-2026). Casilla →
   `components/Casella` (`Casella` suelta, `FilaCasella` con etiqueta y 44 px de fila);
-  campo → `ui/input`; desplegable → `ui/select` o un `<select>` con `text-base md:text-sm`.
+  campo → `ui/input`; desplegable → `components/Desplegable`.
   Salió de que el cliente viera **dos casillas de tamaños distintos en la misma pantalla**:
   había tres apariencias en la aplicación y una era el control por defecto del navegador.
   ⚠️ El fallo que lo explica: **`size-5` no basta dentro de un flex** —fija el tamaño

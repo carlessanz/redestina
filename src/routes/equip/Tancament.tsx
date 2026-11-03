@@ -287,7 +287,7 @@ export default function Tancament() {
                 <p className="font-medium">{t('tan.open_test')}</p>
                 <p className="mt-1 text-sm text-muted-foreground">{t('tan.open_test_hint')}</p>
                 <Button
-                  className="mt-3 h-11 w-full whitespace-normal md:h-9"
+                  className="mt-3 h-11 w-full whitespace-normal md:h-8"
                   disabled={obrint || any === null}
                   onClick={() => void obre('prueba')}
                 >
@@ -303,7 +303,7 @@ export default function Tancament() {
                 {esSuperAdmin ? (
                   <Button
                     variant="destructive"
-                    className="mt-3 h-11 w-full whitespace-normal md:h-9"
+                    className="mt-3 h-11 w-full whitespace-normal md:h-8"
                     disabled={obrint || any === null}
                     onClick={() => void obre('real')}
                   >

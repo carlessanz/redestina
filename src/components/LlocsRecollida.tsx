@@ -163,7 +163,7 @@ export default function LlocsRecollida({
         ))}
       </ul>
       {potEditar && !llocNou && (
-        <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+        <Button variant="outline" className="h-11 whitespace-normal md:h-8"
           onClick={() => setLlocNou({ ...BUIT, id: null })}>
           <Plus className="size-4" aria-hidden /> {t('po.place_add')}
         </Button>
@@ -217,8 +217,8 @@ export default function LlocsRecollida({
               onChange={(e) => setLlocNou((l) => (l ? { ...l, observaciones: e.target.value } : l))} />
           </div>
           <div className="flex flex-wrap gap-2 sm:col-span-2">
-            <Button className="h-11 whitespace-normal md:h-9" onClick={() => void afegeix()}>{t('po.place_save')}</Button>
-            <Button variant="ghost" className="h-11 md:h-9" onClick={() => setLlocNou(null)}>{t('c.cancel')}</Button>
+            <Button className="h-11 whitespace-normal md:h-8" onClick={() => void afegeix()}>{t('po.place_save')}</Button>
+            <Button variant="ghost" className="h-11 md:h-8" onClick={() => setLlocNou(null)}>{t('c.cancel')}</Button>
           </div>
         </div>
       )}

@@ -2,7 +2,7 @@
 // Solo lectura: corre contra el clon o contra producción.
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSalt } from './ajuda'
+import { entra, motiuSalt, tria, opcionsDe } from './ajuda'
 
 test.beforeEach(() => {
   const m = motiuSalt('productor')
@@ -19,14 +19,14 @@ test('«Les meves ofertes»: dos filtros combinados reducen la lista y «Neteja�
   if (info.project.name === 'mobil') await page.getByRole('button', { name: /^Filtres|^Filtros/ }).click()
   const mod = page.locator('#po-modalitat')
   test.skip(await mod.count() === 0, 'Totes les ofertes tenen la mateixa modalitat: no hi ha res a filtrar')
-  const opcions = await mod.locator('option').allTextContents()
-  await mod.selectOption({ index: 1 })
+  const opcions = await opcionsDe(mod)
+  await tria(mod, { index: 1 })
   const ambUn = await files.count()
   expect(ambUn).toBeLessThanOrEqual(total)
   await expect(page.getByText(/Mostrant \d+ de \d+|Mostrando \d+ de \d+/)).toBeVisible()
   const estat = page.locator('#po-estat')
   if (await estat.count()) {
-    await estat.selectOption({ index: 1 })
+    await tria(estat, { index: 1 })
     expect(await files.count()).toBeLessThanOrEqual(ambUn)
   }
   await page.getByRole('button', { name: /Neteja els filtres|Quitar los filtros/ }).click()

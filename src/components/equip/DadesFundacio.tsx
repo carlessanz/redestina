@@ -180,7 +180,7 @@ export default function DadesFundacio() {
                   </label>
                   <Input
                     id={`fund-${camp}`}
-                    className="h-11 md:h-9"
+                    className="h-11 md:h-8"
                     value={form[camp]}
                     disabled={!potEditar || desant}
                     onChange={(e) => setForm((f) => ({ ...f, [camp]: e.target.value }))}
@@ -197,7 +197,7 @@ export default function DadesFundacio() {
               </label>
               <Input
                 id="fund-dni"
-                className="h-11 md:h-9 sm:max-w-xs"
+                className="h-11 md:h-8 sm:max-w-xs"
                 value={dni}
                 placeholder={t('cfgf.dni_ph')}
                 disabled={!potEditar || desant}
@@ -227,7 +227,7 @@ export default function DadesFundacio() {
             </div>
 
             <Button
-              className="h-11 whitespace-normal md:h-9"
+              className="h-11 whitespace-normal md:h-8"
               disabled={!potEditar || desant || !hiHaCanvis}
               onClick={() => void desa()}
             >

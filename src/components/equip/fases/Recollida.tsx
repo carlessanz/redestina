@@ -222,7 +222,7 @@ function Entrega({ c, ca, onRegistra }: { c: ContextFase; ca: CanalitzacioCanal;
             <Input id={`cd-hora-${ca.id}`} type="datetime-local" value={hora}
               onChange={(e) => setHora(e.target.value)} />
           </div>
-          <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+          <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
             disabled={desant || !hora || hora === localDateTime(ca.data_hora_recollida)}
             onClick={() => void fixaHora()}>
             {t('cfase.fixa_hora')}
@@ -237,7 +237,7 @@ function Entrega({ c, ca, onRegistra }: { c: ContextFase; ca: CanalitzacioCanal;
           admin (la base lo exige con `pot_aprovar()`). */}
       {(estat === 'pendent' || estat === 'retornada' || estat === 'per_validar') && (
         <BotoAmbMotiu
-          className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+          className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
           disabled={!c.potAprovar}
           motiu={c.potAprovar ? undefined : t('recol.need_admin')}
           onClick={onRegistra}

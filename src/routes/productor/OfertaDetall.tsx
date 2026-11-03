@@ -347,7 +347,7 @@ export default function ProductorOfertaDetall() {
       </Card>
 
       {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(oferta.estado) && (
-        <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => setEditant(true)}>
+        <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => setEditant(true)}>
           {t('edit.cta')}
         </Button>
       )}
@@ -357,7 +357,7 @@ export default function ProductorOfertaDetall() {
       {cancelable && (
         <Button
           variant="destructive"
-          className="h-11 whitespace-normal md:h-9"
+          className="h-11 whitespace-normal md:h-8"
           onClick={() => setCancelant(true)}
         >
           {t('po.cancel_offer')}

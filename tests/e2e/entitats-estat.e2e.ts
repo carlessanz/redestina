@@ -7,7 +7,7 @@
 // deja como estaban al acabar.
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom, opcionsDe } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -95,8 +95,8 @@ test('el selector del interés asistido del equipo no ofrece la entidad inactiva
   const sel = page.locator('#od-interes-entitat')
   await expect(sel).toBeVisible()
   // Cargadas las opciones (hay otras entidades activas), la inactiva no está.
-  await expect.poll(async () => (await sel.locator('option').count())).toBeGreaterThan(1)
-  await expect(sel.locator('option', { hasText: nomSocial })).toHaveCount(0)
+  await expect.poll(async () => (await opcionsDe(sel)).length).toBeGreaterThan(1)
+  expect((await opcionsDe(sel)).filter((o) => o.includes(nomSocial))).toHaveLength(0)
 })
 
 test('reactivarla le devuelve las ofertas nuevas del Mercat', async ({ page }) => {

@@ -34,6 +34,7 @@ import { crearEspigolada, dataCurta, estilEstatAlbara, kg, repartirEspigolada } 
 import type { LiniaEntrada, LotEspigolada } from '../../lib/albarans'
 import type { Espigolada } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
+import Desplegable from '../../components/Desplegable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -43,9 +44,6 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
-
-/** Clases de un `<select>` estilado a mano. `text-base md:text-sm` es obligatorio (§2). */
-const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm'
 
 interface LiniaForm {
   producto: string
@@ -169,7 +167,7 @@ export function Espigolades() {
             value={cerca}
             onChange={(e) => setCerca(e.target.value)}
           />
-          <Button asChild className="h-11 whitespace-normal md:h-9">
+          <Button asChild className="h-11 whitespace-normal md:h-8">
             <Link to="/equip/espigolades/nova">
               <Plus className="size-4" aria-hidden />{t('esp.new_title')}
             </Link>
@@ -369,21 +367,17 @@ export function NovaEspigolada() {
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <div className="space-y-1.5">
             <Label htmlFor="esp-prod">{t('esp.producer')}</Label>
-            <select id="esp-prod" className={SELECT} value={productor}
-              onChange={(e) => setProductor(e.target.value)}>
-              <option value="">{t('esp.pick_producer')}</option>
-              {productors.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-            </select>
+            <Desplegable id="esp-prod" value={productor} onChange={setProductor}
+              placeholder={t('esp.pick_producer')}
+              opcions={productors.map((p) => ({ valor: p.id, text: p.nom }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="esp-ubi">{t('esp.location')}</Label>
-            <select id="esp-ubi" className={SELECT} value={ubicacio}
-              onChange={(e) => setUbicacio(e.target.value)} disabled={ubicacions.length === 0}>
-              <option value="">{ubicacions.length === 0 ? t('esp.no_locations') : t('c.none')}</option>
-              {ubicacions.map((u) => (
-                <option key={u.id} value={u.id}>{u.alias || u.municipio || u.id.slice(0, 8)}</option>
-              ))}
-            </select>
+            {/* Sin lugares de recogida, el control queda gris y lo dice; con ellos, «cap» es elegible. */}
+            <Desplegable id="esp-ubi" value={ubicacio} onChange={setUbicacio} disabled={ubicacions.length === 0}
+              buit={ubicacions.length === 0 ? undefined : t('c.none')}
+              placeholder={t('esp.no_locations')}
+              opcions={ubicacions.map((u) => ({ valor: u.id, text: u.alias || u.municipio || u.id.slice(0, 8) }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="esp-data">{t('esp.date')}</Label>
@@ -410,11 +404,9 @@ export function NovaEspigolada() {
             <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor={`el-prod-${i}`}>{t('alb.ln_product')}</Label>
-                <select id={`el-prod-${i}`} className={SELECT} value={l.producto}
-                  onChange={(e) => actualitza(i, 'producto', e.target.value)}>
-                  <option value="">{t('c.none')}</option>
-                  {productes.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
+                <Desplegable id={`el-prod-${i}`} value={l.producto}
+                  onChange={(v) => actualitza(i, 'producto', v)} buit={t('c.none')}
+                  opcions={productes.map((p) => ({ valor: p, text: p }))} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={`el-var-${i}`}>{t('alb.ln_variety')}</Label>
@@ -428,11 +420,9 @@ export function NovaEspigolada() {
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={`el-tc-${i}`}>{t('alb.ln_boxtype')}</Label>
-                <select id={`el-tc-${i}`} className={SELECT} value={l.tipo_caja}
-                  onChange={(e) => actualitza(i, 'tipo_caja', e.target.value)}>
-                  <option value="">{t('c.none')}</option>
-                  {caixes.map((c) => <option key={c.codigo} value={c.codigo}>{c.nombre}</option>)}
-                </select>
+                <Desplegable id={`el-tc-${i}`} value={l.tipo_caja}
+                  onChange={(v) => actualitza(i, 'tipo_caja', v)} buit={t('c.none')}
+                  opcions={caixes.map((c) => ({ valor: c.codigo, text: c.nombre }))} />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor={`el-br-${i}`}>{t('alb.ln_gross')}</Label>
@@ -451,7 +441,7 @@ export function NovaEspigolada() {
               </div>
               {linies.length > 1 && (
                 <div className="sm:col-span-2">
-                  <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-9"
+                  <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-8"
                     onClick={() => setLinies((p) => p.filter((_, j) => j !== i))}>
                     {t('alb.ln_remove')}
                   </Button>
@@ -459,13 +449,13 @@ export function NovaEspigolada() {
               )}
             </div>
           ))}
-          <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8"
             onClick={() => setLinies((p) => [...p, { ...LINIA_BUIDA }])}>
             {t('alb.ln_add')}
           </Button>
         </div>
 
-        <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={() => void desa()}>
+        <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat} onClick={() => void desa()}>
           {ocupat ? t('c.saving') : t('esp.create')}
         </Button>
       </CardContent>
@@ -627,7 +617,7 @@ export function EspigoladaDetall() {
       <div className="flex flex-wrap items-center gap-2">
         {/* Desde que hay listado, «Enrere» vuelve a él: antes mandaba a `/equip/albarans`
             porque era lo más parecido a un sitio del que se pudiera haber venido. */}
-        <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={() => navigate('/equip/espigolades')}>
+        <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => navigate('/equip/espigolades')}>
           <ArrowLeft className="size-4" />{t('c.back')}
         </Button>
         <h1 className="text-xl">{t('esp.title', { date: dataCurta(espigolada.fecha) })}</h1>
@@ -726,11 +716,10 @@ export function EspigoladaDetall() {
                       <div key={`${r.id}-${i}`} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-2">
                         <div className="space-y-1.5">
                           <Label htmlFor={`lot-ent-${idx}`}>{t('esp.entity')}</Label>
-                          <select id={`lot-ent-${idx}`} className={SELECT} value={l.entidad_id}
-                            onChange={(e) => setLots((p) => p.map((x, j) => j === idx ? { ...x, entidad_id: e.target.value } : x))}>
-                            <option value="">{t('esp.pick_entity')}</option>
-                            {entitats.map((en) => <option key={en.id} value={en.id}>{en.nombre}</option>)}
-                          </select>
+                          <Desplegable id={`lot-ent-${idx}`} value={l.entidad_id}
+                            onChange={(v) => setLots((p) => p.map((x, j) => j === idx ? { ...x, entidad_id: v } : x))}
+                            placeholder={t('esp.pick_entity')}
+                            opcions={entitats.map((en) => ({ valor: en.id, text: en.nombre }))} />
                         </div>
                         <div className="space-y-1.5">
                           <Label htmlFor={`lot-kg-${idx}`}>{t('esp.lot_kg')}</Label>
@@ -748,7 +737,7 @@ export function EspigoladaDetall() {
                             onChange={(e) => setLots((p) => p.map((x, j) => j === idx ? { ...x, nota: e.target.value } : x))} />
                         </div>
                         <div className="sm:col-span-2">
-                          <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-9"
+                          <Button variant="outline" size="sm" className="h-11 whitespace-normal md:h-8"
                             onClick={() => setLots((p) => p.filter((_, j) => j !== idx))}>
                             {t('esp.lot_remove')}
                           </Button>
@@ -760,7 +749,7 @@ export function EspigoladaDetall() {
                       entera lo rechazaría la base, y el botón invitaba a intentarlo. */}
                   {resta > 0
                     ? (
-                      <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+                      <Button variant="outline" className="h-11 whitespace-normal md:h-8"
                         onClick={() => afegeixLot(r.id)}>
                         {t('esp.lot_add')}
                       </Button>
@@ -774,7 +763,7 @@ export function EspigoladaDetall() {
       })}
 
       {espigolada.estado === 'oberta' && lots.length > 0 && (
-        <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={() => void reparteix()}>
+        <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat} onClick={() => void reparteix()}>
           {ocupat ? t('c.saving') : t('esp.distribute', { n: lots.length })}
         </Button>
       )}

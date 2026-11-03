@@ -7,7 +7,7 @@
 // `scripts/local/cargar-local.sh` devuelve el clon a la copia de producción.
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -67,7 +67,7 @@ test('des del detall de l’oferta: copia i marca enviada, registra l’interès
 
   // «Registra l'interès»: el mismo formulario y las mismas guardas que el Mercat.
   const form = page.locator('#od-interes')
-  await form.locator('#od-interes-entitat').selectOption(ent)
+  await tria(form.locator('#od-interes-entitat'), ent)
   await form.locator('#od-interes-kg').fill('50')
   await form.getByRole('button', { name: /Registra l’interès|Registra el interés/ }).click()
   await expect(page.getByText(/Interès registrat|Interés registrado/)).toBeVisible()

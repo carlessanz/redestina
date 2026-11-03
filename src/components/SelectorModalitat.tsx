@@ -2,13 +2,16 @@
 //
 // Lo usan el receptor al mostrar interés y el equipo al aprobar. Solo se pinta cuando la
 // oferta tiene más de una: con una sola no hay nada que elegir y el formulario no debe
-// preguntar. Es un `<select>` nativo dentro de un formulario (`name`), así que quien lo usa
-// lo lee con `FormData` o con `onChange`.
+// preguntar. Es un `Desplegable` (el `Select` de shadcn, desde el 03-11-2026; antes un
+// `<select>` nativo) que manda su valor con `name` por un `<input hidden>`, así que quien lo
+// usa lo lee con `FormData` o con `onCanvi`. La opción vacía de `ambBuit` no se puede
+// elegir: es el `placeholder` del desplegable, no una opción.
 //
-// ⚠️ `text-base md:text-sm` no es estético: por debajo de 16 px iOS amplía la página al
-//    enfocarlo y no la devuelve (§2, regla 1).
+// La altura y el `text-base md:text-sm` (§2, regla 1) ya los trae el desplegable; el
+// `className` de quien lo usa es para el ancho.
 
 import { useT } from '../lib/i18n'
+import Desplegable from './Desplegable'
 import type { Modalitat } from '../types'
 
 export default function SelectorModalitat({
@@ -36,19 +39,20 @@ export default function SelectorModalitat({
   const { t } = useT()
   if (modalitats.length <= 1) return null
   const controlat = valor !== undefined
+  const opcions = modalitats.map((m) => ({ valor: m, text: t(`od.mod_${m}`) }))
   return (
-    <select
+    <Desplegable
       id={id}
       name={name}
       required
       aria-label={t('mod.tria')}
+      opcions={opcions}
+      placeholder={ambBuit ? t('mod.tria') : undefined}
       {...(controlat
-        ? { value: valor, onChange: (e) => onCanvi?.(e.target.value as Modalitat | '') }
-        : { defaultValue: inicial && modalitats.includes(inicial) ? inicial : ambBuit ? '' : modalitats[0], onChange: (e) => onCanvi?.(e.target.value as Modalitat | '') })}
-      className={`h-8 rounded-md border border-input bg-background px-2 text-base md:text-sm ${className}`}
-    >
-      {ambBuit && <option value="" disabled>{t('mod.tria')}</option>}
-      {modalitats.map((m) => <option key={m} value={m}>{t(`od.mod_${m}`)}</option>)}
-    </select>
+        ? { value: valor }
+        : { defaultValue: inicial && modalitats.includes(inicial) ? inicial : ambBuit ? '' : modalitats[0] })}
+      onChange={(v) => onCanvi?.(v as Modalitat | '')}
+      className={className}
+    />
   )
 }

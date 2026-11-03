@@ -14,7 +14,7 @@ export default function PlaDetall() {
   if (!id) return <p className="text-sm text-destructive">{t('diagd.bad_url')}</p>
   return (
     <div className="space-y-4">
-      <Button asChild variant="outline" size="sm" className="h-11 md:h-9">
+      <Button asChild variant="outline" size="sm" className="h-11 md:h-8">
         <Link to="/equip/plans"><ArrowLeft className="size-4" aria-hidden /> {t('exp.tornar')}</Link>
       </Button>
       <ExpedientVista key={id} expedientId={id} editable potAprovar={ctx?.potAprovar ?? false} />

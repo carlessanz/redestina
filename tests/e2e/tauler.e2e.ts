@@ -2,7 +2,7 @@
 // Lectura, contra el clon (compara con la base) y solo en escritorio.
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, sql } from './ajuda'
+import { entra, motiuSaltClon, sql, tria } from './ajuda'
 
 test.beforeEach(({}, info) => {
   const m = motiuSaltClon('super_admin')
@@ -18,7 +18,7 @@ test('los indicadores cambian con el periodo y cuadran con la base', async ({ pa
   const any = new Date().getFullYear()
   const canalsAny = JSON.parse(sql(`select kpis_equip('${any}-01-01', '${any}-12-31')`)).canalitzacions
   await expect(bloc.getByText(/Canalitzacions|Canalizaciones/).locator('..')).toContainText(String(canalsAny))
-  await bloc.locator('#kp-periode').selectOption('mes')
+  await tria(bloc.locator('#kp-periode'), 'mes')
   const avui = sql(`select to_char(now() at time zone 'Europe/Madrid', 'YYYY-MM')`)
   const fi = sql(`select to_char((date_trunc('month', now() at time zone 'Europe/Madrid') + interval '1 month - 1 day')::date, 'YYYY-MM-DD')`)
   const canalsMes = JSON.parse(sql(`select kpis_equip('${avui}-01', '${fi}')`)).canalitzacions

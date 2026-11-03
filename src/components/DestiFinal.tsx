@@ -26,6 +26,7 @@ import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { cn } from '../lib/utils'
+import Desplegable from './Desplegable'
 
 export interface SortidaRedestina { entitat: string | null; kg: number }
 
@@ -148,7 +149,7 @@ export default function DestiFinal({
               </ul>
             )}
             {editable && (
-              <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+              <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                 onClick={() => setObert(true)}>
                 {desats.length > 0 ? t('desti.edita') : t('desti.afegeix_externa')}
               </Button>
@@ -162,32 +163,31 @@ export default function DestiFinal({
               <div key={i} className="grid grid-cols-1 gap-2 rounded-md border p-3 sm:grid-cols-[2fr_1fr_2fr_1.3fr_auto] sm:items-end">
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                   {t('desti.f_desti')}
-                  <select
+                  <Desplegable
                     value={f.desti}
-                    onChange={(e) => canvia(i, 'desti', e.target.value)}
-                    className="h-11 w-full rounded-md border border-input bg-background px-2 text-base text-foreground md:h-9 md:text-sm"
-                  >
-                    <option value="">{t('desti.tria')}</option>
-                    {cataleg.map((c) => <option key={c.codi} value={c.codi}>{lang === 'es' ? c.nom_es : c.nom_ca}</option>)}
-                  </select>
+                    onChange={(v) => canvia(i, 'desti', v)}
+                    buit={t('desti.tria')}
+                    opcions={cataleg.map((c) => ({ valor: c.codi, text: lang === 'es' ? c.nom_es : c.nom_ca }))}
+                    className="text-foreground"
+                  />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                   {t('desti.f_kg')}
-                  <Input inputMode="decimal" value={f.kg} className="h-11 md:h-9"
+                  <Input inputMode="decimal" value={f.kg} className="h-11 md:h-8"
                     onChange={(e) => canvia(i, 'kg', e.target.value)} />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                   {t('desti.f_receptor')}
-                  <Input value={f.receptor} maxLength={200} className="h-11 md:h-9"
+                  <Input value={f.receptor} maxLength={200} className="h-11 md:h-8"
                     placeholder={t('desti.f_receptor_ph')}
                     onChange={(e) => canvia(i, 'receptor', e.target.value)} />
                 </label>
                 <label className="flex flex-col gap-1 text-xs text-muted-foreground">
                   {t('desti.f_data')}
-                  <Input type="date" value={f.data} max={avuiMadrid()} className="h-11 md:h-9"
+                  <Input type="date" value={f.data} max={avuiMadrid()} className="h-11 md:h-8"
                     onChange={(e) => canvia(i, 'data', e.target.value)} />
                 </label>
-                <Button variant="ghost" size="icon" className="size-11 md:size-9" type="button"
+                <Button variant="ghost" size="icon" className="size-11 md:size-8" type="button"
                   aria-label={t('desti.treu')}
                   onClick={() => setFiles((p) => (p.length > 1 ? p.filter((_, j) => j !== i) : [{ ...FILA_BUIDA }]))}>
                   <Trash2 className="size-4" />
@@ -195,7 +195,7 @@ export default function DestiFinal({
               </div>
             ))}
 
-            <Button variant="outline" type="button" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+            <Button variant="outline" type="button" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
               onClick={() => setFiles((p) => [...p, { ...FILA_BUIDA }])}>
               <Plus className="size-4" /> {t('desti.afegeix')}
             </Button>
@@ -212,12 +212,12 @@ export default function DestiFinal({
             {error && error !== 'desti.err_massa' && <p className="text-sm text-error">{t(error)}</p>}
 
             <div className="flex flex-col gap-2 sm:flex-row">
-              <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={!!error || desant}
+              <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={!!error || desant}
                 onClick={() => void desa()}>
                 {t('desti.desa')}
               </Button>
               {!demanar && (
-                <Button variant="ghost" className="h-11 w-full sm:w-auto md:h-9" type="button"
+                <Button variant="ghost" className="h-11 w-full sm:w-auto md:h-8" type="button"
                   onClick={() => setObert(false)}>
                   {t('c.cancel')}
                 </Button>

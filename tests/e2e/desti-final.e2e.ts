@@ -7,7 +7,7 @@
 //   E2E_CLON=1 npx playwright test tests/e2e/desti-final.e2e.ts
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, productorDe, sql } from './ajuda'
+import { entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -53,12 +53,12 @@ test('el productor ve la banda y registra 100 kg de venda + 50 de donació', asy
 
   const files = page.locator('#desti')
   // Primera fila: venda externa, 100 kg, a una empresa.
-  await files.locator('select').first().selectOption('venda')
+  await tria(files.getByRole('combobox').first(), 'venda')
   await files.getByLabel(/^Kg$/).first().fill('100')
   await files.getByLabel(/A qui|A quién/).first().fill('Empresa E2E')
   // Segunda fila: donació externa, 50 kg.
   await files.getByRole('button', { name: /Afegeix un altre destí|Añade otro destino/ }).click()
-  await files.locator('select').nth(1).selectOption('donacio')
+  await tria(files.getByRole('combobox').nth(1), 'donacio')
   await files.getByLabel(/^Kg$/).nth(1).fill('50')
   await expect(files.getByText(/falten 0 kg|faltan 0 kg/)).toBeVisible()
   // Captura para revisar a ojo (va a `test-results/`, fuera de git).

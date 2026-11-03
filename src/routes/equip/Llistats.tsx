@@ -21,7 +21,7 @@ export function Ofertes() {
       <OffersList
         onOpen={(o) => navigate(`/equip/ofertes/${o.id}`)}
         accio={(
-          <Button className="h-11 whitespace-normal md:h-9" onClick={() => setNova(true)}>
+          <Button className="h-11 whitespace-normal md:h-8" onClick={() => setNova(true)}>
             {t('canalz.nova_oferta')}
           </Button>
         )}

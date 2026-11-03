@@ -20,7 +20,7 @@ export default function TargetaPerfilRecepcio() {
             <p className="mt-1 text-sm text-muted-foreground">{t('precep.card_d')}</p>
           </div>
         </div>
-        <Button asChild variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9">
+        <Button asChild variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8">
           <Link to="/organitzacio/perfil-recepcio">
             {t('precep.card_go')}
             <ArrowRight className="size-4" aria-hidden />

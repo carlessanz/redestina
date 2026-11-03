@@ -53,12 +53,12 @@ export default function BlocPublicada({
       )}
 
       <div className="flex flex-col gap-2 sm:flex-row">
-        <Button className="h-11 whitespace-normal md:h-9" onClick={onInici}>
+        <Button className="h-11 whitespace-normal md:h-8" onClick={onInici}>
           {t('proc.publicada_home')}
         </Button>
         <Button
           variant="outline"
-          className="h-11 whitespace-normal md:h-9"
+          className="h-11 whitespace-normal md:h-8"
           onClick={onAltra}
         >
           {t('proc.publicada_another')}

@@ -5,8 +5,7 @@ import { useT } from '../lib/i18n'
 import type { Periode } from '../lib/periode'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-
-const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
+import Desplegable from './Desplegable'
 
 export default function SelectorPeriode({
   periode, onPeriode, rang, onRang, any, idPrefix,
@@ -24,11 +23,12 @@ export default function SelectorPeriode({
     <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
       <div className="space-y-1 sm:w-44">
         <Label htmlFor={`${idPrefix}-periode`} className="text-xs text-muted-foreground">{t('kp.periode')}</Label>
-        <select id={`${idPrefix}-periode`} className={SELECT} value={periode} onChange={(e) => onPeriode(e.target.value as Periode)}>
-          <option value="any">{t('kp.p_any', { any })}</option>
-          <option value="mes">{t('kp.p_mes')}</option>
-          <option value="rang">{t('kp.p_rang')}</option>
-        </select>
+        <Desplegable id={`${idPrefix}-periode`} value={periode} onChange={(v) => onPeriode(v as Periode)}
+          opcions={[
+            { valor: 'any', text: t('kp.p_any', { any }) },
+            { valor: 'mes', text: t('kp.p_mes') },
+            { valor: 'rang', text: t('kp.p_rang') },
+          ]} />
       </div>
       {periode === 'rang' && (
         <>

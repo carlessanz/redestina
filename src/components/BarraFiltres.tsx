@@ -3,8 +3,9 @@
 // dimensión (solo con valores que dan resultado), un rango de fechas opcional, «Neteja els
 // filtres» y el recuento. En móvil se pliega detrás de un botón «Filtres (n)».
 //
-// Los desplegables son `<select>` nativos, como los del Mercat: en el móvil abren el selector
-// del sistema. ⚠️ `text-base md:text-sm` obligatorio (§2, regla 1: iOS amplía al enfocar).
+// Los desplegables son `Desplegable` (el Select de shadcn con los tokens, 03-11-2026): el
+// `<select>` nativo se pintaba con el borde azul y la flecha del sistema y no casaba con nada.
+// Compactos (`mida="sm"`): la barra es una herramienta, no un formulario.
 
 import { useState } from 'react'
 import { Filter, X } from 'lucide-react'
@@ -13,6 +14,7 @@ import { filtresActius, type ValorsFiltre } from '../lib/filtres'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Desplegable from './Desplegable'
 
 export interface DesplegableFiltre {
   clau: string
@@ -37,8 +39,6 @@ interface Props {
   extra?: React.ReactNode
 }
 
-const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
-
 export default function BarraFiltres({ id, desplegables, valors, onValors, rang, mostrant, total, extra }: Props) {
   const { t } = useT()
   const [obert, setObert] = useState(false)
@@ -51,36 +51,34 @@ export default function BarraFiltres({ id, desplegables, valors, onValors, rang,
   return (
     <div className="space-y-2" data-testid={`filtres-${id}`}>
       <div className="flex flex-wrap items-center gap-2 md:hidden">
-        <Button variant="outline" size="sm" className="h-11" onClick={() => setObert((o) => !o)} aria-expanded={obert}>
+        <Button variant="outline" size="sm" onClick={() => setObert((o) => !o)} aria-expanded={obert}>
           <Filter className="size-4" aria-hidden /> {n > 0 ? t('fl.btn_n', { n }) : t('fl.btn')}
         </Button>
       </div>
-      <div className={(obert ? 'grid' : 'hidden') + ' grid-cols-1 gap-3 sm:grid-cols-2 md:flex md:flex-wrap md:items-end'}>
+      <div className={(obert ? 'grid' : 'hidden') + ' grid-cols-2 gap-x-2 gap-y-2.5 md:flex md:flex-wrap md:items-end'}>
         {desplegables.filter((d) => d.opcions.length > 0 || valors[d.clau]).map((d) => (
-          <div key={d.clau} className="min-w-0 space-y-1 md:w-44">
-            <Label htmlFor={`${id}-${d.clau}`} className="text-xs text-muted-foreground">{t(d.etiquetaKey)}</Label>
-            <select id={`${id}-${d.clau}`} className={SELECT} value={valors[d.clau] ?? ''}
-              onChange={(e) => onValors({ ...valors, [d.clau]: e.target.value })}>
-              <option value="">{t('fl.tots')}</option>
-              {d.opcions.map((o) => <option key={o} value={o}>{d.text ? d.text(o) : o}</option>)}
-            </select>
+          <div key={d.clau} className="min-w-0 space-y-1 md:w-40">
+            <Label htmlFor={`${id}-${d.clau}`} className="text-xs font-normal text-muted-foreground">{t(d.etiquetaKey)}</Label>
+            <Desplegable id={`${id}-${d.clau}`} mida="sm" value={valors[d.clau] ?? ''} buit={t('fl.tots')}
+              onChange={(v) => onValors({ ...valors, [d.clau]: v })}
+              opcions={d.opcions.map((o) => ({ valor: o, text: d.text ? d.text(o) : o }))} />
           </div>
         ))}
         {rang && (
           <>
-            <div className="min-w-0 space-y-1 md:w-40">
-              <Label htmlFor={`${id}-des`} className="text-xs text-muted-foreground">{t(rang.etiquetaKey)} · {t('fl.des_de')}</Label>
-              <Input id={`${id}-des`} type="date" value={rang.desDe} onChange={(e) => rang.onCanvi(e.target.value, rang.finsA)} />
+            <div className="min-w-0 space-y-1 md:w-36">
+              <Label htmlFor={`${id}-des`} className="text-xs font-normal text-muted-foreground">{t(rang.etiquetaKey)} · {t('fl.des_de')}</Label>
+              <Input id={`${id}-des`} type="date" className="md:h-7" value={rang.desDe} onChange={(e) => rang.onCanvi(e.target.value, rang.finsA)} />
             </div>
-            <div className="min-w-0 space-y-1 md:w-40">
-              <Label htmlFor={`${id}-fins`} className="text-xs text-muted-foreground">{t('fl.fins_a')}</Label>
-              <Input id={`${id}-fins`} type="date" value={rang.finsA} onChange={(e) => rang.onCanvi(rang.desDe, e.target.value)} />
+            <div className="min-w-0 space-y-1 md:w-36">
+              <Label htmlFor={`${id}-fins`} className="text-xs font-normal text-muted-foreground">{t('fl.fins_a')}</Label>
+              <Input id={`${id}-fins`} type="date" className="md:h-7" value={rang.finsA} onChange={(e) => rang.onCanvi(rang.desDe, e.target.value)} />
             </div>
           </>
         )}
         {extra}
         {n > 0 && (
-          <Button variant="ghost" size="sm" className="h-11 md:h-9" onClick={neteja}>
+          <Button variant="ghost" size="sm" className="col-span-2 justify-self-start text-muted-foreground" onClick={neteja}>
             <X className="size-4" aria-hidden /> {t('fl.neteja')}
           </Button>
         )}

@@ -20,6 +20,7 @@ import {
 } from '../../lib/expedientApi'
 import { useConfirma } from '../DialegConfirma'
 import BotoIcona from '../BotoIcona'
+import Desplegable from '../Desplegable'
 import { usePuntTall, type PuntTall } from '../../hooks/usePuntTall'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -42,8 +43,6 @@ export interface CampElement {
 
 /** Cifras, fechas y listas cortas van centradas; los textos, a la izquierda. */
 const centrat = (c: CampElement) => c.tipus === 'date' || c.tipus === 'mes' || c.tipus === 'number' || c.tipus === 'select'
-
-const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
 
 /** Del valor guardado al del control, y al revés. */
 function aControl(c: CampElement, v: unknown): string {
@@ -147,10 +146,7 @@ export default function TaulaElements({
               {c.tipus === 'textarea' ? (
                 <Textarea id={id} rows={2} value={valor} onChange={(e) => posa(e.target.value)} />
               ) : c.tipus === 'select' ? (
-                <select id={id} className={SELECT} value={valor} onChange={(e) => posa(e.target.value)}>
-                  <option value="">—</option>
-                  {(c.opcions ?? []).map((o) => <option key={o.valor} value={o.valor}>{o.text}</option>)}
-                </select>
+                <Desplegable id={id} value={valor} onChange={posa} buit="—" opcions={c.opcions ?? []} />
               ) : (
                 <Input id={id} value={valor} onChange={(e) => posa(e.target.value)}
                   type={c.tipus === 'date' ? 'date' : c.tipus === 'mes' ? 'month' : c.tipus === 'number' ? 'number' : 'text'}
@@ -161,10 +157,10 @@ export default function TaulaElements({
         })}
       </div>
       <div className="flex flex-wrap gap-2">
-        <Button className="h-11 w-full sm:w-auto md:h-9" disabled={desant} onClick={() => void desa()}>
+        <Button className="h-11 w-full sm:w-auto md:h-8" disabled={desant} onClick={() => void desa()}>
           {desant ? t('c.saving') : t('c.save')}
         </Button>
-        <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" onClick={() => setObert(null)}>{t('c.cancel')}</Button>
+        <Button variant="outline" className="h-11 w-full sm:w-auto md:h-8" onClick={() => setObert(null)}>{t('c.cancel')}</Button>
       </div>
     </div>
   )
@@ -177,7 +173,7 @@ export default function TaulaElements({
           {ajudaKey && <p className="mt-1 text-sm text-muted-foreground">{t(ajudaKey)}</p>}
         </div>
         {editable && !obert && (
-          <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" onClick={nou}>
+          <Button variant="outline" className="h-11 w-full sm:w-auto md:h-8" onClick={nou}>
             <Plus className="size-4" aria-hidden /> {t('exp.afegeix')}
           </Button>
         )}

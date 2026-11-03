@@ -81,7 +81,7 @@ export default function FactorsImpacte() {
             </FilaCasella>
             {potEditar && (
               <div className="flex sm:justify-end">
-                <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" disabled={desant !== null}
+                <Button variant="outline" className="h-11 w-full sm:w-auto md:h-8" disabled={desant !== null}
                   onClick={() => void desa(f)}>
                   {desant === f.codi ? t('c.saving') : t('c.save')}
                 </Button>

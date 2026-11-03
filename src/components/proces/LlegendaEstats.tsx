@@ -32,7 +32,7 @@ export default function LlegendaEstats({ items, ambPunt }: { items: ItemLlegenda
 
   return (
     <Collapsible open={obert} onOpenChange={setObert}>
-      <CollapsibleTrigger className="flex h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted-foreground hover:text-foreground md:h-9">
+      <CollapsibleTrigger className="flex h-11 items-center gap-1.5 rounded-md px-1 text-sm text-muted-foreground hover:text-foreground md:h-8">
         <ChevronDown
           className={cn('size-4 transition-transform', obert && 'rotate-180')}
           aria-hidden

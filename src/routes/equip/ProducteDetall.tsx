@@ -127,7 +127,7 @@ export default function ProducteDetall() {
                 <Input id="prod-motiu" value={motiu} onChange={(e) => setMotiu(e.target.value)} />
               </div>
               <div className="sm:col-span-3">
-                <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={ocupat}
+                <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={ocupat}
                   onClick={() => void desaCost()}>
                   {cost ? t('cost.a_edit') : t('cost.a_set')}
                 </Button>

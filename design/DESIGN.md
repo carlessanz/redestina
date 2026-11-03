@@ -81,7 +81,7 @@ La aplicación habla en catalán a los usuarios y en castellano en el código y 
 
 Los componentes son los de shadcn/ui en `src/components/ui/` (estilo new-york). No se modifican para aplicar la marca: cambian de piel por los tokens. Lo que sigue son las convenciones de uso.
 
-**Botón.** `default` = verde (acción principal, una por vista). `secondary` = verde suave (apoyo). `outline` y `ghost` para acciones terciarias y barras de herramientas; su hover es `accent` (crema). `destructive` = rojo, siempre con confirmación. El coral **no** es una variante de botón; si hace falta un botón de marca en la parte pública (por ejemplo «Vull participar-hi»), es verde. Radio `md`, altura 36 px (`h-9`), texto Inter 500 `sm`.
+**Botón.** `default` = verde (acción principal, una por vista). `secondary` = verde suave (apoyo). `outline` y `ghost` para acciones terciarias y barras de herramientas; su hover es `accent` (crema). `destructive` = rojo, siempre con confirmación. El coral **no** es una variante de botón; si hace falta un botón de marca en la parte pública (por ejemplo «Vull participar-hi»), es verde. Radio `md`, texto Inter 500 `sm`. Alturas compactas (03-11-2026): en escritorio `default` 32 px (`md:h-8`), `sm` 28 px, `lg` 36 px; en móvil 40/36/44 px para el dedo. Las acciones de fila de tabla van en icono (`components/BotoIcona`, 28 px en escritorio).
 
 **Tarjeta.** Blanca sobre crema, borde `border`, radio `xl`, padding `6`, sombra `sm` (o ninguna). Título en Sora 600 `xl`, descripción en `muted-foreground`. Las tarjetas de lote llevan el estado como badge arriba a la derecha y las cantidades en Sora 600.
 
@@ -105,6 +105,8 @@ Los componentes son los de shadcn/ui en `src/components/ui/` (estilo new-york). 
 
 ### 6bis. Los controles miden todos lo mismo (16-09-2026)
 
+**Medidas (03-11-2026).** Campo de texto y desplegable: 32 px de alto en escritorio (`md:h-8`), 40 px en móvil, `px-2.5`, texto `text-base md:text-sm` **ya en la base** (`ui/input`, `ui/select`), no a mano. Desplegable de filtro (`mida="sm"`): 28 px en escritorio. Tarjeta: padding 20 px (`py-5`/`px-5`). Una altura a mano en un control (`h-11 md:h-8`) solo para igualarlo con sus vecinos.
+
 🔴 **Ningún control de formulario se estila a mano.** Casilla, desplegable, campo de texto:
 si hace falta uno, se usa el componente que ya existe o se añade allí. La regla nace de un
 caso concreto —el cliente vio dos casillas de tamaños distintos en la misma pantalla de
@@ -116,7 +118,7 @@ control por defecto del navegador, que ni siquiera mide igual en Safari que en C
 | --- | --- | --- |
 | Casilla | `components/Casella` (`Casella` suelta, `FilaCasella` con etiqueta) | `<input type="checkbox">` a pelo |
 | Campo de texto | `ui/input` | Un `<input>` estilado a mano |
-| Desplegable | `ui/select`, o un `<select>` nativo con `text-base md:text-sm` (§2 regla 1) | Un `<select>` sin ese tamaño: iOS amplía la página y no lo deshace |
+| Desplegable | `components/Desplegable` (el `Select` de shadcn con la API del nativo; `mida="sm"` en filtros) | Un `<select>` nativo: cada sistema lo pinta a su manera (borde azul, flecha propia) y no casa con el resto |
 
 ⚠️ **`size-5` NO basta dentro de un flex, y ese era el fallo de verdad**: fija el tamaño
 *preferido*, no el mínimo, así que una casilla junto a una etiqueta larga **se deja

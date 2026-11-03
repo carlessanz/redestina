@@ -32,7 +32,7 @@ export default function BotoIcona({ icona: Icona, etiqueta, motiu, className, va
       variant={variant}
       size="icon"
       aria-label={etiqueta}
-      className={cn('size-11 md:size-8', className)}
+      className={cn('size-11 md:size-7', className)}
     >
       <Icona className="size-4" aria-hidden />
     </Button>

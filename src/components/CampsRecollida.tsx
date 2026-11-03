@@ -9,13 +9,15 @@
 // Controlado desde fuera: quien lo usa guarda el día y la hora, y decide si con uno solo de
 // los dos se puede enviar (el Mercat dice que no: `mk.need_dia_hora`).
 //
-// ⚠️ `grid-cols-1` explícito y `text-base md:text-sm` en el `<select>` (§2, reglas 1 y 5).
+// ⚠️ `grid-cols-1` explícito (§2, regla 5); el `text-base md:text-sm` de la hora ya lo trae
+//    el `Desplegable` (regla 1).
 
 import { useT } from '../lib/i18n'
 import { avuiLocal } from '../lib/format'
 import { horesDins } from '../lib/franja'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import Desplegable from './Desplegable'
 
 interface Props {
   /** Prefijo de los `id` de los dos campos: dos formularios en la misma pantalla no los comparten. */
@@ -47,13 +49,8 @@ export default function CampsRecollida({
       </div>
       <div>
         <Label htmlFor={`${idPrefix}-hora`} className="mb-1.5 block text-xs text-muted-foreground">{t('mk.hora_rec')}</Label>
-        <select id={`${idPrefix}-hora`} value={hora} onChange={(e) => onHora(e.target.value)}
-          className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm">
-          <option value="">—</option>
-          {horesDins(inici, fi).map((h) => (
-            <option key={h} value={h}>{h}</option>
-          ))}
-        </select>
+        <Desplegable id={`${idPrefix}-hora`} value={hora} onChange={onHora} buit="—"
+          opcions={horesDins(inici, fi).map((h) => ({ valor: h, text: h }))} />
       </div>
       {ajuda && <p className="text-xs text-muted-foreground sm:col-span-2">{ajuda}</p>}
     </div>

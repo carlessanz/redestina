@@ -88,13 +88,13 @@ export default function DiagnosticDetall() {
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-9">
+          <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-8">
             <Link to="/equip/diagnostics">
               <ArrowLeft className="size-4" aria-hidden />
               {t('diagd.back_list')}
             </Link>
           </Button>
-          <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-9">
+          <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-8">
             <Link to={`${tornar}/${id}`}>{t('diagd.go_record')}</Link>
           </Button>
         </div>

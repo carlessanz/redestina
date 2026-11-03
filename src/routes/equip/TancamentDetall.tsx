@@ -237,7 +237,7 @@ function DialegSimula({
                 type="button"
                 size="sm"
                 variant={pct === p ? 'default' : 'outline'}
-                className="h-11 whitespace-normal md:h-9"
+                className="h-11 whitespace-normal md:h-8"
                 onClick={() => setPct(p)}
               >
                 {t(p === '0' ? 'tan.sim_exact' : 'tan.sim_dev', { p })}
@@ -857,7 +857,7 @@ export default function TancamentDetall() {
 
   return (
     <div className="space-y-4">
-      <Button asChild variant="ghost" size="sm" className="h-11 -ml-2 md:h-9">
+      <Button asChild variant="ghost" size="sm" className="h-11 -ml-2 md:h-8">
         <Link to="/equip/tancament"><ArrowLeft className="mr-1 size-4" />{t('c.back')}</Link>
       </Button>
 
@@ -909,7 +909,7 @@ export default function TancamentDetall() {
               <div className="flex flex-wrap gap-2">
                 <BotoAmbMotiu
                   variant={accioSeguent === 'calcula' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-9"
+                  className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || !editable}
                   motiu={motiuTancat}
                   onClick={() => void calcula()}
@@ -918,7 +918,7 @@ export default function TancamentDetall() {
                 </BotoAmbMotiu>
                 <BotoAmbMotiu
                   variant={accioSeguent === 'resum' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-9"
+                  className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || !editable}
                   motiu={motiuTancat}
                   onClick={() => void resumsProvisionals()}
@@ -927,7 +927,7 @@ export default function TancamentDetall() {
                 </BotoAmbMotiu>
                 <BotoAmbMotiu
                   variant={accioSeguent === 'tanca' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-9"
+                  className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || !editable}
                   motiu={motiuTancat}
                   onClick={() => void tanca()}
@@ -936,7 +936,7 @@ export default function TancamentDetall() {
                 </BotoAmbMotiu>
                 <BotoAmbMotiu
                   variant={accioSeguent === 'certificats' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-9"
+                  className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || cap?.estado !== 'tancat'
                     || bloquejaProvisionals(provisionals, cap?.modo)
                     || totals.pendentsCert === 0}
@@ -947,7 +947,7 @@ export default function TancamentDetall() {
                 </BotoAmbMotiu>
                 <BotoAmbMotiu
                   variant={accioSeguent === 'declara' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-9"
+                  className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || !potDeclarar}
                   motiu={motiuDeclarar}
                   onClick={() => void declara()}
@@ -962,7 +962,7 @@ export default function TancamentDetall() {
                 <div className="flex flex-wrap gap-2">
                   <Button
                     variant="outline"
-                    className="h-11 whitespace-normal md:h-9"
+                    className="h-11 whitespace-normal md:h-8"
                     onClick={() => void exporta182()}
                   >
                     {t('tan.a_export_182')}
@@ -970,7 +970,7 @@ export default function TancamentDetall() {
                   {esProva && (
                     <Button
                       variant="destructive"
-                      className="h-11 whitespace-normal md:h-9"
+                      className="h-11 whitespace-normal md:h-8"
                       disabled={ocupat}
                       onClick={() => setReinici(true)}
                     >
@@ -1054,7 +1054,7 @@ export default function TancamentDetall() {
                 se le esconde (§6ter). `w-full sm:w-auto`: con `shrink-0` de serie, el
                 `whitespace-normal` solo no basta en móvil (§2, regla 2). */}
             <BotoAmbMotiu
-              className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+              className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
               disabled={ocupat || motiuCtTots !== undefined}
               motiu={motiuCtTots}
               onClick={() => void certificatsCtTots()}
@@ -1147,12 +1147,12 @@ export default function TancamentDetall() {
               <p className="text-xs text-muted-foreground">{t('tan.cmp_format')}</p>
             </div>
             <div className="flex flex-wrap gap-2">
-              <Button className="h-11 whitespace-normal md:h-9" onClick={() => void compara()}>
+              <Button className="h-11 whitespace-normal md:h-8" onClick={() => void compara()}>
                 {t('tan.cmp_do')}
               </Button>
               <Button
                 variant="outline"
-                className="h-11 whitespace-normal md:h-9"
+                className="h-11 whitespace-normal md:h-8"
                 onClick={plantillaComparacio}
               >
                 {t('tan.cmp_template')}

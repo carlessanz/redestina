@@ -19,6 +19,7 @@ import type { EntidadPuntuada } from '../../../lib/redestina'
 import { supabase } from '../../../lib/supabase'
 import MissatgesDelPunt from '../../MissatgesDelPunt'
 import BotoCopiar from '../../BotoCopiar'
+import Desplegable from '../../Desplegable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Label } from '@/components/ui/label'
@@ -86,7 +87,7 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
             <>
               <pre className="max-h-64 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted/50 p-3 font-sans text-sm">{text}</pre>
               <BotoCopiar text={text} etiqueta={t('cfase.copia_text')} size="default"
-                className="h-11 w-full whitespace-normal sm:w-auto md:h-9" />
+                className="h-11 w-full whitespace-normal sm:w-auto md:h-8" />
             </>
           )
           : <p className="text-sm text-muted-foreground">{t('od.no_text')}</p>}
@@ -140,7 +141,7 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
                   })}
                 </ul>
               )}
-        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
           <Link to={`/equip/ofertes/${extra.oferta.id}`}>{t('cfase.ranking_complet')}</Link>
         </Button>
       </div>
@@ -152,21 +153,19 @@ export default function FaseDistribucio({ c }: { c: ContextFase }) {
             <Label htmlFor="cd-manual-entitat" className="mb-1.5 block text-xs text-muted-foreground">
               {t('cfase.altra_entitat')}
             </Label>
-            <select
+            <Desplegable
               id="cd-manual-entitat"
-              className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm"
               value={entitatManual}
-              onChange={(ev) => setEntitatManual(ev.target.value)}
-            >
-              <option value="">—</option>
-              {entitats.map((e) => <option key={e.id} value={e.id}>{e.nombre}</option>)}
-            </select>
+              onChange={setEntitatManual}
+              buit="—"
+              opcions={entitats.map((e) => ({ valor: e.id, text: e.nombre }))}
+            />
           </div>
           <BotoCopiar
             text={text}
             etiqueta={t('manual.copy_mark')}
             size="default"
-            className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+            className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
             disabled={ocupat || !entitatManual || !disponible || jaResposta(entitatManual)}
             onCopiat={() => void marca(entitatManual)}
           />

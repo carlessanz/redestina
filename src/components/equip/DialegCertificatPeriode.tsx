@@ -224,14 +224,14 @@ export default function DialegCertificatPeriode(
         <div className="flex flex-wrap gap-2">
           <Button
             variant={calcul ? 'outline' : 'default'}
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             disabled={ocupat}
             onClick={() => void calcula()}
           >
             {t('cdp.a_calc')}
           </Button>
           <BotoAmbMotiu
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             disabled={ocupat || motiuEmetre !== undefined}
             motiu={motiuEmetre}
             onClick={() => void emet()}
@@ -263,7 +263,7 @@ export default function DialegCertificatPeriode(
                 <p className="text-sm text-muted-foreground">{t('cdp.rev_hint')}</p>
                 <Label htmlFor="cdp-nota">{t('tan.f_rev_nota')}</Label>
                 <Input id="cdp-nota" value={nota} onChange={(e) => setNota(e.target.value)} />
-                <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+                <Button variant="outline" className="h-11 whitespace-normal md:h-8"
                   disabled={ocupat || nota.trim() === ''} onClick={() => void aprovaEnNom()}>
                   {t('tan.a_rev_equip')}
                 </Button>

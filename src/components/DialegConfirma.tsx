@@ -69,12 +69,12 @@ export function useConfirma() {
           )}
         </DialogHeader>
         <DialogFooter>
-          <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => tanca(false)}>
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => tanca(false)}>
             {t('c.cancel')}
           </Button>
           <Button
             variant={opcions?.destructiu ? 'destructive' : 'default'}
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             onClick={() => tanca(true)}
           >
             {opcions?.confirmar ?? t('c.ok')}
@@ -135,14 +135,14 @@ export function useTria() {
           )}
         </DialogHeader>
         <DialogFooter className="flex-col gap-2 sm:flex-row sm:flex-wrap">
-          <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => tanca(null)}>
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => tanca(null)}>
             {t('c.cancel')}
           </Button>
           {opcions?.opcions.map((o) => (
             <Button
               key={o.valor}
               variant={o.destructiu ? 'destructive' : 'default'}
-              className="h-11 whitespace-normal md:h-9"
+              className="h-11 whitespace-normal md:h-8"
               onClick={() => tanca(o.valor)}
             >
               {o.text}

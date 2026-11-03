@@ -23,6 +23,7 @@ import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { supabase } from '../../lib/supabase'
 import FormulariNovaOferta from '../FormulariNovaOferta'
+import Desplegable from '../Desplegable'
 import type { ResultatNovaOferta } from '../FormulariNovaOferta'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -106,16 +107,14 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
               <Label htmlFor="dnoa-productor" className="mb-1 block text-xs text-muted-foreground">
                 {t('canalz.c_productor')}
               </Label>
-              <select
+              <Desplegable
                 id="dnoa-productor"
                 name="productor"
-                className="h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
                 value={triat}
-                onChange={(e) => setTriat(e.target.value)}
-              >
-                <option value="">—</option>
-                {visibles.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-              </select>
+                onChange={setTriat}
+                buit="—"
+                opcions={visibles.map((p) => ({ valor: p.id, text: p.nom }))}
+              />
             </div>
           </div>
 

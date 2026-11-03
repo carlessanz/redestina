@@ -181,7 +181,7 @@ export default function RegistraRecollida({
           <PackageCheck className="size-4 shrink-0" aria-hidden />{t('rrec.crida_t')}
         </p>
         <p className="text-sm">{t(venda ? 'rrec.crida_venda' : 'rrec.crida')}</p>
-        <Button className="h-11 w-full sm:w-auto md:h-9" onClick={obre}>{t('rrec.obre')}</Button>
+        <Button className="h-11 w-full sm:w-auto md:h-8" onClick={obre}>{t('rrec.obre')}</Button>
       </div>
     )
   }
@@ -275,8 +275,8 @@ export default function RegistraRecollida({
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
 
       <div className="flex flex-col-reverse gap-2 sm:flex-row sm:justify-end">
-        <Button variant="outline" className="h-11 md:h-9" onClick={tanca} disabled={ocupat}>{t('c.cancel')}</Button>
-        <Button className="h-11 whitespace-normal md:h-9" onClick={confirma} disabled={ocupat}>
+        <Button variant="outline" className="h-11 md:h-8" onClick={tanca} disabled={ocupat}>{t('c.cancel')}</Button>
+        <Button className="h-11 whitespace-normal md:h-8" onClick={confirma} disabled={ocupat}>
           {ocupat && <Loader2 className="animate-spin" />}
           {t(assistit ? 'rrec.as_go' : 'rrec.go')}
         </Button>

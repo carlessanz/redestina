@@ -256,7 +256,7 @@ export function Interessos() {
         <div role="tablist" className="mb-2 flex flex-wrap gap-2">
           {(['interessos', 'per_a_tu'] as const).map((p) => (
             <Button key={p} role="tab" aria-selected={pestanya === p} type="button" size="sm"
-              variant={pestanya === p ? 'default' : 'outline'} className="h-11 md:h-9"
+              variant={pestanya === p ? 'default' : 'outline'} className="h-11 md:h-8"
               onClick={() => setPestanya(p)}>
               {t(p === 'interessos' ? 'int.tab_meus' : 'int.tab_per_a_tu')}
               {p === 'per_a_tu' && perATu.length > 0 && (
@@ -413,11 +413,11 @@ export function Interessos() {
                 <BadgeEstat clase={est.clase}>{t(est.key)}</BadgeEstat>
                 {perDemanar && (
                   <div className="flex flex-col gap-2 sm:flex-row">
-                    <Button variant="outline" className="h-11 md:h-9" disabled={declinant}
+                    <Button variant="outline" className="h-11 md:h-8" disabled={declinant}
                       onClick={() => void declina(obert)}>
                       {t('int.no_minteressa')}
                     </Button>
-                    <Button asChild className="h-11 md:h-9">
+                    <Button asChild className="h-11 md:h-8">
                       <Link to="/receptor/mercat">{t('int.a_mercat')}</Link>
                     </Button>
                   </div>
@@ -627,7 +627,7 @@ export function Historic() {
               </div>
               {alb?.numero_completo && (
                 <DialogFooter>
-                  <Button asChild variant="outline" className="h-11 md:h-9">
+                  <Button asChild variant="outline" className="h-11 md:h-8">
                     <Link to="/receptor/documents">{t('hist.a_documents')}</Link>
                   </Button>
                 </DialogFooter>

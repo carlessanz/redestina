@@ -87,7 +87,7 @@ export default function GestorWhitelist({
               onChange={(e) => { setClave(e.target.value); setError(null) }} />
             <Input className="flex-1" placeholder={placeholderEtiqueta} value={etiqueta}
               onChange={(e) => setEtiqueta(e.target.value)} />
-            <Button className="h-11 whitespace-normal md:h-9" onClick={async () => {
+            <Button className="h-11 whitespace-normal md:h-8" onClick={async () => {
               const err = await onAdd(clave, etiqueta)
               if (err) { setError(err); return }
               setClave(''); setEtiqueta('')

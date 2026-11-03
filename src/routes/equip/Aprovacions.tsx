@@ -890,7 +890,7 @@ export default function Aprovacions() {
                   >
                     {/* El detalle sigue a un clic: aquí no caben el resto de respuestas ni
                         el ranking de entidades, y a veces son justo lo que hay que mirar. */}
-                    <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-9"
+                    <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-8"
                       onClick={() => navigate(`/equip/ofertes/${f.excedente_id}`)}>
                       {t('appr.open')}
                     </Button>
@@ -963,12 +963,12 @@ export default function Aprovacions() {
                     )}
                   </div>
                   <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
-                    <BotoAmbMotiu size="sm" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                    <BotoAmbMotiu size="sm" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                       disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
                       onClick={() => obreValidacio(r)}>
                       {t('vrec.go')}
                     </BotoAmbMotiu>
-                    <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-9"
+                    <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                       disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
                       onClick={() => setMotiuDe({ tipus: 'recollida', recollida: r })}>
                       {t('vrec.ret_go')}
@@ -1138,11 +1138,11 @@ function DialegValidacio({
         )}
 
         <DialogFooter className="flex-col-reverse gap-2 sm:flex-row">
-          <Button variant="outline" className="h-11 md:h-9" disabled={ocupat} onClick={onTancar}>
+          <Button variant="outline" className="h-11 md:h-8" disabled={ocupat} onClick={onTancar}>
             {t(fet ? 'c.close' : 'c.cancel')}
           </Button>
           {!fet && (
-            <Button className="h-11 whitespace-normal md:h-9" disabled={ocupat} onClick={onConfirma}>
+            <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat} onClick={onConfirma}>
               {ocupat && <Loader2 className="size-4 animate-spin" />}{t('vrec.dlg_go')}
             </Button>
           )}

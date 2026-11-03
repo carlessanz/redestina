@@ -171,7 +171,7 @@ export default function PendentsEquip() {
                   {sub && <p className="text-sm text-muted-foreground">{sub}</p>}
                 </div>
               </div>
-              <Button asChild className="h-11 shrink-0 whitespace-normal md:h-9">
+              <Button asChild className="h-11 shrink-0 whitespace-normal md:h-8">
                 <Link to={desti}>{t(`pe.${f.cua}_cta`)}</Link>
               </Button>
             </div>

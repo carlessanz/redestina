@@ -140,7 +140,7 @@ export default function Canalitzacio() {
         </div>
         {/* Empezar un lote, que es lo que faltaba: hasta ahora solo se podían continuar los
             que ya existían, porque el alta asistida vivía DENTRO del ciclo. */}
-        <Button className="h-11 whitespace-normal md:h-9" onClick={() => setDlgNova(true)}>
+        <Button className="h-11 whitespace-normal md:h-8" onClick={() => setDlgNova(true)}>
           {t('canalz.nova_oferta')}
         </Button>
       </div>

@@ -316,12 +316,12 @@ export default function Productes() {
                                 <Input id="cost-motiu" value={motiu} onChange={(e) => setMotiu(e.target.value)} />
                               </div>
                               <div className="flex flex-wrap gap-2">
-                                <Button type="submit" className="h-11 w-full sm:w-auto md:h-9" disabled={ocupat}>
+                                <Button type="submit" className="h-11 w-full sm:w-auto md:h-8" disabled={ocupat}>
                                   {t('c.save')}
                                 </Button>
                                 <Button
                                   type="button" variant="outline"
-                                  className="h-11 w-full sm:w-auto md:h-9"
+                                  className="h-11 w-full sm:w-auto md:h-8"
                                   disabled={ocupat}
                                   onClick={() => setEditant(null)}
                                 >

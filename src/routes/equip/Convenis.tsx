@@ -22,14 +22,12 @@ import { dataCurta } from '../../lib/albarans'
 import { ESTATS_CONVENI, TIPUS_CONVENI, estilEstatConveni, nomOrganitzacio } from '../../lib/convenis'
 import type { ConvenioEstado, ConvenioTipo } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
+import Desplegable from '../../components/Desplegable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -51,8 +49,6 @@ interface Fila {
 }
 
 interface Org { nom: string; comarca: string | null }
-
-const TOTS = '__tots'
 
 /**
  * Lo que una columna escondida por ancho deja de enseñar, en una línea bajo la organización
@@ -86,9 +82,10 @@ export default function Convenis() {
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
-  const [estat, setEstat] = useState<string>(TOTS)
-  const [tipus, setTipus] = useState<string>(TOTS)
-  const [comarca, setComarca] = useState<string>(TOTS)
+  // '' = «Tots» (la opción vacía de `Desplegable`).
+  const [estat, setEstat] = useState('')
+  const [tipus, setTipus] = useState('')
+  const [comarca, setComarca] = useState('')
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas va en UN literal (§7, deuda 46): partida, supabase-js pierde
@@ -150,10 +147,10 @@ export default function Convenis() {
 
   const visibles = useMemo(() => {
     return files.filter((f) => {
-      if (estat !== TOTS && f.estado !== estat) return false
-      if (tipus !== TOTS && f.tipo !== tipus) return false
+      if (estat && f.estado !== estat) return false
+      if (tipus && f.tipo !== tipus) return false
       const o = orgDe(f)
-      if (comarca !== TOTS && (o.comarca ?? '') !== comarca) return false
+      if (comarca && (o.comarca ?? '') !== comarca) return false
       return casaCerca([f.numero_completo, o.nom, o.comarca, nomOrganitzacio(f.datos_org, null)], q)
     })
   }, [files, q, estat, tipus, comarca, orgDe])
@@ -166,12 +163,9 @@ export default function Convenis() {
       </CardHeader>
       <CardContent className="space-y-4">
         {/* A 360 px los cuatro controles van uno debajo de otro; desde `sm`, en dos
-            columnas. Ningún `<select>` a mano.
-            ⚠️ Pero `SelectTrigger` de shadcn NO trae `text-base md:text-sm` —solo `Input` y
-               `Textarea` lo traen (`ui/select.tsx:40` es `text-sm` a secas)—, así que hay
-               que repetirlo aquí, igual que en un `<select>` nativo (§2, regla 1). Y
-               `w-full` porque el trigger nace `w-fit` con `whitespace-nowrap`: dentro de una
-               celda de rejilla eso puede crecer más que la celda y empujar la página. */}
+            columnas. Los desplegables son `Desplegable`, que ya trae `text-base md:text-sm`
+            (§2, regla 1) y `w-full min-w-0`; van a la altura normal y no a `sm` para casar
+            con el buscador de al lado, que es un `Input` con su etiqueta encima. */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           <div className="space-y-1.5">
             <Label htmlFor="conv-cerca">{t('c.search')}</Label>
@@ -180,37 +174,18 @@ export default function Convenis() {
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="conv-estat">{t('conv.f_status')}</Label>
-            <Select value={estat} onValueChange={setEstat}>
-              <SelectTrigger id="conv-estat" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
-                {ESTATS_CONVENI.map((e) => (
-                  <SelectItem key={e} value={e}>{t(`conv.st_${e}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Desplegable id="conv-estat" value={estat} onChange={setEstat} buit={t('conv.all')}
+              opcions={ESTATS_CONVENI.map((e) => ({ valor: e, text: t(`conv.st_${e}`) }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="conv-tipus">{t('conv.f_model')}</Label>
-            <Select value={tipus} onValueChange={setTipus}>
-              <SelectTrigger id="conv-tipus" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
-                {TIPUS_CONVENI.map((x) => (
-                  <SelectItem key={x} value={x}>{t(`sig.model_${x}`)}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <Desplegable id="conv-tipus" value={tipus} onChange={setTipus} buit={t('conv.all')}
+              opcions={TIPUS_CONVENI.map((x) => ({ valor: x, text: t(`sig.model_${x}`) }))} />
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="conv-comarca">{t('conv.f_region')}</Label>
-            <Select value={comarca} onValueChange={setComarca}>
-              <SelectTrigger id="conv-comarca" className="w-full text-base md:text-sm"><SelectValue /></SelectTrigger>
-              <SelectContent>
-                <SelectItem value={TOTS}>{t('conv.all')}</SelectItem>
-                {comarques.map((c) => <SelectItem key={c} value={c}>{c}</SelectItem>)}
-              </SelectContent>
-            </Select>
+            <Desplegable id="conv-comarca" value={comarca} onChange={setComarca} buit={t('conv.all')}
+              opcions={comarques.map((c) => ({ valor: c, text: c }))} />
           </div>
         </div>
 

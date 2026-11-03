@@ -56,11 +56,11 @@ export default function ValidacioOferta({
       <p className="mt-1 text-sm text-aviso">{t('val.banner_d')}</p>
       {motiu && <p className="mt-1 text-sm text-aviso">{motiu}</p>}
       <div className="mt-2 flex flex-wrap gap-2">
-        <BotoAmbMotiu className="h-11 md:h-9" disabled={!potAprovar || ocupat} motiu={motiu}
+        <BotoAmbMotiu className="h-11 md:h-8" disabled={!potAprovar || ocupat} motiu={motiu}
           onClick={() => void valida()}>
           {t('val.cta')}
         </BotoAmbMotiu>
-        <BotoAmbMotiu className="h-11 md:h-9" variant="outline" disabled={!potAprovar || ocupat} motiu={motiu}
+        <BotoAmbMotiu className="h-11 md:h-8" variant="outline" disabled={!potAprovar || ocupat} motiu={motiu}
           onClick={() => setRebutjant(true)}>
           {t('val.reject')}
         </BotoAmbMotiu>

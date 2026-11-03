@@ -76,7 +76,7 @@ export default function FaseTancament({ c }: { c: ContextFase }) {
                   <Input id="cd-cost-motiu" value={motiu} onChange={(e) => setMotiu(e.target.value)} />
                 </div>
                 <div className="sm:col-span-3">
-                  <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-9" disabled={ocupat}
+                  <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={ocupat}
                     onClick={() => void desaCost()}>
                     {t('cost.a_set')}
                   </Button>
@@ -100,7 +100,7 @@ export default function FaseTancament({ c }: { c: ContextFase }) {
       <div className="flex flex-wrap gap-2">
         {/* Al cierre CONCRETO de este ejercicio, si ya existe: ahí viven los certificados de
             donación y de transacción de este generador. */}
-        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-9">
+        <Button asChild variant="outline" className="h-11 whitespace-normal md:h-8">
           <Link to={extra.exercici?.id ? `/equip/tancament/${extra.exercici.id}` : '/equip/tancament'}>
             {t('canalz.b_tancament')}
           </Link>

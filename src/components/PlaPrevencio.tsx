@@ -201,7 +201,7 @@ export default function PlaPrevencio({
               variant="outline"
               disabled={!docVigent || descarregador.ocupat !== null}
               onClick={() => { if (docVigent) void descarregador.mostra(docVigent) }}
-              className="h-11 shrink-0 whitespace-normal md:h-9"
+              className="h-11 shrink-0 whitespace-normal md:h-8"
             >
               {descarregador.generant === docVigent
                 ? <Loader2 className="size-4 animate-spin" aria-hidden />

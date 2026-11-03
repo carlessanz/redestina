@@ -98,7 +98,7 @@ export default function TargetaDiagnostic({
         <Button
           asChild
           variant={fet ? 'outline' : 'default'}
-          className="h-11 shrink-0 whitespace-normal md:h-9"
+          className="h-11 shrink-0 whitespace-normal md:h-8"
         >
           <Link to={desti}>
             {t(clauBoto(e))}

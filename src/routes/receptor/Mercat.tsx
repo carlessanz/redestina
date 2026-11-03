@@ -38,6 +38,7 @@ import CampsRecollida from '../../components/CampsRecollida'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
+import Desplegable from '../../components/Desplegable'
 import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Button } from '@/components/ui/button'
@@ -326,32 +327,26 @@ export default function Mercat() {
           <div className="flex flex-wrap items-end gap-2 pb-1">
             <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
               <Label htmlFor="mk-f-zona" className="text-xs text-muted-foreground">{t('mk.f_zone')}</Label>
-              <select id="mk-f-zona"
-                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base sm:w-48 md:h-9 md:text-sm"
+              {/* Una comarca recordada que hoy ya no tiene ofertas se sigue ofreciendo: si no,
+                  el desplegable no podría enseñar el valor elegido. */}
+              <Desplegable id="mk-f-zona" mida="sm" className="sm:w-48"
                 value={filtres.comarca}
-                onChange={(e) => canviaFiltres({ ...filtres, comarca: e.target.value })}>
-                <option value="">{t('mk.f_all_zones')}</option>
-                {/* Una comarca recordada que hoy ya no tiene ofertas se sigue ofreciendo: si no,
-                    el select no podría enseñar el valor elegido. */}
-                {[...new Set([...opcions.comarques, ...(filtres.comarca ? [filtres.comarca] : [])])].map((c) => (
-                  <option key={c} value={c}>{c}</option>
-                ))}
-              </select>
+                onChange={(v) => canviaFiltres({ ...filtres, comarca: v })}
+                buit={t('mk.f_all_zones')}
+                opcions={[...new Set([...opcions.comarques, ...(filtres.comarca ? [filtres.comarca] : [])])]
+                  .map((c) => ({ valor: c, text: c }))} />
             </div>
             <div className="min-w-0 flex-1 space-y-1 sm:flex-none">
               <Label htmlFor="mk-f-tipus" className="text-xs text-muted-foreground">{t('mk.f_type')}</Label>
-              <select id="mk-f-tipus"
-                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base sm:w-48 md:h-9 md:text-sm"
+              <Desplegable id="mk-f-tipus" mida="sm" className="sm:w-48"
                 value={filtres.categoria}
-                onChange={(e) => canviaFiltres({ ...filtres, categoria: e.target.value as FiltresMercat['categoria'] })}>
-                <option value="">{t('mk.f_all_types')}</option>
-                {[...new Set([...opcions.categories, ...(filtres.categoria ? [filtres.categoria] : [])])].map((c) => (
-                  <option key={c} value={c}>{t(c === 'altres' ? 'mk.f_other' : `pr.o_${c}`)}</option>
-                ))}
-              </select>
+                onChange={(v) => canviaFiltres({ ...filtres, categoria: v as FiltresMercat['categoria'] })}
+                buit={t('mk.f_all_types')}
+                opcions={[...new Set([...opcions.categories, ...(filtres.categoria ? [filtres.categoria] : [])])]
+                  .map((c) => ({ valor: c, text: t(c === 'altres' ? 'mk.f_other' : `pr.o_${c}`) }))} />
             </div>
             {ambFiltre && (
-              <Button variant="ghost" className="h-11 md:h-9" onClick={() => canviaFiltres(SENSE_FILTRES)}>
+              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => canviaFiltres(SENSE_FILTRES)}>
                 {t('mk.f_clear')}
               </Button>
             )}
@@ -408,7 +403,7 @@ export default function Mercat() {
                 // ⚠️ `w-full` en móvil: con la foto de 64 px, el botón en la misma fila dejaba
                 // ~69 px al texto a 375 px y el nombre se salía (§2, regla 4).
                 <Button
-                  className="h-11 w-full sm:w-auto md:h-9"
+                  className="h-11 w-full sm:w-auto md:h-8"
                   disabled={motiu !== null}
                   title={motiu ? t(motiu) : undefined}
                   onClick={() => obre(o, 'interes')}
@@ -454,7 +449,7 @@ export default function Mercat() {
                   <div>
                     <Label htmlFor="mk-mode" className="mb-1.5 block text-xs text-muted-foreground">{t('mk.mode_q')}</Label>
                     <SelectorModalitat id="mk-mode" modalitats={obertMods} valor={modalitat} ambBuit
-                      className="h-11 w-full md:h-9" onCanvi={setModalitat} />
+                      className="h-11 w-full md:h-8" onCanvi={setModalitat} />
                     <p className="mt-1 text-xs text-muted-foreground">{t('mk.mode_help')}</p>
                   </div>
                 )}
@@ -486,7 +481,7 @@ export default function Mercat() {
             )}
             <DialogFooter>
               {mode === 'interes' ? (
-                <Button className="h-11 md:h-9" onClick={() => void envia()}
+                <Button className="h-11 md:h-8" onClick={() => void envia()}
                   disabled={enviant || obertMotiu !== null}>
                   {enviant ? t('c.sending') : t('mk.send')}
                 </Button>
@@ -496,7 +491,7 @@ export default function Mercat() {
                 </BadgeEstat>
               ) : (
                 <Button
-                  className="h-11 md:h-9"
+                  className="h-11 md:h-8"
                   disabled={obertMotiu !== null}
                   title={obertMotiu ? t(obertMotiu) : undefined}
                   onClick={() => setMode('interes')}

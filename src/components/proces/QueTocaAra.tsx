@@ -94,7 +94,7 @@ export default function QueTocaAra({
           asChild
           size="sm"
           variant={punt.emToca ? 'default' : 'outline'}
-          className="mt-3 h-11 whitespace-normal md:h-9"
+          className="mt-3 h-11 whitespace-normal md:h-8"
         >
           {/* «Fes-ho ara» solo cuando te toca; si no, «Veure-ho»: con «Res» justo encima,
               «Fes-ho ara» se contradecía. */}

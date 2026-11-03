@@ -25,8 +25,10 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
+import Desplegable from './Desplegable'
 
-const SEL = 'h-11 rounded-md border border-input bg-background px-2 text-base md:h-9 md:text-sm'
+// Las horas de la franja, de cuarto en cuarto («07:00», «07:15»…): las dos puntas eligen de aquí.
+const OPCIONS_HORA = HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).map((v) => ({ valor: v, text: v }))
 
 export default function DialegEditaOferta({
   obert, onObert, oferta, kgCanalitzats, esEquip, onFet,
@@ -147,17 +149,11 @@ export default function DialegEditaOferta({
             <p className="text-sm font-medium">{t('edit.franja')}</p>
             <div className="flex flex-wrap items-center gap-2 text-sm">
               <span className="text-muted-foreground">{t('po.franja_de')}</span>
-              <select aria-label={t('po.franja_h_inici')} className={SEL} value={inici}
-                onChange={(e) => setInici(e.target.value)}>
-                <option value="">—</option>
-                {HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <Desplegable aria-label={t('po.franja_h_inici')} className="w-24" value={inici}
+                onChange={setInici} buit="—" opcions={OPCIONS_HORA} />
               <span className="text-muted-foreground">{t('po.franja_a')}</span>
-              <select aria-label={t('po.franja_h_fi')} className={SEL} value={fi}
-                onChange={(e) => setFi(e.target.value)}>
-                <option value="">—</option>
-                {HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).map((v) => <option key={v} value={v}>{v}</option>)}
-              </select>
+              <Desplegable aria-label={t('po.franja_h_fi')} className="w-24" value={fi}
+                onChange={setFi} buit="—" opcions={OPCIONS_HORA} />
             </div>
             {errorFranja && <p className="text-xs text-error">{t('po.franja_invalida')}</p>}
           </div>
@@ -177,8 +173,8 @@ export default function DialegEditaOferta({
         </div>
 
         <DialogFooter>
-          <Button variant="outline" className="h-11 md:h-9" onClick={() => onObert(false)}>{t('c.cancel')}</Button>
-          <Button className="h-11 md:h-9" disabled={desant || Boolean(errorKg) || mods.length === 0 || errorFranja}
+          <Button variant="outline" className="h-11 md:h-8" onClick={() => onObert(false)}>{t('c.cancel')}</Button>
+          <Button className="h-11 md:h-8" disabled={desant || Boolean(errorKg) || mods.length === 0 || errorFranja}
             onClick={() => void desa()}>
             {desant ? t('c.saving') : t('edit.desa')}
           </Button>

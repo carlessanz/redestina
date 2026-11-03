@@ -157,36 +157,36 @@ export default function FormulariAprovacio({
       <label htmlFor={`${idPrefix}-kg`} className="flex flex-col gap-1 text-xs text-muted-foreground">
         {t('od.f_kg_assignats')}
         <Input id={`${idPrefix}-kg`} type="number" inputMode="decimal" min="0" step="0.01"
-          className="h-11 w-24 text-base md:h-9 md:text-sm"
+          className="h-11 w-24 text-base md:h-8 md:text-sm"
           value={kg} placeholder={t('od.kg_ph')} onChange={(e) => setKg(e.target.value)} />
       </label>
       {mods.length > 1 && (
         <label htmlFor={`${idPrefix}-mode`} className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t('mod.entrega')}
           <SelectorModalitat id={`${idPrefix}-mode`} modalitats={mods} valor={triada} ambBuit
-            className="h-11 md:h-9" onCanvi={setModalitat} />
+            className="h-11 md:h-8" onCanvi={setModalitat} />
         </label>
       )}
       <label htmlFor={`${idPrefix}-rec`} className="flex flex-col gap-1 text-xs text-muted-foreground">
         {t('appr.recollida')}
         <Input id={`${idPrefix}-rec`} type="datetime-local"
-          className="h-11 w-48 text-base md:h-9 md:text-sm"
+          className="h-11 w-48 text-base md:h-8 md:text-sm"
           value={recollida} onChange={(e) => setRecollida(e.target.value)} />
       </label>
       {ambPreuTriat && (
         <label htmlFor={`${idPrefix}-preu`} className="flex flex-col gap-1 text-xs text-muted-foreground">
           {t('od.rs_preu_venda')}
           <Input id={`${idPrefix}-preu`} type="number" inputMode="decimal" step="0.01" min="0"
-            className="h-11 w-24 text-base md:h-9 md:text-sm"
+            className="h-11 w-24 text-base md:h-8 md:text-sm"
             value={preu} placeholder={t('od.rs_preu')} onChange={(e) => setPreu(e.target.value)} />
         </label>
       )}
-      <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-9"
+      <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-8"
         disabled={bloquejat} motiu={motiu}
         onClick={() => void aprova()}>
         {t('od.approve')}
       </BotoAmbMotiu>
-      <BotoAmbMotiu size="sm" variant="outline" className="h-11 whitespace-normal md:h-9"
+      <BotoAmbMotiu size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
         disabled={ocupat || !potAprovar} motiu={motiuRol}
         onClick={() => setRebutjant(true)}>
         {t('od.reject_appr')}

@@ -50,6 +50,7 @@ import { HORES, QUARTS, esFranjaValida } from '../lib/franja'
 import type { Franja } from '../lib/franja'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
+import Desplegable from './Desplegable'
 import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
@@ -65,6 +66,10 @@ import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/component
 import { ddmmaaaaAIso, interpretaEsborrany, isoADdmmaaaa, type Esborrany } from '../lib/esborranyOferta'
 
 type Datos = Record<string, unknown>
+
+/** Las opciones de los desplegables de la franja: horas por un lado, cuartos por otro. */
+const OPCIONS_HORES = HORES.map((h) => ({ valor: h, text: h }))
+const OPCIONS_QUARTS = QUARTS.map((q) => ({ valor: q, text: q }))
 
 /** Quien ya ha publicado alguna vez no necesita releer el proceso cada vez. */
 const CLAU_PROCES_VIST = 'redestina-proces-vist'
@@ -442,62 +447,42 @@ export default function FormulariNovaOferta(
     const valor = datos[campo.clave]
     const id = idDe(campo.clave)
     const invalid = campsFaltants.has(campo.clave)
-    // ⚠️ `text-base md:text-sm` NO es cosmético: iOS Safari amplía la página al enfocar
-    // cualquier control por debajo de 16px, y como el viewport renuncia a propósito a
-    // `maximum-scale` (accesibilidad), NO deshace el zoom al salir del campo. Con
-    // `text-sm` a secas, tocar el primer desplegable dejaba el resto del formulario —13
-    // campos— ampliado y desplazándose en horizontal. Es el mismo patrón que ya usa
-    // `components/ui/input.tsx`, y por eso los <input> nunca tuvieron el problema.
-    // La altura pasa de h-10 a h-9 para que dejen de alternar con los Input.
-    // El `<select>` nativo no trae de serie la variante `aria-invalid:` que sí llevan
-    // `Input`/`Textarea` de shadcn (`ui/input.tsx`): hay que repetirla aquí, igual que ya
-    // hay que repetir `text-base md:text-sm` (§2bis).
-    const comuns = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm aria-invalid:border-destructive aria-invalid:ring-destructive/20'
+    // Los desplegables son `Desplegable` (03-11-2026; antes `<select>` nativos con sus clases
+    // repetidas a mano): ya traen `text-base md:text-sm` —por debajo de 16 px iOS amplía la
+    // página al enfocar y no la devuelve—, la altura de los `Input` y la variante
+    // `aria-invalid:`. El `name` viaja por su `<input hidden>`.
 
     switch (campo.tipo) {
       case 'familia':
         return (
-          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-            value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
-            <option value="">—</option>
-            {(catalogos?.familias ?? []).map((f) => (
-              <option key={f} value={f}>{etiquetaFamilia(f, catalogos, lang)}</option>
-            ))}
-          </select>
+          <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
+            value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+            opcions={(catalogos?.familias ?? []).map((f) => ({ valor: f, text: etiquetaFamilia(f, catalogos, lang) }))} />
         )
       case 'producte':
         return (
-          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-            value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}
-            disabled={!datos.familia}>
-            <option value="">—</option>
-            {productesDeFamilia.map((p) => <option key={p.nombre} value={p.nombre}>{p.nombre}</option>)}
-          </select>
+          <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
+            value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+            disabled={!datos.familia}
+            opcions={productesDeFamilia.map((p) => ({ valor: p.nombre, text: p.nombre }))} />
         )
       case 'causa':
         return (
-          <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-            value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
-            <option value="">—</option>
-            {(catalogos?.causas ?? []).map((c) => (
-              <option key={c.codigo} value={c.codigo}>{c.nombre ?? c.codigo}</option>
-            ))}
-          </select>
+          <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
+            value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+            opcions={(catalogos?.causas ?? []).map((c) => ({ valor: c.codigo, text: c.nombre ?? c.codigo }))} />
         )
       case 'ubicacio': {
         const ubis = catalogos?.ubicaciones ?? []
         return (
           <div className="space-y-2">
             {ubis.length > 0 && (
-              <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-                value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
-                <option value="">—</option>
-                {ubis.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.alias ?? u.municipio ?? t('po.place_unnamed')}{u.alias && u.municipio ? ` · ${u.municipio}` : ''}
-                  </option>
-                ))}
-              </select>
+              <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
+                value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+                opcions={ubis.map((u) => ({
+                  valor: u.id,
+                  text: `${u.alias ?? u.municipio ?? t('po.place_unnamed')}${u.alias && u.municipio ? ` · ${u.municipio}` : ''}`,
+                }))} />
             )}
             {ubis.length === 0 && !llocNou && (
               <p className="text-sm text-muted-foreground">{t('po.no_locations')}</p>
@@ -505,7 +490,7 @@ export default function FormulariNovaOferta(
             {/* Un lloc nou sense sortir del formulari: un productor pot tenir diversos
                 camps i magatzems, i obligar-lo a anar a la fitxa a mig alta és perdre'l. */}
             {!llocNou ? (
-              <Button type="button" variant="outline" className="h-11 whitespace-normal md:h-9"
+              <Button type="button" variant="outline" className="h-11 whitespace-normal md:h-8"
                 onClick={() => setLlocNou({ alias: '', maps: '', municipi: null })}>
                 <Plus className="size-4" aria-hidden /> {t('po.place_add')}
               </Button>
@@ -531,11 +516,11 @@ export default function FormulariNovaOferta(
                     onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
                 </div>
                 <div className="flex flex-wrap gap-2 sm:col-span-2">
-                  <Button type="button" className="h-11 whitespace-normal md:h-9" disabled={desantLloc}
+                  <Button type="button" className="h-11 whitespace-normal md:h-8" disabled={desantLloc}
                     onClick={() => void desaLlocNou()}>
                     {desantLloc ? t('c.saving') : t('po.place_save')}
                   </Button>
-                  <Button type="button" variant="ghost" className="h-11 md:h-9" onClick={() => setLlocNou(null)}>
+                  <Button type="button" variant="ghost" className="h-11 md:h-8" onClick={() => setLlocNou(null)}>
                     {t('c.cancel')}
                   </Button>
                 </div>
@@ -573,17 +558,15 @@ export default function FormulariNovaOferta(
             </div>
           )
         }
-        // La explicación de la opción ELEGIDA va debajo del control, no en el <option>:
-        // un `<option>` no admite más que texto plano, y las tres modalidades deciden qué
+        // La explicación de la opción ELEGIDA va debajo del control, no en la opción:
+        // una opción del desplegable es una línea corta, y las tres modalidades deciden qué
         // entidades pueden recibir la oferta y qué documento se genera.
         const triada = (campo.opciones ?? []).find((o) => o.id === String(valor ?? ''))
         return (
           <>
-            <select id={id} name={campo.clave} className={comuns} aria-invalid={invalid}
-              value={String(valor ?? '')} onChange={(e) => set(campo.clave, e.target.value)}>
-              <option value="">—</option>
-              {(campo.opciones ?? []).map((o) => <option key={o.id} value={o.id}>{o.titulo}</option>)}
-            </select>
+            <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
+              value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+              opcions={(campo.opciones ?? []).map((o) => ({ valor: o.id, text: o.titulo }))} />
             {triada?.descripcion && (
               <p className="mt-1 text-xs text-muted-foreground">{triada.descripcion}</p>
             )}
@@ -649,31 +632,29 @@ export default function FormulariNovaOferta(
             nou[clau] = h ? `${h}:${m || '00'}` : ''
             set(campo.clave, nou.inici || nou.fi ? nou : null)
           }
-          const sel = 'h-9 rounded-md border border-input bg-transparent px-2 text-base md:text-sm aria-invalid:border-destructive'
+          // Cada punta («de hh:mm», «a hh:mm») va en un bloque que no se parte: en un móvil
+          // estrecho la fila salta entre las dos puntas, nunca entre la hora y sus minutos.
+          // Los minutos no tienen opción vacía: sin hora se leen «--» y están apagados.
           return (
-            <div id={id} role="group" className="flex flex-wrap items-center gap-2 text-sm">
-              <span className="text-muted-foreground">{t('po.franja_de')}</span>
-              <select aria-label={t('po.franja_h_inici')} className={sel} aria-invalid={invalid}
-                value={hi ?? ''} onChange={(e) => posa('inici', e.target.value, mi)}>
-                <option value="">--</option>
-                {HORES.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
-              <span aria-hidden>:</span>
-              <select aria-label={t('po.franja_m_inici')} className={sel} aria-invalid={invalid}
-                value={mi ?? ''} disabled={!hi} onChange={(e) => posa('inici', hi, e.target.value)}>
-                {QUARTS.map((q) => <option key={q} value={q}>{q}</option>)}
-              </select>
-              <span className="text-muted-foreground">{t('po.franja_a')}</span>
-              <select aria-label={t('po.franja_h_fi')} className={sel} aria-invalid={invalid}
-                value={hf ?? ''} onChange={(e) => posa('fi', e.target.value, mf)}>
-                <option value="">--</option>
-                {HORES.map((h) => <option key={h} value={h}>{h}</option>)}
-              </select>
-              <span aria-hidden>:</span>
-              <select aria-label={t('po.franja_m_fi')} className={sel} aria-invalid={invalid}
-                value={mf ?? ''} disabled={!hf} onChange={(e) => posa('fi', hf, e.target.value)}>
-                {QUARTS.map((q) => <option key={q} value={q}>{q}</option>)}
-              </select>
+            <div id={id} role="group" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
+              <span className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">{t('po.franja_de')}</span>
+                <Desplegable aria-label={t('po.franja_h_inici')} className="w-18" aria-invalid={invalid}
+                  value={hi ?? ''} onChange={(v) => posa('inici', v, mi)} buit="--" opcions={OPCIONS_HORES} />
+                <span aria-hidden>:</span>
+                <Desplegable aria-label={t('po.franja_m_inici')} className="w-18" aria-invalid={invalid}
+                  value={mi ?? ''} disabled={!hi} onChange={(v) => posa('inici', hi, v)} placeholder="--"
+                  opcions={OPCIONS_QUARTS} />
+              </span>
+              <span className="flex items-center gap-1.5">
+                <span className="text-muted-foreground">{t('po.franja_a')}</span>
+                <Desplegable aria-label={t('po.franja_h_fi')} className="w-18" aria-invalid={invalid}
+                  value={hf ?? ''} onChange={(v) => posa('fi', v, mf)} buit="--" opcions={OPCIONS_HORES} />
+                <span aria-hidden>:</span>
+                <Desplegable aria-label={t('po.franja_m_fi')} className="w-18" aria-invalid={invalid}
+                  value={mf ?? ''} disabled={!hf} onChange={(v) => posa('fi', hf, v)} placeholder="--"
+                  opcions={OPCIONS_QUARTS} />
+              </span>
             </div>
           )
         }
@@ -850,28 +831,28 @@ export default function FormulariNovaOferta(
             scroll —parecía un bucle—. Aquí está siempre a la vista, junto al botón. */}
         {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
         {pasSegur > 0 && (
-          <Button variant="outline" className="h-11 whitespace-normal md:h-9" onClick={() => vesAlPas(pasSegur - 1)}>
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => vesAlPas(pasSegur - 1)}>
             <ArrowLeft className="size-4" aria-hidden /> {t('po.back')}
           </Button>
         )}
         {ultim ? (
           // Sin el convenio que toca, el botón se apaga y el motivo va escrito debajo.
           <Button
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             onClick={() => void enviar()}
             disabled={enviant || motiuConveni !== null}
           >
             {enviant ? t('c.saving') : t('po.publish')}
           </Button>
         ) : (
-          <Button className="h-11 whitespace-normal md:h-9" onClick={() => bloc && continua(bloc.camps, pasSegur + 1)}>
+          <Button className="h-11 whitespace-normal md:h-8" onClick={() => bloc && continua(bloc.camps, pasSegur + 1)}>
             {t('po.continue')} <ArrowRight className="size-4" aria-hidden />
           </Button>
         )}
         {onCancel && (
           <Button
             variant="ghost"
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             onClick={() => { if (productorId) esborraEsborrany(productorId); onCancel() }}
           >
             {t('c.cancel')}

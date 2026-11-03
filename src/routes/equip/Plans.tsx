@@ -11,14 +11,13 @@ import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { useAppContext } from '../../hooks/useAppContext'
 import BotoIcona from '../../components/BotoIcona'
+import Desplegable from '../../components/Desplegable'
 import { llistaExpedients, obrirExpedient, type Expedient } from '../../lib/expedientApi'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Label } from '@/components/ui/label'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
-const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
 
 export default function Plans() {
   const { t } = useT()
@@ -76,19 +75,18 @@ export default function Plans() {
             <div className="grid grid-cols-1 gap-3 rounded-lg border border-border p-3 sm:grid-cols-[1fr_12rem_auto] sm:items-end">
               <div className="space-y-1">
                 <Label htmlFor="plans-org" className="text-xs text-muted-foreground">{t('exp.f_organitzacio')}</Label>
-                <select id="plans-org" className={SELECT} value={tria} onChange={(e) => setTria(e.target.value)}>
-                  <option value="">—</option>
-                  {disponibles.map((p) => <option key={p.id} value={p.id}>{p.nom}</option>)}
-                </select>
+                <Desplegable id="plans-org" value={tria} onChange={setTria} buit="—"
+                  opcions={disponibles.map((p) => ({ valor: p.id, text: p.nom }))} />
               </div>
               <div className="space-y-1">
                 <Label htmlFor="plans-nivell" className="text-xs text-muted-foreground">{t('exp.f_nivell')}</Label>
-                <select id="plans-nivell" className={SELECT} value={nivell} onChange={(e) => setNivell(e.target.value as 'basic' | 'personalitzat')}>
-                  <option value="basic">{t('exp.nivell_basic')}</option>
-                  <option value="personalitzat">{t('exp.nivell_personalitzat')}</option>
-                </select>
+                <Desplegable id="plans-nivell" value={nivell} onChange={(v) => setNivell(v as 'basic' | 'personalitzat')}
+                  opcions={[
+                    { valor: 'basic', text: t('exp.nivell_basic') },
+                    { valor: 'personalitzat', text: t('exp.nivell_personalitzat') },
+                  ]} />
               </div>
-              <Button className="h-11 md:h-9" disabled={!tria || obrint} onClick={() => void obre()}>{t('exp.obre')}</Button>
+              <Button className="h-11 md:h-8" disabled={!tria || obrint} onClick={() => void obre()}>{t('exp.obre')}</Button>
             </div>
           )}
 

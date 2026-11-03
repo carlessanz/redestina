@@ -25,6 +25,7 @@ import { categoriaDeFamilia } from '../lib/filtresMercat'
 import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../lib/filtres'
 import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
 import BarraFiltres from './BarraFiltres'
+import Desplegable from './Desplegable'
 import { kg as fmtKg } from '../lib/format'
 import { useCerca } from '../hooks/useCerca'
 import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
@@ -266,12 +267,12 @@ export default function OffersList({ onOpen, accio }: Props) {
           extra={(
             <div className="min-w-0 space-y-1 md:w-44">
               <label htmlFor="off-ordre" className="text-xs text-muted-foreground">{t('fl.ordre')}</label>
-              <select id="off-ordre" value={ordre}
-                className="h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm"
-                onChange={(e) => setOrdre(e.target.value === 'recent' ? 'recent' : 'disponibilitat')}>
-                <option value="disponibilitat">{t('fl.o_disponibilitat')}</option>
-                <option value="recent">{t('fl.o_recent')}</option>
-              </select>
+              <Desplegable id="off-ordre" mida="sm" value={ordre}
+                onChange={(v) => setOrdre(v === 'recent' ? 'recent' : 'disponibilitat')}
+                opcions={[
+                  { valor: 'disponibilitat', text: t('fl.o_disponibilitat') },
+                  { valor: 'recent', text: t('fl.o_recent') },
+                ]} />
             </div>
           )}
         />

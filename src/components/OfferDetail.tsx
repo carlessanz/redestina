@@ -12,6 +12,7 @@ import { carregaTipusActivitat } from '../lib/organitzacio'
 import type { FranjaRecepcio } from '../lib/rankingEntitats'
 import { dataCurta } from '../lib/format'
 import BotoCopiar from './BotoCopiar'
+import Desplegable from './Desplegable'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useConfirma } from './DialegConfirma'
@@ -735,7 +736,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           />
           {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado) && (
             <>
-              <Button variant="outline" className="h-11 md:h-9" onClick={() => setEditant(true)}>{t('edit.cta')}</Button>
+              <Button variant="outline" className="h-11 md:h-8" onClick={() => setEditant(true)}>{t('edit.cta')}</Button>
               <DialegEditaOferta obert={editant} onObert={setEditant} oferta={exc}
                 kgCanalitzats={canalizados} esEquip onFet={recargar} />
             </>
@@ -754,7 +755,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 <p className="mt-1 text-sm text-aviso">{motiuNoConvertible}</p>
               )}
               <BotoAmbMotiu
-                className="mt-2 h-11 whitespace-normal md:h-9"
+                className="mt-2 h-11 whitespace-normal md:h-8"
                 disabled={Boolean(motiuNoConvertible)}
                 motiu={motiuNoConvertible ?? undefined}
                 onClick={() => setConvertint(true)}
@@ -844,13 +845,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {!cargandoRanking && !rankingError && tipusDelRanking.length > 1 && (
             <div className="flex flex-wrap items-center gap-2">
               <label htmlFor="od-filtre-tipus" className="text-sm text-muted-foreground">{t('od.f_type')}</label>
-              <select id="od-filtre-tipus"
-                className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+              <Desplegable id="od-filtre-tipus" mida="sm" className="w-auto"
                 value={filtreTipus}
-                onChange={(e) => { setFiltreTipus(e.target.value); setMostrats(PAS_RANKING) }}>
-                <option value="">{t('od.f_type_all', { n: ranking.length })}</option>
-                {tipusDelRanking.map((tp) => <option key={tp} value={tp}>{t(`org.tr_${tp}`)}</option>)}
-              </select>
+                onChange={(v) => { setFiltreTipus(v); setMostrats(PAS_RANKING) }}
+                buit={t('od.f_type_all', { n: ranking.length })}
+                opcions={tipusDelRanking.map((tp) => ({ valor: tp, text: t(`org.tr_${tp}`) }))} />
             </div>
           )}
           {!cargandoRanking && !rankingError && ranking.length > 0 && (
@@ -858,33 +857,27 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {comarquesDelRanking.length > 1 && (
                 <>
                   <label htmlFor="od-filtre-zona" className="text-sm text-muted-foreground">{t('fl.d_comarca')}</label>
-                  <select id="od-filtre-zona"
-                    className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                  <Desplegable id="od-filtre-zona" mida="sm" className="w-auto"
                     value={filtreComarca}
-                    onChange={(e) => { setFiltreComarca(e.target.value); setMostrats(PAS_RANKING) }}>
-                    <option value="">{t('fl.tots')}</option>
-                    {comarquesDelRanking.map((c) => <option key={c} value={c}>{c}</option>)}
-                  </select>
+                    onChange={(v) => { setFiltreComarca(v); setMostrats(PAS_RANKING) }}
+                    buit={t('fl.tots')}
+                    opcions={comarquesDelRanking.map((c) => ({ valor: c, text: c }))} />
                 </>
               )}
               <label htmlFor="od-filtre-recepcio" className="text-sm text-muted-foreground">{t('od.f_recepcio')}</label>
-              <select id="od-filtre-recepcio"
-                className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+              <Desplegable id="od-filtre-recepcio" mida="sm" className="w-auto"
                 value={filtreRecepcio}
-                onChange={(e) => { setFiltreRecepcio(e.target.value as FranjaRecepcio); setMostrats(PAS_RANKING) }}>
-                <option value="">{t('fl.tots')}</option>
-                {FRANGES_RECEPCIO.map((f) => <option key={f} value={f}>{t(`od.fr_${f}`)}</option>)}
-              </select>
+                onChange={(v) => { setFiltreRecepcio(v as FranjaRecepcio); setMostrats(PAS_RANKING) }}
+                buit={t('fl.tots')}
+                opcions={FRANGES_RECEPCIO.map((f) => ({ valor: f, text: t(`od.fr_${f}`) }))} />
               {activitatsDelRanking.length > 0 && (
                 <>
                   <label htmlFor="od-filtre-activitat" className="text-sm text-muted-foreground">{t('org.f_activitat_curt')}</label>
-                  <select id="od-filtre-activitat"
-                    className="h-9 rounded-md border border-input bg-transparent px-3 text-base md:text-sm"
+                  <Desplegable id="od-filtre-activitat" mida="sm" className="w-auto"
                     value={filtreActivitat}
-                    onChange={(e) => { setFiltreActivitat(e.target.value); setMostrats(PAS_RANKING) }}>
-                    <option value="">{t('fl.tots')}</option>
-                    {activitatsDelRanking.map((a) => <option key={a} value={a}>{nomsActivitat[a] ?? a}</option>)}
-                  </select>
+                    onChange={(v) => { setFiltreActivitat(v); setMostrats(PAS_RANKING) }}
+                    buit={t('fl.tots')}
+                    opcions={activitatsDelRanking.map((a) => ({ valor: a, text: nomsActivitat[a] ?? a }))} />
                 </>
               )}
             </div>
@@ -1129,9 +1122,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             <p className="mt-1 text-sm text-muted-foreground">{t('od.close_help')}</p>
           </CardHeader>
           <CardContent className="flex flex-wrap gap-2">
-            <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
+            <Button variant="destructive" className="h-11 whitespace-normal md:h-8"
               onClick={() => setNoColocada(true)}>{t('od.mark_uncoll')}</Button>
-            <Button variant="destructive" className="h-11 whitespace-normal md:h-9"
+            <Button variant="destructive" className="h-11 whitespace-normal md:h-8"
               onClick={() => void cancelarOferta()}>{t('od.cancel_offer')}</Button>
           </CardContent>
         </Card>

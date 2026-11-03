@@ -354,11 +354,11 @@ export default function CampanyaConvenis() {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" className="h-11 whitespace-normal md:h-9"
+            <Button variant="outline" className="h-11 whitespace-normal md:h-8"
               disabled={enviant || enviables.length === 0} onClick={triaTanda}>
               {t('camp.pick_batch', { n: TANDA })}
             </Button>
-            <BotoAmbMotiu className="h-11 whitespace-normal md:h-9"
+            <BotoAmbMotiu className="h-11 whitespace-normal md:h-8"
               disabled={enviant || triades.size === 0 || !!motiuEmail}
               motiu={motiuEmail ? t(motiuEmail) : undefined} onClick={() => void enviaTanda()}>
               {enviant && <Loader2 className="size-4 animate-spin" />}

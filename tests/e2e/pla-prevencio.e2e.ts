@@ -3,7 +3,7 @@
 // número de la serie PLA del clon).
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, productorDe, sql } from './ajuda'
+import { entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -21,7 +21,7 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
 
   await entra(page, 'superadmin')
   await page.goto('/equip/plans')
-  await page.locator('#plans-org').selectOption({ label: nom })
+  await tria(page.locator('#plans-org'), { text: nom })
   await page.getByRole('button', { name: /Obre l’expedient|Abre el expediente/ }).click()
   await expect(page).toHaveURL(/\/equip\/plans\/[0-9a-f-]{36}$/)
   const id = page.url().split('/').pop()!
@@ -30,7 +30,7 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
   const visites = page.getByTestId('exp-visites')
   await visites.getByRole('button', { name: /Afegeix|Añade/ }).click()
   await page.locator('#pla_visites-data').fill('2026-10-01')
-  await page.locator('#pla_visites-tipus').selectOption('diagnosi')
+  await tria(page.locator('#pla_visites-tipus'), 'diagnosi')
   await page.locator('#pla_visites-notes').fill('Visita inicial E2E')
   await visites.getByRole('button', { name: /^Desar$|^Guardar$/ }).click()
   await expect(visites.getByText('Visita inicial E2E')).toBeVisible()
@@ -42,7 +42,7 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
     await quant.getByRole('button', { name: /Afegeix|Añade/ }).click()
     await page.locator('#pla_quantificacio-mes').fill(mes)
     await page.locator('#pla_quantificacio-producte').fill('Tomàquet')
-    await page.locator('#pla_quantificacio-categoria').selectOption('perdua')
+    await tria(page.locator('#pla_quantificacio-categoria'), 'perdua')
     await page.locator('#pla_quantificacio-kg').fill(kg)
     await quant.getByRole('button', { name: /^Desar$|^Guardar$/ }).click()
     await expect(quant.getByText(mes)).toBeVisible()
@@ -54,7 +54,7 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
   const accions = page.getByTestId('exp-accions')
   await accions.getByRole('button', { name: /Afegeix|Añade/ }).click()
   await page.locator('#pla_accions-mesura').fill('Venda de segona categoria')
-  await page.locator('#pla_accions-estat').selectOption('en_curs')
+  await tria(page.locator('#pla_accions-estat'), 'en_curs')
   await accions.getByRole('button', { name: /^Desar$|^Guardar$/ }).click()
   await expect(accions.getByText('Venda de segona categoria')).toBeVisible()
 

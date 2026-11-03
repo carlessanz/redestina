@@ -30,6 +30,7 @@ import { crearEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada } from '../../lib/albarans'
 import { motiuConversio } from '../../lib/conversioEspigolada'
 import type { Excedente } from '../../types'
+import Desplegable from '../Desplegable'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
@@ -37,9 +38,6 @@ import {
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-
-/** `text-base md:text-sm` es obligatorio: sin él, iOS amplía la página al enfocar (§2). */
-const SELECT = 'h-9 w-full rounded-md border border-input bg-transparent px-3 text-base md:text-sm'
 
 interface Props {
   obert: boolean
@@ -209,20 +207,12 @@ export default function DialegEspigolada(
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="space-y-1.5">
               <Label htmlFor="ce-ubi">{t('esp.location')}</Label>
-              <select
-                id="ce-ubi" className={SELECT} value={ubicacio}
-                onChange={(e) => setUbicacio(e.target.value)}
+              <Desplegable
+                id="ce-ubi" value={ubicacio} onChange={setUbicacio}
                 disabled={ubicacions.length === 0}
-              >
-                <option value="">
-                  {ubicacions.length === 0 ? t('esp.no_locations') : t('c.none')}
-                </option>
-                {ubicacions.map((u) => (
-                  <option key={u.id} value={u.id}>
-                    {u.alias || u.municipio || u.id.slice(0, 8)}
-                  </option>
-                ))}
-              </select>
+                buit={ubicacions.length === 0 ? t('esp.no_locations') : t('c.none')}
+                opcions={ubicacions.map((u) => ({ valor: u.id, text: u.alias || u.municipio || u.id.slice(0, 8) }))}
+              />
             </div>
             <div className="space-y-1.5">
               <Label htmlFor="ce-data">{t('esp.date')}</Label>
@@ -251,13 +241,11 @@ export default function DialegEspigolada(
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1.5">
                 <Label htmlFor="ce-prod">{t('alb.ln_product')}</Label>
-                <select
-                  id="ce-prod" className={SELECT} value={producte}
-                  onChange={(e) => setProducte(e.target.value)}
-                >
-                  <option value="">{t('c.none')}</option>
-                  {opcions.map((p) => <option key={p} value={p}>{p}</option>)}
-                </select>
+                <Desplegable
+                  id="ce-prod" value={producte} onChange={setProducte}
+                  buit={t('c.none')}
+                  opcions={opcions.map((p) => ({ valor: p, text: p }))}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ce-var">{t('alb.ln_variety')}</Label>
@@ -272,13 +260,11 @@ export default function DialegEspigolada(
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ce-tc">{t('alb.ln_boxtype')}</Label>
-                <select
-                  id="ce-tc" className={SELECT} value={tipusCaixa}
-                  onChange={(e) => setTipusCaixa(e.target.value)}
-                >
-                  <option value="">{t('c.none')}</option>
-                  {caixes.map((c) => <option key={c.codigo} value={c.codigo}>{c.nombre}</option>)}
-                </select>
+                <Desplegable
+                  id="ce-tc" value={tipusCaixa} onChange={setTipusCaixa}
+                  buit={t('c.none')}
+                  opcions={caixes.map((c) => ({ valor: c.codigo, text: c.nombre }))}
+                />
               </div>
               <div className="space-y-1.5">
                 <Label htmlFor="ce-brut">{t('alb.ln_gross')}</Label>
@@ -307,13 +293,13 @@ export default function DialegEspigolada(
 
         <DialogFooter className="shrink-0">
           <Button
-            variant="outline" className="h-11 whitespace-normal md:h-9"
+            variant="outline" className="h-11 whitespace-normal md:h-8"
             disabled={ocupat} onClick={onTancar}
           >
             {t('c.cancel')}
           </Button>
           <Button
-            className="h-11 whitespace-normal md:h-9"
+            className="h-11 whitespace-normal md:h-8"
             disabled={ocupat} onClick={() => void desa()}
           >
             {ocupat ? t('c.saving') : t('conv_esp.create')}

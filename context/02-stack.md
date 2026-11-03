@@ -157,7 +157,8 @@ dos con la página en esos mismos 0 px):
    (accesibilidad), **no deshace el zoom al salir**. `Input`/`Textarea` de shadcn ya traen
    `text-base md:text-sm`; los `<select>` nativos de `NovaOferta` no, y tocar el primer desplegable
    dejaba los 13 campos restantes ampliados y desplazándose en horizontal. **Cualquier control
-   estilado a mano tiene que repetir ese `text-base md:text-sm`.**
+   estilado a mano tiene que repetir ese `text-base md:text-sm`.** (Desde el 03-11-2026 no queda ningún `<select>`
+   nativo —`components/Desplegable`— y la base de `ui/select` ya lo trae.)
 2. **`whitespace-nowrap` viene de serie en `Button`.** Una etiqueta larga dentro de un botón fija un
    ancho mínimo que se **propaga hacia arriba por los grids** y termina desplazando la página entera
    (pasó en `/login`: 47 px a 320 px de ancho). Si el texto de un botón puede crecer, `whitespace-normal`.

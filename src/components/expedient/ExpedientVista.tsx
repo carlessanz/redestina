@@ -20,6 +20,7 @@ import {
 import { descarregarDocumentExtern, pujarDocumentExtern } from '../../lib/documents'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { useConfirma } from '../DialegConfirma'
+import Desplegable from '../Desplegable'
 import TaulaElements, { type CampElement } from './TaulaElements'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -29,8 +30,6 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
-
-const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
 
 const ESTIL_ESTAT: Record<string, string> = {
   obert: 'bg-aviso-fondo text-aviso',
@@ -234,13 +233,13 @@ export default function ExpedientVista({
           </div>
           {aprova && (
             <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
-              <Button className="h-11 md:h-9" disabled={ocupat !== null} onClick={() => void exporta()}>
+              <Button className="h-11 md:h-8" disabled={ocupat !== null} onClick={() => void exporta()}>
                 <FileText className="size-4" aria-hidden /> {t('exp.exporta')}
               </Button>
-              <Button variant="outline" className="h-11 md:h-9" onClick={() => setVerif({ any, resum: '', conclusio: '' })}>
+              <Button variant="outline" className="h-11 md:h-8" onClick={() => setVerif({ any, resum: '', conclusio: '' })}>
                 {t('exp.verifica')}
               </Button>
-              <Button variant="outline" className="h-11 md:h-9" onClick={() => void tanca()}>{t('exp.tanca')}</Button>
+              <Button variant="outline" className="h-11 md:h-8" onClick={() => void tanca()}>{t('exp.tanca')}</Button>
             </div>
           )}
         </CardHeader>
@@ -249,20 +248,22 @@ export default function ExpedientVista({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
               <div className="space-y-1">
                 <Label htmlFor="exp-estat" className="text-xs text-muted-foreground">{t('exp.f_estat_exp')}</Label>
-                <select id="exp-estat" className={SELECT} value={ex.estat === 'verificat' ? 'en_seguiment' : ex.estat}
-                  onChange={(e) => void canviaCamp({ estat: e.target.value })}>
-                  <option value="obert">{t('exp.estat_obert')}</option>
-                  <option value="en_seguiment">{t('exp.estat_en_seguiment')}</option>
-                </select>
+                <Desplegable id="exp-estat" value={ex.estat === 'verificat' ? 'en_seguiment' : ex.estat}
+                  onChange={(v) => void canviaCamp({ estat: v })}
+                  opcions={[
+                    { valor: 'obert', text: t('exp.estat_obert') },
+                    { valor: 'en_seguiment', text: t('exp.estat_en_seguiment') },
+                  ]} />
               </div>
               {aprova && (
                 <div className="space-y-1">
                   <Label htmlFor="exp-nivell" className="text-xs text-muted-foreground">{t('exp.f_nivell')}</Label>
-                  <select id="exp-nivell" className={SELECT} value={ex.nivell}
-                    onChange={(e) => void canviaCamp({ nivell: e.target.value })}>
-                    <option value="basic">{t('exp.nivell_basic')}</option>
-                    <option value="personalitzat">{t('exp.nivell_personalitzat')}</option>
-                  </select>
+                  <Desplegable id="exp-nivell" value={ex.nivell}
+                    onChange={(v) => void canviaCamp({ nivell: v })}
+                    opcions={[
+                      { valor: 'basic', text: t('exp.nivell_basic') },
+                      { valor: 'personalitzat', text: t('exp.nivell_personalitzat') },
+                    ]} />
                 </div>
               )}
             </div>
@@ -286,8 +287,8 @@ export default function ExpedientVista({
                 </div>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button className="h-11 md:h-9" disabled={ocupat !== null} onClick={() => void verifica()}>{t('exp.verifica')}</Button>
-                <Button variant="outline" className="h-11 md:h-9" onClick={() => setVerif(null)}>{t('c.cancel')}</Button>
+                <Button className="h-11 md:h-8" disabled={ocupat !== null} onClick={() => void verifica()}>{t('exp.verifica')}</Button>
+                <Button variant="outline" className="h-11 md:h-8" onClick={() => setVerif(null)}>{t('c.cancel')}</Button>
               </div>
             </div>
           )}
@@ -309,8 +310,8 @@ export default function ExpedientVista({
                 <p className="text-xs text-muted-foreground">{t('exp.h_equip')}</p>
               </div>
               <div className="flex flex-wrap gap-2">
-                <Button className="h-11 md:h-9" disabled={ocupat !== null} onClick={() => void desaCapcalera()}>{t('c.save')}</Button>
-                <Button variant="outline" className="h-11 md:h-9" onClick={() => setCap(null)}>{t('c.cancel')}</Button>
+                <Button className="h-11 md:h-8" disabled={ocupat !== null} onClick={() => void desaCapcalera()}>{t('c.save')}</Button>
+                <Button variant="outline" className="h-11 md:h-8" onClick={() => setCap(null)}>{t('c.cancel')}</Button>
               </div>
             </div>
           ) : (
@@ -337,7 +338,7 @@ export default function ExpedientVista({
               </div>
               {pot && (
                 <div className="md:col-span-3">
-                  <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" onClick={() => setCap({
+                  <Button variant="outline" className="h-11 w-full sm:w-auto md:h-8" onClick={() => setCap({
                     context: ex.context ?? '',
                     objectius: ex.objectius_estrategics.join('\n'),
                     equip: ex.equip.map((e) => [e.nom, e.carrec].filter(Boolean).join(', ')).join('\n'),
@@ -381,7 +382,7 @@ export default function ExpedientVista({
                 <p className="mt-1 text-sm text-muted-foreground">{t('exp.h_comparativa')}</p>
               </div>
               {pot && (
-                <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" disabled={ocupat !== null} onClick={() => void importa()}>
+                <Button variant="outline" className="h-11 w-full sm:w-auto md:h-8" disabled={ocupat !== null} onClick={() => void importa()}>
                   <Download className="size-4" aria-hidden /> {t('exp.importa', { any })}
                 </Button>
               )}
@@ -464,7 +465,7 @@ export default function ExpedientVista({
                 <p className="mt-1 text-sm text-muted-foreground">{t('exp.h_evidencies')}</p>
               </div>
               {pot && (
-                <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium sm:w-auto md:h-9">
+                <label className="inline-flex h-11 w-full cursor-pointer items-center justify-center gap-2 rounded-md border border-input bg-background px-3 text-sm font-medium sm:w-auto md:h-8">
                   <Upload className="size-4" aria-hidden /> {t('exp.puja_evidencia')}
                   <input type="file" accept="application/pdf,image/jpeg,image/png" className="sr-only"
                     onChange={(e) => { const f = e.target.files?.[0]; e.target.value = ''; if (f) void pujaEvidencia(f) }} />

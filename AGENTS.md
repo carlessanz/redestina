@@ -98,7 +98,7 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
   `/version.json` + `useVersioNova` avisan de versión nueva.
   Aviso de instalación solo en móvil (dispositivo, no ancho) para productor y receptor.
 - **Siete reglas de móvil medidas** (detalle en `context/02-stack.md`): controles ≥16 px
-  (`text-base md:text-sm`, también en `SelectTrigger` y `<select>`); `Button` trae
+  (`text-base md:text-sm`, ya en la base de `ui/`); `Button` trae
   `whitespace-nowrap` **y `shrink-0`** (ancho explícito `w-full sm:w-auto` si el texto crece);
   `env(safe-area-inset-*)`; en una fila texto+botón el botón va a su línea en móvil
   (`flex-wrap`, `min-w-0 flex-1 basis-*`); `grid-cols-1` explícito antes de `sm:grid-cols-2`;
@@ -118,7 +118,8 @@ Reglas: **ningún hex ni clase de la paleta genérica de Tailwind**; solo las cl
 `index.css` se deriva a mano de `tokens.json` (y los colores del correo viven en
 `_shared/resend.ts`). Logo en seis variantes en `public/`; `logo-email.png` es el logo en color
 (cabecera de correo clara); el sello `segell-redestina.svg` va sin texto. Ningún control de
-formulario estilado a mano (`components/Casella`, `ui/input`, `ui/select`). Badge sobre fondo de
+formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
+`<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
 color = chip blanco con texto en color. `{n}` reservado a contadores (singular `<clau>_1`). Sin
 modo oscuro. Dos h2 de la portada van en `coral-oscuro` por decisión del cliente (2,85:1).
 
