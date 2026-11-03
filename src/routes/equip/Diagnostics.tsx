@@ -15,7 +15,8 @@
 // Se filtra en cliente sobre lo ya cargado, como `Convenis` y `Albarans` (deuda §12.5).
 
 import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useNavigate } from 'react-router'
+import { Eye } from 'lucide-react'
 import { dataCurta } from '../../lib/format'
 import { useT } from '../../lib/i18n'
 import { casaCerca } from '../../lib/cerca'
@@ -24,8 +25,8 @@ import { textError } from '../../lib/textError'
 import { ESTATS_DIAGNOSTIC, estilEstatDiagnostic } from '../../lib/diagnostic'
 import { diagnosticsEquip } from '../../lib/diagnosticApi'
 import type { DiagnosticEquip } from '../../types'
+import BotoIcona from '../../components/BotoIcona'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -40,6 +41,7 @@ const TOTS = '__tots'
 
 export default function Diagnostics() {
   const { t } = useT()
+  const navigate = useNavigate()
   const [files, setFiles] = useState<DiagnosticEquip[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -116,63 +118,72 @@ export default function Diagnostics() {
                 {t(files.length === 0 ? 'diagl.empty' : 'diagl.no_match')}
               </p>
             : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('diagl.c_org')}</TableHead>
-                      <TableHead>{t('diagl.c_updated')}</TableHead>
-                      <TableHead>{t('diagl.c_status')}</TableHead>
-                      <TableHead className="text-right">{t('diagl.c_missing')}</TableHead>
-                      <TableHead className="text-right">{t('diagl.c_measures')}</TableHead>
-                      <TableHead>{t('diagl.c_number')}</TableHead>
-                      <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibles.map((f) => (
+              // El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a
+              // 360 px. En móvil, organización (enlazada, con la fecha y el número debajo mientras
+              // no tienen columna), estado y la acción; «Falten» desde `md`, la fecha y las
+              // medidas desde `lg`, el número desde `xl`.
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('diagl.c_org')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('diagl.c_updated')}</TableHead>
+                    <TableHead>{t('diagl.c_status')}</TableHead>
+                    <TableHead className="hidden md:table-cell">{t('diagl.c_missing')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('diagl.c_measures')}</TableHead>
+                    <TableHead className="hidden xl:table-cell">{t('diagl.c_number')}</TableHead>
+                    <TableHead className="w-15">
+                      <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibles.map((f) => {
+                    const ruta = `/equip/diagnostics/${f.tipo_org}/${f.org_id}`
+                    return (
                       <TableRow key={`${f.tipo_org}-${f.org_id}`}>
                         {/* Parte en líneas en vez de cortar: con `truncate` el nombre salía
                             «Comercial de Prova SL…» y la marca «Prova» desaparecía justo en
-                            los nombres largos (§2, regla 6: la celda hereda `nowrap`). */}
-                        <TableCell className="min-w-44 max-w-64 whitespace-normal font-medium">
-                          {f.nom ?? '—'}
+                            los nombres largos. */}
+                        <TableCell className="font-medium">
+                          <Link to={ruta} className="text-primary hover:underline">{f.nom ?? '—'}</Link>
                           {f.es_test && (
                             <Badge variant="outline" className="ml-2">{t('diagl.test')}</Badge>
                           )}
+                          <span className="block text-xs font-normal text-muted-foreground lg:hidden">
+                            {dataCurta(f.darrera_actualitzacio)}
+                          </span>
+                          {f.numero && (
+                            <span className="block text-xs font-normal tabular-nums text-muted-foreground xl:hidden">{f.numero}</span>
+                          )}
                         </TableCell>
                         {/* La ficha viva (fase 9): cuándo se actualizó por última vez. */}
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                        <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground lg:table-cell">
                           {dataCurta(f.darrera_actualitzacio)}
                         </TableCell>
-                        <TableCell>
-                          <Badge className={estilEstatDiagnostic(f.estat)}>
+                        <TableCell className="text-center">
+                          <Badge className={`whitespace-normal ${estilEstatDiagnostic(f.estat)}`}>
                             {t(`diag.st_${f.estat}`)}
                           </Badge>
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        <TableCell className="hidden text-center tabular-nums md:table-cell">
                           {f.falten_n > 0 ? f.falten_n : '—'}
                         </TableCell>
-                        <TableCell className="text-right tabular-nums">
+                        <TableCell className="hidden text-center tabular-nums lg:table-cell">
                           {f.mesures_n > 0 ? f.mesures_n : '—'}
                         </TableCell>
-                        <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
+                        <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground xl:table-cell">
                           {f.numero ?? '—'}
                         </TableCell>
                         <TableCell>
-                          <div className="flex justify-end">
-                            <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                              <Link to={`/equip/diagnostics/${f.tipo_org}/${f.org_id}`}>
-                                {t('c.detail')}
-                              </Link>
-                            </Button>
+                          <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                            <BotoIcona icona={Eye} etiqueta={t('diagl.a_obre')} onClick={() => navigate(ruta)} />
                           </div>
                         </TableCell>
                       </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             )
         )}
       </CardContent>

@@ -16,6 +16,7 @@
 
 import { useSearchParams } from 'react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Eye } from 'lucide-react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -30,9 +31,9 @@ import { etiquetaEstatOferta, llegendaOferta } from '../lib/procesOferta'
 import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
+import BotoIcona from './BotoIcona'
 import { FotoOfertaResolta, useFotosOfertes } from './FotosOferta'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -160,64 +161,76 @@ export default function OffersList({ onOpen, accio }: Props) {
 
   function taula(files: Excedente[], buitKey: string) {
     if (files.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
+    // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal. En
+    // móvil quedan producto, estado y la acción; la referencia y los kilos van bajo el
+    // nombre hasta que tienen su columna (progreso desde `md`, referencia desde `xl`), y la
+    // miniatura aparece desde `sm`. Títulos centrados y la acción en icono con tooltip.
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('off.c_ref')}</TableHead>
-              <TableHead>{t('off.c_product')}</TableHead>
-              <TableHead>{t('off.c_progress')}</TableHead>
-              <TableHead>{t('off.c_state')}</TableHead>
-              <TableHead className="text-right"></TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {files.map((o) => {
-              const total = Number(o.kg_total ?? 0)
-              const canalizados = kg[o.id] ?? 0
-              const faltan = Math.max(0, total - canalizados)
-              const pct = total > 0 ? Math.min(100, Math.round((canalizados / total) * 100)) : 0
-              const est = etiquetaEstatOferta(o.estado)
-              return (
-                <TableRow key={o.id}>
-                  <TableCell><code className="text-xs">{o.id_excedente ?? '—'}</code></TableCell>
-                  <TableCell>
-                    <div className="flex items-center gap-3">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="hidden xl:table-cell">{t('off.c_ref')}</TableHead>
+            <TableHead>{t('off.c_product')}</TableHead>
+            <TableHead className="hidden w-44 md:table-cell">{t('off.c_progress')}</TableHead>
+            <TableHead className="w-28 sm:w-36">{t('off.c_state')}</TableHead>
+            <TableHead className="w-15 md:w-16"><span className="sr-only">{t('doc.c_actions')}</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {files.map((o) => {
+            const total = Number(o.kg_total ?? 0)
+            const canalizados = kg[o.id] ?? 0
+            const faltan = Math.max(0, total - canalizados)
+            const pct = total > 0 ? Math.min(100, Math.round((canalizados / total) * 100)) : 0
+            const est = etiquetaEstatOferta(o.estado)
+            const resumKg = `${fmtKg(canalizados)}/${fmtKg(total)} kg · ${faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}`
+            return (
+              <TableRow key={o.id}>
+                <TableCell className="hidden xl:table-cell"><code className="text-xs break-all">{o.id_excedente ?? '—'}</code></TableCell>
+                <TableCell>
+                  <div className="flex items-center gap-3">
+                    <span className="hidden shrink-0 sm:block">
                       <FotoOfertaResolta foto={foto(o)} alt={o.producto ?? ''} className="size-10" />
-                      <span>{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="min-w-40">
-                    <div className="h-2 w-36 overflow-hidden rounded-full bg-muted">
-                      <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
-                    </div>
-                    <span className="mt-1 block text-xs text-muted-foreground">
-                      {fmtKg(canalizados)}/{fmtKg(total)} kg · {faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}
                     </span>
-                  </TableCell>
-                  <TableCell>
+                    <div className="min-w-0">
+                      <span className="font-medium">{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</span>
+                      <code className="block text-xs break-all text-muted-foreground xl:hidden">{o.id_excedente ?? '—'}</code>
+                      <span className="block text-xs text-muted-foreground md:hidden">{resumKg}</span>
+                    </div>
+                  </div>
+                </TableCell>
+                <TableCell className="hidden md:table-cell">
+                  <div className="mx-auto h-2 w-36 max-w-full overflow-hidden rounded-full bg-muted">
+                    <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
+                  </div>
+                  <span className="mt-1 block text-center text-xs text-muted-foreground">{resumKg}</span>
+                </TableCell>
+                <TableCell className="text-center">
+                  <div className="flex flex-col items-center gap-1">
                     {/* `Badge` y no un `span` a mano: las clases eran exactamente las suyas
                         —`rounded-full px-2 py-0.5 text-xs font-medium`— copiadas, y una
                         tercera forma de pintar un badge es un sitio más donde el radio o el
-                        tamaño pueden dejar de coincidir con el resto (§2bis). */}
-                    <Badge className={est.clase}>{t(est.key)}</Badge>
+                        tamaño pueden dejar de coincidir con el resto (§2bis). Parte línea
+                        si no cabe: la columna es estrecha en móvil. */}
+                    <Badge className={`${est.clase} max-w-full whitespace-normal`}>{t(est.key)}</Badge>
                     {/* F3. El listado es a donde manda la cola `espigolades_per_convertir`
                         del tablero, así que tiene que poder decir CUÁLES son: una oferta
                         con producto sin cosechar y sin jornada todavía. */}
                     {o.producte_al_camp && !o.espigolada_id && (
-                      <Badge className="ml-1 bg-aviso-fondo text-aviso">{t('conv_esp.tag')}</Badge>
+                      <Badge className="max-w-full bg-aviso-fondo whitespace-normal text-aviso">{t('conv_esp.tag')}</Badge>
                     )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    <Button size="sm" onClick={() => onOpen(o)}>{t('off.open')}</Button>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona icona={Eye} etiqueta={t('off.a_open')} onClick={() => onOpen(o)} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 

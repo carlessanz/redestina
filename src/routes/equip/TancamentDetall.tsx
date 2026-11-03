@@ -24,7 +24,10 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, Download, Eye, Loader2 } from 'lucide-react'
+import {
+  AlertTriangle, ArrowLeft, Check, Download, FileCheck, FileOutput, FilePen, FileText, FlaskConical,
+  HandHelping, Loader2, MailCheck, Receipt, RotateCcw,
+} from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -52,6 +55,7 @@ import type {
 import DialegMotiu from '../../components/DialegMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import BotoIcona from '../../components/BotoIcona'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
 import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canalitzacio'
@@ -991,48 +995,49 @@ export default function TancamentDetall() {
           {donants.length === 0 ? (
             <p className="text-sm text-muted-foreground">{t('tan.no_donors')}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('tan.c_donor')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_kg')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_value')}</TableHead>
-                    <TableHead>{t('tan.c_status')}</TableHead>
-                    <TableHead>{t('tan.c_blocks')}</TableHead>
-                    <TableHead>{t('tan.c_invoice')}</TableHead>
-                    <TableHead>{t('tan.c_docs')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {donants.map((d) => (
-                    <FilaDonant
-                      key={d.id}
-                      d={d}
-                      docs={perDonant[d.id] ?? []}
-                      esProva={esProva}
-                      provisionals={provisionals}
-                      potAprovar={potAprovar}
-                      ocupat={ocupat}
-                      descarregant={descarregador.ocupat}
-                      generant={descarregador.generant}
-                      onDescarrega={(docId) => void descarregador.descarrega(docId)}
-                      onMostra={(docId) => void descarregador.mostra(docId)}
-                      onResum={(prov) => void resum(d, prov)}
-                      onFactura={() => setFactura(d)}
-                      onFacturaAssistida={() => setFacturaAssistida(d)}
-                      onSimula={() => setSimula(d)}
-                      onCertificat={() => void certificat(d)}
-                      onRectifica={() => setRectifica(d)}
-                      onEnviat={() => void enviat(d)}
-                      esSuperAdmin={esSuperAdmin}
-                      onRevisa={() => setRevisa(d)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+            // Criterio de las tablas (§2): en móvil, donante, valor y acciones; el estado, los
+            // bloqueos, la factura y los documentos van debajo del nombre hasta que su
+            // columna cabe (estado en `md`, quilos y documentos en `lg`, el resto en `xl`).
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('tan.c_donor')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('tan.c_kg')}</TableHead>
+                  <TableHead>{t('tan.c_value')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('tan.c_status')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('tan.c_blocks')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('tan.c_invoice')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('tan.c_docs')}</TableHead>
+                  <TableHead>{t('doc.c_actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {donants.map((d) => (
+                  <FilaDonant
+                    key={d.id}
+                    d={d}
+                    docs={perDonant[d.id] ?? []}
+                    esProva={esProva}
+                    provisionals={provisionals}
+                    potAprovar={potAprovar}
+                    ocupat={ocupat}
+                    descarregant={descarregador.ocupat}
+                    generant={descarregador.generant}
+                    onDescarrega={(docId) => void descarregador.descarrega(docId)}
+                    onMostra={(docId) => void descarregador.mostra(docId)}
+                    onResum={(prov) => void resum(d, prov)}
+                    onFactura={() => setFactura(d)}
+                    onFacturaAssistida={() => setFacturaAssistida(d)}
+                    onSimula={() => setSimula(d)}
+                    onCertificat={() => void certificat(d)}
+                    onRectifica={() => setRectifica(d)}
+                    onEnviat={() => void enviat(d)}
+                    esSuperAdmin={esSuperAdmin}
+                    onRevisa={() => setRevisa(d)}
+                  />
+                ))}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -1073,39 +1078,40 @@ export default function TancamentDetall() {
                 <Dada etiqueta={t('tan.c_certs')} valor={String(totalsCt.certificats)} />
                 <Dada etiqueta={t('tan.c_blocked')} valor={String(totalsCt.bloquejats)} />
               </div>
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('tan.ct_c_generator')}</TableHead>
-                      <TableHead className="text-right">{t('tan.c_kg')}</TableHead>
-                      <TableHead>{t('tan.c_status')}</TableHead>
-                      <TableHead>{t('tan.c_blocks')}</TableHead>
-                      <TableHead>{t('tan.c_docs')}</TableHead>
-                      <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {generadors.map((g) => (
-                      <FilaGenerador
-                        key={g.id}
-                        g={g}
-                        docs={perDonant[g.id] ?? []}
-                        esProva={esProva}
-                        provisionals={provisionals}
-                        potAprovar={potAprovar}
-                        ocupat={ocupat}
-                        descarregant={descarregador.ocupat}
-                        generant={descarregador.generant}
-                        onDescarrega={(docId) => void descarregador.descarrega(docId)}
-                        onMostra={(docId) => void descarregador.mostra(docId)}
-                        onCertificat={() => void certificatCt(g)}
-                        onRectifica={() => setRectificaCt(g)}
-                      />
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
+              {/* Criterio de las tablas (§2): en móvil, generador, quilos y acciones; estado
+                  en `md`, documentos en `lg`, bloqueos en `xl`, y hasta entonces debajo del
+                  nombre. */}
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead>{t('tan.ct_c_generator')}</TableHead>
+                    <TableHead>{t('tan.c_kg')}</TableHead>
+                    <TableHead className="hidden md:table-cell">{t('tan.c_status')}</TableHead>
+                    <TableHead className="hidden xl:table-cell">{t('tan.c_blocks')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('tan.c_docs')}</TableHead>
+                    <TableHead>{t('doc.c_actions')}</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {generadors.map((g) => (
+                    <FilaGenerador
+                      key={g.id}
+                      g={g}
+                      docs={perDonant[g.id] ?? []}
+                      esProva={esProva}
+                      provisionals={provisionals}
+                      potAprovar={potAprovar}
+                      ocupat={ocupat}
+                      descarregant={descarregador.ocupat}
+                      generant={descarregador.generant}
+                      onDescarrega={(docId) => void descarregador.descarrega(docId)}
+                      onMostra={(docId) => void descarregador.mostra(docId)}
+                      onCertificat={() => void certificatCt(g)}
+                      onRectifica={() => setRectificaCt(g)}
+                    />
+                  ))}
+                </TableBody>
+              </Table>
             </>
           )}
         </CardContent>
@@ -1157,40 +1163,54 @@ export default function TancamentDetall() {
               comparacio.length === 0
                 ? <p className="text-sm text-muted-foreground">{t('tan.cmp_empty')}</p>
                 : (
-                  <div className="overflow-x-auto">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>{t('tan.c_donor')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_kg_calc')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_kg_real')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_dif_kg')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_val_calc')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_val_real')}</TableHead>
-                          <TableHead className="text-right">{t('tan.cmp_dif_val')}</TableHead>
-                          <TableHead>{t('tan.cmp_match')}</TableHead>
+                  // Criterio de las tablas (§2): en móvil, donante, diferencia de valor y si
+                  // coincide; la diferencia de quilos en `md`, los valores en `lg` y los
+                  // quilos en `xl`. Hasta entonces, debajo del nombre.
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>{t('tan.c_donor')}</TableHead>
+                        <TableHead className="hidden xl:table-cell">{t('tan.cmp_kg_calc')}</TableHead>
+                        <TableHead className="hidden xl:table-cell">{t('tan.cmp_kg_real')}</TableHead>
+                        <TableHead className="hidden md:table-cell">{t('tan.cmp_dif_kg')}</TableHead>
+                        <TableHead className="hidden lg:table-cell">{t('tan.cmp_val_calc')}</TableHead>
+                        <TableHead className="hidden lg:table-cell">{t('tan.cmp_val_real')}</TableHead>
+                        <TableHead>{t('tan.cmp_dif_val')}</TableHead>
+                        <TableHead>{t('tan.cmp_match')}</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {comparacio.map((f, i) => (
+                        <TableRow key={`${f.nif ?? ''}-${i}`}>
+                          <TableCell>
+                            <span className="font-medium">{f.donante ?? '—'}</span>
+                            <span className="block text-xs text-muted-foreground tabular-nums xl:hidden">
+                              {t('tan.cmp_kg_calc')}: {kg(f.kg_calculado)} · {t('tan.cmp_kg_real')}: {kg(f.kg_real)}
+                            </span>
+                            <span className="block text-xs text-muted-foreground tabular-nums lg:hidden">
+                              {t('tan.cmp_val_calc')}: {euros(f.valor_calculado)} · {t('tan.cmp_val_real')}: {euros(f.valor_real)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="hidden text-center tabular-nums whitespace-nowrap xl:table-cell">{kg(f.kg_calculado)}</TableCell>
+                          <TableCell className="hidden text-center tabular-nums whitespace-nowrap xl:table-cell">{kg(f.kg_real)}</TableCell>
+                          <TableCell className="hidden text-center tabular-nums whitespace-nowrap md:table-cell">{kg(f.dif_kg)}</TableCell>
+                          <TableCell className="hidden text-center tabular-nums whitespace-nowrap lg:table-cell">{euros(f.valor_calculado)}</TableCell>
+                          <TableCell className="hidden text-center tabular-nums whitespace-nowrap lg:table-cell">{euros(f.valor_real)}</TableCell>
+                          <TableCell className="text-center tabular-nums">
+                            <span className="whitespace-nowrap">{euros(f.dif_valor)}</span>
+                            <span className="block text-xs whitespace-nowrap text-muted-foreground md:hidden">
+                              {kg(f.dif_kg)}
+                            </span>
+                          </TableCell>
+                          <TableCell className="text-center">
+                            <Badge className={f.coincide ? 'bg-exito-fondo text-exito' : 'bg-error-fondo text-error'}>
+                              {t(f.coincide ? 'c.yes' : 'c.no')}
+                            </Badge>
+                          </TableCell>
                         </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {comparacio.map((f, i) => (
-                          <TableRow key={`${f.nif ?? ''}-${i}`}>
-                            <TableCell className="max-w-56 truncate">{f.donante ?? '—'}</TableCell>
-                            <TableCell className="text-right tabular-nums">{kg(f.kg_calculado)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{kg(f.kg_real)}</TableCell>
-                            <TableCell className="text-right tabular-nums">{kg(f.dif_kg)}</TableCell>
-                            <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(f.valor_calculado)}</TableCell>
-                            <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(f.valor_real)}</TableCell>
-                            <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(f.dif_valor)}</TableCell>
-                            <TableCell>
-                              <Badge className={f.coincide ? 'bg-exito-fondo text-exito' : 'bg-error-fondo text-error'}>
-                                {t(f.coincide ? 'c.yes' : 'c.no')}
-                              </Badge>
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )
             )}
           </CardContent>
@@ -1353,157 +1373,160 @@ function FilaDonant({
           ? t('tan.why_sense_revisio')
           : !esProva && !esSuperAdmin ? t('tan.why_super_admin') : undefined
 
+  // Las piezas que cambian de sitio con el ancho (criterio de las tablas, §2): cada una tiene
+  // su columna cuando cabe y, hasta entonces, va debajo del nombre. Se pintan dos veces con
+  // `hidden`/`*:hidden` complementarios, así que en cada ancho solo se ve una.
+  const estat = (
+    <>
+      <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
+      {d.excepcion_sin_factura && (
+        <Badge className="ml-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.exception')}</Badge>
+      )}
+      {/* La revisión del donante (fase 4): un eje aparte del estado del cierre. */}
+      {!teCertificat && d.revisio_estat && (
+        <Badge className={'ml-1 whitespace-normal ' + (d.revisio_estat === 'pendent_revisio'
+          ? 'bg-secondary text-secondary-foreground' : 'bg-exito-fondo text-exito')}>
+          {t(`tan.rev_${d.revisio_estat}`)}
+        </Badge>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">{t(punt.claus.toca, punt.vars)}</p>
+    </>
+  )
+  const factura = d.factura_numero
+    ? (
+      <>
+        <p className="tabular-nums">{d.factura_numero}</p>
+        <p className="text-xs text-muted-foreground tabular-nums">
+          {euros(d.factura_importe)} · {dataTancament(d.factura_fecha)}
+        </p>
+      </>
+    )
+    : <span className="text-muted-foreground">{t('tan.no_invoice')}</span>
+  const documents = (
+    <BotonsDocuments
+      docs={docs} descarregant={descarregant} generant={generant}
+      onDescarrega={onDescarrega} onMostra={onMostra}
+    />
+  )
+  const senseCertificable = ocupat || bloquejat || Number(d.kg_total) <= 0
+    || bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
+    || senseRevisio || (!esProva && !esSuperAdmin)
+
   return (
     <TableRow>
-      <TableCell className="max-w-56">
-        <p className="truncate font-medium">{nom(d)}</p>
+      <TableCell>
+        <p className="font-medium">{nom(d)}</p>
         <p className="text-xs text-muted-foreground tabular-nums">{nif(d)}</p>
         {d.requiere_llamada && (
           <Badge className="mt-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.needs_call')}</Badge>
         )}
-      </TableCell>
-      <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(d.kg_total)}</TableCell>
-      <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(d.valor_total)}</TableCell>
-      {/* `whitespace-normal`: la celda hereda `whitespace-nowrap` de la tabla, y el «qué
-          toca» se salía del `max-w-52` y se pintaba encima de la columna siguiente. */}
-      <TableCell className="min-w-44 max-w-52 whitespace-normal">
-        <Badge className={estilEstatDonant(d.estado)}>{t(`tan.ds_${d.estado}`)}</Badge>
-        {d.excepcion_sin_factura && (
-          <Badge className="ml-1 bg-aviso-fondo text-aviso whitespace-normal">{t('tan.exception')}</Badge>
+        <div className="mt-2 md:hidden">{estat}</div>
+        {(d.bloqueos ?? []).length > 0 && (
+          <div className="mt-2 xl:hidden"><Bloquejos llista={d.bloqueos ?? []} /></div>
         )}
-        {/* La revisión del donante (fase 4): un eje aparte del estado del cierre. */}
-        {!teCertificat && d.revisio_estat && (
-          <Badge className={'ml-1 whitespace-normal ' + (d.revisio_estat === 'pendent_revisio'
-            ? 'bg-secondary text-secondary-foreground' : 'bg-exito-fondo text-exito')}>
-            {t(`tan.rev_${d.revisio_estat}`)}
-          </Badge>
-        )}
-        <p className="mt-1 text-xs text-muted-foreground">{t(punt.claus.toca, punt.vars)}</p>
-      </TableCell>
-      {/* `whitespace-normal`: el detalle del bloqueo lo escribe la base y es largo; con el
-          `nowrap` heredado de la tabla ensanchaba la columna hasta empujar las acciones. */}
-      <TableCell className="min-w-48 whitespace-normal"><Bloquejos llista={d.bloqueos ?? []} /></TableCell>
-      <TableCell className="text-sm">
-        {d.factura_numero
-          ? (
-            <>
-              <p className="tabular-nums">{d.factura_numero}</p>
-              <p className="text-xs text-muted-foreground tabular-nums">
-                {euros(d.factura_importe)} · {dataTancament(d.factura_fecha)}
-              </p>
-            </>
-          )
-          : <span className="text-muted-foreground">{t('tan.no_invoice')}</span>}
-      </TableCell>
-      {/* `min-w-48`: el botón con el número del documento mide ~175 px por sí solo; sin
-          ancho mínimo, la tabla estrechaba la columna y el botón se salía de ella. */}
-      <TableCell className="min-w-48">
-        <BotonsDocuments
-          docs={docs} descarregant={descarregant} generant={generant}
-          onDescarrega={onDescarrega} onMostra={onMostra}
-        />
-      </TableCell>
-      <TableCell>
-        <div className="flex flex-col items-stretch gap-1">
-          {potAprovar && (
-            <>
-              <BotoAmbMotiu
-                size="sm" variant={ara === 'resum' ? 'default' : 'outline'}
-                className="h-11 whitespace-normal md:h-8"
-                disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
-                motiu={motiuResum}
-                onClick={() => onResum(true)}
-              >
-                {t('tan.a_summary')}
-              </BotoAmbMotiu>
-              <BotoAmbMotiu
-                size="sm" variant="outline"
-                className="h-11 whitespace-normal md:h-8"
-                disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
-                motiu={motiuResum}
-                onClick={() => onResum(false)}
-              >
-                {t('tan.a_summary_final')}
-              </BotoAmbMotiu>
-              <Button
-                size="sm" variant={ara === 'factura' ? 'default' : 'outline'}
-                className="h-11 whitespace-normal md:h-8"
-                disabled={ocupat}
-                onClick={onFactura}
-              >
-                {t('tan.a_invoice')}
-              </Button>
-              {/* La misma factura, pero subida CON el donante al teléfono: el formulario
-                  que él vería, dentro de un diálogo, y la evidencia marcada como asistida
-                  con el nombre de quien la conduce (§9). */}
-              <Button
-                size="sm" variant="outline"
-                className="h-11 whitespace-normal md:h-8"
-                disabled={ocupat}
-                onClick={onFacturaAssistida}
-              >
-                {t('tan.a_invoice_assisted')}
-              </Button>
-              {esProva && (
-                <Button
-                  size="sm" variant="outline"
-                  className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat}
-                  onClick={onSimula}
-                >
-                  {t('tan.a_simulate')}
-                </Button>
-              )}
-              {!teCertificat && d.revisio_estat === 'pendent_revisio' && (
-                <BotoAmbMotiu
-                  size="sm" variant="outline"
-                  className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat || !potAprovar}
-                  motiu={potAprovar ? undefined : t('tan.ct_need_approver')}
-                  onClick={onRevisa}
-                >
-                  {t('tan.a_rev_equip')}
-                </BotoAmbMotiu>
-              )}
-              {!teCertificat && (
-                <BotoAmbMotiu
-                  size="sm"
-                  variant={ara === 'certificat' ? 'default' : 'outline'}
-                  className="h-11 whitespace-normal md:h-8"
-                  disabled={ocupat || bloquejat || Number(d.kg_total) <= 0
-                    || bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
-                    || senseRevisio || (!esProva && !esSuperAdmin)}
-                  motiu={motiuCertificat}
-                  onClick={onCertificat}
-                >
-                  {t(esProva ? 'tan.a_certificate' : 'tan.a_sign_emit')}
-                </BotoAmbMotiu>
-              )}
-              {teCertificat && (
-                <>
-                  <Button
-                    size="sm" variant="outline"
-                    className="h-11 whitespace-normal md:h-8"
-                    disabled={ocupat}
-                    onClick={onRectifica}
-                  >
-                    {t('tan.a_rectify')}
-                  </Button>
-                  {d.enviado_at === null && (
-                    <Button
-                      size="sm" variant={ara === 'enviat' ? 'default' : 'outline'}
-                      className="h-11 whitespace-normal md:h-8"
-                      disabled={ocupat}
-                      onClick={onEnviat}
-                    >
-                      {t('tan.a_mark_sent')}
-                    </Button>
-                  )}
-                </>
-              )}
-            </>
-          )}
+        <div className="mt-2 text-xs xl:hidden">
+          <p className="text-muted-foreground">{t('tan.c_invoice')}</p>
+          {factura}
         </div>
+        {docs.some((doc) => doc.vigente) && <div className="mt-2 lg:hidden">{documents}</div>}
+      </TableCell>
+      <TableCell className="hidden text-center tabular-nums whitespace-nowrap lg:table-cell">{kg(d.kg_total)}</TableCell>
+      {/* El total del donante es la cifra del cierre: se ve en todos los anchos. */}
+      <TableCell className="text-center tabular-nums">
+        <span className="whitespace-nowrap">{euros(d.valor_total)}</span>
+        <span className="block text-xs whitespace-nowrap text-muted-foreground lg:hidden">{kg(d.kg_total)}</span>
+      </TableCell>
+      <TableCell className="hidden max-w-52 md:table-cell">{estat}</TableCell>
+      {/* El detalle del bloqueo lo escribe la base y es largo: parte en líneas (la base de la
+          tabla ya trae `whitespace-normal break-words`). */}
+      <TableCell className="hidden xl:table-cell"><Bloquejos llista={d.bloqueos ?? []} /></TableCell>
+      <TableCell className="hidden text-center text-sm xl:table-cell">{factura}</TableCell>
+      <TableCell className="hidden lg:table-cell">{documents}</TableCell>
+      <TableCell>
+        {/* Acciones en icono con su nombre en el tooltip (§2). La que toca va rellena
+            (`default`), igual que cuando eran botones con texto; en móvil se apilan y desde
+            `md` van de tres en tres. */}
+        {potAprovar && (
+          <div className="flex flex-col items-center justify-center gap-1 md:w-26 md:flex-row md:flex-wrap">
+            <BotoIcona
+              icona={FilePen}
+              etiqueta={t('tan.a_summary')}
+              variant={ara === 'resum' ? 'default' : 'ghost'}
+              disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
+              motiu={motiuResum}
+              onClick={() => onResum(true)}
+            />
+            <BotoIcona
+              icona={FileOutput}
+              etiqueta={t('tan.a_summary_final')}
+              disabled={ocupat || bloquejat || Number(d.kg_total) <= 0}
+              motiu={motiuResum}
+              onClick={() => onResum(false)}
+            />
+            <BotoIcona
+              icona={Receipt}
+              etiqueta={t('tan.a_invoice')}
+              variant={ara === 'factura' ? 'default' : 'ghost'}
+              disabled={ocupat}
+              onClick={onFactura}
+            />
+            {/* La misma factura, pero subida CON el donante al teléfono: el formulario
+                que él vería, dentro de un diálogo, y la evidencia marcada como asistida
+                con el nombre de quien la conduce (§9). */}
+            <BotoIcona
+              icona={HandHelping}
+              etiqueta={t('tan.a_invoice_assisted')}
+              disabled={ocupat}
+              onClick={onFacturaAssistida}
+            />
+            {esProva && (
+              <BotoIcona
+                icona={FlaskConical}
+                etiqueta={t('tan.a_simulate')}
+                disabled={ocupat}
+                onClick={onSimula}
+              />
+            )}
+            {!teCertificat && d.revisio_estat === 'pendent_revisio' && (
+              <BotoIcona
+                icona={Check}
+                etiqueta={t('tan.a_rev_equip')}
+                disabled={ocupat || !potAprovar}
+                motiu={potAprovar ? undefined : t('tan.ct_need_approver')}
+                onClick={onRevisa}
+              />
+            )}
+            {!teCertificat && (
+              <BotoIcona
+                icona={FileCheck}
+                etiqueta={t(esProva ? 'tan.a_certificate' : 'tan.a_sign_emit')}
+                variant={ara === 'certificat' ? 'default' : 'ghost'}
+                disabled={senseCertificable}
+                motiu={motiuCertificat}
+                onClick={onCertificat}
+              />
+            )}
+            {teCertificat && (
+              <>
+                <BotoIcona
+                  icona={RotateCcw}
+                  etiqueta={t('tan.a_rectify')}
+                  disabled={ocupat}
+                  onClick={onRectifica}
+                />
+                {d.enviado_at === null && (
+                  <BotoIcona
+                    icona={MailCheck}
+                    etiqueta={t('tan.a_mark_sent')}
+                    variant={ara === 'enviat' ? 'default' : 'ghost'}
+                    disabled={ocupat}
+                    onClick={onEnviat}
+                  />
+                )}
+              </>
+            )}
+          </div>
+        )}
       </TableCell>
     </TableRow>
   )
@@ -1529,32 +1552,31 @@ function BotonsDocuments({
   return (
     <div className="space-y-1">
       {vigents.map((doc) => (
-        // «Veure» primero: al repasar un cierre se abre el resumen o el certificado para
-        // leerlo, no para guardarlo. Los dos botones van juntos: son del mismo documento.
-        <div key={doc.id} className="flex flex-wrap gap-1">
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-11 whitespace-normal md:h-8"
-            disabled={descarregant === doc.id}
-            onClick={() => onMostra(doc.id)}
-          >
-            <Eye className="mr-1 size-3.5" aria-hidden />
-            {t('doc.view')}
-          </Button>
-          <Button
-            size="sm"
-            variant="outline"
-            className="h-11 justify-start whitespace-normal md:h-8"
-            disabled={descarregant === doc.id}
-            onClick={() => onDescarrega(doc.id)}
-          >
-            {generant === doc.id
-              ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-              : <Download className="mr-1 size-3.5" aria-hidden />}
-            <span className="tabular-nums">{doc.numero_completo}</span>
+        // El número a la vista y, a su lado, «veure» y «descarrega» en icono (§2): el número
+        // es lo que se busca al repasar un cierre, y los dos iconos son del mismo documento.
+        // «Veure» primero: se abre para leerlo, no para guardarlo.
+        <div key={doc.id} className="flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span className="text-xs tabular-nums">
+            {doc.numero_completo}
             {doc.version > 1 && <span className="ml-1 text-muted-foreground">v{doc.version}</span>}
-          </Button>
+          </span>
+          <span className="flex items-center gap-1">
+            <BotoIcona
+              icona={FileText}
+              etiqueta={t('tan.a_view_doc', { num: doc.numero_completo })}
+              disabled={descarregant === doc.id}
+              onClick={() => onMostra(doc.id)}
+            />
+            <BotoIcona
+              icona={generant === doc.id ? Loader2 : Download}
+              etiqueta={generant === doc.id
+                ? t('doc.generating')
+                : t('tan.a_download_doc', { num: doc.numero_completo })}
+              className={generant === doc.id ? '[&_svg]:animate-spin' : undefined}
+              disabled={descarregant === doc.id}
+              onClick={() => onDescarrega(doc.id)}
+            />
+          </span>
         </div>
       ))}
     </div>
@@ -1651,55 +1673,60 @@ function FilaGenerador({
     ? 'tan.ct_next_done'
     : bloquejat ? 'tan.ct_next_blocked' : 'tan.ct_next_emit'
 
+  // Lo mismo que en la fila del donante: cada pieza en su columna cuando cabe y, hasta
+  // entonces, debajo del nombre (criterio de las tablas, §2).
+  const estat = (
+    <>
+      <Badge className={estilEstatDonant(g.estado)}>{t(`tan.ds_${g.estado}`)}</Badge>
+      {teCertificat && (
+        <p className="mt-1 text-xs tabular-nums">{g.certificado_numero}</p>
+      )}
+      <p className="mt-1 text-xs text-muted-foreground">{t(toca)}</p>
+    </>
+  )
+  const documents = (
+    <BotonsDocuments
+      docs={docs} descarregant={descarregant} generant={generant}
+      onDescarrega={onDescarrega} onMostra={onMostra}
+    />
+  )
+
   return (
     <TableRow>
-      <TableCell className="max-w-56">
-        <p className="truncate font-medium">{nom(g)}</p>
-        <p className="text-xs text-muted-foreground tabular-nums">{nif(g)}</p>
-      </TableCell>
-      <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(g.kg_total)}</TableCell>
-      {/* `whitespace-normal`: la celda hereda `whitespace-nowrap` de la tabla (§2, regla 6). */}
-      <TableCell className="min-w-44 max-w-52 whitespace-normal">
-        <Badge className={estilEstatDonant(g.estado)}>{t(`tan.ds_${g.estado}`)}</Badge>
-        {teCertificat && (
-          <p className="mt-1 text-xs tabular-nums">{g.certificado_numero}</p>
-        )}
-        <p className="mt-1 text-xs text-muted-foreground">{t(toca)}</p>
-      </TableCell>
-      <TableCell className="min-w-48 whitespace-normal"><Bloquejos llista={g.bloqueos ?? []} /></TableCell>
-      <TableCell className="min-w-48">
-        <BotonsDocuments
-          docs={docs} descarregant={descarregant} generant={generant}
-          onDescarrega={onDescarrega} onMostra={onMostra}
-        />
-      </TableCell>
       <TableCell>
-        <div className="flex min-w-40 flex-col items-stretch gap-1">
+        <p className="font-medium">{nom(g)}</p>
+        <p className="text-xs text-muted-foreground tabular-nums">{nif(g)}</p>
+        <div className="mt-2 md:hidden">{estat}</div>
+        {(g.bloqueos ?? []).length > 0 && (
+          <div className="mt-2 xl:hidden"><Bloquejos llista={g.bloqueos ?? []} /></div>
+        )}
+        {docs.some((doc) => doc.vigente) && <div className="mt-2 lg:hidden">{documents}</div>}
+      </TableCell>
+      <TableCell className="text-center tabular-nums whitespace-nowrap">{kg(g.kg_total)}</TableCell>
+      <TableCell className="hidden max-w-52 md:table-cell">{estat}</TableCell>
+      <TableCell className="hidden xl:table-cell"><Bloquejos llista={g.bloqueos ?? []} /></TableCell>
+      <TableCell className="hidden lg:table-cell">{documents}</TableCell>
+      <TableCell>
+        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
           {!teCertificat && (
-            <BotoAmbMotiu
-              size="sm"
+            // La etiqueta corta, como la del donante: la tarjeta ya dice que es el CT.
+            <BotoIcona
+              icona={FileCheck}
+              etiqueta={t('tan.a_certificate')}
               variant="default"
-              className="h-11 w-full whitespace-normal md:h-8"
               disabled={ocupat || motiuEmetre !== undefined}
               motiu={motiuEmetre}
               onClick={onCertificat}
-            >
-              {/* La etiqueta corta, como la del donante: la tarjeta ya dice que es el CT, y
-                  la larga partía en dos líneas dentro de un botón de 32 px en escritorio. */}
-              {t('tan.a_certificate')}
-            </BotoAmbMotiu>
+            />
           )}
           {teCertificat && (
-            <BotoAmbMotiu
-              size="sm"
-              variant="outline"
-              className="h-11 w-full whitespace-normal md:h-8"
+            <BotoIcona
+              icona={RotateCcw}
+              etiqueta={t('tan.a_rectify')}
               disabled={ocupat || motiuRectificar !== undefined}
               motiu={motiuRectificar}
               onClick={onRectifica}
-            >
-              {t('tan.a_rectify')}
-            </BotoAmbMotiu>
+            />
           )}
         </div>
       </TableCell>

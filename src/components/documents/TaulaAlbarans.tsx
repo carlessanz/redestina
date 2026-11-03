@@ -9,14 +9,14 @@
 // cruzando los dos paneles. Aquí no le pertenece a ninguno.
 
 import { useMemo } from 'react'
-import { Download, Eye, Loader2 } from 'lucide-react'
+import { Download, FileText, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento } from '../../types'
+import BotoIcona from '../BotoIcona'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
@@ -50,76 +50,75 @@ export default function TaulaAlbarans({
     return mapa
   }, [docs])
 
+  // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal. En
+  // móvil quedan el número (con el producto, los kilos y la fecha debajo), el estado y las
+  // acciones en icono, apiladas; los kilos salen desde `sm`, la fecha desde `md` y el
+  // producto desde `lg`.
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t('alb.c_number')}</TableHead>
-            <TableHead>{t('alb.c_product')}</TableHead>
-            <TableHead className="text-right">{t('alb.c_kg')}</TableHead>
-            <TableHead>{t('alb.c_status')}</TableHead>
-            <TableHead>{t('doc.c_date')}</TableHead>
-            <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {files.map((f) => {
-            const docId = perAlbara[f.id]
-            return (
-              <TableRow key={f.id}>
-                <TableCell className="font-medium whitespace-nowrap tabular-nums">
+    <Table>
+      <TableHeader>
+        <TableRow>
+          <TableHead>{t('alb.c_number')}</TableHead>
+          <TableHead className="hidden lg:table-cell">{t('alb.c_product')}</TableHead>
+          <TableHead className="hidden w-20 sm:table-cell">{t('alb.c_kg')}</TableHead>
+          <TableHead className="w-24 sm:w-32">{t('alb.c_status')}</TableHead>
+          <TableHead className="hidden w-28 md:table-cell">{t('doc.c_date')}</TableHead>
+          <TableHead className="w-15 md:w-24"><span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span></TableHead>
+        </TableRow>
+      </TableHeader>
+      <TableBody>
+        {files.map((f) => {
+          const docId = perAlbara[f.id]
+          const kilos = kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)
+          return (
+            <TableRow key={f.id}>
+              <TableCell>
+                <span className="font-medium tabular-nums sm:whitespace-nowrap">
                   {f.numero_completo ?? t('alb.no_number')}
-                </TableCell>
-                <TableCell className="text-muted-foreground">{f.producto ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
-                  {kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)}
-                </TableCell>
-                <TableCell>
-                  <Badge className={estilEstatAlbara(f.estado)}>{t(`alb.st_${f.estado}`)}</Badge>
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {dataCurta(f.emitido_at)}
-                </TableCell>
-                <TableCell>
-                  {/* «Veure» delante de «Descarrega»: repasar un albarán es lo que se hace
-                      a diario, guardarlo es la excepción. Sin PDF no hay ninguno de los dos. */}
-                  <div className="flex justify-end gap-2">
-                    {docId
-                      ? (
-                        <>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 whitespace-normal md:h-8"
-                            disabled={descarregador.ocupat === docId}
-                            onClick={() => void descarregador.mostra(docId)}
-                          >
-                            <Eye className="mr-1 size-3.5" aria-hidden />
-                            {t('doc.view')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 whitespace-normal md:h-8"
-                            disabled={descarregador.ocupat === docId}
-                            onClick={() => void descarregador.descarrega(docId)}
-                          >
-                            {descarregador.generant === docId
-                              ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                              : <Download className="mr-1 size-3.5" aria-hidden />}
-                            {t('doc.download')}
-                          </Button>
-                        </>
-                      )
-                      : <span className="text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>}
-                  </div>
-                </TableCell>
-              </TableRow>
-            )
-          })}
-        </TableBody>
-      </Table>
-    </div>
+                </span>
+                <span className="block text-xs text-muted-foreground lg:hidden">{f.producto ?? '—'}</span>
+                <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
+                  <span className="sm:hidden">{kilos} kg · </span>{dataCurta(f.emitido_at)}
+                </span>
+              </TableCell>
+              <TableCell className="hidden text-muted-foreground lg:table-cell">{f.producto ?? '—'}</TableCell>
+              <TableCell className="hidden text-center tabular-nums whitespace-nowrap sm:table-cell">
+                {kilos}
+              </TableCell>
+              <TableCell className="text-center">
+                <Badge className={`${estilEstatAlbara(f.estado)} max-w-full whitespace-normal`}>{t(`alb.st_${f.estado}`)}</Badge>
+              </TableCell>
+              <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground md:table-cell">
+                {dataCurta(f.emitido_at)}
+              </TableCell>
+              <TableCell>
+                {/* «Veure» delante de «Descarrega»: repasar un albarán es lo que se hace
+                    a diario, guardarlo es la excepción. Sin PDF no hay ninguno de los dos. */}
+                {docId
+                  ? (
+                    <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                      <BotoIcona
+                        icona={FileText}
+                        etiqueta={t('alb.a_view_pdf')}
+                        disabled={descarregador.ocupat === docId}
+                        onClick={() => void descarregador.mostra(docId)}
+                      />
+                      <BotoIcona
+                        icona={descarregador.generant === docId ? Loader2 : Download}
+                        etiqueta={t('alb.a_download_pdf')}
+                        className={descarregador.generant === docId ? '[&_svg]:animate-spin' : undefined}
+                        disabled={descarregador.ocupat === docId}
+                        motiu={descarregador.generant === docId ? t('doc.generating') : undefined}
+                        onClick={() => void descarregador.descarrega(docId)}
+                      />
+                    </div>
+                  )
+                  : <p className="text-center text-xs text-muted-foreground">{t('mydoc.no_pdf')}</p>}
+              </TableCell>
+            </TableRow>
+          )
+        })}
+      </TableBody>
+    </Table>
   )
 }

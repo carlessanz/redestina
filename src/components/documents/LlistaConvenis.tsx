@@ -17,9 +17,9 @@ import { estilEstatConveni } from '../../lib/convenis'
 import { docVigent } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
 import type { Convenio, Documento } from '../../types'
-import { Download, Eye, Loader2 } from 'lucide-react'
+import { Download, FileText, Loader2, PenLine } from 'lucide-react'
+import BotoIcona from '../BotoIcona'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -72,114 +72,116 @@ export default function LlistaConvenis({
         {files.length === 0
           ? <p className="text-sm text-muted-foreground">{t('mydoc.conv_empty')}</p>
           : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('conv.c_model')}</TableHead>
-                    <TableHead>{t('alb.c_number')}</TableHead>
-                    <TableHead>{t('alb.c_status')}</TableHead>
-                    <TableHead>{t('doc.c_date')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {files.map((c) => {
-                    const doc = docVigent(docs, 'convenio', c.id)
-                    // Un convenio firmado pero sin contrafirmar tiene PDF, y conviene decir
-                    // que todavía no es el definitivo: lo que falta es la firma de la
-                    // Fundación, no nada suyo.
-                    const provisional = doc?.subtipo === 'firmat'
-                    // Firmado fuera de la plataforma: no tiene número de serie (lo lleva el
-                    // papel) ni PDF de Redestina, a propósito (§4). Lo que acredita es el
-                    // escaneado, que está en «Documentació aportada per l'equip».
-                    const paper = c.origen === 'paper'
-                    // Declarado por el equipo, sin firma: es vigente (verde) y lo dice. El
-                    // titular lo puede firmar de verdad; la contrafirma lo sustituirá.
-                    const declarat = c.origen === 'declarat' && c.estado === 'vigent'
-                    return (
-                      <TableRow key={c.id}>
-                        <TableCell className="font-medium">{t(`sig.model_${c.tipo}`)}</TableCell>
-                        <TableCell className="whitespace-nowrap tabular-nums">
-                          {c.numero_completo ?? (paper ? c.referencia_paper : null) ?? '—'}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap items-center gap-1">
-                            <Badge className={estilEstatConveni(c.estado)}>
-                              {t(`conv.st_${c.estado}`)}
-                            </Badge>
-                            {provisional && (
-                              <span className="text-xs text-muted-foreground">
-                                {t('mydoc.conv_provisional')}
-                              </span>
-                            )}
-                            {declarat && (
-                              <span className="text-xs text-muted-foreground">
-                                {t('conv.origen_declarat')}
-                              </span>
-                            )}
-                          </div>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {dataCurta(c.contrafirmado_at ?? c.firmado_at ?? c.enviado_at ?? c.created_at)}
-                        </TableCell>
-                        <TableCell>
-                          {/* Leer el convenio es lo habitual —lo que hay que consultar es
-                              qué se firmó—, así que «Veure» va delante. */}
-                          <div className="flex flex-wrap justify-end gap-2">
-                            {declarat && signar?.titular && (
-                              <Button
-                                size="sm"
-                                className="h-11 whitespace-normal md:h-8"
-                                onClick={() => setDlgFirma(true)}
-                              >
-                                {t('mydoc.conv_signa_declarat')}
-                              </Button>
-                            )}
-                            {doc
-                              ? (
-                                <>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    disabled={descarregador.ocupat === doc.id}
-                                    onClick={() => void descarregador.mostra(doc.id)}
-                                  >
-                                    <Eye className="mr-1 size-3.5" aria-hidden />
-                                    {t('doc.view')}
-                                  </Button>
-                                  <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    disabled={descarregador.ocupat === doc.id}
-                                    onClick={() => void descarregador.descarrega(doc.id)}
-                                  >
-                                    {descarregador.generant === doc.id
-                                      ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                                      : <Download className="mr-1 size-3.5" aria-hidden />}
-                                    {t('doc.download')}
-                                  </Button>
-                                </>
-                              )
-                              : (
-                                // La celda hereda `whitespace-nowrap` (§2, regla 6): la
-                                // frase del papel es larga y tiene que poder partirse.
-                                <span className={paper
-                                  ? 'block min-w-48 whitespace-normal text-right text-xs text-muted-foreground'
-                                  : 'text-xs text-muted-foreground'}>
-                                  {paper ? t('mydoc.conv_paper') : t('mydoc.no_pdf')}
-                                </span>
-                              )}
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            // Criterio de las tablas (03-11-2026, AGENTS.md §2): a 360 px quedan modelo,
+            // estado y acciones; el número y la fecha van bajo el modelo hasta que tienen
+            // columna —el número desde `md`, la fecha desde `lg`—.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('conv.c_model')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('alb.c_number')}</TableHead>
+                  <TableHead>{t('alb.c_status')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('doc.c_date')}</TableHead>
+                  <TableHead className="w-15 md:w-30">
+                    <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {files.map((c) => {
+                  const doc = docVigent(docs, 'convenio', c.id)
+                  // Un convenio firmado pero sin contrafirmar tiene PDF, y conviene decir
+                  // que todavía no es el definitivo: lo que falta es la firma de la
+                  // Fundación, no nada suyo.
+                  const provisional = doc?.subtipo === 'firmat'
+                  // Firmado fuera de la plataforma: no tiene número de serie (lo lleva el
+                  // papel) ni PDF de Redestina, a propósito (§4). Lo que acredita es el
+                  // escaneado, que está en «Documentació aportada per l'equip».
+                  const paper = c.origen === 'paper'
+                  // Declarado por el equipo, sin firma: es vigente (verde) y lo dice. El
+                  // titular lo puede firmar de verdad; la contrafirma lo sustituirá.
+                  const declarat = c.origen === 'declarat' && c.estado === 'vigent'
+                  const numero = c.numero_completo ?? (paper ? c.referencia_paper : null) ?? null
+                  const data = dataCurta(c.contrafirmado_at ?? c.firmado_at ?? c.enviado_at ?? c.created_at)
+                  return (
+                    <TableRow key={c.id}>
+                      <TableCell>
+                        <span className="font-medium">{t(`sig.model_${c.tipo}`)}</span>
+                        {/* El número se esconde en `md` y la fecha en `lg`: el «·» va delante
+                            del número para que nunca quede colgando. */}
+                        <span className="block text-xs text-muted-foreground lg:hidden">
+                          {data}
+                          {numero && <span className="tabular-nums md:hidden"> · {numero}</span>}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden text-center tabular-nums md:table-cell">
+                        {numero ?? '—'}
+                      </TableCell>
+                      <TableCell className="text-center">
+                        <div className="flex flex-col items-center gap-1">
+                          <Badge className={`whitespace-normal ${estilEstatConveni(c.estado)}`}>
+                            {t(`conv.st_${c.estado}`)}
+                          </Badge>
+                          {provisional && (
+                            <span className="text-xs text-muted-foreground">
+                              {t('mydoc.conv_provisional')}
+                            </span>
+                          )}
+                          {declarat && (
+                            <span className="text-xs text-muted-foreground">
+                              {t('conv.origen_declarat')}
+                            </span>
+                          )}
+                          {/* La frase del papel vivía en la columna de acciones, donde la
+                              ensanchaba; ahora va bajo el estado, que es lo que explica. */}
+                          {paper && !doc && (
+                            <span className="text-xs text-muted-foreground">{t('mydoc.conv_paper')}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                      <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground lg:table-cell">
+                        {data}
+                      </TableCell>
+                      <TableCell>
+                        {/* Leer el convenio es lo habitual —lo que hay que consultar es
+                            qué se firmó—, así que «Veure el PDF» va delante de la descarga.
+                            Firmar un declarado va primero y relleno: es lo que le toca. */}
+                        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                          {declarat && signar?.titular && (
+                            <BotoIcona
+                              icona={PenLine}
+                              variant="default"
+                              etiqueta={t('mydoc.conv_signa_declarat')}
+                              onClick={() => setDlgFirma(true)}
+                            />
+                          )}
+                          {doc && (
+                            <>
+                              <BotoIcona
+                                icona={FileText}
+                                etiqueta={t('doc.a_view_pdf')}
+                                disabled={descarregador.ocupat === doc.id}
+                                onClick={() => void descarregador.mostra(doc.id)}
+                              />
+                              <BotoIcona
+                                icona={descarregador.generant === doc.id ? Loader2 : Download}
+                                etiqueta={t('doc.download')}
+                                className={descarregador.generant === doc.id ? '[&_svg]:animate-spin' : undefined}
+                                disabled={descarregador.ocupat === doc.id}
+                                onClick={() => void descarregador.descarrega(doc.id)}
+                              />
+                            </>
+                          )}
+                          {!doc && !paper && (
+                            <span className="text-center text-xs text-muted-foreground">{t('mydoc.no_pdf')}</span>
+                          )}
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
       </CardContent>
       {/* SIN `conveniId`: va por `signar_conveni_propi()`, que prepara el de col·laboració de

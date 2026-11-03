@@ -22,7 +22,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { ArrowLeft, Plus } from 'lucide-react'
+import { ArrowLeft, Eye, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -33,6 +33,7 @@ import { textError } from '../../lib/textError'
 import { crearEspigolada, dataCurta, estilEstatAlbara, kg, repartirEspigolada } from '../../lib/albarans'
 import type { LiniaEntrada, LotEspigolada } from '../../lib/albarans'
 import type { Espigolada } from '../../types'
+import BotoIcona from '../../components/BotoIcona'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -86,6 +87,7 @@ interface FilaEspigolada {
 
 export function Espigolades() {
   const { t } = useT()
+  const navigate = useNavigate()
   const [files, setFiles] = useState<FilaEspigolada[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -184,27 +186,45 @@ export function Espigolades() {
         )}
 
         {!carregant && !error && visibles.length > 0 && (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>{t('esp.c_date')}</TableHead>
-                  <TableHead>{t('esp.c_producer')}</TableHead>
-                  <TableHead>{t('esp.c_ref')}</TableHead>
-                  <TableHead className="text-right">{t('esp.c_records')}</TableHead>
-                  <TableHead className="text-right">{t('esp.c_kg')}</TableHead>
-                  <TableHead>{t('esp.c_status')}</TableHead>
-                  <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {visibles.map((f) => (
+          // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal.
+          // En móvil quedan la productora (enlazada a la jornada, con la fecha y los kilos
+          // debajo), el estado y la acción; los kilos salen desde `sm`, la fecha desde `md`,
+          // la referencia desde `lg` y el número de registros desde `xl`.
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead className="hidden w-28 md:table-cell">{t('esp.c_date')}</TableHead>
+                <TableHead>{t('esp.c_producer')}</TableHead>
+                <TableHead className="hidden lg:table-cell">{t('esp.c_ref')}</TableHead>
+                <TableHead className="hidden w-24 xl:table-cell">{t('esp.c_records')}</TableHead>
+                <TableHead className="hidden w-24 sm:table-cell">{t('esp.c_kg')}</TableHead>
+                <TableHead className="w-24">{t('esp.c_status')}</TableHead>
+                <TableHead className="w-15 md:w-16"><span className="sr-only">{t('doc.c_actions')}</span></TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {visibles.map((f) => {
+                const ruta = `/equip/espigolades/${f.esp.id}`
+                return (
                   <TableRow key={f.esp.id}>
-                    <TableCell className="font-medium whitespace-nowrap tabular-nums">
+                    <TableCell className="hidden text-center font-medium whitespace-nowrap tabular-nums md:table-cell">
                       {dataCurta(f.esp.fecha)}
                     </TableCell>
-                    <TableCell className="max-w-56 truncate">{f.productor}</TableCell>
-                    <TableCell className="text-muted-foreground">
+                    <TableCell>
+                      <Link to={ruta} className="font-medium text-primary hover:underline">{f.productor}</Link>
+                      <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
+                        {dataCurta(f.esp.fecha)}<span className="sm:hidden"> · {kg(f.kgTotal)} kg</span>
+                      </span>
+                      {(f.esp.ref_externa || f.esp.oferta_origen_id) && (
+                        <span className="block text-xs text-muted-foreground lg:hidden">
+                          {f.esp.ref_externa}
+                          {f.esp.oferta_origen_id && (
+                            <Badge variant="outline" className={f.esp.ref_externa ? 'ml-2' : undefined}>{t('conv_esp.badge')}</Badge>
+                          )}
+                        </span>
+                      )}
+                    </TableCell>
+                    <TableCell className="hidden text-muted-foreground lg:table-cell">
                       {f.esp.ref_externa ?? '—'}
                       {/* De dónde salió la jornada (F3). Una espigolada nacida de una oferta
                           no se comporta distinto, pero saber que existe esa oferta evita
@@ -213,26 +233,23 @@ export function Espigolades() {
                         <Badge variant="outline" className="ml-2">{t('conv_esp.badge')}</Badge>
                       )}
                     </TableCell>
-                    <TableCell className="text-right tabular-nums">{f.registres}</TableCell>
-                    <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(f.kgTotal)}</TableCell>
-                    <TableCell>
+                    <TableCell className="hidden text-center tabular-nums xl:table-cell">{f.registres}</TableCell>
+                    <TableCell className="hidden text-center tabular-nums whitespace-nowrap sm:table-cell">{kg(f.kgTotal)}</TableCell>
+                    <TableCell className="text-center">
                       <Badge className={estilEstatEspigolada(f.esp.estado)}>
                         {t(`esp.st_${f.esp.estado}`)}
                       </Badge>
                     </TableCell>
                     <TableCell>
-                      <div className="flex justify-end">
-                        {/* `h-11` en móvil: es la acción de la fila y 32 px es poco para un pulgar. */}
-                        <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                          <Link to={`/equip/espigolades/${f.esp.id}`}>{t('c.detail')}</Link>
-                        </Button>
+                      <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                        <BotoIcona icona={Eye} etiqueta={t('esp.a_open')} onClick={() => navigate(ruta)} />
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
     </Card>

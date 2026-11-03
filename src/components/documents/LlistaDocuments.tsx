@@ -9,14 +9,14 @@
 // indistinguibles.
 
 import type { ReactNode } from 'react'
-import { Download, Eye, Loader2 } from 'lucide-react'
+import { Download, FileText, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
+import BotoIcona from '../BotoIcona'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { etiquetaTipusDocument } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -76,69 +76,73 @@ export default function LlistaDocuments({
         {files.length === 0
           ? <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
           : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('alb.c_number')}</TableHead>
-                    <TableHead>{t('doc.c_type')}</TableHead>
-                    <TableHead>{t('alb.c_status')}</TableHead>
-                    <TableHead>{t('doc.c_date')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {files.map((d) => (
+            // Criterio de las tablas (03-11-2026, AGENTS.md §2): a 360 px quedan número,
+            // estado y acciones; el tipo (con su `extra`) y la fecha van bajo el número hasta
+            // que tienen columna —la fecha desde `md`, el tipo desde `lg`—.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('alb.c_number')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('doc.c_type')}</TableHead>
+                  <TableHead>{t('alb.c_status')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('doc.c_date')}</TableHead>
+                  <TableHead className="w-15 md:w-22">
+                    <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {files.map((d) => {
+                  const gris = descarregador.ocupat === d.id || d.estado === 'error'
+                  return (
                     <TableRow key={d.id}>
-                      <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                        {d.numero_completo}
+                      <TableCell>
+                        <span className="font-medium whitespace-nowrap tabular-nums">{d.numero_completo}</span>
+                        {/* El tipo se esconde en `lg` y la fecha en `md`: por eso el «·» va
+                            delante de la fecha y nunca queda colgando. */}
+                        <span className="block text-xs text-muted-foreground lg:hidden">
+                          {t(etiquetaTipusDocument(d.tipo))}
+                          <span className="md:hidden"> · {dataCurta(d.emitido_at)}</span>
+                        </span>
+                        {extra && <div className="text-muted-foreground lg:hidden">{extra(d)}</div>}
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
+                      <TableCell className="hidden text-muted-foreground lg:table-cell">
                         <div>{t(etiquetaTipusDocument(d.tipo))}</div>
                         {extra?.(d)}
                       </TableCell>
-                      <TableCell>
+                      <TableCell className="text-center">
                         {substituit?.(d)
-                          ? <Badge className="bg-secondary text-secondary-foreground">{t('tan.ds_substituit')}</Badge>
-                          : <Badge className={ESTIL_ESTAT[d.estado]}>{t(CLAU_ESTAT[d.estado])}</Badge>}
+                          ? <Badge className="whitespace-normal bg-secondary text-secondary-foreground">{t('tan.ds_substituit')}</Badge>
+                          : <Badge className={`whitespace-normal ${ESTIL_ESTAT[d.estado]}`}>{t(CLAU_ESTAT[d.estado])}</Badge>}
                       </TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">
+                      <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground md:table-cell">
                         {dataCurta(d.emitido_at)}
                       </TableCell>
                       <TableCell>
-                        {/* «Veure» va primero: mirar el documento es lo frecuente y
+                        {/* «Veure el PDF» va primero: mirar el documento es lo frecuente y
                             guardarlo la excepción. Se apagan los dos a la vez, porque los
                             dos piden la misma URL firmada. */}
-                        <div className="flex justify-end gap-2">
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 whitespace-normal md:h-8"
-                            disabled={descarregador.ocupat === d.id || d.estado === 'error'}
+                        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                          <BotoIcona
+                            icona={FileText}
+                            etiqueta={t('doc.a_view_pdf')}
+                            disabled={gris}
                             onClick={() => void descarregador.mostra(d.id)}
-                          >
-                            <Eye className="mr-1 size-3.5" aria-hidden />
-                            {t('doc.view')}
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-11 whitespace-normal md:h-8"
-                            disabled={descarregador.ocupat === d.id || d.estado === 'error'}
+                          />
+                          <BotoIcona
+                            icona={descarregador.generant === d.id ? Loader2 : Download}
+                            etiqueta={t('doc.download')}
+                            className={descarregador.generant === d.id ? '[&_svg]:animate-spin' : undefined}
+                            disabled={gris}
                             onClick={() => void descarregador.descarrega(d.id)}
-                          >
-                            {descarregador.generant === d.id
-                              ? <Loader2 className="mr-1 size-3.5 animate-spin" aria-hidden />
-                              : <Download className="mr-1 size-3.5" aria-hidden />}
-                            {t('doc.download')}
-                          </Button>
+                          />
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
       </CardContent>
     </Card>

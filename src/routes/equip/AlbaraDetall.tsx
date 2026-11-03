@@ -885,35 +885,44 @@ export default function AlbaraDetall() {
               </Button>
             </>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('alb.ln_product')}</TableHead>
-                    <TableHead className="text-right">{t('alb.ln_boxes')}</TableHead>
-                    <TableHead className="text-right">{t('alb.ln_planned')}</TableHead>
-                    <TableHead className="text-right">{t('alb.ln_net')}</TableHead>
-                    <TableHead className="text-right">{t('alb.ln_confirmed')}</TableHead>
-                    <TableHead className="text-right">{t('alb.ln_validated')}</TableHead>
+            // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal.
+            // En móvil quedan el producto y los kilos validados (los únicos que cuentan); el
+            // neto y los confirmados salen desde `md`, y las cajas y los previstos desde `xl`.
+            // Lo que no tiene columna va bajo el producto, con su nombre: es el detalle, y
+            // aquí no hay otro sitio donde verlo.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('alb.ln_product')}</TableHead>
+                  <TableHead className="hidden w-20 xl:table-cell">{t('alb.ln_boxes')}</TableHead>
+                  <TableHead className="hidden w-24 xl:table-cell">{t('alb.ln_planned')}</TableHead>
+                  <TableHead className="hidden w-24 md:table-cell">{t('alb.ln_net')}</TableHead>
+                  <TableHead className="hidden w-24 md:table-cell">{t('alb.ln_confirmed')}</TableHead>
+                  <TableHead className="w-24">{t('alb.ln_validated')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {linies.map((l) => (
+                  <TableRow key={l.id}>
+                    <TableCell>
+                      <span className="font-medium">{l.producto ?? '—'}</span>
+                      {l.variedad ? <span className="text-muted-foreground"> · {l.variedad}</span> : null}
+                      <span className="block text-xs text-muted-foreground tabular-nums xl:hidden">
+                        {t('alb.ln_boxes')}: {l.num_cajas ?? '—'} · {t('alb.ln_planned')}: {kg(l.kg_previstos)}
+                      </span>
+                      <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
+                        {t('alb.ln_net')}: {kg(l.kg_neto)} · {t('alb.ln_confirmed')}: {kg(l.kg_confirmados)}
+                      </span>
+                    </TableCell>
+                    <TableCell className="hidden text-center tabular-nums xl:table-cell">{l.num_cajas ?? '—'}</TableCell>
+                    <TableCell className="hidden text-center tabular-nums xl:table-cell">{kg(l.kg_previstos)}</TableCell>
+                    <TableCell className="hidden text-center tabular-nums md:table-cell">{kg(l.kg_neto)}</TableCell>
+                    <TableCell className="hidden text-center tabular-nums md:table-cell">{kg(l.kg_confirmados)}</TableCell>
+                    <TableCell className="text-center font-medium tabular-nums">{kg(l.kg_validados)}</TableCell>
                   </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {linies.map((l) => (
-                    <TableRow key={l.id}>
-                      <TableCell className="font-medium">
-                        {l.producto ?? '—'}
-                        {l.variedad ? <span className="text-muted-foreground"> · {l.variedad}</span> : null}
-                      </TableCell>
-                      <TableCell className="text-right tabular-nums">{l.num_cajas ?? '—'}</TableCell>
-                      <TableCell className="text-right tabular-nums">{kg(l.kg_previstos)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{kg(l.kg_neto)}</TableCell>
-                      <TableCell className="text-right tabular-nums">{kg(l.kg_confirmados)}</TableCell>
-                      <TableCell className="text-right font-medium tabular-nums">{kg(l.kg_validados)}</TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                ))}
+              </TableBody>
+            </Table>
           )}
           <p className="text-sm text-muted-foreground">
             {t('alb.totals', {

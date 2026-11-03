@@ -2,8 +2,14 @@
 // procesos, cuantificación, objetivos, acciones, seguimientos) y, para el equipo, el alta,
 // la edición y el borrado. Genérica sobre una lista de campos: las columnas que de verdad se
 // guardan las decide la base (`columnes_element_expedient`), no esta pantalla.
+//
+// El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a 360 px. Cada
+// campo dice con `des` desde qué ancho tiene columna propia; antes, su valor va bajo la primera
+// columna («Etiqueta: valor»), así que no se pierde nada. Se decide en JS (`usePuntTall`) y no
+// con `hidden md:table-cell` para que el valor esté UNA sola vez en el DOM. Editar abre una fila
+// debajo con el formulario (como Productes), con `colSpan` = columnas visibles; el alta, arriba.
 
-import { useCallback, useEffect, useState } from 'react'
+import { Fragment, useCallback, useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
@@ -13,6 +19,8 @@ import {
   desarElement, elements, esborrarElement, type Element, type TaulaExpedient,
 } from '../../lib/expedientApi'
 import { useConfirma } from '../DialegConfirma'
+import BotoIcona from '../BotoIcona'
+import { usePuntTall, type PuntTall } from '../../hooks/usePuntTall'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -28,7 +36,12 @@ export interface CampElement {
   obligatori?: boolean
   /** No sale como columna de la tabla (sí en el formulario). */
   nomesFormulari?: boolean
+  /** Desde qué punto de corte tiene columna propia; antes, va bajo la primera. Sin él, siempre. */
+  des?: Exclude<PuntTall, 'sm'>
 }
+
+/** Cifras, fechas y listas cortas van centradas; los textos, a la izquierda. */
+const centrat = (c: CampElement) => c.tipus === 'date' || c.tipus === 'mes' || c.tipus === 'number' || c.tipus === 'select'
 
 const SELECT = 'h-11 w-full rounded-md border border-input bg-transparent px-3 text-base md:h-9 md:text-sm'
 
@@ -114,7 +127,47 @@ export default function TaulaElements({
     await carrega()
   }
 
-  const columnes = camps.filter((c) => !c.nomesFormulari)
+  const punts = { md: usePuntTall('md'), lg: usePuntTall('lg'), xl: usePuntTall('xl') }
+  const llistats = camps.filter((c) => !c.nomesFormulari)
+  // La primera columna identifica la fila: siempre visible, lleve o no `des`.
+  const columnes = llistats.filter((c, i) => i === 0 || !c.des || punts[c.des])
+  const sota = llistats.filter((c) => !columnes.includes(c))
+  const nCols = columnes.length + Number(editable)
+
+  const formulari = () => obert && (
+    <div className="space-y-3 rounded-lg border border-border bg-secondary/40 p-3">
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+        {camps.map((c) => {
+          const id = `${taula}-${c.clau}`
+          const valor = obert.valors[c.clau]
+          const posa = (v: string) => setObert((o) => (o ? { ...o, valors: { ...o.valors, [c.clau]: v } } : o))
+          return (
+            <div key={c.clau} className={c.tipus === 'textarea' ? 'space-y-1 sm:col-span-2' : 'space-y-1'}>
+              <Label htmlFor={id} className="text-xs text-muted-foreground">{t(c.labelKey)}</Label>
+              {c.tipus === 'textarea' ? (
+                <Textarea id={id} rows={2} value={valor} onChange={(e) => posa(e.target.value)} />
+              ) : c.tipus === 'select' ? (
+                <select id={id} className={SELECT} value={valor} onChange={(e) => posa(e.target.value)}>
+                  <option value="">—</option>
+                  {(c.opcions ?? []).map((o) => <option key={o.valor} value={o.valor}>{o.text}</option>)}
+                </select>
+              ) : (
+                <Input id={id} value={valor} onChange={(e) => posa(e.target.value)}
+                  type={c.tipus === 'date' ? 'date' : c.tipus === 'mes' ? 'month' : c.tipus === 'number' ? 'number' : 'text'}
+                  inputMode={c.tipus === 'number' ? 'decimal' : undefined} />
+              )}
+            </div>
+          )
+        })}
+      </div>
+      <div className="flex flex-wrap gap-2">
+        <Button className="h-11 w-full sm:w-auto md:h-9" disabled={desant} onClick={() => void desa()}>
+          {desant ? t('c.saving') : t('c.save')}
+        </Button>
+        <Button variant="outline" className="h-11 w-full sm:w-auto md:h-9" onClick={() => setObert(null)}>{t('c.cancel')}</Button>
+      </div>
+    </div>
+  )
 
   return (
     <Card data-testid={testId}>
@@ -132,75 +185,66 @@ export default function TaulaElements({
       <CardContent className="space-y-4">
         {error && <p className="text-sm text-destructive">{textError(t, error)}</p>}
 
-        {obert && (
-          <div className="space-y-3 rounded-lg border border-border bg-secondary/40 p-3">
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {camps.map((c) => {
-                const id = `${taula}-${c.clau}`
-                const valor = obert.valors[c.clau]
-                const posa = (v: string) => setObert((o) => (o ? { ...o, valors: { ...o.valors, [c.clau]: v } } : o))
-                return (
-                  <div key={c.clau} className={c.tipus === 'textarea' ? 'space-y-1 sm:col-span-2' : 'space-y-1'}>
-                    <Label htmlFor={id} className="text-xs text-muted-foreground">{t(c.labelKey)}</Label>
-                    {c.tipus === 'textarea' ? (
-                      <Textarea id={id} rows={2} value={valor} onChange={(e) => posa(e.target.value)} />
-                    ) : c.tipus === 'select' ? (
-                      <select id={id} className={SELECT} value={valor} onChange={(e) => posa(e.target.value)}>
-                        <option value="">—</option>
-                        {(c.opcions ?? []).map((o) => <option key={o.valor} value={o.valor}>{o.text}</option>)}
-                      </select>
-                    ) : (
-                      <Input id={id} value={valor} onChange={(e) => posa(e.target.value)}
-                        type={c.tipus === 'date' ? 'date' : c.tipus === 'mes' ? 'month' : c.tipus === 'number' ? 'number' : 'text'}
-                        inputMode={c.tipus === 'number' ? 'decimal' : undefined} />
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-            <div className="flex flex-wrap gap-2">
-              <Button className="h-11 md:h-9" disabled={desant} onClick={() => void desa()}>
-                {desant ? t('c.saving') : t('c.save')}
-              </Button>
-              <Button variant="outline" className="h-11 md:h-9" onClick={() => setObert(null)}>{t('c.cancel')}</Button>
-            </div>
-          </div>
-        )}
+        {/* El alta, arriba; la edición de una fila, debajo de ella. */}
+        {obert && obert.id === null && formulari()}
 
         {files.length === 0 ? (
           <p className="text-sm text-muted-foreground">{t('exp.buit')}</p>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  {columnes.map((c) => <TableHead key={c.clau}>{t(c.labelKey)}</TableHead>)}
-                  {editable && <TableHead className="text-right">{t('doc.c_actions')}</TableHead>}
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {files.map((f) => (
-                  <TableRow key={f.id}>
-                    {columnes.map((c) => (
-                      <TableCell key={c.clau} className="min-w-28 max-w-80 whitespace-normal">{textCel(c, f[c.clau])}</TableCell>
-                    ))}
-                    {editable && (
-                      <TableCell>
-                        <div className="flex justify-end gap-1">
-                          <Button size="icon" variant="ghost" className="size-11 md:size-8" aria-label={t('exp.edita')} onClick={() => edita(f)}>
-                            <Pencil className="size-4" aria-hidden />
-                          </Button>
-                          <Button size="icon" variant="ghost" className="size-11 md:size-8" aria-label={t('c.delete')} onClick={() => void esborra(f)}>
-                            <Trash2 className="size-4" aria-hidden />
-                          </Button>
-                        </div>
-                      </TableCell>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                {columnes.map((c) => <TableHead key={c.clau}>{t(c.labelKey)}</TableHead>)}
+                {editable && (
+                  <TableHead className="w-15 md:w-22">
+                    <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                  </TableHead>
+                )}
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {files.map((f) => {
+                const editant = obert?.id === f.id
+                return (
+                  <Fragment key={f.id}>
+                    <TableRow className={editant ? 'bg-muted/50' : undefined}>
+                      {columnes.map((c, i) => (
+                        <TableCell key={c.clau} className={i > 0 && centrat(c) ? 'text-center' : undefined}>
+                          <span className={i === 0 ? 'font-medium' : undefined}>{textCel(c, f[c.clau])}</span>
+                          {/* Lo que no tiene columna a este ancho, bajo la primera. */}
+                          {i === 0 && sota.map((x) => {
+                            const v = textCel(x, f[x.clau])
+                            if (v === '—') return null
+                            return (
+                              <span key={x.clau} className="block text-xs text-muted-foreground">
+                                {t(x.labelKey)}: <span>{v}</span>
+                              </span>
+                            )
+                          })}
+                        </TableCell>
+                      ))}
+                      {editable && (
+                        <TableCell>
+                          <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                            <BotoIcona icona={Pencil} etiqueta={t('exp.edita')} aria-expanded={editant}
+                              onClick={() => (editant ? setObert(null) : edita(f))} />
+                            <BotoIcona icona={Trash2} etiqueta={t('c.delete')}
+                              className="text-destructive hover:text-destructive"
+                              onClick={() => void esborra(f)} />
+                          </div>
+                        </TableCell>
+                      )}
+                    </TableRow>
+                    {editant && (
+                      <TableRow className="bg-muted/50 hover:bg-muted/50">
+                        <TableCell colSpan={nCols}>{formulari()}</TableCell>
+                      </TableRow>
                     )}
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
+                  </Fragment>
+                )
+              })}
+            </TableBody>
+          </Table>
         )}
       </CardContent>
       {dialeg}

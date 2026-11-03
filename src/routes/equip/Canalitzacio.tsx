@@ -16,7 +16,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
-import { Loader2 } from 'lucide-react'
+import { Eye, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
@@ -28,6 +28,7 @@ import type { FetsCanal } from '../../lib/passosCanalitzacio'
 import type { ConvenioEstado, EstadoAlbaran, EstadoExcedente } from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import BotoIcona from '../../components/BotoIcona'
 import DialegNovaOfertaAssistida from '../../components/equip/DialegNovaOfertaAssistida'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -166,78 +167,106 @@ export default function Canalitzacio() {
             // Con error no se dice «cap lot en curs»: no se sabe, y el error ya está arriba.
             !error && <p className="py-6 text-sm text-muted-foreground">{t('canalz.empty')}</p>
           ) : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('canalz.c_ref')}</TableHead>
-                    <TableHead>{t('canalz.c_productor')}</TableHead>
-                    <TableHead>{t('canalz.c_fase')}</TableHead>
-                    <TableHead>{t('canalz.c_accio')}</TableHead>
-                    <TableHead className="text-right">{t('canalz.c_kg')}</TableHead>
-                    <TableHead className="text-right">{t('canalz.c_pendents')}</TableHead>
-                    <TableHead className="text-right whitespace-normal">{t('cfase.c_missatges')}</TableHead>
-                    <TableHead />
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibles.map((l) => {
-                    const escala = escalaCanal(fetsDeLaFila(l))
-                    const ara = escala.find((e) => e.estat === 'ara')
-                      ?? escala.find((e) => e.estat === 'bloquejat')
-                    return (
-                      <TableRow key={l.excedente_id}>
-                        <TableCell className="font-medium tabular-nums">
+            // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal.
+            // En móvil quedan el lote (referencia, enlazada al ciclo, con la productora debajo),
+            // la fase con lo que toca y la acción; los kilos salen desde `md`, la acción pendiente
+            // en su columna desde `lg` y la productora y los dos contadores desde `xl`. Hasta
+            // entonces, los contadores van como badge bajo la referencia: lo que se esconde por
+            // ancho no se pierde. El orden de las columnas no cambia (`tauler.e2e.ts` lee la
+            // cuarta celda, la acción pendiente, a 1280 px).
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('canalz.c_ref')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('canalz.c_productor')}</TableHead>
+                  <TableHead className="w-32 lg:w-36">{t('canalz.c_fase')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('canalz.c_accio')}</TableHead>
+                  <TableHead className="hidden w-28 md:table-cell">{t('canalz.c_kg')}</TableHead>
+                  <TableHead className="hidden w-24 xl:table-cell">{t('canalz.c_pendents')}</TableHead>
+                  <TableHead className="hidden w-24 xl:table-cell">{t('cfase.c_missatges')}</TableHead>
+                  <TableHead className="w-15 md:w-16"><span className="sr-only">{t('doc.c_actions')}</span></TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {visibles.map((l) => {
+                  const escala = escalaCanal(fetsDeLaFila(l))
+                  const ara = escala.find((e) => e.estat === 'ara')
+                    ?? escala.find((e) => e.estat === 'bloquejat')
+                  const nEnviar = perEnviar === null ? null : (perEnviar[l.excedente_id] ?? 0)
+                  const ruta = `/equip/canalitzacio/${l.excedente_id}`
+                  // «Acció pendent» (fase 8 de la revisión del 08-10-2026): qué toca ahora; si
+                  // está bloqueado, por qué. Sale en su columna desde `lg` y bajo la fase antes.
+                  const accio = ara ? (
+                    <>
+                      <p className="text-sm">{t(`canal.${clauPas(ara)}_t`)}</p>
+                      {ara.estat === 'bloquejat' && ara.motiuKey && (
+                        <p className="mt-1 text-xs text-aviso">{t(ara.motiuKey)}</p>
+                      )}
+                    </>
+                  ) : <span className="text-sm text-muted-foreground">{t('canalz.res_pendent')}</span>
+                  return (
+                    <TableRow key={l.excedente_id}>
+                      <TableCell>
+                        <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline">
                           {l.id_excedente ?? '—'}
-                        </TableCell>
-                        <TableCell>{l.productor ?? '—'}</TableCell>
-                        <TableCell>
-                          <Badge variant={ara?.estat === 'bloquejat' ? 'outline' : 'secondary'}>
-                            {t(PASSOS_FASE_CLAUS[ara?.fase ?? 5])}
-                          </Badge>
-                        </TableCell>
-                        {/* «Acció pendent» (fase 8 de la revisión del 08-10-2026): qué toca ahora,
-                            en su columna; si está bloqueado, por qué. */}
-                        <TableCell className="min-w-48 whitespace-normal">
-                          {ara ? (
-                            <>
-                              <p className="text-sm">{t(`canal.${clauPas(ara)}_t`)}</p>
-                              {ara.estat === 'bloquejat' && ara.motiuKey && (
-                                <p className="mt-1 text-xs text-aviso">{t(ara.motiuKey)}</p>
-                              )}
-                            </>
-                          ) : <span className="text-sm text-muted-foreground">{t('canalz.res_pendent')}</span>}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {Number(l.kg_canalitzats ?? 0).toLocaleString('ca-ES')} / {Number(l.kg_total ?? 0).toLocaleString('ca-ES')}
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">
-                          {l.n_per_aprovar > 0 && (
-                            <Badge className="bg-aviso-fondo text-aviso">{l.n_per_aprovar}</Badge>
-                          )}
-                        </TableCell>
-                        {/* Lo que la plataforma no pudo mandar (interruptores o gates): se
-                            copia desde «Missatges d'aquest pas» de cada fase. */}
-                        <TableCell className="text-right tabular-nums">
-                          {perEnviar === null
-                            ? <span className="text-muted-foreground">—</span>
-                            : (perEnviar[l.excedente_id] ?? 0) > 0 && (
-                              <Badge className="bg-aviso-fondo text-aviso">{perEnviar[l.excedente_id]}</Badge>
+                        </Link>
+                        <span className="block text-xs text-muted-foreground xl:hidden">{l.productor ?? '—'}</span>
+                        <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
+                          {Number(l.kg_canalitzats ?? 0).toLocaleString('ca-ES')} / {Number(l.kg_total ?? 0).toLocaleString('ca-ES')} kg
+                        </span>
+                        {(l.n_per_aprovar > 0 || (nEnviar ?? 0) > 0) && (
+                          <span className="mt-1 flex flex-wrap gap-1 xl:hidden">
+                            {l.n_per_aprovar > 0 && (
+                              <Badge className="bg-aviso-fondo whitespace-normal text-aviso">
+                                {t('canalz.c_pendents')}: {l.n_per_aprovar}
+                              </Badge>
                             )}
-                        </TableCell>
-                        <TableCell className="text-right">
-                          <Button asChild variant="outline" size="sm" className="h-11 whitespace-normal md:h-8">
-                            <Link to={`/equip/canalitzacio/${l.excedente_id}`}>
-                              {t('canalz.open')}
-                            </Link>
-                          </Button>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                            {(nEnviar ?? 0) > 0 && (
+                              <Badge className="bg-aviso-fondo whitespace-normal text-aviso">
+                                {t('cfase.c_missatges')}: {nEnviar}
+                              </Badge>
+                            )}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="hidden xl:table-cell">{l.productor ?? '—'}</TableCell>
+                      <TableCell className="text-center">
+                        <Badge
+                          variant={ara?.estat === 'bloquejat' ? 'outline' : 'secondary'}
+                          className="max-w-full whitespace-normal"
+                        >
+                          {t(PASSOS_FASE_CLAUS[ara?.fase ?? 5])}
+                        </Badge>
+                        <div className="mt-1 text-left lg:hidden">{accio}</div>
+                      </TableCell>
+                      <TableCell className="hidden lg:table-cell">{accio}</TableCell>
+                      <TableCell className="hidden text-center tabular-nums md:table-cell">
+                        {Number(l.kg_canalitzats ?? 0).toLocaleString('ca-ES')} / {Number(l.kg_total ?? 0).toLocaleString('ca-ES')}
+                      </TableCell>
+                      <TableCell className="hidden text-center tabular-nums xl:table-cell">
+                        {l.n_per_aprovar > 0 && (
+                          <Badge className="bg-aviso-fondo text-aviso">{l.n_per_aprovar}</Badge>
+                        )}
+                      </TableCell>
+                      {/* Lo que la plataforma no pudo mandar (interruptores o gates): se
+                          copia desde «Missatges d'aquest pas» de cada fase. */}
+                      <TableCell className="hidden text-center tabular-nums xl:table-cell">
+                        {nEnviar === null
+                          ? <span className="text-muted-foreground">—</span>
+                          : nEnviar > 0 && (
+                            <Badge className="bg-aviso-fondo text-aviso">{nEnviar}</Badge>
+                          )}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                          <BotoIcona icona={Eye} etiqueta={t('canalz.a_open')} onClick={() => navega(ruta)} />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

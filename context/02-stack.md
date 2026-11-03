@@ -235,9 +235,20 @@ dos con la página en esos mismos 0 px):
 ## Criterio de las tablas (03-11-2026)
 
 Pedido por Carles: **todas las tablas responsive sin scroll horizontal, acciones en iconos que
-dicen qué hacen al pasar por encima y títulos de columna centrados.** Se aplica tabla a tabla;
-la primera, **Productes** (`routes/equip/Productes.tsx`), revisada por Carles antes de hacer el
-resto. Cómo se hace:
+dicen qué hacen al pasar por encima y títulos de columna centrados.** Primero **Productes**
+(`routes/equip/Productes.tsx`, publicada en `171483f` y aprobada por Carles); el mismo día, **todas
+las demás** (25 tablas en 18 ficheros: Entitats, Ofertes, Canalització, Espigolades, Albarans y su
+detalle, Documents, Convenis y Campanya, Tancament y su detalle, Diagnòstics, Plans, el expediente
+y las listas de documentos, convenios y albaranes de los paneles externos). Cómo se hace:
+
+- **La base (`components/ui/table.tsx`) ya trae el criterio**: `TableHead` con `text-center
+  whitespace-normal` y `TableCell` con `whitespace-normal wrap-anywhere` y los badges de shadcn
+  (`[data-slot=badge]`) también partiendo. `wrap-anywhere` y no `break-words`: en una tabla de
+  ancho automático solo `overflow-wrap: anywhere` deja encoger la columna por debajo de un código
+  largo sin espacios (`E-E2E-PA-Car-1793652249346-A` desbordaba Canalització 21 px); parte solo
+  si no cabe. Un badge de 133 px («Sense cost per quilo») desbordaba el detalle del cierre 28 px.
+  Por eso un `TableHead` ya **no lleva** `text-right`/`text-left`, y `whitespace-nowrap` solo va
+  donde partir rompe (un importe con su unidad).
 
 - **Qué columnas quedan en móvil**: solo lo que identifica la fila, la cifra que importa y las
   acciones. Lo secundario va **debajo del nombre**, en `text-xs text-muted-foreground` (la familia
@@ -257,3 +268,14 @@ resto. Cómo se hace:
   `matchMedia`.
 - **Medir**: a 360 px, `scrollWidth > clientWidth` en todos los hijos de `main` (solo los `sr-only`
   pueden salir, son de 1 px). Productes: 0 desbordamientos, tres columnas visibles en móvil.
+  Las barras de pestañas (`-mx-1 overflow-x-auto`, Ofertes y Albarans) scrollean de lado a
+  propósito: no son tablas. Medido el 03-11-2026 en el clon: 0 en los 13 listados y detalles con
+  datos, a 360, 1024 y 1440 px.
+- **Iconos, los mismos en toda la aplicación**: abrir/detalle `Eye`, editar `Pencil`, fijar
+  `CirclePlus`, borrar `Trash2` (rojo), ver PDF `FileText`, descargar `Download`, correo `Mail`,
+  WhatsApp `MessageCircle`, aprobar `Check`, emitir certificado `FileCheck`, rectificar
+  `RotateCcw`, firmar `PenLine`, marcar enviado `MailCheck`, generando `Loader2` girando. La
+  etiqueta dice la acción entera («Obre l’albarà», «Envia un correu»): es el nombre accesible, y
+  las E2E buscan por él (`getByRole('button', {name})`). En castellano, infinitivo («Abrir…»).
+- **Lo que no se convierte**: las acciones de cabecera o de bloque (Nova…, calcular, emitir
+  todos, enviar la tanda, filtros). Solo las de cada fila.

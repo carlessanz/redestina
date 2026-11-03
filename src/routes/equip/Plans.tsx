@@ -4,11 +4,13 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
 import { toast } from 'sonner'
+import { Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { useAppContext } from '../../hooks/useAppContext'
+import BotoIcona from '../../components/BotoIcona'
 import { llistaExpedients, obrirExpedient, type Expedient } from '../../lib/expedientApi'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -93,38 +95,50 @@ export default function Plans() {
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
           {error && <p className="text-sm text-destructive">{textError(t, error)}</p>}
           {!carregant && !error && (files.length === 0 ? <p className="text-sm text-muted-foreground">{t('exp.cap_expedient')}</p> : (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('exp.f_organitzacio')}</TableHead>
-                    <TableHead>{t('exp.f_nivell')}</TableHead>
-                    <TableHead>{t('exp.f_estat_exp')}</TableHead>
-                    <TableHead>{t('exp.f_numero')}</TableHead>
-                    <TableHead>{t('diagl.c_updated')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {files.map((f) => (
+            // El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a 360 px.
+            // En móvil, organización (enlazada, con nivel, número y fecha debajo mientras no tienen
+            // columna), estado y la acción; el nivel desde `md`, número y fecha desde `lg`.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('exp.f_organitzacio')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('exp.f_nivell')}</TableHead>
+                  <TableHead>{t('exp.f_estat_exp')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('exp.f_numero')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('diagl.c_updated')}</TableHead>
+                  <TableHead className="w-15">
+                    <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                  </TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {files.map((f) => {
+                  const nivell = t(f.nivell === 'personalitzat' ? 'exp.nivell_personalitzat' : 'exp.nivell_basic')
+                  return (
                     <TableRow key={f.id}>
-                      <TableCell className="min-w-44 whitespace-normal font-medium">{f.productores?.empresa || f.productores?.name || '—'}</TableCell>
-                      <TableCell>{t(f.nivell === 'personalitzat' ? 'exp.nivell_personalitzat' : 'exp.nivell_basic')}</TableCell>
-                      <TableCell><Badge variant="outline">{t(`exp.estat_${f.estat}`)}</Badge></TableCell>
-                      <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{f.numero_completo ?? '—'}</TableCell>
-                      <TableCell className="whitespace-nowrap text-muted-foreground">{dataCurta(f.updated_at)}</TableCell>
+                      <TableCell className="font-medium">
+                        <Link to={`/equip/plans/${f.id}`} className="text-primary hover:underline">
+                          {f.productores?.empresa || f.productores?.name || '—'}
+                        </Link>
+                        <span className="block text-xs font-normal text-muted-foreground md:hidden">{nivell}</span>
+                        <span className="block text-xs font-normal tabular-nums text-muted-foreground lg:hidden">
+                          {[f.numero_completo, dataCurta(f.updated_at)].filter(Boolean).join(' · ')}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden text-center md:table-cell">{nivell}</TableCell>
+                      <TableCell className="text-center"><Badge variant="outline" className="whitespace-normal">{t(`exp.estat_${f.estat}`)}</Badge></TableCell>
+                      <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground lg:table-cell">{f.numero_completo ?? '—'}</TableCell>
+                      <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground lg:table-cell">{dataCurta(f.updated_at)}</TableCell>
                       <TableCell>
-                        <div className="flex justify-end">
-                          <Button asChild size="sm" variant="outline" className="h-11 md:h-8">
-                            <Link to={`/equip/plans/${f.id}`}>{t('c.detail')}</Link>
-                          </Button>
+                        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                          <BotoIcona icona={Eye} etiqueta={t('exp.a_veure')} onClick={() => navigate(`/equip/plans/${f.id}`)} />
                         </div>
                       </TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  )
+                })}
+              </TableBody>
+            </Table>
           ))}
         </CardContent>
       </Card>

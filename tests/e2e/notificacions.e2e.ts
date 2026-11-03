@@ -55,13 +55,14 @@ test('apagar el general apaga los canales; encenderlo no los enciende', async ({
   await expect(page).toHaveURL(/\/equip\/tauler/)
 })
 
-test('con el correo apagado, «Correu» de los listados queda gris', async ({ page }) => {
+// Decisión de Carles (03-11-2026): en el listado «Entitats», con el correo apagado el icono de
+// correo DESAPARECE (antes quedaba gris). El resto de botones de correo siguen grises con motivo.
+test('con el correo apagado, el listado «Entitats» no ofrece correo', async ({ page }) => {
   sql(`update app_settings set value = 'false' where key = 'email_activo'`)
   await entra(page, 'super_admin')
   await page.goto('/equip/entitats')
-  const boto = page.getByRole('button', { name: /^Correu$|^Correo$/ }).first()
-  await expect(boto).toBeVisible()
-  await expect(boto).toBeDisabled()
+  await expect(page.getByTestId('entitat-fila').first()).toBeVisible()
+  await expect(page.getByRole('button', { name: /Envia un correu|Enviar un correo/ })).toHaveCount(0)
 })
 
 test('el registro pide aceptar la privacidad y enlaza la política', async ({ page }) => {

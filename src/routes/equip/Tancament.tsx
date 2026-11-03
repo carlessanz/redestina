@@ -11,14 +11,15 @@
 // de `cierres_donante`, o sea del cálculo ya hecho: aquí no se suma nada en el cliente.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
-import { AlertTriangle } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
+import { AlertTriangle, Eye } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useConfirma } from '../../components/DialegConfirma'
 import { useAppContext } from '../../hooks/useAppContext'
+import BotoIcona from '../../components/BotoIcona'
 import {
   dataTancament, estilEstatTancament, euros, obrirTancament,
 } from '../../lib/tancament'
@@ -77,6 +78,7 @@ export default function Tancament() {
   const potAprovar = ctx?.potAprovar ?? false
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const { confirma, dialeg: dialegConfirma } = useConfirma()
+  const navigate = useNavigate()
 
   const [files, setFiles] = useState<Fila[]>([])
   const [totals, setTotals] = useState<Record<string, Totals>>({})
@@ -179,53 +181,84 @@ export default function Tancament() {
           )}
 
           {files.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('tan.c_year')}</TableHead>
-                    <TableHead>{t('tan.c_mode')}</TableHead>
-                    <TableHead>{t('tan.c_status')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_donors')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_kg')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_value')}</TableHead>
-                    <TableHead className="text-right">{t('tan.c_certs')}</TableHead>
-                    <TableHead>{t('tan.c_opened')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {files.map((f) => {
-                    const s = totals[f.id]
-                    return (
-                      <TableRow key={f.id}>
-                        <TableCell className="font-medium tabular-nums">{f.ejercicio}</TableCell>
-                        <TableCell><BadgeMode mode={f.modo} /></TableCell>
-                        <TableCell>
-                          <Badge className={estilEstatTancament(f.estado)}>
-                            {t(`tan.st_${f.estado}`)}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="text-right tabular-nums">{s?.donants ?? 0}</TableCell>
-                        <TableCell className="text-right tabular-nums whitespace-nowrap">{kg(s?.kg ?? 0)}</TableCell>
-                        <TableCell className="text-right tabular-nums whitespace-nowrap">{euros(s?.valor ?? 0)}</TableCell>
-                        <TableCell className="text-right tabular-nums">{s?.certificats ?? 0}</TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
-                          {dataTancament(f.abierto_at)}
-                        </TableCell>
-                        <TableCell>
-                          <div className="flex justify-end">
-                            <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                              <Link to={`/equip/tancament/${f.id}`}>{t('c.detail')}</Link>
-                            </Button>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+            // Criterio de las tablas (§2): en móvil, ejercicio (con modo, estado y fecha
+            // debajo), valor (con quilos, donantes y certificados debajo) y la acción. Las
+            // columnas aparecen por ancho; lo escondido sigue debajo del dato principal.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>{t('tan.c_year')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('tan.c_mode')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('tan.c_status')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('tan.c_donors')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('tan.c_kg')}</TableHead>
+                  <TableHead>{t('tan.c_value')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('tan.c_certs')}</TableHead>
+                  <TableHead className="hidden xl:table-cell">{t('tan.c_opened')}</TableHead>
+                  <TableHead>{t('doc.c_actions')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {files.map((f) => {
+                  const s = totals[f.id]
+                  return (
+                    <TableRow key={f.id}>
+                      <TableCell>
+                        <Link
+                          to={`/equip/tancament/${f.id}`}
+                          className="font-medium tabular-nums underline-offset-4 hover:underline"
+                        >
+                          {f.ejercicio}
+                        </Link>
+                        {/* El modo debajo también en móvil: es lo que más importa de la fila. */}
+                        <span className="mt-1 block md:hidden"><BadgeMode mode={f.modo} /></span>
+                        <span className="mt-1 block md:hidden">
+                          <Badge className={estilEstatTancament(f.estado)}>{t(`tan.st_${f.estado}`)}</Badge>
+                        </span>
+                        <span className="mt-1 block text-xs text-muted-foreground xl:hidden">
+                          {t('tan.c_opened')} {dataTancament(f.abierto_at)}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden text-center md:table-cell"><BadgeMode mode={f.modo} /></TableCell>
+                      <TableCell className="hidden text-center md:table-cell">
+                        <Badge className={estilEstatTancament(f.estado)}>
+                          {t(`tan.st_${f.estado}`)}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="hidden text-center tabular-nums lg:table-cell">{s?.donants ?? 0}</TableCell>
+                      <TableCell className="hidden text-center tabular-nums whitespace-nowrap lg:table-cell">
+                        {kg(s?.kg ?? 0)}
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">
+                        <span className="whitespace-nowrap">{euros(s?.valor ?? 0)}</span>
+                        <span className="block text-xs whitespace-nowrap text-muted-foreground lg:hidden">
+                          {kg(s?.kg ?? 0)}
+                        </span>
+                        <span className="block text-xs text-muted-foreground lg:hidden">
+                          {t('tan.c_donors')}: {s?.donants ?? 0}
+                        </span>
+                        <span className="block text-xs text-muted-foreground xl:hidden">
+                          {t('tan.c_certs')}: {s?.certificats ?? 0}
+                        </span>
+                      </TableCell>
+                      <TableCell className="hidden text-center tabular-nums xl:table-cell">{s?.certificats ?? 0}</TableCell>
+                      <TableCell className="hidden text-center text-muted-foreground xl:table-cell">
+                        {dataTancament(f.abierto_at)}
+                      </TableCell>
+                      <TableCell>
+                        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                          <BotoIcona
+                            icona={Eye}
+                            etiqueta={t('tan.a_open_detail')}
+                            onClick={() => navigate(`/equip/tancament/${f.id}`)}
+                          />
+                        </div>
+                      </TableCell>
+                    </TableRow>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

@@ -104,9 +104,9 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
   (`flex-wrap`, `min-w-0 flex-1 basis-*`); `grid-cols-1` explícito antes de `sm:grid-cols-2`;
   celdas de tabla con `whitespace-normal`; **auditar `scrollWidth > clientWidth` en los hijos**,
   no solo en el documento.
-- **Tablas (03-11-2026; hecha Productes, el resto pendiente)**: sin scroll horizontal (columnas
-  secundarias `hidden md:table-cell`, lo esencial bajo el nombre), títulos centrados, acciones
-  en iconos `BotoIcona` (tooltip y `aria-label`); `colSpan` de fila completa con `usePuntTall`.
+- **Tablas (03-11-2026, todas)**: sin scroll horizontal (secundarias `hidden md:table-cell`, lo
+  esencial bajo el nombre; `ui/table` centra títulos y parte celdas), acciones por fila en
+  iconos `BotoIcona` (tooltip y `aria-label`); `colSpan` de fila completa con `usePuntTall`.
 
 ## 2bis. Sistema de diseño
 

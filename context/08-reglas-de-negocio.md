@@ -58,8 +58,9 @@ Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
   ruta —que vuelve al tablero—, KPI y cola del tablero, con `NavItem.requereix` y `filtraPerCanals`);
   **excepción (03-11-2026, decisión de Carles): en el listado «Entitats», «Missatge» y «Correu»
   desaparecen** con su canal apagado (o con todas las notificaciones apagadas), en vez de quedar
-  grises: es una tabla de cientos de filas y un botón gris por fila solo ocupa sitio. «Correu» sigue
-  gris, con motivo, si la organización no tiene correo. Fuera de ese listado,
+  grises: es una tabla de cientos de filas y un botón gris por fila solo ocupa sitio. «Correu» (icono
+  `Mail`, «Envia un correu») sigue gris, con motivo, si la organización no tiene correo; «Missatge»
+  (`MessageCircle`, «Envia un WhatsApp»), gris si no tiene teléfono. Fuera de ese listado,
   un botón que envía se queda gris con el motivo (`BotoAmbMotiu`, `motiuCanal()` de `lib/canals.ts`):
   «Correu» y «Enviar» de la oferta, «Envia un correu», enviar el enlace del convenio, la tanda de la
   campaña, «Reenvia». Emitir documentos no se bloquea (acto legal): `AvisCorreuDesactivat` avisa en el

@@ -7,12 +7,12 @@
 // «Mostrant N de M» lo dice; quitarlo enseña las inactivas (las importadas de 1E entrarán así).
 // `?rol=ofertant|receptor` en la URL fija el papel (es a donde redirigen `/equip/productors` y
 // las tarjetas del tablero). Como los listados de siempre: arriba las de prueba, buscador en
-// cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila. «Darrer
+// cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila (iconos). «Darrer
 // contacte» es la nota interna más reciente (1F, `notes_internes`).
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Plus } from 'lucide-react'
+import { Eye, Mail, MessageCircle, Plus } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
@@ -25,7 +25,7 @@ import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filt
 import { dataCurta } from '../../lib/format'
 import { faTemps } from '../../lib/notesInternes'
 import BarraFiltres from '../../components/BarraFiltres'
-import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import BotoIcona from '../../components/BotoIcona'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
 import type { EntitatLlistat } from '../../types'
 import { Button } from '@/components/ui/button'
@@ -129,109 +129,119 @@ export default function Entitats() {
     return { text: t('el.conveni_part', { rol: te.toLowerCase() }), ok: false }
   }
 
+  // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal a 360 px.
+  // En móvil quedan el nombre —con sus marcas y, debajo, la persona de contacto, la población y
+  // el papel— y las acciones; «Rol» sale desde `md`, «Conveni» y «Població» desde `lg`, y NIF,
+  // cuenta y las dos fechas desde `xl` (con el menú lateral, antes no caben). Lo escondido sigue
+  // en la ficha. Las acciones van en iconos con tooltip y se apilan en móvil.
   function tabla(lista: EntitatLlistat[], marcarTest: boolean) {
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('el.c_name')}</TableHead>
-              <TableHead>{t('el.c_rols')}</TableHead>
-              <TableHead>{t('el.c_nif')}</TableHead>
-              <TableHead>{t('el.c_town')}</TableHead>
-              <TableHead>{t('el.c_compte')}</TableHead>
-              <TableHead>{t('el.c_conveni')}</TableHead>
-              <TableHead>{t('el.c_activitat')}</TableHead>
-              <TableHead>{t('el.c_contacte')}</TableHead>
-              <TableHead className="text-right">{t('el.c_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {lista.map((e) => {
-              const tel = soloDigitos(e.telefono)
-              const sense = tel ? (unanswered[tel] ?? 0) : 0
-              const conv = conveni(e)
-              const nom = e.nom_comercial || e.razon_social || e.persona_contacte || '—'
-              const contacte = e.darrer_contacte_at ? faTemps(e.darrer_contacte_at) : null
-              return (
-                <TableRow key={e.id} data-testid="entitat-fila">
-                  <TableCell className="font-medium">
-                    <span className="flex flex-wrap items-center gap-2">
-                      {nom}
-                      {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
-                      {!e.activa && <Badge className="bg-muted text-muted-foreground">{t('ef.estat_inactiva')}</Badge>}
-                      {/* Un alta rechazada se MARCA, no se esconde (§12.29). */}
-                      {e.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
-                      {sense > 0 && <Badge variant="destructive">{t('el.unanswered', { n: sense })}</Badge>}
-                      {e.persona_contacte && e.persona_contacte !== nom && (
-                        <span className="w-full text-xs font-normal text-muted-foreground">{e.persona_contacte}</span>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <span className="flex flex-wrap gap-1">
-                      {/* Un papel inactivo, en gris: la organización puede seguir activa por el otro. */}
-                      {e.es_generadora && (
-                        <Badge variant="outline" className={e.productor_activo ? undefined : 'text-muted-foreground line-through'}>
-                          {t('ef.paper_ofertant')}
-                        </Badge>
-                      )}
-                      {e.es_receptora && (
-                        <Badge variant="outline" className={e.entidad_activo ? undefined : 'text-muted-foreground line-through'}>
-                          {t('ef.paper_receptor')}
-                        </Badge>
-                      )}
-                    </span>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">{e.nif ?? '—'}</TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {e.poblacion ?? '—'}
-                    {e.comarca && <span className="block text-xs">{e.comarca}</span>}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{t(`ef.compte_${e.compte_estat}`)}</TableCell>
-                  <TableCell className={conv.ok ? 'text-exito' : 'text-aviso'}>{conv.text}</TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {e.darrera_activitat ? dataCurta(e.darrera_activitat) : t('el.activitat_mai')}
-                  </TableCell>
-                  {/* La nota interna más reciente (1F): «fa 3 dies · WhatsApp». */}
-                  <TableCell className="whitespace-nowrap text-muted-foreground" data-testid="darrer-contacte"
-                    title={e.darrer_contacte_at ? dataCurta(e.darrer_contacte_at) : undefined}>
-                    {contacte
-                      ? [t(contacte.clau, { n: contacte.n }),
-                        e.darrer_contacte_canal && t(`ni.canal_${e.darrer_contacte_canal}`)].filter(Boolean).join(' · ')
-                      : t('el.contacte_mai')}
-                  </TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button variant="outline" size="sm" onClick={() => navigate(`/equip/entitats/${e.id}`)}>{t('c.detail')}</Button>
-                      {/* Con WhatsApp apagado (§8) se quita, no se deshabilita. */}
-                      {waActiu && (
-                        <Button size="sm" disabled={!tel} title={tel ? undefined : t('el.no_phone')}
-                          onClick={() => tel && void assegurarContacte(tel, nom).then(() => navigate(`/equip/missatgeria/${tel}`))}>
-                          {t('c.message')}
-                        </Button>
-                      )}
-                      {/* Y «Correu», igual: con el correo apagado —o todas las notificaciones— se
-                          quita (decisión de Carles, 03-11-2026); gris solo si falta el correo. */}
-                      {!motiuEmail && (
-                        <BotoAmbMotiu variant="outline" size="sm" disabled={!e.email}
-                          motiu={e.email ? undefined : t('correu.no_email')}
-                          onClick={() => setCorreuA({
-                            email: e.email, nom,
-                            tipus: e.productor_id ? 'productor' : 'entidad',
-                            id: (e.productor_id ?? e.entidad_id) as string,
-                          })}>
-                          {t('c.email_action')}
-                        </BotoAmbMotiu>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('el.c_name')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('el.c_rols')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('el.c_nif')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('el.c_town')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('el.c_compte')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('el.c_conveni')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('el.c_activitat')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('el.c_contacte')}</TableHead>
+            <TableHead className="w-15 md:w-32">
+              <span className="sr-only md:not-sr-only">{t('el.c_actions')}</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {lista.map((e) => {
+            const tel = soloDigitos(e.telefono)
+            const sense = tel ? (unanswered[tel] ?? 0) : 0
+            const conv = conveni(e)
+            const nom = e.nom_comercial || e.razon_social || e.persona_contacte || '—'
+            const contacte = e.darrer_contacte_at ? faTemps(e.darrer_contacte_at) : null
+            // El papel en texto, para debajo del nombre cuando la columna «Rol» no cabe.
+            const rols = [e.es_generadora && t('ef.paper_ofertant'), e.es_receptora && t('ef.paper_receptor')]
+              .filter(Boolean).join(' · ')
+            return (
+              <TableRow key={e.id} data-testid="entitat-fila">
+                <TableCell className="font-medium">
+                  <span className="flex flex-wrap items-center gap-2">
+                    {nom}
+                    {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
+                    {!e.activa && <Badge className="bg-muted text-muted-foreground">{t('ef.estat_inactiva')}</Badge>}
+                    {/* Un alta rechazada se MARCA, no se esconde (§12.29). */}
+                    {e.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
+                    {sense > 0 && <Badge variant="destructive">{t('el.unanswered', { n: sense })}</Badge>}
+                  </span>
+                  {e.persona_contacte && e.persona_contacte !== nom && (
+                    <span className="block text-xs font-normal text-muted-foreground">{e.persona_contacte}</span>
+                  )}
+                  {/* Lo que en pantallas estrechas no tiene columna: población (hasta `lg`) y papel (hasta `md`). */}
+                  {e.poblacion && (
+                    <span className="block text-xs font-normal text-muted-foreground lg:hidden">{e.poblacion}</span>
+                  )}
+                  {rols && <span className="block text-xs font-normal text-muted-foreground md:hidden">{rols}</span>}
+                </TableCell>
+                <TableCell className="hidden text-center md:table-cell">
+                  <span className="flex flex-wrap justify-center gap-1">
+                    {/* Un papel inactivo, en gris: la organización puede seguir activa por el otro. */}
+                    {e.es_generadora && (
+                      <Badge variant="outline" className={e.productor_activo ? undefined : 'text-muted-foreground line-through'}>
+                        {t('ef.paper_ofertant')}
+                      </Badge>
+                    )}
+                    {e.es_receptora && (
+                      <Badge variant="outline" className={e.entidad_activo ? undefined : 'text-muted-foreground line-through'}>
+                        {t('ef.paper_receptor')}
+                      </Badge>
+                    )}
+                  </span>
+                </TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground xl:table-cell">{e.nif ?? '—'}</TableCell>
+                <TableCell className="hidden text-muted-foreground lg:table-cell">
+                  {e.poblacion ?? '—'}
+                  {e.comarca && <span className="block text-xs">{e.comarca}</span>}
+                </TableCell>
+                <TableCell className="hidden text-center text-muted-foreground xl:table-cell">{t(`ef.compte_${e.compte_estat}`)}</TableCell>
+                <TableCell className={`hidden text-center lg:table-cell ${conv.ok ? 'text-exito' : 'text-aviso'}`}>{conv.text}</TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground xl:table-cell">
+                  {e.darrera_activitat ? dataCurta(e.darrera_activitat) : t('el.activitat_mai')}
+                </TableCell>
+                {/* La nota interna más reciente (1F): «fa 3 dies · WhatsApp». */}
+                <TableCell className="hidden text-center text-muted-foreground xl:table-cell" data-testid="darrer-contacte"
+                  title={e.darrer_contacte_at ? dataCurta(e.darrer_contacte_at) : undefined}>
+                  {contacte
+                    ? [t(contacte.clau, { n: contacte.n }),
+                      e.darrer_contacte_canal && t(`ni.canal_${e.darrer_contacte_canal}`)].filter(Boolean).join(' · ')
+                    : t('el.contacte_mai')}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona icona={Eye} etiqueta={t('ne.obre_fitxa')} onClick={() => navigate(`/equip/entitats/${e.id}`)} />
+                    {/* Con WhatsApp apagado (§8) se quita, no se deshabilita; gris si no hay teléfono. */}
+                    {waActiu && (
+                      <BotoIcona icona={MessageCircle} etiqueta={t('el.a_whatsapp')}
+                        disabled={!tel} motiu={t('el.no_phone')}
+                        onClick={() => tel && void assegurarContacte(tel, nom).then(() => navigate(`/equip/missatgeria/${tel}`))} />
+                    )}
+                    {/* Y «Correu», igual: con el correo apagado —o todas las notificaciones— se
+                        quita (decisión de Carles, 03-11-2026); gris solo si falta el correo. */}
+                    {!motiuEmail && (
+                      <BotoIcona icona={Mail} etiqueta={t('el.a_correu')}
+                        disabled={!e.email} motiu={t('correu.no_email')}
+                        onClick={() => setCorreuA({
+                          email: e.email, nom,
+                          tipus: e.productor_id ? 'productor' : 'entidad',
+                          id: (e.productor_id ?? e.entidad_id) as string,
+                        })} />
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 

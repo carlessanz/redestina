@@ -65,12 +65,17 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
   )
 }
 
+// Criterio de tablas (03-11-2026, AGENTS.md §2): títulos centrados y celdas que parten línea,
+// para que ninguna tabla necesite scroll horizontal. `wrap-anywhere` y no `break-words`: en una tabla
+// de ancho automático solo `overflow-wrap: anywhere` deja encoger la columna por debajo de un código
+// largo sin espacios (E-…-1793652249346-A); parte solo si no cabe. Los badges de shadcn traen
+// `whitespace-nowrap`: dentro de una celda también parten. `whitespace-nowrap`, donde haga falta.
 function TableHead({ className, ...props }: React.ComponentProps<"th">) {
   return (
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "h-10 px-2 text-center align-middle font-medium whitespace-normal text-foreground [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}
@@ -83,7 +88,7 @@ function TableCell({ className, ...props }: React.ComponentProps<"td">) {
     <td
       data-slot="table-cell"
       className={cn(
-        "p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
+        "p-2 align-middle whitespace-normal wrap-anywhere [&_[data-slot=badge]]:whitespace-normal [&:has([role=checkbox])]:pr-0 [&>[role=checkbox]]:translate-y-[2px]",
         className
       )}
       {...props}

@@ -18,14 +18,15 @@
 // enlace anterior—. Veinticinco correos de golpe tampoco es algo que convenga acelerar.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
-import { Loader2 } from 'lucide-react'
+import { useNavigate } from 'react-router'
+import { Eye, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import BotoIcona from '../../components/BotoIcona'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
@@ -66,6 +67,7 @@ function clauDe(f: FitxaIncompleta): string {
 
 export default function CampanyaConvenis() {
   const { t, lang } = useT()
+  const navigate = useNavigate()
   // La tanda manda el enlace de firma por correo: con el correo apagado (§8) no se ofrece.
   const motiuEmail = motiuCanal(useCanals(), 'email')
   const [fitxes, setFitxes] = useState<FitxaIncompleta[]>([])
@@ -262,36 +264,54 @@ export default function CampanyaConvenis() {
           {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
           {resum.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('conv.c_model')}</TableHead>
-                    <TableHead>{t('conv.c_region')}</TableHead>
-                    <TableHead className="text-right">{t('camp.c_orgs')}</TableHead>
-                    <TableHead className="text-right">{t('camp.c_current')}</TableHead>
-                    <TableHead className="text-right">{t('camp.c_pending')}</TableHead>
-                    <TableHead className="text-right">{t('camp.c_none')}</TableHead>
-                    <TableHead className="text-right">{t('camp.c_pct')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {resum.map((r) => (
+            // Criterio de las tablas (03-11-2026, AGENTS.md §2): a 360 px quedan comarca,
+            // organizaciones y % firmado; el modelo y el desglose van bajo la comarca hasta
+            // que tienen columna —vigentes y sin convenio desde `md`, modelo y en marcha
+            // desde `lg`—.
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="hidden lg:table-cell">{t('conv.c_model')}</TableHead>
+                  <TableHead>{t('conv.c_region')}</TableHead>
+                  <TableHead>{t('camp.c_orgs')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('camp.c_current')}</TableHead>
+                  <TableHead className="hidden lg:table-cell">{t('camp.c_pending')}</TableHead>
+                  <TableHead className="hidden md:table-cell">{t('camp.c_none')}</TableHead>
+                  <TableHead>{t('camp.c_pct')}</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {resum.map((r) => {
+                  const enMarxa = r.pendents_firma + r.per_contrasignar + r.retornats
+                  return (
                     <TableRow key={`${r.tipo}-${r.comarca}`}>
-                      <TableCell><Badge variant="outline">{t(`sig.model_${r.tipo}`)}</Badge></TableCell>
-                      <TableCell className="max-w-48 truncate">{r.comarca}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.organitzacions}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.vigents}</TableCell>
-                      <TableCell className="text-right tabular-nums">
-                        {r.pendents_firma + r.per_contrasignar + r.retornats}
+                      <TableCell className="hidden text-center lg:table-cell">
+                        <Badge variant="outline" className="whitespace-normal">{t(`sig.model_${r.tipo}`)}</Badge>
                       </TableCell>
-                      <TableCell className="text-right tabular-nums">{r.sense_conveni}</TableCell>
-                      <TableCell className="text-right tabular-nums">{r.pct_vigent ?? 0}%</TableCell>
+                      <TableCell>
+                        <span className="font-medium">{r.comarca}</span>
+                        <span className="block text-xs text-muted-foreground lg:hidden">{t(`sig.model_${r.tipo}`)}</span>
+                        {/* El desglose que esconden las columnas: «en marxa» tiene columna
+                            desde `lg`, vigentes y sin convenio desde `md`. El «·» va delante
+                            de los que se esconden antes, para que nunca quede colgando. */}
+                        <span className="block text-xs text-muted-foreground tabular-nums lg:hidden">
+                          {t('camp.c_pending')}: {enMarxa}
+                          <span className="md:hidden">
+                            {' · '}{t('camp.c_current')}: {r.vigents}
+                            {' · '}{t('camp.c_none')}: {r.sense_conveni}
+                          </span>
+                        </span>
+                      </TableCell>
+                      <TableCell className="text-center tabular-nums">{r.organitzacions}</TableCell>
+                      <TableCell className="hidden text-center tabular-nums md:table-cell">{r.vigents}</TableCell>
+                      <TableCell className="hidden text-center tabular-nums lg:table-cell">{enMarxa}</TableCell>
+                      <TableCell className="hidden text-center tabular-nums md:table-cell">{r.sense_conveni}</TableCell>
+                      <TableCell className="text-center tabular-nums whitespace-nowrap">{r.pct_vigent ?? 0}%</TableCell>
                     </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </div>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>
@@ -366,68 +386,84 @@ export default function CampanyaConvenis() {
           {visibles.length === 0
             ? <p className="text-sm text-muted-foreground">{t('camp.list_empty')}</p>
             : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead className="w-10"><span className="sr-only">{t('camp.c_pick')}</span></TableHead>
-                      <TableHead>{t('conv.c_org')}</TableHead>
-                      <TableHead>{t('conv.c_model')}</TableHead>
-                      <TableHead>{t('conv.c_region')}</TableHead>
-                      <TableHead>{t('camp.c_missing')}</TableHead>
-                      <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibles.map((f) => {
-                      const clau = clauDe(f)
-                      const falta = f.falta ?? []
-                      return (
-                        <TableRow key={clau}>
-                          <TableCell>
-                            <Casella
-                              aria-label={f.nom ?? clau}
-                              disabled={f.nomes_firma_assistida || f.te_conveni_vigent || enviant}
-                              checked={triades.has(clau)}
-                              onChange={() => commuta(clau)}
-                            />
-                          </TableCell>
-                          <TableCell className="max-w-56 truncate">
-                            <span className="font-medium">{f.nom ?? '—'}</span>
-                            {f.es_test && <Badge className="ml-2 bg-secondary text-secondary-foreground">{t('camp.badge_test')}</Badge>}
-                            <span className="block text-xs text-muted-foreground">{f.email ?? t('camp.no_mail')}</span>
-                          </TableCell>
-                          <TableCell><Badge variant="outline">{t(`sig.model_${f.tipo}`)}</Badge></TableCell>
-                          <TableCell className="text-muted-foreground">{f.comarca ?? '—'}</TableCell>
-                          <TableCell>
+              // Criterio de las tablas (03-11-2026, AGENTS.md §2): a 360 px quedan la casilla,
+              // la organización (con su correo debajo), el estado de la ficha y la acción; el
+              // modelo tiene columna desde `lg` y la comarca desde `xl`, y hasta entonces van
+              // bajo el correo.
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="w-10"><span className="sr-only">{t('camp.c_pick')}</span></TableHead>
+                    <TableHead>{t('conv.c_org')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('conv.c_model')}</TableHead>
+                    <TableHead className="hidden xl:table-cell">{t('conv.c_region')}</TableHead>
+                    <TableHead>{t('camp.c_missing')}</TableHead>
+                    <TableHead className="w-15 md:w-22">
+                      <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibles.map((f) => {
+                    const clau = clauDe(f)
+                    const falta = f.falta ?? []
+                    return (
+                      <TableRow key={clau}>
+                        <TableCell>
+                          <Casella
+                            aria-label={f.nom ?? clau}
+                            disabled={f.nomes_firma_assistida || f.te_conveni_vigent || enviant}
+                            checked={triades.has(clau)}
+                            onChange={() => commuta(clau)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <span className="font-medium">{f.nom ?? '—'}</span>
+                          {f.es_test && <Badge className="ml-2 bg-secondary text-secondary-foreground">{t('camp.badge_test')}</Badge>}
+                          {/* `wrap-anywhere`: el correo es una sola palabra y, en una tabla de
+                              ancho automático, solo así deja de imponer su ancho. */}
+                          <span className="block text-xs wrap-anywhere text-muted-foreground">{f.email ?? t('camp.no_mail')}</span>
+                          {/* La comarca tiene columna en `xl` y el modelo en `lg`: el «·» va
+                              delante del modelo para que nunca quede colgando. */}
+                          <span className="block text-xs text-muted-foreground xl:hidden">
+                            {f.comarca}
+                            <span className="lg:hidden">{f.comarca ? ' · ' : ''}{t(`sig.model_${f.tipo}`)}</span>
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden text-center lg:table-cell">
+                          <Badge variant="outline" className="whitespace-normal">{t(`sig.model_${f.tipo}`)}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden text-muted-foreground xl:table-cell">{f.comarca ?? '—'}</TableCell>
+                        <TableCell className="text-center">
+                          <div className="flex flex-wrap items-center justify-center gap-1">
                             {f.te_conveni_vigent && (
-                              <Badge className="bg-exito-fondo text-exito">{t('camp.has_current')}</Badge>
+                              <Badge className="whitespace-normal bg-exito-fondo text-exito">{t('camp.has_current')}</Badge>
                             )}
                             {f.nomes_firma_assistida && (
-                              <Badge className="bg-aviso-fondo text-aviso">{t('camp.only_assisted')}</Badge>
+                              <Badge className="whitespace-normal bg-aviso-fondo text-aviso">{t('camp.only_assisted')}</Badge>
                             )}
                             {falta.filter((x) => x !== 'correu').map((x) => (
-                              <Badge key={x} variant="outline" className="ml-1">{t(`camp.miss_${x}`)}</Badge>
+                              <Badge key={x} variant="outline" className="whitespace-normal">{t(`camp.miss_${x}`)}</Badge>
                             ))}
                             {!f.te_conveni_vigent && !f.nomes_firma_assistida && falta.length === 0 && (
                               <span className="text-xs text-muted-foreground">{t('camp.ready')}</span>
                             )}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex justify-end">
-                              <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                                <Link to={`/equip/entitats/${f.org_id}`}>
-                                  {t('camp.open_record')}
-                                </Link>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+                          </div>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                            <BotoIcona
+                              icona={Eye}
+                              etiqueta={t('camp.a_open_record')}
+                              onClick={() => navigate(`/equip/entitats/${f.org_id}`)}
+                            />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             )}
         </CardContent>
       </Card>

@@ -12,15 +12,16 @@
 // única que se resuelve sola con el tiempo… o no se resuelve nunca.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
+import BotoIcona from '../../components/BotoIcona'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -33,6 +34,7 @@ type Noms = Record<string, string>
 export default function Albarans() {
   const { t } = useT()
   const [params, setParams] = useSearchParams()
+  const navigate = useNavigate()
   const PESTANYES = ['tots', 'esborranys', 'pendents', 'conciliar', 'tancats'] as const
   const tabParam = params.get('tab')
   const tab = (PESTANYES as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'tots'
@@ -136,60 +138,72 @@ export default function Albarans() {
 
   function taula(llista: AlbaranBandeja[], buitKey: string) {
     if (llista.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
+    // El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal. En
+    // móvil quedan el número (enlazado al detalle, con el tipo al lado y la contraparte y el
+    // producto debajo), el estado (con la espera debajo) y la acción; los kilos salen desde
+    // `sm`, la contraparte y la espera desde `lg`, y el tipo y el producto desde `xl`.
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('alb.c_number')}</TableHead>
-              <TableHead>{t('alb.c_type')}</TableHead>
-              <TableHead>{t('alb.c_counterpart')}</TableHead>
-              <TableHead>{t('alb.c_product')}</TableHead>
-              <TableHead className="text-right">{t('alb.c_kg')}</TableHead>
-              <TableHead>{t('alb.c_status')}</TableHead>
-              <TableHead>{t('alb.c_waiting')}</TableHead>
-              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {llista.map((f) => (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('alb.c_number')}</TableHead>
+            <TableHead className="hidden w-16 xl:table-cell">{t('alb.c_type')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('alb.c_counterpart')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('alb.c_product')}</TableHead>
+            <TableHead className="hidden w-20 sm:table-cell">{t('alb.c_kg')}</TableHead>
+            <TableHead className="w-24 sm:w-32">{t('alb.c_status')}</TableHead>
+            <TableHead className="hidden w-24 lg:table-cell">{t('alb.c_waiting')}</TableHead>
+            <TableHead className="w-15 md:w-16"><span className="sr-only">{t('doc.c_actions')}</span></TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {llista.map((f) => {
+            const ruta = `/equip/albarans/${f.id}`
+            const kilos = kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)
+            const espera = f.dias_esperando != null
+              ? t('alb.days', { n: f.dias_esperando })
+              : dataCurta(f.emitido_at)
+            return (
               <TableRow key={f.id}>
-                <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                  {f.numero_completo ?? t('alb.no_number')}
+                <TableCell>
+                  <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline sm:whitespace-nowrap">
+                    {f.numero_completo ?? t('alb.no_number')}
+                  </Link>
+                  <Badge variant="outline" className="ml-1 xl:hidden">{f.tipo}</Badge>
+                  <span className="block text-xs text-muted-foreground lg:hidden">{contraparte(f)}</span>
+                  <span className="block text-xs text-muted-foreground xl:hidden">
+                    {f.producto ?? '—'}<span className="sm:hidden"> · {kilos} kg</span>
+                  </span>
                 </TableCell>
-                <TableCell><Badge variant="outline">{f.tipo}</Badge></TableCell>
-                <TableCell className="max-w-56 truncate">{contraparte(f)}</TableCell>
-                <TableCell className="text-muted-foreground">{f.producto ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
-                  {kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)}
+                <TableCell className="hidden text-center xl:table-cell"><Badge variant="outline">{f.tipo}</Badge></TableCell>
+                <TableCell className="hidden lg:table-cell">{contraparte(f)}</TableCell>
+                <TableCell className="hidden text-muted-foreground xl:table-cell">{f.producto ?? '—'}</TableCell>
+                <TableCell className="hidden text-center tabular-nums whitespace-nowrap sm:table-cell">{kilos}</TableCell>
+                <TableCell className="text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <Badge className={`${estilEstatAlbara(f.estado)} max-w-full whitespace-normal`}>{t(`alb.st_${f.estado}`)}</Badge>
+                    {f.rechazo !== 'cap' && (
+                      <Badge className="max-w-full bg-error-fondo whitespace-normal text-error">{t(`alb.rj_${f.rechazo}`)}</Badge>
+                    )}
+                    {teIncidencia(f) && (
+                      <Badge className="max-w-full bg-aviso-fondo whitespace-normal text-aviso">{t('alb.inc_badge')}</Badge>
+                    )}
+                    <span className="text-xs text-muted-foreground tabular-nums lg:hidden">{espera}</span>
+                  </div>
+                </TableCell>
+                <TableCell className="hidden text-center tabular-nums text-muted-foreground lg:table-cell">
+                  {espera}
                 </TableCell>
                 <TableCell>
-                  <Badge className={estilEstatAlbara(f.estado)}>{t(`alb.st_${f.estado}`)}</Badge>
-                  {f.rechazo !== 'cap' && (
-                    <Badge className="ml-1 bg-error-fondo text-error">{t(`alb.rj_${f.rechazo}`)}</Badge>
-                  )}
-                  {teIncidencia(f) && (
-                    <Badge className="ml-1 bg-aviso-fondo text-aviso">{t('alb.inc_badge')}</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                  {f.dias_esperando != null
-                    ? t('alb.days', { n: f.dias_esperando })
-                    : dataCurta(f.emitido_at)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    {/* `h-11` en móvil: es la acción de la fila y 32 px es poco para un pulgar. */}
-                    <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                      <Link to={`/equip/albarans/${f.id}`}>{t('c.detail')}</Link>
-                    </Button>
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona icona={Eye} etiqueta={t('alb.a_open')} onClick={() => navigate(ruta)} />
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 

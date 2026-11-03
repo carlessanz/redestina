@@ -91,48 +91,50 @@ export default function ExpedientVista({
   if (error) return <p className="text-sm text-destructive">{textError(t, error)}</p>
   if (!ex) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
 
+  // `des`: desde qué ancho tiene columna propia (criterio de las tablas, 03-11-2026); antes,
+  // su valor va bajo la primera columna. Sin `des`, columna siempre.
   const CAMPS: Record<string, CampElement[]> = {
     visites: [
       { clau: 'data', labelKey: 'exp.f_data', tipus: 'date', obligatori: true },
       { clau: 'tipus', labelKey: 'exp.f_tipus', tipus: 'select', obligatori: true, opcions: ['diagnosi', 'seguiment', 'verificacio', 'altres'].map((v) => ({ valor: v, text: t(`exp.visita_${v}`) })) },
-      { clau: 'assistents', labelKey: 'exp.f_assistents', tipus: 'text' },
-      { clau: 'notes', labelKey: 'exp.f_notes', tipus: 'textarea' },
+      { clau: 'assistents', labelKey: 'exp.f_assistents', tipus: 'text', des: 'lg' },
+      { clau: 'notes', labelKey: 'exp.f_notes', tipus: 'textarea', des: 'md' },
     ],
     processos: [
       { clau: 'nom', labelKey: 'exp.f_proces', tipus: 'text', obligatori: true },
-      { clau: 'descripcio', labelKey: 'exp.f_descripcio', tipus: 'textarea' },
-      { clau: 'punts_critics', labelKey: 'exp.f_punts', tipus: 'textarea' },
+      { clau: 'descripcio', labelKey: 'exp.f_descripcio', tipus: 'textarea', des: 'md' },
+      { clau: 'punts_critics', labelKey: 'exp.f_punts', tipus: 'textarea', des: 'lg' },
       { clau: 'ordre', labelKey: 'exp.f_ordre', tipus: 'number', nomesFormulari: true },
     ],
     quantificacio: [
       { clau: 'mes', labelKey: 'exp.f_mes', tipus: 'mes', obligatori: true },
-      { clau: 'producte', labelKey: 'exp.f_producte', tipus: 'text' },
+      { clau: 'producte', labelKey: 'exp.f_producte', tipus: 'text', des: 'md' },
       { clau: 'categoria', labelKey: 'exp.f_categoria', tipus: 'select', obligatori: true, opcions: ['perdua', 'excedent', 'residu'].map((v) => ({ valor: v, text: t(`exp.cat_${v}`) })) },
       { clau: 'kg', labelKey: 'exp.f_kg', tipus: 'number', obligatori: true },
-      { clau: 'desti', labelKey: 'exp.f_desti', tipus: 'text' },
-      { clau: 'causa', labelKey: 'exp.f_causa', tipus: 'text' },
+      { clau: 'desti', labelKey: 'exp.f_desti', tipus: 'text', des: 'lg' },
+      { clau: 'causa', labelKey: 'exp.f_causa', tipus: 'text', des: 'xl' },
     ],
     objectius: [
       { clau: 'descripcio', labelKey: 'exp.f_descripcio', tipus: 'text', obligatori: true },
-      { clau: 'indicador', labelKey: 'exp.f_indicador', tipus: 'text' },
-      { clau: 'valor_inicial', labelKey: 'exp.f_inicial', tipus: 'number' },
-      { clau: 'valor_objectiu', labelKey: 'exp.f_objectiu', tipus: 'number' },
-      { clau: 'unitat', labelKey: 'exp.f_unitat', tipus: 'text' },
-      { clau: 'data_objectiu', labelKey: 'exp.f_data_objectiu', tipus: 'date' },
+      { clau: 'indicador', labelKey: 'exp.f_indicador', tipus: 'text', des: 'md' },
+      { clau: 'valor_inicial', labelKey: 'exp.f_inicial', tipus: 'number', des: 'lg' },
+      { clau: 'valor_objectiu', labelKey: 'exp.f_objectiu', tipus: 'number', des: 'md' },
+      { clau: 'unitat', labelKey: 'exp.f_unitat', tipus: 'text', des: 'lg' },
+      { clau: 'data_objectiu', labelKey: 'exp.f_data_objectiu', tipus: 'date', des: 'xl' },
     ],
     accions: [
       { clau: 'mesura', labelKey: 'exp.f_mesura', tipus: 'text', obligatori: true },
-      { clau: 'causa', labelKey: 'exp.f_causa', tipus: 'text' },
-      { clau: 'objectiu_id', labelKey: 'exp.f_objectiu_rel', tipus: 'select', opcions: opcionsObjectius },
-      { clau: 'responsable', labelKey: 'exp.f_responsable', tipus: 'text' },
-      { clau: 'data_objectiu', labelKey: 'exp.f_data_objectiu', tipus: 'date' },
+      { clau: 'causa', labelKey: 'exp.f_causa', tipus: 'text', des: 'xl' },
+      { clau: 'objectiu_id', labelKey: 'exp.f_objectiu_rel', tipus: 'select', opcions: opcionsObjectius, des: 'xl' },
+      { clau: 'responsable', labelKey: 'exp.f_responsable', tipus: 'text', des: 'lg' },
+      { clau: 'data_objectiu', labelKey: 'exp.f_data_objectiu', tipus: 'date', des: 'md' },
       { clau: 'estat', labelKey: 'exp.f_estat', tipus: 'select', opcions: ['pendent', 'en_curs', 'feta', 'descartada'].map((v) => ({ valor: v, text: t(`exp.accio_${v}`) })) },
       { clau: 'notes', labelKey: 'exp.f_notes', tipus: 'textarea', nomesFormulari: true },
     ],
     seguiment: [
       { clau: 'trimestre', labelKey: 'exp.f_trimestre', tipus: 'text', obligatori: true },
       { clau: 'data', labelKey: 'exp.f_data', tipus: 'date' },
-      { clau: 'resum', labelKey: 'exp.f_resum', tipus: 'textarea' },
+      { clau: 'resum', labelKey: 'exp.f_resum', tipus: 'textarea', des: 'md' },
       { clau: 'notes', labelKey: 'exp.f_notes', tipus: 'textarea', nomesFormulari: true },
     ],
   }
@@ -386,34 +388,40 @@ export default function ExpedientVista({
             </CardHeader>
             <CardContent>
               {comparativa.length === 0 ? <p className="text-sm text-muted-foreground">{t('exp.buit')}</p> : (
-                <div className="overflow-x-auto" data-testid="exp-comparativa">
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>{t('exp.f_any')}</TableHead>
-                        <TableHead className="text-right">{t('exp.cat_perdua')}</TableHead>
-                        <TableHead className="text-right">{t('exp.cat_excedent')}</TableHead>
-                        <TableHead className="text-right">{t('exp.cat_residu')}</TableHead>
-                        <TableHead className="text-right">{t('exp.total')}</TableHead>
-                        <TableHead className="text-right">{t('exp.variacio')}</TableHead>
+                // El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a
+                // 360 px. En móvil, año, total y variación; las tres categorías van bajo el año
+                // hasta `md`, donde ya tienen columna. Cifras centradas.
+                <Table data-testid="exp-comparativa">
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>{t('exp.f_any')}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t('exp.cat_perdua')}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t('exp.cat_excedent')}</TableHead>
+                      <TableHead className="hidden md:table-cell">{t('exp.cat_residu')}</TableHead>
+                      <TableHead>{t('exp.total')}</TableHead>
+                      <TableHead>{t('exp.variacio')}</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {comparativa.map((a) => (
+                      <TableRow key={a.any}>
+                        <TableCell className="text-center">
+                          <span className="font-medium tabular-nums">{a.any}</span>
+                          <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
+                            {t('exp.cat_perdua')} {nombre(a.perdua, 0)} · {t('exp.cat_excedent')} {nombre(a.excedent, 0)} · {t('exp.cat_residu')} {nombre(a.residu, 0)}
+                          </span>
+                        </TableCell>
+                        <TableCell className="hidden text-center tabular-nums md:table-cell">{nombre(a.perdua, 0)}</TableCell>
+                        <TableCell className="hidden text-center tabular-nums md:table-cell">{nombre(a.excedent, 0)}</TableCell>
+                        <TableCell className="hidden text-center tabular-nums md:table-cell">{nombre(a.residu, 0)}</TableCell>
+                        <TableCell className="text-center font-medium tabular-nums">{nombre(a.total, 0)}</TableCell>
+                        <TableCell className="text-center whitespace-nowrap tabular-nums">
+                          {a.variacio === null ? '—' : `${a.variacio > 0 ? '+' : ''}${nombre(a.variacio, 1)} %`}
+                        </TableCell>
                       </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {comparativa.map((a) => (
-                        <TableRow key={a.any}>
-                          <TableCell>{a.any}</TableCell>
-                          <TableCell className="text-right tabular-nums">{nombre(a.perdua, 0)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{nombre(a.excedent, 0)}</TableCell>
-                          <TableCell className="text-right tabular-nums">{nombre(a.residu, 0)}</TableCell>
-                          <TableCell className="text-right font-medium tabular-nums">{nombre(a.total, 0)}</TableCell>
-                          <TableCell className="text-right tabular-nums">
-                            {a.variacio === null ? '—' : `${a.variacio > 0 ? '+' : ''}${nombre(a.variacio, 1)} %`}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
+                    ))}
+                  </TableBody>
+                </Table>
               )}
             </CardContent>
           </Card>

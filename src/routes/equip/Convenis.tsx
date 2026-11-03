@@ -10,15 +10,18 @@
 // **solo de los ids que salen en pantalla**, como en `Albarans`. Traerse las 343 fichas
 // para poner una comarca en 12 filas sería cometer la deuda a propósito.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useNavigate } from 'react-router'
+import { Eye } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { cn } from '../../lib/utils'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { dataCurta } from '../../lib/albarans'
 import { ESTATS_CONVENI, TIPUS_CONVENI, estilEstatConveni, nomOrganitzacio } from '../../lib/convenis'
 import type { ConvenioEstado, ConvenioTipo } from '../../types'
+import BotoIcona from '../../components/BotoIcona'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -51,8 +54,33 @@ interface Org { nom: string; comarca: string | null }
 
 const TOTS = '__tots'
 
+/**
+ * Lo que una columna escondida por ancho deja de enseñar, en una línea bajo la organización
+ * (criterio de las tablas, 03-11-2026, AGENTS.md §2; la misma pieza que `equip/Documents`).
+ * Las piezas van de la que tiene columna MÁS TARDE a la que antes: cada una lleva su «·»
+ * delante y, al esconderse las últimas, nunca queda un separador colgando.
+ */
+type Peca = { text: ReactNode; fins: 'md' | 'lg' | 'xl' }
+const AMAGA: Record<Peca['fins'], string> = { md: 'md:hidden', lg: 'lg:hidden', xl: 'xl:hidden' }
+const RANG: Record<Peca['fins'], number> = { xl: 0, lg: 1, md: 2 }
+
+function Secundari({ peces }: { peces: Peca[] }) {
+  const visibles = peces
+    .filter((p) => p.text !== null && p.text !== undefined && p.text !== '')
+    .sort((a, b) => RANG[a.fins] - RANG[b.fins])
+  if (visibles.length === 0) return null
+  return (
+    <span className={cn('block text-xs text-muted-foreground', AMAGA[visibles[0].fins])}>
+      {visibles.map((p, i) => (
+        <span key={i} className={AMAGA[p.fins]}>{i > 0 && ' · '}{p.text}</span>
+      ))}
+    </span>
+  )
+}
+
 export default function Convenis() {
   const { t } = useT()
+  const navigate = useNavigate()
   const [files, setFiles] = useState<Fila[]>([])
   const [orgs, setOrgs] = useState<Record<string, Org>>({})
   const [carregant, setCarregant] = useState(true)
@@ -202,57 +230,71 @@ export default function Convenis() {
           visibles.length === 0
             ? <p className="text-sm text-muted-foreground">{t(files.length === 0 ? 'conv.empty' : 'conv.no_match')}</p>
             : (
-              <div className="overflow-x-auto">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>{t('conv.c_number')}</TableHead>
-                      <TableHead>{t('conv.c_org')}</TableHead>
-                      <TableHead>{t('conv.c_model')}</TableHead>
-                      <TableHead>{t('conv.c_region')}</TableHead>
-                      <TableHead>{t('conv.c_status')}</TableHead>
-                      <TableHead>{t('conv.c_date')}</TableHead>
-                      <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {visibles.map((f) => {
-                      const o = orgDe(f)
-                      return (
-                        <TableRow key={f.id}>
-                          <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                            {f.numero_completo ?? t('conv.no_number')}
-                          </TableCell>
-                          {/* La organización ACTUAL, que es por lo que se busca; la razón social
-                              con la que se firmó, debajo, solo si es otra cosa. */}
-                          <TableCell className="max-w-56">
-                            <span className="block truncate">{o.nom !== '—' ? o.nom : nomOrganitzacio(f.datos_org, null)}</span>
-                            {o.nom !== '—' && nomOrganitzacio(f.datos_org, o.nom) !== o.nom && (
-                              <span className="block truncate text-xs text-muted-foreground">{nomOrganitzacio(f.datos_org, o.nom)}</span>
-                            )}
-                          </TableCell>
-                          <TableCell><Badge variant="outline">{t(`sig.model_${f.tipo}`)}</Badge></TableCell>
-                          <TableCell className="text-muted-foreground">{o.comarca ?? '—'}</TableCell>
-                          <TableCell>
-                            <Badge className={estilEstatConveni(f.estado)}>{t(`conv.st_${f.estado}`)}</Badge>
-                          </TableCell>
-                          <TableCell className="whitespace-nowrap text-muted-foreground">
-                            {dataCurta(f.contrafirmado_at ?? f.firmado_at ?? f.enviado_at ?? f.created_at)}
-                          </TableCell>
-                          <TableCell>
-                            <div className="flex justify-end">
-                              {/* `h-11` en móvil: es la acción de la fila y 32 px es poco para un pulgar. */}
-                              <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                                <Link to={`/equip/convenis/${f.id}`}>{t('c.detail')}</Link>
-                              </Button>
-                            </div>
-                          </TableCell>
-                        </TableRow>
-                      )
-                    })}
-                  </TableBody>
-                </Table>
-              </div>
+              // Criterio de las tablas (03-11-2026, AGENTS.md §2): a 360 px quedan
+              // organización, estado y acción; lo demás va bajo la organización hasta que
+              // tiene columna —número desde `md`, modelo y fecha desde `lg`, comarca en `xl`—.
+              <Table>
+                <TableHeader>
+                  <TableRow>
+                    <TableHead className="hidden md:table-cell">{t('conv.c_number')}</TableHead>
+                    <TableHead>{t('conv.c_org')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('conv.c_model')}</TableHead>
+                    <TableHead className="hidden xl:table-cell">{t('conv.c_region')}</TableHead>
+                    <TableHead>{t('conv.c_status')}</TableHead>
+                    <TableHead className="hidden lg:table-cell">{t('conv.c_date')}</TableHead>
+                    <TableHead className="w-15 md:w-22">
+                      <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                    </TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {visibles.map((f) => {
+                    const o = orgDe(f)
+                    const ruta = `/equip/convenis/${f.id}`
+                    const numero = f.numero_completo ?? t('conv.no_number')
+                    const data = dataCurta(f.contrafirmado_at ?? f.firmado_at ?? f.enviado_at ?? f.created_at)
+                    return (
+                      <TableRow key={f.id}>
+                        <TableCell className="hidden text-center font-medium tabular-nums md:table-cell">
+                          {numero}
+                        </TableCell>
+                        {/* La organización ACTUAL, que es por lo que se busca; la razón social
+                            con la que se firmó, debajo, solo si es otra cosa. Enlaza al
+                            detalle, como el icono de la última columna. */}
+                        <TableCell>
+                          <Link to={ruta} className="font-medium text-primary hover:underline">
+                            {o.nom !== '—' ? o.nom : nomOrganitzacio(f.datos_org, null)}
+                          </Link>
+                          {o.nom !== '—' && nomOrganitzacio(f.datos_org, o.nom) !== o.nom && (
+                            <span className="block text-xs text-muted-foreground">{nomOrganitzacio(f.datos_org, o.nom)}</span>
+                          )}
+                          <Secundari peces={[
+                            { text: o.comarca, fins: 'xl' },
+                            { text: t(`sig.model_${f.tipo}`), fins: 'lg' },
+                            { text: data, fins: 'lg' },
+                            { text: numero, fins: 'md' },
+                          ]} />
+                        </TableCell>
+                        <TableCell className="hidden text-center lg:table-cell">
+                          <Badge variant="outline" className="whitespace-normal">{t(`sig.model_${f.tipo}`)}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden text-muted-foreground xl:table-cell">{o.comarca ?? '—'}</TableCell>
+                        <TableCell className="text-center">
+                          <Badge className={`whitespace-normal ${estilEstatConveni(f.estado)}`}>{t(`conv.st_${f.estado}`)}</Badge>
+                        </TableCell>
+                        <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground lg:table-cell">
+                          {data}
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                            <BotoIcona icona={Eye} etiqueta={t('conv.a_open')} onClick={() => navigate(ruta)} />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    )
+                  })}
+                </TableBody>
+              </Table>
             )
         )}
       </CardContent>

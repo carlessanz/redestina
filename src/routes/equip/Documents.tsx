@@ -36,15 +36,16 @@
 //     lee todo el equipo. Con destinatario, propósito, estado y error se contesta la única
 //     pregunta que hay que contestar —«¿este correo salió?»— sin publicar una credencial.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Download, Eye, Loader2, Send } from 'lucide-react'
+import { useCallback, useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Download, Eye, FileText, Loader2, Mail } from 'lucide-react'
 import { toast } from 'sonner'
-import { Link, useSearchParams } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
+import { cn } from '../../lib/utils'
 import { useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
-import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import BotoIcona from '../../components/BotoIcona'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -55,7 +56,6 @@ import { dataCurta, dataHora, kg } from '../../lib/format'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento, DocumentoEstado } from '../../types'
 import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -175,8 +175,36 @@ function senseResposta(d: Fila): boolean {
   return d.estado === 'error' && d.intentos === 0
 }
 
+/**
+ * Lo que una columna escondida por ancho deja de enseñar, en una línea bajo el dato
+ * principal de la fila (criterio de las tablas, 03-11-2026, AGENTS.md §2). Cada pieza dice
+ * desde qué punto de corte tiene ya su columna y deja de salir aquí.
+ *
+ * Las piezas se ordenan de la que se esconde MÁS TARDE a la que antes: así cada una lleva su
+ * «·» delante y, al esconderse las últimas, nunca queda un separador colgando. La línea
+ * entera desaparece con la primera, que es la última en tener columna.
+ */
+type Peca = { text: ReactNode; fins: 'md' | 'lg' | 'xl' }
+const AMAGA: Record<Peca['fins'], string> = { md: 'md:hidden', lg: 'lg:hidden', xl: 'xl:hidden' }
+const RANG: Record<Peca['fins'], number> = { xl: 0, lg: 1, md: 2 }
+
+function Secundari({ peces }: { peces: Peca[] }) {
+  const visibles = peces
+    .filter((p) => p.text !== null && p.text !== undefined && p.text !== '')
+    .sort((a, b) => RANG[a.fins] - RANG[b.fins])
+  if (visibles.length === 0) return null
+  return (
+    <span className={cn('block text-xs text-muted-foreground', AMAGA[visibles[0].fins])}>
+      {visibles.map((p, i) => (
+        <span key={i} className={AMAGA[p.fins]}>{i > 0 && ' · '}{p.text}</span>
+      ))}
+    </span>
+  )
+}
+
 export default function Documents() {
   const { t } = useT()
+  const navigate = useNavigate()
   // «Reenvia» manda un correo: con el correo apagado (§8) se queda gris con el motivo.
   const motiuEmail = motiuCanal(useCanals(), 'email')
   // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
@@ -331,162 +359,177 @@ export default function Documents() {
     [enviamentsFiltrats],
   )
 
+  // Las tres tablas siguen el criterio de las tablas (03-11-2026, AGENTS.md §2): caben a
+  // 360 px sin scroll horizontal —en móvil quedan lo que identifica la fila, su estado y las
+  // acciones; lo demás va bajo el dato principal (`Secundari`) hasta que su columna cabe—,
+  // títulos centrados y acciones en iconos con tooltip, apiladas en móvil.
+
   function taula(llista: Fila[], buitKey: string) {
     if (llista.length === 0) {
       return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
     }
+    // Móvil: número, estado y acciones. `md`: + tipo y fecha. `lg`: + modo. `xl`: todo.
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('doc.c_number')}</TableHead>
-              <TableHead>{t('doc.c_type')}</TableHead>
-              <TableHead>{t('doc.c_subtype')}</TableHead>
-              <TableHead>{t('doc.c_version')}</TableHead>
-              <TableHead>{t('doc.c_mode')}</TableHead>
-              <TableHead>{t('doc.c_status')}</TableHead>
-              <TableHead>{t('doc.c_date')}</TableHead>
-              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {llista.map((d) => {
-              const esperant = descarregador.generant === d.id
-              return (
-                <TableRow key={d.id}>
-                  <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                    {d.numero_completo ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge variant="outline" className="tabular-nums">{d.tipo}</Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {d.subtipo ? t(`doc.sub_${d.subtipo}`) : '—'}
-                  </TableCell>
-                  <TableCell className="tabular-nums">v{d.version}</TableCell>
-                  <TableCell>
-                    {d.modo === 'prueba'
-                      ? <Badge className="bg-coral-suave text-coral-texto">{t('doc.mode_test')}</Badge>
-                      : <span className="text-muted-foreground">{t('doc.mode_real')}</span>}
-                  </TableCell>
-                  <TableCell>
-                    <Badge
-                      className={ESTIL_ESTAT[d.estado]}
-                      title={d.estado === 'error' ? (d.ultimo_error ?? undefined) : undefined}
-                    >
-                      {t(esperant
-                        ? 'doc.st_generating'
-                        : senseResposta(d) ? 'doc.st_encallat' : CLAU_ESTAT[d.estado])}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                    {dataCurta(d.emitido_at)}
-                  </TableCell>
-                  <TableCell>
-                    {/* `h-11` en móvil: son las acciones de la fila y 32 px es poco para
-                        un pulgar. En escritorio vuelven al alto del resto. «Veure» va
-                        delante: en esta bandeja se abre un PDF para comprobarlo, y la
-                        descarga es lo excepcional. */}
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        size="sm"
-                        variant="outline"
-                        className="h-11 whitespace-normal md:h-8"
-                        disabled={descarregador.ocupat === d.id}
-                        onClick={() => void descarregador.mostra(d.id)}
-                      >
-                        {esperant
-                          ? <Loader2 className="size-4 animate-spin" />
-                          : <Eye className="size-4" aria-hidden />}
-                        {esperant ? t('doc.generating') : t('doc.view')}
-                      </Button>
-                      <Button
-                        size="sm"
-                        className="h-11 whitespace-normal md:h-8"
-                        disabled={descarregador.ocupat === d.id}
-                        onClick={() => void descarregador.descarrega(d.id)}
-                      >
-                        {descarregador.ocupat === d.id
-                          ? <Loader2 className="size-4 animate-spin" />
-                          : <Download className="size-4" />}
-                        {esperant ? t('doc.generating') : t('doc.download')}
-                      </Button>
-                      {TIPUS_ENVIABLES.has(d.tipo) && d.estado === 'emitido' && (
-                        <BotoAmbMotiu
-                          size="sm"
-                          variant="outline"
-                          className="h-11 whitespace-normal md:h-8"
-                          disabled={reenviant === d.id || !!motiuEmail}
-                          motiu={motiuEmail ? t(motiuEmail) : undefined}
-                          onClick={() => void reenvia(d.id, d.numero_completo, null)}
-                        >
-                          {reenviant === d.id
-                            ? <Loader2 className="size-4 animate-spin" />
-                            : <Send className="size-4" aria-hidden />}
-                          {t('doc.resend')}
-                        </BotoAmbMotiu>
-                      )}
-                    </div>
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('doc.c_number')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('doc.c_type')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('doc.c_subtype')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('doc.c_version')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('doc.c_mode')}</TableHead>
+            <TableHead>{t('doc.c_status')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('doc.c_date')}</TableHead>
+            <TableHead className="w-15 md:w-30">
+              <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {llista.map((d) => {
+            const esperant = descarregador.generant === d.id
+            const ocupat = descarregador.ocupat === d.id
+            const fase = d.subtipo ? t(`doc.sub_${d.subtipo}`) : null
+            return (
+              <TableRow key={d.id}>
+                <TableCell>
+                  {/* Sin `whitespace-nowrap`: un número de convenio («P-CONV-COL-PROD-…») no
+                      cabe entero a 360 px y parte por los guiones. */}
+                  <span className="font-medium tabular-nums">{d.numero_completo ?? '—'}</span>
+                  <Secundari peces={[
+                    { text: fase, fins: 'xl' },
+                    { text: `v${d.version}`, fins: 'xl' },
+                    { text: d.tipo, fins: 'md' },
+                    { text: dataCurta(d.emitido_at), fins: 'md' },
+                  ]} />
+                  {d.modo === 'prueba' && (
+                    <Badge className="mt-1 bg-coral-suave text-coral-texto lg:hidden">{t('doc.mode_test')}</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="hidden text-center md:table-cell">
+                  <Badge variant="outline" className="tabular-nums">{d.tipo}</Badge>
+                </TableCell>
+                <TableCell className="hidden text-center text-muted-foreground xl:table-cell">
+                  {fase ?? '—'}
+                </TableCell>
+                <TableCell className="hidden text-center tabular-nums xl:table-cell">v{d.version}</TableCell>
+                <TableCell className="hidden text-center lg:table-cell">
+                  {d.modo === 'prueba'
+                    ? <Badge className="bg-coral-suave text-coral-texto">{t('doc.mode_test')}</Badge>
+                    : <span className="text-muted-foreground">{t('doc.mode_real')}</span>}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge
+                    className={cn('whitespace-normal', ESTIL_ESTAT[d.estado])}
+                    title={d.estado === 'error' ? (d.ultimo_error ?? undefined) : undefined}
+                  >
+                    {t(esperant
+                      ? 'doc.st_generating'
+                      : senseResposta(d) ? 'doc.st_encallat' : CLAU_ESTAT[d.estado])}
+                  </Badge>
+                </TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground tabular-nums md:table-cell">
+                  {dataCurta(d.emitido_at)}
+                </TableCell>
+                <TableCell>
+                  {/* «Veure el PDF» va delante: en esta bandeja se abre un PDF para
+                      comprobarlo, y la descarga es lo excepcional. */}
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona
+                      icona={esperant ? Loader2 : FileText}
+                      etiqueta={t(esperant ? 'doc.generating' : 'doc.a_view_pdf')}
+                      className={esperant ? '[&_svg]:animate-spin' : undefined}
+                      disabled={ocupat}
+                      onClick={() => void descarregador.mostra(d.id)}
+                    />
+                    <BotoIcona
+                      icona={ocupat ? Loader2 : Download}
+                      etiqueta={t(esperant ? 'doc.generating' : 'doc.download')}
+                      className={ocupat ? '[&_svg]:animate-spin' : undefined}
+                      disabled={ocupat}
+                      onClick={() => void descarregador.descarrega(d.id)}
+                    />
+                    {TIPUS_ENVIABLES.has(d.tipo) && d.estado === 'emitido' && (
+                      <BotoIcona
+                        icona={reenviant === d.id ? Loader2 : Mail}
+                        etiqueta={t('doc.a_resend_mail')}
+                        className={reenviant === d.id ? '[&_svg]:animate-spin' : undefined}
+                        disabled={reenviant === d.id || !!motiuEmail}
+                        motiu={motiuEmail ? t(motiuEmail) : undefined}
+                        onClick={() => void reenvia(d.id, d.numero_completo, null)}
+                      />
+                    )}
+                  </div>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 
   /** Tabla mínima de albaranes: número, tipo, kilos, estado y el enlace a su ficha. */
   function taulaAlbarans(llista: AlbaranBandeja[], buitKey: string) {
     if (llista.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
+    // Móvil: número, estado y acción. `md`: + tipo y kilos. `lg`: + espera. `xl`: + producto.
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('alb.c_number')}</TableHead>
-              <TableHead>{t('alb.c_type')}</TableHead>
-              <TableHead>{t('alb.c_product')}</TableHead>
-              <TableHead className="text-right">{t('alb.c_kg')}</TableHead>
-              <TableHead>{t('alb.c_status')}</TableHead>
-              <TableHead>{t('alb.c_waiting')}</TableHead>
-              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {llista.map((a) => (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('alb.c_number')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('alb.c_type')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('alb.c_product')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('alb.c_kg')}</TableHead>
+            <TableHead>{t('alb.c_status')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('alb.c_waiting')}</TableHead>
+            <TableHead className="w-15 md:w-22">
+              <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {llista.map((a) => {
+            const ruta = `/equip/albarans/${a.id}`
+            const kilos = kg(a.kg_confirmados ?? a.kg_neto ?? a.kg_previstos)
+            const espera = a.dias_esperando != null ? t('alb.days', { n: a.dias_esperando }) : dataCurta(a.emitido_at)
+            return (
               <TableRow key={a.id}>
-                <TableCell className="font-medium whitespace-nowrap tabular-nums">
-                  {a.numero_completo ?? t('alb.no_number')}
+                <TableCell>
+                  <Link to={ruta} className="font-medium whitespace-nowrap text-primary tabular-nums hover:underline">
+                    {a.numero_completo ?? t('alb.no_number')}
+                  </Link>
+                  <Secundari peces={[
+                    { text: a.producto, fins: 'xl' },
+                    { text: espera, fins: 'lg' },
+                    { text: a.tipo, fins: 'md' },
+                    { text: kilos, fins: 'md' },
+                  ]} />
                 </TableCell>
-                <TableCell><Badge variant="outline">{a.tipo}</Badge></TableCell>
-                <TableCell className="text-muted-foreground">{a.producto ?? '—'}</TableCell>
-                <TableCell className="text-right tabular-nums whitespace-nowrap">
-                  {kg(a.kg_confirmados ?? a.kg_neto ?? a.kg_previstos)}
+                <TableCell className="hidden text-center md:table-cell"><Badge variant="outline">{a.tipo}</Badge></TableCell>
+                <TableCell className="hidden text-muted-foreground xl:table-cell">{a.producto ?? '—'}</TableCell>
+                <TableCell className="hidden text-center tabular-nums whitespace-nowrap md:table-cell">{kilos}</TableCell>
+                <TableCell className="text-center">
+                  <div className="flex flex-col items-center gap-1">
+                    <Badge className={cn('whitespace-normal', estilEstatAlbara(a.estado))}>{t(`alb.st_${a.estado}`)}</Badge>
+                    {a.rechazo !== 'cap' && (
+                      <Badge className="whitespace-normal bg-error-fondo text-error">{t(`alb.rj_${a.rechazo}`)}</Badge>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground lg:table-cell">
+                  {espera}
                 </TableCell>
                 <TableCell>
-                  <Badge className={estilEstatAlbara(a.estado)}>{t(`alb.st_${a.estado}`)}</Badge>
-                  {a.rechazo !== 'cap' && (
-                    <Badge className="ml-1 bg-error-fondo text-error">{t(`alb.rj_${a.rechazo}`)}</Badge>
-                  )}
-                </TableCell>
-                <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                  {a.dias_esperando != null ? t('alb.days', { n: a.dias_esperando }) : dataCurta(a.emitido_at)}
-                </TableCell>
-                <TableCell>
-                  <div className="flex justify-end">
-                    <Button asChild size="sm" variant="outline" className="h-11 whitespace-normal md:h-8">
-                      <Link to={`/equip/albarans/${a.id}`}>{t('c.detail')}</Link>
-                    </Button>
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona icona={Eye} etiqueta={t('alb.a_open')} onClick={() => navigate(ruta)} />
                   </div>
                 </TableCell>
               </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 
@@ -499,73 +542,82 @@ export default function Documents() {
         </p>
       )
     }
+    // Móvil: destinatario, estado y acción. `md`: + fecha. `lg`: + propósito y documento.
+    // `xl`: + función.
     return (
-      <div className="overflow-x-auto">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>{t('doc.c_date')}</TableHead>
-              <TableHead>{t('doc.c_to')}</TableHead>
-              <TableHead>{t('doc.c_purpose')}</TableHead>
-              <TableHead>{t('doc.c_function')}</TableHead>
-              <TableHead>{t('doc.c_document')}</TableHead>
-              <TableHead>{t('doc.c_status')}</TableHead>
-              <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {enviamentsFiltrats.map((e) => {
-              const numero = e.documento_id ? numeroPerDocument.get(e.documento_id) : null
-              return (
-                <TableRow key={e.id}>
-                  <TableCell className="whitespace-nowrap text-muted-foreground tabular-nums">
-                    {dataHora(e.enviado_at ?? e.created_at)}
-                  </TableCell>
-                  <TableCell className="min-w-40 font-medium whitespace-normal break-all">{e.destinatario}</TableCell>
-                  <TableCell>
-                    <Badge variant="outline">
-                      {CLAU_PROPOSIT[e.proposito] ? t(CLAU_PROPOSIT[e.proposito]) : e.proposito}
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">{e.funcion ?? '—'}</TableCell>
-                  <TableCell className="whitespace-nowrap tabular-nums text-muted-foreground">
-                    {/* Sin número no se inventa nada: la mayoría de los correos no llevan
-                        documento, y el `documento_id` de los que lo llevan puede apuntar a
-                        uno que ya no está (la FK es `on delete cascade`, pero la fila del
-                        envío se va con él). */}
-                    {numero ?? '—'}
-                  </TableCell>
-                  <TableCell>
-                    <Badge className={ESTIL_ENVIAMENT[e.estado]}>{t(CLAU_ENVIAMENT[e.estado])}</Badge>
-                    {e.estado === 'error' && e.error && (
-                      <p className="mt-1 max-w-xs text-xs whitespace-normal text-error">{e.error}</p>
-                    )}
-                  </TableCell>
-                  <TableCell className="text-right">
-                    {/* Solo los correos de un documento: el resto (accesos, avisos) no se
-                        reenvían desde aquí, cada uno tiene su propia pantalla. */}
-                    {e.proposito === 'document' && e.documento_id && (
-                      <BotoAmbMotiu
-                        size="sm"
-                        variant="outline"
-                        className="h-11 whitespace-normal md:h-8"
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="hidden md:table-cell">{t('doc.c_date')}</TableHead>
+            <TableHead>{t('doc.c_to')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('doc.c_purpose')}</TableHead>
+            <TableHead className="hidden xl:table-cell">{t('doc.c_function')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('doc.c_document')}</TableHead>
+            <TableHead>{t('doc.c_status')}</TableHead>
+            <TableHead className="w-15 md:w-22">
+              <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {enviamentsFiltrats.map((e) => {
+            const numero = e.documento_id ? numeroPerDocument.get(e.documento_id) : null
+            const proposit = CLAU_PROPOSIT[e.proposito] ? t(CLAU_PROPOSIT[e.proposito]) : e.proposito
+            const quan = dataHora(e.enviado_at ?? e.created_at)
+            return (
+              <TableRow key={e.id}>
+                <TableCell className="hidden text-center text-muted-foreground tabular-nums md:table-cell">
+                  {quan}
+                </TableCell>
+                {/* `wrap-anywhere`: un correo es una sola palabra larga, y en una tabla de
+                    ancho automático solo así deja de imponer su ancho a la columna. */}
+                <TableCell>
+                  <span className="block font-medium wrap-anywhere">{e.destinatario}</span>
+                  <Secundari peces={[
+                    { text: e.funcion, fins: 'xl' },
+                    { text: proposit, fins: 'lg' },
+                    { text: numero, fins: 'lg' },
+                    { text: quan, fins: 'md' },
+                  ]} />
+                </TableCell>
+                <TableCell className="hidden text-center lg:table-cell">
+                  <Badge variant="outline" className="whitespace-normal">{proposit}</Badge>
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground xl:table-cell">{e.funcion ?? '—'}</TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground lg:table-cell">
+                  {/* Sin número no se inventa nada: la mayoría de los correos no llevan
+                      documento, y el `documento_id` de los que lo llevan puede apuntar a
+                      uno que ya no está (la FK es `on delete cascade`, pero la fila del
+                      envío se va con él). */}
+                  {numero ?? '—'}
+                </TableCell>
+                <TableCell className="text-center">
+                  <Badge className={cn('whitespace-normal', ESTIL_ENVIAMENT[e.estado])}>{t(CLAU_ENVIAMENT[e.estado])}</Badge>
+                  {e.estado === 'error' && e.error && (
+                    <p className="mt-1 text-left text-xs wrap-anywhere text-error">{e.error}</p>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {/* Solo los correos de un documento: el resto (accesos, avisos) no se
+                      reenvían desde aquí, cada uno tiene su propia pantalla. */}
+                  {e.proposito === 'document' && e.documento_id && (
+                    <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                      <BotoIcona
+                        icona={reenviant === e.documento_id ? Loader2 : Mail}
+                        etiqueta={t('doc.a_resend_mail')}
+                        className={reenviant === e.documento_id ? '[&_svg]:animate-spin' : undefined}
                         disabled={reenviant === e.documento_id || !!motiuEmail}
                         motiu={motiuEmail ? t(motiuEmail) : undefined}
                         onClick={() => void reenvia(e.documento_id!, numero ?? null, e.destinatario)}
-                      >
-                        {reenviant === e.documento_id
-                          ? <Loader2 className="size-4 animate-spin" />
-                          : <Send className="size-4" aria-hidden />}
-                        {t('doc.resend')}
-                      </BotoAmbMotiu>
-                    )}
-                  </TableCell>
-                </TableRow>
-              )
-            })}
-          </TableBody>
-        </Table>
-      </div>
+                      />
+                    </div>
+                  )}
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
     )
   }
 
