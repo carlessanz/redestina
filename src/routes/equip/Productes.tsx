@@ -14,13 +14,15 @@
 //
 // Los iconos no se editan desde la aplicación: salen de `scripts/icones-productes.ts`.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
 import { Link } from 'react-router'
+import { CirclePlus, Pencil, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
+import { usePuntTall } from '../../hooks/usePuntTall'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { esborrarCostProducte, eurKg, fixarCostProducte } from '../../lib/tancament'
@@ -28,7 +30,7 @@ import { dataCurta } from '../../lib/albarans'
 import type { CosteProducto } from '../../types'
 import { IconaProducte } from '../../components/FotosOferta'
 import DialegMotiu from '../../components/DialegMotiu'
-import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
+import BotoIcona from '../../components/BotoIcona'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -75,6 +77,9 @@ export default function Productes() {
   const [valor, setValor] = useState('')
   const [motiu, setMotiu] = useState('')
   const [esborrant, setEsborrant] = useState<string | null>(null)
+  // La fila de editar ocupa las columnas VISIBLES, que cambian con el ancho (usePuntTall).
+  const columnes = 2 + Number(usePuntTall('sm')) + Number(usePuntTall('md'))
+    + Number(usePuntTall('xl')) + Number(potAprovar)
 
   useEffect(() => {
     let viu = true
@@ -219,116 +224,119 @@ export default function Productes() {
             <p className="text-sm text-muted-foreground">{t('cost.no_match')}</p>
           )}
 
+          {/* El criterio de las tablas (03-11-2026, AGENTS.md §2): cabe sin scroll horizontal
+              —en móvil quedan producto, coste y acciones; la familia va bajo el nombre, la
+              fecha sale desde `md` y el motivo desde `xl`—, títulos centrados y acciones en
+              iconos con tooltip. Editar abre una fila debajo con los dos campos. */}
           {files.length > 0 && (
-            <div className="overflow-x-auto">
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead className="w-14"><span className="sr-only">{t('prod.c_photo')}</span></TableHead>
-                    <TableHead>{t('cost.c_product')}</TableHead>
-                    <TableHead>{t('cost.c_family')}</TableHead>
-                    <TableHead className="text-right">{t('cost.c_cost')}</TableHead>
-                    <TableHead>{t('cost.c_reason')}</TableHead>
-                    <TableHead>{t('cost.c_updated')}</TableHead>
-                    <TableHead className="text-right">{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {files.map((p) => {
-                    const c = perProducte[p.nombre]
-                    const obert = editant === p.nombre
-                    return (
-                      <TableRow key={p.nombre}>
-                        <TableCell>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="hidden w-14 sm:table-cell"><span className="sr-only">{t('prod.c_photo')}</span></TableHead>
+                  <TableHead className="text-center whitespace-normal">{t('cost.c_product')}</TableHead>
+                  <TableHead className="w-24 text-center whitespace-normal sm:w-32">{t('cost.c_cost')}</TableHead>
+                  <TableHead className="hidden text-center whitespace-normal xl:table-cell">{t('cost.c_reason')}</TableHead>
+                  <TableHead className="hidden w-28 text-center whitespace-normal md:table-cell">{t('cost.c_updated')}</TableHead>
+                  {potAprovar && (
+                    <TableHead className="w-15 text-center whitespace-normal md:w-22">
+                      <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+                    </TableHead>
+                  )}
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {files.map((p) => {
+                  const c = perProducte[p.nombre]
+                  const obert = editant === p.nombre
+                  return (
+                    <Fragment key={p.nombre}>
+                      <TableRow className={obert ? 'bg-muted/50' : undefined}>
+                        <TableCell className="hidden sm:table-cell">
                           <Link to={rutaProducte(p.nombre)} aria-label={t('prod.open', { p: p.nombre })}>
                             <IconaProducte producto={p.nombre} familia={p.familia} className="size-10" />
                           </Link>
                         </TableCell>
-                        <TableCell className="font-medium">
-                          <Link to={rutaProducte(p.nombre)} className="text-primary hover:underline">{p.nombre}</Link>
+                        <TableCell className="whitespace-normal break-words">
+                          <Link to={rutaProducte(p.nombre)} className="font-medium text-primary hover:underline">{p.nombre}</Link>
+                          {p.familia && <span className="block text-xs text-muted-foreground">{p.familia}</span>}
                         </TableCell>
-                        <TableCell className="text-muted-foreground">{p.familia ?? '—'}</TableCell>
-                        <TableCell className="text-right tabular-nums whitespace-nowrap">
+                        <TableCell className="text-center tabular-nums whitespace-normal">
                           {c
                             ? eurKg(c.coste_kg)
                             : <Badge className="bg-aviso-fondo text-aviso">{t('cost.missing')}</Badge>}
                         </TableCell>
-                        <TableCell className="max-w-64 min-w-40 text-sm whitespace-normal text-muted-foreground">
-                          {obert
-                            ? (
-                              <Input
-                                value={motiu}
-                                onChange={(e) => setMotiu(e.target.value)}
-                                placeholder={t('cost.f_reason')}
-                                aria-label={t('cost.f_reason')}
-                              />
-                            )
-                            : <span className="line-clamp-2">{c?.motivo ?? '—'}</span>}
+                        <TableCell className="hidden text-sm whitespace-normal text-muted-foreground xl:table-cell">
+                          <span className="line-clamp-2">{c?.motivo ?? '—'}</span>
                         </TableCell>
-                        <TableCell className="whitespace-nowrap text-muted-foreground">
+                        <TableCell className="hidden text-center text-muted-foreground md:table-cell">
                           {dataCurta(c?.updated_at ?? null)}
                         </TableCell>
-                        <TableCell>
-                          <div className="flex flex-wrap justify-end gap-1">
-                            {obert
-                              ? (
-                                <>
-                                  <Input
-                                    className="w-28"
-                                    inputMode="decimal"
-                                    value={valor}
-                                    onChange={(e) => setValor(e.target.value)}
-                                    aria-label={t('cost.f_cost')}
-                                    autoFocus
-                                  />
-                                  <Button
-                                    size="sm"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    disabled={ocupat}
-                                    onClick={() => void desa(p.nombre)}
-                                  >
-                                    {t('c.save')}
-                                  </Button>
-                                  <Button
-                                    size="sm" variant="outline"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    disabled={ocupat}
-                                    onClick={() => setEditant(null)}
-                                  >
-                                    {t('c.cancel')}
-                                  </Button>
-                                </>
-                              )
-                              : potAprovar && (
-                                <>
-                                  <Button
-                                    size="sm" variant="outline"
-                                    className="h-11 whitespace-normal md:h-8"
-                                    onClick={() => obreEdicio(p.nombre)}
-                                  >
-                                    {t(c ? 'cost.a_edit' : 'cost.a_set')}
-                                  </Button>
-                                  {c && (
-                                    <BotoAmbMotiu
-                                      size="sm" variant="outline"
-                                      className="h-11 whitespace-normal md:h-8"
-                                      disabled={!esSuperAdmin}
-                                      motiu={esSuperAdmin ? undefined : t('cost.del_only_super')}
-                                      onClick={() => setEsborrant(p.nombre)}
-                                    >
-                                      {t('c.delete')}
-                                    </BotoAmbMotiu>
-                                  )}
-                                </>
+                        {potAprovar && (
+                          <TableCell>
+                            <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                              <BotoIcona
+                                icona={c ? Pencil : CirclePlus}
+                                etiqueta={t(c ? 'cost.a_edit' : 'cost.a_set')}
+                                aria-expanded={obert}
+                                onClick={() => (obert ? setEditant(null) : obreEdicio(p.nombre))}
+                              />
+                              {c && (
+                                <BotoIcona
+                                  icona={Trash2}
+                                  etiqueta={t('cost.del_title')}
+                                  className="text-destructive hover:text-destructive"
+                                  disabled={!esSuperAdmin}
+                                  motiu={t('cost.del_only_super')}
+                                  onClick={() => setEsborrant(p.nombre)}
+                                />
                               )}
-                          </div>
-                        </TableCell>
+                            </div>
+                          </TableCell>
+                        )}
                       </TableRow>
-                    )
-                  })}
-                </TableBody>
-              </Table>
-            </div>
+                      {obert && (
+                        <TableRow className="bg-muted/50 hover:bg-muted/50">
+                          <TableCell colSpan={columnes} className="whitespace-normal">
+                            <form
+                              className="grid grid-cols-1 items-end gap-3 sm:grid-cols-[9rem_minmax(0,1fr)_auto]"
+                              onSubmit={(e) => { e.preventDefault(); void desa(p.nombre) }}
+                            >
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cost-valor">{t('cost.f_cost')}</Label>
+                                <Input
+                                  id="cost-valor"
+                                  inputMode="decimal"
+                                  value={valor}
+                                  onChange={(e) => setValor(e.target.value)}
+                                  autoFocus
+                                />
+                              </div>
+                              <div className="space-y-1.5">
+                                <Label htmlFor="cost-motiu">{t('cost.f_reason')}</Label>
+                                <Input id="cost-motiu" value={motiu} onChange={(e) => setMotiu(e.target.value)} />
+                              </div>
+                              <div className="flex flex-wrap gap-2">
+                                <Button type="submit" className="h-11 w-full sm:w-auto md:h-9" disabled={ocupat}>
+                                  {t('c.save')}
+                                </Button>
+                                <Button
+                                  type="button" variant="outline"
+                                  className="h-11 w-full sm:w-auto md:h-9"
+                                  disabled={ocupat}
+                                  onClick={() => setEditant(null)}
+                                >
+                                  {t('c.cancel')}
+                                </Button>
+                              </div>
+                            </form>
+                          </TableCell>
+                        </TableRow>
+                      )}
+                    </Fragment>
+                  )
+                })}
+              </TableBody>
+            </Table>
           )}
         </CardContent>
       </Card>

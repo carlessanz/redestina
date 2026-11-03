@@ -231,3 +231,29 @@ dos con la página en esos mismos 0 px):
    desplazaba de lado. En móvil el logo, los márgenes y los botones encogen, y por debajo de
    360 px el selector de idioma pierde el icono; cabe desde 320. Medido el 28-09-2026.
 
+
+## Criterio de las tablas (03-11-2026)
+
+Pedido por Carles: **todas las tablas responsive sin scroll horizontal, acciones en iconos que
+dicen qué hacen al pasar por encima y títulos de columna centrados.** Se aplica tabla a tabla;
+la primera, **Productes** (`routes/equip/Productes.tsx`), revisada por Carles antes de hacer el
+resto. Cómo se hace:
+
+- **Qué columnas quedan en móvil**: solo lo que identifica la fila, la cifra que importa y las
+  acciones. Lo secundario va **debajo del nombre**, en `text-xs text-muted-foreground` (la familia
+  del producto), o se esconde por ancho con `hidden md:table-cell` / `xl:table-cell` (fecha,
+  motivo) **en la cabecera y en la celda a la vez**. El detalle sigue a un clic (nombre enlazado).
+- **Títulos**: `text-center whitespace-normal` en cada `TableHead` (que parta un título largo en
+  dos líneas en vez de ensanchar la columna). Cifras, fechas y acciones centradas; textos a la
+  izquierda.
+- **Acciones**: `components/BotoIcona.tsx` (icono `lucide-react`, `etiqueta` = tooltip y
+  `aria-label`, `motiu` cuando está gris, 44 px en móvil y 32 desde `md`). En móvil las acciones
+  se apilan (`flex-col md:flex-row`) para que la columna mida un icono. Solo acciones con icono
+  inequívoco: en táctil no hay tooltip. Borrar va en `text-destructive`.
+- **Editar en línea**: una segunda fila debajo con el formulario, nunca inputs repartidos por las
+  celdas (con columnas escondidas, la mitad desaparecería). Su `colSpan` tiene que ser el número
+  de columnas **visibles**: uno mayor crea columnas fantasma que se comen el ancho (visto con
+  `table-fixed` y sin él). `hooks/usePuntTall.ts` da los puntos de corte de Tailwind por
+  `matchMedia`.
+- **Medir**: a 360 px, `scrollWidth > clientWidth` en todos los hijos de `main` (solo los `sr-only`
+  pueden salir, son de 1 px). Productes: 0 desbordamientos, tres columnas visibles en móvil.

@@ -46,7 +46,7 @@ export default function Entitats() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const waActiu = useWhatsappActiu()
-  // Con el correo apagado (§8) «Correu» se queda gris con el motivo.
+  // Con el correo apagado (§8) «Correu» desaparece, como «Missatge» con WhatsApp apagado.
   const motiuEmail = motiuCanal(useCanals(), 'email')
   const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
   const [files, setFiles] = useState<EntitatLlistat[]>([])
@@ -211,15 +211,19 @@ export default function Entitats() {
                           {t('c.message')}
                         </Button>
                       )}
-                      <BotoAmbMotiu variant="outline" size="sm" disabled={!e.email || !!motiuEmail}
-                        motiu={motiuEmail ? t(motiuEmail) : e.email ? undefined : t('correu.no_email')}
-                        onClick={() => setCorreuA({
-                          email: e.email, nom,
-                          tipus: e.productor_id ? 'productor' : 'entidad',
-                          id: (e.productor_id ?? e.entidad_id) as string,
-                        })}>
-                        {t('c.email_action')}
-                      </BotoAmbMotiu>
+                      {/* Y «Correu», igual: con el correo apagado —o todas las notificaciones— se
+                          quita (decisión de Carles, 03-11-2026); gris solo si falta el correo. */}
+                      {!motiuEmail && (
+                        <BotoAmbMotiu variant="outline" size="sm" disabled={!e.email}
+                          motiu={e.email ? undefined : t('correu.no_email')}
+                          onClick={() => setCorreuA({
+                            email: e.email, nom,
+                            tipus: e.productor_id ? 'productor' : 'entidad',
+                            id: (e.productor_id ?? e.entidad_id) as string,
+                          })}>
+                          {t('c.email_action')}
+                        </BotoAmbMotiu>
+                      )}
                     </div>
                   </TableCell>
                 </TableRow>

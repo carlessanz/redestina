@@ -104,6 +104,9 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
   (`flex-wrap`, `min-w-0 flex-1 basis-*`); `grid-cols-1` explícito antes de `sm:grid-cols-2`;
   celdas de tabla con `whitespace-normal`; **auditar `scrollWidth > clientWidth` en los hijos**,
   no solo en el documento.
+- **Tablas (03-11-2026; hecha Productes, el resto pendiente)**: sin scroll horizontal (columnas
+  secundarias `hidden md:table-cell`, lo esencial bajo el nombre), títulos centrados, acciones
+  en iconos `BotoIcona` (tooltip y `aria-label`); `colSpan` de fila completa con `usePuntTall`.
 
 ## 2bis. Sistema de diseño
 
@@ -457,8 +460,8 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   comunicación operativa (un solo punto por canal: `sendEmail()` y `enviar()`, que devuelven
   `ok:false` 503 `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un
   simulado); no cortan lo **transaccional** (`enviar-acceso`, `recuperar-password`, con
-  `{transaccional:true}`). El correo de `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria) y
-  deja gris lo que envía (`BotoAmbMotiu`, `motiuCanal()`). En producción los tres encendidos.
+  `{transaccional:true}`). El correo de `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria;
+  «Missatge» y «Correu» de Entitats) y deja gris lo demás (`BotoAmbMotiu`, `motiuCanal()`). En producción los tres encendidos.
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).

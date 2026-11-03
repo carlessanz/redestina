@@ -204,6 +204,8 @@ src/
                                copiado TRES veces y una copia ya había divergido (sin icono y
                                sin reparto a partes iguales): dos botones distintos para la
                                misma elección en dos pantallas seguidas
+    BotoIcona.tsx              La acción de una fila de tabla como icono con tooltip (03-11-2026,
+                               criterio de tablas de §2); `hooks/usePuntTall.ts` da el colSpan
     BotoCopiar.tsx             El botón de copiar de toda la aplicación (icono ✓ y aviso «Copiat»);
                                `onCopiat` para «Copia i marca com a enviada»
     MissatgeACopiar.tsx        Un mensaje del ciclo: a quién va, si salió, el WhatsApp y el correo
