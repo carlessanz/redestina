@@ -8,8 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.628 pruebas en 70 ficheros** de Vitest: 1.627 correctas y **1 saltada a propósito**
-   (04-11-2026, consentimiento por enlace: +5 en `consentiments.test.ts`, nuevo). Antes, **1.623 en 69** (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
+   Referencia: **1.629 pruebas en 70 ficheros** de Vitest: 1.628 correctas y **1 saltada a propósito**
+   (04-11-2026, «Copia l’enllaç»: +1 en `consentiments.test.ts`). Antes, **1.628** (04-11-2026,
+   consentimiento por enlace: +5 en `consentiments.test.ts`, nuevo). Antes, **1.623 en 69** (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
    `ni.seg_*` y `el.seg_*`). Antes, **1.617** (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `acc.estat_*`). Antes, **1.560 en 66** (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
@@ -340,3 +341,7 @@
    comandos o deuda técnica; y **§1bis + su tabla de correspondencia** si cambió el alcance
    funcional o el estado de implementación (✅/🟡/⬜).
 7. Commit en castellano, describiendo el *qué* y el *por qué*.
+
+**E2E contra el clon** (punto 4 del canónico): `tests/e2e/*.e2e.ts`; `tests/e2e/ajuda.ts` da `sql()`,
+`sqlCom()`, `compte()`, `entra()` y `motiuSaltClon()`. Un test que apaga un interruptor
+(`email_activo`…) lo restaura en un `finally`.

@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 
-import { ambComunicacions, csvConsentiments, filesExport, type FilaConsentiment } from '../src/lib/consentiments'
+import { ambComunicacions, csvConsentiments, filesExport, textCopiaConsentiment, type FilaConsentiment } from '../src/lib/consentiments'
 
 const base = {
   organizacion_id: 'o1', entitat: 'Cooperativa', es_generadora: true, es_receptora: false,
@@ -69,5 +69,14 @@ describe('csvConsentiments', () => {
     )
     expect(csv.startsWith('﻿a;b;c;d;e;f;g;h\n')).toBe(true)
     expect(csv).toContain('"Coop; ""La Bona""";ofertant;hola@coop.cat;Sí;;;enllac;2026-11-04')
+  })
+})
+
+describe('textCopiaConsentiment', () => {
+  it('cuerpo, enlace público con el token y nota, separados por línea en blanco', () => {
+    vi.stubGlobal('window', { location: { origin: 'https://redestina.test' } })
+    const text = textCopiaConsentiment({ cos: 'Hola', boto: 'Llegeix i respon', nota: 'Caduca' }, 'abc')
+    expect(text).toBe('Hola\n\nLlegeix i respon: https://redestina.test/consentiment/abc\n\nCaduca')
+    vi.unstubAllGlobals()
   })
 })

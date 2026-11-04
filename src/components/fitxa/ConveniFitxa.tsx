@@ -4,7 +4,8 @@
 //
 //   1. «Envia’l per correu»: prepara el convenio si no lo hay, acuña el enlace y lo manda
 //      al correo de la ficha; la persona firma desde el correo (`/signar/:token`) y el
-//      equipo lo contrafirma después (`enviarConveniPerCorreu`).
+//      equipo lo contrafirma después (`enviarConveniPerCorreu`). Con el correo apagado (§8)
+//      pasa a «Copia l’enllaç de signatura»: el mismo enlace, para un correo propio.
 //   2. «Registra un conveni signat en paper» (super_admin): sube el escaneado y lo da por
 //      vigente (`DialegConveniPaper`, tres pasos en orden).
 //   3. «Dona’l per vigent» (super_admin): declarado con los datos de la ficha, sin firma ni
@@ -18,7 +19,8 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
-import { enviarConveniPerCorreu } from '../../lib/convenis'
+import { copiarAlPortapapeles } from '../../lib/copiar'
+import { crearEnllacConveni, enviarConveniPerCorreu, textCopiaConveni } from '../../lib/convenis'
 import { tipusConveniDeclarat } from '../../lib/conveniDeclarat'
 import { refrescaAvisos, useTicAvisos } from '../../lib/refrescAvisos'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
@@ -29,6 +31,7 @@ import { useConfirma } from '../DialegConfirma'
 import DialegConveniPaper from '../equip/DialegConveniPaper'
 import DialegConveniDeclarat from '../equip/DialegConveniDeclarat'
 import { declarable } from '../equip/fases/AccionsConveni'
+import EnllacPerCopiar from './EnllacPerCopiar'
 
 export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu, conveniPaper }: {
   tipusOrg: 'productor' | 'entidad'
@@ -48,6 +51,7 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
   const tic = useTicAvisos()
   const [estat, setEstat] = useState<string | null | undefined>(undefined)
   const [enviant, setEnviant] = useState(false)
+  const [copia, setCopia] = useState<{ text: string; correu: string } | null>(null)
   const [paper, setPaper] = useState(false)
   const [declarat, setDeclarat] = useState(false)
   const { confirma, dialeg } = useConfirma()
@@ -96,11 +100,23 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
     fet()
   }
 
+  // Correo apagado: prepara y acuña igual, y da el texto para pegarlo en un correo propio.
+  async function creaPerCopiar() {
+    setEnviant(true)
+    const r = await crearEnllacConveni({ tipusOrg, orgId, tipus, email: correu.trim(), nom })
+    setEnviant(false)
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
+    const text = textCopiaConveni({ cos: t('conv.mail_body'), boto: t('conv.mail_button'), nota: t('conv.mail_note') }, r.token)
+    setCopia({ text, correu: r.destinatari })
+    toast.success(t(await copiarAlPortapapeles(text) ? 'epc.ok_copiat' : 'epc.ok_creat'))
+    fet()
+  }
+
   if (estat === undefined) return null
 
   const resolt = estat === 'vigent' || estat === 'firmat'
   const senseCorreu = correu.trim() === ''
-  const motiuEnvia = motiuCorreu ? t(motiuCorreu) : senseCorreu ? t('cfx.need_correu') : undefined
+  const motiuEnvia = senseCorreu ? t('cfx.need_correu') : undefined
   const classe = 'h-11 w-full whitespace-normal sm:w-auto md:h-8'
 
   return (
@@ -110,10 +126,14 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
       {!resolt && (
         <>
           <p className="text-sm text-muted-foreground">{t('cfx.h')}</p>
+          {motiuCorreu && <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('epc.alternativa')}</p>}
+          {copia && <EnllacPerCopiar text={copia.text} correu={copia.correu} testid="conveni-copia" />}
           <div className="flex flex-wrap gap-2">
             <BotoAmbMotiu size="sm" className={classe} disabled={enviant || !!motiuEnvia} motiu={motiuEnvia}
-              onClick={() => void envia()}>
-              {t(estat === 'pendent_firma' ? 'cfx.b_correu_de_nou' : 'cfx.b_correu')}
+              onClick={() => void (motiuCorreu ? creaPerCopiar() : envia())}>
+              {motiuCorreu
+                ? t(estat === 'pendent_firma' ? 'cfx.b_copia_nou' : 'cfx.b_copia')
+                : t(estat === 'pendent_firma' ? 'cfx.b_correu_de_nou' : 'cfx.b_correu')}
             </BotoAmbMotiu>
             <BotoAmbMotiu size="sm" variant="outline" className={classe} disabled={!esSuperAdmin}
               motiu={t('conv.paper_err_permis')} onClick={() => setPaper(true)}>

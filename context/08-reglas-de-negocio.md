@@ -73,6 +73,13 @@ Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
   `alta-assistida` nueva) y el frontend. En producción los tres interruptores quedan **encendidos**; CORS de
   `alta-assistida` correcto, `registro` rechaza un alta sin privacidad y `generar-documento` sigue generando
   (PDF de prueba de 123.610 bytes, retirado después).
+- **Estado en producción (04-11-2026): los tres interruptores APAGADOS** (general, correo y
+  WhatsApp), visto en Configuració › Notificacions; lo decide Carles. Con ellos apagados, la ficha
+  de una entidad no puede pedir el RGPD ni mandar el convenio por correo, así que el botón pasa a
+  **«Copia l’enllaç»** (`components/fitxa/EnllacPerCopiar`): se acuña el mismo enlace
+  (`crearEnllacConsentiment` / `crearEnllacConveni`, sin `enviar-email`) y se da el texto con el
+  enlace para pegarlo en un correo propio. La respuesta de la persona queda registrada igual. Es
+  el mismo criterio que los mensajes para copiar del modo autónomo (§6ter).
 
 ### Interruptor global `whatsapp_activo` (14-09-2026)
 

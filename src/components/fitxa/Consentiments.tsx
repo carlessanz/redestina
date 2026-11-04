@@ -7,13 +7,17 @@
 //    manda un enlace por correo a la ficha; la persona responde en `/consentiment/:token` y
 //    hasta entonces no consta nada. Debajo se ve el estado de la última petición (enviada,
 //    abierta, respondida, caducada).
+//    Con el correo apagado (§8), el botón pasa a «Copia l’enllaç»: crea el mismo enlace y da
+//    el texto para mandarlo desde un correo propio (`EnllacPerCopiar`).
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { demanarConsentiment } from '../../lib/consentiments'
+import { copiarAlPortapapeles } from '../../lib/copiar'
+import { crearEnllacConsentiment, demanarConsentiment, textCopiaConsentiment } from '../../lib/consentiments'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
+import EnllacPerCopiar from './EnllacPerCopiar'
 import { Badge } from '@/components/ui/badge'
 
 interface Fila {
@@ -48,6 +52,7 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
   const [peticio, setPeticio] = useState<Peticio | null>(null)
   const [carregat, setCarregat] = useState(false)
   const [enviant, setEnviant] = useState(false)
+  const [copia, setCopia] = useState<{ text: string; correu: string } | null>(null)
 
   const carrega = useCallback(async () => {
     const [cons, enll] = await Promise.all([
@@ -93,6 +98,23 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
     await carrega()
   }
 
+  // Correo apagado: el mismo enlace, para pegarlo en un correo propio.
+  async function creaPerCopiar() {
+    const desti = (correu ?? '').trim()
+    if (!desti) return
+    setEnviant(true)
+    const r = await crearEnllacConsentiment(organitzacioId, desti)
+    setEnviant(false)
+    if (!r.ok) {
+      toast.error(t(r.codi === 'sense_correu' ? 'cons.err_sense_correu' : 'cons.err_enllac'))
+      return
+    }
+    const text = textCopiaConsentiment({ cos: t('cons.copia_cos'), boto: t('cons.mail_boto'), nota: t('cons.mail_nota') }, r.enllac.token)
+    setCopia({ text, correu: r.enllac.destinatari })
+    toast.success(t(await copiarAlPortapapeles(text) ? 'epc.ok_copiat' : 'epc.ok_creat'))
+    await carrega()
+  }
+
   if (!carregat) return null
 
   // El estado de la última petición, en una frase.
@@ -110,7 +132,8 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
             : t('cons.pet_enviada', { data: data(peticio.created_at), correu: peticio.destinatario_email ?? '—' })
   }
   const senseCorreu = !(correu ?? '').trim()
-  const motiu = motiuCorreu ? t(motiuCorreu) : senseCorreu ? t('cons.need_correu') : undefined
+  const motiu = senseCorreu ? t('cons.need_correu') : undefined
+  const pendent = !!peticio && !peticio.usado_at && peticio.estado === 'activo'
 
   return (
     <div className="space-y-2" data-testid="consentiments">
@@ -136,10 +159,23 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
       {estatPeticio && (
         <p className="text-sm [overflow-wrap:anywhere]" data-testid="consentiment-peticio">{estatPeticio}</p>
       )}
-      <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-        disabled={enviant || !!motiu} motiu={motiu} onClick={() => void demana()}>
-        {t(peticio && !peticio.usado_at && peticio.estado === 'activo' ? 'cons.b_reenvia' : 'cons.b_demana')}
-      </BotoAmbMotiu>
+      {copia && <EnllacPerCopiar text={copia.text} correu={copia.correu} testid="consentiment-copia" />}
+      {motiuCorreu
+        ? (
+          <>
+            <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('epc.alternativa')}</p>
+            <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+              disabled={enviant || !!motiu} motiu={motiu} onClick={() => void creaPerCopiar()}>
+              {t(pendent ? 'cons.b_copia_nou' : 'cons.b_copia')}
+            </BotoAmbMotiu>
+          </>
+        )
+        : (
+          <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+            disabled={enviant || !!motiu} motiu={motiu} onClick={() => void demana()}>
+            {t(pendent ? 'cons.b_reenvia' : 'cons.b_demana')}
+          </BotoAmbMotiu>
+        )}
     </div>
   )
 }

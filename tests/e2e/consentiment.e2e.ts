@@ -9,6 +9,8 @@
 //      enseña como «enllaç per correu».
 //   3. El convenio se envía por correo desde Documentació: queda pendiente de firma con su
 //      enlace al correo de la ficha, sin que la entidad entre en Redestina.
+//   4. Con el correo apagado, los dos botones pasan a «Copia l’enllaç»: el texto que se copia
+//      lleva un token que es el del enlace activo y la página pública lo abre.
 
 import { expect, test } from '@playwright/test'
 import { entra, motiuSaltClon, sql, sqlCom } from './ajuda'
@@ -117,4 +119,46 @@ test('el conveni s’envia per correu des de la fitxa', async ({ page }) => {
   expect(sql(`select c.estado || '|' || t.destinatario_email from convenios c
     join enlaces_token t on t.id = c.enlace_id
     where c.entidad_id = '${ent}' and c.tipo = 'col_receptor'`)).toBe(`pendent_firma|${email}`)
+})
+
+test('amb el correu apagat es copia l’enllaç', async ({ page, browser }) => {
+  const abans = sql(`select coalesce((select value from app_settings where key = 'email_activo'), '')`)
+  sql(`insert into app_settings (key, value) values ('email_activo', 'false')
+       on conflict (key) do update set value = 'false'`)
+  const hash = (tok: string) => `encode(sha256(convert_to('${tok}', 'UTF8')), 'hex')`
+  try {
+    await page.context().grantPermissions(['clipboard-read', 'clipboard-write']).catch(() => {})
+    await entra(page, 'super_admin')
+
+    // Consentimiento: el enlace del texto es el activo y la página pública lo abre.
+    await page.goto(`/equip/entitats/${org}?pestanya=intern`)
+    const bloc = page.getByTestId('consentiments')
+    await expect(bloc.getByRole('button', { name: /Demana el consentiment per correu|Pide el consentimiento por correo/ })).toHaveCount(0)
+    await bloc.getByRole('button', { name: /Copia l’enllaç del consentiment|Copia un enllaç nou|Copia el enlace del consentimiento|Copia un enlace nuevo/ }).click()
+    const copia = page.getByTestId('consentiment-copia')
+    await expect(copia).toContainText(email)
+    const tokCons = (await copia.innerText()).match(/\/consentiment\/([\w-]+)/)?.[1] ?? ''
+    expect(tokCons).not.toBe('')
+    expect(sql(`select estado || '|' || destinatario_email from enlaces_token
+      where proposito = 'consentiment_rgpd' and objeto_id = '${org}' and token_hash = ${hash(tokCons)}`)).toBe(`activo|${email}`)
+    const ctx = await browser.newContext()
+    const pub = await ctx.newPage()
+    await pub.goto(`/consentiment/${tokCons}`)
+    await expect(pub.getByTestId('consentiment-public')).toContainText(/E2E Consentiment/)
+    await ctx.close()
+
+    // Convenio: el test anterior lo dejó pendiente de firma; el enlace nuevo es el suyo.
+    await page.goto(`/equip/entitats/${org}?pestanya=documentacio`)
+    const conv = page.getByTestId('conveni-entidad')
+    await conv.getByRole('button', { name: /Copia un enllaç de signatura nou|Copia un enlace de firma nuevo/ }).click()
+    const copiaConv = page.getByTestId('conveni-copia')
+    await expect(copiaConv).toContainText(email)
+    const tokConv = (await copiaConv.innerText()).match(/\/signar\/([\w-]+)/)?.[1] ?? ''
+    expect(tokConv).not.toBe('')
+    expect(sql(`select c.estado || '|' || t.estado from convenios c join enlaces_token t on t.id = c.enlace_id
+      where c.entidad_id = '${ent}' and c.tipo = 'col_receptor' and t.token_hash = ${hash(tokConv)}`)).toBe('pendent_firma|activo')
+  } finally {
+    if (abans) sql(`update app_settings set value = '${abans}' where key = 'email_activo'`)
+    else sql(`delete from app_settings where key = 'email_activo'`)
+  }
 })

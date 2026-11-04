@@ -1895,7 +1895,17 @@ Lo que pidió Carles al ver las pestañas del 03-11:
 - **Gestió interna › Consentiments RGPD** (`components/fitxa/Consentiments`): el equipo ya no marca
   nada; **«Demana el consentiment per correu»** (`demanarConsentiment`) manda el enlace al correo de la
   ficha, y debajo se ve el estado de la última petición (enviada, oberta, resposta, caducada). Gris
-  con el motivo si no hay correo o el canal está apagado.
+  con el motivo si no hay correo.
+- **Con el correo apagado** (§8: en producción lo está desde noviembre de 2026), los dos botones de
+  correo pasan a **«Copia l’enllaç del consentiment»** y **«Copia l’enllaç de signatura»** (y su
+  «… nou» si ya hay uno pendiente). Acuñan el mismo enlace sin mandar nada
+  (`crearEnllacConsentiment` de `lib/consentiments.ts`, `crearEnllacConveni` de `lib/convenis.ts`,
+  que también usan los envíos por correo) y enseñan `EnllacPerCopiar`: el cuerpo del correo, el
+  enlace y la nota de caducidad (`textCopiaConsentiment` / `textCopiaConveni`), con «Copia». Se
+  intenta copiar solo al crearlo, pero el texto se queda a la vista porque Safari niega el
+  portapapeles después de un `await`. E2E: `tests/e2e/consentiment.e2e.ts`, cuarto test (apaga
+  `email_activo` en el clon y lo restaura; comprueba que el hash del token copiado es el del enlace
+  activo y que la página pública lo abre).
 - **`/consentiment/:token`** (`routes/public/Consentiment.tsx`): la persona lee los textos que manda
   el servidor y marca; privacidad obligatoria, comunicaciones desmarcadas.
 - **«Entitats › Correus amb consentiment»**: descarga el CSV de quien aceptó alguna comunicación.

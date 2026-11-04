@@ -331,8 +331,8 @@ del ARA 2026 en CSV en `scripts/data/2026/` (nunca en git), mapeo **por cabecera
 (D2) con `ref_externa = ARA26:<hoja>:<línea>`, NIF inválido o repetido → sin NIF y nota «ARA 2026» en
 el comentario, doble rol solo por NIF, segunda pasada solo rellena huecos; informe y cruce con Airtable
 (solo informe: la coincidencia exacta la confirma Carles) en la misma carpeta; fuera del clon solo
-`--dry-run` salvo `--produccio`. `import-ara.ts` es histórico. **El clon lleva las 721 importadas**
-(550 + 171, 720 organizaciones); refrescarlo desde producción las quita. 🔴 **En producción, los
+`--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**
+(720 organizaciones); refrescarlo desde producción las quita. 🔴 **En producción, los
 datos importados se borraron el 16-09-2026**: quedan 6 productores + 8 entidades de prueba, la ficha «Compte de proves de l'arnes»
 (`TEST-PENDENT-ARNES`, **no aprobar nunca**: sostiene 73 checks) y
 `tecnologia@espigoladors.com` en la whitelist de correo.
@@ -407,8 +407,8 @@ Lo que manda hoy, en una línea cada uno:
   última interacción, seguimientos pendientes con «Fet», formulario (tipo, canal, fecha, responsable,
   nota, próxima acción) e hilo sin edición; borra el super_admin; el listado marca lo vencido.
 - **Sin que la entidad entre**: Documentació › Convenis (`fitxa/ConveniFitxa`) manda el convenio a
-  firmar por correo, lo registra en papel o lo declara; Gestió interna pide el RGPD por correo;
-  «Entitats» exporta los correos con consentimiento.
+  firmar por correo (o «Copia l’enllaç»), lo registra en papel o lo declara; Gestió interna
+  pide el RGPD igual; «Entitats» exporta los correos con consentimiento.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -462,8 +462,9 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   comunicación operativa (un solo punto por canal: `sendEmail()` y `enviar()`, que devuelven
   `ok:false` 503 `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un
   simulado); no cortan lo **transaccional** (`enviar-acceso`, `recuperar-password`, con
-  `{transaccional:true}`). El correo de `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria;
-  «Missatge» y «Correu» de Entitats) y deja gris lo demás (`BotoAmbMotiu`, `motiuCanal()`). En producción los tres encendidos.
+  `{transaccional:true}`). `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria;
+  «Missatge» y «Correu» de Entitats) y deja gris lo demás (`BotoAmbMotiu`, `motiuCanal()`); RGPD y convenio de
+  la ficha pasan a «Copia l’enllaç» (`fitxa/EnllacPerCopiar`). **En producción, los tres apagados.**
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
@@ -617,17 +618,16 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.627 pruebas de Vitest en 70
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.629 pruebas de Vitest en 70
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 1.759/1.759 y 28 sin datos; producción 1.764/1.764 y 23
-   (la diferencia son datos). «Sin fallos de permisos».** Una
-   cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
+   «Sin fallos de permisos».** Una cifra que sube o baja sin checks nuevos es cambio de
+   **datos**; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.
-4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; `ajuda.ts` da `sql()`, `sqlCom()`,
-   `compte()`, `motiuSaltClon()`).
+4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.
 7. **Actualizar este fichero (≤ 48 KB) y el `context/<sección>.md` que toque**; §1bis si cambia

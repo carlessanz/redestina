@@ -406,6 +406,37 @@ export function nomOrganitzacio(
 }
 
 /**
+ * Prepara el convenio si no lo hay y acuña el enlace de firma, SIN mandar el correo. Lo usan
+ * el envío por correo y «Copia l’enllaç de signatura» (correo apagado, §8).
+ */
+export async function crearEnllacConveni(args: {
+  tipusOrg: 'productor' | 'entidad'
+  orgId: string
+  tipus: ConvenioTipo
+  email: string | null
+  nom: string | null
+}): Promise<
+  | { ok: true; destinatari: string; nom: string | null; token: string }
+  | { ok: false; fase: 'preparar' | 'enviar'; error: { ok: false; missatge: string; codi: string | null } }
+> {
+  const prep = await prepararConveni(args.tipusOrg, args.orgId, args.tipus)
+  if (!prep.ok) return { ok: false, fase: 'preparar', error: prep }
+  const env = await enviarConveni(prep.data.id, args.email)
+  if (!env.ok) return { ok: false, fase: 'enviar', error: env }
+  return {
+    ok: true,
+    destinatari: env.data.enllac.destinatari ?? args.email ?? '',
+    nom: env.data.enllac.nom ?? args.nom,
+    token: env.data.enllac.token,
+  }
+}
+
+/** El texto para pegar en un correo propio: el cuerpo, el enlace y la nota de caducidad. */
+export function textCopiaConveni(t: { cos: string; boto: string; nota: string }, token: string): string {
+  return `${t.cos}\n\n${t.boto}: ${urlSignatura(token)}\n\n${t.nota}`
+}
+
+/**
  * Prepara (si no lo hay), acuña el enlace y manda el convenio por correo en un solo paso
  * (04-11-2026): la campaña de convenios y la ficha de la entidad hacen exactamente esto, y
  * la persona firma desde el correo sin cuenta (`/signar/:token`). `fase` dice dónde se paró:
@@ -424,15 +455,13 @@ export async function enviarConveniPerCorreu(args: {
   | { ok: false; fase: 'preparar' | 'enviar'; error: { ok: false; missatge: string; codi: string | null } }
   | { ok: false; fase: 'correu' }
 > {
-  const prep = await prepararConveni(args.tipusOrg, args.orgId, args.tipus)
-  if (!prep.ok) return { ok: false, fase: 'preparar', error: prep }
-  const env = await enviarConveni(prep.data.id, args.email)
-  if (!env.ok) return { ok: false, fase: 'enviar', error: env }
-  const destinatari = env.data.enllac.destinatari ?? args.email ?? ''
+  const env = await crearEnllacConveni(args)
+  if (!env.ok) return env
+  const { destinatari, token } = env
   const correu = await enviarCorreuConveni({
     email: destinatari,
-    nom: env.data.enllac.nom ?? args.nom,
-    token: env.data.enllac.token,
+    nom: env.nom,
+    token,
     ...args.textos,
     idioma: args.idioma,
   })

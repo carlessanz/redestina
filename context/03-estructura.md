@@ -279,7 +279,8 @@ src/
     fitxa/                     Los bloques de la ficha única (1C): BlocCamps (los campos de un bloque,
                                para el equipo y para el actor), BlocRols (activar/desactivar/añadir papel),
                                CanalPreferit, Consentiments (RGPD: los ve y los PIDE por correo, 04-11-2026),
-                               ConveniFitxa (el convenio por correo, en papel o declarado), AccesEntitat (1D:
+                               ConveniFitxa (el convenio por correo, en papel o declarado), EnllacPerCopiar
+                               (el texto con el enlace cuando el correo está apagado), AccesEntitat (1D:
                                estado de la cuenta y «Dona-li accés» / «Torna a enviar» / «Desactiva l'accés»),
                                NotesInternes (1F: el hilo de notas del equipo en «Gestió interna»)
     ContactList.tsx            Sidebar de contactos + alta manual

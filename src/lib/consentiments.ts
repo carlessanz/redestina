@@ -101,6 +101,26 @@ export interface TextosCorreuConsentiment {
   nota: string
 }
 
+export interface EnllacConsentiment { token: string; destinatari: string; nom: string | null }
+
+/**
+ * Acuña el enlace de consentimiento (revoca el anterior) SIN mandar nada. Lo usan el envío por
+ * correo y «Copia l’enllaç», que es la vía con el correo apagado (§8): el super_admin lo manda
+ * desde su propio correo y la respuesta queda registrada igual.
+ */
+export async function crearEnllacConsentiment(orgId: string, email: string): Promise<
+  { ok: true; enllac: EnllacConsentiment } | { ok: false; codi: string | null; missatge: string | null }
+> {
+  const { data, error } = await supabase.rpc('demanar_consentiment', { p_org: orgId, p_email: email || null })
+  if (error) return { ok: false, codi: error.message?.trim() ?? null, missatge: error.message ?? null }
+  return { ok: true, enllac: data as EnllacConsentiment }
+}
+
+/** El texto para pegar en un correo propio: el cuerpo, el enlace y la nota de caducidad. */
+export function textCopiaConsentiment(t: { cos: string; boto: string; nota: string }, token: string): string {
+  return `${t.cos}\n\n${t.boto}: ${urlConsentiment(token)}\n\n${t.nota}`
+}
+
 /**
  * Pide el consentimiento: acuña el enlace (revoca el anterior) y lo manda por correo.
  * `fase` dice dónde se paró: con `correu` el enlace existe pero el correo no salió.
@@ -111,9 +131,9 @@ export async function demanarConsentiment(
   textos: TextosCorreuConsentiment,
   idioma: 'ca' | 'es',
 ): Promise<{ ok: true; simulat: boolean } | { ok: false; fase: 'enllac' | 'correu'; codi: string | null; missatge: string | null }> {
-  const { data, error } = await supabase.rpc('demanar_consentiment', { p_org: orgId, p_email: email || null })
-  if (error) return { ok: false, fase: 'enllac', codi: error.message?.trim() ?? null, missatge: error.message ?? null }
-  const enllac = data as { token: string; destinatari: string; nom: string | null }
+  const r = await crearEnllacConsentiment(orgId, email)
+  if (!r.ok) return { ok: false, fase: 'enllac', codi: r.codi, missatge: r.missatge }
+  const enllac = r.enllac
   const res = await enviarEmail({
     to: enllac.destinatari,
     subject: textos.assumpte,
