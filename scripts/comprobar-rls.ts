@@ -705,6 +705,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes internes" },
   { tabla: "afegir_nota_interna", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "NO afegeix notes internes" },
   { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes" },
+  // Taula mestra 1.5 (20270504100000): cerrar un seguimiento es del equipo, y activar la
+  // organización entera, de `pot_aprovar()`.
+  { tabla: "tancar_seguiment", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca seguiments del CRM" },
+  { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap organització" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
   // Fase 10 (20270424100000): el impacto global es del equipo; los factores son catálogo
@@ -1333,6 +1337,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
     { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
     { tabla: "esborrar_nota_interna", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra notes internes (és del super_admin)" },
+    // 1.5 (20270504100000): el técnico cierra seguimientos (uuid inventado → 22023
+    // `nota_inexistent`), pero activar la organización entera es del admin.
+    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
+    { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
     { tabla: "factors_impacte", op: "leer", esperado: "permitir", descripcion: "veu els factors d'impacte", requiereFixture: "els factors sembrats (20270424100000)" },
@@ -1576,6 +1584,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "notes_internes", op: "insertar", esperado: "denegar", descripcion: "NO escriu notes directament (només afegir_nota_interna)" },
     { tabla: "afegir_nota_interna", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_canal: "telefon", p_text: "arnes" }, descripcion: "pot afegir una nota interna (22023 si l'organització no existeix)" },
     { tabla: "esborrar_nota_interna", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar una nota interna (22023 si no existeix)" },
+    { tabla: "tancar_seguiment", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot tancar un seguiment (22023 si la nota no existeix)" },
+    { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
     { tabla: "fitxa_estat_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial d'estats de les fitxes", requiereFixture: "algun canvi d'estat d'una fitxa (activar/desactivar)" },

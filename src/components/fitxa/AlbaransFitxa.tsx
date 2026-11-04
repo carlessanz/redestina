@@ -20,11 +20,9 @@ type Fila = Pick<
 >
 type Doc = Pick<Documento, 'id' | 'objeto_id' | 'objeto_tipo' | 'numero_completo' | 'estado' | 'vigente'>
 
-export default function AlbaransFitxa({ tipusOrg, orgId, onCompte }: {
+export default function AlbaransFitxa({ tipusOrg, orgId }: {
   tipusOrg: 'productor' | 'entidad'
   orgId: string
-  /** Cuántos hay, para el contador de la pestaña. */
-  onCompte?: (n: number) => void
 }) {
   const { t } = useT()
   const [files, setFiles] = useState<Fila[] | null>(null)
@@ -55,8 +53,7 @@ export default function AlbaransFitxa({ tipusOrg, orgId, onCompte }: {
     setError(false)
     setFiles(llista)
     setDocs(pdfs)
-    onCompte?.(llista.length)
-  }, [tipusOrg, orgId, onCompte])
+  }, [tipusOrg, orgId])
 
   useEffect(() => { void carrega() }, [carrega])
   const descarregador = useDescarregaDocument(carrega)

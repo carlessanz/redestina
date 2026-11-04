@@ -13,7 +13,7 @@
 //   5. Un NIF que ya tiene otra organización no se da de alta dos veces: el error sale en el campo.
 
 import { expect, test, type Page } from '@playwright/test'
-import { entra, motiuSaltClon, sql, sqlCom, opcionsDe } from './ajuda'
+import { entra, motiuSaltClon, pestanya, sql, sqlCom, opcionsDe } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -107,6 +107,7 @@ test('una inactiva: sin NIF no se activa; con NIF se activa y aparece en «Nova 
   await dialeg.locator('#ne-act-rao').fill(`${nomInactiva} SCP`)
   await dialeg.getByTestId('ne-activar-ok').click()
   await page.waitForURL((u) => u.pathname === `/equip/entitats/${orgInactiva}`)
+  await pestanya(page, 'intern')
   await expect(page.getByTestId('bloc-rols')).toBeVisible()
   expect(sql(`select activo || '|' || nif from productores where organizacion_id = '${orgInactiva}'`)).toBe(`true|${nifInactiva}`)
   // Quién la activó queda en el historial (trigger de 1A).
@@ -137,6 +138,7 @@ test('la que no tiene el otro papel: «Afegeix el paper d’ofertant» crea la f
   // La confirmación (mismo texto en el botón del diálogo).
   await page.getByRole('dialog').getByRole('button', { name: /Afegeix el paper d.ofertant|Añade el papel de ofertante/ }).click()
   await page.waitForURL((u) => u.pathname === `/equip/entitats/${orgActiva}`)
+  await pestanya(page, 'intern')
   await expect(page.getByTestId('rols-productor')).toContainText(/Activa/)
   expect(sql(`select count(*) || '|' || bool_and(activo) || '|' || max(nif) from productores where organizacion_id = '${orgActiva}'`))
     .toBe(`1|true|${nifActiva}`)
@@ -165,6 +167,7 @@ test('una nueva: «És nova» lleva el NIF al alta, y el alta con doble rol crea
 
   await page.waitForURL((u) => /^\/equip\/entitats\/[0-9a-f-]{36}$/.test(u.pathname))
   orgNova = new URL(page.url()).pathname.split('/').pop() as string
+  await pestanya(page, 'intern')
   await expect(page.getByTestId('rols-productor')).toBeVisible()
   await expect(page.getByTestId('rols-entidad')).toBeVisible()
   expect(sql(`select es_generadora || '|' || es_receptora || '|' || productor_activo || '|' || entidad_activo || '|' || nif

@@ -459,6 +459,11 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 | --- | --- | --- |
 | `afegir_nota_interna(p_org, p_canal, p_text, p_data default now()) → notes_internes` | `es_intern()` **con sesión** (`auth.uid() is null` también `42501`) | Inserta la nota con `autor = auth.uid()` (no se firma en nombre de otro). Errores `22023`: `canal_nota_desconegut`, `nota_buida`, `nota_massa_llarga` (> 2.000), `nota_futura` (más de un día por delante), `organitzacio_inexistent`; el permiso va **antes** que la existencia |
 | `esborrar_nota_interna(p_id)` | `es_super_admin()` con sesión | Borra la nota; `22023 nota_inexistent` si no está |
+| `afegir_nota_interna(…, p_tipus default 'seguiment', p_responsable default auth.uid(), p_propera_accio, p_propera_data)` (04-11-2026, `20270504100000`: drop + create, la llamada de 1F sigue valiendo) | igual | Nuevos `22023`: `tipus_nota_desconegut`, `responsable_no_equip` (sin fila en `usuario_roles`), `propera_accio_sense_data` / `propera_data_sense_accio`, `propera_accio_massa_llarga` (> 500) |
+| `tancar_seguiment(p_id)` (04-11-2026) | `es_intern()` con sesión | Da por hecha la próxima acción (`seguiment_fet_at = now()`, `_per = auth.uid()`); idempotente. `nota_inexistent`, `nota_sense_seguiment` |
+
+Arnés (04-11-2026, +18 en total): `tancar_seguiment` y `activar_organitzacio` denegadas a las externas;
+el técnico cierra seguimientos (`22023`) y no activa organizaciones; el super_admin, las dos (`22023`).
 
 Las dos: `revoke execute` de `public, anon, service_role` y `grant` a `authenticated`;
 `auditoria_funcions_obertes()` sigue en 0. Arnés (+36): leer e insertar en `notes_internes` y las dos
@@ -544,6 +549,7 @@ cambio. `actualizar_meu_canal()` la usa también la ficha del equipo (ya admití
 | `cerca_entitats(p_q, p_nomes_actives=false, p_limit=10)` | `es_intern()` con sesión | Busca organizaciones por NIF (normalizado, prefijo; exacto primero) y por nombre (contiene o `similarity ≥ 0.4` sobre `nom_comercial`, `razon_social`, `nombre`). Menos de 3 caracteres = vacío. Devuelve ficha(s), estado y `compte_estat` (D6). |
 | `activar_fitxa(p_tipus, p_id)` / `desactivar_fitxa(…)` | `pot_aprovar()` con sesión | `{tipus,id,activo,canviat}`; idempotentes. `fitxa_inexistent`, `tipus_desconegut`; las reglas de activar las pone el trigger. |
 | `desactivar_organitzacio(p_org)` | `pot_aprovar()` | Desactiva los dos papeles; devuelve cuántos. `organitzacio_inexistent`. |
+| `activar_organitzacio(p_org)` (04-11-2026, `20270504100000`) | `pot_aprovar()` con sesión | «Activa l'entitat»: todas sus fichas en una transacción (si a una le falta NIF válido o razón social, el trigger corta todo); devuelve cuántas. `organitzacio_inexistent`. |
 | `afegir_paper_org_equip(p_org, p_paper)` | `pot_aprovar()` | Crea la ficha hermana con los datos comunes, `es_test` y `activo` de la existente, sin membresía; el NIF solo se copia si es válido. `paper_desconegut`, `organitzacio_inexistent`, `ja_te_paper`, `organitzacio_buida`, `dades_en_us`. |
 
 Las cuatro: `revoke … from public, anon, service_role` + `grant … to authenticated` (piden sesión).

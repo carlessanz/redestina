@@ -8,8 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.617 pruebas en 69 ficheros** de Vitest: 1.616 correctas y **1 saltada a propósito**
-   (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
+   Referencia: **1.623 pruebas en 69 ficheros** de Vitest: 1.622 correctas y **1 saltada a propósito**
+   (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
+   `ni.seg_*` y `el.seg_*`). Antes, **1.617** (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `acc.estat_*`). Antes, **1.560 en 66** (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
    paridad del alta con `crear_entitat()`). Antes, **1.548 en 65** (02-11-2026, plan 1 1A: +1 en `textError.test.ts` por los cinco códigos de estado de la ficha y −1
@@ -93,7 +94,9 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
+   contacto denegado). **Clon, tras 1.5 (`20270504100000`, 04-11-2026): 1.730/1.730 y 30 sin
+   datos (total 1.760: +18 de `tancar_seguiment` y `activar_organitzacio`; una «sin datos» menos por las
+   notas que dejan las E2E en el clon). Producción, esperado: 1.735/1.735 y 25.** Antes, **clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
    leer e insertar en `notes_internes`, `afegir_nota_interna` y `esborrar_nota_interna` denegadas a las
    siete externas —leer = 0 filas—; el técnico lee, añade con `22023` y no borra ni inserta directo; el
    super_admin lee, añade y borra con `22023`. Las dos lecturas del equipo salen «sin datos» mientras el

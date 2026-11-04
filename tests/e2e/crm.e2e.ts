@@ -10,6 +10,11 @@
 //   3. La cuenta de una entidad NO ve las notas: ni el bloque en «La meva organització», ni por
 //      API (`select` vacío, sin error), ni el último contacto en `v_entitats_llistat`.
 //   4. El super_admin borra una nota y el hilo se queda con la otra.
+//   5. (Taula mestra 1.5, 04-11-2026) El técnico apunta una interacción con tipo y próxima
+//      acción; con otra ya vencida, el resumen las ordena, el listado marca «vençut» y «Fet» la
+//      cierra.
+//   6. El estado GLOBAL de la entidad, en «Gestió interna»: el super_admin la desactiva entera
+//      y la vuelve a activar.
 
 import { readFileSync } from 'node:fs'
 import { expect, test } from '@playwright/test'
@@ -153,4 +158,65 @@ test('el super_admin esborra una nota', async ({ page }) => {
   await page.getByRole('dialog').getByRole('button', { name: /Esborra la nota|Borra la nota/ }).click()
   await expect(bloc.getByTestId('nota')).toHaveCount(1)
   await expect(bloc.getByTestId('nota').first()).toContainText('primera')
+})
+
+test('1.5: tipus, propera acció i seguiments pendents', async ({ page }) => {
+  await entra(page, 'equip')
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
+  const bloc = page.getByTestId('notes-internes')
+  await expect(bloc.getByTestId('nota')).toHaveCount(1, { timeout: 20_000 })
+
+  await bloc.locator('#nota-tipus').click()
+  await page.getByRole('option', { name: /^Incidència$|^Incidencia$/ }).click()
+  await bloc.locator('#nota-text').fill(`E2E 1F ${marca} incidència`)
+  // Solo el texto, sin fecha: no se manda.
+  await bloc.locator('#nota-accio').fill('Trucar per confirmar')
+  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await expect(page.getByText(/necessita el text i la data|necesita el texto y la fecha/).first()).toBeVisible()
+  await bloc.locator('#nota-accio-data').fill(faDies(-7))
+  await bloc.getByRole('button', { name: /Afegeix la nota|Añade la nota/ }).click()
+  await expect(bloc.getByTestId('nota')).toHaveCount(2)
+  await expect(bloc.getByTestId('nota').first().getByTestId('nota-tipus')).toHaveText(/Incidència|Incidencia/)
+  const pendents = bloc.getByTestId('seguiment')
+  await expect(pendents).toHaveCount(1)
+  await expect(pendents.first().getByTestId('seguiment-estat')).toHaveAttribute('data-estat', 'previst')
+  expect(sql(`select tipus || '|' || (responsable = autor) || '|' || propera_data from notes_internes
+                where text = 'E2E 1F ${marca} incidència'`)).toBe(`incidencia|true|${faDies(-7)}`)
+
+  // Otra ya vencida (por la RPC: la pantalla no ofrece fechas pasadas).
+  sqlCom('equip', `select afegir_nota_interna('${org}', 'email', 'E2E 1F ${marca} vençuda', now(), 'seguiment', null,
+                     'Enviar el conveni', current_date - 2)`)
+  await page.reload()
+  await expect(pendents).toHaveCount(2, { timeout: 20_000 })
+  await expect(pendents.first().getByTestId('seguiment-estat')).toHaveAttribute('data-estat', 'vencut')
+  await expect(pendents.first()).toContainText('Enviar el conveni')
+
+  // El listado lo marca.
+  await page.goto('/equip/entitats')
+  await page.getByRole('searchbox').fill(nom)
+  const fila = page.getByTestId('entitat-fila').filter({ hasText: nom })
+  await expect(fila.getByTestId('seguiment-vencut')).toBeVisible({ timeout: 20_000 })
+
+  // «Fet» la cierra y deja de estar pendiente.
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
+  await expect(pendents).toHaveCount(2, { timeout: 20_000 })
+  await pendents.first().getByRole('button', { name: /^Fet$|^Hecho$/ }).click()
+  await expect(pendents).toHaveCount(1)
+  expect(sql(`select (seguiment_fet_at is not null) || '|' || (seguiment_fet_per is not null) from notes_internes
+                where text = 'E2E 1F ${marca} vençuda'`)).toBe('true|true')
+  expect(sql(`select seguiments_pendents from v_entitats_llistat where id = '${org}'`)).toBe('1')
+})
+
+test('l’estat global de l’entitat: el super_admin la desactiva i la torna a activar', async ({ page }) => {
+  await entra(page, 'super_admin')
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
+  const estat = page.getByTestId('estat-entitat')
+  await expect(estat.getByTestId('estat-entitat-badge')).toHaveText(/^Activa$/, { timeout: 20_000 })
+  await estat.getByRole('button', { name: /Desactiva l’entitat|Desactiva la entidad/ }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /Desactiva l’entitat|Desactiva la entidad/ }).click()
+  await expect(estat.getByTestId('estat-entitat-badge')).toHaveText(/^Inactiva$/)
+  expect(sql(`select activo from entidades where id = '${entitat}'`)).toBe('f')
+  await estat.getByRole('button', { name: /Activa l’entitat|Activa la entidad/ }).click()
+  await expect(estat.getByTestId('estat-entitat-badge')).toHaveText(/^Activa$/)
+  expect(sql(`select activo from entidades where id = '${entitat}'`)).toBe('t')
 })

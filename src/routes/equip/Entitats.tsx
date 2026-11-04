@@ -22,8 +22,8 @@ import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
-import { dataCurta } from '../../lib/format'
-import { faTemps } from '../../lib/notesInternes'
+import { avuiLocal, dataCurta } from '../../lib/format'
+import { estatSeguiment, faTemps } from '../../lib/notesInternes'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoIcona from '../../components/BotoIcona'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
@@ -36,10 +36,17 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 
-const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat, darrer_contacte_at, darrer_contacte_canal'
+const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat, darrer_contacte_at, darrer_contacte_canal, seguiments_pendents, propera_seguiment'
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
 const PER_DEFECTE = { estat: 'activa' }
+
+/** Cómo van los seguimientos de una entidad: el más próximo decide si hay alguno vencido. */
+function seguimentDe(e: EntitatLlistat): 'vencut' | 'avui' | 'pendent' | 'cap' {
+  if (!e.propera_seguiment || e.seguiments_pendents === 0) return 'cap'
+  const estat = estatSeguiment(e.propera_seguiment, avuiLocal(), false)
+  return estat === 'previst' || estat === 'fet' ? 'pendent' : estat
+}
 
 export default function Entitats() {
   const { t } = useT()
@@ -95,6 +102,8 @@ export default function Entitats() {
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (e) => e.comarca },
     { clau: 'tipus', etiquetaKey: 'fl.d_tipus', valor: (e) => e.tipo_receptor },
     { clau: 'compte', etiquetaKey: 'fl.d_compte', valor: (e) => e.compte_estat },
+    // Los seguimientos del CRM (1.5): con alguno vencido, para hoy, pendiente o sin ninguno.
+    { clau: 'seguiment', etiquetaKey: 'fl.d_seguiment', valor: (e) => seguimentDe(e) },
   ], [])
   const perRol = (e: EntitatLlistat) => !fl.valors.rol
     || (fl.valors.rol === 'ofertant' && e.es_generadora) || (fl.valors.rol === 'receptor' && e.es_receptora)
@@ -115,6 +124,7 @@ export default function Entitats() {
     if (clau === 'estat') return t(`fl.v_${v}`)
     if (clau === 'tipus') return t(`org.tr_${v}`)
     if (clau === 'compte') return t(`ef.compte_${v}`)
+    if (clau === 'seguiment') return t(`el.seg_${v}`)
     return v
   }
 
@@ -159,6 +169,7 @@ export default function Entitats() {
             const conv = conveni(e)
             const nom = e.nom_comercial || e.razon_social || e.persona_contacte || '—'
             const contacte = e.darrer_contacte_at ? faTemps(e.darrer_contacte_at) : null
+            const seg = seguimentDe(e)
             // El papel en texto, para debajo del nombre cuando la columna «Rol» no cabe.
             const rols = [e.es_generadora && t('ef.paper_ofertant'), e.es_receptora && t('ef.paper_receptor')]
               .filter(Boolean).join(' · ')
@@ -172,6 +183,7 @@ export default function Entitats() {
                     {/* Un alta rechazada se MARCA, no se esconde (§12.29). */}
                     {e.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
                     {sense > 0 && <Badge variant="destructive">{t('el.unanswered', { n: sense })}</Badge>}
+                    {seg === 'vencut' && <Badge className="bg-error-fondo text-error" data-testid="seguiment-vencut">{t('el.seg_vencut')}</Badge>}
                   </span>
                   {e.persona_contacte && e.persona_contacte !== nom && (
                     <span className="block text-xs font-normal text-muted-foreground">{e.persona_contacte}</span>
@@ -214,6 +226,14 @@ export default function Entitats() {
                     ? [t(contacte.clau, { n: contacte.n }),
                       e.darrer_contacte_canal && t(`ni.canal_${e.darrer_contacte_canal}`)].filter(Boolean).join(' · ')
                     : t('el.contacte_mai')}
+                  {/* Y la próxima acción pendiente más cercana (1.5), en el color de cómo va. */}
+                  {e.propera_seguiment && (
+                    <span className={`block text-xs ${seg === 'vencut' ? 'text-error' : seg === 'avui' ? 'text-aviso' : ''}`}
+                      data-testid="propera-seguiment">
+                      {t('el.propera', { data: dataCurta(`${e.propera_seguiment}T12:00:00`) })}
+                      {e.seguiments_pendents > 1 ? ` (+${e.seguiments_pendents - 1})` : ''}
+                    </span>
+                  )}
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col items-center justify-center gap-1 md:flex-row">

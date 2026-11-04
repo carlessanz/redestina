@@ -1194,6 +1194,25 @@ D4: un hilo cronológico por organización, **solo del equipo**, sin «próxima 
 - 🔴 **Las notas nunca salen por ningún canal** (§8): ninguna Edge Function, plantilla, documento ni
   la ficha del actor las lee.
 
+### El CRM completo y el estado global (Taula mestra 1.5, `20270504100000`, 04-11-2026)
+
+1.5 pide «data, canal, tipus, responsable, resultat/comentari, propera acció i data», historial,
+«darrera interacció i seguiments pendents». Carles pidió el 04-11 acabar lo que D4 dejó fuera:
+
+- **`notes_internes` +** `tipus` (`not null default 'seguiment'`, CHECK `seguiment · captacio ·
+  operativa · incidencia · documentacio · altres`), `responsable` (quién lleva el seguimiento; las
+  notas de 1F se rellenan con su autor), `propera_accio` (1–500) + `propera_data` (date; CHECK: las dos
+  o ninguna), `seguiment_fet_at` + `seguiment_fet_per` (CHECK: solo con próxima acción). Índice parcial
+  de pendientes `(organizacion_id, propera_data) where propera_accio is not null and seguiment_fet_at is null`.
+- `responsable` y `seguiment_fet_per` → **`auth.users`**, no `perfiles`, **a propósito**: con tres FK a
+  `perfiles`, el embed `autor:perfiles(nombre)` del frontend publicado pasaba a ser ambiguo (PGRST201) y
+  dejaba de cargar las notas entre la migración y el `git push`. Como `usuario_roles.user_id`.
+- La nota sigue sin UPDATE: lo único que cambia después es el cierre del seguimiento, por
+  `tancar_seguiment()` (§4bis).
+- **`v_entitats_llistat`** suma al final `seguiments_pendents` (int) y `propera_seguiment` (la fecha
+  pendiente más próxima). A un actor, 0 y null.
+- **`activar_organitzacio(p_org)`**: la pareja de `desactivar_organitzacio()` (§4bis).
+
 ### El listado «Entitats» (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 - **`v_entitats_llistat`** (`security_invoker`): una fila por organización con ficha (las

@@ -19,7 +19,8 @@
 // accés · Operativa · Diagnòstic i perfil · Documentació · Gestió interna. Todas montadas
 // (`forceMount`) y ocultas las que no tocan, así que un solo «Desa» guarda lo de todas; un
 // punto marca la que tiene cambios, un error de validación salta a la suya y la activa va en
-// `?pestanya=`. Cada bloque de `campsFitxa` cae en una pestaña (`PESTANYA_DE_BLOC`).
+// `?pestanya=`. Cada bloque de `campsFitxa` cae en una pestaña (`PESTANYA_DE_BLOC`). El estado
+// (global y por papel) va en Gestió interna desde el 04-11-2026, con el CRM completo (1.5).
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
 import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
@@ -72,7 +73,7 @@ const ETIQUETA_PESTANYA: Record<Pestanya, string> = {
 }
 /** En qué pestaña se pinta cada bloque de `campsFitxa`. */
 const PESTANYA_DE_BLOC: Record<Bloc, Pestanya> = {
-  identitat: 'dades', rols: 'dades', adreca: 'dades', contacte: 'contacte',
+  identitat: 'dades', rols: 'intern', adreca: 'dades', contacte: 'contacte',
   ofertant: 'operativa', receptor: 'operativa', diagnostic: 'diagnostic',
   documentacio: 'documentacio', intern: 'intern',
 }
@@ -164,12 +165,8 @@ export default function EntitatDetall() {
     if (r.left < caixa.left || r.right > caixa.right) barra.current.scrollLeft += r.left - caixa.left - 16
   }, [pestanya, carregant])
 
-  // Los contadores de las pestañas los dicen los propios bloques al cargar.
-  const [comptes, setComptes] = useState<Record<string, number>>({})
-  const comptador = useMemo(() => {
-    const de = (k: string) => (n: number) => setComptes((c) => (c[k] === n ? c : { ...c, [k]: n }))
-    return { albProd: de('albProd'), albEnt: de('albEnt'), arxProd: de('arxProd'), arxEnt: de('arxEnt'), notes: de('notes') }
-  }, [])
+  // El contador de notas de la pestaña Gestió interna lo dice el propio bloque al cargar.
+  const [nNotes, setNNotes] = useState<number | undefined>(undefined)
 
   // Qué papeles tiene.
   const rols = useMemo(() => ({ ofertant: prod !== null, receptor: ent !== null }), [prod, ent])
@@ -368,7 +365,6 @@ export default function EntitatDetall() {
   const rotolPaper = (rol: 'ofertant' | 'receptor') => doble
     ? <p className="text-sm font-medium">{t(rol === 'ofertant' ? 'ef.sec_ofertant' : 'ef.sec_receptor')}</p>
     : null
-  const nDocs = (comptes.albProd ?? 0) + (comptes.albEnt ?? 0) + (comptes.arxProd ?? 0) + (comptes.arxEnt ?? 0)
   const etiqueta = (p: Pestanya, compte?: number) => (
     <>
       {t(ETIQUETA_PESTANYA[p])}
@@ -436,8 +432,8 @@ export default function EntitatDetall() {
             <TabsTrigger value="contacte">{etiqueta('contacte')}</TabsTrigger>
             <TabsTrigger value="operativa">{etiqueta('operativa')}</TabsTrigger>
             <TabsTrigger value="diagnostic">{etiqueta('diagnostic')}</TabsTrigger>
-            <TabsTrigger value="documentacio">{etiqueta('documentacio', nDocs)}</TabsTrigger>
-            <TabsTrigger value="intern">{etiqueta('intern', comptes.notes)}</TabsTrigger>
+            <TabsTrigger value="documentacio">{etiqueta('documentacio')}</TabsTrigger>
+            <TabsTrigger value="intern">{etiqueta('intern', nNotes)}</TabsTrigger>
           </TabsList>
         </div>
 
@@ -447,9 +443,6 @@ export default function EntitatDetall() {
             <Seccio titol={t('org.sec_identitat')} testid="bloc-identitat">
               <BlocCamps {...blocProps} camps={camps('identitat')} activitats={activitats}
                 placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
-            </Seccio>
-            <Seccio titol={t('org.sec_rol')} testid="bloc-rols">
-              <BlocRols org={org} potAprovar={potAprovar} onCanviat={recarrega} />
             </Seccio>
             <Seccio titol={t('org.sec_adreca')} testid="bloc-adreca">
               <BlocCamps {...blocProps} camps={camps('adreca')} />
@@ -536,13 +529,13 @@ export default function EntitatDetall() {
               {org.productor_id && (
                 <div className="space-y-2">
                   {rotolPaper('ofertant')}
-                  <AlbaransFitxa tipusOrg="productor" orgId={org.productor_id} onCompte={comptador.albProd} />
+                  <AlbaransFitxa tipusOrg="productor" orgId={org.productor_id} />
                 </div>
               )}
               {org.entidad_id && (
                 <div className="space-y-2">
                   {rotolPaper('receptor')}
-                  <AlbaransFitxa tipusOrg="entidad" orgId={org.entidad_id} onCompte={comptador.albEnt} />
+                  <AlbaransFitxa tipusOrg="entidad" orgId={org.entidad_id} />
                 </div>
               )}
             </Seccio>
@@ -556,25 +549,29 @@ export default function EntitatDetall() {
               doble rol son dos tarjetas, y el rótulo dice de qué papel es cada una. */}
           {org.productor_id && (
             <div data-testid="doc-productor">
-              <DocumentacioOrganitzacio tipusOrg="productor" orgId={org.productor_id} nom={nom} onCompte={comptador.arxProd}
+              <DocumentacioOrganitzacio tipusOrg="productor" orgId={org.productor_id} nom={nom}
                 titol={doble ? `${t('orgdoc.title')} · ${t('ef.sec_ofertant').toLowerCase()}` : undefined} />
             </div>
           )}
           {org.entidad_id && (
             <div data-testid="doc-entidad">
-              <DocumentacioOrganitzacio tipusOrg="entidad" orgId={org.entidad_id} nom={nom} onCompte={comptador.arxEnt}
+              <DocumentacioOrganitzacio tipusOrg="entidad" orgId={org.entidad_id} nom={nom}
                 titol={doble ? `${t('orgdoc.title')} · ${t('ef.sec_receptor').toLowerCase()}` : undefined} />
             </div>
           )}
         </TabsContent>
 
-        {/* 6 · Gestió interna (1.5): el CRM, lo que solo ve el equipo, y el borrado al final. */}
+        {/* 6 · Gestió interna (1.5): el estado de la entidad, el CRM, lo que solo ve el equipo y
+            el borrado al final. */}
         <TabsContent value="intern" forceMount className={contingut}>
           <Card><CardContent className="space-y-6">
-            {/* El CRM mínimo (1F, D4): el hilo de contactos del equipo con la entidad. Trae su
-                propio título, así que no va dentro de una `Seccio`. */}
-            <section data-testid="bloc-notes">
-              <NotesInternes orgId={org.id} potEsborrar={potEsborrar} onCompte={comptador.notes} />
+            <Seccio titol={t('ef.sec_estat')} testid="bloc-rols">
+              <BlocRols org={org} potAprovar={potAprovar} onCanviat={recarrega} />
+            </Seccio>
+            {/* El CRM (1F + 1.5): interacciones, próximas acciones y seguimientos pendientes.
+                Trae su propio título, así que no va dentro de una `Seccio`. */}
+            <section className="border-t border-border pt-6" data-testid="bloc-notes">
+              <NotesInternes orgId={org.id} potEsborrar={potEsborrar} onCompte={setNNotes} />
             </section>
             <Seccio titol={t('ef.sec_intern')} ajuda={t('ef.h_intern')} testid="bloc-intern">
               <BlocCamps {...blocProps} camps={camps('intern')} />

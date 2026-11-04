@@ -124,13 +124,15 @@ export function sqlCom(rol: string, consulta: string): string {
  * opción), por texto o por posición (la 0 es la opción vacía si la hay, como en el nativo).
  */
 /**
- * La ficha de una entidad del equipo va por pestañas (03-11-2026) y las que no tocan están
- * ocultas: antes de mirar o tocar un bloque, se abre la suya. Ir directo con
- * `/equip/entitats/<org>?pestanya=<nom>` hace lo mismo sin el clic.
+ * La ficha de una entidad del equipo va por pestañas (03-11-2026), y la del actor también
+ * (04-11-2026, `dades` · `contacte` · `operativa`); las que no tocan están ocultas: antes de
+ * mirar o tocar un bloque, se abre la suya. Ir directo con `?pestanya=<nom>` hace lo mismo sin
+ * el clic.
  */
 const NOMS_PESTANYA = {
   dades: /^Dades de l’entitat|^Datos de la entidad/,
-  contacte: /^Contacte i accés|^Contacto y acceso/,
+  // «Contacte» a secas en la ficha del actor («La meva organització»).
+  contacte: /^Contacte|^Contacto/,
   operativa: /^Operativa/,
   diagnostic: /^Diagnòstic i perfil|^Diagnóstico y perfil/,
   documentacio: /^Documentaci[óo]/,

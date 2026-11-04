@@ -14,13 +14,19 @@
 // ⚠️ EL TIPO LLEGA POR PROP, NO SE DEDUCE, y la pestaña lleva `key`: con doble rol React
 // reutilizaría la instancia y conservaría el estado de la otra ficha (ver `LaMevaOrganitzacio`).
 //
+// PESTAÑAS (04-11-2026, como la ficha del equipo y la Taula mestra 1.3): Dades de l'entitat
+// (identidad, dirección y rol) · Contacte (persona, teléfonos, canal preferido) · Operativa (lo
+// del papel: explotación y lugares de recogida, o la recepción). Todas montadas y ocultas las que
+// no tocan, así que «Desar» guarda lo de todas; un error salta a su pestaña; la activa va en
+// `?pestanya=`.
+//
 // El canal preferido vive en `organizaciones` (`CanalPreferit`, RPC `actualizar_meu_canal`).
 // Las preferencias de recepción (modalidades, perfil del tipo) se editan en «El meu perfil
 // de recepció» (`PerfilRecepcio`): aquí solo el puntero, para que no haya dos formularios
 // del mismo dato.
 
-import { useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { useEffect, useMemo, useState, type ReactNode } from 'react'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
@@ -38,17 +44,40 @@ import LlocsRecollida from '../components/LlocsRecollida'
 import RolRedestina from '../components/RolRedestina'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type Fila = Record<string, unknown>
 
-/** Los bloques que ve el actor, en orden, con su título. */
-const BLOCS_ACTOR: { bloc: Bloc; titolKey: string; ajudaKey?: string }[] = [
-  { bloc: 'identitat', titolKey: 'org.sec_identitat' },
-  { bloc: 'contacte', titolKey: 'org.sec_contacte' },
-  { bloc: 'adreca', titolKey: 'org.sec_adreca' },
-  { bloc: 'ofertant', titolKey: 'ef.sec_ofertant' },
-  { bloc: 'receptor', titolKey: 'ef.sec_receptor' },
+const PESTANYES = ['dades', 'contacte', 'operativa'] as const
+type Pestanya = typeof PESTANYES[number]
+const ETIQUETA_PESTANYA: Record<Pestanya, string> = {
+  dades: 'ef.tab_dades', contacte: 'org.tab_contacte', operativa: 'ef.tab_operativa',
+}
+
+/** Los bloques que ve el actor, con su título y su pestaña. */
+const BLOCS_ACTOR: { bloc: Bloc; titolKey: string; pestanya: Pestanya }[] = [
+  { bloc: 'identitat', titolKey: 'org.sec_identitat', pestanya: 'dades' },
+  { bloc: 'adreca', titolKey: 'org.sec_adreca', pestanya: 'dades' },
+  { bloc: 'contacte', titolKey: 'org.sec_contacte', pestanya: 'contacte' },
+  { bloc: 'ofertant', titolKey: 'ef.sec_ofertant', pestanya: 'operativa' },
+  { bloc: 'receptor', titolKey: 'ef.sec_receptor', pestanya: 'operativa' },
 ]
+const PESTANYA_DE_BLOC = new Map<Bloc, Pestanya>(BLOCS_ACTOR.map((b) => [b.bloc, b.pestanya]))
+
+/** Una sección de una pestaña, con la raya de separación salvo la primera. */
+function Seccio({ titol, ajuda, children, testid }: { titol?: string; ajuda?: string; children: ReactNode; testid?: string }) {
+  return (
+    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
+      {titol && (
+        <div>
+          <h3 className="text-base font-semibold">{titol}</h3>
+          {ajuda && <p className="mt-1 text-sm text-muted-foreground">{ajuda}</p>}
+        </div>
+      )}
+      {children}
+    </section>
+  )
+}
 
 /** Lo que se edita en «El meu perfil de recepció», no aquí. */
 const A_PERFIL_RECEPCIO = new Set(['modalitats_interes'])
@@ -81,6 +110,18 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const telefon = String(valors.telefon ?? '').trim()
   const correu = String(valors.email ?? '').trim()
   const tipusReceptor = tipus === 'entidad' ? String(valors.tipo_receptor ?? '') : ''
+
+  // La pestaña activa, en la URL (como en la ficha del equipo).
+  const [params, setParams] = useSearchParams()
+  const enUrl = params.get('pestanya')
+  const pestanya: Pestanya = (PESTANYES as readonly string[]).includes(enUrl ?? '') ? enUrl as Pestanya : 'dades'
+  function triaPestanya(p: Pestanya) {
+    setParams((prev) => {
+      const n = new URLSearchParams(prev)
+      if (p === 'dades') n.delete('pestanya'); else n.set('pestanya', p)
+      return n
+    }, { replace: true })
+  }
 
   // El catálogo de actividades (fase 7): solo las que aplican a este papel.
   const [activitats, setActivitats] = useState<TipusActivitat[]>([])
@@ -161,7 +202,18 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     setErrors(nous)
     if (Object.keys(nous).length > 0) {
       toast.error(t('org.fix_errors'))
-      document.getElementById(`po-${tipus}-${Object.keys(nous)[0]}`)?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      // El primer error puede estar en otra pestaña: se salta a ella y, ya visible, se enseña.
+      const primer = Object.keys(nous)[0]
+      const bloc = camps.find((c) => c.clau === primer)?.bloc
+      triaPestanya((bloc && PESTANYA_DE_BLOC.get(bloc)) ?? 'dades')
+      let intents = 0
+      const enfoca = () => {
+        const el = document.getElementById(`po-${tipus}-${primer}`)
+        if (el && el.offsetParent === null && intents++ < 30) { requestAnimationFrame(enfoca); return }
+        el?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        el?.focus({ preventScroll: true })
+      }
+      requestAnimationFrame(enfoca)
       return
     }
 
@@ -225,60 +277,69 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
           </Button>
         )}
       </CardHeader>
-      <CardContent className="space-y-8">
-        {BLOCS_ACTOR.map((b) => {
-          const del = camps.filter((c) => c.bloc === b.bloc)
-          if (del.length === 0) return null
-          return (
-            <section key={b.bloc} className="space-y-3" data-testid={`po-${tipus}-${b.bloc}`}>
-              <h3 className="text-base font-semibold">{t(b.titolKey)}</h3>
-              <BlocCamps camps={del} valors={valors} onChange={setCamp} veu="tots" potEditar={potEditar}
-                errors={errors} idPrefix={`po-${tipus}`} activitats={activitats}
-                // Hay fichas con el nombre de la organización en `name` y `empresa` vacío: se
-                // sugiere, sin escribirlo, para que no parezca que no hay.
-                placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
-              {/* El tipo de receptor decide qué ofertas ve: lo fija el equipo, y se dice. */}
-              {b.bloc === 'identitat' && tipus === 'entidad' && (
-                <p className="text-sm text-muted-foreground">
-                  {t('org.tipus_receptor', { x: tipusReceptor ? t(`org.tr_${tipusReceptor}`) : '—' })}
-                </p>
-              )}
-            </section>
-          )
-        })}
-
-        {/* Las preferencias de recepción y las condiciones del tipo se editan en «El meu perfil
-            de recepció»: aquí solo el puntero, para que no haya dos formularios del mismo dato. */}
-        {tipus === 'entidad' && (
-          <p className="border-t border-border pt-6 text-sm text-muted-foreground">
-            {t('precep.a_la_fitxa')}{' '}
-            <Link to="/organitzacio/perfil-recepcio" className="font-medium text-primary underline-offset-4 hover:underline">
-              {t('precep.card_go')}
-            </Link>
-          </p>
-        )}
-
-        <section className="space-y-3 border-t border-border pt-6">
-          <div>
-            <h3 className="text-base font-semibold">{t('org.sec_rol')}</h3>
-            <p className="mt-1 text-sm text-muted-foreground">{t('org.h_rol')}</p>
+      <CardContent>
+        <Tabs value={pestanya} onValueChange={(v) => triaPestanya(v as Pestanya)}>
+          <div className="min-w-0 overflow-x-auto pb-1">
+            <TabsList variant="line" className="w-max">
+              {PESTANYES.map((p) => <TabsTrigger key={p} value={p}>{t(ETIQUETA_PESTANYA[p])}</TabsTrigger>)}
+            </TabsList>
           </div>
-          <RolRedestina tipus={tipus} fitxaId={organitzacio.id} potEditar={potEditar} />
-        </section>
+          {PESTANYES.map((p) => (
+            // Montadas todas: lo escrito en una pestaña sigue ahí al volver, y «Desar» lo guarda.
+            <TabsContent key={p} value={p} forceMount className="space-y-6 pt-4 data-[state=inactive]:hidden">
+              {BLOCS_ACTOR.filter((b) => b.pestanya === p).map((b) => {
+                const del = camps.filter((c) => c.bloc === b.bloc)
+                if (del.length === 0) return null
+                return (
+                  <Seccio key={b.bloc} titol={t(b.titolKey)} testid={`po-${tipus}-${b.bloc}`}>
+                    <BlocCamps camps={del} valors={valors} onChange={setCamp} veu="tots" potEditar={potEditar}
+                      errors={errors} idPrefix={`po-${tipus}`} activitats={activitats}
+                      // Hay fichas con el nombre de la organización en `name` y `empresa` vacío: se
+                      // sugiere, sin escribirlo, para que no parezca que no hay.
+                      placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
+                    {/* El tipo de receptor decide qué ofertas ve: lo fija el equipo, y se dice. */}
+                    {b.bloc === 'identitat' && tipus === 'entidad' && (
+                      <p className="text-sm text-muted-foreground">
+                        {t('org.tipus_receptor', { x: tipusReceptor ? t(`org.tr_${tipusReceptor}`) : '—' })}
+                      </p>
+                    )}
+                  </Seccio>
+                )
+              })}
 
-        {tipus === 'productor' && (
-          <section className="space-y-3 border-t border-border pt-6">
-            <div>
-              <h3 className="text-base font-semibold">{t('org.sec_llocs')}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t('org.h_llocs')}</p>
-            </div>
-            <LlocsRecollida productorId={organitzacio.id} potEditar={potEditar} idPrefix="org-lloc" />
-          </section>
-        )}
+              {p === 'dades' && (
+                <Seccio titol={t('org.sec_rol')} ajuda={t('org.h_rol')}>
+                  <RolRedestina tipus={tipus} fitxaId={organitzacio.id} potEditar={potEditar} />
+                </Seccio>
+              )}
 
-        <section className="border-t border-border pt-6">
-          <CanalPreferit canal={canal} onChange={setCanal} potEditar={potEditar} telefon={telefon} correu={correu} />
-        </section>
+              {p === 'contacte' && (
+                <Seccio>
+                  <CanalPreferit canal={canal} onChange={setCanal} potEditar={potEditar} telefon={telefon} correu={correu} />
+                </Seccio>
+              )}
+
+              {p === 'operativa' && tipus === 'productor' && (
+                <Seccio titol={t('org.sec_llocs')} ajuda={t('org.h_llocs')}>
+                  <LlocsRecollida productorId={organitzacio.id} potEditar={potEditar} idPrefix="org-lloc" />
+                </Seccio>
+              )}
+
+              {/* Las preferencias de recepción y las condiciones del tipo se editan en «El meu
+                  perfil de recepció»: aquí solo el puntero, para que no haya dos formularios. */}
+              {p === 'operativa' && tipus === 'entidad' && (
+                <Seccio>
+                  <p className="text-sm text-muted-foreground">
+                    {t('precep.a_la_fitxa')}{' '}
+                    <Link to="/organitzacio/perfil-recepcio" className="font-medium text-primary underline-offset-4 hover:underline">
+                      {t('precep.card_go')}
+                    </Link>
+                  </p>
+                </Seccio>
+              )}
+            </TabsContent>
+          ))}
+        </Tabs>
       </CardContent>
     </Card>
   )

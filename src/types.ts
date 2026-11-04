@@ -165,6 +165,9 @@ export interface EntitatLlistat {
   /** La nota interna más reciente (1F, `notes_internes`); null para quien no es del equipo. */
   darrer_contacte_at: string | null
   darrer_contacte_canal: string | null
+  /** Próximas acciones sin hacer (Taula mestra 1.5, 20270504100000) y la fecha más próxima. */
+  seguiments_pendents: number
+  propera_seguiment: string | null
 }
 
 /** Estado de la cuenta de una organización, derivado de `membresias` (1A). */

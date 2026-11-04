@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join, dirname } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { CANALS_NOTA, MAX_TEXT_NOTA, dataPerEnviar, faTemps, textValid } from '../src/lib/notesInternes'
+import {
+  CANALS_NOTA, MAX_ACCIO, MAX_TEXT_NOTA, TIPUS_NOTA, dataPerEnviar, estatSeguiment, faTemps, seguimentPerEnviar, textValid,
+} from '../src/lib/notesInternes'
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..')
 
@@ -48,7 +50,34 @@ describe('textValid', () => {
   })
 })
 
+describe('estatSeguiment', () => {
+  it('vencido, hoy, previsto y hecho (por días de calendario)', () => {
+    expect(estatSeguiment('2026-11-01', '2026-11-04', false)).toBe('vencut')
+    expect(estatSeguiment('2026-11-04', '2026-11-04', false)).toBe('avui')
+    expect(estatSeguiment('2026-11-10', '2026-11-04', false)).toBe('previst')
+    expect(estatSeguiment('2026-11-01', '2026-11-04', true)).toBe('fet')
+  })
+})
+
+describe('seguimentPerEnviar', () => {
+  it('las dos cosas o ninguna', () => {
+    expect(seguimentPerEnviar('  ', '')).toBeNull()
+    expect(seguimentPerEnviar('Trucar', '')).toBe('incompleta')
+    expect(seguimentPerEnviar('', '2026-11-10')).toBe('incompleta')
+    expect(seguimentPerEnviar(' Trucar ', '2026-11-10')).toEqual({ accio: 'Trucar', data: '2026-11-10' })
+  })
+})
+
 describe('el vocabulario coincide con la base', () => {
+  it('TIPUS_NOTA y MAX_ACCIO son los de 20270504100000', () => {
+    const sql = readFileSync(join(RAIZ, 'supabase/migrations/20270504100000_crm_seguiments_i_estat_org.sql'), 'utf-8')
+    const lista = `(${TIPUS_NOTA.map((c) => `'${c}'`).join(', ')})`
+    expect(sql).toContain(`tipus in ${lista}`)
+    expect(sql).toContain(`'seguiment') not in ${lista}`)
+    expect(sql).toContain(`between 1 and ${MAX_ACCIO}`)
+    expect(sql).toContain(`> ${MAX_ACCIO}`)
+  })
+
   it('CANALS_NOTA es el CHECK de notes_internes.canal y el de la RPC', () => {
     const sql = readFileSync(join(RAIZ, 'supabase/migrations/20270502100000_notes_internes.sql'), 'utf-8')
     const lista = `(${CANALS_NOTA.map((c) => `'${c}'`).join(', ')})`

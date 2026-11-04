@@ -1,7 +1,8 @@
-// El bloque «Rols a REDESTINA» de la ficha del EQUIPO (1C): qué papeles tiene la organización,
-// el estado de cada uno, y las acciones de la 1A —activar o desactivar un papel
-// (`activar_fitxa` / `desactivar_fitxa`), añadir el otro (`afegir_paper_org_equip`) y
-// desactivar la organización entera (`desactivar_organitzacio`, D7)—.
+// El bloque «Estat i papers» de la ficha del EQUIPO (1C; en «Gestió interna» desde el
+// 04-11-2026): primero el estado GLOBAL de la entidad —activar o desactivar todos sus papeles a
+// la vez (`activar_organitzacio` / `desactivar_organitzacio`, D7)—, y debajo cada papel por
+// separado —activar o desactivar uno (`activar_fitxa` / `desactivar_fitxa`) y añadir el otro
+// (`afegir_paper_org_equip`)—.
 //
 // `activo` NO es un campo del formulario a propósito (deuda §12.147): se cambia aquí, por
 // RPC, con quién y cuándo en `fitxa_estat_hist`; el alta no lo manda y la columna toma su
@@ -75,6 +76,10 @@ export default function BlocRols({ org, potAprovar, onCanviat }: {
     await crida('desactivar_organitzacio', { p_org: org.id }, 'ef.estat_canviat')
   }
 
+  // Sin confirmación: activar no quita nada, y si a una ficha le falta el NIF o la razón social
+  // el trigger corta todo y lo dice.
+  const activaTot = () => crida('activar_organitzacio', { p_org: org.id }, 'ef.estat_canviat')
+
   function fila(paper: Paper, id: string | null, actiu: boolean | null) {
     const te = id !== null
     const rolKey = paper === 'productor' ? 'ef.paper_ofertant' : 'ef.paper_receptor'
@@ -102,21 +107,46 @@ export default function BlocRols({ org, potAprovar, onCanviat }: {
     )
   }
 
-  const algunActiu = Boolean(org.productor_activo) || Boolean(org.entidad_activo)
+  // Los papeles que tiene y cómo están: la entidad está activa si lo está alguno (D7), y «en
+  // part» si con doble rol uno está activo y el otro no.
+  const estats = [
+    org.productor_id ? Boolean(org.productor_activo) : null,
+    org.entidad_id ? Boolean(org.entidad_activo) : null,
+  ].filter((x): x is boolean => x !== null)
+  const algunActiu = estats.some(Boolean)
+  const algunInactiu = estats.some((x) => !x)
 
   return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">{t('ef.h_rols')}</p>
-      {fila('productor', org.productor_id, org.productor_activo)}
-      {fila('entidad', org.entidad_id, org.entidad_activo)}
-      {algunActiu && org.productor_id && org.entidad_id && (
-        <div className="pt-1">
-          <BotoAmbMotiu variant="ghost" size="sm" className="text-destructive" disabled={ocupat || !potAprovar} motiu={motiu}
-            onClick={() => void desactivaTot()}>
-            {t('ef.desactiva_org')}
-          </BotoAmbMotiu>
+    <div className="space-y-5">
+      <div className="space-y-2" data-testid="estat-entitat">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="min-w-28 font-medium">{t('ef.estat_entitat')}</span>
+          <Badge className={algunActiu ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'} data-testid="estat-entitat-badge">
+            {t(!algunActiu ? 'ef.estat_inactiva' : algunInactiu ? 'ef.estat_parcial' : 'ef.estat_activa')}
+          </Badge>
+          <span className="flex-1" />
+          {algunInactiu && (
+            <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !potAprovar} motiu={motiu}
+              onClick={() => void activaTot()}>
+              {t('ef.activa_org')}
+            </BotoAmbMotiu>
+          )}
+          {algunActiu && (
+            <BotoAmbMotiu variant="outline" size="sm" className="text-destructive" disabled={ocupat || !potAprovar} motiu={motiu}
+              onClick={() => void desactivaTot()}>
+              {t('ef.desactiva_org')}
+            </BotoAmbMotiu>
+          )}
         </div>
-      )}
+        <p className="text-sm text-muted-foreground">{t('ef.h_estat_entitat')}</p>
+      </div>
+
+      <div className="space-y-3 border-t border-border pt-4">
+        <p className="text-sm font-medium">{t('ef.per_paper')}</p>
+        <p className="text-sm text-muted-foreground">{t('ef.h_rols')}</p>
+        {fila('productor', org.productor_id, org.productor_activo)}
+        {fila('entidad', org.entidad_id, org.entidad_activo)}
+      </div>
       {dialeg}
     </div>
   )

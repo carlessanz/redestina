@@ -9,8 +9,37 @@
 export const CANALS_NOTA = ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] as const
 export type CanalNota = (typeof CANALS_NOTA)[number]
 
+/** El CHECK de `notes_internes.tipus` (Taula mestra 1.5, 20270504100000), en el orden del desplegable. */
+export const TIPUS_NOTA = ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] as const
+export type TipusNota = (typeof TIPUS_NOTA)[number]
+
 /** El tope de la RPC (`nota_massa_llarga`). */
 export const MAX_TEXT_NOTA = 2000
+
+/** El tope de la próxima acción (`propera_accio_massa_llarga`). */
+export const MAX_ACCIO = 500
+
+/**
+ * Cómo va un seguimiento (la próxima acción de una nota): `fet` si se dio por hecho, y si no,
+ * `vencut` (la fecha ya pasó), `avui` o `previst`. Por días de calendario: `data` y `avui` son
+ * `AAAA-MM-DD`, que se comparan como texto.
+ */
+export function estatSeguiment(data: string, avui: string, fet: boolean): 'fet' | 'vencut' | 'avui' | 'previst' {
+  if (fet) return 'fet'
+  if (data < avui) return 'vencut'
+  return data === avui ? 'avui' : 'previst'
+}
+
+/**
+ * La próxima acción que se manda con la nota: las dos cosas o ninguna (la RPC rechaza una sin
+ * la otra). `null` = sin seguimiento; `'incompleta'` = falta una de las dos.
+ */
+export function seguimentPerEnviar(accio: string, data: string): { accio: string; data: string } | null | 'incompleta' {
+  const a = accio.trim()
+  if (!a && !data) return null
+  if (!a || !/^\d{4}-\d{2}-\d{2}$/.test(data)) return 'incompleta'
+  return { accio: a, data }
+}
 
 /**
  * «Fa 3 dies»: la clave i18n y el número, por días de calendario LOCALES (una nota de ayer a

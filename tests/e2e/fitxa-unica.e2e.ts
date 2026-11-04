@@ -70,6 +70,8 @@ test('las rutas de antes de 1C redirigen al listado y a la organización', async
   await page.waitForURL((u) => u.pathname === `/equip/entitats/${org}`)
   await page.goto(`/equip/entitats/${ent}`)
   await page.waitForURL((u) => u.pathname === `/equip/entitats/${org}`)
+  // El estado y los papeles viven en «Gestió interna» (04-11-2026).
+  await pestanya(page, 'intern')
   await expect(page.getByTestId('bloc-rols')).toBeVisible()
 })
 
@@ -78,7 +80,7 @@ test('la ficha única enseña los dos papeles y un campo común se escribe en la
   sql(`update productores set telefono_alt = null where id = '${prod}'`)
   sql(`update entidades set telefono2 = null where id = '${ent}'`)
   await entra(page, 'super_admin')
-  await page.goto(`/equip/entitats/${org}`)
+  await page.goto(`/equip/entitats/${org}?pestanya=intern`)
   await expect(page.getByTestId('rols-productor')).toBeVisible()
   await expect(page.getByTestId('rols-entidad')).toBeVisible()
   // Una pestaña por apartado (Taula mestra 1.3): lo de cada papel en «Operativa».
@@ -104,7 +106,9 @@ test('1.6: el actor ve lo que cambió el equipo, no ve la gestión interna, y lo
   await page.goto('/organitzacio')
   await expect(page.locator('#po-entidad-telefon2')).toHaveValue(TEL)
   await expect(page.getByTestId('bloc-intern')).toHaveCount(0)
+  await pestanya(page, 'operativa')
   await expect(page.getByTestId('po-entidad-receptor')).toBeVisible()
+  await pestanya(page, 'dades')
   await page.locator('#po-entidad-direccion').fill('Carrer de la Prova, 16')
   await page.getByRole('button', { name: /^Desar$|^Guardar$/ }).first().click()
   await expect(page.getByText(/Canvis desats|Cambios guardados/).first()).toBeVisible()

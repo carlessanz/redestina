@@ -1792,6 +1792,7 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
     receptor») y con el subtítulo que dice que lo que emite Redestina está arriba.
   - **Gestió interna**: `NotesInternes` arriba · campos internos · `Consentiments` ·
     `EnllacOrganitzacio` · «Esborra l'entitat» al final.
+    *(04-11-2026: «Estat i papers» —`BlocRols`— pasó aquí desde Dades, arriba del todo; ver abajo.)*
   Con un solo papel, lo del otro no sale. Todas las pestañas van **montadas** (`forceMount` +
   `data-[state=inactive]:hidden`): lo escrito sigue al cambiar de pestaña y «Desa» guarda lo de todas.
   `PESTANYA_DE_BLOC` dice dónde cae cada bloque de `campsFitxa`; con él, un **punto** (`bg-aviso`,
@@ -1838,3 +1839,32 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
 - **Errores**: `entitat_inactiva`, `falta_nif`, `falta_rao_social` (y los ya existentes `nif_invalid`,
   `ja_te_paper`) tienen clave en `textError.ts`; `clauErrorInteres()` reconoce `entitat_inactiva`.
 - E2E: `tests/e2e/entitats-estat.e2e.ts` (7 pruebas, clon y escritorio; deja las fichas como estaban).
+
+### Gestió interna completa y «La meva organització» por pestañas (04-11-2026)
+
+Lo que pidió Carles al ver las pestañas del 03-11:
+
+- **Sin contador en Documentació** («no hace falta que esté»): se quitaron los `onCompte` de
+  `AlbaransFitxa` y `DocumentacioOrganitzacio`. El de notas en Gestió interna se queda.
+- **Estado global de la entidad, en Gestió interna** (`components/fitxa/BlocRols.tsx`, sección
+  «Estat i papers», `data-testid="bloc-rols"`): arriba «Estat de l'entitat» (Activa · Activa en part ·
+  Inactiva; `estat-entitat-badge`) con **«Activa l'entitat»** (`activar_organitzacio`, sin confirmación:
+  no quita nada) si algún papel está inactivo y **«Desactiva l'entitat»** (`desactivar_organitzacio`,
+  con confirmación) si alguno está activo —también con un solo papel—; debajo, «Per paper», las filas de
+  siempre (`rols-productor`/`rols-entidad`). `PESTANYA_DE_BLOC.rols = 'intern'`.
+- **CRM completo (Taula mestra 1.5)** en `NotesInternes`: resumen arriba (`crm-resum`: «Darrera
+  interacció» y «Seguiments pendents (n)», ordenados por fecha, con la fecha en color —vençut
+  `error`, avui `aviso`— y **«Fet»** → `tancar_seguiment`); formulario en rejilla (tipo, canal, fecha,
+  responsable —las cuentas con fila en `usuario_roles`, por defecto quien escribe—, nota en `Textarea`,
+  próxima acción y «Per a quan»; las dos o ninguna, `seguimentPerEnviar()`); hilo con chip de tipo,
+  «Responsable: …» si no es el autor y la próxima acción con su estado. El autor sin nombre sale con su
+  correo. `lib/notesInternes.ts` suma `TIPUS_NOTA`, `MAX_ACCIO`, `estatSeguiment()` y
+  `seguimentPerEnviar()` (con paridad con el SQL en `tests/notesInternes.test.ts`).
+- **Listado «Entitats»**: chip «Seguiment vençut» junto al nombre, «Propera acció: dd/mm/aaaa (+n)» bajo
+  el último contacto y filtro «Seguiment» (vençut · per avui · pendent · sense), `seguimentDe()`.
+- **«La meva organització» (`PerfilOrganitzacio`) en tres pestañas**, con el mismo patrón (montadas,
+  `?pestanya=`, salto al primer error): **Dades de l'entitat** (Identitat · Adreça · Rol a REDESTINA) ·
+  **Contacte** (contacto · canal preferido) · **Operativa** (Com a ofertant + llocs de recollida, o Com a
+  receptor + el enlace a «El meu perfil de recepció»). La tarjeta de diagnóstico sigue encima, fuera.
+- E2E: `crm.e2e.ts` +2 (seguimientos y estado global); `fitxa-unica`, `entitats` abren Gestió interna
+  antes de mirar los papeles; el helper `pestanya()` acepta «Contacte» a secas.

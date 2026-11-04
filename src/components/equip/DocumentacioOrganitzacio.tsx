@@ -50,15 +50,13 @@ function exerciciDe(f: Fila): number {
 }
 
 export default function DocumentacioOrganitzacio({
-  tipusOrg, orgId, nom, titol, onCompte,
+  tipusOrg, orgId, nom, titol,
 }: {
   tipusOrg: 'productor' | 'entidad'
   orgId: string
   nom?: string | null
   /** El rótulo, si no es el de siempre (con doble rol, dice de qué papel es). */
   titol?: string
-  /** Cuántos papeles hay, para el contador de la pestaña de la ficha. */
-  onCompte?: (n: number) => void
 }) {
   const { t } = useT()
   const { ctx } = useAppContext()
@@ -132,8 +130,7 @@ export default function DocumentacioOrganitzacio({
     totes.sort((a, b) => (a.fecha ?? a.created_at) < (b.fecha ?? b.created_at) ? 1 : -1)
     setFiles(totes)
     setCarregant(false)
-    onCompte?.(totes.length)
-  }, [orgId, tipusOrg, onCompte])
+  }, [orgId, tipusOrg])
 
   useEffect(() => { void carrega() }, [carrega])
 

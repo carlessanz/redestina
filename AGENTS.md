@@ -175,12 +175,11 @@ inactiva no entra en el Mercat (`modalitats_compatibles_meves()`; la rama de his
 en `priorizar-entidades`, ni en los selectores del equipo, y `comprova_interes()` la rechaza con
 `entitat_inactiva`. **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva (P6) pero
 sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146). **1C (`20270501200000`)**:
-vista `v_entitats_llistat` (`security_invoker`, una fila por organización: lo de `v_organizaciones`
-más `es_test`, `rebutjada`, `modalitats_interes`, `conveni_productor/entitat` y
-`darrera_activitat`) para el listado «Entitats». **1F (`20270502100000`)**: `notes_internes`
-(CRM D4: organización en cascada, `data`, `canal`, `autor`, `text` ≤2.000): solo inserción por
-RPC, sin UPDATE; lectura `es_intern()` (un externo, 0
-filas sin error); la vista suma `darrer_contacte_at/_canal`.
+vista `v_entitats_llistat` (`security_invoker`, una fila por organización, columnas en el
+detalle) para el listado «Entitats». **1F + 1.5 (`20270502100000`, `20270504100000`)**:
+`notes_internes` (CRM: `data`, `canal`, `tipus`, `autor`, `responsable`, `text`, `propera_accio`,
+`propera_data`, `seguiment_fet_at`): solo por RPC; lectura `es_intern()` (externo: 0 filas,
+sin error); la vista suma el último contacto y los seguimientos pendientes.
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
@@ -293,10 +292,10 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
   `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` (1B, `es_intern()`: NIF válido, razón social y
   `tipo_receptor`), `activar_/desactivar_fitxa`,
-  `desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
+  `activar_/desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
   `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
-  `afegir_nota_interna` (`es_intern()` con sesión, autor `auth.uid()`), `esborrar_nota_interna`
+  `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); y las de cierre y certificados, diagnóstico y
   plan, equipo, interruptores y jobs (solo `service_role`), con su nombre, en el detalle (§4bis, «Familias»).
@@ -394,8 +393,8 @@ Lo que manda hoy, en una línea cada uno:
   (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` lo cruza con el SQL). `EntitatDetall`
   (`/equip/entitats/:orgId`, `ample`) pinta una ficha por organización en **seis pestañas**
   (Dades · Contacte i accés · Operativa · Diagnòstic i perfil · Documentació por tipo · Gestió
-  interna; `?pestanya=`) y guarda **solo lo que cambia**, en las dos fichas si es común. `PerfilOrganitzacio` pinta los
-  mismos bloques con `veu: tots` por sus RPC (P5). Listado `Entitats` sobre
+  interna, con el estado global y por papel; `?pestanya=`) y guarda **solo lo que cambia**. `PerfilOrganitzacio`
+  pinta los mismos bloques con `veu: tots` por sus RPC (P5), en tres pestañas. Listado `Entitats` sobre
   `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`.
 - **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).
   1 «Qui és?»: `cerca_entitats` al teclear → una inactiva se activa (NIF y razón social si faltan), una
@@ -404,9 +403,9 @@ Lo que manda hoy, en una línea cada uno:
 - **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
   (`fitxa/AccesEntitat`, `lib/accesEntitat.ts`: estado, dar, reenviar y desactivar, con motivo) o con
   la casilla de «Nova entitat» (si falla, el alta se queda).
-- **Notas internas (1F)**: «Gestió interna» de `EntitatDetall` (`fitxa/NotesInternes`,
-  `lib/notesInternes.ts`): una línea para añadir y el hilo con lo último arriba, sin edición;
-  borra el super_admin. «Darrer contacte» en el listado.
+- **CRM (1F + Taula mestra 1.5)**: «Gestió interna» (`fitxa/NotesInternes`, `lib/notesInternes.ts`):
+  última interacción, seguimientos pendientes con «Fet», formulario (tipo, canal, fecha, responsable,
+  nota, próxima acción) e hilo sin edición; borra el super_admin; el listado marca lo vencido.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -446,7 +445,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270503100000`.
+  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270504100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -617,12 +616,12 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.617 pruebas de Vitest en 69
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.622 pruebas de Vitest en 69
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.711/1.711 y 31 sin datos (tras 1F, +36; igual con el ARA 2026 cargado, 1E); producción 1.717/1.717 y 25
-   (tras 1F; la diferencia son datos). «Sin fallos de permisos».** Una
+   **Referencia: clon 1.730/1.730 y 30 sin datos (igual con el ARA 2026 cargado, 1E); producción 1.735/1.735 y 25
+   (la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

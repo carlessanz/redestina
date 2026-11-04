@@ -65,6 +65,14 @@ const CODIS: Record<string, string> = {
   cal_nom: 'org.err_cal_nom',
   // Las notas internas (plan 1, 1F, `afegir_nota_interna()` / `esborrar_nota_interna()`).
   canal_nota_desconegut: 'ni.err_canal',
+  // Los seguimientos (Taula mestra 1.5, 20270504100000). `propera_accio_massa_llarga` antes que
+  // `nota_massa_llarga` por si acaso (no lo contiene, pero se parecen).
+  tipus_nota_desconegut: 'ni.err_tipus',
+  responsable_no_equip: 'ni.err_responsable',
+  propera_accio_sense_data: 'ni.err_seguiment_incomplet',
+  propera_data_sense_accio: 'ni.err_seguiment_incomplet',
+  propera_accio_massa_llarga: 'ni.err_accio_llarga',
+  nota_sense_seguiment: 'ni.err_sense_seguiment',
   nota_buida: 'ni.err_buida',
   nota_massa_llarga: 'ni.err_massa_llarga',
   nota_futura: 'ni.err_futura',
