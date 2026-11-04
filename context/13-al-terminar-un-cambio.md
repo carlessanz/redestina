@@ -95,7 +95,8 @@
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
    contacto denegado). **Clon, tras el consentimiento por enlace (`20270506100000`, 04-11-2026): 1.759/1.759 y 28 sin datos
-   (total 1.787: +27, las tres RPC nuevas en los nueve perfiles).** **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
+   (total 1.787: +27, las tres RPC nuevas en los nueve perfiles). Producción, tras publicar `414319c` el
+   04-11-2026: 1.764/1.764 y 23 sin datos (mismo total; la diferencia con el clon son datos).** **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
    sin datos (mismo total, 1.760: sin checks nuevos; dos «sin datos» menos por datos del clon).** **Clon, tras 1.5 (`20270504100000`, 04-11-2026): 1.730/1.730 y 30 sin
    datos (total 1.760: +18 de `tancar_seguiment` y `activar_organitzacio`; una «sin datos» menos por las
    notas que dejan las E2E en el clon). Producción, tras publicar `d18f04c` el 04-11-2026 (con 20270503100000 de 1E, que aún no estaba —solo la columna `ref_externa`, sin datos—): 1.737/1.737 y 23 sin datos (mismo total, 1.760; la diferencia con el clon son datos).** Antes, **clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
