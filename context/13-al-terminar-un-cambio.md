@@ -96,7 +96,7 @@
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
    contacto denegado). **Clon, tras 1.5 (`20270504100000`, 04-11-2026): 1.730/1.730 y 30 sin
    datos (total 1.760: +18 de `tancar_seguiment` y `activar_organitzacio`; una «sin datos» menos por las
-   notas que dejan las E2E en el clon). Producción, esperado: 1.735/1.735 y 25.** Antes, **clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
+   notas que dejan las E2E en el clon). Producción, tras publicar `d18f04c` el 04-11-2026 (con 20270503100000 de 1E, que aún no estaba —solo la columna `ref_externa`, sin datos—): 1.737/1.737 y 23 sin datos (mismo total, 1.760; la diferencia con el clon son datos).** Antes, **clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:
    leer e insertar en `notes_internes`, `afegir_nota_interna` y `esborrar_nota_interna` denegadas a las
    siete externas —leer = 0 filas—; el técnico lee, añade con `22023` y no borra ni inserta directo; el
    super_admin lee, añade y borra con `22023`. Las dos lecturas del equipo salen «sin datos» mientras el
