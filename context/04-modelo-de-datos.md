@@ -1239,6 +1239,29 @@ editar y un campo aparte para esos lugares.
 - Datos: `update … set poblacion = poblacion where municipio_ine is null` los pasa por la regla. En el
   clon (con el ARA): 6 + 4 casados, 96 + 15 a `ubicacio`.
 
+### Consentimiento RGPD por enlace y su exportación (`20270506100000`, 04-11-2026)
+
+**Por qué.** Solo había consentimiento si la persona se registraba en `/registre`. Las entidades que da de
+alta el equipo no tenían ninguno, y declararlo el equipo en su nombre (`alta_assistida`) no vale: el
+consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide** y la persona lo **da**.
+
+- `consentiments.user_id` admite nulo; columnas nuevas `email` y `enlace_id` (FK a `enlaces_token`,
+  `on delete set null`); `origen` gana `enllac`. CHECK `consentiments_titular`: o hay cuenta, o es
+  `enllac` con correo (la organización puede quedar nula si se borra la ficha; el correo no).
+- `v_consentiments_vigents` agrupa por persona: la cuenta, o (sin cuenta) organización + correo; suma
+  `email` al final.
+- `enlaces_token`: propósito `consentiment_rgpd` sobre `objeto_tipo = 'organizacion'`.
+- `demanar_consentiment(p_org, p_email)` (equipo, `es_intern()`): correo de la ficha si no se da,
+  `sense_correu`/`organitzacio_desconeguda` (22023); revoca el enlace vivo anterior; caduca a los
+  `caducidad_enlace_dias` (30); devuelve el token en claro, que solo viaja en el correo.
+- `registrar_consentiment_enllac(p_token_hash, p_respostes, p_versio, p_idioma, p_ip, p_user_agent)`
+  (solo `service_role`, la llama `enlace-publico`): `PT404`/`PT409`/`PT410` como los otros enlaces;
+  exige los tres tipos con su huella y la privacidad en `true` (`falta_acceptacio`); inserta las tres
+  filas, una evidencia `confirmacion` y gasta el enlace.
+- `llista_consentiments()` (equipo): el valor vigente por persona y tipo con su correo (el de la
+  cuenta, o el del enlace) y su organización. Lo usa «Entitats › Correus amb consentiment» (CSV con
+  `;` y BOM, solo quien aceptó alguna comunicación; `lib/consentiments.ts`, con test).
+
 ### El listado «Entitats» (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 - **`v_entitats_llistat`** (`security_invoker`): una fila por organización con ficha (las

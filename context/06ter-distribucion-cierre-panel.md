@@ -1881,3 +1881,24 @@ Lo que pidió Carles al ver las pestañas del 03-11:
 - En «La meva organització», la población deducida del código postal también pone su comarca.
 - E2E: `organitzacio.e2e.ts` +1 (el CP elige Barcelona, se cambia a Badalona, el área a Maresme, la
   ubicación «Mercabarna»; una comarca inventada da `comarca_desconeguda`).
+
+### Convenio y consentimiento sin que la entidad entre (04-11-2026, `20270506100000`)
+
+- **Documentació › Convenis** (`components/fitxa/ConveniFitxa`, una por papel, `data-testid`
+  `conveni-productor`/`conveni-entidad`): el estado (`BadgeConveni`) y, mientras no esté vigente ni
+  firmado, tres salidas: **«Envia’l per correu per signar»** (`enviarConveniPerCorreu` de
+  `lib/convenis.ts`: prepara si no lo hay, `enviar_convenio` al correo de la ficha y el correo con
+  la plantilla; la persona firma en `/signar/:token` sin cuenta y el equipo contrafirma), **«Registra
+  un conveni signat en paper»** y **«Dona’l per vigent»** (super_admin; los diálogos de siempre, que
+  antes estaban en el archivo de documentación y se movieron aquí). La campaña de convenios usa el
+  mismo `enviarConveniPerCorreu`.
+- **Gestió interna › Consentiments RGPD** (`components/fitxa/Consentiments`): el equipo ya no marca
+  nada; **«Demana el consentiment per correu»** (`demanarConsentiment`) manda el enlace al correo de la
+  ficha, y debajo se ve el estado de la última petición (enviada, oberta, resposta, caducada). Gris
+  con el motivo si no hay correo o el canal está apagado.
+- **`/consentiment/:token`** (`routes/public/Consentiment.tsx`): la persona lee los textos que manda
+  el servidor y marca; privacidad obligatoria, comunicaciones desmarcadas.
+- **«Entitats › Correus amb consentiment»**: descarga el CSV de quien aceptó alguna comunicación.
+- El «Opt-in (consentiment)» de Gestió interna es **otra cosa**: el permiso de WhatsApp para enviar
+  plantillas (`entidades.opt_in`), no el RGPD.
+

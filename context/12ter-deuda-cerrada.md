@@ -6,7 +6,7 @@
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **86** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
+Las **87** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -114,3 +114,4 @@ se va solo **cómo se llegó hasta aquí**.
 | 145 | `reiniciar_cierre_prueba()` ponía a 0 `P-RES`/`P-CD`/`P-CT` del año aunque otro cierre de prueba conservara sus documentos: la siguiente emisión chocaba con `23505`. Ahora deja el último número vivo | `20270430100400` |
 | 150 | El equipo podía insertar fichas directo por REST (políticas `alta intern`) y saltarse las reglas de `crear_entitat()`: una ficha activa sin NIF | `20270501400000` |
 | 144 | El trigger del NIF hacía fallar las filas de la importación masiva con un NIF mal escrito o repetido | 02-11-2026 (`import-ara-2026.ts`, 1E) |
+| 142 | Los consentimientos RGPD no tenían exportación ni forma de pedirse a quien no se registró | `20270506100000` (export en «Entitats», petición por correo desde la ficha) |

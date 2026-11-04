@@ -21,13 +21,10 @@ import { Download, Loader2, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useTicAvisos } from '../../lib/refrescAvisos'
 import { descarregarDocumentExtern, pujarDocumentExtern } from '../../lib/documents'
 import { dataCurta } from '../../lib/albarans'
 import type { DocumentExternTipus, DocumentoExterno } from '../../types'
-import BotoAmbMotiu from '../proces/BotoAmbMotiu'
-import DialegConveniPaper from './DialegConveniPaper'
-import DialegConveniDeclarat from './DialegConveniDeclarat'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -50,16 +47,19 @@ function exerciciDe(f: Fila): number {
 }
 
 export default function DocumentacioOrganitzacio({
-  tipusOrg, orgId, nom, titol,
+  tipusOrg, orgId, titol,
 }: {
   tipusOrg: 'productor' | 'entidad'
   orgId: string
+  /** Ya no se usa aquí (el convenio en papel se registra desde `ConveniFitxa`); se acepta por compatibilidad. */
   nom?: string | null
   /** El rótulo, si no es el de siempre (con doble rol, dice de qué papel es). */
   titol?: string
 }) {
   const { t } = useT()
-  const { ctx } = useAppContext()
+  // El escaneado de un convenio en papel se registra desde `ConveniFitxa`, que avisa con
+  // `refrescaAvisos()`: con el tic, el archivo lo enseña sin recargar la ficha.
+  const tic = useTicAvisos()
   const fitxerRef = useRef<HTMLInputElement | null>(null)
 
   const [files, setFiles] = useState<Fila[]>([])
@@ -72,17 +72,8 @@ export default function DocumentacioOrganitzacio({
   const [data, setData] = useState('')
   const [fitxer, setFitxer] = useState<File | null>(null)
   const [pujant, setPujant] = useState(false)
-  const [dialeg, setDialeg] = useState(false)
-  const [dialegDeclarat, setDialegDeclarat] = useState(false)
   const [descarregant, setDescarregant] = useState<string | null>(null)
 
-  /**
-   * Registrar un convenio en papel lo exige la RPC (`no_autoritzat`), así que aquí solo se
-   * refleja. Fail-cerrado mientras el contexto no ha llegado (07-10-2026), como el resto
-   * del panel del equipo: quien decide de verdad es la base, y esto es para no enseñar un
-   * botón que va a fallar — no para sustituir la guarda.
-   */
-  const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const carrega = useCallback(async () => {
     setCarregant(true)
@@ -132,7 +123,7 @@ export default function DocumentacioOrganitzacio({
     setCarregant(false)
   }, [orgId, tipusOrg])
 
-  useEffect(() => { void carrega() }, [carrega])
+  useEffect(() => { void carrega() }, [carrega, tic])
 
   async function descarrega(id: string) {
     setDescarregant(id)
@@ -176,7 +167,7 @@ export default function DocumentacioOrganitzacio({
           <CardTitle className="text-base">{titol ?? t('orgdoc.title')}</CardTitle>
           <p className="mt-1 text-sm text-muted-foreground">{t('orgdoc.subtitle')}</p>
         </div>
-        {/* 🔴 `w-full sm:w-auto` en los dos botones, y NO basta con `whitespace-normal`:
+        {/* 🔴 `w-full sm:w-auto` en el botón (y en los del convenio, `ConveniFitxa`), y NO basta con `whitespace-normal`:
             el `Button` de shadcn trae **`shrink-0` de serie** (`ui/button.tsx:8`), así que
             fija su ancho preferido (`max-content`) y no lo deja encoger — medido el
             22-09-2026 a 320 px: «Registra un conveni signat en paper» pedía 264 px dentro
@@ -193,29 +184,6 @@ export default function DocumentacioOrganitzacio({
             <Upload className="mr-1 size-4" aria-hidden />
             {t('orgdoc.upload')}
           </Button>
-          {/* Gris con el motivo, no escondido: quien no puede registrarlo tiene que saber
-              que existe y por qué no le toca a él (§6ter). */}
-          <BotoAmbMotiu
-            size="sm"
-            className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-            disabled={!esSuperAdmin}
-            motiu={t('conv.paper_err_permis')}
-            onClick={() => setDialeg(true)}
-          >
-            {t('conv.paper_open')}
-          </BotoAmbMotiu>
-          {/* Sin papel ni firma: lo da por vigente el super_admin con los datos de la ficha,
-              y el PDF lo dice (gestión autónoma, fase 1). */}
-          <BotoAmbMotiu
-            size="sm"
-            variant="outline"
-            className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-            disabled={!esSuperAdmin}
-            motiu={t('cdecl.need_super')}
-            onClick={() => setDialegDeclarat(true)}
-          >
-            {t('cdecl.open')}
-          </BotoAmbMotiu>
         </div>
       </CardHeader>
 
@@ -381,22 +349,6 @@ export default function DocumentacioOrganitzacio({
         ))}
       </CardContent>
 
-      <DialegConveniPaper
-        obert={dialeg}
-        tipusOrg={tipusOrg}
-        orgId={orgId}
-        nom={nom}
-        onTancar={() => setDialeg(false)}
-        onFet={() => void carrega()}
-      />
-      <DialegConveniDeclarat
-        obert={dialegDeclarat}
-        tipusOrg={tipusOrg}
-        orgId={orgId}
-        nom={nom}
-        onTancar={() => setDialegDeclarat(false)}
-        onFet={() => void carrega()}
-      />
     </Card>
   )
 }

@@ -41,6 +41,7 @@
 //      · `albaran.ts`  — `confirmacion_albaran`: acta, huella, confirmación y aviso
 //      · `factura.ts`  — `subida_factura`
 //      · `convenio.ts` — `firma_convenio`, con su segundo factor
+//      · `consentiment.ts` — `consentiment_rgpd` (04-11-2026): el consentimiento RGPD por correo
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
@@ -61,6 +62,7 @@ import {
 import { confirmarAlbaran, getAlbaran } from "./albaran.ts";
 import { getFactura, subirFactura } from "./factura.ts";
 import { enviarCodi, firmarConvenio, getConvenio, validarCodi } from "./convenio.ts";
+import { getConsentiment, registrarConsentiment } from "./consentiment.ts";
 
 // ---------------------------------------------------------------------------
 Deno.serve(async (req) => {
@@ -136,6 +138,11 @@ async function manejarGet(
   // Fase 2: la página de firma del convenio, que enseña el texto completo antes de firmar.
   if (enlace.proposito === "firma_convenio") {
     return await getConvenio(req, supabase, responder, enlace, ip, t0);
+  }
+
+  // El consentimiento RGPD que el equipo pide por correo (20270506100000).
+  if (enlace.proposito === "consentiment_rgpd") {
+    return await getConsentiment(req, supabase, responder, enlace, ip, t0);
   }
 
   // Cualquier propósito que se añada a `enlaces_token` y todavía no tenga rama: se dice,
@@ -242,6 +249,9 @@ async function manejarPost(
   }
   if (accion === "validar_codi") {
     return await validarCodi(supabase, responder, body, t0);
+  }
+  if (accion === "consentir") {
+    return await registrarConsentiment(req, supabase, responder, body, ip, t0);
   }
   if (accion === "subir_factura") {
     return await subirFactura(req, supabase, responder, body, fichero, ip, t0);

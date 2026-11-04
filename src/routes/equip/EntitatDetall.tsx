@@ -46,7 +46,7 @@ import Consentiments from '../../components/fitxa/Consentiments'
 import AccesEntitat from '../../components/fitxa/AccesEntitat'
 import NotesInternes from '../../components/fitxa/NotesInternes'
 import CampsPerfilReceptor from '../../components/CampsPerfilReceptor'
-import BadgeConveni from '../../components/BadgeConveni'
+import ConveniFitxa from '../../components/fitxa/ConveniFitxa'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import TargetaDiagnostic from '../../components/TargetaDiagnostic'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
@@ -515,13 +515,15 @@ export default function EntitatDetall() {
               {org.productor_id && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t('ef.conveni_ofertant')}</p>
-                  <BadgeConveni tipusOrg="productor" orgId={org.productor_id} conveniPaper={(prod?.conveni as string | null) ?? null} />
+                  <ConveniFitxa tipusOrg="productor" orgId={org.productor_id} nom={nom} correu={correu}
+                    motiuCorreu={motiuEmail} conveniPaper={(prod?.conveni as string | null) ?? null} />
                 </div>
               )}
               {org.entidad_id && (
                 <div className="space-y-2">
                   <p className="text-sm font-medium">{t('ef.conveni_receptor')}</p>
-                  <BadgeConveni tipusOrg="entidad" orgId={org.entidad_id} conveniPaper={(ent?.estat as string | null) ?? null} />
+                  <ConveniFitxa tipusOrg="entidad" orgId={org.entidad_id} nom={nom} correu={correu}
+                    motiuCorreu={motiuEmail} conveniPaper={(ent?.estat as string | null) ?? null} />
                 </div>
               )}
             </Seccio>
@@ -575,7 +577,7 @@ export default function EntitatDetall() {
             </section>
             <Seccio titol={t('ef.sec_intern')} ajuda={t('ef.h_intern')} testid="bloc-intern">
               <BlocCamps {...blocProps} camps={camps('intern')} />
-              <Consentiments organitzacioId={org.id} />
+              <Consentiments organitzacioId={org.id} correu={correu} motiuCorreu={motiuEmail} />
               {/* Con quién comparte organización, que es donde se deshace un enlace equivocado. */}
               <EnllacOrganitzacio tipus={org.productor_id ? 'productor' : 'entidad'}
                 fitxa={org.productor_id ?? org.entidad_id} potAprovar={potAprovar} onCanviat={recarrega} />

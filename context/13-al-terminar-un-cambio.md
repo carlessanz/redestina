@@ -8,8 +8,8 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.623 pruebas en 69 ficheros** de Vitest: 1.622 correctas y **1 saltada a propósito**
-   (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
+   Referencia: **1.628 pruebas en 70 ficheros** de Vitest: 1.627 correctas y **1 saltada a propósito**
+   (04-11-2026, consentimiento por enlace: +5 en `consentiments.test.ts`, nuevo). Antes, **1.623 en 69** (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
    `ni.seg_*` y `el.seg_*`). Antes, **1.617** (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `acc.estat_*`). Antes, **1.560 en 66** (02-11-2026, plan 1 1B: +9 en `novaEntitat.test.ts`, nuevo, y +3 en `campsFitxa.test.ts` por la
@@ -94,7 +94,8 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
+   contacto denegado). **Clon, tras el consentimiento por enlace (`20270506100000`, 04-11-2026): 1.759/1.759 y 28 sin datos
+   (total 1.787: +27, las tres RPC nuevas en los nueve perfiles).** **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
    sin datos (mismo total, 1.760: sin checks nuevos; dos «sin datos» menos por datos del clon).** **Clon, tras 1.5 (`20270504100000`, 04-11-2026): 1.730/1.730 y 30 sin
    datos (total 1.760: +18 de `tancar_seguiment` y `activar_organitzacio`; una «sin datos» menos por las
    notas que dejan las E2E en el clon). Producción, tras publicar `d18f04c` el 04-11-2026 (con 20270503100000 de 1E, que aún no estaba —solo la columna `ref_externa`, sin datos—): 1.737/1.737 y 23 sin datos (mismo total, 1.760; la diferencia con el clon son datos).** Antes, **clon, tras 1F (`20270502100000`): 1.711/1.711 y 31 sin datos (total 1.742; +36:

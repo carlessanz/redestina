@@ -738,3 +738,55 @@ export async function validaCodiFirma(
     return falla('xarxa')
   }
 }
+
+// ---------------------------------------------------------------------------
+// El consentimiento RGPD pedido por correo (`consentiment_rgpd`, 04-11-2026)
+// ---------------------------------------------------------------------------
+// Quien lo abre es la persona de contacto de una organización que dio de alta el equipo.
+// Los textos que se enseñan son los que el servidor hashea: llegan en el GET, en los dos
+// idiomas, y la pantalla pinta el del idioma que tenga puesto.
+
+export interface DadesConsentiment {
+  entitat: string | null
+  versio: string | null
+  caducaAt: string | null
+  textos: Record<'ca' | 'es', Record<TipusRgpd, string>>
+}
+
+export type TipusRgpd = 'privacitat' | 'comunicacions_plataforma' | 'comunicacions_espigoladors'
+
+export async function carregaConsentiment(token: string): Promise<ResultatEnllac<DadesConsentiment>> {
+  const res = await demanaEnllac(token)
+  if (!res.ok) return res
+  if (text(res.data.proposito) !== 'consentiment_rgpd') return falla('proposit_incorrecte')
+  const textos = (res.data.textos ?? {}) as DadesConsentiment['textos']
+  return {
+    ok: true,
+    data: {
+      entitat: text(res.data.entitat),
+      versio: text(res.data.versio),
+      caducaAt: text(res.data.caduca_at),
+      textos,
+    },
+  }
+}
+
+export async function enviaConsentiment(
+  token: string,
+  dades: Record<TipusRgpd, boolean> & { idioma: 'ca' | 'es'; web: string },
+): Promise<ResultatEnllac<{ ok: true }>> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/enlace-publico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ t: token, accion: 'consentir', ...dades }),
+    })
+    if (!res.ok) {
+      const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
+      return falla(codiDe(res.status, cos?.code))
+    }
+    return { ok: true, data: { ok: true } }
+  } catch {
+    return falla('xarxa')
+  }
+}

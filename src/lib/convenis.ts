@@ -404,3 +404,38 @@ export function nomOrganitzacio(
   if (typeof raso === 'string' && raso.trim() !== '') return raso
   return nomFitxa || '—'
 }
+
+/**
+ * Prepara (si no lo hay), acuña el enlace y manda el convenio por correo en un solo paso
+ * (04-11-2026): la campaña de convenios y la ficha de la entidad hacen exactamente esto, y
+ * la persona firma desde el correo sin cuenta (`/signar/:token`). `fase` dice dónde se paró:
+ * con `correu` el enlace ya existe y se puede reenviar desde el detalle del convenio.
+ */
+export async function enviarConveniPerCorreu(args: {
+  tipusOrg: 'productor' | 'entidad'
+  orgId: string
+  tipus: ConvenioTipo
+  email: string | null
+  nom: string | null
+  textos: { assumpte: string; titol: string; preheader: string; cos: string; boto: string; nota: string }
+  idioma: 'ca' | 'es'
+}): Promise<
+  | { ok: true; destinatari: string; simulat: boolean }
+  | { ok: false; fase: 'preparar' | 'enviar'; error: { ok: false; missatge: string; codi: string | null } }
+  | { ok: false; fase: 'correu' }
+> {
+  const prep = await prepararConveni(args.tipusOrg, args.orgId, args.tipus)
+  if (!prep.ok) return { ok: false, fase: 'preparar', error: prep }
+  const env = await enviarConveni(prep.data.id, args.email)
+  if (!env.ok) return { ok: false, fase: 'enviar', error: env }
+  const destinatari = env.data.enllac.destinatari ?? args.email ?? ''
+  const correu = await enviarCorreuConveni({
+    email: destinatari,
+    nom: env.data.enllac.nom ?? args.nom,
+    token: env.data.enllac.token,
+    ...args.textos,
+    idioma: args.idioma,
+  })
+  if (!correu.ok) return { ok: false, fase: 'correu' }
+  return { ok: true, destinatari, simulat: correu.simulat }
+}

@@ -36,8 +36,8 @@ test('el super_admin dona per vigent el conveni d’una receptora des de la seva
 
   await entra(page, 'super_admin')
   await page.goto(`/equip/entitats/${ent}?pestanya=documentacio`)
-  // En el archivo de su papel de receptora: con doble rol, el primero sería el de ofertante.
-  await page.getByTestId('doc-entidad').getByRole('button', { name: /Dona’l per vigent|Dalo por vigente/ }).click()
+  // En el convenio de su papel de receptora (Documentació › Convenis): con doble rol hay dos.
+  await page.getByTestId('conveni-entidad').getByRole('button', { name: /Dona’l per vigent|Dalo por vigente/ }).click()
   const dialeg = page.getByRole('dialog')
   await expect(dialeg).toBeVisible()
   await dialeg.locator('#cdecl-signant').fill('Persona E2E')

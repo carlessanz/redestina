@@ -12,7 +12,8 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Eye, Mail, MessageCircle, Plus } from 'lucide-react'
+import { Download, Eye, Mail, MessageCircle, Plus } from 'lucide-react'
+import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
@@ -24,6 +25,8 @@ import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { avuiLocal, dataCurta } from '../../lib/format'
 import { estatSeguiment, faTemps } from '../../lib/notesInternes'
+import { ambComunicacions, csvConsentiments, filesExport, llistaConsentiments } from '../../lib/consentiments'
+import { descarregarText } from '../../lib/tancament'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoIcona from '../../components/BotoIcona'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
@@ -58,6 +61,7 @@ export default function Entitats() {
   const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
   const [files, setFiles] = useState<EntitatLlistat[]>([])
   const [loading, setLoading] = useState(true)
+  const [exportant, setExportant] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [unanswered, setUnanswered] = useState<Record<string, number>>({})
   const { cerca, setCerca, q } = useCerca()
@@ -267,6 +271,21 @@ export default function Entitats() {
 
   const vacio = !loading && !error && test.length === 0 && resto.length === 0
 
+  async function exportaCorreus() {
+    setExportant(true)
+    const r = await llistaConsentiments()
+    setExportant(false)
+    if (!r.ok) { toast.error(t('el.export_err')); return }
+    const base = ambComunicacions(filesExport(r.files))
+    if (base.length === 0) { toast.info(t('el.export_buit')); return }
+    const capcalera = ['entitat', 'papers', 'correu', 'privacitat', 'com_redestina', 'com_espigoladors', 'origen', 'data']
+      .map((c) => t(`el.exp_${c}`))
+    descarregarText(`correus-consentiment-${avuiLocal()}.csv`,
+      csvConsentiments(base, capcalera, (v) => (v === null ? '' : t(v ? 'c.yes' : 'c.no'))),
+      'text/csv;charset=utf-8')
+    toast.success(t('el.export_ok', { n: base.length }))
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
@@ -275,6 +294,11 @@ export default function Entitats() {
           <p className="mt-1 text-sm text-muted-foreground">{t('el.subtitle')}</p>
         </div>
         <div className="flex flex-wrap justify-end gap-2">
+          {/* La base de correos con consentimiento (RGPD, 04-11-2026): solo quien ha dicho que sí
+              a alguna comunicación, con lo que dijo a cada una. */}
+          <Button variant="outline" onClick={() => void exportaCorreus()} disabled={exportant}>
+            <Download className="size-4" /> {t('el.export_correus')}
+          </Button>
           {/* Sin cuenta (D5): el acceso se da después desde la ficha, «Dona-li accés» (1D). */}
           <Button onClick={() => navigate(`/equip/entitats/nova${fl.valors.rol ? `?rol=${fl.valors.rol}` : ''}`)}>
             <Plus className="size-4" /> {t('el.nova')}

@@ -37,6 +37,7 @@ import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/E
 import Confirmar from '../routes/public/Confirmar'
 import Verificar from '../routes/public/Verificar'
 import Signar from '../routes/public/Signar'
+import Consentiment from '../routes/public/Consentiment'
 import Tancament from '../routes/equip/Tancament'
 import TancamentDetall from '../routes/equip/TancamentDetall'
 import Productes from '../routes/equip/Productes'
@@ -75,6 +76,8 @@ export const router = createBrowserRouter([
       { path: '/confirmar/:token', element: <Confirmar /> },
       { path: '/factura/:token', element: <Factura /> },
       { path: '/signar/:token', element: <Signar /> },
+      // El consentimiento RGPD que pide el equipo por correo (04-11-2026): sin cuenta, por token.
+      { path: '/consentiment/:token', element: <Consentiment /> },
       // Verificación de un certificado (F4). Pública sin matices: quien llega es un
       // tercero sin cuenta —un ayuntamiento, quien revisa una subvención— que ha
       // escaneado el código del PDF o ha pulsado el sello de una web. Lo único que

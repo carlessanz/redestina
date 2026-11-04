@@ -31,7 +31,7 @@ import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/albarans'
-import { enviarConveni, enviarCorreuConveni, prepararConveni } from '../../lib/convenis'
+import { enviarConveniPerCorreu } from '../../lib/convenis'
 import type { CampanyaFila, FitxaIncompleta } from '../../lib/convenis'
 import { Casella } from '../../components/Casella'
 import { useConfirma } from '../../components/DialegConfirma'
@@ -173,28 +173,12 @@ export default function CampanyaConvenis() {
 
     for (const f of llista) {
       const nom = f.nom ?? '—'
-      const prep = await prepararConveni(f.tipo_org, f.org_id, f.tipo)
-      if (!prep.ok) {
-        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: textError(t, prep) })
-        setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
-        continue
-      }
-      const env = await enviarConveni(prep.data.id, f.email)
-      if (!env.ok) {
-        sortida.push({ clau: clauDe(f), nom, ok: false, missatge: textError(t, env) })
-        setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
-        continue
-      }
-      const correu = await enviarCorreuConveni({
-        email: env.data.enllac.destinatari ?? f.email ?? '',
-        nom: env.data.enllac.nom ?? nom,
-        token: env.data.enllac.token,
-        assumpte: t('conv.mail_subject'),
-        titol: t('conv.mail_title'),
-        preheader: t('conv.mail_preheader'),
-        cos: t('conv.mail_body'),
-        boto: t('conv.mail_button'),
-        nota: t('conv.mail_note'),
+      const r = await enviarConveniPerCorreu({
+        tipusOrg: f.tipo_org, orgId: f.org_id, tipus: f.tipo, email: f.email, nom,
+        textos: {
+          assumpte: t('conv.mail_subject'), titol: t('conv.mail_title'), preheader: t('conv.mail_preheader'),
+          cos: t('conv.mail_body'), boto: t('conv.mail_button'), nota: t('conv.mail_note'),
+        },
         idioma: lang,
       })
       // El enlace ya existe aunque el correo no salga (modo test, dirección mala): eso no
@@ -203,8 +187,8 @@ export default function CampanyaConvenis() {
       sortida.push({
         clau: clauDe(f),
         nom,
-        ok: correu.ok,
-        missatge: correu.ok ? null : t('camp.res_mail_ko'),
+        ok: r.ok,
+        missatge: r.ok ? null : r.fase === 'correu' ? t('camp.res_mail_ko') : textError(t, r.error),
       })
       setProgres((p) => (p ? { ...p, fetes: p.fetes + 1 } : p))
       setResultats([...sortida])

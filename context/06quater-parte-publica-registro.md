@@ -230,3 +230,11 @@ botones grises con el motivo («Només admin»): no se le esconde nada, se le di
 ⚠️ `appr.rej_desc` y `appr.rej_reason` se usan a través de la tabla `TEXTOS_MOTIU`, no como literal
 dentro de `t(...)`, así que `tests/cobertura.test.ts` **no** avisaría si faltaran.
 
+### `/consentiment/:token` (04-11-2026, `20270506100000`)
+
+Pública, fuera de `RequireSessio`, como `/signar` y `/factura`: el único permiso es el token del correo
+que manda el equipo desde la ficha. `enlace-publico` (rama `consentiment.ts`) da en el GET la entidad y
+los textos de `_shared/textosRgpd.ts` en ca y es, deja la evidencia de apertura y, en el POST
+`accion: 'consentir'`, recompone y hashea los textos y llama a `registrar_consentiment_enllac`. Un
+enlace usado o caducado enseña «No es pot obrir aquest enllaç».
+

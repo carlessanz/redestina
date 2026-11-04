@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **04-11-2026 (consentimiento RGPD por enlace, `20270506100000`): se cierra la 142** (exportación en
+«Entitats» y petición por correo desde la ficha): **61 vivas** y la siguiente entrada nueva sigue siendo la 154.
 ⚠️ **02-11-2026 (plan 1, rebanada 1D): se abren la 151 y la 152**: **62 vivas** y la siguiente entrada nueva
 es la 153.
 ⚠️ **02-11-2026 (tras publicar 1B): se cierra la 150** (`20270501400000`): **60 vivas** y la siguiente
@@ -720,11 +722,6 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      ✅ **Decidido el 17-10-2026 (Carles): de momento se queda SIN freno.** Lo que empuja al receptor es
      el aviso y la cola del equipo; si se quiere el freno, es la propuesta de arriba.
 
-142. **Los consentimientos RGPD no tienen exportación** (27-10-2026; a medias desde 1C, 02-11-2026).
-     Se guardan en el alta (`consentiments`). Desde 1C el equipo los ve en «Gestió interna» de la ficha
-     (`components/fitxa/Consentiments`, solo lectura); la persona sigue sin verlos en la suya y no hay
-     listado/CSV de quién acepta las comunicaciones de Espigoladors. Las cuentas anteriores no tienen
-     ninguna fila.
 143. **Con WhatsApp apagado, los mensajes que entran se registran pero nadie los ve** (27-10-2026).
      El webhook sigue guardando los entrantes (§5), y Missatgeria desaparece con el canal (§8). Es lo
      pedido —«no deben aparecer los apartados»—, pero si alguien escribe mientras está apagado, el
@@ -779,6 +776,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      que no hay nadie real afectado. 🔴 **Condición para apagar el modo test.** Arreglo: una pantalla tras
      el login que exija la privacidad si la cuenta no tiene fila en `consentiments`, con una RPC que la
      guarde con `origen` propio y la huella de `textosRgpd`.
+     🟡 **04-11-2026**: el equipo ya puede **pedir** el consentimiento por correo desde la ficha (enlace
+     `consentiment_rgpd`, `/consentiment/:token`, sin cuenta; `20270506100000`). Sigue faltando exigirlo
+     en el primer acceso a quien entra sin haberlo dado.
 153. **La importación del ARA 2026 no crea `productor_ubicaciones`** (02-11-2026, plan 1 1E). Las columnas
      «Coord»/«Coord 2» de Prod traen 14 pares numéricos útiles y mucho texto («Visitat, varies finques»);
      se guardan en la nota «ARA 2026» del comentario, no como lugar de recogida. Arreglo, si se quiere:
