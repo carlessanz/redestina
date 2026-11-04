@@ -361,7 +361,11 @@ export type ResultatReenviament =
  * Vuelve a mandar un documento emitido al destinatario que ya tenía, con el PDF adjunto.
  * Solo el equipo. Nunca lanza.
  */
-export async function reenviarDocument(documentoId: string): Promise<ResultatReenviament> {
+export async function reenviarDocument(
+  documentoId: string,
+  /** Con las notificaciones apagadas, si la persona lo ha aceptado (`acceptaEnviament`, §8). */
+  opcions: { manual?: boolean } = {},
+): Promise<ResultatReenviament> {
   const falla = (codi: CodiReenviament): ResultatReenviament =>
     ({ ok: false, codi, motiuKey: MOTIU_REENVIAMENT[codi] })
   try {
@@ -372,7 +376,7 @@ export async function reenviarDocument(documentoId: string): Promise<ResultatRee
     const res = await fetch(`${supabaseUrl}/functions/v1/reenviar-documento`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documento_id: documentoId }),
+      body: JSON.stringify({ documento_id: documentoId, manual: opcions.manual === true }),
     })
     const cos = (await res.json().catch(() => null)) as
       | { resultat?: string; destinatari?: string | null; code?: string }

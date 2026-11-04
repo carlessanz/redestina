@@ -4,8 +4,9 @@
 //
 //   1. «Envia’l per correu»: prepara el convenio si no lo hay, acuña el enlace y lo manda
 //      al correo de la ficha; la persona firma desde el correo (`/signar/:token`) y el
-//      equipo lo contrafirma después (`enviarConveniPerCorreu`). Con el correo apagado (§8)
-//      pasa a «Copia l’enllaç de signatura»: el mismo enlace, para un correo propio.
+//      equipo lo contrafirma después (`enviarConveniPerCorreu`). Con las notificaciones
+//      apagadas (§8) es un envío MANUAL: sale si se acepta en la confirmación, y al lado está
+//      «Copia l’enllaç de signatura», el mismo enlace para un correo propio.
 //   2. «Registra un conveni signat en paper» (super_admin): sube el escaneado y lo da por
 //      vigente (`DialegConveniPaper`, tres pasos en orden).
 //   3. «Dona’l per vigent» (super_admin): declarado con los datos de la ficha, sin firma ni
@@ -32,6 +33,7 @@ import DialegConveniPaper from '../equip/DialegConveniPaper'
 import DialegConveniDeclarat from '../equip/DialegConveniDeclarat'
 import { declarable } from '../equip/fases/AccionsConveni'
 import EnllacPerCopiar from './EnllacPerCopiar'
+import { acceptaEnviament } from '../../lib/enviamentManual'
 
 export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu, conveniPaper }: {
   tipusOrg: 'productor' | 'entidad'
@@ -79,11 +81,12 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
 
   async function envia() {
     const desti = correu.trim()
-    if (!(await confirma({
+    const acceptat = await acceptaEnviament(confirma, t, motiuCorreu, {
       titol: t('cfx.confirm_t'),
       descripcio: t('cfx.confirm', { correu: desti }),
       confirmar: t('cfx.b_correu'),
-    }))) return
+    })
+    if (!acceptat) return
     setEnviant(true)
     const r = await enviarConveniPerCorreu({
       tipusOrg, orgId, tipus, email: desti, nom,
@@ -92,6 +95,7 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
         cos: t('conv.mail_body'), boto: t('conv.mail_button'), nota: t('conv.mail_note'),
       },
       idioma: lang,
+      manual: acceptat.manual,
     })
     setEnviant(false)
     if (r.ok) toast.success(t(r.simulat ? 'cfx.ok_simulat' : 'cfx.ok', { correu: r.destinatari }))
@@ -126,15 +130,19 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
       {!resolt && (
         <>
           <p className="text-sm text-muted-foreground">{t('cfx.h')}</p>
-          {motiuCorreu && <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('epc.alternativa')}</p>}
+          {motiuCorreu && <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('man.alternativa')}</p>}
           {copia && <EnllacPerCopiar text={copia.text} correu={copia.correu} testid="conveni-copia" />}
           <div className="flex flex-wrap gap-2">
             <BotoAmbMotiu size="sm" className={classe} disabled={enviant || !!motiuEnvia} motiu={motiuEnvia}
-              onClick={() => void (motiuCorreu ? creaPerCopiar() : envia())}>
-              {motiuCorreu
-                ? t(estat === 'pendent_firma' ? 'cfx.b_copia_nou' : 'cfx.b_copia')
-                : t(estat === 'pendent_firma' ? 'cfx.b_correu_de_nou' : 'cfx.b_correu')}
+              onClick={() => void envia()}>
+              {t(estat === 'pendent_firma' ? 'cfx.b_correu_de_nou' : 'cfx.b_correu')}
             </BotoAmbMotiu>
+            {motiuCorreu && (
+              <BotoAmbMotiu size="sm" variant="outline" className={classe} disabled={enviant || !!motiuEnvia}
+                motiu={motiuEnvia} onClick={() => void creaPerCopiar()}>
+                {t(estat === 'pendent_firma' ? 'cfx.b_copia_nou' : 'cfx.b_copia')}
+              </BotoAmbMotiu>
+            )}
             <BotoAmbMotiu size="sm" variant="outline" className={classe} disabled={!esSuperAdmin}
               motiu={t('conv.paper_err_permis')} onClick={() => setPaper(true)}>
               {t('conv.paper_open')}

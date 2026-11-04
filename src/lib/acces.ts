@@ -75,7 +75,12 @@ export interface ResultatDonarAcces {
  * contraseña. `email` es el de la ficha tal como está guardada. Nunca lanza, como `enviarAcces`:
  * el alta de «Nova entitat» ya ha ocurrido cuando se llama desde allí.
  */
-export async function donarAcces(organizacionId: string, email: string): Promise<ResultatDonarAcces> {
+export async function donarAcces(
+  organizacionId: string,
+  email: string,
+  /** Con las notificaciones apagadas, si la persona lo ha aceptado (§8): sale igualmente. */
+  opcions: { manual?: boolean } = {},
+): Promise<ResultatDonarAcces> {
   try {
     const { data: { session } } = await supabase.auth.getSession()
     if (!session) return { ok: false, codi: 'unauthorized', compteNou: false }
@@ -86,7 +91,7 @@ export async function donarAcces(organizacionId: string, email: string): Promise
         'Content-Type': 'application/json',
         Authorization: `Bearer ${session.access_token}`,
       },
-      body: JSON.stringify({ organizacion_id: organizacionId, email }),
+      body: JSON.stringify({ organizacion_id: organizacionId, email, manual: opcions.manual === true }),
     })
     const dades = (await res.json().catch(() => null)) as { code?: string; compte_nou?: boolean } | null
     if (!res.ok) return { ok: false, codi: dades?.code ?? `http_${res.status}`, compteNou: false }

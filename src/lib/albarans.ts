@@ -11,7 +11,7 @@
 // Devuelve `ok` y, cuando no, el mensaje que da la base (que ya viene en catalán y dice
 // exactamente qué regla se ha incumplido) más una clave i18n de respaldo para lo genérico.
 
-import { supabase } from './supabase'
+import { supabase, supabaseUrl } from './supabase'
 import { enviarEmail } from './email'
 
 /** Resultado uniforme. `missatge` ya es texto listo para enseñar; `codi` es el SQLSTATE. */
@@ -377,4 +377,41 @@ export async function enviaEnllacosConfirmacio(
     else fallits++
   }
   return { enviats, fallits, desactivat: false }
+}
+
+/** Lo que pasó con el correo de una parte, tal como lo dice `enviar-albara`. */
+export type ResultatEnviamentAlbara =
+  | 'enviat' | 'enviat_sense_adjunt' | 'simulat' | 'desactivat' | 'no_test_user' | 'fora_llista_test' | 'error'
+
+export const RESULTATS_ENVIAMENT_ALBARA: readonly ResultatEnviamentAlbara[] = [
+  'enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error',
+]
+
+/**
+ * «Envia per correu» del albarán (04-11-2026): `enviar-albara` manda el PDF a cada parte con
+ * correo y, si a esa parte le falta confirmar, un enlace nuevo para hacerlo. Es un envío
+ * MANUAL (§8): con las notificaciones apagadas sale si se pasa `manual`, que la pantalla pone
+ * cuando la persona lo acepta (`acceptaEnviament`). Nunca lanza.
+ */
+export async function enviarAlbara(albaranId: string, opcions: { manual?: boolean } = {}): Promise<
+  | { ok: true; resultats: { rol: string; destinatari: string; resultat: ResultatEnviamentAlbara; amb_enllac: boolean }[] }
+  | { ok: false; codi: string }
+> {
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return { ok: false, codi: 'unauthorized' }
+    const res = await fetch(`${supabaseUrl}/functions/v1/enviar-albara`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ albaran_id: albaranId, manual: opcions.manual === true }),
+    })
+    const cos = (await res.json().catch(() => null)) as
+      | { resultats?: { rol: string; destinatari: string; resultat: ResultatEnviamentAlbara; amb_enllac: boolean }[]; code?: string }
+      | null
+    if (res.ok && cos?.resultats) return { ok: true, resultats: cos.resultats }
+    return { ok: false, codi: cos?.code ?? `http_${res.status}` }
+  } catch {
+    return { ok: false, codi: 'xarxa' }
+  }
 }

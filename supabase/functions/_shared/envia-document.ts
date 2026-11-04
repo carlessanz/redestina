@@ -4,6 +4,9 @@
 // · `generar-documento`, en cuanto el PDF existe por primera vez;
 // · `reenviar-documento`, cuando alguien del equipo pulsa «Reenvia» (28-09-2026).
 //
+// Con las notificaciones apagadas (§8), el primero se corta (es automático) y el segundo puede
+// salir si quien pulsa lo acepta: `opcions.manual` (`_shared/enviamentManual.ts`).
+//
 // Tenerlo en un solo sitio es lo que garantiza que un reenvío pasa por las MISMAS barreras
 // que el envío original: con dos copias, bastaría con que una se quedara atrás para que el
 // botón de reenviar fuera la forma de saltarse el modo test.
@@ -59,7 +62,7 @@ export type ResultatEnviament =
   | "error";
 
 /** Base64 por trozos: `String.fromCharCode(...bytes)` de golpe revienta la pila. */
-function encodeBase64(b: Uint8Array): string {
+export function encodeBase64(b: Uint8Array): string {
   let s = "";
   for (let i = 0; i < b.length; i += 0x8000) s += String.fromCharCode(...b.subarray(i, i + 0x8000));
   return btoa(s);
@@ -77,6 +80,8 @@ export async function enviaDocument(
   doc: DocumentAEnviar,
   bytes: Uint8Array,
   funcion: string,
+  /** Solo `reenviar-documento`, a petición del botón: se salta los interruptores, no el modo test. */
+  opcions: { manual?: boolean } = {},
 ): Promise<ResultatEnviament> {
   try {
     const c = composaCorreuDocument({
@@ -121,7 +126,7 @@ export async function enviaDocument(
       objetoTipo: doc.objeto_tipo,
       objetoId: doc.objeto_id,
       funcion,
-    });
+    }, { manual: opcions.manual === true });
     if (r.desactivado) return "desactivat";
     if (!r.ok) return "error";
     return r.simulado ? "simulat" : adjunt ? "enviat" : "enviat_sense_adjunt";

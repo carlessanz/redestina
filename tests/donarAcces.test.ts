@@ -102,12 +102,13 @@ describe('accionsAcces: los botones del bloque «Contacte i accés»', () => {
   it('con un registro pendiente no se ofrece nada: se decide en Aprovacions', () => {
     expect(accionsAcces({ ...base, estat: 'pendent' })).toEqual({ donar: null, reenviar: null, desactivar: null })
   })
-  it('los motivos, en orden: permiso, entidad inactiva, sin correo, correo sin desar, correo apagado', () => {
+  it('los motivos, en orden: permiso, entidad inactiva, sin correo, correo sin desar', () => {
     expect(accionsAcces({ ...base, potAprovar: false, entitatActiva: false }).donar?.motiu).toBe('appr.need_approver')
     expect(accionsAcces({ ...base, entitatActiva: false, correu: '' }).donar?.motiu).toBe('acc.m_inactiva')
     expect(accionsAcces({ ...base, correu: '  ', correuCanviat: true }).donar?.motiu).toBe('acc.m_sense_correu')
     expect(accionsAcces({ ...base, correuCanviat: true, motiuCorreu: 'canal.motiu_email' }).donar?.motiu).toBe('acc.m_desa_correu')
-    expect(accionsAcces({ ...base, motiuCorreu: 'canal.motiu_email' }).donar?.motiu).toBe('canal.motiu_email')
+    // Con el correo apagado ya no sale gris: es un envío manual (§8, 04-11-2026).
+    expect(accionsAcces({ ...base, motiuCorreu: 'canal.motiu_email' }).donar?.motiu).toBeNull()
   })
   it('desactivar no depende del correo, solo del permiso', () => {
     const a = accionsAcces({ ...base, estat: 'actiu', correu: '', motiuCorreu: 'canal.motiu_notificacions' })

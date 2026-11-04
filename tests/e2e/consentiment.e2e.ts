@@ -9,8 +9,8 @@
 //      enseña como «enllaç per correu».
 //   3. El convenio se envía por correo desde Documentació: queda pendiente de firma con su
 //      enlace al correo de la ficha, sin que la entidad entre en Redestina.
-//   4. Con el correo apagado, los dos botones pasan a «Copia l’enllaç»: el texto que se copia
-//      lleva un token que es el del enlace activo y la página pública lo abre.
+//   4. Con el correo apagado, al lado del envío (manual, §8) sale «Copia l’enllaç»: el texto que
+//      se copia lleva un token que es el del enlace activo y la página pública lo abre.
 
 import { expect, test } from '@playwright/test'
 import { entra, motiuSaltClon, sql, sqlCom } from './ajuda'
@@ -133,7 +133,8 @@ test('amb el correu apagat es copia l’enllaç', async ({ page, browser }) => {
     // Consentimiento: el enlace del texto es el activo y la página pública lo abre.
     await page.goto(`/equip/entitats/${org}?pestanya=intern`)
     const bloc = page.getByTestId('consentiments')
-    await expect(bloc.getByRole('button', { name: /Demana el consentiment per correu|Pide el consentimiento por correo/ })).toHaveCount(0)
+    // El envío por correo sigue (es manual, §8) y al lado sale «Copia l’enllaç».
+    await expect(bloc.getByRole('button', { name: /Torna a enviar la petició|Vuelve a enviar la petición|Demana el consentiment per correu|Pide el consentimiento por correo/ })).toBeVisible()
     await bloc.getByRole('button', { name: /Copia l’enllaç del consentiment|Copia un enllaç nou|Copia el enlace del consentimiento|Copia un enlace nuevo/ }).click()
     const copia = page.getByTestId('consentiment-copia')
     await expect(copia).toContainText(email)

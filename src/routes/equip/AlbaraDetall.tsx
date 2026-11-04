@@ -17,7 +17,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router'
-import { AlertTriangle, ArrowLeft, Download, Eye, Loader2, Upload } from 'lucide-react'
+import { AlertTriangle, ArrowLeft, Download, Eye, Loader2, Mail, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -27,9 +27,11 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { pujarDocumentExtern } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
-  enviaEnllacosConfirmacio, marcarEntregat, paramsConciliacio, propostaConciliacio,
+  enviaEnllacosConfirmacio, enviarAlbara, marcarEntregat, paramsConciliacio, propostaConciliacio,
   rectificarAlbara, venciment,
 } from '../../lib/albarans'
+import { acceptaEnviament } from '../../lib/enviamentManual'
+import { motiuCanal } from '../../lib/canals'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
 import { diferenciaKg, incidenciesDiferencia, llegeixIncidencia } from '../../lib/incidenciaRecollida'
@@ -495,6 +497,35 @@ export default function AlbaraDetall() {
   }
 
   /**
+   * «Envia per correu»: el PDF a cada parte con correo y, si le falta confirmar, el enlace.
+   * Con las notificaciones apagadas es un envío manual (§8): sale si se acepta.
+   */
+  async function enviaPerCorreu() {
+    if (!albara) return
+    const acceptat = await acceptaEnviament(confirma, t, motiuCanal(canals, 'email'), {
+      titol: t('alb.env_t', { num: albara.numero_completo ?? '—' }),
+      descripcio: t(albara.estado === 'entregado' ? 'alb.env_desc_enllac' : 'alb.env_desc'),
+      confirmar: t('alb.env_b'),
+    })
+    if (!acceptat) return
+    setOcupat(true)
+    const r = await enviarAlbara(albara.id, acceptat)
+    setOcupat(false)
+    if (!r.ok) {
+      toast.error(t(['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc'].includes(r.codi)
+        ? `alb.env_e_${r.codi}` : 'alb.env_e_error'))
+      return
+    }
+    for (const x of r.resultats) {
+      const missatge = t(`alb.env_r_${x.resultat}`, { email: x.destinatari })
+      if (x.resultat === 'enviat' || x.resultat === 'enviat_sense_adjunt') toast.success(missatge)
+      else if (x.resultat === 'simulat') toast.info(missatge)
+      else toast.error(missatge)
+    }
+    await carrega()
+  }
+
+  /**
    * Abre la conciliación. Solo el REC tiene propuesta —contrasta su neto con lo que han
    * confirmado sus salidas—; un ENT o un OPE se concilian solos, con sus propios kilos.
    */
@@ -634,6 +665,11 @@ export default function AlbaraDetall() {
   // y OPE en `entregado`/`confirmado` (sin confirmar, con plazo vencido y motivo). Antes
   // solo el REC, y un OPE de venta —que no tiene REC— no tenía ninguna puerta a mano.
   const potConciliar = albara.estado === 'entregado' || albara.estado === 'confirmado'
+  // «Envia per correu» (04-11-2026): con el albarán emitido y su PDF vigente. Es un envío
+  // manual (§8): con las notificaciones apagadas sigue, y la confirmación lo dice.
+  const ambPdf = documents.some((d) => d.vigente && d.estado === 'emitido')
+  const emes = !['borrador', 'anulado', 'rectificado'].includes(albara.estado)
+  const motiuEnviar = !emes ? t('alb.env_m_no_emes') : !ambPdf ? t('alb.env_m_sense_pdf') : undefined
   const motiuConciliar = potConciliar
     ? undefined
     : t(inactiu ? 'alb.why_inactive'
@@ -965,6 +1001,15 @@ export default function AlbaraDetall() {
               onClick={() => void obreConciliacio()}
             >
               {t('alb.reconcile')}
+            </BotoAmbMotiu>
+            <BotoAmbMotiu
+              className="h-11 whitespace-normal md:h-8"
+              variant="outline"
+              disabled={ocupat || !!motiuEnviar}
+              motiu={motiuEnviar}
+              onClick={() => void enviaPerCorreu()}
+            >
+              <Mail className="size-4" aria-hidden />{t('alb.env_b')}
             </BotoAmbMotiu>
           </div>
 

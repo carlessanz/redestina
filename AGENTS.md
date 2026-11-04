@@ -52,8 +52,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   producto v3* manda en el porqué, el *funcional 2026 v3* en el qué, la automatización y la guía
   técnica en el cómo.
 - **Planes vivos** en `3. Claude Code/`: **plan 1 CRM y registro de entidades** (2026-11-02; 1A-1D
-  y 1F publicadas; **1E solo en el clon**, la carga en producción antes del 31-12); los anteriores
-  (documental, organización unificada, revisión del 08-10), ejecutados.
+  y 1F publicadas; **1E solo en el clon**, la carga en producción antes del 31-12); los anteriores, ejecutados.
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -104,7 +103,7 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
   celdas de tabla con `whitespace-normal`; **auditar `scrollWidth > clientWidth` en los hijos**,
   no solo en el documento.
 - **Tablas**: sin scroll horizontal (secundarias `hidden md:table-cell`, lo
-  esencial bajo el nombre; `ui/table` centra títulos y parte celdas), acciones por fila en
+  esencial bajo el nombre), acciones por fila en
   iconos `BotoIcona` (tooltip y `aria-label`); `colSpan` de fila completa con `usePuntTall`.
 
 ## 2bis. Sistema de diseño
@@ -141,8 +140,8 @@ src/
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend; 20 funciones: whatsapp-send/webhook, crear-oferta, registro,
-          donar-acces, enviar-email/acceso/avis, generar/descargar/reenviar-documento,
+          autorizacion, resend; 21 funciones: whatsapp-send/webhook, crear-oferta, registro,
+          donar-acces, enviar-email/acceso/avis/albara, generar/descargar/reenviar-documento,
           enlace-publico, subir-documento-externo, priorizar-entidades, recordatorios-*,
           recollides-programades, recuperar-password, verificar-certificat, limpiar-documentos-prueba)
 docs/ (ignorado por git)
@@ -297,7 +296,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
-  `registrar_consentiment_enllac` (servidor);
+  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); y las de cierre y certificados, diagnóstico y
   plan, equipo, interruptores y jobs (solo `service_role`), con su nombre, en el detalle (§4bis, «Familias»).
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
@@ -407,8 +406,8 @@ Lo que manda hoy, en una línea cada uno:
   última interacción, seguimientos pendientes con «Fet», formulario (tipo, canal, fecha, responsable,
   nota, próxima acción) e hilo sin edición; borra el super_admin; el listado marca lo vencido.
 - **Sin que la entidad entre**: Documentació › Convenis (`fitxa/ConveniFitxa`) manda el convenio a
-  firmar por correo (o «Copia l’enllaç»), lo registra en papel o lo declara; Gestió interna
-  pide el RGPD igual; «Entitats» exporta los correos con consentimiento.
+  firmar por correo (o «Copia l’enllaç»), lo registra en papel o lo
+  declara; Gestió interna pide el RGPD igual; el albarán, «Envia per correu» (PDF + enlace si falta confirmar); «Entitats» exporta los correos con consentimiento.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -448,7 +447,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270506100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270507100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -458,13 +457,16 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
 
 - **Interruptores de notificaciones** (Configuració › Notificacions, solo super_admin):
   general `notificacions_actives`, `email_activo`, `whatsapp_activo`; canal efectivo = general
-  **y** canal; apagar el general apaga los dos, encenderlo no los enciende. Cortan **toda**
-  comunicación operativa (un solo punto por canal: `sendEmail()` y `enviar()`, que devuelven
-  `ok:false` 503 `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un
-  simulado); no cortan lo **transaccional** (`enviar-acceso`, `recuperar-password`, con
-  `{transaccional:true}`). `donar-acces` **no** lo es: apagado → 409 sin crear nada. La interfaz esconde el apartado de un canal apagado (Missatgeria;
-  «Missatge» y «Correu» de Entitats) y deja gris lo demás (`BotoAmbMotiu`, `motiuCanal()`); RGPD y convenio de
-  la ficha pasan a «Copia l’enllaç» (`fitxa/EnllacPerCopiar`). **En producción, los tres apagados.**
+  **y** canal; apagar el general apaga los dos. 🔴 **Cortan lo AUTOMÁTICO** (triggers, jobs, avisos,
+  el PDF al generarse; un solo punto por canal: `sendEmail()` y `enviar()`, 503
+  `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un simulado); **no**
+  lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
+  una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
+  `{manual:true}`, traza `<funció>:manual`; el modo test sigue): RGPD y convenio a firmar
+  (`_shared/enviamentManual.ts`), «Reenvia», «Dona-li accés» y «Envia per correu» del albarán
+  (`enviar-albara`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
+  un canal apagado (Missatgeria; «Missatge» y «Correu» de Entitats) y deja gris lo demás
+  (`BotoAmbMotiu`, `motiuCanal()`). **En producción, los tres apagados.**
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
@@ -514,7 +516,7 @@ distingue: `190` token caducado (nuevo secreto + redesplegar); `100/33` token si
   consentimientos (`consentiments`, huella del texto del servidor).
 - `donar-acces` (1D, JWT + `pot_aprovar`; sustituye a `alta-assistida`): cuenta si no la hay →
   `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
-  409; modo test, solo `es_test`. Sin consentimientos (deuda 152).
+  409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152).
 - Firma por enlace: el servidor compone y hashea el texto (`409 document_canviat`); tres vías
   —correo, asistida (segundo factor solo si la persona pide el código), panel— y el PDF las
   distingue; mínimos `MIN_NOM`/`MIN_DNI` en cliente y servidor. Confirmación de albarán:
@@ -574,11 +576,7 @@ git config core.hooksPath .githooks            # una vez por clon
   (`emitir_documento_prova()`: 6 páginas, ~123.600 bytes). Tocar `_shared/` obliga a redesplegar
   todas las que lo importan. Logs remotos por el Management API de analítica
   (`function_logs`, `edge_logs`, con `iso_timestamp_*`).
-- Fixtures: `crear-usuarios-prueba.ts` → `crear-usuarios-whatsapp.ts` →
-  `crear-datos-documentales-prueba.ts` → `crear-respuestas-prueba.ts`; `escenari-demo.ts`
-  (consume numeración); `prueba-numeracion.ts`; `limpiar-e2e.ts`.
-- Emergencias: `scripts/roles-activos.ts off`; `update app_settings set value='false' where
-  key='whatsapp_activo'`.
+- Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
 ## 12. Checkpoints y deuda técnica (cuerpo completo en `context/12-…md`)
 
@@ -618,11 +616,11 @@ editar) viven en sus ficheros de `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.629 pruebas de Vitest en 70
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.639 pruebas de Vitest en 71
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.759/1.759 y 28 sin datos; producción 1.764/1.764 y 23
+   **Referencia: clon 1.768/1.768 y 28 sin datos; producción 1.764/1.764 y 23
    «Sin fallos de permisos».** Una cifra que sube o baja sin checks nuevos es cambio de
    **datos**; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si

@@ -1,6 +1,9 @@
 // Reenviar por correo un documento ya emitido (28-09-2026).
 //
-//   POST /reenviar-documento  { documento_id }          (JWT de una cuenta del equipo)
+//   POST /reenviar-documento  { documento_id, manual? }  (JWT de una cuenta del equipo)
+//
+// `manual: true` (04-11-2026): el botón lo manda aunque las notificaciones estén apagadas,
+// porque quien pulsa lo ha aceptado (§8, `_shared/enviamentManual.ts`). Sin él, como siempre.
 //   -> 200 { resultat: 'enviat' | 'enviat_sense_adjunt' | 'simulat', destinatari }
 //   -> 409 { code: 'no_s_envia' | 'bloquejat_prova' | 'bloquejat_mode_test' | 'fora_llista_test' }
 //   -> 409 { code: 'sense_fitxer' }        el PDF todavía no se ha generado
@@ -55,9 +58,11 @@ Deno.serve(async (req) => {
   }
 
   let documentoId: string | null = null;
+  let manual = false;
   try {
     const cuerpo = await req.json();
     documentoId = typeof cuerpo?.documento_id === "string" ? cuerpo.documento_id : null;
+    manual = cuerpo?.manual === true;
   } catch {
     return responder({ error: "Cuerpo JSON inválido", code: "cos_invalid" }, 400);
   }
@@ -97,7 +102,7 @@ Deno.serve(async (req) => {
   }
   const bytes = new Uint8Array(await fitxer.arrayBuffer());
 
-  const resultat = await enviaDocument(supabase, doc, bytes, "reenviar-documento");
+  const resultat = await enviaDocument(supabase, doc, bytes, "reenviar-documento", { manual });
   const destinatari = typeof doc.envio?.destinatario === "string" ? doc.envio.destinatario : null;
   console.log(JSON.stringify({ fn: "reenviar-documento", documento: doc.id, per: auth.ctx.userId, resultat }));
 

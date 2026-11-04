@@ -345,6 +345,8 @@ export async function enviarCorreuConveni(camps: {
   nota: string
   /** El idioma de la pantalla, que es el del texto: el pie del correo va en el mismo. */
   idioma?: 'ca' | 'es'
+  /** Con las notificaciones apagadas, si la persona lo ha aceptado (`acceptaEnviament`, §8). */
+  manual?: boolean
 }): Promise<{ ok: boolean; missatge: string | null; code: string | null; simulat: boolean }> {
   const res = await enviarEmail({
     to: camps.email,
@@ -360,6 +362,7 @@ export async function enviarCorreuConveni(camps: {
     // Sin esto `enviar-email` lo registraba como `oferta` (su valor por defecto), y en la
     // pestaña Enviaments de Documents un enlace de firma salía como «Oferta».
     proposito: 'firma_conveni',
+    manual: camps.manual === true,
   })
   // `simulat`: el servidor dice ok pero el correo no ha salido (RESEND_ENVIO_REAL apagado).
   if (res.ok) return { ok: true, missatge: null, code: null, simulat: res.simulat === true }
@@ -450,6 +453,8 @@ export async function enviarConveniPerCorreu(args: {
   nom: string | null
   textos: { assumpte: string; titol: string; preheader: string; cos: string; boto: string; nota: string }
   idioma: 'ca' | 'es'
+  /** Solo los botones de una ficha, no la campaña masiva (§8: lo masivo no es manual). */
+  manual?: boolean
 }): Promise<
   | { ok: true; destinatari: string; simulat: boolean }
   | { ok: false; fase: 'preparar' | 'enviar'; error: { ok: false; missatge: string; codi: string | null } }
@@ -464,6 +469,7 @@ export async function enviarConveniPerCorreu(args: {
     token,
     ...args.textos,
     idioma: args.idioma,
+    manual: args.manual === true,
   })
   if (!correu.ok) return { ok: false, fase: 'correu' }
   return { ok: true, destinatari, simulat: correu.simulat }

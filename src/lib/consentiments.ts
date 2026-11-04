@@ -130,6 +130,8 @@ export async function demanarConsentiment(
   email: string,
   textos: TextosCorreuConsentiment,
   idioma: 'ca' | 'es',
+  /** Con las notificaciones apagadas, si la persona lo ha aceptado (`acceptaEnviament`). */
+  manual = false,
 ): Promise<{ ok: true; simulat: boolean } | { ok: false; fase: 'enllac' | 'correu'; codi: string | null; missatge: string | null }> {
   const r = await crearEnllacConsentiment(orgId, email)
   if (!r.ok) return { ok: false, fase: 'enllac', codi: r.codi, missatge: r.missatge }
@@ -148,6 +150,7 @@ export async function demanarConsentiment(
     proposito: 'consentiment_rgpd',
     objeto_tipo: 'organizacion',
     objeto_id: orgId,
+    manual,
   })
   if (!res.ok) {
     const cos = res.data as { code?: string; error?: string } | null

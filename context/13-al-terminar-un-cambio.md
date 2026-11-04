@@ -8,8 +8,9 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.629 pruebas en 70 ficheros** de Vitest: 1.628 correctas y **1 saltada a propósito**
-   (04-11-2026, «Copia l’enllaç»: +1 en `consentiments.test.ts`). Antes, **1.628** (04-11-2026,
+   Referencia: **1.639 pruebas en 71 ficheros** de Vitest: 1.638 correctas y **1 saltada a propósito**
+   (04-11-2026, envío manual: +10 en `enviamentManual.test.ts`, nuevo, y +2 en `i18n.test.ts` por
+   `alb.env_r_*` y `alb.env_e_*`). Antes, **1.629 en 70** (04-11-2026, «Copia l’enllaç»: +1 en `consentiments.test.ts`). Antes, **1.628** (04-11-2026,
    consentimiento por enlace: +5 en `consentiments.test.ts`, nuevo). Antes, **1.623 en 69** (04-11-2026, Taula mestra 1.5: +3 en `notesInternes.test.ts` y +3 en `i18n.test.ts` por `ni.tipus_*`,
    `ni.seg_*` y `el.seg_*`). Antes, **1.617** (02-11-2026, plan 1 1E: +22 en `importAra2026.test.ts`, nuevo). Antes, **1.595 en 68** (02-11-2026, plan 1 1F: +7 en `notesInternes.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
    compuesta `ni.canal_*`). Antes, **1.587 en 67** (02-11-2026, plan 1 1D: +26 en `donarAcces.test.ts`, nuevo, y +1 en `i18n.test.ts` por la clave
@@ -95,7 +96,8 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras el consentimiento por enlace (`20270506100000`, 04-11-2026): 1.759/1.759 y 28 sin datos
+   contacto denegado). **Clon, tras el envío manual (`20270507100000`, 04-11-2026): 1.768/1.768 y 28 sin datos
+   (total 1.796: +9, `preparar_enviament_albara` denegada en los nueve perfiles).** Antes, **clon, tras el consentimiento por enlace (`20270506100000`, 04-11-2026): 1.759/1.759 y 28 sin datos
    (total 1.787: +27, las tres RPC nuevas en los nueve perfiles). Producción, tras publicar `414319c` el
    04-11-2026: 1.764/1.764 y 23 sin datos (mismo total; la diferencia con el clon son datos).** **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
    sin datos (mismo total, 1.760: sin checks nuevos; dos «sin datos» menos por datos del clon).** **Clon, tras 1.5 (`20270504100000`, 04-11-2026): 1.730/1.730 y 30 sin

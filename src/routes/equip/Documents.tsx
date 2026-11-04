@@ -50,6 +50,7 @@ import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { reenviarDocument } from '../../lib/documents'
+import { acceptaEnviament } from '../../lib/enviamentManual'
 import { useConfirma } from '../../components/DialegConfirma'
 import { estilEstatAlbara } from '../../lib/albarans'
 import { dataCurta, dataHora, kg } from '../../lib/format'
@@ -205,7 +206,8 @@ function Secundari({ peces }: { peces: Peca[] }) {
 export default function Documents() {
   const { t } = useT()
   const navigate = useNavigate()
-  // «Reenvia» manda un correo: con el correo apagado (§8) se queda gris con el motivo.
+  // «Reenvia» manda un correo. Con las notificaciones apagadas (§8) es un envío manual: el
+  // botón sigue y la confirmación lo dice (`acceptaEnviament`).
   const motiuEmail = motiuCanal(useCanals(), 'email')
   // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
   // «Tots» dejaba los fallidos mezclados con el resto.
@@ -287,16 +289,16 @@ export default function Documents() {
    * reenvía desde la pestaña de envíos (`documentos.envio` no lo lee el panel).
    */
   async function reenvia(documentoId: string, numero: string | null, destinatari: string | null) {
-    const ok = await confirma({
+    const acceptat = await acceptaEnviament(confirma, t, motiuEmail, {
       titol: t('doc.resend_title', { num: numero ?? '—' }),
       descripcio: destinatari
         ? t('doc.resend_desc_to', { email: destinatari })
         : t('doc.resend_desc'),
       confirmar: t('doc.resend'),
     })
-    if (!ok) return
+    if (!acceptat) return
     setReenviant(documentoId)
-    const r = await reenviarDocument(documentoId)
+    const r = await reenviarDocument(documentoId, acceptat)
     setReenviant(null)
     if (!r.ok) {
       toast.error(t(r.motiuKey))
@@ -454,8 +456,7 @@ export default function Documents() {
                         icona={reenviant === d.id ? Loader2 : Mail}
                         etiqueta={t('doc.a_resend_mail')}
                         className={reenviant === d.id ? '[&_svg]:animate-spin' : undefined}
-                        disabled={reenviant === d.id || !!motiuEmail}
-                        motiu={motiuEmail ? t(motiuEmail) : undefined}
+                        disabled={reenviant === d.id}
                         onClick={() => void reenvia(d.id, d.numero_completo, null)}
                       />
                     )}
@@ -606,8 +607,7 @@ export default function Documents() {
                         icona={reenviant === e.documento_id ? Loader2 : Mail}
                         etiqueta={t('doc.a_resend_mail')}
                         className={reenviant === e.documento_id ? '[&_svg]:animate-spin' : undefined}
-                        disabled={reenviant === e.documento_id || !!motiuEmail}
-                        motiu={motiuEmail ? t(motiuEmail) : undefined}
+                        disabled={reenviant === e.documento_id}
                         onClick={() => void reenvia(e.documento_id!, numero ?? null, e.destinatario)}
                       />
                     </div>

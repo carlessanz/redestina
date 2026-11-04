@@ -713,6 +713,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "demanar_consentiment", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO demana consentiments" },
   { tabla: "llista_consentiments", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu la llista de consentiments" },
   { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
+  { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
   { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap organització" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1350,6 +1351,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "demanar_consentiment", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot demanar el consentiment (22023 si l'organització no existeix)" },
     { tabla: "llista_consentiments", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu la llista de consentiments" },
     { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
+    { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
@@ -1600,6 +1602,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "demanar_consentiment", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot demanar el consentiment (22023 si l'organització no existeix)" },
     { tabla: "llista_consentiments", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu la llista de consentiments" },
     { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
+    { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },

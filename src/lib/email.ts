@@ -29,6 +29,12 @@ export interface EmailPayload {
   proposito?: string
   objeto_tipo?: string
   objeto_id?: string
+  /**
+   * Envío MANUAL (§8): con las notificaciones apagadas sale igualmente, pero solo para los
+   * propósitos de la lista cerrada del servidor (`_shared/enviamentManual.ts`); con otro, el
+   * servidor lo ignora. Lo pone `acceptaEnviament()` cuando la persona lo acepta.
+   */
+  manual?: boolean
 }
 
 export interface EmailResult {

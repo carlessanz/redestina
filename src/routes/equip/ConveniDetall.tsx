@@ -38,6 +38,7 @@ import { refrescaComptadors } from '../../lib/pendentsEquip'
 import type { Convenio, Documento, EnlaceToken, Evidencia } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
+import { acceptaEnviament } from '../../lib/enviamentManual'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
@@ -209,6 +210,9 @@ export default function ConveniDetall() {
     if (!conv || !enllacNou) return
     const desti = correu.trim() || enllacNou.destinatari || ''
     if (desti === '') { toast.error(t('conv.no_email')); return }
+    // Con las notificaciones apagadas es un envío manual (§8): sale si se acepta.
+    const acceptat = await acceptaEnviament(confirma, t, motiuEmail)
+    if (!acceptat) return
     setOcupat(true)
     const res = await enviarCorreuConveni({
       email: desti,
@@ -221,6 +225,7 @@ export default function ConveniDetall() {
       boto: t('conv.mail_button'),
       nota: t('conv.mail_note'),
       idioma: lang,
+      manual: acceptat.manual,
     })
     setOcupat(false)
     if (!res.ok) {
@@ -500,8 +505,7 @@ export default function ConveniDetall() {
                   {t('conv.link_open')}
                 </a>
               </Button>
-              <BotoAmbMotiu className="h-11 whitespace-normal md:h-8" disabled={ocupat || !!motiuEmail}
-                motiu={motiuEmail ? t(motiuEmail) : undefined}
+              <BotoAmbMotiu className="h-11 whitespace-normal md:h-8" disabled={ocupat}
                 onClick={() => void mandaCorreu()}>
                 {t('conv.link_mail')}
               </BotoAmbMotiu>

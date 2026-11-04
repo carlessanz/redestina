@@ -144,7 +144,8 @@ export default function NovaEntitat() {
   const [ambAcces, setAmbAcces] = useState(false)
   const motiuCorreu = motiuCanal(useCanals(), 'email')
   const correuAlta = String(valors.email ?? '').trim()
-  const motiuAcces = motiuCorreu ?? (correuAlta ? null : 'acc.m_sense_correu')
+  // Con las notificaciones apagadas la casilla sigue (§8): marcarla es aceptar el envío manual.
+  const motiuAcces = correuAlta ? null : 'acc.m_sense_correu'
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [desant, setDesant] = useState(false)
   const [cataleg, setCataleg] = useState<TipusActivitat[]>([])
@@ -197,7 +198,7 @@ export default function NovaEntitat() {
     toast.success(t('rec.created'))
     if (org && ambAcces && !motiuAcces) {
       // El alta ya está hecha: un fallo aquí no la deshace, se dice y el acceso se da desde la ficha.
-      const r = await donarAcces(org, correuAlta)
+      const r = await donarAcces(org, correuAlta, { manual: !!motiuCorreu })
       if (r.ok) toast.success(t('acc.ok_donat', { email: correuAlta }))
       else toast.warning(`${t('acc.e_alta_feta')} ${t(clauErrorAcces(r.codi))}`)
     }
@@ -378,6 +379,9 @@ export default function NovaEntitat() {
                   {t('ne.dona_acces')}
                 </FilaCasella>
                 <p className="ml-8 text-xs text-muted-foreground">{t(motiuAcces ?? 'ne.h_dona_acces')}</p>
+                {!motiuAcces && motiuCorreu && (
+                  <p className="ml-8 text-xs text-muted-foreground">{t(motiuCorreu)} {t('man.casella')}</p>
+                )}
               </div>
             )}
 

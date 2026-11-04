@@ -3,7 +3,11 @@
 // para que ponga su contraseña. Sustituye a `alta-assistida`, que siempre creaba una organización
 // nueva con una contraseña puesta por el equipo.
 //
-//   POST { organizacion_id, email? }  →  { ok, compte_nou, email: "···@domini", correu }
+//   POST { organizacion_id, email?, manual? }  →  { ok, compte_nou, email: "···@domini", correu }
+//
+// `manual: true` (04-11-2026): quien pulsa «Dona-li accés» acepta mandarlo con las
+// notificaciones apagadas (§8, `_shared/enviamentManual.ts`): ni el precheck ni `sendEmail`
+// miran entonces los interruptores. El modo test sigue mandando. Sin él, como antes.
 //
 // AUTORIZACIÓN: `exigirEquipo` y, encima, `pot_aprovar` (admin o super_admin): crear una cuenta
 // ya aprobada es aprobar un alta. Mismo idioma que tenía `alta-assistida`.
@@ -130,7 +134,8 @@ Deno.serve(async (req) => {
     if (!correu.ok) return responder({ error: correu.code, code: correu.code }, 400);
     const email = correu.email;
 
-    if (!(await emailActivo(supabase))) {
+    const manual = body.manual === true;
+    if (!manual && !(await emailActivo(supabase))) {
       return responder({ error: "El correu està desactivat a Configuració", code: "correu_desactivat" }, 409);
     }
     if ((await modoTestActivo(supabase)) && actives.some((f) => !f.es_test)) {
@@ -221,6 +226,7 @@ Deno.serve(async (req) => {
     const r = await sendEmail(
       { to: email, ...missatge },
       { supabase, proposito: "acces_entitat", objetoTipo: "organizacion", objetoId: org, funcion: "donar-acces" },
+      { manual },
     );
     if (!r.ok) {
       await desfer();

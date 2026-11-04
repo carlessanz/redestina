@@ -1912,3 +1912,19 @@ Lo que pidió Carles al ver las pestañas del 03-11:
 - El «Opt-in (consentiment)» de Gestió interna es **otra cosa**: el permiso de WhatsApp para enviar
   plantillas (`entidades.opt_in`), no el RGPD.
 
+### Envío manual con las notificaciones apagadas (04-11-2026, `20270507100000`)
+
+El concepto y la lista cerrada están en §8 («Automático y manual»). En los paneles:
+- **Ficha de la entidad**: «Demana el consentiment per correu» y «Envia’l per correu per signar»
+  vuelven a funcionar con el correo apagado (confirmación con el aviso, `acceptaEnviament`) y
+  «Copia l’enllaç» queda al lado como alternativa. «Dona-li accés» igual; en «Nova entitat», la
+  casilla sigue activa y avisa de que el correo saldrá igualmente.
+- **Detalle del convenio** (enviar el enlace por correo) y **Documents** («Reenvia», en las dos
+  pestañas): ya no se ponen grises por el interruptor.
+- **Detalle del albarán**: botón nuevo **«Envia per correu»** en Accions (con el albarán emitido y su
+  PDF vigente). `enviar-albara` manda el PDF adjunto a cada parte con correo (receptora en ENT/OPE,
+  ofertante en REC/OPE) y, si el albarán está `entregado` y la parte no ha confirmado, un enlace
+  nuevo para confirmar (el anterior de correo de esa parte se revoca). Un aviso por destinatario
+  (`alb.env_r_*`). Freno de doble clic de 2 minutos. «Marcar entregat» sigue sin mandar nada con el
+  correo apagado: su correo es una consecuencia, no el botón, y el aviso remite a «Envia per correu».
+

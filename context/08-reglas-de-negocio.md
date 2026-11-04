@@ -79,7 +79,53 @@ Deno `canalsActius()`/`whatsappActivo()`, contexto `useCanals()`).
   **«Copia l’enllaç»** (`components/fitxa/EnllacPerCopiar`): se acuña el mismo enlace
   (`crearEnllacConsentiment` / `crearEnllacConveni`, sin `enviar-email`) y se da el texto con el
   enlace para pegarlo en un correo propio. La respuesta de la persona queda registrada igual. Es
-  el mismo criterio que los mensajes para copiar del modo autónomo (§6ter).
+  el mismo criterio que los mensajes para copiar del modo autónomo (§6ter). Desde el mismo día
+  conviven con el envío manual (siguiente apartado): el botón de correo vuelve a funcionar, con
+  confirmación, y «Copia l’enllaç» queda al lado.
+
+### Automático y manual: qué cortan los interruptores (04-11-2026, decisión de Carles)
+
+🔴 **Desactivar las notificaciones corta todo lo que sale de forma AUTOMÁTICA**: triggers, jobs
+(`pg_cron`), avisos, recordatorios, el PDF que `generar-documento` manda al generarse, el correo
+que acompaña a «Marcar entregat»… **Unos pocos envíos que alguien del equipo lanza a mano con un
+botón SÍ salen, si lo acepta en el momento.** El porqué: con las notificaciones apagadas en
+producción (para que nada salga solo mientras se prueba), el equipo se quedaba sin poder pedir un
+consentimiento o mandar un albarán, que son actos deliberados de una persona.
+
+La lista es **cerrada** y la elige Carles (no se amplía sin preguntarle):
+
+| Botón | Dónde | Cómo sale |
+| --- | --- | --- |
+| «Demana el consentiment per correu» | Gestió interna de la ficha | `enviar-email`, propósito `consentiment_rgpd` |
+| «Envia’l per correu per signar» | Documentació › Convenis de la ficha y detalle del convenio | `enviar-email`, propósito `firma_conveni` |
+| «Reenvia» | Documents (las dos pestañas) | `reenviar-documento` con `manual` |
+| «Dona-li accés» / «Torna a enviar» y la casilla de «Nova entitat» | Contacte i accés | `donar-acces` con `manual` |
+| «Envia per correu» del albarán | Detalle del albarán | `enviar-albara` (nueva) con `manual` |
+
+**No** entran, y con las notificaciones apagadas siguen en gris: la campaña masiva de convenios,
+la oferta por correo y el correo libre a una entidad (`DialegCorreu`).
+
+Cómo funciona:
+- **Un solo punto decide**: `sendEmail(…, traza, { manual: true })` (`_shared/resend.ts`) se salta
+  los dos interruptores (general y correo) y **mantiene el modo test**; la lista blanca y los
+  documentos de prueba los siguen mirando los llamadores, como siempre. La traza de
+  `documento_envios` lleva `funcion = '<funció>:manual'`, así que lo que salió a mano con las
+  notificaciones apagadas se puede auditar.
+- **`enviar-email` no se fía del cliente**: acepta `manual: true` solo si el propósito está en
+  `PROPOSITS_MANUALS` (`_shared/enviamentManual.ts`, puro, con test); con otro, lo ignora y el
+  correo se corta (503). Las funciones propias (`reenviar-documento`, `donar-acces`,
+  `enviar-albara`) leen `manual` del cuerpo; las tres exigen equipo (y `donar-acces`, `pot_aprovar`).
+  Sin `manual`, todas se comportan como antes (compatible con el frontend publicado).
+- **El cliente pregunta siempre**: `acceptaEnviament(confirma, t, motiuCorreu, base?)`
+  (`src/lib/enviamentManual.ts`). Con el correo encendido, la confirmación propia del botón (o
+  ninguna) y sin `manual`; apagado, siempre un diálogo con el aviso «Les notificacions estan
+  apagades… sortirà igualment perquè l’envies tu» y, si se acepta, `manual: true`. Los botones ya no
+  salen grises por el interruptor; solo por falta de correo u otros motivos propios.
+- **Añadir un envío manual**: un propósito nuevo en `PROPOSITS_MANUALS` (si va por `enviar-email`)
+  o `manual` en la función propia, el botón con `acceptaEnviament`, una línea en esta tabla y en
+  AGENTS.md §8. Nunca para algo que se dispare solo o en masa.
+- E2E: `tests/e2e/enviament-manual.e2e.ts` (oferta cortada aunque diga `manual`; convenio, reenvío y
+  albarán, conciliado y entregado, con el correo apagado).
 
 ### Interruptor global `whatsapp_activo` (14-09-2026)
 

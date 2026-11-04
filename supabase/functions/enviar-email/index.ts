@@ -11,6 +11,7 @@ import { createClient } from "@supabase/supabase-js";
 import { bloquePreformateado, escaparHtml, plantillaEmail, sendEmail } from "../_shared/resend.ts";
 import { bustiaEquip, esEmailTest, modoTestActivo } from "../_shared/gate.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
+import { esEnviamentManual } from "../_shared/enviamentManual.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
 
@@ -123,13 +124,16 @@ Deno.serve(async (req) => {
       }
     }
 
+    // Manual (04-11-2026): solo los propósitos de la lista cerrada; con cualquier otro, el
+    // `manual: true` del cliente se ignora y los interruptores lo cortan como siempre.
+    const manual = esEnviamentManual(proposito, input?.manual);
     const r = await sendEmail({ to, subject, html: htmlFinal, text, replyTo: await bustiaEquip(supabase) }, {
       supabase,
       proposito,
       objetoTipo,
       objetoId,
       funcion: "enviar-email",
-    });
+    }, { manual });
     if (!r.ok) return responder(r.data, r.status === 0 ? 502 : r.status);
     return responder({ ok: true, data: r.data, simulat: r.simulado === true }, 200);
   } catch (err) {

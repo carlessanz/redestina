@@ -7,8 +7,9 @@
 //    manda un enlace por correo a la ficha; la persona responde en `/consentiment/:token` y
 //    hasta entonces no consta nada. Debajo se ve el estado de la última petición (enviada,
 //    abierta, respondida, caducada).
-//    Con el correo apagado (§8), el botón pasa a «Copia l’enllaç»: crea el mismo enlace y da
-//    el texto para mandarlo desde un correo propio (`EnllacPerCopiar`).
+//    Con las notificaciones apagadas (§8) es un envío MANUAL: el botón sigue funcionando y
+//    pide la confirmación (`acceptaEnviament`); al lado sale «Copia l’enllaç», que crea el
+//    mismo enlace y da el texto para mandarlo desde un correo propio (`EnllacPerCopiar`).
 
 import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
@@ -16,7 +17,9 @@ import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { copiarAlPortapapeles } from '../../lib/copiar'
 import { crearEnllacConsentiment, demanarConsentiment, textCopiaConsentiment } from '../../lib/consentiments'
+import { acceptaEnviament } from '../../lib/enviamentManual'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
+import { useConfirma } from '../DialegConfirma'
 import EnllacPerCopiar from './EnllacPerCopiar'
 import { Badge } from '@/components/ui/badge'
 
@@ -53,6 +56,7 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
   const [carregat, setCarregat] = useState(false)
   const [enviant, setEnviant] = useState(false)
   const [copia, setCopia] = useState<{ text: string; correu: string } | null>(null)
+  const { confirma, dialeg } = useConfirma()
 
   const carrega = useCallback(async () => {
     const [cons, enll] = await Promise.all([
@@ -78,6 +82,10 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
   async function demana() {
     const desti = (correu ?? '').trim()
     if (!desti) return
+    const acceptat = await acceptaEnviament(confirma, t, motiuCorreu, motiuCorreu
+      ? { titol: t('cons.b_demana'), descripcio: t('cons.confirm_manual', { correu: desti }), confirmar: t('man.envia') }
+      : undefined)
+    if (!acceptat) return
     setEnviant(true)
     const r = await demanarConsentiment(organitzacioId, desti, {
       assumpte: t('cons.mail_assumpte'),
@@ -86,7 +94,7 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
       cos: t('cons.mail_cos'),
       boto: t('cons.mail_boto'),
       nota: t('cons.mail_nota'),
-    }, lang)
+    }, lang, acceptat.manual)
     setEnviant(false)
     if (!r.ok) {
       toast.error(r.fase === 'enllac'
@@ -160,22 +168,20 @@ export default function Consentiments({ organitzacioId, correu, motiuCorreu }: {
         <p className="text-sm [overflow-wrap:anywhere]" data-testid="consentiment-peticio">{estatPeticio}</p>
       )}
       {copia && <EnllacPerCopiar text={copia.text} correu={copia.correu} testid="consentiment-copia" />}
-      {motiuCorreu
-        ? (
-          <>
-            <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('epc.alternativa')}</p>
-            <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-              disabled={enviant || !!motiu} motiu={motiu} onClick={() => void creaPerCopiar()}>
-              {t(pendent ? 'cons.b_copia_nou' : 'cons.b_copia')}
-            </BotoAmbMotiu>
-          </>
-        )
-        : (
+      {motiuCorreu && <p className="text-xs text-muted-foreground">{t(motiuCorreu)} {t('man.alternativa')}</p>}
+      <div className="flex flex-wrap gap-2">
+        <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
+          disabled={enviant || !!motiu} motiu={motiu} onClick={() => void demana()}>
+          {t(pendent ? 'cons.b_reenvia' : 'cons.b_demana')}
+        </BotoAmbMotiu>
+        {motiuCorreu && (
           <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-            disabled={enviant || !!motiu} motiu={motiu} onClick={() => void demana()}>
-            {t(pendent ? 'cons.b_reenvia' : 'cons.b_demana')}
+            disabled={enviant || !!motiu} motiu={motiu} onClick={() => void creaPerCopiar()}>
+            {t(pendent ? 'cons.b_copia_nou' : 'cons.b_copia')}
           </BotoAmbMotiu>
         )}
+      </div>
+      {dialeg}
     </div>
   )
 }

@@ -463,6 +463,7 @@ Si algo sale mal: **Nivel 0**, `update app_settings set value='false' where key=
 | `tancar_seguiment(p_id)` (04-11-2026) | `es_intern()` con sesión | Da por hecha la próxima acción (`seguiment_fet_at = now()`, `_per = auth.uid()`); idempotente. `nota_inexistent`, `nota_sense_seguiment` |
 | `demanar_consentiment(p_org, p_email)` (04-11-2026, `20270506100000`) | `es_intern()` con sesión | Acuña el enlace `consentiment_rgpd` (revoca el anterior) y devuelve el token en claro para el correo. `organitzacio_desconeguda`, `sense_correu` |
 | `llista_consentiments()` (04-11-2026) | `es_intern()` con sesión | Consentimiento vigente por persona y tipo, con correo y organización (exportación) |
+| `preparar_enviament_albara(p_albaran, p_per)` (04-11-2026, `20270507100000`) | solo `service_role` (`enviar-albara`) | Documento vigente y destinatarios de correo del albarán (misma regla que `marcar_entregado`); si está `entregado` y la parte no ha confirmado, revoca su enlace de correo activo y acuña uno nuevo (token en claro solo en la respuesta). `albara_no_emes` (22023), `albara_desconegut` (PT404) |
 | `registrar_consentiment_enllac(...)` (04-11-2026) | solo `service_role` (`enlace-publico`) | Guarda las tres respuestas del enlace con la huella del servidor, deja evidencia y gasta el enlace. `PT404`/`PT409`/`PT410`, `falta_acceptacio`, `dades_invalides` |
 
 Arnés (04-11-2026, +18 en total): `tancar_seguiment` y `activar_organitzacio` denegadas a las externas;

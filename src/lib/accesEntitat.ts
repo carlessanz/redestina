@@ -15,7 +15,11 @@ export interface CondicionsAcces {
   correu: string
   /** El correo del formulario no es el guardado: primero se desa. */
   correuCanviat: boolean
-  /** Clave i18n de `motiuCanal(…, 'email')` si el correo está apagado (§8), o null. */
+  /**
+   * Clave i18n de `motiuCanal(…, 'email')` si el correo está apagado (§8), o null. Ya NO pone
+   * gris el botón (04-11-2026): «Dona-li accés» es un envío manual, y el componente pide la
+   * confirmación (`acceptaEnviament`).
+   */
   motiuCorreu: string | null
 }
 
@@ -34,7 +38,7 @@ function motiuEnviar(c: CondicionsAcces): string | null {
   if (!c.entitatActiva) return 'acc.m_inactiva'
   if (!c.correu.trim()) return 'acc.m_sense_correu'
   if (c.correuCanviat) return 'acc.m_desa_correu'
-  return c.motiuCorreu
+  return null
 }
 
 /**

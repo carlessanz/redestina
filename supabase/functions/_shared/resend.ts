@@ -125,6 +125,13 @@ export interface OpcionsEnviament {
    * cliente y no puede servir para saltarse el corte).
    */
   transaccional?: boolean;
+  /**
+   * Envío MANUAL (04-11-2026): alguien del equipo lo lanza con un botón y lo acepta en el
+   * momento. Se salta los interruptores de notificaciones, que cortan lo automático, pero
+   * NO el modo test (`tallNotificacions`). Quién puede pasarlo: `_shared/enviamentManual.ts`.
+   * La traza lo apunta como `<funció>:manual`.
+   */
+  manual?: boolean;
 }
 
 type Cliente = ClienteSupabase;
@@ -225,8 +232,9 @@ export async function sendEmail(
   traza?: TrazaEnvio,
   opcions: OpcionsEnviament = {},
 ): Promise<EmailResult> {
+  if (opcions.manual && traza?.funcion) traza = { ...traza, funcion: `${traza.funcion}:manual` };
   if (!opcions.transaccional) {
-    const tall = await tallNotificacions(traza, payload.to);
+    const tall = await tallNotificacions(traza, payload.to, opcions.manual === true);
     if (tall) {
       console.warn(`[resend] correo no enviado a ${traza?.proposito ?? "?"}: ${tall}`);
       const r: EmailResult = { ok: false, status: 503, desactivado: true, data: { code: tall, error: tall } };
@@ -247,11 +255,15 @@ export async function sendEmail(
 async function tallNotificacions(
   traza: TrazaEnvio | undefined,
   to: string,
+  manual: boolean,
 ): Promise<"notificacions_desactivades" | "email_desactivat" | "no_test_user" | null> {
   if (!traza) return "notificacions_desactivades";
-  const c = await canalsActius(traza.supabase);
-  if (!c.notificacions) return "notificacions_desactivades";
-  if (!c.email) return "email_desactivat";
+  // Lo manual no mira los interruptores (cortan lo automático); el modo test, sí.
+  if (!manual) {
+    const c = await canalsActius(traza.supabase);
+    if (!c.notificacions) return "notificacions_desactivades";
+    if (!c.email) return "email_desactivat";
+  }
   // 🔴 EL MODO TEST, TAMBIÉN AQUÍ (27-10-2026): la misma red que en `enviar()` de WhatsApp.
   //    Cada llamador ya lo comprueba antes; esto es lo que impide que un envío nuevo que se
   //    olvide del gate escriba a todo el import. Pasan las fichas `es_test` y el buzón del

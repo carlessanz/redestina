@@ -14,6 +14,7 @@ import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { donarAcces } from '../../lib/acces'
 import { accionsAcces, clauErrorAcces, type EstatAcces } from '../../lib/accesEntitat'
+import { acceptaEnviament } from '../../lib/enviamentManual'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import { Badge } from '@/components/ui/badge'
@@ -58,8 +59,11 @@ export default function AccesEntitat({ orgId, correu, correuCanviat, entitatActi
   useEffect(() => { void carrega() }, [carrega])
 
   async function envia(reenviar: boolean) {
+    // Con las notificaciones apagadas es un envío manual (§8): sale si se acepta.
+    const acceptat = await acceptaEnviament(confirma, t, motiuCorreu)
+    if (!acceptat) return
     setOcupat(true)
-    const r = await donarAcces(orgId, correu.trim())
+    const r = await donarAcces(orgId, correu.trim(), acceptat)
     setOcupat(false)
     if (!r.ok) { toast.error(t(clauErrorAcces(r.codi))); return }
     toast.success(t(reenviar ? 'acc.ok_reenviat' : 'acc.ok_donat', { email: correu.trim() }))

@@ -418,7 +418,11 @@ supabase/
                                static_files ya no llega al isolate (§11)
     descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
     reenviar-documento/        POST (JWT, equipo): vuelve a mandar un documento emitido por
-                               correo, al destinatario de su `envio` y con las mismas barreras (§4)
+                               correo, al destinatario de su `envio` y con las mismas barreras (§4);
+                               `manual` lo deja salir con las notificaciones apagadas (§8)
+    enviar-albara/             POST (JWT, equipo; 04-11-2026): «Envia per correu» del albarán, el PDF
+                               a cada parte y, si le falta confirmar, un enlace nuevo
+                               (`preparar_enviament_albara()`); envío manual (§8)
     recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
@@ -427,6 +431,8 @@ supabase/
     _shared/url-publica.ts     Reescribe el origen de una URL firmada con URL_PUBLICA_STORAGE (solo
                                el clon local; en producción no hace nada, §11)
     _shared/correu-document.ts Qué dice el correo que acompaña a un documento emitido (puro, §4)
+    _shared/correu-albara.ts   Qué dice el correo de «Envia per correu» del albarán (puro)
+    _shared/enviamentManual.ts PROPOSITS_MANUALS: qué puede salir a mano por enviar-email (puro, §8)
     _shared/envia-document.ts  Lo manda: barreras + PDF adjunto + traza. Uno solo para
                                generar-documento y reenviar-documento (§4)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo

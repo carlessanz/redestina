@@ -156,6 +156,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // El estado de la cuenta de una entitat (plan 1, 1D): `estat_acces_org()`.
     { que: 'estat_acces_org().estat', prefijo: 'acc.estat_', valores: ['sense', 'pendent', 'enviat', 'actiu', 'desactivat'] },
     // Las notas internas (plan 1, 1F): el CHECK de `notes_internes.canal`, en la ficha y en el listado.
+    // «Envia per correu» del albarán (04-11-2026): lo que responde `enviar-albara`.
+    { que: 'enviar-albara resultat', prefijo: 'alb.env_r_', valores: ['enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error'] },
+    { que: 'enviar-albara code', prefijo: 'alb.env_e_', valores: ['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc', 'error'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },

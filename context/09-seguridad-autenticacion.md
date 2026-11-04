@@ -394,6 +394,11 @@ pone su propia contraseña. `POST /functions/v1/donar-acces` (`verify_jwt = true
 - **Correo** (`donar-acces/correu.ts`, puro): «Benvingut/da a REDESTINA · Estableix la teva contrasenya»
   (ca/es por `perfiles.idioma`), `plantillaEmail()` con botón al enlace, datos escapados, **sin código
   de seis cifras** (es un enlace de recuperación, no un acceso mágico). El enlace lleva a `/restablir`.
+- **Envío manual (04-11-2026, §8)**: con `manual: true` en el cuerpo, ni el precheck (409
+  `correu_desactivat`) ni `sendEmail` miran los interruptores; el modo test, sí. Lo pone la ficha
+  cuando quien pulsa acepta el aviso de que las notificaciones están apagadas, y la casilla de
+  «Nova entitat» (marcarla es aceptarlo). Sin él, como antes: `tests/e2e/acces.e2e.ts` sigue
+  esperando el 409.
 - **Consentimientos: ninguno.** Nadie acepta la privacidad por la persona (P3); aceptarla en el primer
   acceso es la **deuda 152**, condición para apagar el modo test.
 - **Mailpit del clon**: si el envío sale `simulado` y existe `MAILPIT_URL` (solo en
