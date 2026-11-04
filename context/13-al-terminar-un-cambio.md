@@ -96,7 +96,7 @@
    el técnico (busca y lee el historial; activar, desactivar, desactivar la organización y añadir un
    papel, no) más los dos de contactos, que pasan de «permitir» a «denegar» (D3), y ocho en el
    super_admin (los cuatro de estado con uuid inventado → 22023, la búsqueda, el historial y el
-   contacto denegado). **Clon, tras el bloqueo del borrado por ofertas (`20270508100000`, 04-11-2026): 1.769/1.769 y 28 sin datos (total 1.797: +1, `bloqueigs_esborrat_fitxa` del super_admin sobre una ficha con ofertas, que exige el código `ofertes` con `codiEsperat`).** Antes, **clon, tras el envío manual (`20270507100000`, 04-11-2026): 1.768/1.768 y 28 sin datos
+   contacto denegado). **Clon, tras el bloqueo del borrado por ofertas (`20270508100000`, 04-11-2026): 1.769/1.769 y 28 sin datos (total 1.797: +1, `bloqueigs_esborrat_fitxa` del super_admin sobre una ficha con ofertas, que exige el código `ofertes` con `codiEsperat`). Producción, tras publicar `b557346` el 04-11-2026: 1.774/1.774 y 23 sin datos (mismo total).** Antes, **clon, tras el envío manual (`20270507100000`, 04-11-2026): 1.768/1.768 y 28 sin datos
    (total 1.796: +9, `preparar_enviament_albara` denegada en los nueve perfiles). Producción, tras publicar `3cfba88` el 04-11-2026: 1.773/1.773 y 23 sin datos (mismo total).** Antes, **clon, tras el consentimiento por enlace (`20270506100000`, 04-11-2026): 1.759/1.759 y 28 sin datos
    (total 1.787: +27, las tres RPC nuevas en los nueve perfiles). Producción, tras publicar `414319c` el
    04-11-2026: 1.764/1.764 y 23 sin datos (mismo total; la diferencia con el clon son datos).** **Clon, tras població real y ubicació (`20270505100000`, 04-11-2026): 1.732/1.732 y 28
