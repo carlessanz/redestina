@@ -1213,6 +1213,32 @@ D4: un hilo cronológico por organización, **solo del equipo**, sin «próxima 
   pendiente más próxima). A un actor, 0 y null.
 - **`activar_organitzacio(p_org)`**: la pareja de `desactivar_organitzacio()` (§4bis).
 
+### Població real, àrea editable i «Ubicació» (`20270505100000`, 04-11-2026)
+
+En una ficha ponía «Mercabarna» como población: no es un municipio sino un lugar de Barcelona.
+Carles pidió que la población sea siempre un municipio de verdad, que población y área se puedan
+editar y un campo aparte para esos lugares.
+
+- **`ubicacio`** (text, CHECK 1–120 sin blancos) en `productores` y `entidades`: el lugar que no es
+  un municipio (Mercabarna, un polígono, un mercado).
+- **`poblacion` ya no es texto libre**: `trg_fitxa_municipi()` (ahora `before insert or update of
+  municipio_ine, poblacion`) la deriva SIEMPRE del municipio. Un texto que llega sin municipio
+  (registro público, importación, dato antiguo) se casa con `municipi_de_text()` —sin acentos,
+  mayúsculas ni el artículo pospuesto, y **solo con una coincidencia exacta y única**: «Sant Boi» o
+  «Hospitalet» no casan—; si no casa, pasa a `ubicacio` (si estaba vacía) y la población queda null.
+  Un texto escrito junto a un municipio que no es él («Polígon Can Calderon» + Viladecans) también va a
+  `ubicacio`. Borrar el municipio a propósito vacía la población.
+- **`area_geografica` = la comarca, editable**: sale del municipio al insertar y al cambiar de
+  municipio, **salvo que la misma escritura cambie el área** (así respeta la que elige la pantalla).
+  Las RPC del actor solo aceptan una comarca de `municipios` **o el valor que ya tenía** (los
+  «Terres Ebre», «Girona», «Bages-Vallès»… del ARA son zonas de Espigoladors, no comarcas, y se
+  conservan hasta que alguien los cambie): `comarca_desconeguda`. El equipo escribe directo (sin
+  comprobación en la base; la pantalla solo ofrece la lista).
+- `actualitzar_fitxa_productor/entitat` aceptan `ubicacio` (`ubicacio_massa_llarga`) y
+  `area_geografica`; `crear_entitat` acepta `ubicacio`. `municipi_de_text()` sin EXECUTE para nadie.
+- Datos: `update … set poblacion = poblacion where municipio_ine is null` los pasa por la regla. En el
+  clon (con el ARA): 6 + 4 casados, 96 + 15 a `ubicacio`.
+
 ### El listado «Entitats» (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 - **`v_entitats_llistat`** (`security_invoker`): una fila por organización con ficha (las

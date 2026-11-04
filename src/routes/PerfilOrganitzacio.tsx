@@ -35,6 +35,7 @@ import { refrescaAvisos } from '../lib/refrescAvisos'
 import { useOrganitzacio } from '../hooks/useAppContext'
 import { errorCorreu, errorCp, errorNif, errorTelefon } from '../lib/validacio'
 import { activitatsPerPaper, carregaTipusActivitat, type TipusActivitat } from '../lib/organitzacio'
+import { carregaMunicipis } from '../lib/municipis'
 import {
   campsDeTaula, normalitzaValor, potEditar as potEditarCamp, type Bloc, type CampFitxa, type Taula,
 } from '../lib/campsFitxa'
@@ -177,7 +178,13 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     let viu = true
     void supabase.from('codis_postals').select('codi_ine').eq('codi_postal', cp).then(({ data }) => {
       const files = (data ?? []) as { codi_ine: string }[]
-      if (viu && files.length === 1) setValors((f) => ({ ...f, municipio_ine: files[0].codi_ine }))
+      if (!viu || files.length !== 1) return
+      const codi = files[0].codi_ine
+      // Y su comarca en «Àrea geogràfica», como al elegirla en el selector.
+      void carregaMunicipis().then((ms) => {
+        const comarca = ms.find((m) => m.codi_ine === codi)?.comarca
+        if (viu) setValors((f) => ({ ...f, municipio_ine: codi, ...(comarca ? { area_geografica: comarca } : {}) }))
+      })
     })
     return () => { viu = false }
   }, [cp, teMunicipi, potEditar])

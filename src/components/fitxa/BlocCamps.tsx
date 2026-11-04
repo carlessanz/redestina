@@ -6,7 +6,9 @@
 // Los `id` llevan prefijo (`po-productor-nif`, `ed-nif`): con doble rol puede haber dos
 // formularios en la misma página (la ficha del actor, una pestaña por papel).
 
+import { useEffect, useState } from 'react'
 import { useT } from '../../lib/i18n'
+import { carregaMunicipis } from '../../lib/municipis'
 import { TIPUS_EMPRESA } from '../../lib/perfilReceptor'
 import { potEditar, type CampFitxa, type Veu } from '../../lib/campsFitxa'
 import type { TipusActivitat } from '../../lib/organitzacio'
@@ -51,6 +53,18 @@ export default function BlocCamps({
   const { t, lang } = useT()
   const idDe = (c: CampFitxa) => `${idPrefix}-${c.clau}`
   const selectClasses = 'w-full text-base md:text-sm'
+
+  // Las comarcas, del mismo nomenclátor que el selector de población (cargado una vez).
+  const ambComarca = camps.some((c) => c.tipus === 'comarca')
+  const [comarques, setComarques] = useState<string[]>([])
+  useEffect(() => {
+    if (!ambComarca) return
+    let viu = true
+    void carregaMunicipis().then((ms) => {
+      if (viu) setComarques([...new Set(ms.map((m) => m.comarca))].sort((a, b) => a.localeCompare(b, 'ca')))
+    })
+    return () => { viu = false }
+  }, [ambComarca])
 
   function control(c: CampFitxa) {
     const tp = c.tipus ?? 'text'
@@ -135,14 +149,34 @@ export default function BlocCamps({
     if (tp === 'municipi') {
       return (
         <>
+          {/* Elegir la población pone su comarca en «Àrea geogràfica», que luego se puede
+              cambiar (la base hace lo mismo si el área no llega en la misma escritura). */}
           <SelectorMunicipi id={id} valor={(v as string | null) ?? null} invalid={invalid}
-            onChange={(m) => { if (!disabled) onChange(c.clau, m?.codi_ine ?? null) }} />
-          {/* Lo que había escrito a mano antes de que existiera la lista: se enseña para que
-              se sepa qué municipio elegir, y desaparece al guardar uno oficial. */}
-          {!v && valors.poblacion ? (
-            <p className="mt-1 text-xs text-muted-foreground">{t('org.h_poblacio_antiga', { x: String(valors.poblacion) })}</p>
-          ) : null}
+            onChange={(m) => {
+              if (disabled) return
+              onChange(c.clau, m?.codi_ine ?? null)
+              if (m && camps.some((x) => x.clau === 'area_geografica')) onChange('area_geografica', m.comarca)
+            }} />
         </>
+      )
+    }
+    if (tp === 'comarca') {
+      // Un valor de antes de la lista (el «Terres Ebre» del import) se conserva como opción
+      // propia, como en `tipus_empresa`; la RPC del actor también lo acepta.
+      const val = (v as string | null) ?? ''
+      const llegat = val && comarques.length > 0 && !comarques.includes(val) ? val : null
+      return (
+        <Select value={val === '' ? '__none' : val} disabled={disabled}
+          onValueChange={(nv) => onChange(c.clau, nv === '__none' ? null : nv)}>
+          <SelectTrigger id={id} className={selectClasses}><SelectValue placeholder="—" /></SelectTrigger>
+          <SelectContent>
+            <SelectItem value="__none">—</SelectItem>
+            {llegat && <SelectItem value={llegat}>{llegat}</SelectItem>}
+            {/* Mientras carga la lista, el valor actual, para que el desplegable no salga vacío. */}
+            {comarques.length === 0 && val && <SelectItem value={val}>{val}</SelectItem>}
+            {comarques.map((co) => <SelectItem key={co} value={co}>{co}</SelectItem>)}
+          </SelectContent>
+        </Select>
       )
     }
     if (tp === 'xips_activitat') {
@@ -174,6 +208,7 @@ export default function BlocCamps({
         value={(v as string) ?? ''}
         disabled={disabled}
         aria-invalid={invalid}
+        maxLength={c.maxim}
         type={tp === 'email' ? 'email' : tp === 'tel' ? 'tel' : 'text'}
         placeholder={c.clau === 'nom_comercial' && !v ? placeholderNom : undefined}
         inputMode={tp === 'cp' ? 'numeric' : tp === 'tel' ? 'tel' : undefined}

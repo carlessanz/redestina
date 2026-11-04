@@ -1868,3 +1868,16 @@ Lo que pidió Carles al ver las pestañas del 03-11:
   receptor + el enlace a «El meu perfil de recepció»). La tarjeta de diagnóstico sigue encima, fuera.
 - E2E: `crm.e2e.ts` +2 (seguimientos y estado global); `fitxa-unica`, `entitats` abren Gestió interna
   antes de mirar los papeles; el helper `pestanya()` acepta «Contacte» a secas.
+
+### Població, àrea i ubicació editables (04-11-2026, `20270505100000`)
+
+- En el bloque Adreça (las dos fichas, `campsFitxa.ts`): **Població** es el `SelectorMunicipi`
+  (`municipio_ine`, ayuda «Tria-la de la llista de municipis»); **Àrea geogràfica** es un desplegable
+  de comarcas (tipo `comarca` en `BlocCamps`, lista de `carregaMunicipis()`, conserva un valor antiguo
+  como opción propia, como `tipus_empresa`) que se rellena solo al elegir la población y se puede
+  cambiar; **Ubicació** es texto libre (`maxim: 120`, también en el alta de «Nova entitat»).
+  `poblacion` pasa a `NO_ES_MOSTRA` y ya no queda ningún campo `edita: 'ningu'`. Se quitó la ayuda
+  «Abans hi havia escrit…» (`org.h_poblacio_antiga`) y la clave `org.f_municipi`.
+- En «La meva organització», la población deducida del código postal también pone su comarca.
+- E2E: `organitzacio.e2e.ts` +1 (el CP elige Barcelona, se cambia a Badalona, el área a Maresme, la
+  ubicación «Mercabarna»; una comarca inventada da `comarca_desconeguda`).

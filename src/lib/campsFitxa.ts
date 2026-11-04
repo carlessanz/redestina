@@ -41,6 +41,7 @@ export type TipusCamp =
   | 'select' // lista fija (`opcions`), con `etiquetaOpcio` como prefijo i18n si se guarda un identificador
   | 'tipus_empresa' // lista cerrada TIPUS_EMPRESA; conserva un valor antiguo de texto libre
   | 'municipi' // codi INE (SelectorMunicipi); el trigger rellena población y comarca
+  | 'comarca' // una comarca de `municipios`; conserva un valor antiguo del import
   | 'xips_activitat' // catálogo `tipus_activitat`, filtrado por papel
   | 'xips_modalitats' // donacio · venda · maquila
   | 'data' // `yyyy-mm-dd` (productores.data_alta es date; entidades.data_alta, texto)
@@ -65,6 +66,8 @@ export interface CampFitxa {
   ample?: 'full'
   /** No se puede dejar vacío (el actor lo valida en pantalla; la RPC también). */
   obligatori?: boolean
+  /** Longitud máxima de un texto (la base tiene el mismo CHECK). */
+  maxim?: number
 }
 
 /** El papel al que pertenece un campo: común si tiene columna en las dos tablas. */
@@ -104,13 +107,15 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
     labelKey: 'f.direccion', veu: 'tots', edita: 'tots' },
   { clau: 'codigo_postal', columnes: { productores: 'codigo_postal', entidades: 'codigo_postal' }, bloc: 'adreca',
     tipus: 'cp', labelKey: 'f.codigo_postal', veu: 'tots', edita: 'tots' },
+  // La población ES el municipio (20270505100000): se elige de la lista oficial y el trigger
+  // `*_municipi` escribe `poblacion` con su nombre. Lo que no es un municipio va a Ubicació.
   { clau: 'municipio_ine', columnes: { productores: 'municipio_ine', entidades: 'municipio_ine' }, bloc: 'adreca',
-    tipus: 'municipi', labelKey: 'org.f_municipi', veu: 'tots', edita: 'tots' },
-  // Derivados del municipio por el trigger `*_municipi`: se enseñan, no se teclean.
-  { clau: 'poblacion', columnes: { productores: 'poblacion', entidades: 'poblacion' }, bloc: 'adreca',
-    labelKey: 'f.poblacion', veu: 'tots', edita: 'ningu' },
+    tipus: 'municipi', labelKey: 'f.poblacion', ajudaKey: 'org.h_poblacio', veu: 'tots', edita: 'tots' },
+  // La comarca: sale sola al elegir la población y se puede cambiar.
   { clau: 'area_geografica', columnes: { productores: 'area_geografica', entidades: 'area_geografica' }, bloc: 'adreca',
-    labelKey: 'org.f_area', ajudaKey: 'org.h_area', veu: 'tots', edita: 'ningu' },
+    tipus: 'comarca', labelKey: 'org.f_area', ajudaKey: 'org.h_area', veu: 'tots', edita: 'tots' },
+  { clau: 'ubicacio', columnes: { productores: 'ubicacio', entidades: 'ubicacio' }, bloc: 'adreca',
+    labelKey: 'org.f_ubicacio', ajudaKey: 'org.h_ubicacio', veu: 'tots', edita: 'tots', maxim: 120 },
 
   // ------------------------------------------------------------------ Ofertant
   { clau: 'productos_habituales', columnes: { productores: 'productos_habituales' }, bloc: 'ofertant', tipus: 'list',
@@ -196,8 +201,9 @@ export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
     'id', 'organizacion_id', 'created_at',
     'temporada', // la escribe el diagnóstico operativo (20270423100000); se ve en «Diagnòstic»
     'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
+    'poblacion', // el nombre del municipio, que escribe el trigger: se ve en el selector de «Població»
   ],
-  entidades: ['id', 'organizacion_id', 'created_at', 'ref_externa'],
+  entidades: ['id', 'organizacion_id', 'created_at', 'ref_externa', 'poblacion'],
 }
 
 /** Columnas que el actor puede escribir por su RPC, además de los campos `edita: 'tots'`. */
@@ -243,7 +249,7 @@ export function columnesEditablesActor(taula: Taula): string[] {
 export const CLAUS_ALTA: readonly string[] = [
   'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat',
   'persona_contacte', 'email', 'telefon',
-  'direccion', 'codigo_postal', 'municipio_ine',
+  'direccion', 'codigo_postal', 'municipio_ine', 'ubicacio',
   'tipo_receptor',
 ]
 

@@ -157,7 +157,8 @@ Sin FK con `productores`: unidas por teléfono.
 
 **Fichas**: `productores` y `entidades` (dos tablas, con `es_test`, `activo`, `nif` validado por
 trigger `*_nif` —`nif_invalid`/`nif_en_us`—, `razon_social`, `municipio_ine` → trigger rellena
-`poblacion` y `area_geografica` = comarca, `tipus_activitat[]`, `perfil_receptor` jsonb,
+`poblacion` (siempre un municipio; si no casa, a `ubicacio`) y `area_geografica` =
+comarca (editable), `tipus_activitat[]`, `perfil_receptor` jsonb,
 `tipo_receptor` social·animal·transformador·comercial, `modalitats_interes`, `ref_externa` =
 origen de la importación, 1E), ambas colgando de
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
@@ -445,7 +446,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás (el frontend vigente sigue sirviéndose). Última: `20270504100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270505100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -620,7 +621,7 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.730/1.730 y 30 sin datos (igual con el ARA 2026 cargado, 1E); producción 1.737/1.737 y 23
+   **Referencia: clon 1.732/1.732 y 28 sin datos; producción 1.737/1.737 y 23
    (la diferencia son datos). «Sin fallos de permisos».** Una
    cifra que sube o baja sin checks nuevos es cambio de **datos**, no de permisos; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si

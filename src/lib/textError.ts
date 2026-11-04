@@ -56,6 +56,9 @@ const CODIS: Record<string, string> = {
   falta_rao_social: 'org.err_falta_rao_social',
   entitat_inactiva: 'org.err_entitat_inactiva',
   tipus_activitat_desconegut: 'org.err_activitat',
+  // Població real, àrea i ubicació (20270505100000).
+  comarca_desconeguda: 'org.err_comarca',
+  ubicacio_massa_llarga: 'org.err_ubicacio',
   // El alta de una entidad (plan 1, 1B, `crear_entitat()`). `cal_nom_comercial` va ANTES
   // que `cal_nom`, que lo contiene.
   cal_nom_comercial: 'ef.nom_obligatori',

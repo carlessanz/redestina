@@ -30,6 +30,8 @@ export interface Productor {
   nif: string | null
   area_geografica: string | null
   poblacion: string | null
+  /** Lugar que no es un municipio (Mercabarna…); la población es siempre un municipio */
+  ubicacio: string | null
   productos_habituales: string[] | null
   data_alta: string | null
   activo: boolean | null
@@ -222,6 +224,8 @@ export interface Entidad {
   comentarios: string | null
   area_geografica: string | null
   poblacion: string | null
+  /** Lugar que no es un municipio (Mercabarna…); la población es siempre un municipio */
+  ubicacio: string | null
   direccion: string | null
   codigo_postal: string | null
   horario: string | null
