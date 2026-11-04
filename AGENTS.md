@@ -620,7 +620,7 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.768/1.768 y 28 sin datos; producción 1.764/1.764 y 23
+   **Referencia: clon 1.768/1.768 y 28 sin datos; producción 1.773/1.773 y 23
    «Sin fallos de permisos».** Una cifra que sube o baja sin checks nuevos es cambio de
    **datos**; la cuenta
    `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
