@@ -141,7 +141,7 @@ export default function EntitatDetall() {
   const [cataleg, setCataleg] = useState<TipusActivitat[]>([])
   useEffect(() => { void carregaTipusActivitat().then(setCataleg) }, [])
 
-  const { esborra, ocupat: esborrant, error: errorEsborrat, dialegs } = useEsborrarFitxa(() => navigate(LLISTA))
+  const { esborra, ocupat: esborrant, error: errorEsborrat, dialegs } = useEsborrarFitxa(() => navigate(LLISTA), recarrega)
 
   // La pestaña activa, en la URL: un enlace o «atrás» vuelven al mismo sitio.
   const [params, setParams] = useSearchParams()
@@ -585,7 +585,10 @@ export default function EntitatDetall() {
                 {errorEsborrat && <p className="mb-2 text-sm text-destructive">{errorEsborrat}</p>}
                 <BotoAmbMotiu variant="destructive" disabled={esborrant || !potEsborrar}
                   motiu={potEsborrar ? undefined : t('rec.no_permission_delete')}
-                  onClick={() => void esborra({ productorId: org.productor_id, entidadId: org.entidad_id, nom })}>
+                  onClick={() => void esborra({
+                    orgId: org.id, productorId: org.productor_id, entidadId: org.entidad_id,
+                    productorActiu: Boolean(org.productor_activo), entidadActiu: Boolean(org.entidad_activo), nom,
+                  })}>
                   <Trash2 className="size-4" /> {t('ef.esborra')}
                 </BotoAmbMotiu>
               </div>

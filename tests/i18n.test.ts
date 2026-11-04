@@ -159,6 +159,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // «Envia per correu» del albarán (04-11-2026): lo que responde `enviar-albara`.
     { que: 'enviar-albara resultat', prefijo: 'alb.env_r_', valores: ['enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error'] },
     { que: 'enviar-albara code', prefijo: 'alb.env_e_', valores: ['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc', 'error'] },
+    // Lo que impide borrar una ficha: los `codi` de `bloqueigs_esborrat_fitxa()` (desde
+    // 20270508100000 también las ofertas), compuestos en `useEsborrarFitxa.tsx`.
+    { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'documents'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },

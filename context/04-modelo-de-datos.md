@@ -959,7 +959,8 @@ privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al aña
 ### Borrado de una ficha: un único camino, `borrar_ficha_completa()`
 
 ✅ **Desde `20260921153439` hay UNA puerta** (§4bis), y es la que aplica la regla de §7.
-Hace, en una sola transacción: (1) comprueba los **bloqueos fiscales** —albaranes que ya no
+Hace, en una sola transacción: (1) comprueba los **bloqueos** —desde `20270508100000` las
+**ofertas** (abajo) y los fiscales: albaranes que ya no
 son borrador, cierres anuales o a demanda, líneas de cierre que citan la ficha, convenios o
 planes **con número**, y cualquier `documentos` emitido de esos objetos— y si hay alguno se
 niega con `22023 bloqueig_esborrat: <codis>` **sin tocar nada**; (2) si no, arrastra lo
@@ -984,6 +985,32 @@ desde el 22-09-2026 se purga en el mismo paso, sin llevarse nunca
 `tecnologia@espigoladors.com` (deuda §12.33, cerrada; detalle arriba en «Modelo de datos»).
 Y lo que SQL no puede hacer: **retirar los ficheros de
 Storage**. Sus rutas salen en `fitxers_orfes` del resultado, para que lo haga quien llama.
+
+🔴 **Desde `20270508100000` (04-11-2026, decisión de Carles) las OFERTAS también bloquean.**
+`bloqueigs_esborrat_fitxa()` suma dos motivos al principio: `ofertes` (el productor tiene algún
+`excedentes`, **en cualquier estado**, también `cancelada` o `borrador`) y `ofertes_rebudes` (la
+entidad ha participado en alguna oferta: una `oferta_respuestas` o una `canalizaciones`), con
+`@germana` si lo aporta la hermana. `borrar_ficha_completa()` los lee de ahí sin cambiar su
+lógica; solo su `hint` propone desactivar. Por qué: una entidad que ha operado tiene historia
+—y, si se canalizó, la de otra organización—, y lo que se hace con ella es **desactivarla**
+(`desactivar_fitxa` / `desactivar_organitzacio`); el borrado queda para lo que se dio de alta
+por error y nunca operó. `borrar_una_fitxa()` **no se tocó**: sigue sabiendo borrar ofertas,
+aunque la puerta ya no le deje llegar con ninguna (es la red si algún día se decide otra cosa).
+En la práctica, de las fichas del clon el 04-11-2026, 6 de 557 productores y 8 de 179 entidades
+tienen algún bloqueo. Para limpiar fixtures de E2E con oferta hay que quitar antes la oferta como
+`postgres` (`tests/e2e/esborrar-fitxa.e2e.ts`); `scripts/limpiar-e2e.ts` lista el motivo y sigue.
+
+**La pantalla (`hooks/useEsborrarFitxa.tsx`, «Esborra l’entitat» en Gestió interna)**:
+(1) pregunta **antes** a `bloqueigs_esborrat_fitxa()` por cada papel; si no hay nada que se pueda
+borrar, un diálogo dice por qué (los motivos, traducidos con `rec.block_<codi>`) y ofrece
+«Desactiva l’entitat» (`desactivar_organitzacio`), o «Ja està inactiva» si no queda nada activo;
+(2) con doble rol, elige un papel o los dos **solo entre lo que no está bloqueado**, y para el
+papel bloqueado ofrece «Desactiva el paper …» (`desactivar_fitxa`); (3) **confirmación fuerte**:
+qué se pierde (la ficha y lo operativo que cuelga de ella, las cuentas que se quedan sin panel,
+la organización retirada si se queda vacía —y sus notas—, que no se puede deshacer), la
+recomendación de desactivar con su botón, y «Esborra definitivament» **solo se enciende al
+escribir la palabra** `esb.paraula` («esborrar» en ca, «borrar» en es; sin mayúsculas ni
+espacios que cuenten). Si el servidor encuentra un bloqueo entre medias, abre el diálogo (1).
 
 🔴 **Exige `es_super_admin()`, no `pot_aprovar()`**, y conviene saber por qué: borrar una
 ficha ya lo exigía —lo imponen las políticas `productores: baixa super_admin` y

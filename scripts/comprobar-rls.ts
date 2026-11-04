@@ -294,6 +294,11 @@ interface Check {
    */
   vacioEsDenegar?: boolean;
   /**
+   * Solo `rpc` que devuelve filas con `codi`: el check pasa si alguna fila trae este código
+   * (20270508100000: una ficha con ofertas tiene que dar `ofertes`, no un motivo cualquiera).
+   */
+  codiEsperat?: string;
+  /**
    * SQLSTATE adicionales que, en un check `permitir`, cuentan como «autorizó y falló
    * después». Casi nunca hace falta: lo normal ya lo cubre `ERRORES_DE_NEGOCIO`.
    */
@@ -307,6 +312,8 @@ interface Check {
    *   · `@fitxa_amb_documents` → un productor con algún albarán fuera de borrador, o sea
    *                              una ficha que NO se puede borrar (20270328100200). Uuid
    *                              nulo si el fixture documental no está puesto.
+   *   · `@fitxa_amb_ofertes`   → un productor con alguna oferta (20270508100000): tampoco se
+   *                              puede borrar. Uuid nulo si no hay ninguna oferta.
    *   · `@meva_fitxa_productor` / `@meva_fitxa_entitat` → la ficha propia de ese tipo,
    *                              leída de la propia membresía (20270414100600: lo que
    *                              `convenio_vigente()` sí responde a una cuenta externa).
@@ -2027,6 +2034,19 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "una fitxa amb albarans emesos NO es pot esborrar (i diu per què)",
       requiereFixture: "un albarán emitido de una ficha de prueba (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // 20270508100000 (04-11-2026): las OFERTAS también bloquean el borrado. De solo lectura,
+    // por el mismo motivo que el de arriba; y exige el código `ofertes`, no un motivo
+    // cualquiera: un productor con ofertas suele tener además albaranes, y sin `codiEsperat`
+    // este check pasaría aunque se perdiera la regla nueva.
+    {
+      tabla: "bloqueigs_esborrat_fitxa",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo: "productor", p_ficha: "@fitxa_amb_ofertes" },
+      codiEsperat: "ofertes",
+      descripcion: "una fitxa amb ofertes NO es pot esborrar (motiu «ofertes»)",
+      requiereFixture: "una oferta de una ficha de prueba",
+    },
   ],
   productor: [
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
@@ -2669,6 +2689,12 @@ async function resolverArgs(
         .not("productor_id", "is", null)
         .limit(1).maybeSingle();
       salida[clave] = (data as { productor_id: string } | null)?.productor_id ?? UUID_NULO;
+    } else if (valor === "@fitxa_amb_ofertes") {
+      const { data } = await cliente.from("excedentes")
+        .select("productor_id")
+        .not("productor_id", "is", null)
+        .limit(1).maybeSingle();
+      salida[clave] = (data as { productor_id: string } | null)?.productor_id ?? UUID_NULO;
     } else {
       salida[clave] = valor;
     }
@@ -2860,6 +2886,14 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
     if (filas === 0) {
       const esperadoAqui = check.vacioEsDenegar ? "denegar" : "permitir";
       return { ok: check.esperado === esperadoAqui, detalle: "0 filas (ejecutada)" };
+    }
+    if (check.codiEsperat) {
+      const codis = (data as { codi?: string }[]).map((f) => f.codi ?? "?");
+      const hi = codis.includes(check.codiEsperat);
+      return {
+        ok: check.esperado === "permitir" && hi,
+        detalle: hi ? `ejecutada (${check.codiEsperat} entre ${codis.length})` : `¡sin ${check.codiEsperat}! (${codis.join(", ")})`,
+      };
     }
     return {
       ok: check.esperado === "permitir",

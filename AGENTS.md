@@ -236,9 +236,10 @@ factura ya no condiciona el certificado (21-09-2026); el anual sustituye a los p
 `impacte_*` sobre kilos conciliados.
 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
-rechaza con `22023 bloqueig_esborrat: <codis>` si hay documentos, albaranes o cierres; si no,
-arrastra lo operativo, borra la ficha, retira la organización vacía y purga la whitelist. Las FK
-`NO ACTION` se quedan como última red. Un `.delete()` suelto está prohibido (§7).
+rechaza con `22023 bloqueig_esborrat: <codis>` si hay **ofertas** (`ofertes`·`ofertes_rebudes`),
+documentos, albaranes o cierres; si no, arrastra lo operativo, borra la ficha, retira la
+organización vacía y purga la whitelist. FK `NO ACTION` = última red; nunca un `.delete()` suelto
+(§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
 **RLS y GRANT — dos capas**: `service_role` todo (y `BYPASSRLS`); `anon` **ningún privilegio**
 de tabla; `authenticated` nace con **SELECT y nada más** en una tabla nueva (los `alter default
@@ -376,7 +377,7 @@ Lo que manda hoy, en una línea cada uno:
   NIF válido y único, razón social obligatoria, «afegir paper». Tablero con indicadores por
   periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu v2 (ficha viva, sin
   plan automático) y perfil de recepción; Pla de Prevenció como **expediente**; «El meu impacte».
-- **Gestión autónoma del super_admin** (27-10-2026, publicado `3907281`): convenio
+- **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
   **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
@@ -447,7 +448,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270507100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270508100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -609,9 +610,8 @@ inactiva sigue viendo las ofertas que ya se le enviaron). Resto: 4, 10, 12,
 17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
 95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
 
-**§12bis** (decisiones con precio, material de terceros, interruptores, decisiones de negocio) y
-**§12ter** (86 cerradas, indexadas porque 48 números se citan desde código que no se puede
-editar) viven en sus ficheros de `context/`.
+**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (86
+cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
@@ -620,10 +620,9 @@ editar) viven en sus ficheros de `context/`.
    ficheros (1 saltada a propósito) + 9 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.768/1.768 y 28 sin datos; producción 1.773/1.773 y 23
-   «Sin fallos de permisos».** Una cifra que sube o baja sin checks nuevos es cambio de
-   **datos**; la cuenta
-   `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
+   **Referencia: clon 1.769/1.769 y 28 sin datos; producción 1.773/1.773 y 23
+   «Sin fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de
+   **datos**; la cuenta `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

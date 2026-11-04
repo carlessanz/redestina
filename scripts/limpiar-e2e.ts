@@ -7,7 +7,8 @@
 //      CANCELAN (no se borran: una oferta con canalizaciones o albaranes es evidencia).
 //   2. Las fichas cuyo nombre empieza por «E2E-» se borran con `borrar_ficha_completa()`,
 //      que es la única puerta (§7). Si la base se niega (`bloqueig_esborrat`), se LISTA el
-//      motivo y se sigue: un albarán emitido no se borra nunca.
+//      motivo y se sigue: un albarán emitido no se borra nunca, y desde 20270508100000 una
+//      ficha con ofertas (aunque estén canceladas) tampoco: se queda, y se desactiva si estorba.
 
 import { createClient } from "jsr:@supabase/supabase-js@2";
 
