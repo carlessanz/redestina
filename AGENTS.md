@@ -618,7 +618,7 @@ cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
    ficheros (1 saltada a propósito) + 15 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.796/1.796 y 28 sin datos; producción 1.774/1.774 y 23
+   **Referencia: clon 1.796/1.796 y 28 sin datos; producción 1.801/1.801 y 23
    «Sin fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de
    **datos**; la cuenta `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.
