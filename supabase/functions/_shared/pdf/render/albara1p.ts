@@ -27,6 +27,7 @@ import {
   codigoVerificacion, type ConfirmacionAlbaran, type DatosAlbaran, fecha, type LineaAlbaran,
   lineasDe, num, type OpcionesAlbaran, type ParteAlbaran, type Renderizado, textoIncidencias,
 } from "./comu.ts";
+import { dataSignatura, embeberTrazo, textosSignatura, viaSignatura } from "./signatura.ts";
 
 type Idioma = "ca" | "es";
 
@@ -357,7 +358,10 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
   // ------------------------------------------- pie: gracias y la firma
   const fund = datos.fundacio ?? (tipo === "REC" ? partes.recibe : partes.entrega) ?? {};
   const fundObj = fund as Record<string, unknown>;
-  const hPeu = 98;
+  // La firma con trazo de la versión `signat` (05-11-2026): solo REC y ENT, una caja.
+  const signatura = op.signatura && (tipo === "REC" || tipo === "ENT") ? op.signatura : null;
+  const trazo = signatura ? await embeberTrazo(doc, signatura) : null;
+  const hPeu = signatura ? 104 : 98;
   if (y - hPeu < 40) {
     p = doc.addPage([A4.ancho, A4.alto]);
     pagines.push(p);
@@ -379,7 +383,7 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
     : [{ titol: tipo === "REC" ? t.firma_rec : t.firma_ent, rol: null }];
   const xF = MARGEN + ANCHO * 0.52;
   const wF = ANCHO * 0.48;
-  const hF = tipo === "OPE" ? 44 : 64;
+  const hF = tipo === "OPE" ? 44 : signatura ? 100 : 64;
   let yF = y;
   for (const c of caixesFirma) {
     caixa(xF, yF, wF, hF, COLORES.crema100);
@@ -387,7 +391,30 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
     const conf: ConfirmacionAlbaran | undefined = c.rol
       ? confs.find((x) => x.rol === c.rol)
       : confs[confs.length - 1];
-    if (conf) {
+    if (signatura) {
+      // El trazo dentro de la caja, «Signat per Nom · Càrrec» y el día con la vía; debajo,
+      // en una línea, la confirmación de los kilos si la hubo (son dos actos distintos).
+      const ts = textosSignatura(idioma);
+      if (trazo) {
+        const altMax = 40;
+        const ampleMax = wF - 24;
+        let w = (trazo.width / trazo.height) * altMax;
+        let h = altMax;
+        if (w > ampleMax) { w = ampleMax; h = (trazo.height / trazo.width) * w }
+        p.drawImage(trazo, { x: xF + (wF - w) / 2, y: yF - 18 - h, width: w, height: h });
+      }
+      text(`${ts.signat_per} ${[signatura.nom, signatura.carrec].filter(Boolean).join(" · ")}`,
+        xF + 6, yF - 68, { size: 8, max: wF - 12 });
+      const dia = dataSignatura(signatura.data);
+      text(`${dia ? `${dia} · ` : ""}${viaSignatura(idioma, signatura.canal)}`,
+        xF + 6, yF - 79, { size: 7.5, color: COLORES.verdeGris, max: wF - 12 });
+      if (conf) {
+        const via = conf.canal === "asistido" ? t.via_assistit : conf.canal === "panel" ? t.via_panell
+          : conf.canal === "whatsapp" ? t.via_whatsapp : t.via_enllac;
+        text(`${t.confirmat} ${[conf.nombre, conf.cargo].filter(Boolean).join(" · ")} · ${fecha(conf.at, true)} · ${via}`,
+          xF + 6, yF - 92, { size: 7, color: COLORES.verdeGris, max: wF - 12 });
+      }
+    } else if (conf) {
       const via = conf.canal === "asistido" ? t.via_assistit : conf.canal === "panel" ? t.via_panell
         : conf.canal === "whatsapp" ? t.via_whatsapp : t.via_enllac;
       text(`${t.confirmat} ${[conf.nombre, conf.cargo].filter(Boolean).join(" · ")}`, xF + 6, yF - 26, { size: 8, max: wF - 12 });

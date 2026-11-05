@@ -54,19 +54,13 @@ import { createClient } from "@supabase/supabase-js";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
+// Formato por cabecera mágica, tope de 10 MB y huella: lo mismo que `pujar-document-signat`.
+import { sha256Bytes, validaAbansDeLlegir, validaBytes } from "../_shared/pujada.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
 
 const BUCKET = "documentos";
-const MAX_BYTES = 10 * 1024 * 1024;
-
-/** Los tres formatos del circuito (los mismos que acepta el bucket, 20260928100600). */
-const MIMES: Record<string, string> = {
-  "application/pdf": "pdf",
-  "image/jpeg": "jpg",
-  "image/png": "png",
-};
 
 // El mismo vocabulario que el CHECK de `documentos_externos` (20270329100000). Se valida
 // aquí para poder responder un 400 con el campo señalado, no un 23514 crudo de Postgres;
@@ -105,15 +99,6 @@ const MOTIU_FORBIDDEN: Record<string, string> = {
 
 function textNet(v: unknown): string {
   return typeof v === "string" ? v.trim() : "";
-}
-
-async function sha256(bytes: Uint8Array): Promise<string> {
-  const copia = new Uint8Array(bytes.length);
-  copia.set(bytes);
-  const resumen = await crypto.subtle.digest("SHA-256", copia.buffer);
-  return Array.from(new Uint8Array(resumen))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
 }
 
 /**
@@ -215,28 +200,16 @@ Deno.serve(async (req) => {
   }
 
   const fichero = form.get("fitxer") ?? form.get("fichero") ?? form.get("file");
-  if (!(fichero instanceof File)) {
-    return responder({ error: "Falta el fitxer", code: "falta_fitxer" }, 400);
-  }
   // El tamaño se mira ANTES de leer los bytes: `arrayBuffer()` de un fichero de 200 MB
-  // se los trae a memoria antes de que nadie pueda decir que no.
-  if (fichero.size > MAX_BYTES) {
-    return responder(
-      { error: "El fitxer no pot passar de 10 MB", code: "massa_gran", bytes: fichero.size },
-      413,
-    );
+  // se los trae a memoria antes de que nadie pueda decir que no (`_shared/pujada.ts`).
+  {
+    const previ = validaAbansDeLlegir(fichero instanceof File ? fichero : null);
+    if (previ) {
+      const { status, ...cos } = previ;
+      return responder(cos, status);
+    }
   }
-  if (fichero.size === 0) {
-    return responder({ error: "El fitxer és buit", code: "fitxer_buit" }, 400);
-  }
-  const mime = (fichero.type || "").toLowerCase();
-  const extension = MIMES[mime];
-  if (!extension) {
-    return responder(
-      { error: "Només s'accepten PDF, JPG i PNG", code: "mime_no_acceptat", mime },
-      415,
-    );
-  }
+  const fitxer = fichero as File;
 
   // ---------------------------------------------------------------- permiso
   // Una pregunta, con la misma respuesta que daría un `select` desde el navegador. Se
@@ -364,15 +337,16 @@ Deno.serve(async (req) => {
   }
 
   // ------------------------------------------------------------------ subida
-  const bytes = new Uint8Array(await fichero.arrayBuffer());
-  // Doble comprobación del tamaño: `File.size` es lo que dice el cliente; esto es lo que
-  // de verdad ha llegado.
-  if (bytes.length > MAX_BYTES) {
-    return responder(
-      { error: "El fitxer no pot passar de 10 MB", code: "massa_gran", bytes: bytes.length },
-      413,
-    );
+  // Doble comprobación del tamaño (`File.size` es lo que dice el cliente; esto es lo que
+  // de verdad ha llegado) y el FORMATO por sus bytes, no por la etiqueta del navegador
+  // (05-11-2026): es el MIME real el que se guarda y el que decide la extensión.
+  const bytes = new Uint8Array(await fitxer.arrayBuffer());
+  const comprovat = validaBytes(bytes, fitxer.type);
+  if ("error" in comprovat) {
+    const { status, ...cos } = comprovat.error;
+    return responder(cos, status);
   }
+  const { mime, extensio: extension } = comprovat;
 
   let ruta: string;
   try {
@@ -386,7 +360,7 @@ Deno.serve(async (req) => {
     );
   }
 
-  const huella = await sha256(bytes);
+  const huella = await sha256Bytes(bytes);
 
   const { error: errSubida } = await supabase.storage
     .from(BUCKET)
@@ -438,6 +412,6 @@ Deno.serve(async (req) => {
     sha256: fila.sha256,
     mime: fila.mime,
     bytes: fila.bytes,
-    nombre: fichero.name,
+    nombre: fitxer.name,
   }, 201);
 });

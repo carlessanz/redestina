@@ -6,7 +6,18 @@
 //   POST /descargar-documento  { documento_extern_id }   (JWT de la sesión)
 //   -> { url, nombre, sha256, bytes, mime, caduca_en }
 //
-// Exactamente UNO de los dos. Son dos tablas distintas y dos autorizaciones distintas,
+//   POST /descargar-documento  { firma_document_id }     (JWT de la sesión, 05-11-2026)
+//   -> { url, nombre, sha256, bytes, mime, caduca_en }
+//   El fichero que alguien SUBIÓ firmado (`firmes_document.fitxer_ruta`, vías `pujat` y
+//   `correu`), para revisarlo antes de cerrar la firma. Lo ve el equipo (`esIntern`) y la
+//   persona titular de la organización que firma (`puc_signar_document`); una firma con
+//   trazo no tiene fichero (`409 sense_fitxer`): su resultado es la versión `signat`.
+//
+// Una versión SUBIDA (la `signat` de las vías `pujat`/`correu`) puede ser un JPG o un PNG:
+// el nombre y el `mime` de la respuesta salen de la extensión real de `ruta`, nunca se da
+// por hecho `.pdf` (05-11-2026).
+//
+// Exactamente UNO de los tres. Son dos tablas distintas y dos autorizaciones distintas,
 // pero el mismo bucket y la misma puerta: partirlo en dos funciones duplicaría el
 // `contextoUsuario()`, el CORS y la firma de la URL, que es donde no conviene que dos
 // copias se separen.
@@ -74,11 +85,40 @@ const EXTENSION_POR_MIME: Record<string, string> = {
   "image/png": "png",
 };
 
+/** Del revés: la extensión de la hoja de una ruta → su MIME. */
+const MIME_POR_EXTENSION: Record<string, string> = {
+  pdf: "application/pdf",
+  jpg: "image/jpeg",
+  jpeg: "image/jpeg",
+  png: "image/png",
+};
+
+/** La extensión real de una ruta (`…-signat-1a2b3c4d.jpg` → `jpg`); `pdf` si no se sabe. */
+function extensionDe(ruta: string | null | undefined): string {
+  const hoja = (ruta ?? "").split("/").pop() ?? "";
+  const ext = hoja.includes(".") ? (hoja.split(".").pop() ?? "").toLowerCase() : "";
+  if (ext === "jpeg") return "jpg";
+  return ext in MIME_POR_EXTENSION ? ext : "pdf";
+}
+
 /** Nombre con el que se ofrece el fichero: el número del documento, no un uuid. */
 function nombreFichero(doc: FilaDocumento): string {
-  if (doc.numero_completo) return `${doc.numero_completo}-v${doc.version}.pdf`;
+  const ext = extensionDe(doc.ruta);
+  if (doc.numero_completo) return `${doc.numero_completo}-v${doc.version}.${ext}`;
   const hoja = (doc.ruta ?? "").split("/").pop();
-  return hoja && hoja.length > 0 ? hoja : `${doc.id}.pdf`;
+  return hoja && hoja.length > 0 ? hoja : `${doc.id}.${ext}`;
+}
+
+interface FilaFirma {
+  id: string;
+  documento_id: string;
+  tipo_doc: string;
+  via: string;
+  estat: string;
+  fitxer_ruta: string | null;
+  fitxer_sha256: string | null;
+  fitxer_mime: string | null;
+  fitxer_bytes: number | null;
 }
 
 /**
@@ -117,25 +157,84 @@ Deno.serve(async (req) => {
 
   let documentoId: string | null = null;
   let externoId: string | null = null;
+  let firmaId: string | null = null;
   try {
     const cuerpo = await req.json();
     documentoId = typeof cuerpo?.documento_id === "string" ? cuerpo.documento_id : null;
     externoId = typeof cuerpo?.documento_extern_id === "string"
       ? cuerpo.documento_extern_id
       : null;
+    firmaId = typeof cuerpo?.firma_document_id === "string" ? cuerpo.firma_document_id : null;
   } catch {
     return responder({ error: "Cuerpo JSON inválido", code: "cos_invalid" }, 400);
   }
-  // Uno de los dos, y solo uno: con los dos puestos habría que elegir cuál manda, y esa
-  // elección la acabaría descubriendo alguien al recibir el fichero equivocado.
-  if (documentoId && externoId) {
+  // Uno, y solo uno: con dos puestos habría que elegir cuál manda, y esa elección la
+  // acabaría descubriendo alguien al recibir el fichero equivocado.
+  if ([documentoId, externoId, firmaId].filter(Boolean).length > 1) {
     return responder(
-      { error: "Envia 'documento_id' o 'documento_extern_id', no tots dos", code: "id_ambigu" },
+      { error: "Envia 'documento_id', 'documento_extern_id' o 'firma_document_id', només un", code: "id_ambigu" },
       400,
     );
   }
-  if (!documentoId && !externoId) {
+  if (!documentoId && !externoId && !firmaId) {
     return responder({ error: "Falta 'documento_id'", code: "falta_id" }, 400);
+  }
+
+  // --------------------------------------------- fichero subido de una firma
+  if (firmaId) {
+    if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(firmaId)) {
+      return responder({ error: "No pots veure aquest document", code: "forbidden" }, 403);
+    }
+    const { data: dataFirma, error: errFirmaFila } = await supabase
+      .from("firmes_document")
+      .select("id, documento_id, tipo_doc, via, estat, fitxer_ruta, fitxer_sha256, fitxer_mime, fitxer_bytes")
+      .eq("id", firmaId)
+      .maybeSingle();
+    if (errFirmaFila) {
+      console.error("descargar-documento: firmes_document:", errFirmaFila.message);
+      return responder({ error: "Error consultando el documento", code: "error_bd" }, 500);
+    }
+    const fila = dataFirma as FilaFirma | null;
+    // Permiso: el equipo, o la titular de la organización que firma. Una firma que no
+    // existe responde lo MISMO que una ajena (403): el permiso no filtra la existencia.
+    let permitidoFirma = ctx.esIntern;
+    if (!permitidoFirma && fila) {
+      const { data: puc, error: errPuc } = await supabase.rpc("puc_signar_document", {
+        p_documento: fila.documento_id,
+        p_user: ctx.userId,
+      });
+      if (errPuc) {
+        console.error("descargar-documento: puc_signar_document:", errPuc.message);
+        return responder({ error: "Error comprobando permisos", code: "error_bd" }, 500);
+      }
+      permitidoFirma = puc === true;
+    }
+    if (!permitidoFirma) {
+      return responder({ error: "No pots veure aquest document", code: "forbidden" }, 403);
+    }
+    if (!fila) return responder({ error: "Documento inexistente", code: "no_existeix" }, 404);
+    if (!fila.fitxer_ruta) {
+      // Firma con trazo: no hay fichero subido; lo firmado es la versión `signat`.
+      return responder({ error: "Aquesta signatura no té cap fitxer pujat", code: "sense_fitxer" }, 409);
+    }
+    const { data: urlFirma, error: errUrl } = await supabase.storage
+      .from(BUCKET)
+      .createSignedUrl(fila.fitxer_ruta, SEGUNDOS_FIRMA);
+    if (errUrl || !urlFirma?.signedUrl) {
+      console.error("descargar-documento: createSignedUrl firma:", errUrl?.message ?? "sin url");
+      return responder({ error: "No s'ha pogut preparar la descàrrega", code: "error_storage" }, 500);
+    }
+    const ext = EXTENSION_POR_MIME[(fila.fitxer_mime ?? "").toLowerCase()] ?? extensionDe(fila.fitxer_ruta);
+    return responder({
+      url: urlPublica(urlFirma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")),
+      nombre: `${(fila.fitxer_ruta.split("/").pop() ?? "").replace(/\.[^.]*$/, "") || fila.tipo_doc}.${ext}`,
+      sha256: fila.fitxer_sha256,
+      bytes: fila.fitxer_bytes,
+      mime: fila.fitxer_mime ?? MIME_POR_EXTENSION[ext],
+      via: fila.via,
+      estat: fila.estat,
+      caduca_en: SEGUNDOS_FIRMA,
+    }, 200);
   }
 
   // ------------------------------------------------------- documento externo
@@ -240,6 +339,8 @@ Deno.serve(async (req) => {
   return responder({
     url: urlPublica(firma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")),
     nombre: nombreFichero(doc),
+    // La extensión real: una versión `signat` subida puede ser un JPG o un PNG.
+    mime: MIME_POR_EXTENSION[extensionDe(doc.ruta)],
     sha256_fichero: doc.sha256_fichero,
     bytes: doc.bytes,
     paginas: doc.paginas,

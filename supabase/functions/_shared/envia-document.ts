@@ -19,6 +19,7 @@ import {
   bustiaEquip, destinatariosPrueba, enLlistaCorreuTest, esEmailTest, modoTestActivo,
 } from "./gate.ts";
 import { plantillaEmail, sendEmail } from "./resend.ts";
+import { EXTENSIO_PER_MIME, mimeReal } from "./pujada.ts";
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -82,8 +83,14 @@ export async function enviaDocument(
   doc: DocumentAEnviar,
   bytes: Uint8Array,
   funcion: string,
-  /** Solo `reenviar-documento`, a petición del botón: se salta los interruptores, no el modo test. */
-  opcions: { manual?: boolean } = {},
+  /**
+   * Solo `reenviar-documento`, a petición del botón:
+   * · `manual`: se salta los interruptores, no el modo test;
+   * · `urlSignar`: el enlace para firmar en línea (05-11-2026), que cambia el texto y el botón;
+   * · `destinatari`: a quién, cuando el documento no lo lleva en `envio` (el albarán): lo da
+   *   `preparar_enviament_signatura()` desde la ficha, nunca la petición.
+   */
+  opcions: { manual?: boolean; urlSignar?: string | null; destinatari?: { email: string; nom?: string | null } | null } = {},
 ): Promise<ResultatEnviament> {
   try {
     const c = composaCorreuDocument({
@@ -94,8 +101,11 @@ export async function enviaDocument(
       ejercicio: doc.ejercicio,
       idioma: doc.idioma,
       modo: doc.modo,
-      envio: doc.envio as { destinatario?: string | null; nombre?: string | null } | null,
+      envio: opcions.destinatari
+        ? { destinatario: opcions.destinatari.email, nombre: opcions.destinatari.nom ?? null }
+        : doc.envio as { destinatario?: string | null; nombre?: string | null } | null,
       datos: (doc.datos ?? null) as DocumentPerEnviar["datos"],
+      urlSignar: opcions.urlSignar ?? null,
     });
     if (!c) return "no_s_envia";
 
@@ -108,11 +118,17 @@ export async function enviaDocument(
     if (!(await enLlistaCorreuTest(supabase, c.destinatari))) return "fora_llista_test";
 
     const adjunt = bytes.length <= MAX_ADJUNT_BYTES;
+    // Una versión `signat` subida puede ser una foto (JPG/PNG): el adjunto se llama por lo
+    // que ES, no `.pdf` (05-11-2026).
+    const real = mimeReal(bytes);
+    const fitxer = real && real !== "application/pdf"
+      ? c.fitxer.replace(/\.pdf$/, `.${EXTENSIO_PER_MIME[real]}`)
+      : c.fitxer;
     const html = plantillaEmail({
       titulo: c.titol,
       preheader: c.preheader,
       cuerpoHtml: c.cosHtml,
-      boton: { texto: c.boto, url: `${APP_URL}/login` },
+      boton: { texto: c.boto, url: c.urlBoto ?? `${APP_URL}/login` },
       nota: c.nota,
       idioma: c.idioma,
     });
@@ -121,7 +137,7 @@ export async function enviaDocument(
       subject: c.assumpte,
       html,
       replyTo: await bustiaEquip(supabase),
-      ...(adjunt ? { attachments: [{ filename: c.fitxer, content: encodeBase64(bytes) }] } : {}),
+      ...(adjunt ? { attachments: [{ filename: fitxer, content: encodeBase64(bytes) }] } : {}),
     }, {
       supabase,
       proposito: "document",

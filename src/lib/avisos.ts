@@ -19,13 +19,15 @@ export type TipusAvis =
   | 'recollida_per_registrar'
   // 17-10-2026: un admin devuelve al receptor el registro de la recogida, con un motivo.
   | 'recollida_retornada'
+  // 05-11-2026 (circuito de firma): la firma de un documento de la organización quedó cerrada.
+  | 'document_signat'
 
 export interface Avis {
   id: string
   destinatari_tipo: 'productor' | 'entidad'
   destinatari_id: string
   tipus: TipusAvis
-  objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion' | 'cierre_donante' | 'cierre_periodo'
+  objecte_tipo: 'excedente' | 'oferta_resposta' | 'canalizacion' | 'cierre_donante' | 'cierre_periodo' | 'documento'
   objecte_id: string
   params: Record<string, unknown>
   llegit_at: string | null
@@ -82,7 +84,8 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
   for (const a of llista) {
     if (a.llegit_at) continue
     // Los certificados por revisar no son de ninguna oferta: solo suenan en la campana.
-    if (a.objecte_tipo === 'cierre_donante' || a.objecte_tipo === 'cierre_periodo') continue
+    // Ni los documentos firmados: van a «Els meus documents», no a una oferta.
+    if (a.objecte_tipo === 'cierre_donante' || a.objecte_tipo === 'cierre_periodo' || a.objecte_tipo === 'documento') continue
     if (a.destinatari_tipo === 'productor') ofertes++
     else interessos++
   }
@@ -90,7 +93,11 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
 }
 
 /** A dónde lleva un aviso en la aplicación. */
-export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'>): string {
+export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'> & Partial<Pick<Avis, 'destinatari_tipo'>>): string {
+  // Un documento firmado (`document_signat`) va a «Els meus documents» del papel que firmó.
+  if (a.objecte_tipo === 'documento') {
+    return a.destinatari_tipo === 'entidad' ? '/receptor/documents' : '/productor/documents'
+  }
   // `oferta_resposta` y `canalizacion` (una entrega sin interés previo, fase 2 del 08-10-2026)
   // son del receptor: van a «Els meus interessos».
   // Un certificado por revisar (fase 4) va a «Els meus certificats» del productor.
@@ -119,6 +126,8 @@ export function varsAvis(a: Pick<Avis, 'params'>): Record<string, string | numbe
     // «10/10 · 10:00» en hora de Madrid, como en el correo (`_shared/textAvis.ts`).
     quan: quanAvis(p.recollida_at),
     exercici: String(p.exercici ?? ''),
+    // El número del documento firmado (`document_signat`).
+    numero: String(p.numero ?? ''),
     valor: new Intl.NumberFormat('ca-ES', { style: 'currency', currency: 'EUR' }).format(Number(p.valor ?? 0)),
   }
 }

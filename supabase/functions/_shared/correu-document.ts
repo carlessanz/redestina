@@ -12,6 +12,9 @@
 // · PLA NO: se descarga al momento desde el panel, `envio` va a null a propósito.
 // · El resumen anual NO pide la factura (decisión del 23-09-2026: el productor la gestiona
 //   con su gestor y el certificado no depende de ella, §12.127).
+// · Con `urlSignar` (05-11-2026, circuito de firma) el correo invita a firmar en línea y el
+//   botón lleva a `/signar-document/<token>`; solo entonces se admiten también el REC y el
+//   ENT (firma del donante y de la receptora), que sin enlace siguen sin mandarse.
 // · El CD habla de su ámbito (05-11-2026): el ejercicio, el periodo o la donación de una
 //   oferta, con las fechas del snapshot (`datos`). El CT ya no se emite, pero lo emitido se
 //   puede reenviar y por eso conserva su texto.
@@ -35,6 +38,12 @@ export interface DocumentPerEnviar {
    * `cierre_periodo`, del periodo sin fechas.
    */
   datos?: { abast?: unknown; periode?: { des_de?: unknown; fins_a?: unknown } | null } | null;
+  /**
+   * El enlace para firmar en línea (`/signar-document/<token>`), si quien envía lo ha pedido
+   * y el documento se puede firmar. Lo acuña `preparar_enviament_signatura()`; el token solo
+   * viaja por correo, nunca por WhatsApp.
+   */
+  urlSignar?: string | null;
 }
 
 export interface CorreuDocument {
@@ -46,12 +55,16 @@ export interface CorreuDocument {
   cosHtml: string;
   nota: string;
   boto: string;
+  /** A dónde lleva el botón: el enlace de firma, o null (el panel, que pone quien envía). */
+  urlBoto: string | null;
   fitxer: string;
   idioma: Idioma;
 }
 
 /** Los tipos que se mandan por correo. El resto se ignora sin error. */
 const TIPUS_ENVIABLES = new Set(["CONV", "RES", "CD", "CT", "CR"]);
+/** Los que, además, se mandan cuando llevan enlace de firma (el albarán firmable). */
+const TIPUS_AMB_SIGNATURA = new Set(["CD", "CR", "REC", "ENT"]);
 
 function escapa(s: string): string {
   return s.replace(/[&<>"']/g, (c) =>
@@ -120,6 +133,30 @@ function textos(d: DocumentPerEnviar, l: Idioma, num: string, any: string): Text
           assumpte: `Certificado de aprovechamiento alimentario ${any} · ${num}`,
           titol: "Tu certificado de aprovechamiento alimentario",
           cos: `Te adjuntamos el certificado <strong>${num}</strong> de las operaciones de venta y transformación hechas a través de Redestina en ${any}.`,
+        };
+    case "REC":
+      return ca
+        ? {
+          assumpte: `Albarà de recepció per signar · ${num}`,
+          titol: "El teu albarà de recepció",
+          cos: `T’adjuntem l’albarà <strong>${num}</strong> dels aliments que has donat a la Fundació Espigoladors a través de Redestina.`,
+        }
+        : {
+          assumpte: `Albarán de recepción para firmar · ${num}`,
+          titol: "Tu albarán de recepción",
+          cos: `Te adjuntamos el albarán <strong>${num}</strong> de los alimentos que has donado a la Fundació Espigoladors a través de Redestina.`,
+        };
+    case "ENT":
+      return ca
+        ? {
+          assumpte: `Albarà d’entrega per signar · ${num}`,
+          titol: "El teu albarà d’entrega",
+          cos: `T’adjuntem l’albarà <strong>${num}</strong> dels aliments que la teva entitat ha rebut a través de Redestina.`,
+        }
+        : {
+          assumpte: `Albarán de entrega para firmar · ${num}`,
+          titol: "Tu albarán de entrega",
+          cos: `Te adjuntamos el albarán <strong>${num}</strong> de los alimentos que tu entidad ha recibido a través de Redestina.`,
         };
     case "CR":
       return ca
@@ -202,7 +239,9 @@ function textosCd(d: DocumentPerEnviar, ca: boolean, num: string, any: string): 
  * de §8, que aplica quien envía—, solo qué se dice.
  */
 export function composaCorreuDocument(d: DocumentPerEnviar): CorreuDocument | null {
-  if (!TIPUS_ENVIABLES.has(d.tipo)) return null;
+  const urlSignar = (d.urlSignar ?? "").trim() || null;
+  const ambSignatura = urlSignar !== null && TIPUS_AMB_SIGNATURA.has(d.tipo);
+  if (!TIPUS_ENVIABLES.has(d.tipo) && !ambSignatura) return null;
   const destinatari = (d.envio?.destinatario ?? "").trim();
   if (!destinatari) return null;
 
@@ -222,6 +261,16 @@ export function composaCorreuDocument(d: DocumentPerEnviar): CorreuDocument | nu
     }</strong></p>`
     : "";
 
+  // La invitación a firmar en línea. El enlace NO entra en el cuerpo: va solo en el botón
+  // (`urlBoto`), que compone `plantillaEmail()`.
+  const signa = ambSignatura
+    ? `<p style="margin:12px 0 0">${
+      ca
+        ? "<strong>Pots signar-lo en línia</strong>: obre’l amb el botó d’aquí sota, revisa’l i signa’l amb el dit o el ratolí. També el pots imprimir, signar-lo a mà i tornar-nos-el."
+        : "<strong>Puedes firmarlo en línea</strong>: ábrelo con el botón de aquí abajo, revísalo y fírmalo con el dedo o el ratón. También puedes imprimirlo, firmarlo a mano y devolvérnoslo."
+    }</p>`
+    : "";
+
   return {
     destinatari,
     assumpte: `${prova ? (ca ? "[PROVA] " : "[PRUEBA] ") : ""}${
@@ -229,11 +278,14 @@ export function composaCorreuDocument(d: DocumentPerEnviar): CorreuDocument | nu
     }`.replace(/&amp;/g, "&").replace(/&lt;/g, "<").replace(/&gt;/g, ">").replace(/&quot;/g, '"').replace(/&#39;/g, "'"),
     titol: t.titol,
     preheader: t.cos.replace(/<[^>]+>/g, "").slice(0, 120),
-    cosHtml: `${avisProva}<p style="margin:0 0 12px">${salutacio}</p><p style="margin:0">${t.cos}</p>`,
+    cosHtml: `${avisProva}<p style="margin:0 0 12px">${salutacio}</p><p style="margin:0">${t.cos}</p>${signa}`,
     nota: ca
       ? "També el tens al teu panell de Redestina, a l’apartat de documents. Guarda aquest correu: el PDF adjunt porta un codi per verificar-ne l’autenticitat."
       : "También lo tienes en tu panel de Redestina, en el apartado de documentos. Guarda este correo: el PDF adjunto lleva un código para verificar su autenticidad.",
-    boto: ca ? "Entra al teu panell" : "Entra en tu panel",
+    boto: ambSignatura
+      ? (ca ? "Signa’l en línia" : "Fírmalo en línea")
+      : (ca ? "Entra al teu panell" : "Entra en tu panel"),
+    urlBoto: ambSignatura ? urlSignar : null,
     fitxer: `${(d.numero_completo ?? "document").replace(/[^A-Za-z0-9._-]/g, "_")}.pdf`,
     idioma,
   };

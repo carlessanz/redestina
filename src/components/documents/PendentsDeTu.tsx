@@ -20,12 +20,14 @@
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
-import { FileSignature, Loader2, PackageCheck } from 'lucide-react'
+import { FileSignature, Loader2, PackageCheck, PenLine, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { acunarEnllacPropi, carregaPendents } from '../../lib/pendents'
 import { refrescaAvisos } from '../../lib/refrescAvisos'
 import DialegFirmaConveni from '../DialegFirmaConveni'
+import DialegSignaDocument, { type PestanyaSignatura } from '../DialegSignaDocument'
+import { useAppContext } from '../../hooks/useAppContext'
 import type { Pendent } from '../../lib/pendents'
 import { rutaPerProposit } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
@@ -36,12 +38,21 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 export default function PendentsDeTu({
   tipusOrg,
   tornarA,
+  onCanvi,
 }: {
   tipusOrg: 'productor' | 'entidad'
   /** A dónde vuelve la página pública al terminar. */
   tornarA: string
+  /** Tras firmar o subir un documento: la pantalla de detrás relee su archivo. */
+  onCanvi?: () => void
 }) {
   const { t } = useT()
+  const { ctx } = useAppContext()
+  /** ¿Es titular de esta ficha? El operador ve lo pendiente pero no firma (como el convenio). */
+  const esTitular = (orgId: string) => (ctx?.organitzacions ?? []).some((o) =>
+    o.tipo === tipusOrg && o.id === orgId && o.rol_org === 'titular')
+  // El documento que se está firmando o subiendo (circuito de firma, 05-11-2026).
+  const [signant, setSignant] = useState<{ p: Pendent; pestanya: PestanyaSignatura } | null>(null)
   const navigate = useNavigate()
   const [files, setFiles] = useState<Pendent[]>([])
   const [obrint, setObrint] = useState<string | null>(null)
@@ -87,7 +98,22 @@ export default function PendentsDeTu({
     navigate(desti, { state: { tornar: tornarA } })
   }
 
-  if (files.length === 0) return null
+  // Firmar un documento (CD, CR, REC, ENT): «Signa aquí» o «Puja'l signat». Al acabar se
+  // relee la lista —lo firmado ya no está pendiente— y el archivo de la pantalla. ⚠️ Vive
+  // fuera de la tarjeta: al firmar, la lista puede quedarse vacía y la tarjeta desaparecer,
+  // y el diálogo tiene que seguir para enseñar «Document signat».
+  const dialegDocument = signant && (
+    <DialegSignaDocument
+      obert
+      doc={{ id: signant.p.objeto_id, tipus: signant.p.tipus, numero: signant.p.numero }}
+      mode="titular"
+      pestanya={signant.pestanya}
+      onTancar={() => { setSignant(null); void carrega() }}
+      onFet={() => { void carrega(); onCanvi?.() }}
+    />
+  )
+
+  if (files.length === 0) return dialegDocument || null
 
   return (
     <Card className="border-aviso/30 bg-aviso-fondo">
@@ -97,6 +123,12 @@ export default function PendentsDeTu({
       </CardHeader>
       <CardContent className="space-y-3">
         {files.map((p) => {
+          if (p.proposito === 'firma_document') {
+            return (
+              <FilaDocument key={clau(p)} p={p} titular={esTitular(p.org_id)}
+                onObre={(pestanya) => setSignant({ p, pestanya })} />
+            )
+          }
           const esConveni = p.proposito === 'firma_convenio'
           const Icona = esConveni ? FileSignature : PackageCheck
           const titol = esConveni
@@ -150,6 +182,8 @@ export default function PendentsDeTu({
         })}
       </CardContent>
 
+      {dialegDocument}
+
       {/* Firmar sin salir del panel. Al cerrar se relee la lista: el convenio que se acaba
           de firmar ya no está pendiente y la tarjeta desaparece sola. */}
       {firmant && (
@@ -166,5 +200,45 @@ export default function PendentsDeTu({
         />
       )}
     </Card>
+  )
+}
+
+/**
+ * Una fila de «Pendent de tu» de un documento a firmar. Dos botones —firmar aquí o subir el
+ * firmado— para el titular; el operador solo ve que está pendiente y quién lo puede firmar.
+ * Si viene de un rechazo, dice por qué.
+ */
+function FilaDocument({ p, titular, onObre }: {
+  p: Pendent
+  titular: boolean
+  onObre: (pestanya: PestanyaSignatura) => void
+}) {
+  const { t } = useT()
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
+      data-testid="pendent-signatura"
+    >
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <PenLine className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="font-medium">{t(`doc.tipus_${p.tipus}`)}</span>
+          {p.numero && <span className="text-sm text-muted-foreground tabular-nums">{p.numero}</span>}
+        </div>
+        {p.etiqueta && <p className="text-sm text-muted-foreground">{p.etiqueta}</p>}
+        {p.motiu && <p className="text-sm text-aviso">{t('sgn.rebutjat_motiu', { motiu: p.motiu })}</p>}
+        {!titular && <p className="text-xs text-muted-foreground">{t('pend.only_titular')}</p>}
+      </div>
+      {titular && (
+        <div className="flex w-full flex-wrap gap-2 sm:w-auto">
+          <Button className="h-11 w-full whitespace-normal sm:w-auto" onClick={() => onObre('signa')}>
+            <PenLine className="mr-1 size-4" aria-hidden />{t('sgn.a_signa')}
+          </Button>
+          <Button variant="outline" className="h-11 w-full whitespace-normal sm:w-auto" onClick={() => onObre('puja')}>
+            <Upload className="mr-1 size-4" aria-hidden />{t('sgn.a_puja')}
+          </Button>
+        </div>
+      )}
+    </div>
   )
 }

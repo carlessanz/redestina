@@ -34,6 +34,8 @@ import DialegConveniDeclarat from '../equip/DialegConveniDeclarat'
 import { declarable } from '../equip/fases/AccionsConveni'
 import EnllacPerCopiar from './EnllacPerCopiar'
 import { acceptaEnviament } from '../../lib/enviamentManual'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
+import AccionsSignatura from '../AccionsSignatura'
 
 export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu, conveniPaper }: {
   tipusOrg: 'productor' | 'entidad'
@@ -52,6 +54,12 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
   const tipus = tipusConveniDeclarat(tipusOrg)
   const tic = useTicAvisos()
   const [estat, setEstat] = useState<string | null | undefined>(undefined)
+  // El PDF vigente del convenio firmado o vigente: sobre él se sube el firmado en papel
+  // (circuito de firma, 05-11-2026). Solo el super_admin; los demás ven el estado.
+  const [docConveni, setDocConveni] = useState<string | null>(null)
+  const [recarregaDoc, setRecarregaDoc] = useState(0)
+  const { perDoc, recarrega: recarregaSig } = useEstatsSignatura(docConveni ? [docConveni] : [])
+  const sigConveni = docConveni ? perDoc[docConveni] ?? null : null
   const [enviant, setEnviant] = useState(false)
   const [copia, setCopia] = useState<{ text: string; correu: string } | null>(null)
   const [paper, setPaper] = useState(false)
@@ -61,18 +69,27 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
   // El estado del convenio de este modelo que cuenta: el más reciente que no está retirado.
   useEffect(() => {
     let viu = true
-    void supabase.from('convenios')
-      .select('estado, created_at')
-      .eq(tipusOrg === 'productor' ? 'productor_id' : 'entidad_id', orgId)
-      .eq('tipo', tipus)
-      .not('estado', 'in', '(substituit,resolt)')
-      .order('created_at', { ascending: false }).limit(1)
-      .then(({ data }) => {
-        if (!viu) return
-        setEstat(((data ?? []) as { estado: string }[])[0]?.estado ?? null)
-      })
+    void (async () => {
+      const { data } = await supabase.from('convenios')
+        .select('id, estado, created_at')
+        .eq(tipusOrg === 'productor' ? 'productor_id' : 'entidad_id', orgId)
+        .eq('tipo', tipus)
+        .not('estado', 'in', '(substituit,resolt)')
+        .order('created_at', { ascending: false }).limit(1)
+      if (!viu) return
+      const fila = ((data ?? []) as { id: string; estado: string }[])[0] ?? null
+      setEstat(fila?.estado ?? null)
+      // Solo un convenio firmado o vigente tiene un PDF que firmar en papel y subir.
+      if (!fila || (fila.estado !== 'firmat' && fila.estado !== 'vigent')) { setDocConveni(null); return }
+      const { data: docs } = await supabase.from('documentos')
+        .select('id')
+        .eq('objeto_tipo', 'convenio').eq('objeto_id', fila.id).eq('vigente', true)
+        .limit(1)
+      if (!viu) return
+      setDocConveni(((docs ?? []) as { id: string }[])[0]?.id ?? null)
+    })()
     return () => { viu = false }
-  }, [tipusOrg, orgId, tipus, tic])
+  }, [tipusOrg, orgId, tipus, tic, recarregaDoc])
 
   function fet() {
     refrescaAvisos()
@@ -155,6 +172,15 @@ export default function ConveniFitxa({ tipusOrg, orgId, nom, correu, motiuCorreu
             )}
           </div>
         </>
+      )}
+
+      {/* El convenio firmado en papel y escaneado, subido encima del vigente: pasa a ser la
+          versión definitiva de la biblioteca. No toca el estado del convenio. */}
+      {resolt && sigConveni && (
+        <div data-testid={`conveni-signatura-${tipusOrg}`}>
+          <AccionsSignatura sig={sigConveni} clauPujaEquip="sgn.a_puja_conveni"
+            onCanvi={() => { setRecarregaDoc((n) => n + 1); void recarregaSig(); fet() }} />
+        </div>
       )}
 
       <DialegConveniPaper obert={paper} tipusOrg={tipusOrg} orgId={orgId} nom={nom}

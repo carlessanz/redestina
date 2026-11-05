@@ -37,6 +37,7 @@ import { EspigoladaDetall, Espigolades, NovaEspigolada } from '../routes/equip/E
 import Confirmar from '../routes/public/Confirmar'
 import Verificar from '../routes/public/Verificar'
 import Signar from '../routes/public/Signar'
+import SignarDocument from '../routes/public/SignarDocument'
 import Consentiment from '../routes/public/Consentiment'
 import Tancament from '../routes/equip/Tancament'
 import TancamentDetall from '../routes/equip/TancamentDetall'
@@ -76,6 +77,9 @@ export const router = createBrowserRouter([
       { path: '/confirmar/:token', element: <Confirmar /> },
       { path: '/factura/:token', element: <Factura /> },
       { path: '/signar/:token', element: <Signar /> },
+      // La firma de un documento —certificado o albarán— por el enlace del correo (05-11-2026):
+      // sin cuenta, por token, como `/signar/:token`.
+      { path: '/signar-document/:token', element: <SignarDocument /> },
       // El consentimiento RGPD que pide el equipo por correo (04-11-2026): sin cuenta, por token.
       { path: '/consentiment/:token', element: <Consentiment /> },
       // Verificación de un certificado (F4). Pública sin matices: quien llega es un

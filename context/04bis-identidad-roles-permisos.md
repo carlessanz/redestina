@@ -568,6 +568,22 @@ el autor del cambio tiene que quedar en el historial.
   hoy). `entitats_receptores` no se filtra por `activo`: es un hecho del periodo, y filtrarla por el
   estado de hoy falsearía periodos pasados.
 
+### Firma de documentos (circuito unificado, `20270510100100`, 05-11-2026)
+
+| RPC | Quién | Qué hace y errores |
+|---|---|---|
+| `document_part_signant(doc)` · `puc_signar_document(doc, user)` | `authenticated` | Consultas: qué parte firma la versión vigente (0 filas si no se puede) y si esta cuenta puede firmarla (equipo siempre; externo solo titular activo y documento real) |
+| `acunar_enllac_propi('firma_document','documento',doc)` | titular | Enlace `panel` 1 h → `{id, token, url_path '/signar-document/<token>', caduca_at}`. `42501` si no es suyo/no titular/prueba; `22023 usa_firma_conveni`·`versio_substituida`·`ja_signat`·`no_signable` |
+| `signar_document_per_enllac(enlace, evidencia)` | solo servidor | Firma con trazo: valida (`PT404/PT409/PT410`, `document_canviat`, `dades_invalides`), inserta `evidencias` y **cierra** (versión `signat` encolada). `42501` si una sesión la llama |
+| `registrar_document_signat(doc, user, fitxer, signant)` | solo servidor | Fichero subido: `42501` sin permiso (antes que existencia); `no_signable`·`versio_substituida`·`ja_signat`·`dades_invalides`. Super_admin → `correu` y cierre; si no → `pujat`, queda `signat` |
+| `tancar_signatura(firma, nota)` · `rebutjar_signatura(firma, motiu)` | `es_super_admin()` | Desde `signat`; `cal_motiu`, `estat_incorrecte`, `versio_substituida` |
+| `preparar_enviament_signatura(doc, email, per)` | solo servidor | Enlace `email` 30 días para el correo con «signa'l en línia»; `sense_correu`, `usa_firma_conveni`, `ja_signat`… |
+| `document_emet_versio_signada`, `document_signatura_comprova`, `ruta_document_signat` | internas / servidor | Sin EXECUTE desde la API |
+
+Triggers de respaldo nuevos: `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una
+versión sustituida), `firmes_document_avis` (aviso al cerrar), `documentos_esborra_enllacos_firma`.
+Arnés: bloques `FIRMA_SERVIDOR` y `FIRMA_EXTERN`; `filasExactas` para las 17 colas de `pendents_equip`.
+
 ## Familias de RPC que el canónico ya no enumera (movidas de `AGENTS.md` el 02-11-2026, 1E)
 
 Para que `AGENTS.md` quepa en su tope de 48 KB, estas familias se citan allí solo por su nombre. La

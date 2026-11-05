@@ -34,7 +34,8 @@ export type { ProposicPendent }
 /** Una fila de `pendents_meus()`. */
 export interface Pendent {
   proposito: ProposicPendent
-  objeto_tipo: 'convenio' | 'albaran'
+  /** `documento` = un documento que firmar (circuito de firma, `firma_document`). */
+  objeto_tipo: 'convenio' | 'albaran' | 'documento'
   objeto_id: string
   tipo_org: 'productor' | 'entidad'
   org_id: string
@@ -44,10 +45,10 @@ export interface Pendent {
   numero: string | null
   /** Los productos del albarán, para reconocerlo sin abrirlo. */
   etiqueta: string | null
-  /** `don_gen`/`don_rec`/`com` en convenios; `REC`/`ENT`/`OPE` en albaranes. */
+  /** `don_gen`/`don_rec`/`com` en convenios; `REC`/`ENT`/`OPE` en albaranes; `CD`/`CR`/`REC`/`ENT` en documentos. */
   tipus: string
   estat_objecte: string
-  /** El motivo por el que el equipo devolvió el convenio, si lo devolvió. */
+  /** El motivo por el que el equipo devolvió el convenio (o rechazó la firma de un documento). */
   motiu: string | null
   ejercicio: number | null
   // --- El último enlace, solo como información -------------------------------
@@ -61,7 +62,7 @@ export interface Pendent {
 export interface EnllacPropi {
   id: string
   token: string
-  /** `/signar/<token>` o `/confirmar/<token>`, compuesto por la base. */
+  /** `/signar/<token>`, `/confirmar/<token>` o `/signar-document/<token>`, compuesto por la base. */
   url_path: string
   rol_part?: 'entrega' | 'recibe'
   caduca_at: string
@@ -73,6 +74,12 @@ export interface EnllacPropi {
  */
 export function clauErrorPendent(missatge: string | null | undefined): string {
   const m = missatge ?? ''
+  // Circuito de firma (20270510100100): códigos propios al principio del mensaje.
+  if (m.includes('usa_firma_conveni')) return 'sgn.err_usa_firma_conveni'
+  if (m.includes('versio_substituida')) return 'sgn.err_versio_substituida'
+  if (m.includes('ja_signat')) return 'sgn.err_ja_signat'
+  if (m.includes('no_signable')) return 'sgn.err_no_signable'
+  if (m.includes('Nomes la persona titular')) return 'pend.only_titular'
   if (m.includes('Ja has signat')) return 'pend.err_ja_signat'
   if (m.includes('Ja tens un conveni vigent')) return 'pend.err_ja_vigent'
   if (m.includes('no esta pendent')) return 'pend.err_no_pendent'
@@ -145,6 +152,27 @@ export async function signarConveniPropi(
     const { data, error } = await supabase.rpc('signar_conveni_propi', {
       p_tipo_org: tipusOrg,
       p_org: orgId,
+    })
+    if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
+    return { ok: true, data: data as EnllacPropi }
+  } catch {
+    return { ok: false, missatge: 'pend.err_generic', codi: null }
+  }
+}
+
+/**
+ * El enlace de firma de UN DOCUMENTO (CD, CR, REC, ENT) para firmarlo desde el panel, una
+ * hora (`acunar_enllac_propi('firma_document', 'documento', <id>)`). Solo el titular; un CONV
+ * contesta `usa_firma_conveni` (se firma por su circuito). Lo llama el diálogo al entrar en
+ * «Signa aquí», y una sola vez: acuñar otro revoca el anterior.
+ */
+export async function acunarEnllacSignatura(documentoId: string): Promise<ResultatRpc<EnllacPropi>> {
+  try {
+    const { data, error } = await supabase.rpc('acunar_enllac_propi', {
+      p_proposito: 'firma_document',
+      p_objeto_tipo: 'documento',
+      p_objeto_id: documentoId,
+      p_rol_parte: null,
     })
     if (error) return { ok: false, missatge: clauErrorPendent(error.message), codi: error.code ?? null }
     return { ok: true, data: data as EnllacPropi }

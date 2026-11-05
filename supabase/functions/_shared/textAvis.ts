@@ -25,14 +25,35 @@ export type TipusAvis =
   | "oferta_enviada"
   | "certificat_per_revisar"
   | "recollida_per_registrar"
-  | "recollida_retornada";
+  | "recollida_retornada"
+  | "document_signat";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
   "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
-  "recollida_retornada",
+  "recollida_retornada", "document_signat",
 ];
+
+/** El nombre del documento por su sigla, para los avisos del circuito de firma. */
+export function nomDocument(tipus: string, idioma: Idioma): string {
+  const es = idioma === "es";
+  switch (tipus) {
+    case "CD": return es ? "El certificado de donación" : "El certificat de donació";
+    case "CR": return es ? "El certificado de recepción" : "El certificat de recepció";
+    case "REC": return es ? "El albarán de recepción" : "L’albarà de recepció";
+    case "ENT": return es ? "El albarán de entrega" : "L’albarà d’entrega";
+    case "CONV": return es ? "El convenio" : "El conveni";
+    default: return es ? "El documento" : "El document";
+  }
+}
+
+/** «del certificat…», «de l’albarà…»: la contracción catalana a partir del nombre con artículo. */
+function deDocument(nom: string): string {
+  if (nom.startsWith("L’")) return `de l’${nom.slice(2)}`;
+  if (nom.startsWith("El ")) return `del ${nom.slice(3)}`;
+  return `de ${nom}`;
+}
 
 /** A quién va el aviso: decide el enlace de los que reciben las dos partes (fase 2). */
 export type DestinatariAvis = "productor" | "entidad";
@@ -222,6 +243,22 @@ export function textAvis(
           : `Tenim preparat el teu certificat de donació ${any}: ${kg(params.kg, idioma)} kg, amb un valor de ${euros}.\nRevisa’l i aprova’l; després el signarem i te l’enviarem.`,
         boton: es ? "Revisar el certificado" : "Revisar el certificat",
         ruta: "/productor/documents",
+      };
+    }
+    case "document_signat": {
+      // Circuito de firma (05-11-2026): la firma de la organización ha quedado cerrada y la
+      // versión definitiva ya está en su biblioteca. `tipus` es la sigla del documento (CD, CR,
+      // REC, ENT, CONV) y `numero` su número.
+      const num = s(params.numero);
+      const nomDoc = nomDocument(s(params.tipus), idioma);
+      return {
+        asunto: es ? `${nomDoc} ${num}: versión firmada disponible` : `${nomDoc} ${num}: versió signada disponible`,
+        titulo: es ? "Documento firmado" : "Document signat",
+        cuerpo: es
+          ? `La firma de ${nomDoc.toLowerCase()} ${num} ha quedado registrada. Ya tienes la versión definitiva en Mis documentos.`
+          : `La signatura ${deDocument(nomDoc)} ${num} ha quedat registrada. Ja tens la versió definitiva a Els meus documents.`,
+        boton: es ? "Ver mis documentos" : "Veure els meus documents",
+        ruta: destinatari === "entidad" ? "/receptor/documents" : "/productor/documents",
       };
     }
     case "oferta_enviada":

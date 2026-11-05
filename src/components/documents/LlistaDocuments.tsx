@@ -12,6 +12,8 @@ import type { ReactNode } from 'react'
 import { Download, FileText, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import BotoIcona from '../BotoIcona'
+import BadgeSignatura from '../BadgeSignatura'
+import AccionsSignatura, { type SignaturaFila } from '../AccionsSignatura'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { etiquetaTipusDocument } from '../../lib/documentsPanell'
 import { dataCurta } from '../../lib/albarans'
@@ -46,7 +48,7 @@ const ESTIL_ESTAT: Record<DocumentoEstado, string> = {
 }
 
 export default function LlistaDocuments({
-  files, descarregador, titolKey, buitKey, descKey, extra, substituit, accio,
+  files, descarregador, titolKey, buitKey, descKey, extra, substituit, accio, signatures, onSignatura,
 }: {
   files: DocFila[]
   descarregador: ReturnType<typeof useDescarregaDocument>
@@ -60,6 +62,13 @@ export default function LlistaDocuments({
   substituit?: (d: DocFila) => boolean
   /** Un enlace junto al título: a la pantalla donde ese documento se trabaja. */
   accio?: ReactNode
+  /**
+   * El estado de firma de cada documento, por id (circuito de firma, 05-11-2026). Con él, la
+   * fila dice si falta su firma y ofrece «Signa» / «Puja'l signat».
+   */
+  signatures?: Record<string, SignaturaFila>
+  /** Tras firmar o subir: la pantalla relee documentos y firmas. */
+  onSignatura?: () => void
 }) {
   const { t } = useT()
 
@@ -111,9 +120,12 @@ export default function LlistaDocuments({
                         {extra?.(d)}
                       </TableCell>
                       <TableCell className="text-center">
-                        {substituit?.(d)
-                          ? <Badge className="whitespace-normal bg-secondary text-secondary-foreground">{t('tan.ds_substituit')}</Badge>
-                          : <Badge className={`whitespace-normal ${ESTIL_ESTAT[d.estado]}`}>{t(CLAU_ESTAT[d.estado])}</Badge>}
+                        <div className="flex flex-col items-center gap-1">
+                          {substituit?.(d)
+                            ? <Badge className="whitespace-normal bg-secondary text-secondary-foreground">{t('tan.ds_substituit')}</Badge>
+                            : <Badge className={`whitespace-normal ${ESTIL_ESTAT[d.estado]}`}>{t(CLAU_ESTAT[d.estado])}</Badge>}
+                          <BadgeSignatura estat={signatures?.[d.id]?.estat} perspectiva="usuari" />
+                        </div>
                       </TableCell>
                       <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground md:table-cell">
                         {dataCurta(d.emitido_at)}
@@ -136,6 +148,8 @@ export default function LlistaDocuments({
                             disabled={gris}
                             onClick={() => void descarregador.descarrega(d.id)}
                           />
+                          <AccionsSignatura sig={signatures?.[d.id]} variant="icones" ambBadge={false}
+                            onCanvi={onSignatura} />
                         </div>
                       </TableCell>
                     </TableRow>

@@ -59,6 +59,7 @@ import {
   type OpcionesCierre,
   type Renderizado,
 } from "./cierre.ts";
+import { pintarSignaturaDocument } from "./signatura.ts";
 
 // ---------------------------------------------------------------------------
 // Medidas del modelo (escaneo A4 a 935 px de ancho → 0,636 pt/px)
@@ -269,6 +270,13 @@ export async function renderCd(
     m.paginaActual.drawImage(sello, { x: xSello, y: y - alto, width: ancho, height: alto });
   }
   m.espacio(ALTO_SELLO);
+
+  // ------------------------------------------- la firma del donante (versión signat)
+  // «Rebut i conforme, el donant», tras la firma de la apoderada y antes del anexo. Solo en
+  // la versión firmada con trazo; sin ella, el certificado no cambia ni un punto.
+  if (op.signatura) {
+    await pintarSignaturaDocument(m, doc, op.signatura, lengua, { tamano: TAM_CUERPO });
+  }
 
   // ------------------------------------------------------------------ anexo
   if (datos.annex === true) pintarAnnex(ctx);

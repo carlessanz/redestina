@@ -59,6 +59,7 @@ import DialegMotiu from '../../components/DialegMotiu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
+import CuaSignatures from '../../components/equip/CuaSignatures'
 import { Badge } from '@/components/ui/badge'
 import FormulariAprovacio from '../../components/equip/FormulariAprovacio'
 import type { Modalitat } from '../../types'
@@ -980,6 +981,10 @@ export default function Aprovacions() {
           })}
         </CardContent>
       </Card>
+
+      {/* ── 5. Signatures per tancar (05-11-2026): lo que una organización firmó fuera y subió.
+             Componente propio: lee su vista, decide el super_admin y se ancla en `#signatures`. */}
+      <CuaSignatures />
 
       <DialegValidacio
         estat={validant}

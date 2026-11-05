@@ -17,10 +17,10 @@
 //     confirmados no coinciden con los entregados. Es un filtro de «mira esto», no un
 //     veredicto; el veredicto lo da la ficha del albarán al abrir la conciliación.
 //
-// «Enllaços caducats» todavía no consulta nada: `enlaces_token` llega con la fase 2
-// (firma de convenios). Preferimos una pestaña que diga honestamente que aún no hay
-// enlaces a una consulta contra una tabla que no existe, que llenaría la pantalla de un
-// error de PostgREST.
+// «Signatures» (05-11-2026) sustituye a la vacía «Enllaços caducats»: la firma de la
+// contraparte de cada documento firmable (`v_signatures_bandeja`), con un filtro —pendents,
+// rebudes (por defecto: lo que espera al super_admin), tancades—. Fail-soft: si la vista no
+// responde, la pestaña sale vacía y el resto de la bandeja sigue.
 //
 // «Enviaments» (deuda §12.25) lee `documento_envios`, que `sendEmail()` escribe con
 // `service_role` desde julio y que **no leía ninguna pantalla**: un correo rechazado por
@@ -49,16 +49,21 @@ import BotoIcona from '../../components/BotoIcona'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
-import { reenviarDocument } from '../../lib/documents'
-import { acceptaEnviament } from '../../lib/enviamentManual'
-import { useConfirma } from '../../components/DialegConfirma'
+import { carregaBandejaSignatures, reenviarDocument } from '../../lib/documents'
+import { useConfirmaEnviament } from '../../components/DialegEnviament'
+import AccionsSignatura from '../../components/AccionsSignatura'
+import BadgeSignatura from '../../components/BadgeSignatura'
+import Desplegable from '../../components/Desplegable'
+import { rutaSignatura } from '../../components/equip/CuaSignatures'
+import { clauVia } from '../../lib/signatures'
 import { estilEstatAlbara } from '../../lib/albarans'
 import { dataCurta, dataHora, kg } from '../../lib/format'
 import type { AlbaranBandeja } from '../../lib/albarans'
-import type { Documento, DocumentoEstado } from '../../types'
+import type { Documento, DocumentoEstado, EstatSignatura, SignaturaBandeja } from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -111,6 +116,8 @@ interface Enviament {
  * contesta `no_s_envia` si ese documento no lleva destinatario.
  */
 const TIPUS_ENVIABLES = new Set(['CONV', 'RES', 'CD', 'CT', 'CR'])
+/** Los firmables que salen por `reenviar-documento` (los albaranes, por su ficha: `enviar-albara`). */
+const TIPUS_ENVIABLES_SIG = new Set(['CD', 'CR'])
 
 /** Solo se traen los últimos: la tabla crece con cada correo y no se pagina (§12.5). */
 const MAX_ENVIAMENTS = 200
@@ -212,7 +219,7 @@ export default function Documents() {
   // `?tab=` como en Albarans: el tablero manda aquí la cola «PDF amb error», y aterrizar en
   // «Tots» dejaba los fallidos mezclados con el resto.
   const [params] = useSearchParams()
-  const PESTANYES = ['tots', 'error', 'conciliar', 'discrepancia', 'enviaments', 'enllacos']
+  const PESTANYES = ['tots', 'error', 'conciliar', 'discrepancia', 'enviaments', 'signatures']
   const pestanyaInicial = PESTANYES.includes(params.get('tab') ?? '') ? (params.get('tab') as string) : 'tots'
   const [documents, setDocuments] = useState<Fila[]>([])
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
@@ -221,7 +228,10 @@ export default function Documents() {
   const [error, setError] = useState<string | null>(null)
   const { cerca, setCerca, q } = useCerca()
   const [reenviant, setReenviant] = useState<string | null>(null)
-  const { confirma, dialeg } = useConfirma()
+  const { pregunta, dialeg } = useConfirmaEnviament()
+  // La firma de la contraparte de cada documento firmable (circuito de firma, 05-11-2026).
+  const [signatures, setSignatures] = useState<SignaturaBandeja[]>([])
+  const [filtreSig, setFiltreSig] = useState<EstatSignatura>('signat')
 
   const carrega = useCallback(async () => {
     // ⚠️ La lista de columnas va en UN literal: partida, supabase-js pierde el tipo de
@@ -283,18 +293,31 @@ export default function Documents() {
     return () => { cancelled = true }
   }, [carregaEnviaments])
 
+  const carregaSignatures = useCallback(async () => {
+    const r = await carregaBandejaSignatures()
+    if (r.ok) setSignatures(r.data)
+    else console.warn('v_signatures_bandeja:', r.missatge)
+  }, [])
+
+  useEffect(() => { void carregaSignatures() }, [carregaSignatures])
+
+  const sigPerDoc = useMemo(() => new Map(signatures.map((x) => [x.documento_id, x])), [signatures])
+
   /**
    * Vuelve a mandar el documento por correo, al destinatario que ya tenía. Pregunta antes:
    * es un correo que sale a una organización. El destinatario solo se conoce cuando se
    * reenvía desde la pestaña de envíos (`documentos.envio` no lo lee el panel).
    */
   async function reenvia(documentoId: string, numero: string | null, destinatari: string | null) {
-    const acceptat = await acceptaEnviament(confirma, t, motiuEmail, {
+    // Pendiente de firma con trazo: el correo puede llevar el enlace para firmar en línea.
+    const sig = sigPerDoc.get(documentoId)
+    const acceptat = await pregunta(motiuEmail, {
       titol: t('doc.resend_title', { num: numero ?? '—' }),
       descripcio: destinatari
         ? t('doc.resend_desc_to', { email: destinatari })
         : t('doc.resend_desc'),
       confirmar: t('doc.resend'),
+      ambCasellaSignatura: sig?.estat === 'pendent' && sig.admet_canvas,
     })
     if (!acceptat) return
     setReenviant(documentoId)
@@ -621,6 +644,89 @@ export default function Documents() {
     )
   }
 
+  // Un CONV «pendent» no espera nada de nadie (se firma por su circuito): no es un pendiente.
+  const signaturesFiltrades = useMemo(() => filtraCerca(
+    signatures.filter((x) => x.estat === filtreSig && (x.estat !== 'pendent' || x.admet_canvas)),
+    q, (x) => [x.numero_completo, x.tipo, x.org_nom, x.signant_nom],
+  ), [signatures, filtreSig, q])
+
+  /** La firma de cada documento: quién, por dónde, cuándo y qué se puede hacer. */
+  function taulaSignatures() {
+    if (signaturesFiltrades.length === 0) {
+      return <p className="text-sm text-muted-foreground">{t(`doc.empty_sig_${filtreSig}`)}</p>
+    }
+    // Móvil: número (con la organización debajo), estado y acciones. `md`: + vía y fecha.
+    return (
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>{t('doc.c_number')}</TableHead>
+            <TableHead className="hidden lg:table-cell">{t('doc.c_org')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('doc.c_via')}</TableHead>
+            <TableHead>{t('doc.c_status')}</TableHead>
+            <TableHead className="hidden md:table-cell">{t('doc.c_date')}</TableHead>
+            <TableHead className="w-15 md:w-36">
+              <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
+            </TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {signaturesFiltrades.map((x) => {
+            const ruta = rutaSignatura(x)
+            const quan = dataCurta(x.tancat_at ?? x.signat_at ?? x.emitido_at)
+            const via = x.via ? t(clauVia(x.via)) : null
+            return (
+              <TableRow key={x.documento_id} data-testid="fila-signatura">
+                <TableCell>
+                  {ruta
+                    ? <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline">{x.numero_completo}</Link>
+                    : <span className="font-medium tabular-nums">{x.numero_completo}</span>}
+                  <Secundari peces={[
+                    { text: x.org_nom, fins: 'lg' },
+                    { text: via, fins: 'md' },
+                    { text: quan, fins: 'md' },
+                  ]} />
+                  {x.modo === 'prueba' && (
+                    <Badge className="mt-1 bg-coral-suave text-coral-texto">{t('doc.mode_test')}</Badge>
+                  )}
+                </TableCell>
+                <TableCell className="hidden text-muted-foreground lg:table-cell">{x.org_nom ?? '—'}</TableCell>
+                <TableCell className="hidden text-center text-muted-foreground md:table-cell">{via ?? '—'}</TableCell>
+                <TableCell className="text-center">
+                  <BadgeSignatura estat={x.estat} perspectiva="equip" />
+                </TableCell>
+                <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground md:table-cell">
+                  {quan}
+                </TableCell>
+                <TableCell>
+                  <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
+                    <BotoIcona
+                      icona={FileText}
+                      etiqueta={t('doc.a_view_pdf')}
+                      disabled={descarregador.ocupat === x.documento_id}
+                      onClick={() => void descarregador.mostra(x.documento_id)}
+                    />
+                    {TIPUS_ENVIABLES_SIG.has(x.tipo) && x.estat === 'pendent' && (
+                      <BotoIcona
+                        icona={reenviant === x.documento_id ? Loader2 : Mail}
+                        etiqueta={t('doc.a_resend_mail')}
+                        className={reenviant === x.documento_id ? '[&_svg]:animate-spin' : undefined}
+                        disabled={reenviant === x.documento_id}
+                        onClick={() => void reenvia(x.documento_id, x.numero_completo, null)}
+                      />
+                    )}
+                    <AccionsSignatura sig={x} variant="icones" ambBadge={false}
+                      onCanvi={() => { void carregaSignatures(); void refresca() }} />
+                  </div>
+                </TableCell>
+              </TableRow>
+            )
+          })}
+        </TableBody>
+      </Table>
+    )
+  }
+
   const buitKey = documents.length === 0 ? 'doc.empty' : 'doc.no_match'
 
   return (
@@ -651,7 +757,7 @@ export default function Documents() {
                 <TabsTrigger value="conciliar">{t('doc.tab_toreconcile', { n: perConciliar.length })}</TabsTrigger>
                 <TabsTrigger value="discrepancia">{t('doc.tab_mismatch', { n: ambDiscrepancia.length })}</TabsTrigger>
                 <TabsTrigger value="enviaments">{t('doc.tab_sends', { n: enviamentsFiltrats.length })}</TabsTrigger>
-                <TabsTrigger value="enllacos">{t('doc.tab_links')}</TabsTrigger>
+                <TabsTrigger value="signatures">{t('doc.tab_signatures', { n: signatures.filter((x) => x.estat === 'signat').length })}</TabsTrigger>
               </TabsList>
             </div>
 
@@ -687,8 +793,18 @@ export default function Documents() {
               {taulaEnviaments()}
             </TabsContent>
 
-            <TabsContent value="enllacos" className="space-y-2">
-              <p className="text-sm text-muted-foreground">{t('doc.empty_links')}</p>
+            <TabsContent value="signatures" className="space-y-3">
+              <p className="text-sm text-muted-foreground">{t('doc.hint_signatures')}</p>
+              <div className="space-y-1.5 sm:max-w-xs">
+                <Label htmlFor="doc-filtre-sig">{t('doc.f_sig')}</Label>
+                <Desplegable
+                  id="doc-filtre-sig"
+                  value={filtreSig}
+                  onChange={(v) => setFiltreSig(v as EstatSignatura)}
+                  opcions={(['signat', 'pendent', 'tancat'] as const).map((e) => ({ valor: e, text: t(`doc.f_sig_${e}`) }))}
+                />
+              </div>
+              {taulaSignatures()}
             </TabsContent>
           </Tabs>
         )}

@@ -128,6 +128,8 @@ export const FASE_AVIS: Record<TipusAvis, FaseMissatge> = {
   recollida_confirmada: 'tancament',
   oferta_sense_desti: 'tancament',
   certificat_per_revisar: 'tancament',
+  // Circuito de firma (05-11-2026): la versión firmada ya está en la biblioteca; es del cierre.
+  document_signat: 'tancament',
 }
 
 const ORDRE_FASE: readonly FaseMissatge[] = ['conveni', 'entrada', 'distribucio', 'aprovacio', 'lliurament', 'tancament']

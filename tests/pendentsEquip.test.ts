@@ -19,17 +19,20 @@ const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 // Las colas cuya fila del tablero lleva segunda línea (`pe.<cua>_sub`).
 const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
   'ofertes_vencudes', 'costos', 'albarans_conciliar', 'espigolades_per_convertir',
-  'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error', 'recollides_per_validar']
+  'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error', 'recollides_per_validar',
+  'signatures_per_tancar']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
 // equipo) y se enseña como segunda línea de `albarans_conciliar`. Sin clave propia, a propósito.
 const SENSE_FILA = ['albarans_esperant']
 
 describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () => {
-  it('lee las dieciséis colas del union CuaEquip', () => {
+  it('lee las diecisiete colas del union CuaEquip', () => {
     // 14 desde el 05-10-2026 (`ofertes_per_validar`), 15 desde el 11-10-2026
     // (`ofertes_modificades`, fase 2 de la revisión del 08-10-2026) y 16 desde el 17-10-2026
     // (`recollides_per_validar`: el admin valida la recogida antes de generar los albaranes).
-    expect(CUES).toHaveLength(16)
+    // 17 desde el 05-11-2026 (`signatures_per_tancar`: firmas subidas que revisa el super_admin).
+    expect(CUES).toHaveLength(17)
+    expect(CUES).toContain('signatures_per_tancar')
     expect(CUES).toContain('recollides_per_validar')
     expect(CUES).toContain('ofertes_modificades')
     expect(CUES).toContain('ofertes_per_validar')

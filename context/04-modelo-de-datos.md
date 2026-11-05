@@ -1014,6 +1014,64 @@ y `rectificar_certificado_transaccion` responden `22023 certificat_transaccio_re
 canalizaciones sin modalidad (`20270509100600`; el `coalesce(…,'donacio')` las contaba como donación y
 rompía D3).
 
+### Circuito de firma unificado (`20270510100000`…`100200`, 05-11-2026)
+
+Carles pidió (05-11-2026) que todo documento que deba firmarse se pueda firmar desde el panel **con el
+dedo o el ratón** o **descargándolo, firmándolo fuera y volviéndolo a subir**, y que el **super_admin**
+pueda enviarlo por correo, recibir la versión firmada y **subirla para darlo por cerrado**. Entran **CD**
+(firma el donante), **CR** (la receptora), **REC** (el productor), **ENT** (la receptora) y **CONV** (solo
+subiendo el PDF firmado: su firma en canvas y la contrafirma siguen como estaban). **No bloquea nada**:
+recogida, conciliación, cierre y declaración siguen igual.
+
+**El modelo.** `documentos` es inmutable, así que **una firma es una versión n+1** con `subtipo='signat'`
+y **el mismo `datos` y `sha256_datos`** (el código de verificación impreso sigue valiendo), y la anterior
+pasa a `vigente=false` con `sustituido_por`. Con trazo nace `pendiente_fichero` (el trigger encola
+`generar-documento`, que pinta el trazo); con fichero subido nace `emitido` con `fichero_at`, la ruta del
+fichero (`<carpeta>/<numero>-signat-<8hex>.<pdf|jpg|png>`, `ruta_document_signat()`), `sha256_fichero` y
+`bytes`, y **no se encola** (`trg_documentos_encola_generacion` ya ignoraba filas con `fichero_at`). El PDF
+subido se guarda **tal cual**: lo firmado son esos bytes.
+
+**`firmes_document`** registra el acto: `documento_id` (la versión que se firmó), `document_signat_id` (la
+n+1, null hasta cerrar), `objeto_tipo/objeto_id`, `tipo_doc`, `modo`, `part` (donant·receptor·organitzacio),
+`tipo_org`, `org_id`, `via` (**canvas** · **pujat** por la organización · **correu** = la subió el
+super_admin), `estat` (**signat** · **tancat** · **rebutjat**), `enlace_id`/`evidencia_id` (canvas),
+`fitxer_ruta/sha256/mime/bytes` (pujat/correu), `signant_nom/carrec`, `data_signatura`, `signat_per/at`,
+`tancat_per/at`, `nota_tancament`, `rebutjat_per/at`, `motiu_rebuig`. CHECKs de coherencia por vía y
+estado; índice único «una firma viva por (documento, parte)» (`where estat <> 'rebutjat'`). **Sin DNI**: el
+de la firma con trazo vive en `evidencias.documento_identidad` (fuera del GRANT). GRANT SELECT a
+`authenticated` y nada más; RLS «intern o meves» (`documents_meus()` y `modo <> 'prueba'`). Un externo
+**nunca firma en prueba**; el equipo sí recorre el circuito completo en prueba.
+
+**«Pendent» no se guarda: se deriva.** `document_part_signant(doc)` devuelve `(part, tipo_org, org_id,
+admet_canvas)` solo para la versión vigente, `emitido`, `subtipo <> 'signat'` y con el dominio en estado
+firmable (CD: `cierre_donante`/`cierre_periodo` en `certificat_emes`/`enviat`; CR: `cierre_receptor`
+ídem; REC/ENT: albarán `confirmado`/`conciliado`; CONV: `firmat`/`vigent`, `admet_canvas=false`). La
+vista **`v_signatura_document`** (`security_invoker`) da por documento vigente `estat` pendent·signat·tancat,
+`firma_id`, `via`, `signant_nom`, `signat_at`, `tancat_at`, `fitxer_mime`, `part`, `tipo_org`, `org_id`,
+`admet_canvas`, `ultim_motiu_rebuig`; **`v_signatures_bandeja`** (solo equipo) añade `modo`, objeto,
+`org_nom`, `fitxa_id`, `organizacion_id`. ⚠️ Un CONV vigente sale `pendent` con `admet_canvas=false`: no es
+«te toca firmar» para la organización, solo «se le puede subir el firmado».
+
+**Cómo se cierra cada vía.** Trazo (`signar_document_per_enllac`, solo servidor): valida enlace
+`firma_document`, `sha256_texto = sha256_datos` (`document_canviat`), mínimos nombre/cargo 2 y DNI 5,
+inserta la evidencia y **cierra al momento** (la evidencia es la revisión). Fichero de la organización
+(`registrar_document_signat`, solo servidor): queda `signat` en la cola «Signatures per tancar» y el
+super_admin **cierra** (`tancar_signatura`, nota opcional) o **rechaza** (`rebutjar_signatura`, motivo
+obligatorio → vuelve a «pendent» con el motivo visible). Fichero del super_admin: vía `correu`, **cierra al
+momento**. Trigger `documentos_firma_substituida`: si otra vía emite una versión nueva (una conciliación)
+mientras una firma `signat` espera, esa firma se rechaza sola con `versio_substituida`; cerrar o rechazar
+después responde `22023 versio_substituida`. Al cerrar, `firmes_document_avis` crea el aviso
+`document_signat` a la organización (`objecte_tipo='documento'`). `rectificar_certificado_periodo`
+devuelve `versio` sin contar las versiones `signat` intermedias (deuda 165).
+
+**Enlaces.** `enlaces_token.proposito` gana `firma_document` y `objeto_tipo` gana `documento`
+(`objeto_id` = la versión que se firma). `acunar_enllac_propi('firma_document','documento',doc)` (titular,
+canal `panel`, 1 h; CONV → `usa_firma_conveni`) y `preparar_enviament_signatura(doc, email, per)` (solo
+servidor; canal `email`, 30 días; la usa `reenviar-documento` con `amb_enllac_signatura`). Al borrar un
+documento de prueba, `documentos_esborra_enllacos_firma` arrastra sus enlaces. **Colas**: `pendents_meus()`
+añade filas `proposito='firma_document'` (sin CONV, solo real, a cualquier miembro activo; firmar solo
+puede el titular) y `pendents_equip()` la 17.ª cola `signatures_per_tancar`.
+
 ### Borrado de una ficha: un único camino, `borrar_ficha_completa()`
 
 ✅ **Desde `20260921153439` hay UNA puerta** (§4bis), y es la que aplica la regla de §7.

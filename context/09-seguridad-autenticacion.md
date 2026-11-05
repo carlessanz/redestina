@@ -320,6 +320,26 @@ ante la duda vale `false` — afirmar un acompañamiento que no consta es justo 
 si firma quien registra (misma sesión, misma persona); si firma otra, el enlace queda esperando y lo
 envía el equipo, porque `registro` sigue sin mandar ningún correo (§8).
 
+### Firma de documentos: el mismo estándar que el convenio (05-11-2026)
+
+La contraparte firma CD, CR, REC y ENT con **firma electrónica simple**: nombre, cargo y DNI, el trazo
+dibujado (`SignaturePad`, PNG ≤ 1 MB en `…/evidencies/<enlace>.png`), IP, user agent y la **huella del
+documento** (`sha256_texto` = `documentos.sha256_datos`; si cambia, `409 document_canviat`). Lo acredita
+`evidencias`, no el trazo. Tres canales con el **mismo POST** de `enlace-publico` (`accion:'firmar_document'`):
+el enlace del panel (`acunar_enllac_propi`, 1 h), el del correo (`preparar_enviament_signatura`, 30 días,
+`/signar-document/:token`) y la asistida. Sin segundo factor. El GET devuelve `text_acta` («Rebut i
+conforme. Signo com a representant de <org> el document <tipus> núm. <n>, amb codi de verificació <codi>…»),
+`pdf_url` (60 s), el firmante prellenado y los mínimos; `409 ja_signat`/`versio_substituida`/`usa_firma_conveni`.
+Un documento de **prueba** solo lo firma un enlace acuñado por el equipo (`403 forbidden` si no).
+
+**Fichero firmado** (`pujar-document-signat`, JWT): el formato lo dicen **los bytes** (`_shared/pujada.ts`,
+cabecera mágica; PDF/JPG/PNG ≤ 10 MB; desde el mismo día `subir-documento-externo` aplica la misma regla y
+guarda el MIME real), `puc_signar_document` se comprueba **antes de leer el fichero**, y el fichero se
+guarda tal cual, sin estampar nada: el código de verificación ya va impreso en el original. El super_admin
+cierra al momento; la organización queda `signat` hasta que el super_admin lo revisa (`descargar-documento`
+`{firma_document_id}` para verlo; titular o equipo) y lo cierra o lo rechaza. `verificar-certificat` prefiere
+la versión vigente entre varias del mismo número (antes respondía «ambiguo» con dos filas).
+
 ### Recordatorios de enlaces (`recordatorios-documentales`)
 
 `POST /functions/v1/recordatorios-documentales {}` — **pública** (`--no-verify-jwt`) porque la

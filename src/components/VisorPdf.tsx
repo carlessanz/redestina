@@ -24,6 +24,7 @@
 // botón de recargar del visor no reutiliza la URL: pide una nueva.
 
 import { useT } from '../lib/i18n'
+import PdfIncrustat from './PdfIncrustat'
 import { Button } from '@/components/ui/button'
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle,
@@ -61,14 +62,7 @@ export default function VisorPdf({ pdf, onTancar, onDescarregar }: Props) {
           <DialogTitle className="truncate text-base">{pdf?.nombre ?? ''}</DialogTitle>
         </DialogHeader>
 
-        {pdf && (
-          <iframe
-            key={pdf.url}
-            src={pdf.url}
-            title={pdf.nombre}
-            className="min-h-0 w-full flex-1 rounded-md border border-border bg-muted"
-          />
-        )}
+        {pdf && <PdfIncrustat url={pdf.url} titol={pdf.nombre} className="min-h-0 flex-1" />}
 
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
           <Button

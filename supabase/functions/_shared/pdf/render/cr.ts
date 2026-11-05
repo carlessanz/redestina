@@ -47,6 +47,7 @@ import type { BytesActivos } from "../fuentes.ts";
 import { COLORES, type Columna } from "../maquetador.ts";
 import { num } from "./comu.ts";
 import type { Bloque } from "../plantilla.ts";
+import { pintarSignaturaDocument } from "./signatura.ts";
 import {
   abrirCierre,
   cerrarCierre,
@@ -396,6 +397,11 @@ export async function renderCr(
 
   // --------------------------------------------------------- lugar, fecha, firma
   await pintarFirma(ctx);
+
+  // ------------------------------- la firma de la entidad receptora (versión signat)
+  if (op.signatura) {
+    await pintarSignaturaDocument(m, ctx.doc, op.signatura, lengua);
+  }
 
   return await cerrarCierre(ctx);
 }

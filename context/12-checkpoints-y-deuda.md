@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **05-11-2026 (circuito de firma): se abren la 157 a la 164**: **70 vivas** y la siguiente entrada nueva
+es la 165.
 ⚠️ **05-11-2026 (certificado de donación según el modelo): se cierran la 85 y la 139 y se abren la 154, la
 155 y la 156**: **62 vivas** y la siguiente entrada nueva es la 157.
 ⚠️ **04-11-2026 (consentimiento RGPD por enlace, `20270506100000`): se cierra la 142** (exportación en
@@ -789,3 +791,28 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      (05-11-2026). El motor admite los tres; `DialegCertificatDonacio` lleva un selector aislado que se
      ajustará a la respuesta (opción por defecto, orden o quitar alguna). Relacionado: una entidad sin
      `tipo_receptor` queda fuera del certificado (`entitat_no_social:desconegut`) y sale en «Excloses».
+157. **El convenio en papel y `registrar_document_signat` son dos caminos** (05-11-2026). Un convenio
+     `pendent_firma` devuelto firmado en papel sigue por `preparar_/registrar_conveni_en_paper`
+     (`documentos_externos` `conveni_signat`, sin versión de `documentos`); el circuito unificado solo
+     admite subir el PDF de un CONV ya `firmat`/`vigent`. Unificarlos: que el papel pase por
+     `registrar_document_signat` y produzca la versión `signat`.
+158. **Rechazar una firma no avisa a la organización** (05-11-2026). `rebutjar_signatura` deja el motivo en
+     `v_signatura_document.ultim_motiu_rebuig` y lo pinta «Pendent de tu», pero no hay aviso ni correo.
+159. **`reenviar-documento` con enlace de firma acuña antes de los gates** (05-11-2026). El enlace de 30 días
+     se crea (y el anterior de correo se revoca) antes de saber si el correo sale (modo test, lista blanca,
+     interruptor apagado, fallo de Resend): puede quedar un enlace sin entregar.
+160. **`enviar-albara` no lleva el enlace de firma** (05-11-2026). La pantalla del albarán usa
+     `reenviar-documento` con el REC/ENT vigente cuando la casilla está marcada; si se quiere en
+     `enviar-albara`, tocar `_shared/correu-albara.ts`.
+161. **Los albaranes rectificativos `R-REC`/`R-ENT` no se firman** (05-11-2026): `document_part_signant`
+     no los contempla.
+162. **Un CD `declarat` deja de estar pendiente de firma** (05-11-2026): el estado firmable es
+     `certificat_emes`/`enviat`; al marcar el cierre como declarado, la firma pendiente desaparece.
+163. **El fichero de una firma rechazada se queda en Storage** (05-11-2026): la ruta sigue registrada en
+     `firmes_document` y nadie lo sirve, pero no se borra.
+164. **`rectificar_certificado_periodo` devuelve `versio` sin contar las versiones `signat`** (05-11-2026):
+     con una firma en medio dice `2` cuando crea la `3`. Solo el valor devuelto; la fila es correcta.
+     Y el fixture de planes (`crear-datos-documentales-prueba.ts`) no emite el de TEST-ENT-SOCIAL
+     (`falten_obligatories` desde el diagnóstico v2): avisa y sigue. Los E2E `signatures.e2e.ts` dejan en
+     el clon enlaces usados, evidencias y ficheros de cada pasada (solo restaura documentos, firmas y avisos).
+

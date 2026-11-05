@@ -130,6 +130,8 @@ describe('rutaPerProposit', () => {
   it('cada propósito va a su página pública', () => {
     expect(rutaPerProposit('firma_convenio', 'abc')).toBe('/signar/abc')
     expect(rutaPerProposit('confirmacion_albaran', 'abc')).toBe('/confirmar/abc')
+    // Circuito de firma (05-11-2026): el documento se firma en su propia página pública.
+    expect(rutaPerProposit('firma_document', 'abc')).toBe('/signar-document/abc')
   })
 
   // El token es base64url (`-` y `_`): no necesita escaparse en una ruta, y tocarlo lo

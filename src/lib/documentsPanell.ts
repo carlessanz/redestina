@@ -7,7 +7,7 @@
 import type { ConvenioEstado, DocumentoTipo } from '../types'
 
 /** Para qué sirve un enlace pendiente. Mismo vocabulario que `enlaces_token.proposito`. */
-export type ProposicPendent = 'firma_convenio' | 'confirmacion_albaran'
+export type ProposicPendent = 'firma_convenio' | 'confirmacion_albaran' | 'firma_document'
 
 /**
  * La ruta pública que le toca a cada propósito.
@@ -20,7 +20,9 @@ export type ProposicPendent = 'firma_convenio' | 'confirmacion_albaran'
  * responde «enlace desconocido», que parece un problema del token y no de la ruta.
  */
 export function rutaPerProposit(proposito: ProposicPendent, token: string): string {
-  return proposito === 'firma_convenio' ? `/signar/${token}` : `/confirmar/${token}`
+  if (proposito === 'firma_convenio') return `/signar/${token}`
+  if (proposito === 'firma_document') return `/signar-document/${token}`
+  return `/confirmar/${token}`
 }
 
 /** Lo mínimo que hace falta de una fila de `documentos` para agrupar y etiquetar. */

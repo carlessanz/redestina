@@ -165,6 +165,17 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // Lo que impide borrar una ficha: los `codi` de `bloqueigs_esborrat_fitxa()` (desde
     // 20270508100000 también las ofertas), compuestos en `useEsborrarFitxa.tsx`.
     { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'documents'] },
+    // El circuito de firma (05-11-2026, `lib/signatures.ts`): el estado por perspectiva
+    // (`clauEstatSignatura`), quién firma (`firmes_document.part`), la vía y el filtro de
+    // la bandeja de Documents.
+    { que: 'clauEstatSignatura()', prefijo: 'sgn.st_', valores: ['pendent_usuari', 'pendent_equip', 'signat_usuari', 'signat_equip', 'tancat'] },
+    { que: 'firmes_document.part', prefijo: 'sgn.qui_', valores: ['donant', 'receptor', 'organitzacio'] },
+    { que: 'firmes_document.via', prefijo: 'sgn.via_', valores: ['canvas', 'pujat', 'correu'] },
+    { que: 'Documents › Signatures · filtro', prefijo: 'doc.f_sig_', valores: ['pendent', 'signat', 'tancat'] },
+    { que: 'Documents › Signatures · vacío', prefijo: 'doc.empty_sig_', valores: ['pendent', 'signat', 'tancat'] },
+    { que: 'documentos.subtipo (bandeja y albarán)', prefijo: 'doc.sub_', valores: ['emes', 'conciliat', 'firmat', 'contrafirmat', 'provisional', 'definitiu', 'signat'] },
+    { que: 'documentos.subtipo (convenio)', prefijo: 'conv.sub_', valores: ['firmat', 'contrafirmat', 'signat'] },
+    { que: 'firmes_document.tipo_doc', prefijo: 'doc.tipus_', valores: ['CD', 'CR', 'REC', 'ENT', 'CONV'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },
@@ -188,6 +199,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
         'recollida_per_registrar',
         // 17-10-2026: un admin devuelve el registro de la recogida al receptor.
         'recollida_retornada',
+        // 05-11-2026 (circuito de firma): la firma de un documento quedó cerrada.
+        'document_signat',
       ],
     },
     {

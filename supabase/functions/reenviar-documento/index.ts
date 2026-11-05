@@ -1,10 +1,20 @@
 // Reenviar por correo un documento ya emitido (28-09-2026).
 //
-//   POST /reenviar-documento  { documento_id, manual? }  (JWT de una cuenta del equipo)
+//   POST /reenviar-documento  { documento_id, manual?, amb_enllac_signatura? }  (JWT del equipo)
 //
 // `manual: true` (04-11-2026): el botón lo manda aunque las notificaciones estén apagadas,
 // porque quien pulsa lo ha aceptado (§8, `_shared/enviamentManual.ts`). Sin él, como siempre.
-//   -> 200 { resultat: 'enviat' | 'enviat_sense_adjunt' | 'simulat', destinatari }
+//
+// `amb_enllac_signatura: true` (05-11-2026, circuito de firma): si el documento se puede
+// firmar (CD, CR, REC, ENT vigente y sin firma viva), acuña el enlace de firma por correo
+// (`preparar_enviament_signatura`, 30 días; revoca el anterior de correo) y el correo invita
+// a firmarlo en línea, con el botón a `/signar-document/<token>`. Con REC y ENT —que sin
+// enlace no se mandan— el destinatario es el correo de la ficha que firma, el que devuelve
+// la RPC. Si no se puede firmar (`ja_signat`, `no_signable`, `versio_substituida`,
+// `usa_firma_conveni`, `sense_correu`), se manda SIN enlace (si el tipo se manda sin él) y
+// la respuesta lo dice: `enllac_signatura: null` + `motiu_sense_enllac`.
+//   -> 200 { resultat: 'enviat' | 'enviat_sense_adjunt' | 'simulat', destinatari,
+//            enllac_signatura: { caduca_at } | null, motiu_sense_enllac? }
 //   -> 409 { code: 'no_s_envia' | 'bloquejat_prova' | 'bloquejat_mode_test' | 'fora_llista_test' }
 //   -> 409 { code: 'sense_fitxer' }        el PDF todavía no se ha generado
 //   -> 429 { code: 'enviat_fa_poc' }       ya salió hace menos de 2 minutos
@@ -31,6 +41,9 @@ import { type DocumentAEnviar, enviaDocument } from "../_shared/envia-document.t
 import { preflight, respondedor } from "../_shared/http.ts";
 
 const BUCKET = "documentos";
+const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/$/, "");
+/** Los motivos de negocio por los que no se acuña el enlace (`preparar_enviament_signatura`). */
+const MOTIUS_SENSE_ENLLAC = ["ja_signat", "no_signable", "versio_substituida", "usa_firma_conveni", "sense_correu"];
 /** Un doble clic no manda dos correos: si salió hace menos que esto, se rechaza. */
 const MIN_ENTRE_ENVIAMENTS_MS = 2 * 60 * 1000;
 
@@ -61,10 +74,12 @@ Deno.serve(async (req) => {
 
   let documentoId: string | null = null;
   let manual = false;
+  let ambEnllac = false;
   try {
     const cuerpo = await req.json();
     documentoId = typeof cuerpo?.documento_id === "string" ? cuerpo.documento_id : null;
     manual = cuerpo?.manual === true;
+    ambEnllac = cuerpo?.amb_enllac_signatura === true;
   } catch {
     return responder({ error: "Cuerpo JSON inválido", code: "cos_invalid" }, 400);
   }
@@ -83,6 +98,18 @@ Deno.serve(async (req) => {
   if (!doc) return responder({ error: "Documento inexistente", code: "no_existeix" }, 404);
   if (doc.estado !== "emitido" || !doc.ruta || !doc.fichero_at) {
     return responder({ error: "El PDF encara no s'ha generat", code: "sense_fitxer" }, 409);
+  }
+
+  // Una versión `signat` (05-11-2026) nace sin `envio`: la firma no es un envío. Para poder
+  // reenviarla, el destinatario es el de la versión que sustituyó (la que se firmó), que es
+  // el mismo documento —mismo número y mismo código— ya firmado. Nunca uno de la petición.
+  if (!doc.envio && doc.subtipo === "signat") {
+    const { data: anterior } = await supabase
+      .from("documentos")
+      .select("id, envio")
+      .eq("sustituido_por", doc.id)
+      .maybeSingle();
+    if (anterior?.envio) doc.envio = anterior.envio as Record<string, unknown>;
   }
 
   // Freno del doble clic. Cuenta solo lo que SALIÓ: un error reciente no impide reintentar.
@@ -104,15 +131,65 @@ Deno.serve(async (req) => {
   }
   const bytes = new Uint8Array(await fitxer.arrayBuffer());
 
-  const resultat = await enviaDocument(supabase, doc, bytes, "reenviar-documento", { manual });
-  const destinatari = typeof doc.envio?.destinatario === "string" ? doc.envio.destinatario : null;
-  console.log(JSON.stringify({ fn: "reenviar-documento", documento: doc.id, per: auth.ctx.userId, resultat }));
+  // ------------------------------------------------- el enlace de firma (opcional)
+  // DESPUÉS del freno y de tener el PDF: acuñar revoca el enlace de correo anterior, y
+  // revocarlo para no mandar nada dejaría a la persona con un enlace muerto.
+  let urlSignar: string | null = null;
+  let enllac: { caduca_at: string | null } | null = null;
+  let motiuSenseEnllac: string | null = null;
+  let destinatariSignatura: { email: string; nom: string | null } | null = null;
+  if (ambEnllac) {
+    const envioDest = typeof doc.envio?.destinatario === "string" ? doc.envio.destinatario.trim() : "";
+    const { data: prep, error: errPrep } = await supabase.rpc("preparar_enviament_signatura", {
+      p_documento: doc.id,
+      // El mismo correo al que va el documento; sin él (el albarán), el de la ficha.
+      p_email: envioDest || null,
+      p_per: auth.ctx.userId,
+    });
+    if (errPrep) {
+      const m = String(errPrep.message ?? "").match(/^([a-z_]+):/);
+      const pref = m ? m[1] : "";
+      if (String(errPrep.code) === "22023" && MOTIUS_SENSE_ENLLAC.includes(pref)) {
+        motiuSenseEnllac = pref;
+      } else {
+        console.error("reenviar-documento: preparar_enviament_signatura:", errPrep.code, errPrep.message);
+        return responder({ error: "No s'ha pogut preparar l'enllaç de signatura", code: "error_bd" }, 500);
+      }
+    } else {
+      const p = (prep ?? {}) as { token?: string; email?: string; nom?: string | null; caduca_at?: string };
+      if (p.token) {
+        // ⚠️ El token solo vive aquí y en el correo: nunca en el log ni en la respuesta.
+        urlSignar = `${APP_URL}/signar-document/${encodeURIComponent(p.token)}`;
+        enllac = { caduca_at: p.caduca_at ?? null };
+        if (!envioDest && p.email) destinatariSignatura = { email: p.email, nom: p.nom ?? null };
+      }
+    }
+  }
 
+  const resultat = await enviaDocument(supabase, doc, bytes, "reenviar-documento", {
+    manual,
+    urlSignar,
+    destinatari: destinatariSignatura,
+  });
+  const destinatari = destinatariSignatura?.email ??
+    (typeof doc.envio?.destinatario === "string" ? doc.envio.destinatario : null);
+  console.log(JSON.stringify({
+    fn: "reenviar-documento",
+    documento: doc.id,
+    per: auth.ctx.userId,
+    resultat,
+    amb_enllac_signatura: urlSignar !== null,
+    motiu_sense_enllac: motiuSenseEnllac,
+  }));
+
+  const extra = ambEnllac
+    ? { enllac_signatura: enllac, ...(motiuSenseEnllac ? { motiu_sense_enllac: motiuSenseEnllac } : {}) }
+    : {};
   if (resultat === "enviat" || resultat === "enviat_sense_adjunt" || resultat === "simulat") {
-    return responder({ resultat, destinatari }, 200);
+    return responder({ resultat, destinatari, ...extra }, 200);
   }
   if (resultat === "error") {
     return responder({ error: "El correu no ha sortit", code: "error_envio" }, 502);
   }
-  return responder({ error: "Aquest document no es pot enviar", code: resultat, destinatari }, 409);
+  return responder({ error: "Aquest document no es pot enviar", code: resultat, destinatari, ...extra }, 409);
 });

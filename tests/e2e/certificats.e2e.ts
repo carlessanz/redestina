@@ -82,7 +82,11 @@ test('el equipo aprueba en nombre del donante con una nota, y después emite', a
   sql(`update cierres_donante set revisio_estat = 'pendent_revisio', revisio_at = null, revisio_per = null where id = '${donant}'`)
   await entra(page, 'super_admin')
   await page.goto(`/equip/tancament/${tancament}`)
-  await page.getByRole('button', { name: /Aprova en nom del donant|Aprobar en nombre del donante/ }).first().click()
+  // La fila del donante de la prueba, no la primera de la tabla: el clon puede tener otros
+  // donantes con certificados por revisar (05-11-2026).
+  const nomDonant = sql(`select coalesce(datos_fiscales->>'raó_social', datos_fiscales->>'nombre') from cierres_donante where id = '${donant}'`)
+  const filaDonant = page.getByRole('row').filter({ hasText: nomDonant }).first()
+  await filaDonant.getByRole('button', { name: /Aprova en nom del donant|Aprobar en nombre del donante/ }).click()
   const dlg = page.getByRole('dialog')
   await dlg.getByRole('textbox').fill('Confirmat per telèfon amb la gerent (prova E2E)')
   await dlg.getByRole('button', { name: /Aprova en nom del donant|Aprobar en nombre del donante/ }).click()
@@ -93,7 +97,6 @@ test('el equipo aprueba en nombre del donante con una nota, y después emite', a
 
   // La emisión, desde la fila: pide antes la fecha de expedición (por defecto el 31-12; en
   // un ensayo del ejercicio en curso, hoy) y el anexo (05-11-2026, `DialegExpedicio`).
-  const nomDonant = sql(`select coalesce(datos_fiscales->>'raó_social', datos_fiscales->>'nombre') from cierres_donante where id = '${donant}'`)
   const fila = page.getByRole('row').filter({ hasText: nomDonant }).first()
   await fila.getByRole('button', { name: /^Emet certificat$|^Emitir certificado$/ }).click()
   const exp = page.getByRole('dialog')

@@ -238,3 +238,11 @@ los textos de `_shared/textosRgpd.ts` en ca y es, deja la evidencia de apertura 
 `accion: 'consentir'`, recompone y hashea los textos y llama a `registrar_consentiment_enllac`. Un
 enlace usado o caducado enseña «No es pot obrir aquest enllaç».
 
+### `/signar-document/:token` (05-11-2026)
+
+Ruta pública nueva del circuito de firma (`context/06ter`, `context/09`): `routes/public/SignarDocument.tsx`
+monta `FormulariSignaDocument` dentro de `LayoutAcces ample`, sin sesión ni `AppContextProvider`. La abre
+el enlace del correo («Inclou l'enllaç per signar en línia», 30 días) y la del panel (1 h) con el mismo
+token; al volver a abrir un enlace ya usado responde «ja signat». Aprovacions pasa a **cinco colas**:
+la quinta es «Signatures per tancar».
+

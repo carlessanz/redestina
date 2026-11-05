@@ -29,6 +29,7 @@ import { PDFDocument } from "npm:pdf-lib@1";
 import { type BytesActivos, embeberFuentes, embeberLogo } from "../fuentes.ts";
 import { COLORES, type Columna, Maquetador } from "../maquetador.ts";
 import { type Bloque, esCuerpo, interpolarCuerpo, pintarCuerpo } from "../plantilla.ts";
+import { pintarSignaturaDocument, type SignaturaDocument } from "./signatura.ts";
 
 // ---------------------------------------------------------------------------
 // El snapshot, tal como lo compone `albaran_datos()` (20261012100500)
@@ -153,6 +154,13 @@ export interface OpcionesAlbaran {
    *    renderizador sigue sin hablar con la base.
    */
   confirmaciones?: ConfirmacionAlbaran[];
+  /**
+   * REC y ENT: la firma con trazo de la contraparte, solo en la versión `signat`
+   * (05-11-2026). El albarán de una página la pinta dentro de su caja de firma; los
+   * antiguos (`rec.ts`, `ent.ts`), como bloque «Rebut i conforme» tras la conformidad. La
+   * lee `generar-documento` de `firmes_document` y `evidencias`, como las confirmaciones.
+   */
+  signatura?: SignaturaDocument | null;
 }
 
 /** Un espacio de firma: su rótulo y, si se sabe, de qué parte del albarán es. */
@@ -986,6 +994,12 @@ export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
     for (const c of sueltas) {
       m.campos(lineasConfirmacion(t, c), { anchoEtiqueta: 150, despues: 8 });
     }
+  }
+
+  // La firma con trazo de la versión `signat` (05-11-2026). Sin DNI: el albarán lo lee
+  // también la otra parte.
+  if (op.signatura && (tipo === "REC" || tipo === "ENT")) {
+    await pintarSignaturaDocument(m, ctx.doc, op.signatura, ctx.idioma, { ambDni: false });
   }
 
   m.finalizar();

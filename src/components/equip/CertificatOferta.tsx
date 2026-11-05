@@ -64,7 +64,7 @@ export default function CertificatOferta({ excedenteId, productorId }: { exceden
                 </span>
               </p>
               {cert.doc
-                ? <AccionsCertificat doc={cert.doc} descarregador={descarregador} enviar />
+                ? <AccionsCertificat doc={cert.doc} descarregador={descarregador} enviar onCanvi={() => void recarrega()} />
                 : <p className="text-xs text-muted-foreground">{t('doc.generating')}</p>}
             </div>
           )

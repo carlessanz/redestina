@@ -20,6 +20,9 @@
 //   · documentos, enlaces_token y evidencias reales   -> los tres «requiereFixture» del equipo
 //   · una oferta de `venda` publicada de TEST-PROD-2  -> el receptor comercial deja de ver
 //     un mercado vacío, que era la última saltada estructural del arnés (deuda §12.32)
+//   · una **firma subida** por la titular de TEST-PROD-1 sobre un REC (20270510100000)
+//                                                     -> el productor ve SU firma y la cola
+//                                                        «Signatures per tancar» tiene una
 //   · un **cierre de prueba de 2026 ya calculado**     -> los dos productores ven su
 //     acumulado anual y sus líneas (fase 4), con TEST-PROD-1 certificable y TEST-PROD-2
 //     bloqueado por datos fiscales: los dos casos de la pantalla de cierre
@@ -440,9 +443,17 @@ async function prepararPlans() {
     const { data: esborrany } = await db.from("planes_prevencion")
       .select("id").eq(columna, org.id).eq("estado", "esborrany").single();
 
-    const emitido = await rpc<{ numero: string; versio: number; document: string }>(
-      "emitir_plan_basico", { p_plan: esborrany!.id });
-    console.log(`  ${org.etiqueta}: ${emitido.numero} (v${emitido.versio}), document ${emitido.document}`);
+    // ⚠️ (05-11-2026) Desde el diagnóstico operativo v2, `emitir_plan_basico` exige el
+    //    diagnóstico completo (`falten_obligatories`) y este relleno no lo está: la entidad
+    //    se queda con el borrador. Se avisa y se sigue, para que lo que va detrás del
+    //    fixture (la firma, 20270510100000) no dependa de este paso.
+    try {
+      const emitido = await rpc<{ numero: string; versio: number; document: string }>(
+        "emitir_plan_basico", { p_plan: esborrany!.id });
+      console.log(`  ${org.etiqueta}: ${emitido.numero} (v${emitido.versio}), document ${emitido.document}`);
+    } catch (e) {
+      console.log(`  ${org.etiqueta}: AVÍS, no s'emet el pla: ${(e as Error).message.slice(0, 120)}`);
+    }
   }
 }
 
@@ -539,6 +550,76 @@ async function prepararConvenis() {
 }
 
 // ---------------------------------------------------------------------------
+// Lo que el CIRCUITO DE FIRMA necesita (20270510100000–100200)
+// ---------------------------------------------------------------------------
+// Una firma SUBIDA por la titular de TEST-PROD-1 sobre uno de sus REC conciliados: queda
+// `signat` (vía `pujat`), esperando a que el super_admin la revise. Con eso:
+//   · el arnés afirma que el productor ve SU firma en `firmes_document` y que el equipo la
+//     ve (los `requiereFixture` de «prepararSignatura»);
+//   · la cola «Signatures per tancar» de Aprovacions tiene algo que pintar.
+// NO crea ninguna versión de documento (eso pasa al cerrarla): el REC sigue igual. El
+// fichero es un PDF mínimo de prueba, subido a la carpeta del documento con la ruta que
+// da `ruta_document_signat()` (sufijo aleatorio, `upsert:false`); si el registro falla,
+// se borra.
+//
+// IDEMPOTENTE: si TEST-PROD-1 ya tiene alguna firma viva (signat o tancat), no hace nada.
+const PDF_SIGNAT_PROVA = new TextEncoder().encode(
+  "%PDF-1.4\n1 0 obj<</Type/Catalog/Pages 2 0 R>>endobj\n" +
+    "2 0 obj<</Type/Pages/Kids[3 0 R]/Count 1>>endobj\n" +
+    "3 0 obj<</Type/Page/Parent 2 0 R/MediaBox[0 0 595 842]>>endobj\n" +
+    "trailer<</Root 1 0 R>>\n%%EOF\n",
+);
+
+async function prepararSignatura() {
+  paso("Signatura pujada per la titular de TEST-PROD-1 (circuit de signatura)");
+
+  const { data: ja } = await db.from("firmes_document")
+    .select("id, estat, via").eq("tipo_org", "productor").eq("org_id", productor)
+    .neq("estat", "rebutjat").limit(1).maybeSingle();
+  if (ja) {
+    console.log(`  ja hi ha una signatura (${ja.via}, ${ja.estat}): no se'n crea cap altra`);
+    return;
+  }
+
+  const { data: doc } = await db.from("v_signatura_document")
+    .select("documento_id, numero_completo")
+    .eq("tipo", "REC").eq("estat", "pendent").eq("tipo_org", "productor").eq("org_id", productor)
+    .order("numero_completo").limit(1).maybeSingle();
+  if (!doc) {
+    console.log("  cap REC de TEST-PROD-1 pendent de signar: no se'n crea cap");
+    return;
+  }
+
+  const { data: titular } = await db.from("membresias")
+    .select("user_id").eq("productor_id", productor).eq("rol_org", "titular").eq("activo", true)
+    .limit(1).maybeSingle();
+  if (!titular) {
+    console.log("  TEST-PROD-1 no té cap titular actiu: no se'n crea cap");
+    return;
+  }
+
+  const ruta = await rpc<string>("ruta_document_signat", { p_documento: doc.documento_id, p_ext: "pdf" });
+  const sha = Array.from(new Uint8Array(await crypto.subtle.digest("SHA-256", PDF_SIGNAT_PROVA)))
+    .map((b) => b.toString(16).padStart(2, "0")).join("");
+  const { error: errPujada } = await db.storage.from("documentos")
+    .upload(ruta, PDF_SIGNAT_PROVA, { contentType: "application/pdf", upsert: false });
+  if (errPujada) throw new Error(`pujada ${ruta}: ${errPujada.message}`);
+
+  try {
+    const r = await rpc<{ firma_id: string; estat: string; via: string }>("registrar_document_signat", {
+      p_documento: doc.documento_id,
+      p_user: titular.user_id,
+      p_fitxer: { ruta, sha256: sha, mime: "application/pdf", bytes: PDF_SIGNAT_PROVA.byteLength },
+      p_signant: { nom: "Titular de Mas de Prova (fixture)", carrec: "Titular" },
+    });
+    console.log(`  ${doc.numero_completo}: signatura ${r.via} (${r.estat}), pendent que la tanqui el super_admin`);
+  } catch (e) {
+    await db.storage.from("documentos").remove([ruta]);
+    throw e;
+  }
+}
+
+// ---------------------------------------------------------------------------
 // 0. Simulación
 // ---------------------------------------------------------------------------
 
@@ -548,7 +629,8 @@ if (dryRun) {
   console.log(`con ${KG_RECHAZADOS} kg rechazados. Nada escrito.`);
   console.log(`Y la preparación del cierre: dades fiscals de TEST-PROD-1, cost de ${PRODUCTO_2},`);
   console.log(`una donació de ${KG_RETRO_2} kg conciliada retroactivament i les dates de recollida.`);
-  console.log("I dos convenis: TEST-PROD-1 vigent (firmat i contrasignat) i TEST-ENT-SOCIAL pendent de firma.\n");
+  console.log("I dos convenis: TEST-PROD-1 vigent (firmat i contrasignat) i TEST-ENT-SOCIAL pendent de firma.");
+  console.log("I una signatura pujada per la titular de TEST-PROD-1 sobre un REC (queda per tancar).\n");
   Deno.exit(0);
 }
 
@@ -705,6 +787,7 @@ if (yaExiste) {
   await prepararCertificatPeriode();
   await prepararPlans();
   await prepararConvenis();
+  await prepararSignatura();
   console.log();
   Deno.exit(0);
 }
@@ -989,6 +1072,7 @@ if (cierrePrueba) await prepararTransaccio(cierrePrueba);
 await prepararCertificatPeriode();
 await prepararPlans();
 await prepararConvenis();
+await prepararSignatura();
 
 const { count: nDocs } = await db.from("documentos")
   .select("id", { count: "exact", head: true }).eq("objeto_tipo", "albaran");

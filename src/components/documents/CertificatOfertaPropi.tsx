@@ -39,7 +39,7 @@ export default function CertificatOfertaPropi({ excedenteId }: { excedenteId: st
             {cert.periode.data_expedicio ? ` · ${t('cdon.expedit', { data: dataCurta(cert.periode.data_expedicio) })}` : ''}
           </span>
         </p>
-        <AccionsCertificat doc={cert.doc} descarregador={descarregador} />
+        <AccionsCertificat doc={cert.doc} descarregador={descarregador} onCanvi={() => void recarrega()} />
       </CardContent>
       {descarregador.visor}
     </Card>

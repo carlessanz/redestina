@@ -26,6 +26,7 @@ import { type BytesActivos, embeberFuentes, embeberLogo } from "../fuentes.ts";
 import { COLORES, Maquetador } from "../maquetador.ts";
 import { type Bloque, esCuerpo, interpolarCuerpo, pintarCuerpo } from "../plantilla.ts";
 import { type PlantillaLegal } from "./comu.ts";
+import type { SignaturaDocument } from "./signatura.ts";
 
 // ---------------------------------------------------------------------------
 // El snapshot
@@ -213,6 +214,12 @@ export interface OpcionesCierre {
    * periodo sin adivinarlo.
    */
   objetoTipo?: string | null;
+  /**
+   * CD y CR: la firma de la contraparte («Rebut i conforme»), solo en la versión `signat`
+   * firmada con trazo (05-11-2026). No sale del snapshot: la lee `generar-documento` de
+   * `firmes_document` y `evidencias`. Sin ella, el papel sale como siempre.
+   */
+  signatura?: SignaturaDocument | null;
 }
 
 export interface Renderizado {
@@ -792,6 +799,9 @@ export async function pintarFirma(ctx: ContextoCierre): Promise<void> {
 
   const { firma, sello } = await embeberFirmaYSello(ctx.doc, op);
 
+  // El título va con su firma: antes se reservaba el sitio DESPUÉS de pintarlo y, al pie de
+  // una página, «Signatura i segell» se quedaba solo y la firma saltaba a la siguiente.
+  m.asegurar(alto + 46 + 24);
   m.titulo(t.signatura_titol, 3);
   m.asegurar(alto + 46);
   const y = m.y;

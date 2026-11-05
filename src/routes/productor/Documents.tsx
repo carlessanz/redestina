@@ -32,6 +32,8 @@ import { textError } from '../../lib/textError'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
+import { esPujable } from '../../lib/signatures'
 import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import { euros, exerciciDeNumero } from '../../lib/tancament'
@@ -205,6 +207,15 @@ export default function ProductorDocuments() {
 
   const descarregador = useDescarregaDocument(refresca)
 
+  // El estado de firma de sus documentos vigentes firmables (circuito de firma, 05-11-2026).
+  // Fail-soft: si la vista no responde, la pantalla sale igual, sin las etiquetas de firma.
+  const idsFirmables = useMemo(() => docs.filter((d) => esPujable(d.tipo)).map((d) => d.id), [docs])
+  const { perDoc: signatures, recarrega: recarregaSignatures } = useEstatsSignatura(idsFirmables)
+  const onSignatura = useCallback(() => {
+    void refresca()
+    void recarregaSignatures()
+  }, [refresca, recarregaSignatures])
+
   const perDonant = useMemo(() => {
     const mapa: Record<string, DocFila[]> = {}
     // Solo lo que no es un certificado (el resumen anual): los certificados van todos a «Els
@@ -285,7 +296,7 @@ export default function ProductorDocuments() {
 
       {/* --- Lo que espera su firma o su confirmación. Va PRIMERO porque es lo único de
               esta pantalla que le pide algo; el resto es archivo. --- */}
-      <PendentsDeTu tipusOrg="productor" tornarA="/productor/documents" />
+      <PendentsDeTu tipusOrg="productor" tornarA="/productor/documents" onCanvi={onSignatura} />
 
       {/* --- Sus convenios --- */}
       <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador}
@@ -394,7 +405,8 @@ export default function ProductorDocuments() {
         <CardContent>
           {albarans.length === 0
             ? <p className="text-sm text-muted-foreground">{t('mydoc.rec_empty')}</p>
-            : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador} />}
+            : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador}
+                signatures={signatures} onSignatura={onSignatura} />}
         </CardContent>
       </Card>
 
@@ -420,6 +432,8 @@ export default function ProductorDocuments() {
               distingue es el objeto (`cierre_donante` = anual, `cierre_periodo` = intervalo u
               oferta). Los CT emitidos antes de retirarse siguen aquí, solo para descargar. --- */}
       <LlistaDocuments
+        signatures={signatures}
+        onSignatura={onSignatura}
         files={certificats}
         descarregador={descarregador}
         titolKey="mydoc.title"

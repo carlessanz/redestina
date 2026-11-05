@@ -25,6 +25,14 @@ const CODIS: Record<string, string> = {
   // `conciliar_albaran()` con una incidencia de recogida y sin motivo (17-10-2026).
   cal_motiu_incidencia: 'alb.err_cal_motiu_incidencia',
   sense_conveni: 'od.conv_blocked',
+  // El circuito de firma (05-11-2026, 20270510100100). `cal_motiu` de `rebutjar_signatura` no
+  // va aquí (lo comparte con la cancelación de una oferta): lo traduce `AccionsSignatura`.
+  versio_substituida: 'sgn.err_versio_substituida',
+  usa_firma_conveni: 'sgn.err_usa_firma_conveni',
+  ja_signat: 'sgn.err_ja_signat',
+  no_signable: 'sgn.err_no_signable',
+  estat_incorrecte: 'sgn.err_estat_incorrecte',
+  sense_correu: 'sgn.err_sense_correu',
   // `desar_diagnostic()`, fase 9 de la revisión del 08-10-2026.
   massa_productes: 'diag.err_massa_productes',
   // El expediente de prevención, fase 11.

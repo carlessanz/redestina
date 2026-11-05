@@ -17,10 +17,11 @@ import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
-import { acceptaEnviament } from '../../lib/enviamentManual'
 import { esperarGeneracio, reenviarDocument } from '../../lib/documents'
 import type { Descarregador } from '../../hooks/useDescarregaDocument'
-import { useConfirma } from '../DialegConfirma'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
+import { useConfirmaEnviament } from '../DialegEnviament'
+import AccionsSignatura from '../AccionsSignatura'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
 import { Button } from '@/components/ui/button'
 
@@ -32,16 +33,24 @@ export interface DocCertificat {
 }
 
 export default function AccionsCertificat({
-  doc, descarregador, enviar = false,
+  doc, descarregador, enviar = false, onCanvi,
 }: {
   doc: DocCertificat
   descarregador: Descarregador
   /** «Envia per correu»: solo el equipo (la Edge Function lo exige igualmente). */
   enviar?: boolean
+  /**
+   * Tras firmar, subir, cerrar o rechazar la firma (circuito de firma, 05-11-2026): la
+   * versión vigente puede haber cambiado y quien monta esto la tiene que releer.
+   */
+  onCanvi?: () => void
 }) {
   const { t } = useT()
   const motiuEmail = motiuCanal(useCanals(), 'email')
-  const { confirma, dialeg } = useConfirma()
+  const { pregunta, dialeg } = useConfirmaEnviament()
+  // El estado de la firma de este certificado (CD/CR). Fail-soft: sin él, no hay badge.
+  const { perDoc, recarrega } = useEstatsSignatura([doc.id])
+  const sig = perDoc[doc.id] ?? null
   const [enviant, setEnviant] = useState(false)
   // El estado del PDF, vigilado aquí: recién emitido está `pendiente` y el botón de enviar
   // espera a que haya fichero. Polling de 2 s durante 30 s (`esperarGeneracio`), sin Realtime.
@@ -61,10 +70,13 @@ export default function AccionsCertificat({
   const motiuEnviar = estat === 'emitido' ? undefined : t('doc.generating')
 
   async function envia() {
-    const acceptat = await acceptaEnviament(confirma, t, motiuEmail, {
+    // Pendiente de firma con trazo: el correo puede llevar el enlace para firmar en línea
+    // (marcado por defecto). Con las notificaciones apagadas, el envío es manual (§8).
+    const acceptat = await pregunta(motiuEmail, {
       titol: t('doc.resend_title', { num: doc.numero_completo ?? '—' }),
       descripcio: t('cdon.send_desc'),
       confirmar: t('cdon.a_send'),
+      ambCasellaSignatura: sig?.estat === 'pendent' && sig.admet_canvas,
     })
     if (!acceptat) return
     setEnviant(true)
@@ -109,6 +121,13 @@ export default function AccionsCertificat({
         </BotoAmbMotiu>
       )}
       {dialeg}
+      {/* La firma de la contraparte: su estado y, según quién mire, firmar, subir el firmado,
+          o revisarlo y cerrarlo (lo decide `accionsSignatura()`). */}
+      {sig && (
+        <span className="basis-full">
+          <AccionsSignatura sig={sig} onCanvi={() => { void recarrega(); onCanvi?.() }} />
+        </span>
+      )}
     </span>
   )
 }

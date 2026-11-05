@@ -102,3 +102,41 @@ describe('qué se dice', () => {
     expect(c.fitxer).toBe('CD_b_1.pdf')
   })
 })
+
+describe('con enlace para firmar en línea (urlSignar, 05-11-2026)', () => {
+  const url = 'https://redestina.example/signar-document/tok_123'
+  it('sin enlace, el texto y el botón de siempre (al panel)', () => {
+    const c = composaCorreuDocument(base)!
+    expect(c.cosHtml).not.toContain('signar-lo en línia')
+    expect(c.boto).toBe('Entra al teu panell')
+    expect(c.urlBoto).toBeNull()
+  })
+  it('con enlace, invita a firmar y el botón lleva al enlace', () => {
+    const c = composaCorreuDocument({ ...base, urlSignar: url })!
+    expect(c.cosHtml).toContain('Pots signar-lo en línia')
+    expect(c.boto).toBe('Signa’l en línia')
+    expect(c.urlBoto).toBe(url)
+    // El enlace no se pega en el cuerpo: solo en el botón.
+    expect(c.cosHtml).not.toContain('tok_123')
+  })
+  it('en castellano', () => {
+    const c = composaCorreuDocument({ ...base, idioma: 'es', urlSignar: url })!
+    expect(c.cosHtml).toContain('Puedes firmarlo en línea')
+    expect(c.boto).toBe('Fírmalo en línea')
+  })
+  it('el CR también; el RES y el CT no ganan el enlace', () => {
+    expect(composaCorreuDocument({ ...base, tipo: 'CR', urlSignar: url })!.urlBoto).toBe(url)
+    expect(composaCorreuDocument({ ...base, tipo: 'RES', urlSignar: url })!.urlBoto).toBeNull()
+    expect(composaCorreuDocument({ ...base, tipo: 'CT', urlSignar: url })!.cosHtml).not.toContain('en línia')
+  })
+  it('REC y ENT solo se mandan con enlace (firma del donante y de la receptora)', () => {
+    for (const tipo of ['REC', 'ENT']) {
+      expect(composaCorreuDocument({ ...base, tipo }), tipo).toBeNull()
+      const c = composaCorreuDocument({ ...base, tipo, numero_completo: `${tipo}-2026-00001`, urlSignar: url })!
+      expect(c.assumpte, tipo).toContain('per signar')
+      expect(c.urlBoto, tipo).toBe(url)
+    }
+    // El OPE no se firma: ni con enlace.
+    expect(composaCorreuDocument({ ...base, tipo: 'OPE', urlSignar: url })).toBeNull()
+  })
+})

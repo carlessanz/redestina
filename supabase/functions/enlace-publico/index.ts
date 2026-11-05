@@ -42,6 +42,7 @@
 //      · `factura.ts`  — `subida_factura`
 //      · `convenio.ts` — `firma_convenio`, con su segundo factor
 //      · `consentiment.ts` — `consentiment_rgpd` (04-11-2026): el consentimiento RGPD por correo
+//      · `document.ts` — `firma_document` (05-11-2026): firmar con trazo un CD, CR, REC o ENT
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
@@ -63,6 +64,7 @@ import { confirmarAlbaran, getAlbaran } from "./albaran.ts";
 import { getFactura, subirFactura } from "./factura.ts";
 import { enviarCodi, firmarConvenio, getConvenio, validarCodi } from "./convenio.ts";
 import { getConsentiment, registrarConsentiment } from "./consentiment.ts";
+import { firmarDocument, getDocument } from "./document.ts";
 
 // ---------------------------------------------------------------------------
 Deno.serve(async (req) => {
@@ -119,6 +121,17 @@ async function manejarGet(
   // nada que un atacante pueda aprender de la diferencia.
   if (!enlace) return responder({ error: "Enllaç desconegut.", code: "desconegut" }, 404);
 
+  // Un enlace de firma de documento ya usado es, siempre, un documento firmado con él: se
+  // dice así (`ja_signat`), que es lo que la pantalla tiene que enseñar.
+  if (enlace.proposito === "firma_document" && enlace.estado_efectivo === "usado") {
+    return responder({
+      error: "Aquest document ja està signat.",
+      code: "ja_signat",
+      proposito: enlace.proposito,
+      estado_efectivo: enlace.estado_efectivo,
+    }, 409);
+  }
+
   const malestado = estadoAHttp(enlace.estado_efectivo);
   if (malestado) {
     return responder({
@@ -143,6 +156,11 @@ async function manejarGet(
   // El consentimiento RGPD que el equipo pide por correo (20270506100000).
   if (enlace.proposito === "consentiment_rgpd") {
     return await getConsentiment(req, supabase, responder, enlace, ip, t0);
+  }
+
+  // La firma con trazo de un documento ya emitido (CD, CR, REC, ENT; 05-11-2026).
+  if (enlace.proposito === "firma_document") {
+    return await getDocument(req, supabase, responder, enlace, ip, t0);
   }
 
   // Cualquier propósito que se añada a `enlaces_token` y todavía no tenga rama: se dice,
@@ -249,6 +267,9 @@ async function manejarPost(
   }
   if (accion === "validar_codi") {
     return await validarCodi(supabase, responder, body, t0);
+  }
+  if (accion === "firmar_document") {
+    return await firmarDocument(req, supabase, responder, body, ip, t0);
   }
   if (accion === "consentir") {
     return await registrarConsentiment(req, supabase, responder, body, ip, t0);

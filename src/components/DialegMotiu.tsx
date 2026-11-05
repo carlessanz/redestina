@@ -30,6 +30,7 @@ export default function DialegMotiu({
   destructiu = false,
   ocupat = false,
   extra,
+  opcional = false,
   onConfirma,
 }: {
   obert: boolean
@@ -43,6 +44,11 @@ export default function DialegMotiu({
   ocupat?: boolean
   /** Campos añadidos encima del motivo (p. ej. el destino final al conciliar). */
   extra?: ReactNode
+  /**
+   * El texto no es obligatorio (una nota al cerrar una firma, 05-11-2026): el botón se
+   * enciende vacío y no sale el «el motivo es obligatorio».
+   */
+  opcional?: boolean
   onConfirma: (motiu: string) => void
 }) {
   const { t } = useT()
@@ -52,7 +58,7 @@ export default function DialegMotiu({
   // motivo de la anterior, que es la forma más fácil de anular la cosa equivocada.
   useEffect(() => { if (!obert) setMotiu('') }, [obert])
 
-  const buit = motiu.trim() === ''
+  const buit = motiu.trim() === '' && !opcional
 
   return (
     <Dialog open={obert} onOpenChange={onObert}>

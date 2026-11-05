@@ -59,6 +59,8 @@ import { cn } from '../lib/utils'
 import SignaturePad from './SignaturePad'
 import { FilaCasella } from './Casella'
 import { marcadorsDelFormulari, omplirMarcadors } from '../lib/marcadors'
+import { signantValid } from '../lib/signatures'
+import BlocSignant from './BlocSignant'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -101,9 +103,8 @@ export interface PropsFirmaConveni {
 
 // Los mismos mínimos que `enlace-publico` (firma): nombre y cargo ≥ 2, documento ≥ 5.
 // Sin ellos aquí, el botón se encendía con «a» o «123» y el servidor devolvía un 400 que
-// la pantalla solo sabía pintar como «alguna dada no quadra», sin decir cuál.
-const MIN_NOM = 2
-const MIN_DNI = 5
+// la pantalla solo sabía pintar como «alguna dada no quadra», sin decir cuál. Desde el
+// 05-11-2026 viven en `lib/signatures.ts`, compartidos con la firma de los documentos.
 
 /** Del campo que señala el 400 del servidor a la frase que dice qué corregir. */
 const ERROR_CAMP: Record<string, string> = {
@@ -297,9 +298,7 @@ export default function FirmaConveni(
   const exigits = dades.obligatoris.length > 0 ? dades.obligatoris : OBLIGATORIS_PER_DEFECTE
   const falten = CAMPS.filter((c) => exigits.includes(c.clau) && org[c.clau].trim() === '')
   const calCodi = dades.calCodi && !codiValidat
-  const nomCurt = nom.trim().length < MIN_NOM
-  const carrecCurt = carrec.trim().length < MIN_NOM
-  const dniCurt = dni.trim().length < MIN_DNI
+  const { nomCurt, carrecCurt, dniCurt } = signantValid({ nom, carrec, dni })
   const potSignar =
     falten.length === 0 && !nomCurt && !carrecCurt && !dniCurt
     && declaracio && acceptacio && firma !== null && !calCodi && !enviant
@@ -375,32 +374,9 @@ export default function FirmaConveni(
           {/* ── 3. Quién firma ── */}
           <section className="space-y-3">
             <h2 className="text-base">{t('sig.signer_title')}</h2>
-            <div className={cn('grid grid-cols-1 gap-3', ample && 'sm:grid-cols-2')}>
-            <div className="space-y-1.5">
-              <Label htmlFor="sig-signant-nom">{t('sig.f_signer_name')} *</Label>
-              <Input id="sig-signant-nom" className="h-11" autoComplete="name"
-                value={nom} onChange={(e) => setNom(e.target.value)} />
-              {nom.trim() !== '' && nomCurt && (
-                <p className="text-xs text-error">{t('sig.err_nom_curt')}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="sig-signant-carrec">{t('sig.f_signer_role')} *</Label>
-              <Input id="sig-signant-carrec" className="h-11"
-                value={carrec} onChange={(e) => setCarrec(e.target.value)} />
-              {carrec.trim() !== '' && carrecCurt && (
-                <p className="text-xs text-error">{t('sig.err_carrec_curt')}</p>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label htmlFor="sig-signant-dni">{t('sig.f_dni')} *</Label>
-              <Input id="sig-signant-dni" className="h-11"
-                value={dni} onChange={(e) => setDni(e.target.value)} />
-              {dni.trim() !== '' && dniCurt
-                ? <p className="text-xs text-error">{t('sig.err_dni_curt')}</p>
-                : <p className="text-xs text-muted-foreground">{t('sig.dni_hint')}</p>}
-            </div>
-            </div>
+            {/* Los ids `sig-signant-*` se conservan: los usa el E2E del convenio. */}
+            <BlocSignant nom={nom} carrec={carrec} dni={dni}
+              onNom={setNom} onCarrec={setCarrec} onDni={setDni} ample={ample} />
           </section>
     </>
   )

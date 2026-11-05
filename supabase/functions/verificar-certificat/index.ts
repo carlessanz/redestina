@@ -104,6 +104,7 @@ function prefijoDe(bruto: string): string | null {
 
 interface FilaDocumento {
   numero_completo: string | null;
+  version: number | null;
   modo: string;
   vigente: boolean;
   emitido_at: string | null;
@@ -199,13 +200,19 @@ Deno.serve(async (req) => {
     // tienen otro sujeto y saldrían con `entitat` en blanco, afirmando un vacío que no es
     // cierto. Responden como un código desconocido.
     //
-    // Se piden DOS filas para poder distinguir la colisión de prefijo del caso normal.
+    // ⚠️ Desde el 05-11-2026 un mismo código puede tener VARIAS filas legítimas: firmar un
+    //    certificado emite la versión n+1 (`subtipo = 'signat'`) con el MISMO snapshot y por
+    //    tanto el mismo `sha256_datos`. Son el mismo certificado (mismo `numero_completo`), y
+    //    se responde por la vigente —o, si ninguna lo es, por la de mayor versión—. Solo
+    //    números DISTINTOS bajo el mismo prefijo son una colisión de verdad. Se piden unas
+    //    pocas filas para poder distinguir los dos casos.
     const { data, error } = await supabase
       .from("documentos")
-      .select("numero_completo, modo, vigente, emitido_at, datos")
+      .select("numero_completo, version, modo, vigente, emitido_at, datos")
       .eq("tipo", "CR")
       .ilike("sha256_datos", `${prefijo}%`)
-      .limit(2);
+      .order("version", { ascending: false })
+      .limit(10);
 
     if (error) {
       console.error("verificar-certificat: select:", error.message);
@@ -218,13 +225,17 @@ Deno.serve(async (req) => {
     // si pasara no se puede elegir uno: decir «este es» sería inventarse cuál. Se responde
     // como desconocido y se deja escrito en el log, que es el único sitio donde alguien
     // podría enterarse.
-    if (filas.length > 1) {
+    if (filas.length === 0) return noExiste();
+    const numeros = new Set(filas.map((f) => f.numero_completo ?? ""));
+    if (numeros.size > 1) {
       console.warn(
         JSON.stringify({ fn: "verificar-certificat", avis: "prefix_ambigu", prefix: prefijo.length }),
       );
       return noExiste();
     }
-    if (filas.length === 0) return noExiste();
+    // El mismo certificado en varias versiones (la firmada y la anterior): la vigente, y si
+    // no hay ninguna, la más nueva (vienen ordenadas por versión, de mayor a menor).
+    const elegida = filas.find((f) => f.vigente === true) ?? filas[0];
 
     const ms = performance.now() - t0;
     if (ms > 500) {
@@ -235,12 +246,13 @@ Deno.serve(async (req) => {
     console.log(JSON.stringify({
       fn: "verificar-certificat",
       trobat: true,
-      vigent: filas[0].vigente === true,
-      mode: filas[0].modo,
+      vigent: elegida.vigente === true,
+      mode: elegida.modo,
+      versions: filas.length,
       ms: Number(ms.toFixed(1)),
     }));
 
-    return responder(resumir(filas[0]), 200);
+    return responder(resumir(elegida), 200);
   } catch (e) {
     console.error("verificar-certificat:", e instanceof Error ? e.message : String(e));
     return responder({ error: "Hi ha hagut un problema. Torna-ho a provar.", code: "error_intern" }, 500);

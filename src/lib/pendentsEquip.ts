@@ -29,7 +29,7 @@ import type { ResultatRpc } from './albarans'
 import type { Comptador } from './nav'
 
 /**
- * Las trece colas que devuelve `pendents_equip()`, en su orden de proceso.
+ * Las colas que devuelve `pendents_equip()` (diecisiete desde el 05-11-2026), en su orden de proceso.
  *
  * ⚠️ ESTA UNIÓN ES UN FILTRO, no una etiqueta. `comptadorsDePendents()` y la tarjeta del
  *    tablero buscan por `cua`, así que una cola que la base devuelva y que no esté aquí no
@@ -49,6 +49,9 @@ export type CuaEquip =
   // 17-10-2026: recogidas que el receptor ha registrado y un admin tiene que validar para que
   // se generen los albaranes (la 16.ª cola).
   | 'recollides_per_validar'
+  // 05-11-2026 (circuito de firma, la 17.ª): firmas que una organización ha SUBIDO y que el
+  // super_admin tiene que revisar (cerrar o rechazar) en Aprovacions.
+  | 'signatures_per_tancar'
   | 'albarans_esborrany' | 'albarans_conciliar' | 'albarans_esperant'
   | 'costos' | 'tancament' | 'documents_error'
   // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
@@ -124,9 +127,10 @@ export function buidaComptadors(): void {
 export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptador, number>> {
   const n = (cua: CuaEquip) => p.find((x) => x.cua === cua)?.n ?? 0
   return {
-    // Las cuatro colas de la pantalla Aprovacions, sumadas: el desglose va en el tablero
+    // Las cinco colas de la pantalla Aprovacions, sumadas: el desglose va en el tablero
     // y en el título de cada cola, no en el badge.
-    aprovacions: n('registres') + n('convenis_contrasignar') + n('respostes') + n('recollides_per_validar'),
+    aprovacions: n('registres') + n('convenis_contrasignar') + n('respostes') + n('recollides_per_validar')
+      + n('signatures_per_tancar'),
     missatges: n('missatges'),
     // No baja al entrar en Ofertes: solo al validar o rechazar, porque la oferta se queda
     // parada hasta que alguien decide.

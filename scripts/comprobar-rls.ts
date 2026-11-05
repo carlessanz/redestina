@@ -370,6 +370,13 @@ interface Check {
    * catálogo —«ninguna función abierta de más»— con la misma tabla PASS/FAIL que el resto.
    */
   listaPermitida?: readonly string[];
+  /**
+   * Solo `rpc`+`permitir` sobre una función que devuelve SIEMPRE el mismo número de filas
+   * (hoy, `pendents_equip()`: una por cola, aunque valga 0). Pasa si devuelve exactamente
+   * esas. Es como se vigila que una cola nueva no se quede fuera al recrear la función
+   * (20270510100200: diecisiete).
+   */
+  filasExactas?: number;
 }
 
 // Las funciones de `public` que pueden quedar abiertas de más A PROPÓSITO, en el formato
@@ -391,6 +398,127 @@ interface Check {
 // Añadir aquí una entrada exige escribir al lado el motivo: qué hace la función sin sesión y
 // por qué eso es seguro (p. ej. una consulta pública de solo lectura que valida un token).
 const PERMITIDAS_ABIERTAS: readonly string[] = [];
+
+// CIRCUITO DE FIRMA (20270510100000–100200). Lo que el arnés afirma:
+//
+//   · `firmes_document` no se escribe desde el navegador, ni siendo del equipo: todo entra
+//     por RPC (insert y update denegados por GRANT, antes de evaluar ninguna política);
+//   · las cinco funciones de servidor (`signar_document_per_enllac`,
+//     `registrar_document_signat`, `preparar_enviament_signatura`, `ruta_document_signat`) y
+//     las tres internas (`document_emet_versio_signada`, `document_part_signant_intern`,
+//     `document_signatura_comprova`) dan 42501 a CUALQUIER sesión: las primeras por su
+//     guarda (`auth.uid() is not null`), las internas porque no tienen EXECUTE;
+//   · cerrar y rechazar una firma es `es_super_admin()`: el super_admin con un uuid
+//     inventado recibe 22023 (autoriza) y el resto 42501;
+//   · una cuenta externa no acuña un enlace de firma sobre un documento que no es suyo
+//     (42501 con uuid inventado: permiso antes que existencia) y ve 0 filas en la bandeja.
+//
+// Las lecturas «permitir» llevan `requiereFixture`: el productor de prueba solo tiene una
+// firma si `crear-datos-documentales-prueba.ts` ha subido la suya (`prepararSignatura`).
+const FIRMA_SERVIDOR: Check[] = [
+  {
+    tabla: "signar_document_per_enllac",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_evidencia: {} },
+    descripcion: "NO registra una signatura per enllac (nomes el servidor)",
+  },
+  {
+    tabla: "registrar_document_signat",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_documento: "00000000-0000-0000-0000-000000000000",
+      p_user: "00000000-0000-0000-0000-000000000000",
+      p_fitxer: {},
+      p_signant: {},
+    },
+    descripcion: "NO registra un document signat (nomes el servidor)",
+  },
+  {
+    tabla: "preparar_enviament_signatura",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO acunya l'enllac de signatura per correu (nomes el servidor)",
+  },
+  {
+    tabla: "ruta_document_signat",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000", p_ext: "pdf" },
+    descripcion: "NO calcula la ruta d'un document signat (nomes el servidor)",
+  },
+  {
+    tabla: "document_emet_versio_signada",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_firma: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO emet la versio signada (interna, sense EXECUTE)",
+  },
+  {
+    tabla: "document_part_signant_intern",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO consulta la part signant sense filtre (interna)",
+  },
+  {
+    tabla: "document_signatura_comprova",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO bloqueja documents per signar (interna)",
+  },
+  { tabla: "firmes_document", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap signatura directament (nomes per RPC)" },
+  { tabla: "firmes_document", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap signatura directament" },
+  // Las dos consultas abiertas a cualquier sesión. Con un uuid inventado: `false` y 0 filas.
+  {
+    tabla: "puc_signar_document",
+    op: "rpc",
+    esperado: "permitir",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "pot preguntar si pot signar un document",
+  },
+  {
+    tabla: "document_part_signant",
+    op: "rpc",
+    esperado: "permitir",
+    args: { p_documento: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "pot preguntar qui signa un document (0 files si no es seu)",
+  },
+];
+
+// Lo que se añade a `DOCUMENTAL_EXTERN` (los cinco perfiles externos).
+const FIRMA_EXTERN: Check[] = [
+  ...FIRMA_SERVIDOR,
+  { tabla: "v_signatures_bandeja", op: "leer", esperado: "denegar", descripcion: "NO veu la safata de signatures de l'equip" },
+  {
+    tabla: "tancar_signatura",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_firma: "00000000-0000-0000-0000-000000000000" },
+    descripcion: "NO tanca cap signatura (es del super_admin)",
+  },
+  {
+    tabla: "rebutjar_signatura",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" },
+    descripcion: "NO rebutja cap signatura (es del super_admin)",
+  },
+  {
+    tabla: "acunar_enllac_propi",
+    op: "rpc",
+    esperado: "denegar",
+    args: {
+      p_proposito: "firma_document",
+      p_objeto_tipo: "documento",
+      p_objeto_id: "00000000-0000-0000-0000-000000000000",
+    },
+    descripcion: "NO encunya un enllac de signatura d'un document que no es seu",
+  },
+];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
@@ -970,6 +1098,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // `emitir_plan_basico` va antes de buscar el plan, así que un uuid inventado da 42501.
   { tabla: "diagnostics_historial", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial del diagnostic a ma" },
   { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap pla de prevencio (es de l'equip)" },
+  // Circuito de firma (20270510100000–100200): ver `FIRMA_EXTERN`.
+  ...FIRMA_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1570,7 +1700,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 17, descripcion: "consulta la cua de treball de l'equip (17 cues)" },
     // Borrado de una ficha (20270328100100, deuda §12.108). El técnico SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
@@ -1593,6 +1723,58 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "denegar",
       args: { p_tipo: "productor", p_ficha_id: "00000000-0000-0000-0000-000000000000", p_tambe_germana: false },
       descripcion: "NO esborra fitxes (és de super_admin)",
+    },
+    // --- Circuito de firma (20270510100000–100200) ---
+    ...FIRMA_SERVIDOR,
+    {
+      tabla: "firmes_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu les signatures de documents",
+      requiereFixture: "alguna signatura (scripts/crear-datos-documentales-prueba.ts → prepararSignatura)",
+    },
+    {
+      tabla: "v_signatura_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu l'estat de signatura dels documents",
+      requiereFixture: "algun document signable vigent (albarà confirmat/conciliat, certificat emès o conveni)",
+    },
+    {
+      tabla: "v_signatures_bandeja",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu la safata de signatures",
+      requiereFixture: "algun document signable vigent (albarà confirmat/conciliat, certificat emès o conveni)",
+    },
+    // El tècnic no tanca ni rebutja: és del super_admin. La guarda va abans de buscar la
+    // signatura, així que el uuid inventat dona 42501.
+    {
+      tabla: "tancar_signatura",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_firma: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "NO tanca cap signatura (es del super_admin)",
+    },
+    {
+      tabla: "rebutjar_signatura",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" },
+      descripcion: "NO rebutja cap signatura (es del super_admin)",
+    },
+    // Sin organización propia, el equipo no acuña enlaces de firma de panel (eso es de la
+    // persona titular): 42501 antes de mirar si el documento existe.
+    {
+      tabla: "acunar_enllac_propi",
+      op: "rpc",
+      esperado: "denegar",
+      args: {
+        p_proposito: "firma_document",
+        p_objeto_tipo: "documento",
+        p_objeto_id: "00000000-0000-0000-0000-000000000000",
+      },
+      descripcion: "NO encunya un enllac de signatura de panell (no te organitzacio)",
     },
   ],
   super_admin: [
@@ -2037,7 +2219,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_id: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot validar una oferta (autoritza; l'oferta no existeix, 22023)",
     },
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", descripcion: "consulta la cua de treball de l'equip" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 17, descripcion: "consulta la cua de treball de l'equip (17 cues)" },
     {
       tabla: "convenios",
       op: "leer",
@@ -2091,6 +2273,45 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       codiEsperat: "ofertes",
       descripcion: "una fitxa amb ofertes NO es pot esborrar (motiu «ofertes»)",
       requiereFixture: "una oferta de una ficha de prueba",
+    },
+    // --- Circuito de firma (20270510100000–100200) ---
+    // Cerrar y rechazar son del super_admin: con un uuid inventado la guarda deja pasar y la
+    // existencia corta con 22023 (`estat_incorrecte`); sin motivo, `cal_motiu`. No escribe nada.
+    ...FIRMA_SERVIDOR,
+    {
+      tabla: "tancar_signatura",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_firma: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot tancar una signatura (autoritza; la signatura no existeix)",
+    },
+    {
+      tabla: "rebutjar_signatura",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" },
+      descripcion: "pot rebutjar una signatura (autoritza; la signatura no existeix)",
+    },
+    {
+      tabla: "rebutjar_signatura",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_firma: "00000000-0000-0000-0000-000000000000", p_motiu: "  " },
+      descripcion: "rebutjar sense motiu → 22023 cal_motiu",
+    },
+    {
+      tabla: "firmes_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu les signatures de documents",
+      requiereFixture: "alguna signatura (scripts/crear-datos-documentales-prueba.ts → prepararSignatura)",
+    },
+    {
+      tabla: "v_signatures_bandeja",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu la safata de signatures",
+      requiereFixture: "algun document signable vigent (albarà confirmat/conciliat, certificat emès o conveni)",
     },
   ],
   productor: [
@@ -2222,6 +2443,23 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // ficha de productor, el uuid nulo daría 42501 y saldría FALLA, no saltada.
     { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor", p_valorizacion: "donacio", p_parte: "entrega" }, descripcion: "pot consultar el conveni de la SEVA fitxa" },
     ...DOCUMENTAL_EXTERN,
+    // Circuito de firma: ve la firma de SU documento (la que sube el fixture para
+    // TEST-PROD-1) y el estado de firma de sus documentos. `productor-altre` (TEST-PROD-2) no
+    // tiene ninguno y sale «sense», que es lo correcto.
+    {
+      tabla: "firmes_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu les signatures dels SEUS documents",
+      requiereFixture: "la signatura de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts → prepararSignatura)",
+    },
+    {
+      tabla: "v_signatura_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu l'estat de signatura dels SEUS documents",
+      requiereFixture: "un REC confirmat/conciliat de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // Albaranes (fase 3): el productor ve SU albarán de recepción y sus líneas. Es la
     // primera vez que `documents_meus()` devuelve algo, y por tanto la primera vez que
     // estos «permitir» significan algo.
@@ -2428,6 +2666,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // `manifestar_interes()` comprueba por dentro, y tiene que seguir respondiendo.
     { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "entidad", p_org: "@meva_fitxa_entitat", p_valorizacion: "donacio", p_parte: "recibe" }, descripcion: "pot consultar el conveni de la SEVA entitat" },
     ...DOCUMENTAL_EXTERN,
+    // Circuito de firma: el estado de firma de SUS documentos (ENT, CR, convenio).
+    {
+      tabla: "v_signatura_document",
+      op: "leer",
+      esperado: "permitir",
+      descripcion: "veu l'estat de signatura dels SEUS documents",
+      requiereFixture: "un ENT confirmat/conciliat o un conveni de la seva entitat (scripts/crear-datos-documentales-prueba.ts)",
+    },
     // Albaranes (fase 3): la entidad ve SUS albaranes de entrega…
     {
       tabla: "albaranes",
@@ -2499,6 +2745,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "v_entitats_llistat", op: "leer", esperado: "denegar", descripcion: "no ve ninguna entidad del listado (1C)" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
+    { tabla: "firmes_document", op: "leer", esperado: "denegar", descripcion: "no ve cap signatura" },
+    { tabla: "v_signatura_document", op: "leer", esperado: "denegar", descripcion: "no ve l'estat de signatura de cap document" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -2525,6 +2773,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "v_organizaciones", op: "leer", esperado: "denegar", descripcion: "no ve ninguna organización" },
     { tabla: "v_entitats_llistat", op: "leer", esperado: "denegar", descripcion: "no ve ninguna entidad del listado (1C)" },
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
+    { tabla: "firmes_document", op: "leer", esperado: "denegar", descripcion: "no ve cap signatura" },
+    { tabla: "v_signatura_document", op: "leer", esperado: "denegar", descripcion: "no ve l'estat de signatura de cap document" },
     ...DOCUMENTAL_EXTERN,
   ],
 };
@@ -2622,6 +2872,20 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     cuerpo: [],
     vigente: false,
   },
+  // Circuito de firma (20270510100000): sin GRANT de escritura para nadie. La fila cumple los
+  // CHECK (vía canvas, estado signat) para que lo que corte sea el permiso y no un check.
+  firmes_document: {
+    documento_id: "00000000-0000-0000-0000-000000000000",
+    objeto_tipo: "albaran",
+    objeto_id: "00000000-0000-0000-0000-000000000000",
+    tipo_doc: "REC",
+    modo: "real",
+    part: "donant",
+    tipo_org: "productor",
+    org_id: "00000000-0000-0000-0000-000000000000",
+    via: "canvas",
+    estat: "signat",
+  },
   // `documentos` tiene checks y NOT NULL por todas partes: la fila se rellena entera
   // para que lo que corte sea el permiso y no una restricción de datos (si cortara un
   // check, la comprobación no diría nada sobre RLS). Ejercicio 1999 para que se
@@ -2646,6 +2910,8 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
  */
 const COLUMNA_INOCUA: Record<string, string> = {
   documentos: "intentos",
+  // Sin GRANT de UPDATE: lo corta el permiso (42501) antes de mirar ninguna fila.
+  firmes_document: "signant_nom",
   // Retirar/publicar una plantilla es lo único que se puede hacer sobre una ya usada, así
   // que `vigente` es también la columna con la que se mide el permiso de escritura.
   plantillas_documento: "vigente",
@@ -2910,6 +3176,15 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
         detalle: sobran.length === 0
           ? `cap fora de la llista (${filas.length} permeses)`
           : `¡${sobran.length} oberta(es) de mes!: ${sobran.join(", ").slice(0, 200)}`,
+      };
+    }
+    if (check.filasExactas !== undefined) {
+      const n = Array.isArray(data) ? data.length : -1;
+      return {
+        ok: check.esperado === "permitir" && n === check.filasExactas,
+        detalle: n === check.filasExactas
+          ? `ejecutada (${n} filas, las esperadas)`
+          : `¡${n} filas, se esperaban ${check.filasExactas}!`,
       };
     }
     // La RPC ha hecho su trabajo: si deja rastro, se limpia ahora mismo. El arnés no

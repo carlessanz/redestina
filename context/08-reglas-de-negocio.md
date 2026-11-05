@@ -274,3 +274,14 @@ enviar; el interruptor, si sale **algo** (hoy, no).
 Consecuencia práctica: se puede responder a cualquiera que escriba espontáneamente aunque no
 tenga opt-in, pero no iniciar una conversación sin consentimiento.
 
+### El correo con el enlace de firma es manual (05-11-2026)
+
+«Envia per correu» de un CD, CR, REC o ENT pendiente de firma puede llevar la casilla «Inclou l'enllaç
+per signar en línia»: entonces sale por `reenviar-documento {manual:true, amb_enllac_signatura:true}`,
+que acuña el enlace de 30 días (`preparar_enviament_signatura`) y lo pone en el botón del correo. Entra
+en la **lista cerrada de lo manual** de §8: sale aunque las notificaciones estén apagadas, con la
+confirmación de quien pulsa, y con las barreras del modo test. REC y ENT solo se envían por esta vía
+con enlace. ⚠️ El enlace se acuña (y el anterior de correo se revoca) **antes** de saber si el correo pasa
+los gates (deuda 159). La firma en sí nunca manda correo: el aviso `document_signat` al cerrar es
+automático y respeta los interruptores.
+

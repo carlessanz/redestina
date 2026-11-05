@@ -17,8 +17,10 @@ let conveni = ''
 test.beforeAll(({}, info) => {
   if (motiuSaltClon('productor', 'super_admin') || info.project.name !== 'escriptori') return
   prod = productorDe('productor')
-  // Punto de partida: sin ningún col_productor (ni a medias ni vigente) de pasadas anteriores.
-  sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E' where productor_id = '${prod}' and tipo = 'col_productor' and estado = 'vigent'`)
+  // Punto de partida: sin ningún col_productor (ni a medias ni vigente) de pasadas anteriores, y
+  // sin un `com` vigente (05-11-2026: el clon tenía uno del 11-10 y la primera prueba —«no puede
+  // vender»— dejaba de ser cierta antes de abrir ninguna pantalla).
+  sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E' where productor_id = '${prod}' and tipo in ('col_productor', 'com') and estado = 'vigent'`)
   sql(`delete from enlaces_token where objeto_tipo = 'convenio' and objeto_id in (select id from convenios where productor_id = '${prod}' and tipo = 'col_productor' and estado in ('esborrany', 'pendent_firma'))`)
   sql(`delete from convenios where productor_id = '${prod}' and tipo = 'col_productor' and estado in ('esborrany', 'pendent_firma')`)
   conveni = sqlCom('super_admin', `select (preparar_convenio('productor', '${prod}', 'col_productor')).id`)

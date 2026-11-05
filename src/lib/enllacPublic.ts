@@ -32,6 +32,8 @@ export type CodiEnllac =
   | 'codi_incorrecte' | 'codi_caducat' | 'sense_codi' | 'no_cal_codi' | 'sense_correu'
   | 'no_test_user' | 'error_email' | 'email_desactivat' | 'notificacions_desactivades'
   | 'falta_declaracio' | 'falta_acceptacio' | 'falta_signatura'
+  // Solo en la firma de un documento (circuito de firma, 05-11-2026).
+  | 'versio_substituida' | 'ja_signat' | 'no_signable' | 'usa_firma_conveni'
   | 'xarxa' | 'desconegut_client'
 
 /** Cada código, su frase. Los tres finales del enlace —no existe, ya usado, caducado— se
@@ -75,6 +77,10 @@ const MOTIU: Record<CodiEnllac, string> = {
   falta_declaracio: 'sig.err_declaracio',
   falta_acceptacio: 'sig.err_acceptacio',
   falta_signatura: 'sig.err_signatura',
+  versio_substituida: 'sgn.err_versio_substituida',
+  ja_signat: 'sgn.err_ja_signat',
+  no_signable: 'sgn.err_no_signable',
+  usa_firma_conveni: 'sgn.err_usa_firma_conveni',
   xarxa: 'conf.err_xarxa',
   desconegut_client: 'conf.err_generic',
 }
@@ -786,6 +792,119 @@ export async function enviaConsentiment(
       return falla(codiDe(res.status, cos?.code))
     }
     return { ok: true, data: { ok: true } }
+  } catch {
+    return falla('xarxa')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// La firma de un documento (CD, CR, REC, ENT) por enlace (05-11-2026)
+// ---------------------------------------------------------------------------
+// Mismo endpoint que el resto: `GET ?t=` con `proposito = 'firma_document'` y `POST` con
+// `accion: 'firmar_document'`. Lo usan la página `/signar-document/:token` (el enlace del
+// correo, 30 días) y el diálogo del panel (un enlace propio de una hora): un solo POST, una
+// sola evidencia, pase por donde pase.
+
+export interface DadesDocumentSignatura {
+  /** `CD` · `CR` · `REC` · `ENT`. */
+  tipus: string
+  numero: string | null
+  /** `donant` · `receptor`: decide quién firma («el donant», «l'entitat receptora»). */
+  part: string | null
+  organitzacio: { nom: string | null }
+  /** El código impreso en el PDF (huella del snapshot). */
+  codiVerificacio: string | null
+  /** La huella de lo que se firma: viaja de vuelta en el POST (409 `document_canviat`). */
+  sha256Texto: string | null
+  /** El acta de conformidad que se acepta, literal. */
+  textActa: string | null
+  /** URL firmada de 60 s del PDF que se firma. Nunca una ruta de Storage. */
+  pdfUrl: string | null
+  assistida: boolean
+  /** Lo que ya se sabe de quien firma, para no teclearlo de cero. */
+  signant: { nom: string; carrec: string }
+}
+
+function normalitzaDocument(cos: Record<string, unknown>): DadesDocumentSignatura {
+  const org = (cos.organitzacio ?? {}) as Record<string, unknown>
+  const sig = (cos.signant ?? {}) as Record<string, unknown>
+  return {
+    tipus: text(cos.tipus) ?? '',
+    numero: text(cos.numero),
+    part: text(cos.part),
+    organitzacio: { nom: text(org.nom) },
+    codiVerificacio: text(cos.codi_verificacio),
+    sha256Texto: text(cos.sha256_texto),
+    textActa: text(cos.text_acta),
+    pdfUrl: text(cos.pdf_url),
+    assistida: cos.assistida === true,
+    signant: { nom: text(sig.nom) ?? '', carrec: text(sig.carrec) ?? '' },
+  }
+}
+
+/** Carga el documento que hay detrás del token. */
+export async function carregaDocumentSignatura(token: string): Promise<ResultatEnllac<DadesDocumentSignatura>> {
+  const res = await demanaEnllac(token)
+  if (!res.ok) return res
+  // Un token de convenio o de albarán abierto aquí responde 200 con otra cosa: mejor decirlo
+  // que pintar un documento vacío que parece que funciona.
+  const proposito = text(res.data.proposito)
+  if (proposito && proposito !== 'firma_document') return falla('proposit_incorrecte')
+  return { ok: true, data: normalitzaDocument(res.data) }
+}
+
+export interface FirmaDocument {
+  nom: string
+  carrec: string
+  /** ⚠️ Muere en `evidencias` (fuera del GRANT de SELECT): ninguna pantalla lo vuelve a leer. */
+  documentIdentitat: string
+  declaracioRepresentacio: boolean
+  /** PNG del trazo en data URI. */
+  firmaPng: string
+  sha256Texto: string | null
+  /** Honeypot: siempre vacío en una persona. */
+  web: string
+}
+
+export interface ResultatFirmaDocument {
+  numero: string | null
+  tipus: string | null
+  /** El PDF firmado se genera después del commit: al firmar todavía no hay nada que bajar. */
+  pdfPendent: boolean
+}
+
+/** Firma el documento. El servidor valida otra vez todo y su 400 dice qué campo falla. */
+export async function signaDocument(
+  token: string,
+  firma: FirmaDocument,
+): Promise<ResultatEnllac<ResultatFirmaDocument>> {
+  try {
+    const res = await fetch(`${supabaseUrl}/functions/v1/enlace-publico`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        t: token,
+        accion: 'firmar_document',
+        nombre: firma.nom,
+        cargo: firma.carrec,
+        documento_identidad: firma.documentIdentitat,
+        declaracio_representacio: firma.declaracioRepresentacio,
+        signatura_base64: firma.firmaPng,
+        sha256_texto: firma.sha256Texto,
+        web: firma.web,
+      }),
+    })
+    const cos = (await res.json().catch(() => null)) as Record<string, unknown> | null
+    if (!res.ok || !cos) return falla(codiDe(res.status, cos?.code), cos?.camp)
+    const doc = (cos.document ?? cos.documento ?? {}) as Record<string, unknown>
+    return {
+      ok: true,
+      data: {
+        numero: text(doc.numero) ?? text(doc.numero_completo),
+        tipus: text(doc.tipus) ?? text(doc.tipo),
+        pdfPendent: cos.pdf_pendent === true,
+      },
+    }
   } catch {
     return falla('xarxa')
   }

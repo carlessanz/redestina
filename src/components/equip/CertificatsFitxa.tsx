@@ -260,7 +260,7 @@ export default function CertificatsFitxa(
                   <span className="flex flex-wrap gap-2">
                     {doc && doc.estado === 'emitido' && (
                       <AccionsCertificat doc={doc} descarregador={descarregador}
-                        enviar={tipus === 'productor' && esSuperAdmin} />
+                        enviar={tipus === 'productor' && esSuperAdmin} onCanvi={() => void carrega()} />
                     )}
                     {c.cierre && (
                       <Button asChild size="sm" variant="ghost" className="h-11 whitespace-normal md:h-8">

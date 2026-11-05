@@ -37,6 +37,8 @@ interface FilaCua {
    * útil aunque no lo puedas hacer tú.
    */
   nomesAdmin?: boolean
+  /** Cerrar una firma es solo del super_admin (`tancar_signatura`). */
+  nomesSuperAdmin?: boolean
 }
 
 /**
@@ -53,6 +55,8 @@ const FILES: readonly FilaCua[] = [
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
   // 17-10-2026: la cuarta cola de Aprovacions; el ancla baja directamente a ella.
   { cua: 'recollides_per_validar', desti: '/equip/aprovacions#recollides', nomesAdmin: true },
+  // 05-11-2026: firmas subidas por una organización que el super_admin revisa y cierra.
+  { cua: 'signatures_per_tancar', desti: '/equip/aprovacions#signatures', nomesSuperAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
   { cua: 'ofertes_sense_enviar', desti: '/equip/ofertes' },
   { cua: 'ofertes_modificades', desti: '/equip/ofertes' },
@@ -72,7 +76,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'espigolades_per_convertir', 'recollides_per_validar',
+  'ofertes_vencudes', 'costos', 'espigolades_per_convertir', 'recollides_per_validar', 'signatures_per_tancar',
   // Fase 8: «què ha passat → què falta → acció» en todas las filas.
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]
@@ -166,6 +170,9 @@ export default function PendentsEquip() {
                     <span className="font-medium">{text}</span>
                     {f.nomesAdmin && ctx && !ctx.potAprovar && (
                       <Badge variant="outline">{t('pe.only_admin')}</Badge>
+                    )}
+                    {f.nomesSuperAdmin && ctx && !ctx.esSuperAdmin && (
+                      <Badge variant="outline">{t('pe.only_super_admin')}</Badge>
                     )}
                   </div>
                   {sub && <p className="text-sm text-muted-foreground">{sub}</p>}

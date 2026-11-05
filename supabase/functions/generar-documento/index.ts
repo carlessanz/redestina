@@ -46,6 +46,7 @@ import { type DatosPlan, renderPla } from "../_shared/pdf/render/pla.ts";
 import { type DatosExpedient, renderExpedient } from "../_shared/pdf/render/expedient.ts";
 import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
+import type { SignaturaDocument } from "../_shared/pdf/render/signatura.ts";
 import { enviaDocument } from "../_shared/envia-document.ts";
 import { exigirSecreto, json } from "../_shared/http.ts";
 
@@ -371,10 +372,15 @@ async function renderizar(
   // Los tres albaranes y sus rectificativos: mismo snapshot, mismo camino, renderizador
   // distinto. `R-REC` se pinta como un REC con el rótulo de rectificativo (y su ruta ya
   // lo archiva en la carpeta del original, `ruta_documento`).
+  // La firma con trazo de la contraparte, solo en la versión `signat` (05-11-2026). Nada de
+  // esto entra en `datos`: el snapshot es el del documento que se firmó.
+  const signatura = doc.subtipo === "signat" ? await signaturaDocument(supabase, doc) : null;
+
   const tipoBase = doc.tipo.replace(/^R-/, "");
   if (tipoBase === "REC" || tipoBase === "ENT" || tipoBase === "OPE") {
     const confirmaciones = await confirmacionesAlbaran(supabase, doc.objeto_id);
     const op = {
+      signatura,
       datos: datos as DatosAlbaran,
       sha256Datos: doc.sha256_datos,
       plantilla: await plantillaDe(supabase, doc.plantilla_id),
@@ -406,6 +412,8 @@ async function renderizar(
       plantilla: await plantillaDe(supabase, doc.plantilla_id),
       modo: doc.modo === "prueba" ? ("prueba" as const) : ("real" as const),
       subtipo: doc.subtipo,
+      // Solo la llevan el CD y el CR (los firmables de la familia); el RES y el CT, nunca.
+      signatura: doc.tipo === "CD" || doc.tipo === "CR" ? signatura : null,
     };
     if (doc.tipo === "RES") {
       return await renderRes(activos, {
@@ -764,4 +772,101 @@ async function activosConvenio(
 
   salida.ms = performance.now() - t0;
   return salida;
+}
+
+
+// ---------------------------------------------------------------------------
+// La FIRMA DE LA CONTRAPARTE de una versión `signat` (05-11-2026)
+// ---------------------------------------------------------------------------
+// Firmar con trazo emite la versión n+1 (`subtipo = 'signat'`) con el MISMO snapshot que la
+// firmada y la deja en `pendiente_fichero`; esto es lo que esa versión tiene de distinto, y
+// por eso no está en `datos`: quién firmó, con qué cargo y DNI, cuándo, por qué vía, y el
+// trazo. Se lee con `service_role`:
+//   firmes_document (document_signat_id = esta versión, vía canvas)
+//     → evidencias (nombre, cargo, documento_identidad —fuera del GRANT—, created_at, trazo)
+//     → enlaces_token.canal (panel · email · asistido)
+//     → el PNG del trazo, del bucket `documentos`.
+// Las versiones subidas (vías `pujat`/`correu`) nunca llegan aquí: nacen con su fichero.
+// Nada de esto puede impedir que el documento se genere: sin evidencia, sin firma; sin
+// PNG, el bloque sale con su texto y el hueco del trazo (mismo criterio que el convenio).
+
+async function signaturaDocument(
+  supabase: Cliente,
+  doc: FilaDocumento,
+): Promise<SignaturaDocument | null> {
+  const t0 = performance.now();
+  const { data: firmes, error: errFirma } = await supabase
+    .from("firmes_document")
+    .select("id, part, via, estat, evidencia_id, enlace_id, signant_nom, signant_carrec, signat_at")
+    .eq("document_signat_id", doc.id)
+    .eq("via", "canvas")
+    .limit(1);
+  if (errFirma) {
+    console.warn("generar-documento: firmes_document:", errFirma.message);
+    return null;
+  }
+  const firma = ((firmes ?? []) as {
+    id: string;
+    part: string;
+    evidencia_id: string | null;
+    enlace_id: string | null;
+    signant_nom: string | null;
+    signant_carrec: string | null;
+    signat_at: string | null;
+  }[])[0];
+  if (!firma) return null;
+
+  let ev: {
+    nombre: string | null;
+    cargo: string | null;
+    documento_identidad: string | null;
+    created_at: string | null;
+    trazo_firma_ruta: string | null;
+  } | null = null;
+  if (firma.evidencia_id) {
+    const { data, error } = await supabase
+      .from("evidencias")
+      .select("id, nombre, cargo, documento_identidad, created_at, trazo_firma_ruta")
+      .eq("id", firma.evidencia_id)
+      .maybeSingle();
+    if (error) console.warn("generar-documento: evidencia de la signatura:", error.message);
+    ev = data ?? null;
+  }
+
+  let canal: string | null = null;
+  if (firma.enlace_id) {
+    const { data } = await supabase
+      .from("enlaces_token").select("id, canal").eq("id", firma.enlace_id).maybeSingle();
+    canal = (data?.canal as string | null) ?? null;
+  }
+
+  let trazoPng: Uint8Array | null = null;
+  const ruta = ev?.trazo_firma_ruta ?? null;
+  if (ruta) {
+    const { data, error } = await supabase.storage.from(BUCKET).download(ruta);
+    if (error || !data) {
+      console.warn("generar-documento: traç de la signatura no descarregat:", ruta, error?.message);
+    } else {
+      trazoPng = new Uint8Array(await data.arrayBuffer());
+    }
+  }
+
+  const ms = performance.now() - t0;
+  console.log(JSON.stringify({
+    fn: "generar-documento",
+    documento: doc.id,
+    signatura_ms: Number(ms.toFixed(1)),
+    trac: trazoPng !== null,
+    canal,
+  }));
+
+  return {
+    part: firma.part,
+    nom: ev?.nombre ?? firma.signant_nom,
+    carrec: ev?.cargo ?? firma.signant_carrec,
+    dni: ev?.documento_identidad ?? null,
+    data: ev?.created_at ?? firma.signat_at,
+    trazoPng,
+    canal,
+  };
 }

@@ -467,7 +467,7 @@ export type DocumentoEstado = 'pendiente_fichero' | 'emitido' | 'error'
 export interface Documento {
   id: string
   tipo: DocumentoTipo
-  subtipo: 'emes' | 'conciliat' | 'firmat' | 'contrafirmat' | 'provisional' | 'definitiu' | null
+  subtipo: 'emes' | 'conciliat' | 'firmat' | 'contrafirmat' | 'provisional' | 'definitiu' | 'signat' | null
   objeto_tipo: DocumentoObjetoTipo
   objeto_id: string
   numero_completo: string
@@ -583,8 +583,8 @@ export interface PlantillaDocumento {
  */
 export interface EnlaceToken {
   id: string
-  proposito: 'firma_convenio' | 'confirmacion_albaran' | 'subida_factura'
-  objeto_tipo: 'albaran' | 'convenio' | 'cierre_donante'
+  proposito: 'firma_convenio' | 'confirmacion_albaran' | 'subida_factura' | 'consentiment_rgpd' | 'firma_document'
+  objeto_tipo: 'albaran' | 'convenio' | 'cierre_donante' | 'organizacion' | 'documento'
   objeto_id: string
   destinatario_email: string | null
   destinatario_nombre: string | null
@@ -1357,4 +1357,91 @@ export interface DiagnosticEquip {
   versio_questionari: number | null
   provisional: boolean
   darrera_actualitzacio?: string | null
+}
+
+// ---------------------------------------------------------------------------
+// Circuito de firma (`20270510100000`, 05-11-2026): la contraparte firma CD · CR · REC · ENT
+// (con el trazo en el panel o subiendo el PDF firmado) y CONV (solo subiendo). «pendent» no se
+// guarda: lo deriva la vista `v_signatura_document`. El DNI no está en ninguna de estas filas
+// (vive en `evidencias.documento_identidad`, fuera del GRANT).
+// ---------------------------------------------------------------------------
+
+export type TipusDocSignable = 'CD' | 'CR' | 'REC' | 'ENT' | 'CONV'
+export type PartSignant = 'donant' | 'receptor' | 'organitzacio'
+export type ViaSignatura = 'canvas' | 'pujat' | 'correu'
+export type EstatFirma = 'signat' | 'tancat' | 'rebutjat'
+/** Derivado en `v_signatura_document`: «pendent» no se guarda. */
+export type EstatSignatura = 'pendent' | 'signat' | 'tancat'
+
+/** Una fila de `firmes_document` (una firma registrada sobre una versión de `documentos`). */
+export interface FirmaDocument {
+  id: string
+  documento_id: string
+  document_signat_id: string | null
+  objeto_tipo: string
+  objeto_id: string
+  tipo_doc: TipusDocSignable
+  modo: 'real' | 'prueba'
+  part: PartSignant
+  tipo_org: 'productor' | 'entidad'
+  org_id: string
+  via: ViaSignatura
+  estat: EstatFirma
+  enlace_id: string | null
+  evidencia_id: string | null
+  fitxer_ruta: string | null
+  fitxer_sha256: string | null
+  fitxer_mime: 'application/pdf' | 'image/jpeg' | 'image/png' | null
+  fitxer_bytes: number | null
+  signant_nom: string | null
+  signant_carrec: string | null
+  data_signatura: string | null
+  signat_per: string | null
+  signat_at: string
+  tancat_per: string | null
+  tancat_at: string | null
+  nota_tancament: string | null
+  rebutjat_per: string | null
+  rebutjat_at: string | null
+  motiu_rebuig: string | null
+  created_at: string
+}
+
+/** Una fila de `v_signatura_document`: el estado de firma de un documento vigente. */
+export interface SignaturaDocument {
+  documento_id: string
+  tipo: TipusDocSignable
+  numero_completo: string
+  version: number
+  estat: EstatSignatura
+  firma_id: string | null
+  via: ViaSignatura | null
+  signant_nom: string | null
+  signat_at: string | null
+  tancat_at: string | null
+  fitxer_mime: string | null
+  part: PartSignant
+  tipo_org: 'productor' | 'entidad'
+  org_id: string
+  /** `false` en el CONV: solo admite subir el PDF firmado (y no sale como «te toca firmar»). */
+  admet_canvas: boolean
+  ultim_motiu_rebuig: string | null
+  ultim_rebutjat_at: string | null
+}
+
+/** Una fila de `v_signatures_bandeja` (solo equipo). */
+export interface SignaturaBandeja extends SignaturaDocument {
+  modo: 'real' | 'prueba'
+  objeto_tipo: string
+  objeto_id: string
+  ejercicio: number
+  emitido_at: string
+  signant_carrec: string | null
+  data_signatura: string | null
+  signat_per: string | null
+  fitxer_bytes: number | null
+  nota_tancament: string | null
+  org_nom: string | null
+  fitxa_id: string
+  organizacion_id: string | null
 }

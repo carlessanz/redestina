@@ -16,6 +16,8 @@ import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento } from '../../types'
 import BotoIcona from '../BotoIcona'
+import BadgeSignatura from '../BadgeSignatura'
+import AccionsSignatura, { type SignaturaFila } from '../AccionsSignatura'
 import { Badge } from '@/components/ui/badge'
 import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
@@ -29,7 +31,7 @@ import {
  * lo lea.
  */
 export default function TaulaAlbarans({
-  files, docs, descarregador,
+  files, docs, descarregador, signatures, onSignatura, perspectiva = 'usuari',
 }: {
   // Solo lo que se pinta: el panel del receptor no pide a la bandeja las columnas que
   // nombran a la productora (D3), y no tiene por qué para usar esta tabla.
@@ -40,6 +42,11 @@ export default function TaulaAlbarans({
   >[]
   docs: Pick<Documento, 'id' | 'objeto_id' | 'objeto_tipo' | 'numero_completo' | 'estado' | 'vigente'>[]
   descarregador: ReturnType<typeof useDescarregaDocument>
+  /** El estado de firma del PDF vigente de cada albarán, por id de documento (05-11-2026). */
+  signatures?: Record<string, SignaturaFila>
+  onSignatura?: () => void
+  /** El equipo (ficha de la entidad) lee el mismo estado al revés: «espera a l'entitat». */
+  perspectiva?: 'usuari' | 'equip'
 }) {
   const { t } = useT()
   const perAlbara = useMemo(() => {
@@ -86,7 +93,10 @@ export default function TaulaAlbarans({
                 {kilos}
               </TableCell>
               <TableCell className="text-center">
-                <Badge className={`${estilEstatAlbara(f.estado)} max-w-full whitespace-normal`}>{t(`alb.st_${f.estado}`)}</Badge>
+                <div className="flex flex-col items-center gap-1">
+                  <Badge className={`${estilEstatAlbara(f.estado)} max-w-full whitespace-normal`}>{t(`alb.st_${f.estado}`)}</Badge>
+                  {docId && <BadgeSignatura estat={signatures?.[docId]?.estat} perspectiva={perspectiva} />}
+                </div>
               </TableCell>
               <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground md:table-cell">
                 {dataCurta(f.emitido_at)}
@@ -111,6 +121,8 @@ export default function TaulaAlbarans({
                         motiu={descarregador.generant === docId ? t('doc.generating') : undefined}
                         onClick={() => void descarregador.descarrega(docId)}
                       />
+                      <AccionsSignatura sig={signatures?.[docId]} variant="icones" ambBadge={false}
+                        onCanvi={onSignatura} />
                     </div>
                   )
                   : <p className="text-center text-xs text-muted-foreground">{t('mydoc.no_pdf')}</p>}

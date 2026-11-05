@@ -12,7 +12,8 @@
 
 import { supabase, supabaseUrl } from './supabase'
 import type { DocumentExternObjecte, DocumentExternTipus } from '../types'
-import type { DocumentoEstado } from '../types'
+import type { DocumentoEstado, SignaturaBandeja, SignaturaDocument } from '../types'
+import type { ResultatRpc } from './albarans'
 
 /** Códigos que devuelve `descargar-documento`, más los que solo ocurren en el cliente. */
 export type CodiDescarrega =
@@ -91,8 +92,17 @@ export async function urlDocumentExtern(externId: string): Promise<ResultatDesca
   return demanaUrl({ documento_extern_id: externId }, externId)
 }
 
+/**
+ * El fichero FIRMADO que subió la contraparte (`firmes_document`), para que el super_admin lo
+ * revise antes de cerrar. Puede ser un PDF o una foto (JPG/PNG): la extensión la pone el
+ * servidor. Mismo canal que todo lo demás: `descargar-documento`, URL de 60 s.
+ */
+export async function urlFitxerFirma(firmaId: string): Promise<ResultatDescarrega> {
+  return demanaUrl({ firma_document_id: firmaId }, firmaId)
+}
+
 async function demanaUrl(
-  cos: { documento_id: string } | { documento_extern_id: string },
+  cos: { documento_id: string } | { documento_extern_id: string } | { firma_document_id: string },
   nomPerDefecte: string,
 ): Promise<ResultatDescarrega> {
   let dades: Descarrega
@@ -335,6 +345,8 @@ export type CodiReenviament =
   | 'unauthorized' | 'forbidden' | 'no_existeix' | 'sense_fitxer' | 'enviat_fa_poc'
   | 'no_s_envia' | 'bloquejat_prova' | 'bloquejat_mode_test' | 'fora_llista_test'
   | 'error_envio' | 'desactivat' | 'xarxa' | 'desconegut'
+  // Circuito de firma: el correo con el enlace para firmar (`preparar_enviament_signatura`).
+  | 'sense_correu' | 'usa_firma_conveni' | 'ja_signat' | 'versio_substituida' | 'no_signable'
 
 const MOTIU_REENVIAMENT: Record<CodiReenviament, string> = {
   unauthorized: 'doc.err_sessio',
@@ -349,12 +361,17 @@ const MOTIU_REENVIAMENT: Record<CodiReenviament, string> = {
   error_envio: 'doc.resend_err_envio',
   // Las notificaciones o el correo están apagados en Configuració (§8).
   desactivat: 'canal.motiu_email',
+  sense_correu: 'sgn.err_sense_correu',
+  usa_firma_conveni: 'sgn.err_usa_firma_conveni',
+  ja_signat: 'sgn.err_ja_signat',
+  versio_substituida: 'sgn.err_versio_substituida',
+  no_signable: 'sgn.err_no_signable',
   xarxa: 'doc.err_xarxa',
   desconegut: 'doc.resend_err_generic',
 }
 
 export type ResultatReenviament =
-  | { ok: true; simulat: boolean; destinatari: string | null }
+  | { ok: true; simulat: boolean; destinatari: string | null; ambEnllac?: boolean }
   | { ok: false; codi: CodiReenviament; motiuKey: string }
 
 /**
@@ -364,7 +381,15 @@ export type ResultatReenviament =
 export async function reenviarDocument(
   documentoId: string,
   /** Con las notificaciones apagadas, si la persona lo ha aceptado (`acceptaEnviament`, §8). */
-  opcions: { manual?: boolean } = {},
+  opcions: {
+    manual?: boolean
+    /**
+     * El correo lleva además el enlace para firmar en línea (`/signar-document/<token>`, 30
+     * días). Solo tiene sentido con un documento pendiente de firma con trazo; el servidor
+     * lo ignora en los demás.
+     */
+    ambEnllacSignatura?: boolean
+  } = {},
 ): Promise<ResultatReenviament> {
   const falla = (codi: CodiReenviament): ResultatReenviament =>
     ({ ok: false, codi, motiuKey: MOTIU_REENVIAMENT[codi] })
@@ -376,14 +401,23 @@ export async function reenviarDocument(
     const res = await fetch(`${supabaseUrl}/functions/v1/reenviar-documento`, {
       method: 'POST',
       headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ documento_id: documentoId, manual: opcions.manual === true }),
+      body: JSON.stringify({
+        documento_id: documentoId,
+        manual: opcions.manual === true,
+        amb_enllac_signatura: opcions.ambEnllacSignatura === true,
+      }),
     })
     const cos = (await res.json().catch(() => null)) as
-      | { resultat?: string; destinatari?: string | null; code?: string }
+      | { resultat?: string; destinatari?: string | null; code?: string; enllac_signatura?: unknown }
       | null
 
     if (res.ok && cos?.resultat) {
-      return { ok: true, simulat: cos.resultat === 'simulat', destinatari: cos.destinatari ?? null }
+      return {
+        ok: true,
+        simulat: cos.resultat === 'simulat',
+        destinatari: cos.destinatari ?? null,
+        ambEnllac: cos.enllac_signatura != null && cos.enllac_signatura !== false,
+      }
     }
     const codi = typeof cos?.code === 'string' && cos.code in MOTIU_REENVIAMENT
       ? cos.code as CodiReenviament
@@ -391,5 +425,169 @@ export async function reenviarDocument(
     return falla(codi)
   } catch {
     return falla('xarxa')
+  }
+}
+
+// ---------------------------------------------------------------------------
+// El circuito de firma (05-11-2026, `20270510100000`…`100200`)
+// ---------------------------------------------------------------------------
+// La firma con trazo va por el enlace público (`enllacPublic.ts`, `signaDocument`); aquí
+// está todo lo demás: el estado de cada documento, la subida del fichero firmado y las dos
+// decisiones del super_admin. Mismo contrato: nunca lanza.
+
+/**
+ * El estado de firma de unos documentos, por id. **Fail-soft**: si la vista no responde
+ * (migración sin aplicar, un corte) devuelve un mapa vacío y la pantalla se pinta igual, sin
+ * badges de firma — un archivo que no se lista por culpa de la firma sería peor.
+ */
+export async function carregaEstatsSignatura(ids: string[]): Promise<Record<string, SignaturaDocument>> {
+  if (ids.length === 0) return {}
+  try {
+    // ⚠️ Lista de columnas en UN literal (§7, deuda 46).
+    const { data, error } = await supabase
+      .from('v_signatura_document')
+      .select('documento_id, tipo, numero_completo, version, estat, firma_id, via, signant_nom, signat_at, tancat_at, fitxer_mime, part, tipo_org, org_id, admet_canvas, ultim_motiu_rebuig, ultim_rebutjat_at')
+      .in('documento_id', ids)
+    if (error) { console.warn('v_signatura_document:', error.message); return {} }
+    const mapa: Record<string, SignaturaDocument> = {}
+    for (const f of (data as SignaturaDocument[] | null) ?? []) mapa[f.documento_id] = f
+    return mapa
+  } catch {
+    return {}
+  }
+}
+
+/** La bandeja del equipo (Aprovacions › Signatures per tancar, Documents › Signatures). */
+export async function carregaBandejaSignatures(
+  estat?: 'pendent' | 'signat' | 'tancat',
+): Promise<ResultatRpc<SignaturaBandeja[]>> {
+  try {
+    let q = supabase
+      .from('v_signatures_bandeja')
+      .select('documento_id, tipo, numero_completo, version, estat, firma_id, via, signant_nom, signat_at, tancat_at, fitxer_mime, part, tipo_org, org_id, admet_canvas, ultim_motiu_rebuig, ultim_rebutjat_at, modo, objeto_tipo, objeto_id, ejercicio, emitido_at, signant_carrec, data_signatura, signat_per, fitxer_bytes, nota_tancament, org_nom, fitxa_id, organizacion_id')
+    if (estat) q = q.eq('estat', estat)
+    const { data, error } = await q.order('signat_at', { ascending: true, nullsFirst: false })
+    if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
+    return { ok: true, data: (data as SignaturaBandeja[] | null) ?? [] }
+  } catch {
+    return { ok: false, missatge: 'c.load_error', codi: null }
+  }
+}
+
+/** Qué puede contestar `pujar-document-signat`, más los fallos del cliente. */
+export type CodiPujadaSignat =
+  | CodiPujada | 'ja_signat' | 'no_signable' | 'versio_substituida' | 'usa_firma_conveni'
+
+const MOTIU_PUJADA_SIGNAT: Record<CodiPujadaSignat, string> = {
+  ...MOTIU_PUJADA,
+  forbidden: 'sgn.err_permis',
+  dades_invalides: 'sgn.err_dades',
+  ja_signat: 'sgn.err_ja_signat',
+  no_signable: 'sgn.err_no_signable',
+  versio_substituida: 'sgn.err_versio_substituida',
+  usa_firma_conveni: 'sgn.err_usa_firma_conveni',
+}
+
+export interface PujadaSignat {
+  firma: { id: string; estat: 'signat' | 'tancat'; via: 'pujat' | 'correu'; document_signat_id: string | null }
+  sha256: string | null
+  bytes: number | null
+  mime: string | null
+}
+
+export type ResultatPujadaSignat =
+  | { ok: true; data: PujadaSignat }
+  | { ok: false; codi: CodiPujadaSignat; motiuKey: string }
+
+/**
+ * Sube el fichero firmado de un documento (PDF, JPG o PNG, hasta 10 MB). Lo que pasa
+ * después lo decide el servidor por quién lo sube: la organización → `signat` (lo revisa el
+ * super_admin); el super_admin → `tancat` al momento.
+ */
+export async function pujarDocumentSignat(camps: {
+  fitxer: File
+  documentoId: string
+  signantNom?: string | null
+  signantCarrec?: string | null
+  /** `AAAA-MM-DD`, la fecha que pone el papel. */
+  dataSignatura?: string | null
+}): Promise<ResultatPujadaSignat> {
+  const falla = (codi: CodiPujadaSignat): ResultatPujadaSignat =>
+    ({ ok: false, codi, motiuKey: MOTIU_PUJADA_SIGNAT[codi] })
+  try {
+    const { data } = await supabase.auth.getSession()
+    const token = data.session?.access_token
+    if (!token) return falla('unauthorized')
+
+    const form = new FormData()
+    form.append('fitxer', camps.fitxer)
+    form.append('documento_id', camps.documentoId)
+    if (camps.signantNom?.trim()) form.append('signant_nom', camps.signantNom.trim())
+    if (camps.signantCarrec?.trim()) form.append('signant_carrec', camps.signantCarrec.trim())
+    if (camps.dataSignatura) form.append('data_signatura', camps.dataSignatura)
+
+    // Sin `Content-Type` a mano: el navegador pone el `boundary` del multipart.
+    const res = await fetch(`${supabaseUrl}/functions/v1/pujar-document-signat`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    })
+    const cos = (await res.json().catch(() => null)) as
+      | (Partial<PujadaSignat> & { code?: string })
+      | null
+
+    if (!res.ok || !cos?.firma?.id) {
+      const codi: CodiPujadaSignat = typeof cos?.code === 'string' && cos.code in MOTIU_PUJADA_SIGNAT
+        ? cos.code as CodiPujadaSignat
+        : res.status === 401 ? 'unauthorized'
+          : res.status === 403 ? 'forbidden'
+            : res.status === 413 ? 'massa_gran'
+              : res.status === 415 ? 'mime_no_acceptat'
+                : res.status === 400 ? 'dades_invalides'
+                  : 'desconegut'
+      return falla(codi)
+    }
+    return {
+      ok: true,
+      data: {
+        firma: cos.firma,
+        sha256: cos.sha256 ?? null,
+        bytes: cos.bytes ?? null,
+        mime: cos.mime ?? null,
+      },
+    }
+  } catch {
+    return falla('xarxa')
+  }
+}
+
+/** El código propio (`22023 <codi>: …`) del mensaje de una RPC, si lo hay. */
+function codiDeMissatge(m: string | null | undefined): string | null {
+  const c = /^([a-z_]+):/.exec(m ?? '')?.[1]
+  return c ?? null
+}
+
+/** El super_admin da por buena una firma subida (`tancar_signatura`). Nota opcional. */
+export async function tancarSignatura(firmaId: string, nota?: string | null): Promise<ResultatRpc<null>> {
+  try {
+    const { error } = await supabase.rpc('tancar_signatura', {
+      p_firma: firmaId,
+      p_nota: nota?.trim() ? nota.trim() : null,
+    })
+    if (error) return { ok: false, missatge: error.message, codi: codiDeMissatge(error.message) ?? error.code ?? null }
+    return { ok: true, data: null }
+  } catch {
+    return { ok: false, missatge: 'c.error', codi: null }
+  }
+}
+
+/** El super_admin la rechaza (`rebutjar_signatura`): motivo obligatorio; vuelve a «pendent». */
+export async function rebutjarSignatura(firmaId: string, motiu: string): Promise<ResultatRpc<null>> {
+  try {
+    const { error } = await supabase.rpc('rebutjar_signatura', { p_firma: firmaId, p_motiu: motiu.trim() })
+    if (error) return { ok: false, missatge: error.message, codi: codiDeMissatge(error.message) ?? error.code ?? null }
+    return { ok: true, data: null }
+  } catch {
+    return { ok: false, missatge: 'c.error', codi: null }
   }
 }

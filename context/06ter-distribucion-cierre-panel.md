@@ -1967,3 +1967,48 @@ El concepto y la lista cerrada están en §8 («Automático y manual»). En los 
   **Sin plantilla, error** (se retiró el `CUERPO_PROVISIONAL`, la caja del importe, «qui certifica», la línea de
   revisión y el 182). El correo (`correu-document.ts`) dice el ámbito y las fechas. Prueba:
   `tests/pdf/cd_test.ts` (extractor `tests/pdf/textPdf.ts`).
+
+### Circuito de firma unificado (05-11-2026)
+
+Carles pidió que todo documento que deba firmarse tenga **doble vía** desde el panel del usuario —firmar
+con el dedo o el ratón, o descargar, firmar fuera y volver a subir— y que el super_admin pueda enviarlo
+por correo y subir la versión firmada que le devuelven para cerrarlo. El modelo de datos está en
+`context/04` («Circuito de firma unificado»); la seguridad, en `context/09`.
+
+- **Piezas** (`src/components/`): `BlocSignant` (nombre · cargo · DNI, extraído de `FirmaConveni`, que
+  ahora lo usa; mínimos en `lib/signatures.ts`), `PdfIncrustat` (extraído de `VisorPdf`),
+  `FormulariSignaDocument` (documento → quién firma → conformidad `FilaCasella` con el `text_acta` del
+  servidor → `SignaturePad` → botón; en escritorio el PDF incrustado al lado, en móvil tarjeta «Obre el
+  PDF»/«Descarrega» y la URL de 60 s se renueva si pasan 50 s), **`DialegSignaDocument`** (80vw×88dvh;
+  `mode='titular'` con pestañas «Signa aquí» / «Puja'l signat»; `mode='equip'` solo «Puja el signat» con
+  confirmación «passarà a ser la definitiva… quedarà tancat»; el enlace del panel se acuña una sola vez
+  por apertura al entrar en «Signa aquí»), `BadgeSignatura` (perspectiva usuario/equipo: ámbar «te
+  toca», verde `tancat`), **`AccionsSignatura`** (badge + botones o iconos), `DialegEnviament` (casilla
+  «Inclou l'enllaç per signar en línia», marcada por defecto si está `pendent` y admite canvas),
+  `equip/CuaSignatures`. Hook `useEstatsSignatura` (lee `v_signatura_document`, falla en blando).
+- **`lib/signatures.ts`**: `accionsSignatura({estat, rol, tipo, admetCanvas, ambPdf})` es **el único
+  sitio que decide qué botón sale**: titular + `pendent` + canvas → Signa y Puja'l signat; super_admin +
+  `pendent` → Puja el signat; super_admin + `signat` → Veure el fitxer, Tanca (nota opcional), Rebutja
+  (motivo obligatorio); operador, resto del equipo y `tancat` → nada; un CONV `pendent` (`admet_canvas`
+  false) no se pinta como pendiente para la organización (`mostraEstatSignatura`).
+- **Usuario**: «Pendent de tu» lista cada documento a firmar (`proposito='firma_document'` de
+  `pendents_meus`): la titular ve «Signa» y «Puja'l signat»; el operador, «només la persona titular» y el
+  motivo si hubo rechazo. Las tablas de albaranes y de documentos y la tarjeta de la oferta llevan el
+  estado y las acciones en icono. El convenio firmado (versión `signat`) se pinta como «signat».
+- **Equipo**: Aprovacions › quinta cola **«Signatures per tancar»** (`v_signatures_bandeja where
+  estat='signat'`: organización, tipo, número, vía, fecha; Veure el fitxer por `descargar-documento
+  {firma_document_id}`, Obre la fitxa/albarán, Tanca, Rebutja; solo super_admin actúa, el resto gris con
+  motivo; ancla `#signatures`; tablero `pe.signatures_per_tancar`), Documents › pestaña **«Signatures»**
+  (sustituye a «Enllaços», vacía desde la fase 1; filtro pendents/rebudes/tancats), ficha del albarán
+  (estado y «Puja el signat»), ficha de la entidad › Convenis («Puja el conveni signat»), certificados
+  (`AccionsCertificat` + `AccionsSignatura`).
+- **Ruta pública `/signar-document/:token`** (`routes/public/SignarDocument.tsx`, `LayoutAcces`, sin
+  sesión): el enlace del correo (30 días) y el del panel (1 h) abren el mismo formulario y hacen el mismo
+  POST (`enlace-publico` `firmar_document`). «Envia per correu» con la casilla marcada llama a
+  `reenviar-documento {documento_id, manual, amb_enllac_signatura}`; para un albarán se usa el REC/ENT
+  vigente (`enviar-albara` no lleva el enlace, deuda 160); con el albarán `entregado` la casilla no
+  aparece porque ese correo lleva el enlace de confirmar los kilos.
+- Sin Realtime: se recarga al cerrar el diálogo y se refrescan avisos y contadores. E2E:
+  `tests/e2e/signatures.e2e.ts` (5 pruebas, solo clon y escritorio; restaura documentos, firmas y
+  avisos; deja enlaces usados, evidencias y ficheros, deuda 157 bis → ver §12).
+

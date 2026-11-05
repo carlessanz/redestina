@@ -44,15 +44,12 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
 - Entorno de **pruebas de Meta** con `WHATSAPP_ENVIO_REAL=true`: Meta solo entrega a los ≤5
   números verificados (`meta_test_recipients`); el resto rechaza con `131030`. Mensajería
   siempre individual (la Cloud API no escribe en grupos).
-- **Documentación fuera del repo**: `docs/` (ignorado por git; funcionales, guías operativas,
-  `Usuarios y accesos` y `usuarios-test.md` **con credenciales**) y la carpeta de consultoría en
-  Google Drive `…/02-Proyectos/04-Espigoladors/03-Redestina/` (`0. Documentación vigente/`,
-  `1. Fuentes/`, `2. Contexto/`, **`3. Claude Code/`** = lo que escribe Claude). Solo se escribe
-  en `3. Claude Code/`; nunca credenciales ni datos personales allí. Jerarquía: la *Definición de
-  producto v3* manda en el porqué, el *funcional 2026 v3* en el qué, la automatización y la guía
-  técnica en el cómo.
-- **Planes vivos** en `3. Claude Code/`: **plan 1 CRM y registro de entidades** (2026-11-02; 1A-1D
-  y 1F publicadas; **1E solo en el clon**, la carga en producción antes del 31-12); los anteriores, ejecutados.
+- **Documentación fuera del repo**: `docs/` (ignorado; funcionales y credenciales) y la carpeta de
+  Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
+  `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
+  técnica (cómo).
+- **Planes vivos** en `3. Claude Code/`: plan 1 CRM (1A-1D y 1F publicadas; **1E solo en el clon**,
+  carga en producción antes del 31-12); certificado y firma (05-11) ejecutados.
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -87,24 +84,16 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
 - **Producción es la base de verdad; el clon local (Docker, puertos 553xx) es una copia** (§11).
 - Router como capa raíz con rutas públicas y privadas (§6quater). Sin librería de estado.
   `vercel.json` lleva el rewrite de SPA.
-- **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` es `min-h-0 flex-1`, scrollea
-  él y lleva `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flags de ruta:
-  `fullBleed` (Mensajería) y `ample` (listados anchos). `CarregantSeccio` como esqueleto con alto.
-- **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false` para lo que no
-  cabe, `labelBarraKey` para etiqueta corta; `li` con `min-w-0`). Medir, no estimar.
-- **PWA instalable sin service worker** (`selfDestroying`; el porqué, en el detalle).
-  `/version.json` + `useVersioNova` avisan de versión nueva.
-  Aviso de instalación solo en móvil (dispositivo, no ancho), a productor y receptor.
-- **Siete reglas de móvil medidas** (detalle en el fichero): controles ≥16 px
-  (`text-base md:text-sm`, ya en la base de `ui/`); `Button` trae
-  `whitespace-nowrap` **y `shrink-0`** (ancho explícito `w-full sm:w-auto` si el texto crece);
-  `env(safe-area-inset-*)`; en una fila texto+botón el botón va a su línea en móvil
-  (`flex-wrap`, `min-w-0 flex-1 basis-*`); `grid-cols-1` explícito antes de `sm:grid-cols-2`;
-  celdas de tabla con `whitespace-normal`; **auditar `scrollWidth > clientWidth` en los hijos**,
-  no solo en el documento.
-- **Tablas**: sin scroll horizontal (secundarias `hidden md:table-cell`, lo
-  esencial bajo el nombre), acciones por fila en
-  iconos `BotoIcona` (tooltip y `aria-label`); `colSpan` de fila completa con `usePuntTall`.
+- **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
+  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flags de ruta `fullBleed` y `ample`.
+- **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
+- **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
+- **Siete reglas de móvil medidas** (detalle): controles ≥16 px (`text-base md:text-sm`); `Button`
+  con `whitespace-nowrap shrink-0` (`w-full sm:w-auto` si el texto crece); `safe-area-inset`; en una
+  fila texto+botón el botón baja de línea; `grid-cols-1` antes de `sm:grid-cols-2`; celdas con
+  `whitespace-normal`; **auditar `scrollWidth > clientWidth` en los hijos**.
+- **Tablas**: sin scroll horizontal (secundarias `hidden md:table-cell`), acciones en `BotoIcona`
+  (tooltip y `aria-label`); `colSpan` completo con `usePuntTall`.
 
 ## 2bis. Sistema de diseño
 
@@ -141,9 +130,9 @@ src/
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend; 21 funciones: whatsapp-send/webhook, crear-oferta, registro,
+          autorizacion, resend, pujada; 22 funciones: whatsapp-send/webhook, crear-oferta, registro,
           donar-acces, enviar-email/acceso/avis/albara, generar/descargar/reenviar-documento,
-          enlace-publico, subir-documento-externo, priorizar-entidades, recordatorios-*,
+          enlace-publico, subir-documento-externo, pujar-document-signat, priorizar-entidades, recordatorios-*,
           recollides-programades, recuperar-password, verificar-certificat, limpiar-documentos-prueba)
 docs/ (ignorado por git)
 ```
@@ -167,18 +156,13 @@ tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 producción (§6).
 
 **Estado de las fichas (plan 1, 1A, `20270501100000`)**: `activo` en las dos; la organización está
-activa si lo está algún papel (D7). Pasar a activa exige NIF válido y razón social (trigger
-`trg_fitxa_estat`: `falta_nif`·`nif_invalid`·`falta_rao_social`, P9) y todo cambio deja fila en
-`fitxa_estat_hist` (solo la lee el equipo). `v_organizaciones` añade el estado, el nombre comercial, la comarca y la cuenta (detalle). Una entidad
-inactiva no entra en el Mercat (`modalitats_compatibles_meves()`; la rama de historial sigue), ni
-en `priorizar-entidades`, ni en los selectores del equipo, y `comprova_interes()` la rechaza con
-`entitat_inactiva`. **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva (P6) pero
-sus RPC no se ejecutan con sesión y la pantalla se retiró (deuda 146). **1C (`20270501200000`)**:
-vista `v_entitats_llistat` (`security_invoker`, una fila por organización, columnas en el
-detalle) para el listado «Entitats». **1F + 1.5 (`20270502100000`, `20270504100000`)**:
-`notes_internes` (CRM: `data`, `canal`, `tipus`, `autor`, `responsable`, `text`, `propera_accio`,
-`propera_data`, `seguiment_fet_at`): solo por RPC; lectura `es_intern()` (externo: 0 filas,
-sin error); la vista suma el último contacto y los seguimientos pendientes.
+activa si lo está algún papel (D7). Activar exige NIF válido y razón social (`trg_fitxa_estat`:
+`falta_nif`·`nif_invalid`·`falta_rao_social`) y todo cambio deja fila en `fitxa_estat_hist` (solo
+equipo). Una entidad inactiva no entra en el Mercat (`modalitats_compatibles_meves()`), ni en
+`priorizar-entidades`, ni en los selectores, y `comprova_interes()` la rechaza (`entitat_inactiva`).
+**Un contacto por ficha (D3)**: `organizacion_contactos` se conserva sin uso (deuda 146). **1C**: vista
+`v_entitats_llistat` (`security_invoker`) para «Entitats». **1F + 1.5**: `notes_internes` (CRM) solo
+por RPC; lectura `es_intern()` (externo: 0 filas); la vista suma el último contacto y los seguimientos.
 
 **Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
@@ -215,7 +199,13 @@ sin borrado salvo `reiniciar_documentos_prova()`), `documento_envios` (solo corr
 `pg_cron` `documentos-pendientes` (5 intentos, dos contadores). **Cinco columnas fuera del GRANT
 de SELECT**: `enlaces_token.token_hash/codigo_hash`, `evidencias.documento_identidad`,
 `parametros_documentales.apoderada_dni`, `documentos.envio` → `select('*')` da `42501`; toda
-columna nueva de `documentos` nace sin SELECT.
+columna nueva de `documentos` nace sin SELECT. **Circuito de firma (05-11-2026)**: la contraparte
+firma CD·CR·REC·ENT (trazo en panel/enlace, o PDF firmado subido) y CONV (solo subido); una firma =
+**versión n+1 `subtipo='signat'` con el mismo `sha256_datos`**; `firmes_document` (vía canvas·pujat·
+correu; estat signat·tancat·rebutjat; sin DNI) lo registra, «pendent» lo deriva
+`document_part_signant()` y lo sirven `v_signatura_document`/`v_signatures_bandeja`. Trazo y subida
+del super_admin cierran al momento; la subida de la organización espera en «Signatures per tancar».
+Un externo nunca firma en prueba. Nada se bloquea por la firma.
 
 **Albaranes** (`albaranes`, `albaran_lineas`: REC entrada · ENT entrega · OPE venta/maquila;
 solo `kg_validados` cuenta; **sin columna de importe**; nacen por trigger al crear la
@@ -262,9 +252,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `mercat_vist_at`), `usuario_roles` (`super_admin` > `admin` > `tecnic`; externos sin fila),
   `membresias` (cuenta ↔ ficha; `rol_org` titular/operador; eje `aprovacio` pendent · aprovada ·
   rebutjada × `activo`; **el rol no viaja en el JWT**: se consulta en cada política).
-- **`roles_activos` ENCENDIDO en producción** (fail-open deliberado; un entorno recreado nace
-  apagado: `scripts/roles-activos.ts`). `hola@carlessanz.com` es `super_admin`; las otras dos
-  cuentas del equipo, `admin`.
+- **`roles_activos` ENCENDIDO en producción** (fail-open; un entorno recreado nace apagado:
+  `scripts/roles-activos.ts`). `hola@carlessanz.com` es `super_admin`; las otras dos del equipo, `admin`.
 - Helpers `stable security definer set search_path = public, pg_temp` con `revoke execute …
   from public, anon`: `es_intern()`, `pot_aprovar()`, `es_super_admin()`, `mi_rol()`,
   `mis_productores()`, `mis_entidades()`, `soc_titular()`, `get_my_session_context()`
@@ -303,10 +292,14 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
   `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor);
-  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); y las de cierre y certificados, diagnóstico y
+  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); firma (`acunar_enllac_propi('firma_document',…)`
+  titular, `tancar_/rebutjar_signatura` super_admin, `puc_signar_document`, `document_part_signant`; solo
+  servidor `signar_document_per_enllac`, `registrar_document_signat`, `preparar_enviament_signatura`);
+  y las de cierre y certificados, diagnóstico y
   plan, equipo, interruptores y jobs (solo `service_role`), con su nombre, en el detalle (§4bis, «Familias»).
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
-  `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`.
+  `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`,
+  `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una versión sustituida).
 - **Edge Functions**: `service_role` ignora RLS, así que `_shared/autorizacion.ts`
   (`contextoUsuario`, `exigirEquipo`: `401`/`403`) se aplica en las que lo necesitan;
   `rolesActivos()` **falla cerrado** ante un error de lectura.
@@ -344,13 +337,11 @@ datos importados se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
-17 pasos (`_shared/camposOferta.ts`, compartidos con el panel vía `GET crear-oferta/campos`):
-familia → producte → varietat → producte_al_camp → kg → format_entrega → caixes → retorn →
-transport → ubicacio → disponible_fins → horari → modalitat (lista, «Totes») → preu_minim →
-cost_kg → causa → observacions; condiciones en lista (`condicions`), textos ca/es en el propio
-descriptor (`tests/camposOferta.test.ts` vigila el castellano y los límites de Meta).
-Arranca con guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → aviso y repite; `Stop` cancela;
-texto libre ≤400; ubicación por Maps o `location`; convenio comprobado al final. Bot en catalán.
+17 pasos (`_shared/camposOferta.ts`, compartidos con el panel vía `GET crear-oferta/campos`; textos
+ca/es en el descriptor, `tests/camposOferta.test.ts`): familia → producte → varietat → producte_al_camp
+→ kg → format_entrega → caixes → retorn → transport → ubicacio → disponible_fins → horari → modalitat →
+preu_minim → cost_kg → causa → observacions. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
+`Stop` cancela; texto ≤400; ubicación por Maps o `location`; convenio al final. Bot en catalán.
 
 ## 6ter. Paneles y procesos (detalle, por fecha y fase, en `context/06ter-…md`)
 
@@ -380,7 +371,13 @@ Lo que manda hoy, en una línea cada uno:
   ficha › Certificats y la tarjeta de `/equip/ofertes/:id`: ámbito Oferta · Interval · Exercici
   (`ABASTS_DIALEG`, pendiente del cliente, deuda 156), fecha de expedición, anexo, «Excloses», revisión
   (en real, obligatoria y super_admin) y Veure/Descarrega/«Envia per correu» manual. El ofertante, en
-  «Els meus certificats» y en su oferta (los `prueba` no los ve nadie de fuera). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
+  «Els meus certificats» y en su oferta (los `prueba` no los ve nadie de fuera).
+- **Circuito de firma (05-11-2026)**: `DialegSignaDocument` (titular: «Signa aquí» con `BlocSignant` +
+  `SignaturePad`, o «Puja'l signat»; equipo: solo subir) y `AccionsSignatura`; `lib/signatures.ts`
+  (`accionsSignatura()`) es el único sitio que decide el botón. «Pendent de tu» lista lo que toca
+  firmar; `BadgeSignatura` en biblioteca, albaranes y certificados; Aprovacions › **«Signatures per
+  tancar»** (quinta cola: Veure el fitxer, Tanca, Rebutja; solo super_admin); Documents › «Signatures».
+  «Envia per correu» de un documento pendiente lleva «Inclou l'enllaç per signar» (`DialegEnviament`). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
   `BarraFiltres`). Ficha de la organización con listas cerradas, `tipus_activitat`, contactos,
   NIF válido y único, razón social obligatoria, «afegir paper». Tablero con indicadores por
   periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu v2 (ficha viva, sin
@@ -411,16 +408,13 @@ Lo que manda hoy, en una línea cada uno:
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
 `SessioProvider → RouterProvider`; `ArrelApp` desvía `PASSWORD_RECOVERY` a `/restablir`;
-`RequireSessio` monta `AppContextProvider` solo con sesión. **El contexto falla cerrado** (un
-error no concede nada; pantalla «No s'ha pogut carregar»); `carregant` solo en la primera carga;
-`SIGNED_IN` no recarga si es el mismo usuario. Rutas: `/` landing · `/login` (usuarios, con
-accesos de prueba tras `VITE_ACCESSOS_TEST` y `AccesAmbCodi`) · `/admin` (equipo, no enlazado)
-· `/registre` (uno o los dos papeles) · `/restablir` · `/privacitat` · `/confirmar/:token` ·
-`/signar/:token` · `/factura/:token` · `/consentiment/:token` · `/verificar/:codi` · `/panell` (raíz por rol) ·
-`/sense-acces`. `RoleGuard` redirige a `/panell`. Las rutas de antes de 1C redirigen a la
-organización. Aprovacions: cuatro colas (registros,
-convenios por contrasignar, intereses, recogidas por validar); aprobar un alta manda el acceso
-por correo (`enviar-acceso`, casilla «usuari de prova» antes).
+`RequireSessio` monta `AppContextProvider` solo con sesión; **el contexto falla cerrado**.
+Rutas: `/` · `/login` (accesos de prueba tras `VITE_ACCESSOS_TEST`) · `/admin` (equipo) · `/registre`
+· `/restablir` · `/privacitat` · `/confirmar/:token` · `/signar/:token` · `/signar-document/:token`
+(firma de CD/CR/REC/ENT) · `/factura/:token` · `/consentiment/:token` · `/verificar/:codi` · `/panell`
+(raíz por rol) · `/sense-acces`. `RoleGuard` redirige a `/panell`. Aprovacions: cinco colas
+(registros, convenios por contrasignar, intereses, recogidas por validar, firmas por cerrar); aprobar
+un alta manda el acceso por correo (`enviar-acceso`).
 
 ## 7. Convenciones (detalle en `context/07-convenciones.md`)
 
@@ -446,7 +440,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270509100700`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270510100200`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -463,7 +457,8 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
   `{manual:true}`, traza `<funció>:manual`; el modo test sigue): RGPD y convenio a firmar
   (`_shared/enviamentManual.ts`), «Reenvia», «Dona-li accés» y «Envia per correu» del albarán
-  (`enviar-albara`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
+  (`enviar-albara`), «Envia per correu» con «Inclou l'enllaç per signar» (`reenviar-documento
+  {manual, amb_enllac_signatura}`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
   un canal apagado (Missatgeria; «Missatge» y «Correu» de Entitats) y deja gris lo demás
   (`BotoAmbMotiu`, `motiuCanal()`). **En producción, los tres apagados.**
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
@@ -484,30 +479,24 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
 ## 8bis. Canal preferente
 
 El **correo es el canal por defecto**; WhatsApp solo cuando se puede (`_shared/canal.ts`, puro):
-interruptor apagado → correo; móvil y ventana abierta → WhatsApp texto; móvil y opt-in →
-plantilla; si no, correo; sin ninguno, `cap`. `canal_preferido` de la organización se respeta
-si es viable (`preferenciaRespetada`). Lo decide el servidor (`priorizar-entidades` devuelve
-`canal`, `motiu_canal`…); `enviar-acceso` acepta `canal:'auto'`.
+interruptor apagado → correo; móvil y ventana abierta → texto; móvil y opt-in → plantilla; si no,
+correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide el servidor
+(`priorizar-entidades` devuelve `canal`, `motiu_canal`); `enviar-acceso` acepta `canal:'auto'`.
 
 ## 8ter. Cuando Meta rechaza
 
-Se registra `wa_messages.status='error'` (wamid sintético `err-…`). `scripts/diagnostico-whatsapp.ts`
-distingue: `190` token caducado (nuevo secreto + redesplegar); `100/33` token sin acceso al
-`phone_id`; `131030` destinatario fuera de los ≤5 de test; `131047` ventana cerrada.
+`wa_messages.status='error'` (wamid `err-…`); `scripts/diagnostico-whatsapp.ts` distingue `190`
+(token caducado), `100/33` (sin acceso al `phone_id`), `131030` (fuera de los ≤5 de test), `131047`.
 
 ## 9. Seguridad (detalle en `context/09-…md`)
 
-- 🔴 **Cortina de contraseña delante de toda la web** (Vercel middleware `middleware.js`,
-  generado de `cortina/` con `scripts/construir-cortina.mjs`; cookie `redestina_cortina` 7 días;
-  solo `HASH_TOKEN` en git; `scripts/cortina-hash.mjs` para cambiarla; libres solo
-  `logo-email.png`, el sello, favicon y `sw.js`; `/__cortina/surt` borra la cookie). Los enlaces
-  de correo y `/verificar` piden la contraseña primero.
-- Todo dato exige sesión de Supabase Auth; `anon` sin privilegios. Login con
-  `signInWithPassword` (`FormulariAcces`); recuperación por `recuperar-password` +
-  `admin.generateLink` + Resend; `enable_signup=false` y el **mailer nativo apagado** (nunca
-  `resetPasswordForEmail`, `inviteUserByEmail` ni magic links nativos). Resend con dominio
-  `espigoladors.com` verificado; `plantillaEmail()` en `_shared/resend.ts` es el único maquetado
-  (cabecera clara con `logo-email.png`; `textoAHtml` escapa).
+- 🔴 **Cortina de contraseña delante de toda la web** (`middleware.js` generado de `cortina/`; cookie
+  7 días; solo `HASH_TOKEN` en git; `scripts/cortina-hash.mjs` la cambia; libres solo `logo-email.png`,
+  el sello, favicon y `sw.js`). Los enlaces de correo y `/verificar` piden la contraseña primero.
+- Todo dato exige sesión de Supabase Auth; `anon` sin privilegios. Login `signInWithPassword`;
+  recuperación por `recuperar-password` + `admin.generateLink` + Resend; `enable_signup=false` y el
+  **mailer nativo apagado** (nunca `resetPasswordForEmail`, `inviteUserByEmail` ni magic links). Resend
+  con `espigoladors.com`; `plantillaEmail()` (`_shared/resend.ts`) es el único maquetado.
 - `enviar-acceso`: enlace por correo, **solo el código de 6 cifras por WhatsApp** (canjeado en
   `/login` con `verifyOtp`). `registro` público: crea cuenta + ficha + membresía **pendiente**,
   deduplica por correo/teléfono exactos (principales deniegan `409`, secundarias → revisión),
@@ -516,10 +505,12 @@ distingue: `190` token caducado (nuevo secreto + redesplegar); `100/33` token si
 - `donar-acces` (1D, JWT + `pot_aprovar`; sustituye a `alta-assistida`): cuenta si no la hay →
   `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
   409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152).
-- Firma por enlace: el servidor compone y hashea el texto (`409 document_canviat`); tres vías
-  —correo, asistida (segundo factor solo si la persona pide el código), panel— y el PDF las
-  distingue; mínimos `MIN_NOM`/`MIN_DNI` en cliente y servidor. Confirmación de albarán:
-  `sha256_texto` del acta del servidor; D3 también en la API.
+- **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
+  (convenio: el texto; CD/CR/REC/ENT: `sha256_datos`; `409 document_canviat`), nombre, cargo y DNI
+  (`MIN_NOM`/`MIN_DNI` de `lib/signatures.ts`), trazo PNG ≤1 MB en `evidencies/`, IP y UA en
+  `evidencias`; tres vías —correo, asistida, panel— y el PDF las distingue. `pujar-document-signat`:
+  formato por **bytes** (`_shared/pujada.ts`, también en `subir-documento-externo`), permiso antes de
+  leer el fichero, se guarda tal cual. Confirmación de albarán: `sha256_texto` del acta; D3 en la API.
 - Cuentas de prueba: 5 organizaciones `TEST-*` y 7 cuentas (`crear-usuarios-prueba.ts`), 5 de
   WhatsApp sobre fichas reales del equipo (`crear-usuarios-whatsapp.ts`), `hola+pendent-arnes@` (**pendiente, no aprobar**) y `hola+senserol-arnes@`.
   Credenciales en `scripts/data/cuentas-prueba.json`; las del bundle de `/login` solo con
@@ -540,9 +531,8 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
-`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026). No reusar los nombres viejos (redirecciones). El
-próximo cambio de dominio exige 308. Verificar CORS leyendo la cabecera
-`Access-Control-Allow-Origin` del preflight, no el código de estado.
+`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Un cambio de dominio
+exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
 
@@ -564,29 +554,24 @@ git config core.hooksPath .githooks            # una vez por clon
   volcado tiene que tener al menos las migraciones del clon. Correo y WhatsApp simulados; jobs
   contra las funciones locales; `roles_activos` y `test_mode` encendidos (detalle y fallos conocidos en el
   fichero de §11).
-- **Producción, con token temporal**: `bash scripts/sesion-supabase-temporal.sh` en la terminal
-  del usuario (PAT `Redestina - Admin - Producción`); dentro, `deno run -A
-  scripts/aplicar-migracion.ts <f> [--dry-run]`, `supabase functions deploy <f>
-  [--no-verify-jwt según config.toml]`, `secrets set`, Management API. El asistente **no pide ni
-  lee el token** y sus herramientas no heredan la variable; en la app de escritorio los comandos
-  van en el panel de terminal, una sola pestaña, scripts por fase en `scripts/data/` con log.
-- **Publicar**: skill `/publicar`, orden **base de datos → Edge Functions → frontend** (`git push`
-  el último). Tras redesplegar `generar-documento`, emitir un documento de prueba
-  (`emitir_documento_prova()`: 6 páginas, ~123.600 bytes). Tocar `_shared/` obliga a redesplegar
-  todas las que lo importan. Logs remotos por el Management API de analítica
-  (`function_logs`, `edge_logs`, con `iso_timestamp_*`).
+- **Producción, con token temporal**: `bash scripts/sesion-supabase-temporal.sh` en la terminal del
+  usuario (PAT `Redestina - Admin - Producción`); dentro, `aplicar-migracion.ts <f> [--dry-run]`,
+  `functions deploy <f> [--no-verify-jwt según config.toml]`, `secrets set`, Management API. El
+  asistente **no pide ni lee el token**; una sola pestaña, scripts por fase en `scripts/data/` con log.
+- **Publicar**: skill `/publicar`, orden **base → Edge Functions → frontend** (`git push` el último).
+  Tras redesplegar `generar-documento`, `emitir_documento_prova()`. Tocar `_shared/` obliga a
+  redesplegar todas las que lo importan. Logs remotos por el Management API de analítica.
 - Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
 ## 12. Checkpoints y deuda técnica (cuerpo completo en `context/12-…md`)
 
-**Checkpoints de negocio (no código)**: 2 plantillas propias en Meta y número de producción
-(flags `PLANTILLES_CA_APROVADES`, `PLANTILLA_OFERTA_APROVADA`); 3 opt-in real; 4 formato legal
-del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 apagar
-`VITE_ACCESSOS_TEST`; 8 avisar a mano la validación de altas; 9 checklist de ficha antes de
-aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
-Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
+**Checkpoints de negocio (no código)**: 2 plantillas de Meta y número de producción (flags
+`PLANTILLES_CA_APROVADES`, `PLANTILLA_OFERTA_APROVADA`); 3 opt-in real; 4 formato legal del albarán;
+5 reexportar `prod_actius.csv`; 6 Meta a producción; 7 apagar `VITE_ACCESSOS_TEST`; 8-9 validación de
+altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
+(Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (62 vivas; la siguiente entrada nueva es la 157; los números no se renumeran ni
+**Deuda abierta (70 vivas; la siguiente entrada nueva es la 165; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **126**
@@ -599,7 +584,11 @@ los expedientes) · **143**
 (dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
 · **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
-(una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado).
+(una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
+**157-164** (firma, 05-11: el convenio en papel y `registrar_document_signat` son dos caminos; sin aviso
+de rechazo; el enlace del correo se acuña antes de los gates; `enviar-albara` sin enlace de firma;
+R-REC/R-ENT no se firman; el CD `declarat` deja de estar pendiente; fichero de una firma rechazada en
+Storage; `rectificar_certificado_periodo` devuelve `versio` sin contar las `signat`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -613,15 +602,13 @@ cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
-1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.671 pruebas de Vitest en 73
-   ficheros (1 saltada a propósito) + 15 de Deno.**
+1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
+   **Referencia: 1.720 pruebas de Vitest en 75 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.796/1.796 y 28 sin datos; producción 1.801/1.801 y 23
-   «Sin fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de
-   **datos**; la cuenta `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
-   toca la numeración.
+   **Referencia: clon 1.945/1.945 y 28 sin datos; producción 1.801/1.801 y 23 «Sin fallos de
+   permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
+   aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

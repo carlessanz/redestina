@@ -153,6 +153,17 @@ export async function urlPdf(
   return firma?.signedUrl ? urlPublica(firma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")) : null;
 }
 
+/**
+ * Una ruta concreta del bucket, firmada 60 s y para abrir en el navegador (sin
+ * `download`): la usa la firma de un documento, que enseña EXACTAMENTE la versión del
+ * enlace (`documentos.id`) y no «la vigente del objeto» como `urlPdf()`.
+ */
+export async function urlRutaFirmada(supabase: Cliente, ruta: string | null): Promise<string | null> {
+  if (!ruta) return null;
+  const { data: firma } = await supabase.storage.from(BUCKET).createSignedUrl(ruta, SEGUNDOS_FIRMA);
+  return firma?.signedUrl ? urlPublica(firma.signedUrl, Deno.env.get("URL_PUBLICA_STORAGE")) : null;
+}
+
 /** El fichero que llega, venga por multipart o en base64. */
 export interface FicheroSubido {
   bytes: Uint8Array;

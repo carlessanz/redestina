@@ -11,7 +11,7 @@
 // Comparte con ella los componentes de `components/documents/`: lo que cambia es qué se le
 // pide a cada uno, no cómo se pinta.
 
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
@@ -21,6 +21,8 @@ import { kgRebutsExercici } from '../../lib/certificatRecepcio'
 import { codiVerificacio } from '../../lib/codiVerificacio'
 import { dataCurta, kg, type AlbaranBandeja } from '../../lib/albarans'
 import type { CierreReceptor, Convenio, Documento, KgRebutsExercici } from '../../types'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
+import { esPujable } from '../../lib/signatures'
 import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import LlistaConvenis from '../../components/documents/LlistaConvenis'
 import LlistaDocuments from '../../components/documents/LlistaDocuments'
@@ -168,6 +170,15 @@ export default function ReceptorDocuments() {
 
   const descarregador = useDescarregaDocument(refresca)
 
+  // El estado de firma de sus documentos vigentes firmables (circuito de firma, 05-11-2026).
+  // Fail-soft: si la vista no responde, la pantalla sale igual, sin las etiquetas de firma.
+  const idsFirmables = useMemo(() => docs.filter((d) => esPujable(d.tipo)).map((d) => d.id), [docs])
+  const { perDoc: signatures, recarrega: recarregaSignatures } = useEstatsSignatura(idsFirmables)
+  const onSignatura = useCallback(() => {
+    void refresca()
+    void recarregaSignatures()
+  }, [refresca, recarregaSignatures])
+
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org_entity')}</p>
   if (carregant) return <CarregantSeccio />
   // El texto de Postgres no le dice nada a la entidad (y va en catalán sin acentos).
@@ -190,7 +201,7 @@ export default function ReceptorDocuments() {
       </div>
 
       {/* Lo único de esta pantalla que le pide algo. El resto es archivo. */}
-      <PendentsDeTu tipusOrg="entidad" tornarA="/receptor/documents" />
+      <PendentsDeTu tipusOrg="entidad" tornarA="/receptor/documents" onCanvi={onSignatura} />
 
       <LlistaConvenis files={convenis} docs={docs} descarregador={descarregador}
         signar={orgId ? {
@@ -249,12 +260,15 @@ export default function ReceptorDocuments() {
         <CardContent>
           {albarans.length === 0
             ? <p className="text-sm text-muted-foreground">{t('entdoc.empty')}</p>
-            : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador} />}
+            : <TaulaAlbarans files={albarans} docs={docs} descarregador={descarregador}
+                signatures={signatures} onSignatura={onSignatura} />}
         </CardContent>
       </Card>
 
       {/* --- Sus certificados de recepción (`CR`): lo que puede enseñar a un tercero --- */}
       <LlistaDocuments
+        signatures={signatures}
+        onSignatura={onSignatura}
         files={docsCr}
         descarregador={descarregador}
         titolKey="entdoc.cr_title"

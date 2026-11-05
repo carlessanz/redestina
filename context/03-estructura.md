@@ -416,10 +416,14 @@ supabase/
     generar-documento/         POST (secreto): renderiza el PDF y lo sube al bucket. activos/ con
                                las fuentes y el logo, y su copia EN EL BUNDLE (incrustats.ts):
                                static_files ya no llega al isolate (§11)
-    descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento()
+    descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento(); también
+                               `{firma_document_id}` (el fichero subido de una firma) y extensión real
     reenviar-documento/        POST (JWT, equipo): vuelve a mandar un documento emitido por
                                correo, al destinatario de su `envio` y con las mismas barreras (§4);
                                `manual` lo deja salir con las notificaciones apagadas (§8)
+    pujar-document-signat/     POST multipart (JWT; 05-11-2026): el PDF/JPG/PNG firmado que vuelve
+                               (CD, CR, REC, ENT, CONV); formato por bytes (`_shared/pujada.ts`),
+                               `puc_signar_document` antes de leerlo, `registrar_document_signat` (§9)
     enviar-albara/             POST (JWT, equipo; 04-11-2026): «Envia per correu» del albarán, el PDF
                                a cada parte y, si le falta confirmar, un enlace nuevo
                                (`preparar_enviament_albara()`); envío manual (§8)

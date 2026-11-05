@@ -24,13 +24,12 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useAppContext, useCanals } from '../../hooks/useAppContext'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
-import { pujarDocumentExtern } from '../../lib/documents'
+import { pujarDocumentExtern, reenviarDocument } from '../../lib/documents'
 import {
   anullarAlbara, conciliarAlbara, dataCurta, emetreAlbara, estilEstatAlbara, kg,
   enviaEnllacosConfirmacio, enviarAlbara, marcarEntregat, paramsConciliacio, propostaConciliacio,
   rectificarAlbara, venciment,
 } from '../../lib/albarans'
-import { acceptaEnviament } from '../../lib/enviamentManual'
 import { motiuCanal } from '../../lib/canals'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
@@ -44,6 +43,10 @@ import type { Albaran, AlbaranLinea, DocumentoExterno } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import Desplegable from '../../components/Desplegable'
 import { useConfirma } from '../../components/DialegConfirma'
+import { useConfirmaEnviament } from '../../components/DialegEnviament'
+import AccionsSignatura from '../../components/AccionsSignatura'
+import BadgeSignatura from '../../components/BadgeSignatura'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import PasosProces from '../../components/proces/PasosProces'
 import QueTocaAra from '../../components/proces/QueTocaAra'
@@ -502,14 +505,33 @@ export default function AlbaraDetall() {
    */
   async function enviaPerCorreu() {
     if (!albara) return
-    const acceptat = await acceptaEnviament(confirma, t, motiuCanal(canals, 'email'), {
+    // Pendiente de firma con trazo: el correo puede llevar el enlace para firmarlo en línea,
+    // marcado por defecto (circuito de firma, 05-11-2026). No con el albarán «entregado»: ese
+    // correo lleva el enlace de CONFIRMAR los kilos, que va primero, y `enviar-albara` no sabe
+    // poner los dos (deuda propuesta por `servidor`).
+    const ambCasella = albara.estado !== 'entregado' && docVigent !== null
+      && sigVigent?.estat === 'pendent' && sigVigent.admet_canvas
+    const acceptat = await preguntaEnviament(motiuCanal(canals, 'email'), {
       titol: t('alb.env_t', { num: albara.numero_completo ?? '—' }),
       descripcio: t(albara.estado === 'entregado' ? 'alb.env_desc_enllac' : 'alb.env_desc'),
       confirmar: t('alb.env_b'),
+      ambCasellaSignatura: ambCasella,
     })
     if (!acceptat) return
+    if (acceptat.ambEnllacSignatura && docVigent) {
+      // Con el enlace de firma, el PDF vigente sale por `reenviar-documento` (el que sabe
+      // acuñarlo), a la parte que firma ese albarán: el productor el REC, la entidad el ENT.
+      setOcupat(true)
+      const d = await reenviarDocument(docVigent.id, acceptat)
+      setOcupat(false)
+      if (!d.ok) toast.error(t(d.motiuKey))
+      else if (d.simulat) toast.info(t('doc.resend_simulat'))
+      else toast.success(d.destinatari ? t('doc.resend_ok_to', { email: d.destinatari }) : t('doc.resend_ok'))
+      await carrega()
+      return
+    }
     setOcupat(true)
-    const r = await enviarAlbara(albara.id, acceptat)
+    const r = await enviarAlbara(albara.id, { manual: acceptat.manual })
     setOcupat(false)
     if (!r.ok) {
       toast.error(t(['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc'].includes(r.codi)
@@ -592,6 +614,13 @@ export default function AlbaraDetall() {
   // la bandeja de documentos, copiada. `descarregador.ocupat` es lo que antes era
   // `descarregant`, y al acabar recarga la ficha igual que hacía la versión de aquí.
   const descarregador = useDescarregaDocument(carrega)
+
+  // La firma de la contraparte sobre el PDF vigente (REC: el productor; ENT: la receptora).
+  // Fail-soft: si la vista no responde, la ficha sale igual.
+  const docVigent = documents.find((d) => d.vigente) ?? null
+  const { perDoc: signatures, recarrega: recarregaSignatures } = useEstatsSignatura(docVigent ? [docVigent.id] : [])
+  const sigVigent = docVigent ? signatures[docVigent.id] ?? null : null
+  const { pregunta: preguntaEnviament, dialeg: dialegEnviament } = useConfirmaEnviament()
 
   /**
    * Sube un documento que aporta la otra parte (el albarán en papel del productor, la foto
@@ -1138,6 +1167,14 @@ export default function AlbaraDetall() {
         <CardHeader><CardTitle className="text-base">{t('alb.versions')}</CardTitle></CardHeader>
         <CardContent className="space-y-2">
           {documents.length === 0 && <p className="text-sm text-muted-foreground">{t('alb.no_versions')}</p>}
+          {/* La firma de la contraparte: el super_admin sube la que le devolvieron, o revisa y
+              cierra la que subió la organización (lo decide `accionsSignatura()`). */}
+          {sigVigent && (
+            <div className="rounded-md border p-3" data-testid="albara-signatura">
+              <p className="mb-2 text-sm text-muted-foreground">{t(`sgn.qui_${albara.tipo === 'REC' ? 'donant' : 'receptor'}`)}</p>
+              <AccionsSignatura sig={sigVigent} onCanvi={() => { void carrega(); void recarregaSignatures() }} />
+            </div>
+          )}
           {documents.map((d) => (
             <div key={d.id} className="flex flex-wrap items-center justify-between gap-2 border-b pb-2 text-sm">
               <div>
@@ -1146,6 +1183,9 @@ export default function AlbaraDetall() {
                   {' '}{d.subtipo ? t(`doc.sub_${d.subtipo}`) : ''} · {dataCurta(d.emitido_at)}
                 </span>
                 {!d.vigente && <Badge className="ml-2 bg-muted text-muted-foreground">{t('alb.superseded')}</Badge>}
+                {d.vigente && sigVigent && (
+                  <BadgeSignatura className="ml-2" estat={sigVigent.estat} perspectiva="equip" />
+                )}
               </div>
               {/* «Veure» delante: al revisar un albarán se abre el PDF para comprobar
                   los kilos, no para guardarlo. El botón sólido sigue siendo la descarga. */}
@@ -1295,6 +1335,7 @@ export default function AlbaraDetall() {
       {/* El visor de PDF. Una sola vez por pantalla. */}
       {descarregador.visor}
       {dialegConfirma}
+      {dialegEnviament}
     </div>
   )
 }

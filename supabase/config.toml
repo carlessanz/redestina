@@ -300,6 +300,16 @@ verify_jwt = true
 import_map = "./functions/subir-documento-externo/deno.json"
 entrypoint = "./functions/subir-documento-externo/index.ts"
 
+# Subida de un documento firmado fuera de Redestina (CD, CR, REC, ENT, CONV; 05-11-2026).
+# Multipart, 10 MB, PDF/JPG/PNG por sus bytes; equipo o titular de la organización que firma
+# (`puc_signar_document`). Del super_admin cierra la firma al momento; de la organización,
+# queda en «Signatures per tancar».
+[functions.pujar-document-signat]
+enabled = true
+verify_jwt = true
+import_map = "./functions/pujar-document-signat/deno.json"
+entrypoint = "./functions/pujar-document-signat/index.ts"
+
 # Verificación pública de un certificado de recepción (F4). Sin JWT: quien comprueba un
 # certificado es un tercero —un ayuntamiento, una financiadora, un auditor— que no tiene
 # cuenta. Lo que autoriza es conocer el código impreso (16 hex del sha256 del snapshot, o

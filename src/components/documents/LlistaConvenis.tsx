@@ -94,6 +94,9 @@ export default function LlistaConvenis({
                   // que todavía no es el definitivo: lo que falta es la firma de la
                   // Fundación, no nada suyo.
                   const provisional = doc?.subtipo === 'firmat'
+                  // El PDF firmado que se subió (circuito de firma, 05-11-2026): esa versión es
+                  // la definitiva de la biblioteca, y lo dice.
+                  const signat = doc?.subtipo === 'signat'
                   // Firmado fuera de la plataforma: no tiene número de serie (lo lleva el
                   // papel) ni PDF de Redestina, a propósito (§4). Lo que acredita es el
                   // escaneado, que está en «Documentació aportada per l'equip».
@@ -127,9 +130,14 @@ export default function LlistaConvenis({
                               {t('mydoc.conv_provisional')}
                             </span>
                           )}
-                          {declarat && (
+                          {declarat && !signat && (
                             <span className="text-xs text-muted-foreground">
                               {t('conv.origen_declarat')}
+                            </span>
+                          )}
+                          {signat && (
+                            <span className="text-xs text-exito" data-testid="conveni-signat-tancat">
+                              {t('mydoc.conv_signat')}
                             </span>
                           )}
                           {/* La frase del papel vivía en la columna de acciones, donde la

@@ -13,6 +13,7 @@ import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento } from '../../types'
 import TaulaAlbarans from '../documents/TaulaAlbarans'
+import { useEstatsSignatura } from '../../hooks/useEstatsSignatura'
 
 type Fila = Pick<
   AlbaranBandeja,
@@ -57,13 +58,17 @@ export default function AlbaransFitxa({ tipusOrg, orgId }: {
 
   useEffect(() => { void carrega() }, [carrega])
   const descarregador = useDescarregaDocument(carrega)
+  // La firma de la contraparte de cada albarán (05-11-2026), vista desde el equipo.
+  const { perDoc: signatures, recarrega: recarregaSig } = useEstatsSignatura(docs.map((d) => d.id))
 
   if (error) return <p className="text-sm text-destructive">{t('c.load_error')}</p>
   if (files === null) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
   if (files.length === 0) return <p className="text-sm text-muted-foreground">{t('ef.doc_cap_albara')}</p>
   return (
     <>
-      <TaulaAlbarans files={files} docs={docs} descarregador={descarregador} />
+      <TaulaAlbarans files={files} docs={docs} descarregador={descarregador}
+        signatures={signatures} perspectiva="equip"
+        onSignatura={() => { void carrega(); void recarregaSig() }} />
       {descarregador.visor}
     </>
   )
