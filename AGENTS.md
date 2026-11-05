@@ -124,7 +124,7 @@ src/
   hooks/ (useSessio, useAppContext, useConveni, useMissatgesOferta…)
   routes/ public/ · equip/ · productor/ · receptor/ · PerfilOrganitzacio · PerfilRecepcio · PlaOrganitzacio
   components/ (ui/ shadcn · documents/ · proces/ · equip/ (fases/, diálogos asistidos) · expedient/ …)
-  lib/ (módulos PUROS con test: procesOferta, passosCanalitzacio, seguentPas, validacio, format,
+  lib/ (módulos PUROS con test: importEntitats, normalitzaImport, procesOferta, passosCanalitzacio, seguentPas, validacio, format,
         cerca, filtres, missatgesOferta, destiFinal, registreRecollida, diagnostic, i18n…)
   types.ts · index.css
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
@@ -148,7 +148,7 @@ trigger `*_nif` —`nif_invalid`/`nif_en_us`—, `razon_social`, `municipio_ine`
 `poblacion` (siempre un municipio; si no casa, a `ubicacio`) y `area_geografica` =
 comarca (editable), `tipus_activitat[]`, `perfil_receptor` jsonb,
 `tipo_receptor` social·animal·transformador·comercial, `modalitats_interes`, `ref_externa` =
-origen de la importación, 1E), ambas colgando de
+origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`, sin escritura directa), ambas colgando de
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
@@ -292,7 +292,9 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
   `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor);
-  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); firma (`acunar_enllac_propi('firma_document',…)`
+  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); importación (`previsualitzar_importacio_entitats`,
+  `importar_entitats`: `es_super_admin()`, ≤1.000 filas, savepoint por fila; núcleo interno `alta_fitxa_interna`,
+  compartido con `crear_entitat`); firma (`acunar_enllac_propi('firma_document',…)`
   titular, `tancar_/rebutjar_signatura` super_admin, `puc_signar_document`, `document_part_signant`; solo
   servidor `signar_document_per_enllac`, `registrar_document_signat`, `preparar_enviament_signatura`);
   y las de cierre y certificados, diagnóstico y
@@ -323,17 +325,21 @@ precio) → intake. Recordatorio de intake a los 10 min por `pg_cron` → `pg_ne
 
 ## 6. Datos maestros
 
-Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas: **`scripts/import-ara-2026.ts`**
-(1E; núcleo puro `scripts/ara2026/nucli.ts`; decisiones y cifras en el detalle, §6.1): las cinco hojas
-del ARA 2026 en CSV en `scripts/data/2026/` (nunca en git), mapeo **por cabecera**, **todo inactivo**
-(D2) con `ref_externa = ARA26:<hoja>:<línea>`, NIF inválido o repetido → sin NIF y nota «ARA 2026» en
-el comentario, doble rol solo por NIF, segunda pasada solo rellena huecos; informe y cruce con Airtable
-(solo informe: la coincidencia exacta la confirma Carles) en la misma carpeta; fuera del clon solo
-`--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**
-(720 organizaciones); refrescarlo desde producción las quita. 🔴 **En producción, los
-datos importados se borraron el 16-09-2026**: quedan 6 productores + 8 entidades de prueba, la ficha «Compte de proves de l'arnes»
-(`TEST-PENDENT-ARNES`, **no aprobar nunca**: sostiene 73 checks) y
-`tecnologia@espigoladors.com` en la whitelist de correo.
+Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos vías (detalle en §6.1-6.2):
+- **`scripts/import-ara-2026.ts`** (1E; núcleo `scripts/ara2026/nucli.ts`): ARA 2026 en CSV en
+  `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2), `ref_externa = ARA26:<hoja>:<línea>`,
+  NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
+  `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
+- **Importador del panel** (`/equip/entitats/importa`, solo super_admin, `20270511100000`): el navegador lee
+  el `.xlsx`/`.csv` (`read-excel-file`/`write-excel-file` por `import()`), mapea por cabecera con alias de
+  Airtable (`lib/importEntitats.ts`) y la base revalida (`previsualitzar_importacio_entitats` →
+  `importar_entitats`): **inactivo**, identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
+  coincidencia débil = «dubtosa» que decide la persona, existente = solo rellena huecos; **reimportar = todo
+  `sense_canvis`**. Plantilla descargable (`lib/plantillaEntitats.ts`).
+
+🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
+de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
+en la whitelist de correo.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
@@ -347,7 +353,7 @@ preu_minim → cost_kg → causa → observacions. Guía Sí/Ara no; listas de 9
 
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
-| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · entitats[/nova · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
+| Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · entitats[/nova · /importa · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
 | Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo agregado, alta con el cuestionario del intake |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
@@ -367,17 +373,15 @@ Lo que manda hoy, en una línea cada uno:
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
-- **Certificat de donació** (05-11-2026): `DialegCertificatDonacio`, solo super_admin, desde la
-  ficha › Certificats y la tarjeta de `/equip/ofertes/:id`: ámbito Oferta · Interval · Exercici
-  (`ABASTS_DIALEG`, pendiente del cliente, deuda 156), fecha de expedición, anexo, «Excloses», revisión
-  (en real, obligatoria y super_admin) y Veure/Descarrega/«Envia per correu» manual. El ofertante, en
-  «Els meus certificats» y en su oferta (los `prueba` no los ve nadie de fuera).
-- **Circuito de firma (05-11-2026)**: `DialegSignaDocument` (titular: «Signa aquí» con `BlocSignant` +
-  `SignaturePad`, o «Puja'l signat»; equipo: solo subir) y `AccionsSignatura`; `lib/signatures.ts`
-  (`accionsSignatura()`) es el único sitio que decide el botón. «Pendent de tu» lista lo que toca
-  firmar; `BadgeSignatura` en biblioteca, albaranes y certificados; Aprovacions › **«Signatures per
-  tancar»** (quinta cola: Veure el fitxer, Tanca, Rebutja; solo super_admin); Documents › «Signatures».
-  «Envia per correu» de un documento pendiente lleva «Inclou l'enllaç per signar» (`DialegEnviament`). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
+- **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y
+  `/equip/ofertes/:id`): ámbito (`ABASTS_DIALEG`, deuda 156), fecha, anexo, «Excloses», revisión y envío
+  manual. El ofertante, en «Els meus certificats» y en su oferta.
+- **Circuito de firma (05-11)**: `DialegSignaDocument` («Signa aquí» o «Puja'l signat»; el equipo solo
+  sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) es el único que decide el botón**.
+  «Pendent de tu», `BadgeSignatura`, Aprovacions › «Signatures per tancar» (solo super_admin), Documents ›
+  «Signatures»; «Envia per correu» con «Inclou l'enllaç per signar».
+- **Importa des d'Excel** (06-11, `ImportaEntitats`, solo super_admin): Fitxer (plantilla, columnas
+  reconocidas) → Revisió (estado por fila, papeles, «dubtosa» con candidatos) → Resultat (informe CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
   `BarraFiltres`). Ficha de la organización con listas cerradas, `tipus_activitat`, contactos,
   NIF válido y único, razón social obligatoria, «afegir paper». Tablero con indicadores por
   periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu v2 (ficha viva, sin
@@ -440,7 +444,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270510100200`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270511100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -571,7 +575,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (70 vivas; la siguiente entrada nueva es la 165; los números no se renumeran ni
+**Deuda abierta (73 vivas; la siguiente entrada nueva es la 168; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
 filtran en cliente, aceptado por volumen) · **126**
@@ -585,10 +589,8 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (firma, 05-11: el convenio en papel y `registrar_document_signat` son dos caminos; sin aviso
-de rechazo; el enlace del correo se acuña antes de los gates; `enviar-albara` sin enlace de firma;
-R-REC/R-ENT no se firman; el CD `declarat` deja de estar pendiente; fichero de una firma rechazada en
-Storage; `rectificar_certificado_periodo` devuelve `versio` sin contar las `signat`).
+**157-164** (flecos del circuito de firma, 05-11) · **165-167** (importador: sin ubicaciones, sin parecido de
+nombre dentro del fichero, registro sin fixture en el arnés).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -603,10 +605,10 @@ cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.720 pruebas de Vitest en 75 ficheros (1 saltada a propósito) + 25 de Deno.**
+   **Referencia: 1.763 pruebas de Vitest en 76 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.945/1.945 y 28 sin datos; producción 1.946/1.946 y 27 «Sin fallos de
+   **Referencia: clon 2.040/2.040 y 32 sin datos; producción 1.946/1.946 y 27 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

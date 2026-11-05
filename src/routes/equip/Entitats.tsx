@@ -8,15 +8,16 @@
 // `?rol=ofertant|receptor` en la URL fija el papel (es a donde redirigen `/equip/productors` y
 // las tarjetas del tablero). Como los listados de siempre: arriba las de prueba, buscador en
 // cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila (iconos). «Darrer
-// contacte» es la nota interna más reciente (1F, `notes_internes`).
+// contacte» es la nota interna más reciente (1F, `notes_internes`). «Importa des d'Excel»
+// (06-11-2026, solo super_admin) lleva al importador, `/equip/entitats/importa`.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Download, Eye, Mail, MessageCircle, Plus } from 'lucide-react'
+import { Download, Eye, FileSpreadsheet, Mail, MessageCircle, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
-import { useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
+import { useAppContext, useCanals, useWhatsappActiu } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import { assegurarContacte, pendentsPerTelefon } from '../../lib/contactes'
 import { filtraCerca } from '../../lib/cerca'
@@ -56,6 +57,8 @@ export default function Entitats() {
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const waActiu = useWhatsappActiu()
+  // «Importa des d'Excel» (06-11-2026): solo el super_admin (la RPC también lo exige).
+  const esSuperAdmin = useAppContext().ctx?.esSuperAdmin ?? false
   // Con el correo apagado (§8) «Correu» desaparece, como «Missatge» con WhatsApp apagado.
   const motiuEmail = motiuCanal(useCanals(), 'email')
   const [correuA, setCorreuA] = useState<DestinatariCorreu | null>(null)
@@ -299,6 +302,11 @@ export default function Entitats() {
           <Button variant="outline" onClick={() => void exportaCorreus()} disabled={exportant}>
             <Download className="size-4" /> {t('el.export_correus')}
           </Button>
+          {esSuperAdmin && (
+            <Button variant="outline" onClick={() => navigate('/equip/entitats/importa')} data-testid="el-importa">
+              <FileSpreadsheet className="size-4" /> {t('ie.boto_importa')}
+            </Button>
+          )}
           {/* Sin cuenta (D5): el acceso se da después desde la ficha, «Dona-li accés» (1D). */}
           <Button onClick={() => navigate(`/equip/entitats/nova${fl.valors.rol ? `?rol=${fl.valors.rol}` : ''}`)}>
             <Plus className="size-4" /> {t('el.nova')}

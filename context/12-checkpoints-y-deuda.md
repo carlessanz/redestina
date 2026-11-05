@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **06-11-2026 (importador de entidades, `20270511100000`): se abren la 165, la 166 y la 167**: **73 vivas** y
+la siguiente entrada nueva es la 168.
 ⚠️ **05-11-2026 (circuito de firma): se abren la 157 a la 164**: **70 vivas** y la siguiente entrada nueva
 es la 165.
 ⚠️ **05-11-2026 (certificado de donación según el modelo): se cierran la 85 y la 139 y se abren la 154, la
@@ -815,4 +817,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      Y el fixture de planes (`crear-datos-documentales-prueba.ts`) no emite el de TEST-ENT-SOCIAL
      (`falten_obligatories` desde el diagnóstico v2): avisa y sigue. Los E2E `signatures.e2e.ts` dejan en
      el clon enlaces usados, evidencias y ficheros de cada pasada (solo restaura documentos, firmas y avisos).
-
+165. **El importador de entidades no crea `productor_ubicaciones`** (06-11-2026; como la 153) **ni guarda en la
+     nota los valores de listas cerradas que descarta** (`tipus_activitat_desconegut`, `modalitat_desconeguda`…
+     solo dejan aviso en el registro).
+166. **Dentro de un mismo fichero no se avisa del parecido de nombre** (06-11-2026), solo de correo o
+     teléfono compartidos (`semblant_a_fila`): medirlo hacía pasar de 8 s el lote de 1.000 filas. Los
+     duplicados exactos sí se cortan por la ref `IMP:` (`repetit_al_fitxer`).
+167. **Las lecturas del registro de importaciones salen «sin datos» en el arnés** (06-11-2026) mientras no
+     haya ninguna importación: falta un fixture, que en producción crearía una ficha real.

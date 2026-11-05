@@ -537,6 +537,52 @@ importación de 1E escribe con su script). Es el paso 2 de «Nova entitat» (§6
 Arnés: `crear_entitat` denegado a las siete cuentas externas (`DOCUMENTAL_EXTERN`) y permitido
 —con `rols: []`, `22023 cal_paper`, sin escribir nada— al técnico y al super_admin: **+9**.
 
+### Importación de entidades desde Excel (`20270511100000`, 06-11-2026)
+
+- **`alta_fitxa_interna(p_rols, p_org, p_activo, p_productor jsonb, p_entitat jsonb)`**: el núcleo del alta,
+  **sin EXECUTE para nadie** (ni `service_role`). Crea las fichas en una organización nueva o colgadas de
+  `p_org`, activas o inactivas, con rastro en `fitxa_estat_hist`; `unique_violation` → `22023 dades_en_us`.
+  `crear_entitat()` se recreó encima (comparada con la anterior en 16 entradas: mismos errores y mismo
+  resultado; sigue leyendo de `d` las mismas claves, así que `tests/campsFitxa.test.ts` no cambia).
+- **`previsualitzar_importacio_entitats(p_files jsonb)`** e **`importar_entitats(p_fitxer jsonb, p_files
+  jsonb)`**: `if auth.uid() is not null and not es_super_admin() then 42501` (técnico y admin también
+  fuera; `service_role` pasa, con `creat_per` null). Las dos ejecutan **el mismo código**
+  (`importacio_processa(..., p_aplicar)`), así que la previsualización dice exactamente lo que hará la
+  importación sobre la misma base. `volatile` (crean tablas temporales con índice btree y GIN de
+  trigramas): **siempre por POST**, nunca `{get:true}`. Medido en el clon (~736 fichas): 1.000 filas en
+  0,29 s (previsualizar), 0,43 s (importar) y 0,44 s (reimportar), dentro del `statement_timeout` de 8 s.
+  - Errores de lote (`22023`): `dades_invalides`, `massa_files` (>1.000), `fila_invalida`, `fila_repetida`,
+    y en `importar_entitats` además `sense_files` y `dades_invalides` si `p_fitxer` no trae `nom` (≤255) y
+    `sha256` (64 hex).
+  - `importar_entitats` toma `pg_advisory_xact_lock(hashtext('importar_entitats'))` (no hay índice único
+    de NIF: el candado impide dos importaciones a la vez), **recalcula la identidad** de cada fila y abre
+    un savepoint por fila: un error de fila no aborta el lote; un `42501`, sí.
+  - **Identidad, por orden**: NIF válido (en cualquiera de las dos tablas) → `ref_externa` `AIRTABLE:` →
+    `IMP:`; si no hay fuerte, **débil** = correo exacto, teléfono por las últimas 9 cifras (principales y
+    secundarias) o nombre con similitud ≥ 0,65 → fila `dubtosa` con hasta 10 `candidats`. **Nunca une
+    sola**: la `decisio` (`crear` · `ometre` · uuid de un candidato recalculado) solo cuenta en filas
+    dudosas; sin ella, `omesa`; un uuid que no es candidato, `error decisio_no_candidata`.
+  - **Acciones**: nueva → fichas **inactivas** de los papeles pedidos en una organización; existente con
+    el papel → **solo rellena huecos** (nunca pisa, nunca toca `activo`, `es_test` ni `ref_externa`; las
+    diferencias, en `conflictes`); existente sin ese papel → `paper_afegit` en la misma organización
+    (inactiva, con lo que falte copiado de la hermana, su `es_test` y su NIF). La nota va como bloque
+    `[Importació AAAA-MM-DD · fila N]`; en una ficha existente solo se añaden las líneas que no estén.
+    **Reimportar el mismo fichero deja todas las filas en `sense_canvis`.**
+  - Dentro del lote: NIF o ref `IMP:` repetidos, o dos filas que resuelven a la misma organización →
+    `repetit_al_fitxer:<fila>` en la segunda; correo o teléfono compartidos con una fila anterior →
+    aviso `semblant_a_fila:<n>` (sin unir).
+  - Avisos (no bloquean): `sense_nif`, `nif_invalid` (entra sin NIF, valor original a la nota),
+    `nif_diferent_germana`, `correu[2]_invalid`, `telefon[2]_invalid`, `correu_en_us` y `telefon_en_us`
+    (UNIQUE de `productores`: a la nota), `correu2_a_nota`, `tipus_empresa_desconegut`,
+    `tipus_activitat_desconegut:<codi>`, `modalitat_desconeguda:<v>`, `sense_tipus_receptor`,
+    `tipus_receptor_desconegut`, `codi_postal_invalid`, `municipi_ine_desconegut`, `municipi_no_trobat`,
+    `area_desconeguda`, `area_no_coincideix`, `ref_externa_en_us`.
+- Internas sin EXECUTE desde ninguna sesión: `importacio_processa`, `importacio_aplica_fila`,
+  `importacio_actualitza`, `importacio_normalitza_fila` y nueve ayudantes `importacio_*`;
+  `auditoria_funcions_obertes()` sigue en 0.
+- Arnés: +99 checks (95 ejecutados; las 4 «sin datos» son la lectura del registro por el equipo mientras
+  no haya ninguna importación, deuda 167). Prueba `scripts/sql/prova-importacio.sql`: 67 comprobaciones.
+
 ### La lista blanca del actor, ampliada (plan 1, rebanada 1C, `20270501200000`, 02-11-2026)
 
 `actualitzar_fitxa_entitat()` acepta además `telefono2`, `telefono3`, `email2`, `contacto2`,

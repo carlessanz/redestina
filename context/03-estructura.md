@@ -62,6 +62,7 @@ src/
   routes/equip/Entitats.tsx    El listado «Entitats» (una fila por organización, `v_entitats_llistat`; 1C)
   routes/equip/EntitatDetall.tsx  La ficha ÚNICA por organización del equipo (1C)
   routes/equip/NovaEntitat.tsx  «Nova entitat» en dos pasos: buscar (cerca_entitats) y dar de alta (crear_entitat) (1B)
+  routes/equip/ImportaEntitats.tsx  «Importa des d'Excel» (super_admin): Fitxer → Revisió → Resultat (§6.2, 06-11-2026)
   hooks/useEsborrarFitxa.tsx   Borrar una organización (`borrar_ficha_completa`, diálogo de doble rol)
   routes/PerfilRecepcio.tsx    «El meu perfil de recepció» del receptor (fase 9, §6ter)
   routes/PlaOrganitzacio.tsx   «El meu pla de prevenció», solo lectura (fase 11, §6ter)
@@ -82,6 +83,11 @@ src/
     ofertes.ts                 Alta de oferta (Edge Function) e interés (RPC) de los paneles
     contactes.ts               assegurarContacte(): crea el wa_contact antes de abrir el chat
     whatsapp.ts                sendWhatsApp(): llama a la Edge Function; nunca lanza
+    importEntitats.ts          Importador: columnas de la plantilla, alias, mapeo y normalización de filas (puro, §6.2)
+    normalitzaImport.ts        Normalizadores compartidos con scripts/ara2026/nucli.ts (puro)
+    plantillaEntitats.ts       Plantilla .xlsx descargable (write-excel-file por import())
+    fitxerImportacio.ts        Lee .xlsx (read-excel-file por import()) o .csv; nunca lanza
+    importacions.ts            Cliente de previsualitzar_importacio_entitats / importar_entitats
     plantillas.ts              plantillaPrimerContacte(): tría plantilla de 1r contacte per rol (§6ter)
     ofertaTemplate.ts          construirComponentsOferta(): variables de la plantilla oferta_excedent (§6ter)
     redestina.ts               priorizarEntidades(): llama a la Edge Function con el JWT

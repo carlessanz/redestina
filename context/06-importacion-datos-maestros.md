@@ -150,3 +150,70 @@ producción; confirmar el cruce de Airtable (las 6 exactas, las 11 dudosas, y si
 están en Airtable); pedir la exportación de «Ofertantes»/«Receptores» de Airtable para casar por
 teléfono o correo (P7); si el `.xlsm` del 21-09 es el definitivo (riesgo del plan, §7); y si se quieren
 las coordenadas como `productor_ubicaciones`.
+
+## 6.2 Importador de entidades desde Excel en el panel (`20270511100000`, 06-11-2026)
+
+**Para qué.** El super_admin da de alta actores en lote desde un Excel exportado de Airtable (o la plantilla
+propia) sin pasar por un script. Lo pidió la Fundació con el fichero «Actores dar alta REDESTINA.xlsx» (una
+hoja, 3 actores con NIF válido, sin la columna «Rol» rellena) y la nota de la Taula mestra 1.1: «importar con
+organización inactiva, buscar por NIF; ¿y sin NIF? ¿por nombre? 1 convenio».
+
+**Reparto.** El navegador lee y normaliza; la base decide. Nada de lo que manda el cliente se da por bueno:
+`importar_entitats` recalcula la identidad de cada fila (contrato y códigos en `context/04bis-…md`).
+- `src/lib/fitxerImportacio.ts`: `.xlsx` con `read-excel-file/browser` (todas las hojas; se elige una),
+  `.csv` con `;` o `,`, BOM y Windows-1252 si no es UTF-8; tope 5 MB; `.xls` se rechaza con su mensaje.
+  Las dos librerías van por `import()` en chunks aparte (≈58 + 61 kB + `fflate` 15 kB): **no** se usa
+  `exceljs` (≈1 MB y un aviso moderado de `uuid`) ni `xlsx` de npm (abandonada, con CVE).
+- `src/lib/normalitzaImport.ts`: hoja pura con los normalizadores que antes vivían en
+  `scripts/ara2026/nucli.ts` (`normalitzaCapcalera`, `normalitzaNom`, `similitud`, `extraerTelefonos`,
+  `extraerCorreos`, `claveMunicipi`, `parseCsv`); `nucli.ts` los importa y reexporta, sin copias.
+- `src/lib/importEntitats.ts`: `COLUMNES_PLANTILLA` (30 columnas: clave del contrato, cabecera en catalán,
+  alias en castellano, de Airtable y del ARA, obligatoria, si va a la plantilla, formato texto, lista y
+  ejemplo), `localitzaCapcalera` (tolera filas de título encima), `mapaCapcaleres` (reconocidas, ignoradas
+  —`desconeguda` · `a_proposit` · `repetida`— y obligatorias que faltan; cabeceras repetidas por
+  ocurrencia: los dos «Cargo» del Excel de Airtable), `llegeixFulla` (salta filas vacías, la fila «EXEMPLE —»
+  de la plantilla y las filas con datos solo en columnas sin cabecera), `normalitzaFila`, `proposaRols`,
+  `filesPerEnviar`, `sha256Hex`, `csvInforme` (con protección de fórmulas, molde `cella()` de `csv182`).
+- `src/lib/plantillaEntitats.ts`: la plantilla con `write-excel-file`: «Entitats» (cabeceras en catalán, fila
+  «EXEMPLE — esborra aquesta fila» y 300 filas en formato texto `@` en NIF, CP, teléfonos e ID Airtable),
+  «Instruccions» y «Llistes» (Rol, Tipus de receptor, Forma jurídica, Tipus d'activitat, Modalitats, Comarca
+  —de `municipios`—). **Sin desplegables**: `write-excel-file` no hace validación de datos sin un paquete
+  aparte o sin inyectar XML en el orden que Excel exige. La plantilla descargada se reconoce entera al
+  subirla (lo vigilan `tests/importEntitats.test.ts` y el E2E).
+
+**Reglas de mapeo** (en `normalitzaFila`):
+- **Papeles**: manda la columna «Rol» (Ofertant · Receptor · Tots dos, y sus equivalentes en castellano). Sin
+  ella: «Entidad social» → receptor `social`; «Productor individual» o un «Registro excedente» → ofertant; un
+  tipo de receptor → receptor. Si nada lo dice, la fila queda **sin papel** y no se puede importar hasta
+  elegirlo en la revisión. «Tipo de entidad» no es el papel: va a la nota como «Tipus d'entitat (origen)».
+- **Teléfonos**: se juntan los de todas las columnas (`Mòbil (WhatsApp)`, `Telèfon fix` y sus alias), cada
+  trozo de una celda («937… / 629…») por separado, a E.164 con `normalitzaTelefon`; **los móviles delante**
+  (el primero es el de WhatsApp); el 1.º a `telefon`, el 2.º a `telefon2`, el resto a la nota; lo que no se
+  reconoce, a la nota como «no reconegut». Correos igual («contacto: x@…» se extrae).
+- **CP** con ceros a la izquierda (8380 → 08380). «No disponible», «No localizada», «-» = vacío.
+- **Forma jurídica** → `tipus_empresa` (`autonom`, `sl`, `sa`, `cooperativa`, `fundacio`, `associacio`); lo
+  que no casa, `altres` y el texto original a la nota.
+- **Actividad**: lo que casa con el catálogo `tipus_activitat` (código o nombre ca/es) **y vale para el
+  papel de la fila** (`aplica`) va a la ficha; el resto, a la nota. («Explotación agrícola» es del catálogo
+  de receptores: a un ofertant le va a la nota.)
+- **Nombre**: el comercial; si falta, «Entidad» o la razón social, con aviso. «Entidad» distinta del
+  comercial, cargos, web, trabajadores, responsable interno, observaciones, «Registro excedente» y el
+  convenio firmado (fecha y firmante) van a la nota, línea a línea («Etiqueta: valor»).
+- **Ignoradas a propósito**: «Contactos» (registros enlazados de Airtable: otras organizaciones),
+  «Provincia» y «Provincia (from Municipio)» (se derivan del municipio).
+
+**Pantalla** `/equip/entitats/importa` (`ImportaEntitats.tsx`; botón «Importa des d'Excel» en Entitats, solo
+super_admin; el resto ve un aviso): Fitxer (plantilla siempre a mano, columnas reconocidas, ignoradas y que
+faltan; aviso si el `sha256` ya se importó) → Revisió (`previsualitzar_importacio_entitats`; badge por fila,
+casillas de papel que vuelven a previsualizar —300 ms, respuestas tardías descartadas—, qué rellenará,
+conflictos y avisos, y en las `dubtosa` un `Desplegable` crear nova / és «X» / ometre; filtros por estado;
+«Importa N files» bloqueado con filas sin papel; confirmación) → Resultat (cifras, enlace a cada ficha,
+avisos y errores, enlace a Documentació si la fila trae convenio, informe CSV). El convenio **no se declara
+en el lote** (`declarar_conveni` emite PDF, consume número y exige NIF y dirección): se hace desde la ficha.
+
+**Medido con el Excel recibido, en el clon (06-11-2026)**: 20 columnas reconocidas y 3 ignoradas; las 3 filas
+salen `existent` por NIF (ya estaban del ARA, inactivas) y solo rellenan huecos (correo, razón social, CP,
+teléfono secundario…; los nombres distintos quedan como conflicto, no se pisan). Segunda importación del
+mismo fichero: 3 `sense_canvis` y aviso de «ja importat». En producción las 3 serían nuevas (el ARA se borró).
+
+**Cómo debe ser el Excel** para la Fundació: `3. Claude Code/2026-11-06-importador-entitats.md` en Drive.

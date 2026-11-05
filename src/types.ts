@@ -1445,3 +1445,65 @@ export interface SignaturaBandeja extends SignaturaDocument {
   fitxa_id: string
   organizacion_id: string | null
 }
+
+// ---------------------------------------------------------------------------
+// Importador de entidades desde Excel (20270511100000; AGENTS.md §4 y §6).
+// Contrato de `previsualitzar_importacio_entitats` e `importar_entitats`.
+// ---------------------------------------------------------------------------
+export type ImportacioEstat = 'nova' | 'existent' | 'dubtosa' | 'error'
+export type ImportacioAccioPrevista = 'crear' | 'actualitzar' | 'afegir_paper' | 'sense_canvis' | 'ometre' | 'error'
+export type ImportacioAccio = 'creada' | 'actualitzada' | 'paper_afegit' | 'sense_canvis' | 'omesa' | 'error'
+export type ImportacioMotiu = 'correu' | 'telefon' | 'nom'
+export interface ImportacioCandidat {
+  organizacion_id: string
+  nom: string | null
+  nif: string | null
+  motiu: ImportacioMotiu
+  motius: ImportacioMotiu[]
+  similitud: number | null
+}
+export interface ImportacioConflicte {
+  taula: 'productores' | 'entidades'
+  columna: string
+  camp: string
+  actual: string | null
+  fitxer: string | null
+}
+export interface PrevisualitzacioFila {
+  fila: number
+  estat: ImportacioEstat
+  accio_prevista: ImportacioAccioPrevista
+  identificada_per: 'nif' | 'airtable' | 'ref' | 'decisio' | null
+  organizacion_id: string | null
+  rols_existents: ('productor' | 'entidad')[]
+  candidats: ImportacioCandidat[]
+  omplira: string[]
+  conflictes: ImportacioConflicte[]
+  avisos: string[]
+  errors: string[]
+}
+export interface Previsualitzacio {
+  files: PrevisualitzacioFila[]
+  resum: {
+    total: number
+    per_estat: Record<ImportacioEstat, number>
+    per_accio: Record<ImportacioAccioPrevista, number>
+  }
+}
+export interface ImportacioFilaResultat {
+  fila: number
+  accio: ImportacioAccio
+  organizacion_id: string | null
+  productor_id: string | null
+  entidad_id: string | null
+  camps_omplerts: string[]
+  conflictes: ImportacioConflicte[]
+  avisos: string[]
+  errors: string[]
+}
+export interface ResultatImportacio {
+  importacio_id: string
+  ja_importat_at: string | null
+  resum: { creades: number; actualitzades: number; paper_afegit: number; sense_canvis: number; omeses: number; errors: number }
+  files: ImportacioFilaResultat[]
+}

@@ -176,6 +176,40 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'documentos.subtipo (bandeja y albarán)', prefijo: 'doc.sub_', valores: ['emes', 'conciliat', 'firmat', 'contrafirmat', 'provisional', 'definitiu', 'signat'] },
     { que: 'documentos.subtipo (convenio)', prefijo: 'conv.sub_', valores: ['firmat', 'contrafirmat', 'signat'] },
     { que: 'firmes_document.tipo_doc', prefijo: 'doc.tipus_', valores: ['CD', 'CR', 'REC', 'ENT', 'CONV'] },
+    // El importador de entidades (06-11-2026, 20270511100000): lo que devuelven
+    // `previsualitzar_importacio_entitats()` e `importar_entitats()`, compuesto en
+    // `ImportaEntitats.tsx`. Los avisos y errores de fila (`ie.c_*`), las columnas (`ie.h_*`,
+    // `ie.col_*`) y los campos los vigila también `tests/importEntitats.test.ts` desde sus listas.
+    { que: 'importació · estat', prefijo: 'ie.est_', valores: ['nova', 'existent', 'dubtosa', 'error'] },
+    { que: 'importació · accio_prevista', prefijo: 'ie.prev_', valores: ['crear', 'actualitzar', 'afegir_paper', 'sense_canvis', 'ometre', 'error'] },
+    { que: 'importació · accio', prefijo: 'ie.acc_', valores: ['creada', 'actualitzada', 'paper_afegit', 'sense_canvis', 'omesa', 'error'] },
+    { que: 'importació · resum', prefijo: 'ie.res_', valores: ['creades', 'actualitzades', 'paper_afegit', 'sense_canvis', 'omeses', 'errors'] },
+    { que: 'importació · candidats[].motius', prefijo: 'ie.mot_', valores: ['correu', 'telefon', 'nom'] },
+    { que: 'importació · columna ignorada', prefijo: 'ie.motiu_', valores: ['desconeguda', 'a_proposit', 'repetida'] },
+    { que: 'importació · errors de lot (22023)', prefijo: 'ie.lot_', valores: ['dades_invalides', 'massa_files', 'fila_invalida', 'fila_repetida', 'sense_files'] },
+    { que: 'importació · lectura del fitxer', prefijo: 'ie.err_', valores: ['massa_gran', 'buit', 'format', 'xls', 'lectura'] },
+    {
+      que: 'importació · avisos i errors de fila',
+      prefijo: 'ie.c_',
+      valores: [
+        'cal_paper', 'paper_desconegut', 'cal_nom_comercial', 'repetit_al_fitxer', 'decisio_no_candidata', 'decisio_invalida',
+        'error_bd', 'sense_nif', 'nif_invalid', 'nif_diferent_germana', 'correu_invalid', 'correu2_invalid', 'telefon_invalid',
+        'telefon2_invalid', 'correu_en_us', 'telefon_en_us', 'correu2_a_nota', 'tipus_empresa_desconegut',
+        'tipus_activitat_desconegut', 'modalitat_desconeguda', 'sense_tipus_receptor', 'tipus_receptor_desconegut',
+        'codi_postal_invalid', 'municipi_ine_desconegut', 'municipi_no_trobat', 'area_desconeguda', 'area_no_coincideix',
+        'ref_externa_en_us', 'semblant_a_fila',
+      ],
+    },
+    {
+      que: 'importació · conflictes[].camp (importacio_camp)',
+      prefijo: 'ie.camp_',
+      valores: [
+        'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat', 'persona_contacte', 'email', 'email2',
+        'telefon', 'telefon2', 'direccion', 'codigo_postal', 'municipi', 'area_geografica', 'tipo_receptor',
+        'modalitats_interes', 'nota',
+      ],
+    },
+    { que: 'importació · informe CSV', prefijo: 'ie.inf_', valores: ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'conflictes', 'avisos', 'errors', 'conveni'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },

@@ -1317,6 +1317,21 @@ nueva, comprueba que es accesible**:
   solo por el equipo); la interfaz no la enseña (`NO_ES_MOSTRA` en `campsFitxa.ts`). El plan la daba
   por puesta en 1A; 1A no la añadió.
 
+### Importador de entidades desde Excel (`20270511100000`, 06-11-2026)
+
+- **`importacions_entitats`** (`id`, `fitxer_nom`, `fitxer_sha256` —64 hex en minúsculas—, `files_total`,
+  `resum jsonb`, `creat_per` → `auth.users`, `creat_at`) e **`importacions_entitats_files`** (pk
+  `(importacio_id, fila)`; `accio` CHECK `creada · actualitzada · paper_afegit · sense_canvis · omesa ·
+  error`; `organizacion_id`, `productor_id`, `entidad_id` con FK **`ON DELETE SET NULL`** —el registro no
+  bloquea `borrar_ficha_completa()`: la fila se queda sin las referencias—; `camps_omplerts text[]`,
+  `conflictes jsonb`, `avisos text[]`, `errors text[]`). RLS con lectura `(select es_intern())`, `grant
+  select` explícito y **ninguna escritura directa** (ni el super_admin): solo las escribe `importar_entitats()`.
+- **`ref_externa` de lo importado**: `AIRTABLE:<record id>` si la fila trae el ID de Airtable; si no,
+  `IMP:NIF:<nif>` con NIF válido; si no, `IMP:<sha256(nombre normalizado | municipio_ine)>` (normalizado =
+  `lower(unaccent)`, sin signos, espacios/guiones/barras a un espacio: «TEST-IMP Delta, S.L.» y «test-imp
+  DELTA SL» dan lo mismo). La búsqueda por la ref `IMP:` se hace con toda fila sin NIF, venga o no con ID
+  de Airtable. Una ficha que ya tenía `ref_externa` (p. ej. `ARA26:…`) no la cambia.
+
 ### Notas internas: el CRM mínimo (plan 1, rebanada 1F, `20270502100000`, 02-11-2026)
 
 D4: un hilo cronológico por organización, **solo del equipo**, sin «próxima acción» ni cola.

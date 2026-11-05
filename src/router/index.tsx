@@ -26,6 +26,7 @@ import { Ofertes } from '../routes/equip/Llistats'
 import Entitats from '../routes/equip/Entitats'
 import EntitatDetall, { RedireccioFitxa } from '../routes/equip/EntitatDetall'
 import NovaEntitat from '../routes/equip/NovaEntitat'
+import ImportaEntitats from '../routes/equip/ImportaEntitats'
 import OfertaDetall from '../routes/equip/OfertaDetall'
 import Missatgeria from '../routes/equip/Missatgeria'
 import Documents from '../routes/equip/Documents'
@@ -149,6 +150,7 @@ export const router = createBrowserRouter([
                   { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entitats', ample: true } },
                   // «Nova entitat» en dos pasos (plan 1, 1B): buscar antes de dar de alta.
                   { path: 'entitats/nova', element: <NovaEntitat />, handle: { titleKey: 'nav.entitats' } },
+                  { path: 'entitats/importa', element: <ImportaEntitats />, handle: { titleKey: 'nav.entitats', ample: true } },
                   // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
                   // ficha de antes se resuelve y redirige.
                   { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats', ample: true } },

@@ -520,6 +520,66 @@ const FIRMA_EXTERN: Check[] = [
   },
 ];
 
+// IMPORTADOR DE ENTIDADES (20270511100000). Lo que el arnés afirma:
+//
+//   · previsualizar e importar son SOLO del super_admin (`es_super_admin()`): el técnico, el
+//     admin y cualquier externo reciben 42501 antes de que se mire el payload; el super_admin,
+//     con un payload inválido, 22023 `dades_invalides` (autoriza y no escribe nada);
+//   · el registro (`importacions_entitats`, `importacions_entitats_files`) lo lee el equipo y
+//     nadie lo escribe directo (sin GRANT de escritura: lo escribe la RPC);
+//   · las funciones internas (el núcleo del alta y las `importacio_*`) no tienen EXECUTE para
+//     ninguna sesión: 42501 «permission denied for function».
+//
+// Las lecturas «permitir» llevan `requiereFixture`: sin ninguna importación hecha, 0 filas.
+const IMPORTACIO_INTERNES: Check[] = [
+  {
+    tabla: "alta_fitxa_interna",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_rols: ["productor"], p_org: null, p_activo: false, p_productor: {}, p_entitat: {} },
+    descripcion: "NO crida el nucli de l'alta (intern, sense EXECUTE)",
+  },
+  {
+    tabla: "importacio_processa",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_files: [], p_aplicar: false },
+    descripcion: "NO processa un lot d'importacio directament (intern)",
+  },
+  {
+    tabla: "importacio_aplica_fila",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_n: {}, p_org: null, p_aplicar: false, p_ocupats: [], p_data: "2026-01-01" },
+    descripcion: "NO aplica una fila d'importacio directament (intern)",
+  },
+  {
+    tabla: "importacio_actualitza",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_taula: "productores", p_id: "00000000-0000-0000-0000-000000000000", p_patch: {} },
+    descripcion: "NO escriu una fitxa per la porta de la importacio (intern)",
+  },
+  {
+    tabla: "importacio_normalitza_fila",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_f: {}, p_munis: {} },
+    descripcion: "NO normalitza files directament (intern)",
+  },
+  { tabla: "importacions_entitats", op: "insertar", esperado: "denegar", descripcion: "NO escriu el registre d'importacions directament" },
+  { tabla: "importacions_entitats_files", op: "insertar", esperado: "denegar", descripcion: "NO escriu les files del registre directament" },
+];
+
+// Lo que se añade a `DOCUMENTAL_EXTERN` (los cinco perfiles externos).
+const IMPORTACIO_EXTERN: Check[] = [
+  ...IMPORTACIO_INTERNES,
+  { tabla: "previsualitzar_importacio_entitats", op: "rpc", esperado: "denegar", args: { p_files: [] }, descripcion: "NO previsualitza importacions (es del super_admin)" },
+  { tabla: "importar_entitats", op: "rpc", esperado: "denegar", args: { p_fitxer: {}, p_files: [] }, descripcion: "NO importa entitats (es del super_admin)" },
+  { tabla: "importacions_entitats", op: "leer", esperado: "denegar", descripcion: "NO veu el registre d'importacions (0 files)" },
+  { tabla: "importacions_entitats_files", op: "leer", esperado: "denegar", descripcion: "NO veu les files importades (0 files)" },
+];
+
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
 // afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
@@ -1100,6 +1160,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap pla de prevencio (es de l'equip)" },
   // Circuito de firma (20270510100000–100200): ver `FIRMA_EXTERN`.
   ...FIRMA_EXTERN,
+  // Importador de entidades (20270511100000): ver `IMPORTACIO_EXTERN`.
+  ...IMPORTACIO_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1776,6 +1838,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       },
       descripcion: "NO encunya un enllac de signatura de panell (no te organitzacio)",
     },
+    // --- Importador de entidades (20270511100000) ---
+    // El técnico lee el registro, pero importar es del super_admin: 42501 antes del payload.
+    ...IMPORTACIO_INTERNES,
+    { tabla: "previsualitzar_importacio_entitats", op: "rpc", esperado: "denegar", args: { p_files: [] }, descripcion: "NO previsualitza importacions (es del super_admin)" },
+    { tabla: "importar_entitats", op: "rpc", esperado: "denegar", args: { p_fitxer: {}, p_files: [] }, descripcion: "NO importa entitats (es del super_admin)" },
+    { tabla: "importacions_entitats", op: "leer", esperado: "permitir", descripcion: "veu el registre d'importacions", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
+    { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", descripcion: "veu les files importades", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
   ],
   super_admin: [
     // Plan 1, 1A (20270501100000): con ids inventados la guarda de rol deja pasar y corta la
@@ -2313,6 +2382,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "veu la safata de signatures",
       requiereFixture: "algun document signable vigent (albarà confirmat/conciliat, certificat emès o conveni)",
     },
+    // --- Importador de entidades (20270511100000) ---
+    // Con un payload inválido la guarda deja pasar y corta 22023 `dades_invalides` sin
+    // escribir nada (ni el registro: se valida antes de insertarlo).
+    ...IMPORTACIO_INTERNES,
+    { tabla: "previsualitzar_importacio_entitats", op: "rpc", esperado: "permitir", args: { p_files: {} }, descripcion: "pot previsualitzar una importacio (22023 dades_invalides)" },
+    { tabla: "importar_entitats", op: "rpc", esperado: "permitir", args: { p_fitxer: {}, p_files: [] }, descripcion: "pot importar entitats (22023 dades_invalides)" },
+    { tabla: "importacions_entitats", op: "leer", esperado: "permitir", descripcion: "veu el registre d'importacions", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
+    { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", descripcion: "veu les files importades", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
   ],
   productor: [
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
@@ -2791,6 +2868,10 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // escritura, el insert tiene que morir en 42501 aunque la fila sea válida.
   fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
   notes_internes: { organizacion_id: "00000000-0000-0000-0000-000000000000", canal: "telefon", text: "arnes" },
+  // 20270511100000: el registro del importador solo lo escribe `importar_entitats()`. Filas
+  // válidas para que lo que corte sea el GRANT (42501) y no un `not null` o un `check`.
+  importacions_entitats: { fitxer_nom: "arnes.xlsx", fitxer_sha256: "0".repeat(64), files_total: 0 },
+  importacions_entitats_files: { importacio_id: "00000000-0000-0000-0000-000000000000", fila: 1, accio: "omesa" },
   // Deuda 150 (20270501400000): las fichas solo nacen por RPC. Filas válidas (inactivas y de
   // prueba) para que lo que corte sea el GRANT y no un `not null` o el trigger del NIF.
   productores: { name: "TEST-RLS", es_test: true, activo: false },

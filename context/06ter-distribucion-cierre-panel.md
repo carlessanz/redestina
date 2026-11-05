@@ -2012,3 +2012,15 @@ por correo y subir la versión firmada que le devuelven para cerrarlo. El modelo
   `tests/e2e/signatures.e2e.ts` (5 pruebas, solo clon y escritorio; restaura documentos, firmas y
   avisos; deja enlaces usados, evidencias y ficheros, deuda 157 bis → ver §12).
 
+
+### «Importa des d'Excel» (06-11-2026, `20270511100000`)
+
+Ruta `/equip/entitats/importa` (`routes/equip/ImportaEntitats.tsx`), solo super_admin (el resto del equipo ve
+un aviso y nada más; el botón «Importa des d'Excel» de `Entitats.tsx` solo lo ve el super_admin). Tres pasos
+—Fitxer, Revisió, Resultat— sobre `previsualitzar_importacio_entitats` e `importar_entitats`; reglas de mapeo,
+plantilla y cifras en `context/06-importacion-datos-maestros.md` §6.2. Textos con prefijo **`ie.*`** (no
+`imp.*`, que es «El meu impacte»); los códigos de la base se traducen como `ie.c_<codi>` con el detalle tras
+`:` interpolado (familias declaradas en `tests/i18n.test.ts`). En la interfaz la nota se llama «comentari»
+para no confundirla con las notas internas del CRM. E2E `tests/e2e/importa-entitats.e2e.ts` (Excel sintético
+con las cabeceras de Airtable: 4 creadas + 1 sin cambios; reimportar = todo sin cambios; plantilla
+descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres pasos; limpia las `TEST-IMP`).
