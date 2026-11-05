@@ -1,5 +1,9 @@
-// Cliente del cierre anual: los certificados de donación (CD) y de transacción (CT), y lo
-// que hace falta para llegar a ellos (calcular, resumen, factura, excepción, 182).
+// Cliente del cierre anual y del certificado de donación (CD: anual, de intervalo y de
+// oferta), y lo que hace falta para llegar a ellos (calcular, resumen, factura, 182).
+//
+// El certificado de transacción (CT, venta y maquila) se retiró el 05-11-2026
+// (`20270509100400`): sus RPC responden `22023 certificat_transaccio_retirat` y aquí ya no
+// hay envoltorios. Lo emitido se conserva y se descarga como cualquier documento.
 //
 // Igual que `albarans.ts`, todo es RPC y **ninguna escritura directa**: `authenticated` no
 // tiene INSERT ni UPDATE sobre `cierres_ejercicio`, `cierres_donante` ni
@@ -16,6 +20,7 @@ import type { ResultatRpc } from './albarans'
 import type { BloqueigCierre, CierreDonante, CierrePeriodo } from '../types'
 import { bloqueja } from './tancamentFormat'
 import type { Fila182 } from './tancamentFormat'
+import type { Exclosa } from './certificatsDonacio'
 
 // Lo puro (formato de importes, estilos, el CSV del 182…) vive en `tancamentFormat.ts`, sin
 // el cliente de Supabase, para poder probarlo desde Vitest (el patrón de
@@ -39,19 +44,6 @@ export interface FilaComparacio {
   coincide: boolean | null
 }
 
-/**
- * Lo que devuelve `calcular_cierre_transacciones()`, que desde `20270414100200` llama
- * `calcular_cierre()` en la misma transacción: el cierre calcula los dos acumulados a la vez.
- */
-export interface ResumCalculTransaccions {
-  generadors: number
-  linies: number
-  kg_total: number
-  /** Indicador interno del equipo: el CT no imprime ningún importe. */
-  valor_intern: number
-  bloquejats: number
-}
-
 /** Lo que devuelve `calcular_cierre()`. */
 export interface ResumCalcul {
   tancament: string
@@ -62,8 +54,6 @@ export interface ResumCalcul {
   kg_total: number
   valor_total: number
   bloquejats: number
-  /** Ausente en una base anterior a `20270414100200`. */
-  transaccions?: ResumCalculTransaccions | null
 }
 
 /** Lo que devuelve `emitir_resumen()`. El `token` es la única vez que existe en claro. */
@@ -193,76 +183,113 @@ export function simularFactura(
   }, 'tan.err_generic')
 }
 
+/** La fecha de expedición y el anexo por producto (05-11-2026, `20270509100200`). */
+export interface OpcionsExpedicio {
+  /** ISO. `null` = la de la base: 31-12 del ejercicio en el anual, hoy en los demás. */
+  dataExpedicio?: string | null
+  /** «Annex amb el detall per producte»: una segunda página con el desglose. */
+  annex?: boolean
+}
+
 /**
- * El certificado de un donante.
+ * El certificado anual de un donante.
  *
- * ⚠️ **La factura ya no lo condiciona** (decisión del cliente, 21-09-2026): antes la base
- * exigía una factura que cuadrase al céntimo, o la excepción D4 del super_admin con motivo.
- * Hoy se emite sin ella; la factura se registra si llega y la discrepancia solo avisa.
- * `p_motivo_excepcion` **se conserva en la firma y se ignora** —cambiarla rompería a quien
- * ya la llama— así que este envoltorio manda siempre `null` y no lo recibe por parámetro.
+ * ⚠️ **La factura ya no lo condiciona** (decisión del cliente, 21-09-2026): `p_motivo_excepcion`
+ * se conserva en la firma y se ignora, así que este envoltorio manda siempre `null`.
+ *
+ * La fecha de expedición la elige el super_admin; la base la acepta entre el 31-12 del
+ * ejercicio (hoy, en un ensayo en curso) y hoy, o responde `22023 data_expedicio_fora_rang`.
  */
-export function emetreCertificat(cd: string): Promise<ResultatRpc<ResultatCertificat>> {
+export function emetreCertificat(
+  cd: string,
+  opcions: OpcionsExpedicio = {},
+): Promise<ResultatRpc<ResultatCertificat>> {
   return crida('emitir_certificado', {
     p_cd: cd,
     p_motivo_excepcion: null,
+    p_data_expedicio: opcions.dataExpedicio ?? null,
+    p_annex: opcions.annex ?? false,
   }, 'tan.err_generic')
 }
 
-// --- Certificado a demanda -------------------------------------------------
+// --- Certificado a demanda: intervalo u oferta -----------------------------
 //
-// El mismo acumulado de un donante, pero de una VENTANA de fechas dentro de un ejercicio:
-// «lo que llevo donado este año, a fecha de hoy». Vive en `cierres_periodo`, con serie
-// propia (`CDP`), y **no abre ningún cierre**: por eso se puede pedir cualquier día sin
-// tocar la contabilidad del año.
-//
-// ⚠️ El backend existe desde la fase 5 y hasta hoy no lo llamaba NADIE: el equipo no tenía
-//    forma de emitir uno. Estas dos funciones son esa puerta.
+// El mismo acumulado de un donante, pero de una VENTANA de fechas dentro de un ejercicio
+// (`abast = 'periode'`) o de UNA oferta (`abast = 'oferta'`, la ventana la deriva la base de
+// sus recogidas certificables). Vive en `cierres_periodo`, con serie propia (`CDP`), y **no
+// abre ningún cierre**. 🔴 Solo cuenta la donación conciliada a una entidad `social`; lo que
+// se queda fuera lo dice `excloses()`.
 
 export interface ResultatCertificatPeriode {
   document: string
   numero: string | null
-  /** Cuántos certificados parciales anteriores quedan sustituidos por este. */
+  /** Cuántos certificados anteriores quedan sustituidos por este. */
   substitueix?: number
+  abast?: 'periode' | 'oferta'
+  data_expedicio?: string | null
+  periode?: { des_de: string; fins_a: string } | null
 }
 
 /**
  * El borrador de un certificado a demanda, con sus kilos y sus bloqueos.
  *
- * ⚠️ **Escribe**: inserta la fila de `cierres_periodo` aunque después no se emita nada. Es
- * lo que permite enseñar kilos y bloqueos antes de decidir, y el precio es que probar tres
- * ventanas deja tres borradores sin número (deuda §12.112).
- *
- * La base rechaza con `22023` y un mensaje útil si la ventana cruza dos ejercicios, si
- * termina en el futuro o si esa misma ventana ya tiene certificado: se enseña tal cual, que
- * explica mejor que cualquier texto nuestro.
+ * ⚠️ **Escribe**: inserta (o actualiza) la fila de `cierres_periodo` aunque después no se
+ * emita nada (deuda §12.112). Con `excedente` las fechas se ignoran: la ventana es la de la
+ * oferta. La base rechaza con `22023` y un mensaje útil (`oferta_sense_certificable`, dos
+ * ejercicios, periodo no acabado, ya certificado).
  */
 export function calcularCertificatPeriode(c: {
   productor: string
-  desde: string
-  hasta: string
+  desde: string | null
+  hasta: string | null
   modo: 'prueba' | 'real'
+  excedente?: string | null
 }): Promise<ResultatRpc<CierrePeriodo>> {
   return crida('calcular_certificado_periodo', {
     p_productor: c.productor,
     p_desde: c.desde,
     p_hasta: c.hasta,
     p_modo: c.modo,
+    p_excedente: c.excedente ?? null,
   }, 'tan.err_generic')
 }
 
 /**
  * Emitirlo. Consume un número de la serie `CDP` y no se puede deshacer: solo rectificar.
- *
- * `p_motivo_excepcion` va siempre `null` por lo mismo que en el anual: la factura dejó de
- * condicionar el certificado el 21-09-2026 y el parámetro se conserva pero se ignora.
+ * Con `excedente`, la base comprueba que el borrador es de esa oferta (`oferta_no_coincideix`).
+ * La fecha de expedición, por defecto hoy, entre el fin del periodo y hoy.
  */
 export function emetreCertificatPeriode(
   periode: string,
+  opcions: OpcionsExpedicio & { excedente?: string | null } = {},
 ): Promise<ResultatRpc<ResultatCertificatPeriode>> {
   return crida('emitir_certificado_periodo', {
     p_periodo: periode,
     p_motivo_excepcion: null,
+    p_data_expedicio: opcions.dataExpedicio ?? null,
+    p_annex: opcions.annex ?? false,
+    p_excedente: opcions.excedente ?? null,
+  }, 'tan.err_generic')
+}
+
+/**
+ * Lo que se queda FUERA del certificado de un donante, con su motivo: venta, maquila,
+ * entidad no social, sin entidad, sin modalidad o conciliación retroactiva (en real). Solo
+ * el equipo (`es_intern`). Con `excedente`, las fechas pueden ir a null.
+ */
+export function excloses(c: {
+  productor: string
+  desde: string | null
+  fins: string | null
+  excedente?: string | null
+  modo: 'prueba' | 'real'
+}): Promise<ResultatRpc<Exclosa[]>> {
+  return crida('cierre_exclosos_periodo', {
+    p_productor: c.productor,
+    p_desde: c.desde,
+    p_fins: c.fins,
+    p_excedente: c.excedente ?? null,
+    p_modo: c.modo,
   }, 'tan.err_generic')
 }
 
@@ -296,8 +323,13 @@ export interface ResultatCertificatsMassius {
  */
 export function emetreCertificatsTancament(
   cierre: string,
+  opcions: OpcionsExpedicio = {},
 ): Promise<ResultatRpc<ResultatCertificatsMassius>> {
-  return crida('emitir_certificados_cierre', { p_cierre: cierre }, 'tan.err_generic')
+  return crida('emitir_certificados_cierre', {
+    p_cierre: cierre,
+    p_data_expedicio: opcions.dataExpedicio ?? null,
+    p_annex: opcions.annex ?? false,
+  }, 'tan.err_generic')
 }
 
 /** Versión siguiente del mismo CD; no consume número nuevo. */
@@ -310,55 +342,6 @@ export function rectificarCertificat(
 
 export function marcarEnviat(cd: string): Promise<ResultatRpc<CierreDonante>> {
   return crida('marcar_enviado', { p_cd: cd }, 'tan.err_generic')
-}
-
-// --- Certificado de transacción (CT) ---------------------------------------
-//
-// Venta y maquila. Vive en la misma tabla que el CD (`cierres_donante`, `tipo =
-// 'transaccio'`) y reutiliza su motor, pero **no lleva importes, ni resumen, ni factura, ni
-// va al 182**: es la constancia de qué kilos se vendieron o se transformaron, sacados de los
-// albaranes OPE conciliados. Sus tres RPC existían desde la fase 5 y no las llamaba ninguna
-// pantalla.
-
-/** Un generador saltado por la emisión en bloque de los CT, con el motivo de la base. */
-export interface GeneradorSaltat {
-  cd: string
-  generador: string | null
-  codi: 'bloquejat' | 'sense_kg' | 'error'
-  motiu: string
-}
-
-export interface ResultatCertificatsTransaccio {
-  tancament: string
-  exercici: number
-  mode: 'prueba' | 'real'
-  emesos: number
-  ja_tenien: number
-  saltats: GeneradorSaltat[]
-}
-
-/** El CT de un generador. Consume un número de la serie `CT` (`P-CT` en prueba). */
-export function emetreCertificatTransaccio(cd: string): Promise<ResultatRpc<ResultatCertificat>> {
-  return crida('emitir_certificado_transaccion', { p_cd: cd }, 'tan.err_generic')
-}
-
-/**
- * Todos los CT de un cierre `tancat`, de una vez. Mismo contrato y mismas guardas, en el
- * mismo orden, que `emetreCertificatsTancament()`; y como aquella, un botón APARTE de
- * cerrar. Nunca lanza: los saltados vienen dentro, con su motivo.
- */
-export function emetreCertificatsTransaccioTancament(
-  cierre: string,
-): Promise<ResultatRpc<ResultatCertificatsTransaccio>> {
-  return crida('emitir_certificados_transaccion_cierre', { p_cierre: cierre }, 'tan.err_generic')
-}
-
-/** Versión siguiente del mismo CT, con motivo. No consume número (no existe serie `R-CT`). */
-export function rectificarCertificatTransaccio(
-  cd: string,
-  motiu: string,
-): Promise<ResultatRpc<ResultatCertificat>> {
-  return crida('rectificar_certificado_transaccion', { p_cd: cd, p_motivo: motiu }, 'tan.err_generic')
 }
 
 /** Lo que la escalera del ciclo guiado necesita del cierre de un generador. */

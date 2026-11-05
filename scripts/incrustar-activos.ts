@@ -1,6 +1,7 @@
 /**
  * Regenera `supabase/functions/generar-documento/activos/incrustats.ts`, el módulo que
- * lleva las cuatro fuentes y el logo del PDF **dentro del bundle**, en base64.
+ * lleva las cuatro fuentes y los dos logos del PDF (Redestina y, para el certificado de
+ * donación, Espigoladors) **dentro del bundle**, en base64.
  *
  * 🔴 **No es una optimización: es la única forma que funciona.** Los `static_files` de
  * `config.toml` dejaron de llegar al disco del isolate cuando cambió el modo de
@@ -27,6 +28,8 @@ const FICHEROS: Record<string, string> = {
   cuerpo: "Inter-Regular.ttf",
   cuerpoFuerte: "Inter-SemiBold.ttf",
   logo: "logo-redestina-pdf.png",
+  // Solo el certificado de donación (05-11-2026): el membrete de la Fundació.
+  logoEspigoladors: "logo-espigoladors-pdf.png",
 };
 
 const partes: string[] = [];
@@ -39,7 +42,7 @@ for (const [clave, nombre] of Object.entries(FICHEROS)) {
 
 const cabecera = `// GENERADO POR scripts/incrustar-activos.ts — NO EDITAR A MANO.
 //
-// Las cuatro fuentes y el logo del PDF, en base64, dentro del bundle. Los ficheros
+// Las cuatro fuentes y los dos logos del PDF, en base64, dentro del bundle. Los ficheros
 // originales siguen en esta misma carpeta y son la fuente de verdad: este módulo es su
 // copia empaquetada, y se regenera con el script.
 //

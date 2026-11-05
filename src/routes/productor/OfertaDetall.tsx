@@ -20,6 +20,7 @@ import LiniesSortida from '../../components/LiniesSortida'
 import FitxaOperacio from '../../components/FitxaOperacio'
 import MissatgesDelPunt from '../../components/MissatgesDelPunt'
 import BotoCopiar from '../../components/BotoCopiar'
+import CertificatOfertaPropi from '../../components/documents/CertificatOfertaPropi'
 import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useCallback, useEffect, useState } from 'react'
@@ -345,6 +346,9 @@ export default function ProductorOfertaDetall() {
           ))}
         </CardContent>
       </Card>
+
+      {/* Su certificado de donación de esta oferta, si lo hay (05-11-2026). */}
+      <CertificatOfertaPropi excedenteId={oferta.id} />
 
       {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(oferta.estado) && (
         <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => setEditant(true)}>

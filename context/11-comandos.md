@@ -296,8 +296,13 @@ npm run check:tipos           # solo tsc: tsconfig.json y tsconfig.tests.json
 git config core.hooksPath .githooks
 
 # Los activos del PDF viajan DENTRO del bundle, no en el disco (§11, 21-09-2026). Tras
-# cambiar una fuente o el logo hay que regenerar el módulo y redesplegar generar-documento:
+# cambiar una fuente o uno de los DOS logos (Redestina y, desde el 05-11-2026, el de Espigoladors del
+# certificado de donación) hay que regenerar el módulo y redesplegar generar-documento:
 deno run -A scripts/incrustar-activos.ts
+
+# El PDF del certificado de donación (05-11-2026); con PDF_SORTIDA=<carpeta> deja los PDF generados.
+# `tests/pdf/textPdf.ts` extrae el texto de los PDF del maquetador para las pruebas.
+deno test -A --config supabase/functions/generar-documento/deno.json tests/pdf/cd_test.ts
 
 # Qué Edge Functions han cambiado DE VERDAD entre dos despliegues (§12.44). La salida del
 # CLI no sirve para saberlo; el `ezbr_sha256` sí, pero hace falta guardar el de antes.

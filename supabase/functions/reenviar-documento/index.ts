@@ -35,6 +35,8 @@ const BUCKET = "documentos";
 const MIN_ENTRE_ENVIAMENTS_MS = 2 * 60 * 1000;
 
 interface Fila extends DocumentAEnviar {
+  /** El snapshot: el asunto del CD dice su ámbito y su periodo (`correu-document.ts`). */
+  datos: Record<string, unknown> | null;
   ruta: string | null;
   estado: string;
   fichero_at: string | null;
@@ -70,7 +72,7 @@ Deno.serve(async (req) => {
 
   const { data, error } = await supabase
     .from("documentos")
-    .select("id, tipo, subtipo, objeto_tipo, objeto_id, numero_completo, ejercicio, idioma, modo, envio, ruta, estado, fichero_at")
+    .select("id, tipo, subtipo, objeto_tipo, objeto_id, numero_completo, ejercicio, idioma, modo, envio, datos, ruta, estado, fichero_at")
     .eq("id", documentoId)
     .maybeSingle();
   if (error) {

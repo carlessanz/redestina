@@ -840,7 +840,10 @@ export interface CierreDonante {
   id: string
   cierre_id: string
   productor_id: string
-  /** `donacio` = certificado de donación (con importes y factura) · `transaccio` = de transacción */
+  /**
+   * `donacio` = certificado de donación (con importes y factura) · `transaccio` = de
+   * transacción, retirado el 05-11-2026: no se calculan filas nuevas, las emitidas se conservan.
+   */
   tipo: 'donacio' | 'transaccio'
   datos_fiscales: Record<string, string | null> | null
   kg_total: number
@@ -866,6 +869,10 @@ export interface CierreDonante {
   enviado_at: string | null
   declarado_at: string | null
   created_at: string
+  /** La fecha que imprime el certificado anual (por defecto, 31-12 del ejercicio; 20270509100200). */
+  data_expedicio: string | null
+  /** Con la segunda página del detalle por producto. */
+  annex: boolean
 }
 
 export interface CierreDonanteLinea {
@@ -931,6 +938,18 @@ export interface CierrePeriodo {
   enviado_at: string | null
   creado_por: string | null
   created_at: string
+  /**
+   * `periode` = una ventana de fechas · `oferta` = una sola oferta (`excedente_id`), con la
+   * ventana derivada de sus recogidas certificables (20270509100100).
+   */
+  abast: 'periode' | 'oferta'
+  excedente_id: string | null
+  /** La fecha que imprime el certificado; la elige el super_admin al emitir (20270509100200). */
+  data_expedicio: string | null
+  /** Con la segunda página del detalle por producto. */
+  annex: boolean
+  /** Fase 4: en REAL no se firma sin la revisión del donante. */
+  revisio_estat: string | null
 }
 
 export interface CierrePeriodoLinea {

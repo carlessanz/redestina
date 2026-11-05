@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **05-11-2026 (certificado de donación según el modelo): se cierran la 85 y la 139 y se abren la 154, la
+155 y la 156**: **62 vivas** y la siguiente entrada nueva es la 157.
 ⚠️ **04-11-2026 (consentimiento RGPD por enlace, `20270506100000`): se cierra la 142** (exportación en
 «Entitats» y petición por correo desde la ficha): **61 vivas** y la siguiente entrada nueva sigue siendo la 154.
 ⚠️ **02-11-2026 (plan 1, rebanada 1D): se abren la 151 y la 152**: **62 vivas** y la siguiente entrada nueva
@@ -452,15 +454,8 @@ panel del equipo y en el externo).
     certificado a demanda** (variante `parcial`), aunque no para el certificado anual (ver §12.71).
     `CT` y `PLA` sí siguen sin ninguna, tal como dice la entrada.
 
-85. 🟡 **El certificado de transacción no tenía prueba end-to-end, y ya la puede tener**
-    (21-09-2026). Lo que lo bloqueaba —`datos_provisionales = true` en el fixture— dejó de
-    cortar en modo prueba con `20260921214526`, así que el CT **sí se puede ejercitar** con
-    serie `P-CT`. Lo que queda es hacerlo: nadie lo ha recorrido todavía. El cuerpo original,
-    que explica el caso: `emitir_certificado_transaccion`
-    aborta con `42501` porque el fixture deja `datos_provisionales = true` —que es la barrera
-    funcionando, no un fallo—, así que no hay ninguna fila `documentos` de tipo `CT` que generar. El
-    renderizador se probó en directo y el despacho son ocho líneas. Se cierra el día que el fixture
-    pueda desmarcar el flag, o con los datos reales de la Fundación.
+85. ~~E2E del CT~~ **Cerrada el 05-11-2026**: el CT se retiró (`20270509100400`); ya no hay nada que
+    recorrer. Lo emitido se sigue descargando. Ver §12ter.
 
 91. **La detección de organización del registro tiene puntos ciegos, todos hacia el lado seguro.**
     ⚠️ **La primera mitad de esta entrada era FALSA** y se corrige (14-09-2026): decía «solo mira
@@ -700,11 +695,10 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 138. **El certificado de recepción no se puede rectificar ni marcar enviado desde la interfaz**: existen las
      RPC (`rectificar_certificat_recepcio`, `marcar_enviat_recepcio`, `20270328101200`) y los envoltorios en
      `src/lib/certificatRecepcio.ts` (`rectificarCertificatRecepcio`, `marcarEnviatRecepcio`) pero ningún
-     botón los llama. Brecha funcional, no solo código muerto. Mismo tipo de hueco: «Marca com a enviat» del CT.
-139. **Por verificar: el REC suma los kilos de TODAS las canalizaciones del excedente aunque la oferta
-     tenga varias modalidades** (donación y venta a la vez). El reparto del neto del REC en el CD asigna ese
-     neto solo a las líneas de donación, así que podría inflarse. Lo señaló el trazado de flujos desde el
-     código; no está reproducido en el clon. Reproducir antes de tocar nada.
+     botón los llama. Brecha funcional, no solo código muerto. (El CT, que tenía el mismo hueco, se retiró el 05-11-2026.)
+139. ~~REC mixto~~ **Cerrada el 05-11-2026** (`20270509100000` + `20270509100700`): reproducida en el clon
+     (la social salía con 64,29 kg de 50); el neto del REC se reparte ahora entre todas las conciliadas del
+     REC y después se descartan las no certificables. Ver §12ter.
 
 140. **`borrar_ficha_completa()` y `bloqueigs_esborrat_fitxa()` no conocen los expedientes de prevención**
      (fase 11, `20270425100000`). La FK `expedients_prevencion.productor_id` es `restrict` a propósito: un
@@ -783,3 +777,15 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      «Coord»/«Coord 2» de Prod traen 14 pares numéricos útiles y mucho texto («Visitat, varies finques»);
      se guardan en la nota «ARA 2026» del comentario, no como lugar de recogida. Arreglo, si se quiere:
      crearlas al activar la ficha, o una pasada del importador que lea la nota.
+154. **Código muerto del CT** (05-11-2026, `20270509100400`). El certificado de transacción (venta y maquila)
+     se retiró: las tres RPC de emisión responden `22023 certificat_transaccio_retirat` y
+     `calcular_cierre_transacciones` no escribe. Siguen vivas, sin uso, `cierre_base_transaccion`,
+     `cierre_pendents_transaccion`, `cierre_datos_certificado_transaccion` y la llamada desde
+     `congelar_un_cierre`/`congelar_ejercicio`; `render/ct.ts` se conserva para lo ya emitido. Retirarlas
+     cuando se decida qué es una venta sin albarán de serie legal (D20, plan 3A).
+155. **Una rectificación de certificado reimprime la `data_expedicio` guardada** (05-11-2026). Los
+     `rectificar_certificado*` no tienen parámetro para cambiarla: si hace falta otra fecha, se emite de nuevo.
+156. **Cómo elige el equipo el ámbito del certificado (oferta, intervalo o ejercicio) lo decide el cliente**
+     (05-11-2026). El motor admite los tres; `DialegCertificatDonacio` lleva un selector aislado que se
+     ajustará a la respuesta (opción por defecto, orden o quitar alguna). Relacionado: una entidad sin
+     `tipo_receptor` queda fuera del certificado (`entitat_no_social:desconegut`) y sale en «Excloses».

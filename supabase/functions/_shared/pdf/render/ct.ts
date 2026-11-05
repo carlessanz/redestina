@@ -1,5 +1,10 @@
 // Certificado de transacción (CT) — el hermano del CD para venta y maquila.
 //
+// 🔴 RETIRADO el 05-11-2026: ya no se emiten CT nuevos (`emitir_certificado_transaccion`
+//    responde `certificat_transaccio_retirat`). Este renderizador se queda SOLO para poder
+//    regenerar y descargar los que ya se emitieron (`documentos` es inmutable y lo emitido
+//    se conserva). No se toca su diseño ni su texto: es el de los papeles que ya existen.
+//
 // Acredita al **generador** las operaciones que ha hecho durante el ejercicio con los
 // kilos que quedaron conciliados. Comparte con el certificado de donación el esqueleto
 // entero (`cierre.ts`): mismo snapshot anual, mismas partes, mismo diccionario, misma

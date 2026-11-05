@@ -956,6 +956,64 @@ nueva nace sin SELECT** y hay que otorgarla a mano. Es la contrapartida del `alt
 privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al añadir una columna
 (precedente: `enlaces_token.rol_parte`, `20270304100200:39`).
 
+### El certificado de donación según el modelo de la Fundació (`20270509100000`…`100700`, 05-11-2026)
+
+El modelo es `Certificat_Donacio_Tabaquet.pdf` (Drive › `1. Fuentes/Certificats donacio/`). Pasa a ser la
+**única** plantilla del certificado de donación: el diseño anterior de `render/cd.ts` y su texto provisional
+se retiraron (lo emitido antes conserva su PDF).
+
+🔴 **Lo certificable: donación conciliada a una entidad `social`, y nada más.** Un solo criterio,
+`motiu_exclusio_certificat(valorizacion, entidad, tipo_receptor)` (`20270509100000`), que devuelve null si
+entra y si no el motivo: `sense_valoritzacio` · `venda` · `maquila` · `sense_entitat` ·
+`entitat_no_social:<tipo>` (`desconegut` si la entidad no tiene tipo). Lo usan `cierre_base_periodo` —y con
+ella el anual, el periodo y la oferta— y `cierre_pendents_periodo`. Hasta ese día el filtro era solo
+`valorizacion='donacio'` y no miraba `tipo_receptor`: entraban kilos de entidades animales y
+transformadoras (en el clon, 4 líneas y 1.750 kg). **`cierre_exclosos_periodo(productor, desde, fins,
+excedente, modo)`** (equipo) lista lo que se queda fuera y por qué —además `conciliacio_retroactiva` en
+real—, y el diálogo lo enseña como «Excloses del certificat».
+
+**Lo certificable y el REC mixto (`20270509100000` + `20270509100700`).** El REC suma todas las salidas de la
+oferta (`validar_recollida()` no mira la modalidad) y se repartía solo entre las donaciones: en una oferta con
+donación social 50 + donación animal 20 + venta 30 y un REC de 90, la social salía con 64,29 kg. Ahora el
+universo del reparto es toda canalización conciliada bajo el REC, de cualquier modalidad o entidad. Cada una
+recibe su parte proporcional `rec_neto · kg_conciliados / suma`, **sin tope**, y el céntimo del redondeo va a
+la línea mayor; después se descartan las no certificables. Así la social queda en 45 y la parte de la venta y
+de la entidad no social no llega a ningún certificado. Se certifica lo que el donante entregó a la Fundació
+(el REC), no lo que confirmó la entidad: con un REC de 100 y un ENT de 99 se certifican 100. `20270509100000`
+llevaba un tope por línea en `kg_conciliados` que se quitó el mismo día en `20270509100700`. Invariante por
+`(clau_repartiment, producto)`: la suma de `kg_neto` de todas las líneas conciliadas es exactamente
+`rec_neto`. Cierra la deuda 139.
+
+**Tres ámbitos.** Ejercicio = el CD anual del cierre (`cierres_donante`, serie `CD`). Intervalo y **oferta** =
+el certificado a demanda (`cierres_periodo`, serie `CDP`), con `abast` periode·oferta y `excedente_id`
+(`20270509100100`, checks `not valid` + `validate`). Con oferta, `calcular_certificado_periodo(…, p_excedente)`
+ignora desde/hasta y deriva la ventana del mínimo al máximo de `coalesce(data_hora_recollida, conciliada_at,
+created_at)` (Madrid) de lo certificable de esa oferta; un solo borrador por oferta y modo; el solape entre
+certificados se mide por **líneas** cuando interviene una oferta (por ventana entre dos de periodo). El anual
+sigue sustituyendo todos los CDP del donante.
+
+**Fecha de expedición y anexo** (`20270509100200`): `data_expedicio` y `annex` en `cierres_donante` y
+`cierres_periodo` (en la fila, para que una rectificación reimprima lo mismo; deuda 155) y en el snapshot,
+junto con `abast`. La elige quien emite: anual, por defecto el 31-12 del ejercicio (en real, nunca antes; en
+prueba con el ejercicio en curso, hoy); periodo y oferta, por defecto hoy, rango `[periodo_hasta, hoy]`. Fuera
+de rango, `22023 data_expedicio_fora_rang`. El anexo (detalle por producto en segunda página) es opcional
+(D21). La revisión del donante sigue en el snapshot como evidencia, pero el PDF ya no la imprime.
+
+**Plantilla del modelo** (`20270509100300`): `CD` sin variante v1 y `CD/parcial` v2, ca/es, con las cláusulas
+Primer a Quart, el art. 16 y «expedeixo … a {lloc}, {data}». Las anteriores (incluida la `[ESBORRANY]`)
+quedan `vigente=false`. Hasta ese día el anual **no tenía plantilla sin variante** e imprimía el cuerpo
+provisional del código. Los 20 marcadores los rellena `_shared/certificatDonacio.ts` (módulo hoja); la
+paridad con el SQL la vigila `tests/certificatDonacio.test.ts`. `{{factura.frase}}` es opcional: sin factura
+(lo normal en una donación) se quita antes de interpolar.
+
+**CT retirado** (`20270509100400`): `emitir_certificado_transaccion`, `emitir_certificados_transaccion_cierre`
+y `rectificar_certificado_transaccion` responden `22023 certificat_transaccio_retirat` tras la guarda;
+`calcular_cierre_transacciones` no escribe (la llaman `congelar_*`) y `calcular_cierre` devuelve
+`transaccions: null`. Lo emitido se conserva y se descarga (deuda 154). **`datos_182()`** filtra
+`tipo='donacio'` (`20270509100500`: un CT emitido habría acabado en el 182). **El CR** deja fuera las
+canalizaciones sin modalidad (`20270509100600`; el `coalesce(…,'donacio')` las contaba como donación y
+rompía D3).
+
 ### Borrado de una ficha: un único camino, `borrar_ficha_completa()`
 
 ✅ **Desde `20260921153439` hay UNA puerta** (§4bis), y es la que aplica la regla de §7.

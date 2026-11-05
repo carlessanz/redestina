@@ -159,6 +159,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // «Envia per correu» del albarán (04-11-2026): lo que responde `enviar-albara`.
     { que: 'enviar-albara resultat', prefijo: 'alb.env_r_', valores: ['enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error'] },
     { que: 'enviar-albara code', prefijo: 'alb.env_e_', valores: ['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc', 'error'] },
+    // El certificado de donación (05-11-2026): el ámbito (`clauAbast`) y el tipo de la
+    // entidad no social de una exclusión (`clauTipus`). Los motivos los vigila su propio test.
+    { que: 'certificat de donació · abast', prefijo: 'cdon.abast_', valores: ['oferta', 'periode', 'exercici'] },
     // Lo que impide borrar una ficha: los `codi` de `bloqueigs_esborrat_fitxa()` (desde
     // 20270508100000 también las ofertas), compuestos en `useEsborrarFitxa.tsx`.
     { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'documents'] },
@@ -242,8 +245,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       ],
     },
     {
-      // Los mismos estados, en la pantalla del EQUIPO (`TancamentDetall.tsx`): el badge de
-      // cada donante y de cada generador con CT, y `substituit` de los certificados a demanda.
+      // Los mismos estados, en la pantalla del EQUIPO (`TancamentDetall.tsx`, `CertificatsFitxa`):
+      // el badge de cada donante, y `substituit` de los certificados de intervalo y de oferta.
       que: 'cierres_donante.estado (badge del equipo)',
       prefijo: 'tan.ds_',
       valores: [
@@ -252,9 +255,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       ],
     },
     {
-      // Los `codigo` de `bloqueos` que escriben `calcular_cierre()` (CD) y
-      // `calcular_cierre_transacciones()` (CT). Se componen en `components/equip/Bloquejos.tsx`.
-      // Al añadir un bloqueo nuevo en SQL, añadirlo aquí.
+      // Los `codigo` de `bloqueos` que escribe `calcular_cierre()` (CD) —y escribía el CT,
+      // retirado el 05-11-2026: sus filas emitidas los conservan—. Se componen en
+      // `components/equip/Bloquejos.tsx`. Al añadir un bloqueo nuevo en SQL, añadirlo aquí.
       que: 'cierres_donante.bloqueos[].codigo',
       prefijo: 'tan.bl_',
       valores: [
@@ -263,8 +266,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       ],
     },
     {
-      // Los `codi` de los saltados de la emisión en bloque: `emitir_certificados_cierre()` y
-      // `emitir_certificados_transaccion_cierre()`. Se componen en `TancamentDetall.tsx`.
+      // Los `codi` de los saltados de la emisión en bloque: `emitir_certificados_cierre()`.
+      // Se componen en `TancamentDetall.tsx`.
       que: 'emisión en bloque · saltats[].codi',
       prefijo: 'tan.skip_',
       valores: ['bloquejat', 'sense_kg', 'error', 'sense_revisio'],

@@ -630,7 +630,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "cierres_donante", op: "insertar", esperado: "denegar", descripcion: "NO escribe en el cierre (no hay GRANT)" },
   { tabla: "abrir_cierre", op: "rpc", esperado: "denegar", args: { p_ejercicio: 2020, p_modo: "prueba" }, descripcion: "NO obre cap tancament" },
   { tabla: "calcular_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula un cierre" },
-  { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de donació" },
+  // Desde 20270509100200 con la fecha de expedición y el anexo: se llama con la firma nueva.
+  { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet certificats de donació" },
   { tabla: "conciliacion_retroactiva", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_motivo: "arnes" }, descripcion: "NO concilia res a posteriori" },
   { tabla: "reiniciar_cierre_prueba", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO reinicia un cierre de prueba" },
   { tabla: "datos_182", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO exporta los datos del 182" },
@@ -638,7 +639,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Emitir TODOS los certificados de un cierre de golpe (20270328100800). Es la acción
   // más destructiva del circuito fiscal —N documentos con número legal y N correos a N
   // donantes— así que es la primera que tiene que cortar para cualquier cuenta externa.
-  { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament" },
+  { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet en bloc els certificats d'un tancament" },
   // Su espejo para los certificados de transacción (20270414100200): misma guarda.
   { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats de transacció" },
   // El helper de la conciliación en cascada (20270414100100) es interno: sin EXECUTE.
@@ -839,8 +840,9 @@ const DOCUMENTAL_EXTERN: Check[] = [
     args: { p_user: "00000000-0000-0000-0000-0000000000ff" },
     descripcion: "NO consulta els plans d'una altra persona",
   },
-  // Certificado de transacción (fase 5): la misma regla que el de donación. Las dos son
-  // de `pot_aprovar()`, así que un externo no llega ni a la comprobación siguiente.
+  // Certificado de transacción (fase 5; RETIRADO en 20270509100400): la guarda de
+  // `pot_aprovar()` sigue delante del `certificat_transaccio_retirat`, así que un externo
+  // sigue recibiendo 42501 y no el error de negocio.
   { tabla: "calcular_cierre_transacciones", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula les transaccions d'un tancament" },
   { tabla: "emitir_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats de transaccio" },
   { tabla: "rectificar_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat de transaccio" },
@@ -860,7 +862,14 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // `productor`, que es donde esa afirmación significa algo.
   { tabla: "cierres_periodo", op: "insertar", esperado: "denegar", descripcion: "NO escriu al certificat a demanda (no hi ha GRANT)" },
   { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula cap certificat a demanda" },
-  { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap certificat a demanda" },
+  // El ámbito oferta (20270509100100): la misma guarda, con la firma nueva.
+  { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: null, p_hasta: null, p_modo: "prueba", p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO calcula cap certificat d'una oferta" },
+  { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false, p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap certificat a demanda" },
+  // Lo que se queda fuera de un certificado (20270509100000) es del equipo: lleva el nombre
+  // de las entidades receptoras y las ventas del donante. Y el criterio puro no tiene
+  // EXECUTE para nadie con sesión.
+  { tabla: "cierre_exclosos_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_fins: "1999-12-31", p_excedente: null, p_modo: "prueba" }, descripcion: "NO llegeix les donacions excloses d'un certificat" },
+  { tabla: "motiu_exclusio_certificat", op: "rpc", esperado: "denegar", args: { p_valorizacion: "donacio", p_entidad: null, p_tipo_receptor: "social" }, descripcion: "NO executa el criteri intern del certificable" },
   { tabla: "registrar_factura_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_numero: "F-ARNES" }, descripcion: "NO registra la factura d'un periode" },
   { tabla: "rectificar_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_motivo: "arnes" }, descripcion: "NO rectifica cap certificat a demanda" },
   { tabla: "marcar_enviado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO marca com a enviat cap certificat a demanda" },
@@ -1426,11 +1435,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // El botón «Tanca l'exercici» tampoco es del técnico: cerrar emite los resúmenes
     // definitivos y congela el cálculo. Mismo `pot_aprovar()` que calcular.
     { tabla: "cerrar_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tanca un exercici (és de pot_aprovar)" },
-    { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet certificats (és de pot_aprovar)" },
+    { tabla: "emitir_certificado", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet certificats (és de pot_aprovar)" },
     // Emitir en bloque tampoco: es `pot_aprovar()`, la misma guarda que emitir uno a uno.
     // Si algún día la de la tanda se relajara sin tocar la individual, este check es el
     // único sitio donde se vería —desde el panel las dos se ven igual de grises—.
-    { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats d'un tancament (és de pot_aprovar)" },
+    { tabla: "emitir_certificados_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false }, descripcion: "NO emet en bloc els certificats d'un tancament (és de pot_aprovar)" },
     { tabla: "emitir_certificados_transaccion_cierre", op: "rpc", esperado: "denegar", args: { p_cierre: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet en bloc els certificats de transacció (és de pot_aprovar)" },
     // Interno de la conciliación en cascada (20270414100100): ni el equipo lo llama.
     { tabla: "albarans_germans_rec", op: "rpc", esperado: "denegar", args: { p_rec: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta els germans d'un albarà (intern)" },
@@ -1448,6 +1457,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierre_base", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "pot llegir la base de calcul del tancament" },
     { tabla: "cierre_base_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "pot llegir la base de calcul d'un periode" },
     { tabla: "cierre_pendents_periodo", op: "rpc", esperado: "permitir", args: { p_desde: "1999-01-01", p_hasta: "1999-12-31" }, descripcion: "pot llegir els pendents d'un periode" },
+    // Lo que se queda fuera de un certificado (20270509100000): lectura del equipo, como la
+    // base de cálculo. Sobre un donante inexistente devuelve 0 filas.
+    { tabla: "cierre_exclosos_periodo", op: "rpc", esperado: "permitir", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_fins: "1999-12-31", p_excedente: null, p_modo: "prueba" }, descripcion: "pot llegir les donacions excloses d'un certificat" },
+    { tabla: "motiu_exclusio_certificat", op: "rpc", esperado: "denegar", args: { p_valorizacion: "donacio", p_entidad: null, p_tipo_receptor: "social" }, descripcion: "NO executa el criteri intern del certificable (nomes servidor)" },
     // --- Auditoría de funciones del 07-10-2026 (20270414100400…101000) ---
     // La base de cálculo del CT sigue siendo del equipo (como la del CD); su snapshot y el
     // del plan, en cambio, son solo del servidor, igual que `cierre_datos_certificado()`.
@@ -1475,8 +1488,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "algún certificado a demanda calculado (calcular_certificado_periodo con una cuenta que pueda aprobar)",
     },
     { tabla: "cierres_periodo", op: "insertar", esperado: "denegar", descripcion: "NO crea certificats a demanda a mà (van per RPC)" },
-    { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba" }, descripcion: "NO calcula un certificat a demanda (és de pot_aprovar)" },
-    { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet un certificat a demanda (és de pot_aprovar)" },
+    { tabla: "calcular_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_hasta: "1999-12-31", p_modo: "prueba", p_excedente: null }, descripcion: "NO calcula un certificat a demanda (és de pot_aprovar)" },
+    { tabla: "emitir_certificado_periodo", op: "rpc", esperado: "denegar", args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false, p_excedente: null }, descripcion: "NO emet un certificat a demanda (és de pot_aprovar)" },
     // Plan de prevención (fase 5). El equipo lo ve todo y **sí** puede contestar el
     // cuestionario de cualquier organización: el diagnóstico es un servicio asistido. Lo
     // que se comprueba es la autorización (`puc_gestionar_pla`), no el guardado: guardar
@@ -1856,28 +1869,29 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       requiereFixture: "un cierre de prueba calculado (scripts/crear-datos-documentales-prueba.ts)",
     },
     // Certificado de transacción (fase 5): la contraparte de los dos «denegar» del
-    // técnico. Sobre un uuid inventado la autorización pasa y la función falla después con
-    // 22023, sin dejar rastro: emitir uno de verdad consumiría un número de la serie CT.
+    // técnico. RETIRADO en 20270509100400: la autorización pasa y la función responde
+    // `22023 certificat_transaccio_retirat` (calcular devuelve `{retirat: true}` sin
+    // escribir). Lo que se mide sigue siendo que la guarda de rol va primero.
     {
       tabla: "calcular_cierre_transacciones",
       op: "rpc",
       esperado: "permitir",
       args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
-      descripcion: "pot calcular les transaccions (autoritza; el tancament no existeix)",
+      descripcion: "pot cridar el càlcul de transaccions (autoritza; retirat: no escriu res)",
     },
     {
       tabla: "emitir_certificado_transaccion",
       op: "rpc",
       esperado: "permitir",
       args: { p_cd: "00000000-0000-0000-0000-000000000000" },
-      descripcion: "pot emetre un certificat de transaccio (autoritza; l'acumulat no existeix)",
+      descripcion: "passa la guarda d'emetre un CT (autoritza; retirat → 22023)",
     },
     {
       tabla: "rectificar_certificado_transaccion",
       op: "rpc",
       esperado: "permitir",
       args: { p_cd: "00000000-0000-0000-0000-000000000000", p_motivo: "Comprobación del arnés de RLS" },
-      descripcion: "pot rectificar un certificat de transaccio (autoritza; l'acumulat no existeix)",
+      descripcion: "passa la guarda de rectificar un CT (autoritza; retirat → 22023)",
     },
     // Emitir en bloque los certificados de un cierre (20270328100800). Sobre un uuid
     // inventado la guarda de rol pasa y la función cae con 22023 («aquest tancament no
@@ -1888,7 +1902,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "emitir_certificados_cierre",
       op: "rpc",
       esperado: "permitir",
-      args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
+      args: { p_cierre: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: false },
       descripcion: "pot emetre en bloc els certificats (autoritza; el tancament no existeix)",
     },
     // El mismo criterio para la tanda de CT (20270414100200): uuid inventado, la guarda de
@@ -1898,7 +1912,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       op: "rpc",
       esperado: "permitir",
       args: { p_cierre: "00000000-0000-0000-0000-000000000000" },
-      descripcion: "pot emetre en bloc els certificats de transacció (autoritza; el tancament no existeix)",
+      descripcion: "passa la guarda de la tanda de CT (autoritza; retirat → 22023)",
     },
     {
       tabla: "albarans_germans_rec",
@@ -1922,8 +1936,39 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       tabla: "emitir_certificado_periodo",
       op: "rpc",
       esperado: "permitir",
-      args: { p_periodo: "00000000-0000-0000-0000-000000000000" },
+      args: { p_periodo: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: true, p_excedente: null },
       descripcion: "pot emetre un certificat a demanda (autoritza; el periode no existeix)",
+    },
+    // El ámbito oferta y la fecha de expedición (20270509100100 / 100200), con la firma
+    // nueva y sobre uuids inventados: 22023 («aquest donant no existeix» / «aquest donant
+    // no es d'un tancament») sin consumir ningún número.
+    {
+      tabla: "calcular_certificado_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: null, p_hasta: null, p_modo: "prueba", p_excedente: "00000000-0000-0000-0000-000000000000" },
+      descripcion: "pot calcular el certificat d'una oferta (autoritza; el donant no existeix)",
+    },
+    {
+      tabla: "emitir_certificado",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_cd: "00000000-0000-0000-0000-000000000000", p_data_expedicio: "1999-12-31", p_annex: true },
+      descripcion: "pot emetre el certificat anual amb data d'expedició (autoritza; l'acumulat no existeix)",
+    },
+    {
+      tabla: "cierre_exclosos_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: "1999-01-01", p_fins: "1999-12-31", p_excedente: null, p_modo: "prueba" },
+      descripcion: "pot llegir les donacions excloses d'un periode",
+    },
+    {
+      tabla: "cierre_exclosos_periodo",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_productor: "00000000-0000-0000-0000-000000000000", p_desde: null, p_fins: null, p_excedente: "00000000-0000-0000-0000-000000000000", p_modo: "real" },
+      descripcion: "pot llegir les donacions excloses d'una oferta",
     },
     {
       tabla: "rectificar_certificado_periodo",

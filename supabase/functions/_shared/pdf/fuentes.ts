@@ -55,6 +55,12 @@ export const FICHEROS = {
   cuerpo: "Inter-Regular.ttf",
   cuerpoFuerte: "Inter-SemiBold.ttf",
   logo: "logo-redestina-pdf.png",
+  /**
+   * El logo de la Fundació Espigoladors (05-11-2026), solo para el certificado de donación:
+   * el modelo de la Fundació es su papel con membrete, no uno de Redestina. 900×589, fondo
+   * transparente, preparado a partir del oficial (el escaneo del modelo no sirve).
+   */
+  logoEspigoladors: "logo-espigoladors-pdf.png",
 } as const;
 
 export interface BytesActivos {
@@ -64,6 +70,8 @@ export interface BytesActivos {
   cuerpoFuerte: Uint8Array;
   /** Logo positivo sobre blanco, con su propio activo. */
   logo: Uint8Array | null;
+  /** Logo de la Fundació Espigoladors (solo el CD). Opcional: sin él, el CD sale sin logo. */
+  logoEspigoladors?: Uint8Array | null;
 }
 
 export interface Fuentes {
@@ -82,13 +90,15 @@ export interface Fuentes {
  * las peticiones siguientes reutilizan los mismos bytes (son inmutables: nadie los
  * escribe, solo se pasan a `embedFont`, que copia).
  */
-/** Los cinco activos de un PDF, en base64. Los sirve el módulo generado de la función. */
+/** Los activos de un PDF, en base64. Los sirve el módulo generado de la función. */
 export interface ActivosBase64 {
   titulo: string;
   tituloFuerte: string;
   cuerpo: string;
   cuerpoFuerte: string;
   logo: string;
+  /** Opcional: un `incrustats.ts` generado antes del 05-11-2026 no lo trae. */
+  logoEspigoladors?: string;
 }
 
 /**
@@ -126,6 +136,7 @@ export function cargarActivos(b64: ActivosBase64): BytesActivos {
     cuerpoFuerte: deBase64(b64.cuerpoFuerte),
     // El logo es opcional: un documento sin logo es feo, uno que no se genera es un fallo.
     logo: b64.logo ? deBase64(b64.logo) : null,
+    logoEspigoladors: b64.logoEspigoladors ? deBase64(b64.logoEspigoladors) : null,
   };
   return cache;
 }
@@ -154,4 +165,17 @@ export async function embeberLogo(
 ): Promise<PDFImage | null> {
   if (!activos.logo) return null;
   return await doc.embedPng(activos.logo);
+}
+
+/**
+ * Embebe el logo de la Fundació Espigoladors (el membrete del certificado de donación).
+ * `null` si no está: el CD no cae al logo de Redestina, porque el modelo es el papel de la
+ * Fundació y otro logo en su lugar sería peor que ninguno.
+ */
+export async function embeberLogoEspigoladors(
+  doc: PDFDocument,
+  activos: BytesActivos,
+): Promise<PDFImage | null> {
+  if (!activos.logoEspigoladors) return null;
+  return await doc.embedPng(activos.logoEspigoladors);
 }

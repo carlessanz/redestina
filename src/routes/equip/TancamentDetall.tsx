@@ -11,11 +11,14 @@
 // en rojo con su detalle («3 canalitzacions sense conciliar (412.0 kg)»); los que solo
 // avisan, en ámbar. La diferencia la decide el dato (`bloqueja`), no un criterio de aquí.
 //
-// Y LOS DOS CERTIFICADOS. El de donación (CD) arriba, con su resumen, su factura y el 182;
-// el de transacción (CT, venta y maquila) en su propia tarjeta debajo, porque no tiene
-// nada de eso: ni importes, ni resumen, ni factura, ni 182. Los dos viven en
-// `cierres_donante` (`tipo`), y por eso cada tabla filtra el suyo: mezclarlos haría que los
-// botones de una fila llamaran a las RPC del otro, que responden `22023`.
+// SOLO EL CERTIFICADO DE DONACIÓN (CD). El de transacción (CT, venta y maquila) se retiró el
+// 05-11-2026 (`20270509100400`): `calcular_cierre()` ya no crea filas `transaccio` y sus RPC
+// responden `22023 certificat_transaccio_retirat`. Los CT ya emitidos se conservan y se
+// descargan desde «Documents» y desde el panel del ofertante; aquí ya no tienen tarjeta.
+//
+// LA FECHA DE EXPEDICIÓN. Emitir (uno o todos) pide antes la fecha que imprimirá el
+// certificado —por defecto el 31-12 del ejercicio— y si lleva el anexo por producto
+// (`DialegExpedicio`).
 //
 // Y EL MODO. Un cierre de prueba tiene su propia serie (`P-RES`, `P-CD`), su marca de agua
 // y sus destinatarios, y se puede reiniciar entero. Confundirlo con el real sería emitir
@@ -39,8 +42,7 @@ import { kg } from '../../lib/albarans'
 import {
   bloqueja, calcularTancament, compararTancamentProva, tancarTancament, csv182, dades182,
   dataTancament, descarregarText, emetreCertificat, emetreCertificatsTancament, emetreResum,
-  emetreCertificatTransaccio, emetreCertificatsTransaccioTancament, estilEstatDonant,
-  rectificarCertificatTransaccio,
+  estilEstatDonant,
   estilEstatTancament, euros, marcarDeclarat, marcarEnviat, rectificarCertificat,
   registrarFactura, reiniciarTancamentProva, simularFactura,
 } from '../../lib/tancament'
@@ -62,6 +64,7 @@ import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canali
 import { BadgeMode } from './Tancament'
 import DialegAssistit from '../../components/equip/DialegAssistit'
 import Bloquejos from '../../components/equip/Bloquejos'
+import DialegExpedicio from '../../components/equip/DialegExpedicio'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -88,20 +91,8 @@ type Donant = Pick<
   | 'requiere_llamada' | 'rectificaciones' | 'enviado_at'
 > & { revisio_estat: string | null; revisio_nota: string | null }
 
-/** Una fila `transaccio` de `cierres_donante`: el CT de un generador. Sin importes. */
-type Generador = Pick<
-  CierreDonante,
-  | 'id' | 'productor_id' | 'datos_fiscales' | 'kg_total' | 'estado' | 'bloqueos'
-  | 'certificado_numero' | 'certificado_at' | 'rectificaciones' | 'enviado_at'
->
-
-/**
- * El resultado de una emisión en bloque, CD o CT, con la misma forma: así un solo panel
- * pinta los dos y no pueden acabar contando lo mismo de dos maneras.
- */
+/** El resultado de una emisión en bloque de los certificados de donación. */
 interface ResultatEmissio {
-  /** `cd` = certificados de donación · `ct` = de transacción. */
-  quins: 'cd' | 'ct'
   emesos: number
   ja_tenien: number
   saltats: { cd: string; nom: string | null; codi: 'bloquejat' | 'sense_kg' | 'error'; motiu: string }[]
@@ -273,7 +264,6 @@ export default function TancamentDetall() {
 
   const [cap, setCap] = useState<Capcalera | null>(null)
   const [donants, setDonants] = useState<Donant[]>([])
-  const [generadors, setGeneradors] = useState<Generador[]>([])
   const [docs, setDocs] = useState<DocFila[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -287,7 +277,8 @@ export default function TancamentDetall() {
   const [simula, setSimula] = useState<Donant | null>(null)
   const [rectifica, setRectifica] = useState<Donant | null>(null)
   const [revisa, setRevisa] = useState<Donant | null>(null)
-  const [rectificaCt, setRectificaCt] = useState<Generador | null>(null)
+  // Antes de emitir: la fecha de expedición y el anexo. `'tots'` = la tanda del cierre.
+  const [expedicio, setExpedicio] = useState<Donant | 'tots' | null>(null)
   const [reinici, setReinici] = useState(false)
 
   // Informe de comparación (solo cierres de prueba).
@@ -303,11 +294,8 @@ export default function TancamentDetall() {
       .maybeSingle()
     if (errCap) return { errCap }
 
-    // ⚠️ `.eq('tipo', 'donacio')` no es un adorno. Desde que existe el certificado de
-    // transacción, esta tabla guarda los dos acumulados; sin el filtro, las filas
-    // `transaccio` salían mezcladas con las de donación y sus botones llamaban a las RPC de
-    // donación, que responden `22023` por el trigger guardián. Los CT se piden aparte, con
-    // sus propias columnas, y se pintan en su propia tarjeta.
+    // ⚠️ `.eq('tipo', 'donacio')` no es un adorno: la tabla conserva las filas `transaccio`
+    // de los CT ya emitidos (retirados el 05-11-2026), y sus botones no son estos.
     const { data: donData } = await supabase
       .from('cierres_donante')
       .select('id, productor_id, datos_fiscales, kg_total, valor_total, estado, bloqueos, resumen_numero, certificado_numero, certificado_at, factura_numero, factura_fecha, factura_importe, excepcion_sin_factura, excepcion_motivo, recordatorios, requiere_llamada, rectificaciones, enviado_at, revisio_estat, revisio_nota')
@@ -316,19 +304,9 @@ export default function TancamentDetall() {
 
     const llista = (donData as Donant[] | null) ?? []
 
-    // Los CT: venta y maquila. Sin importes, ni resumen, ni factura (§4 «Cierre anual»).
-    const { data: genData } = await supabase
-      .from('cierres_donante')
-      .select('id, productor_id, datos_fiscales, kg_total, estado, bloqueos, certificado_numero, certificado_at, rectificaciones, enviado_at')
-      .eq('cierre_id', id)
-      .eq('tipo', 'transaccio')
-
-    const llistaGen = (genData as Generador[] | null) ?? []
-
     // Los documentos se piden por los ids que hay en pantalla, no por la tabla entera
-    // (§12.5). `documentos` es polimórfica y no tiene FK, así que no se puede embeber. Los
-    // del CT cuelgan del mismo `objeto_tipo` que los del CD: la fila es de la misma tabla.
-    const ids = [...llista.map((d) => d.id), ...llistaGen.map((g) => g.id)]
+    // (§12.5). `documentos` es polimórfica y no tiene FK, así que no se puede embeber.
+    const ids = llista.map((d) => d.id)
     const { data: docData } = ids.length
       ? await supabase
         .from('documentos')
@@ -341,7 +319,6 @@ export default function TancamentDetall() {
     return {
       cap: (capData as Capcalera | null) ?? null,
       donants: llista,
-      generadors: llistaGen,
       docs: (docData as DocFila[] | null) ?? [],
       errCap: null,
     }
@@ -352,7 +329,6 @@ export default function TancamentDetall() {
     if (r.errCap) { setError(r.errCap.message); return }
     setCap(r.cap ?? null)
     setDonants(r.donants ?? [])
-    setGeneradors(r.generadors ?? [])
     setDocs(r.docs ?? [])
   }, [carrega])
 
@@ -364,8 +340,7 @@ export default function TancamentDetall() {
       if (r.errCap) { setError(r.errCap.message); setCarregant(false); return }
       setCap(r.cap ?? null)
       setDonants(r.donants ?? [])
-      setGeneradors(r.generadors ?? [])
-      setDocs(r.docs ?? [])
+        setDocs(r.docs ?? [])
       setCarregant(false)
     })()
     return () => { viu = false }
@@ -417,23 +392,6 @@ export default function TancamentDetall() {
     { kg: 0, valor: 0, bloquejats: 0, certificats: 0, pendentsCert: 0 },
   ), [donants])
 
-  /**
-   * Lo mismo para los CT. `pendents` es el criterio EXACTO de
-   * `emitir_certificados_transaccion_cierre()` —sin número, sin bloqueo y con kilos; el
-   * valor no cuenta, porque el CT no lleva importe—, para que la cifra del botón cuadre
-   * con lo que la base emitirá.
-   */
-  const totalsCt = useMemo(() => generadors.reduce(
-    (acc, g) => ({
-      kg: acc.kg + Number(g.kg_total ?? 0),
-      bloquejats: acc.bloquejats + (bloqueja(g.bloqueos) ? 1 : 0),
-      certificats: acc.certificats + (g.certificado_numero ? 1 : 0),
-      pendents: acc.pendents
-        + (!g.certificado_numero && !bloqueja(g.bloqueos) && Number(g.kg_total ?? 0) > 0 ? 1 : 0),
-    }),
-    { kg: 0, bloquejats: 0, certificats: 0, pendents: 0 },
-  ), [generadors])
-
   const esProva = cap?.modo === 'prueba'
   const editable = cap?.estado === 'obert' || cap?.estado === 'provisional'
 
@@ -478,14 +436,6 @@ export default function TancamentDetall() {
       ? t('tan.why_provisional')
       : totals.pendentsCert === 0 ? t('tan.why_no_cert_candidates') : undefined
 
-  /** El mismo orden para la tanda de CT, con el rol delante: los CT van siempre visibles. */
-  const motiuCtTots = !potAprovar
-    ? t('tan.ct_need_approver')
-    : cap?.estado !== 'tancat'
-      ? t('tan.why_close_first')
-      : bloquejaProvisionals(provisionals, cap?.modo)
-        ? t('tan.why_provisional')
-        : totalsCt.pendents === 0 ? t('tan.ct_why_no_candidates') : undefined
   // 🔴 «Marca com a declarat» estaba habilitado con el ejercicio abierto: se podía dar por
   // presentado ante Hacienda un cierre que ni siquiera se había calculado. La base lo
   // rechazaba, pero el botón no lo decía. Declarar es lo último del circuito, después de
@@ -502,10 +452,7 @@ export default function TancamentDetall() {
     const res = await calcularTancament(id)
     setOcupat(false)
     if (!res.ok) { toast.error(textError(t, res)); return }
-    const ct = res.data.transaccions
-    toast.success(ct && ct.generadors > 0
-      ? `${t('tan.calculated', { n: res.data.donants, kg: kg(res.data.kg_total), b: res.data.bloquejats })} ${t('tan.calculated_ct', { n: ct.generadors, kg: kg(ct.kg_total), b: ct.bloquejats })}`
-      : t('tan.calculated', { n: res.data.donants, kg: kg(res.data.kg_total), b: res.data.bloquejats }))
+    toast.success(t('tan.calculated', { n: res.data.donants, kg: kg(res.data.kg_total), b: res.data.bloquejats }))
     void refrescaComptadors()
     await refresca()
   }
@@ -714,21 +661,14 @@ export default function TancamentDetall() {
    * Los saltados NO son un fallo: son donantes que la base ha dejado fuera por bloqueo o
    * por no tener kilos, y vienen con su motivo para poder enseñarlos uno a uno.
    */
-  async function certificatsTots() {
+  async function certificatsTots(dataExpedicio: string, annex: boolean) {
     if (!id) return
-    const ok = await confirma({
-      titol: t('tan.certs_confirm_t', { n: totals.pendentsCert }),
-      descripcio: t('tan.certs_confirm', { serie: esProva ? 'P-CD' : 'CD' }),
-      confirmar: t('tan.a_certificates_all'),
-      destructiu: !esProva,
-    })
-    if (!ok) return
     setOcupat(true)
-    const res = await emetreCertificatsTancament(id)
+    const res = await emetreCertificatsTancament(id, { dataExpedicio, annex })
     setOcupat(false)
+    setExpedicio(null)
     if (!res.ok) { toast.error(textError(t, res)); return }
     setResultatMassiu({
-      quins: 'cd',
       emesos: res.data.emesos,
       ja_tenien: res.data.ja_tenien,
       saltats: res.data.saltats.map((x) => ({ cd: x.cd, nom: x.donant, codi: x.codi, motiu: x.motiu })),
@@ -741,10 +681,11 @@ export default function TancamentDetall() {
     await refresca()
   }
 
-  async function certificat(d: Donant) {
+  async function certificat(d: Donant, dataExpedicio: string, annex: boolean) {
     setOcupat(true)
-    const res = await emetreCertificat(d.id)
+    const res = await emetreCertificat(d.id, { dataExpedicio, annex })
     setOcupat(false)
+    setExpedicio(null)
     if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.cert_done', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
@@ -771,68 +712,6 @@ export default function TancamentDetall() {
     const res = await rectificarCertificat(rectifica.id, motiu)
     setOcupat(false)
     setRectifica(null)
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    toast.success(t('tan.cert_rectified', { num: res.data.numero ?? '' }))
-    void refrescaComptadors()
-    await refresca()
-  }
-
-  // --- Acciones del certificado de transacción (CT) ------------------------
-
-  /**
-   * Todos los CT del cierre. Mismo patrón que `certificatsTots()`: botón aparte de cerrar,
-   * confirmación que dice la serie, y los saltados uno a uno con su motivo.
-   */
-  async function certificatsCtTots() {
-    if (!id) return
-    const ok = await confirma({
-      titol: t('tan.ct_certs_confirm_t', { n: totalsCt.pendents }),
-      descripcio: t('tan.ct_certs_confirm', { serie: esProva ? 'P-CT' : 'CT' }),
-      confirmar: t('tan.ct_a_all'),
-      destructiu: !esProva,
-    })
-    if (!ok) return
-    setOcupat(true)
-    const res = await emetreCertificatsTransaccioTancament(id)
-    setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    setResultatMassiu({
-      quins: 'ct',
-      emesos: res.data.emesos,
-      ja_tenien: res.data.ja_tenien,
-      saltats: res.data.saltats.map((x) => ({ cd: x.cd, nom: x.generador, codi: x.codi, motiu: x.motiu })),
-    })
-    const text = t('tan.ct_certs_done', { n: res.data.emesos, m: res.data.saltats.length })
-    if (res.data.emesos > 0) toast.success(text)
-    else toast.warning(text)
-    void refrescaComptadors()
-    await refresca()
-  }
-
-  /** El CT de un generador. Consume un número de serie y sale por correo: se pregunta antes. */
-  async function certificatCt(g: Generador) {
-    const ok = await confirma({
-      titol: t('tan.ct_confirm_t', { nom: nom(g) }),
-      descripcio: t('tan.ct_confirm', { serie: esProva ? 'P-CT' : 'CT' }),
-      confirmar: t('tan.ct_a_emit'),
-      destructiu: !esProva,
-    })
-    if (!ok) return
-    setOcupat(true)
-    const res = await emetreCertificatTransaccio(g.id)
-    setOcupat(false)
-    if (!res.ok) { toast.error(textError(t, res)); return }
-    toast.success(t('tan.cert_done', { num: res.data.numero ?? '' }))
-    void refrescaComptadors()
-    await refresca()
-  }
-
-  async function rectificaCertificatCt(motiu: string) {
-    if (!rectificaCt) return
-    setOcupat(true)
-    const res = await rectificarCertificatTransaccio(rectificaCt.id, motiu)
-    setOcupat(false)
-    setRectificaCt(null)
     if (!res.ok) { toast.error(textError(t, res)); return }
     toast.success(t('tan.cert_rectified', { num: res.data.numero ?? '' }))
     void refrescaComptadors()
@@ -941,7 +820,7 @@ export default function TancamentDetall() {
                     || bloquejaProvisionals(provisionals, cap?.modo)
                     || totals.pendentsCert === 0}
                   motiu={motiuCertificatsTots}
-                  onClick={() => void certificatsTots()}
+                  onClick={() => setExpedicio('tots')}
                 >
                   {t('tan.a_certificates_all')}
                 </BotoAmbMotiu>
@@ -1029,7 +908,7 @@ export default function TancamentDetall() {
                     onFactura={() => setFactura(d)}
                     onFacturaAssistida={() => setFacturaAssistida(d)}
                     onSimula={() => setSimula(d)}
-                    onCertificat={() => void certificat(d)}
+                    onCertificat={() => setExpedicio(d)}
                     onRectifica={() => setRectifica(d)}
                     onEnviat={() => void enviat(d)}
                     esSuperAdmin={esSuperAdmin}
@@ -1038,81 +917,6 @@ export default function TancamentDetall() {
                 ))}
               </TableBody>
             </Table>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* --- Certificats de transacció (venta y maquila) --- */}
-      <Card>
-        <CardHeader>
-          <div className="flex flex-wrap items-start justify-between gap-2">
-            <div className="min-w-0 flex-1">
-              <CardTitle className="text-base">{t('tan.ct_title')}</CardTitle>
-              <p className="mt-1 text-sm text-muted-foreground">{t('tan.ct_hint')}</p>
-            </div>
-            {/* Siempre visible: a quien no puede aprobar se le deja gris CON el motivo, no
-                se le esconde (§6ter). `w-full sm:w-auto`: con `shrink-0` de serie, el
-                `whitespace-normal` solo no basta en móvil (§2, regla 2). */}
-            <BotoAmbMotiu
-              className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-              disabled={ocupat || motiuCtTots !== undefined}
-              motiu={motiuCtTots}
-              onClick={() => void certificatsCtTots()}
-            >
-              {t('tan.ct_a_all')}
-            </BotoAmbMotiu>
-          </div>
-          {/* El motivo también escrito: en táctil no hay tooltip. */}
-          {motiuCtTots && generadors.length > 0 && (
-            <p className="mt-1 text-xs text-muted-foreground">{motiuCtTots}</p>
-          )}
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {generadors.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('tan.ct_none')}</p>
-          ) : (
-            <>
-              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                <Dada etiqueta={t('tan.ct_c_generators')} valor={String(generadors.length)} />
-                <Dada etiqueta={t('tan.c_kg')} valor={kg(totalsCt.kg)} />
-                <Dada etiqueta={t('tan.c_certs')} valor={String(totalsCt.certificats)} />
-                <Dada etiqueta={t('tan.c_blocked')} valor={String(totalsCt.bloquejats)} />
-              </div>
-              {/* Criterio de las tablas (§2): en móvil, generador, quilos y acciones; estado
-                  en `md`, documentos en `lg`, bloqueos en `xl`, y hasta entonces debajo del
-                  nombre. */}
-              <Table>
-                <TableHeader>
-                  <TableRow>
-                    <TableHead>{t('tan.ct_c_generator')}</TableHead>
-                    <TableHead>{t('tan.c_kg')}</TableHead>
-                    <TableHead className="hidden md:table-cell">{t('tan.c_status')}</TableHead>
-                    <TableHead className="hidden xl:table-cell">{t('tan.c_blocks')}</TableHead>
-                    <TableHead className="hidden lg:table-cell">{t('tan.c_docs')}</TableHead>
-                    <TableHead>{t('doc.c_actions')}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {generadors.map((g) => (
-                    <FilaGenerador
-                      key={g.id}
-                      g={g}
-                      docs={perDonant[g.id] ?? []}
-                      esProva={esProva}
-                      provisionals={provisionals}
-                      potAprovar={potAprovar}
-                      ocupat={ocupat}
-                      descarregant={descarregador.ocupat}
-                      generant={descarregador.generant}
-                      onDescarrega={(docId) => void descarregador.descarrega(docId)}
-                      onMostra={(docId) => void descarregador.mostra(docId)}
-                      onCertificat={() => void certificatCt(g)}
-                      onRectifica={() => setRectificaCt(g)}
-                    />
-                  ))}
-                </TableBody>
-              </Table>
-            </>
           )}
         </CardContent>
       </Card>
@@ -1254,15 +1058,24 @@ export default function TancamentDetall() {
         onConfirma={(nota) => { if (revisa) void aprovaEnNom(revisa, nota) }}
       />
 
-      <DialegMotiu
-        obert={rectificaCt !== null}
-        onObert={(v) => { if (!v) setRectificaCt(null) }}
-        titol={t('tan.ct_rect_title')}
-        descripcio={t('tan.ct_rect_desc')}
-        etiqueta={t('tan.f_rect_reason')}
-        confirmar={t('tan.rect_do')}
+      {/* Antes de emitir, uno o todos: la fecha de expedición y el anexo. */}
+      <DialegExpedicio
+        obert={expedicio !== null}
+        onObert={(v) => { if (!v) setExpedicio(null) }}
+        titol={expedicio === 'tots'
+          ? t('tan.certs_confirm_t', { n: totals.pendentsCert })
+          : t('tan.cert_confirm_t', { nom: expedicio ? nom(expedicio) : '' })}
+        descripcio={expedicio === 'tots'
+          ? t('tan.certs_confirm', { serie: esProva ? 'P-CD' : 'CD' })
+          : t('cdp.confirm', { serie: esProva ? 'P-CD' : 'CD' })}
+        confirmar={t(expedicio === 'tots' ? 'tan.a_certificates_all' : esProva ? 'tan.a_certificate' : 'tan.a_sign_emit')}
+        exercici={cap.ejercicio}
+        mode={cap.modo}
         ocupat={ocupat}
-        onConfirma={(motiu) => void rectificaCertificatCt(motiu)}
+        onConfirma={(data, annex) => {
+          if (expedicio === 'tots') void certificatsTots(data, annex)
+          else if (expedicio) void certificat(expedicio, data, annex)
+        }}
       />
 
       <DialegMotiu
@@ -1492,7 +1305,7 @@ function FilaDonant({
                 icona={Check}
                 etiqueta={t('tan.a_rev_equip')}
                 disabled={ocupat || !potAprovar}
-                motiu={potAprovar ? undefined : t('tan.ct_need_approver')}
+                motiu={potAprovar ? undefined : t('fit.cert_readonly')}
                 onClick={onRevisa}
               />
             )}
@@ -1533,8 +1346,7 @@ function FilaDonant({
 }
 
 /**
- * Los documentos vigentes de una fila: «Veure» y la descarga con el número. Lo comparten el
- * donante y el generador, así que un CT se abre exactamente igual que un CD (por
+ * Los documentos vigentes de un donante: «Veure» y la descarga con el número (por
  * `descargar-documento`, URL firmada de 60 s).
  */
 function BotonsDocuments({
@@ -1584,7 +1396,7 @@ function BotonsDocuments({
 }
 
 /**
- * El resultado de la última emisión en bloque, de CD o de CT.
+ * El resultado de la última emisión en bloque.
  *
  * Se enseña ENTERO —emitidos, los que ya lo tenían y cada saltado con su motivo— porque un
  * «3 emesos» a secas deja sin saber qué pasó con los otros dos, y esos dos son justo los
@@ -1592,19 +1404,18 @@ function BotonsDocuments({
  */
 function PanellResultat({ resultat, onTanca }: { resultat: ResultatEmissio; onTanca: () => void }) {
   const { t } = useT()
-  const ct = resultat.quins === 'ct'
   return (
     <div className="rounded-md border bg-card p-3">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="font-titulos text-sm font-semibold">
-          {t(ct ? 'tan.ct_certs_result' : 'tan.certs_result')}
+          {t('tan.certs_result')}
         </p>
         <Button size="sm" variant="ghost" className="h-11 whitespace-normal md:h-8" onClick={onTanca}>
           {t('c.close')}
         </Button>
       </div>
       <p className="mt-1 text-sm text-exito">
-        {t(ct ? 'tan.ct_certs_done' : 'tan.certs_done', {
+        {t('tan.certs_done', {
           n: resultat.emesos, m: resultat.saltats.length,
         })}
       </p>
@@ -1625,111 +1436,5 @@ function PanellResultat({ resultat, onTanca }: { resultat: ResultatEmissio; onTa
         </ul>
       )}
     </div>
-  )
-}
-
-/**
- * Un generador con certificado de transacción.
- *
- * ⚠️ Los botones salen SIEMPRE, también para quien no puede aprobar: grises y con el
- * motivo (§6ter). La fila del donante los esconde; esta es nueva y sigue la regla de ahora.
- */
-function FilaGenerador({
-  g, docs, esProva, provisionals, potAprovar, ocupat, descarregant, generant,
-  onDescarrega, onMostra, onCertificat, onRectifica,
-}: {
-  g: Generador
-  docs: DocFila[]
-  esProva: boolean
-  provisionals: boolean
-  potAprovar: boolean
-  ocupat: boolean
-  descarregant: string | null
-  generant: string | null
-  onDescarrega: (docId: string) => void
-  onMostra: (docId: string) => void
-  onCertificat: () => void
-  onRectifica: () => void
-}) {
-  const { t } = useT()
-  const bloquejat = bloqueja(g.bloqueos)
-  const teCertificat = g.certificado_numero !== null
-  const provisionalsBloquegen = bloquejaProvisionals(provisionals, esProva ? 'prueba' : 'real')
-
-  // En el orden en que frena la base (`emitir_certificado_transaccion`): rol, datos de la
-  // Fundación (solo en real), bloqueos, quilos.
-  const motiuEmetre = !potAprovar
-    ? t('tan.ct_need_approver')
-    : provisionalsBloquegen
-      ? t('tan.why_provisional')
-      : bloquejat
-        ? t('tan.why_blocked')
-        : Number(g.kg_total) <= 0 ? t('tan.ct_why_no_kg') : undefined
-  const motiuRectificar = !potAprovar
-    ? t('tan.ct_need_approver')
-    : provisionalsBloquegen ? t('tan.why_provisional') : undefined
-
-  const toca = teCertificat
-    ? 'tan.ct_next_done'
-    : bloquejat ? 'tan.ct_next_blocked' : 'tan.ct_next_emit'
-
-  // Lo mismo que en la fila del donante: cada pieza en su columna cuando cabe y, hasta
-  // entonces, debajo del nombre (criterio de las tablas, §2).
-  const estat = (
-    <>
-      <Badge className={estilEstatDonant(g.estado)}>{t(`tan.ds_${g.estado}`)}</Badge>
-      {teCertificat && (
-        <p className="mt-1 text-xs tabular-nums">{g.certificado_numero}</p>
-      )}
-      <p className="mt-1 text-xs text-muted-foreground">{t(toca)}</p>
-    </>
-  )
-  const documents = (
-    <BotonsDocuments
-      docs={docs} descarregant={descarregant} generant={generant}
-      onDescarrega={onDescarrega} onMostra={onMostra}
-    />
-  )
-
-  return (
-    <TableRow>
-      <TableCell>
-        <p className="font-medium">{nom(g)}</p>
-        <p className="text-xs text-muted-foreground tabular-nums">{nif(g)}</p>
-        <div className="mt-2 md:hidden">{estat}</div>
-        {(g.bloqueos ?? []).length > 0 && (
-          <div className="mt-2 xl:hidden"><Bloquejos llista={g.bloqueos ?? []} /></div>
-        )}
-        {docs.some((doc) => doc.vigente) && <div className="mt-2 lg:hidden">{documents}</div>}
-      </TableCell>
-      <TableCell className="text-center tabular-nums whitespace-nowrap">{kg(g.kg_total)}</TableCell>
-      <TableCell className="hidden max-w-52 md:table-cell">{estat}</TableCell>
-      <TableCell className="hidden xl:table-cell"><Bloquejos llista={g.bloqueos ?? []} /></TableCell>
-      <TableCell className="hidden lg:table-cell">{documents}</TableCell>
-      <TableCell>
-        <div className="flex flex-col items-center justify-center gap-1 md:flex-row">
-          {!teCertificat && (
-            // La etiqueta corta, como la del donante: la tarjeta ya dice que es el CT.
-            <BotoIcona
-              icona={FileCheck}
-              etiqueta={t('tan.a_certificate')}
-              variant="default"
-              disabled={ocupat || motiuEmetre !== undefined}
-              motiu={motiuEmetre}
-              onClick={onCertificat}
-            />
-          )}
-          {teCertificat && (
-            <BotoIcona
-              icona={RotateCcw}
-              etiqueta={t('tan.a_rectify')}
-              disabled={ocupat || motiuRectificar !== undefined}
-              motiu={motiuRectificar}
-              onClick={onRectifica}
-            />
-          )}
-        </div>
-      </TableCell>
-    </TableRow>
   )
 }

@@ -6,7 +6,7 @@
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **87** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
+Las **89** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026; la 85 y la 139, el 05-11-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -115,3 +115,5 @@ se va solo **cómo se llegó hasta aquí**.
 | 150 | El equipo podía insertar fichas directo por REST (políticas `alta intern`) y saltarse las reglas de `crear_entitat()`: una ficha activa sin NIF | `20270501400000` |
 | 144 | El trigger del NIF hacía fallar las filas de la importación masiva con un NIF mal escrito o repetido | 02-11-2026 (`import-ara-2026.ts`, 1E) |
 | 142 | Los consentimientos RGPD no tenían exportación ni forma de pedirse a quien no se registró | `20270506100000` (export en «Entitats», petición por correo desde la ficha) |
+| 139 | El REC de una oferta mixta (donación y venta) se repartía solo entre las donaciones e inflaba el certificado | `20270509100000` + `20270509100700` (05-11-2026) |
+| 85 | El CT no tenía prueba end-to-end | 05-11-2026: el CT se retiró (`20270509100400`) |

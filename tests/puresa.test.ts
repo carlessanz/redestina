@@ -27,6 +27,7 @@ const HOJA = [
   'correu-document',
   'modalitats',
   'franja',
+  'certificatDonacio',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

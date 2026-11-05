@@ -64,7 +64,7 @@ comercial, maquila, espigueo, diagnóstico/prevención). Flujo core: registrar �
 publicar → match asistido → recogida → albaranes → conciliación → certificados.
 
 Construido ✅: usuario/membresías, convenios con firma por enlace, excedentes, canalizaciones
-con conciliación, albaranes REC/ENT/OPE sin huecos, documentos externos, certificados CD/CT/CR,
+con conciliación, albaranes REC/ENT/OPE sin huecos, documentos externos, certificados CD/CR,
 roles y RLS, registro self-service validado, i18n ca/es, responsive, comunicación WhatsApp+correo,
 coste por kilo, PWA. Parcial 🟡: organización multirol (`organizaciones` es identidad común;
 faltan `usuario`/`rol_organizacion` propios y campos propios), `interes`, `sugerencia_match` (no
@@ -114,7 +114,8 @@ Reglas: **ningún hex ni clase de la paleta genérica de Tailwind**; solo las cl
 `error` y sus `-fondo`, `chart-1…5`, `font-titulos`, `text-nav` solo para la barra inferior).
 `accent` no es el coral; el error es rojo; títulos en Sora; nombres de shadcn no se renombran;
 `index.css` se deriva a mano de `tokens.json` (y los colores del correo viven en
-`_shared/resend.ts`). Logo en seis variantes en `public/`; `logo-email.png` es el logo en color
+`_shared/resend.ts`). Logo en seis variantes en `public/` (y el de la Fundació, `logo-espigoladors.svg`, que lleva el
+CD); `logo-email.png` es el logo en color
 (cabecera de correo clara); el sello `segell-redestina.svg` va sin texto. Ningún control de
 formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
 `<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
@@ -225,11 +226,15 @@ ficha, evidencias de expediente). **Convenios** (`convenios`: tipos `col_product
 `col_receptor` desde el 11-10-2026, los anteriores `don_gen`/`don_rec`/`com` valen por
 equivalencia; `origen` plataforma · paper · **declarat**; uno vigente por tipo; número al
 firmar; `convenio_vigente()`/`exigir_convenio()`; **fecha de corte encendida** desde el
-16-09-2026: sin convenio no se publica ni se muestra interés). **Cierre anual** (`cierres_ejercicio`,
-`cierres_donante` tipo donacio/transaccio con `revisio_estat`, `cierre_donante_lineas`;
-`P-*` en prueba; `datos_182()`), **certificado a demanda** (`cierres_periodo`, serie `CDP`),
-**certificado de recepción** (`cierres_receptor`, serie `CR`, sin importes, D3 por CHECK). La
-factura ya no condiciona el certificado (21-09-2026); el anual sustituye a los parciales.
+16-09-2026: sin convenio no se publica ni se muestra interés). **Certificado de donación** (05-11-2026, modelo Tabaquet; detalle en §4 del fichero):
+🔴 **certificable = donación conciliada a entidad `social`** (`motiu_exclusio_certificat()`, único
+criterio; lo demás, en `cierre_exclosos_periodo`); el REC se reparte en proporción entre todas las
+conciliadas y luego se descarta lo no certificable. Tres ámbitos: **ejercicio** (`cierres_ejercicio`,
+`cierres_donante`, `revisio_estat`, `P-*` en prueba, `datos_182()` solo donación), **intervalo** y
+**oferta** (`cierres_periodo`, serie `CDP`, `abast`, `excedente_id`); `data_expedicio` y `annex` en la
+fila. Plantilla `CD`/`CD parcial` del modelo; el anual sustituye a los parciales; la factura es
+opcional. **CT retirado** (lo emitido se conserva). **Certificado de recepción** (`cierres_receptor`,
+serie `CR`, sin importes, D3 por CHECK).
 **Diagnóstico y plan**: `questionaris_diagnostic` (v2 productor; receptor retirado),
 `mesures_prevencio`, `regles_pla`, `planes_prevencion` (sobre autocontenido),
 `diagnostics_historial`, y el **expediente** `expedients_prevencion` + 7 hijas. Impacto:
@@ -371,8 +376,11 @@ Lo que manda hoy, en una línea cada uno:
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
-- **Certificado revisado antes de firmarse** (`revisio_estat`; en real exige revisión y
-  super_admin). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
+- **Certificat de donació** (05-11-2026): `DialegCertificatDonacio`, solo super_admin, desde la
+  ficha › Certificats y la tarjeta de `/equip/ofertes/:id`: ámbito Oferta · Interval · Exercici
+  (`ABASTS_DIALEG`, pendiente del cliente, deuda 156), fecha de expedición, anexo, «Excloses», revisión
+  (en real, obligatoria y super_admin) y Veure/Descarrega/«Envia per correu» manual. El ofertante, en
+  «Els meus certificats» y en su oferta (los `prueba` no los ve nadie de fuera). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
   `BarraFiltres`). Ficha de la organización con listas cerradas, `tipus_activitat`, contactos,
   NIF válido y único, razón social obligatoria, «afegir paper». Tablero con indicadores por
   periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu v2 (ficha viva, sin
@@ -382,24 +390,14 @@ Lo que manda hoy, en una línea cada uno:
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
   **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
   `components/equip/fases/`) sobre las RPC reales (`tests/e2e/paritat-assistida.e2e.ts`).
-- Otros: «Productes» con icono propio y coste de referencia; espigoladas (alta manual y
-  conversión desde oferta); documentación de la organización (archivo previo, convenio en papel);
-  Els meus documents con «Pendent de tu» (firmar y confirmar desde el panel, diálogo
-  `DialegFirmaConveni`); verificación pública del sello (`/verificar/:codi`); doble rol = todos
-  los paneles en el menú, el activo se deriva de la URL, `useOrganitzacio(tipus)` y `key` por
-  tipo; vocabulario («oferta», «Coberta», «Excedents disponibles», «Entitats»/«ofertant»/
-  «receptor», «certificat d'aprofitament alimentari»); el ofertante no ve el código `E-…`.
-- **Ficha única «Entitat» (1C, D1+D8)**: `lib/campsFitxa.ts` es **la única definición de campos**
-  (tabla, bloque, quién ve y edita; `tests/campsFitxa.test.ts` lo cruza con el SQL). `EntitatDetall`
-  (`/equip/entitats/:orgId`, `ample`) pinta una ficha por organización en **seis pestañas**
-  (Dades · Contacte i accés · Operativa · Diagnòstic i perfil · Documentació por tipo · Gestió
-  interna, con el estado global y por papel; `?pestanya=`) y guarda **solo lo que cambia**. `PerfilOrganitzacio`
-  pinta los mismos bloques con `veu: tots` por sus RPC (P5), en tres pestañas. Listado `Entitats` sobre
-  `v_entitats_llistat`, **solo activas por defecto** (P10), filtro de papel por `?rol=`.
-- **«Nova entitat» en dos pasos (1B)**: `/equip/entitats/nova` (`NovaEntitat`, `lib/novaEntitat.ts`).
-  1 «Qui és?»: `cerca_entitats` al teclear → una inactiva se activa (NIF y razón social si faltan), una
-  activa abre su ficha, al que le falta un papel se le añade; 2 «És nova» → `crear_entitat()` con
-  `CLAUS_ALTA` de `campsFitxa` (paridad con el SQL en `tests/campsFitxa.test.ts`).
+- Otros: «Productes» con icono y coste de referencia; espigoladas; documentación de la organización;
+  «Pendent de tu» (`DialegFirmaConveni`); `/verificar/:codi`; doble rol = todos los paneles, el activo
+  por la URL (`useOrganitzacio(tipus)`); vocabulario en el detalle; el ofertante no ve el código `E-…`.
+- **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts` es **la única definición de campos** (paridad con
+  el SQL en `tests/campsFitxa.test.ts`); `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo
+  que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC; listado solo activas por defecto.
+- **«Nova entitat» (1B)**: `NovaEntitat`, «Qui és?» con `cerca_entitats` (activa, abre o añade papel) y
+  «És nova» → `crear_entitat()` con `CLAUS_ALTA`.
 - **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
   (`fitxa/AccesEntitat`, `lib/accesEntitat.ts`: estado, dar, reenviar y desactivar, con motivo) o con
   la casilla de «Nova entitat» (si falla, el alta se queda).
@@ -448,7 +446,7 @@ por correo (`enviar-acceso`, casilla «usuari de prova» antes).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270508100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270509100700`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -588,20 +586,20 @@ del albarán; 5 reexportar `prod_actius.csv`; 6 paso a producción de Meta; 7 ap
 aprobar; 10 **datos reales de la Fundación** en `parametros_documentales` (desde Configuració ›
 Fundació); 11 textos legales de las plantillas; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (61 vivas; la siguiente entrada nueva es la 154; los números no se renumeran ni
+**Deuda abierta (62 vivas; la siguiente entrada nueva es la 157; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
-filtran en cliente, aceptado por volumen) · **85** (prueba E2E del CT, ya posible) · **126**
+filtran en cliente, aceptado por volumen) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
 ofreciendo la factura) · **128** (canalización conciliada sin coste no se puede valorar después)
 · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code splitting,
-chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz; CT sin «enviat») ·
-**139** (verificar el REC con varias modalidades) · **140** (`borrar_ficha_completa` no conoce
+chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz) · **140** (`borrar_ficha_completa` no conoce
 los expedientes) · **143**
 (entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso) · **149**
 (dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
 · **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test)
-· **153** (el ARA 2026 no crea `productor_ubicaciones`).
+· **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
+(una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -610,17 +608,17 @@ inactiva sigue viendo las ofertas que ya se le enviaron). Resto: 4, 10, 12,
 17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
 95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
 
-**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (86
+**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (89
 cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos de app y pruebas, `lint`, `vitest run`, `deno check` de
-   scripts y funciones, `deno test` del PDF). **Referencia: 1.639 pruebas de Vitest en 71
-   ficheros (1 saltada a propósito) + 9 de Deno.**
+   scripts y funciones, `deno test` del PDF). **Referencia: 1.671 pruebas de Vitest en 73
+   ficheros (1 saltada a propósito) + 15 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 1.769/1.769 y 28 sin datos; producción 1.774/1.774 y 23
+   **Referencia: clon 1.796/1.796 y 28 sin datos; producción 1.774/1.774 y 23
    «Sin fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de
    **datos**; la cuenta `pendent-arnes` aprobada por error da cuatro FALLA de «ve 1 fila». `prueba-numeracion.ts` si
    toca la numeración.

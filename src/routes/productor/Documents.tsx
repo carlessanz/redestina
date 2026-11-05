@@ -1,6 +1,11 @@
 // Los documentos de un productor: lo que le falta hacer, sus convenios, su acumulado del
 // año, sus albaranes de recepción, sus certificados y su plan de prevención.
 //
+// «ELS MEUS CERTIFICATS» ES UNA SOLA LISTA (05-11-2026): el anual, los de un intervalo y
+// los de una oferta, cada uno con su ámbito y su periodo dicho con las mismas palabras que
+// el PDF (`textPeriodeUi`). Los certificados de transacción (CT) ya emitidos siguen ahí y se
+// descargan, pero no se emiten nuevos (retirados en `20270509100400`).
+//
 // ES LA ÚNICA PANTALLA DEL PROYECTO DONDE UNA ORGANIZACIÓN VE UN IMPORTE SUYO, y por eso
 // conviene decir de dónde sale y de dónde no. Sale de `cierres_donante`, que la RLS
 // (20261109100000) le deja leer **solo si la fila es suya**; y la fila de un cierre de
@@ -20,7 +25,7 @@
 // rol vería también los de su otra ficha, y esta pantalla es la del productor.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Award, Download, Eye, Loader2, Truck } from 'lucide-react'
+import { AlertTriangle, CalendarRange, Download, Eye, Loader2, Truck } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
@@ -29,9 +34,8 @@ import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
-import {
-  dataTancament, euros, exerciciDeNumero,
-} from '../../lib/tancament'
+import { euros, exerciciDeNumero } from '../../lib/tancament'
+import { abastPeriode, clauAbast, textExercici, textPeriodeUi } from '../../lib/certificatsDonacio'
 import type { CierreDonante, Convenio, Documento } from '../../types'
 import PendentsDeTu from '../../components/documents/PendentsDeTu'
 import RevisioCertificat from '../../components/documents/RevisioCertificat'
@@ -66,11 +70,13 @@ type ConveniFila = Pick<
   | 'enviado_at' | 'firmado_at' | 'contrafirmado_at' | 'created_at'
 >
 
-/** Una ventana de `cierres_periodo`: el certificado a demanda y sus fechas. */
+/** Una ventana de `cierres_periodo`: el certificado de un intervalo o de una oferta. */
 interface PeriodeFila {
   id: string
   periodo_desde: string
   periodo_hasta: string
+  abast: string | null
+  excedente_id: string | null
   modo: 'real' | 'prueba'
   kg_total: number | null
   valor_total: number | null
@@ -79,7 +85,7 @@ interface PeriodeFila {
 }
 
 export default function ProductorDocuments() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const org = useOrganitzacio('productor')
 
   const [donants, setDonants] = useState<Donant[]>([])
@@ -88,6 +94,8 @@ export default function ProductorDocuments() {
   const [albarans, setAlbarans] = useState<AlbaranBandeja[]>([])
   const [convenis, setConvenis] = useState<ConveniFila[]>([])
   const [periodes, setPeriodes] = useState<PeriodeFila[]>([])
+  /** El producto de cada oferta certificada: el ofertante no ve el código `E-…` (§6ter). */
+  const [productes, setProductes] = useState<Record<string, string>>({})
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
@@ -132,7 +140,7 @@ export default function ProductorDocuments() {
         : Promise.resolve({ data: [], error: null }),
       supabase
         .from('cierres_periodo')
-        .select('id, periodo_desde, periodo_hasta, modo, kg_total, valor_total, certificado_numero, revisio_estat')
+        .select('id, periodo_desde, periodo_hasta, abast, excedente_id, modo, kg_total, valor_total, certificado_numero, revisio_estat')
         .order('periodo_hasta', { ascending: false }),
     ])
     const fallada = [don, info, doc, alb, conv, per].map((r) => r.error).find((e) => e) ?? null
@@ -141,14 +149,29 @@ export default function ProductorDocuments() {
       return { error: fallada.message }
     }
 
+    // El nombre del producto de las ofertas certificadas. Sus ofertas las lee por RLS; un
+    // fallo aquí no tumba la pantalla: la fila sale sin producto.
+    const pers = (per.data as PeriodeFila[] | null) ?? []
+    const idsOferta = [...new Set(pers.map((p) => p.excedente_id).filter((x): x is string => Boolean(x)))]
+    const { data: excs } = idsOferta.length
+      ? await supabase.from('excedentes').select('id, producto, variedad').in('id', idsOferta)
+      : { data: [] }
+    const productes: Record<string, string> = {}
+    for (const e of (excs as { id: string; producto: string | null; variedad: string | null }[] | null) ?? []) {
+      productes[e.id] = [e.producto, e.variedad].filter(Boolean).join(' · ')
+    }
+
     return {
       error: null,
-      donants: (don.data as Donant[] | null) ?? [],
+      productes,
+      // Las filas `transaccio` (CT, retirado el 05-11-2026) no tienen acumulado que enseñar:
+      // su certificado emitido sale, para descargar, en «Els meus certificats».
+      donants: ((don.data as Donant[] | null) ?? []).filter((d) => d.tipo !== 'transaccio'),
       infos: (info.data as InfoTancament[] | null) ?? [],
       docs: (doc.data as DocFila[] | null) ?? [],
       albarans: (alb.data as AlbaranBandeja[] | null) ?? [],
       convenis: (conv.data as ConveniFila[] | null) ?? [],
-      periodes: (per.data as PeriodeFila[] | null) ?? [],
+      periodes: pers,
     }
   }, [orgId])
 
@@ -162,6 +185,7 @@ export default function ProductorDocuments() {
     setAlbarans(r.albarans)
     setConvenis(r.convenis)
     setPeriodes(r.periodes)
+    setProductes(r.productes)
   }, [t])
 
   const refresca = useCallback(async () => {
@@ -183,7 +207,9 @@ export default function ProductorDocuments() {
 
   const perDonant = useMemo(() => {
     const mapa: Record<string, DocFila[]> = {}
-    for (const d of docs.filter((x) => x.objeto_tipo === 'cierre_donante')) {
+    // Solo lo que no es un certificado (el resumen anual): los certificados van todos a «Els
+    // meus certificats».
+    for (const d of docs.filter((x) => x.objeto_tipo === 'cierre_donante' && x.tipo !== 'CD' && x.tipo !== 'CT')) {
       const llista = mapa[d.objeto_id] ?? []
       llista.push(d)
       mapa[d.objeto_id] = llista
@@ -223,6 +249,27 @@ export default function ProductorDocuments() {
     return mapa
   }, [periodes])
 
+  /** El ejercicio de cada fila anual, por id: el que da `info()` con lo que sí puede leer. */
+  const exerciciDe = useMemo(() => {
+    const mapa: Record<string, number | null> = {}
+    for (const d of donants) mapa[d.id] = info(d).exercici
+    return mapa
+  }, [donants, info])
+
+  /** Todos sus certificados, de cualquier ámbito (y los CT ya emitidos), más recientes primero. */
+  const certificats = useMemo(
+    () => docs.filter((d) => d.tipo === 'CT'
+      || (d.tipo === 'CD' && (d.objeto_tipo === 'cierre_donante' || d.objeto_tipo === 'cierre_periodo'))),
+    [docs],
+  )
+
+  /** Cómo se dice un periodo de `cierres_periodo`, con el producto si es de una oferta. */
+  const textDePeriode = useCallback((p: PeriodeFila) => {
+    const ab = abastPeriode(p)
+    const producte = ab === 'oferta' && p.excedente_id ? productes[p.excedente_id] : null
+    return [producte, textPeriodeUi(ab, p.periodo_desde, p.periodo_hasta, lang)].filter(Boolean).join(' · ')
+  }, [productes, lang])
+
   if (!org) return <p className="text-sm text-muted-foreground">{t('mydoc.no_org')}</p>
   if (carregant) return <CarregantSeccio />
   if (error) return <p className="text-sm text-destructive">{error}</p>
@@ -250,7 +297,7 @@ export default function ProductorDocuments() {
       {/* --- El acumulado del año --- */}
       <Card>
         <CardHeader>
-          <TitolSeccio icona={Award}>{t('mydoc.title')}</TitolSeccio>
+          <TitolSeccio icona={CalendarRange}>{t('mydoc.any_title')}</TitolSeccio>
           <p className="mt-1 text-sm text-muted-foreground">{t('mydoc.subtitle')}</p>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -266,9 +313,6 @@ export default function ProductorDocuments() {
                   <h3 className="text-base">
                     {t('mydoc.year_title', { y: exercici ?? '—' })}
                   </h3>
-                  <Badge className="bg-secondary text-secondary-foreground">
-                    {t(d.tipo === 'transaccio' ? 'mydoc.kind_tx' : 'mydoc.kind_don')}
-                  </Badge>
                   <Badge className={estilEstatPropi(d.estado)}>{t(`mydoc.st_${d.estado}`)}</Badge>
                   {prova && (
                     <Badge className="bg-aviso-fondo text-aviso whitespace-normal">
@@ -279,15 +323,10 @@ export default function ProductorDocuments() {
                 </div>
 
                 <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                  {/* Una fila de TRANSACCIÓN (venta o maquila, el CT) no lleva importe: su
-                      certificado no tiene ninguno, y «Valor de la donació: 0,00 €» afirmaba
-                      una donación que no existe. */}
-                  <Dada etiqueta={t(d.tipo === 'transaccio' ? 'mydoc.f_kg_tx' : 'mydoc.f_kg')} valor={kg(d.kg_total)} />
+                  <Dada etiqueta={t('mydoc.f_kg')} valor={kg(d.kg_total)} />
                   {/* El importe es SUYO: aquí sí, y solo aquí. */}
-                  {d.tipo !== 'transaccio' && <Dada etiqueta={t('mydoc.f_value')} valor={euros(d.valor_total)} />}
-                  {/* El CT no tiene resumen anual: no hay factura que pedir (la RPC lo niega,
-                      `20270301100100`). Un «Resum anual —» prometía un papel que no llegará. */}
-                  {d.tipo !== 'transaccio' && <Dada etiqueta={t('mydoc.f_summary')} valor={d.resumen_numero ?? '—'} />}
+                  <Dada etiqueta={t('mydoc.f_value')} valor={euros(d.valor_total)} />
+                  <Dada etiqueta={t('mydoc.f_summary')} valor={d.resumen_numero ?? '—'} />
                   <Dada etiqueta={t('mydoc.f_certificate')} valor={d.certificado_numero ?? '—'} />
                 </div>
 
@@ -297,17 +336,15 @@ export default function ProductorDocuments() {
                     subirla hacía pensar que era obligatoria. */}
                 {/* Qué toca hacer ahora, dicho con palabras y no con un estado en inglés. */}
                 <p className="mt-3 text-sm text-muted-foreground">
-                  {t(textSeguent(d))}
+                  {t(`mydoc.next_${d.estado}`)}
                 </p>
-                {/* Fase 4: revisar las cifras antes de la firma (solo donación). */}
-                {d.tipo !== 'transaccio' && (
-                  <RevisioCertificat
-                    tipus="anual" id={d.id} revisioEstat={d.revisio_estat}
-                    certificat={d.certificado_numero != null}
-                    kgTotal={d.kg_total} valorTotal={d.valor_total}
-                    quin={String(exercici ?? '')} onFet={() => void refresca()}
-                  />
-                )}
+                {/* Fase 4: revisar las cifras antes de la firma. */}
+                <RevisioCertificat
+                  tipus="anual" id={d.id} revisioEstat={d.revisio_estat}
+                  certificat={d.certificado_numero != null}
+                  kgTotal={d.kg_total} valorTotal={d.valor_total}
+                  quin={String(exercici ?? '')} onFet={() => void refresca()}
+                />
 
                 <div className="mt-3 flex flex-wrap gap-2">
                   {/* Cada documento, su pareja: mirarlo (lo frecuente) y guardarlo. El
@@ -371,36 +408,43 @@ export default function ProductorDocuments() {
             <RevisioCertificat
               tipus="periode" id={p.id} revisioEstat={p.revisio_estat} certificat={false}
               kgTotal={p.kg_total} valorTotal={p.valor_total}
-              quin={t('mydoc.cdp_period', { desde: dataTancament(p.periodo_desde), fins: dataTancament(p.periodo_hasta) })}
+              quin={textDePeriode(p)}
               onFet={() => void refresca()}
             />
           </CardContent>
         </Card>
       ))}
 
-      {/* --- Certificados a demanda: el mismo acumulado, pero de una ventana de fechas.
-              Se emiten con `tipo = 'CD'`, así que lo que los distingue del anual es el
-              objeto al que cuelgan (`cierre_periodo`), no el tipo. --- */}
-      {docsDe('cierre_periodo').length > 0 && (
-        <LlistaDocuments
-          files={docsDe('cierre_periodo')}
-          descarregador={descarregador}
-          titolKey="mydoc.cdp_title"
-          buitKey="mydoc.cdp_title"
-          extra={(d) => {
+      {/* --- «Els meus certificats»: el anual, los de intervalo y los de oferta en UNA
+              lista, cada uno con su ámbito y su periodo. Todos son `tipo = 'CD'`; lo que los
+              distingue es el objeto (`cierre_donante` = anual, `cierre_periodo` = intervalo u
+              oferta). Los CT emitidos antes de retirarse siguen aquí, solo para descargar. --- */}
+      <LlistaDocuments
+        files={certificats}
+        descarregador={descarregador}
+        titolKey="mydoc.title"
+        descKey="mydoc.certs_hint"
+        buitKey="mydoc.certs_empty"
+        extra={(d) => {
+          if (d.objeto_tipo === 'cierre_periodo') {
             const p = perPeriode[d.objeto_id]
             if (!p) return null
             return (
               <p className="text-xs">
-                {t('mydoc.cdp_period', {
-                  desde: dataTancament(p.periodo_desde),
-                  fins: dataTancament(p.periodo_hasta),
-                })}
+                <span className="font-medium">{t(clauAbast(abastPeriode(p)))}</span>
+                {` · ${textDePeriode(p)}`}
               </p>
             )
-          }}
-        />
-      )}
+          }
+          const y = exerciciDe[d.objeto_id] ?? d.ejercicio
+          return (
+            <p className="text-xs">
+              <span className="font-medium">{t(d.tipo === 'CT' ? 'mydoc.cert_ct' : clauAbast('exercici'))}</span>
+              {y ? ` · ${textExercici(y, lang)}` : ''}
+            </p>
+          )
+        }}
+      />
 
       {/* --- Su plan de prevención: los PDF, con el sustituido marcado, y el enlace a la
               pantalla del diagnóstico, que es donde el plan se trabaja. --- */}
@@ -438,15 +482,6 @@ function estilEstatPropi(estat: string): string {
     default:
       return 'bg-secondary text-secondary-foreground'
   }
-}
-
-/** Qué toca ahora. En venta y maquila no hay resumen ni declaración de donación, así que
-    esos dos textos, escritos para el donante, dirían algo falso. */
-function textSeguent(d: Pick<Donant, 'tipo' | 'estado'>): string {
-  if (d.tipo === 'transaccio' && (d.estado === 'calculat' || d.estado === 'declarat')) {
-    return `mydoc.next_tx_${d.estado}`
-  }
-  return `mydoc.next_${d.estado}`
 }
 
 function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {

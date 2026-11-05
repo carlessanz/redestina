@@ -12,6 +12,11 @@
 // · PLA NO: se descarga al momento desde el panel, `envio` va a null a propósito.
 // · El resumen anual NO pide la factura (decisión del 23-09-2026: el productor la gestiona
 //   con su gestor y el certificado no depende de ella, §12.127).
+// · El CD habla de su ámbito (05-11-2026): el ejercicio, el periodo o la donación de una
+//   oferta, con las fechas del snapshot (`datos`). El CT ya no se emite, pero lo emitido se
+//   puede reenviar y por eso conserva su texto.
+
+import { abastDe, dataCurta } from "./certificatDonacio.ts";
 
 export type Idioma = "ca" | "es";
 
@@ -24,6 +29,12 @@ export interface DocumentPerEnviar {
   idioma: string | null;
   modo: string | null;
   envio: { destinatario?: string | null; nombre?: string | null } | null;
+  /**
+   * El snapshot (`documentos.datos`), solo para el CD: de él salen el ámbito (`abast`) y el
+   * periodo del asunto. Opcional: sin él, el anual habla del ejercicio y el de
+   * `cierre_periodo`, del periodo sin fechas.
+   */
+  datos?: { abast?: unknown; periode?: { des_de?: unknown; fins_a?: unknown } | null } | null;
 }
 
 export interface CorreuDocument {
@@ -97,30 +108,7 @@ function textos(d: DocumentPerEnviar, l: Idioma, num: string, any: string): Text
         };
     }
     case "CD":
-      if (d.objeto_tipo === "cierre_periodo") {
-        return ca
-          ? {
-            assumpte: `Certificat de donació · ${num}`,
-            titol: "El teu certificat de donació",
-            cos: `T’adjuntem el certificat <strong>${num}</strong> de les donacions del període que ens vas demanar.`,
-          }
-          : {
-            assumpte: `Certificado de donación · ${num}`,
-            titol: "Tu certificado de donación",
-            cos: `Te adjuntamos el certificado <strong>${num}</strong> de las donaciones del periodo que nos pediste.`,
-          };
-      }
-      return ca
-        ? {
-          assumpte: `Certificat de donació ${any} · ${num}`,
-          titol: "El teu certificat de donació",
-          cos: `T’adjuntem el certificat <strong>${num}</strong> de les donacions que has fet a la Fundació Espigoladors el ${any}.`,
-        }
-        : {
-          assumpte: `Certificado de donación ${any} · ${num}`,
-          titol: "Tu certificado de donación",
-          cos: `Te adjuntamos el certificado <strong>${num}</strong> de las donaciones que has hecho a la Fundació Espigoladors en ${any}.`,
-        };
+      return textosCd(d, ca, num, any);
     case "CT":
       return ca
         ? {
@@ -147,6 +135,65 @@ function textos(d: DocumentPerEnviar, l: Idioma, num: string, any: string): Text
         };
   }
   return null;
+}
+
+/**
+ * El certificado de donación según su ámbito (05-11-2026): el del ejercicio, el de un periodo
+ * o el de una oferta. Sin mencionar el modelo 182: el certificado es lo que el donante se
+ * lleva a su declaración, y la informativa la presenta la Fundació.
+ */
+function textosCd(d: DocumentPerEnviar, ca: boolean, num: string, any: string): Textos {
+  const datos = (d.datos ?? {}) as Record<string, unknown>;
+  const abast = datos.abast === undefined && d.objeto_tipo === "cierre_periodo"
+    ? "periode"
+    : abastDe(datos);
+  const periode = d.datos?.periode ?? null;
+  const desDe = escapa(dataCurta(periode?.des_de));
+  const finsA = escapa(dataCurta(periode?.fins_a));
+  const titol = ca ? "El teu certificat de donació" : "Tu certificado de donación";
+
+  if (abast === "oferta") {
+    // Una oferta se recoge casi siempre en un día; si fueron varios, se dicen los dos.
+    const quan = desDe && finsA && desDe !== finsA
+      ? `del ${desDe} al ${finsA}`
+      : (desDe || finsA ? `del ${desDe || finsA}` : "");
+    return ca
+      ? {
+        assumpte: `Certificat de donació de la teva donació${quan ? ` ${quan}` : ""} · ${num}`,
+        titol,
+        cos: `T’adjuntem el certificat <strong>${num}</strong> de la donació${quan ? ` ${quan}` : ""} que has fet a la Fundació Espigoladors a través de Redestina.`,
+      }
+      : {
+        assumpte: `Certificado de donación de tu donación${quan ? ` ${quan}` : ""} · ${num}`,
+        titol,
+        cos: `Te adjuntamos el certificado <strong>${num}</strong> de la donación${quan ? ` ${quan}` : ""} que has hecho a la Fundació Espigoladors a través de Redestina.`,
+      };
+  }
+  if (abast === "periode") {
+    const interval = desDe && finsA ? ` ${desDe} – ${finsA}` : "";
+    return ca
+      ? {
+        assumpte: `Certificat de donació del període${interval} · ${num}`,
+        titol,
+        cos: `T’adjuntem el certificat <strong>${num}</strong> de les donacions que has fet a la Fundació Espigoladors durant el període${interval}.`,
+      }
+      : {
+        assumpte: `Certificado de donación del periodo${interval} · ${num}`,
+        titol,
+        cos: `Te adjuntamos el certificado <strong>${num}</strong> de las donaciones que has hecho a la Fundació Espigoladors durante el periodo${interval}.`,
+      };
+  }
+  return ca
+    ? {
+      assumpte: `Certificat de donació de l’exercici ${any} · ${num}`,
+      titol,
+      cos: `T’adjuntem el certificat <strong>${num}</strong> de les donacions que has fet a la Fundació Espigoladors durant l’exercici ${any}.`,
+    }
+    : {
+      assumpte: `Certificado de donación del ejercicio ${any} · ${num}`,
+      titol,
+      cos: `Te adjuntamos el certificado <strong>${num}</strong> de las donaciones que has hecho a la Fundació Espigoladors durante el ejercicio ${any}.`,
+    };
 }
 
 /**

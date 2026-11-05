@@ -1928,3 +1928,42 @@ El concepto y la lista cerrada están en §8 («Automático y manual»). En los 
   (`alb.env_r_*`). Freno de doble clic de 2 minutos. «Marcar entregat» sigue sin mandar nada con el
   correo apagado: su correo es una consecuencia, no el botón, y el aviso remite a «Envia per correu».
 
+
+### Certificat de donació según el modelo de Tabaquet (05-11-2026)
+
+- **Un solo diálogo**, `components/equip/DialegCertificatDonacio.tsx` (sustituye a `DialegCertificatPeriode`;
+  el CR pasa a `DialegCertificatRecepcio`). Lo abre solo el super_admin (botón oculto al resto; la guarda
+  real está en las RPC): desde `CertificatsFitxa` (ficha › Documentació) y desde `CertificatOferta`
+  (ficha de la oferta del equipo, solo con modalidad `donacio`, con ámbito «Oferta» y la oferta elegidos).
+- **Ámbitos**: Oferta (ofertas del donante con alguna canalización `conciliada`; «producte · data · E-…»),
+  Interval (desde/hasta ≤ hoy) y Exercici (el CD anual de `cierres_donante`: emitir/enviar si el cierre es
+  `tancat`; si no, aviso y enlace a `/equip/tancament/:id`). Orden y defecto en `ABASTS_DIALEG`/
+  `ABAST_PER_DEFECTE` (`lib/certificatsDonacio.ts`): es lo único que cambia cuando el cliente decida (deuda 156).
+- **Calcular** (oferta/intervalo) escribe el borrador y trae a la vez `cierre_exclosos_periodo()`: «Excloses
+  del certificat» lista cada canalización fuera con su motivo (`motiuExclusio`: venda, maquila, entitat no
+  social: <tipus>, sense entitat, sense modalitat, conciliació retroactiva; uno nuevo → «Un altre motiu»).
+- **Fecha de expedición**: defecto hoy (oferta/intervalo) o 31-12 (anual; hoy en un ensayo del año en curso);
+  rango `[fin del periodo, hoy]` replicado de la base (`rangDataExpedicio`); fuera de rango el botón se
+  apaga con motivo y la base responde `data_expedicio_fora_rang` (traducido en `textError`).
+- **Emitir no cierra el diálogo**: pasa a «Emès» con `AccionsCertificat` (Veure/Descarrega por
+  `descargar-documento`; «Envia per correu» = patrón «Reenvia»: `acceptaEnviament` + `{manual:true}`, gris
+  hasta que el PDF existe, polling `esperarGeneracio`). Sale aunque las notificaciones estén apagadas (§8,
+  lista cerrada de lo manual). El destinatario es el `email` de la ficha del donante (`periodo_destinatario`
+  / `cierre_destinatario`), con las barreras del modo test.
+- **`TancamentDetall`**: sin CT (tarjeta, tanda, rectificar). «Emet tots els certificats» y el certificado de
+  una fila piden fecha y anexo en `DialegExpedicio`.
+- **Panel del ofertante**: «El teu any» (acumulado, resumen y revisión, solo donación) y «Els meus
+  certificats» = `LlistaDocuments` de todos los `CD` (anual, intervalo, oferta) y los `CT` antiguos (solo
+  descarga), con ámbito y periodo (`textPeriodeUi`/`textExercici`, las mismas palabras que el PDF) y el
+  producto de la oferta, nunca el `E-…`. `/productor/ofertes/:id` monta `CertificatOfertaPropi` si hay CD vigente.
+- ⚠️ La política `documentos: intern o meus` oculta a los externos todo documento `modo='prueba'`: en el
+  clon el ofertante lee su `cierres_periodo` (abast, excedente_id) pero no el PDF de prueba. Con certificados
+  reales la misma lectura funciona. E2E: `tests/e2e/certificats.e2e.ts` (5 pruebas).
+- **El PDF** (`_shared/pdf/render/cd.ts`, anual/periodo/oferta): papel con membrete de la Fundació (logo de
+  Espigoladors arriba a la derecha, `generar-documento/activos/logo-espigoladors-pdf.png`, incrustado por
+  `scripts/incrustar-activos.ts`; los demás PDF siguen con el de Redestina), título, la prosa de la plantilla
+  congelada con los marcadores de `_shared/certificatDonacio.ts`, nombre y cargo de la apoderada, firma y
+  sello PNG, pie con número y código de verificación; anexo por producto en la 2.ª página solo si `annex`.
+  **Sin plantilla, error** (se retiró el `CUERPO_PROVISIONAL`, la caja del importe, «qui certifica», la línea de
+  revisión y el 182). El correo (`correu-document.ts`) dice el ámbito y las fechas. Prueba:
+  `tests/pdf/cd_test.ts` (extractor `tests/pdf/textPdf.ts`).

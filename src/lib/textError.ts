@@ -45,6 +45,12 @@ const CODIS: Record<string, string> = {
   no_pendent_revisio: 'rev.no_pendent_revisio',
   certificat_bloquejat: 'rev.certificat_bloquejat',
   sense_revisio: 'tan.err_sense_revisio',
+  // El certificado de donación (05-11-2026, 20270509100100/100200/100400).
+  data_expedicio_fora_rang: 'cdon.err_data_fora_rang',
+  oferta_sense_certificable: 'cdon.err_oferta_sense_certificable',
+  oferta_daltri_productor: 'cdon.err_oferta_daltri',
+  oferta_no_coincideix: 'cdon.err_oferta_no_coincideix',
+  certificat_transaccio_retirat: 'cdon.err_ct_retirat',
   cal_nota: 'tan.err_cal_nota',
   // La ficha de la organización (fase 7).
   nif_invalid: 'val.nif_control',

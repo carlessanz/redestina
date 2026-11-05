@@ -14,7 +14,7 @@
 // Nunca lanza: devuelve un código que dice qué pasó. Cada intento que llega a Resend queda
 // en `documento_envios` (`proposito = 'document'`, con `documento_id`).
 
-import { composaCorreuDocument } from "./correu-document.ts";
+import { composaCorreuDocument, type DocumentPerEnviar } from "./correu-document.ts";
 import {
   bustiaEquip, destinatariosPrueba, enLlistaCorreuTest, esEmailTest, modoTestActivo,
 } from "./gate.ts";
@@ -40,6 +40,8 @@ export interface DocumentAEnviar {
   idioma: string | null;
   modo: string;
   envio: Record<string, unknown> | null;
+  /** El snapshot (`documentos.datos`): el asunto del CD dice su ámbito y su periodo. */
+  datos?: Record<string, unknown> | null;
 }
 
 /**
@@ -93,6 +95,7 @@ export async function enviaDocument(
       idioma: doc.idioma,
       modo: doc.modo,
       envio: doc.envio as { destinatario?: string | null; nombre?: string | null } | null,
+      datos: (doc.datos ?? null) as DocumentPerEnviar["datos"],
     });
     if (!c) return "no_s_envia";
 

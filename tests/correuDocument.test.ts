@@ -45,6 +45,45 @@ describe('qué se dice', () => {
     const c = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo' })!
     expect(c.cosHtml).toContain('període')
   })
+  describe('el certificado de donación, según su ámbito', () => {
+    it('el anual: «de l’exercici AAAA»', () => {
+      const c = composaCorreuDocument({ ...base, datos: { abast: 'exercici', periode: { des_de: '2026-01-01', fins_a: '2026-12-31' } } })!
+      expect(c.assumpte).toBe('Certificat de donació de l’exercici 2026 · CD-2026-0001')
+      expect(c.cosHtml).toContain('durant l’exercici 2026')
+      const es = composaCorreuDocument({ ...base, idioma: 'es' })!
+      expect(es.assumpte).toBe('Certificado de donación del ejercicio 2026 · CD-2026-0001')
+    })
+    it('el de un periodo: las dos fechas en dd/mm/aaaa', () => {
+      const d = { abast: 'periode', periode: { des_de: '2026-03-01', fins_a: '2026-03-15' } }
+      const c = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', numero_completo: 'CDP-2026-0002', datos: d })!
+      expect(c.assumpte).toBe('Certificat de donació del període 01/03/2026 – 15/03/2026 · CDP-2026-0002')
+      expect(c.cosHtml).toContain('durant el període 01/03/2026 – 15/03/2026')
+      const es = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', idioma: 'es', numero_completo: 'CDP-2026-0002', datos: d })!
+      expect(es.assumpte).toBe('Certificado de donación del periodo 01/03/2026 – 15/03/2026 · CDP-2026-0002')
+    })
+    it('el de una oferta: «de la teva donació del dd/mm/aaaa»', () => {
+      const d = { abast: 'oferta', periode: { des_de: '2026-10-14', fins_a: '2026-10-14' } }
+      const c = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', numero_completo: 'CDP-2026-0003', datos: d })!
+      expect(c.assumpte).toBe('Certificat de donació de la teva donació del 14/10/2026 · CDP-2026-0003')
+      expect(c.cosHtml).toContain('de la donació del 14/10/2026')
+      const es = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', idioma: 'es', numero_completo: 'CDP-2026-0003', datos: d })!
+      expect(es.assumpte).toBe('Certificado de donación de tu donación del 14/10/2026 · CDP-2026-0003')
+      const dos = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', datos: { abast: 'oferta', periode: { des_de: '2026-10-14', fins_a: '2026-10-16' } } })!
+      expect(dos.assumpte).toContain('del 14/10/2026 al 16/10/2026')
+    })
+    it('lo de antes de `abast` se lee por `objeto_tipo`', () => {
+      const c = composaCorreuDocument({ ...base, objeto_tipo: 'cierre_periodo', datos: { periode: { des_de: '2026-03-01', fins_a: '2026-03-15' } } })!
+      expect(c.assumpte).toContain('del període 01/03/2026 – 15/03/2026')
+    })
+    it('ninguno menciona el modelo 182', () => {
+      for (const abast of ['exercici', 'periode', 'oferta']) {
+        for (const idioma of ['ca', 'es']) {
+          const c = composaCorreuDocument({ ...base, idioma, datos: { abast, periode: { des_de: '2026-01-01', fins_a: '2026-12-31' } } })!
+          expect(`${c.assumpte} ${c.cosHtml} ${c.nota}`).not.toContain('182')
+        }
+      }
+    })
+  })
   it('en castellano si el documento está en castellano', () => {
     const c = composaCorreuDocument({ ...base, idioma: 'es' })!
     expect(c.idioma).toBe('es')

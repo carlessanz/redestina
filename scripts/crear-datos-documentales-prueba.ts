@@ -308,18 +308,17 @@ async function prepararCierre() {
 // Una venta conciliada **con su albarán de operación**, no una conciliación retroactiva:
 // es el camino real del CT (los kilos salen del `OPE`) y es el que conviene ejercitar.
 // Recorre el ciclo entero —emitir, entregar, confirmar por enlace, conciliar— igual que
-// los ENT de la espigolada, y termina calculando las transacciones del cierre de prueba,
-// que es lo que deja una fila `cierres_donante` con `tipo = 'transaccio'`.
+// los ENT de la espigolada.
 //
-// ⚠️ NO emite el certificado. `emitir_certificado_transaccion()` exige que
-//    `parametros_documentales.datos_provisionales` sea `false`, y el fixture no toca ese
-//    interruptor: ponerlo a `false` con el CIF de relleno sería justo lo que la
-//    comprobación existe para impedir. El certificado se emite a mano cuando la
-//    Configuración esté completa.
+// 🔴 El CT está RETIRADO desde 20270509100400 (05-11-2026): `calcular_cierre_transacciones()`
+//    ya no crea filas `tipo = 'transaccio'` (devuelve `{retirat: true}`) y emitir responde
+//    `certificat_transaccio_retirat`. La venta del fixture se conserva porque sigue siendo
+//    útil: es la «venda» que el diálogo del certificado de donación lista en «Excloses del
+//    certificat» (`cierre_exclosos_periodo`) y la compra del certificado de recepción (CR).
 //
 // IDEMPOTENTE: si la oferta de venta del fixture ya existe, no se rehace nada.
 async function prepararTransaccio(cierre: string) {
-  paso("Venta conciliada para el certificado de transacción (fase 5)");
+  paso("Venta conciliada (Excloses del certificat de donació i CR; el CT està retirat)");
 
   const idCT = `E-TEST-CT-${ejercicio}`;
   const { data: ya } = await db.from("excedentes")
@@ -379,10 +378,15 @@ async function prepararTransaccio(cierre: string) {
     console.log(`  ${val.albara ?? "OPE"}  200 kg venuts → 195 kg ${val.conciliat ? "conciliats" : "confirmats"}`);
   }
 
+  // Se sigue llamando para que el fixture funcione igual contra una base anterior a
+  // 20270509100400; desde esa migración no escribe nada.
   const res = await rpc<Record<string, unknown>>("calcular_cierre_transacciones", { p_cierre: cierre });
-  console.log(`  transaccions calculades: ${res.generadors} generadors, ${res.linies} línies, ` +
-    `${res.kg_total} kg (valor intern ${res.valor_intern} €, ${res.bloquejats} bloquejats)`);
-  console.log("  el certificat NO s'emet: cal desmarcar datos_provisionales a Configuració");
+  if (res.retirat) {
+    console.log("  certificat de transacció retirat (20270509100400): no es calcula ni s'emet");
+  } else {
+    console.log(`  transaccions calculades: ${res.generadors} generadors, ${res.linies} línies, ` +
+      `${res.kg_total} kg (valor intern ${res.valor_intern} €, ${res.bloquejats} bloquejats)`);
+  }
 }
 
 // ---------------------------------------------------------------------------

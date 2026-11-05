@@ -449,8 +449,13 @@ async function renderizar(
         selloPng: firma.selloPng,
       }, doc.idioma);
     }
+    // El CD es el papel con membrete de la Fundació (05-11-2026): lleva el logo de
+    // Espigoladors (`activos.logoEspigoladors`), no el de Redestina, y sin plantilla
+    // congelada lanza en vez de imprimir un texto provisional. `objetoTipo` distingue el
+    // anual del de periodo en los snapshots anteriores, que no traen `abast`.
     return await renderCd(activos, {
       ...base,
+      objetoTipo: doc.objeto_tipo,
       apoderadaDni: firma.apoderadaDni,
       firmaPng: firma.firmaPng,
       selloPng: firma.selloPng,

@@ -1,5 +1,10 @@
 // Esqueleto común del cierre anual: el resumen (RES) y el certificado (CD) — anexo B.
 //
+// ⚠️ Desde el 05-11-2026 el CD ya no usa el esqueleto visual de aquí (`abrirCierre`,
+//    `pintarLegal`, `pintarFirma`): es el papel con membrete de la Fundació (`cd.ts`). Sigue
+//    compartiendo el snapshot, el vocabulario de fechas, el código de verificación, la
+//    filigrana y `embeberFirmaYSello`. RES, CT y CR no cambian.
+//
 // Los dos documentos hablan del MISMO acumulado de un donante en un ejercicio y por eso
 // comparten el snapshot (`cierre_datos_resumen` / `cierre_datos_certificado`), las partes
 // —quién emite y quién dona— y el vocabulario. Lo que cambia es a qué se dedica cada uno:
@@ -133,6 +138,16 @@ export interface DatosCierre {
 
   // --- certificado
   data_generacio?: string | null;
+  /**
+   * CD (05-11-2026): la fecha que la Fundación pone al pie («expedeixo… a Barcelona, 31 de
+   * desembre de 2025»). La elige el super_admin al emitir; lo anterior no la trae y se usa
+   * `data_generacio`.
+   */
+  data_expedicio?: string | null;
+  /** CD: `true` añade la página «Annex · Detall per producte». */
+  annex?: boolean | null;
+  /** CD de oferta: la oferta que certifica. */
+  excedente_id?: string | null;
   lloc?: string | null;
   apoderada?: { nom?: string | null; carrec?: string | null } | null;
   periode?: { des_de?: string | null; fins_a?: string | null } | null;
@@ -172,7 +187,10 @@ export interface OpcionesCierre {
   datos: DatosCierre;
   /** `documentos.sha256_datos`: el código de verificación impreso. */
   sha256Datos?: string | null;
-  /** Plantilla legal vigente. Sin ella se imprime el texto provisional, marcado. */
+  /**
+   * Plantilla legal congelada al emitir. Sin ella, el RES y el CT imprimen su texto
+   * provisional, marcado; el CD se niega (desde el 05-11-2026 no tiene texto propio).
+   */
   plantilla?: PlantillaLegal | null;
   /** `prueba` estampa la filigrana «PROVA, SENSE VALIDESA FISCAL». */
   modo?: "real" | "prueba";
@@ -189,6 +207,12 @@ export interface OpcionesCierre {
   selloPng?: Uint8Array | null;
   /** Marca de rectificativo (rectificar_certificado). */
   rectificativo?: boolean;
+  /**
+   * Solo CD: `documentos.objeto_tipo` (`cierre_donante` | `cierre_periodo`). Un snapshot
+   * anterior al 05-11-2026 no trae `abast`, y esto es lo que distingue el anual del de
+   * periodo sin adivinarlo.
+   */
+  objetoTipo?: string | null;
 }
 
 export interface Renderizado {
@@ -213,8 +237,6 @@ export interface DiccionarioCierre {
   res: string;
   res_sub: string;
   res_provisional: string;
-  cd: string;
-  cd_sub: string;
   ct: string;
   ct_sub: string;
   cr: string;
@@ -264,7 +286,6 @@ export interface DiccionarioCierre {
   total_kg: string;
   total_valor: string;
   detall: string;
-  detall_cd: string;
   sense_detall: string;
   destinacions: string;
   destinacions_text: string;
@@ -282,17 +303,6 @@ export interface DiccionarioCierre {
   enllac_sense: string;
   bloquejos_titol: string;
   bloquejos_text: string;
-  certifica: string;
-  import_titol: string;
-  import_xifres: string;
-  import_lletres: string;
-  quilos: string;
-  factura_citada: string;
-  factura_citada_sense: string;
-  revisio_ofertant: string;
-  revisio_equip: string;
-  excepcio_titol: string;
-  excepcio_text: string;
   signatura_titol: string;
   legal: string;
   provisional_titol: string;
@@ -307,8 +317,6 @@ const CA: DiccionarioCierre = {
   res: "Resum anual de donacions",
   res_sub: "Aliments fora del circuit de venda habitual lliurats a la Fundació Espigoladors",
   res_provisional: "Resum provisional",
-  cd: "Certificat de donació",
-  cd_sub: "Article 16 de la Llei 49/2002, de règim fiscal de les entitats sense fins lucratius",
   ct: "Certificat d’aprofitament alimentari",
   ct_sub: "Operacions de venda i de maquila conciliades durant l'exercici",
   cr: "Certificat de recepció",
@@ -325,7 +333,7 @@ const CA: DiccionarioCierre = {
   detall_ct: "Detall per producte",
   detall_cr: "Detall per producte",
   destinacions_ct: "Qui ha rebut el producte",
-  // ⚠️ NO se reutiliza `quilos` («Quilos donats»): en un CT no se ha donado nada, se ha
+  // ⚠️ NO se dice «Quilos donats», como decía el CD anterior: en un CT no se ha donado nada, se ha
   // vendido o se ha encargado una maquila. La misma palabra en los dos papeles borraría
   // justo la diferencia que separa el CD del CT.
   quilos_ct: "Quilos acreditats",
@@ -370,7 +378,6 @@ const CA: DiccionarioCierre = {
   total_kg: "Quilos nets conciliats",
   total_valor: "Valor",
   detall: "Detall per producte i mes",
-  detall_cd: "Detall per producte",
   sense_detall: "No hi ha cap línia conciliada en aquest exercici.",
   destinacions: "On ha anat el producte",
   destinacions_text:
@@ -392,17 +399,6 @@ const CA: DiccionarioCierre = {
     "L'enllaç per pujar la factura va al correu amb què t'hem enviat aquest resum. També la pots pujar des del teu panell a Redestina.",
   bloquejos_titol: "Falta alguna cosa abans del certificat",
   bloquejos_text: "Mentre no es resolgui, el certificat de donació no es pot emetre.",
-  certifica: "Certifica",
-  import_titol: "Valor de la donació",
-  import_xifres: "En xifres",
-  import_lletres: "En lletres",
-  quilos: "Quilos donats",
-  factura_citada: "Factura del donant",
-  factura_citada_sense: "Certificat emès sense factura del donant",
-  revisio_ofertant: "Xifres revisades i aprovades pel donant el {data}.",
-  revisio_equip: "Xifres aprovades per l'equip de Redestina en nom del donant ({per}, {data}): {nota}",
-  excepcio_titol: "Emès sense factura coincident",
-  excepcio_text: "Motiu:",
   signatura_titol: "Signatura i segell",
   legal: "Condicions",
   provisional_titol: "Text provisional, pendent de validació",
@@ -435,8 +431,6 @@ const ES: DiccionarioCierre = {
   res: "Resumen anual de donaciones",
   res_sub: "Alimentos fuera del circuito de venta habitual entregados a la Fundació Espigoladors",
   res_provisional: "Resumen provisional",
-  cd: "Certificado de donación",
-  cd_sub: "Artículo 16 de la Ley 49/2002, de régimen fiscal de las entidades sin fines lucrativos",
   ct: "Certificado de aprovechamiento alimentario",
   ct_sub: "Operaciones de venta y de maquila conciliadas durante el ejercicio",
   cr: "Certificado de recepción",
@@ -492,7 +486,6 @@ const ES: DiccionarioCierre = {
   total_kg: "Kilos netos conciliados",
   total_valor: "Valor",
   detall: "Detalle por producto y mes",
-  detall_cd: "Detalle por producto",
   sense_detall: "No hay ninguna línea conciliada en este ejercicio.",
   destinacions: "Adónde ha ido el producto",
   destinacions_text:
@@ -514,17 +507,6 @@ const ES: DiccionarioCierre = {
     "El enlace para subir la factura va en el correo con el que te hemos enviado este resumen. También la puedes subir desde tu panel en Redestina.",
   bloquejos_titol: "Falta algo antes del certificado",
   bloquejos_text: "Mientras no se resuelva, el certificado de donación no se puede emitir.",
-  certifica: "Certifica",
-  import_titol: "Valor de la donación",
-  import_xifres: "En cifras",
-  import_lletres: "En letras",
-  quilos: "Kilos donados",
-  factura_citada: "Factura del donante",
-  factura_citada_sense: "Certificado emitido sin factura del donante",
-  revisio_ofertant: "Cifras revisadas y aprobadas por el donante el {data}.",
-  revisio_equip: "Cifras aprobadas por el equipo de Redestina en nombre del donante ({per}, {data}): {nota}",
-  excepcio_titol: "Emitido sin factura coincidente",
-  excepcio_text: "Motivo:",
   signatura_titol: "Firma y sello",
   legal: "Condiciones",
   provisional_titol: "Texto provisional, pendiente de validación",
@@ -765,9 +747,32 @@ export function pintarBloqueos(ctx: ContextoCierre): void {
 }
 
 /**
+ * La firma y el sello de la apoderada, embebidos en este documento, o `null` el que falte.
+ * Un PNG ilegible no puede impedir que salga el certificado: se avisa y se deja el hueco.
+ * Lo que no se hace nunca es sustituirlo por otra cosa.
+ */
+export async function embeberFirmaYSello(
+  doc: PDFDocument,
+  op: Pick<OpcionesCierre, "firmaPng" | "selloPng">,
+): Promise<{ firma: PDFImage | null; sello: PDFImage | null }> {
+  let firma: PDFImage | null = null;
+  let sello: PDFImage | null = null;
+  try {
+    if (op.firmaPng && op.firmaPng.length > 0) firma = await doc.embedPng(op.firmaPng);
+    if (op.selloPng && op.selloPng.length > 0) sello = await doc.embedPng(op.selloPng);
+  } catch (e) {
+    console.warn(
+      "cierre: firma/sello no embebibles:",
+      e instanceof Error ? e.message : String(e),
+    );
+  }
+  return { firma, sello };
+}
+
+/**
  * Lugar y fecha de generación (D14), la firma y el sello estampados y, debajo, quién
- * firma. Lo comparten el CD y el CT: los dos los firma la misma apoderada, con el mismo
- * PNG y el mismo pie. Sin PNG en el bucket `activos` se deja el espacio en blanco con su
+ * firma. Lo comparten el CT y el CR: los firma la misma apoderada, con el mismo PNG y el
+ * mismo pie (el CD, desde el 05-11-2026, firma al estilo del modelo de la Fundació, `cd.ts`). Sin PNG en el bucket `activos` se deja el espacio en blanco con su
  * filete: un certificado sin firma se imprime igual y se firma a mano, que es mejor que
  * no poder emitirlo.
  */
@@ -785,19 +790,7 @@ export async function pintarFirma(ctx: ContextoCierre): Promise<void> {
   const ALTO_SELLO = 74;
   const alto = Math.max(ALTO_FIRMA, ALTO_SELLO);
 
-  let firma = null;
-  let sello = null;
-  try {
-    if (op.firmaPng && op.firmaPng.length > 0) firma = await ctx.doc.embedPng(op.firmaPng);
-    if (op.selloPng && op.selloPng.length > 0) sello = await ctx.doc.embedPng(op.selloPng);
-  } catch (e) {
-    // Un PNG ilegible no puede impedir que salga el certificado: se avisa y se deja el
-    // hueco. Lo que no se hace nunca es sustituirlo por otra cosa.
-    console.warn(
-      "cierre: firma/sello no embebibles:",
-      e instanceof Error ? e.message : String(e),
-    );
-  }
+  const { firma, sello } = await embeberFirmaYSello(ctx.doc, op);
 
   m.titulo(t.signatura_titol, 3);
   m.asegurar(alto + 46);

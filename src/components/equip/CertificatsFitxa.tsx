@@ -1,7 +1,8 @@
 // Los certificados de UNA organización, desde su propia ficha. Un componente, dos usos:
 //
 //   · ficha de **entidad productora** → certificados de DONACIÓN (`CD`): el anual, que sale
-//     del cierre, y los de a demanda (`cierres_periodo`).
+//     del cierre, y los de intervalo y de oferta (`cierres_periodo`). Se emiten con
+//     «Certificat de donació» (`DialegCertificatDonacio`), **solo el super_admin** (05-11-2026).
 //   · ficha de **entidad receptora**  → certificados de RECEPCIÓN (`CR`, fase F4): los
 //     kilos que le han entrado en una ventana de fechas (`cierres_receptor`).
 //
@@ -17,7 +18,7 @@
 // PDF— es idéntico. Dos copias serían dos sitios donde esa barrera puede quedar puesta en
 // uno y no en el otro, y eso no falla: emite.
 //
-// ⚠️ **El modo sale de `es_test`, no se elige** (ver `DialegCertificatPeriode`).
+// ⚠️ **El modo sale de `es_test`, no se elige** (ver `DialegCertificatDonacio`).
 // ⚠️ Con `datos_provisionales` a `true` la base se niega a emitir en modo REAL, así que el
 //    botón se apaga **con su motivo visible**. Es material de la fase 0 lo que falta
 //    (§12.10), no software, y esconder el botón haría parecer que la función no existe.
@@ -29,10 +30,14 @@ import { supabase } from '../../lib/supabase'
 import { bloquejaProvisionals, dadesFiscalsProvisionals } from '../../lib/canalitzacio'
 import { estilEstatDonant } from '../../lib/tancament'
 import { dataCurta } from '../../lib/albarans'
+import { abastPeriode, clauAbast, textPeriodeUi } from '../../lib/certificatsDonacio'
+import type { AbastCertificat } from '../../lib/certificatsDonacio'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
 import { useAppContext } from '../../hooks/useAppContext'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
-import DialegCertificatPeriode from './DialegCertificatPeriode'
+import DialegCertificatDonacio from './DialegCertificatDonacio'
+import DialegCertificatRecepcio from './DialegCertificatRecepcio'
+import AccionsCertificat from './AccionsCertificat'
 import { BadgeMode } from '../../routes/equip/Tancament'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -43,6 +48,9 @@ interface FilaPeriode {
   periodo_hasta: string
   estado: string
   certificado_numero: string | null
+  /** Solo en `cierres_periodo` (donación): `periode` u `oferta`. */
+  abast?: string | null
+  excedente_id?: string | null
 }
 
 interface FilaAnual {
@@ -64,8 +72,10 @@ interface Emes {
   id: string
   numero: string
   estat: string
-  /** «01/01/2026 → 30/06/2026», o null si es el anual (que no tiene ventana). */
+  /** «El període 01/01/2026 a 30/06/2026», o null si es el anual (que no tiene ventana). */
   periode: string | null
+  /** Solo en la donación: exercici · periode · oferta. */
+  abast: AbastCertificat | null
   /** El cierre al que pertenece, para enlazarlo. Solo el certificado anual tiene uno. */
   cierre: string | null
 }
@@ -77,7 +87,7 @@ const PERFIL = {
     titolKey: 'fit.cert_title',
     hintKey: 'fit.cert_hint',
     buitKey: 'fit.cert_none',
-    accioKey: 'fit.cert_generate',
+    accioKey: 'cdon.title',
   },
   entidad: {
     tipusDoc: 'CR',
@@ -89,12 +99,8 @@ const PERFIL = {
 } as const
 
 /**
- * La ventana de fechas, con el MISMO formato que el resto de la aplicación.
- *
- * ⚠️ No se componía: se pintaba `2026-01-01 → 2026-06-30`, tal cual sale de la base, en la
- *    única pantalla donde esto se lee. Las otras tres que enseñan el mismo periodo —el panel
- *    del productor, el del receptor y `/verificar/:codi`— ya usaban `mydoc.cdp_period` con
- *    `dataCurta()`. Un mismo dato con dos caras es lo que hace dudar de si son dos cosas.
+ * La ventana de fechas del certificado de recepción, con el MISMO formato que el panel del
+ * receptor y `/verificar/:codi` (`mydoc.cdp_period` + `dataCurta()`).
  */
 function periode(
   t: (clau: string, params?: Record<string, string | number>) => string,
@@ -114,9 +120,12 @@ export default function CertificatsFitxa(
     esTest: boolean
   },
 ) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
+  // El certificado de donación lo emite y lo envía solo el super_admin (05-11-2026); la
+  // guarda de verdad está en las RPC (en real, `es_super_admin()`).
+  const esSuperAdmin = ctx?.esSuperAdmin ?? false
   const perfil = PERFIL[tipus]
   const [emesos, setEmesos] = useState<Emes[]>([])
   const [docs, setDocs] = useState<Doc[]>([])
@@ -134,7 +143,7 @@ export default function CertificatsFitxa(
     if (tipus === 'productor') {
       const [per, anu] = await Promise.all([
         supabase.from('cierres_periodo')
-          .select('id, periodo_desde, periodo_hasta, estado, certificado_numero')
+          .select('id, periodo_desde, periodo_hasta, estado, certificado_numero, abast, excedente_id')
           .eq('productor_id', orgId)
           .order('periodo_hasta', { ascending: false }),
         supabase.from('cierres_donante')
@@ -151,12 +160,15 @@ export default function CertificatsFitxa(
       files = [
         ...fa.filter((a) => a.certificado_numero).map((a) => ({
           id: a.id, numero: a.certificado_numero!, estat: a.estado,
-          periode: null, cierre: a.cierre_id,
+          periode: null, cierre: a.cierre_id, abast: 'exercici' as const,
         })),
-        ...fp.filter((p) => p.certificado_numero).map((p) => ({
-          id: p.id, numero: p.certificado_numero!, estat: p.estado,
-          periode: periode(t, p), cierre: null,
-        })),
+        ...fp.filter((p) => p.certificado_numero).map((p) => {
+          const ab = abastPeriode(p)
+          return {
+            id: p.id, numero: p.certificado_numero!, estat: p.estado,
+            periode: textPeriodeUi(ab, p.periodo_desde, p.periodo_hasta, lang), cierre: null, abast: ab,
+          }
+        }),
       ]
     } else {
       // El certificado de recepción es SIEMPRE a demanda: no cuelga de ningún cierre, así
@@ -174,7 +186,7 @@ export default function CertificatsFitxa(
         .filter((p) => p.certificado_numero)
         .map((p) => ({
           id: p.id, numero: p.certificado_numero!, estat: p.estado,
-          periode: periode(t, p), cierre: null,
+          periode: periode(t, p), cierre: null, abast: null,
         }))
     }
 
@@ -187,7 +199,7 @@ export default function CertificatsFitxa(
     if (error) console.warn('CertificatsFitxa.docs:', error.message)
     setErrorCarrega(error !== null)
     setDocs((data as Doc[] | null) ?? [])
-  }, [orgId, tipus, perfil.tipusDoc, t])
+  }, [orgId, tipus, perfil.tipusDoc, t, lang])
 
   useEffect(() => { void carrega() }, [carrega])
   useEffect(() => {
@@ -201,6 +213,8 @@ export default function CertificatsFitxa(
   const motiu = !potAprovar
     ? t('fit.cert_readonly')
     : bloquejaProvisionals(provisionals, esTest ? 'prueba' : 'real') ? t('tan.why_provisional') : undefined
+  // La donación: el botón solo existe para el super_admin (a los demás no se les ofrece).
+  const potEmetre = tipus === 'entidad' || esSuperAdmin
 
   return (
     <div className="rounded-md border bg-card p-3">
@@ -211,7 +225,7 @@ export default function CertificatsFitxa(
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {esTest && <BadgeMode mode="prueba" />}
-          <BotoAmbMotiu
+          {potEmetre && <BotoAmbMotiu
             size="sm"
             className="h-11 whitespace-normal md:h-8"
             disabled={motiu !== undefined}
@@ -219,12 +233,12 @@ export default function CertificatsFitxa(
             onClick={() => setObert(true)}
           >
             {t(perfil.accioKey)}
-          </BotoAmbMotiu>
+          </BotoAmbMotiu>}
         </div>
       </div>
 
       {/* El motivo, visible y no solo en el tooltip. */}
-      {motiu && <p className="mt-2 text-xs text-muted-foreground">{motiu}</p>}
+      {potEmetre && motiu && <p className="mt-2 text-xs text-muted-foreground">{motiu}</p>}
 
       {errorCarrega && <p className="mt-2 text-sm text-destructive">{t('c.load_error')}</p>}
       {errorCarrega && emesos.length === 0 ? null : emesos.length === 0
@@ -237,31 +251,16 @@ export default function CertificatsFitxa(
                 <li key={c.id} className="flex flex-wrap items-center justify-between gap-2 rounded-md border p-2">
                   <span className="text-sm">
                     <span className="font-medium tabular-nums">{c.numero}</span>
-                    {c.periode
-                      ? <span className="text-muted-foreground">{` · ${c.periode}`}</span>
-                      : <span className="text-muted-foreground">{` · ${t('fit.cert_annual')}`}</span>}
+                    {c.abast && <span className="text-muted-foreground">{` · ${t(clauAbast(c.abast))}`}</span>}
+                    {c.periode && <span className="text-muted-foreground">{` · ${c.periode}`}</span>}
                     <Badge className={`ml-2 ${estilEstatDonant(c.estat)}`}>
                       {t(`tan.ds_${c.estat}`)}
                     </Badge>
                   </span>
                   <span className="flex flex-wrap gap-2">
                     {doc && doc.estado === 'emitido' && (
-                      <>
-                        <Button
-                          size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
-                          disabled={descarregador.ocupat === doc.id}
-                          onClick={() => void descarregador.mostra(doc.id)}
-                        >
-                          {t('doc.view')}
-                        </Button>
-                        <Button
-                          size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
-                          disabled={descarregador.ocupat === doc.id}
-                          onClick={() => void descarregador.descarrega(doc.id)}
-                        >
-                          {t('doc.download')}
-                        </Button>
-                      </>
+                      <AccionsCertificat doc={doc} descarregador={descarregador}
+                        enviar={tipus === 'productor' && esSuperAdmin} />
                     )}
                     {c.cierre && (
                       <Button asChild size="sm" variant="ghost" className="h-11 whitespace-normal md:h-8">
@@ -275,15 +274,27 @@ export default function CertificatsFitxa(
           </ul>
         )}
 
-      <DialegCertificatPeriode
-        obert={obert}
-        onTancar={() => setObert(false)}
-        tipus={tipus}
-        orgId={orgId}
-        modo={esTest ? 'prueba' : 'real'}
-        provisionals={provisionals}
-        onEmes={() => void carrega()}
-      />
+      {tipus === 'productor'
+        ? (
+          <DialegCertificatDonacio
+            obert={obert}
+            onTancar={() => setObert(false)}
+            productorId={orgId}
+            modo={esTest ? 'prueba' : 'real'}
+            provisionals={provisionals}
+            onEmes={() => void carrega()}
+          />
+        )
+        : (
+          <DialegCertificatRecepcio
+            obert={obert}
+            onTancar={() => setObert(false)}
+            entitatId={orgId}
+            modo={esTest ? 'prueba' : 'real'}
+            provisionals={provisionals}
+            onEmes={() => void carrega()}
+          />
+        )}
       {descarregador.visor}
     </div>
   )

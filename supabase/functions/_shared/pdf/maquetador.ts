@@ -115,6 +115,15 @@ export interface OpcionesMaquetador {
   margenes?: Partial<Margenes>;
   /** Cómo se escribe la paginación. Por defecto, en catalán. */
   paginacion?: (n: number, total: number) => string;
+  /**
+   * La cabecera del papel con membrete (el certificado de donación, 05-11-2026): solo el
+   * logo arriba a la DERECHA, sin rótulos ni filete, como el modelo de la Fundació. Sin
+   * esta opción la cabecera es la de siempre (logo a la izquierda, número y filete), así
+   * que ningún otro documento cambia.
+   */
+  membrete?: { anchoLogo: number; separacion?: number } | null;
+  /** Pie sin filete: solo el texto y la paginación, en pequeño. */
+  pieSinFilete?: boolean;
 }
 
 const MARGENES: Margenes = { arriba: 48, abajo: 48, izquierda: 56, derecha: 56 };
@@ -149,6 +158,8 @@ export class Maquetador {
   private readonly pieTexto: string;
   private readonly marca: OpcionesMarcaAgua | null;
   private readonly paginacion: (n: number, total: number) => string;
+  private readonly membrete: { anchoLogo: number; separacion?: number } | null;
+  private readonly pieSinFilete: boolean;
 
   private paginas: PDFPage[] = [];
   private pagina: PDFPage | null = null;
@@ -169,6 +180,8 @@ export class Maquetador {
       ? { texto: op.marcaAgua }
       : (op.marcaAgua ?? null);
     this.paginacion = op.paginacion ?? ((n, total) => `pàg. ${n} de ${total}`);
+    this.membrete = op.membrete ?? null;
+    this.pieSinFilete = op.pieSinFilete === true;
     this.nuevaPagina();
   }
 
@@ -229,6 +242,22 @@ export class Maquetador {
 
   private dibujarCabecera(p: PDFPage): void {
     const top = A4.alto - this.margenes.arriba;
+    if (this.membrete) {
+      // Membrete: el logo a la derecha, alineado con el margen, y nada más.
+      let alto = 0;
+      if (this.logo) {
+        const ancho = this.membrete.anchoLogo;
+        alto = (this.logo.height / this.logo.width) * ancho;
+        p.drawImage(this.logo, {
+          x: A4.ancho - this.margenes.derecha - ancho,
+          y: top - alto,
+          width: ancho,
+          height: alto,
+        });
+      }
+      this.cursor = top - alto - (this.membrete.separacion ?? 18);
+      return;
+    }
     if (this.logo) {
       const escala = ALTO_LOGO / this.logo.height;
       p.drawImage(this.logo, {
@@ -722,12 +751,14 @@ export class Maquetador {
     this.paginas.forEach((p, i) => {
       if (this.marca) this.dibujarMarcaAgua(p, this.marca);
       const y = this.margenes.abajo + 10;
-      p.drawLine({
-        start: { x: this.margenes.izquierda, y: y + 12 },
-        end: { x: A4.ancho - this.margenes.derecha, y: y + 12 },
-        thickness: 0.5,
-        color: COLORES.crema300,
-      });
+      if (!this.pieSinFilete) {
+        p.drawLine({
+          start: { x: this.margenes.izquierda, y: y + 12 },
+          end: { x: A4.ancho - this.margenes.derecha, y: y + 12 },
+          thickness: 0.5,
+          color: COLORES.crema300,
+        });
+      }
       if (this.pieTexto) {
         // El pie es una sola línea: lo que no cabe en el ancho útil menos el hueco
         // de la paginación, no se pinta.

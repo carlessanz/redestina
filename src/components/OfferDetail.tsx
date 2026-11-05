@@ -39,6 +39,7 @@ import { carregaDestins } from '../lib/ofertes'
 import DialegEditaOferta from './DialegEditaOferta'
 import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
 import FormulariAprovacio from './equip/FormulariAprovacio'
+import CertificatOferta from './equip/CertificatOferta'
 import { registrarEnviamentManual } from '../lib/canalitzacio'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
 import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '../types'
@@ -1091,6 +1092,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           })}
         </CardContent>
       </Card>
+
+      {/* El certificado de donación de ESTA oferta (05-11-2026): solo el super_admin, y solo
+          si la oferta es de donación. La guarda de verdad está en las RPC. */}
+      {ctx?.esSuperAdmin && exc.productor_id && mods.includes('donacio') && (
+        <CertificatOferta excedenteId={exc.id} productorId={exc.productor_id} />
+      )}
 
       {exc.estado === 'bloqueada' && (
         <Card>
