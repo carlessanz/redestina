@@ -608,7 +608,7 @@ cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
    **Referencia: 1.763 pruebas de Vitest en 76 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.040/2.040 y 32 sin datos; producción 1.946/1.946 y 27 «Sin fallos de
+   **Referencia: clon 2.040/2.040 y 32 sin datos; producción 2.041/2.041 y 31 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
