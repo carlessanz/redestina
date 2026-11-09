@@ -4,7 +4,7 @@ import tailwindcss from '@tailwindcss/vite'
 import { VitePWA } from 'vite-plugin-pwa'
 import { fileURLToPath, URL } from 'node:url'
 import type { Plugin } from 'vite'
-import { gestiona } from './cortina/cortina.ts'
+import { creaLectorEstat, gestiona } from './cortina/cortina.ts'
 
 /**
  * La cortina de contraseña también en `npm run dev` (28-09-2026). En Vercel la pone
@@ -23,6 +23,13 @@ function cortinaDev(): Plugin {
         server.config.logger.warn('⚠️  Cortina desactivada (REDESTINA_SENSE_CORTINA=1, només el clon local).')
         return
       }
+      // El estado de la cortina (encendida/apagada y su huella) lo da la Edge Function del
+      // proyecto al que apunta este servidor —producción con `npm run dev`, el clon con
+      // `dev:local`—, igual que en Vercel. Caché corta: que un cambio de Configuració se note ya.
+      const urlSupabase = server.config.env.VITE_SUPABASE_URL as string | undefined
+      const lector = urlSupabase
+        ? creaLectorEstat(`${urlSupabase}/functions/v1/cortina-estat`, { ttl: 2_000 })
+        : undefined
       server.middlewares.use(async (req, res, next) => {
         try {
           const cos = req.method === 'POST'
@@ -39,7 +46,7 @@ function cortinaDev(): Plugin {
           }
           const resposta = await gestiona(new Request(`http://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, {
             method: req.method, headers: capcaleres, body: cos,
-          }))
+          }), lector)
           if (resposta.headers.get('x-middleware-next') === '1') { next(); return }
           res.statusCode = resposta.status
           // En http://localhost la cookie `Secure` también vale (los navegadores lo tratan

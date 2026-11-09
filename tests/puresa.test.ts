@@ -28,6 +28,7 @@ const HOJA = [
   'modalitats',
   'franja',
   'certificatDonacio',
+  'cortinaHash',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

@@ -19,9 +19,43 @@ de **7 días** (`HttpOnly; Secure; SameSite=Lax`).
   `VITE_ACCESSOS_TEST` lleva las contraseñas de las cuentas de prueba— tampoco se sirve.
 - **La contraseña no está en git**: solo `HASH_TOKEN` = SHA-256 del token, y el token es
   PBKDF2-SHA256 (100.000 vueltas) de la contraseña. Con el repo no se fabrica la cookie.
-  **Para cambiarla**: `node scripts/cortina-hash.mjs 'nova'`, sustituir `HASH_TOKEN` y
-  publicar; todas las cookies anteriores dejan de valer al momento. La contraseña vigente la
-  tiene el cliente (no se escribe en ningún fichero del repo ni de la consultoría).
+  **Desde el 09-11-2026 se cambia desde Configuració › General** (abajo); `HASH_TOKEN` del repo
+  queda como huella de RESPALDO (la contraseña de antes de esa fecha, que no se puede mostrar) y
+  `scripts/cortina-hash.mjs 'nova'` solo sirve para calcular una huella a mano. La contraseña
+  inicial no se escribe en ningún fichero del repo ni de la consultoría.
+- 🔴 **«Pantalla de protección previa a la home»: se enciende, se apaga y se cambia desde
+  Configuració › General (09-11-2026, migración `20270517110000`, solo super_admin).** Lo pidió el
+  cliente: de momento la web queda **abierta** (la fila **nace `activa = false`**), con la opción de
+  volver a cerrarla y de ver y cambiar la contraseña.
+  - **Estado**: tabla `cortina_config` (una fila `id = 1`: `activa`, `contrasenya` EN CLARO a
+    propósito para que el super_admin la vea y la dé, `hash_token`, `updated_at`, `updated_by` =
+    correo copiado como texto, sin FK). Sin GRANT para `anon` ni `authenticated`: se lee con
+    `cortina_config()` y se enciende con `cortina_activar(bool)` (las dos, `es_super_admin()`);
+    `cortina_desar_contrasenya(pw, hash, per)` es solo `service_role`. `contrasenya` y `hash_token`
+    van juntas o ninguna (CHECK): sin ellas vale la huella del repo y la interfaz dice que la
+    contraseña vigente no se puede mostrar.
+  - **La contraseña nueva** pasa por la Edge Function **`cortina-config`** (JWT, `ctx.rol ===
+    'super_admin'` sin depender de `roles_activos`): valida 8–100 caracteres, calcula la huella
+    con `_shared/cortinaHash.ts` (PBKDF2 + SHA-256, mismo código que el middleware; paridad con
+    `scripts/cortina-hash.mjs` probada) y la guarda. Cambiarla invalida todas las cookies.
+  - **El middleware** (`creaLectorEstat` en `cortina/cortina.ts`) pregunta a la Edge Function
+    **pública `cortina-estat`** (`verify_jwt = false`; devuelve `{activa, hash}`, nunca la
+    contraseña; la huella es de la misma naturaleza que `HASH_TOKEN` en el repo) y cachea 20 s por
+    instancia, con una sola consulta en vuelo y un timeout de 2,5 s. 🔴 **FAIL-CLOSED**: la
+    cortina solo se abre ante un `{activa:false}` bien formado; un error, un timeout, un 503 o una
+    respuesta rara dejan la puesta (con el último estado bueno si lo hay, y si no con
+    `HASH_TOKEN`). Por eso un cambio de Configuració tarda hasta ~30 s en notarse.
+  - **Apagada**, todo pasa (`x-middleware-next`) y `POST /__cortina` vuelve a la portada;
+    `/__cortina/surt` sigue borrando la cookie. `npm run dev` y `dev:local` usan el mismo
+    lector contra el proyecto al que apuntan (caché 2 s).
+  - **Al encenderla, el propio super_admin** tendrá que poner la contraseña al recargar. Apagarla
+    pide confirmación; encenderla no.
+  - **Orden de publicación**: migración → `functions deploy cortina-estat --no-verify-jwt` y
+    `cortina-config` → frontend (con el `middleware.js` nuevo). Con la migración puesta y el
+    middleware viejo, nada cambia; con el middleware nuevo y la función sin desplegar, el
+    respaldo deja la cortina como estaba (fail-closed).
+  - En producción la contraseña en claro de `cortina_config` se carga a mano la primera vez
+    (`scripts/data/`, fuera de git): el repo no la lleva.
 - **Se sirven sin cortina solo cinco cosas sin datos** (`esLliure()`): `logo-email.png` (los
   correos lo pintan desde la bandeja), `segell-redestina*.svg` (el sello vive en webs de
   terceros), `favicon.svg`, `sw.js` y `workbox-*.js`.

@@ -948,6 +948,12 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "documento_datos_fundacio_actual", op: "rpc", esperado: "denegar", args: { p_datos: {} }, descripcion: "NO crida la funció interna de dades de la Fundació" },
   { tabla: "regeneracions_documents", op: "leer", esperado: "denegar", descripcion: "NO veu el registre de regeneracions (0 files)" },
   { tabla: "regeneracions_documents", op: "insertar", esperado: "denegar", descripcion: "NO escriu el registre de regeneracions directament" },
+  // Pantalla de protecció prèvia a la home / la cortina (20270517110000): la contrasenya és en clar i només la veu el super_admin; la taula no té GRANT per a ningú.
+  { tabla: "cortina_config", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu la contrasenya de la cortina (és del super_admin)" },
+  { tabla: "cortina_activar", op: "rpc", esperado: "denegar", args: { p_activa: false }, descripcion: "NO encén ni apaga la cortina (és del super_admin)" },
+  { tabla: "cortina_desar_contrasenya", op: "rpc", esperado: "denegar", args: { p_contrasenya: "contrasenya-arnes", p_hash: "0000000000000000000000000000000000000000000000000000000000000000", p_per: "arnes" }, descripcion: "NO desa la contrasenya de la cortina directament (només la Edge Function)" },
+  { tabla: "cortina_config", op: "leer", esperado: "denegar", descripcion: "NO llegeix la taula de la cortina (contrasenya en clar: sense GRANT)" },
+  { tabla: "cortina_config", op: "insertar", esperado: "denegar", descripcion: "NO escriu la taula de la cortina directament" },
   { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap organització" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1628,6 +1634,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documento_datos_fundacio_actual", op: "rpc", esperado: "denegar", args: { p_datos: {} }, descripcion: "NO crida la funció interna de dades de la Fundació" },
     { tabla: "regeneracions_documents", op: "leer", esperado: "denegar", descripcion: "NO veu el registre de regeneracions (0 files)" },
     { tabla: "regeneracions_documents", op: "insertar", esperado: "denegar", descripcion: "NO escriu el registre de regeneracions directament" },
+    // Pantalla de protecció prèvia a la home / la cortina (20270517110000): la contrasenya és en clar i només la veu el super_admin; la taula no té GRANT per a ningú.
+    { tabla: "cortina_config", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu la contrasenya de la cortina (és del super_admin)" },
+    { tabla: "cortina_activar", op: "rpc", esperado: "denegar", args: { p_activa: false }, descripcion: "NO encén ni apaga la cortina (és del super_admin)" },
+    { tabla: "cortina_desar_contrasenya", op: "rpc", esperado: "denegar", args: { p_contrasenya: "contrasenya-arnes", p_hash: "0000000000000000000000000000000000000000000000000000000000000000", p_per: "arnes" }, descripcion: "NO desa la contrasenya de la cortina directament (només la Edge Function)" },
+    { tabla: "cortina_config", op: "leer", esperado: "denegar", descripcion: "NO llegeix la taula de la cortina (contrasenya en clar: sense GRANT)" },
+    { tabla: "cortina_config", op: "insertar", esperado: "denegar", descripcion: "NO escriu la taula de la cortina directament" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
@@ -1973,6 +1985,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "documento_datos_fundacio_actual", op: "rpc", esperado: "denegar", args: { p_datos: {} }, descripcion: "NO crida la funció interna de dades de la Fundació" },
     { tabla: "regeneracions_documents", op: "leer", esperado: "permitir", descripcion: "veu el registre de regeneracions", requiereFixture: "alguna regeneracio de documents" },
     { tabla: "regeneracions_documents", op: "insertar", esperado: "denegar", descripcion: "NO escriu el registre de regeneracions directament" },
+    // Pantalla de protecció prèvia a la home / la cortina (20270517110000): la contrasenya és en clar i només la veu el super_admin; la taula no té GRANT per a ningú.
+    { tabla: "cortina_config", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu l'estat de la cortina i la seva contrasenya (és del super_admin)" },
+    { tabla: "cortina_activar", op: "rpc", esperado: "permitir", args: { p_activa: null }, descripcion: "pot encendre/apagar la cortina (amb null, error de negoci i no canvia res)" },
+    { tabla: "cortina_desar_contrasenya", op: "rpc", esperado: "denegar", args: { p_contrasenya: "contrasenya-arnes", p_hash: "0000000000000000000000000000000000000000000000000000000000000000", p_per: "arnes" }, descripcion: "NO desa la contrasenya de la cortina directament (només la Edge Function)" },
+    { tabla: "cortina_config", op: "leer", esperado: "denegar", descripcion: "NO llegeix la taula de la cortina (contrasenya en clar: sense GRANT)" },
+    { tabla: "cortina_config", op: "insertar", esperado: "denegar", descripcion: "NO escriu la taula de la cortina directament" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -2984,6 +3002,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   equip_traspassos: { origen_id: "00000000-0000-0000-0000-000000000000", desti_id: "00000000-0000-0000-0000-000000000000", motiu: "traspas", total: 0, detall: [] },
   equip_persones_arxiu: { user_id: "00000000-0000-0000-0000-000000000000", email: "arnes@exemple.cat" },
   regeneracions_documents: { total: 0, signats: 0, detall: [] },
+  cortina_config: { id: 2, activa: true },
   equip_traspassos_files: { traspas_id: "00000000-0000-0000-0000-000000000000", taula: "documentos", columna: "emitido_por", fila: { id: "00000000-0000-0000-0000-000000000000" } },
   notes_internes: { organizacion_id: "00000000-0000-0000-0000-000000000000", canal: "telefon", text: "arnes" },
   // 20270511100000: el registro del importador solo lo escribe `importar_entitats()`. Filas

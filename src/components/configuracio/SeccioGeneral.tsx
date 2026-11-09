@@ -1,4 +1,5 @@
-// Configuració › General: la validación previa de ofertas y el idioma. (El modo test pasó a
+// Configuració › General: la validación previa de ofertas, la pantalla de protección previa
+// a la home (la cortina) y el idioma. (El modo test pasó a
 // Notificacions el 27-10-2026: decide a quién se envía, que es parte de las notificaciones.)
 
 import { useEffect, useState } from 'react'
@@ -8,6 +9,7 @@ import type { Lang } from '../../lib/i18n'
 import { cn } from '../../lib/utils'
 import { getValidacioOfertes, setValidacioOfertes } from '../../lib/settings'
 import Interruptor from './Interruptor'
+import SeccioCortina from './SeccioCortina'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
@@ -46,6 +48,9 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
         bloquejat={saving || !potCanviar}
         motiu={motiu}
       />
+
+      {/* La cortina de contraseña (09-11-2026): solo la ve el super_admin. */}
+      {potCanviar && <SeccioCortina />}
 
       {/* Idioma */}
       <Card>

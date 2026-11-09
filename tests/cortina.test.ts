@@ -5,15 +5,23 @@
 // ⚠️ El camino bueno (contraseña correcta → cookie → pasa) solo se prueba si se da la
 //    contraseña por entorno: `CORTINA_PROVA='…' npx vitest run tests/cortina.test.ts`.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
+import { spawnSync } from 'node:child_process'
 import { empaqueta } from '../scripts/construir-cortina.mjs'
 import {
-  COOKIE, COOKIE_IDIOMA, RUTA_ENTRADA, RUTA_SORTIDA, destiSegur, idiomaDe, esLliure, esTokenValid, gestiona, llegeixCookie,
-  tokenDeContrasenya,
+  COOKIE, COOKIE_IDIOMA, ESTAT_DE_RESPALD, HASH_TOKEN, RUTA_ENTRADA, RUTA_SORTIDA, TTL_ESTAT_MS, creaLectorEstat, destiSegur,
+  idiomaDe, esLliure, esTokenValid, gestiona as gestionaReal, llegeixCookie, llegeixEstat, tokenDeContrasenya,
 } from '../cortina/cortina.ts'
+import type { LectorEstat } from '../cortina/cortina.ts'
+import { huellaDeContrasenya, huellaDeToken, motiuContrasenyaInvalida } from '../supabase/functions/_shared/cortinaHash.ts'
 
 const BASE = 'https://redestina.carlessanz.com'
+
+// Las pruebas de la petición NO salen a la red: el estado de la cortina (puesta, con la huella del
+// repo) se inyecta. Sin lector, `gestiona` preguntaría a la Edge Function de producción.
+const ACTIVA: LectorEstat = async () => ({ activa: true, hash: HASH_TOKEN })
+const gestiona = (req: Request, estat: LectorEstat = ACTIVA) => gestionaReal(req, estat)
 
 describe('lo que se sirve sin cortina', () => {
   it('las imágenes de terceros y el service worker, sí', () => {
@@ -138,5 +146,134 @@ describe('salir de la cortina', () => {
     }))
     expect(r.status).toBe(401)
     expect(r.headers.get('set-cookie') ?? '').not.toContain(`${COOKIE}=`)
+  })
+})
+
+// ── La cortina que se enciende y se apaga (09-11-2026) ───────────────────────────────────────────
+
+describe('apagada desde Configuració', () => {
+  const APAGADA: LectorEstat = async () => ({ activa: false, hash: HASH_TOKEN })
+  it('una navegación y un script pasan sin cookie', async () => {
+    const nav = await gestiona(new Request(`${BASE}/equip/tauler`, { headers: { 'sec-fetch-mode': 'navigate' } }), APAGADA)
+    expect(nav.headers.get('x-middleware-next')).toBe('1')
+    const js = await gestiona(new Request(`${BASE}/assets/index-abc.js`), APAGADA)
+    expect(js.headers.get('x-middleware-next')).toBe('1')
+  })
+  it('el formulario ya no tiene a quién entregar nada: vuelve a la portada, sin cookie', async () => {
+    const r = await gestiona(new Request(`${BASE}${RUTA_ENTRADA}`, {
+      method: 'POST', body: new URLSearchParams({ contrasenya: 'x'.repeat(10), desti: '/login' }),
+    }), APAGADA)
+    expect(r.status).toBe(303)
+    expect(new URL(r.headers.get('location') ?? '', BASE).pathname).toBe('/')
+    expect(r.headers.get('set-cookie') ?? '').not.toContain(`${COOKIE}=`)
+  })
+  it('salir de la cortina sigue borrando la cookie', async () => {
+    const r = await gestiona(new Request(`${BASE}${RUTA_SORTIDA}`), APAGADA)
+    expect(r.headers.get('set-cookie')).toContain(`${COOKIE}=; Path=/; Max-Age=0`)
+  })
+})
+
+describe('con la huella de la base', () => {
+  it('la contraseña nueva abre y la otra no', async () => {
+    const hash = await huellaDeContrasenya('prova-cortina-A')
+    const estat: LectorEstat = async () => ({ activa: true, hash })
+    const dolenta = await gestiona(new Request(`${BASE}${RUTA_ENTRADA}`, {
+      method: 'POST', body: new URLSearchParams({ contrasenya: 'prova-cortina-B', desti: '/' }),
+    }), estat)
+    expect(dolenta.status).toBe(401)
+    const bona = await gestiona(new Request(`${BASE}${RUTA_ENTRADA}`, {
+      method: 'POST', body: new URLSearchParams({ contrasenya: 'prova-cortina-A', desti: '/login' }),
+    }), estat)
+    expect(bona.status).toBe(303)
+    const token = (bona.headers.get('set-cookie') ?? '').split(';')[0].split('=')[1]
+    const dins = await gestiona(new Request(`${BASE}/`, { headers: { cookie: `${COOKIE}=${token}` } }), estat)
+    expect(dins.headers.get('x-middleware-next')).toBe('1')
+    // Cambiada la contraseña, la cookie de la anterior deja de valer.
+    const canviat: LectorEstat = async () => ({ activa: true, hash: await huellaDeContrasenya('prova-cortina-C') })
+    const fora = await gestiona(new Request(`${BASE}/`, {
+      headers: { cookie: `${COOKIE}=${token}`, 'sec-fetch-mode': 'navigate' },
+    }), canviat)
+    expect(fora.status).toBe(401)
+  })
+  it('esTokenValid compara con la huella que se le da, y por defecto con la del repo', async () => {
+    const token = await tokenDeContrasenya('prova-cortina-A')
+    expect(await esTokenValid(token, await huellaDeToken(token))).toBe(true)
+    expect(await esTokenValid(token)).toBe(false)
+  })
+  it('la huella coincide con la de scripts/cortina-hash.mjs (mismo algoritmo, dos sitios)', async () => {
+    const r = spawnSync('node', ['scripts/cortina-hash.mjs', 'prova-cortina-A'], { encoding: 'utf8' })
+    expect(r.stdout.trim()).toBe(await huellaDeContrasenya('prova-cortina-A'))
+  })
+})
+
+describe('lo que contesta cortina-estat', () => {
+  const H = 'a'.repeat(64)
+  it('solo se acepta { activa: boolean, hash: 64 hex | null }', () => {
+    expect(llegeixEstat({ activa: false, hash: H })).toEqual({ activa: false, hash: H })
+    expect(llegeixEstat({ activa: true, hash: null })).toEqual({ activa: true, hash: HASH_TOKEN })
+    expect(llegeixEstat({ activa: true })).toEqual({ activa: true, hash: HASH_TOKEN })
+  })
+  it('cualquier otra cosa se rechaza: una respuesta rara NUNCA abre', () => {
+    for (const x of [null, undefined, 'false', 0, [], {}, { activa: 'false', hash: H }, { activa: 0, hash: H },
+      { activa: null }, { activa: false, hash: 'zz' }, { activa: false, hash: 'A'.repeat(64) }, { activa: false, hash: 5 }]) {
+      expect(llegeixEstat(x)).toBeNull()
+    }
+  })
+})
+
+describe('el lector de estado (caché y fail-closed)', () => {
+  const resposta = (cos: unknown, status = 200) => new Response(JSON.stringify(cos), { status })
+  const H = 'b'.repeat(64)
+
+  it('pregunta una vez y reutiliza la respuesta hasta que caduca', async () => {
+    let t = 0
+    const f = vi.fn(async () => resposta({ activa: false, hash: H }))
+    const lector = creaLectorEstat('http://x/estat', { fetchFn: f as unknown as typeof fetch, ara: () => t })
+    expect(await lector()).toEqual({ activa: false, hash: H })
+    t += TTL_ESTAT_MS - 1
+    await lector()
+    expect(f).toHaveBeenCalledTimes(1)
+    t += 2
+    await lector()
+    expect(f).toHaveBeenCalledTimes(2)
+  })
+  it('peticiones a la vez comparten una sola consulta', async () => {
+    const f = vi.fn(async () => resposta({ activa: true, hash: H }))
+    const lector = creaLectorEstat('http://x/estat', { fetchFn: f as unknown as typeof fetch })
+    await Promise.all([lector(), lector(), lector()])
+    expect(f).toHaveBeenCalledTimes(1)
+  })
+  it('sin respuesta y sin estado anterior: la cortina PUESTA, con la huella del repo', async () => {
+    for (const f of [
+      async () => { throw new Error('red') },
+      async () => resposta({ error: 'x' }, 503),
+      async () => resposta({ activa: 'false' }),
+      async () => new Response('no es json', { status: 200 }),
+    ]) {
+      const lector = creaLectorEstat('http://x/estat', { fetchFn: f as unknown as typeof fetch })
+      expect(await lector()).toEqual(ESTAT_DE_RESPALD)
+    }
+    expect(ESTAT_DE_RESPALD).toEqual({ activa: true, hash: HASH_TOKEN })
+  })
+  it('si la base deja de contestar, se mantiene el último estado bueno', async () => {
+    let t = 0
+    let cae = false
+    const f = vi.fn(async () => { if (cae) throw new Error('red'); return resposta({ activa: false, hash: H }) })
+    const lector = creaLectorEstat('http://x/estat', { fetchFn: f as unknown as typeof fetch, ara: () => t })
+    expect(await lector()).toEqual({ activa: false, hash: H })
+    cae = true
+    t += TTL_ESTAT_MS + 1
+    expect(await lector()).toEqual({ activa: false, hash: H })
+  })
+})
+
+describe('la contraseña que se puede poner', () => {
+  it('de 8 a 100 caracteres', () => {
+    expect(motiuContrasenyaInvalida('1234567')).toBe('curta')
+    expect(motiuContrasenyaInvalida('12345678')).toBeNull()
+    expect(motiuContrasenyaInvalida('x'.repeat(100))).toBeNull()
+    expect(motiuContrasenyaInvalida('x'.repeat(101))).toBe('llarga')
+    expect(motiuContrasenyaInvalida(12345678)).toBe('tipus')
+    expect(motiuContrasenyaInvalida(null)).toBe('tipus')
   })
 })

@@ -274,6 +274,21 @@ verify_jwt = true
 import_map = "./functions/enviar-albara/deno.json"
 entrypoint = "./functions/enviar-albara/index.ts"
 
+# La cortina de contraseña (09-11-2026). `cortina-estat` lo llama el middleware de Vercel antes de
+# que nadie tenga sesión: va SIN JWT y solo da «activa» y la huella, nunca la contraseña.
+# `cortina-config` cambia la contraseña desde Configuració: con JWT y super_admin dentro.
+[functions.cortina-estat]
+enabled = true
+verify_jwt = false
+import_map = "./functions/cortina-estat/deno.json"
+entrypoint = "./functions/cortina-estat/index.ts"
+
+[functions.cortina-config]
+enabled = true
+verify_jwt = true
+import_map = "./functions/cortina-config/deno.json"
+entrypoint = "./functions/cortina-config/index.ts"
+
 # Recordatorios del circuito documental: enlaces sin usar a 7 y 14 días. La llama pg_cron
 # a las 7:00 (disparar_recordatorios_documentales), así que va sin JWT y con el mismo
 # secreto compartido que generar-documento. No sirve ficheros estáticos.

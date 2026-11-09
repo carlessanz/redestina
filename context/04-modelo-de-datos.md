@@ -1530,6 +1530,16 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   Probado en el clon (con rollback): 68 documentos regenerados, 3 firmados intactos, todas las huellas cuadran.
   Pantalla: `RegeneraDocuments` debajo de Configuració › Fundació, con recuento por tipo, aviso y diálogo «Accepto i regenero».
 
+### La cortina, desde Configuració (09-11-2026, `20270517110000`)
+
+Tabla `cortina_config` (una fila, `id = 1`): `activa` (nace **false**), `contrasenya` (en claro, 8–100),
+`hash_token` (SHA-256 del token PBKDF2; `^[0-9a-f]{64}$`), `updated_at`, `updated_by` (correo como texto, sin
+FK: el rastro no depende de que la cuenta siga existiendo). CHECK `cortina_config_parella`: contraseña y huella,
+juntas o ninguna. RLS activada y **sin GRANT** para `anon` ni `authenticated`. RPC: `cortina_config()` y
+`cortina_activar(bool)` (super_admin), `cortina_desar_contrasenya(...)` (solo `service_role`). Pantalla:
+`SeccioCortina` (Configuració › General, solo la monta el super_admin), cliente `lib/cortina.ts`. Detalle del
+funcionamiento y de la postura de seguridad en `context/09`.
+
 ### Datos fiscales y de facturación, CB y fecha de alta (09-11-2026, `20270517100000`)
 
 Revisión de la Taula mestra por la Fundació (columna de Sebas, filas 1.3 y 1.5). En las dos fichas (`productores` y

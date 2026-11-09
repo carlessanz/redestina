@@ -10,13 +10,24 @@
 //      token = PBKDF2-SHA256(contraseña, sal fija, 100.000 vueltas)   → va en la cookie
 //      HASH_TOKEN = SHA-256(token)                                     → va aquí
 //    Con el repo en la mano no se puede fabricar la cookie (haría falta invertir SHA-256) y
-//    probar contraseñas contra la huella cuesta 100.000 vueltas por intento. Para cambiar la
-//    contraseña: `node scripts/cortina-hash.mjs 'nova'` y sustituir la constante.
+//    probar contraseñas contra la huella cuesta 100.000 vueltas por intento.
+//
+// 🔴 DESDE EL 09-11-2026 la cortina se ENCIENDE, se APAGA y cambia de contraseña desde
+//    Configuració › General (solo super_admin): el estado vive en la tabla `cortina_config` y el
+//    middleware lo lee de la Edge Function pública `cortina-estat` (`creaLectorEstat`, con caché
+//    de 20 s). `HASH_TOKEN` queda como la huella de RESPALDO: vale mientras la base no tenga una
+//    propia y cuando la base no contesta.
+//    ⚠️ FAIL-CLOSED: la cortina solo se abre ante un «activa: false» explícito y bien formado.
+//    Un error, un timeout o una respuesta rara dejan la cortina puesta (con el último estado
+//    bueno si lo hay, y si no con `HASH_TOKEN`).
 //
 // ⚠️ Módulo PURO (Web Crypto y nada más), para que lo puedan importar el middleware —que
 //    corre en el runtime Edge— y las pruebas de Vitest, que corren en Node.
 
 import { LOGO_NEGATIU } from './logo.ts'
+import { huellaDeToken, tokenDeContrasenya } from '../supabase/functions/_shared/cortinaHash.ts'
+
+export { tokenDeContrasenya }
 
 /** SHA-256 del token de la contraseña vigente. */
 export const HASH_TOKEN = 'df8d7e4a9627eaf3650b2b5de6eff139fb2813c8f29f2e2bd9276a4ba89201a3'
@@ -28,9 +39,6 @@ export const DURADA_S = 7 * 24 * 60 * 60
 export const RUTA_ENTRADA = '/__cortina'
 /** Borra la cookie: la cortina vuelve a salir. */
 export const RUTA_SORTIDA = '/__cortina/surt'
-
-const SAL = 'redestina-cortina-v1'
-const VOLTES = 100_000
 
 /**
  * Lo que se sirve SIN cortina, y por qué cada uno:
@@ -50,28 +58,78 @@ export function esLliure(ruta: string): boolean {
     || /^\/workbox-[A-Za-z0-9_-]+\.js$/.test(ruta)
 }
 
-function hex(buf: ArrayBuffer): string {
-  return [...new Uint8Array(buf)].map((b) => b.toString(16).padStart(2, '0')).join('')
-}
-
-/** El token que va en la cookie, derivado de la contraseña escrita. */
-export async function tokenDeContrasenya(contrasenya: string): Promise<string> {
-  const enc = new TextEncoder()
-  const clau = await crypto.subtle.importKey('raw', enc.encode(contrasenya), 'PBKDF2', false, ['deriveBits'])
-  const bits = await crypto.subtle.deriveBits(
-    { name: 'PBKDF2', salt: enc.encode(SAL), iterations: VOLTES, hash: 'SHA-256' },
-    clau,
-    256,
-  )
-  return hex(bits)
-}
-
-/** ¿Este token abre la cortina? Una sola SHA-256: se evalúa en cada petición. */
-export async function esTokenValid(token: string | null | undefined): Promise<boolean> {
+/**
+ * ¿Este token abre la cortina? Una sola SHA-256: se evalúa en cada petición. `hash` es la
+ * huella vigente (la de la base, o `HASH_TOKEN` de respaldo).
+ */
+export async function esTokenValid(token: string | null | undefined, hash: string = HASH_TOKEN): Promise<boolean> {
   if (!token || !/^[0-9a-f]{64}$/.test(token)) return false
-  const h = hex(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(token)))
-  return h === HASH_TOKEN
+  return (await huellaDeToken(token)) === hash
 }
+
+// ── El estado de la cortina (09-11-2026) ─────────────────────────────────────────────────────
+
+/** Lo que dice la base: si la cortina está puesta y con qué huella se abre. */
+export interface EstatCortina { activa: boolean; hash: string }
+export type LectorEstat = () => Promise<EstatCortina>
+
+/** El proyecto de Supabase de producción (público: sale en el bundle). */
+export const URL_ESTAT_PER_DEFECTE = 'https://uxppvaldhptdomvdhsmn.supabase.co/functions/v1/cortina-estat'
+/** Lo que tarda un cambio de Configuració en notarse: cada instancia relee cada tanto. */
+export const TTL_ESTAT_MS = 20_000
+const TIMEOUT_ESTAT_MS = 2_500
+
+/** Lo que se hace sin saber nada: cortina puesta, con la huella del repo. */
+export const ESTAT_DE_RESPALD: EstatCortina = { activa: true, hash: HASH_TOKEN }
+
+/**
+ * Valida lo que contesta `cortina-estat`. Devuelve `null` ante cualquier cosa que no sea
+ * exactamente `{ activa: boolean, hash: <64 hex> | null }`: una respuesta rara NUNCA abre.
+ */
+export function llegeixEstat(cos: unknown): EstatCortina | null {
+  if (!cos || typeof cos !== 'object') return null
+  const { activa, hash } = cos as { activa?: unknown; hash?: unknown }
+  if (typeof activa !== 'boolean') return null
+  if (hash !== null && hash !== undefined && !(typeof hash === 'string' && /^[0-9a-f]{64}$/.test(hash))) return null
+  return { activa, hash: typeof hash === 'string' ? hash : HASH_TOKEN }
+}
+
+/**
+ * Un lector con caché y fail-closed. Una sola consulta en vuelo a la vez; si la base no
+ * contesta, vale el último estado bueno (aunque esté caducado) y, si no lo hay, el respaldo.
+ */
+export function creaLectorEstat(
+  url: string,
+  opcions: { fetchFn?: typeof fetch; ara?: () => number; ttl?: number } = {},
+): LectorEstat {
+  const fetchFn = opcions.fetchFn ?? ((...a: Parameters<typeof fetch>) => fetch(...a))
+  const ara = opcions.ara ?? Date.now
+  const ttl = opcions.ttl ?? TTL_ESTAT_MS
+  let ultim: { estat: EstatCortina; at: number } | null = null
+  let enVol: Promise<EstatCortina> | null = null
+
+  async function consulta(): Promise<EstatCortina> {
+    const ctl = new AbortController()
+    const rellotge = setTimeout(() => ctl.abort(), TIMEOUT_ESTAT_MS)
+    try {
+      const r = await fetchFn(url, { signal: ctl.signal, headers: { accept: 'application/json' } })
+      const e = r.ok ? llegeixEstat(await r.json().catch(() => null)) : null
+      if (e) { ultim = { estat: e, at: ara() }; return e }
+    } catch { /* se trata como «no contesta» */ } finally { clearTimeout(rellotge) }
+    return ultim?.estat ?? ESTAT_DE_RESPALD
+  }
+
+  return async () => {
+    if (ultim && ara() - ultim.at < ttl) return ultim.estat
+    enVol ??= consulta().finally(() => { enVol = null })
+    return enVol
+  }
+}
+
+/** El lector de producción. En el runtime Edge de Vercel `URL_ESTAT` puede venir del entorno. */
+const urlEstat = (globalThis as { process?: { env?: Record<string, string | undefined> } }).process?.env?.CORTINA_ESTAT_URL
+  ?? URL_ESTAT_PER_DEFECTE
+const lectorPerDefecte = creaLectorEstat(urlEstat)
 
 /** El valor de una cookie en la cabecera `Cookie`, o null. */
 export function llegeixCookie(capcalera: string | null, nom: string): string | null {
@@ -286,7 +344,7 @@ function continua(): Response {
  * Toda la lógica, en una función que las pruebas pueden llamar con una `Request` a mano.
  * Devuelve siempre una `Response`: o la cortina, o la redirección tras entrar, o `continua()`.
  */
-export async function gestiona(req: Request): Promise<Response> {
+export async function gestiona(req: Request, estat: LectorEstat = lectorPerDefecte): Promise<Response> {
   const url = new URL(req.url)
 
   // Borrar la cookie y volver a ver la cortina. Existe para PROBARLA: el navegador integrado
@@ -303,6 +361,13 @@ export async function gestiona(req: Request): Promise<Response> {
     })
   }
 
+  // La cortina apagada desde Configuració: la web pasa como si no existiera. (El formulario ya
+  // no tiene a quién entregar nada: se vuelve a la portada.)
+  const { activa, hash } = await estat()
+  if (!activa) {
+    return url.pathname === RUTA_ENTRADA ? Response.redirect(new URL('/', url), 303) : continua()
+  }
+
   if (url.pathname === RUTA_ENTRADA) {
     if (req.method !== 'POST') return Response.redirect(new URL('/', url), 303)
     const form = await req.formData().catch(() => null)
@@ -310,7 +375,7 @@ export async function gestiona(req: Request): Promise<Response> {
     const desti = destiSegur(String(form?.get('desti') ?? '/'))
     const idioma: Idioma = form?.get('idioma') === 'es' ? 'es' : 'ca'
     const token = contrasenya ? await tokenDeContrasenya(contrasenya) : ''
-    if (!(await esTokenValid(token))) return htmlCortina(desti, true, idioma)
+    if (!(await esTokenValid(token, hash))) return htmlCortina(desti, true, idioma)
     return new Response(null, {
       status: 303,
       headers: {
@@ -322,7 +387,7 @@ export async function gestiona(req: Request): Promise<Response> {
   }
 
   if (esLliure(url.pathname)) return continua()
-  if (await esTokenValid(llegeixCookie(req.headers.get('cookie'), COOKIE))) return continua()
+  if (await esTokenValid(llegeixCookie(req.headers.get('cookie'), COOKIE), hash)) return continua()
 
   // Una navegación ve la cortina; cualquier otra cosa (un script, una imagen, el manifest)
   // recibe un 401 seco, sin el HTML de la cortina dentro de un `<script>`.

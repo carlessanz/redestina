@@ -435,6 +435,10 @@ supabase/
     enviar-albara/             POST (JWT, equipo; 04-11-2026): «Envia per correu» del albarán, el PDF
                                a cada parte y, si le falta confirmar, un enlace nuevo
                                (`preparar_enviament_albara()`); envío manual (§8)
+    cortina-estat/             GET (SIN JWT; 09-11-2026): `{activa, hash}` de la cortina para el middleware
+                               de Vercel; nunca la contraseña; 503 ante cualquier error (§9)
+    cortina-config/            POST {contrasenya} (JWT, solo super_admin): calcula la huella
+                               (`_shared/cortinaHash.ts`) y la guarda con `cortina_desar_contrasenya()`
     recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.

@@ -8,27 +8,21 @@ trabajan en este repositorio. `CLAUDE.md` lo importa; **no dupliques contenido a
 > este fichero en el mismo cambio.** Si el código y este documento discrepan, el documento
 > está roto.
 
-> 🔴 **Regla de tamaño (02-11-2026): este fichero se carga ENTERO en cada sesión y no puede
-> pasar de 48 KB.** Llegó a 681 KB (~200.000 tokens: la ventana de contexto entera) y cada
-> sesión del proyecto se compactaba antes de empezar. Aquí vive **solo lo vigente, en forma
-> compacta**; el detalle de cada sección —con su historia, sus medidas y sus porqués— está en
-> **`context/<sección>.md`**, que se lee bajo demanda y se mantiene al día con la misma regla
-> permanente. Una cita «AGENTS.md §N» del código vale para las dos: el número de sección es el
-> mismo. `tests/agentsMida.test.ts` falla si este fichero supera el tope. **Lo histórico («el
-> día X se vio que…») va al fichero de detalle, nunca aquí.**
+> 🔴 **Regla de tamaño (02-11-2026): este fichero se carga ENTERO en cada sesión y no puede pasar
+> de 48 KB** (llegó a 681 KB y cada sesión se compactaba antes de empezar). Aquí vive **solo lo
+> vigente, compacto**; el detalle, la historia y los porqués de cada § están en
+> **`context/<sección>.md`** (bajo demanda, con la misma regla permanente; «AGENTS.md §N» vale para
+> los dos). `tests/agentsMida.test.ts` falla si se pasa. **Lo histórico va al detalle, nunca aquí.**
 
-| § | Fichero de detalle | § | Fichero de detalle |
-| --- | --- | --- | --- |
-| 1 | `context/01-proyecto.md` | 7 | `context/07-convenciones.md` |
-| 1bis | `context/01bis-vision-funcional.md` | 8 | `context/08-reglas-de-negocio.md` |
-| 2 | `context/02-stack.md` | 8bis | `context/08bis-canal-preferente.md` |
-| 2bis | `context/02bis-sistema-de-diseno.md` | 8ter | `context/08ter-cuando-meta-rechaza.md` |
-| 3 | `context/03-estructura.md` | 9 | `context/09-seguridad-autenticacion.md` |
-| 4 | `context/04-modelo-de-datos.md` | 10 · 10bis · 10ter | `context/10-variables-de-entorno.md`, `10bis-nombres-retirados.md`, `10ter-rename-completado.md` |
-| 4bis | `context/04bis-identidad-roles-permisos.md` | 11 | `context/11-comandos.md` |
-| 5 | `context/05-flujos.md` | 12 | `context/12-checkpoints-y-deuda.md` |
-| 6 · 6bis | `context/06-importacion-datos-maestros.md`, `06bis-intake-conversacional.md` | 12bis · 12ter | `context/12bis-decisiones-con-precio.md`, `12ter-deuda-cerrada.md` |
-| 6ter · 6quater | `context/06ter-distribucion-cierre-panel.md`, `06quater-parte-publica-registro.md` | 13 | `context/13-al-terminar-un-cambio.md` |
+Detalle por §: 1 `context/01-proyecto.md` · 1bis `context/01bis-vision-funcional.md` · 2 `context/02-stack.md` ·
+2bis `context/02bis-sistema-de-diseno.md` · 3 `context/03-estructura.md` · 4 `context/04-modelo-de-datos.md` ·
+4bis `context/04bis-identidad-roles-permisos.md` · 5 `context/05-flujos.md` · 6 `context/06-importacion-datos-maestros.md` ·
+6bis `context/06bis-intake-conversacional.md` · 6ter `context/06ter-distribucion-cierre-panel.md` ·
+6quater `context/06quater-parte-publica-registro.md` · 7 `context/07-convenciones.md` ·
+8 `context/08-reglas-de-negocio.md` · 8bis `context/08bis-canal-preferente.md` · 8ter `context/08ter-cuando-meta-rechaza.md` ·
+9 `context/09-seguridad-autenticacion.md` · 10 `context/10-variables-de-entorno.md` (+ `context/10bis-nombres-retirados.md`,
+`context/10ter-rename-completado.md`) · 11 `context/11-comandos.md` · 12 `context/12-checkpoints-y-deuda.md` (+
+`context/12bis-decisiones-con-precio.md`, `context/12ter-deuda-cerrada.md`) · 13 `context/13-al-terminar-un-cambio.md`.
 
 ---
 
@@ -47,8 +41,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
   técnica (cómo).
-- **Planes vivos** (`3. Claude Code/`): plan 1 CRM (1A-1D y 1F publicadas; **1E solo en el clon**,
-  carga en producción antes del 31-12); certificado y firma, ejecutados.
+- **Planes vivos** (`3. Claude Code/`): plan 1 CRM (**1E solo en el clon**, carga en producción antes del 31-12).
 - Vocabulario: la tabla `excedentes` es la «oferta» de los textos («AFCV» en el funcional).
 
 ## 1bis. Visión funcional (objetivo ↔ construido)
@@ -125,7 +118,7 @@ src/
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend, pujada; 22 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
+          autorizacion, resend, pujada; 24 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
           enviar-*, *-documento, enlace-publico, priorizar-entidades, recordatorios-*… ; lista en `context/03`)
 docs/ (ignorado por git)
 ```
@@ -440,7 +433,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270517100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270517110000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -491,9 +484,13 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 
 ## 9. Seguridad (detalle en `context/09-…md`)
 
-- 🔴 **Cortina de contraseña delante de toda la web** (`middleware.js` generado de `cortina/`; cookie
-  7 días; solo `HASH_TOKEN` en git; `scripts/cortina-hash.mjs` la cambia; libres solo `logo-email.png`,
-  el sello, favicon y `sw.js`). Los enlaces de correo y `/verificar` piden la contraseña primero.
+- 🔴 **Cortina de contraseña** («pantalla de protección previa a la home»; `middleware.js` generado de
+  `cortina/`; cookie 7 días). **Desde el 09-11-2026 el super_admin la enciende, apaga y cambia en
+  Configuració › General** (`cortina_config`; contraseña en claro solo para él; RPC `cortina_config/activar`,
+  Edge Function `cortina-config` calcula la huella; **nace APAGADA**). El middleware lee la Edge Function pública
+  `cortina-estat` (caché 20 s, **fail-closed**: solo un `activa:false` explícito abre; `HASH_TOKEN` del repo =
+  respaldo). Libres solo `logo-email.png`, sello, favicon y `sw.js`; con ella puesta, los enlaces de correo y
+  `/verificar` piden la contraseña primero.
 - Todo dato exige sesión de Supabase Auth; `anon` sin privilegios. Login `signInWithPassword`;
   recuperación por `recuperar-password` + `admin.generateLink` + Resend; `enable_signup=false` y el
   **mailer nativo apagado** (nunca `resetPasswordForEmail`, `inviteUserByEmail` ni magic links). Resend
@@ -512,10 +509,9 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   `evidencias`; tres vías —correo, asistida, panel— y el PDF las distingue. `pujar-document-signat`:
   formato por **bytes** (`_shared/pujada.ts`, también en `subir-documento-externo`), permiso antes de
   leer el fichero, se guarda tal cual. Confirmación de albarán: `sha256_texto` del acta; D3 en la API.
-- Cuentas de prueba: 5 organizaciones `TEST-*` y 7 cuentas (`crear-usuarios-prueba.ts`), 5 de
-  WhatsApp (`crear-usuarios-whatsapp.ts`), `hola+pendent-arnes@` (**pendiente, no aprobar**) y `hola+senserol-arnes@`.
-  Credenciales en `scripts/data/cuentas-prueba.json`; las del bundle de `/login` solo con
-  `VITE_ACCESSOS_TEST`.
+- Cuentas de prueba: 5 organizaciones `TEST-*`, 7 cuentas + 5 de WhatsApp, `hola+pendent-arnes@`
+  (**pendiente, no aprobar**) y `hola+senserol-arnes@`; credenciales en `scripts/data/cuentas-prueba.json`
+  (las del bundle de `/login`, solo con `VITE_ACCESSOS_TEST`; detalle en `context/09`).
 - ⚠️ **Nunca `supabase config push`** (apagaría el login por email y subiría el Auth local); los
   flags de Auth van por Management API.
 
@@ -597,10 +593,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.807 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.820 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.290/2.290 y 36 sin datos; producción 2.293/2.293 y 33 «Sin fallos de
+   **Referencia: clon 2.335/2.335 y 36 sin datos; producción 2.293/2.293 y 33 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
