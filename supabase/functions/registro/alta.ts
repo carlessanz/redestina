@@ -225,9 +225,9 @@ export async function executarAlta(supabase: Cliente, d: Dades, opcions: Opcions
         // opt_in = false: el consentimiento de WhatsApp se recoge aparte (§12.3).
         opt_in: false,
         es_test: opcions.esTest === true,
-        // `estat` se deja NULL a propósito: la priorización excluye a las entidades
-        // sin estado (_shared/priorizacion.ts), así que una ficha recién registrada
-        // no puede colarse en un ranking hasta que el equipo la revise.
+        // Una ficha recién registrada no entra en el ranking hasta que el equipo apruebe
+        // el registro: `priorizar-entidades` deja fuera a las entidades con membresías y
+        // ninguna `aprovada` (desde el 09-11-2026; antes lo hacía su `estat` NULL).
       };
 
     const { data: fitxa, error: errFitxa } = await supabase

@@ -76,7 +76,7 @@ Deno.serve(async (req) => {
       poblacion = poblacion ?? p?.poblacion ?? null;
     }
 
-    const { data: entidades, error: entError } = await supabase
+    const { data: entidadesActives, error: entError } = await supabase
       .from("entidades")
       // ⚠️ La lista de columnas va en UN literal, sin concatenar: supabase-js deduce el
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
@@ -91,14 +91,52 @@ Deno.serve(async (req) => {
       return json({ error: "Error consultando las entidades" }, 500);
     }
 
+    // Fuera también la que se registró sola y el equipo aún no ha aprobado (o rechazó): tiene
+    // membresías y NINGUNA `aprovada`. La ficha del registro nace `activo = true` (el default),
+    // y hasta el 09-11-2026 la mantenía fuera su `estat` vacío; desde la deuda §12.168 el
+    // `estat` vacío ya no excluye, así que esta regla lo dice explícitamente. Las fichas que
+    // crea el equipo sin cuenta no tienen membresías y entran. Falla cerrado: sin poder leer
+    // las membresías no se sabe quién está sin revisar.
+    const idsActives = (entidadesActives ?? []).map((e: { id: string }) => e.id);
+    const { data: membres, error: memError } = idsActives.length
+      ? await supabase.from("membresias").select("entidad_id, aprovacio").in("entidad_id", idsActives)
+      : { data: [], error: null };
+    if (memError) {
+      console.error("membresias select:", memError.message);
+      return json({ error: "Error consultando las membresías" }, 500);
+    }
+    const ambMembresia = new Set<string>();
+    const aprovades = new Set<string>();
+    for (const m of (membres ?? []) as { entidad_id: string | null; aprovacio: string | null }[]) {
+      if (!m.entidad_id) continue;
+      ambMembresia.add(m.entidad_id);
+      if (m.aprovacio === "aprovada") aprovades.add(m.entidad_id);
+    }
+    const entidades = (entidadesActives ?? []).filter((e: { id: string }) => !ambMembresia.has(e.id) || aprovades.has(e.id));
+
     const contexto: ExcedenteContexto = {
       familia: excedente.familia,
       area_geografica: area,
       poblacion,
       kg_total: excedente.kg_total,
     };
+    // `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
+    // Con VARIAS modalidades (05-10-2026) a una entidad le falta el papel solo si no tiene el
+    // convenio de NINGUNA: con el de una, puede pedirla en esa modalidad (D2). Es la
+    // intersección de los «sin convenio» de cada una.
+    const ids = (entidades ?? []).map((e: { id: string }) => e.id);
+    const modalitats = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
+    const sinPorModalitat: Set<string>[] = [];
+    for (const m of modalitats) sinPorModalitat.push(await entidadesSinConvenio(supabase, m, ids));
+    const sinConvenio: Set<string> = sinPorModalitat.length === 0
+      ? new Set<string>()
+      : sinPorModalitat.reduce((acc, sin) => new Set([...acc].filter((x) => sin.has(x))));
+
+    // Y es también lo que decide «activa o pendiente» en el ranking (deuda §12.168,
+    // 09-11-2026): antes lo decidía `entidades.estat`, la columna del antiguo Excel, y un
+    // `estat` vacío —el de toda entidad nueva— la dejaba fuera de las sugerencias.
     const ranking = priorizar(
-      (entidades ?? []) as unknown as EntidadPriorizable[],
+      (entidades ?? []).map((e: { id: string }) => ({ ...e, conveni_vigent: !sinConvenio.has(e.id) })) as unknown as EntidadPriorizable[],
       contexto,
     );
 
@@ -139,18 +177,6 @@ Deno.serve(async (req) => {
     // Desde el 27-10-2026, también el correo y el general: con todo apagado, `cap` para todas.
     const canals = await canalsActius(supabase);
     const waActivo = canals.whatsapp;
-
-    // Y `sense_conveni` dice si le FALTA EL PAPEL para poder recibir esto (fase 2).
-    // Con VARIAS modalidades (05-10-2026) a una entidad le falta el papel solo si no tiene el
-    // convenio de NINGUNA: con el de una, puede pedirla en esa modalidad (D2). Es la
-    // intersección de los «sin convenio» de cada una.
-    const ids = (entidades ?? []).map((e: { id: string }) => e.id);
-    const modalitats = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
-    const sinPorModalitat: Set<string>[] = [];
-    for (const m of modalitats) sinPorModalitat.push(await entidadesSinConvenio(supabase, m, ids));
-    const sinConvenio: Set<string> = sinPorModalitat.length === 0
-      ? new Set<string>()
-      : sinPorModalitat.reduce((acc, sin) => new Set([...acc].filter((x) => sin.has(x))));
 
     // La última vez que cada entidad RECIBIÓ algo (fase 6 de la revisión del 08-10-2026):
     // una canalización conciliada. Para el filtro «última recepció» del panel; no puntúa.

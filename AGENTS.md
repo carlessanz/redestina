@@ -446,7 +446,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270512100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270512100100`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -479,7 +479,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `sendEmail()`); `esCuentaPermitida` para acceso y recuperación (pasa el equipo). Documentos
   `modo='prueba'` → `destinatariosPrueba()` aunque el modo test esté apagado. Whitelists:
   con filas, solo a quien esté; vacías, no restringen.
-- Proceso de canalización: intake → distribución → confirmación → cierre. Valor = kg × coste
+- Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
+  convenio, al final; `estat` solo excluye «No procedeix». Valor = kg × coste
   por kilo de la canalización (nunca `productos.eur_kg` para lo fiscal).
 
 ## 8bis. Canal preferente
@@ -577,7 +578,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (74 vivas; la siguiente entrada nueva es la 169; los números no se renumeran ni
+**Deuda abierta (73 vivas; la siguiente entrada nueva es la 169; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
 interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
@@ -591,8 +592,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **168** (`entidades.estat` vacío deja
-la entidad fuera de `priorizar-entidades`).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -601,13 +601,13 @@ inactiva sigue viendo lo ya enviado). Resto: 4, 10, 12,
 17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
 95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
 
-**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (89
+**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (90
 cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.765 pruebas de Vitest en 77 ficheros (1 saltada a propósito) + 25 de Deno.**
+   **Referencia: 1.764 pruebas de Vitest en 77 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.040/2.040 y 32 sin datos; producción 2.041/2.041 y 31 «Sin fallos de

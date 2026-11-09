@@ -21,9 +21,15 @@ const PRIORITAT_MAX = 3; // prioritat 1 es la más alta; suma (3 - prioritat)
 // La única familia que NO se considera fresca.
 const FAMILIA_NO_FRESCA = "Varis";
 
-// `estat`: qué se considera activo, qué va al final y qué se excluye.
-const ESTAT_ACTIVO = "signat";
-const ESTATS_EXCLUIDOS = ["no procedeix", ""]; // + cualquiera vacío/nulo
+// Quién entra y quién va al final (deuda §12.168, 09-11-2026):
+//   · «al final, con aviso» = sin el convenio vigente que exige la modalidad de la oferta
+//     (`conveni_vigent`, calculado en `priorizar-entidades` con `convenios_exigidos`: el mismo
+//     que alimenta `sense_conveni` y que pide la fecha de corte para mostrar interés).
+//   · excluida = `estat` «No procedeix», la única decisión explícita del equipo que guarda la
+//     columna del antiguo Excel del ARA.
+// Antes «Signat» en `estat` era lo activo y un `estat` vacío EXCLUÍA: toda entidad dada de alta
+// en el panel o por el importador nace sin `estat`, así que no salía nunca en las sugerencias.
+const ESTATS_EXCLUIDOS = ["no procedeix"];
 
 export interface EntidadPriorizable {
   id: string;
@@ -32,7 +38,10 @@ export interface EntidadPriorizable {
   telefono: string | null;
   opt_in: boolean | null;
   area_geografica: string | null;
+  /** Columna del antiguo Excel del ARA: solo «No procedeix» cuenta (excluye). */
   estat: string | null;
+  /** ¿Tiene el convenio vigente que exige la modalidad? Sin él, va al final con aviso. */
+  conveni_vigent: boolean;
   prioritat: number | null;
   productes_frescos: boolean | null;
   transport_plataforma: boolean | null;
@@ -56,7 +65,7 @@ export interface EntidadPuntuada {
   opt_in: boolean;
   puntuacion: number;
   motivos: string[];
-  /** Estat pendiente: candidata pero avisada, va al final del ranking. */
+  /** Sin convenio vigente: candidata pero avisada, va al final del ranking. */
   pendiente: boolean;
   /**
    * ¿Ha dicho la entidad que le interesa esta categoría de producto? `null` si no ha
@@ -109,12 +118,10 @@ export function puntuarEntidad(
   entidad: EntidadPriorizable,
   excedente: ExcedenteContexto,
 ): EntidadPuntuada | null {
-  const estat = norm(entidad.estat);
-  // Excluidas: sin estado o "No procedeix" no entran en el ranking.
-  if (ESTATS_EXCLUIDOS.includes(estat)) return null;
+  // Excluida: «No procedeix» en la columna del Excel. Sin estado ya NO excluye (§12.168).
+  if (ESTATS_EXCLUIDOS.includes(norm(entidad.estat))) return null;
 
-  const activo = estat === ESTAT_ACTIVO;
-  const pendiente = !activo; // cualquier "Pendent*" que no sea Signat
+  const pendiente = !entidad.conveni_vigent;
 
   let puntuacion = 0;
   const motivos: string[] = [];

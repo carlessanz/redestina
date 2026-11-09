@@ -7,8 +7,9 @@
 //
 // Los pesos son una regla de negocio acordada (AGENTS.md §6ter), no un detalle de
 // implementación: por eso se prueban uno a uno y por su valor exacto, no «que puntúe más».
-// Y las dos decisiones que sí excluyen a alguien del reparto —`No procedeix` y sin estado—
-// se prueban aparte, porque son las únicas que pueden dejar a una entidad sin ver nada.
+// Y la única decisión que excluye a alguien del reparto —`No procedeix`— se prueba aparte,
+// porque es la única que puede dejar a una entidad sin ver nada. Sin estado ya no excluye
+// (deuda §12.168): lo que manda «activa o pendiente» es el convenio real (`conveni_vigent`).
 
 import { describe, it, expect } from 'vitest'
 import { categoriaDeFamilia as catSrv, categoriesInteres, PESO_PRODUCTE } from '../supabase/functions/_shared/priorizacion.ts'
@@ -29,7 +30,8 @@ function entidad(parcial: Partial<EntidadPriorizable> = {}): EntidadPriorizable 
     telefono: null,
     opt_in: true,
     area_geografica: null,
-    estat: 'Signat',
+    estat: null,
+    conveni_vigent: true,
     prioritat: null,
     productes_frescos: null,
     transport_plataforma: null,
@@ -166,34 +168,38 @@ describe('puntuarEntidad · prioritat', () => {
   })
 })
 
-// Los seis valores que de verdad hay en `sda.csv`: Signat (62), Pendent (36),
-// No procedeix (7), vacío (5), Pendent entitat (1) y Pendent Espigoladors (1).
-describe('puntuarEntidad · los seis valores reales de estat', () => {
-  it('«Signat» entra como activa', () => {
-    const r = puntuarEntidad(entidad({ estat: 'Signat' }), excedente())
+// Activa o pendiente lo decide el convenio real; el `estat` del Excel solo excluye con
+// «No procedeix» (deuda §12.168, 09-11-2026).
+describe('puntuarEntidad · convenio y estat', () => {
+  it('con convenio vigente entra como activa, sin aviso', () => {
+    const r = puntuarEntidad(entidad({ conveni_vigent: true }), excedente())
     expect(r!.pendiente).toBe(false)
     expect(r!.motivos).not.toContain('⚠️ Conveni pendent')
   })
 
-  it.each(['Pendent', 'Pendent entitat', 'Pendent Espigoladors'])(
-    '«%s» entra, pero marcada como pendiente y con aviso',
-    (estat) => {
-      const r = puntuarEntidad(entidad({ estat }), excedente())
-      expect(r).not.toBeNull()
-      expect(r!.pendiente).toBe(true)
-      expect(r!.motivos).toContain('⚠️ Conveni pendent')
-    },
-  )
-
-  it('«No procedeix» queda EXCLUIDA del reparto', () => {
-    expect(puntuarEntidad(entidad({ estat: 'No procedeix' }), excedente())).toBeNull()
-    expect(puntuarEntidad(entidad({ estat: 'NO PROCEDEIX' }), excedente())).toBeNull()
+  it('sin convenio vigente entra, pero marcada como pendiente y con aviso', () => {
+    const r = puntuarEntidad(entidad({ conveni_vigent: false }), excedente())
+    expect(r).not.toBeNull()
+    expect(r!.pendiente).toBe(true)
+    expect(r!.motivos).toContain('⚠️ Conveni pendent')
   })
 
-  it('sin estado queda EXCLUIDA, tanto si es null como si es una cadena vacía', () => {
-    expect(puntuarEntidad(entidad({ estat: null }), excedente())).toBeNull()
-    expect(puntuarEntidad(entidad({ estat: '' }), excedente())).toBeNull()
-    expect(puntuarEntidad(entidad({ estat: '   ' }), excedente())).toBeNull()
+  // El caso que dejaba fuera a toda entidad nueva: «Nova entitat» y el importador no
+  // escriben `estat`.
+  it('sin estado ENTRA (null, vacío o espacios): ya no excluye', () => {
+    for (const estat of [null, '', '   ']) {
+      expect(puntuarEntidad(entidad({ estat }), excedente())).not.toBeNull()
+    }
+  })
+
+  it('el texto del Excel no decide activa o pendiente: manda el convenio', () => {
+    expect(puntuarEntidad(entidad({ estat: 'Signat', conveni_vigent: false }), excedente())!.pendiente).toBe(true)
+    expect(puntuarEntidad(entidad({ estat: 'Pendent', conveni_vigent: true }), excedente())!.pendiente).toBe(false)
+  })
+
+  it('«No procedeix» queda EXCLUIDA del reparto, aunque tenga convenio', () => {
+    expect(puntuarEntidad(entidad({ estat: 'No procedeix' }), excedente())).toBeNull()
+    expect(puntuarEntidad(entidad({ estat: 'NO PROCEDEIX' }), excedente())).toBeNull()
   })
 
   // Una entidad pendiente sigue puntuando: lo que cambia es dónde acaba en el ranking,
@@ -201,7 +207,7 @@ describe('puntuarEntidad · los seis valores reales de estat', () => {
   // sería arbitrario.
   it('una pendiente conserva su puntuación entera', () => {
     const x = excedente({ area_geografica: 'Baix Llobregat' })
-    expect(puntos(entidad({ estat: 'Pendent', area_geografica: 'Baix Llobregat' }), x)).toBe(3)
+    expect(puntos(entidad({ conveni_vigent: false, area_geografica: 'Baix Llobregat' }), x)).toBe(3)
   })
 })
 
@@ -267,13 +273,13 @@ describe('priorizar', () => {
     const lista = [
       entidad({
         id: 'pendent-perfecta',
-        estat: 'Pendent',
+        conveni_vigent: false,
         area_geografica: 'A',
         poblacion: 'P',
         transport_plataforma: true,
         prioritat: 1,
       }),
-      entidad({ id: 'activa-fluixa', estat: 'Signat' }),
+      entidad({ id: 'activa-fluixa', conveni_vigent: true }),
     ]
     const r = priorizar(lista, x)
     expect(r.map((e) => e.id)).toEqual(['activa-fluixa', 'pendent-perfecta'])
@@ -283,8 +289,8 @@ describe('priorizar', () => {
   it('dentro del bloque pendiente también ordena por puntuación', () => {
     const x = excedente({ area_geografica: 'A' })
     const lista = [
-      entidad({ id: 'p-baixa', estat: 'Pendent entitat' }),
-      entidad({ id: 'p-alta', estat: 'Pendent Espigoladors', area_geografica: 'A' }),
+      entidad({ id: 'p-baixa', conveni_vigent: false }),
+      entidad({ id: 'p-alta', conveni_vigent: false, area_geografica: 'A' }),
     ]
     expect(priorizar(lista, x).map((e) => e.id)).toEqual(['p-alta', 'p-baixa'])
   })
@@ -295,7 +301,7 @@ describe('priorizar', () => {
       entidad({ id: 'no-procedeix', estat: 'No procedeix' }),
       entidad({ id: 'sense-estat', estat: null }),
     ]
-    expect(priorizar(lista, excedente()).map((e) => e.id)).toEqual(['ok'])
+    expect(priorizar(lista, excedente()).map((e) => e.id)).toEqual(['ok', 'sense-estat'])
   })
 
   it('con la lista vacía devuelve la lista vacía, no falla', () => {
@@ -317,10 +323,10 @@ describe('priorizar', () => {
 
   it('el empate es estable también cruzando activas y pendientes', () => {
     const lista = [
-      entidad({ id: 'a1', estat: 'Signat' }),
-      entidad({ id: 'p1', estat: 'Pendent' }),
-      entidad({ id: 'a2', estat: 'Signat' }),
-      entidad({ id: 'p2', estat: 'Pendent' }),
+      entidad({ id: 'a1', conveni_vigent: true }),
+      entidad({ id: 'p1', conveni_vigent: false }),
+      entidad({ id: 'a2', conveni_vigent: true }),
+      entidad({ id: 'p2', conveni_vigent: false }),
     ]
     expect(priorizar(lista, excedente()).map((e) => e.id)).toEqual(['a1', 'a2', 'p1', 'p2'])
   })
@@ -337,12 +343,12 @@ describe('priorizar', () => {
 describe('el ranking contiene exactamente a las candidatas, con su puntuación intacta', () => {
   const x = excedente({ area_geografica: 'A', poblacion: 'P', familia: 'Horta Fulla', kg_total: 700 })
   const lista = [
-    entidad({ id: '1', estat: 'Signat', area_geografica: 'A', poblacion: 'P' }),
-    entidad({ id: '2', estat: 'Pendent', transport_plataforma: true, prioritat: 1 }),
+    entidad({ id: '1', area_geografica: 'A', poblacion: 'P' }),
+    entidad({ id: '2', conveni_vigent: false, transport_plataforma: true, prioritat: 1 }),
     entidad({ id: '3', estat: 'No procedeix', area_geografica: 'A' }),
     entidad({ id: '4', estat: null }),
-    entidad({ id: '5', estat: 'Pendent entitat', productes_frescos: true, opt_in: false }),
-    entidad({ id: '6', estat: 'Signat', descarrega_toro: true }),
+    entidad({ id: '5', conveni_vigent: false, productes_frescos: true, opt_in: false }),
+    entidad({ id: '6', descarrega_toro: true }),
   ]
 
   it('no pierde ni inventa candidatas', () => {
@@ -377,7 +383,7 @@ describe('interés por producto (C3 v1)', () => {
   it('suma PESO_PRODUCTE y lo dice; sin perfil, null', () => {
     const base = {
       id: 'e', nombre: 'E', poblacion: null, telefono: null, opt_in: true, area_geografica: null,
-      estat: 'Signat', prioritat: null, productes_frescos: null, transport_plataforma: null, descarrega_toro: null,
+      estat: null, conveni_vigent: true, prioritat: null, productes_frescos: null, transport_plataforma: null, descarrega_toro: null,
     }
     const exc = { familia: 'Fruita Dolça', area_geografica: null, poblacion: null, kg_total: 100 }
     const sense = puntuarEntidad(base, exc)!

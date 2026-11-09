@@ -1625,8 +1625,10 @@ intake (§6bis) y persiste al editar (se re-sincroniza con `exc.disponible_hasta
 excedente, ordena las entidades candidatas. Pesos: misma área +3 (mismo municipio +2 extra);
 `transport_plataforma` +1 y `descarrega_toro` +1 (peso doble si `kg_total > 500`); producto
 fresco + entidad que acepta frescos +2; `prioritat` suma `max(0, 3 - prioritat)`. Sobre el
-`estat` (6 valores reales, no 2): `Signat` puntúa arriba; las tres variantes `Pendent*` van al
-final con aviso; `No procedeix` y sin estado se **excluyen**. Sin `opt_in` no se excluye, se
+orden por bloques (desde el 09-11-2026, deuda 168): **con el convenio que pide la modalidad**
+arriba; **sin él**, al final con aviso «⚠️ Conveni pendent» (es lo mismo que `sense_conveni`); el
+`estat` del Excel solo cuenta para **excluir** con `No procedeix` (antes `Signat`/`Pendent*` decidían el
+bloque y un estado vacío excluía). Sin `opt_in` no se excluye, se
 marca (no se le puede enviar por API). Sobre ese ranking, `OfferDetail` aplica un **reorden de
 presentación estable**: primero las **contactables**, sin tocar la puntuación del servidor; y añade a
 la línea de motivos «No és usuari de prova» en las que no lo son, para que se vea *por qué* el botón
@@ -2040,4 +2042,11 @@ descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres 
   de la pestaña Gestió interna, debajo del CRM, se llamaba igual que la pestaña («Gestió interna
   REDESTINA»). Ahora es «Altres dades internes (de l'antic Excel)» y cada campo dice de dónde viene y si
   cuenta para algo (`ef.fi_*` etiquetas, `ef.hi_*` ayudas en `campsFitxa`): «Estat» y «Prioritat» siguen
-  ordenando `priorizar-entidades` (y un `estat` vacío excluye: deuda 168); el resto solo informa.
+  ordenando `priorizar-entidades` (y un `estat` vacío excluía: deuda 168); el resto solo informa.
+- **Deuda 168 cerrada (mismo día)**: el ranking de `priorizar-entidades` ya no mira `estat` para decidir
+  activa o pendiente, sino el convenio que pide la modalidad (`entidadesSinConvenio()`, el de
+  `sense_conveni`); `estat` solo excluye con «No procedeix», y queda fuera la entidad cuyo registro
+  self-service no está aprobado (membresías sin ninguna `aprovada`). Detalle en §12.168.
+- **1.3 «Cooperativa agraria. Mantener el resto de actividades»**: la actividad `cooperativa_agraria`
+  existía solo para el papel de ofertante; pasa a `ambdos` (`20270512100100`) y sale también en la ficha
+  de una receptora. El resto del catálogo, igual.
