@@ -2078,5 +2078,6 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   dice «Fora de l'aplicació (SQL)». El correo de quien cambia se copia en la fila, así que borrar su cuenta no lo borra.
 - Pruebas: `tests/e2e/equip.e2e.ts` (clon; la cuenta de prueba `comunicacio@esimperfect.com` baja y sube, con
   confirmación, y el clon queda como estaba) y el arnés (denegada a todo el que no sea super_admin).
-- En producción **Sebastián pasó a `super_admin` por esta misma pantalla** (o, antes de publicarla, por SQL
-  desde la sesión con token): anotar aquí la fecha cuando se haga.
+- En producción, **Sebastián (`sebastian@espigoladors.com`) pasó de `admin` a `super_admin` el 09-11-2026**, por SQL
+  desde la sesión con token justo al publicar (`publicar-equip.sh`); quedó en el historial como «Fora de l'aplicació».
+  Los super_admin activos son ahora tres: `hola@`, `hola+superadmin@` (cuenta de prueba) y él.
