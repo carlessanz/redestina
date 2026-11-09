@@ -1448,6 +1448,28 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   equipo—, `per` → `perfiles` `set null`, `per_email`, `at`): una fila por cambio real de `canviar_rol_equip()`, que es la
   única que escribe. Los correos van copiados porque al sacar a alguien o borrar la cuenta el id ya no dice nada.
   RLS: la lee `es_super_admin()`; `authenticated` solo tiene SELECT.
+  Desde `20270514100000` lleva `accio` (`rol`·`activa`·`desactiva`·`edita`·`esborra`·`traspas`) y `detall` jsonb.
+- **`equip_traspassos`** (`20270514100000`; `origen_id`/`desti_id` y sus correos, `motiu` traspas·desactiva·esborra, `total`,
+  `detall` = `[{taula, columna, n}]`, `per`, `per_email`, `at`): cada traspaso de acciones entre cuentas del equipo. **Sin FK a
+  propósito** (sobrevive al borrado de las cuentas), solo inserción por las RPC `equip_*`, lectura `es_super_admin()`.
+
+### Gestión del equipo (09-11-2026, `20270514100000`)
+
+- 🔴 **Una cuenta del equipo no tiene organizaciones**, y por tanto ni ofertas propias (Carles, 09-11-2026): `trg_membresia_no_equip`
+  (`22023 compte_equip`: no se crea ni reactiva una membresía a quien tiene rol) y `trg_rol_no_membre` (`22023 te_membresies`: no se da
+  rol a quien tiene una membresía activa). Solo miran lo que entra: lo que ya hubiera no se toca (`equip_membres().membresies` lo avisa).
+  Las ofertas **asistidas** del equipo en nombre de un productor siguen siendo legítimas: no son de la cuenta del equipo.
+- **«Sus acciones» = toda columna de autoría**: `equip_columnes_autoria()` lee el catálogo (FK de `public` a `auth.users`/`perfiles` con
+  `on delete set null`, 56 columnas hoy: `convenios.contrafirmado_por`, `documentos.emitido_por`, `notes_internes.autor`…) más dos sin FK
+  (`excedente_destins.registrat_per`, `excedentes_canvis.revisat_per`), y excluye `equip_*`. Una tabla nueva con su `creado_por` entra sola;
+  el diálogo la rotula «Altres» hasta que se añada a `GRUP_TAULA` (`lib/equip.ts`).
+- 🔴 **La inmutabilidad deja mover QUIÉN, solo en las RPC `equip_*`.** Diez triggers (`albaranes`, `convenios`, `documentos`, `planes_prevencion`,
+  `cierres_donante`, `canalizaciones`, `membresias`, `costes_producto`, `plantillas_documento`, `questionaris_diagnostic`) llevan al principio
+  `if tg_op = 'UPDATE' and current_setting('redestina.traspas_autoria', true) = 'on' then return new`, parcheada desde la definición vigente
+  con un `DO` que verifica que quedó puesta. La marca la pone `set_config(..., true)` dentro de la transacción y se apaga al acabar. Se probó
+  antes: el traspaso toca SOLO la autoría (hash del resto de columnas idéntico antes y después). El PDF ya emitido conserva el nombre impreso.
+- Bloqueos: nadie se activa/desactiva/borra a sí mismo (`no_et_pots_tocar`); nunca el equipo sin super_admin activo (`ultim_super_admin`,
+  con `pg_advisory_xact_lock` para dos cambios a la vez); el destino ha de ser una cuenta ACTIVA del equipo distinta del origen.
 - **`v_organizaciones`** (sigue `security_invoker`): columnas nuevas al final, en este orden: `activa`,
   `productor_activo`, `entidad_activo`, `razon_social`, `nom_comercial`
   (`coalesce(p.empresa, e.nombre, p.name)`), `persona_contacte`, `municipio_ine`, `comarca`

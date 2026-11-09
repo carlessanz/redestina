@@ -295,7 +295,8 @@ src/
                                Impacte y Diagnòstic (§6ter)
     configuracio/              Interruptor (la tarjeta Activat/Desactivat), SeccioGeneral (modo test,
                                validación, idioma) y SeccioNotificacions (los tres interruptores, §8)
-                               y SeccioEquip (09-11-2026: cuentas del equipo y su rol, solo super_admin)
+                               y SeccioEquip (09-11-2026: cuentas del equipo y su rol, solo super_admin),
+                               con DialegEditaMembre y DialegTraspasMembre (desactivar/borrar con traspaso)
     FormulariAlta.tsx          EL formulario de alta con cuenta y casillas RGPD de `/registre`, patrón de
                                FirmaConveni (§9). El modo `assistit` y `equip/DialegAltaAssistida.tsx` se
                                retiraron en 1D (P1): el equipo da de alta sin cuenta y da el acceso después

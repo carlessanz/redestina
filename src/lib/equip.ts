@@ -2,11 +2,14 @@
 // `tecnic`—, que NO son los usuarios de las organizaciones. Vocabulario y cálculos de la pantalla
 // «Configuració › Equip», sin React ni Supabase (prueba en `tests/equip.test.ts`).
 //
-// Las escribe `canviar_rol_equip()` y las lee `equip_membres()` (`20270513100000`); las dos son
-// solo del super_admin. Quién puede qué (reglas de la base, que esta pantalla solo anticipa para
-// no ofrecer botones que acabarían en error):
-//   · no puedes cambiarte el rol a ti mismo;
-//   · el equipo nunca se queda sin un super_admin;
+// Las escribe `canviar_rol_equip()` (`20270513100000`) y, desde `20270514100000`, editar, activar,
+// desactivar, borrar y traspasar acciones (`*_membre_equip`, `traspassar_accions_equip`); las lee
+// `equip_membres()`. Todas son solo del super_admin. Quién puede qué (reglas de la base, que esta
+// pantalla solo anticipa para no ofrecer botones que acabarían en error):
+//   · no puedes cambiarte el rol, ni activarte, desactivarte o borrarte a ti mismo;
+//   · el equipo nunca se queda sin un super_admin activo;
+//   · borrar a quien ha hecho cosas EXIGE decir a quién pasan (`cal_desti`);
+//   · una cuenta del equipo no tiene organizaciones (ni, por tanto, ofertas);
 //   · aquí no se dan de alta cuentas ni se convierte una externa en equipo.
 
 /** El CHECK de `usuario_roles.rol`, del que más permisos tiene al que menos. */
@@ -27,7 +30,14 @@ export interface MembreEquip {
   des_de: string | null
   otorgat_per: string | null
   es_tu: boolean
+  telefon: string | null
+  /** Membresías de organización activas: una cuenta del equipo debería tener 0. */
+  membresies: number
 }
+
+/** Qué se hizo en una fila de `equip_rols_hist` (el CHECK de `accio`). */
+export const ACCIONS_HIST = ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'traspas'] as const
+export type AccioHist = (typeof ACCIONS_HIST)[number]
 
 /** Una fila de `equip_rols_hist`. */
 export interface CanviRol {
@@ -35,8 +45,73 @@ export interface CanviRol {
   email: string | null
   rol_abans: RolEquip | null
   rol_despres: RolEquip | null
+  accio: AccioHist
+  detall: { traspassades?: number; desti_email?: string | null; total?: number } | null
   per_email: string | null
   at: string
+}
+
+/** Lo que devuelve `equip_accions()`: las filas que llevan el nombre de la cuenta, por columna. */
+export interface AccionsCompte {
+  accions: { taula: string; columna: string; n: number }[]
+  total: number
+  membresies: number
+  es_equip: boolean
+}
+
+/**
+ * Las tablas de `equip_columnes_autoria()` agrupadas como se las explicaría una persona: «Convenis»,
+ * «Documents»… Una tabla que no esté aquí cae en `altres` (una tabla nueva con autoría entra en el
+ * traspaso sola, solo que con el rótulo genérico). Las claves `eq.g_<grup>` están declaradas en
+ * `tests/i18n.test.ts`.
+ */
+export const GRUP_TAULA: Record<string, string> = {
+  albaranes: 'albarans',
+  canalizaciones: 'canalitzacions',
+  cierres_donante: 'certificats', cierres_ejercicio: 'certificats', cierres_periodo: 'certificats', cierres_receptor: 'certificats',
+  consentiments: 'consentiments',
+  convenios: 'convenis',
+  costes_producto: 'costos', costes_producto_hist: 'costos',
+  diagnostics_historial: 'diagnostic', questionaris_diagnostic: 'diagnostic',
+  documentos: 'documents', documentos_externos: 'documents',
+  enlaces_token: 'enllacos',
+  espigoladas: 'espigolades',
+  evidencias: 'signatures', firmes_document: 'signatures',
+  excedentes: 'ofertes', excedentes_canvis: 'ofertes', excedente_destins: 'ofertes',
+  expedients_prevencion: 'prevencio', planes_prevencion: 'prevencio', pla_accions: 'prevencio', pla_objectius: 'prevencio',
+  pla_processos: 'prevencio', pla_quantificacio: 'prevencio', pla_seguiments: 'prevencio', pla_verificacions: 'prevencio',
+  pla_visites: 'prevencio',
+  factors_impacte: 'configuracio', parametros_documentales: 'configuracio', plantillas_documento: 'configuracio',
+  fitxa_estat_hist: 'fitxes', importacions_entitats: 'fitxes', organizaciones: 'fitxes',
+  membresias: 'accessos', usuario_roles: 'accessos',
+  notes_internes: 'notes',
+}
+
+/** Los grupos que existen (cada uno con su clave `eq.g_<grup>`). */
+export const GRUPS_ACCIO = [
+  'albarans', 'canalitzacions', 'certificats', 'consentiments', 'convenis', 'costos', 'diagnostic', 'documents',
+  'enllacos', 'espigolades', 'ofertes', 'signatures', 'prevencio', 'configuracio', 'fitxes', 'accessos', 'notes', 'altres',
+] as const
+
+/** Las acciones de `equip_accions()` sumadas por grupo, de más a menos filas. */
+export function agrupaAccions(accions: AccionsCompte['accions']): { grup: string; n: number }[] {
+  const per: Record<string, number> = {}
+  for (const a of accions) {
+    const g = GRUP_TAULA[a.taula] ?? 'altres'
+    per[g] = (per[g] ?? 0) + a.n
+  }
+  return Object.entries(per).map(([grup, n]) => ({ grup, n })).sort((a, b) => b.n - a.n || a.grup.localeCompare(b.grup))
+}
+
+/** El teléfono tal como lo guarda la base: E.164 sin «+», sin espacios, guiones ni paréntesis. */
+export function normalitzaTelefon(s: string): string {
+  return s.replace(/[\s+()-]/g, '')
+}
+
+/** ¿Vale? Vacío sí (sin teléfono); si no, 8 a 15 cifras sin cero inicial (la misma regla que la RPC). */
+export function telefonValid(s: string): boolean {
+  const t = normalitzaTelefon(s)
+  return t === '' || /^[1-9][0-9]{7,14}$/.test(t)
 }
 
 const ORDRE: Record<RolEquip, number> = { super_admin: 0, admin: 1, tecnic: 2 }
@@ -57,24 +132,55 @@ export function recompteRols(membres: readonly MembreEquip[]): Record<RolEquip, 
 /** Una opción del desplegable de cada fila: el rol, o `cap`, con su clave i18n. */
 export interface OpcioRol { valor: RolAAssignar; clau: string }
 
+/** ¿Es el único super_admin activo? Bajarlo, desactivarlo o borrarlo dejaría el equipo sin nadie que lo corrija. */
+function esUltimSuper(m: MembreEquip, membres: readonly MembreEquip[]): boolean {
+  return m.rol === 'super_admin' && m.actiu
+    && !membres.some((x) => x.user_id !== m.user_id && x.rol === 'super_admin' && x.actiu)
+}
+
 /**
- * Lo que se puede hacer con una cuenta, igual que lo va a exigir la base. `canvia` = false con
- * su `motiu` (clave i18n) cuando no hay nada que ofrecer: tú mismo, o el único super_admin
- * activo (bajarlo dejaría el equipo sin nadie que pueda corregirlo desde la interfaz).
+ * Lo que se puede hacer con una cuenta, igual que lo va a exigir la base. `canvia` = false con su
+ * `motiu` (clave i18n) cuando no hay rol que ofrecer: tú mismo, o el único super_admin activo.
+ * `pot` dice cuáles de las demás acciones salen, y `motiuTocar` por qué no salen las tres últimas.
  */
 export function accionsMembre(
   m: MembreEquip,
   membres: readonly MembreEquip[],
-): { canvia: boolean; motiu: string | null; opcions: OpcioRol[] } {
-  if (m.es_tu) return { canvia: false, motiu: 'eq.m_tu', opcions: [] }
-  const ultim = m.rol === 'super_admin'
-    && !membres.some((x) => x.user_id !== m.user_id && x.rol === 'super_admin' && x.actiu)
-  if (ultim) return { canvia: false, motiu: 'eq.m_ultim', opcions: [] }
+): {
+  canvia: boolean
+  motiu: string | null
+  opcions: OpcioRol[]
+  pot: { edita: boolean; activa: boolean; desactiva: boolean; esborra: boolean }
+  motiuTocar: string | null
+} {
+  const motiuTocar = m.es_tu ? 'eq.m_tu_tocar' : esUltimSuper(m, membres) ? 'eq.m_ultim' : null
+  const pot = {
+    edita: true,
+    activa: !m.actiu && !m.es_tu,
+    desactiva: m.actiu && motiuTocar === null,
+    esborra: motiuTocar === null,
+  }
+  if (m.es_tu) return { canvia: false, motiu: 'eq.m_tu', opcions: [], pot, motiuTocar }
+  if (esUltimSuper(m, membres)) return { canvia: false, motiu: 'eq.m_ultim', opcions: [], pot, motiuTocar }
   const opcions: OpcioRol[] = [
     ...ROLS_EQUIP.map((r) => ({ valor: r as RolAAssignar, clau: `eq.rol_${r}` })),
     { valor: 'cap', clau: 'eq.treu' },
   ]
-  return { canvia: true, motiu: null, opcions }
+  return { canvia: true, motiu: null, opcions, pot, motiuTocar }
+}
+
+/**
+ * A quién se pueden pasar las acciones de `origen`: cuentas del equipo ACTIVAS que no son él
+ * (`desti_no_equip`/`desti_igual` en la base), ordenadas por rol.
+ */
+export function destinsPossibles(membres: readonly MembreEquip[], origenId: string): MembreEquip[] {
+  return ordenaEquip(membres.filter((x) => x.actiu && x.user_id !== origenId))
+}
+
+/** El destino que se propone: quien está pulsando si puede serlo («me las quedo yo»), y si no, el primero. */
+export function destiPerDefecte(membres: readonly MembreEquip[], origenId: string): string {
+  const v = destinsPossibles(membres, origenId)
+  return (v.find((x) => x.es_tu) ?? v[0])?.user_id ?? ''
 }
 
 /**
@@ -90,9 +196,11 @@ export function esBaixada(abans: RolEquip, despres: RolAAssignar): boolean {
 /** Los códigos que levanta `canviar_rol_equip()` y que la pantalla sabe explicar. */
 const CODIS = new Set([
   'rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin',
+  'no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg',
+  'compte_equip', 'te_membresies',
 ])
 
-/** Clave i18n de un error de `canviar_rol_equip()`: `eq.e_<codi>` o `eq.e_error`. */
+/** Clave i18n de un error de las RPC del equip: `eq.e_<codi>` o `eq.e_error`. */
 export function clauErrorEquip(missatge: string | null | undefined): string {
   const codi = [...CODIS].find((c) => (missatge ?? '').includes(c))
   return codi ? `eq.e_${codi}` : 'eq.e_error'

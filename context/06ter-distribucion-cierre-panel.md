@@ -2066,8 +2066,15 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   advertencia de acceso total al subir a super_admin. Tras la llamada se recarga **también en error**.
 - A uno mismo no se le ofrece nada («No et pots canviar el rol a tu mateix») y tampoco al único super_admin
   activo; lo anticipa `accionsMembre()` (`lib/equip.ts`, puro, `tests/equip.test.ts`) y lo impone la base.
-- **Lo que NO hace**: dar de alta cuentas del equipo (hoy `scripts/crear-usuario.ts`; **deuda 169**) ni convertir
-  una cuenta externa en equipo. Es deliberado: ese paso da acceso a todos los datos y merece su propia puerta.
+- **Lo que NO hace**: dar de alta cuentas del equipo (hoy `scripts/crear-usuario.ts`; **deuda 169**), cambiar el correo (es el de
+  acceso: Admin API) ni convertir una cuenta externa en equipo. Es deliberado: ese paso da acceso a todos los datos.
+- **Gestión de cada cuenta** (pedida el mismo día, `20270514100000`): tres iconos por fila (`BotoIcona`): **editar** (nombre y
+  teléfono, `DialegEditaMembre`), **activar/desactivar** y **borrar** (`DialegTraspasMembre`). Desactivar y borrar preguntan antes qué
+  se hace con lo que esa cuenta ha hecho: cuentan sus acciones por grupo («Convenis: 12 · Documents: 41…», `agrupaAccions()`) y dejan
+  pasarlas a otra cuenta ACTIVA del equipo, a elegir (por defecto, quien pulsa). En **borrar**, si hay acciones el traspaso es
+  obligatorio (casilla marcada y bloqueada: la base exige destino) y hay que escribir «esborrar»/«borrar». A uno mismo y al único
+  super_admin activo se les desactivan los botones con el motivo. Cada paso queda en el historial («X ha desactivado a Y. 12
+  acciones pasan a Z.»). Textos `eq.*`; en móvil el diálogo lleva `grid-cols-[minmax(0,1fr)]` (un correo largo lo ensanchaba).
 - **El rol se ve en todas partes** (pedido el mismo día: el rótulo junto al logo decía «Admin» tanto al
   super_admin como al admin): `AppSidebar` pinta un **chip** con el rol real (`ctx.rol`; coral de marca para
   «Super admin», neutro para «Admin» y «Tècnic»; `data-testid="rol-equip"`, `data-rol`), el grupo del panel del

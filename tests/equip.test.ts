@@ -3,14 +3,15 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  ROLS_EQUIP, accionsMembre, clauErrorEquip, esBaixada, ordenaEquip, recompteRols, rolEquipDe, type MembreEquip,
+  ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, destiPerDefecte,
+  destinsPossibles, esBaixada, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
 } from '../src/lib/equip'
 import { DICTS } from '../src/lib/i18n'
 
 function membre(over: Partial<MembreEquip>): MembreEquip {
   return {
     user_id: 'u', email: 'a@x.org', nom: null, rol: 'admin', actiu: true,
-    ultim_acces: null, des_de: null, otorgat_per: null, es_tu: false, ...over,
+    ultim_acces: null, des_de: null, otorgat_per: null, es_tu: false, telefon: null, membresies: 0, ...over,
   }
 }
 
@@ -46,7 +47,8 @@ describe('recompteRols', () => {
 describe('accionsMembre', () => {
   it('a uno mismo no se le ofrece nada (la base lo rechaza con no_et_pots_canviar)', () => {
     const yo = membre({ user_id: 'yo', rol: 'super_admin', es_tu: true })
-    expect(accionsMembre(yo, [yo])).toEqual({ canvia: false, motiu: 'eq.m_tu', opcions: [] })
+    const r = accionsMembre(yo, [yo])
+    expect(r).toMatchObject({ canvia: false, motiu: 'eq.m_tu', opcions: [] })
   })
 
   it('el único super_admin activo no se puede bajar', () => {
@@ -125,6 +127,108 @@ describe('rolEquipDe', () => {
     for (const k of ['app.rol_title', 'eq.el_teu_rol']) {
       expect(DICTS.ca[k], k).toBeTruthy()
       expect(DICTS.es[k], k).toBeTruthy()
+    }
+  })
+})
+
+describe('accionsMembre: las demás acciones', () => {
+  it('a uno mismo solo se le deja editar', () => {
+    const yo = membre({ user_id: 'yo', rol: 'super_admin', es_tu: true })
+    const { pot, motiuTocar } = accionsMembre(yo, [yo, membre({ user_id: 'x', rol: 'super_admin' })])
+    expect(pot).toEqual({ edita: true, activa: false, desactiva: false, esborra: false })
+    expect(motiuTocar).toBe('eq.m_tu_tocar')
+  })
+
+  it('el único super_admin activo no se desactiva ni se borra, pero se edita', () => {
+    const s = membre({ user_id: 's', rol: 'super_admin' })
+    const { pot, motiuTocar } = accionsMembre(s, [s, membre({ user_id: 'a' })])
+    expect(pot).toEqual({ edita: true, activa: false, desactiva: false, esborra: false })
+    expect(motiuTocar).toBe('eq.m_ultim')
+  })
+
+  it('un admin activo se puede desactivar y borrar; uno inactivo, activar y borrar', () => {
+    const a = membre({ user_id: 'a' })
+    expect(accionsMembre(a, [a]).pot).toEqual({ edita: true, activa: false, desactiva: true, esborra: true })
+    const i = membre({ user_id: 'i', actiu: false })
+    expect(accionsMembre(i, [i]).pot).toEqual({ edita: true, activa: true, desactiva: false, esborra: true })
+  })
+
+  it('un super_admin INACTIVO que es el último de los activos no bloquea al otro', () => {
+    const a = membre({ user_id: 's1', rol: 'super_admin' })
+    const b = membre({ user_id: 's2', rol: 'super_admin', actiu: false })
+    expect(accionsMembre(b, [a, b]).pot.esborra).toBe(true)
+  })
+})
+
+describe('destinsPossibles y destiPerDefecte', () => {
+  const yo = membre({ user_id: 'yo', email: 'yo@x.org', rol: 'super_admin', es_tu: true })
+  const a = membre({ user_id: 'a', email: 'a@x.org', rol: 'admin' })
+  const t = membre({ user_id: 't', email: 't@x.org', rol: 'tecnic' })
+  const baja = membre({ user_id: 'b', email: 'b@x.org', rol: 'admin', actiu: false })
+
+  it('solo activas y nunca el origen', () => {
+    expect(destinsPossibles([yo, a, t, baja], 'a').map((m) => m.user_id)).toEqual(['yo', 't'])
+  })
+  it('propone a quien pulsa, y si no puede ser él, la primera', () => {
+    expect(destiPerDefecte([yo, a, t], 'a')).toBe('yo')
+    expect(destiPerDefecte([yo, a, t], 'yo')).toBe('a')
+  })
+  it('sin nadie, cadena vacía', () => {
+    expect(destiPerDefecte([a], 'a')).toBe('')
+  })
+})
+
+describe('agrupaAccions', () => {
+  it('suma por grupo y ordena de más a menos', () => {
+    const r = agrupaAccions([
+      { taula: 'documentos', columna: 'emitido_por', n: 41 },
+      { taula: 'documentos_externos', columna: 'subido_por', n: 4 },
+      { taula: 'convenios', columna: 'creado_por', n: 7 },
+      { taula: 'convenios', columna: 'contrafirmado_por', n: 7 },
+    ])
+    expect(r).toEqual([{ grup: 'documents', n: 45 }, { grup: 'convenis', n: 14 }])
+  })
+  it('una tabla desconocida cae en «altres»', () => {
+    expect(agrupaAccions([{ taula: 'tabla_nueva', columna: 'creado_por', n: 2 }])).toEqual([{ grup: 'altres', n: 2 }])
+  })
+  it('todos los grupos usados existen y tienen texto en los dos idiomas', () => {
+    for (const g of new Set(Object.values(GRUP_TAULA))) expect(GRUPS_ACCIO as readonly string[], g).toContain(g)
+    for (const g of GRUPS_ACCIO) {
+      expect(DICTS.ca[`eq.g_${g}`], g).toBeTruthy()
+      expect(DICTS.es[`eq.g_${g}`], g).toBeTruthy()
+    }
+  })
+})
+
+describe('teléfono', () => {
+  it('normaliza quitando +, espacios, guiones y paréntesis', () => {
+    expect(normalitzaTelefon('+34 (600) 11-22-33')).toBe('34600112233')
+  })
+  it('vacío vale; de 8 a 15 cifras sin cero inicial, también; el resto no', () => {
+    expect(telefonValid('')).toBe(true)
+    expect(telefonValid('  ')).toBe(true)
+    expect(telefonValid('+34 600 11 22 33')).toBe(true)
+    expect(telefonValid('600112233')).toBe(true)
+    expect(telefonValid('123')).toBe(false)
+    expect(telefonValid('0600112233')).toBe(false)
+    expect(telefonValid('1'.repeat(16))).toBe(false)
+    expect(telefonValid('abc12345678')).toBe(false)
+  })
+})
+
+describe('el historial y los errores nuevos', () => {
+  it('hay un texto por cada acción del historial', () => {
+    for (const a of ACCIONS_HIST) {
+      expect(DICTS.ca[`eq.h_${a}`], a).toBeTruthy()
+      expect(DICTS.es[`eq.h_${a}`], a).toBeTruthy()
+    }
+  })
+  it('traduce los códigos de las RPC nuevas', () => {
+    for (const c of ['no_et_pots_tocar', 'cal_desti', 'desti_igual', 'desti_no_equip', 'telefon_invalid', 'nom_massa_llarg', 'compte_equip', 'te_membresies']) {
+      const clau = clauErrorEquip(c)
+      expect(clau).toBe(`eq.e_${c}`)
+      expect(DICTS.ca[clau], clau).toBeTruthy()
+      expect(DICTS.es[clau], clau).toBeTruthy()
     }
   })
 })

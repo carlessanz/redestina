@@ -847,8 +847,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      ninguna `aprovada` (pendiente o rechazada); las fichas del equipo sin cuenta no tienen membresías y
      entran—. Probado en el clon: una entidad sin `estat` sale; una con «Signat» y sin convenio sale
      pendiente; con su membresía en `pendent`, desaparece. La ayuda del campo (`ef.hi_estat`) lo dice.
-169. **No hay alta de cuentas del equipo en la interfaz** (09-11-2026). Configuració › Equip cambia el rol de las
-     cuentas que ya existen (`canviar_rol_equip`), pero crear una cuenta nueva del equipo sigue siendo
+169. **No hay alta de cuentas del equipo ni cambio de correo en la interfaz** (09-11-2026). Configuració › Equip cambia el rol, edita,
+     activa, desactiva y borra las cuentas que ya existen, pero crear una cuenta nueva del equipo (o cambiarle el correo) sigue siendo
      `scripts/crear-usuario.ts` (Admin API con la service key). Hacerlo desde la pantalla pide una Edge Function con
      `service_role` (cuenta + perfil + rol + enlace de acceso por `recuperar-password`) y decidir si una cuenta
      externa existente puede pasar a equipo —da acceso a TODOS los datos—. Precio: media jornada; no urgente
