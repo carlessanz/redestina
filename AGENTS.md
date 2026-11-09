@@ -41,9 +41,8 @@ receptoras y registra las **canalizaciones** hasta el cierre con kg reales, alba
 certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Redestina**
 (intake, priorización, canalización, cierre, sistema documental, paneles por rol).
 
-- Entorno de **pruebas de Meta** con `WHATSAPP_ENVIO_REAL=true`: Meta solo entrega a los ≤5
-  números verificados (`meta_test_recipients`); el resto rechaza con `131030`. Mensajería
-  siempre individual (la Cloud API no escribe en grupos).
+- Meta en **pruebas** (`WHATSAPP_ENVIO_REAL=true`): solo entrega a los ≤5 de `meta_test_recipients`
+  (el resto, `131030`). Mensajería siempre individual (la Cloud API no escribe en grupos).
 - **Documentación fuera del repo**: `docs/` (ignorado; funcionales y credenciales) y la carpeta de
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
@@ -146,8 +145,8 @@ origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
-(lugares de recogida con dirección, contacto, horario). **Solo quedan fichas de prueba** en
-producción (§6).
+(lugares de recogida). Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
+convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` por trigger.
 
 **Estado de las fichas (plan 1, 1A, `20270501100000`)**: `activo` en las dos; la organización está
 activa si lo está algún papel (D7). Activar exige NIF válido y razón social (`trg_fitxa_estat`:
@@ -387,8 +386,8 @@ Lo que manda hoy, en una línea cada uno:
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
   **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
   `components/equip/fases/`) sobre las RPC reales (`tests/e2e/paritat-assistida.e2e.ts`).
-- Otros: «Pendent de tu» (`DialegFirmaConveni`); doble rol = todos los paneles, el activo por la URL
-  (`useOrganitzacio(tipus)`); el ofertante no ve el código `E-…`.
+- Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
+  ofertante no ve el `E-…`.
 - **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts` es **la única definición de campos** (paridad con
   el SQL en `tests/campsFitxa.test.ts`); `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo
   que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC; listado solo activas por defecto.
@@ -441,7 +440,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270516100100`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270517100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -514,7 +513,7 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   formato por **bytes** (`_shared/pujada.ts`, también en `subir-documento-externo`), permiso antes de
   leer el fichero, se guarda tal cual. Confirmación de albarán: `sha256_texto` del acta; D3 en la API.
 - Cuentas de prueba: 5 organizaciones `TEST-*` y 7 cuentas (`crear-usuarios-prueba.ts`), 5 de
-  WhatsApp sobre fichas reales del equipo (`crear-usuarios-whatsapp.ts`), `hola+pendent-arnes@` (**pendiente, no aprobar**) y `hola+senserol-arnes@`.
+  WhatsApp (`crear-usuarios-whatsapp.ts`), `hola+pendent-arnes@` (**pendiente, no aprobar**) y `hola+senserol-arnes@`.
   Credenciales en `scripts/data/cuentas-prueba.json`; las del bundle de `/login` solo con
   `VITE_ACCESSOS_TEST`.
 - ⚠️ **Nunca `supabase config push`** (apagaría el login por email y subiría el Auth local); los
@@ -573,7 +572,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (75 vivas; la siguiente entrada nueva es la 171; los números no se renumeran ni
+**Deuda abierta (76 vivas; la siguiente entrada nueva es la 172; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -586,7 +585,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -598,10 +597,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.805 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.807 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.269/2.269 y 37 sin datos; producción 2.273/2.273 y 33 «Sin fallos de
+   **Referencia: clon 2.290/2.290 y 36 sin datos; producción 2.273/2.273 y 33 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

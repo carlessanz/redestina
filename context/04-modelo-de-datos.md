@@ -1529,3 +1529,36 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   perderían la firma). Con el modo test apagado: `22023 nomes_en_mode_test`. Cada ejecución, en `regeneracions_documents`.
   Probado en el clon (con rollback): 68 documentos regenerados, 3 firmados intactos, todas las huellas cuadran.
   Pantalla: `RegeneraDocuments` debajo de Configuració › Fundació, con recuento por tipo, aviso y diálogo «Accepto i regenero».
+
+### Datos fiscales y de facturación, CB y fecha de alta (09-11-2026, `20270517100000`)
+
+Revisión de la Taula mestra por la Fundació (columna de Sebas, filas 1.3 y 1.5). En las dos fichas (`productores` y
+`entidades`, como `nif` y `razon_social`):
+
+- **`regim_iva`**, lista cerrada por CHECK `*_regim_iva`: `general` · `reagp` · `simplificat` · `exempt` (exento o no
+  sujeto) · `altres`. Un valor fuera da `23514`.
+- **Domicilio fiscal** en tres columnas, `domicili_fiscal`, `codi_postal_fiscal` (CHECK de cinco cifras, el mismo
+  `errorCp` de la pantalla) y `poblacio_fiscal` (texto libre: puede no ser un municipio del catálogo). **Regla única, en
+  bloque**: si `domicili_fiscal` tiene texto, los documentos usan los tres campos fiscales; si no, la dirección de la
+  ficha (`direccion`, `codigo_postal`, `poblacion`). Nunca se mezcla calle fiscal con código postal de la ficha. La
+  aplica `dada_fiscal(p_domicili_fiscal, p_fiscal, p_fitxa)` (inmutable, sin EXECUTE para nadie: solo la llaman
+  funciones `security definer`) dentro de `convenio_datos_org()` (convenio y su firma), `calcular_cierre()` (CD anual),
+  `calcular_certificado_periodo()` (CD por intervalo y por oferta; también la `provincia` del 182 sale del CP fiscal) y
+  `calcular_certificat_recepcio()` (CR), copiadas de su última definición y cambiando solo eso y la comprobación de «falta
+  domicili» (con el fiscal completo ya no bloquea aunque la dirección de la ficha esté vacía). Lo emitido no cambia: lleva
+  su copia congelada. `firmar_convenio_por_enlace` y `registro` siguen rellenando la dirección de la ficha (lo que escribe
+  quien firma ya manda en la copia congelada del convenio).
+- **Contacto de facturación**: `contacte_facturacio_nom` y `contacte_facturacio_email` (CHECK de formato, el de
+  `errorCorreu`). Solo se guardan: **no cambian a quién se envía nada** (certificados y facturas siguen saliendo al correo de
+  la ficha). Si se quiere usarlos como destinatario, es otro cambio.
+- El titular edita los seis campos por `actualitzar_fitxa_productor/entitat` (lista blanca ampliada; el arnés lo afirma con
+  `errorExigit`: el valor inválido tiene que llegar a la columna y chocar con su CHECK).
+- **`data_alta` automática**: trigger `BEFORE INSERT` `productores_data_alta`/`entidades_data_alta`
+  (`trg_fitxa_data_alta()`): si llega vacía, hoy en Europe/Madrid (`date` en productores; texto `AAAA-MM-DD` en entidades,
+  donde conviven valores heredados como «2020»). Las vacías se rellenaron con `created_at` (en el clon, 398 productores y 95
+  entidades; las del ARA quedan con la fecha de la importación). Sigue editable por el equipo.
+- **Forma jurídica `cb`** (Comunitat de béns) en `tipus_empresa_valid()`, junto a `sat` y `sc` (`20270512100000`).
+- **«Cooperativa agrària» fuera del catálogo `tipus_activitat`**: la Fundació pidió **eliminarla**; `20270512100100` había
+  hecho lo contrario (ampliarla a los dos papeles, leyendo la petición sin la palabra «Eliminar»). Se quita de las fichas
+  (`array_remove`; no hay FK) y del catálogo. La forma jurídica `cooperativa` se queda: es la forma legal, no la actividad.
+

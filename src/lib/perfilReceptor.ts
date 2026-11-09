@@ -94,7 +94,7 @@ export const PREFERENCIES_RECEPCIO: readonly CampPerfil[] = [
 export const CLAUS_PREFERENCIES = new Set(PREFERENCIES_RECEPCIO.map((c) => c.clau))
 
 /** Los tipos de empresa o entidad, lista cerrada (y el check de la RPC los repite). */
-export const TIPUS_EMPRESA = ['cooperativa', 'sat', 'sc', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'] as const
+export const TIPUS_EMPRESA = ['cooperativa', 'sat', 'sc', 'cb', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'] as const
 
 /** Todas las claves i18n que usa este módulo: para la prueba de cobertura. */
 export function clausPerfil(): string[] {

@@ -2047,9 +2047,22 @@ descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres 
   activa o pendiente, sino el convenio que pide la modalidad (`entidadesSinConvenio()`, el de
   `sense_conveni`); `estat` solo excluye con «No procedeix», y queda fuera la entidad cuyo registro
   self-service no está aprobado (membresías sin ninguna `aprovada`). Detalle en §12.168.
-- **1.3 «Cooperativa agraria. Mantener el resto de actividades»**: la actividad `cooperativa_agraria`
-  existía solo para el papel de ofertante; pasa a `ambdos` (`20270512100100`) y sale también en la ficha
-  de una receptora. El resto del catálogo, igual.
+- **1.3 «Eliminar Cooperativa agraria. Mantener el resto de actividades»**: ⚠️ se leyó primero sin la palabra
+  «Eliminar» y `20270512100100` la amplió a los dos papeles; **corregido el mismo día** (`20270517100000`): fuera del
+  catálogo y de las fichas. El resto del catálogo, igual.
+- **Segunda pasada (mismo día, `20270517100000`)**: el resto de la fila 1.3 y la 1.5.
+  - **CB**: `TIPUS_EMPRESA` suma `cb` («Comunitat de béns (CB)»); el importador reconoce «CB», «C.B.», «Comunitat de
+    béns» y «Comunidad de bienes».
+  - **Bloque nuevo «Dades fiscals i facturació»** (`bloc: 'fiscal'` en `campsFitxa.ts`, después de «Adreça», pestaña
+    «Dades de l'entitat»; también en «La meva organització» del actor): règim d'IVA (lista cerrada, `org.iva_*`), domicili
+    fiscal con CP y població («Només si és diferent de l'adreça…»), contacte administratiu y correu de facturació. Los
+    ve y edita el equipo y el titular; validación de CP y correo como los demás (`errorCp`, `errorCorreu`). Detalle de
+    la regla del domicilio en §4.
+  - **1.5 «Data d'alta automàtica»**: la pone la base al crear la ficha (trigger, §4); en la pestaña Gestió interna sigue
+    siendo editable para los históricos.
+  - Fuera de este cambio: el importador no lee los campos fiscales (deuda 171).
+  - Pruebas: `tests/e2e/taula-mestra-fiscal.e2e.ts` (bloque visible, CP mal escrito no se guarda, se guardan los seis
+    campos y el convenio toma el domicilio fiscal) y `entitats.e2e.ts` (CB en la lista y fecha de alta al crear).
 
 ### Configuració › Equip: cuentas del equipo y su rol (09-11-2026, `20270513100000`)
 

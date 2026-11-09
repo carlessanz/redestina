@@ -166,6 +166,8 @@ test('una nueva: «És nova» lleva el NIF al alta, y el alta con doble rol crea
   // Forma jurídica: SAT y sociedad civil en la lista (Taula mestra 1.3, 09-11-2026).
   await page.locator('#ne-tipus_empresa').click()
   await expect(page.getByRole('option', { name: /^Societat civil \(SC\/SCP\)$|^Sociedad civil \(SC\/SCP\)$/ })).toBeVisible()
+  // …y la comunitat de béns (revisión de la Fundació, 09-11-2026, 20270517100000).
+  await expect(page.getByRole('option', { name: /^Comunitat de béns \(CB\)$|^Comunidad de bienes \(CB\)$/ })).toBeVisible()
   await page.getByRole('option', { name: /^SAT / }).click()
   await page.getByRole('button', { name: /^Productor agrícola$/ }).click()
   await page.locator('#ne-persona_contacte').fill('Persona Nova E2E')
@@ -185,6 +187,9 @@ test('una nueva: «És nova» lleva el NIF al alta, y el alta con doble rol crea
   expect(sql(`select p.nif = e.nif and p.es_test and e.es_test and e.tipo_receptor = 'social'
                      and p.tipus_activitat = '{productor_agricola}' and e.tipus_activitat = '{productor_agricola}'
                      and p.tipo_empresa = 'sat' and e.tipo_entidad = 'sat'
+                     -- La data d'alta la pone la base al crear (20270517100000).
+                     and p.data_alta = (now() at time zone 'Europe/Madrid')::date
+                     and e.data_alta = to_char((now() at time zone 'Europe/Madrid')::date, 'YYYY-MM-DD')
                 from productores p join entidades e on e.organizacion_id = p.organizacion_id
                where p.organizacion_id = '${orgNova}'`)).toBe('t')
 })

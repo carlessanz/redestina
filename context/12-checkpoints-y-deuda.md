@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **09-11-2026 (Taula mestra, datos fiscales, `20270517100000`): se abre la 171**: **76 vivas** y la siguiente entrada nueva es la 172.
 ⚠️ **09-11-2026 (nombre de la Fundació desde el snapshot): se abre la 170**: **75 vivas** y la siguiente entrada nueva es la 171.
 ⚠️ **09-11-2026 (Configuració › Equip, `20270513100000`): se abre la 169**: **74 vivas** y la siguiente entrada nueva es la 170.
 ⚠️ **09-11-2026 (revisión de la Taula mestra por la Fundació, `20270512100000`): se abre la 168 y se cierra el
@@ -866,3 +867,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      decidirlo en la plantilla. Además `valoresConvenio()` deja `fundacio.raso_social` vacío si falta, a
      propósito: entra en el texto firmado y un respaldo cambiaría la huella. Precio: una hora; espera a ver
      la razón social real.
+171. **El importador de entidades no lee los datos fiscales** (09-11-2026, `20270517100000`). La ficha tiene ya
+     régimen de IVA, domicilio fiscal (tres campos) y contacto de facturación, pero ni `lib/importEntitats.ts` ni la
+     plantilla los mapean, y `alta_fitxa_interna()` / `importar_entitats()` no los aceptan. Se dejó fuera a propósito:
+     el Excel de Airtable de la Fundació no trae esas columnas. Si las trae un Excel futuro, son cuatro claves en el
+     mapa de columnas y en las dos RPC (lista cerrada del IVA validada en la base por su CHECK). Precio: dos horas.

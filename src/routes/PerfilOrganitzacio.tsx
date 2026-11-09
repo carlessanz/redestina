@@ -59,6 +59,7 @@ const ETIQUETA_PESTANYA: Record<Pestanya, string> = {
 const BLOCS_ACTOR: { bloc: Bloc; titolKey: string; pestanya: Pestanya }[] = [
   { bloc: 'identitat', titolKey: 'org.sec_identitat', pestanya: 'dades' },
   { bloc: 'adreca', titolKey: 'org.sec_adreca', pestanya: 'dades' },
+  { bloc: 'fiscal', titolKey: 'org.sec_fiscal', pestanya: 'dades' },
   { bloc: 'contacte', titolKey: 'org.sec_contacte', pestanya: 'contacte' },
   { bloc: 'ofertant', titolKey: 'ef.sec_ofertant', pestanya: 'operativa' },
   { bloc: 'receptor', titolKey: 'ef.sec_receptor', pestanya: 'operativa' },

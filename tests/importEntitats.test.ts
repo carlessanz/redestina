@@ -151,7 +151,11 @@ describe('valores de celda', () => {
     expect(tipusEmpresaDe('S.C.P.')).toEqual({ codi: 'sc', aNota: false })
     expect(tipusEmpresaDe('SC')).toEqual({ codi: 'sc', aNota: false })
     expect(tipusEmpresaDe('S.C.C.L.')).toEqual({ codi: 'cooperativa', aNota: false })
-    expect(tipusEmpresaDe('Comunidad de bienes')).toEqual({ codi: 'altres', aNota: true })
+    // Comunitat de béns (revisión de la Fundació, 09-11-2026).
+    expect(tipusEmpresaDe('Comunidad de bienes')).toEqual({ codi: 'cb', aNota: false })
+    expect(tipusEmpresaDe('Comunitat de béns')).toEqual({ codi: 'cb', aNota: false })
+    expect(tipusEmpresaDe('C.B.')).toEqual({ codi: 'cb', aNota: false })
+    expect(tipusEmpresaDe('Comunitat de béns (CB)')).toEqual({ codi: 'cb', aNota: false })
     expect(tipusEmpresaDe(null)).toEqual({ codi: null, aNota: false })
   })
 
@@ -221,7 +225,7 @@ describe('normalitzaFila (Excel de Airtable)', () => {
   it('ofertant por «Registro excedente»; actividad libre y forma desconocida a la nota; tres teléfonos', () => {
     const f = normalitzaFila(6, filaAirtable({
       'Nombre comercial': 'TEST-IMP Hort', 'Tipo de entidad': 'Empresa', 'Registro excedente': 'E-2026-001, E-2026-007',
-      Actividad: 'Fruita dolça', 'Forma jurídica': 'Comunidad de bienes', 'Número fijo': '972000000 / 600000000 / 611111111',
+      Actividad: 'Fruita dolça', 'Forma jurídica': 'Agrupación de interés económico', 'Número fijo': '972000000 / 600000000 / 611111111',
       'Correo (contacto)': 'a@exemple.invalid; b@exemple.invalid', 'Email general': 'c@exemple.invalid',
     }), m, ctx)
     expect(f.rols).toEqual(['productor'])
@@ -234,7 +238,7 @@ describe('normalitzaFila (Excel de Airtable)', () => {
     expect(f.contracte.email2).toBe('b@exemple.invalid')
     expect(f.contracte.nota?.split('\n')).toEqual([
       "Tipus d'entitat (origen): Empresa", 'Altres correus: c@exemple.invalid', 'Altres telèfons: 34972000000',
-      'Forma jurídica: Comunidad de bienes', 'Activitat: Fruita dolça', "Registre d'excedents (origen): E-2026-001, E-2026-007",
+      'Forma jurídica: Agrupación de interés económico', 'Activitat: Fruita dolça', "Registre d'excedents (origen): E-2026-001, E-2026-007",
     ])
     expect(f.avisosLocals).toEqual(expect.arrayContaining(['telefons_a_nota', 'correus_a_nota', 'forma_juridica_a_nota', 'activitat_a_nota']))
   })
@@ -343,7 +347,7 @@ describe('la plantilla', () => {
       const c = { ...pctx, t: tl, lang }
       for (const v of valorsLlista('rol', c)) expect(rolsDeText(v), v).not.toBeNull()
       expect(valorsLlista('tipo_receptor', c).map(tipusReceptorDe)).toEqual(['social', 'animal', 'transformador', 'comercial'])
-      expect(valorsLlista('tipus_empresa', c).map((v) => tipusEmpresaDe(v).codi)).toEqual(['cooperativa', 'sat', 'sc', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
+      expect(valorsLlista('tipus_empresa', c).map((v) => tipusEmpresaDe(v).codi)).toEqual(['cooperativa', 'sat', 'sc', 'cb', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
       expect(modalitatsDeText(valorsLlista('modalitats', c).join(', '))).toEqual(['donacio', 'venda', 'maquila'])
       expect(activitatsDe(valorsLlista('tipus_activitat', c).join(', '), CATALEG).resta).toEqual([])
     }

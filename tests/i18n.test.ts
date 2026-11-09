@@ -284,6 +284,13 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['social', 'animal', 'transformador', 'comercial'],
     },
     {
+      // CHECK de `productores/entidades.regim_iva` (20270517100000). Se compone en la ficha
+      // (`campsFitxa.ts`, `etiquetaOpcio: 'org.iva_'`).
+      que: 'regim_iva',
+      prefijo: 'org.iva_',
+      valores: ['general', 'reagp', 'simplificat', 'exempt', 'altres'],
+    },
+    {
       que: 'entidades.tipo_receptor (perfil)',
       prefijo: 'org.sec_perfil_',
       valores: ['social', 'animal', 'transformador', 'comercial'],

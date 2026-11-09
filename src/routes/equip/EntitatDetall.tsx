@@ -73,7 +73,7 @@ const ETIQUETA_PESTANYA: Record<Pestanya, string> = {
 }
 /** En qué pestaña se pinta cada bloque de `campsFitxa`. */
 const PESTANYA_DE_BLOC: Record<Bloc, Pestanya> = {
-  identitat: 'dades', rols: 'intern', adreca: 'dades', contacte: 'contacte',
+  identitat: 'dades', rols: 'intern', adreca: 'dades', fiscal: 'dades', contacte: 'contacte',
   ofertant: 'operativa', receptor: 'operativa', diagnostic: 'diagnostic',
   documentacio: 'documentacio', intern: 'intern',
 }
@@ -446,6 +446,9 @@ export default function EntitatDetall() {
             </Seccio>
             <Seccio titol={t('org.sec_adreca')} testid="bloc-adreca">
               <BlocCamps {...blocProps} camps={camps('adreca')} />
+            </Seccio>
+            <Seccio titol={t('org.sec_fiscal')} testid="bloc-fiscal">
+              <BlocCamps {...blocProps} camps={camps('fiscal')} />
             </Seccio>
           </CardContent></Card>
         </TabsContent>

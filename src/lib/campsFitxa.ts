@@ -22,11 +22,11 @@ export type Taula = 'productores' | 'entidades'
 
 /** Los bloques de la ficha, en el orden en que se pintan. */
 export type Bloc =
-  | 'identitat' | 'rols' | 'contacte' | 'adreca' | 'ofertant' | 'receptor'
+  | 'identitat' | 'rols' | 'contacte' | 'adreca' | 'fiscal' | 'ofertant' | 'receptor'
   | 'diagnostic' | 'documentacio' | 'intern'
 
 export const BLOCS: readonly Bloc[] = [
-  'identitat', 'rols', 'contacte', 'adreca', 'ofertant', 'receptor', 'diagnostic', 'documentacio', 'intern',
+  'identitat', 'rols', 'contacte', 'adreca', 'fiscal', 'ofertant', 'receptor', 'diagnostic', 'documentacio', 'intern',
 ]
 
 /** Quién ve el campo: todos (equipo y actor) o solo el equipo. */
@@ -116,6 +116,25 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
     tipus: 'comarca', labelKey: 'org.f_area', ajudaKey: 'org.h_area', veu: 'tots', edita: 'tots' },
   { clau: 'ubicacio', columnes: { productores: 'ubicacio', entidades: 'ubicacio' }, bloc: 'adreca',
     labelKey: 'org.f_ubicacio', ajudaKey: 'org.h_ubicacio', veu: 'tots', edita: 'tots', maxim: 120 },
+
+  // ------------------------------------------------------------------ Dades fiscals i facturació
+  // Taula mestra, revisión de la Fundació (09-11-2026, fila 1.3). El domicilio fiscal solo si
+  // es distinto de la dirección: si `domicili_fiscal` tiene texto, convenio y certificados usan
+  // los tres campos fiscales (`dada_fiscal()`, 20270517100000); si no, la dirección.
+  // Las opciones del IVA se pintan con `org.iva_${opció}` (CHECK `*_regim_iva` de la base).
+  { clau: 'regim_iva', columnes: { productores: 'regim_iva', entidades: 'regim_iva' }, bloc: 'fiscal', tipus: 'select',
+    opcions: ['general', 'reagp', 'simplificat', 'exempt', 'altres'], etiquetaOpcio: 'org.iva_',
+    labelKey: 'org.f_regim_iva', ajudaKey: 'org.h_regim_iva', veu: 'tots', edita: 'tots' },
+  { clau: 'domicili_fiscal', columnes: { productores: 'domicili_fiscal', entidades: 'domicili_fiscal' }, bloc: 'fiscal',
+    labelKey: 'org.f_domicili_fiscal', ajudaKey: 'org.h_domicili_fiscal', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'codi_postal_fiscal', columnes: { productores: 'codi_postal_fiscal', entidades: 'codi_postal_fiscal' }, bloc: 'fiscal',
+    tipus: 'cp', labelKey: 'org.f_cp_fiscal', veu: 'tots', edita: 'tots' },
+  { clau: 'poblacio_fiscal', columnes: { productores: 'poblacio_fiscal', entidades: 'poblacio_fiscal' }, bloc: 'fiscal',
+    labelKey: 'org.f_poblacio_fiscal', veu: 'tots', edita: 'tots' },
+  { clau: 'contacte_facturacio_nom', columnes: { productores: 'contacte_facturacio_nom', entidades: 'contacte_facturacio_nom' },
+    bloc: 'fiscal', labelKey: 'org.f_contacte_facturacio', ajudaKey: 'org.h_contacte_facturacio', veu: 'tots', edita: 'tots' },
+  { clau: 'contacte_facturacio_email', columnes: { productores: 'contacte_facturacio_email', entidades: 'contacte_facturacio_email' },
+    bloc: 'fiscal', tipus: 'email', labelKey: 'org.f_email_facturacio', veu: 'tots', edita: 'tots' },
 
   // ------------------------------------------------------------------ Ofertant
   { clau: 'productos_habituales', columnes: { productores: 'productos_habituales' }, bloc: 'ofertant', tipus: 'list',

@@ -30,6 +30,8 @@ const COLUMNES: Record<Taula, string[]> = {
     'tipo_empresa', 'telefono_alt', 'direccion', 'codigo_postal', 'nif', 'area_geografica', 'poblacion',
     'productos_habituales', 'data_alta', 'activo', 'es_test', 'organizacion_id', 'razon_social', 'municipio_ine',
     'tipus_activitat', 'temporada', 'ref_externa', 'ubicacio',
+    // 20270517100000: datos fiscales y de facturación (Taula mestra, Fundació 09-11-2026).
+    'regim_iva', 'domicili_fiscal', 'codi_postal_fiscal', 'poblacio_fiscal', 'contacte_facturacio_nom', 'contacte_facturacio_email',
   ],
   entidades: [
     'id', 'nombre', 'codigo', 'familia', 'prioritat', 'estat', 'gestio', 'comentarios', 'area_geografica',
@@ -39,6 +41,8 @@ const COLUMNES: Record<Taula, string[]> = {
     'opt_in', 'created_at', 'modalitat', 'es_test', 'tipo_receptor', 'organizacion_id', 'razon_social',
     'municipio_ine', 'tipo_entidad', 'perfil_receptor', 'tipus_activitat', 'modalitats_interes', 'activo',
     'ref_externa', 'ubicacio',
+    // 20270517100000: datos fiscales y de facturación (Taula mestra, Fundació 09-11-2026).
+    'regim_iva', 'domicili_fiscal', 'codi_postal_fiscal', 'poblacio_fiscal', 'contacte_facturacio_nom', 'contacte_facturacio_email',
   ],
 }
 

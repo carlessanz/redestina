@@ -304,6 +304,14 @@ interface Check {
    */
   erroresEsperados?: string[];
   /**
+   * Solo `rpc`+`permitir`: el check pasa ÚNICAMENTE si la RPC falla con este SQLSTATE (y falla
+   * si se ejecuta sin error). Sirve para afirmar, sin escribir nada, que una clave llega a su
+   * columna: `actualitzar_fitxa_*` con `regim_iva: 'xx'` tiene que chocar con el CHECK
+   * (`23514`); si la clave no estuviera en la lista blanca, se ignoraría y daría éxito
+   * (20270517100000).
+   */
+  errorExigit?: string;
+  /**
    * Solo para `rpc`: argumentos. Dos valores literales se sustituyen en tiempo de
    * ejecución, para que la comprobación mida la AUTORIZACIÓN y no un "esa fila no existe"
    * que llegaría igual con permisos de sobra:
@@ -2610,6 +2618,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // niega `DOCUMENTAL_EXTERN`. Responde true/false sin error; si la cuenta no tuviera
     // ficha de productor, el uuid nulo daría 42501 y saldría FALLA, no saltada.
     { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor", p_valorizacion: "donacio", p_parte: "entrega" }, descripcion: "pot consultar el conveni de la SEVA fitxa" },
+    // Taula mestra (20270517100000): el titular corrige sus datos fiscales y de facturación por
+    // su RPC. Sin escribir nada: un valor inválido tiene que llegar a la columna y chocar con su
+    // CHECK (si la clave no estuviera en la lista blanca, se ignoraría y daría éxito).
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { regim_iva: "no_existeix" } }, descripcion: "el règim d'IVA és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { contacte_facturacio_email: "no-es-un-correu" } }, descripcion: "el correu de facturació és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { codi_postal_fiscal: "123" } }, descripcion: "el codi postal fiscal és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_productor", p_dades: { tipus_activitat: ["cooperativa_agraria"] } }, descripcion: "«Cooperativa agrària» ja no és una activitat (retirada a petició de la Fundació)" },
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: ve la firma de SU documento (la que sube el fixture para
     // TEST-PROD-1) y el estado de firma de sus documentos. `productor-altre` (TEST-PROD-2) no
@@ -2833,6 +2848,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // `convenio_vigente()` sobre la entidad PROPIA (20270414100600): es lo que
     // `manifestar_interes()` comprueba por dentro, y tiene que seguir respondiendo.
     { tabla: "convenio_vigente", op: "rpc", esperado: "permitir", args: { p_tipo_org: "entidad", p_org: "@meva_fitxa_entitat", p_valorizacion: "donacio", p_parte: "recibe" }, descripcion: "pot consultar el conveni de la SEVA entitat" },
+    // Taula mestra (20270517100000): el titular corrige sus datos fiscales y de facturación por
+    // su RPC. Sin escribir nada: un valor inválido tiene que llegar a la columna y chocar con su
+    // CHECK (si la clave no estuviera en la lista blanca, se ignoraría y daría éxito).
+    { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_entitat", p_dades: { regim_iva: "no_existeix" } }, descripcion: "el règim d'IVA és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_entitat", p_dades: { contacte_facturacio_email: "no-es-un-correu" } }, descripcion: "el correu de facturació és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_entitat", p_dades: { codi_postal_fiscal: "123" } }, descripcion: "el codi postal fiscal és a la llista blanca (i el CHECK el valida)" },
+    { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_entitat", p_dades: { tipus_activitat: ["cooperativa_agraria"] } }, descripcion: "«Cooperativa agrària» ja no és una activitat (retirada a petició de la Fundació)" },
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: el estado de firma de SUS documentos (ENT, CR, convenio).
     {
@@ -3332,6 +3354,10 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       if (check.esperado === "denegar") {
         return { ok: false, detalle: `error: ${error.message.slice(0, 60)}` };
       }
+      if (check.errorExigit) {
+        const hi = codigo === check.errorExigit;
+        return { ok: hi, detalle: hi ? `autoritza i falla amb ${codigo} (l'esperat)` : `¡${codigo} en lloc de ${check.errorExigit}!: ${error.message.slice(0, 50)}` };
+      }
       const esperado = esErrorDeNegocio(codigo, check.erroresEsperados ?? []);
       return {
         ok: esperado,
@@ -3339,6 +3365,9 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
           ? `autoritza (${codigo} esperat)`
           : `ERROR NO ESPERADO ${codigo}: ${error.message.slice(0, 50)}`,
       };
+    }
+    if (check.errorExigit) {
+      return { ok: false, detalle: `¡ejecutada sin el error ${check.errorExigit}!` };
     }
     // Propiedad GLOBAL (auditoría del catálogo): cada fila tiene que estar en la lista
     // permitida. Va antes que todo lo demás porque aquí 0 filas no es «sin datos», es el
