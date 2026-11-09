@@ -2074,6 +2074,8 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   equipo con doble rol lleva el mismo nombre, y el menú de usuario añade «Rol: …». `rolEquipDe()` (`lib/equip.ts`)
   descarta cualquier valor que no sea de los tres. Con doble rol (equipo + organización) no hay rótulo junto al
   logo, como antes. No hizo falta tocar la base: `get_my_session_context()` ya devolvía `rol`.
+- Un cambio hecho por SQL (sesión con token, sin usuario) queda en el historial sin `per_email`: la pantalla lo
+  dice «Fora de l'aplicació (SQL)». El correo de quien cambia se copia en la fila, así que borrar su cuenta no lo borra.
 - Pruebas: `tests/e2e/equip.e2e.ts` (clon; la cuenta de prueba `comunicacio@esimperfect.com` baja y sube, con
   confirmación, y el clon queda como estaba) y el arnés (denegada a todo el que no sea super_admin).
 - En producción **Sebastián pasó a `super_admin` por esta misma pantalla** (o, antes de publicarla, por SQL
