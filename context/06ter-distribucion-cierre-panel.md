@@ -2083,6 +2083,8 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   logo, como antes. No hizo falta tocar la base: `get_my_session_context()` ya devolvía `rol`.
 - Un cambio hecho por SQL (sesión con token, sin usuario) queda en el historial sin `per_email`: la pantalla lo
   dice «Fora de l'aplicació (SQL)». El correo de quien cambia se copia en la fila, así que borrar su cuenta no lo borra.
+- Publicado el 09-11-2026 (`d90ed94`). La prueba que se deshace sola confirmó en producción que `esborrar_membre_equip` puede borrar de `auth.users`
+  (la cuenta de prueba no tenía acciones, así que el traspaso con documentos inmutables solo está probado en el clon).
 - Pruebas: `tests/e2e/equip.e2e.ts` (clon; la cuenta de prueba `comunicacio@esimperfect.com` baja y sube, con
   confirmación, y el clon queda como estaba) y el arnés (denegada a todo el que no sea super_admin).
 - En producción, **Sebastián (`sebastian@espigoladors.com`) pasó de `admin` a `super_admin` el 09-11-2026**, por SQL
