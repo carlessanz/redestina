@@ -22,6 +22,7 @@ import { filtraPerCanals } from '../lib/canals'
 import { ORGANITZACIO, navPerRol } from '../lib/nav'
 import type { Comptador } from '../lib/nav'
 import type { Rol } from '../lib/rols'
+import { rolEquipDe } from '../lib/equip'
 import {
   Sidebar, SidebarContent, SidebarFooter, SidebarGroup, SidebarGroupContent,
   SidebarGroupLabel, SidebarHeader, SidebarMenu, SidebarMenuBadge, SidebarMenuButton,
@@ -80,6 +81,10 @@ export default function AppSidebar({
   // era decir en qué panel estás. Con un nombre corto, además, cabe empujado a la derecha sin
   // pelearse con el logo.
   const titol = multi ? null : (organitzacio?.nombre ?? t('app.team'))
+  // El rol de plataforma de la cuenta del equipo (09-11-2026): antes el rótulo decía «Admin» para
+  // el super_admin y para el admin, y no había forma de saber con cuál habías entrado.
+  const rolEquip = rolEquipDe(ctx?.rol)
+  const nomPanell = (rol: Rol) => (rol === 'intern' && rolEquip ? t(`eq.rol_${rolEquip}`) : t(PANELL[rol].clau))
 
   // En móvil, elegir una sección cierra el panel; si no, se queda encima del contenido.
   const alNavegar = () => { if (isMobile) setOpenMobile(false) }
@@ -94,7 +99,21 @@ export default function AppSidebar({
             organización es largo (mismo motivo que la barra inferior, §2). */}
         <NavLink to="/panell" className="flex items-center justify-between gap-2.5 overflow-hidden" onClick={alNavegar}>
           <img src="/logo-redestina-negativo.svg" alt="Redestina" className="h-7 w-auto shrink-0" />
-          {titol && (
+          {titol && rolEquip && !organitzacio?.nombre ? (
+            // Un chip y no solo texto: el super_admin lleva el coral de marca, para distinguirlo a
+            // primera vista del admin y del técnico.
+            <span
+              className={cn(
+                'min-w-0 truncate rounded-full px-2.5 py-0.5 text-xs font-semibold group-data-[collapsible=icon]:hidden',
+                rolEquip === 'super_admin' ? 'bg-coral-suave text-coral-texto' : 'bg-sidebar-accent text-sidebar-accent-foreground',
+              )}
+              title={t('app.rol_title', { rol: t(`eq.rol_${rolEquip}`) })}
+              data-testid="rol-equip"
+              data-rol={rolEquip}
+            >
+              {t(`eq.rol_${rolEquip}`)}
+            </span>
+          ) : titol && (
             <span className="min-w-0 truncate text-sm font-semibold group-data-[collapsible=icon]:hidden">
               {titol}
             </span>
@@ -121,7 +140,7 @@ export default function AppSidebar({
                   )}
                 >
                   <panell.icona />
-                  {t(panell.clau)}
+                  {nomPanell(rol)}
                 </SidebarGroupLabel>
               )}
               {navPerRol(rol).map((grup, i) => (

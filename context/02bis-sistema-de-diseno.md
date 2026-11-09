@@ -102,5 +102,6 @@ como **sistema de diseño que el código consume**. Tres piezas, en `design/`:
   es lo que lo hacía desaparecer justo en la sección en la que estabas. `design/DESIGN.md §6ter`.
 - **Fuentes**: Sora (500/600/700/800) e Inter (400/500/600/700), libres (OFL), desde Google Fonts
   en `index.html`. No hay fuentes propias en el repo.
+- Dos h2 de la portada van en `coral-oscuro` por decisión del cliente (contraste 2,85:1 sobre el fondo).
 - Modo oscuro: no existe en el branding y no se implementa (`@custom-variant dark` se queda sin valores).
 

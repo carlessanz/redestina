@@ -2050,3 +2050,31 @@ descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres 
 - **1.3 «Cooperativa agraria. Mantener el resto de actividades»**: la actividad `cooperativa_agraria`
   existía solo para el papel de ofertante; pasa a `ambdos` (`20270512100100`) y sale también en la ficha
   de una receptora. El resto del catálogo, igual.
+
+### Configuració › Equip: cuentas del equipo y su rol (09-11-2026, `20270513100000`)
+
+Pedido por Carles al ver que Sebastián (`admin`) no veía un botón del `super_admin` (el importador): las dos
+cuentas no tenían el mismo rol y **no había ninguna pantalla para verlo ni cambiarlo** (era SQL con la service
+key, o sea una sesión con token). Ahora hay una pestaña **«Equip»** en Configuració, **solo para el
+super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también lo exigen):
+
+- `SeccioEquip` (`components/configuracio/`): lo que puede cada rol (resumen), el recuento, una fila por cuenta
+  del equipo —nombre/correo, rol, último acceso, desde cuándo y quién le dio el rol— con un desplegable
+  (Super admin · Admin · Tècnic · «Treu de l'equip»), y debajo los últimos 15 cambios (`equip_rols_hist`).
+  Las cuentas de las organizaciones (ofertantes y receptores) no salen: solo las que tienen fila en `usuario_roles`.
+- Cada cambio pide confirmación (`useConfirma`): **roja** al bajar o sacar a alguien, normal al subir, con la
+  advertencia de acceso total al subir a super_admin. Tras la llamada se recarga **también en error**.
+- A uno mismo no se le ofrece nada («No et pots canviar el rol a tu mateix») y tampoco al único super_admin
+  activo; lo anticipa `accionsMembre()` (`lib/equip.ts`, puro, `tests/equip.test.ts`) y lo impone la base.
+- **Lo que NO hace**: dar de alta cuentas del equipo (hoy `scripts/crear-usuario.ts`; **deuda 169**) ni convertir
+  una cuenta externa en equipo. Es deliberado: ese paso da acceso a todos los datos y merece su propia puerta.
+- **El rol se ve en todas partes** (pedido el mismo día: el rótulo junto al logo decía «Admin» tanto al
+  super_admin como al admin): `AppSidebar` pinta un **chip** con el rol real (`ctx.rol`; coral de marca para
+  «Super admin», neutro para «Admin» y «Tècnic»; `data-testid="rol-equip"`, `data-rol`), el grupo del panel del
+  equipo con doble rol lleva el mismo nombre, y el menú de usuario añade «Rol: …». `rolEquipDe()` (`lib/equip.ts`)
+  descarta cualquier valor que no sea de los tres. Con doble rol (equipo + organización) no hay rótulo junto al
+  logo, como antes. No hizo falta tocar la base: `get_my_session_context()` ya devolvía `rol`.
+- Pruebas: `tests/e2e/equip.e2e.ts` (clon; la cuenta de prueba `comunicacio@esimperfect.com` baja y sube, con
+  confirmación, y el clon queda como estaba) y el arnés (denegada a todo el que no sea super_admin).
+- En producción **Sebastián pasó a `super_admin` por esta misma pantalla** (o, antes de publicarla, por SQL
+  desde la sesión con token): anotar aquí la fecha cuando se haga.

@@ -48,8 +48,8 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
   técnica (cómo).
-- **Planes vivos** en `3. Claude Code/`: plan 1 CRM (1A-1D y 1F publicadas; **1E solo en el clon**,
-  carga en producción antes del 31-12); certificado y firma (05-11) ejecutados.
+- **Planes vivos** (`3. Claude Code/`): plan 1 CRM (1A-1D y 1F publicadas; **1E solo en el clon**,
+  carga en producción antes del 31-12); certificado y firma, ejecutados.
 - Vocabulario: en el código la tabla es `excedentes` y los textos dicen «oferta»; «AFCV» es el
   término del funcional, pendiente de rename.
 
@@ -109,7 +109,7 @@ CD); `logo-email.png` es el logo en color
 formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
 `<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
 color = chip blanco, texto en color. `{n}` reservado a contadores (singular `<clau>_1`). Sin
-modo oscuro. Dos h2 de la portada van en `coral-oscuro` por decisión del cliente (2,85:1).
+modo oscuro. Dos h2 de la portada, en `coral-oscuro` por decisión del cliente.
 
 ## 3. Estructura (resumen; árbol completo en `context/03-estructura.md`)
 
@@ -177,12 +177,12 @@ cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas
 
 **Catálogos**: `productos` (iconos propios en `public/icones-productes/`), `causas`,
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
-`tipos_caja`, `municipios` (947, INE texto), `codis_postals`, `tipus_activitat`,
-`factors_impacte`, `modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**),
-`convenis_equivalents`. Whitelists `meta_test_recipients`, `email_test_recipients` (vacía = sin
-límite). `app_config` (secretos de jobs, solo `service_role`) y `app_settings` (`test_mode`
-fail-safe cerrado; `roles_activos`, `whatsapp_activo`, `email_activo`, `notificacions_actives`
-fail-safe abierto; `validacio_ofertes`). `consentiments` (RGPD, solo inserción; sin cuenta, por el enlace
+`tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
+`modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**), `convenis_equivalents`.
+Whitelists `meta_test_recipients`, `email_test_recipients` (vacía = sin límite). `app_config`
+(secretos de jobs, solo `service_role`) y `app_settings` (`test_mode` fail-safe cerrado;
+`roles_activos`, `whatsapp_activo`, `email_activo`, `notificacions_actives` fail-safe abierto;
+`validacio_ofertes`). `consentiments` (RGPD, solo inserción; sin cuenta, por enlace
 `consentiment_rgpd`: el equipo lo pide, no lo marca).
 
 **Sistema documental** — regla que lo ordena todo: **el número pertenece a la fila, no al
@@ -291,7 +291,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
-  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor);
+  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo: `equip_membres`, `canviar_rol_equip` (`es_super_admin()`; no a uno mismo, nunca sin super_admin; historial `equip_rols_hist`);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); importación (`previsualitzar_importacio_entitats`,
   `importar_entitats`: `es_super_admin()`, ≤1.000 filas, savepoint por fila; núcleo interno `alta_fitxa_interna`,
   compartido con `crear_entitat`); firma (`acunar_enllac_propi('firma_document',…)`
@@ -374,18 +374,20 @@ Lo que manda hoy, en una línea cada uno:
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y
-  `/equip/ofertes/:id`): ámbito (`ABASTS_DIALEG`, deuda 156), fecha, anexo, «Excloses», revisión y envío
-  manual. El ofertante, en «Els meus certificats» y en su oferta.
-- **Circuito de firma (05-11)**: `DialegSignaDocument` («Signa aquí» o «Puja'l signat»; el equipo solo
-  sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) es el único que decide el botón**.
-  «Pendent de tu», `BadgeSignatura`, Aprovacions › «Signatures per tancar» (solo super_admin), Documents ›
-  «Signatures»; «Envia per correu» con «Inclou l'enllaç per signar».
-- **Importa des d'Excel** (06-11, `ImportaEntitats`, solo super_admin): Fitxer (plantilla, columnas
-  reconocidas) → Revisió (estado por fila, papeles, «dubtosa» con candidatos) → Resultat (informe CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`,
-  `BarraFiltres`). Ficha de la organización con listas cerradas, `tipus_activitat`, contactos,
-  NIF válido y único, razón social obligatoria, «afegir paper». Tablero con indicadores por
-  periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu v2 (ficha viva, sin
-  plan automático) y perfil de recepción; Pla de Prevenció como **expediente**; «El meu impacte».
+  `/equip/ofertes/:id`): ámbito, fecha, anexo, «Excloses», revisión y envío manual; el ofertante, en
+  «Els meus certificats» y en su oferta.
+- **Circuito de firma (05-11)**: `DialegSignaDocument` («Signa aquí» / «Puja'l signat»; el equipo solo
+  sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) decide el botón**.
+  «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
+  «Envia per correu» con «Inclou l'enllaç per signar».
+- **Configuració › Equip** (09-11, solo super_admin, `SeccioEquip`): las cuentas con rol de
+  plataforma (no los usuarios de organizaciones), cambio de rol con confirmación e historial.
+- **Importa des d'Excel** (06-11, `ImportaEntitats`, super_admin): Fitxer → Revisió (estado por fila,
+  «dubtosa» con candidatos) → Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros
+  comunes (`lib/filtres.ts`, `BarraFiltres`). Ficha de la organización con listas cerradas,
+  `tipus_activitat`, contactos, NIF válido y único, razón social obligatoria, «afegir paper».
+  Tablero con indicadores por periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu
+  v2 (ficha viva) y perfil de recepción; Pla de Prevenció como **expediente**; «El meu impacte».
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -446,7 +448,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270512100100`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270513100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -578,9 +580,8 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (73 vivas; la siguiente entrada nueva es la 169; los números no se renumeran ni
-se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
-interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (filtros en
+**Deuda abierta (74 vivas; la siguiente entrada nueva es la 170; los números no se renumeran ni
+se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
 ofreciendo la factura) · **128** (canalización conciliada sin coste no se puede valorar después)
@@ -592,25 +593,23 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
-inactiva sigue viendo lo ya enviado). Resto: 4, 10, 12,
-17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
-95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
+inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
 **§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (90
-cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
+cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.764 pruebas de Vitest en 77 ficheros (1 saltada a propósito) + 25 de Deno.**
+   **Referencia: 1.783 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.040/2.040 y 32 sin datos; producción 2.041/2.041 y 31 «Sin fallos de
+   **Referencia: clon 2.075/2.075 y 33 sin datos; producción 2.041/2.041 y 31 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

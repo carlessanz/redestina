@@ -12,18 +12,22 @@ import FactorsImpacte from './equip/FactorsImpacte'
 import EditorDiagnostic from './equip/EditorDiagnostic'
 import SeccioGeneral from './configuracio/SeccioGeneral'
 import SeccioNotificacions from './configuracio/SeccioNotificacions'
+import SeccioEquip from './configuracio/SeccioEquip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const PESTANYES = ['general', 'notificacions', 'fundacio', 'impacte', 'diagnostic'] as const
+const PESTANYES = ['general', 'notificacions', 'fundacio', 'impacte', 'diagnostic', 'equip'] as const
 
 export default function Settings() {
   const { t } = useT()
   const { ctx } = useAppContext()
   const [params, setParams] = useSearchParams()
   const tabParam = params.get('tab')
-  const tab = (PESTANYES as readonly string[]).includes(tabParam ?? '') ? (tabParam as string) : 'general'
-  // Los interruptores de `app_settings` solo los escribe el super_admin.
+  // Los interruptores de `app_settings` solo los escribe el super_admin, y «Equip» solo lo ve él
+  // (las dos RPC de la base también lo exigen): a un admin, `?tab=equip` cae en «General».
   const potCanviar = ctx?.esSuperAdmin ?? false
+  const tab = (PESTANYES as readonly string[]).includes(tabParam ?? '') && (tabParam !== 'equip' || potCanviar)
+    ? (tabParam as string)
+    : 'general'
 
   return (
     <div className="mx-auto max-w-3xl space-y-6">
@@ -44,6 +48,7 @@ export default function Settings() {
             <TabsTrigger value="fundacio">{t('set.tab_fundacio')}</TabsTrigger>
             <TabsTrigger value="impacte">{t('set.tab_impacte')}</TabsTrigger>
             <TabsTrigger value="diagnostic">{t('set.tab_diagnostic')}</TabsTrigger>
+            {potCanviar && <TabsTrigger value="equip" data-testid="tab-equip">{t('set.tab_equip')}</TabsTrigger>}
           </TabsList>
         </div>
 
@@ -56,6 +61,8 @@ export default function Settings() {
         <TabsContent value="impacte" className="pt-4"><FactorsImpacte /></TabsContent>
         {/* El cuestionario, las medidas y las reglas del diagnóstico (F2). */}
         <TabsContent value="diagnostic" className="pt-4"><EditorDiagnostic /></TabsContent>
+        {/* Las cuentas del equipo y su rol (09-11-2026): solo el super_admin. */}
+        {potCanviar && <TabsContent value="equip" className="pt-4"><SeccioEquip /></TabsContent>}
       </Tabs>
     </div>
   )

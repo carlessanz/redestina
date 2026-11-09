@@ -910,6 +910,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "llista_consentiments", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu la llista de consentiments" },
   { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
   { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
+  // El equipo (20270513100000): ver y cambiar roles es SOLO del super_admin.
+  { tabla: "equip_membres", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu les comptes de l'equip (és del super_admin)" },
+  { tabla: "canviar_rol_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000", p_rol: "admin" }, descripcion: "NO canvia el rol de ningú de l'equip (és del super_admin)" },
+  { tabla: "equip_rols_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial de rols de l'equip (0 files)" },
+  { tabla: "equip_rols_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial de rols directament (només la RPC)" },
   { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap organització" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1560,6 +1565,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "llista_consentiments", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu la llista de consentiments" },
     { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
     { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
+    // El equipo (20270513100000): ver y cambiar roles es SOLO del super_admin.
+    { tabla: "equip_membres", op: "rpc", esperado: "denegar", args: {}, descripcion: "NO veu les comptes de l'equip (és del super_admin)" },
+    { tabla: "canviar_rol_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000", p_rol: "admin" }, descripcion: "NO canvia el rol de ningú de l'equip (és del super_admin)" },
+    { tabla: "equip_rols_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial de rols de l'equip (0 files)" },
+    { tabla: "equip_rols_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial de rols directament (només la RPC)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
@@ -1874,6 +1884,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "llista_consentiments", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu la llista de consentiments" },
     { tabla: "registrar_consentiment_enllac", op: "rpc", esperado: "denegar", args: { p_token_hash: "arnes", p_respostes: [], p_versio: "1", p_idioma: "ca" }, descripcion: "NO registra consentiments per enllaç (només service_role)" },
     { tabla: "preparar_enviament_albara", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO prepara l'enviament d'un albarà (només service_role, enviar-albara)" },
+    // El equipo (20270513100000): ver y cambiar roles es SOLO del super_admin.
+    // Con un uuid inventado la guarda deja pasar y corta 22023 `usuari_inexistent` sin escribir nada.
+    { tabla: "equip_membres", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu les comptes de l'equip" },
+    { tabla: "canviar_rol_equip", op: "rpc", esperado: "permitir", args: { p_user: "00000000-0000-0000-0000-000000000000", p_rol: "admin" }, descripcion: "pot canviar el rol d'un compte de l'equip (22023 si no existeix)" },
+    { tabla: "equip_rols_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historial de rols de l'equip", requiereFixture: "algun canvi de rol de l'equip" },
+    { tabla: "equip_rols_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial de rols directament (només la RPC)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -2867,6 +2883,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // Plan 1, 1A: el historial solo lo escribe el trigger `trg_fitxa_estat()`; sin GRANT de
   // escritura, el insert tiene que morir en 42501 aunque la fila sea válida.
   fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
+  equip_rols_hist: { user_id: "00000000-0000-0000-0000-000000000000", rol_abans: "admin", rol_despres: "super_admin" },
   notes_internes: { organizacion_id: "00000000-0000-0000-0000-000000000000", canal: "telefon", text: "arnes" },
   // 20270511100000: el registro del importador solo lo escribe `importar_entitats()`. Filas
   // válidas para que lo que corte sea el GRANT (42501) y no un `not null` o un `check`.

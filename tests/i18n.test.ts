@@ -159,6 +159,9 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // «Envia per correu» del albarán (04-11-2026): lo que responde `enviar-albara`.
     { que: 'enviar-albara resultat', prefijo: 'alb.env_r_', valores: ['enviat', 'enviat_sense_adjunt', 'simulat', 'desactivat', 'no_test_user', 'fora_llista_test', 'error'] },
     { que: 'enviar-albara code', prefijo: 'alb.env_e_', valores: ['albara_no_emes', 'sense_fitxer', 'sense_destinatari', 'enviat_fa_poc', 'error'] },
+    // El equipo (09-11-2026): el rol de `usuario_roles` y los códigos de `canviar_rol_equip()`.
+    { que: 'usuario_roles.rol', prefijo: 'eq.rol_', valores: ['super_admin', 'admin', 'tecnic'] },
+    { que: 'canviar_rol_equip codi', prefijo: 'eq.e_', valores: ['rol_invalid', 'no_et_pots_canviar', 'usuari_inexistent', 'no_es_de_lequip', 'ultim_super_admin', 'error'] },
     // El certificado de donación (05-11-2026): el ámbito (`clauAbast`) y el tipo de la
     // entidad no social de una exclusión (`clauTipus`). Los motivos los vigila su propio test.
     { que: 'certificat de donació · abast', prefijo: 'cdon.abast_', valores: ['oferta', 'periode', 'exercici'] },

@@ -1444,6 +1444,10 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
 - **`fitxa_estat_hist`** (`tipus`, `productor_id`/`entidad_id` con `on delete cascade`, `activo`, `per`
   → `perfiles` `set null`, `at`): una fila por cambio real, escrita solo por el trigger. RLS: la lee
   `es_intern()`; `authenticated` solo tiene SELECT.
+- **`equip_rols_hist`** (09-11-2026, `20270513100000`; `user_id` sin FK, `email`, `rol_abans`/`rol_despres` —null = sacada del
+  equipo—, `per` → `perfiles` `set null`, `per_email`, `at`): una fila por cambio real de `canviar_rol_equip()`, que es la
+  única que escribe. Los correos van copiados porque al sacar a alguien o borrar la cuenta el id ya no dice nada.
+  RLS: la lee `es_super_admin()`; `authenticated` solo tiene SELECT.
 - **`v_organizaciones`** (sigue `security_invoker`): columnas nuevas al final, en este orden: `activa`,
   `productor_activo`, `entidad_activo`, `razon_social`, `nom_comercial`
   (`coalesce(p.empresa, e.nombre, p.name)`), `persona_contacte`, `municipio_ine`, `comarca`

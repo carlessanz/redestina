@@ -129,6 +129,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **09-11-2026 (Configuració › Equip, `20270513100000`): se abre la 169**: **74 vivas** y la siguiente entrada nueva es la 170.
 ⚠️ **09-11-2026 (revisión de la Taula mestra por la Fundació, `20270512100000`): se abre la 168 y se cierra el
 mismo día** (`priorizar-entidades`): **73 vivas** y la siguiente entrada nueva es la 169.
 ⚠️ **06-11-2026 (importador de entidades, `20270511100000`): se abren la 165, la 166 y la 167**: **73 vivas** y
@@ -846,3 +847,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      ninguna `aprovada` (pendiente o rechazada); las fichas del equipo sin cuenta no tienen membresías y
      entran—. Probado en el clon: una entidad sin `estat` sale; una con «Signat» y sin convenio sale
      pendiente; con su membresía en `pendent`, desaparece. La ayuda del campo (`ef.hi_estat`) lo dice.
+169. **No hay alta de cuentas del equipo en la interfaz** (09-11-2026). Configuració › Equip cambia el rol de las
+     cuentas que ya existen (`canviar_rol_equip`), pero crear una cuenta nueva del equipo sigue siendo
+     `scripts/crear-usuario.ts` (Admin API con la service key). Hacerlo desde la pantalla pide una Edge Function con
+     `service_role` (cuenta + perfil + rol + enlace de acceso por `recuperar-password`) y decidir si una cuenta
+     externa existente puede pasar a equipo —da acceso a TODOS los datos—. Precio: media jornada; no urgente
+     con un equipo de tres personas.

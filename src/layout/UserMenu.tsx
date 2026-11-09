@@ -13,6 +13,7 @@ import { useAppContext, useCanals } from '../hooks/useAppContext'
 import { useCanalPropi } from '../hooks/useCanalPropi'
 import type { TriaCanal } from '../hooks/useCanalPropi'
 import { cn } from '../lib/utils'
+import { rolEquipDe } from '../lib/equip'
 import { Button } from '@/components/ui/button'
 import {
   DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuItem,
@@ -90,6 +91,12 @@ export default function UserMenu() {
           )}
           {organitzacio?.nombre && (
             <div className="truncate text-xs text-muted-foreground">{organitzacio.nombre}</div>
+          )}
+          {/* El rol de plataforma, para saber con qué permisos has entrado (09-11-2026). */}
+          {rolEquipDe(ctx?.rol) && (
+            <div className="truncate text-xs font-medium text-muted-foreground" data-testid="menu-rol-equip">
+              {t('eq.el_teu_rol', { rol: t(`eq.rol_${rolEquipDe(ctx?.rol)}`) })}
+            </div>
           )}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
