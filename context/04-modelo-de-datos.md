@@ -1452,6 +1452,11 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
 - **`equip_traspassos`** (`20270514100000`; `origen_id`/`desti_id` y sus correos, `motiu` traspas·desactiva·esborra, `total`,
   `detall` = `[{taula, columna, n}]`, `per`, `per_email`, `at`): cada traspaso de acciones entre cuentas del equipo. **Sin FK a
   propósito** (sobrevive al borrado de las cuentas), solo inserción por las RPC `equip_*`, lectura `es_super_admin()`.
+  Desde `20270515100000` nace con `total = 0` y se completa al final del mismo traspaso (sus filas cuelgan de ella).
+- **`equip_traspassos_files`** (`20270515100000`; `traspas_id` → `equip_traspassos` `on delete cascade`, `taula`, `columna`, `fila`
+  = la clave primaria de la fila movida en jsonb, p. ej. `{"id": "…"}`): el **rastro por fila** del traspaso. El autor original
+  de una fila es el `origen_*` de su traspaso más antiguo (`equip_autoria_fila(taula, id)`, super_admin). Solo inserción por
+  `equip_moure_accions()`, en la misma sentencia que mueve (CTE `update … returning` → `insert`); lectura `es_super_admin()`.
 
 ### Gestión del equipo (09-11-2026, `20270514100000`)
 
@@ -1468,6 +1473,17 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   `if tg_op = 'UPDATE' and current_setting('redestina.traspas_autoria', true) = 'on' then return new`, parcheada desde la definición vigente
   con un `DO` que verifica que quedó puesta. La marca la pone `set_config(..., true)` dentro de la transacción y se apaga al acabar. Se probó
   antes: el traspaso toca SOLO la autoría (hash del resto de columnas idéntico antes y después). El PDF ya emitido conserva el nombre impreso.
+- 🔴 **La autoría de una cuenta del equipo no tiene efectos fiscales** (análisis del 09-11-2026, pedido por Carles: «el usuario es un
+  simple gestor; todo lo legal recae en la Fundació»). Comprobado en el código: el convenio, el CD, el CR y el cierre imprimen a la
+  **apoderada** de `parametros_documentales` (nombre, cargo, DNI, firma y sello), nunca a quien emitió o contrafirmó; el albarán lo
+  firma la **contraparte** y, si lo registró el equipo, dice «Registrada per l'equip en nom de X» sin nombre de persona; los
+  `datos` congelados de `documentos` no guardan al emisor; `datos_182()` no toca usuarios; ninguna pantalla enseña las columnas de
+  autoría. Son **trazabilidad interna**. Por eso borrar una cuenta y pasar lo suyo a otra no tiene impedimento legal, y no se
+  bloquea «por motivos fiscales». Lo único con valor probatorio es quién condujo un acto asistido (`evidencias.asistido_por`): de ahí
+  el rastro por fila de `20270515100000`, que conserva quién lo hizo de verdad. Lo fiscal que SÍ falta son los datos reales de la
+  Fundació en Configuració › Fundació (checkpoint 10: `datos_provisionales`).
+- **Destino propuesto** (`destiPerDefecte()`, `lib/equip.ts`): alguien activo **del mismo rol** que la cuenta que se va (y entre
+  ellos quien pulsa); si no hay, quien pulsa. Solo se propone: el desplegable deja elegir cualquier cuenta activa del equipo.
 - Bloqueos: nadie se activa/desactiva/borra a sí mismo (`no_et_pots_tocar`); nunca el equipo sin super_admin activo (`ultim_super_admin`,
   con `pg_advisory_xact_lock` para dos cambios a la vez); el destino ha de ser una cuenta ACTIVA del equipo distinta del origen.
 - **`v_organizaciones`** (sigue `security_invoker`): columnas nuevas al final, en este orden: `activa`,

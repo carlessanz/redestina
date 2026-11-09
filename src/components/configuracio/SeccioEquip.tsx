@@ -9,6 +9,10 @@
 // error: nada de esto se hace sobre uno mismo, el equipo nunca se queda sin un super_admin activo,
 // y aquí no se dan de alta cuentas (nota al pie). Cada cambio queda en `equip_rols_hist`, que se
 // enseña debajo.
+//
+// Dos pestañas (09-11-2026): «Actius» por defecto y «Desactivats» aparte, para que las cuentas que
+// ya no trabajan no se mezclen con el equipo de verdad. Las reglas («el último super_admin activo»,
+// los destinos del traspaso) se calculan siempre sobre TODAS las cuentas, no sobre la pestaña.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { Pencil, Power, PowerOff, Trash2 } from 'lucide-react'
@@ -19,7 +23,7 @@ import { cn } from '../../lib/utils'
 import { dataCurta } from '../../lib/format'
 import { faTemps } from '../../lib/notesInternes'
 import {
-  accionsMembre, clauErrorEquip, esBaixada, ordenaEquip, recompteRols, ROLS_EQUIP,
+  accionsMembre, clauErrorEquip, esBaixada, filtraEquip, ordenaEquip, recompteRols, ROLS_EQUIP,
   type CanviRol, type MembreEquip, type RolAAssignar, type RolEquip,
 } from '../../lib/equip'
 import { useConfirma } from '../DialegConfirma'
@@ -30,6 +34,7 @@ import DialegEditaMembre from './DialegEditaMembre'
 import DialegTraspasMembre, { type ModeMembre } from './DialegTraspasMembre'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 type Traductor = (clau: string, params?: Record<string, string | number>) => string
 
@@ -131,6 +136,7 @@ export default function SeccioEquip() {
   // Los diálogos: editar una cuenta, o desactivar/borrar una (con el traspaso de sus acciones).
   const [edita, setEdita] = useState<MembreEquip | null>(null)
   const [traspas, setTraspas] = useState<{ m: MembreEquip; mode: ModeMembre } | null>(null)
+  const [pestanya, setPestanya] = useState<'actius' | 'inactius'>('actius')
 
   const carrega = useCallback(async () => {
     const [m, h] = await Promise.all([
@@ -147,7 +153,9 @@ export default function SeccioEquip() {
   useEffect(() => { void carrega() }, [carrega])
 
   const equip = useMemo(() => ordenaEquip(membres ?? []), [membres])
-  const recompte = useMemo(() => recompteRols(membres ?? []), [membres])
+  const actius = useMemo(() => filtraEquip(membres ?? [], 'actius'), [membres])
+  const inactius = useMemo(() => filtraEquip(membres ?? [], 'inactius'), [membres])
+  const recompte = useMemo(() => recompteRols(actius), [actius])
 
   async function canvia(m: MembreEquip, rol: RolAAssignar) {
     if (rol === m.rol || ocupat) return
@@ -201,6 +209,25 @@ export default function SeccioEquip() {
     return t(`eq.h_${c.accio}`, { per, email }) + (c.accio === 'desactiva' || c.accio === 'traspas' ? extra : '')
   }
 
+  /** Una pestaña: sus cuentas (las reglas de cada fila miran a todo el equipo, `equip`). */
+  function llista(files: readonly MembreEquip[], buit: string) {
+    if (files.length === 0) return <p className="text-sm text-muted-foreground" data-testid="eq-llista-buida">{t(buit)}</p>
+    return (
+      <ul className="divide-y divide-border" data-testid="eq-llista">
+        {files.map((m) => (
+          <FilaMembre
+            key={m.user_id} m={m} membres={equip} ocupat={ocupat} t={t}
+            onCanvia={(x, r) => void canvia(x, r)}
+            onEdita={setEdita}
+            onActiva={(x) => void activa(x)}
+            onDesactiva={(x) => setTraspas({ m: x, mode: 'desactiva' })}
+            onEsborra={(x) => setTraspas({ m: x, mode: 'esborra' })}
+          />
+        ))}
+      </ul>
+    )
+  }
+
   return (
     <div className="space-y-4" data-testid="seccio-equip">
       <Card>
@@ -227,23 +254,22 @@ export default function SeccioEquip() {
             <p className="text-sm text-muted-foreground">{t('eq.buit')}</p>
           )}
           {equip.length > 0 && (
-            <>
-              <p className="text-sm text-muted-foreground" data-testid="eq-resum">
-                {t('eq.resum', { sa: recompte.super_admin, a: recompte.admin, t: recompte.tecnic })}
-              </p>
-              <ul className="divide-y divide-border" data-testid="eq-llista">
-                {equip.map((m) => (
-                  <FilaMembre
-                    key={m.user_id} m={m} membres={equip} ocupat={ocupat} t={t}
-                    onCanvia={(x, r) => void canvia(x, r)}
-                    onEdita={setEdita}
-                    onActiva={(x) => void activa(x)}
-                    onDesactiva={(x) => setTraspas({ m: x, mode: 'desactiva' })}
-                    onEsborra={(x) => setTraspas({ m: x, mode: 'esborra' })}
-                  />
-                ))}
-              </ul>
-            </>
+            <Tabs value={pestanya} onValueChange={(v) => setPestanya(v === 'inactius' ? 'inactius' : 'actius')}>
+              <TabsList>
+                <TabsTrigger value="actius" data-testid="eq-tab-actius">{t('eq.tab_actius', { n: actius.length })}</TabsTrigger>
+                <TabsTrigger value="inactius" data-testid="eq-tab-inactius">{t('eq.tab_inactius', { n: inactius.length })}</TabsTrigger>
+              </TabsList>
+              <TabsContent value="actius" className="space-y-2">
+                <p className="text-sm text-muted-foreground" data-testid="eq-resum">
+                  {t('eq.resum', { sa: recompte.super_admin, a: recompte.admin, t: recompte.tecnic })}
+                </p>
+                {llista(actius, 'eq.buit_actius')}
+              </TabsContent>
+              <TabsContent value="inactius" className="space-y-2">
+                <p className="text-sm text-muted-foreground">{t('eq.hint_inactius')}</p>
+                {llista(inactius, 'eq.buit_inactius')}
+              </TabsContent>
+            </Tabs>
           )}
           <p className="text-xs text-muted-foreground">{t('eq.nota_alta')}</p>
         </CardContent>

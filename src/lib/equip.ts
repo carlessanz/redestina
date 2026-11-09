@@ -177,10 +177,23 @@ export function destinsPossibles(membres: readonly MembreEquip[], origenId: stri
   return ordenaEquip(membres.filter((x) => x.actiu && x.user_id !== origenId))
 }
 
-/** El destino que se propone: quien está pulsando si puede serlo («me las quedo yo»), y si no, el primero. */
+/**
+ * El destino que se propone: alguien del MISMO ROL que el origen (lo que pidió Carles: «a otro
+ * usuario del mismo rol»), y entre ellos quien está pulsando si lo es («me las quedo yo»); si no
+ * hay nadie del mismo rol activo, quien pulsa, y si no, el primero. Solo se propone: el
+ * desplegable deja elegir a cualquier cuenta activa del equipo (la autoría no tiene efectos
+ * fiscales; ver `20270515100000`).
+ */
 export function destiPerDefecte(membres: readonly MembreEquip[], origenId: string): string {
   const v = destinsPossibles(membres, origenId)
-  return (v.find((x) => x.es_tu) ?? v[0])?.user_id ?? ''
+  const rol = membres.find((x) => x.user_id === origenId)?.rol
+  const mateixRol = v.filter((x) => x.rol === rol)
+  return (mateixRol.find((x) => x.es_tu) ?? mateixRol[0] ?? v.find((x) => x.es_tu) ?? v[0])?.user_id ?? ''
+}
+
+/** Las cuentas de una pestaña de Configuració › Equip: activas (por defecto) o desactivadas. */
+export function filtraEquip(membres: readonly MembreEquip[], pestanya: 'actius' | 'inactius'): MembreEquip[] {
+  return ordenaEquip(membres.filter((m) => m.actiu === (pestanya === 'actius')))
 }
 
 /**

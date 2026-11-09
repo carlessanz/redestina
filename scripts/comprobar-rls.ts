@@ -928,6 +928,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "editar_membre_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000", p_nom: "x", p_telefon: null }, descripcion: "NO edita comptes de l'equip (és del super_admin)" },
   { tabla: "esborrar_membre_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra comptes de l'equip (és del super_admin)" },
   { tabla: "equip_traspassos", op: "leer", esperado: "denegar", descripcion: "NO veu el registre de traspassos (0 files)" },
+  // Rastro por fila del traspaso (20270515100000): solo el super_admin lo lee; nadie lo escribe.
+  { tabla: "equip_traspassos_files", op: "leer", esperado: "denegar", descripcion: "NO veu el rastre per fila dels traspassos (0 files)" },
+  { tabla: "equip_traspassos_files", op: "insertar", esperado: "denegar", descripcion: "NO escriu el rastre per fila directament" },
+  { tabla: "equip_autoria_fila", op: "rpc", esperado: "denegar", args: { p_taula: "documentos", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta l'autoria original d'una fila (és del super_admin)" },
   { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap organització" },
   // Los indicadores del tablero (20270422100000, fase 8): solo el equipo.
   { tabla: "kpis_equip", op: "rpc", esperado: "denegar", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "NO veu els indicadors de l'equip" },
@@ -1596,6 +1600,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "editar_membre_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000", p_nom: "x", p_telefon: null }, descripcion: "NO edita comptes de l'equip (és del super_admin)" },
     { tabla: "esborrar_membre_equip", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra comptes de l'equip (és del super_admin)" },
     { tabla: "equip_traspassos", op: "leer", esperado: "denegar", descripcion: "NO veu el registre de traspassos (0 files)" },
+    // Rastro por fila del traspaso (20270515100000): solo el super_admin lo lee; nadie lo escribe.
+    { tabla: "equip_traspassos_files", op: "leer", esperado: "denegar", descripcion: "NO veu el rastre per fila dels traspassos (0 files)" },
+    { tabla: "equip_traspassos_files", op: "insertar", esperado: "denegar", descripcion: "NO escriu el rastre per fila directament" },
+    { tabla: "equip_autoria_fila", op: "rpc", esperado: "denegar", args: { p_taula: "documentos", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta l'autoria original d'una fila (és del super_admin)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa organitzacions (és de l'admin)" },
     { tabla: "kpis_equip", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu els indicadors del període" },
     { tabla: "impacte_global", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu l'impacte de tota la plataforma" },
@@ -1930,6 +1938,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "editar_membre_equip", op: "rpc", esperado: "permitir", args: { p_user: "00000000-0000-0000-0000-000000000000", p_nom: "x", p_telefon: null }, descripcion: "pot editar un compte de l'equip (22023 si no existeix)" },
     { tabla: "esborrar_membre_equip", op: "rpc", esperado: "permitir", args: { p_user: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar un compte de l'equip (22023 si no existeix)" },
     { tabla: "equip_traspassos", op: "leer", esperado: "permitir", descripcion: "veu el registre de traspassos", requiereFixture: "algun traspas d'accions entre comptes de l'equip" },
+    { tabla: "equip_traspassos_files", op: "leer", esperado: "permitir", descripcion: "veu el rastre per fila dels traspassos", requiereFixture: "algun traspas d'accions entre comptes de l'equip" },
+    { tabla: "equip_traspassos_files", op: "insertar", esperado: "denegar", descripcion: "NO escriu el rastre per fila directament (només la funció interna)" },
+    { tabla: "equip_autoria_fila", op: "rpc", esperado: "permitir", args: { p_taula: "documentos", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "consulta l'autoria original d'una fila (buida si no s'ha traspassat)" },
     { tabla: "activar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una organització (22023 si no existeix)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -2925,6 +2936,7 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   fitxa_estat_hist: { tipus: "entidad", entidad_id: "00000000-0000-0000-0000-000000000000", activo: true },
   equip_rols_hist: { user_id: "00000000-0000-0000-0000-000000000000", rol_abans: "admin", rol_despres: "super_admin" },
   equip_traspassos: { origen_id: "00000000-0000-0000-0000-000000000000", desti_id: "00000000-0000-0000-0000-000000000000", motiu: "traspas", total: 0, detall: [] },
+  equip_traspassos_files: { traspas_id: "00000000-0000-0000-0000-000000000000", taula: "documentos", columna: "emitido_por", fila: { id: "00000000-0000-0000-0000-000000000000" } },
   notes_internes: { organizacion_id: "00000000-0000-0000-0000-000000000000", canal: "telefon", text: "arnes" },
   // 20270511100000: el registro del importador solo lo escribe `importar_entitats()`. Filas
   // válidas para que lo que corte sea el GRANT (42501) y no un `not null` o un `check`.

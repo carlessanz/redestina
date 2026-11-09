@@ -2075,6 +2075,11 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   obligatorio (casilla marcada y bloqueada: la base exige destino) y hay que escribir «esborrar»/«borrar». A uno mismo y al único
   super_admin activo se les desactivan los botones con el motivo. Cada paso queda en el historial («X ha desactivado a Y. 12
   acciones pasan a Z.»). Textos `eq.*`; en móvil el diálogo lleva `grid-cols-[minmax(0,1fr)]` (un correo largo lo ensanchaba).
+- **Pestañas «Actius · n» / «Desactivats · n»** (09-11-2026, pedido por Carles): por defecto, las activas (`filtraEquip()`); las
+  desactivadas aparte, con «Es poden tornar a activar o esborrar». El resumen por rol cuenta solo las activas; las reglas de cada
+  fila (último super_admin, destinos del traspaso) miran a todo el equipo. El destino que propone el diálogo es **alguien del mismo
+  rol** (`destiPerDefecte()`), y la nota del diálogo dice ahora que **no tiene efectos fiscales** (los documentos salen a nombre de
+  la Fundació o de la contraparte) y que queda apuntado, fila a fila, quién lo hizo (`20270515100000`).
 - **El rol se ve en todas partes** (pedido el mismo día: el rótulo junto al logo decía «Admin» tanto al
   super_admin como al admin): `AppSidebar` pinta un **chip** con el rol real (`ctx.rol`; coral de marca para
   «Super admin», neutro para «Admin» y «Tècnic»; `data-testid="rol-equip"`, `data-rol`), el grupo del panel del

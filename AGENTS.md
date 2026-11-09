@@ -81,7 +81,6 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
 | Scripts / pruebas | Deno 2.x; Vitest 4; Playwright (E2E); `deno test` para el PDF |
 | Hosting | Vercel (proyecto `redestina`, dominio `redestina.carlessanz.com`) |
 
-- **Producción es la base de verdad; el clon local (Docker, puertos 553xx) es una copia** (§11).
 - Router como capa raíz con rutas públicas y privadas (§6quater). Sin librería de estado.
   `vercel.json` lleva el rewrite de SPA.
 - **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
@@ -234,7 +233,7 @@ documentos, albaranes o cierres; si no, arrastra lo operativo, borra la ficha, r
 organización vacía y purga la whitelist. FK `NO ACTION` = última red; nunca un `.delete()` suelto
 (§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
-🔴 **Una cuenta del equipo no tiene organizaciones** (triggers `compte_equip`/`te_membresies`): ni ofertas. Desactivarla o borrarla **traspasa sus acciones** (toda FK de autoría `SET NULL`, por catálogo: `equip_columnes_autoria()`) a otra cuenta activa; los triggers de inmutabilidad dejan mover QUIÉN solo con `redestina.traspas_autoria` (la ponen las RPC `equip_*`); borrar a quien ha hecho algo **exige destino** (`cal_desti`).
+🔴 **Una cuenta del equipo no tiene organizaciones** (triggers `compte_equip`/`te_membresies`) ni ofertas; **su autoría no es fiscal** (todo sale a nombre de la Fundació o de la contraparte). Desactivarla o borrarla **traspasa sus acciones** (FK de autoría `SET NULL`, `equip_columnes_autoria()`) a otra cuenta activa (propone el mismo rol), con rastro por fila (`equip_traspassos_files`, `equip_autoria_fila`); la inmutabilidad deja mover QUIÉN solo con `redestina.traspas_autoria`; borrar a quien ha hecho algo **exige destino** (`cal_desti`).
 
 **RLS y GRANT — dos capas**: `service_role` todo (y `BYPASSRLS`); `anon` **ningún privilegio**
 de tabla; `authenticated` nace con **SELECT y nada más** en una tabla nueva (los `alter default
@@ -288,7 +287,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
-  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo (`es_super_admin()`, nunca a uno mismo ni sin super_admin activo; `equip_rols_hist`, `equip_traspassos`): `equip_membres`, `canviar_rol_equip`, `editar_/activar_/desactivar_/esborrar_membre_equip`, `traspassar_accions_equip`, `equip_accions`;
+  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo (`es_super_admin()`, nunca a uno mismo ni sin super_admin activo; `equip_rols_hist`, `equip_traspassos`): `equip_membres`, `canviar_rol_equip`, `editar_/activar_/desactivar_/esborrar_membre_equip`, `traspassar_accions_equip`, `equip_accions`, `equip_autoria_fila`;
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); importación (`previsualitzar_importacio_entitats`,
   `importar_entitats`: `es_super_admin()`, ≤1.000 filas); firma (`acunar_enllac_propi('firma_document',…)`
   titular, `tancar_/rebutjar_signatura` super_admin, `puc_signar_document`; servidor: `signar_document_per_enllac`,
@@ -377,7 +376,7 @@ Lo que manda hoy, en una línea cada uno:
   «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
   «Envia per correu» con «Inclou l'enllaç per signar».
 - **Configuració › Equip** (09-11, super_admin, `SeccioEquip`): cuentas con rol de plataforma:
-  rol, editar, activar/desactivar y borrar con traspaso de sus acciones.
+  rol, editar, activar/desactivar y borrar con traspaso; pestañas Actius/Desactivats.
 - **Importa des d'Excel** (06-11, `ImportaEntitats`, super_admin): Fitxer → Revisió (estado por fila,
   «dubtosa» con candidatos) → Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros
   comunes (`lib/filtres.ts`, `BarraFiltres`). Ficha de la organización con listas cerradas,
@@ -444,7 +443,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270514100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270515100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -596,16 +595,15 @@ Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), 
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
 inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
-**§12bis** (decisiones con precio, material de terceros, interruptores) y **§12ter** (90
-cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (90 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.799 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 25 de Deno.**
+   **Referencia: 1.801 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.182/2.182 y 34 sin datos; producción 2.186/2.186 y 30 «Sin fallos de
+   **Referencia: clon 2.208/2.208 y 35 sin datos; producción 2.186/2.186 y 30 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

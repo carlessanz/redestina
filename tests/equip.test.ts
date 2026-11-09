@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, destiPerDefecte,
-  destinsPossibles, esBaixada, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
+  destinsPossibles, esBaixada, filtraEquip, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
 } from '../src/lib/equip'
 import { DICTS } from '../src/lib/i18n'
 
@@ -175,6 +175,26 @@ describe('destinsPossibles y destiPerDefecte', () => {
   })
   it('sin nadie, cadena vacía', () => {
     expect(destiPerDefecte([a], 'a')).toBe('')
+  })
+  it('prefiere a alguien del mismo rol (y entre ellos, a quien pulsa)', () => {
+    const a2 = membre({ user_id: 'a2', email: 'a2@x.org', rol: 'admin' })
+    const s2 = membre({ user_id: 's2', email: 's2@x.org', rol: 'super_admin' })
+    expect(destiPerDefecte([yo, a, a2, t], 'a')).toBe('a2')
+    expect(destiPerDefecte([yo, s2, a, t], 's2')).toBe('yo')
+    expect(destiPerDefecte([s2, yo, a], 'yo')).toBe('s2')
+    // El del mismo rol desactivado no vale: entonces, quien pulsa.
+    expect(destiPerDefecte([yo, a, baja, t], 'a')).toBe('yo')
+  })
+})
+
+describe('filtraEquip', () => {
+  it('separa activas e inactivas, ordenadas por rol', () => {
+    const yo = membre({ user_id: 'yo', email: 'yo@x.org', rol: 'super_admin', es_tu: true })
+    const t = membre({ user_id: 't', email: 't@x.org', rol: 'tecnic' })
+    const a = membre({ user_id: 'a', email: 'a@x.org', rol: 'admin' })
+    const baja = membre({ user_id: 'b', email: 'b@x.org', rol: 'admin', actiu: false })
+    expect(filtraEquip([t, baja, yo, a], 'actius').map((m) => m.user_id)).toEqual(['yo', 'a', 't'])
+    expect(filtraEquip([t, baja, yo, a], 'inactius').map((m) => m.user_id)).toEqual(['b'])
   })
 })
 

@@ -11,9 +11,11 @@
 //   5. Borrar a quien ha hecho algo EXIGE destino y escribir la palabra; al confirmar, la cuenta
 //      desaparece y lo suyo pasa al destino.
 //   6. Una cuenta del equipo no puede tener organizaciones (la base lo rechaza).
+//   Y (20270515100000): las cuentas desactivadas viven en su pestaña, y cada fila traspasada deja
+//   rastro del autor original en `equip_traspassos_files`.
 
 import { expect, test } from '@playwright/test'
-import { compte, entra, motiuSaltClon, sql } from './ajuda'
+import { compte, entra, motiuSaltClon, sql, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -67,7 +69,7 @@ function neteja() {
   // Sin `replica`: así el borrado arrastra el perfil y el rol, como en la aplicación.
   sql(`delete from auth.users where email = '${EMAIL}'`)
   sql(`delete from equip_rols_hist where email = '${EMAIL}'`)
-  sql(`delete from equip_traspassos where origen_email = '${EMAIL}'`)
+  sql(`delete from equip_traspassos where origen_email = '${EMAIL}'`)  // arrastra sus filas (cascade)
 }
 
 test('a uno mismo no se le ofrece desactivar ni borrar', async ({ page }) => {
@@ -101,9 +103,15 @@ test('desactivar con traspaso: la cuenta queda inactiva y lo emitido pasa al des
   await fila(page).getByTestId('eq-desactiva').click()
   const d = page.getByTestId('eq-t-dialeg')
   await expect(d.getByTestId('eq-t-accions')).toBeVisible()
-  // El destino propuesto es quien pulsa («Tu»).
-  await expect(d.getByTestId('eq-t-desti')).toContainText(/Tu|Tú/)
+  // El destino propuesto es alguien del MISMO rol (la cuenta es técnica: otro técnico), no quien pulsa…
+  await expect(d.getByTestId('eq-t-desti')).toContainText(/Tècnic|Técnico/)
+  await expect(d.getByTestId('eq-t-desti')).not.toContainText(/Tu|Tú/)
+  // …pero se puede elegir cualquier cuenta activa del equipo: aquí, quien pulsa.
+  await tria(d.getByTestId('eq-t-desti'), dest)
   await d.getByTestId('eq-t-confirma').click()
+  // Sale de «Actius» y aparece en «Desactivats».
+  await expect(fila(page)).toHaveCount(0)
+  await page.getByTestId('eq-tab-inactius').click()
   await expect(fila(page)).toHaveAttribute('data-actiu', 'no')
   await expect(fila(page).getByTestId('eq-inactiu')).toBeVisible()
 
@@ -111,13 +119,22 @@ test('desactivar con traspaso: la cuenta queda inactiva y lo emitido pasa al des
   expect(sql(`select emitido_por from documentos where id = '${doc}'`)).toBe(dest)
   expect(sql(`select creado_por from enlaces_token where id = '${tokenId}'`)).toBe(dest)
   expect(sql(`select count(*) from equip_traspassos where origen_email = '${EMAIL}' and motiu = 'desactiva' and total >= 2`)).toBe('1')
+  // El rastro por fila: el documento consta como hecho originalmente por la cuenta desactivada.
+  expect(sql(`select tr.origen_email from equip_traspassos_files f join equip_traspassos tr on tr.id = f.traspas_id
+              where f.taula = 'documentos' and f.fila->>'id' = '${doc}' and tr.origen_email = '${EMAIL}'`)).toBe(EMAIL)
   await expect(page.getByTestId('eq-hist')).toContainText(EMAIL)
 })
 
 test('activar la vuelve a dejar activa', async ({ page }) => {
   await entra(page, 'super_admin')
   await page.goto(URL_EQUIP)
+  // Por defecto se ven las activas: la desactivada no está ahí.
+  await expect(page.getByTestId('eq-tab-actius')).toHaveAttribute('data-state', 'active')
+  await expect(fila(page)).toHaveCount(0)
+  await page.getByTestId('eq-tab-inactius').click()
   await fila(page).getByTestId('eq-activa').click()
+  await expect(fila(page)).toHaveCount(0)
+  await page.getByTestId('eq-tab-actius').click()
   await expect(fila(page)).toHaveAttribute('data-actiu', 'si')
   expect(sql(`select activo from perfiles where id = '${userId()}'`)).toBe('t')
 })
@@ -134,6 +151,7 @@ test('borrar a quien ha hecho algo exige destino y la palabra, y traspasa', asyn
   await expect(d.getByRole('checkbox')).toBeChecked()
   await expect(d.getByRole('checkbox')).toBeDisabled()
   await expect(d.getByTestId('eq-t-confirma')).toBeDisabled()
+  await tria(d.getByTestId('eq-t-desti'), dest)
   await d.getByTestId('eq-t-paraula').fill('esborrar')
   await expect(d.getByTestId('eq-t-confirma')).toBeEnabled()
   await d.getByTestId('eq-t-confirma').click()
