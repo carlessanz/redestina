@@ -409,9 +409,13 @@ export function tipusEmpresaDe(text: string | null): { codi: string | null; aNot
   if (exacte) return { codi: exacte, aNota: false }
   const t = ` ${n(text)} `
   if (/ (autonom|autonoma|autonomo|persona fisica|empresari individual|empresario individual) /.test(t)) return { codi: 'autonom', aNota: false }
+  // SAT antes que SA («s a t» contiene «s a») y la cooperativa antes que la sociedad civil
+  // («s c c l» contiene «s c»).
+  if (/ (sat|s a t|societat agraria de transformacio|sociedad agraria de transformacion) /.test(t)) return { codi: 'sat', aNota: false }
   if (/ (societat limitada|sociedad limitada|s l|sl|slu|s l u|slp|s l p|slne) /.test(t)) return { codi: 'sl', aNota: false }
   if (/ (societat anonima|sociedad anonima|s a|sa|sau|s a u) /.test(t)) return { codi: 'sa', aNota: false }
   if (/ (cooperativa|sccl|s c c l|s coop|scoop) /.test(t)) return { codi: 'cooperativa', aNota: false }
+  if (/ (societat civil|sociedad civil|sc|s c|scp|s c p) /.test(t)) return { codi: 'sc', aNota: false }
   if (/ (fundacio|fundacion) /.test(t)) return { codi: 'fundacio', aNota: false }
   if (/ (associacio|asociacion) /.test(t)) return { codi: 'associacio', aNota: false }
   return { codi: 'altres', aNota: true }

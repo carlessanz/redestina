@@ -129,6 +129,8 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **09-11-2026 (revisión de la Taula mestra por la Fundació, `20270512100000`): se abre la 168**: **74 vivas**
+y la siguiente entrada nueva es la 169.
 ⚠️ **06-11-2026 (importador de entidades, `20270511100000`): se abren la 165, la 166 y la 167**: **73 vivas** y
 la siguiente entrada nueva es la 168.
 ⚠️ **05-11-2026 (circuito de firma): se abren la 157 a la 164**: **70 vivas** y la siguiente entrada nueva
@@ -825,3 +827,12 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      duplicados exactos sí se cortan por la ref `IMP:` (`repetit_al_fitxer`).
 167. **Las lecturas del registro de importaciones salen «sin datos» en el arnés** (06-11-2026) mientras no
      haya ninguna importación: falta un fixture, que en producción crearía una ficha real.
+168. **`entidades.estat` vacío deja la entidad fuera de `priorizar-entidades`** (09-11-2026). `estat` es la
+     columna «Estat» del antiguo Excel del ARA (Signat, Pendent…); `puntuarEntidad()`
+     (`_shared/priorizacion.ts`, `ESTATS_EXCLUIDOS`) excluye las que no tienen estado o dicen «No
+     procedeix», y solo «Signat» no lleva «⚠️ Conveni pendent». Una entidad dada de alta en el panel
+     («Nova entitat», `crear_entitat`) o por el importador nace sin `estat`, así que **no sale nunca en
+     los suggeriments de una oferta** aunque esté activa y tenga convenio vigente. Lo coherente con el
+     convenio real (§4, fecha de corte encendida) es que el ranking mire `convenio_vigente()` y no el texto
+     del Excel; es un cambio de criterio de la priorización, por eso no se tocó al detectarlo. La ficha ya
+     lo explica en la ayuda del campo (`ef.hi_estat`).

@@ -1766,8 +1766,8 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
   1A y solo `pot_aprovar()`) · Contacte i accés (estado de la cuenta `compte_estat`, `CanalPreferit`)
   · Adreça · Com a ofertant (+ `LlocsRecollida`) · Com a receptor (+ `CampsPerfilReceptor`) ·
   Diagnòstic operatiu (`TargetaDiagnostic` equipo) · Documentació (por papel: `BadgeConveni`,
-  `CertificatsFitxa`; y `DocumentacioOrganitzacio` debajo) · Gestió interna REDESTINA (campos
-  internos, `Consentiments` RGPD de las cuentas de la organización —solo lectura; cierra la parte
+  `CertificatsFitxa`; y `DocumentacioOrganitzacio` debajo) · Gestió interna (bloque «Altres dades internes
+  (de l'antic Excel)» desde el 09-11-2026, con campos internos, `Consentiments` RGPD de las cuentas de la organización —solo lectura; cierra la parte
   «pantalla» de la deuda 142—, `EnllacOrganitzacio`, «Esborra l'entitat» con `useEsborrarFitxa`).
   **Guarda solo lo que cambia** y solo lo valida (un NIF heredado inválido ya no bloquea guardar otro
   campo); un campo común cambiado se escribe en las dos fichas; `productores.name` vacío no se
@@ -2024,3 +2024,20 @@ plantilla y cifras en `context/06-importacion-datos-maestros.md` §6.2. Textos c
 para no confundirla con las notas internas del CRM. E2E `tests/e2e/importa-entitats.e2e.ts` (Excel sintético
 con las cabeceras de Airtable: 4 creadas + 1 sin cambios; reimportar = todo sin cambios; plantilla
 descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres pasos; limpia las `TEST-IMP`).
+
+### Revisión de la Taula mestra por la Fundació (09-11-2026, columna de Sebas)
+
+- **1.1 «Cada vez que pongo letra en sección me saca de sección»**: en «Nova entitat», `Seccio` estaba
+  definida DENTRO de `NovaEntitat()`; cada render creaba un tipo de componente nuevo, React desmontaba la
+  sección y el campo perdía el foco tras la primera letra (reproducido en el clon: el nombre se quedaba en
+  «E»). Sacada fuera del componente; lo vigilan `tests/componentsNiats.test.ts` (ningún `.tsx` define un
+  componente dentro de otro) y `entitats.e2e.ts`, que ahora teclea el nombre con `pressSequentially` y
+  comprueba valor y foco (con `fill()` el fallo no se veía).
+- **1.3 Forma jurídica**: `TIPUS_EMPRESA` suma `sat` («SAT (Societat agrària de transformació)») y `sc`
+  («Societat civil (SC/SCP)»); la base, en `tipus_empresa_valid()` (`20270512100000`); el importador
+  los reconoce (§6.2). El resto de la frase de esa celda llegó cortada («…y»): pendiente de confirmar.
+- **1.5 «Una sección de gestión interna que no entiendo… codi, conveni, visitat»**: el bloque de campos
+  de la pestaña Gestió interna, debajo del CRM, se llamaba igual que la pestaña («Gestió interna
+  REDESTINA»). Ahora es «Altres dades internes (de l'antic Excel)» y cada campo dice de dónde viene y si
+  cuenta para algo (`ef.fi_*` etiquetas, `ef.hi_*` ayudas en `campsFitxa`): «Estat» y «Prioritat» siguen
+  ordenando `priorizar-entidades` (y un `estat` vacío excluye: deuda 168); el resto solo informa.

@@ -236,3 +236,9 @@
   lo registra así. Lo que obligó a renumerar fue `apply_migration` del MCP, que registra la
   fecha real; no se vuelve a usar para migraciones.
 
+
+- **Ningún componente de React se define dentro de otro** (09-11-2026). Una `const Seccio = (…) => …`
+  dentro del cuerpo de un componente es un tipo nuevo en cada render: React desmonta el subárbol y los
+  campos pierden el foco con cada tecla (pasó en «Nova entitat», Taula mestra 1.1). Se ve solo al
+  escribir, ni en tipos ni en build: lo vigila `tests/componentsNiats.test.ts`. Y en E2E, un campo de texto
+  que importa se rellena con `pressSequentially`, no con `fill()`, que lo escribe de golpe y no lo detecta.

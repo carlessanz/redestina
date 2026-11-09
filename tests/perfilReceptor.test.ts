@@ -59,7 +59,7 @@ describe('los campos por tipo de receptor', () => {
   })
 
   it('los tipos de empresa son los del check de la RPC', () => {
-    expect([...TIPUS_EMPRESA]).toEqual(['cooperativa', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
+    expect([...TIPUS_EMPRESA]).toEqual(['cooperativa', 'sat', 'sc', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
   })
 
   it('las listas cerradas llevan opciones, las abiertas no', () => {

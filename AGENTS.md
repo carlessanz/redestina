@@ -440,11 +440,13 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `supabase/.local-dump/` nunca entran en git.
 - **Claves nuevas de Supabase** (`sb_publishable_…`/`sb_secret_…`); las legacy están
   deshabilitadas (401). Rol ≠ clave.
+- **Ningún componente React se define dentro de otro** (el campo pierde el foco en cada tecla;
+  `tests/componentsNiats.test.ts`).
 - `sendWhatsApp()` y los clientes de `src/lib` nunca lanzan. El tipo de una fila vive junto a su
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270511100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270512100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -575,27 +577,27 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (73 vivas; la siguiente entrada nueva es la 168; los números no se renumeran ni
+**Deuda abierta (74 vivas; la siguiente entrada nueva es la 169; los números no se renumeran ni
 se reutilizan)**. Casi todas son **decisiones con precio conocido, espera de material o
-interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (listados
-filtran en cliente, aceptado por volumen) · **126**
+interruptores** (clasificadas en §12bis). Defectos o trabajo real pendiente: **5** (filtros en
+cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
 ofreciendo la factura) · **128** (canalización conciliada sin coste no se puede valorar después)
-· **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code splitting,
-chunk de 1,65 MB) · **138** (CR sin rectificar ni «enviat» desde la interfaz) · **140** (`borrar_ficha_completa` no conoce
+· **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
+splitting) · **138** (CR sin rectificar ni «enviat») · **140** (`borrar_ficha_completa` no conoce
 los expedientes) · **143**
 (entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso) · **149**
 (dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
-· **152** (privacidad en el primer acceso de «Dona-li accés», P3: condición para apagar el modo test)
+· **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos del circuito de firma, 05-11) · **165-167** (importador: sin ubicaciones, sin parecido de
-nombre dentro del fichero, registro sin fixture en el arnés).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **168** (`entidades.estat` vacío deja
+la entidad fuera de `priorizar-entidades`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
-inactiva sigue viendo las ofertas que ya se le enviaron). Resto: 4, 10, 12,
+inactiva sigue viendo lo ya enviado). Resto: 4, 10, 12,
 17, 21, 24, 26, 27, 30, 34, 37, 54, 55, 66, 67, 70, 71, 72, 76, 77, 80, 81, 83, 84, 91, 92, 93,
 95, 97, 98, 109, 110, 111, 113, 114, 115, 116.
 
@@ -605,7 +607,7 @@ cerradas, indexadas: 48 números se citan desde código) viven en `context/`.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.763 pruebas de Vitest en 76 ficheros (1 saltada a propósito) + 25 de Deno.**
+   **Referencia: 1.765 pruebas de Vitest en 77 ficheros (1 saltada a propósito) + 25 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.040/2.040 y 32 sin datos; producción 2.041/2.041 y 31 «Sin fallos de

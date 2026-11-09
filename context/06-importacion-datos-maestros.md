@@ -191,8 +191,10 @@ organización inactiva, buscar por NIF; ¿y sin NIF? ¿por nombre? 1 convenio».
   (el primero es el de WhatsApp); el 1.º a `telefon`, el 2.º a `telefon2`, el resto a la nota; lo que no se
   reconoce, a la nota como «no reconegut». Correos igual («contacto: x@…» se extrae).
 - **CP** con ceros a la izquierda (8380 → 08380). «No disponible», «No localizada», «-» = vacío.
-- **Forma jurídica** → `tipus_empresa` (`autonom`, `sl`, `sa`, `cooperativa`, `fundacio`, `associacio`); lo
-  que no casa, `altres` y el texto original a la nota.
+- **Forma jurídica** → `tipus_empresa` (`autonom`, `sl`, `sa`, `cooperativa`, `sat`, `sc`, `fundacio`, `associacio`); lo
+  que no casa, `altres` y el texto original a la nota. `sat` (S.A.T., «societat agrària de transformació») se
+  mira antes que `sa` y la cooperativa (SCCL) antes que `sc` (SC, SCP, «societat civil»), porque las siglas
+  se solapan (09-11-2026).
 - **Actividad**: lo que casa con el catálogo `tipus_activitat` (código o nombre ca/es) **y vale para el
   papel de la fila** (`aplica`) va a la ficha; el resto, a la nota. («Explotación agrícola» es del catálogo
   de receptores: a un ofertant le va a la nota.)

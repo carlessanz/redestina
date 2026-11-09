@@ -155,8 +155,18 @@ test('una nueva: «És nova» lleva el NIF al alta, y el alta con doble rol crea
   await page.getByTestId('ne-rol-productor').click()
   await page.getByTestId('ne-rol-entidad').click()
   await expect(page.getByTestId('ne-rol-productor')).toHaveAttribute('aria-pressed', 'true')
-  await page.locator('#ne-nom_comercial').fill(nomNova)
+  // Tecla a tecla, no con `fill()`: con la sección definida dentro del componente, cada letra
+  // desmontaba el campo y el foco se perdía tras la primera (Taula mestra 1.1, 09-11-2026).
+  const nomCamp = page.locator('#ne-nom_comercial')
+  await nomCamp.click()
+  await nomCamp.pressSequentially(nomNova)
+  await expect(nomCamp).toHaveValue(nomNova)
+  await expect(nomCamp).toBeFocused()
   await page.locator('#ne-razon_social').fill(`${nomNova} SL`)
+  // Forma jurídica: SAT y sociedad civil en la lista (Taula mestra 1.3, 09-11-2026).
+  await page.locator('#ne-tipus_empresa').click()
+  await expect(page.getByRole('option', { name: /^Societat civil \(SC\/SCP\)$|^Sociedad civil \(SC\/SCP\)$/ })).toBeVisible()
+  await page.getByRole('option', { name: /^SAT / }).click()
   await page.getByRole('button', { name: /^Productor agrícola$/ }).click()
   await page.locator('#ne-persona_contacte').fill('Persona Nova E2E')
   await page.locator('#ne-email').fill(`e2e-1b-${Date.now()}@example.com`)
@@ -174,6 +184,7 @@ test('una nueva: «És nova» lleva el NIF al alta, y el alta con doble rol crea
                 from v_organizaciones where id = '${orgNova}'`)).toBe(`true|true|true|true|${nifNova}`)
   expect(sql(`select p.nif = e.nif and p.es_test and e.es_test and e.tipo_receptor = 'social'
                      and p.tipus_activitat = '{productor_agricola}' and e.tipus_activitat = '{productor_agricola}'
+                     and p.tipo_empresa = 'sat' and e.tipo_entidad = 'sat'
                 from productores p join entidades e on e.organizacion_id = p.organizacion_id
                where p.organizacion_id = '${orgNova}'`)).toBe('t')
 })

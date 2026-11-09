@@ -154,33 +154,36 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
     labelKey: 'ef.f_email2', veu: 'tots', edita: 'tots' },
 
   // ------------------------------------------------------------------ Gestió interna
+  // Taula mestra 1.5 (09-11-2026): «no entiendo muy bien esta sección… codi, conveni,
+  // visitat». Son columnas del antiguo Excel del ARA: cada una dice de dónde viene y si
+  // cuenta para algo (`ef.hi_*`); la sección se titula como lo que es (`ef.sec_intern`).
   { clau: 'codigo', columnes: { productores: 'codigo', entidades: 'codigo' }, bloc: 'intern',
-    labelKey: 'f.codigo', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_codi', ajudaKey: 'ef.hi_codi', veu: 'equip', edita: 'equip' },
   { clau: 'data_alta', columnes: { productores: 'data_alta', entidades: 'data_alta' }, bloc: 'intern', tipus: 'data',
-    labelKey: 'f.data_alta', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_data_alta', veu: 'equip', edita: 'equip' },
   { clau: 'es_test', columnes: { productores: 'es_test', entidades: 'es_test' }, bloc: 'intern', tipus: 'bool',
-    labelKey: 'f.es_test', veu: 'equip', edita: 'equip' },
+    labelKey: 'f.es_test', ajudaKey: 'ef.hi_es_test', veu: 'equip', edita: 'equip' },
   { clau: 'opt_in', columnes: { entidades: 'opt_in' }, bloc: 'intern', tipus: 'bool',
-    labelKey: 'f.opt_in', veu: 'equip', edita: 'equip' },
+    labelKey: 'f.opt_in', ajudaKey: 'ef.hi_opt_in', veu: 'equip', edita: 'equip' },
   // Texto heredado del Excel (la nota del convenio en papel): `BadgeConveni` lo enseña como lo
   // que es, papel histórico que no habilita a operar.
   { clau: 'conveni_paper', columnes: { productores: 'conveni' }, bloc: 'intern',
-    labelKey: 'f.conveni', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_conveni', ajudaKey: 'ef.hi_conveni', veu: 'equip', edita: 'equip' },
   { clau: 'visitado', columnes: { productores: 'visitado' }, bloc: 'intern',
-    labelKey: 'f.visitado', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_visitat', ajudaKey: 'ef.hi_visitat', veu: 'equip', edita: 'equip' },
   { clau: 'familia', columnes: { entidades: 'familia' }, bloc: 'intern',
-    labelKey: 'f.familia', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_familia', ajudaKey: 'ef.hi_familia', veu: 'equip', edita: 'equip' },
   { clau: 'prioritat', columnes: { entidades: 'prioritat' }, bloc: 'intern', tipus: 'number',
-    labelKey: 'f.prioritat', veu: 'equip', edita: 'equip' },
+    labelKey: 'f.prioritat', ajudaKey: 'ef.hi_prioritat', veu: 'equip', edita: 'equip' },
   { clau: 'estat_paper', columnes: { entidades: 'estat' }, bloc: 'intern',
-    labelKey: 'f.estat', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_estat', ajudaKey: 'ef.hi_estat', veu: 'equip', edita: 'equip' },
   { clau: 'gestio', columnes: { entidades: 'gestio' }, bloc: 'intern',
-    labelKey: 'f.gestio', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_gestio', ajudaKey: 'ef.hi_gestio', veu: 'equip', edita: 'equip' },
   { clau: 'modalitat_paper', columnes: { entidades: 'modalitat' }, bloc: 'intern', tipus: 'select',
     opcions: ['Donació', 'Transformació', 'Venda', 'Maquila', 'Altres'],
-    labelKey: 'f.modalitat', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_modalitat', ajudaKey: 'ef.hi_modalitat', veu: 'equip', edita: 'equip' },
   { clau: 'comentari', columnes: { productores: 'comentario', entidades: 'comentarios' }, bloc: 'intern',
-    tipus: 'textarea', labelKey: 'f.comentario', veu: 'equip', edita: 'equip', ample: 'full' },
+    tipus: 'textarea', labelKey: 'f.comentario', ajudaKey: 'ef.hi_comentari', veu: 'equip', edita: 'equip', ample: 'full' },
 ]
 
 /**

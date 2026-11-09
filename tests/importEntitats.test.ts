@@ -143,6 +143,14 @@ describe('valores de celda', () => {
     expect(tipusEmpresaDe('Fundación')).toEqual({ codi: 'fundacio', aNota: false })
     expect(tipusEmpresaDe('Associació')).toEqual({ codi: 'associacio', aNota: false })
     expect(tipusEmpresaDe('Cooperativa agrària SCCL')).toEqual({ codi: 'cooperativa', aNota: false })
+    // SAT y sociedad civil (Taula mestra 1.3, 09-11-2026): sin confundirse con SA ni con la SCCL.
+    expect(tipusEmpresaDe('SAT')).toEqual({ codi: 'sat', aNota: false })
+    expect(tipusEmpresaDe('S.A.T. núm. 123')).toEqual({ codi: 'sat', aNota: false })
+    expect(tipusEmpresaDe('Sociedad Agraria de Transformación')).toEqual({ codi: 'sat', aNota: false })
+    expect(tipusEmpresaDe('Societat civil privada')).toEqual({ codi: 'sc', aNota: false })
+    expect(tipusEmpresaDe('S.C.P.')).toEqual({ codi: 'sc', aNota: false })
+    expect(tipusEmpresaDe('SC')).toEqual({ codi: 'sc', aNota: false })
+    expect(tipusEmpresaDe('S.C.C.L.')).toEqual({ codi: 'cooperativa', aNota: false })
     expect(tipusEmpresaDe('Comunidad de bienes')).toEqual({ codi: 'altres', aNota: true })
     expect(tipusEmpresaDe(null)).toEqual({ codi: null, aNota: false })
   })
@@ -335,7 +343,7 @@ describe('la plantilla', () => {
       const c = { ...pctx, t: tl, lang }
       for (const v of valorsLlista('rol', c)) expect(rolsDeText(v), v).not.toBeNull()
       expect(valorsLlista('tipo_receptor', c).map(tipusReceptorDe)).toEqual(['social', 'animal', 'transformador', 'comercial'])
-      expect(valorsLlista('tipus_empresa', c).map((v) => tipusEmpresaDe(v).codi)).toEqual(['cooperativa', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
+      expect(valorsLlista('tipus_empresa', c).map((v) => tipusEmpresaDe(v).codi)).toEqual(['cooperativa', 'sat', 'sc', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'])
       expect(modalitatsDeText(valorsLlista('modalitats', c).join(', '))).toEqual(['donacio', 'venda', 'maquila'])
       expect(activitatsDe(valorsLlista('tipus_activitat', c).join(', '), CATALEG).resta).toEqual([])
     }

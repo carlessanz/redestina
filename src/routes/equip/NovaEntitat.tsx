@@ -59,6 +59,19 @@ const nomDe = (r: ResultatCerca) => r.nom_comercial || r.razon_social || r.perso
 
 type EstatCerca = 'buit' | 'cercant' | 'ok' | 'error'
 
+// Fuera del componente, siempre: definida dentro, cada render crea un tipo de componente
+// nuevo, React desmonta la sección entera y el campo pierde el foco en cada tecla («cada vez
+// que pongo una letra me saca de la sección», Taula mestra 1.1, 09-11-2026). Lo vigila
+// `tests/componentsNiats.test.ts`.
+function Seccio({ titol, children, testid }: { titol: string; children: React.ReactNode; testid?: string }) {
+  return (
+    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
+      <h3 className="text-base font-semibold">{titol}</h3>
+      {children}
+    </section>
+  )
+}
+
 export default function NovaEntitat() {
   const { t } = useT()
   const navigate = useNavigate()
@@ -206,13 +219,6 @@ export default function NovaEntitat() {
   }
 
   const blocProps = { valors, onChange: setCamp, veu: 'equip' as const, potEditar: true, errors, idPrefix: 'ne' }
-  const Seccio = ({ titol, children, testid }: { titol: string; children: React.ReactNode; testid?: string }) => (
-    <section className="space-y-3 border-t border-border pt-6 first:border-t-0 first:pt-0" data-testid={testid}>
-      <h3 className="text-base font-semibold">{titol}</h3>
-      {children}
-    </section>
-  )
-
   return (
     <div className="space-y-4">
       <Button variant="ghost" size="sm" onClick={() => navigate(LLISTA)} className="text-muted-foreground">
