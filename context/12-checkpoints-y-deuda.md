@@ -54,6 +54,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
     de **Configuració** (`components/equip/DadesFundacio.tsx`) escribe esa fila, así que esto
     deja de ser «SQL a mano». Lo que sigue faltando es el **material** —los datos reales, el DNI
     de la apoderada y los PNG de firma y sello—, no la pantalla.
+    ⚠️ **09-11-2026**: los PDF toman ya la razón social del snapshot también en las cláusulas legales y los
+    pies (`_shared/pdf/fundacio.ts`), así que mientras siga provisional sale «PROVISIONAL — …» ahí también.
+    Al cargar los datos reales, en modo test se puede repintar lo ya emitido desde la misma pantalla
+    («Regenerar els documents ja emesos», `regenerar_documents_fundacio`); en producción, no.
     ⚠️ El interruptor `datos_provisionales` **no se puede desmarcar mientras algún campo siga
     vacío o conserve lo sembrado**, y eso incluye dos literales que NO contienen la palabra
     «PROVISIONAL» y habrían pasado un filtro ingenuo: el CIF `G00000000` y el CP `00000`. Lo
@@ -129,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **09-11-2026 (nombre de la Fundació desde el snapshot): se abre la 170**: **75 vivas** y la siguiente entrada nueva es la 171.
 ⚠️ **09-11-2026 (Configuració › Equip, `20270513100000`): se abre la 169**: **74 vivas** y la siguiente entrada nueva es la 170.
 ⚠️ **09-11-2026 (revisión de la Taula mestra por la Fundació, `20270512100000`): se abre la 168 y se cierra el
 mismo día** (`priorizar-entidades`): **73 vivas** y la siguiente entrada nueva es la 169.
@@ -853,3 +858,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `service_role` (cuenta + perfil + rol + enlace de acceso por `recuperar-password`) y decidir si una cuenta
      externa existente puede pasar a equipo —da acceso a TODOS los datos—. Precio: media jornada; no urgente
      con un equipo de tres personas.
+170. **Falta el artículo delante del nombre de la Fundació en catalán** (09-11-2026). Los PDF ya no escriben
+     «la Fundació Espigoladors» a mano: ponen la razón social del snapshot (`nomFundacio`), y en catalán queda
+     «lliura a Fundació Espigoladors», «Per Fundació Espigoladors» (igual que ya hacían CR y CT). Con la razón
+     social real en mayúsculas («FUNDACIÓ PRIVADA ESPIGOLADORS») es la forma habitual en un documento legal;
+     si se quiere «la Fundació…», hay que guardar el artículo como dato (`parametros_documentales`) o
+     decidirlo en la plantilla. Además `valoresConvenio()` deja `fundacio.raso_social` vacío si falta, a
+     propósito: entra en el texto firmado y un respaldo cambiaría la huella. Precio: una hora; espera a ver
+     la razón social real.

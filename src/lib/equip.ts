@@ -51,6 +51,48 @@ export interface CanviRol {
   at: string
 }
 
+/** Lo que puede aparecer en `equip_auditoria()`: lo de `equip_rols_hist` más cada traspaso (`mou_accions`). */
+export const ACCIONS_AUDITORIA = ['rol', 'activa', 'desactiva', 'edita', 'esborra', 'mou_accions'] as const
+export type AccioAuditoria = (typeof ACCIONS_AUDITORIA)[number]
+
+/**
+ * Un apunte de `equip_auditoria()` (20270516100000): sobrevive al borrado de las cuentas, con su
+ * nombre y su correo de entonces (`esborrat` = la cuenta ya no existe).
+ */
+export interface ApuntAuditoria {
+  at: string
+  accio: AccioAuditoria
+  user_id: string
+  email: string | null
+  nom: string | null
+  esborrat: boolean
+  rol_abans: RolEquip | null
+  rol_despres: RolEquip | null
+  desti_email: string | null
+  desti_nom: string | null
+  total: number | null
+  detall: { desti_email?: string | null; motiu?: string } | null
+  per_email: string | null
+  per_nom: string | null
+}
+
+/** «Nom (correu)», o lo que haya. Cadena vacía si no hay nada (un apunte hecho por SQL). */
+export function persona(nom: string | null | undefined, email: string | null | undefined): string {
+  const n = (nom ?? '').trim()
+  const e = (email ?? '').trim()
+  if (n && e && n !== e) return `${n} (${e})`
+  return n || e
+}
+
+/** Las personas que salen en la auditoría (para el filtro), incluidas las borradas, por nombre. */
+export function personesAuditoria(apunts: readonly ApuntAuditoria[]): { user_id: string; text: string; esborrat: boolean }[] {
+  const vistes = new Map<string, { user_id: string; text: string; esborrat: boolean }>()
+  for (const a of apunts) {
+    if (!vistes.has(a.user_id)) vistes.set(a.user_id, { user_id: a.user_id, text: persona(a.nom, a.email), esborrat: a.esborrat })
+  }
+  return [...vistes.values()].sort((x, y) => x.text.localeCompare(y.text))
+}
+
 /** Lo que devuelve `equip_accions()`: las filas que llevan el nombre de la cuenta, por columna. */
 export interface AccionsCompte {
   accions: { taula: string; columna: string; n: number }[]

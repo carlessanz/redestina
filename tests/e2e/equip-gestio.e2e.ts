@@ -70,6 +70,7 @@ function neteja() {
   sql(`delete from auth.users where email = '${EMAIL}'`)
   sql(`delete from equip_rols_hist where email = '${EMAIL}'`)
   sql(`delete from equip_traspassos where origen_email = '${EMAIL}'`)  // arrastra sus filas (cascade)
+  sql(`delete from equip_persones_arxiu where email = '${EMAIL}'`)
 }
 
 test('a uno mismo no se le ofrece desactivar ni borrar', async ({ page }) => {
@@ -161,6 +162,15 @@ test('borrar a quien ha hecho algo exige destino y la palabra, y traspasa', asyn
   expect(sql(`select emitido_por from documentos where id = '${doc}'`)).toBe(dest)
   expect(sql(`select creado_por from enlaces_token where id = '${tokenId}'`)).toBe(dest)
   expect(sql(`select count(*) from equip_rols_hist where email = '${EMAIL}' and accio = 'esborra'`)).toBe('1')
+
+  // La auditoría conserva a la persona borrada, con su nombre y su correo (20270516100000).
+  expect(sql(`select nom || '|' || rol from equip_persones_arxiu where email = '${EMAIL}'`)).toBe('Prova E2E|tecnic')
+  const hist = page.getByTestId('eq-hist')
+  await expect(hist.locator('[data-accio="esborra"]').filter({ hasText: EMAIL }).first()).toContainText('Prova E2E')
+  await expect(hist.locator('[data-accio="mou_accions"]').filter({ hasText: EMAIL }).first()).toBeVisible()
+  // Y se puede filtrar por ella aunque ya no exista.
+  await tria(page.getByTestId('eq-aud-qui'), { text: /Prova E2E/ })
+  await expect(hist.locator('li').first()).toContainText(EMAIL)
 })
 
 test('una cuenta del equipo no puede tener organizaciones', async () => {

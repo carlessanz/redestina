@@ -2075,6 +2075,12 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
   obligatorio (casilla marcada y bloqueada: la base exige destino) y hay que escribir «esborrar»/«borrar». A uno mismo y al único
   super_admin activo se les desactivan los botones con el motivo. Cada paso queda en el historial («X ha desactivado a Y. 12
   acciones pasan a Z.»). Textos `eq.*`; en móvil el diálogo lleva `grid-cols-[minmax(0,1fr)]` (un correo largo lo ensanchaba).
+- **Auditoría del equipo** (09-11-2026, `AuditoriaEquip`, sustituye a «Últims canvis»): todo lo hecho con las cuentas del equipo
+  con fecha y hora (`dataHora`), quién lo hizo y a quién, con nombre y correo, incluidas las borradas (chip «compte esborrat»), y
+  cada traspaso («X ha passat N accions de Y a Z (en esborrar-lo)»); filtro por persona (`personesAuditoria()`), borradas incluidas.
+- **Regenerar los documentos ya emitidos** (09-11-2026, `RegeneraDocuments`, debajo de Configuració › Fundació, solo super_admin):
+  recuento por tipo de lo que tiene datos antiguos de la Fundació, aviso «només en mode test», diálogo «Accepto i regenero»; con el
+  modo test apagado solo explica que en producción no se puede. Los documentos nuevos ya salen con lo guardado arriba.
 - **Pestañas «Actius · n» / «Desactivats · n»** (09-11-2026, pedido por Carles): por defecto, las activas (`filtraEquip()`); las
   desactivadas aparte, con «Es poden tornar a activar o esborrar». El resumen por rol cuenta solo las activas; las reglas de cada
   fila (último super_admin, destinos del traspaso) miran a todo el equipo. El destino que propone el diálogo es **alguien del mismo

@@ -7,8 +7,8 @@
 //
 // Lo que impone la base y esta pantalla solo anticipa para no ofrecer un botón que acabaría en
 // error: nada de esto se hace sobre uno mismo, el equipo nunca se queda sin un super_admin activo,
-// y aquí no se dan de alta cuentas (nota al pie). Cada cambio queda en `equip_rols_hist`, que se
-// enseña debajo.
+// y aquí no se dan de alta cuentas (nota al pie). Cada cambio queda en la auditoría del equipo
+// (`AuditoriaEquip`, debajo), que conserva nombres y correos aunque la cuenta se borre.
 //
 // Dos pestañas (09-11-2026): «Actius» por defecto y «Desactivats» aparte, para que las cuentas que
 // ya no trabajan no se mezclen con el equipo de verdad. Las reglas («el último super_admin activo»,
@@ -24,7 +24,7 @@ import { dataCurta } from '../../lib/format'
 import { faTemps } from '../../lib/notesInternes'
 import {
   accionsMembre, clauErrorEquip, esBaixada, filtraEquip, ordenaEquip, recompteRols, ROLS_EQUIP,
-  type CanviRol, type MembreEquip, type RolAAssignar, type RolEquip,
+  type MembreEquip, type RolAAssignar, type RolEquip,
 } from '../../lib/equip'
 import { useConfirma } from '../DialegConfirma'
 import Desplegable from '../Desplegable'
@@ -32,6 +32,7 @@ import CarregantSeccio from '../CarregantSeccio'
 import BotoIcona from '../BotoIcona'
 import DialegEditaMembre from './DialegEditaMembre'
 import DialegTraspasMembre, { type ModeMembre } from './DialegTraspasMembre'
+import AuditoriaEquip from './AuditoriaEquip'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -130,7 +131,8 @@ export default function SeccioEquip() {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
   const [membres, setMembres] = useState<MembreEquip[] | null>(null)
-  const [hist, setHist] = useState<CanviRol[]>([])
+  // Cada recarga del equipo recarga también la auditoría (un cambio acaba de dejar su apunte).
+  const [refresc, setRefresc] = useState(0)
   const [error, setError] = useState(false)
   const [ocupat, setOcupat] = useState(false)
   // Los diálogos: editar una cuenta, o desactivar/borrar una (con el traspaso de sus acciones).
@@ -139,15 +141,11 @@ export default function SeccioEquip() {
   const [pestanya, setPestanya] = useState<'actius' | 'inactius'>('actius')
 
   const carrega = useCallback(async () => {
-    const [m, h] = await Promise.all([
-      supabase.rpc('equip_membres'),
-      supabase.from('equip_rols_hist').select('id, email, rol_abans, rol_despres, accio, detall, per_email, at')
-        .order('at', { ascending: false }).limit(25),
-    ])
+    const m = await supabase.rpc('equip_membres')
+    setRefresc((n) => n + 1)
     if (m.error) { setError(true); setMembres([]); return }
     setError(false)
     setMembres(m.data as MembreEquip[])
-    setHist((h.data ?? []) as CanviRol[])
   }, [])
 
   useEffect(() => { void carrega() }, [carrega])
@@ -193,20 +191,6 @@ export default function SeccioEquip() {
   function fetTraspas() {
     setTraspas(null)
     void carrega()
-  }
-
-  const nomRol = (r: RolEquip | null) => (r ? t(`eq.rol_${r}`) : t('eq.cap'))
-
-  /** El apunte del historial, como una frase. */
-  function liniaHist(c: CanviRol): string {
-    const per = c.per_email ?? t('eq.hist_algu')
-    const email = c.email ?? ''
-    const extra = (c.detall?.traspassades ?? c.detall?.total ?? 0) > 0
-      ? t('eq.h_traspassades', { total: c.detall?.traspassades ?? c.detall?.total ?? 0, desti: c.detall?.desti_email ?? '' })
-      : ''
-    if (c.accio === 'rol') return t('eq.h_rol', { per, email, abans: nomRol(c.rol_abans), despres: nomRol(c.rol_despres) })
-    if (c.accio === 'esborra') return t('eq.h_esborra', { per, email, rol: nomRol(c.rol_abans) }) + extra
-    return t(`eq.h_${c.accio}`, { per, email }) + (c.accio === 'desactiva' || c.accio === 'traspas' ? extra : '')
   }
 
   /** Una pestaña: sus cuentas (las reglas de cada fila miran a todo el equipo, `equip`). */
@@ -275,27 +259,7 @@ export default function SeccioEquip() {
         </CardContent>
       </Card>
 
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">{t('eq.hist_t')}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          {hist.length === 0 ? (
-            <p className="text-sm text-muted-foreground">{t('eq.hist_buit')}</p>
-          ) : (
-            <ul className="space-y-2 text-sm" data-testid="eq-hist">
-              {hist.map((c) => (
-                <li key={c.id} className="flex flex-wrap items-baseline justify-between gap-x-3">
-                  <span className="min-w-0 flex-1 basis-60 [overflow-wrap:anywhere]" data-accio={c.accio}>
-                    {liniaHist(c)}
-                  </span>
-                  <span className="text-xs text-muted-foreground">{t(faTemps(c.at).clau, { n: faTemps(c.at).n })}</span>
-                </li>
-              ))}
-            </ul>
-          )}
-        </CardContent>
-      </Card>
+      <AuditoriaEquip refresc={refresc} />
       <DialegEditaMembre
         membre={edita}
         onTanca={() => setEdita(null)}

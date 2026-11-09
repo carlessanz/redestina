@@ -153,8 +153,9 @@ export interface DiccionarioConvenio {
   clausules: string;
   signatures: string;
   signa_org: string;
-  signa_fundacio: string;
-  pendent_contrafirma: string;
+  /** «Per <razón social>»: la de `datos.fundacio`, nunca escrita a mano (`fundacio.ts`). */
+  signa_fundacio: (fundacio: string) => string;
+  pendent_contrafirma: (fundacio: string) => string;
   evidencies_titol: string;
   evidencies_intro: string;
   ev_qui: string;
@@ -198,7 +199,6 @@ export interface DiccionarioConvenio {
   declaracio_titol: string;
   declaracio_representacio: string;
   declaracio_acceptacio: string;
-  peu: string;
   pagina: (n: number, total: number) => string;
   mesos: string[];
 }
@@ -250,9 +250,9 @@ const CA: DiccionarioConvenio = {
   clausules: "Clàusules",
   signatures: "Signatures",
   signa_org: "Per l'organització",
-  signa_fundacio: "Per la Fundació Espigoladors",
-  pendent_contrafirma:
-    "Pendent de contrasignatura per part de la Fundació Espigoladors. Quan es validi s'emetrà la versió definitiva d'aquest document.",
+  signa_fundacio: (f) => `Per ${f}`,
+  pendent_contrafirma: (f) =>
+    `Pendent de contrasignatura per part de ${f}. Quan es validi s'emetrà la versió definitiva d'aquest document.`,
   evidencies_titol: "Evidències de la signatura electrònica",
   evidencies_intro:
     "Aquesta pàgina forma part del conveni i recull què va passar en el moment de firmar-lo. Es genera automàticament a partir del registre del sistema i no es pot modificar.",
@@ -306,7 +306,6 @@ const CA: DiccionarioConvenio = {
     "Declaro que tinc poders suficients per representar l'organització i obligar-la en aquest conveni.",
   declaracio_acceptacio:
     "He llegit el text complet del conveni i l'accepto. Accepto també rebre comunicacions de REDESTINA per correu i per WhatsApp relacionades amb aquest conveni.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pàg. ${n} de ${total}`,
   mesos: [
     "gener", "febrer", "març", "abril", "maig", "juny",
@@ -361,9 +360,9 @@ const ES: DiccionarioConvenio = {
   clausules: "Cláusulas",
   signatures: "Firmas",
   signa_org: "Por la organización",
-  signa_fundacio: "Por la Fundació Espigoladors",
-  pendent_contrafirma:
-    "Pendiente de contrafirma por parte de la Fundació Espigoladors. Cuando se valide se emitirá la versión definitiva de este documento.",
+  signa_fundacio: (f) => `Por ${f}`,
+  pendent_contrafirma: (f) =>
+    `Pendiente de contrafirma por parte de ${f}. Cuando se valide se emitirá la versión definitiva de este documento.`,
   evidencies_titol: "Evidencias de la firma electrónica",
   evidencies_intro:
     "Esta página forma parte del convenio y recoge qué ocurrió en el momento de firmarlo. Se genera automáticamente a partir del registro del sistema y no se puede modificar.",
@@ -417,7 +416,6 @@ const ES: DiccionarioConvenio = {
     "Declaro que tengo poderes suficientes para representar a la organización y obligarla en este convenio.",
   declaracio_acceptacio:
     "He leído el texto completo del convenio y lo acepto. Acepto también recibir comunicaciones de REDESTINA por correo y por WhatsApp relacionadas con este convenio.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pág. ${n} de ${total}`,
   mesos: [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",

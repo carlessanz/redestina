@@ -22,6 +22,7 @@ import {
   type Renderizado,
 } from "./cierre.ts";
 import { avancAccions, comparativaAnual } from "../../expedient.ts";
+import { peuFundacio } from "../fundacio.ts";
 
 type Fila = Record<string, unknown>;
 
@@ -88,7 +89,7 @@ const CA = {
   seguiment: "Seguiment trimestral", trimestre: "Trimestre", resum: "Resum",
   verificacio: "Verificació anual", conclusio: "Conclusió",
   mesures: "Mesures del pla bàsic", obligatoria: "obligatòria", recomanada: "recomanada",
-  buit: "Sense registres.", peu: "Fundació Espigoladors · REDESTINA",
+  buit: "Sense registres.",
   pagina: (n: number, t: number) => `pàg. ${n} de ${t}`, marca: "PROVA",
 };
 const ES: typeof CA = {
@@ -117,7 +118,7 @@ const ES: typeof CA = {
   seguiment: "Seguimiento trimestral", trimestre: "Trimestre", resum: "Resumen",
   verificacio: "Verificación anual", conclusio: "Conclusión",
   mesures: "Medidas del plan básico", obligatoria: "obligatoria", recomanada: "recomendada",
-  buit: "Sin registros.", peu: "Fundació Espigoladors · REDESTINA",
+  buit: "Sin registros.",
   pagina: (n: number, t: number) => `pág. ${n} de ${t}`, marca: "PRUEBA",
 };
 
@@ -148,7 +149,7 @@ export async function renderExpedient(
     logo,
     cabecera: numero,
     subcabecera: t.titulo,
-    pie: `${t.peu}${numero ? ` · ${numero}` : ""}`,
+    pie: `${peuFundacio(d)}${numero ? ` · ${numero}` : ""}`,
     marcaAgua: op.modo === "prueba" ? { texto: t.marca } : null,
     paginacion: t.pagina,
   });

@@ -29,6 +29,7 @@ import { PDFDocument } from "npm:pdf-lib@1";
 import { type BytesActivos, embeberFuentes, embeberLogo } from "../fuentes.ts";
 import { COLORES, type Columna, Maquetador } from "../maquetador.ts";
 import { type Bloque, esCuerpo, interpolarCuerpo, pintarCuerpo } from "../plantilla.ts";
+import { nomFundacio, peuFundacio } from "../fundacio.ts";
 import { pintarSignaturaDocument, type SignaturaDocument } from "./signatura.ts";
 
 // ---------------------------------------------------------------------------
@@ -285,7 +286,6 @@ export interface Diccionario {
   legal: string;
   provisional_titol: string;
   provisional_avis: string;
-  peu: string;
   pagina: (n: number, total: number) => string;
   col: Record<string, string>;
 }
@@ -363,7 +363,6 @@ const CA: Diccionario = {
   provisional_titol: "Text provisional, pendent de validació",
   provisional_avis:
     "Aquest text encara no ha estat validat per la Fundació Espigoladors ni per l'assessoria. S'imprimeix perquè el document sigui llegible mentre no hi hagi la plantilla definitiva; no substitueix el text legal.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pàg. ${n} de ${total}`,
   col: {
     n: "#",
@@ -456,7 +455,6 @@ const ES: Diccionario = {
   provisional_titol: "Texto provisional, pendiente de validación",
   provisional_avis:
     "Este texto todavía no ha sido validado por la Fundació Espigoladors ni por la asesoría. Se imprime para que el documento sea legible mientras no exista la plantilla definitiva; no sustituye al texto legal.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pág. ${n} de ${total}`,
   col: {
     n: "#",
@@ -502,7 +500,7 @@ const LEGAL_PROVISIONAL: Record<string, Record<Idioma, Bloque[]>> = {
       {
         tipo: "p",
         text:
-          "El generador lliura a la Fundació Espigoladors, amb NIF {{recibe.nif}}, els aliments que consten en aquest albarà, que queden fora del circuit de venda habitual. El lliurament es fa a títol de donació: no comporta cap contraprestació econòmica i aquest document no recull cap import.",
+          "El generador lliura a {{fundacio.rao_social}}, amb NIF {{recibe.nif}}, els aliments que consten en aquest albarà, que queden fora del circuit de venda habitual. El lliurament es fa a títol de donació: no comporta cap contraprestació econòmica i aquest document no recull cap import.",
       },
       {
         tipo: "p",
@@ -519,7 +517,7 @@ const LEGAL_PROVISIONAL: Record<string, Record<Idioma, Bloque[]>> = {
       {
         tipo: "p",
         text:
-          "El generador entrega a la Fundació Espigoladors, con NIF {{recibe.nif}}, los alimentos que constan en este albarán, que quedan fuera del circuito de venta habitual. La entrega se hace a título de donación: no comporta ninguna contraprestación económica y este documento no recoge ningún importe.",
+          "El generador entrega a {{fundacio.rao_social}}, con NIF {{recibe.nif}}, los alimentos que constan en este albarán, que quedan fuera del circuito de venta habitual. La entrega se hace a título de donación: no comporta ninguna contraprestación económica y este documento no recoge ningún importe.",
       },
       {
         tipo: "p",
@@ -538,7 +536,7 @@ const LEGAL_PROVISIONAL: Record<string, Record<Idioma, Bloque[]>> = {
       {
         tipo: "p",
         text:
-          "La Fundació Espigoladors entrega gratuïtament a l'entitat receptora els aliments que consten en aquest albarà. L'entrega no comporta cap contraprestació econòmica i aquest document no recull cap import.",
+          "{{fundacio.rao_social}} entrega gratuïtament a l'entitat receptora els aliments que consten en aquest albarà. L'entrega no comporta cap contraprestació econòmica i aquest document no recull cap import.",
       },
       {
         tipo: "p",
@@ -555,7 +553,7 @@ const LEGAL_PROVISIONAL: Record<string, Record<Idioma, Bloque[]>> = {
       {
         tipo: "p",
         text:
-          "La Fundació Espigoladors entrega gratuitamente a la entidad receptora los alimentos que constan en este albarán. La entrega no comporta ninguna contraprestación económica y este documento no recoge ningún importe.",
+          "{{fundacio.rao_social}} entrega gratuitamente a la entidad receptora los alimentos que constan en este albarán. La entrega no comporta ninguna contraprestación económica y este documento no recoge ningún importe.",
       },
       {
         tipo: "p",
@@ -734,7 +732,7 @@ export async function abrirAlbaran(
     logo,
     cabecera: numero,
     subcabecera: `${titulo} · ${emitido}`,
-    pie: `${t.peu} · ${numero}`,
+    pie: `${peuFundacio(datos)} · ${numero}`,
     marcaAgua: op.modo === "prueba" ? { texto: idioma === "es" ? "Prueba" : "Prova" } : null,
     paginacion: t.pagina,
   });
@@ -935,6 +933,9 @@ export async function cerrarAlbaran(ctx: Contexto): Promise<Renderizado> {
     entrega: datos.partes?.entrega ?? {},
     recibe: datos.partes?.recibe ?? {},
     origen: datos.partes?.origen ?? {},
+    // La Fundació, del snapshot (Configuració › Fundació, congelada al emitir): nunca
+    // escrita a mano en el texto legal.
+    fundacio: { rao_social: nomFundacio(datos) },
     codi: codigoVerificacion(op.sha256Datos),
   };
 

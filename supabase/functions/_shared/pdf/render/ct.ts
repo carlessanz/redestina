@@ -33,6 +33,7 @@ import type { BytesActivos } from "../fuentes.ts";
 import { COLORES, type Columna } from "../maquetador.ts";
 import { num } from "./comu.ts";
 import type { Bloque } from "../plantilla.ts";
+import { nomFundacio } from "../fundacio.ts";
 import {
   abrirCierre,
   cerrarCierre,
@@ -191,7 +192,7 @@ export async function renderCt(
       domicili: domicilioCompleto(datos.generador),
     },
     fundacio: {
-      rao_social: datos.fundacio?.["raó_social"] ?? "",
+      rao_social: nomFundacio(datos),
       cif: datos.fundacio?.cif ?? "",
       domicili: domicilioCompleto(datos.fundacio),
       inscripcio: datos.fundacio?.inscripcio ?? "",

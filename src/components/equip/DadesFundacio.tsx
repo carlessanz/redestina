@@ -18,6 +18,10 @@
 //    aparte. **No bloquean nada**: sin ellos el certificado se emite igual y sale con el
 //    hueco para firmar a mano (`_shared/pdf/render/cierre.ts`, `pintarFirma`).
 //
+// LOS DOCUMENTOS (09-11-2026): cada emisor copia esta fila al snapshot del documento al emitir,
+//    así que lo que se guarda aquí es lo que sale en el SIGUIENTE documento. Lo ya emitido es
+//    inmutable; en modo test se puede repintar con `RegeneraDocuments` (debajo, super_admin).
+//
 // ⚠️ UN `tecnic` VE LA SECCIÓN EN GRIS, no se le esconde. Es el criterio del proyecto
 //    (§6ter, mismo patrón que «Només admin» en Aprovacions): un control apagado con su
 //    motivo informa; un control ausente hace pensar que la función no existe.
@@ -39,6 +43,7 @@ import { cn } from '../../lib/utils'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import RegeneraDocuments from './RegeneraDocuments'
 
 /** Los campos que ocupan la fila entera: son largos y partirlos en dos columnas estorba. */
 const AMPLES = new Set<CampFundacio>(['domicilio', 'inscripcion'])
@@ -63,6 +68,8 @@ export default function DadesFundacio() {
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  // Cada lectura de la fila avisa a «Regenera documents» para que recuente con lo guardado.
+  const [versio, setVersio] = useState(0)
 
   const carrega = useCallback(async () => {
     const { dades: d, error: err } = await llegirParametres()
@@ -71,6 +78,7 @@ export default function DadesFundacio() {
     setForm(aFormulari(d))
     setDni('')
     setCarregant(false)
+    setVersio((v) => v + 1)
   }, [])
 
   useEffect(() => { void carrega() }, [carrega])
@@ -257,6 +265,9 @@ export default function DadesFundacio() {
               )}
               <p className="text-xs text-muted-foreground">{t('cfgf.prov_help')}</p>
             </div>
+
+            {/* Lo ya emitido, con los datos de ahora: solo el super_admin y solo en modo test. */}
+            {potEditar && <RegeneraDocuments refresc={versio} />}
           </>
         )}
         {dialeg}

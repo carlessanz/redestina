@@ -48,6 +48,7 @@ import { COLORES, type Columna } from "../maquetador.ts";
 import { num } from "./comu.ts";
 import type { Bloque } from "../plantilla.ts";
 import { pintarSignaturaDocument } from "./signatura.ts";
+import { nomFundacio } from "../fundacio.ts";
 import {
   abrirCierre,
   cerrarCierre,
@@ -245,7 +246,7 @@ export async function renderCr(
       poblacio: datos.receptora?.poblacio ?? "",
     },
     fundacio: {
-      rao_social: datos.fundacio?.["raó_social"] ?? "",
+      rao_social: nomFundacio(datos),
       cif: datos.fundacio?.cif ?? "",
       domicili: domicilioCompleto(datos.fundacio),
       inscripcio: datos.fundacio?.inscripcio ?? "",

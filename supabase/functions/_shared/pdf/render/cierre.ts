@@ -26,6 +26,7 @@ import { type BytesActivos, embeberFuentes, embeberLogo } from "../fuentes.ts";
 import { COLORES, Maquetador } from "../maquetador.ts";
 import { type Bloque, esCuerpo, interpolarCuerpo, pintarCuerpo } from "../plantilla.ts";
 import { type PlantillaLegal } from "./comu.ts";
+import { nomFundacio, peuFundacio } from "../fundacio.ts";
 import type { SignaturaDocument } from "./signatura.ts";
 
 // ---------------------------------------------------------------------------
@@ -242,7 +243,8 @@ export function idiomaDe(idioma: string | null | undefined): IdiomaCierre {
 
 export interface DiccionarioCierre {
   res: string;
-  res_sub: string;
+  /** Recibe la razón social del snapshot (`nomFundacio`): nunca escrita a mano. */
+  res_sub: (fundacio: string) => string;
   res_provisional: string;
   ct: string;
   ct_sub: string;
@@ -304,7 +306,7 @@ export interface DiccionarioCierre {
   factura_data_ajuda: string;
   factura_concepte: string;
   factura_avis_titol: string;
-  factura_avis: string;
+  factura_avis: (fundacio: string) => string;
   enllac_titol: string;
   enllac_text: (dies: number) => string;
   enllac_sense: string;
@@ -314,7 +316,6 @@ export interface DiccionarioCierre {
   legal: string;
   provisional_titol: string;
   provisional_avis: string;
-  peu: string;
   pagina: (n: number, total: number) => string;
   mesos: string[];
   col: Record<string, string>;
@@ -322,7 +323,7 @@ export interface DiccionarioCierre {
 
 const CA: DiccionarioCierre = {
   res: "Resum anual de donacions",
-  res_sub: "Aliments fora del circuit de venda habitual lliurats a la Fundació Espigoladors",
+  res_sub: (f) => `Aliments fora del circuit de venda habitual lliurats a ${f}`,
   res_provisional: "Resum provisional",
   ct: "Certificat d’aprofitament alimentari",
   ct_sub: "Operacions de venda i de maquila conciliades durant l'exercici",
@@ -397,8 +398,8 @@ const CA: DiccionarioCierre = {
   factura_data_ajuda: "31 de desembre de l'exercici",
   factura_concepte: "Concepte",
   factura_avis_titol: "Per què cal la factura",
-  factura_avis:
-    "La donació d'aliments es documenta amb una factura teva a nom de la Fundació Espigoladors per l'import valorat, sense repercussió d'IVA i sense cap pagament: no s'ha de cobrar ni es cobrarà. Amb la factura registrada i coincident amb aquest import, la Fundació emet el certificat de donació que et dona dret a la deducció de l'article 16 de la Llei 49/2002.",
+  factura_avis: (f) =>
+    `La donació d'aliments es documenta amb una factura teva a nom de ${f} per l'import valorat, sense repercussió d'IVA i sense cap pagament: no s'ha de cobrar ni es cobrarà. Amb la factura registrada i coincident amb aquest import, la Fundació emet el certificat de donació que et dona dret a la deducció de l'article 16 de la Llei 49/2002.`,
   enllac_titol: "Puja la factura",
   enllac_text: (dies) =>
     `Obre aquest enllaç des del mòbil o de l'ordinador i adjunta la factura en PDF, JPG o PNG. L'enllaç és personal i caduca en ${dies} dies.`,
@@ -411,7 +412,6 @@ const CA: DiccionarioCierre = {
   provisional_titol: "Text provisional, pendent de validació",
   provisional_avis:
     "Aquest text encara no ha estat validat per la Fundació Espigoladors ni per l'assessoria. S'imprimeix perquè el document sigui llegible mentre no hi hagi la plantilla definitiva; no substitueix el text legal.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pàg. ${n} de ${total}`,
   mesos: [
     "gener", "febrer", "març", "abril", "maig", "juny",
@@ -436,7 +436,7 @@ const CA: DiccionarioCierre = {
 
 const ES: DiccionarioCierre = {
   res: "Resumen anual de donaciones",
-  res_sub: "Alimentos fuera del circuito de venta habitual entregados a la Fundació Espigoladors",
+  res_sub: (f) => `Alimentos fuera del circuito de venta habitual entregados a ${f}`,
   res_provisional: "Resumen provisional",
   ct: "Certificado de aprovechamiento alimentario",
   ct_sub: "Operaciones de venta y de maquila conciliadas durante el ejercicio",
@@ -505,8 +505,8 @@ const ES: DiccionarioCierre = {
   factura_data_ajuda: "31 de diciembre del ejercicio",
   factura_concepte: "Concepto",
   factura_avis_titol: "Por qué hace falta la factura",
-  factura_avis:
-    "La donación de alimentos se documenta con una factura tuya a nombre de la Fundació Espigoladors por el importe valorado, sin repercusión de IVA y sin ningún pago: no se ha de cobrar ni se cobrará. Con la factura registrada y coincidente con este importe, la Fundación emite el certificado de donación que da derecho a la deducción del artículo 16 de la Ley 49/2002.",
+  factura_avis: (f) =>
+    `La donación de alimentos se documenta con una factura tuya a nombre de ${f} por el importe valorado, sin repercusión de IVA y sin ningún pago: no se ha de cobrar ni se cobrará. Con la factura registrada y coincidente con este importe, la Fundación emite el certificado de donación que da derecho a la deducción del artículo 16 de la Ley 49/2002.`,
   enllac_titol: "Sube la factura",
   enllac_text: (dies) =>
     `Abre este enlace desde el móvil o el ordenador y adjunta la factura en PDF, JPG o PNG. El enlace es personal y caduca en ${dies} días.`,
@@ -519,7 +519,6 @@ const ES: DiccionarioCierre = {
   provisional_titol: "Texto provisional, pendiente de validación",
   provisional_avis:
     "Este texto todavía no ha sido validado por la Fundació Espigoladors ni por la asesoría. Se imprime para que el documento sea legible mientras no exista la plantilla definitiva; no sustituye al texto legal.",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pág. ${n} de ${total}`,
   mesos: [
     "enero", "febrero", "marzo", "abril", "mayo", "junio",
@@ -657,7 +656,7 @@ export async function abrirCierre(
     logo,
     cabecera: numero,
     subcabecera: `${rotulo.titulo} · ${t.exercici} ${datos.exercici ?? ""}`.trim(),
-    pie: `${t.peu} · ${numero}`,
+    pie: `${peuFundacio(datos)} · ${numero}`,
     marcaAgua: op.modo === "prueba" ? { texto: MARCA_PRUEBA[idioma] } : null,
     paginacion: t.pagina,
   });
@@ -830,7 +829,7 @@ export async function pintarFirma(ctx: ContextoCierre): Promise<void> {
     [datos.apoderada?.nom, datos.apoderada?.carrec].filter(Boolean).join(" · "),
     { fuente: m.fuentes.cuerpoFuerte, tamano: 9.5 },
   );
-  m.parrafo(datos.fundacio?.["raó_social"] ?? "", {
+  m.parrafo(nomFundacio(datos), {
     color: COLORES.verdeGris,
     tamano: 9,
     despues: 4,

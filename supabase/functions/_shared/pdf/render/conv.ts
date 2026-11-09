@@ -55,6 +55,7 @@ import {
   tituloSinMarca,
 } from "../convenio.ts";
 import type { PlantillaLegal, Renderizado } from "./comu.ts";
+import { nomFundacio, peuFundacio } from "../fundacio.ts";
 
 /** El DNI de una evidencia, que el snapshot no lleva. Se casa por `created_at`. */
 export interface IdentidadEvidencia {
@@ -152,7 +153,7 @@ export async function renderConv(
     logo,
     cabecera: numero,
     subcabecera: `${t.modelo[tipo]} · ${t.exercici} ${datos.ejercici ?? ""}`.trim(),
-    pie: `${t.peu} · ${numero || t.modelo[tipo]}`,
+    pie: `${peuFundacio(datos)} · ${numero || t.modelo[tipo]}`,
     // La filigrana solo cuando el texto es de trabajo. Un convenio con el articulado
     // validado NO la lleva: es un contrato, no un borrador.
     marcaAgua: esBorrador ? { texto: t.esborrany_marca } : null,
@@ -365,20 +366,24 @@ async function pintarFirmas(
     let cursor = m.y;
     for (const [texto, fuerte] of lineas) {
       if (!texto) continue;
-      const [primera] = m.cortar(
+      // Hasta dos líneas: «Per <razón social>» lleva el nombre de Configuració › Fundació,
+      // y uno largo no se puede cortar a media palabra en la línea de la firma.
+      const trozos = m.cortar(
         texto,
         fuerte ? m.fuentes.cuerpoFuerte : m.fuentes.cuerpo,
         9,
         mitad - 20,
-      );
-      m.paginaActual.drawText(primera, {
-        x,
-        y: cursor - 9,
-        size: 9,
-        font: fuerte ? m.fuentes.cuerpoFuerte : m.fuentes.cuerpo,
-        color: fuerte ? COLORES.negro : COLORES.verdeGris,
-      });
-      cursor -= 12;
+      ).slice(0, 2);
+      for (const trozo of trozos) {
+        m.paginaActual.drawText(trozo, {
+          x,
+          y: cursor - 9,
+          size: 9,
+          font: fuerte ? m.fuentes.cuerpoFuerte : m.fuentes.cuerpo,
+          color: fuerte ? COLORES.negro : COLORES.verdeGris,
+        });
+        cursor -= 12;
+      }
     }
     return cursor;
   };
@@ -393,17 +398,17 @@ async function pintarFirmas(
     [datos.origen === "declarat" ? t.declarat_firma : "", true],
   ]);
   const derecha = escribir(m.x + mitad, [
-    [t.signa_fundacio, true],
+    // «Per <razón social>»: el nombre ya va en el rótulo, no se repite debajo.
+    [t.signa_fundacio(nomFundacio(datos)), true],
     [contrafirmado ? (fun.apoderada_nom ?? "") : "", false],
     [contrafirmado ? (fun.apoderada_carrec ?? "") : "", false],
-    [fun.raso_social ?? "", false],
     [contrafirmado ? fechaLargaConvenio(datos.contrafirmat_at, t, lengua) : "", false],
   ]);
   m.espacio(m.y - Math.min(izquierda, derecha));
 
   if (!contrafirmado) {
     m.espacio(8);
-    m.caja(t.pendent_contrafirma, { fondo: COLORES.crema, barra: COLORES.coral });
+    m.caja(t.pendent_contrafirma(nomFundacio(datos)), { fondo: COLORES.crema, barra: COLORES.coral });
   }
 }
 

@@ -40,6 +40,7 @@ import { COLORES, type Columna, Maquetador } from "../maquetador.ts";
 import { num } from "./comu.ts";
 import type { PlantillaLegal } from "./comu.ts";
 import { type Bloque, esCuerpo, interpolarCuerpo, pintarCuerpo } from "../plantilla.ts";
+import { nomFundacio, peuFundacio } from "../fundacio.ts";
 import {
   codigoVerificacion,
   domicilioCompleto,
@@ -205,7 +206,6 @@ interface DiccionarioPlan {
   no: string;
   buit: string;
   marca_prova: string;
-  peu: string;
   pagina: (n: number, total: number) => string;
   col: { pregunta: string; resposta: string };
 }
@@ -259,7 +259,6 @@ const CA: DiccionarioPlan = {
   no: "No",
   buit: "—",
   marca_prova: "Prova · document sense validesa",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pàg. ${n} de ${total}`,
   col: { pregunta: "Pregunta", resposta: "Resposta" },
   blocs: {
@@ -338,7 +337,6 @@ const ES: DiccionarioPlan = {
   no: "No",
   buit: "—",
   marca_prova: "Prueba · documento sin validez",
-  peu: "Fundació Espigoladors · REDESTINA",
   pagina: (n, total) => `pág. ${n} de ${total}`,
   col: { pregunta: "Pregunta", resposta: "Respuesta" },
   blocs: {
@@ -587,7 +585,7 @@ export async function renderPla(
     logo,
     cabecera: numero,
     subcabecera: `${t.titulo} · ${t.exercici} ${datos.exercici ?? ""}`.trim(),
-    pie: `${t.peu}${numero ? ` · ${numero}` : ""}`,
+    pie: `${peuFundacio(datos)}${numero ? ` · ${numero}` : ""}`,
     marcaAgua: op.modo === "prueba" ? { texto: t.marca_prova } : null,
     paginacion: t.pagina,
   });
@@ -716,7 +714,7 @@ export async function renderPla(
       poblacio: datos.organitzacio?.poblacio ?? "",
     },
     fundacio: {
-      rao_social: datos.fundacio?.["raó_social"] ?? "",
+      rao_social: nomFundacio(datos),
       cif: datos.fundacio?.cif ?? "",
       domicili: domicilioCompleto(datos.fundacio),
     },

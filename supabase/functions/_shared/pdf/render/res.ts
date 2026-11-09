@@ -22,6 +22,7 @@ import { COLORES, type Columna } from "../maquetador.ts";
 import { importEnXifres } from "../lletres.ts";
 import { num } from "./comu.ts";
 import type { Bloque } from "../plantilla.ts";
+import { nomFundacio } from "../fundacio.ts";
 import {
   abrirCierre,
   cerrarCierre,
@@ -114,7 +115,7 @@ async function pintar(
 
   const ctx = await abrirCierre(activos, op, {
     titulo: provisional ? `${t.res} · ${t.res_provisional}` : t.res,
-    subtitulo: t.res_sub,
+    subtitulo: t.res_sub(nomFundacio(datos)),
     idioma,
   });
   const { m } = ctx;
@@ -204,7 +205,7 @@ async function pintar(
   m.titulo(t.factura_titol, 2);
   m.campos(
     paresLlenos([
-      [t.factura_a_nom, factura.a_nom_de ?? datos.fundacio?.["raó_social"]],
+      [t.factura_a_nom, factura.a_nom_de ?? nomFundacio(datos)],
       [t.cif, datos.fundacio?.cif],
       [
         t.factura_import,
@@ -222,7 +223,7 @@ async function pintar(
     ]),
     { anchoEtiqueta: 150, despues: 8 },
   );
-  m.caja(t.factura_avis, { titulo: t.factura_avis_titol });
+  m.caja(t.factura_avis(nomFundacio(datos)), { titulo: t.factura_avis_titol });
 
   // ----------------------------------------------------------------- el enlace
   m.espacio(8);
@@ -253,7 +254,7 @@ async function pintar(
     fundacio: datos.fundacio ?? {},
     factura: {
       ...factura,
-      a_nom_de: factura.a_nom_de ?? datos.fundacio?.["raó_social"] ?? "",
+      a_nom_de: factura.a_nom_de ?? nomFundacio(datos),
       data: fechaLarga(factura.data_operacio, t, idioma),
       import: importEnXifres(
         factura.import === null || factura.import === undefined ? valor : Number(factura.import),

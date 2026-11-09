@@ -1482,6 +1482,14 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   bloquea «por motivos fiscales». Lo único con valor probatorio es quién condujo un acto asistido (`evidencias.asistido_por`): de ahí
   el rastro por fila de `20270515100000`, que conserva quién lo hizo de verdad. Lo fiscal que SÍ falta son los datos reales de la
   Fundació en Configuració › Fundació (checkpoint 10: `datos_provisionales`).
+- 🔴 **La auditoría sobrevive a traspasos y borrados** (`20270516100000`, pedido por Carles: «traspasar es solo para que otra
+  persona siga las acciones; la auditoría mantiene la fecha, los movimientos y quién los hizo, también si esa persona se borra»):
+  `equip_persones_arxiu` (identidad —nombre, correo, teléfono, rol— de toda cuenta del equipo, guardada por el trigger BEFORE DELETE
+  `equip_arxiva_persona` de `auth.users`, borre quien borre); `nom`/`per_nom` en `equip_rols_hist` y `origen_nom`/`desti_nom`/`per_nom`
+  en `equip_traspassos`, rellenados por el trigger BEFORE INSERT `trg_equip_noms()` desde `perfiles` (los apuntes se escriben antes de
+  borrar), así que ninguna RPC `equip_*` cambió; `equip_auditoria(p_user, p_limit)` (super_admin) junta cambios de rol, altas y bajas,
+  ediciones, borrados y cada traspaso (`mou_accions`) con fecha, autor y afectado, con nombre y correo y `esborrat`. La fecha de cada
+  acción es la de su propia fila, que el traspaso no toca. Pantalla: `AuditoriaEquip` en Configuració › Equip.
 - **Destino propuesto** (`destiPerDefecte()`, `lib/equip.ts`): alguien activo **del mismo rol** que la cuenta que se va (y entre
   ellos quien pulsa); si no hay, quien pulsa. Solo se propone: el desplegable deja elegir cualquier cuenta activa del equipo.
 - Bloqueos: nadie se activa/desactiva/borra a sí mismo (`no_et_pots_tocar`); nunca el equipo sin super_admin activo (`ultim_super_admin`,
@@ -1495,3 +1503,29 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
   la cuenta.
 - **El Mercat**: `modalitats_compatibles_meves()` añade `and e.activo`, que vacía la rama del Mercat
   de la política de `excedentes` para una entidad inactiva. Las ramas de historial no cambian.
+
+
+### Datos de la Fundació en los documentos y regeneración en modo test (09-11-2026, `20270516100100`)
+
+- **Lo nuevo sale con lo de Configuració › Fundació**: cada emisor copia `parametros_documentales` al snapshot `documentos.datos`
+  al emitir (`albaran_datos`, `convenio_emet_document`, `cierre_datos_certificado`/`periodo_datos_certificado`,
+  `recepcio_datos_certificat`, `plan_datos`, `expedient_datos`); el DNI, la firma y el sello de CD/CT/CR se leen además al pintar
+  (`generar-documento`). Desde el 09-11 los PDF también toman la **razón social** del snapshot en los textos legales y los pies,
+  donde antes ponía «Fundació Espigoladors» a mano: `_shared/pdf/fundacio.ts` (`nomFundacio`, `peuFundacio`) busca
+  `fundacio.raó_social|raso_social|razon_social|rao_social` y, en los REC/ENT antiguos (también `R-`), la parte que es la
+  Fundació; si falta, «Fundació Espigoladors» (el OPE, donde no es parte, siempre ese). Lo usan las cláusulas provisionales de
+  REC/ENT (`{{fundacio.rao_social}}`, clave nueva de los `valores` del albarán, también para las plantillas validadas), RES
+  (`res_sub`, `factura_avis`), CONV (`signa_fundacio`, `pendent_contrafirma`; el texto firmado y su huella no cambian), el nombre
+  bajo la firma de cierre y el pie `<razón social> · REDESTINA` de todo el maquetador. CD y el albarán de una página ya lo tomaban
+  del snapshot. Pruebas: `tests/pdf/fundacio_test.ts` (14, incluida la razón social provisional larga, que sigue cabiendo). Deuda 170.
+  Las claves del snapshot varían por tipo y época (`raó_social`/`raso_social`/`razon_social`, `cif`/`nif`, `domicili`/`domicilio`…);
+  los REC/ENT antiguos no tienen `fundacio` y la Fundació es `partes.recibe` (REC) o `partes.entrega` (ENT).
+- **Lo ya emitido es inmutable** y en producción así debe seguir. En **modo test** (`app_settings.test_mode = 'true'`) el super_admin
+  puede regenerarlo: `regenerar_documents_fundacio(p_accepto)` — sin aceptar, informa `{mode_test, total, signats, detall}`; con
+  `p_accepto = true` emite la **versión siguiente** (mismo número, la anterior `vigente = false` + `sustituido_por`, como la firma) de
+  cada documento vigente cuyo snapshot cambie con `documento_datos_fundacio_actual(datos, tipo)` (interna: sustituye solo las claves
+  que ya estaban, más `lloc`, `apoderada`, `dades_provisionals` y la parte de `partes` que es la Fundació), con `sha256_datos`
+  recalculado y `pendiente_fichero` para el job. **Se saltan los firmados** (`subtipo = 'signat'` o con fila en `firmes_document`:
+  perderían la firma). Con el modo test apagado: `22023 nomes_en_mode_test`. Cada ejecución, en `regeneracions_documents`.
+  Probado en el clon (con rollback): 68 documentos regenerados, 3 firmados intactos, todas las huellas cuadran.
+  Pantalla: `RegeneraDocuments` debajo de Configuració › Fundació, con recuento por tipo, aviso y diálogo «Accepto i regenero».

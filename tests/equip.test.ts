@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   ACCIONS_HIST, GRUPS_ACCIO, GRUP_TAULA, ROLS_EQUIP, accionsMembre, agrupaAccions, clauErrorEquip, destiPerDefecte,
-  destinsPossibles, esBaixada, filtraEquip, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
+  destinsPossibles, esBaixada, filtraEquip, persona, personesAuditoria, normalitzaTelefon, ordenaEquip, recompteRols, rolEquipDe, telefonValid, type MembreEquip,
 } from '../src/lib/equip'
 import { DICTS } from '../src/lib/i18n'
 
@@ -250,5 +250,30 @@ describe('el historial y los errores nuevos', () => {
       expect(DICTS.ca[clau], clau).toBeTruthy()
       expect(DICTS.es[clau], clau).toBeTruthy()
     }
+  })
+})
+
+describe('auditoría: persona y personesAuditoria', () => {
+  it('«Nom (correu)», o lo que haya', () => {
+    expect(persona('Anna', 'anna@x.org')).toBe('Anna (anna@x.org)')
+    expect(persona(null, 'anna@x.org')).toBe('anna@x.org')
+    expect(persona('Anna', null)).toBe('Anna')
+    expect(persona('a@x.org', 'a@x.org')).toBe('a@x.org')
+    expect(persona(null, null)).toBe('')
+  })
+  it('una entrada por cuenta, ordenadas, y las borradas marcadas', () => {
+    const base = {
+      at: '2026-11-09T10:00:00Z', accio: 'rol' as const, rol_abans: null, rol_despres: null, desti_email: null,
+      desti_nom: null, total: null, detall: null, per_email: null, per_nom: null,
+    }
+    const p = personesAuditoria([
+      { ...base, user_id: 'b', email: 'b@x.org', nom: 'Bet', esborrat: true },
+      { ...base, user_id: 'a', email: 'a@x.org', nom: 'Anna', esborrat: false },
+      { ...base, user_id: 'b', email: 'b@x.org', nom: 'Bet', esborrat: true },
+    ])
+    expect(p).toEqual([
+      { user_id: 'a', text: 'Anna (a@x.org)', esborrat: false },
+      { user_id: 'b', text: 'Bet (b@x.org)', esborrat: true },
+    ])
   })
 })
