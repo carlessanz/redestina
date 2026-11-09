@@ -137,7 +137,9 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
   const motiuCanal = canals && !canals.notificacions ? t('canal.motiu_notificacions') : undefined
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      {/* Columna 1: si se envía y por dónde (general → correo → WhatsApp) y cómo se decide. */}
+      <div className="space-y-6">
       <Interruptor
         titol={t('set.not_title')}
         actiu={canals?.notificacions ?? null}
@@ -182,6 +184,20 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
         ajuda={<p>{t('set.wa_help')}</p>}
       />
 
+      {/* Cómo se decide a quién se envía (para que quede claro). */}
+      <Card>
+        <CardHeader><CardTitle className="text-base">{t('set.sending_title')}</CardTitle></CardHeader>
+        <CardContent className="space-y-1.5 text-sm text-muted-foreground">
+          <p>{t('set.sending_1')}</p>
+          <p>{t('set.sending_2')}</p>
+          <p>{t('set.sending_3b')}</p>
+          <p>{t('set.sending_4')}</p>
+        </CardContent>
+      </Card>
+      </div>
+
+      {/* Columna 2: a quién se envía (modo test y listas de prueba). */}
+      <div className="space-y-6">
       {/* 3.º DESTINATARIOS: solo usuarios de prueba o todos, para los dos canales. Es lo que
           permite probar las notificaciones antes de abrirlas a todo el mundo, y la garantía
           de que una importación masiva no recibe nada. Abrirlo a todos exige el general
@@ -256,16 +272,7 @@ export default function SeccioNotificacions({ potCanviar }: { potCanviar: boolea
         </CardContent>
       </Card>
 
-      {/* Cómo se decide a quién se envía (para que quede claro). */}
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('set.sending_title')}</CardTitle></CardHeader>
-        <CardContent className="space-y-1.5 text-sm text-muted-foreground">
-          <p>{t('set.sending_1')}</p>
-          <p>{t('set.sending_2')}</p>
-          <p>{t('set.sending_3b')}</p>
-          <p>{t('set.sending_4')}</p>
-        </CardContent>
-      </Card>
+      </div>
 
       {dialeg}
     </div>

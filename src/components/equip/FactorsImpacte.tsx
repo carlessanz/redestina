@@ -58,10 +58,10 @@ export default function FactorsImpacte() {
         <CardTitle>{t('fimp.title')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('fimp.desc')}</p>
       </CardHeader>
-      <CardContent className="space-y-6">
-        {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+      <CardContent className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+        {error && <p className="text-sm text-destructive xl:col-span-2">{t('c.load_error')}</p>}
         {factors.map((f) => (
-          <div key={f.codi} className="grid grid-cols-1 gap-3 border-b border-border pb-4 last:border-0 sm:grid-cols-2">
+          <div key={f.codi} className="grid grid-cols-1 content-start gap-3 rounded-lg border border-border p-3 sm:grid-cols-2">
             <div className="space-y-1">
               <Label htmlFor={`fimp-${f.codi}`} className="text-xs text-muted-foreground">
                 {lang === 'es' ? f.nom_es : f.nom_ca} ({f.unitat})
@@ -89,7 +89,7 @@ export default function FactorsImpacte() {
             )}
           </div>
         ))}
-        {!potEditar && <p className="text-xs text-aviso">{t('set.only_super')}</p>}
+        {!potEditar && <p className="text-xs text-aviso xl:col-span-2">{t('set.only_super')}</p>}
       </CardContent>
     </Card>
   )

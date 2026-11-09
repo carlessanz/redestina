@@ -75,7 +75,7 @@ provisional), espigueo, catálogos, back office, parte pública, indicadores (`k
 - Router como capa raíz con rutas públicas y privadas (§6quater). Sin librería de estado.
   `vercel.json` lleva el rewrite de SPA.
 - **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
-  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flags de ruta `fullBleed` y `ample`.
+  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flags de ruta `fullBleed` y `ample` (Configuració: 2 columnas desde `xl`).
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
 - **Siete reglas de móvil medidas** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap

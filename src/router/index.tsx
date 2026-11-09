@@ -178,7 +178,7 @@ export const router = createBrowserRouter([
                   { path: 'plans', element: <Plans />, handle: { titleKey: 'nav.plans', ample: true } },
                   { path: 'plans/:id', element: <PlaDetall />, handle: { titleKey: 'nav.plans', ample: true } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
-                  { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
+                  { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings', ample: true } },
                 ],
               },
               {

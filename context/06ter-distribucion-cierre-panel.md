@@ -2114,3 +2114,16 @@ super_admin** (`?tab=equip` de un admin cae en «General»; las dos RPC también
 - En producción, **Sebastián (`sebastian@espigoladors.com`) pasó de `admin` a `super_admin` el 09-11-2026**, por SQL
   desde la sesión con token justo al publicar (`publicar-equip.sh`); quedó en el historial como «Fora de l'aplicació».
   Los super_admin activos son ahora tres: `hola@`, `hola+superadmin@` (cuenta de prueba) y él.
+
+### Configuració a todo el ancho y en dos columnas (10-11-2026)
+
+La ruta `/equip/configuracio` pasó a `ample: true` y `Settings` dejó de limitarse a `max-w-3xl`: antes
+usaba 768 px en el centro de la pantalla y el resto quedaba vacío. **Por debajo de `xl` (1280 px de
+ventana) todo sigue en una columna**; desde `xl`, cada pestaña reparte sus tarjetas en dos para reducir el
+scroll: **General** (validación + idioma | pantalla de protección), **Notificacions** (general, correo,
+WhatsApp y «Com es decideix» | modo test y listas de prueba, que son lo más largo), **Fundació** (datos y
+guardar | firma y sello, provisionales y regeneración), **Impacte** (una tarjeta por factor, en rejilla),
+**Diagnòstic** (cuestionario JSON | medidas y reglas; el editor JSON topa en `70vh` y scrollea por dentro)
+y **Equip** (cuentas | auditoría). Todas las rejillas llevan `grid-cols-1` explícito: sin él la columna
+única es `auto` y un hijo ancho (el JSON, una tabla) desbordaba la página a 390 px. Auditado
+`scrollWidth > clientWidth` a 390, 1024, 1280 y 1600 px en las seis pestañas: sin desbordes.

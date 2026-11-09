@@ -213,7 +213,7 @@ export default function SeccioEquip() {
   }
 
   return (
-    <div className="space-y-4" data-testid="seccio-equip">
+    <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-2" data-testid="seccio-equip">
       <Card>
         <CardHeader>
           <CardTitle>{t('eq.title')}</CardTitle>

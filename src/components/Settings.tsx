@@ -1,6 +1,9 @@
 // Configuració del equipo, por pestañas (27-10-2026): un submenú horizontal en vez de una
 // página larga. Cada pestaña es un componente de `configuracio/` o un bloque que ya existía.
 //
+// A TODO EL ANCHO (10-11-2026, ruta `ample`): cada pestaña reparte sus tarjetas en dos columnas
+// desde `xl` (1280 px) para no alargar el scroll; por debajo, una sola columna como siempre.
+//
 // La pestaña vive en la URL (`?tab=notificacions`), como en Albarans: es lo que deja que un
 // aviso o un enlace lleven a la sección exacta. Un valor desconocido cae en «General».
 
@@ -30,7 +33,7 @@ export default function Settings() {
     : 'general'
 
   return (
-    <div className="mx-auto max-w-3xl space-y-6">
+    <div className="space-y-6">
       <div>
         <h1 className="text-xl font-bold">{t('set.title')}</h1>
         <p className="mt-1 text-sm text-muted-foreground">{t('set.subtitle')}</p>

@@ -197,7 +197,8 @@ export default function EditorDiagnostic() {
         ) : !vigent ? (
           <p className="text-sm text-muted-foreground">{t('cfgd.no_current')}</p>
         ) : (
-          <>
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+            {/* Columna 1: el cuestionario (JSON). Columna 2: las medidas y sus reglas. */}
             <section className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
                 <h3 className="font-titulos text-sm font-semibold">
@@ -223,7 +224,7 @@ export default function EditorDiagnostic() {
                   disabled={!potEditar}
                   value={esborrany}
                   onChange={(e) => { setEsborrany(e.target.value); setProblemes(null) }}
-                  className="font-mono text-base md:text-xs"
+                  className="max-h-[70vh] overflow-y-auto font-mono text-base md:text-xs"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">{t('cfgd.json_help')}</p>
               </div>
@@ -260,7 +261,8 @@ export default function EditorDiagnostic() {
               <p className="text-xs text-muted-foreground">{t('cfgd.publish_help')}</p>
             </section>
 
-            <section className="space-y-2 border-t border-border pt-6">
+            <div className="space-y-6">
+            <section className="space-y-2 border-t border-border pt-6 xl:border-t-0 xl:pt-0">
               <h3 className="font-titulos text-sm font-semibold">{t('cfgd.measures_t')}</h3>
               <p className="text-xs text-muted-foreground">{t('cfgd.measures_help')}</p>
               <ul className="space-y-1">
@@ -322,7 +324,8 @@ export default function EditorDiagnostic() {
                 ))}
               </ul>
             </section>
-          </>
+            </div>
+          </div>
         )}
         {dialeg}
       </CardContent>

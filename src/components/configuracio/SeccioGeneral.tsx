@@ -36,7 +36,8 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
   }
 
   return (
-    <div className="space-y-6">
+    <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+      <div className="space-y-6">
       {/* El modo test vive en la pestaña Notificacions desde el 27-10-2026: decide A QUIÉN se
           envía, y es el tercer paso de «notificaciones → canal → destinatarios». */}
       {/* Validación previa de las ofertas que publica el productor (05-10-2026). */}
@@ -48,9 +49,6 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
         bloquejat={saving || !potCanviar}
         motiu={motiu}
       />
-
-      {/* La cortina de contraseña (09-11-2026): solo la ve el super_admin. */}
-      {potCanviar && <SeccioCortina />}
 
       {/* Idioma */}
       <Card>
@@ -67,7 +65,11 @@ export default function SeccioGeneral({ potCanviar }: { potCanviar: boolean }) {
           </div>
         </CardContent>
       </Card>
+      </div>
 
+      {/* La cortina de contraseña (09-11-2026): solo la ve el super_admin. Va en la segunda
+          columna porque es la tarjeta más alta. */}
+      {potCanviar && <SeccioCortina />}
     </div>
   )
 }

@@ -154,7 +154,10 @@ export default function DadesFundacio() {
             {t('c.load_error')}
           </p>
         ) : (
-          <>
+          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
+            {/* Columna 1: los datos y el botón de guardar. Columna 2: firma y sello, el
+                interruptor de «provisionales» y lo ya emitido. */}
+            <div className="space-y-4">
             {/* Dónde estamos: provisional (no se puede certificar en real) o no. */}
             <div className={cn('flex items-start gap-3 rounded-lg border p-3',
               dades?.datos_provisionales
@@ -214,6 +217,17 @@ export default function DadesFundacio() {
               <p className="text-xs text-muted-foreground">{t('cfgf.dni_help')}</p>
             </div>
 
+            <Button
+              className="h-11 whitespace-normal md:h-8"
+              disabled={!potEditar || desant || !hiHaCanvis}
+              onClick={() => void desa()}
+            >
+              {desant ? t('c.saving') : t('cfgf.save')}
+            </Button>
+
+          </div>
+
+          <div className="space-y-4">
             {/* Firma y sello: estado, y nada más. */}
             <div className="rounded-md border p-3 text-sm">
               <div className="font-medium">{t('cfgf.assets_title')}</div>
@@ -233,14 +247,6 @@ export default function DadesFundacio() {
               </div>
               <p className="mt-1.5 text-xs text-muted-foreground">{t('cfgf.assets_help')}</p>
             </div>
-
-            <Button
-              className="h-11 whitespace-normal md:h-8"
-              disabled={!potEditar || desant || !hiHaCanvis}
-              onClick={() => void desa()}
-            >
-              {desant ? t('c.saving') : t('cfgf.save')}
-            </Button>
 
             {/* ------------------------------------------------------------------
                 El interruptor. Va al final y separado porque no es un campo más:
@@ -268,7 +274,8 @@ export default function DadesFundacio() {
 
             {/* Lo ya emitido, con los datos de ahora: solo el super_admin y solo en modo test. */}
             {potEditar && <RegeneraDocuments refresc={versio} />}
-          </>
+          </div>
+          </div>
         )}
         {dialeg}
       </CardContent>
