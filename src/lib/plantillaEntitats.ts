@@ -9,17 +9,21 @@
 // `descarregaPlantilla()` carga `write-excel-file` con `import()` dinámico, para que la
 // librería vaya en un chunk aparte y solo la descargue quien la usa.
 //
-// ⚠️ Sin desplegables (validación de datos): `write-excel-file` no los hace sin un paquete
-//    aparte o sin inyectar XML a mano en un orden que Excel exige, y eso es frágil. La hoja
-//    «Llistes» dice los valores, y el lector tolera mayúsculas, acentos y los dos idiomas.
+// Desplegables (Plan 2 B2, 10-11-2026; D9): en la hoja «Entitats», cada columna con lista lleva un
+// desplegable que apunta a su columna de «Llistes» (`validacionsPlantilla`), SALVO Comarca, que la
+// deduce el municipio. `write-excel-file` no hace validación de datos: `lib/excelValidacions.ts`
+// inserta el `<dataValidations>` con una «feature» de la librería, en el sitio que exige OOXML. En
+// las listas de un valor, salirse avisa (no bloquea: el lector tolera mayúsculas, acentos y los dos
+// idiomas); en las de varios (actividad, modalidades), el desplegable solo ayuda.
 //
 // Las columnas de NIF, CP, teléfonos e ID van en formato texto (`@`) en las primeras filas,
 // para que Excel no se coma el cero de «08380» ni convierta un móvil en notación científica.
 
-import type { SheetData } from 'write-excel-file/browser'
+import type { Feature, SheetData } from 'write-excel-file/browser'
 import {
   COLUMNES_PLANTILLA, TIPUS_RECEPTOR, type ActivitatCataleg, type ColumnaPlantilla, type Llista,
 } from './importEntitats'
+import { featureValidacions, rangLlista, type ValidacioLlista } from './excelValidacions'
 import { MODALITATS_IDS } from './modalitats'
 import { TIPUS_EMPRESA } from './perfilReceptor'
 
@@ -30,6 +34,8 @@ export interface ContextPlantilla {
   lang: 'ca' | 'es'
   activitats: readonly ActivitatCataleg[]
   comarques: readonly string[]
+  /** Los nombres de los municipios tal como se escriben (`nomLlegible`), ya ordenados. */
+  municipis: readonly string[]
 }
 
 /** Filas vacías con formato texto, para que lo que se escriba ahí no lo reinterprete Excel. */
@@ -40,7 +46,16 @@ export const NOM_FULLA = { entitats: 'Entitats', instruccions: 'Instruccions', l
 /** Las columnas que salen en la plantilla, en su orden. */
 export const COLUMNES_DE_PLANTILLA: readonly ColumnaPlantilla[] = COLUMNES_PLANTILLA.filter((c) => c.plantilla)
 
-export const LLISTES: readonly Llista[] = ['rol', 'tipo_receptor', 'tipus_empresa', 'tipus_activitat', 'modalitats', 'comarca']
+export const LLISTES: readonly Llista[] = ['rol', 'tipo_receptor', 'tipus_empresa', 'tipus_activitat', 'modalitats', 'comarca', 'municipi']
+
+/** Las listas que NO llevan desplegable en «Entitats» (D9: la comarca sale del municipio). */
+export const SENSE_DESPLEGABLE: readonly Llista[] = ['comarca']
+
+/** Las listas que admiten varios valores separados por coma: el desplegable ayuda pero no avisa. */
+export const LLISTES_MULTIPLES: readonly Llista[] = ['tipus_activitat', 'modalitats']
+
+/** Primera y última fila de «Entitats» con desplegable: la de ejemplo y las que van con formato. */
+export const FILES_AMB_DESPLEGABLE = { primeraFila: 2, ultimaFila: FILES_FORMATADES + 2 } as const
 
 /** Los valores de cada lista, ya en palabras. */
 export function valorsLlista(llista: Llista, ctx: ContextPlantilla): string[] {
@@ -52,6 +67,7 @@ export function valorsLlista(llista: Llista, ctx: ContextPlantilla): string[] {
     case 'tipus_activitat': return ctx.activitats.map((a) => (ctx.lang === 'es' ? a.nom_es : a.nom_ca))
     case 'modalitats': return MODALITATS_IDS.map((m) => t(`od.mod_${m}`))
     case 'comarca': return [...ctx.comarques]
+    case 'municipi': return [...ctx.municipis]
   }
 }
 
@@ -108,17 +124,46 @@ export function dadesPlantilla(ctx: ContextPlantilla): { nom: string; data: Shee
   ]
 }
 
+/**
+ * Los desplegables de «Entitats»: una validación por columna con lista (menos las de
+ * `SENSE_DESPLEGABLE`), con el rango de su columna en «Llistes». Una lista vacía (el catálogo no
+ * cargó) se queda sin desplegable.
+ */
+export function validacionsPlantilla(ctx: ContextPlantilla): ValidacioLlista[] {
+  const out: ValidacioLlista[] = []
+  COLUMNES_DE_PLANTILLA.forEach((c, columna) => {
+    if (!c.llista || SENSE_DESPLEGABLE.includes(c.llista)) return
+    const rang = rangLlista(NOM_FULLA.llistes, LLISTES.indexOf(c.llista), valorsLlista(c.llista, ctx).length)
+    if (rang) out.push({ columna, rang, multiple: LLISTES_MULTIPLES.includes(c.llista) })
+  })
+  return out
+}
+
+/** La feature de `write-excel-file` que pone los desplegables en «Entitats» (la primera hoja). */
+export function featurePlantilla<F = unknown>(ctx: ContextPlantilla): Feature<F> {
+  return featureValidacions<F>(validacionsPlantilla(ctx), {
+    ...FILES_AMB_DESPLEGABLE, avisTitol: ctx.t('ie.dv_titol'), avis: ctx.t('ie.dv_avis'),
+  })
+}
+
+/** Las hojas con el formato de `writeXlsxFile` (sirve igual para `/browser` y para `/node`). */
+export function fullesPlantilla(ctx: ContextPlantilla) {
+  return dadesPlantilla(ctx).map((f) => ({
+    sheet: f.nom,
+    data: f.data,
+    columns: f.amples.map((width) => ({ width })),
+    stickyRowsCount: f.nom === NOM_FULLA.entitats ? 1 : undefined,
+  }))
+}
+
+/** El `FileContent` de `write-excel-file/browser` (el paquete no exporta el alias). */
+type ContingutNavegador = File | Blob | ArrayBuffer
+
 /** El fichero de la plantilla, listo para descargar. `null` si la librería no carga. */
 export async function blobPlantilla(ctx: ContextPlantilla): Promise<Blob | null> {
   try {
     const { default: writeXlsxFile } = await import('write-excel-file/browser')
-    const fulles = dadesPlantilla(ctx).map((f) => ({
-      sheet: f.nom,
-      data: f.data,
-      columns: f.amples.map((width) => ({ width })),
-      stickyRowsCount: f.nom === NOM_FULLA.entitats ? 1 : undefined,
-    }))
-    return await writeXlsxFile(fulles).toBlob()
+    return await writeXlsxFile(fullesPlantilla(ctx), { features: [featurePlantilla<ContingutNavegador>(ctx)] }).toBlob()
   } catch {
     return null
   }

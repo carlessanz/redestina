@@ -74,7 +74,7 @@ export interface FilaContracte {
   decisio?: string
 }
 
-export type Llista = 'rol' | 'tipo_receptor' | 'tipus_empresa' | 'tipus_activitat' | 'modalitats' | 'comarca'
+export type Llista = 'rol' | 'tipo_receptor' | 'tipus_empresa' | 'tipus_activitat' | 'modalitats' | 'comarca' | 'municipi'
 
 export interface ColumnaPlantilla {
   clau: ClauColumna
@@ -145,7 +145,7 @@ export const COLUMNES_PLANTILLA: readonly ColumnaPlantilla[] = [
   { clau: 'codigo_postal', capcalera: 'Codi postal', alias: ['Código postal', 'C.P.', 'CP'],
     obligatoria: false, plantilla: true, multiple: false, text: true, campFitxa: 'codigo_postal', exemple: '08380' },
   { clau: 'municipi', capcalera: 'Municipi', alias: ['Municipio', 'Població', 'Población', 'Poblacio', 'Localitat', 'Localidad'],
-    obligatoria: false, plantilla: true, multiple: false, campFitxa: 'municipio_ine', exemple: 'Malgrat de Mar' },
+    obligatoria: false, plantilla: true, multiple: false, llista: 'municipi', campFitxa: 'municipio_ine', exemple: 'Malgrat de Mar' },
   { clau: 'municipio_ine', capcalera: 'Codi INE', alias: ['Código INE', 'INE', 'Codi INE del municipi'],
     obligatoria: false, plantilla: false, multiple: false, text: true, exemple: '' },
   { clau: 'area_geografica', capcalera: 'Comarca', alias: ['Área (intern)', 'Àrea (intern)', 'Àrea geogràfica', 'Área geográfica', 'Area geografica', 'Àrea'],

@@ -7,6 +7,12 @@
 // es la forma jurídica, «Contactos» que se ignora, cabeceras sueltas sin datos. Ningún dato real.
 
 import { describe, expect, it } from 'vitest'
+import type Stream from 'node:stream'
+import type { Blob as BlobNode } from 'node:buffer'
+import { strFromU8, unzipSync } from 'fflate' // la usa write-excel-file por dentro
+import readXlsxFile from 'read-excel-file/node'
+import writeXlsxFile from 'write-excel-file/node'
+import { lletraColumna } from '../src/lib/excelValidacions'
 import { DICTS } from '../src/lib/i18n'
 import {
   activitatsDe, campDeColumna, campsOmplerts, CAMPS_RESULTAT, cellaCsv, clauCodi, CODIS_BASE, COLUMNES_PLANTILLA,
@@ -14,7 +20,10 @@ import {
   mapaCapcaleres, MARCA_EXEMPLE, modalitatsDeText, normalitzaFila, normalitzaFulla, proposaRols, rolsDeText, sha256Hex,
   telefonsDe, tipusEmpresaDe, tipusReceptorDe, valorCp, valorText, type ActivitatCataleg, type Cella,
 } from '../src/lib/importEntitats'
-import { COLUMNES_DE_PLANTILLA, dadesPlantilla, LLISTES, valorsLlista, type ContextPlantilla } from '../src/lib/plantillaEntitats'
+import {
+  COLUMNES_DE_PLANTILLA, dadesPlantilla, featurePlantilla, FILES_AMB_DESPLEGABLE, fullesPlantilla, LLISTES, LLISTES_MULTIPLES,
+  NOM_FULLA, SENSE_DESPLEGABLE, validacionsPlantilla, valorsLlista, type ContextPlantilla,
+} from '../src/lib/plantillaEntitats'
 
 /** Las cabeceras exactas de la exportación de Airtable (hoja «Hoja1», fila 1). */
 const AIRTABLE = [
@@ -310,7 +319,8 @@ describe('la plantilla', () => {
     for (const [x, v] of Object.entries(p ?? {})) s = s.replaceAll(`{${x}}`, String(v))
     return s
   }
-  const pctx: ContextPlantilla = { t, lang: 'ca', activitats: CATALEG, comarques: ['Maresme', 'Garrotxa'] }
+  const pctx: ContextPlantilla = { t, lang: 'ca', activitats: CATALEG, comarques: ['Maresme', 'Garrotxa'],
+    municipis: ['Malgrat de Mar', "l'Ametlla del Vallès", 'Olot'] }
   const [entitats, instruccions, llistes] = dadesPlantilla(pctx)
   const celles = (r: unknown[]): Cella[] => r.map((c) => (c && typeof c === 'object' && 'value' in c ? (c as { value: Cella }).value : c as Cella))
 
@@ -358,6 +368,91 @@ describe('la plantilla', () => {
     const textos = instruccions.data.flat().map((c) => (c && typeof c === 'object' && 'value' in c ? String(c.value) : String(c ?? '')))
     for (const c of COLUMNES_DE_PLANTILLA) expect(textos).toContain(c.capcalera)
     expect(textos.some((x) => x.startsWith('ie.'))).toBe(false)
+  })
+
+  it('desplegable en cada columna con lista menos Comarca (D9), apuntando a su columna de «Llistes»', () => {
+    const v = validacionsPlantilla(pctx)
+    const ambLlista = COLUMNES_DE_PLANTILLA.filter((c) => c.llista && !SENSE_DESPLEGABLE.includes(c.llista))
+    expect(v.map((x) => COLUMNES_DE_PLANTILLA[x.columna].clau)).toEqual(ambLlista.map((c) => c.clau))
+    expect(ambLlista.map((c) => c.clau)).toEqual(['rols', 'tipus_empresa', 'tipo_receptor', 'tipus_activitat', 'modalitats_interes', 'municipi'])
+    expect(v.some((x) => COLUMNES_DE_PLANTILLA[x.columna].llista === 'comarca')).toBe(false)
+    for (const x of v) {
+      const l = COLUMNES_DE_PLANTILLA[x.columna].llista!
+      const c = lletraColumna(LLISTES.indexOf(l))
+      expect(x.rang, l).toBe(`Llistes!$${c}$2:$${c}$${1 + valorsLlista(l, pctx).length}`)
+      expect(x.multiple, l).toBe(LLISTES_MULTIPLES.includes(l))
+    }
+    // Una lista vacía (el catálogo no cargó) se queda sin desplegable, no con un rango roto.
+    expect(validacionsPlantilla({ ...pctx, municipis: [] }).some((x) => COLUMNES_DE_PLANTILLA[x.columna].clau === 'municipi')).toBe(false)
+  })
+})
+
+/** Posición del primer `<tag` (seguido de espacio, `>` o `/`) en un XML; -1 si no está. */
+function posTag(xml: string, tag: string): number {
+  const ps = [' ', '>', '/'].map((s) => xml.indexOf(`<${tag}${s}`)).filter((p) => p >= 0)
+  return ps.length ? Math.min(...ps) : -1
+}
+
+describe('la plantilla, como fichero .xlsx de verdad', async () => {
+  const t = (k: string) => DICTS.ca[k] ?? k
+  const pctx: ContextPlantilla = { t, lang: 'ca', activitats: CATALEG, comarques: ['Maresme', 'Garrotxa'],
+    municipis: Array.from({ length: 947 }, (_, i) => `Municipi ${i + 1}`) }
+  const buffer = await writeXlsxFile(fullesPlantilla(pctx), { features: [featurePlantilla<Stream | Buffer | BlobNode>(pctx)] }).toBuffer()
+  const zip = unzipSync(new Uint8Array(buffer))
+  const fulla = (n: number) => strFromU8(zip[`xl/worksheets/sheet${n}.xml`])
+
+  it('«Entitats» lleva un solo <dataValidations>, con su count, detrás de </sheetData> y antes de lo que va detrás', () => {
+    const xml = fulla(1)
+    expect(xml.split('<dataValidations ').length - 1).toBe(1)
+    const n = xml.split('<dataValidation ').length - 1
+    expect(n).toBe(validacionsPlantilla(pctx).length)
+    expect(xml).toContain(`<dataValidations count="${n}">`)
+    const pos = posTag(xml, 'dataValidations')
+    expect(pos).toBeGreaterThan(xml.indexOf('</sheetData>'))
+    // Orden de CT_Worksheet (ECMA-376): lo que existe en el fichero, en su lado.
+    for (const tag of ['hyperlinks', 'printOptions', 'pageMargins', 'pageSetup', 'headerFooter', 'drawing', 'tableParts', 'extLst']) {
+      const p = posTag(xml, tag)
+      if (p >= 0) expect(p, tag).toBeGreaterThan(pos)
+    }
+    for (const tag of ['sheetViews', 'cols', 'sheetData', 'mergeCells', 'conditionalFormatting', 'sheetProtection', 'autoFilter']) {
+      const p = posTag(xml, tag)
+      if (p >= 0) expect(p, tag).toBeLessThan(pos)
+    }
+  })
+
+  it('cada desplegable cubre la fila de ejemplo y las 300 preparadas; el de Municipi, los 947', () => {
+    const xml = fulla(1)
+    const { primeraFila, ultimaFila } = FILES_AMB_DESPLEGABLE
+    expect([primeraFila, ultimaFila]).toEqual([2, 302])
+    const col = (clau: string) => lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === clau))
+    for (const clau of ['rols', 'tipus_empresa', 'tipo_receptor', 'tipus_activitat', 'modalitats_interes', 'municipi']) {
+      expect(xml, clau).toContain(`sqref="${col(clau)}${primeraFila}:${col(clau)}${ultimaFila}"`)
+    }
+    expect(xml).not.toContain(`sqref="${col('area_geografica')}`)
+    const g = lletraColumna(LLISTES.indexOf('municipi'))
+    expect(xml).toContain(`<formula1>Llistes!$${g}$2:$${g}$948</formula1>`)
+  })
+
+  it('las otras dos hojas no llevan desplegables, y «Llistes» tiene la columna de municipios', async () => {
+    expect(fulla(2)).not.toContain('dataValidation')
+    expect(fulla(3)).not.toContain('dataValidation')
+    const fulles = await readXlsxFile(buffer)
+    expect(fulles.map((f) => f.sheet)).toEqual([NOM_FULLA.entitats, NOM_FULLA.instruccions, NOM_FULLA.llistes])
+    const g = LLISTES.indexOf('municipi')
+    const llistes = fulles[2].data
+    expect(llistes[0][g]).toBe('Municipi')
+    expect(llistes.slice(1).map((r) => r[g]).filter((x) => x != null)).toHaveLength(947)
+  })
+
+  it('el fichero con desplegables se sigue leyendo entero: cabeceras reconocidas y la fila de ejemplo saltada', async () => {
+    const [entitats] = await readXlsxFile(buffer)
+    const files = entitats.data.map((r) => r.map((c) => c as Cella))
+    const m = mapaCapcaleres(files[0])
+    expect(m.falten).toEqual([])
+    expect(m.reconegudes.map((r) => r.clau)).toEqual(COLUMNES_DE_PLANTILLA.map((c) => c.clau))
+    const f = llegeixFulla(files)
+    expect(f.exemples).toBe(1)
+    expect(f.files).toEqual([])
   })
 })
 

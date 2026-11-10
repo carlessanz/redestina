@@ -323,7 +323,10 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   Airtable (`lib/importEntitats.ts`) y la base revalida (`previsualitzar_importacio_entitats` →
   `importar_entitats`): **`potencial`** (inactivo), identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
   coincidencia débil = «dubtosa» que decide la persona, existente = solo rellena huecos; **reimportar = todo
-  `sense_canvis`**. Plantilla descargable (`lib/plantillaEntitats.ts`).
+  `sense_canvis`**. Plantilla descargable (`lib/plantillaEntitats.ts`) **con desplegables** (B2, D9): en «Entitats»,
+  Rol, Forma jurídica, Tipus de receptor, Tipus d'activitat, Modalitats y Municipi apuntan a su columna de «Llistes»
+  (filas 2–302; **Comarca no**: sale del municipio); `lib/excelValidacions.ts` inserta `<dataValidations>` con una
+  feature de `write-excel-file`. Salirse de la lista **avisa, no bloquea**; en las de varios valores, ni avisa.
 
 🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
 de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
@@ -386,17 +389,9 @@ Lo que manda hoy, en una línea cada uno:
   que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC.
 - **Estado CRM (B1)**: «Estat i papers» (`BlocRols`): selector por papel (`fixar_estat_crm`) y badge
   (`lib/estatCrm.ts`); «Entitats» filtra por estado (con `?rol=`, el del papel) y abre con `actiu`.
-- **«Nova entitat» (1B)**: `NovaEntitat`, «Qui és?» con `cerca_entitats` (activa, abre o añade papel) y
-  «És nova» → `crear_entitat()` con `CLAUS_ALTA`.
-- **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
-  (`fitxa/AccesEntitat`, `lib/accesEntitat.ts`: estado, dar, reenviar y desactivar, con motivo) o con
-  la casilla de «Nova entitat» (si falla, el alta se queda).
-- **CRM (1F + Taula mestra 1.5)**: «Gestió interna» (`fitxa/NotesInternes`, `lib/notesInternes.ts`):
-  última interacción, seguimientos pendientes con «Fet», formulario (tipo, canal, fecha, responsable,
-  nota, próxima acción) e hilo sin edición; borra el super_admin; el listado marca lo vencido.
-- **Sin que la entidad entre**: Documentació › Convenis (`fitxa/ConveniFitxa`) manda el convenio a
-  firmar por correo (o «Copia l’enllaç»), lo registra en papel o lo
-  declara; Gestió interna pide el RGPD igual; el albarán, «Envia per correu» (PDF + enlace si falta confirmar); «Entitats» exporta los correos con consentimiento.
+- **Plan 1 sobre la ficha** (detalle en `context/06ter`): «Nova entitat» (1B, `cerca_entitats` → `crear_entitat`),
+  «Dona-li accés» (1D, `fitxa/AccesEntitat`), «Gestió interna» (1F + 1.5, `fitxa/NotesInternes`) y, sin que la
+  entidad entre, convenio por correo (`fitxa/ConveniFitxa`), RGPD, albarán por correo y correos con consentimiento.
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -595,7 +590,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.827 pruebas de Vitest en 79 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.839 pruebas de Vitest en 80 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.351/2.351 y 36 sin datos; producción 2.355/2.355 y 32 «Sin fallos de

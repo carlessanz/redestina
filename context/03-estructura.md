@@ -85,7 +85,8 @@ src/
     whatsapp.ts                sendWhatsApp(): llama a la Edge Function; nunca lanza
     importEntitats.ts          Importador: columnas de la plantilla, alias, mapeo y normalización de filas (puro, §6.2)
     normalitzaImport.ts        Normalizadores compartidos con scripts/ara2026/nucli.ts (puro)
-    plantillaEntitats.ts       Plantilla .xlsx descargable (write-excel-file por import())
+    plantillaEntitats.ts       Plantilla .xlsx descargable (write-excel-file por import()), con desplegables (B2)
+    excelValidacions.ts        <dataValidations> (desplegables) como feature de write-excel-file; puro (B2, lo reutiliza B3)
     fitxerImportacio.ts        Lee .xlsx (read-excel-file por import()) o .csv; nunca lanza
     importacions.ts            Cliente de previsualitzar_importacio_entitats / importar_entitats
     plantillas.ts              plantillaPrimerContacte(): tría plantilla de 1r contacte per rol (§6ter)

@@ -15,9 +15,10 @@
 
 import { expect, test } from '@playwright/test'
 import type { Page } from '@playwright/test'
-import { mkdtempSync, rmSync } from 'node:fs'
+import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { strFromU8, unzipSync } from 'fflate' // la usa write-excel-file por dentro
 import writeXlsxFile from 'write-excel-file/node'
 import { entra, motiuSaltClon, sql, sqlCom, tria } from './ajuda'
 
@@ -250,6 +251,13 @@ test('la plantilla descarregada, pujada tal qual, es reconeix sencera', async ({
   const [baixada] = await Promise.all([page.waitForEvent('download'), page.getByTestId('ie-plantilla').click()])
   const cami = join(dir, 'plantilla.xlsx')
   await baixada.saveAs(cami)
+  // Plan 2 B2: desplegables en «Entitats» (seis listas, sin Comarca), y el de Municipi con todos
+  // los municipios del catálogo del clon.
+  const fulla1 = strFromU8(unzipSync(new Uint8Array(readFileSync(cami)))['xl/worksheets/sheet1.xml'])
+  expect(fulla1).toContain('<dataValidations count="6">')
+  expect(fulla1.indexOf('<dataValidations')).toBeGreaterThan(fulla1.indexOf('</sheetData>'))
+  const nMunis = Number(sql('select count(*) from municipios'))
+  expect(fulla1).toContain(`<formula1>Llistes!$G$2:$G$${1 + nMunis}</formula1>`)
   await puja(page, cami)
   await expect(page.getByTestId('ie-falten')).toHaveCount(0)
   await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(0)

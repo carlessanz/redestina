@@ -182,9 +182,48 @@ organización inactiva, buscar por NIF; ¿y sin NIF? ¿por nombre? 1 convenio».
 - `src/lib/plantillaEntitats.ts`: la plantilla con `write-excel-file`: «Entitats» (cabeceras en catalán, fila
   «EXEMPLE — esborra aquesta fila» y 300 filas en formato texto `@` en NIF, CP, teléfonos e ID Airtable),
   «Instruccions» y «Llistes» (Rol, Tipus de receptor, Forma jurídica, Tipus d'activitat, Modalitats, Comarca
-  —de `municipios`—). **Sin desplegables**: `write-excel-file` no hace validación de datos sin un paquete
-  aparte o sin inyectar XML en el orden que Excel exige. La plantilla descargada se reconoce entera al
-  subirla (lo vigilan `tests/importEntitats.test.ts` y el E2E).
+  —de `municipios`— y, desde B2, Municipi). La plantilla descargada se reconoce entera al subirla (lo vigilan
+  `tests/importEntitats.test.ts` y el E2E).
+- **Desplegables (Plan 2 B2, 10-11-2026; decisión D9).** Antes no había (06-11: «`write-excel-file` no hace
+  validación de datos»). Ahora, en la primera hoja, **Rol, Forma jurídica, Tipus de receptor, Tipus d'activitat,
+  Modalitats d'interès y Municipi** llevan un desplegable que apunta a su columna de «Llistes»
+  (`Llistes!$G$2:$G$948` para los 947 municipios: un rango, no texto literal, así que no hay tope de 255
+  caracteres). **Comarca no** (D9: la deduce el municipio y, si contradice, manda el municipio). Cómo:
+  - `src/lib/excelValidacions.ts` (puro, `tests/excelValidacions.test.ts`): `xmlValidacions()` construye
+    `<dataValidations count="n">` con un `<dataValidation type="list" …>` por columna, e `insereixValidacions()`
+    lo coloca **detrás de `</sheetData>` y delante del primer elemento que el esquema OOXML (`CT_Worksheet`)
+    pone después** (`hyperlinks`, `printOptions`, `pageMargins`, `pageSetup`, `headerFooter`, `drawing`,
+    `tableParts`, `extLst`…), o antes de `</worksheet>` si no hay ninguno; falla si la hoja ya trae
+    validaciones. `featureValidacions()` lo envuelve como «feature» de `write-excel-file` 4.1.1 (transforma
+    `xl/worksheets/sheet{id}.xml` solo para la hoja indicada). Se descartó el plan B
+    (`@onparallel/write-excel-file-data-validation`): no hizo falta.
+  - `plantillaEntitats.ts`: `validacionsPlantilla(ctx)` (qué columnas y con qué rango; una lista vacía se queda
+    sin desplegable), `featurePlantilla(ctx)`, `fullesPlantilla(ctx)` (las hojas, iguales para `/browser` y
+    `/node`), `SENSE_DESPLEGABLE = ['comarca']`, `LLISTES_MULTIPLES = ['tipus_activitat','modalitats']` y
+    `FILES_AMB_DESPLEGABLE` = filas 2–302 (la de ejemplo y las 300 preparadas en formato texto).
+    `ContextPlantilla` gana `municipis`; `ImportaEntitats` los pasa con `nomLlegible` («l'Ametlla del Vallès»,
+    que `municipi_de_text()` reconoce) **ordenados por el nombre oficial** («Ametlla del Vallès, l'»), para que
+    salgan en la A y no en la L.
+  - **Avisa, no bloquea** (decisión de la sesión B2): `errorStyle="warning"`. En las listas de un valor,
+    escribir algo de fuera abre «Valor fora de la llista» (`ie.dv_titol`/`ie.dv_avis`, en el idioma de la
+    interfaz) con «Sí / No»: el lector acepta variantes que la lista no tiene (el otro idioma, sin acentos,
+    mayúsculas), y la Revisió ya avisa de lo que no reconoce. En las de varios valores separados por coma
+    (actividad, modalidades), `showErrorMessage="0"`: el desplegable solo ayuda. `showDropDown` no se escribe
+    (con `1`, Excel **esconde** la flecha).
+  - **Probado (10-11-2026)**: XML bien formado (`xmllint` en todas las partes del .xlsx, ca y es); orden de
+    hijos de `worksheet` = `sheetViews · cols · sheetData · dataValidations`. **Excel para Mac**: abre sin
+    reparar; desplegables en Rol y Municipi (los 947), aviso con Sí/No en Forma jurídica, sin aviso al escribir
+    dos actividades, Comarca sin flecha. **Numbers**: abre sin avisos y convierte cada lista en menú emergente,
+    **pero corta los menús a 250 elementos** (el de Municipi acaba en «el Palau d'Anglesola»): limitación de
+    Numbers, no del fichero; quien use Numbers escribe el municipio a mano y el importador lo reconoce igual.
+    **LibreOffice**: no está instalado en la máquina de desarrollo; sin probar.
+  - Pruebas: `tests/excelValidacions.test.ts` (letras de columna, rango con comillas, atributos, inserción
+    con y sin `pageMargins`/`drawing`, `sheetData` vacía, la feature solo toca su hoja) e
+    `importEntitats.test.ts` («la plantilla, como fichero .xlsx de verdad»: lo genera `write-excel-file/node`,
+    lo abre con `fflate` y comprueba un solo `<dataValidations>` con su `count`, orden, `sqref` 2–302, ninguno
+    en Comarca ni en las otras hojas, y que `read-excel-file` lo sigue leyendo entero). El E2E
+    `importa-entitats.e2e.ts` comprueba lo mismo en la plantilla que descarga el navegador, con los municipios
+    del clon.
 
 **Reglas de mapeo** (en `normalitzaFila`):
 - **Papeles**: manda la columna «Rol» (Ofertant · Receptor · Tots dos, y sus equivalentes en castellano). Sin

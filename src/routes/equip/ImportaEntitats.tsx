@@ -30,7 +30,7 @@ import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import { carregaTipusActivitat } from '../../lib/organitzacio'
-import { carregaMunicipis } from '../../lib/municipis'
+import { carregaMunicipis, nomLlegible } from '../../lib/municipis'
 import { dataCurta } from '../../lib/format'
 import { llegeixFitxer, type FitxerLlegit } from '../../lib/fitxerImportacio'
 import {
@@ -212,7 +212,10 @@ function Importador() {
     setGenerant(true)
     const munis = await carregaMunicipis()
     const comarques = [...new Set(munis.map((m) => m.comarca).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ca'))
-    const blob = await blobPlantilla({ t, lang, activitats, comarques })
+    // El desplegable de «Municipi» lleva el nombre como se escribe («l'Ametlla…», que el importador reconoce)
+    // pero ordenado por el oficial («Ametlla…, l'»), para que salga en la A y no en la L.
+    const municipis = [...new Set([...munis].sort((a, b) => a.nom.localeCompare(b.nom, 'ca')).map((m) => nomLlegible(m.nom)))]
+    const blob = await blobPlantilla({ t, lang, activitats, comarques, municipis })
     setGenerant(false)
     if (!blob) { toast.error(t('ie.plantilla_err')); return }
     descarregaBlob(`${t('ie.plantilla_nom')}.xlsx`, blob)
