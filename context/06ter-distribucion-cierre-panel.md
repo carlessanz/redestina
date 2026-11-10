@@ -2291,3 +2291,51 @@ formulario y su prefill (la ficha ya no se carga para eso en `DiagnosticDetall`)
 principales, causas, acciones, «Ja no és principal», «Feta» desde Gestió interna, lectura del productor y cruce con
 las ofertas por SQL; restaura el fixture del arnés con `tests/e2e/fixtureDiagnostic.ts`), `diagnostic-pdf.e2e.ts` y
 `pla-prevencio.e2e.ts`.
+
+### Naturalesa y perfil de recepción por tipología (Plan 2, A5, `20270523100000`, 10-11-2026)
+
+- `components/fitxa/SelectorNaturalesa`: desplegable + badge «Suggerida»/«Confirmada» + «Confirma-la». Con `orgId`
+  guarda al momento por `fixar_naturalesa()`. Tres sitios: «Dades de l'entitat» de la ficha del equipo (`EntitatDetall`,
+  bloque de identidad), «Nova entitat» (sin organización: enseña la sugerencia del NIF y la forma que se van tecleando;
+  si el equipo elige una, se fija confirmada justo después de `crear_entitat`) y «La meva organització» (titular; con la
+  confirmada, solo lectura y «parla amb l'equip»).
+- **Perfil por naturalesa (2.8)**: `campsPerfil(naturalesa, tipo)` en `lib/perfilReceptor.ts`. Entitat social: persones
+  ateses, famílies ateses, tipus d'atenció. Empresa: activitat/sector, quantitat per comanda, requisits de qualitat,
+  format, rang de preu, logística (y nada social). Transformador y animal suman su bloque propio. Sin naturalesa
+  confirmada, el bloque del tipo, como antes. Lo que deja de pintarse se queda en `perfil_receptor`.
+- Chips «Modalitats d'interès» (`modalitatsInteresDe`): social donació·compra; empresa compra·maquila; sin confirmar, las
+  tres. Lo ya marcado se sigue enseñando.
+- `PerfilRecepcio` dice la naturalesa en una línea (`naturalesa-perfil`) y pinta por la confirmada.
+- `FormulariInteresAssistit` lee `modalitat_naturalesa_compat` y la naturalesa de cada entidad y no ofrece lo que
+  `comprova_interes()` va a rechazar (`modalitatsDeLaNaturalesa`).
+- E2E `tests/e2e/perfil-recepcio.e2e.ts` (clon, escritorio): sugerida no cambia nada; el titular confirma y queda
+  bloqueado; empresa confirmada sin donación en Mercat ni interés y con perfil comercial; el equipo la cambia.
+
+### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
+
+- **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y
+  `/equip/ofertes/:id`): ámbito, fecha, anexo, «Excloses», revisión y envío manual; el ofertante, en
+  «Els meus certificats» y en su oferta.
+- **Circuito de firma (05-11)**: `DialegSignaDocument` («Signa aquí» / «Puja'l signat»; el equipo solo
+  sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) decide el botón**.
+  «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
+  «Envia per correu» con «Inclou l'enllaç per signar».
+- **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
+
+
+- **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió («Canviarà» por fila, «dubtosa» con candidatos) →
+  Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
+  operatiu: el equipo lo contesta en `/equip/diagnostics/productor/:id` (expediente arriba; secciones Operativa ·
+  Excedents · Accions, A3; Accions también en «Gestió interna»); ficha y «El meu diagnòstic» lo leen y descargan en
+  PDF (`diagnostic-pdf`, sin fila en `documentos`, D2), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
+
+- **Gestión autónoma del super_admin**: convenio
+  **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
+  paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
+  **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
+  `components/equip/fases/`) sobre las RPC reales (`tests/e2e/paritat-assistida.e2e.ts`).
+
+
+- **Plan 1 sobre la ficha** (detalle en `context/06ter`): «Nova entitat» (1B, `cerca_entitats` → `crear_entitat`),
+  «Dona-li accés» (1D, `fitxa/AccesEntitat`), «Gestió interna» (1F + 1.5, `fitxa/NotesInternes`) y, sin que la
+  entidad entre, convenio por correo (`fitxa/ConveniFitxa`), RGPD, albarán por correo y correos con consentimiento.

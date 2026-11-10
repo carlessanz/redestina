@@ -11,6 +11,7 @@ import { useT } from '../../lib/i18n'
 import { dataCurta } from '../../lib/format'
 import { carregaMunicipis } from '../../lib/municipis'
 import { TIPUS_EMPRESA } from '../../lib/perfilReceptor'
+import { modalitatsInteresDe, type Naturalesa } from '../../lib/naturalesa'
 import { potEditar, type CampFitxa, type Veu } from '../../lib/campsFitxa'
 import type { TipusActivitat } from '../../lib/organitzacio'
 import SelectorMunicipi from '../SelectorMunicipi'
@@ -23,7 +24,6 @@ import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
 
-const MODALITATS = ['donacio', 'venda', 'maquila'] as const
 
 export interface PropsBlocCamps {
   camps: readonly CampFitxa[]
@@ -47,10 +47,12 @@ export interface PropsBlocCamps {
   placeholderNom?: string
   /** Pantalla ancha (la ficha del equipo, `ample`): tres columnas desde `lg`. */
   tresColumnes?: boolean
+  /** A5 (2.8): la naturalesa de la organización acota las «Modalitats d'interès» que se ofrecen. */
+  naturalesa?: Naturalesa | null
 }
 
 export default function BlocCamps({
-  camps, valors, onChange, veu, potEditar: potEditarTot, errors = {}, idPrefix, activitats = [], discrepancies = {}, placeholderNom, tresColumnes = false,
+  camps, valors, onChange, veu, potEditar: potEditarTot, errors = {}, idPrefix, activitats = [], discrepancies = {}, placeholderNom, tresColumnes = false, naturalesa = null,
 }: PropsBlocCamps) {
   const { t, lang } = useT()
   const idDe = (c: CampFitxa) => `${idPrefix}-${c.clau}`
@@ -198,7 +200,8 @@ export default function BlocCamps({
     if (tp === 'xips_modalitats') {
       return (
         <XipsTria etiquetaId={`${id}-l`} disabled={disabled}
-          opcions={MODALITATS.map((m) => ({ valor: m, text: t(`org.mi_${m === 'venda' ? 'compra' : m}`) }))}
+          opcions={modalitatsInteresDe(naturalesa, Array.isArray(v) ? (v as string[]) : [])
+            .map((m) => ({ valor: m, text: t(`org.mi_${m === 'venda' ? 'compra' : m}`) }))}
           triats={Array.isArray(v) ? (v as string[]) : []}
           onChange={(nv) => onChange(c.clau, nv)} />
       )

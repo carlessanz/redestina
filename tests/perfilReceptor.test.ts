@@ -6,7 +6,7 @@
 
 import { describe, it, expect } from 'vitest'
 import { errorCorreu, errorCp, errorNif, errorTelefon, normalitzaTelefon, varietatSemblaQuantitat } from '../src/lib/validacio'
-import { PERFIL_RECEPTOR, TIPUS_EMPRESA, clausPerfil } from '../src/lib/perfilReceptor'
+import { CLAUS_SOCIALS, PERFIL_NATURALESA, PERFIL_RECEPTOR, TIPUS_EMPRESA, campsPerfil, clausPerfil } from '../src/lib/perfilReceptor'
 import { DICTS } from '../src/lib/i18n'
 
 describe('NIF, NIE y CIF, con su control', () => {
@@ -69,6 +69,37 @@ describe('los campos por tipo de receptor', () => {
         else expect(c.opcions, c.clau).toBeUndefined()
       }
     }
+  })
+})
+
+describe('el perfil por naturalesa (A5, 2.8)', () => {
+  const claus = (n: string | null, t: string | null) => campsPerfil(n, t).map((c) => c.clau)
+
+  it('sin naturalesa, los campos del tipo de receptor, como antes', () => {
+    for (const t of Object.keys(PERFIL_RECEPTOR)) expect(claus(null, t)).toEqual(PERFIL_RECEPTOR[t].map((c) => c.clau))
+    expect(claus(null, null)).toEqual([])
+  })
+
+  it('a una empresa nunca se le pregunta nada social, sea cual sea el tipo', () => {
+    for (const t of [...Object.keys(PERFIL_RECEPTOR), null]) {
+      for (const c of claus('empresa', t)) expect(CLAUS_SOCIALS.has(c), `${t}: ${c}`).toBe(false)
+    }
+  })
+
+  it('empresa: productos, cantidades, calidad, formato, precio y logística', () => {
+    expect(claus('empresa', 'comercial')).toEqual(
+      ['activitat', 'quantitat_comanda', 'requisits_qualitat', 'format', 'rang_preu', 'logistica'])
+  })
+
+  it('entidad social: personas y familias atendidas y tipo de atención', () => {
+    expect(claus('entitat_social', 'social')).toEqual(['persones_ateses', 'families_ateses', 'tipus_atencio'])
+  })
+
+  it('transformador y animal suman su bloque propio, sin repetir', () => {
+    const c = claus('empresa', 'transformador')
+    expect(c.slice(0, PERFIL_NATURALESA.empresa.length)).toEqual(PERFIL_NATURALESA.empresa.map((x) => x.clau))
+    expect(new Set(c).size).toBe(c.length)
+    expect(c.length).toBeGreaterThan(PERFIL_NATURALESA.empresa.length)
   })
 })
 

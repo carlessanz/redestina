@@ -1,4 +1,5 @@
 import type { EstatCrm } from './lib/estatCrm'
+import type { Naturalesa, OrigenNaturalesa } from './lib/naturalesa'
 import type { BlocExcedentsLlegible } from '../supabase/functions/_shared/excedentsLlegible.ts'
 
 export interface WaContact {
@@ -132,6 +133,9 @@ export interface OrganizacioVista {
   // --- B1 (20270518100000): estado CRM por papel; null si no tiene ese papel ---
   productor_estat_crm: EstatCrm | null
   entidad_estat_crm: EstatCrm | null
+  // --- A5 (20270523100000): naturalesa de la organización (2.7) y si está confirmada ---
+  naturalesa?: Naturalesa | null
+  naturalesa_origen?: OrigenNaturalesa | null
 }
 
 /**

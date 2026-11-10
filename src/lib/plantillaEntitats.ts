@@ -29,6 +29,7 @@ import {
 import { featureValidacions, rangLlista, type ValidacioLlista } from './excelValidacions'
 import { MODALITATS_IDS } from './modalitats'
 import { TIPUS_EMPRESA } from './perfilReceptor'
+import { NATURALESES } from './naturalesa'
 
 type Traductor = (clau: string, params?: Record<string, string | number>) => string
 
@@ -49,7 +50,7 @@ export const NOM_FULLA = { entitats: 'Entitats', instruccions: 'Instruccions', l
 /** Las columnas que salen en la plantilla, en su orden. */
 export const COLUMNES_DE_PLANTILLA: readonly ColumnaPlantilla[] = COLUMNES_PLANTILLA.filter((c) => c.plantilla)
 
-export const LLISTES: readonly Llista[] = ['rol', 'tipo_receptor', 'tipus_empresa', 'tipus_activitat', 'modalitats', 'comarca', 'municipi']
+export const LLISTES: readonly Llista[] = ['rol', 'tipo_receptor', 'tipus_empresa', 'tipus_activitat', 'modalitats', 'comarca', 'municipi', 'naturalesa']
 
 /** Las listas que NO llevan desplegable en «Entitats» (D9: la comarca sale del municipio). */
 export const SENSE_DESPLEGABLE: readonly Llista[] = ['comarca']
@@ -71,6 +72,7 @@ export function valorsLlista(llista: Llista, ctx: ContextPlantilla): string[] {
     case 'modalitats': return MODALITATS_IDS.map((m) => t(`od.mod_${m}`))
     case 'comarca': return [...ctx.comarques]
     case 'municipi': return [...ctx.municipis]
+    case 'naturalesa': return NATURALESES.map((n) => t(`nat.${n}`))
   }
 }
 
@@ -95,6 +97,7 @@ export function dadesPlantilla(ctx: ContextPlantilla): { nom: string; data: Shee
     : c.clau === 'rols' ? 'ie.falta_rols'
       : c.clau === 'redestina_id' ? 'ie.falta_redestina_id'
         : c.clau === 'data_alta' ? 'ie.falta_data_alta'
+          : c.clau === 'naturalesa' ? 'ie.falta_naturalesa'
           : c.etiquetaNota ? 'ie.falta_nota' : 'ie.falta_opcional')
   const instruccions: SheetData = [
     [negreta(t('ie.pl_titol'))],

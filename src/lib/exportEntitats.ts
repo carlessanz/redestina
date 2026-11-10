@@ -29,6 +29,7 @@ import { TIPUS_EMPRESA } from './perfilReceptor'
 import {
   COLUMNES_DE_PLANTILLA, dadesPlantilla, NOM_FULLA, validacionsPlantilla, type ContextPlantilla,
 } from './plantillaEntitats'
+import { esNaturalesa } from './naturalesa'
 
 /** Una fila de `exportar_entitats()` (migración 20270518110000). */
 export interface FilaExportacio {
@@ -54,6 +55,8 @@ export interface FilaExportacio {
   airtable_id: string | null
   /** Texto: `AAAA-MM-DD` o lo que se importó del Excel (a veces solo el año). */
   data_alta: string | null
+  /** A5 (20270523100000): solo la CONFIRMADA (la sugerida no se exporta: reimportarla la confirmaría). */
+  naturalesa?: string | null
   estat_crm_productor: string | null
   estat_crm_entidad: string | null
 }
@@ -120,6 +123,7 @@ export function valorsFila(f: FilaExportacio, ctx: ContextPlantilla): Partial<Re
   posa('airtable_id', f.airtable_id)
   posa('redestina_id', f.organizacion_id)
   posa('data_alta', f.data_alta)
+  posa('naturalesa', esNaturalesa(f.naturalesa) ? t(`nat.${f.naturalesa}`) : null)
   return out
 }
 

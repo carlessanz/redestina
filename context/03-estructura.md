@@ -185,7 +185,10 @@ src/
                                sin +), correo y CP. Devuelve claves i18n. Y `varietatSemblaQuantitat()`,
                                el aviso del alta de oferta cuando la variedad es un número (05-10-2026)
     perfilReceptor.ts          Los campos propios de cada tipo de receptor (listas cerradas) que van
-                               a `entidades.perfil_receptor`, y los tipos de empresa
+                               a `entidades.perfil_receptor`, y los tipos de empresa. Desde A5,
+                               `campsPerfil(naturalesa, tipo)`: el bloque según la naturalesa confirmada
+    naturalesa.ts              PURO, con test (A5): la naturalesa (entitat_social/empresa), su sugerencia
+                               por NIF (espejo de `naturalesa_suggerida()`), `naturalesaEfectiva`, chips y P8
     municipis.ts               El nomenclátor (`municipios`) cargado una vez por sesión, y el nombre
                                oficial vuelto legible («l'Ametlla del Vallès»)
     campsFitxa.ts              PURO, con test: LA definición de campos de la ficha de una organización
@@ -285,7 +288,7 @@ src/
     Dashboard.tsx              Tablero = cola de trabajo: Pendent de l'equip, Com funciona, KPIs (§6ter)
     OffersList.tsx             Ofertas con kg en vivo (Realtime) + buscador; pestañas Actives/Tancades/Totes
     OfferDetail.tsx            Detalle: priorización, canalizaciones, opt-in, cierre, cancelar
-    fitxa/                     Los bloques de la ficha única (1C): BlocCamps (los campos de un bloque,
+    fitxa/                     Los bloques de la ficha única (1C) y SelectorNaturalesa (A5): BlocCamps (los campos de un bloque,
                                para el equipo y para el actor), BlocRols (activar/desactivar/añadir papel),
                                CanalPreferit, Consentiments (RGPD: los ve y los PIDE por correo, 04-11-2026),
                                ConveniFitxa (el convenio por correo, en papel o declarado), EnllacPerCopiar

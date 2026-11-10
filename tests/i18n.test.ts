@@ -238,6 +238,10 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // Los códigos de `diagnostic_falten_productor()` (el tipo, antes de `:`), compuestos en
     // `textFalta()` de `lib/excedentsDiagnostic.ts` (resumen y formulario del diagnóstico).
     { que: 'diagnostic_falten_productor()', prefijo: 'dexc.falta_', valores: ['operativa_productes', 'operativa_principals', 'operativa_lloc', 'excedents', 'dades'] },
+    // La naturalesa (A5, 20270523100000): CHECK de `organizaciones.naturalesa`, compuesto en el
+    // selector, el perfil de recepción, la plantilla y la exportación.
+    { que: 'organizaciones.naturalesa', prefijo: 'nat.', valores: ['entitat_social', 'empresa'] },
+    { que: 'organizaciones.naturalesa (perfil)', prefijo: 'nat.perfil_', valores: ['entitat_social', 'empresa'] },
     {
       // CHECK de `avisos.tipus` (ampliado en 20270416100000 y 20270417100100). Se compone en
       // `CampanaAvisos.tsx` (`avis.t_${tipus}`): el caso `od.ch_asistido` exacto —un tipo nuevo

@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (Plan 2 A5, naturalesa, `20270523100000`): se abren la 176, la 177 y la 178**: **83 vivas** y la siguiente entrada nueva es la 179.
 ⚠️ **10-11-2026 (Plan 2 A3, excedentes del diagnóstico, `20270522100000`): se abre la 175**: **80 vivas** y la siguiente entrada nueva es la 176.
 ⚠️ **10-11-2026 (Plan 2 A1, diagnóstico único, `20270520100000`): se abre la 174**: **79 vivas** y la siguiente entrada nueva es la 175.
 ⚠️ **10-11-2026 (Plan 2 B3, exportación a Excel, `20270518110000`): se abre la 173**: **78 vivas** y la siguiente entrada nueva es la 174.
@@ -902,3 +903,16 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      de las funciones (y retirar del arnés los 14 checks de `questionaris_diagnostic`/`questionari_vigent` de las cuentas
      externas, que desde A3 salen «sin datos») cuando Carles lo autorice. Las tablas, con la 174. Precio: una migración
      pequeña.
+176. **`priorizar-entidades` no mira la naturalesa** (10-11-2026, Plan 2 A5, `20270523100000`). El ranking
+     (`_shared/priorizacion.ts`) filtra por `tipo_receptor` pero no por `modalitat_naturalesa_compat`: puede proponer una
+     donación a una empresa con la naturalesa confirmada. No se rompe nada (el envío es una propuesta y
+     `comprova_interes()` rechaza el interés), pero sobra. Precio: leer la regla y la naturalesa en la función y
+     redesplegarla.
+177. **NIF F, H y V sin sugerencia de naturalesa** (10-11-2026, Plan 2 A5). Cooperativas (F), comunidades (H) y «otros»
+     (V) pueden ser social o empresa; sin forma jurídica que lo diga quedan sin sugerencia y las tiene que confirmar una
+     persona. Decisión de la sesión frente al «G·R·F» del plan; si la Fundació quiere F → social, es una línea en
+     `naturalesa_suggerida()` y su espejo.
+178. **Una empresa confirmada de tipo `animal` no tiene nada compatible** (10-11-2026, Plan 2 A5). `animal` solo admite
+     donación y P8 se la quita a una empresa: no ve nada en el Mercat. Es coherente con P8 pero probablemente no es lo
+     que se quiere (una granja que compra pienso). Decidir con la Fundació si `animal` admite compra o si la naturalesa
+     no se aplica a ese tipo.

@@ -43,6 +43,7 @@ import BlocCamps from '../components/fitxa/BlocCamps'
 import CanalPreferit, { type TriaCanal } from '../components/fitxa/CanalPreferit'
 import LlocsRecollida from '../components/LlocsRecollida'
 import RolRedestina from '../components/RolRedestina'
+import SelectorNaturalesa, { type ValorNaturalesa } from '../components/fitxa/SelectorNaturalesa'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -100,6 +101,9 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
   const [valors, setValors] = useState<Fila>({})
   const [canal, setCanal] = useState<TriaCanal>('auto')
   const [canalDesat, setCanalDesat] = useState<TriaCanal>('auto')
+  /** A5: la naturalesa vive en la organización; el titular la confirma mientras no lo esté. */
+  const [orgId, setOrgId] = useState<string | null>(null)
+  const [nat, setNat] = useState<ValorNaturalesa>({ naturalesa: null, origen: null })
   const [carregant, setCarregant] = useState(true)
   const [desant, setDesant] = useState(false)
   const [errors, setErrors] = useState<Record<string, string>>({})
@@ -143,6 +147,8 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
     setErrors({})
     setCanal('auto')
     setCanalDesat('auto')
+    setOrgId(null)
+    setNat({ naturalesa: null, origen: null })
     if (!idOrganitzacio) { setCarregant(false); return }
     let viu = true
     void (async () => {
@@ -157,13 +163,17 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
         setValors(v)
       }
       // La preferencia vive en la organización, no en la ficha (§4).
-      const orgId = (f?.organizacion_id as string | null) ?? null
-      if (orgId) {
-        const { data: org } = await supabase.from('organizaciones').select('id, canal_preferido').eq('id', orgId).maybeSingle()
+      const idOrgFitxa = (f?.organizacion_id as string | null) ?? null
+      if (idOrgFitxa) {
+        const { data: org } = await supabase.from('organizaciones')
+          .select('id, canal_preferido, naturalesa, naturalesa_origen').eq('id', idOrgFitxa).maybeSingle()
         if (!viu) return
-        const tria = ((org as { canal_preferido: TriaCanal | null } | null)?.canal_preferido ?? 'auto') as TriaCanal
+        const o = org as { canal_preferido: TriaCanal | null; naturalesa: ValorNaturalesa['naturalesa']; naturalesa_origen: ValorNaturalesa['origen'] } | null
+        const tria = (o?.canal_preferido ?? 'auto') as TriaCanal
         setCanal(tria)
         setCanalDesat(tria)
+        setOrgId(idOrgFitxa)
+        setNat({ naturalesa: o?.naturalesa ?? null, origen: o?.naturalesa_origen ?? null })
       }
       setCarregant(false)
     })()
@@ -305,6 +315,11 @@ export default function PerfilOrganitzacio({ tipus }: { tipus: 'productor' | 'en
                       // Hay fichas con el nombre de la organización en `name` y `empresa` vacío: se
                       // sugiere, sin escribirlo, para que no parezca que no hay.
                       placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
+                    {/* A5: la naturalesa (sugerida por el NIF); el titular la confirma una vez. */}
+                    {b.bloc === 'identitat' && (
+                      <SelectorNaturalesa orgId={orgId} valor={nat} onCanviat={setNat} potEditar={potEditar && orgId !== null}
+                        esEquip={false} idPrefix={`po-${tipus}`} />
+                    )}
                     {/* El tipo de receptor decide qué ofertas ve: lo fija el equipo, y se dice. */}
                     {b.bloc === 'identitat' && tipus === 'entidad' && (
                       <p className="text-sm text-muted-foreground">

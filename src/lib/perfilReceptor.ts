@@ -93,13 +93,61 @@ export const PREFERENCIES_RECEPCIO: readonly CampPerfil[] = [
 ]
 export const CLAUS_PREFERENCIES = new Set(PREFERENCIES_RECEPCIO.map((c) => c.clau))
 
+/**
+ * 2.8 · PERFIL POR NATURALESA (Plan 2 A5, 10-11-2026). Desde que la organización tiene naturalesa
+ * (`lib/naturalesa.ts`, sugerida o confirmada), el bloque propio del perfil sale de AQUÍ y no del
+ * tipo de receptor:
+ *   · entitat social → a quién atiende (persones/famílies ateses, tipus d'atenció);
+ *   · empresa        → perfil comercial: actividad, cantidad por pedido, requisitos de calidad
+ *                      (calidad, calibre, variedad), formato, rango de precio, logística.
+ * Los productos, la cantidad habitual y la frecuencia ya son PREFERENCIES_RECEPCIO (comunes), así
+ * que no se repiten. Las claves reutilizan las de `PERFIL_RECEPTOR` donde significan lo mismo: lo
+ * que una receptora ya rellenó por su tipo se sigue viendo. A una empresa no se le pinta ningún
+ * campo social (`CLAUS_SOCIALS`).
+ */
+export const PERFIL_NATURALESA: Record<'entitat_social' | 'empresa', readonly CampPerfil[]> = {
+  entitat_social: PERFIL_RECEPTOR.social.filter((c) => ['persones_ateses', 'families_ateses', 'tipus_atencio'].includes(c.clau)),
+  empresa: [
+    PERFIL_RECEPTOR.comercial.find((c) => c.clau === 'activitat')!,
+    { clau: 'quantitat_comanda', tipus: 'numero', unitatKey: 'pr.u_kg' },
+    { clau: 'requisits_qualitat', tipus: 'text' },
+    { clau: 'format', tipus: 'text' },
+    { clau: 'rang_preu', tipus: 'text' },
+    { clau: 'logistica', tipus: 'multi', opcions: LOGISTICA },
+  ],
+}
+
+/** Los campos que solo tienen sentido para una entidad social (a una empresa, nunca). */
+export const CLAUS_SOCIALS: ReadonlySet<string> = new Set(PERFIL_NATURALESA.entitat_social.map((c) => c.clau))
+
+/** Los tipos de receptor cuyo bloque propio se SUMA al de la naturalesa: dicen qué hace con el
+ *  excedente, no quién es (social y comercial son la misma pregunta que la naturalesa). */
+const TIPUS_AMB_BLOC_PROPI: ReadonlySet<string> = new Set(['transformador', 'animal'])
+
+/**
+ * Los campos propios del perfil de recepción (sin las preferencias comunes, que van aparte):
+ *   · sin naturalesa → los del tipo de receptor, como antes de A5;
+ *   · con naturalesa → los de la naturalesa y, si el tipo es transformador o animal, los de ese
+ *     tipo que no estén ya (y, a una empresa, ninguno social).
+ */
+export function campsPerfil(naturalesa: string | null | undefined, tipusReceptor: string | null | undefined): readonly CampPerfil[] {
+  const delTipus = PERFIL_RECEPTOR[tipusReceptor ?? ''] ?? []
+  if (naturalesa !== 'entitat_social' && naturalesa !== 'empresa') return delTipus
+  const base = PERFIL_NATURALESA[naturalesa]
+  const claus = new Set(base.map((c) => c.clau))
+  const extra = TIPUS_AMB_BLOC_PROPI.has(tipusReceptor ?? '')
+    ? delTipus.filter((c) => !claus.has(c.clau) && !(naturalesa === 'empresa' && CLAUS_SOCIALS.has(c.clau)))
+    : []
+  return [...base, ...extra]
+}
+
 /** Los tipos de empresa o entidad, lista cerrada (y el check de la RPC los repite). */
 export const TIPUS_EMPRESA = ['cooperativa', 'sat', 'sc', 'cb', 'sl', 'sa', 'autonom', 'fundacio', 'associacio', 'altres'] as const
 
 /** Todas las claves i18n que usa este módulo: para la prueba de cobertura. */
 export function clausPerfil(): string[] {
   const claus = new Set<string>()
-  for (const camps of [...Object.values(PERFIL_RECEPTOR), PREFERENCIES_RECEPCIO]) {
+  for (const camps of [...Object.values(PERFIL_RECEPTOR), ...Object.values(PERFIL_NATURALESA), PREFERENCIES_RECEPCIO]) {
     for (const c of camps) {
       claus.add(`pr.${c.clau}`)
       for (const o of c.opcions ?? []) claus.add(`pr.o_${o}`)

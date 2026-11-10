@@ -325,6 +325,7 @@ interface Check {
    *   · `@meva_fitxa_productor` / `@meva_fitxa_entitat` → la ficha propia de ese tipo,
    *                              leída de la propia membresía (20270414100600: lo que
    *                              `convenio_vigente()` sí responde a una cuenta externa).
+   *   · `@meva_organitzacio`  → la organización propia (A5; la RLS le enseña solo la suya).
    *   · `@meva_accio_diagnostic` → una acción del diagnóstico que la cuenta VE (A3: la RLS le
    *                              da las de su ficha). Uuid nulo si no ve ninguna.
    */
@@ -541,6 +542,22 @@ const FIRMA_EXTERN: Check[] = [
 //     ninguna sesión: 42501 «permission denied for function».
 //
 // Las lecturas «permitir» llevan `requiereFixture`: sin ninguna importación hecha, 0 filas.
+// Plan 2, A5 (20270523100000): naturalesa de la organización. Para todas las cuentas.
+//   · `modalitat_naturalesa_compat` es catálogo (como `modalitat_receptor_compat`): se lee, no se escribe.
+//   · `refresca_naturalesa_suggerida` solo la ejecutan los triggers (service_role).
+//   · `naturalesa_suggerida` es pura (NIF + forma jurídica → sugerencia): cualquiera la llama.
+//   · `organizaciones` no tiene GRANT de UPDATE: la naturalesa solo cambia por `fixar_naturalesa`.
+// Lo que la naturalesa CONFIRMADA cambia en el Mercat (una empresa no ve donaciones, P8) no se
+// mide aquí: exigiría confirmar la de una ficha de prueba y cambiaría lo que ven las cuentas
+// receptoras. Lo cubren el E2E `perfil-recepcio.e2e.ts` (clon) y la verificación SQL de A5.
+const NATURALESA_COMUNS: Check[] = [
+  { tabla: "modalitat_naturalesa_compat", op: "leer", esperado: "permitir", descripcion: "llegeix la regla naturalesa ↔ modalitat (cataleg, P8) (A5)" },
+  { tabla: "modalitat_naturalesa_compat", op: "insertar", esperado: "denegar", descripcion: "NO escriu la regla naturalesa ↔ modalitat (A5)" },
+  { tabla: "naturalesa_suggerida", op: "rpc", esperado: "permitir", args: { p_nif: "B12345674", p_forma: null }, descripcion: "calcula el suggeriment de naturalesa (funcio pura) (A5)" },
+  { tabla: "refresca_naturalesa_suggerida", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO recalcula el suggeriment directament (nomes els triggers) (A5)" },
+  { tabla: "organizaciones", op: "actualizar", esperado: "denegar", descripcion: "NO escriu la naturalesa a ma (nomes fixar_naturalesa) (A5)" },
+];
+
 const IMPORTACIO_INTERNES: Check[] = [
   {
     tabla: "alta_fitxa_interna",
@@ -964,6 +981,11 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Plan 2, B1 (20270518100000): el estado CRM por papel es de `pot_aprovar()`.
   { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "actiu" }, descripcion: "NO canvia l'estat CRM de cap fitxa" },
   { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "en_desenvolupament" }, descripcion: "NO canvia l'estat CRM de cap ofertant" },
+  // Plan 2, A5 (20270523100000): la naturalesa la confirma el equipo o el titular de ESA
+  // organización; un uuid inventado da 42501 (el permiso va antes que la existencia). La regla
+  // naturalesa ↔ modalidad (P8) es catálogo; el recálculo de la sugerencia es interno.
+  ...NATURALESA_COMUNS,
+  { tabla: "fixar_naturalesa", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "NO fixa la naturalesa d'una organitzacio que no es seva (A5)" },
   { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
   { tabla: "fitxa_estat_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial d'estats de les fitxes" },
@@ -1697,6 +1719,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
     // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
     { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
+    // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
+    // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
+    ...NATURALESA_COMUNS,
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -2056,6 +2083,11 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
     // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
     { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
+    // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
+    // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
+    ...NATURALESA_COMUNS,
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
     // Plan 1, 1F (20270502100000): con ids inventados, 22023 (`organitzacio_inexistent`,
     // `nota_inexistent`): la guarda dejó pasar sin escribir ni borrar nada.
@@ -2798,6 +2830,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_productor", p_dades: { varietats: "no_es_un_objecte" } }, descripcion: "les varietats van per producte: una forma equivocada es 22023 (A4)" },
     // `fixar_lloc_principal`: con ficha de productor, un uuid inventado llega a la existencia.
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el seu lloc principal (autoritza; 22023 lloc_inexistent) (A4)" },
+    // A5 (20270523100000): el titular puede confirmar la naturalesa de SU organización (mientras
+    // no la haya confirmado el equipo). Sin escribir nada: un valor raro tiene que pasar la
+    // guarda y caer en 22023 `naturalesa_desconeguda`.
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "@meva_organitzacio", p_naturalesa: "no_existeix" }, descripcion: "pot fixar la naturalesa de la SEVA organitzacio (autoritza; 22023 amb un valor desconegut) (A5)" },
     { tabla: "productor_ubicaciones", op: "leer", esperado: "permitir", columnas: "id, es_principal, dies_setmana, franges", descripcion: "veu els dies i franges dels SEUS llocs (A4)", requiereFixture: "algun lloc de recollida de la seva fitxa" },
     // A3 (20270522100000): LEE los excedentes de su diagnóstico y no los escribe (D5), ni por
     // RPC sobre lo suyo ni por UPDATE directo. Los argumentos, inofensivos si la guarda fallara
@@ -3048,6 +3084,10 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
     // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
+    // A5 (20270523100000): el titular puede confirmar la naturalesa de SU organización (mientras
+    // no la haya confirmado el equipo). Sin escribir nada: un valor raro tiene que pasar la
+    // guarda y caer en 22023 `naturalesa_desconeguda`.
+    { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "@meva_organitzacio", p_naturalesa: "no_existeix" }, descripcion: "pot fixar la naturalesa de la SEVA organitzacio (autoritza; 22023 amb un valor desconegut) (A5)" },
     // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
     ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
     ...DOCUMENTAL_EXTERN,
@@ -3179,6 +3219,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
 // Cuerpos mínimos para probar un INSERT que DEBE fallar. Nunca llegan a la base si
 // la política está bien; si llegara, la fila se borra en el `finally`.
 const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
+  // A5: una fila VÁLIDA de la regla, para que el rechazo sea el GRANT y no una columna que no existe.
+  modalitat_naturalesa_compat: { modalitat: "donacio", naturalesa: "empresa" },
   excedentes: { producto: "TEST-RLS", estado: "borrador" },
   excedente_destins: { excedente_id: "00000000-0000-0000-0000-000000000000", desti_codi: "venda", kg: 1, origen: "productor" },
   canalizaciones: { kg_confirmados: 1 },
@@ -3357,6 +3399,8 @@ const COLUMNA_INOCUA: Record<string, string> = {
   diagnostic_productes: "observacions",
   diagnostic_excedents: "detall",
   diagnostic_accions: "notes",
+  // A5 (20270523100000): sin GRANT de UPDATE para `authenticated` (42501 antes de mirar filas).
+  organizaciones: "naturalesa",
 };
 
 /**
@@ -3439,6 +3483,10 @@ async function resolverArgs(
       const { data } = await cliente.from("membresias").select(col)
         .not(col, "is", null).limit(1).maybeSingle();
       salida[clave] = (data as Record<string, string> | null)?.[col] ?? UUID_NULO;
+    } else if (valor === "@meva_organitzacio") {
+      // A5: la organización PROPIA (la RLS de `organizaciones` solo le enseña la suya).
+      const { data } = await cliente.from("organizaciones").select("id").limit(1).maybeSingle();
+      salida[clave] = (data as { id: string } | null)?.id ?? UUID_NULO;
     } else if (valor === "@meva_accio_diagnostic") {
       // A3: una acción del diagnóstico visible para esta sesión (la suya, por RLS). Así la
       // denegación se mide sobre una fila que EXISTE, no solo sobre un uuid inventado.

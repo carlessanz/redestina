@@ -18,7 +18,8 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { useOrganitzacio } from '../hooks/useAppContext'
-import { CLAUS_PREFERENCIES, PERFIL_RECEPTOR, PREFERENCIES_RECEPCIO } from '../lib/perfilReceptor'
+import { CLAUS_PREFERENCIES, PREFERENCIES_RECEPCIO, campsPerfil } from '../lib/perfilReceptor'
+import { modalitatsInteresDe, naturalesaEfectiva, type Naturalesa, type OrigenNaturalesa } from '../lib/naturalesa'
 import CampsPerfilReceptor from '../components/CampsPerfilReceptor'
 import CarregantSeccio from '../components/CarregantSeccio'
 import XipsTria from '../components/XipsTria'
@@ -29,6 +30,8 @@ interface FilaRecepcio {
   tipo_receptor: string | null
   perfil_receptor: Record<string, unknown> | null
   modalitats_interes: string[] | null
+  /** A5: la naturalesa vive en la organización (la RLS le enseña la suya). */
+  organizaciones: { naturalesa: Naturalesa | null; naturalesa_origen: OrigenNaturalesa | null } | null
 }
 
 export default function PerfilRecepcio() {
@@ -48,7 +51,7 @@ export default function PerfilRecepcio() {
     let viu = true
     setCarregant(true)
     void supabase.from('entidades')
-      .select('tipo_receptor, perfil_receptor, modalitats_interes')
+      .select('tipo_receptor, perfil_receptor, modalitats_interes, organizaciones(naturalesa, naturalesa_origen)')
       .eq('id', idOrg).maybeSingle()
       .then(({ data, error: e }) => {
         if (!viu) return
@@ -79,7 +82,12 @@ export default function PerfilRecepcio() {
   if (error || !fila) return <p className="text-sm text-destructive">{t('org.err_load')}</p>
 
   const tipusReceptor = fila.tipo_receptor ?? ''
-  const campsTipus = (PERFIL_RECEPTOR[tipusReceptor] ?? []).filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
+  // A5 (2.8): con la naturalesa CONFIRMADA, el bloque propio y los chips se pintan según ella (a
+  // una empresa no se le pregunta nada social); sugerida o sin ella, según el tipo, como antes.
+  const naturalesa = fila.organizaciones?.naturalesa ?? null
+  const origen = fila.organizaciones?.naturalesa_origen ?? null
+  const efectiva = naturalesaEfectiva(naturalesa, origen)
+  const campsTipus = campsPerfil(efectiva, tipusReceptor).filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
 
   return (
     <Card>
@@ -103,11 +111,8 @@ export default function PerfilRecepcio() {
           <div>
             <p id="pr-mod-int-l" className="mb-1.5 text-xs text-muted-foreground">{t('org.f_modalitats_interes')}</p>
             <XipsTria etiquetaId="pr-mod-int-l" disabled={!potEditar}
-              opcions={[
-                { valor: 'venda', text: t('org.mi_compra') },
-                { valor: 'donacio', text: t('org.mi_donacio') },
-                { valor: 'maquila', text: t('org.mi_maquila') },
-              ]}
+              opcions={modalitatsInteresDe(efectiva, modalitats)
+                .map((m) => ({ valor: m, text: t(`org.mi_${m === 'venda' ? 'compra' : m}`) }))}
               triats={modalitats}
               onChange={setModalitats} />
             <p className="mt-1 text-xs text-muted-foreground">{t('org.h_modalitats_interes')}</p>
@@ -120,15 +125,22 @@ export default function PerfilRecepcio() {
           <section className="space-y-3 border-t border-border pt-6">
             <div>
               <h3 className="text-base font-semibold">{t('precep.sec_condicions')}</h3>
-              <p className="mt-1 text-sm text-muted-foreground">{t(`org.sec_perfil_${tipusReceptor}`)} · {t('org.h_perfil')}</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                {efectiva ? t(`nat.perfil_${efectiva}`) : t(`org.sec_perfil_${tipusReceptor}`)} · {t('org.h_perfil')}
+              </p>
             </div>
-            <CampsPerfilReceptor tipusReceptor={tipusReceptor} perfil={perfil}
-              onChange={setPerfil} disabled={!potEditar} excloure={CLAUS_PREFERENCIES} />
+            <CampsPerfilReceptor tipusReceptor={tipusReceptor} perfil={perfil} camps={campsTipus}
+              onChange={setPerfil} disabled={!potEditar} />
           </section>
         )}
 
         <p className="text-sm text-muted-foreground">
           {t('org.tipus_receptor', { x: tipusReceptor ? t(`org.tr_${tipusReceptor}`) : '—' })}
+        </p>
+        <p className="text-sm text-muted-foreground" data-testid="naturalesa-perfil">
+          {naturalesa
+            ? t('nat.linia', { x: t(`nat.${naturalesa}`), o: t(origen === 'confirmada' ? 'nat.confirmada' : 'nat.suggerida').toLowerCase() })
+            : t('nat.linia_sense')}
         </p>
       </CardContent>
     </Card>

@@ -265,18 +265,18 @@ test('la plantilla descarregada, pujada tal qual, es reconeix sencera', async ({
   const [baixada] = await Promise.all([page.waitForEvent('download'), page.getByTestId('ie-plantilla').click()])
   const cami = join(dir, 'plantilla.xlsx')
   await baixada.saveAs(cami)
-  // Plan 2 B2: desplegables en «Entitats» (seis listas, sin Comarca), y el de Municipi con todos
-  // los municipios del catálogo del clon.
+  // Plan 2 B2: desplegables en «Entitats» (seis listas, sin Comarca; siete con «Naturalesa», A5),
+  // y el de Municipi con todos los municipios del catálogo del clon.
   const fulla1 = strFromU8(unzipSync(new Uint8Array(readFileSync(cami)))['xl/worksheets/sheet1.xml'])
-  expect(fulla1).toContain('<dataValidations count="6">')
+  expect(fulla1).toContain('<dataValidations count="7">')
   expect(fulla1.indexOf('<dataValidations')).toBeGreaterThan(fulla1.indexOf('</sheetData>'))
   const nMunis = Number(sql('select count(*) from municipios'))
   expect(fulla1).toContain(`<formula1>Llistes!$G$2:$G$${1 + nMunis}</formula1>`)
   await puja(page, cami)
   await expect(page.getByTestId('ie-falten')).toHaveCount(0)
   await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(0)
-  // B4: + «ID Redestina» y «Data d'alta a l'organització» (Z y AA).
-  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(27)
+  // B4: + «ID Redestina» y «Data d'alta a l'organització» (Z y AA); A5: + «Naturalesa» (AB).
+  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(28)
   // Solo trae la fila de ejemplo, que se salta.
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^0 /)
 })
@@ -301,7 +301,7 @@ test('B3: el tècnic exporta les files visibles amb el format de la plantilla (d
   expect([entitats.sheet, instruccions.sheet, llistes.sheet]).toEqual(['Entitats', 'Instruccions', 'Llistes'])
   const cap = entitats.data[0].map(String)
   expect(cap.slice(0, 3)).toEqual(['Rol', 'Nom comercial', 'Raó social'])
-  expect(cap.slice(-4)).toEqual(['ID Redestina', "Data d'alta a l'organització", 'Estat CRM (ofertant)', 'Estat CRM (receptor)'])
+  expect(cap.slice(-5)).toEqual(['ID Redestina', "Data d'alta a l'organització", 'Naturalesa', 'Estat CRM (ofertant)', 'Estat CRM (receptor)'])
   const files = entitats.data.slice(1).filter((r) => r.some((c) => c !== null))
   expect(files).toHaveLength(4)
   const iId = cap.indexOf('ID Redestina')
@@ -314,7 +314,7 @@ test('B3: el tècnic exporta les files visibles amb el format de la plantilla (d
   const iEstat = cap.indexOf('Estat CRM (receptor)')
   expect(files.filter((r) => r[iEstat] === 'Potencial')).toHaveLength(3)
   const fulla1 = strFromU8(unzipSync(new Uint8Array(readFileSync(exportat)))['xl/worksheets/sheet1.xml'])
-  expect(fulla1).toContain('<dataValidations count="6">')
+  expect(fulla1).toContain('<dataValidations count="7">')
   expect(fulla1.indexOf('<dataValidations')).toBeGreaterThan(fulla1.indexOf('</sheetData>'))
 })
 
@@ -328,9 +328,9 @@ test('B3: el fitxer exportat, pujat tal qual pel super_admin, surt tot «sense c
   await puja(page, exportat)
   await expect(page.getByTestId('ie-falten')).toHaveCount(0)
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^4 /)
-  // Desde B4, «ID Redestina» y la fecha de alta se importan (27 reconocidas); solo las dos de
-  // «Estat CRM» se ignoran a propósito (P9).
-  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(27)
+  // Desde B4, «ID Redestina» y la fecha de alta se importan, y desde A5 la naturalesa (28
+  // reconocidas); solo las dos de «Estat CRM» se ignoran a propósito (P9).
+  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(28)
   await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(2)
   await expect(page.getByTestId('ie-ignorades')).toContainText('Estat CRM')
   await page.getByTestId('ie-continua').click()

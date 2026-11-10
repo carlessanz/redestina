@@ -41,6 +41,8 @@ import {
   type Paper, type ResultatCerca, type ValorsAlta,
 } from '../../lib/novaEntitat'
 import BlocCamps from '../../components/fitxa/BlocCamps'
+import SelectorNaturalesa from '../../components/fitxa/SelectorNaturalesa'
+import { naturalesaSuggerida, type Naturalesa } from '../../lib/naturalesa'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { FilaCasella } from '../../components/Casella'
 import { useConfirma } from '../../components/DialegConfirma'
@@ -153,6 +155,10 @@ export default function NovaEntitat() {
   )
   const [valors, setValors] = useState<ValorsAlta>({})
   const [esTest, setEsTest] = useState(false)
+  // A5: la naturalesa se SUGIERE del NIF y la forma jurídica (como hará la base al crear); solo si
+  // el equipo elige una, se fija CONFIRMADA justo después del alta.
+  const [natTriada, setNatTriada] = useState<Naturalesa | null>(null)
+  const natSuggerida = naturalesaSuggerida(String(valors.nif ?? ''), String(valors.tipus_empresa ?? ''))
   // «Dona-li accés a la plataforma ara» (1D): apagada por defecto (D5: el alta es sin acceso).
   const [ambAcces, setAmbAcces] = useState(false)
   const motiuCorreu = motiuCanal(useCanals(), 'email')
@@ -209,6 +215,11 @@ export default function NovaEntitat() {
     }
     const org = (data as { organizacion_id: string } | null)?.organizacion_id
     toast.success(t('rec.created'))
+    if (org && natTriada) {
+      // Como el acceso: el alta ya está hecha; si falla, se dice y se fija desde la ficha.
+      const { error: errNat } = await supabase.rpc('fixar_naturalesa', { p_org: org, p_naturalesa: natTriada })
+      if (errNat) toast.warning(textError(t, errNat.message))
+    }
     if (org && ambAcces && !motiuAcces) {
       // El alta ya está hecha: un fallo aquí no la deshace, se dice y el acceso se da desde la ficha.
       const r = await donarAcces(org, correuAlta, { manual: !!motiuCorreu })
@@ -361,6 +372,10 @@ export default function NovaEntitat() {
             <Seccio titol={t('org.sec_identitat')}>
               <BlocCamps {...blocProps} camps={campsAlta('identitat', rols)} activitats={activitats}
                 placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
+              <SelectorNaturalesa orgId={null} idPrefix="ne" potEditar esEquip ajudaKey="nat.nova_h"
+                valor={natTriada ? { naturalesa: natTriada, origen: 'confirmada' }
+                  : { naturalesa: natSuggerida, origen: natSuggerida ? 'suggerida' : null }}
+                onCanviat={(v) => setNatTriada(v.naturalesa)} />
             </Seccio>
 
             <Seccio titol={t('ef.sec_contacte')}>
@@ -374,7 +389,7 @@ export default function NovaEntitat() {
 
             {papers.includes('entidad') && (
               <Seccio titol={t('ef.sec_receptor')}>
-                <BlocCamps {...blocProps} camps={campsAlta('receptor', rols)} />
+                <BlocCamps {...blocProps} camps={campsAlta('receptor', rols)} naturalesa={natTriada} />
               </Seccio>
             )}
 

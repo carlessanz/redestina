@@ -51,7 +51,9 @@ import ConveniFitxa from '../../components/fitxa/ConveniFitxa'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import ResumDiagnostic from '../../components/diagnostic/ResumDiagnostic'
 import AccionsDiagnostic from '../../components/diagnostic/AccionsDiagnostic'
-import { CLAUS_PREFERENCIES, PERFIL_RECEPTOR, PREFERENCIES_RECEPCIO } from '../../lib/perfilReceptor'
+import { CLAUS_PREFERENCIES, PREFERENCIES_RECEPCIO, campsPerfil } from '../../lib/perfilReceptor'
+import { naturalesaEfectiva } from '../../lib/naturalesa'
+import SelectorNaturalesa, { type ValorNaturalesa } from '../../components/fitxa/SelectorNaturalesa'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
 import AlbaransFitxa from '../../components/fitxa/AlbaransFitxa'
@@ -66,7 +68,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 type Fila = Record<string, unknown>
 
 const LLISTA = '/equip/entitats'
-const COLS_ORG = 'id, nombre, nif, email, telefono, poblacion, productor_id, entidad_id, es_generadora, es_receptora, tipo_receptor, canal_preferido, created_at, activa, productor_activo, entidad_activo, razon_social, nom_comercial, persona_contacte, municipio_ine, comarca, tipus_activitat, te_compte, compte_estat, productor_estat_crm, entidad_estat_crm'
+const COLS_ORG = 'id, nombre, nif, email, telefono, poblacion, productor_id, entidad_id, es_generadora, es_receptora, tipo_receptor, canal_preferido, created_at, activa, productor_activo, entidad_activo, razon_social, nom_comercial, persona_contacte, municipio_ine, comarca, tipus_activitat, te_compte, compte_estat, productor_estat_crm, entidad_estat_crm, naturalesa, naturalesa_origen'
 
 const PESTANYES = ['dades', 'contacte', 'operativa', 'diagnostic', 'documentacio', 'intern'] as const
 type Pestanya = typeof PESTANYES[number]
@@ -131,6 +133,8 @@ export default function EntitatDetall() {
   const [perfil, setPerfil] = useState<Record<string, unknown>>({})
   const [perfilInicial, setPerfilInicial] = useState<Record<string, unknown>>({})
   const [canal, setCanal] = useState<TriaCanal>('auto')
+  // A5: la naturalesa se guarda AL MOMENTO (`fixar_naturalesa`), fuera del «Desa» de la ficha.
+  const [nat, setNat] = useState<ValorNaturalesa>({ naturalesa: null, origen: null })
   const [canalDesat, setCanalDesat] = useState<TriaCanal>('auto')
   const [errors, setErrors] = useState<Record<string, string>>({})
   const [carregant, setCarregant] = useState(true)
@@ -255,6 +259,7 @@ export default function EntitatDetall() {
       const pr = ((fe?.perfil_receptor as Record<string, unknown> | null) ?? {})
       setPerfil(pr)
       setPerfilInicial(pr)
+      setNat({ naturalesa: vista.naturalesa ?? null, origen: vista.naturalesa_origen ?? null })
       const tria = (vista.canal_preferido ?? 'auto') as TriaCanal
       setCanal(tria)
       setCanalDesat(tria)
@@ -363,7 +368,9 @@ export default function EntitatDetall() {
   const camps = (bloc: Parameters<typeof campsDelBloc>[0]) => campsDelBloc(bloc, 'equip', rols)
   const blocProps = { valors, onChange: setCamp, veu: 'equip' as const, potEditar: true, errors, idPrefix: 'ed', discrepancies, tresColumnes: true }
   const tipusReceptor = (valors.tipo_receptor as string | null) ?? null
-  const campsTipusReceptor = (PERFIL_RECEPTOR[tipusReceptor ?? ''] ?? []).filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
+  // A5 (2.8): el bloque propio del perfil, según la naturalesa (sin ella, según el tipo).
+  const natEfectiva = naturalesaEfectiva(nat.naturalesa, nat.origen)
+  const campsTipusReceptor = campsPerfil(natEfectiva, tipusReceptor).filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
   const doble = rols.ofertant && rols.receptor
   // Con doble rol, el rótulo de qué papel es cada parte; con uno solo, sobra.
   const rotolPaper = (rol: 'ofertant' | 'receptor') => doble
@@ -447,6 +454,8 @@ export default function EntitatDetall() {
             <Seccio titol={t('org.sec_identitat')} testid="bloc-identitat">
               <BlocCamps {...blocProps} camps={camps('identitat')} activitats={activitats}
                 placeholderNom={String(valors.persona_contacte ?? '') || undefined} />
+              {/* A5 (2.7): la naturalesa, de la organización (no de una ficha). */}
+              <SelectorNaturalesa orgId={org.id} valor={nat} onCanviat={setNat} potEditar esEquip idPrefix="ed" />
             </Seccio>
             <Seccio titol={t('org.sec_adreca')} testid="bloc-adreca">
               <BlocCamps {...blocProps} camps={camps('adreca')} />
@@ -515,20 +524,21 @@ export default function EntitatDetall() {
             )}
             {rols.receptor && (
               <Seccio titol={t('ef.sec_preferencies')} ajuda={t('ef.h_preferencies')} testid="bloc-preferencies">
-                <BlocCamps {...blocProps} camps={camps('diagnostic')} />
+                <BlocCamps {...blocProps} camps={camps('diagnostic')} naturalesa={natEfectiva} />
                 <CampsPerfilReceptor tipusReceptor={tipusReceptor} camps={PREFERENCIES_RECEPCIO} idPrefix="ed-pref"
                   perfil={perfil} onChange={setPerfil} />
               </Seccio>
             )}
             {/* Sin sección vacía: un tipo cuyas condiciones son todas preferencias no la pinta. */}
-            {rols.receptor && (!tipusReceptor || campsTipusReceptor.length > 0) && (
+            {rols.receptor && ((!tipusReceptor && !natEfectiva) || campsTipusReceptor.length > 0) && (
               <Seccio titol={t('ef.sec_perfil')} ajuda={t('ef.h_perfil')} testid="bloc-perfil">
-                {/* Los campos propios del tipo de receptor (`perfil_receptor`): dependen del
-                    tipo que haya ahora en el formulario (pestaña Operativa); los del tipo
-                    anterior se quedan en el objeto, sin pintarse. Las preferencias, arriba. */}
-                {tipusReceptor
-                  ? <CampsPerfilReceptor tipusReceptor={tipusReceptor} idPrefix="ed-pr" perfil={perfil} onChange={setPerfil}
-                      excloure={CLAUS_PREFERENCIES} />
+                {/* Los campos propios del perfil (`perfil_receptor`): según la NATURALESA CONFIRMADA (A5,
+                    2.8; `campsPerfil`) o, sin ella, según el tipo que haya ahora en el formulario
+                    (pestaña Operativa). Lo que deja de pintarse se queda en el objeto. Las
+                    preferencias, arriba. */}
+                {tipusReceptor || natEfectiva
+                  ? <CampsPerfilReceptor tipusReceptor={tipusReceptor} camps={campsTipusReceptor} idPrefix="ed-pr"
+                      perfil={perfil} onChange={setPerfil} />
                   : <p className="text-sm text-muted-foreground">{t('f.perfil_sense_tipus')}</p>}
               </Seccio>
             )}

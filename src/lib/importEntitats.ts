@@ -27,6 +27,7 @@ import {
 } from './normalitzaImport'
 import { TIPUS_EMPRESA } from './perfilReceptor'
 import { errorTelefon, netejaNif, normalitzaTelefon } from './validacio'
+import { naturalesaDeText } from './naturalesa'
 
 // ---------------------------------------------------------------------------
 // Tipos
@@ -41,7 +42,7 @@ export type ClauContracte =
   | 'rols' | 'nom_comercial' | 'razon_social' | 'nif' | 'tipus_empresa' | 'tipus_activitat'
   | 'persona_contacte' | 'email' | 'email2' | 'telefon' | 'telefon2' | 'direccion' | 'codigo_postal'
   | 'municipi' | 'municipio_ine' | 'area_geografica' | 'tipo_receptor' | 'modalitats_interes' | 'airtable_id'
-  | 'redestina_id' | 'data_alta'
+  | 'redestina_id' | 'data_alta' | 'naturalesa'
 /** Columnas sin sitio en la ficha: van a la nota como «Etiqueta: valor». */
 export type ClauNota =
   | 'carrec' | 'entitat' | 'registre_excedent' | 'web' | 'treballadors' | 'observacions'
@@ -76,11 +77,13 @@ export interface FilaContracte {
   redestina_id?: string
   /** «Data d'alta a l'organització» (B4): `AAAA-MM-DD`, `D/M/AAAA` o solo el año (la base valida). */
   data_alta?: string
+  /** «Naturalesa» (A5): `entitat_social` o `empresa`; importada, queda CONFIRMADA (la base decide). */
+  naturalesa?: string
   nota?: string
   decisio?: string
 }
 
-export type Llista = 'rol' | 'tipo_receptor' | 'tipus_empresa' | 'tipus_activitat' | 'modalitats' | 'comarca' | 'municipi'
+export type Llista = 'rol' | 'tipo_receptor' | 'tipus_empresa' | 'tipus_activitat' | 'modalitats' | 'comarca' | 'municipi' | 'naturalesa'
 
 export interface ColumnaPlantilla {
   clau: ClauColumna
@@ -186,6 +189,10 @@ export const COLUMNES_PLANTILLA: readonly ColumnaPlantilla[] = [
   { clau: 'data_alta', capcalera: "Data d'alta a l'organització",
     alias: ["Data d'alta", 'Fecha de alta', 'Fecha de alta en la organización', 'Alta'],
     obligatoria: false, plantilla: true, multiple: false, text: true, exemple: '' },
+  // A5 (10-11-2026): opcional y al final, por lo mismo (no mover letras). Lo que se importe queda
+  // CONFIRMADO; vacía, la base sigue sugiriéndola por el NIF.
+  { clau: 'naturalesa', capcalera: 'Naturalesa', alias: ['Naturaleza', 'Naturalesa jurídica', 'Naturaleza jurídica'],
+    obligatoria: false, plantilla: true, multiple: false, llista: 'naturalesa', exemple: '' },
 ]
 
 /**
@@ -687,6 +694,8 @@ export function normalitzaFila(fila: number, celles: readonly Cella[], mapa: Map
   posa('airtable_id', primer('airtable_id'))
   posa('redestina_id', primer('redestina_id')?.toLowerCase())
   posa('data_alta', valorData(crua('data_alta')))
+  // El código si casa (ca/es); si no, el texto tal cual, para que la base lo marque (`naturalesa_desconeguda`).
+  { const nt = primer('naturalesa'); posa('naturalesa', naturalesaDeText(nt) ?? nt) }
   posa('nota', linies.join('\n'))
 
   return {
@@ -764,6 +773,8 @@ export const CODIS_BASE = [
   'area_desconeguda', 'area_no_coincideix', 'ref_externa_en_us', 'semblant_a_fila',
   // B4 (20270519100000): «ID Redestina» y «Data d'alta a l'organització».
   'id_redestina_invalid', 'id_redestina_inexistent', 'id_nif_contradictoris', 'data_alta_invalida', 'data_alta_nomes_any',
+  // A5 (20270523100000).
+  'naturalesa_desconeguda',
 ] as const
 
 /** Los errores de lote (22023) de las dos RPC. */
@@ -788,7 +799,7 @@ export function campDeColumna(columna: string): string {
 export const CAMPS_RESULTAT = [
   'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat', 'persona_contacte', 'email',
   'email2', 'telefon', 'telefon2', 'direccion', 'codigo_postal', 'municipi', 'area_geografica', 'tipo_receptor',
-  'modalitats_interes', 'data_alta', 'nota',
+  'modalitats_interes', 'data_alta', 'naturalesa', 'nota',
 ] as const
 
 /** Los campos (sin repetir, en el orden del contrato) de una lista de columnas rellenadas. */

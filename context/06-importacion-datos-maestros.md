@@ -406,3 +406,12 @@ Se compactó en `AGENTS.md` para dejar sitio (tope de 48 KB); el texto tal como 
   (sobre `entitat_valors_org`) → `lib/exportEntitats.ts`: columnas de la plantilla (con «ID Redestina» y «Data d'alta»,
   Z·AA), notas vacías, solo valores que el importador acepta; «Estat CRM» informativo (P9). **Exportar → reimportar =
   `sense_canvis`** (clon: 731/731).
+
+## 6.5 Columna «Naturalesa» (Plan 2 A5, `20270523100000`, 10-11-2026)
+
+Columna opcional **al final de la plantilla (AB)**, con desplegable (lista `naturalesa` en «Llistes», última columna):
+«Entitat social» / «Empresa» (acepta el código y las etiquetas ca/es; `naturalesaDeText`). Vacía: no toca nada (si no hay
+confirmada, sigue la sugerencia por NIF). Con valor: la Revisió enseña el `canvi` y al importar queda **confirmada**. La
+exportación solo saca la confirmada, en palabras, así que exportar → reimportar sigue siendo `sense_canvis`. Al ir
+detrás de «Data d'alta», las dos columnas informativas del estado CRM pasan de AB·AC a **AC·AD** (se leen por cabecera:
+el importador las ignora igual).

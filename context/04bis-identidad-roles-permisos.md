@@ -759,3 +759,21 @@ sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los no
 - **Fixture del clon** (para que las lecturas no salgan «sin datos»): Mas de Prova, Tomàquet × EX, estacional,
   500 kg, gestión `{donacio, residu}`, destinos `{donacio, venda}` y una acción de donación «TEST arnes: …» pendiente.
   Producción no lo tiene: allí esas lecturas salen «sin datos».
+
+### Naturalesa: `fixar_naturalesa` (Plan 2, A5, `20270523100000`, 10-11-2026)
+
+`fixar_naturalesa(p_org uuid, p_naturalesa text) returns void`, `security definer`, `authenticated` y `service_role`:
+
+- Permiso primero: `service_role` o `es_intern()` (todo el equipo, también el técnico: es dato de ficha, como el resto
+  de «Dades de l'entitat»), o el **titular** de alguna ficha de esa organización (`soc_titular`). Si no, `42501
+  nomes_equip_o_titular` (también con un uuid inventado).
+- `22023 naturalesa_desconeguda` si el valor no es `entitat_social`/`empresa`; `22023 organitzacio_inexistent`.
+- El titular **solo mientras no esté confirmada**: después `42501 naturalesa_confirmada` (la cambia el equipo).
+- Siempre la deja `confirmada`. Nadie escribe `organizaciones` directo (sin GRANT de UPDATE; el arnés lo comprueba
+  con `COLUMNA_INOCUA.organizaciones = 'naturalesa'`).
+- Arnés (+61 checks): en todos los perfiles, leer sí / insertar no en `modalitat_naturalesa_compat`,
+  `naturalesa_suggerida` sí, `refresca_naturalesa_suggerida` no, `organizaciones` UPDATE no; `fixar_naturalesa` denegada
+  sobre un uuid nulo a los externos, permitida al titular sobre la suya (`@meva_organitzacio`) con `22023` por valor
+  desconocido, y al equipo y al super_admin con `22023` (organización inexistente y valor desconocido). El efecto en el
+  Mercat no se prueba en el arnés (habría que confirmar una ficha compartida): lo cubren la E2E `perfil-recepcio` y la
+  prueba SQL de la sesión.

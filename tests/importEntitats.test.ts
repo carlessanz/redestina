@@ -398,7 +398,9 @@ describe('la plantilla', () => {
   it('se reconoce entera al volver a subirla, y la fila de ejemplo se salta', () => {
     const files = entitats.data.map((r) => celles(r as unknown[]))
     // B4: 27 columnas; «ID Redestina» y la fecha de alta, al final (Z y AA), donde ya las ponía la exportación.
-    expect(files[0]).toHaveLength(27)
+    // A5: 28, con «Naturalesa» detrás (AB).
+    expect(files[0]).toHaveLength(28)
+    expect(lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'naturalesa'))).toBe('AB')
     expect(lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'redestina_id'))).toBe('Z')
     expect(lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'data_alta'))).toBe('AA')
     const m = mapaCapcaleres(files[0])
@@ -449,9 +451,9 @@ describe('la plantilla', () => {
     const v = validacionsPlantilla(pctx)
     const ambLlista = COLUMNES_DE_PLANTILLA.filter((c) => c.llista && !SENSE_DESPLEGABLE.includes(c.llista))
     expect(v.map((x) => COLUMNES_DE_PLANTILLA[x.columna].clau)).toEqual(ambLlista.map((c) => c.clau))
-    expect(ambLlista.map((c) => c.clau)).toEqual(['rols', 'tipus_empresa', 'tipo_receptor', 'tipus_activitat', 'modalitats_interes', 'municipi'])
-    // B4 añadió columnas al FINAL: las de lista siguen en las mismas letras que en B2.
-    expect(v.map((x) => lletraColumna(x.columna))).toEqual(['A', 'E', 'F', 'G', 'H', 'Q'])
+    expect(ambLlista.map((c) => c.clau)).toEqual(['rols', 'tipus_empresa', 'tipo_receptor', 'tipus_activitat', 'modalitats_interes', 'municipi', 'naturalesa'])
+    // B4 y A5 añadieron columnas al FINAL: las de lista siguen en las mismas letras que en B2.
+    expect(v.map((x) => lletraColumna(x.columna))).toEqual(['A', 'E', 'F', 'G', 'H', 'Q', 'AB'])
     expect(v.some((x) => COLUMNES_DE_PLANTILLA[x.columna].llista === 'comarca')).toBe(false)
     for (const x of v) {
       const l = COLUMNES_DE_PLANTILLA[x.columna].llista!

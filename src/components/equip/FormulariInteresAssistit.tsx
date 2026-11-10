@@ -24,6 +24,7 @@ import { kg as fmtKg } from '../../lib/format'
 import { isoRecollida } from '../../lib/franja'
 import { modalitatsDelTipus, modalitatsOferta, modalitatsPossibles } from '../../lib/modalitats'
 import { clauErrorInteres } from '../../lib/ofertes'
+import { modalitatsDeLaNaturalesa } from '../../lib/naturalesa'
 import { interesAssistit } from '../../lib/canalitzacio'
 import type { Excedente, Modalitat } from '../../types'
 import SelectorModalitat from '../SelectorModalitat'
@@ -36,7 +37,14 @@ import { Label } from '@/components/ui/label'
 export type OfertaInteres = Pick<Excedente, 'id' | 'modalitat' | 'kg_total' | 'preu_minim' | 'disponible_hasta'>
   & Partial<Pick<Excedente, 'modalitats' | 'hora_recollida_inici' | 'hora_recollida_fi'>>
 
-interface EntitatTria { id: string; nombre: string; tipo_receptor: string | null }
+interface EntitatTria {
+  id: string
+  nombre: string
+  tipo_receptor: string | null
+  /** A5: la naturalesa de su organización; solo confirmada restringe (P8). */
+  organizaciones: { naturalesa: string | null; naturalesa_origen: string | null } | null
+}
+type ReglaNaturalesa = { modalitat: string; naturalesa: string }
 
 interface Props {
   oferta: OfertaInteres
@@ -53,6 +61,8 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
   const [entitats, setEntitats] = useState<EntitatTria[]>([])
   /** `modalitat_receptor_compat`; `null` = no se pudo leer (no se filtra: decide la base). */
   const [matriu, setMatriu] = useState<{ modalitat: string; tipo_receptor: string }[] | null>(null)
+  /** `modalitat_naturalesa_compat` (A5); `null` = no se pudo leer (no se filtra). */
+  const [reglaNat, setReglaNat] = useState<ReglaNaturalesa[] | null>(null)
   const [entitat, setEntitat] = useState(entitatInicial)
   const [kg, setKg] = useState('')
   const [modalitat, setModalitat] = useState<Modalitat | ''>('')
@@ -67,14 +77,17 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
   useEffect(() => {
     let viu = true
     void (async () => {
-      const [ents, mat] = await Promise.all([
+      const [ents, mat, nat] = await Promise.all([
         // Solo las activas (1A): `comprova_interes()` rechaza una inactiva con `entitat_inactiva`.
-        supabase.from('entidades').select('id, nombre, tipo_receptor').eq('activo', true).order('nombre').limit(500),
+        supabase.from('entidades').select('id, nombre, tipo_receptor, organizaciones(naturalesa, naturalesa_origen)')
+          .eq('activo', true).order('nombre').limit(500),
         supabase.from('modalitat_receptor_compat').select('modalitat, tipo_receptor'),
+        supabase.from('modalitat_naturalesa_compat').select('modalitat, naturalesa'),
       ])
       if (!viu) return
-      if (ents.data) setEntitats(ents.data as EntitatTria[])
+      if (ents.data) setEntitats(ents.data as unknown as EntitatTria[])
       setMatriu(mat.error ? null : (mat.data as { modalitat: string; tipo_receptor: string }[]))
+      setReglaNat(nat.error ? null : (nat.data as ReglaNaturalesa[]))
     })()
     return () => { viu = false }
   }, [])
@@ -82,9 +95,14 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
   const triadaEnt = entitats.find((e) => e.id === entitat) ?? null
   // Lo mismo que puede pedir esa entidad desde el Mercat (sin el filtro de convenio: si le
   // falta, la base lo dice con `sense_conveni` y la fase 4 enseña cómo resolverlo).
-  const mods = useMemo(() => (triadaEnt
-    ? modalitatsPossibles(oferta, matriu ? modalitatsDelTipus(triadaEnt.tipo_receptor, matriu) : null)
-    : modalitatsOferta(oferta)), [oferta, triadaEnt, matriu])
+  // A5: y, con la naturalesa confirmada, solo lo que admite P8 (el mismo cruce que `comprova_interes()`).
+  const mods = useMemo(() => {
+    if (!triadaEnt) return modalitatsOferta(oferta)
+    const perTipus = modalitatsPossibles(oferta, matriu ? modalitatsDelTipus(triadaEnt.tipo_receptor, matriu) : null)
+    const o = triadaEnt.organizaciones
+    const perNat = modalitatsDeLaNaturalesa(o?.naturalesa, o?.naturalesa_origen, reglaNat)
+    return perNat ? perTipus.filter((m) => perNat.includes(m)) : perTipus
+  }, [oferta, triadaEnt, matriu, reglaNat])
   const triada: Modalitat | '' = modalitat && mods.includes(modalitat) ? modalitat : mods.length === 1 ? mods[0] : ''
   // El precio, solo si la entrega ELEGIDA lleva precio: una donación no lo tiene aunque la
   // oferta también se ofrezca en venta.

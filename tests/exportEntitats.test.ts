@@ -55,6 +55,8 @@ const FILES: FilaExportacio[] = [
     nif: '65000772N', tipus_empresa: 'fundacio', tipo_receptor: 'social', tipus_activitat: ['menjador_social'],
     modalitats_interes: ['donacio', 'venda'], email: 'hola@exemple.invalid', email2: 'general@exemple.invalid',
     telefon: '34611111111', municipi: 'Mataró', area_geografica: 'Maresme', data_alta: '2021', estat_crm_entidad: 'potencial',
+    // A5: confirmada, sale en palabras y vuelve como código.
+    naturalesa: 'entitat_social',
   }),
   // Doble papel, actividades de los dos lados, sin NIF.
   fila({
@@ -79,7 +81,7 @@ const ESPERAT: { rols: Paper[]; contracte: Omit<FilaContracte, 'rols' | 'fila'> 
     tipus_activitat: ['menjador_social'], modalitats_interes: ['donacio', 'venda'], email: 'hola@exemple.invalid',
     email2: 'general@exemple.invalid', telefon: '34611111111', municipi: 'Mataró', area_geografica: 'Maresme',
     // Solo el año (lo que trajo el Excel del ARA): vuelve como año, no como fecha.
-    redestina_id: '22222222-2222-4222-8222-222222222222', data_alta: '2021',
+    redestina_id: '22222222-2222-4222-8222-222222222222', data_alta: '2021', naturalesa: 'entitat_social',
   } },
   { rols: ['productor', 'entidad'], contracte: {
     nom_comercial: 'Cooperativa de Prova', tipus_empresa: 'cooperativa', tipo_receptor: 'transformador',
@@ -130,10 +132,11 @@ describe('la exportación tiene el formato de la plantilla', () => {
     expect(cap.slice(0, COLUMNES_DE_PLANTILLA.length)).toEqual(COLUMNES_DE_PLANTILLA.map((c) => c.capcalera))
     expect(cap.slice(COLUMNES_DE_PLANTILLA.length)).toEqual(Object.values(CAPCALERES_EXPORTACIO))
     expect(entitats.amples).toHaveLength(cap.length)
-    // Las letras de B3 no se mueven: Z el ID, AA la fecha, AB y AC el estado CRM.
+    // Z el ID y AA la fecha (B3); A5 metió «Naturalesa» (columna de plantilla) en AB, así que el
+    // estado CRM, informativo y leído por cabecera, pasa a AC y AD.
     const lletra = (h: string) => lletraColumna(cap.indexOf(h))
-    expect(['ID Redestina', "Data d'alta a l'organització", 'Estat CRM (ofertant)', 'Estat CRM (receptor)'].map(lletra))
-      .toEqual(['Z', 'AA', 'AB', 'AC'])
+    expect(['ID Redestina', "Data d'alta a l'organització", 'Naturalesa', 'Estat CRM (ofertant)', 'Estat CRM (receptor)'].map(lletra))
+      .toEqual(['Z', 'AA', 'AB', 'AC', 'AD'])
     // El uuid cabe.
     expect(entitats.amples[cap.indexOf('ID Redestina')]).toBe(38)
   })
@@ -224,7 +227,7 @@ describe('ida y vuelta: lo exportado lo entiende el importador tal cual', () => 
     const { primeraFila, ultimaFila } = filesAmbDesplegable(FILES.length)
     expect([primeraFila, ultimaFila]).toEqual([2, 1 + FILES.length + FILES_BUIDES])
     const v = validacionsPlantilla(ctx)
-    expect(v).toHaveLength(6)
+    expect(v).toHaveLength(7)
     expect(xml.split('<dataValidation ').length - 1).toBe(v.length)
     expect(xml.indexOf('<dataValidations ')).toBeGreaterThan(xml.indexOf('</sheetData>'))
     for (const x of v) {

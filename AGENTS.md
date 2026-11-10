@@ -141,11 +141,12 @@ comarca (editable), `tipus_activitat[]`, `perfil_receptor` jsonb,
 origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`, sin escritura directa), ambas colgando de
 **`organizaciones`** (identidad común, `organizacion_id not null` por trigger; una ficha de cada
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
-`actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
+`actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). **Naturalesa (A5, `20270523100000`)**:
+`organizaciones.naturalesa` (entitat_social·empresa) + `naturalesa_origen` (suggerida·confirmada); la sugiere un trigger
+por el NIF (`naturalesa_suggerida()`; F·H·V solo por la forma) y **solo la confirmada surte efecto** (P8, §8; perfil y
+chips por `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
 (lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4,
-`20270521100000`, T4)**: `productos_habituales`, `productes_principals`, `varietats`, `volum_produccio`, `temporada`,
-`envasos_habituals`, `canals_comercials`, `tipologia_clients`, `facturacio_anual_eur`|`_rang` (P2),
-`volum_comercialitzat_kg`, `suport_interes` (P6); el trigger `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
+`20270521100000`, T4)**: producción y comercialización (columnas en `context/04`); `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
 convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
 l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
 
@@ -276,6 +277,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3); `desar_diagnostic` solo por compatibilidad.
   Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
   `diagnostic-pdf`). `fixar_lloc_principal` (A4). Plan básico: solo `service_role`.
+- **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
+  mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
   `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`,
   `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una versión sustituida).
@@ -311,7 +314,8 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   navegador (`lib/importEntitats.ts`), revalida la base (`previsualitzar_importacio_entitats` → `importar_entitats`).
   Nueva = **`potencial`**. 🔴 **D11: idempotente y ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o
   NIF nunca crea; celda vacía no toca, valor distinto sobrescribe; la Revisió enseña `canvis`). Nunca toca `activo`,
-  `estat_crm`, `es_test`, `ref_externa`. Plantilla con desplegables (B2).
+  `estat_crm`, `es_test`, `ref_externa`. Plantilla con desplegables (B2). Columna opcional **«Naturalesa»** (A5, AB):
+  importada queda confirmada; la exportación solo saca la confirmada.
 - **Exportación** (B3, `20270518110000`; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
   plantilla; **exportar → reimportar = `sense_canvis`**.
 
@@ -352,24 +356,14 @@ Lo que manda hoy, en una línea cada uno:
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
-- **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y
-  `/equip/ofertes/:id`): ámbito, fecha, anexo, «Excloses», revisión y envío manual; el ofertante, en
-  «Els meus certificats» y en su oferta.
-- **Circuito de firma (05-11)**: `DialegSignaDocument` («Signa aquí» / «Puja'l signat»; el equipo solo
-  sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) decide el botón**.
-  «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
-  «Envia per correu» con «Inclou l'enllaç per signar».
-- **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
-- **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió («Canviarà» por fila, «dubtosa» con candidatos) →
-  Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
-  operatiu: el equipo lo contesta en `/equip/diagnostics/productor/:id` (expediente arriba; secciones Operativa ·
-  Excedents · Accions, A3; Accions también en «Gestió interna»); ficha y «El meu diagnòstic» lo leen y descargan en
-  PDF (`diagnostic-pdf`, sin fila en `documentos`, D2), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
-- **Gestión autónoma del super_admin**: convenio
-  **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
-  paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
-  **Ciclo guiado** `/equip/canalitzacio/:id`: 17 pasos en 6 fases (`passosCanalitzacio.ts`,
-  `components/equip/fases/`) sobre las RPC reales (`tests/e2e/paritat-assistida.e2e.ts`).
+- **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
+  `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
+- **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió → Resultat. **Convenio único de col·laboració** por
+  papel. Filtros comunes (`lib/filtres.ts`). **Diagnòstic operatiu**: lo contesta el equipo en
+  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions); ficha y «El meu diagnòstic» lo leen y bajan en PDF
+  (`diagnostic-pdf`, D2); Pla de Prevenció = **expediente** (detalle en `context/06ter`).
+- **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
+  para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
   ofertante no ve el `E-…`.
 - **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts` es **la única definición de campos** (paridad con
@@ -377,9 +371,11 @@ Lo que manda hoy, en una línea cada uno:
   que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC.
 - **Estado CRM (B1)**: «Estat i papers» (`BlocRols`): selector por papel (`fixar_estat_crm`) y badge
   (`lib/estatCrm.ts`); «Entitats» filtra por estado (con `?rol=`, el del papel) y abre con `actiu`.
-- **Plan 1 sobre la ficha** (detalle en `context/06ter`): «Nova entitat» (1B, `cerca_entitats` → `crear_entitat`),
-  «Dona-li accés» (1D, `fitxa/AccesEntitat`), «Gestió interna» (1F + 1.5, `fitxa/NotesInternes`) y, sin que la
-  entidad entre, convenio por correo (`fitxa/ConveniFitxa`), RGPD, albarán por correo y correos con consentimiento.
+- **Plan 1 sobre la ficha** (`context/06ter`): «Nova entitat» (1B), «Dona-li accés» (1D), «Gestió interna» (1F + 1.5)
+  y, sin que la entidad entre, convenio, RGPD, albarán y correos con consentimiento.
+- **Naturalesa (A5)**: `fitxa/SelectorNaturalesa` en «Dades de l'entitat», «Nova entitat» y «La meva organització»
+  (el titular, una vez); `PerfilRecepcio` y «Diagnòstic i perfil» pintan por la confirmada (`campsPerfil`); el
+  interés asistido filtra por P8 (`modalitatsDeLaNaturalesa`).
 
 ## 6quater. Parte pública y accesos (detalle en `context/06quater-…md`)
 
@@ -418,7 +414,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270522100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270523100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -451,6 +447,9 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `sendEmail()`); `esCuentaPermitida` para acceso y recuperación (pasa el equipo). Documentos
   `modo='prueba'` → `destinatariosPrueba()` aunque el modo test esté apagado. Whitelists:
   con filas, solo a quien esté; vacías, no restringen.
+- 🔴 **P8 (A5, provisional hasta que la Fundació diga otra cosa)**: una **empresa** con la naturalesa confirmada solo
+  recibe **compra y maquila**, nunca donación (Mercat y `comprova_interes()`); una entidad social, las tres; sugerida o
+  sin ella, **como antes** (compatibilidad con el frontend publicado).
 - **Diagnóstico = vocabulario de la oferta** (A3): causa = `causas.codigo`, destino = modalidad; cruza por
   `(productor, producto, causa)`.
 - Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
@@ -544,8 +543,8 @@ git config core.hooksPath .githooks            # una vez por clon
   `functions deploy <f> [--no-verify-jwt según config.toml]`, `secrets set`, Management API. El
   asistente **no pide ni lee el token**; una sola pestaña, scripts por fase en `scripts/data/` con log.
 - **Publicar**: skill `/publicar`, orden **base → Edge Functions → frontend** (`git push` el último).
-  Tras redesplegar `generar-documento`, `emitir_documento_prova()`. `diagnostic-pdf` importa los activos de
-  `generar-documento/activos/incrustats.ts` (P4): regenerarlos obliga a redesplegar las dos. Tocar `_shared/` obliga a
+  Tras redesplegar `generar-documento`, `emitir_documento_prova()`. `diagnostic-pdf` comparte activos con
+  `generar-documento` (P4: regenerarlos obliga a redesplegar las dos). Tocar `_shared/` obliga a
   redesplegar todas las que lo importan. Logs remotos por el Management API de analítica.
 - Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
@@ -557,7 +556,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (80 vivas; la siguiente entrada nueva es la 176; los números no se renumeran ni
+**Deuda abierta (83 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -570,7 +569,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10) · **175** (motor del cuestionario y `desar_diagnostic` sin uso; `drop` pendiente, P11).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10) · **175** (motor del cuestionario y `desar_diagnostic` sin uso; `drop` pendiente, P11) · **176** (`priorizar-entidades` no mira la naturalesa) · **177** (NIF F·H·V sin sugerencia) · **178** (`animal` + empresa confirmada = nada compatible).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -582,11 +581,11 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.899 pruebas de Vitest en 87 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.917 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.548/2.548 y 57 sin datos (A3); producción 2.543/2.543 y 62 «Sin
-   fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
+   **Referencia: clon 2.609/2.609 y 57 sin datos (A5); producción 2.543/2.543 y 62 «Sin
+   fallos de permisos» (A3; A5 sin publicar: +61 checks).** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

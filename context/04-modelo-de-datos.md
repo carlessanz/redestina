@@ -1733,3 +1733,41 @@ idioma de las ofertas: causa = `causas.codigo` (el mismo de `excedentes.causa_co
   El frontend nuevo no la llama (deuda 175).
 - **Cruce con las ofertas** (aceptación de A3): `excedentes e join diagnostic_excedents d on d.productor_id =
   e.productor_id and d.producte = e.producto and d.causa_codi = e.causa_codigo`.
+
+### Naturalesa de la organización (Plan 2, A5, `20270523100000`, 10-11-2026)
+
+**Qué es.** Fila 2.7 de la Taula mestra: «Entitat social» (fundacions, associacions, sense ànim de lucre) o «Empresa».
+Es un eje de la **organización**, distinto del papel (ofertant/receptor) y de `tipo_receptor` (lo que la receptora hace
+con el excedente). Columnas en `organizaciones`:
+
+- `naturalesa` (`entitat_social` · `empresa`, CHECK) y `naturalesa_origen` (`suggerida` · `confirmada`, CHECK), con
+  `organizaciones_naturalesa_coherent`: las dos nulas o las dos llenas.
+- **Sugerida, no impuesta.** `naturalesa_suggerida(p_nif, p_forma)` (inmutable, pura; `authenticated` la ejecuta): NIF
+  `G·R·P·Q·S` → entitat_social; `A·B·C·D·E·J·N·U·W`, DNI y NIE → empresa; **F (cooperativas), H y V no dicen nada**
+  (pueden ser las dos cosas: el plan decía «G·R·F», se dejó F fuera a propósito) y decide la forma jurídica
+  (`fundacio`/`associacio` → social; `sl`/`sa`/`autonom`/`sc`/`cb`/`sat` → empresa); si tampoco, `null`.
+  `src/lib/naturalesa.ts` es el espejo (paridad en `tests/naturalesa.test.ts`).
+- Los triggers `trg_entidades_naturalesa` y `trg_productores_naturalesa` (after insert or update of nif, forma,
+  organizacion_id) llaman a `refresca_naturalesa_suggerida(org)` (interna, solo `service_role`): recalcula la
+  sugerencia con el NIF de la entidad y, si no hay, el del productor; **nunca toca una confirmada**. Backfill en la
+  migración (clon: 163 empresa y 47 entitat_social sugeridas, 522 sin sugerencia).
+- **Solo la CONFIRMADA surte efecto** (decisión de la sesión, para cumplir la compatibilidad hacia atrás: las fichas de
+  prueba con DNI o B salen «empresa» sugerida y no pueden perder nada). La confirma `fixar_naturalesa()` (§4bis), el
+  importador (columna «Naturalesa», §6) o «Nova entitat» al crear.
+- **Regla P8 en tabla**: `modalitat_naturalesa_compat(modalitat, naturalesa)`, catálogo legible por `authenticated`, sin
+  escritura: entitat_social → donacio·venda·maquila (no se restringe nada a las sociales); empresa → venda·maquila.
+  `modalitats_compatibles_meves()` (Mercat) y `comprova_interes()` (interés propio y asistido) cruzan con ella **solo si
+  `naturalesa_origen = 'confirmada'`**; mismo mensaje de rechazo que la compatibilidad por tipo.
+- `v_organizaciones` añade `naturalesa, naturalesa_origen` al final; `exportar_entitats()` (drop + create) añade la
+  columna `naturalesa` al final, **solo la confirmada** (exportar → reimportar sigue siendo `sense_canvis`).
+- Importador: los wrappers `importacio_normalitza_fila` / `importacio_aplica_fila` envuelven a las de B4 (renombradas
+  `*_b4`) y añaden la clave `naturalesa`; desconocida → aviso `naturalesa_desconeguda`; distinta de la confirmada →
+  `canvi` en `organizaciones.naturalesa` (antes = la confirmada, o nulo si solo era sugerida) y al aplicar queda
+  confirmada.
+
+### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
+
+**Operativa (A4,
+`20270521100000`, T4)**: `productos_habituales`, `productes_principals`, `varietats`, `volum_produccio`, `temporada`,
+`envasos_habituals`, `canals_comercials`, `tipologia_clients`, `facturacio_anual_eur`|`_rang` (P2),
+`volum_comercialitzat_kg`, `suport_interes` (P6); el trigger `productores_operativa` **poda** lo que no cuelga.

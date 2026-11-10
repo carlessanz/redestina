@@ -298,3 +298,14 @@ cada vegada que es produeix l'excedent» (la frecuencia va al lado). La **gesti�
 con la lista de la jerarquía de usos (venda alternativa · donació · transformació · altres aprofitaments · residu ·
 altres); no vuelve a preguntar por los destinos de interés. Las acciones (una por destino) y su estado los mantiene el
 equipo; la organización los ve, nota de seguimiento incluida.
+
+### P8: qué puede recibir una empresa (Plan 2, A5, 10-11-2026, provisional)
+
+Propuesta por defecto del plan (§8, P8), aplicada **hasta que la Fundació diga otra cosa**: una organización con
+naturalesa **confirmada** «empresa» solo recibe **compra (`venda`) y maquila**; nunca donación. Una entidad social
+confirmada, las tres (no se le quita nada: los chips le proponen donació y compra, 2.8, pero la regla no la restringe).
+Sugerida o sin naturalesa: exactamente como antes (requisito de compatibilidad con el frontend publicado durante la
+ventana base → frontend). La regla vive en la tabla `modalitat_naturalesa_compat`, así que cambiarla es una fila.
+Se cruza con la de `tipo_receptor`: una empresa confirmada de tipo `animal` (solo donación) no tiene nada compatible
+(deuda 178). La priorización (`priorizar-entidades`) no la mira todavía (deuda 176): puede proponer una donación a una
+empresa confirmada, y `comprova_interes()` la rechazaría.
