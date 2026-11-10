@@ -169,7 +169,14 @@ respuesta: pone `_canvia_lloc` en la sesión y manda la lista de siempre (el pri
 final); con la marca puesta, un recordatorio o un reintento repiten la lista, no los botones. Un «sí» escrito
 (`confirmaLlocHabitual()`: sí, ok, d'acord, aquí…) confirma el principal mientras se pregunta por él. Sin principal
 marcado (aunque haya un solo lugar), la lista directa, como antes. **La pregunta nunca se salta.** Probado contra el
-clon con WhatsApp simulado (botón, «Sí» escrito y «Canvia»), y deshecho. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
+clon con WhatsApp simulado (botón, «Sí» escrito y «Canvia»), y deshecho.
+**En el panel, lo mismo (11-11-2026)**, en `FormulariNovaOferta` —el formulario del productor y el de la oferta
+asistida del equipo—: con lugar principal, el campo es una caja «Lloc habitual: *X · municipi*» con «Sí, aquí» y
+«Canvia el lloc» (`estatLlocHabitual()` de `src/lib/predeterminatsOferta.ts`: `confirmar` · `confirmat` · `llista`).
+**El lugar propuesto desde la ficha no cuenta como respuesta hasta que se confirma** (`ubicacioPerConfirmar()`:
+falta como un campo vacío, «Continuar» no pasa); «Canvia el lloc» vacía el campo y enseña la lista y «Afegir un lloc
+nou». Sin principal marcado, la lista de siempre. Un borrador recuperado no recuerda qué era propuesto: su lugar sale
+como confirmado. E2E en `operativa.e2e.ts`. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
 `GET crear-oferta/campos` devuelve `predeterminats` (`ubicacio` = el principal o el único, `horari` = su primera franja
 válida, `format_entrega` = el primer envase habitual con equivalente —`caixes`→`caixes`, `palets`→`palet`; `granel`,
 `sacs` y `altres` no se traducen—). Tocar `_shared/intake.ts` obliga a redesplegar `whatsapp-webhook` y

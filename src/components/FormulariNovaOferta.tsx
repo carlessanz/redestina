@@ -65,7 +65,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ddmmaaaaAIso, interpretaEsborrany, isoADdmmaaaa, type Esborrany } from '../lib/esborranyOferta'
-import { aplicaPredeterminats, treuProposatsQueNoApliquen } from '../lib/predeterminatsOferta'
+import {
+  aplicaPredeterminats, estatLlocHabitual, treuProposatsQueNoApliquen, ubicacioPerConfirmar,
+} from '../lib/predeterminatsOferta'
 
 type Datos = Record<string, unknown>
 
@@ -215,6 +217,12 @@ export default function FormulariNovaOferta(
    * de la fitxa» y deja de estarlo en cuanto se cambia (`set`).
    */
   const [proposats, setProposats] = useState<Set<string>>(new Set())
+  /**
+   * P5 (11-11-2026), como en WhatsApp: con un lugar principal se pide «confirma el lloc
+   * habitual o canvia’l». «Canvia el lloc» pasa a la lista de siempre.
+   */
+  const [canviaLloc, setCanviaLloc] = useState(false)
+  const estatLloc = estatLlocHabitual(datos.ubicacio, proposats.has('ubicacio'), catalogos?.ubicaciones ?? [], canviaLloc)
 
   useEffect(() => {
     if (!productorId) { setCarregant(false); return }
@@ -317,9 +325,13 @@ export default function FormulariNovaOferta(
   // —el servidor sigue siendo la autoridad, y su rechazo real lo recoge `r.faltan` más
   // abajo—, pero dejaría que el aviso en pantalla diga «todo bien» cuando no lo está.
   function faltantsObligatoris(): CampoOferta[] {
-    return campos
+    const f = campos
       .filter((c) => c.obligatorio && aplica(c, datos))
       .filter((c) => esBuit(datos[c.clave]))
+    // P5: el lugar habitual propuesto desde la ficha no es una respuesta hasta que se confirma.
+    const cu = campos.find((c) => c.tipo === 'ubicacio')
+    if (cu && !f.includes(cu) && ubicacioPerConfirmar(estatLloc, aplica(cu, datos))) f.push(cu)
+    return f
   }
 
   /**
@@ -499,6 +511,42 @@ export default function FormulariNovaOferta(
         )
       case 'ubicacio': {
         const ubis = catalogos?.ubicaciones ?? []
+        if (estatLloc.tipus !== 'llista') {
+          const p = ubis.find((u) => u.id === estatLloc.principalId)
+          const nom = p
+            ? `${p.alias ?? p.municipio ?? t('po.place_unnamed')}${p.alias && p.municipio ? ` · ${p.municipio}` : ''}`
+            : t('po.place_unnamed')
+          const canvia = () => { setCanviaLloc(true); set(campo.clave, '') }
+          return (
+            <div id={id} data-testid="lloc-habitual" tabIndex={-1}
+              className={`rounded-lg border p-3 ${invalid ? 'border-error bg-error-fondo' : 'bg-muted/30'}`}>
+              <p className="text-sm">{t('po.place_habitual')}: <strong>{nom}</strong></p>
+              {estatLloc.tipus === 'confirmar' ? (
+                <>
+                  <p className="mt-1 text-sm text-muted-foreground">{t('po.place_confirm_q')}</p>
+                  <div className="mt-2 flex flex-wrap gap-2">
+                    <Button type="button" className="h-11 whitespace-nowrap shrink-0 md:h-8"
+                      onClick={() => set(campo.clave, estatLloc.principalId)}>
+                      <Check className="size-4" aria-hidden /> {t('po.place_confirm')}
+                    </Button>
+                    <Button type="button" variant="outline" className="h-11 whitespace-nowrap shrink-0 md:h-8" onClick={canvia}>
+                      {t('po.place_change')}
+                    </Button>
+                  </div>
+                </>
+              ) : (
+                <div className="mt-2 flex flex-wrap items-center gap-3">
+                  <span className="inline-flex items-center gap-1 text-sm text-exito">
+                    <Check className="size-4" aria-hidden /> {t('po.place_confirmed')}
+                  </span>
+                  <Button type="button" variant="outline" className="h-11 whitespace-nowrap shrink-0 md:h-8" onClick={canvia}>
+                    {t('po.place_change')}
+                  </Button>
+                </div>
+              )}
+            </div>
+          )
+        }
         return (
           <div className="space-y-2">
             {ubis.length > 0 && (
@@ -782,7 +830,7 @@ export default function FormulariNovaOferta(
                   {!campo.obligatorio && <span className="ml-1">{t('po.optional')}</span>}
                 </Label>
                 {control(campo)}
-                {proposats.has(campo.clave) && (
+                {proposats.has(campo.clave) && !(campo.tipo === 'ubicacio' && estatLloc.tipus !== 'llista') && (
                   <p className="mt-1 text-xs text-muted-foreground" data-testid={`proposat-${campo.clave}`}>
                     {t('po.proposat_fitxa')}
                   </p>

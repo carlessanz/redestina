@@ -8,7 +8,8 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.925 pruebas en 88 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (10-11-2026, P5: +3 en
+   Referencia: **1.929 pruebas en 88 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (11-11-2026, P5 en el
+   panel: +4 en `predeterminatsOferta.test.ts`; E2E `operativa` 4/4 en el clon). Antes, **1.925** (10-11-2026, P5: +3 en
    `predeterminatsOferta.test.ts`). Antes, **1.922** (10-11-2026, deuda
    174-178: +5 de `admesaPerNaturalesa` en `priorizacion.test.ts`; F·H·V en `naturalesa.test.ts`). Antes,
    **1.899 pruebas en 87 ficheros** de Vitest **+ 52 de Deno** del PDF

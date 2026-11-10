@@ -11,7 +11,9 @@ import {
   preguntaLlocHabitual, principalPrimer, titolLlocLista,
 } from '../supabase/functions/_shared/predeterminatsOferta.ts'
 import { FORMATS_ENTREGA } from '../supabase/functions/_shared/camposOferta.ts'
-import { aplicaPredeterminats, treuProposatsQueNoApliquen } from '../src/lib/predeterminatsOferta'
+import {
+  aplicaPredeterminats, estatLlocHabitual, treuProposatsQueNoApliquen, ubicacioPerConfirmar,
+} from '../src/lib/predeterminatsOferta'
 
 describe('predeterminatsDe (servidor)', () => {
   it('propone el lugar principal y su primera franja válida', () => {
@@ -113,5 +115,35 @@ describe('P5 · confirma el lloc habitual o canvia’l', () => {
   it('confirmaLlocHabitual: «sí» escrito confirma; lo demás, no', () => {
     for (const t of ['Sí', 'si!', 'Sí, aquí', 'OK', "D'acord", 'vale']) expect(confirmaLlocHabitual(t)).toBe(true)
     for (const t of ['no', 'Canvia', 'https://maps.app.goo.gl/x', '', null]) expect(confirmaLlocHabitual(t)).toBe(false)
+  })
+})
+
+// P5 en el panel (11-11-2026): el mismo «confirma o canvia» que en WhatsApp.
+describe('P5 · panel: confirma el lloc habitual o canvia’l', () => {
+  const ubis = [{ id: 'a' }, { id: 'p', es_principal: true }]
+
+  it('con principal, lo propuesto o vacío pide confirmar', () => {
+    expect(estatLlocHabitual('p', true, ubis, false)).toEqual({ tipus: 'confirmar', principalId: 'p' })
+    expect(estatLlocHabitual('', false, ubis, false)).toEqual({ tipus: 'confirmar', principalId: 'p' })
+  })
+
+  it('confirmado (tocado) se ve como confirmado; otro lugar o «canvia», la lista', () => {
+    expect(estatLlocHabitual('p', false, ubis, false)).toEqual({ tipus: 'confirmat', principalId: 'p' })
+    expect(estatLlocHabitual('a', false, ubis, false)).toEqual({ tipus: 'llista' })
+    expect(estatLlocHabitual('p', true, ubis, true)).toEqual({ tipus: 'llista' })
+  })
+
+  it('sin principal, la lista de siempre', () => {
+    expect(estatLlocHabitual('', false, [{ id: 'a' }], false)).toEqual({ tipus: 'llista' })
+    expect(estatLlocHabitual('', false, [], false)).toEqual({ tipus: 'llista' })
+  })
+
+  it('sin confirmar falta, solo si el campo aplica', () => {
+    const per = estatLlocHabitual('p', true, ubis, false)
+    expect(ubicacioPerConfirmar(per, true)).toBe(true)
+    expect(ubicacioPerConfirmar(per, false)).toBe(false)
+    expect(ubicacioPerConfirmar(estatLlocHabitual('p', false, ubis, false), true)).toBe(false)
+    // Un único lugar sin marcar, propuesto en la lista: vale como antes.
+    expect(ubicacioPerConfirmar(estatLlocHabitual('a', true, [{ id: 'a' }], false), true)).toBe(false)
   })
 })

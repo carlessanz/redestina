@@ -48,3 +48,38 @@ export function treuProposatsQueNoApliquen(
   for (const clau of proposats) if (!aplica(clau)) delete out[clau]
   return out
 }
+
+// ---------------------------------------------------------------------------
+// P5 en el panel (11-11-2026): igual que en WhatsApp, con un lugar principal el formulario
+// pide «confirma el lloc habitual o canvia’l». El lugar propuesto desde la ficha NO cuenta
+// como respuesta hasta que alguien lo confirma o elige otro. Lo usan el formulario del
+// productor y el de la oferta asistida del equipo (el mismo `FormulariNovaOferta`).
+// ---------------------------------------------------------------------------
+
+/** Qué enseña el campo «ubicació»: pedir confirmación, el habitual ya confirmado, o la lista. */
+export type EstatLlocHabitual =
+  | { tipus: 'confirmar'; principalId: string }
+  | { tipus: 'confirmat'; principalId: string }
+  | { tipus: 'llista' }
+
+export function estatLlocHabitual(
+  valor: unknown,
+  proposat: boolean,
+  ubicacions: ReadonlyArray<{ id: string; es_principal?: boolean | null }>,
+  canvia: boolean,
+): EstatLlocHabitual {
+  const principal = ubicacions.find((u) => u.es_principal)
+  if (!principal || canvia) return { tipus: 'llista' }
+  if (buit(valor) || (valor === principal.id && proposat)) return { tipus: 'confirmar', principalId: principal.id }
+  if (valor === principal.id) return { tipus: 'confirmat', principalId: principal.id }
+  return { tipus: 'llista' }
+}
+
+/**
+ * El lugar habitual sin confirmar falta, como un campo vacío, si el campo aplica (con el
+ * transporte a cargo del productor no se pregunta). Solo cuando se está pidiendo confirmar:
+ * lo propuesto en la lista (un único lugar sin marcar) sigue valiendo como antes.
+ */
+export function ubicacioPerConfirmar(estat: EstatLlocHabitual, aplicaUbicacio: boolean): boolean {
+  return aplicaUbicacio && estat.tipus === 'confirmar'
+}

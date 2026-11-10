@@ -84,3 +84,41 @@ test('la oferta nueva nace con el lugar principal, su franja y el formato del en
   }, prod)).toMatchObject({ ubicacio: b, horari: { inici: '08:00', fi: '12:00' }, format_entrega: 'caixes' })
   await page.evaluate((p) => { try { localStorage.removeItem(`redestina-oferta-esborrany:${p}`) } catch { /* */ } }, prod)
 })
+
+// P5 en el panel (11-11-2026): como en WhatsApp, el lugar habitual se confirma o se cambia; el
+// propuesto no cuenta como respuesta hasta entonces. El mismo formulario sirve al equipo.
+test('la oferta nueva pide confirmar el lugar habitual o cambiarlo', async ({ page }) => {
+  const prod = productorDe('productor')
+  const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+  const alias = sql(`select alias from productor_ubicaciones where id = '${b}'`)
+  const clau = `redestina-oferta-esborrany:${prod}`
+  await entra(page, 'productor')
+  // Un borrador que ya está en «Recollida» y dice que hay que ir a buscarlo, sin lugar.
+  await page.evaluate(([k]) => {
+    localStorage.setItem(k, JSON.stringify({
+      datos: { familia: 'Fruita', producte: 'Poma', producte_al_camp: 'no', kg: 100, transport: 'no' },
+      pas: 2, pasMaxim: 2, costTocat: false, desat: Date.now(),
+    }))
+  }, [clau])
+  await page.goto('/productor/ofertes/nova')
+  const caixa = page.getByTestId('lloc-habitual')
+  await expect(caixa).toBeVisible()
+  await expect(caixa).toContainText(alias)
+  const llegeix = () => page.evaluate((k) => {
+    try { return JSON.parse(localStorage.getItem(k) ?? 'null')?.datos?.ubicacio ?? null } catch { return null }
+  }, clau)
+
+  // Sin confirmar no se pasa de sección.
+  await page.getByRole('button', { name: 'Continuar' }).click()
+  await expect(caixa).toHaveClass(/border-error/)
+
+  await caixa.getByRole('button', { name: /Sí, aquí/ }).click()
+  await expect(caixa.getByText(/Confirmat|Confirmado/)).toBeVisible()
+  await expect.poll(llegeix).toBe(b)
+
+  // «Canvia el lloc»: la lista de siempre, sin nada elegido.
+  await caixa.getByRole('button', { name: /Canvia el lloc|Cambiar el lugar/ }).click()
+  await expect(page.getByTestId('lloc-habitual')).toHaveCount(0)
+  await expect.poll(llegeix).toBe('')
+  await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
+})
