@@ -176,7 +176,9 @@ asistida del equipo—: con lugar principal, el campo es una caja «Lloc habitua
 **El lugar propuesto desde la ficha no cuenta como respuesta hasta que se confirma** (`ubicacioPerConfirmar()`:
 falta como un campo vacío, «Continuar» no pasa); «Canvia el lloc» vacía el campo y enseña la lista y «Afegir un lloc
 nou». Sin principal marcado, la lista de siempre. Un borrador recuperado no recuerda qué era propuesto: su lugar sale
-como confirmado. E2E en `operativa.e2e.ts`. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
+como confirmado. E2E en `operativa.e2e.ts`: el productor y, en «Nova oferta assistida» de Ofertes, el
+super_admin y el técnico (6/6 en el clon). Las dos entradas del equipo (Ofertes y Canalització) abren
+`DialegNovaOfertaAssistida`, que monta el mismo formulario; `crear-oferta/campos` da los lugares a toda cuenta interna. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
 `GET crear-oferta/campos` devuelve `predeterminats` (`ubicacio` = el principal o el único, `horari` = su primera franja
 válida, `format_entrega` = el primer envase habitual con equivalente —`caixes`→`caixes`, `palets`→`palet`; `granel`,
 `sacs` y `altres` no se traducen—). Tocar `_shared/intake.ts` obliga a redesplegar `whatsapp-webhook` y

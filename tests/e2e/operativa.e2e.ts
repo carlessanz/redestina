@@ -9,7 +9,7 @@ import { entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
 test.describe.configure({ mode: 'serial' })
 
 test.beforeEach(({}, info) => {
-  const m = motiuSaltClon('productor')
+  const m = motiuSaltClon('productor', 'superadmin', 'equip')
   test.skip(m !== null, m ?? '')
   test.skip(info.project.name !== 'escriptori', 'Edita la fitxa de prova compartida: només a escriptori')
 })
@@ -122,3 +122,36 @@ test('la oferta nueva pide confirmar el lugar habitual o cambiarlo', async ({ pa
   await expect.poll(llegeix).toBe('')
   await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
 })
+
+// Lo mismo desde el panel del equipo: la oferta asistida («Nova oferta» en Ofertes) usa el mismo
+// formulario. Se prueba con el super_admin y con la cuenta del equipo (técnico): el servidor da
+// los lugares a cualquier cuenta interna, y la pantalla no mira el rol.
+for (const rol of ['superadmin', 'equip'] as const) {
+  test(`el equipo (${rol}) también confirma el lugar habitual o lo cambia en la oferta asistida`, async ({ page }) => {
+    const prod = productorDe('productor')
+    const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+    const alias = sql(`select alias from productor_ubicaciones where id = '${b}'`)
+    const clau = `redestina-oferta-esborrany:${prod}`
+    await entra(page, rol)
+    await page.evaluate(([k]) => {
+      localStorage.setItem(k, JSON.stringify({
+        datos: { familia: 'Fruita', producte: 'Poma', producte_al_camp: 'no', kg: 100, transport: 'no' },
+        pas: 2, pasMaxim: 2, costTocat: false, desat: Date.now(),
+      }))
+    }, [clau])
+    await page.goto('/equip/ofertes')
+    await page.getByRole('button', { name: /Nova oferta|Nueva oferta/ }).first().click()
+    const dlg = page.getByRole('dialog')
+    await tria(dlg.locator('#dnoa-productor'), prod)
+    const caixa = dlg.getByTestId('lloc-habitual')
+    await expect(caixa).toBeVisible()
+    await expect(caixa).toContainText(alias)
+    await dlg.getByRole('button', { name: 'Continuar' }).click()
+    await expect(caixa).toHaveClass(/border-error/)
+    await caixa.getByRole('button', { name: /Sí, aquí/ }).click()
+    await expect(caixa.getByText(/Confirmat|Confirmado/)).toBeVisible()
+    await caixa.getByRole('button', { name: /Canvia el lloc|Cambiar el lugar/ }).click()
+    await expect(dlg.getByTestId('lloc-habitual')).toHaveCount(0)
+    await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
+  })
+}
