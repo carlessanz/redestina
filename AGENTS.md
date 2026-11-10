@@ -232,7 +232,8 @@ D4): quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` 
 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
 rechaza con `22023 bloqueig_esborrat: <codis>` si hay **ofertas** (`ofertes`·`ofertes_rebudes`),
-documentos, albaranes o cierres; si no, arrastra lo operativo, borra la ficha, retira la
+documentos, albaranes, cierres o **expedientes de prevención con número** (`expedients`; deuda 140); si no,
+arrastra lo operativo (y los expedientes sin número), borra la ficha, retira la
 organización vacía y purga la whitelist. FK `NO ACTION` = última red; nunca un `.delete()` suelto
 (§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
@@ -414,7 +415,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270524100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270525100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -556,14 +557,13 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (78 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
+**Deuda abierta (77 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
 ofreciendo la factura) · **128** (canalización conciliada sin coste no se puede valorar después)
 · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
-splitting) · **138** (CR sin rectificar ni «enviat») · **140** (`borrar_ficha_completa` no conoce
-los expedientes) · **143**
+splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso) · **149**
 (dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
@@ -576,7 +576,7 @@ Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), 
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
 inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (95 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (96 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
@@ -584,7 +584,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
    **Referencia: 1.922 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.478/2.478 y 43 sin datos (deuda 174-178); producción 2.473/2.473 y 48 «Sin
+   **Referencia: clon 2.479/2.479 y 43 sin datos (deuda 140); producción 2.473/2.473 y 48 «Sin
    fallos de permisos» (deuda 174-178).** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

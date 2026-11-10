@@ -171,7 +171,7 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'certificat de donació · abast', prefijo: 'cdon.abast_', valores: ['oferta', 'periode', 'exercici'] },
     // Lo que impide borrar una ficha: los `codi` de `bloqueigs_esborrat_fitxa()` (desde
     // 20270508100000 también las ofertas), compuestos en `useEsborrarFitxa.tsx`.
-    { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'documents'] },
+    { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'expedients', 'documents'] },
     // El circuito de firma (05-11-2026, `lib/signatures.ts`): el estado por perspectiva
     // (`clauEstatSignatura`), quién firma (`firmes_document.part`), la vía y el filtro de
     // la bandeja de Documents.

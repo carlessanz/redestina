@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (deuda 140, `20270525100000`): se cierra la 140** (el borrado conoce los expedientes de prevención; detalle en §12ter): **77 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 174-178, `20270524100000`): se cierran las cinco** (P8 confirmada por la Fundació; detalle en §12ter): **78 vivas** y la siguiente entrada nueva es la 179.
 ⚠️ **10-11-2026 (Plan 2 A5, naturalesa, `20270523100000`): se abren la 176, la 177 y la 178**: **83 vivas** y la siguiente entrada nueva es la 179.
 ⚠️ **10-11-2026 (Plan 2 A3, excedentes del diagnóstico, `20270522100000`): se abre la 175**: **80 vivas** y la siguiente entrada nueva es la 176.
@@ -719,11 +720,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      (la social salía con 64,29 kg de 50); el neto del REC se reparte ahora entre todas las conciliadas del
      REC y después se descartan las no certificables. Ver §12ter.
 
-140. **`borrar_ficha_completa()` y `bloqueigs_esborrat_fitxa()` no conocen los expedientes de prevención**
-     (fase 11, `20270425100000`). La FK `expedients_prevencion.productor_id` es `restrict` a propósito: un
-     expediente con su PDF emitido es documentación. Hoy borrar una ficha con expediente falla con `23503`
-     (la «última red» de §4) en vez de con `bloqueig_esborrat: expedients` y su motivo. Arreglo: rama
-     `expedients` en las dos funciones (bloquea si tiene `numero_completo`; si no, arrastra el expediente).
+140. ~~El borrado no conocía los expedientes~~ **Cerrada el 10-11-2026** (`20270525100000`):
+     `bloqueigs_esborrat_fitxa()` da el código `expedients` si la ficha tiene un expediente de prevención
+     **con número** (la FK `restrict` se conserva como última red) y la red de documentos mira también los de
+     `expedient` y `cierre_receptor`; `borrar_una_fitxa()` arrastra los expedientes **sin número** y sus
+     evidencias (`documentos_externos` de `objeto_tipo='expedient'`, con sus ficheros). Ver §12ter.
 
 
 141. **Sin emisión a la hora de recogida, el bloqueo de 48 h (G1) ya no actúa sobre las recogidas

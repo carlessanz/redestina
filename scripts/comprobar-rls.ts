@@ -322,6 +322,8 @@ interface Check {
    *                              nulo si el fixture documental no está puesto.
    *   · `@fitxa_amb_ofertes`   → un productor con alguna oferta (20270508100000): tampoco se
    *                              puede borrar. Uuid nulo si no hay ninguna oferta.
+   *   · `@fitxa_amb_expedient` → un productor con un expediente de prevención numerado (deuda
+   *                              §12.140, 20270525100000). Uuid nulo si no hay ninguno.
    *   · `@meva_fitxa_productor` / `@meva_fitxa_entitat` → la ficha propia de ese tipo,
    *                              leída de la propia membresía (20270414100600: lo que
    *                              `convenio_vigente()` sí responde a una cuenta externa).
@@ -2552,6 +2554,17 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "una fitxa amb ofertes NO es pot esborrar (motiu «ofertes»)",
       requiereFixture: "una oferta de una ficha de prueba",
     },
+    // Deuda §12.140 (20270525100000): un expediente de prevención NUMERADO también bloquea, con su
+    // código (antes el borrado acababa en un 23503 de la FK `restrict`). De solo lectura.
+    {
+      tabla: "bloqueigs_esborrat_fitxa",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_tipo: "productor", p_ficha: "@fitxa_amb_expedient" },
+      codiEsperat: "expedients",
+      descripcion: "una fitxa amb un expedient de prevencio amb numero NO es pot esborrar (motiu «expedients»)",
+      requiereFixture: "un expediente de prevención numerado",
+    },
     // --- Circuito de firma (20270510100000–100200) ---
     // Cerrar y rechazar son del super_admin: con un uuid inventado la guarda deja pasar y la
     // existencia corta con 22023 (`estat_incorrecte`); sin motivo, `cal_motiu`. No escribe nada.
@@ -3388,6 +3401,13 @@ async function resolverArgs(
       const { data } = await cliente.from("excedentes")
         .select("productor_id")
         .not("productor_id", "is", null)
+        .limit(1).maybeSingle();
+      salida[clave] = (data as { productor_id: string } | null)?.productor_id ?? UUID_NULO;
+    } else if (valor === "@fitxa_amb_expedient") {
+      const { data } = await cliente.from("expedients_prevencion")
+        .select("productor_id")
+        .not("productor_id", "is", null)
+        .not("numero_completo", "is", null)
         .limit(1).maybeSingle();
       salida[clave] = (data as { productor_id: string } | null)?.productor_id ?? UUID_NULO;
     } else {

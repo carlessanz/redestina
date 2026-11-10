@@ -1123,12 +1123,14 @@ puede el titular) y `pendents_equip()` la 17.ª cola `signatures_per_tancar`.
 ✅ **Desde `20260921153439` hay UNA puerta** (§4bis), y es la que aplica la regla de §7.
 Hace, en una sola transacción: (1) comprueba los **bloqueos** —desde `20270508100000` las
 **ofertas** (abajo) y los fiscales: albaranes que ya no
-son borrador, cierres anuales o a demanda, líneas de cierre que citan la ficha, convenios o
-planes **con número**, y cualquier `documentos` emitido de esos objetos— y si hay alguno se
+son borrador, cierres anuales o a demanda, líneas de cierre que citan la ficha, convenios,
+planes o —desde `20270525100000`, deuda 140— **expedientes de prevención** (`expedients`) **con número**,
+y cualquier `documentos` emitido de esos objetos (también de `expedient` y `cierre_receptor`)— y si hay alguno se
 niega con `22023 bloqueig_esborrat: <codis>` **sin tocar nada**; (2) si no, arrastra lo
 operativo en orden —adjuntos y enlaces de los albaranes en borrador, esos albaranes, las
 sesiones de intake (antes que los excedentes, que las referencian), respuestas,
-canalizaciones, ofertas, espigoladas, ubicaciones y los enlaces de firma de sus convenios—;
+canalizaciones, ofertas, espigoladas, ubicaciones, los enlaces de firma de sus convenios y los
+**expedientes sin número** con sus evidencias (`documentos_externos` de `objeto_tipo='expedient'`)—;
 (3) borra la ficha, que arrastra en `CASCADE` convenios, membresías y planes; y (4)
 **retira la organización si se queda sin ninguna ficha**. Con `tambe_germana` hace lo mismo
 con la otra ficha del doble rol **dentro de la misma transacción**: o las dos o ninguna.
