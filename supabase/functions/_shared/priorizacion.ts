@@ -25,11 +25,11 @@ const FAMILIA_NO_FRESCA = "Varis";
 //   · «al final, con aviso» = sin el convenio vigente que exige la modalidad de la oferta
 //     (`conveni_vigent`, calculado en `priorizar-entidades` con `convenios_exigidos`: el mismo
 //     que alimenta `sense_conveni` y que pide la fecha de corte para mostrar interés).
-//   · excluida = `estat` «No procedeix», la única decisión explícita del equipo que guarda la
-//     columna del antiguo Excel del ARA.
-// Antes «Signat» en `estat` era lo activo y un `estat` vacío EXCLUÍA: toda entidad dada de alta
-// en el panel o por el importador nace sin `estat`, así que no salía nunca en las sugerencias.
-const ESTATS_EXCLUIDOS = ["no procedeix"];
+//   · excluida = la que no es `activo`, y eso lo hace la CONSULTA de `priorizar-entidades`, no
+//     este módulo. Desde el Plan 2 B1 (20270518100000) `activo` lo deriva el estado CRM
+//     (`estat_crm = 'actiu'`): Potencial, En desenvolupament e Inactiu no entran. El «No
+//     procedeix» de la columna `estat` del antiguo Excel —lo único que excluía aquí— pasó a
+//     `inactiu` en el backfill, y la columna queda sin uso (deuda §12.172).
 
 export interface EntidadPriorizable {
   id: string;
@@ -38,8 +38,6 @@ export interface EntidadPriorizable {
   telefono: string | null;
   opt_in: boolean | null;
   area_geografica: string | null;
-  /** Columna del antiguo Excel del ARA: solo «No procedeix» cuenta (excluye). */
-  estat: string | null;
   /** ¿Tiene el convenio vigente que exige la modalidad? Sin él, va al final con aviso. */
   conveni_vigent: boolean;
   prioritat: number | null;
@@ -118,9 +116,6 @@ export function puntuarEntidad(
   entidad: EntidadPriorizable,
   excedente: ExcedenteContexto,
 ): EntidadPuntuada | null {
-  // Excluida: «No procedeix» en la columna del Excel. Sin estado ya NO excluye (§12.168).
-  if (ESTATS_EXCLUIDOS.includes(norm(entidad.estat))) return null;
-
   const pendiente = !entidad.conveni_vigent;
 
   let puntuacion = 0;

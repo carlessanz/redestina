@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest'
 import {
   claveMunicipi, codiValid, creuarAirtable, dataAlta, derivarBoolean, type Existent, extraerCorreos, extraerTelefonos,
   type FilaAra, HOJAS, type Hoja, indexMunicipis, llegirAirtable, llegirFulla, normalitzaCapcalera, parseCsv,
-  pegatRellenaHuecos, planificar, resolCapcaleres, similitud, tipoReceptorDeFamilia, tipusProposat,
+  estatCrmDeHoja, pegatRellenaHuecos, planificar, resolCapcaleres, similitud, tipoReceptorDeFamilia, tipusProposat,
 } from '../scripts/ara2026/nucli'
 
 const CAP_ACTIUS = ',Nom,Empresa,Codi,Comentari,Visitat,Conveni,Tipo  Empresa,Movils,Fix,Adreça,C.P.,NIF,Area geogràfica,Població,Coord,Coord 2,Producte,01/19'
@@ -240,5 +240,20 @@ describe('Airtable', () => {
     expect(tipusProposat('FUNDACION AUREA', ['Donación'])).toBe('social')
     expect(tipusProposat('GRANJA', ['Alimentación animal'])).toBe('animal')
     expect(tipusProposat('EMPRESA', ['Venta'])).toBe('comercial')
+  })
+})
+
+// Plan 2 B1 (20270518100000): el estado CRM con el que entra cada hoja, igual que el backfill.
+describe('estatCrmDeHoja', () => {
+  it('potencials → potencial; inactius → inactiu; actius y sda → en desenvolupament', () => {
+    expect(estatCrmDeHoja('prod_potencials')).toBe('potencial')
+    expect(estatCrmDeHoja('prod_inactius')).toBe('inactiu')
+    expect(estatCrmDeHoja('sda_inactius')).toBe('inactiu')
+    expect(estatCrmDeHoja('prod_actius')).toBe('en_desenvolupament')
+    expect(estatCrmDeHoja('sda')).toBe('en_desenvolupament')
+  })
+  it('la segunda pasada no pisa el estado que haya puesto el equipo', () => {
+    expect(pegatRellenaHuecos({ estat_crm: 'actiu' }, { estat_crm: 'potencial' })).toEqual({})
+    expect(pegatRellenaHuecos({}, { estat_crm: 'potencial' })).toEqual({})
   })
 })

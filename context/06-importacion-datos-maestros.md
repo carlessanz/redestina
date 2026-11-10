@@ -151,6 +151,11 @@ están en Airtable); pedir la exportación de «Ofertantes»/«Receptores» de A
 teléfono o correo (P7); si el `.xlsm` del 21-09 es el definitivo (riesgo del plan, §7); y si se quieren
 las coordenadas como `productor_ubicaciones`.
 
+**Estado CRM (Plan 2 B1, `20270518100000`)**: cada hoja entra con su estado (`estatCrmDeHoja()` en
+`scripts/ara2026/nucli.ts`, misma tabla que el backfill): `prod_potencials` → `potencial`; `prod_inactius` y
+`sda_inactius` → `inactiu`; `prod_actius` y `sda` → `en_desenvolupament`. Ninguna entra `actiu`, y la segunda pasada
+no pisa el estado (`pegatRellenaHuecos` lo salta como `activo`).
+
 ## 6.2 Importador de entidades desde Excel en el panel (`20270511100000`, 06-11-2026)
 
 **Para qué.** El super_admin da de alta actores en lote desde un Excel exportado de Airtable (o la plantilla
@@ -219,3 +224,8 @@ teléfono secundario…; los nombres distintos quedan como conflicto, no se pisa
 mismo fichero: 3 `sense_canvis` y aviso de «ja importat». En producción las 3 serían nuevas (el ARA se borró).
 
 **Cómo debe ser el Excel** para la Fundació: `3. Claude Code/2026-11-06-importador-entitats.md` en Drive.
+
+**Estado CRM (Plan 2 B1, `20270518100000`)**: las fichas que crea el importador del panel nacen **`potencial`**
+(`alta_fitxa_interna(p_activo = false)` → el trigger de alta deriva `potencial`). Una ficha existente no cambia de
+estado al reimportar.
+

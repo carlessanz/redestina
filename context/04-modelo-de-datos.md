@@ -1432,6 +1432,39 @@ consentimiento lo da la persona con una acción suya. Ahora el equipo lo **pide*
 - `v_productores_llistat` y `v_entidades_llistat` **se conservan sin consumidor** (§7, compatibles
   hacia atrás; deuda 149).
 
+### Estado CRM por papel (Plan 2, rebanada B1, `20270518100000`, 10-11-2026)
+
+Teams 1 de Sebas y Taula mestra 1.5. **D8 (Carles): el estado CRM manda y `activo` se deriva.**
+
+- **`productores.estat_crm` / `entidades.estat_crm`** (`text not null`, CHECK `potencial · en_desenvolupament ·
+  actiu · inactiu`). **Sin `default`, a propósito** (decisión de la sesión, desviación del plan que pedía
+  `default 'potencial'`): en un BEFORE INSERT el default ya está aplicado y no se distinguiría «no viene» de «viene
+  potencial»; sin él decide el trigger de alta y el NOT NULL se comprueba después de los triggers. Así
+  `alta_fitxa_interna()` no cambia de firma (el plan le añadía `p_estat_crm`): manda `p_activo` y el trigger deriva.
+- **`activo = (estat_crm = 'actiu')`**. Potencial y En desenvolupament **no operan**: todo lo que filtraba por
+  `activo` (Mercat, `priorizar-entidades`, selectores, `comprova_interes`) sigue igual.
+- **`trg_fitxa_estat()` fundido** (T5) sobre `before update of activo, estat_crm`: si cambia `estat_crm`, deriva
+  `activo`; si no y cambia `activo` (camino legado: `activar_/desactivar_fitxa`, `*_organitzacio`, escritura directa
+  del equipo), traduce: activar → `actiu`; desactivar un `actiu` → `inactiu`; una que nunca operó conserva su estado.
+  Después, las guardas de siempre al activar y la fila en `fitxa_estat_hist`, ahora con `estat_crm`.
+- **`trg_fitxa_estat_alta()`** (`before insert`): si viene `estat_crm`, manda (y fija `activo`); si no, `activo`
+  decide `actiu`/`potencial`. No escribe historial. **`trg_fitxa_estat_hist_estat()`** (`before insert` en
+  `fitxa_estat_hist`): las filas de alta que escriben `alta_fitxa_interna`/`crear_entitat` sin estado toman el de la ficha.
+- **Backfill**: entidad con `estat` «No procedeix» e inactiva → `inactiu` (era lo único que excluía del ranking); activa →
+  `actiu`; `ARA26:prod_potencials:` → `potencial`; `ARA26:*_inactius:` → `inactiu`; `ARA26:prod_actius:` y `ARA26:sda:` →
+  `en_desenvolupament`; con algún `activo=true` en el historial → `inactiu`; resto → `potencial`. El historial anterior,
+  `actiu`/`inactiu` según su `activo`. En el clon (721 importadas): productores 7 actiu · 347 en desenvolupament · 175
+  potencial · 28 inactiu; entidades 8 actiu · 107 en desenvolupament · 64 inactiu.
+- **Valor inicial por vía**: `crear_entitat()` → `actiu` (ya exige NIF válido y razón social); importador del panel →
+  `potencial`; registro propio → `en_desenvolupament` (lo manda `registro/alta.ts`; **P1**) y `aprovar_registre()` intenta
+  `actiu` (si el trigger lo corta, la aprobación sigue y Aprovacions lo avisa: `appr.reg_no_actiu`); importador ARA →
+  `estatCrmDeHoja()`; `afegir_paper_org_equip` copia `activo` de la hermana, así que la nueva nace `actiu` o `potencial`.
+- **Vistas** (columnas al final): `v_organizaciones` + `productor_estat_crm`, `entidad_estat_crm`; `v_entitats_llistat`
+  + esos dos y `estat_crm` de la organización (`actiu` si algún papel lo es; si no, el más avanzado:
+  en_desenvolupament > potencial > inactiu).
+- **`entidades.estat`** (legado del Excel): se queda sin uso —fuera de la ficha (`NO_ES_MOSTRA`) y de
+  `_shared/priorizacion.ts`—; `drop` pendiente de autorización (deuda 172). `prioritat` no se toca.
+
 ### Estado de las fichas y búsqueda (plan 1, rebanada 1A, `20270501100000`, 02-11-2026)
 
 - **`entidades.activo`** (`boolean not null default true`): ya existía en `productores`. Las fichas de

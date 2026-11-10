@@ -7,7 +7,7 @@
 // deja como estaban al acabar.
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom, opcionsDe } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, productorDe, sql, sqlCom, opcionsDe, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -20,11 +20,16 @@ let nomSocial = ''
 let comercial = ''
 let nifComercial = ''
 let ofertaId = ''
+let orgDoble = ''
 
-/** Vuelve una entidad a `activo = true` sin pasar por el trigger (su NIF de prueba no es válido). */
+/**
+ * Vuelve una entidad a `activo = true` sin pasar por el trigger (su NIF de prueba no es válido).
+ * Desde B1 (20270518100000) el estado CRM manda: se repone también `estat_crm = 'actiu'`, que el
+ * trigger no deriva con él apagado.
+ */
 function reactivaSenseTrigger(id: string, nif: string) {
   sql(`begin; set local session_replication_role = replica;
-       update entidades set activo = true, nif = '${nif}' where id = '${id}'; commit;`)
+       update entidades set activo = true, estat_crm = 'actiu', nif = '${nif}' where id = '${id}'; commit;`)
 }
 
 test.beforeEach(({}, info) => {
@@ -56,6 +61,10 @@ test.afterAll(() => {
   if (sql(`select activo from entidades where id = '${comercial}'`) === 'f') reactivaSenseTrigger(comercial, nifComercial)
   if (ofertaId) {
     try { sql(`delete from excedentes where id = '${ofertaId}'`) } catch { sql(`update excedentes set estado = 'cancelada' where id = '${ofertaId}'`) }
+  }
+  if (orgDoble) {
+    const p = sql(`select coalesce((select id::text from productores where organizacion_id = '${orgDoble}'), '')`)
+    if (p) sqlCom('super_admin', `select borrar_ficha_completa('productor', '${p}', true)`)
   }
 })
 
@@ -127,3 +136,78 @@ test('la búsqueda del equipo encuentra por NIF y por nombre; un externo no busc
   expect(sqlCom('equip', `select count(*) from cerca_entitats('ab')`)).toBe('0')
   expect(() => sqlCom(SOCIAL, `select * from cerca_entitats('B0000')`)).toThrow(/Nomes l'equip pot cercar/)
 })
+
+// ---------------------------------------------------------------------------
+// Plan 2, B1 (20270518100000): el ESTADO CRM por papel manda y `activo` se deriva (D8).
+// ---------------------------------------------------------------------------
+
+test('B1 · «En desenvolupament» saca a la entidad del Mercat y del interés; Actiu la devuelve', () => {
+  sqlCom('super_admin', `select fixar_estat_crm('entidad', '${social}', 'en_desenvolupament')`)
+  expect(sql(`select estat_crm || '|' || activo from entidades where id = '${social}'`)).toBe('en_desenvolupament|false')
+  expect(sql(`select estat_crm || '|' || activo from fitxa_estat_hist where entidad_id = '${social}' order by at desc limit 1`))
+    .toBe('en_desenvolupament|false')
+  expect(sqlCom(SOCIAL, `select count(*) from excedentes where id = '${ofertaId}'`)).toBe('0')
+  expect(() => sqlCom(SOCIAL, `select manifestar_interes('${ofertaId}', '${social}', 10)`)).toThrow(/entitat_inactiva/)
+
+  sqlCom('super_admin', `select fixar_estat_crm('entidad', '${social}', 'actiu')`)
+  expect(sql(`select estat_crm || '|' || activo from entidades where id = '${social}'`)).toBe('actiu|true')
+  expect(sqlCom(SOCIAL, `select count(*) from excedentes where id = '${ofertaId}'`)).toBe('1')
+})
+
+test('B1 · Actiu sin NIF → falta_nif; el camino legado (desactivar_fitxa) deja Inactiu; el técnico no puede', () => {
+  // Desactivar por la RPC de siempre: el trigger lo traduce a `inactiu` (estaba `actiu`).
+  sqlCom('super_admin', `select desactivar_fitxa('entidad', '${comercial}')`)
+  expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('inactiu|false')
+  sql(`update entidades set nif = null where id = '${comercial}'`)
+  expect(() => sqlCom('super_admin', `select fixar_estat_crm('entidad', '${comercial}', 'actiu')`)).toThrow(/falta_nif/)
+  expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('inactiu|false')
+  expect(() => sqlCom('equip', `select fixar_estat_crm('entidad', '${comercial}', 'potencial')`)).toThrow(/Nomes admin o super_admin/)
+  expect(() => sqlCom('super_admin', `select fixar_estat_crm('entidad', '${comercial}', 'activa')`)).toThrow(/estat_desconegut/)
+  reactivaSenseTrigger(comercial, nifComercial)
+  expect(sql(`select estat_crm || '|' || activo from entidades where id = '${comercial}'`)).toBe('actiu|true')
+})
+
+test('B1 · doble rol: dos estados independientes en «Estat i papers», y el listado por defecto solo enseña Actiu', async ({ page }) => {
+  const nom = `E2E B1 doble ${marca}`
+  // Una organización con los dos papeles, sin NIF: ofertante Potencial, receptora En desenvolupament.
+  orgDoble = sql(`insert into productores (name, empresa, es_test, estat_crm)
+    values ('Persona E2E', '${nom}', true, 'potencial') returning organizacion_id`).split('\n')[0]
+  sql(`insert into entidades (nombre, tipo_receptor, es_test, organizacion_id, estat_crm)
+    values ('${nom}', 'social', true, '${orgDoble}', 'en_desenvolupament')`)
+  expect(sql(`select productor_estat_crm || '|' || entidad_estat_crm || '|' || estat_crm || '|' || activa
+                from v_entitats_llistat where id = '${orgDoble}'`)).toBe('potencial|en_desenvolupament|en_desenvolupament|false')
+
+  await entra(page, 'super_admin')
+  await page.goto(`/equip/entitats/${orgDoble}?pestanya=intern`)
+  await expect(page.getByTestId('rols-productor-badge')).toHaveText(/^Potencial$/, { timeout: 20_000 })
+  await expect(page.getByTestId('rols-entidad-badge')).toHaveText(/^(En desenvolupament|En desarrollo)$/)
+  await expect(page.getByTestId('capcalera-estat-ofertant')).toContainText(/potencial/i)
+
+  // Cambiar uno no toca el otro.
+  await tria(page.getByTestId('rols-entidad-estat'), 'inactiu')
+  await expect(page.getByTestId('rols-entidad-badge')).toHaveText(/^(Inactiu|Inactivo)$/)
+  await expect(page.getByTestId('rols-productor-badge')).toHaveText(/^Potencial$/)
+  expect(sql(`select p.estat_crm || '|' || e.estat_crm from productores p join entidades e using (organizacion_id)
+               where p.organizacion_id = '${orgDoble}'`)).toBe('potencial|inactiu')
+
+  // Actiu sin NIF: el trigger lo corta y la pantalla lo dice; el estado no cambia.
+  await tria(page.getByTestId('rols-productor-estat'), 'actiu')
+  await expect(page.getByText(/Cal el NIF per activar-la|Hace falta el NIF para activarla/)).toBeVisible()
+  await expect(page.getByTestId('rols-productor-badge')).toHaveText(/^Potencial$/)
+  expect(sql(`select estat_crm from productores where organizacion_id = '${orgDoble}'`)).toBe('potencial')
+
+  // El listado abre con «Estat: Actiu»: la organización no sale hasta pedir su estado.
+  await page.goto('/equip/entitats')
+  await expect(page.getByTestId('entitat-fila').first()).toBeVisible({ timeout: 20_000 })
+  await page.getByRole('searchbox').fill(nom)
+  await expect(page.getByTestId('entitat-fila')).toHaveCount(0)
+  await tria(page.locator('#ent-estat'), 'potencial')
+  await expect(page.getByTestId('entitat-fila')).toHaveCount(1)
+  await expect(page.getByTestId('entitat-fila').getByTestId('entitat-estat')).toHaveText(/^Potencial$/)
+  // Con el papel fijado manda el estado de ese papel: como receptora está Inactiu.
+  await tria(page.locator('#ent-rol'), 'receptor')
+  await expect(page.getByTestId('entitat-fila')).toHaveCount(0)
+  await tria(page.locator('#ent-estat'), 'inactiu')
+  await expect(page.getByTestId('entitat-fila')).toHaveCount(1)
+})
+

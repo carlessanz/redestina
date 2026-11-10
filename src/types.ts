@@ -1,3 +1,5 @@
+import type { EstatCrm } from './lib/estatCrm'
+
 export interface WaContact {
   id: string
   phone: string
@@ -126,6 +128,9 @@ export interface OrganizacioVista {
   tipus_activitat: string[]
   te_compte: boolean
   compte_estat: CompteEstat
+  // --- B1 (20270518100000): estado CRM por papel; null si no tiene ese papel ---
+  productor_estat_crm: EstatCrm | null
+  entidad_estat_crm: EstatCrm | null
 }
 
 /**
@@ -170,6 +175,11 @@ export interface EntitatLlistat {
   /** Próximas acciones sin hacer (Taula mestra 1.5, 20270504100000) y la fecha más próxima. */
   seguiments_pendents: number
   propera_seguiment: string | null
+  // --- B1 (20270518100000) ---
+  productor_estat_crm: EstatCrm | null
+  entidad_estat_crm: EstatCrm | null
+  /** De la organización: `actiu` si algún papel lo es; si no, el más avanzado */
+  estat_crm: EstatCrm
 }
 
 /** Estado de la cuenta de una organización, derivado de `membresias` (1A). */

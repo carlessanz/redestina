@@ -1830,6 +1830,27 @@ propuestas por defecto P5 y P10. Migración `20270501200000` (§4, §4bis).
   interna», y el equipo ve lo que cambió el actor. Deja la ficha de productor de Carles con NIF
   válido y razón social (antes no se podía reactivar).
 
+### Estado CRM por papel en «Estat i papers» y en «Entitats» (Plan 2, B1, 10-11-2026)
+
+- **`fitxa/BlocRols.tsx`** («Gestió interna › Estat i papers»): por papel, badge del estado y un `Desplegable` con
+  los cuatro (`fixar_estat_crm`); dejar `actiu` pide confirmación. Los botones globales «Activa/Desactiva l'entitat»
+  (`activar_/desactivar_organitzacio`) se conservan. El badge de la organización es su estado CRM (el más avanzado)
+  salvo doble rol con uno activo y otro no («Activa en part»). Sin `pot_aprovar()`, todo gris.
+- **Cabecera de `EntitatDetall`**: un badge por papel «Ofertant · potencial» (`capcalera-estat-<paper>`).
+- **`lib/estatCrm.ts`** (puro, `tests/estatCrm.test.ts`): `ESTATS_CRM`, `classeEstatCrm` (actiu éxito, en
+  desenvolupament aviso, potencial secundario, inactiu atenuado), `estatOrganitzacio`, `estatPerFiltre`.
+- **`Entitats.tsx`**: la dimensión «Estat» son los cuatro estados; con el papel fijado (`?rol=` o el filtro «Rol»)
+  manda el estado de ese papel. `PER_DEFECTE = { estat: 'actiu' }`; la clave de filtros recordados pasa a
+  `equip-entitats-crm` (lo recordado como `activa` ya no casaría). Badge por fila si no es `actiu`.
+- **«Nova entitat»**: el estado inicial se enseña, no se elige (`ne.estat_inicial`: nace Actiu).
+- **Aprovacions**: tras aprobar un registro, si la ficha no quedó `actiu` (falta NIF o razón social), aviso
+  `appr.reg_no_actiu` (P1).
+- i18n: `ef.estat_<estat>` y `fl.v_<estat>` declaradas como compuestas en `tests/i18n.test.ts`; se borraron
+  `ef.fi_estat`, `ef.hi_estat`, `ef.btn_desactiva` y `ef.confirm_desactiva_d` (sin uso).
+- E2E `entitats-estat.e2e.ts` (+3): En desenvolupament saca del Mercat y del interés y Actiu lo devuelve;
+  Actiu sin NIF → `falta_nif`, el camino legado deja `inactiu`, el técnico no puede; doble rol con dos estados
+  independientes y el listado que abre con `actiu`.
+
 ### Estado de las fichas en los paneles (plan 1, rebanada 1A, 02-11-2026)
 
 - **Mercat**: si la entidad está inactiva, aviso `mk.entitat_inactiva` (`data-testid="mercat-inactiva"`)

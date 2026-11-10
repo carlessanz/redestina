@@ -230,6 +230,12 @@ export async function executarAlta(supabase: Cliente, d: Dades, opcions: Opcions
         // ninguna `aprovada` (desde el 09-11-2026; antes lo hacía su `estat` NULL).
       };
 
+    // Estado CRM inicial (Plan 2 B1, P1, 20270518100000): el registro propio nace «En
+    // desenvolupament» y, por tanto, sin operar (`activo` lo deriva la base del estado).
+    // Aprobar el registro (`aprovar_registre`) intenta pasarlo a Actiu, que exige NIF válido y
+    // razón social. La rama asistida (código muerto, deuda §12.151) sigue naciendo activa.
+    if (!assistit) fila.estat_crm = "en_desenvolupament";
+
     const { data: fitxa, error: errFitxa } = await supabase
       .from(taula).insert(fila).select("id").single();
 

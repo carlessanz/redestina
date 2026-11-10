@@ -890,6 +890,9 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "cerca_entitats", op: "rpc", esperado: "denegar", args: { p_q: "B0000" }, descripcion: "NO cerca entitats (és de l'equip)" },
   { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa cap fitxa" },
   { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap fitxa" },
+  // Plan 2, B1 (20270518100000): el estado CRM por papel es de `pot_aprovar()`.
+  { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "actiu" }, descripcion: "NO canvia l'estat CRM de cap fitxa" },
+  { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "en_desenvolupament" }, descripcion: "NO canvia l'estat CRM de cap ofertant" },
   { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
   { tabla: "fitxa_estat_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historial d'estats de les fitxes" },
@@ -1575,6 +1578,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fitxa_estat_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial directament (només el trigger)" },
     { tabla: "activar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO activa fitxes (és de l'admin)" },
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva fitxes (és de l'admin)" },
+    // Plan 2, B1 (20270518100000): el técnico no cambia el estado CRM (como activar/desactivar).
+    { tabla: "fixar_estat_crm", op: "rpc", esperado: "denegar", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "actiu" }, descripcion: "NO canvia l'estat CRM (és de l'admin)" },
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva organitzacions (és de l'admin)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers en nom d'una organització (és de l'admin)" },
     // Plan 1, 1B (20270501300000): el técnico SÍ da de alta (como el alta directa de antes).
@@ -1933,6 +1938,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "activar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot activar una fitxa (22023 si no existeix)" },
     { tabla: "v_entitats_llistat", op: "leer", esperado: "permitir", descripcion: "veu el llistat d'entitats (totes)", requiereFixture: "alguna organització amb fitxa" },
     { tabla: "desactivar_fitxa", op: "rpc", esperado: "permitir", args: { p_tipus: "productor", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una fitxa (22023 si no existeix)" },
+    // Plan 2, B1 (20270518100000): con un id inventado, 22023 `fitxa_inexistent`.
+    { tabla: "fixar_estat_crm", op: "rpc", esperado: "permitir", args: { p_tipus: "entidad", p_id: "00000000-0000-0000-0000-000000000000", p_estat: "en_desenvolupament" }, descripcion: "pot canviar l'estat CRM d'una fitxa (22023 si no existeix)" },
     { tabla: "desactivar_organitzacio", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot desactivar una organització (22023 si no existeix)" },
     { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "pot afegir un paper a una organització (22023 si no existeix)" },
     { tabla: "crear_entitat", op: "rpc", esperado: "permitir", args: { p_dades: { rols: [] } }, descripcion: "pot donar d'alta una entitat (22023 sense papers)" },

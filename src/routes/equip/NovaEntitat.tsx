@@ -378,6 +378,9 @@ export default function NovaEntitat() {
               </Seccio>
             )}
 
+            {/* El estado inicial se enseña, no se elige (B1, D8): el alta ya exige NIF válido y
+                razón social, así que `crear_entitat()` la deja Actiu. */}
+            <p className="text-sm text-muted-foreground" data-testid="ne-estat-inicial">{t('ne.estat_inicial')}</p>
             <FilaCasella checked={esTest} onChange={setEsTest}>{t('ne.es_test')}</FilaCasella>
             {potAprovar && (
               <div data-testid="ne-acces">

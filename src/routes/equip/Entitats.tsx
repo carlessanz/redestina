@@ -3,8 +3,10 @@
 // («Entitats productores» / «Entitats receptores», uno por tabla).
 //
 // Filtros con `BarraFiltres` (fase 6): papel, estado, zona, tipo de entidad y cuenta.
-// **Por defecto solo las activas** (P10): el filtro «Estat» viene puesto y el contador
-// «Mostrant N de M» lo dice; quitarlo enseña las inactivas (las importadas de 1E entrarán así).
+// «Estat» es el ESTADO CRM (Plan 2, B1, 10-11-2026): Potencial · En desenvolupament · Actiu ·
+// Inactiu; con el papel fijado (`?rol=` o el filtro «Rol») manda el estado de ese papel, sin él
+// el de la organización (`v_entitats_llistat.estat_crm`). **Por defecto solo `actiu`** (P10 del
+// plan 1): el filtro viene puesto y el contador «Mostrant N de M» lo dice.
 // `?rol=ofertant|receptor` en la URL fija el papel (es a donde redirigen `/equip/productors` y
 // las tarjetas del tablero). Como los listados de siempre: arriba las de prueba, buscador en
 // cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila (iconos). «Darrer
@@ -26,6 +28,7 @@ import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { avuiLocal, dataCurta } from '../../lib/format'
 import { estatSeguiment, faTemps } from '../../lib/notesInternes'
+import { classeEstatCrm, estatPerFiltre } from '../../lib/estatCrm'
 import { ambComunicacions, csvConsentiments, filesExport, llistaConsentiments } from '../../lib/consentiments'
 import { descarregarText } from '../../lib/tancament'
 import BarraFiltres from '../../components/BarraFiltres'
@@ -40,10 +43,10 @@ import {
   Table, TableBody, TableCell, TableHead, TableHeader, TableRow,
 } from '@/components/ui/table'
 
-const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat, darrer_contacte_at, darrer_contacte_canal, seguiments_pendents, propera_seguiment'
+const COLS = 'id, nom_comercial, razon_social, nif, persona_contacte, email, telefono, poblacion, comarca, municipio_ine, productor_id, entidad_id, es_generadora, es_receptora, productor_activo, entidad_activo, activa, tipo_receptor, tipus_activitat, te_compte, compte_estat, canal_preferido, created_at, es_test, rebutjada, modalitats_interes, prioritat, conveni_productor, conveni_entitat, darrera_activitat, darrer_contacte_at, darrer_contacte_canal, seguiments_pendents, propera_seguiment, productor_estat_crm, entidad_estat_crm, estat_crm'
 
 const soloDigitos = (s: string | null) => (s ?? '').replace(/\D/g, '')
-const PER_DEFECTE = { estat: 'activa' }
+const PER_DEFECTE = { estat: 'actiu' }
 
 /** Cómo van los seguimientos de una entidad: el más próximo decide si hay alguno vencido. */
 function seguimentDe(e: EntitatLlistat): 'vencut' | 'avui' | 'pendent' | 'cap' {
@@ -94,7 +97,7 @@ export default function Entitats() {
     return () => { cancelled = true; void supabase.removeChannel(channel) }
   }, [])
 
-  const fl = useFiltresLlistat('equip-entitats', PER_DEFECTE)
+  const fl = useFiltresLlistat('equip-entitats-crm', PER_DEFECTE)
   // `?rol=` fija el papel al llegar (del tablero o de la ruta antigua de productores).
   const rolUrl = params.get('rol')
   useEffect(() => {
@@ -104,14 +107,15 @@ export default function Entitats() {
 
   // El papel NO es una dimensión de `filtraLlistat` (una organización con doble rol cuenta en
   // los dos, y una dimensión solo admite un valor por fila): se filtra aparte, `perRol`.
+  const rolFiltre = fl.valors.rol
   const dims = useMemo<Dimensio<EntitatLlistat>[]>(() => [
-    { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (e) => (e.activa ? 'activa' : 'inactiva') },
+    { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (e) => estatPerFiltre(e, rolFiltre) },
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (e) => e.comarca },
     { clau: 'tipus', etiquetaKey: 'fl.d_tipus', valor: (e) => e.tipo_receptor },
     { clau: 'compte', etiquetaKey: 'fl.d_compte', valor: (e) => e.compte_estat },
     // Los seguimientos del CRM (1.5): con alguno vencido, para hoy, pendiente o sin ninguno.
     { clau: 'seguiment', etiquetaKey: 'fl.d_seguiment', valor: (e) => seguimentDe(e) },
-  ], [])
+  ], [rolFiltre])
   const perRol = (e: EntitatLlistat) => !fl.valors.rol
     || (fl.valors.rol === 'ofertant' && e.es_generadora) || (fl.valors.rol === 'receptor' && e.es_receptora)
 
@@ -186,7 +190,10 @@ export default function Entitats() {
                   <span className="flex flex-wrap items-center gap-2">
                     {nom}
                     {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
-                    {!e.activa && <Badge className="bg-muted text-muted-foreground">{t('ef.estat_inactiva')}</Badge>}
+                    {/* El estado CRM de la organización (B1): solo se marca lo que no es Actiu. */}
+                    {e.estat_crm !== 'actiu' && (
+                      <Badge className={classeEstatCrm(e.estat_crm)} data-testid="entitat-estat">{t(`ef.estat_${e.estat_crm}`)}</Badge>
+                    )}
                     {/* Un alta rechazada se MARCA, no se esconde (§12.29). */}
                     {e.rebutjada && <Badge className="bg-error-fondo text-error">{t('badge.rejected')}</Badge>}
                     {sense > 0 && <Badge variant="destructive">{t('el.unanswered', { n: sense })}</Badge>}

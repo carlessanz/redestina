@@ -1,17 +1,17 @@
 // El bloque «Estat i papers» de la ficha del EQUIPO (1C; en «Gestió interna» desde el
 // 04-11-2026): primero el estado GLOBAL de la entidad —activar o desactivar todos sus papeles a
 // la vez (`activar_organitzacio` / `desactivar_organitzacio`, D7)—, y debajo cada papel por
-// separado —activar o desactivar uno (`activar_fitxa` / `desactivar_fitxa`) y añadir el otro
-// (`afegir_paper_org_equip`)—.
+// separado: su ESTADO CRM (Plan 2, B1, 10-11-2026) —Potencial · En desenvolupament · Actiu ·
+// Inactiu, `fixar_estat_crm()`— y añadir el otro papel (`afegir_paper_org_equip`).
 //
-// `activo` NO es un campo del formulario a propósito (deuda §12.147): se cambia aquí, por
-// RPC, con quién y cuándo en `fitxa_estat_hist`; el alta no lo manda y la columna toma su
-// `default true`. Las reglas (NIF válido, razón social) las pone el trigger y aquí solo se
-// traducen (`textError`: `falta_nif`, `nif_invalid`, `falta_rao_social`).
+// D8: el estado CRM MANDA y `activo` lo deriva la base (`activo = estat_crm = 'actiu'`); solo
+// Actiu opera (Mercat, priorización, selectores). Pasar a Actiu exige NIF válido y razón social:
+// lo corta el trigger y aquí solo se traduce (`textError`: `falta_nif`, `nif_invalid`,
+// `falta_rao_social`). Todo cambio queda en `fitxa_estat_hist` (quién, cuándo, estado).
 //
-// Solo `pot_aprovar()` (admin y super_admin) puede cambiar el estado: a los demás los botones
-// les salen grises con el motivo. El actor tiene su propio bloque (`RolRedestina`), que pide
-// el otro papel con membresía pendiente.
+// Solo `pot_aprovar()` (admin y super_admin) puede cambiar el estado: a los demás el selector y
+// los botones les salen grises con el motivo. El actor tiene su propio bloque (`RolRedestina`),
+// que pide el otro papel con membresía pendiente.
 
 import { useState } from 'react'
 import { toast } from 'sonner'
@@ -20,6 +20,8 @@ import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useConfirma } from '../DialegConfirma'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
+import Desplegable from '../Desplegable'
+import { ESTATS_CRM, classeEstatCrm, estatCrm, estatOrganitzacio, type EstatCrm } from '../../lib/estatCrm'
 import { Badge } from '@/components/ui/badge'
 import type { OrganizacioVista } from '../../types'
 
@@ -45,15 +47,17 @@ export default function BlocRols({ org, potAprovar, onCanviat }: {
     onCanviat()
   }
 
-  async function canviaEstat(paper: Paper, id: string, activar: boolean) {
+  async function canviaEstat(paper: Paper, id: string, estat: EstatCrm) {
     const rolKey = paper === 'productor' ? 'ef.paper_ofertant' : 'ef.paper_receptor'
-    if (!activar && !(await confirma({
+    // Dejar de ser Actiu saca al papel del Mercat y de la priorización: se pregunta antes.
+    const actual = estatCrm(paper === 'productor' ? org.productor_estat_crm : org.entidad_estat_crm)
+    if (actual === 'actiu' && estat !== 'actiu' && !(await confirma({
       titol: t('ef.confirm_desactiva_t', { rol: t(rolKey).toLowerCase() }),
-      descripcio: t('ef.confirm_desactiva_d'),
-      confirmar: t('ef.btn_desactiva'),
+      descripcio: t('ef.confirm_estat_d', { estat: t(`ef.estat_${estat}`) }),
+      confirmar: t('ef.confirm_estat_ok'),
       destructiu: true,
     }))) return
-    await crida(activar ? 'activar_fitxa' : 'desactivar_fitxa', { p_tipus: paper, p_id: id }, 'ef.estat_canviat')
+    await crida('fixar_estat_crm', { p_tipus: paper, p_id: id, p_estat: estat }, 'ef.estat_canviat')
   }
 
   async function afegeix(paper: Paper) {
@@ -80,49 +84,55 @@ export default function BlocRols({ org, potAprovar, onCanviat }: {
   // el trigger corta todo y lo dice.
   const activaTot = () => crida('activar_organitzacio', { p_org: org.id }, 'ef.estat_canviat')
 
-  function fila(paper: Paper, id: string | null, actiu: boolean | null) {
-    const te = id !== null
+  const opcionsEstat = ESTATS_CRM.map((e) => ({ valor: e, text: t(`ef.estat_${e}`) }))
+
+  function fila(paper: Paper, id: string | null, valor: string | null) {
     const rolKey = paper === 'productor' ? 'ef.paper_ofertant' : 'ef.paper_receptor'
+    const estat = estatCrm(valor)
     return (
       <div className="flex flex-wrap items-center gap-2" data-testid={`rols-${paper}`}>
         <span className="min-w-28 font-medium">{t(rolKey)}</span>
-        {te ? (
-          <Badge className={actiu ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'}>
-            {t(actiu ? 'ef.estat_activa' : 'ef.estat_inactiva')}
-          </Badge>
-        ) : <Badge variant="outline" className="text-muted-foreground">—</Badge>}
-        <span className="flex-1" />
-        {te ? (
-          <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !potAprovar} motiu={motiu}
-            onClick={() => void canviaEstat(paper, id, !actiu)}>
-            {t(actiu ? 'ef.btn_desactiva' : 'ef.btn_activa')}
-          </BotoAmbMotiu>
+        {id !== null && estat ? (
+          <>
+            <Badge className={classeEstatCrm(estat)} data-testid={`rols-${paper}-badge`}>{t(`ef.estat_${estat}`)}</Badge>
+            <span className="flex-1" />
+            <Desplegable mida="sm" className="w-52" value={estat} opcions={opcionsEstat}
+              disabled={ocupat || !potAprovar} aria-label={t('ef.estat_crm_de', { rol: t(rolKey).toLowerCase() })}
+              data-testid={`rols-${paper}-estat`}
+              onChange={(v) => { const e = estatCrm(v); if (e && e !== estat) void canviaEstat(paper, id, e) }} />
+          </>
         ) : (
-          <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !potAprovar} motiu={motiu}
-            onClick={() => void afegeix(paper)}>
-            {t(paper === 'productor' ? 'ef.afegeix_ofertant' : 'ef.afegeix_receptor')}
-          </BotoAmbMotiu>
+          <>
+            <Badge variant="outline" className="text-muted-foreground">—</Badge>
+            <span className="flex-1" />
+            <BotoAmbMotiu variant="outline" size="sm" disabled={ocupat || !potAprovar} motiu={motiu}
+              onClick={() => void afegeix(paper)}>
+              {t(paper === 'productor' ? 'ef.afegeix_ofertant' : 'ef.afegeix_receptor')}
+            </BotoAmbMotiu>
+          </>
         )}
       </div>
     )
   }
 
   // Los papeles que tiene y cómo están: la entidad está activa si lo está alguno (D7), y «en
-  // part» si con doble rol uno está activo y el otro no.
+  // part» si con doble rol uno está activo y el otro no. El badge de la organización es su
+  // estado CRM (el más avanzado de sus papeles) salvo ese caso.
   const estats = [
     org.productor_id ? Boolean(org.productor_activo) : null,
     org.entidad_id ? Boolean(org.entidad_activo) : null,
   ].filter((x): x is boolean => x !== null)
   const algunActiu = estats.some(Boolean)
   const algunInactiu = estats.some((x) => !x)
+  const estatOrg = estatOrganitzacio(org.productor_estat_crm, org.entidad_estat_crm)
 
   return (
     <div className="space-y-5">
       <div className="space-y-2" data-testid="estat-entitat">
         <div className="flex flex-wrap items-center gap-2">
           <span className="min-w-28 font-medium">{t('ef.estat_entitat')}</span>
-          <Badge className={algunActiu ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'} data-testid="estat-entitat-badge">
-            {t(!algunActiu ? 'ef.estat_inactiva' : algunInactiu ? 'ef.estat_parcial' : 'ef.estat_activa')}
+          <Badge className={classeEstatCrm(estatOrg)} data-testid="estat-entitat-badge">
+            {algunActiu && algunInactiu ? t('ef.estat_parcial') : t(`ef.estat_${estatOrg}`)}
           </Badge>
           <span className="flex-1" />
           {algunInactiu && (
@@ -144,8 +154,8 @@ export default function BlocRols({ org, potAprovar, onCanviat }: {
       <div className="space-y-3 border-t border-border pt-4">
         <p className="text-sm font-medium">{t('ef.per_paper')}</p>
         <p className="text-sm text-muted-foreground">{t('ef.h_rols')}</p>
-        {fila('productor', org.productor_id, org.productor_activo)}
-        {fila('entidad', org.entidad_id, org.entidad_activo)}
+        {fila('productor', org.productor_id, org.productor_estat_crm)}
+        {fila('entidad', org.entidad_id, org.entidad_estat_crm)}
       </div>
       {dialeg}
     </div>

@@ -284,6 +284,19 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['social', 'animal', 'transformador', 'comercial'],
     },
     {
+      // CHECK de `productores/entidades.estat_crm` (20270518100000, Plan 2 B1). Se compone en
+      // `BlocRols.tsx`, la cabecera de `EntitatDetall.tsx`, `Entitats.tsx` y `Aprovacions.tsx`.
+      que: 'estat_crm (badge)',
+      prefijo: 'ef.estat_',
+      valores: ['potencial', 'en_desenvolupament', 'actiu', 'inactiu'],
+    },
+    {
+      // El mismo estado en el filtro «Estat» de «Entitats» (`textDim`).
+      que: 'estat_crm (filtre)',
+      prefijo: 'fl.v_',
+      valores: ['potencial', 'en_desenvolupament', 'actiu', 'inactiu'],
+    },
+    {
       // CHECK de `productores/entidades.regim_iva` (20270517100000). Se compone en la ficha
       // (`campsFitxa.ts`, `etiquetaOpcio: 'org.iva_'`).
       que: 'regim_iva',

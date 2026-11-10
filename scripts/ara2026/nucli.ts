@@ -99,6 +99,17 @@ export function tipoReceptorDeFamilia(familia: string | null): string | null {
 
 export type Hoja = 'prod_actius' | 'prod_inactius' | 'prod_potencials' | 'sda' | 'sda_inactius'
 export const HOJAS: readonly Hoja[] = ['prod_actius', 'prod_inactius', 'prod_potencials', 'sda', 'sda_inactius']
+
+/**
+ * El estado CRM con el que entra cada hoja (Plan 2 B1, 20270518100000): la misma tabla que el
+ * backfill de la migración. Ninguna entra `actiu` (D2: todo inactivo; `activo` lo deriva la base
+ * del estado), y las «actius» del Excel quedan En desenvolupament hasta tener NIF y convenio.
+ */
+export function estatCrmDeHoja(hoja: Hoja): 'potencial' | 'en_desenvolupament' | 'inactiu' {
+  if (hoja === 'prod_potencials') return 'potencial'
+  if (hoja === 'prod_inactius' || hoja === 'sda_inactius') return 'inactiu'
+  return 'en_desenvolupament'
+}
 export const esProd = (h: Hoja) => h.startsWith('prod_')
 
 /** Una columna por su cabecera normalizada y su ocurrencia (0 = la primera con ese nombre). */
@@ -526,6 +537,7 @@ export function planificar(filesPerHoja: Record<Hoja, { files: FilaAra[]; descar
     if (municipio_ine) dades.municipio_ine = municipio_ine
     dades.ref_externa = f.ref
     dades.activo = false // D2: todo entra inactivo
+    dades.estat_crm = estatCrmDeHoja(f.hoja) // B1: manda sobre `activo` (ninguno es `actiu`)
     dades.es_test = false
 
     const fitxa: FitxaPlanejada = { fila: f, taula, dades, existent: ja ? { id: ja.id, organizacion_id: ja.organizacion_id } : undefined }
@@ -559,7 +571,7 @@ export function pegatRellenaHuecos(actual: Record<string, unknown>, nou: Record<
   const buit = (x: unknown) => x === null || x === undefined || x === '' || (Array.isArray(x) && x.length === 0)
   const out: Record<string, unknown> = {}
   for (const [k, v] of Object.entries(nou)) {
-    if (k === 'activo' || k === 'es_test' || k === 'ref_externa') continue
+    if (k === 'activo' || k === 'estat_crm' || k === 'es_test' || k === 'ref_externa') continue
     if (buit(actual[k]) && !buit(v)) out[k] = v
   }
   return out

@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (Plan 2 B1, estado CRM, `20270518100000`): se abre la 172**: **77 vivas** y la siguiente entrada nueva es la 173.
 ⚠️ **09-11-2026 (Taula mestra, datos fiscales, `20270517100000`): se abre la 171**: **76 vivas** y la siguiente entrada nueva es la 172.
 ⚠️ **09-11-2026 (nombre de la Fundació desde el snapshot): se abre la 170**: **75 vivas** y la siguiente entrada nueva es la 171.
 ⚠️ **09-11-2026 (Configuració › Equip, `20270513100000`): se abre la 169**: **74 vivas** y la siguiente entrada nueva es la 170.
@@ -872,3 +873,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      plantilla los mapean, y `alta_fitxa_interna()` / `importar_entitats()` no los aceptan. Se dejó fuera a propósito:
      el Excel de Airtable de la Fundació no trae esas columnas. Si las trae un Excel futuro, son cuatro claves en el
      mapa de columnas y en las dos RPC (lista cerrada del IVA validada en la base por su CHECK). Precio: dos horas.
+172. **`entidades.estat` sin uso; `drop` pendiente de autorización** (10-11-2026, Plan 2 B1, `20270518100000`). El
+     texto libre del Excel del ARA («Signat», «Pendent», «No procedeix»…) ya no se enseña en la ficha
+     (`NO_ES_MOSTRA`) ni lo mira `_shared/priorizacion.ts` (la exclusión es `activo`, derivado de `estat_crm`; el
+     «No procedeix» pasó a `inactiu` en el backfill). La columna se conserva hasta que Carles autorice el `drop`
+     (y con él, quitarla de `COLUMNES` en `tests/campsFitxa.test.ts`). Precio: una migración y un test.

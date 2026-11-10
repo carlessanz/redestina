@@ -139,7 +139,7 @@ test('la que no tiene el otro papel: «Afegeix el paper d’ofertant» crea la f
   await page.getByRole('dialog').getByRole('button', { name: /Afegeix el paper d.ofertant|Añade el papel de ofertante/ }).click()
   await page.waitForURL((u) => u.pathname === `/equip/entitats/${orgActiva}`)
   await pestanya(page, 'intern')
-  await expect(page.getByTestId('rols-productor')).toContainText(/Activa/)
+  await expect(page.getByTestId('rols-productor-badge')).toHaveText(/^(Actiu|Activo)$/)
   expect(sql(`select count(*) || '|' || bool_and(activo) || '|' || max(nif) from productores where organizacion_id = '${orgActiva}'`))
     .toBe(`1|true|${nifActiva}`)
 })

@@ -79,7 +79,7 @@ test('amb ofertes: diu per què i proposa desactivar-la', async ({ page }) => {
 
   await dialeg.getByRole('button', { name: /^Desactiva l’entitat$|^Desactiva la entidad$/ }).click()
   await expect(dialeg).toBeHidden()
-  await expect(page.getByTestId('estat-entitat-badge')).toHaveText(/^Inactiva$/)
+  await expect(page.getByTestId('estat-entitat-badge')).toHaveText(/^(Inactiu|Inactivo)$/)
   expect(sql(`select activo from productores where id = '${prodOfertes}'`)).toBe('f')
 
   // Ya inactiva: lo dice y no ofrece nada más.

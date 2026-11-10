@@ -41,6 +41,7 @@ import { useEsborrarFitxa } from '../../hooks/useEsborrarFitxa'
 import type { OrganizacioVista } from '../../types'
 import BlocCamps from '../../components/fitxa/BlocCamps'
 import BlocRols from '../../components/fitxa/BlocRols'
+import { classeEstatCrm, estatCrm } from '../../lib/estatCrm'
 import CanalPreferit, { type TriaCanal } from '../../components/fitxa/CanalPreferit'
 import Consentiments from '../../components/fitxa/Consentiments'
 import AccesEntitat from '../../components/fitxa/AccesEntitat'
@@ -63,7 +64,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 type Fila = Record<string, unknown>
 
 const LLISTA = '/equip/entitats'
-const COLS_ORG = 'id, nombre, nif, email, telefono, poblacion, productor_id, entidad_id, es_generadora, es_receptora, tipo_receptor, canal_preferido, created_at, activa, productor_activo, entidad_activo, razon_social, nom_comercial, persona_contacte, municipio_ine, comarca, tipus_activitat, te_compte, compte_estat'
+const COLS_ORG = 'id, nombre, nif, email, telefono, poblacion, productor_id, entidad_id, es_generadora, es_receptora, tipo_receptor, canal_preferido, created_at, activa, productor_activo, entidad_activo, razon_social, nom_comercial, persona_contacte, municipio_ine, comarca, tipus_activitat, te_compte, compte_estat, productor_estat_crm, entidad_estat_crm'
 
 const PESTANYES = ['dades', 'contacte', 'operativa', 'diagnostic', 'documentacio', 'intern'] as const
 type Pestanya = typeof PESTANYES[number]
@@ -392,16 +393,16 @@ export default function EntitatDetall() {
           <div className="min-w-0">
             <CardTitle className="flex flex-wrap items-center gap-2">
               <span>{nom || '—'}</span>
-              {org?.es_generadora && (
-                <Badge className={org.productor_activo ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'}>
-                  {t('ef.paper_ofertant')}{org.productor_activo ? '' : ` · ${t('ef.estat_inactiva').toLowerCase()}`}
-                </Badge>
-              )}
-              {org?.es_receptora && (
-                <Badge className={org.entidad_activo ? 'bg-exito-fondo text-exito' : 'bg-muted text-muted-foreground'}>
-                  {t('ef.paper_receptor')}{org.entidad_activo ? '' : ` · ${t('ef.estat_inactiva').toLowerCase()}`}
-                </Badge>
-              )}
+              {/* El estado CRM de cada papel (B1, 20270518100000): «Ofertant · En desenvolupament». */}
+              {([['ofertant', 'ef.paper_ofertant', org?.es_generadora, org?.productor_estat_crm],
+                ['receptor', 'ef.paper_receptor', org?.es_receptora, org?.entidad_estat_crm]] as const).map(([paper, rolKey, te, valor]) => {
+                const estat = estatCrm(valor)
+                return te && estat ? (
+                  <Badge key={paper} className={classeEstatCrm(estat)} data-testid={`capcalera-estat-${paper}`}>
+                    {t(rolKey)} · {t(`ef.estat_${estat}`).toLowerCase()}
+                  </Badge>
+                ) : null
+              })}
               {Boolean(valors.es_test) && <Badge variant="secondary">{t('badge.test')}</Badge>}
             </CardTitle>
             <p className="mt-1 text-sm text-muted-foreground">

@@ -32,6 +32,8 @@ const COLUMNES: Record<Taula, string[]> = {
     'tipus_activitat', 'temporada', 'ref_externa', 'ubicacio',
     // 20270517100000: datos fiscales y de facturación (Taula mestra, Fundació 09-11-2026).
     'regim_iva', 'domicili_fiscal', 'codi_postal_fiscal', 'poblacio_fiscal', 'contacte_facturacio_nom', 'contacte_facturacio_email',
+    // 20270518100000 (Plan 2, B1): estado CRM por papel.
+    'estat_crm',
   ],
   entidades: [
     'id', 'nombre', 'codigo', 'familia', 'prioritat', 'estat', 'gestio', 'comentarios', 'area_geografica',
@@ -43,6 +45,8 @@ const COLUMNES: Record<Taula, string[]> = {
     'ref_externa', 'ubicacio',
     // 20270517100000: datos fiscales y de facturación (Taula mestra, Fundació 09-11-2026).
     'regim_iva', 'domicili_fiscal', 'codi_postal_fiscal', 'poblacio_fiscal', 'contacte_facturacio_nom', 'contacte_facturacio_email',
+    // 20270518100000 (Plan 2, B1): estado CRM por papel.
+    'estat_crm',
   ],
 }
 

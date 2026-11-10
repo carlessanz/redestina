@@ -194,8 +194,6 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
     labelKey: 'ef.fi_familia', ajudaKey: 'ef.hi_familia', veu: 'equip', edita: 'equip' },
   { clau: 'prioritat', columnes: { entidades: 'prioritat' }, bloc: 'intern', tipus: 'number',
     labelKey: 'f.prioritat', ajudaKey: 'ef.hi_prioritat', veu: 'equip', edita: 'equip' },
-  { clau: 'estat_paper', columnes: { entidades: 'estat' }, bloc: 'intern',
-    labelKey: 'ef.fi_estat', ajudaKey: 'ef.hi_estat', veu: 'equip', edita: 'equip' },
   { clau: 'gestio', columnes: { entidades: 'gestio' }, bloc: 'intern',
     labelKey: 'ef.fi_gestio', ajudaKey: 'ef.hi_gestio', veu: 'equip', edita: 'equip' },
   { clau: 'modalitat_paper', columnes: { entidades: 'modalitat' }, bloc: 'intern', tipus: 'select',
@@ -207,14 +205,16 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
 
 /**
  * Columnas que la ficha enseña y edita con un COMPONENTE propio, no con un campo:
- *   · `activo` → bloque «Rols» («Activa» / «Desactiva», por `activar_fitxa()`; el alta no lo
- *     manda y la columna toma su `default true`, que es lo que cierra la deuda §12.147);
+ *   · `activo` y `estat_crm` → bloque «Estat i papers» (`BlocRols`: un selector de estado CRM
+ *     por papel, `fixar_estat_crm()`; `activo` lo deriva el trigger del estado, B1 20270518100000);
  *   · `perfil_receptor` → `CampsPerfilReceptor` (el actor lo edita en «El meu perfil de
  *     recepció» por la misma RPC, de ahí que cuente como editable por el actor).
  */
 export const GESTIONATS_PER_COMPONENT: Readonly<Record<Taula, readonly string[]>> = {
-  productores: ['activo'],
-  entidades: ['activo', 'perfil_receptor'],
+  // `estat_crm` (B1, 20270518100000): el selector por papel de «Estat i papers» (`BlocRols`,
+  // `fixar_estat_crm`); `activo` lo deriva la base de él.
+  productores: ['activo', 'estat_crm'],
+  entidades: ['activo', 'estat_crm', 'perfil_receptor'],
 }
 
 /** Columnas que NO se enseñan en ninguna ficha, con el porqué. */
@@ -225,7 +225,13 @@ export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
     'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
     'poblacion', // el nombre del municipio, que escribe el trigger: se ve en el selector de «Població»
   ],
-  entidades: ['id', 'organizacion_id', 'created_at', 'ref_externa', 'poblacion'],
+  entidades: [
+    'id', 'organizacion_id', 'created_at', 'ref_externa', 'poblacion',
+    // Texto libre del antiguo Excel del ARA («Signat», «Pendent», «No procedeix»…). Desde B1
+    // (20270518100000) el estado lo lleva `estat_crm` y la priorización solo mira `activo`: la
+    // columna se conserva sin uso hasta autorizar su `drop` (deuda §12.172).
+    'estat',
+  ],
 }
 
 /** Columnas que el actor puede escribir por su RPC, además de los campos `edita: 'tots'`. */

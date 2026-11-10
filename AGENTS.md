@@ -141,10 +141,12 @@ tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 (lugares de recogida). Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
 convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` por trigger.
 
-**Estado de las fichas (plan 1, 1A, `20270501100000`)**: `activo` en las dos; la organización está
-activa si lo está algún papel (D7). Activar exige NIF válido y razón social (`trg_fitxa_estat`:
-`falta_nif`·`nif_invalid`·`falta_rao_social`) y todo cambio deja fila en `fitxa_estat_hist` (solo
-equipo). Una entidad inactiva no entra en el Mercat (`modalitats_compatibles_meves()`), ni en
+**Estado de las fichas** (1A; **B1 `20270518100000`**): `estat_crm` (potencial · en_desenvolupament ·
+actiu · inactiu) **MANDA** y `activo = (estat_crm = 'actiu')` lo deriva `trg_fitxa_estat` (`update of
+activo, estat_crm`; el `activo` legado se traduce) y `*_estat_alta`. Organización activa si lo está algún
+papel (D7). Activar exige NIF válido y razón social (`falta_nif`·`nif_invalid`·`falta_rao_social`); todo
+cambio va a `fitxa_estat_hist` (solo equipo). Nace: `crear_entitat` actiu, importador potencial, registro
+en_desenvolupament (`aprovar_registre` intenta actiu). Una entidad inactiva no entra en el Mercat (`modalitats_compatibles_meves()`), ni en
 `priorizar-entidades`, ni en los selectores, y `comprova_interes()` la rechaza (`entitat_inactiva`).
 **Un contacto por ficha (D3)**: `organizacion_contactos` se conserva sin uso (deuda 146). **1C**: vista
 `v_entitats_llistat` (`security_invoker`) para «Entitats». **1F + 1.5**: `notes_internes` (CRM) solo
@@ -224,7 +226,7 @@ documentos, albaranes o cierres; si no, arrastra lo operativo, borra la ficha, r
 organización vacía y purga la whitelist. FK `NO ACTION` = última red; nunca un `.delete()` suelto
 (§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
-🔴 **Una cuenta del equipo no tiene organizaciones** (triggers `compte_equip`/`te_membresies`) ni ofertas; **su autoría no es fiscal** (todo sale a nombre de la Fundació o de la contraparte). Desactivarla o borrarla **traspasa sus acciones** (FK de autoría `SET NULL`, `equip_columnes_autoria()`) a otra cuenta activa (propone el mismo rol), con rastro por fila (`equip_traspassos_files`); la auditoría (`equip_auditoria`, `equip_persones_arxiu`) guarda nombre y correo aunque se borre; la inmutabilidad deja mover QUIÉN solo con `redestina.traspas_autoria`; borrar a quien ha hecho algo **exige destino** (`cal_desti`).
+🔴 **Una cuenta del equipo no tiene organizaciones** ni ofertas; **su autoría no es fiscal**. Desactivarla o borrarla **traspasa sus acciones** a otra cuenta activa con rastro por fila; borrar a quien ha hecho algo **exige destino** (`cal_desti`; detalle en `context/04`, «Gestión del equipo»).
 
 **RLS y GRANT — dos capas**: `service_role` todo (y `BYPASSRLS`); `anon` **ningún privilegio**
 de tabla; `authenticated` nace con **SELECT y nada más** en una tabla nueva (los `alter default
@@ -272,13 +274,13 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `firmar_convenio_por_enlace` solo servidor); organización
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
   `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` (1B, `es_intern()`: NIF válido, razón social y
-  `tipo_receptor`), `activar_/desactivar_fitxa`,
+  `tipo_receptor`), `activar_/desactivar_fitxa`, `fixar_estat_crm` (B1),
   `activar_/desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
   `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
   `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
   (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
-  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo (`es_super_admin()`, nunca a uno mismo ni sin super_admin activo; `equip_rols_hist`, `equip_traspassos`): `equip_membres`, `canviar_rol_equip`, `editar_/activar_/desactivar_/esborrar_membre_equip`, `traspassar_accions_equip`, `equip_accions`, `equip_autoria_fila`, `equip_auditoria`;
+  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo (`es_super_admin()`, nunca a uno mismo: `equip_*`, `canviar_rol_equip`, `*_membre_equip`, `traspassar_accions_equip`);
   `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); importación (`previsualitzar_importacio_entitats`,
   `importar_entitats`: `es_super_admin()`, ≤1.000 filas); firma (`acunar_enllac_propi('firma_document',…)`
   titular, `tancar_/rebutjar_signatura` super_admin, `puc_signar_document`; servidor: `signar_document_per_enllac`,
@@ -313,13 +315,13 @@ precio) → intake. Recordatorio de intake a los 10 min por `pg_cron` → `pg_ne
 
 Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos vías (detalle en §6.1-6.2):
 - **`scripts/import-ara-2026.ts`** (1E; núcleo `scripts/ara2026/nucli.ts`): ARA 2026 en CSV en
-  `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2), `ref_externa = ARA26:<hoja>:<línea>`,
+  `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
   NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
   `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
 - **Importador del panel** (`/equip/entitats/importa`, solo super_admin, `20270511100000`): el navegador lee
   el `.xlsx`/`.csv` (`read-excel-file`/`write-excel-file` por `import()`), mapea por cabecera con alias de
   Airtable (`lib/importEntitats.ts`) y la base revalida (`previsualitzar_importacio_entitats` →
-  `importar_entitats`): **inactivo**, identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
+  `importar_entitats`): **`potencial`** (inactivo), identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
   coincidencia débil = «dubtosa» que decide la persona, existente = solo rellena huecos; **reimportar = todo
   `sense_canvis`**. Plantilla descargable (`lib/plantillaEntitats.ts`).
 
@@ -366,14 +368,12 @@ Lo que manda hoy, en una línea cada uno:
   sube) y `AccionsSignatura`; **`accionsSignatura()` (`lib/signatures.ts`) decide el botón**.
   «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
   «Envia per correu» con «Inclou l'enllaç per signar».
-- **Configuració › Equip** (09-11, super_admin, `SeccioEquip`): cuentas con rol de plataforma:
-  rol, editar, activar/desactivar y borrar con traspaso; pestañas Actius/Desactivats.
+- **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
 - **Importa des d'Excel** (06-11, `ImportaEntitats`, super_admin): Fitxer → Revisió (estado por fila,
   «dubtosa» con candidatos) → Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros
   comunes (`lib/filtres.ts`, `BarraFiltres`). Ficha de la organización con listas cerradas,
   `tipus_activitat`, contactos, NIF válido y único, razón social obligatoria, «afegir paper».
-  Tablero con indicadores por periodo; foto de la oferta por WhatsApp y correo. Diagnòstic operatiu
-  v2 (ficha viva) y perfil de recepción; Pla de Prevenció como **expediente**; «El meu impacte».
+  Diagnòstic operatiu v2 y perfil de recepción; Pla de Prevenció como **expediente** (resto, `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -383,7 +383,9 @@ Lo que manda hoy, en una línea cada uno:
   ofertante no ve el `E-…`.
 - **Ficha única «Entitat» (1C)**: `lib/campsFitxa.ts` es **la única definición de campos** (paridad con
   el SQL en `tests/campsFitxa.test.ts`); `EntitatDetall` en seis pestañas (`?pestanya=`), guarda solo lo
-  que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC; listado solo activas por defecto.
+  que cambia; `PerfilOrganitzacio`, los mismos bloques por sus RPC.
+- **Estado CRM (B1)**: «Estat i papers» (`BlocRols`): selector por papel (`fixar_estat_crm`) y badge
+  (`lib/estatCrm.ts`); «Entitats» filtra por estado (con `?rol=`, el del papel) y abre con `actiu`.
 - **«Nova entitat» (1B)**: `NovaEntitat`, «Qui és?» con `cerca_entitats` (activa, abre o añade papel) y
   «És nova» → `crear_entitat()` con `CLAUS_ALTA`.
 - **«Dona-li accés» (1D)**: el alta del equipo es sin cuenta; el acceso se da en la ficha
@@ -433,7 +435,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270517110000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270518100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -568,7 +570,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (76 vivas; la siguiente entrada nueva es la 172; los números no se renumeran ni
+**Deuda abierta (77 vivas; la siguiente entrada nueva es la 173; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -581,7 +583,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -593,10 +595,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.820 pruebas de Vitest en 78 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.827 pruebas de Vitest en 79 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.335/2.335 y 36 sin datos; producción 2.338/2.338 y 33 «Sin fallos de
+   **Referencia: clon 2.351/2.351 y 36 sin datos; producción 2.338/2.338 y 33 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

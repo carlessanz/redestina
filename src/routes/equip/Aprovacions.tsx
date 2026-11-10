@@ -486,6 +486,18 @@ export default function Aprovacions() {
     const { error } = await supabase.rpc('aprovar_registre', { p_membresia: r.id })
     if (error) { setOcupat(null); toast.error(textErrorRegistre(error)); return }
 
+    // P1 (Plan 2, B1): aprobar intenta pasar la ficha a Actiu; si le falta NIF válido o razón
+    // social, se queda en su estado (En desenvolupament) y no opera. Se avisa aquí, en la cola.
+    {
+      const taulaFitxa = r.tipo === 'productor' ? 'productores' : 'entidades'
+      const idFitxa = r.tipo === 'productor' ? r.productores?.id : r.entidades?.id
+      if (idFitxa) {
+        const { data: fitxaEstat } = await supabase.from(taulaFitxa).select('estat_crm').eq('id', idFitxa).maybeSingle()
+        const estatFitxa = (fitxaEstat as { estat_crm: string } | null)?.estat_crm
+        if (estatFitxa && estatFitxa !== 'actiu') toast.warning(t('appr.reg_no_actiu', { estat: t(`ef.estat_${estatFitxa}`) }))
+      }
+    }
+
     const correu = perfils[r.user_id]?.email ?? null
     const enviat = correu ? await enviarAcces(correu) : null
     setOcupat(null)
