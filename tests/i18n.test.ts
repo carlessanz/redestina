@@ -230,6 +230,14 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'pla_visites.tipus', prefijo: 'exp.visita_', valores: ['diagnosi', 'seguiment', 'verificacio', 'altres'] },
     { que: 'pla_accions.estat', prefijo: 'exp.accio_', valores: ['pendent', 'en_curs', 'feta', 'descartada'] },
     { que: 'pla_quantificacio.categoria', prefijo: 'exp.cat_', valores: ['perdua', 'excedent', 'residu'] },
+    // Los excedentes del diagnóstico (A3, 20270522100000): los CHECK de `diagnostic_excedents`
+    // y `diagnostic_accions`, compuestos en `_shared/excedentsLlegible.ts` (pantalla y PDF).
+    { que: 'diagnostic_excedents.frequencia', prefijo: 'dexc.freq_', valores: ['puntual', 'estacional', 'mensual', 'setmanal', 'varies_setmana'] },
+    { que: 'diagnostic_excedents.gestio_actual', prefijo: 'dexc.gestio_', valores: ['venda_alternativa', 'donacio', 'transformacio', 'altres_aprofitaments', 'residu', 'altres'] },
+    { que: 'diagnostic_accions.estat', prefijo: 'dexc.estat_', valores: ['pendent', 'en_curs', 'feta', 'descartada'] },
+    // Los códigos de `diagnostic_falten_productor()` (el tipo, antes de `:`), compuestos en
+    // `textFalta()` de `lib/excedentsDiagnostic.ts` (resumen y formulario del diagnóstico).
+    { que: 'diagnostic_falten_productor()', prefijo: 'dexc.falta_', valores: ['operativa_productes', 'operativa_principals', 'operativa_lloc', 'excedents', 'dades'] },
     {
       // CHECK de `avisos.tipus` (ampliado en 20270416100000 y 20270417100100). Se compone en
       // `CampanaAvisos.tsx` (`avis.t_${tipus}`): el caso `od.ch_asistido` exacto —un tipo nuevo

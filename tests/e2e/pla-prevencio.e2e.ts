@@ -1,7 +1,8 @@
 // Fase 11 de la revisión del cliente del 08-10-2026: el Pla de Prevenció como expediente.
 // Desde A1 (`20270520100000`) el expediente queda enlazado al diagnóstico del productor
 // (`diagnostic_id`), su PDF lleva la sección «Diagnòstic operatiu» (`datos->'diagnostic'`) y la
-// pantalla del diagnóstico del equipo lo enseña arriba.
+// pantalla del diagnóstico del equipo lo enseña arriba. Desde A3 (`20270522100000`) esa sección
+// lleva también los excedentes por producto × causa (`datos->'diagnostic'->'excedents'`).
 // Solo contra el CLON LOCAL y en escritorio: crea un expediente y exporta su PDF (consume un
 // número de la serie PLA del clon).
 
@@ -21,9 +22,12 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
   // Uno abierto por organización: se cierran los de pasadas anteriores.
   sql(`update expedients_prevencion set estat = 'tancat' where productor_id = '${prod}' and estat <> 'tancat'`)
   // Un diagnóstico al que enlazarlo (A1): si la ficha de prueba no tiene, lo guarda el equipo.
-  if (sql(`select count(*) from diagnostics where productor_id = '${prod}'`) === '0') {
-    sqlCom('superadmin', `select desar_diagnostic('productor', '${prod}', '{"previsio": "no"}'::jsonb, null, 'ca')`)
+  // A3: con `desar_excedents_diagnostic`, y solo si tampoco tiene bloques (reemplaza el conjunto).
+  if (sql(`select count(*) from diagnostics where productor_id = '${prod}'`) === '0'
+      && sql(`select count(*) from diagnostic_productes where productor_id = '${prod}'`) === '0') {
+    sqlCom('superadmin', `select desar_excedents_diagnostic('${prod}', '[]'::jsonb, null, 'ca')`)
   }
+  const blocs = sql(`select count(*) from diagnostic_productes where productor_id = '${prod}'`)
   const diag = sql(`select id from diagnostics where productor_id = '${prod}'`)
   const nom = sql(`select coalesce(empresa, name) from productores where id = '${prod}'`)
 
@@ -78,6 +82,12 @@ test('el equipo abre el expediente, lo llena por pestañas y exporta el PDF', as
   // El documento lleva el diagnóstico: lo que imprime la sección «Diagnòstic operatiu».
   expect(sql(`select (datos -> 'diagnostic') is not null and jsonb_typeof(datos -> 'diagnostic' -> 'respostes') = 'array'
               from documentos where objeto_tipo = 'expedient' and objeto_id = '${id}' and vigente`)).toBe('t')
+  // A3: y los excedentes del diagnóstico, uno por bloque guardado (el fixture del arnés: Tomàquet × EX).
+  expect(sql(`select jsonb_typeof(datos -> 'diagnostic' -> 'excedents') || ':' || jsonb_array_length(datos -> 'diagnostic' -> 'excedents')
+              from documentos where objeto_tipo = 'expedient' and objeto_id = '${id}' and vigente`)).toBe(`array:${blocs}`)
+  expect(sql(`select jsonb_array_length(jsonb_path_query_array(datos, '$.diagnostic.excedents[*].causes[*].causa'))
+              from documentos where objeto_tipo = 'expedient' and objeto_id = '${id}' and vigente`))
+    .toBe(sql(`select count(*) from diagnostic_excedents where productor_id = '${prod}'`))
 })
 
 test('la pantalla del diagnóstico del equipo enseña el expediente abierto arriba', async ({ page }) => {

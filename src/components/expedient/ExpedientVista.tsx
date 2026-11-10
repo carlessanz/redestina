@@ -352,7 +352,7 @@ export default function ExpedientVista({
 
       {/* ── El recorrido, por pestañas ── */}
       <Tabs defaultValue="visites">
-        <div className="-mx-1 overflow-x-auto px-1">
+        <div className="min-w-0 overflow-x-auto px-1">
           <TabsList>
             <TabsTrigger value="visites">{t('exp.tab_visites')}</TabsTrigger>
             <TabsTrigger value="processos">{t('exp.tab_processos')}</TabsTrigger>

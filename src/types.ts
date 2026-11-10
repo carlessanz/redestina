@@ -1,4 +1,5 @@
 import type { EstatCrm } from './lib/estatCrm'
+import type { BlocExcedentsLlegible } from '../supabase/functions/_shared/excedentsLlegible.ts'
 
 export interface WaContact {
   id: string
@@ -1173,7 +1174,6 @@ export interface KgRebutsExercici {
 export type TipusPregunta = 'opcio' | 'multi' | 'boolea' | 'numero' | 'text'
   // La ficha viva del productor (fase 9, 11-10-2026):
   | 'productes' | 'per_producte_num' | 'mesos' | 'ubicacio'
-export type OperadorRegla = 'sempre' | '=' | '!=' | 'in' | 'conte' | '>=' | '<=' | 'buit'
 export type BlocMesura =
   | 'planificacio' | 'collita' | 'conservacio' | 'canalitzacio' | 'seguiment'
 
@@ -1184,58 +1184,10 @@ export type BlocMesura =
  */
 export interface TextBilingue { ca: string; es: string }
 
-export interface OpcioPregunta {
-  valor: string
-  etiqueta: TextBilingue
-}
-
-export interface CondicioPregunta {
-  pregunta: string
-  operador?: OperadorRegla
-  valor?: unknown
-}
-
-export interface PreguntaDiagnostic {
-  id: string
-  tipus: TipusPregunta
-  seccio: string
-  etiqueta: TextBilingue
-  ajuda?: TextBilingue | null
-  obligatoria: boolean
-  /** Solo en `opcio` y `multi`, y ahí obligatorio */
-  opcions?: OpcioPregunta[] | null
-  /** Pregunta condicional. Misma gramática que `regles_pla` */
-  aplica_a?: CondicioPregunta | null
-  /**
-   * PISTA para la pantalla (`<taula>.<columna>`). ⚠️ El servidor NO la lee nunca: si la
-   * leyera, el diagnóstico contendría algo que la persona no ha dicho.
-   */
-  prefill?: string | null
-  /** `productes`: el catálogo se filtra por las familias contestadas en esta pregunta */
-  familia_de?: string | null
-  /** `productes`: las opciones son lo contestado en esta otra pregunta `productes` */
-  opcions_de?: string | null
-  /** `productes`: cuántos se pueden marcar como mucho */
-  max?: number | null
-  /** `per_producte_num` y `mesos`: una respuesta por cada producto contestado aquí */
-  productes_de?: string | null
-  /** `per_producte_num`: la unidad que se imprime al lado */
-  unitat?: TextBilingue | null
-}
-
-export interface QuestionariDiagnostic {
-  id: string
-  tipo_org: 'productor' | 'entidad'
-  versio: number
-  /** true = texto de trabajo sin validar por la Fundación. Se imprime en el plan */
-  provisional: boolean
-  vigente: boolean
-  valida_desde: string
-  titol: TextBilingue
-  preguntes: PreguntaDiagnostic[]
-  created_by: string | null
-  created_at: string
-}
+// A3 (`20270522100000`): `OpcioPregunta`, `CondicioPregunta`, `PreguntaDiagnostic`,
+// `QuestionariDiagnostic` y `OperadorRegla` se retiraron con el formulario del motor genérico y
+// el editor de Configuració › Diagnòstic. Las respuestas ya guardadas se siguen leyendo
+// (`RespostaDiagnostic`, `SobreDiagnostic`).
 
 /**
  * Una medida dentro del plan. 🔴 `titol` y `descripcio` van COPIADOS y ya resueltos al idioma
@@ -1309,7 +1261,10 @@ export interface DiagnosticEstat {
   /** La fila de `diagnostics`, o `null` si todavía no se ha guardado nunca */
   diagnostic_id: string | null
   idioma: 'ca' | 'es' | null
-  /** Ids de las obligatorias que aplican y siguen sin contestar */
+  /**
+   * Lo que falta, en vivo (A3): `operativa_productes` · `operativa_principals` · `operativa_lloc` ·
+   * `excedents:<producte>` · `dades:<producte>:<causa>`.
+   */
   falten: string[]
   questionari_id: string | null
   versio_questionari: number | null
@@ -1323,6 +1278,10 @@ export interface DiagnosticEstat {
    * error caro.
    */
   provisional: boolean
+  /** A3: excedentes (producto × causa) guardados. Un servidor anterior no la manda. */
+  excedents_n?: number
+  /** A3: acciones del diagnóstico en `pendent` o `en_curs`. */
+  accions_pendents?: number
 }
 
 /** Una fila de `diagnostics_equip()`: solo productores desde A1. */
@@ -1397,13 +1356,97 @@ export interface DiagnosticDatos {
   /** Desde A4; un servidor anterior no la manda. */
   operativa?: OperativaDiagnostic | null
   questionari: { titol: TextBilingue; versio: number; provisional: boolean } | null
+  /** Legado: las respuestas del cuestionario v3 (se enseñan solo si no hay ningún bloque de excedentes). */
   respostes: RespostaDiagnostic[]
+  /**
+   * A3 (`20270522100000`): los bloques de excedentes por producto × causa, con sus acciones
+   * (forma de `diagnostic_excedents_json()`). Se leen con `blocsExcedents()` de
+   * `lib/excedentsLlegible.ts`, que normaliza sin lanzar. Un servidor anterior no la manda.
+   */
+  excedents?: BlocExcedentsLlegible[] | null
   notes: string | null
+  /** En vivo (`diagnostic_falten_productor()`): `false` si no hay diagnóstico guardado. */
   complet: boolean
+  /**
+   * Lo que falta, en vivo. Desde A3, códigos: `operativa_productes` · `operativa_principals` ·
+   * `operativa_lloc` · `excedents:<producte>` · `dades:<producte>:<causa>`.
+   */
   falten: string[]
   actualitzat_at: string | null
   actualitzat_per_nom: string | null
   provisional: boolean
+}
+
+// ---------------------------------------------------------------------------
+// Excedentes del diagnóstico (Plan 2, A3, `20270522100000`): producto principal × causa del
+// catálogo `causas`, con una acción por destino. Solo lectura por RLS; los escribe el equipo con
+// `desar_excedents_diagnostic()` y `fixar_estat_accio()` (D5). Las formas de lectura viven en el
+// módulo hoja `_shared/excedentsLlegible.ts` (las comparte el PDF) y se reexportan aquí.
+// ---------------------------------------------------------------------------
+
+export type {
+  AccioExcedentLlegible as AccioDiagnostic,
+  BlocExcedentsLlegible as BlocExcedentsDiagnostic,
+  CausaExcedentLlegible as CausaExcedentDiagnostic,
+  DestiExcedent,
+  EstatAccio,
+  Frequencia as FrequenciaExcedent,
+  GestioActual,
+} from '../supabase/functions/_shared/excedentsLlegible.ts'
+
+/** Una causa del catálogo `causas` (el mismo código que `excedentes.causa_codigo`, D7). */
+export interface CausaCataleg {
+  codigo: string
+  nombre: string
+  /** Desde A3; si falta, se cae al catalán. */
+  nombre_es: string | null
+}
+
+/** Una acción en el payload de `desar_excedents_diagnostic()`: una por destino marcado. */
+export interface PayloadAccioDiagnostic {
+  desti: string
+  descripcio: string
+}
+
+/** Una causa en el payload de `desar_excedents_diagnostic()`. */
+export interface PayloadCausaDiagnostic {
+  causa: string
+  frequencia: string | null
+  volum_kg: number | null
+  gestio_actual: string[]
+  destins: string[]
+  detall: string | null
+  accions: PayloadAccioDiagnostic[]
+}
+
+/** Un bloque del payload: REEMPLAZA el conjunto del productor (lo ausente se borra). */
+export interface PayloadBlocDiagnostic {
+  producte: string
+  sense_excedent: boolean
+  observacions: string | null
+  causes: PayloadCausaDiagnostic[]
+}
+
+/** Lo que devuelve `desar_excedents_diagnostic()`. */
+export interface ResultatDesatExcedents {
+  diagnostic_id: string
+  complet: boolean
+  falten: string[]
+  productes_n: number
+  excedents_n: number
+  accions_n: number
+}
+
+/** La fila de `diagnostic_accions` que devuelve `fixar_estat_accio()`. */
+export interface FilaAccioDiagnostic {
+  id: string
+  excedent_id: string
+  desti: string
+  descripcio: string
+  estat: string
+  notes: string | null
+  feta_at: string | null
+  actualitzat_at: string | null
 }
 
 // ---------------------------------------------------------------------------

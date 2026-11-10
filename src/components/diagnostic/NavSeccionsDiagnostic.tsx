@@ -27,7 +27,7 @@ export default function NavSeccionsDiagnostic({ seccions }: { seccions: EstatSec
 
   return (
     // En móvil la fila se desliza en horizontal (sin desbordar la página); desde `md`, se parte.
-    <nav aria-label={t('diag.nav_seccions')} className="-mx-1 min-w-0 overflow-x-auto px-1 pb-1">
+    <nav aria-label={t('diag.nav_seccions')} className="min-w-0 overflow-x-auto px-1 pb-1">
       <ul className="flex w-max gap-2 md:w-auto md:flex-wrap">
         {seccions.map((s) => (
           <li key={s.seccio}>

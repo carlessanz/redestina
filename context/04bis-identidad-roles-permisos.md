@@ -723,3 +723,39 @@ forbidden` (un id que no es uuid, también `403`, sin llegar a la base). `22023 
 `fitxa_inexistent` → `404`. **Sin RPC ni política nuevas** (por eso A2 no añade checks al arnés): lo que se
 comprueba es la función, en `tests/e2e/diagnostic-pdf.e2e.ts` (titular 200, ajeno 403, uuid inventado 403, sin
 sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los nombres de la actividad).
+
+### Excedentes del diagnóstico: escritura solo del equipo (Plan 2, A3, `20270522100000`, 10-11-2026)
+
+- **`desar_excedents_diagnostic(p_productor uuid, p_productes jsonb, p_notes text default null, p_idioma text default
+  null) returns jsonb`** (security definer). Externo → `42501` **antes** de mirar si la ficha existe (también sobre la
+  suya: D5); después `22023` con prefijo: `fitxa_inexistent`, `idioma_desconegut`, `productes_no_llista` (también un
+  payload mal formado), `producte_repetit`, `producte_fora_principals` (solo al crear un bloque nuevo de un
+  no-principal), `sense_excedent_amb_causes`, `causa_desconeguda`, `causa_repetida`, `frequencia_desconeguda`,
+  `volum_negatiu` (también no numérico), `gestio_desconeguda`, `desti_desconegut`, `accio_fora_destins`,
+  `accio_repetida`, `text_massa_llarg`. **Reemplaza el conjunto** del productor en una transacción (lo ausente se
+  borra por cascada); excedentes por `(producte, causa)` y acciones por `(producte, causa, desti)` conservan id,
+  estado, notas y `feta_*`; una acción con texto vacío deja de existir. Upsert de la cabecera de `diagnostics`
+  (notas, idioma, `complet`/`falten`, `actualitzat_*`; nunca toca `respostes`/`sobre`). ⚠️ `p_notes = null` **borra**
+  las notas: el formulario manda siempre el valor actual. Devuelve `{diagnostic_id, complet, falten, productes_n,
+  excedents_n, accions_n}`.
+- **`fixar_estat_accio(p_accio uuid, p_estat text, p_notes text default null) returns jsonb`** (definer; `es_intern()`
+  → `42501`; `22023 estat_desconegut · text_massa_llarg · accio_inexistent`): `feta` pone `feta_at/per` (volver a
+  marcarla conserva los originales), otro estado los limpia; `p_notes` no nulo sustituye la nota; siempre
+  `actualitzat_*`. Se guarda al momento, aparte de «Desa».
+- **`diagnostic_falten_productor(p)`**: `security invoker`, `grant` a `authenticated` (bajo RLS: un externo solo
+  calcula lo suyo; una ficha que no ve da los tres códigos de Operativa, nunca «completa»).
+  **`diagnostic_excedents_json(p)`**: definer interna, `revoke` también de `authenticated`.
+- **El frontend ya no llama a `desar_diagnostic`** (P11): se conserva, sin exigir cuestionario vigente, solo para la
+  ventana base → frontend (deuda 175). `publicar_questionari` sigue como estaba (super_admin), sin pantalla.
+- **Arnés** (+95; ningún `permitir` pasa a `denegar`): bloques `DIAGNOSTIC_EXCEDENTS_EXTERN` (en `DOCUMENTAL_EXTERN`:
+  las dos RPC con uuid nulo → denegar; insertar en las tres tablas → denegar), `DIAGNOSTIC_EXCEDENTS_EQUIP` (equip y
+  super_admin: leen las tres con `requiereFixture`, no insertan ni actualizan, las RPC con uuid nulo → `errorExigit
+  22023`), `DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR` (receptor, sin rol, pendiente: no leen nada) y el productor (lee lo
+  suyo; `desar_excedents_diagnostic` sobre lo suyo y `fixar_estat_accio` sobre su acción —marcador
+  `@meva_accio_diagnostic`— → denegar). Los argumentos están elegidos para que una guarda rota no borre nada
+  (`p_productes: {}`, `p_estat: "no_existeix"`). Efecto colateral: los 14 checks de `questionaris_diagnostic` /
+  `questionari_vigent` de las cuentas externas pasan a «sin datos» porque ya no hay cuestionario vigente (se retiran
+  con la deuda 175).
+- **Fixture del clon** (para que las lecturas no salgan «sin datos»): Mas de Prova, Tomàquet × EX, estacional,
+  500 kg, gestión `{donacio, residu}`, destinos `{donacio, venda}` y una acción de donación «TEST arnes: …» pendiente.
+  Producción no lo tiene: allí esas lecturas salen «sin datos».

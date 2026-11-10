@@ -1,199 +1,144 @@
-// EL formulario del diagnóstico operativo del productor (A1, `20270520100000`).
+// EL formulario del diagnóstico operativo del productor (A1 `20270520100000`, A4
+// `20270521100000`, A3 `20270522100000`).
 //
-// Desde A1 lo rellena SOLO EL EQUIPO (D5), con la persona delante o al teléfono: se monta en
+// Lo rellena SOLO EL EQUIPO (D5), con la persona delante o al teléfono: se monta en
 // `/equip/diagnostics/productor/:id` (`DiagnosticDetall`). El productor lo LEE en «El meu
-// diagnòstic» (`ResumDiagnostic`), y `desar_diagnostic()` le respondería `42501`.
+// diagnòstic» (`ResumDiagnostic`). HAY UN SOLO DIAGNÓSTICO POR PRODUCTOR (D1), que se sobrescribe.
 //
-// 🔴 HAY UN SOLO DIAGNÓSTICO POR PRODUCTOR (D1), en `diagnostics`, que se sobrescribe. El
-//    formulario se abre con lo último guardado (`diagnosticActual`) y guardar ya no toca
-//    ningún plan: el plan es el expediente (D4).
+// TRES SECCIONES, con sus chips (`NavSeccionsDiagnostic`, T3):
+//   1. OPERATIVA de la ficha (A4, T4): columnas de `productores` y lugares de recogida, con los
+//      mismos controles que la pestaña Operativa (`useOperativaDiagnostic`, `BlocCamps`,
+//      `LlocsRecollida`; los lugares se guardan al momento).
+//   2. EXCEDENTS (A3): por producto PRINCIPAL vivo de la Operativa, «Sense excedent» o las causas
+//      del catálogo `causas` (D7) con frecuencia, kilos (P7), gestión actual, destinos y una
+//      acción por destino (`BlocExcedentsProducte`, `CausaExcedent`). Los bloques guardados de un
+//      producto que ya no es principal se conservan aparte (decisión a), con «Treu-lo».
+//   3. ACCIONS: las guardadas, con su estado y su nota al momento (`AccionsDiagnostic`).
 //
-// 🔴 SE GUARDA SIEMPRE, COMPLETO O NO, con un solo botón. Si está completo lo dice el
-//    SERVIDOR (`complet`, `falten`) y se enseña como badge: un cuestionario largo no se
-//    contesta de una sentada, y exigirlo entero para guardar haría perder lo tecleado.
+// 🔴 UN SOLO «DESA», que guarda SIEMPRE, completo o no: primero la Operativa (si la base la
+//    rechaza no se guarda nada más) y después `desar_excedents_diagnostic` (excedentes, notas e
+//    idioma en una transacción; REEMPLAZA el conjunto). Si se van a borrar acciones guardadas,
+//    se pregunta antes (`perdues()`). Si está completo lo dice el SERVIDOR; `faltenLocal()` solo
+//    señala lo pendiente mientras se escribe.
 //
-// ⚠️ LO QUE SE VE NO ES TODO LO QUE HAY. Las preguntas condicionales se ocultan con
-//    `preguntaAplica()`, que es una **reimplementación** de la gramática que vive en SQL
-//    (ver la cabecera de `lib/diagnostic.ts`). Lo que decide si está completo es `falten`
-//    tal como lo devuelve el servidor; aquí se calcula en local solo para señalar las
-//    preguntas pendientes y el punto de cada chip de sección mientras se escribe.
-//
-// 🔴 LA SECCIÓN 1 ES LA OPERATIVA DE LA FICHA (A4, `20270521100000`, T4). Actividad,
-//    productos, principales, variedades, volumen, temporada, envases, comercialización, apoyo
-//    y lugares de recogida NO son respuestas del cuestionario: son columnas de `productores`
-//    y filas de `productor_ubicaciones`, con los mismos controles que la pestaña Operativa de
-//    la ficha (`useOperativaDiagnostic`, `BlocCamps`, `LlocsRecollida`). «Desa» escribe primero
-//    lo que haya cambiado de la Operativa y después el cuestionario (v3, sin esas preguntas).
-//
-// ⚠️ EL PREFILL SE MARCA. Un valor propuesto desde la ficha se enseña con su nota hasta que
-//    alguien lo toca. Sin la marca sería indistinguible de una respuesta dada, y `prefill`
-//    existe justamente para no escribir en el diagnóstico algo que la persona no ha dicho
-//    (20270328101600).
+// El estado de los bloques vive en `base` (lo editado) y lo que se enseña es
+// `sincronitzaPrincipals(base, principals)`: desmarcar un principal y volverlo a marcar sin
+// guardar no pierde lo tecleado.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { AlertTriangle, Loader2 } from 'lucide-react'
+import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { textError } from '../lib/textError'
-import { FilaCasella } from './Casella'
+import { dataCurta } from '../lib/format'
+import { estilEstatDiagnostic, idSeccio } from '../lib/diagnostic'
+import { causesDiagnostic, desarExcedentsDiagnostic, diagnosticDatos } from '../lib/diagnosticApi'
+import { blocsExcedents } from '../lib/excedentsLlegible'
+import {
+  blocsAEdicio, faltenLocal, llistaTextos, payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses,
+  posaDestins, posaGestio, posaObservacions, posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals,
+  textFalta, treuBloc, type EstatExcedents,
+} from '../lib/excedentsDiagnostic'
+import type { CausaCataleg, DiagnosticDatos, EstatDiagnostic } from '../types'
 import NavSeccionsDiagnostic from './diagnostic/NavSeccionsDiagnostic'
 import { useOperativaDiagnostic } from './diagnostic/useOperativaDiagnostic'
+import BlocExcedentsProducte from './diagnostic/BlocExcedentsProducte'
+import AccionsDiagnostic from './diagnostic/AccionsDiagnostic'
+import { useConfirma } from './DialegConfirma'
 import BlocCamps from './fitxa/BlocCamps'
 import LlocsRecollida from './LlocsRecollida'
-import {
-  agrupaPerSeccio, esBuit, estilEstatDiagnostic, idSeccio, llistaDe, mesosValids, netejaRespostes,
-  obligatoriesQueFalten, opcionsProductes, opcionsVisibles, prefillDesDeFitxa, progresDiagnostic,
-  seccionsAmbEstat, textBilingue,
-} from '../lib/diagnostic'
-import type { Respostes } from '../lib/diagnostic'
-import {
-  desarDiagnostic, diagnosticActual, diagnosticEstat, questionariVigent,
-} from '../lib/diagnosticApi'
-import { carregaCataleg } from '../lib/fotosProducte'
-import { supabase } from '../lib/supabase'
-import { dataCurta } from '../lib/format'
-import XipsTria from './XipsTria'
-import type {
-  DiagnosticEstat, OpcioPregunta, PreguntaDiagnostic, QuestionariDiagnostic,
-} from '../types'
-import { cn } from '../lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select'
-
-/** La sección 1 (A4): no viene del cuestionario, es la Operativa de la ficha. */
-const SECCIO_OPERATIVA = 'operativa'
-
-/** Radix no admite `value=""`, así que «sense respondre» necesita un centinela. */
-const CAP = '__cap'
 
 export interface Props {
   /** El productor (`productores.id`). Desde A1 el diagnóstico es solo de productores. */
   orgId: string
-  /**
-   * `true` = lo conduce el equipo con la persona delante (modelo asistido): lo dice arriba.
-   * Desde A1 es el único caso real (D5); queda como prop para que el aviso sea explícito.
-   */
+  /** `true` = lo conduce el equipo con la persona delante (modelo asistido): lo dice arriba. */
   assistit?: boolean
-  /** La ficha del productor, para proponer valores. Ver la nota de la cabecera. */
-  prefill?: Record<string, unknown> | null
   /** Se llama después de cada guardado, para que la pantalla refresque lo que enseñe. */
   onDesat?: (r: { complet: boolean }) => void | Promise<void>
 }
 
-export default function FormulariDiagnostic({
-  orgId, assistit = false, prefill = null, onDesat,
-}: Props) {
+export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }: Props) {
   const { t, lang } = useT()
-  const [questionari, setQuestionari] = useState<QuestionariDiagnostic | null>(null)
-  const [estat, setEstat] = useState<DiagnosticEstat | null>(null)
-  const [respostes, setRespostes] = useState<Respostes>({})
-  const [proposats, setProposats] = useState<Set<string>>(new Set())
+  const { confirma, dialeg } = useConfirma()
+  const operativa = useOperativaDiagnostic(orgId)
+  const [dades, setDades] = useState<DiagnosticDatos | null>(null)
+  const [base, setBase] = useState<EstatExcedents>([])
   const [notes, setNotes] = useState('')
+  const [cataleg, setCataleg] = useState<CausaCataleg[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [desant, setDesant] = useState(false)
-  /** El catálogo y los lugares de la ficha: lo que necesitan los tipos de la fase 9. */
-  const [dades, setDades] = useState<DadesControls>({ cataleg: [], llocs: [] })
 
   const carrega = useCallback(async () => {
-    setCarregant(true)
-    const [q, diag, est, cataleg, llocs] = await Promise.all([
-      questionariVigent('productor'),
-      diagnosticActual(orgId),
-      diagnosticEstat('productor', orgId),
-      carregaCataleg(),
-      supabase.from('productor_ubicaciones').select('id, alias, municipio').eq('productor_id', orgId),
-    ])
-    if (!q.ok) { setError(q.missatge); setCarregant(false); return }
+    const r = await diagnosticDatos('productor', orgId)
     // Sin poder leer lo guardado no se abre el formulario: guardarlo vacío pisaría la fila.
-    if (!diag.ok) { setError(diag.missatge); setCarregant(false); return }
+    if (!r.ok) { setError(r.missatge); setCarregant(false); return }
     setError(null)
-    setQuestionari(q.data)
-    setEstat(est.ok ? est.data : null)
-    setDades({
-      cataleg: [...cataleg.values()],
-      llocs: ((llocs.data ?? []) as { id: string; alias: string | null; municipio: string | null }[]),
-    })
-
-    // EL diagnóstico (D1): lo último guardado, tal cual se tecleó.
-    const desades: Respostes = diag.data?.respostes ?? {}
-    setNotes(diag.data?.notes ?? '')
-
-    // La propuesta solo llena los huecos: lo que ya se contestó una vez manda siempre sobre
-    // lo que diga la ficha. Al revés, corregir una respuesta y volver a entrar la
-    // desharía.
-    const proposta = prefillDesDeFitxa(q.data?.preguntes ?? [], prefill)
-    const marcats = new Set<string>()
-    const inicials: Respostes = { ...desades }
-    for (const [id, valor] of Object.entries(proposta)) {
-      if (esBuit(desades[id])) { inicials[id] = valor; marcats.add(id) }
-    }
-    setRespostes(inicials)
-    setProposats(marcats)
+    setDades(r.data)
+    setBase(blocsAEdicio(blocsExcedents(r.data.excedents)))
+    setNotes(r.data.notes ?? '')
     setCarregant(false)
-  }, [orgId, prefill])
+  }, [orgId])
 
   useEffect(() => { void carrega() }, [carrega])
+  useEffect(() => {
+    void causesDiagnostic().then((r) => { if (r.ok) setCataleg(r.data) })
+  }, [])
 
-  // En su propio `useMemo` y no un `??` suelto: un array nuevo en cada render haría que los
-  // `useMemo` de abajo recalcularan siempre, que es lo que `react-hooks` señala.
-  const preguntes = useMemo(() => questionari?.preguntes ?? [], [questionari])
-  const seccions = useMemo(() => agrupaPerSeccio(preguntes, respostes), [preguntes, respostes])
-  const operativa = useOperativaDiagnostic(orgId)
-  // El chip «Operativa» va primero: es la sección 1 (A4). Completa = productos habituales y
-  // algún principal (lo que la oferta y el plan necesitan saber).
-  const estatSeccions = useMemo(() => [
-    {
-      seccio: SECCIO_OPERATIVA, clau: 'diag.sec_operativa', n: operativa.camps.length,
-      contestades: operativa.contestades, falten: operativa.completa ? 0 : 1, completa: operativa.completa,
-    },
-    ...seccionsAmbEstat(seccions, respostes),
-  ], [seccions, respostes, operativa.camps.length, operativa.contestades, operativa.completa])
-  const falten = useMemo(() => obligatoriesQueFalten(preguntes, respostes), [preguntes, respostes])
-  const progres = useMemo(() => progresDiagnostic(preguntes, respostes), [preguntes, respostes])
+  // Los principales y los habituales VIVOS (lo marcado en la Operativa, aunque no se haya guardado).
+  const principalsBrut = operativa.valors.productes_principals
+  const habitualsBrut = operativa.valors.productos_habituales
+  const principals = useMemo(() => llistaTextos(principalsBrut), [principalsBrut])
+  const habituals = useMemo(() => llistaTextos(habitualsBrut), [habitualsBrut])
+  const blocs = useMemo(() => sincronitzaPrincipals(base, principals), [base, principals])
+  const persistits = useMemo(() => blocsExcedents(dades?.excedents), [dades])
 
-  function respon(id: string, valor: unknown) {
-    setRespostes((r) => {
-      const seg = { ...r }
-      if (valor === undefined) delete seg[id]
-      else seg[id] = valor
-      return seg
-    })
-    // Tocado deja de ser propuesto: a partir de aquí es una respuesta.
-    setProposats((p) => {
-      if (!p.has(id)) return p
-      const seg = new Set(p)
-      seg.delete(id)
-      return seg
-    })
-  }
+  // Los lugares se guardan al momento en su componente: si hay un principal con días o franjas lo
+  // dice el servidor (se refresca al guardar).
+  const llocOk = !(dades?.falten ?? []).includes('operativa_lloc')
+  const falten = useMemo(
+    () => faltenLocal(blocs, { habituals, principals, llocOk }), [blocs, habituals, principals, llocOk])
+  const nAccions = persistits.reduce((n, b) => n + b.causes.reduce((m, c) => m + c.accions.length, 0), 0)
+  const seccions = useMemo(() => seccionsDiagnostic(falten, {
+    operativa: { n: operativa.camps.length, contestades: operativa.contestades },
+    principals: principals.length,
+    accions: nAccions,
+  }), [falten, operativa.camps.length, operativa.contestades, principals.length, nAccions])
+
+  const nomCausa = useCallback((codi: string) => {
+    const c = cataleg.find((x) => x.codigo === codi)
+    return c ? (lang === 'es' ? c.nombre_es || c.nombre : c.nombre) : codi
+  }, [cataleg, lang])
 
   async function desa() {
     if (desant) return
+    const payload = payloadExcedents(blocs)
+    const n = perdues(persistits, payload)
+    if (n > 0 && !(await confirma({
+      titol: t('dexc.perdues_t', { n }),
+      descripcio: t('dexc.perdues_d'),
+      confirmar: t('dexc.perdues_ok'),
+      destructiu: true,
+    }))) return
     setDesant(true)
     // Primero la Operativa (columnas de la ficha): si la base la rechaza, no se guarda nada más
-    // y lo tecleado sigue en pantalla.
+    // y lo tecleado sigue en pantalla. Un principal nuevo tiene que estar en la ficha ANTES de
+    // guardar su bloque (`producte_fora_principals`).
     const op = await operativa.desa()
     if (!op.ok) { setDesant(false); toast.error(textError(t, op.missatge)); return }
-    const r = await desarDiagnostic(
-      'productor', orgId, netejaRespostes(preguntes, respostes),
-      notes.trim() === '' ? null : notes.trim(), lang)
+    // ⚠️ Las notas viajan SIEMPRE con su valor actual: `null` las borra.
+    const r = await desarExcedentsDiagnostic(orgId, payload, notes.trim() === '' ? null : notes.trim(), lang)
     setDesant(false)
     if (!r.ok) { toast.error(textError(t, r)); return }
 
-    if (r.data.complet) {
-      toast.success(t('diag.saved_complete'))
-    } else {
-      toast.success(t('diag.saved_partial', { n: r.data.falten.length }))
-    }
+    if (r.data.complet) toast.success(t('diag.saved_complete'))
+    else toast.success(t('diag.saved_partial', { n: r.data.falten.length }))
     // La banda de la Operativa vive en AppShell y no se enteraría sola (refrescAvisos.ts).
     refrescaAvisos()
     // Se recarga SIEMPRE: el estado que manda es el que calcula el servidor.
@@ -202,71 +147,72 @@ export default function FormulariDiagnostic({
   }
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
-  // Se traduce al pintar, no al guardar: meter `t` en la carga la relanzaría al cambiar de
-  // idioma y se perderían las respuestas sin guardar.
-  if (error) return <p className="text-sm text-destructive">{textError(t, error)}</p>
-
-  if (!questionari) {
-    return (
-      <Card>
-        <CardHeader><CardTitle>{t('diag.no_questionnaire_t')}</CardTitle></CardHeader>
-        <CardContent>
-          <p className="text-sm text-muted-foreground">{t('diag.no_questionnaire')}</p>
-        </CardContent>
-      </Card>
-    )
-  }
+  // Se traduce al pintar, no al guardar: meter `t` en la carga la relanzaría al cambiar de idioma.
+  if (error || !dades) return <p className="text-sm text-destructive">{textError(t, error ?? 'diag.err_generic')}</p>
 
   // El estado lo dice el servidor (lo GUARDADO), no lo que hay tecleado sin guardar.
-  const estatServidor = estat?.estat ?? 'sense_comencar'
+  const estatServidor: EstatDiagnostic = !dades.diagnostic_id ? 'sense_comencar' : dades.complet ? 'complet' : 'incomplet'
+  const principalsBlocs = blocs.filter((b) => b.principal)
+  const conservats = blocs.filter((b) => !b.principal)
+  const canvia = (fn: (e: EstatExcedents) => EstatExcedents) => setBase((b) => fn(b))
+  const indexDe = (producte: string) => blocs.findIndex((b) => b.producte === producte)
+  const faltenDe = (producte: string) =>
+    falten.filter((f) => f === `excedents:${producte}` || f.startsWith(`dades:${producte}:`))
+
+  const bloc = (b: (typeof blocs)[number]) => (
+    <BlocExcedentsProducte
+      key={b.producte}
+      bloc={b}
+      index={indexDe(b.producte)}
+      cataleg={cataleg}
+      falten={faltenDe(b.producte)}
+      onSenseExcedent={(v) => canvia((e) => posaSenseExcedent(e, b.producte, v))}
+      onCauses={(codis) => canvia((e) => posaCauses(e, b.producte, codis, cataleg))}
+      onCamp={(causa, camp, valor) => canvia((e) => posaCampCausa(e, b.producte, causa, camp, valor))}
+      onGestio={(causa, g) => canvia((e) => posaGestio(e, b.producte, causa, g))}
+      onDestins={(causa, d) => canvia((e) => posaDestins(e, b.producte, causa, d))}
+      onAccio={(causa, desti, text) => canvia((e) => posaAccio(e, b.producte, causa, desti, text))}
+      onObservacions={(text) => canvia((e) => posaObservacions(e, b.producte, text))}
+      onTreu={b.principal ? undefined : () => canvia((e) => treuBloc(e, b.producte))}
+    />
+  )
 
   return (
     <div className="space-y-4" data-testid="formulari-diagnostic">
       <Card>
         <CardHeader className="gap-2">
           <CardTitle className="flex flex-wrap items-center gap-2">
-            <span>{textBilingue(questionari.titol, lang)}</span>
+            <span>{t('diagd.title')}</span>
             <Badge className={estilEstatDiagnostic(estatServidor)} data-testid="estat-diagnostic">
               {t(`diag.st_${estatServidor}`)}
             </Badge>
           </CardTitle>
-          <p className="text-sm text-muted-foreground">
-            {t('diag.progress', { n: progres.contestades, total: progres.total })}
-            {estat?.actualitzat_at && (
-              <> · {estat.actualitzat_per_nom
-                ? t('diag.actualitzat_per', { data: dataCurta(estat.actualitzat_at), nom: estat.actualitzat_per_nom })
-                : t('diag.actualitzat', { data: dataCurta(estat.actualitzat_at) })}</>
-            )}
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-3">
-          {/* Que el cuestionario sea texto de trabajo se dice ARRIBA y no en letra pequeña:
-              lo que salga de él lo lleva impreso. */}
-          {questionari.provisional && (
-            <div className="flex items-start gap-2 rounded-lg border border-aviso/30 bg-aviso-fondo px-3 py-2 text-sm text-aviso">
-              <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
-              <p className="min-w-0">{t('diag.provisional')}</p>
-            </div>
+          {dades.actualitzat_at && (
+            <p className="text-sm text-muted-foreground">
+              {dades.actualitzat_per_nom
+                ? t('diag.actualitzat_per', { data: dataCurta(dades.actualitzat_at), nom: dades.actualitzat_per_nom })
+                : t('diag.actualitzat', { data: dataCurta(dades.actualitzat_at) })}
+            </p>
           )}
-
-          {assistit && (
+        </CardHeader>
+        {assistit && (
+          <CardContent>
             <p className="rounded-lg bg-secondary px-3 py-2 text-sm text-secondary-foreground">
               {t('diag.assisted_hint')}
             </p>
-          )}
-        </CardContent>
+          </CardContent>
+        )}
       </Card>
 
-      {/* Los chips, pegados arriba mientras se baja: es lo que deja saltar a una sección
-          sin recorrer la página entera. */}
-      <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur">
-        <NavSeccionsDiagnostic seccions={estatSeccions} />
+      {/* Los chips, pegados arriba mientras se baja: dejan saltar a una sección sin recorrer la página. */}
+      <div className="sticky top-0 z-10 bg-background/95 py-2 backdrop-blur">
+        <NavSeccionsDiagnostic seccions={seccions} />
       </div>
 
-      {/* Sección 1: la Operativa de la ficha (A4). */}
+      {/* 1 · La Operativa de la ficha (A4). */}
       <Card className="scroll-mt-24" data-testid="diag-operativa">
         <CardHeader>
-          <CardTitle id={idSeccio(SECCIO_OPERATIVA)} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
+          <CardTitle id={idSeccio('operativa')} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
             {t('diag.sec_operativa')}
           </CardTitle>
           <p className="text-sm text-muted-foreground">{t('diag.operativa_hint')}</p>
@@ -285,31 +231,43 @@ export default function FormulariDiagnostic({
         </CardContent>
       </Card>
 
-      {seccions.map((s) => (
-        <Card key={s.seccio} className="scroll-mt-24">
-          <CardHeader>
-            {/* `tabIndex={-1}`: el chip le lleva el foco al llegar (teclado y lector de pantalla). */}
-            <CardTitle id={idSeccio(s.seccio)} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
-              {s.clau ? t(s.clau) : s.seccio}
-            </CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-6">
-            {s.preguntes.map((p) => (
-              <Pregunta
-                key={p.id}
-                pregunta={p}
-                valor={respostes[p.id]}
-                opcions={opcionsVisibles(p, respostes)}
-                respostes={respostes}
-                dades={dades}
-                falta={falten.includes(p.id)}
-                proposat={proposats.has(p.id)}
-                onCanvi={(v) => respon(p.id, v)}
-              />
-            ))}
-          </CardContent>
-        </Card>
-      ))}
+      {/* 2 · Los excedentes por producto principal × causa (A3). */}
+      <Card className="scroll-mt-24" data-testid="diag-excedents">
+        <CardHeader>
+          <CardTitle id={idSeccio('excedents')} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
+            {t('dexc.titol')}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t('dexc.hint')}</p>
+        </CardHeader>
+        <CardContent className="space-y-5">
+          {principalsBlocs.length === 0
+            ? <p className="text-sm text-aviso" data-testid="exc-sense-principals">{t('dexc.sense_principals')}</p>
+            : principalsBlocs.map(bloc)}
+
+          {conservats.length > 0 && (
+            <div className="space-y-4 rounded-lg border border-dashed border-border p-3" data-testid="exc-conservats">
+              <div>
+                <p className="text-sm font-semibold">{t('dexc.conservats_t')}</p>
+                <p className="text-sm text-muted-foreground">{t('dexc.conservats_hint')}</p>
+              </div>
+              {conservats.map(bloc)}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* 3 · Las acciones guardadas, con su estado y su nota al momento. */}
+      <Card className="scroll-mt-24" data-testid="diag-accions">
+        <CardHeader>
+          <CardTitle id={idSeccio('accions')} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
+            {t('dexc.accions')}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t('dexc.accions_hint')}</p>
+        </CardHeader>
+        <CardContent>
+          <AccionsDiagnostic productorId={orgId} editable excedents={dades.excedents ?? null} />
+        </CardContent>
+      </Card>
 
       <Card>
         <CardHeader><CardTitle className="text-base">{t('diag.notes_t')}</CardTitle></CardHeader>
@@ -328,11 +286,16 @@ export default function FormulariDiagnostic({
           </div>
 
           {falten.length > 0 && (
-            <p className="text-sm text-aviso">{t('diag.missing', { n: falten.length })}</p>
+            <div className="space-y-1" data-testid="diag-falten">
+              <p className="text-sm text-aviso">{t('diag.missing', { n: falten.length })}</p>
+              <ul className="list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
+                {falten.map((f) => <li key={f} className="break-words">{textFalta(f, t, nomCausa)}</li>)}
+              </ul>
+            </div>
           )}
 
-          {/* UN botón, y NUNCA gris por faltar algo: guardar a medias es exactamente lo que
-              esta pantalla tiene que permitir. Si queda completo lo dice el servidor. */}
+          {/* UN botón, y NUNCA gris por faltar algo: guardar a medias es lo que esta pantalla
+              tiene que permitir. Si queda completo lo dice el servidor. */}
           <Button
             onClick={() => void desa()}
             disabled={desant}
@@ -343,315 +306,7 @@ export default function FormulariDiagnostic({
           </Button>
         </CardContent>
       </Card>
-    </div>
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Una pregunta
-// ---------------------------------------------------------------------------
-
-function Pregunta({
-  pregunta, valor, opcions, respostes, dades, falta, proposat, onCanvi,
-}: {
-  pregunta: PreguntaDiagnostic
-  valor: unknown
-  opcions: OpcioPregunta[]
-  respostes: Respostes
-  dades: DadesControls
-  falta: boolean
-  proposat: boolean
-  onCanvi: (valor: unknown) => void
-}) {
-  const { t, lang } = useT()
-  const etiqueta = textBilingue(pregunta.etiqueta, lang)
-  const ajuda = textBilingue(pregunta.ajuda, lang)
-  const id = `diag-${pregunta.id}`
-
-  // ⚠️ `htmlFor` SOLO cuando existe ese `id` en el DOM. `Control` se lo pone al `Select`, al
-  //    `Input` y al `Textarea`, pero un booleano y un `multi` se pintan con VARIAS casillas,
-  //    cada una con su propia etiqueta: ahí no hay ningún control que se llame así. Un
-  //    `htmlFor` colgando no falla el build ni se ve, pero deja la pregunta sin etiqueta
-  //    para un lector de pantalla y hace que pulsar el enunciado no haga nada. Lo que
-  //    corresponde entonces es un grupo con `aria-labelledby`.
-  const unSolControl = pregunta.tipus === 'opcio' || pregunta.tipus === 'numero'
-    || pregunta.tipus === 'text'
-
-  return (
-    <div className={cn('space-y-2', falta && 'rounded-lg border border-aviso/40 bg-aviso-fondo/40 p-3')}>
-      <div>
-        <Label
-          id={`${id}-etiqueta`}
-          htmlFor={unSolControl ? id : undefined}
-          className="block text-sm leading-snug font-medium whitespace-normal"
-        >
-          {etiqueta}
-          {/* Lo opcional se marca; lo obligatorio no lleva asterisco (design/DESIGN.md §6). */}
-          {!pregunta.obligatoria && (
-            <span className="ml-1 font-normal text-muted-foreground">{t('diag.optional')}</span>
-          )}
-        </Label>
-        {ajuda && <p className="mt-1 text-xs text-muted-foreground">{ajuda}</p>}
-      </div>
-
-      {unSolControl
-        ? <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
-        : CONTROLS_FASE9.has(pregunta.tipus)
-          ? <ControlFitxaViva pregunta={pregunta} valor={valor} respostes={respostes} dades={dades}
-              id={id} onCanvi={onCanvi} />
-          : (
-            <div role="group" aria-labelledby={`${id}-etiqueta`}>
-              <Control pregunta={pregunta} opcions={opcions} valor={valor} id={id} onCanvi={onCanvi} />
-            </div>
-          )}
-
-      {proposat && <p className="text-xs text-muted-foreground">{t('diag.prefilled')}</p>}
-    </div>
-  )
-}
-
-function Control({
-  pregunta, opcions, valor, id, onCanvi,
-}: {
-  pregunta: PreguntaDiagnostic
-  opcions: OpcioPregunta[]
-  valor: unknown
-  id: string
-  onCanvi: (valor: unknown) => void
-}) {
-  const { t, lang } = useT()
-
-  if (pregunta.tipus === 'boolea') {
-    // 🔴 DOS CASILLAS Y NO UNA, y no es un capricho de diseño. Una casilla sola tiene dos
-    //    estados y aquí hacen falta TRES: sí, no, y todavía no lo he dicho. Esa tercera es
-    //    exactamente lo que `diagnostic_falten()` mide, así que con una sola casilla
-    //    «respondre que no» y «no respondre» serían el mismo píxel — y una obligatoria
-    //    contestada con «no» quedaría para siempre contada como pendiente.
-    //    Volver a pulsar la que ya está marcada deja la pregunta sin contestar, que es la
-    //    única forma de deshacer una respuesta en una pregunta opcional.
-    const si = valor === true
-    const no = valor === false
-    return (
-      <div className="space-y-0.5">
-        <FilaCasella checked={si} onChange={() => onCanvi(si ? undefined : true)}>
-          {t('c.yes')}
-        </FilaCasella>
-        <FilaCasella checked={no} onChange={() => onCanvi(no ? undefined : false)}>
-          {t('c.no')}
-        </FilaCasella>
-      </div>
-    )
-  }
-
-  if (pregunta.tipus === 'multi') {
-    const triats = Array.isArray(valor) ? (valor as unknown[]) : []
-    return (
-      <div className="space-y-0.5">
-        {opcions.map((o) => {
-          const marcat = triats.includes(o.valor)
-          return (
-            <FilaCasella
-              key={o.valor}
-              checked={marcat}
-              onChange={() => {
-                const seg = marcat
-                  ? triats.filter((v) => v !== o.valor)
-                  : [...triats, o.valor]
-                // Una lista vacía ES «sin contestar» para `avaluar_regla`, así que se
-                // guarda como tal en vez de como un array vacío que confundiría al leerlo.
-                onCanvi(seg.length === 0 ? undefined : seg)
-              }}
-            >
-              {textBilingue(o.etiqueta, lang)}
-            </FilaCasella>
-          )
-        })}
-      </div>
-    )
-  }
-
-  if (pregunta.tipus === 'opcio') {
-    const actual = typeof valor === 'string' && valor !== '' ? valor : CAP
-    return (
-      <Select value={actual} onValueChange={(v) => onCanvi(v === CAP ? undefined : v)}>
-        {/* `text-base` en móvil: por debajo de 16 px iOS amplía la página al enfocar y no
-            deshace el zoom al salir (§2, regla 1). `cn()` es tailwind-merge, así que este
-            gana al `text-sm` que el trigger trae de serie. */}
-        <SelectTrigger id={id} className="w-full text-base md:text-sm">
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value={CAP} className="text-base md:text-sm">
-            {t('diag.unanswered')}
-          </SelectItem>
-          {opcions.map((o) => (
-            <SelectItem key={o.valor} value={o.valor} className="text-base md:text-sm">
-              {textBilingue(o.etiqueta, lang)}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
-    )
-  }
-
-  if (pregunta.tipus === 'numero') {
-    return (
-      <Input
-        id={id}
-        type="number"
-        inputMode="decimal"
-        className="max-w-40"
-        value={typeof valor === 'number' ? String(valor) : ''}
-        onChange={(e) => {
-          const v = e.target.value.trim()
-          // Una cadena numérica NO es un número en jsonb, así que se convierte aquí: las
-          // reglas `>=`/`<=` comparan contra un número y con texto no dispararían nunca.
-          onCanvi(v === '' || !Number.isFinite(Number(v)) ? undefined : Number(v))
-        }}
-      />
-    )
-  }
-
-  return (
-    <Textarea
-      id={id}
-      rows={2}
-      value={typeof valor === 'string' ? valor : ''}
-      onChange={(e) => onCanvi(e.target.value.trim() === '' ? undefined : e.target.value)}
-    />
-  )
-}
-
-// ---------------------------------------------------------------------------
-// Los tipos de la ficha viva (fase 9): productos, por producto, meses y lugares
-// ---------------------------------------------------------------------------
-
-interface DadesControls {
-  cataleg: { nombre: string; familia: string | null }[]
-  llocs: { id: string; alias: string | null; municipio: string | null }[]
-}
-
-const CONTROLS_FASE9: ReadonlySet<string> = new Set(['productes', 'per_producte_num', 'mesos', 'ubicacio'])
-
-const MESOS: Record<'ca' | 'es', string[]> = {
-  ca: ['gen', 'feb', 'mar', 'abr', 'mai', 'jun', 'jul', 'ago', 'set', 'oct', 'nov', 'des'],
-  es: ['ene', 'feb', 'mar', 'abr', 'may', 'jun', 'jul', 'ago', 'sep', 'oct', 'nov', 'dic'],
-}
-
-function ControlFitxaViva({
-  pregunta, valor, respostes, dades, id, onCanvi,
-}: {
-  pregunta: PreguntaDiagnostic
-  valor: unknown
-  respostes: Respostes
-  dades: DadesControls
-  id: string
-  onCanvi: (valor: unknown) => void
-}) {
-  const { t, lang } = useT()
-  const etiquetaId = `${id}-etiqueta`
-
-  if (pregunta.tipus === 'productes') {
-    const opcions = opcionsProductes(pregunta, respostes, dades.cataleg)
-    const triats = llistaDe(respostes, pregunta.id)
-    if (opcions.length === 0) {
-      return (
-        <p className="text-sm text-muted-foreground">
-          {t(pregunta.opcions_de ? 'diag.marca_productes' : 'diag.marca_families')}
-        </p>
-      )
-    }
-    const max = pregunta.max ?? null
-    const ple = max !== null && triats.length >= max
-    return (
-      <div className="space-y-1">
-        <XipsTria
-          etiquetaId={etiquetaId}
-          opcions={opcions.map((n) => ({ valor: n, text: n, desactivat: ple && !triats.includes(n) }))}
-          triats={triats}
-          onChange={(v) => onCanvi(v.length === 0 ? undefined : (max ? v.slice(0, max) : v))}
-        />
-        {max !== null && <p className="text-xs text-muted-foreground">{t('diag.max_productes', { n: max })}</p>}
-      </div>
-    )
-  }
-
-  if (pregunta.tipus === 'ubicacio') {
-    if (dades.llocs.length === 0) {
-      return <p className="text-sm text-muted-foreground">{t('diag.sense_llocs')}</p>
-    }
-    const triats = Array.isArray(valor) ? (valor as string[]) : []
-    return (
-      <XipsTria
-        etiquetaId={etiquetaId}
-        opcions={dades.llocs.map((l) => ({ valor: l.id, text: l.alias || l.municipio || '—' }))}
-        triats={triats}
-        onChange={(v) => onCanvi(v.length === 0 ? undefined : v)}
-      />
-    )
-  }
-
-  // `per_producte_num` y `mesos`: una fila por producto de la pregunta de la que dependen.
-  const productes = pregunta.productes_de ? llistaDe(respostes, pregunta.productes_de) : null
-  if (productes !== null && productes.length === 0) {
-    return <p className="text-sm text-muted-foreground">{t('diag.marca_productes')}</p>
-  }
-  const mapa = valor && typeof valor === 'object' && !Array.isArray(valor)
-    ? (valor as Record<string, unknown>) : {}
-  const posa = (producte: string, v: unknown) => {
-    const seg = { ...mapa }
-    if (v === undefined) delete seg[producte]
-    else seg[producte] = v
-    onCanvi(Object.keys(seg).length === 0 ? undefined : seg)
-  }
-
-  if (pregunta.tipus === 'per_producte_num') {
-    const unitat = textBilingue(pregunta.unitat, lang)
-    return (
-      <div className="space-y-2" role="group" aria-labelledby={etiquetaId}>
-        {(productes ?? []).map((p, i) => (
-          <div key={p} className="flex flex-wrap items-center gap-2">
-            <label htmlFor={`${id}-${i}`} className="min-w-32 text-sm">{p}</label>
-            <Input
-              id={`${id}-${i}`}
-              type="number"
-              inputMode="decimal"
-              min={0}
-              className="max-w-40"
-              value={typeof mapa[p] === 'number' ? String(mapa[p]) : ''}
-              onChange={(e) => {
-                const v = e.target.value.trim()
-                posa(p, v === '' || !Number.isFinite(Number(v)) ? undefined : Number(v))
-              }}
-            />
-            {unitat && <span className="text-sm text-muted-foreground">{unitat}</span>}
-          </div>
-        ))}
-      </div>
-    )
-  }
-
-  // `mesos`
-  const opcionsMesos = MESOS[lang].map((m, i) => ({ valor: String(i + 1), text: m }))
-  const selector = (actuals: number[], onTria: (m: number[]) => void, etiq: string) => (
-    <XipsTria
-      etiquetaId={etiq}
-      opcions={opcionsMesos}
-      triats={actuals.map(String)}
-      onChange={(v) => onTria(mesosValids(v.map(Number)))}
-    />
-  )
-  if (productes === null) {
-    return selector(mesosValids(valor), (m) => onCanvi(m.length === 0 ? undefined : m), etiquetaId)
-  }
-  return (
-    <div className="space-y-3">
-      {productes.map((p, i) => (
-        <div key={p} className="space-y-1">
-          <p id={`${id}-${i}-l`} className="text-sm font-medium">{p}</p>
-          {selector(mesosValids(mapa[p]), (m) => posa(p, m.length === 0 ? undefined : m), `${id}-${i}-l`)}
-        </div>
-      ))}
+      {dialeg}
     </div>
   )
 }

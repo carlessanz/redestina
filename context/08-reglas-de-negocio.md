@@ -285,3 +285,16 @@ con enlace. ⚠️ El enlace se acuña (y el anterior de correo se revoca) **ant
 los gates (deuda 159). La firma en sí nunca manda correo: el aviso `document_signat` al cerrar es
 automático y respeta los interruptores.
 
+
+### El diagnóstico y las ofertas hablan el mismo idioma (Plan 2, A3, 10-11-2026)
+
+Desde A3 (`20270522100000`, D7) los excedentes del diagnóstico usan **los catálogos de la oferta**: la causa es
+`causas.codigo` (el mismo que `excedentes.causa_codigo`; nombre en catalán `nombre`, en castellano `nombre_es`) y los
+destinos de interés son las **modalidades** (`donacio · venda · maquila`, `MODALITATS_IDS`). Así lo que el productor
+declara (producto × causa) se cruza con lo que de verdad ofrece con una consulta simple por `(productor_id, producto =
+producte, causa_codigo = causa_codi)`. El vocabulario propio del cuestionario v2/v3 (`exces_oferta`,
+`qualitat_estetica`, `indiferent`…) queda solo en las respuestas antiguas. **Volumen (P7)**: kg libres, «aproximat,
+cada vegada que es produeix l'excedent» (la frecuencia va al lado). La **gestión actual** (2.4) se pregunta por causa,
+con la lista de la jerarquía de usos (venda alternativa · donació · transformació · altres aprofitaments · residu ·
+altres); no vuelve a preguntar por los destinos de interés. Las acciones (una por destino) y su estado los mantiene el
+equipo; la organización los ve, nota de seguimiento incluida.

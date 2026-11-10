@@ -35,6 +35,9 @@ const CODIS: Record<string, string> = {
   sense_correu: 'sgn.err_sense_correu',
   // `desar_diagnostic()`, fase 9 de la revisión del 08-10-2026.
   massa_productes: 'diag.err_massa_productes',
+  // `desar_excedents_diagnostic()` (A3, 20270522100000): lo que la pantalla no puede evitar.
+  volum_negatiu: 'dexc.err_volum',
+  producte_fora_principals: 'dexc.err_fora_principals',
   // El expediente de prevención, fase 11.
   ja_te_expedient: 'exp.err_ja_te',
   expedient_tancat: 'exp.err_tancat',

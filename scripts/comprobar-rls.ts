@@ -325,6 +325,8 @@ interface Check {
    *   · `@meva_fitxa_productor` / `@meva_fitxa_entitat` → la ficha propia de ese tipo,
    *                              leída de la propia membresía (20270414100600: lo que
    *                              `convenio_vigente()` sí responde a una cuenta externa).
+   *   · `@meva_accio_diagnostic` → una acción del diagnóstico que la cuenta VE (A3: la RLS le
+   *                              da las de su ficha). Uuid nulo si no ve ninguna.
    */
   args?: Record<string, unknown>;
   /**
@@ -603,6 +605,58 @@ const IMPORTACIO_EXTERN: Check[] = [
   { tabla: "importacions_entitats", op: "leer", esperado: "denegar", descripcion: "NO veu el registre d'importacions (0 files)" },
   { tabla: "importacions_entitats_files", op: "leer", esperado: "denegar", descripcion: "NO veu les files importades (0 files)" },
   { tabla: "importacions_entitats_files", op: "leer", esperado: "denegar", columnas: "fila, canvis", descripcion: "NO veu els canvis (abans/després) de cap importacio (B4)" },
+];
+
+// EXCEDENTES DEL DIAGNÓSTICO (A3, 20270522100000). Lo que el arnés afirma:
+//
+//   · las tres tablas (`diagnostic_productes`, `diagnostic_excedents`, `diagnostic_accions`) no
+//     se escriben desde el navegador, ni siendo del equipo: sin GRANT de escritura (42501 antes
+//     de evaluar ninguna política); las escriben `desar_excedents_diagnostic` y
+//     `fixar_estat_accio`, solo del equipo (D5);
+//   · las dos RPC ponen el permiso ANTES que la existencia: un externo recibe 42501 también con
+//     un uuid inventado, y también sobre lo suyo; el equipo, 22023 (autoriza y no escribe);
+//   · `diagnostic_excedents_json` es interna: sin EXECUTE para ninguna sesión;
+//   · las lee el equipo y el propio productor (`requiereFixture`: sin bloques, 0 filas); una
+//     cuenta sin ficha de productor no ve ninguna fila.
+//
+// 🔴 Los argumentos de las RPC, elegidos para que una guarda ROTA no escriba nada: con la ficha
+//    propia, `p_productes: {}` (no es una lista: 22023 `productes_no_llista` antes de tocar
+//    ninguna fila) y, con la acción propia, `p_estat: "no_existeix"` (22023 `estat_desconegut`).
+//    Un `[]` vaciaría los excedentes del productor de prueba si la guarda dejara pasar.
+const DIAGNOSTIC_EXCEDENTS_EXTERN: Check[] = [
+  { tabla: "desar_excedents_diagnostic", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_productes: {} }, descripcion: "NO desa els excedents de cap diagnostic (es de l'equip, D5) (A3)" },
+  { tabla: "fixar_estat_accio", op: "rpc", esperado: "denegar", args: { p_accio: "00000000-0000-0000-0000-000000000000", p_estat: "no_existeix" }, descripcion: "NO canvia l'estat de cap accio del diagnostic (A3)" },
+  { tabla: "diagnostic_excedents_json", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida el json intern dels excedents (sense EXECUTE) (A3)" },
+  { tabla: "diagnostic_productes", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap bloc del diagnostic a ma (A3)" },
+  { tabla: "diagnostic_excedents", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap excedent del diagnostic a ma (A3)" },
+  { tabla: "diagnostic_accions", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap accio del diagnostic a ma (A3)" },
+];
+
+// Lo que se añade a las cuentas SIN ficha de productor (receptores, sin rol, pendiente).
+const DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR: Check[] = [
+  { tabla: "diagnostic_productes", op: "leer", esperado: "denegar", descripcion: "NO veu cap bloc d'excedents del diagnostic (A3)" },
+  { tabla: "diagnostic_excedents", op: "leer", esperado: "denegar", descripcion: "NO veu cap excedent del diagnostic (A3)" },
+  { tabla: "diagnostic_accions", op: "leer", esperado: "denegar", descripcion: "NO veu cap accio del diagnostic (A3)" },
+];
+
+// Lo que se añade al equipo y al super_admin (los dos, igual: el diagnóstico es del equipo).
+const DIAGNOSTIC_EXCEDENTS_EQUIP: Check[] = [
+  { tabla: "diagnostic_productes", op: "leer", esperado: "permitir", descripcion: "veu els blocs d'excedents dels diagnostics (A3)", requiereFixture: "algun bloc d'excedents (desar_excedents_diagnostic)" },
+  { tabla: "diagnostic_excedents", op: "leer", esperado: "permitir", descripcion: "veu els excedents dels diagnostics (A3)", requiereFixture: "algun excedent de diagnostic (desar_excedents_diagnostic)" },
+  { tabla: "diagnostic_accions", op: "leer", esperado: "permitir", descripcion: "veu les accions dels diagnostics (A3)", requiereFixture: "alguna accio de diagnostic (desar_excedents_diagnostic)" },
+  { tabla: "diagnostic_productes", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap bloc a ma (va per desar_excedents_diagnostic) (A3)" },
+  { tabla: "diagnostic_excedents", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap excedent a ma (va per desar_excedents_diagnostic) (A3)" },
+  { tabla: "diagnostic_accions", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap accio a ma (va per desar_excedents_diagnostic) (A3)" },
+  { tabla: "diagnostic_productes", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap bloc a ma (A3)" },
+  { tabla: "diagnostic_excedents", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap excedent a ma (A3)" },
+  { tabla: "diagnostic_accions", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap accio a ma (va per fixar_estat_accio) (A3)" },
+  // ⚠️ Con un uuid INEXISTENTE a propósito: la guarda de rol deja pasar y la RPC corta con
+  //    `22023` (`fitxa_inexistent` / `accio_inexistent`). Mide la autorización y no escribe.
+  { tabla: "desar_excedents_diagnostic", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_productor: "00000000-0000-0000-0000-000000000000", p_productes: [] }, descripcion: "pot desar els excedents de qualsevol productor (autoritza; 22023 fitxa_inexistent) (A3)" },
+  { tabla: "fixar_estat_accio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_accio: "00000000-0000-0000-0000-000000000000", p_estat: "pendent" }, descripcion: "pot canviar l'estat d'una accio (autoritza; 22023 accio_inexistent) (A3)" },
+  // Invoker y de lectura: con un uuid inventado devuelve los tres códigos de Operativa.
+  { tabla: "diagnostic_falten_productor", op: "rpc", esperado: "permitir", args: { p_productor: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot calcular el que falta d'un diagnostic (A3)" },
+  { tabla: "diagnostic_excedents_json", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida el json intern dels excedents (nomes les funcions del servidor) (A3)" },
 ];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
@@ -1232,6 +1286,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "diagnostic_datos", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el diagnostic d'una altra organitzacio (A1)" },
   { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures de cap pla (retirat a A1, D4)" },
   { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell de cap pla (retirat a A1, D4)" },
+  // Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EXTERN`.
+  ...DIAGNOSTIC_EXCEDENTS_EXTERN,
   // Circuito de firma (20270510100000–100200): ver `FIRMA_EXTERN`.
   ...FIRMA_EXTERN,
   // Importador de entidades (20270511100000): ver `IMPORTACIO_EXTERN`.
@@ -1530,6 +1586,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "productores", op: "leer", esperado: "permitir", columnas: "id, productes_principals, varietats, volum_produccio, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes", descripcion: "veu la Operativa de tots els productors (A4)" },
     { tabla: "productores", op: "actualizar", esperado: "permitir", columnas: "id, envasos_habituals", descripcion: "edita la Operativa d'una fitxa (A4, mateix valor)" },
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
+    // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
+    ...DIAGNOSTIC_EXCEDENTS_EQUIP,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2184,6 +2242,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "productores", op: "leer", esperado: "permitir", columnas: "id, productes_principals, varietats, volum_produccio, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes", descripcion: "veu la Operativa de tots els productors (A4)" },
     { tabla: "productores", op: "actualizar", esperado: "permitir", columnas: "id, envasos_habituals", descripcion: "edita la Operativa d'una fitxa (A4, mateix valor)" },
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
+    // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
+    ...DIAGNOSTIC_EXCEDENTS_EQUIP,
     { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura: sense cami en pantalla des d'A1 (D4)" },
     { tabla: "mesures_prevencio", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap mesura: sense cami en pantalla des d'A1 (D4)" },
     { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla: sense cami en pantalla des d'A1 (D4)" },
@@ -2739,6 +2799,15 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // `fixar_lloc_principal`: con ficha de productor, un uuid inventado llega a la existencia.
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el seu lloc principal (autoritza; 22023 lloc_inexistent) (A4)" },
     { tabla: "productor_ubicaciones", op: "leer", esperado: "permitir", columnas: "id, es_principal, dies_setmana, franges", descripcion: "veu els dies i franges dels SEUS llocs (A4)", requiereFixture: "algun lloc de recollida de la seva fitxa" },
+    // A3 (20270522100000): LEE los excedentes de su diagnóstico y no los escribe (D5), ni por
+    // RPC sobre lo suyo ni por UPDATE directo. Los argumentos, inofensivos si la guarda fallara
+    // (ver `DIAGNOSTIC_EXCEDENTS_EXTERN`). `productor-altre` no tiene bloques: sale «sense».
+    { tabla: "diagnostic_productes", op: "leer", esperado: "permitir", descripcion: "veu els blocs d'excedents del SEU diagnostic (A3)", requiereFixture: "algun bloc d'excedents de la seva fitxa (desar_excedents_diagnostic)" },
+    { tabla: "diagnostic_excedents", op: "leer", esperado: "permitir", descripcion: "veu els excedents del SEU diagnostic (A3)", requiereFixture: "algun excedent de la seva fitxa (desar_excedents_diagnostic)" },
+    { tabla: "diagnostic_accions", op: "leer", esperado: "permitir", descripcion: "veu les accions del SEU diagnostic i el seu estat (A3)", requiereFixture: "alguna accio del diagnostic de la seva fitxa (desar_excedents_diagnostic)" },
+    { tabla: "desar_excedents_diagnostic", op: "rpc", esperado: "denegar", args: { p_productor: "@meva_fitxa_productor", p_productes: {} }, descripcion: "NO desa els excedents del SEU diagnostic: el porta l'equip (D5, A3)" },
+    { tabla: "fixar_estat_accio", op: "rpc", esperado: "denegar", args: { p_accio: "@meva_accio_diagnostic", p_estat: "no_existeix" }, descripcion: "NO canvia l'estat de les SEVES accions: el porta l'equip (D5, A3)" },
+    { tabla: "diagnostic_accions", op: "actualizar", esperado: "denegar", descripcion: "NO modifica les SEVES accions a ma (A3)" },
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: ve la firma de SU documento (la que sube el fixture para
     // TEST-PROD-1) y el estado de firma de sus documentos. `productor-altre` (TEST-PROD-2) no
@@ -2979,6 +3048,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
     // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
+    // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
+    ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: el estado de firma de SUS documentos (ENT, CR, convenio).
     {
@@ -3066,6 +3137,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
     // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
+    // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
+    ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -3097,6 +3170,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
     // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
+    // A3 (20270522100000): sin ficha de productor, ningún excedente del diagnóstico es suyo.
+    ...DIAGNOSTIC_EXCEDENTS_SENSE_PRODUCTOR,
     ...DOCUMENTAL_EXTERN,
   ],
 };
@@ -3202,6 +3277,12 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     respostes: {},
     sobre: { respostes: [] },
   },
+  // A3 (20270522100000): las tres tablas de excedentes del diagnóstico no tienen GRANT de
+  // escritura para nadie. Filas que cumplen los `not null` y los CHECK (causa del catálogo,
+  // destino de la lista) para que lo que corte sea el permiso (42501) y no un dato.
+  diagnostic_productes: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS" },
+  diagnostic_excedents: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS", causa_codi: "EX" },
+  diagnostic_accions: { excedent_id: "00000000-0000-0000-0000-000000000000", desti: "donacio", descripcio: "TEST-RLS" },
   // Hasta A1 este insert caía en la fila por defecto (`nombre`) y moría en `PGRST204` («error
   // de datos»): pasaba como denegación sin medir el permiso. Con una fila válida (cumple el
   // check excluyente) lo que corta es el GRANT (42501).
@@ -3272,6 +3353,10 @@ const COLUMNA_INOCUA: Record<string, string> = {
   // A4 (20270521100000): la Operativa. El equipo la escribe directo (política `edicio intern`);
   // el productor, no (0 filas: la política filtra) —él va por `actualitzar_fitxa_productor`—.
   productores: "envasos_habituals",
+  // A3 (20270522100000): sin GRANT de UPDATE para `authenticated` (42501 antes de mirar filas).
+  diagnostic_productes: "observacions",
+  diagnostic_excedents: "detall",
+  diagnostic_accions: "notes",
 };
 
 /**
@@ -3354,6 +3439,11 @@ async function resolverArgs(
       const { data } = await cliente.from("membresias").select(col)
         .not(col, "is", null).limit(1).maybeSingle();
       salida[clave] = (data as Record<string, string> | null)?.[col] ?? UUID_NULO;
+    } else if (valor === "@meva_accio_diagnostic") {
+      // A3: una acción del diagnóstico visible para esta sesión (la suya, por RLS). Así la
+      // denegación se mide sobre una fila que EXISTE, no solo sobre un uuid inventado.
+      const { data } = await cliente.from("diagnostic_accions").select("id").limit(1).maybeSingle();
+      salida[clave] = (data as { id: string } | null)?.id ?? UUID_NULO;
     } else if (valor === "@fitxa_amb_documents") {
       // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
       // se puede borrar (20270328100200). Se busca en vez de codificar `TEST-PROD-1` para

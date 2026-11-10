@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (Plan 2 A3, excedentes del diagnóstico, `20270522100000`): se abre la 175**: **80 vivas** y la siguiente entrada nueva es la 176.
 ⚠️ **10-11-2026 (Plan 2 A1, diagnóstico único, `20270520100000`): se abre la 174**: **79 vivas** y la siguiente entrada nueva es la 175.
 ⚠️ **10-11-2026 (Plan 2 B3, exportación a Excel, `20270518110000`): se abre la 173**: **78 vivas** y la siguiente entrada nueva es la 174.
 ⚠️ **10-11-2026 (Plan 2 B1, estado CRM, `20270518100000`): se abre la 172**: **77 vivas** y la siguiente entrada nueva es la 173.
@@ -892,3 +893,12 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      de las entidades). Nadie lo lee en pantalla. Los triggers de `questionaris_diagnostic` lo siguen contando para no
      dejar editar un cuestionario ya contestado. Se puede hacer `drop` (y quitar esa condición de los triggers y sus
      checks del arnés) cuando Carles lo autorice. Precio: una migración pequeña.
+175. **El motor genérico del cuestionario y `desar_diagnostic` sin uso** (10-11-2026, Plan 2 A3, `20270522100000`,
+     P11). Desde A3 el diagnóstico del productor son la Operativa y las tablas de excedentes; el cuestionario v3 quedó
+     `vigente=false` sin v4 y la pestaña Configuració › Diagnòstic se retiró. Siguen en la base, sin camino en pantalla:
+     `desar_diagnostic` (conservada **solo** para la ventana base → frontend de A3; ya no exige cuestionario),
+     `questionari_vigent`, `publicar_questionari` (super_admin), `questionari_problemes`, `diagnostic_falten`,
+     `diagnostic_compon_sobre`, y las tablas `questionaris_diagnostic`, `regles_pla`, `mesures_prevencio`. Hacer `drop`
+     de las funciones (y retirar del arnés los 14 checks de `questionaris_diagnostic`/`questionari_vigent` de las cuentas
+     externas, que desde A3 salen «sin datos») cuando Carles lo autorice. Las tablas, con la 174. Precio: una migración
+     pequeña.

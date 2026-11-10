@@ -6,7 +6,7 @@
 //      no existe), o una tarjeta para abrirlo (`obrir_expedient`, solo `pot_aprovar()`); al
 //      abrirlo, el expediente queda enlazado a este diagnóstico (`diagnostic_id`).
 //   2. DEBAJO, el formulario del diagnóstico (`FormulariDiagnostic assistit`), que solo el
-//      equipo puede guardar (D5).
+//      equipo puede guardar (D5): Operativa, excedentes por producto × causa y acciones (A3).
 //
 // ⚠️ SOLO PRODUCTORES. Una receptora ya no tiene diagnóstico (fase 9): su perfil de recepción
 //    vive en la pestaña «Diagnòstic i perfil» de su ficha, y allí se la lleva. El `:tipus`
@@ -42,29 +42,28 @@ export default function DiagnosticDetall() {
   return <DiagnosticProductor key={id} id={id} />
 }
 
+/** Solo lo que pinta la cabecera: el nombre y la organización (para volver a la ficha única). */
+const COLUMNES_CAPCALERA = 'empresa, name, organizacion_id'
+interface Capcalera { empresa: string | null; name: string | null; organizacion_id: string | null }
+
 function DiagnosticProductor({ id }: { id: string }) {
   const { t } = useT()
-  const [fitxa, setFitxa] = useState<Record<string, unknown> | null>(null)
-  // El prefill entra en el `carrega()` del formulario, así que llegar tarde significaría
-  // recargarlo con lo tecleado dentro: se espera a la ficha.
-  const [fitxaCarregada, setFitxaCarregada] = useState(false)
+  const [fitxa, setFitxa] = useState<Capcalera | null>(null)
 
   useEffect(() => {
     let viu = true
-    // `select('*')`: qué columnas sirven de prefill lo declara el cuestionario, que vive en
-    // la base y cambia sin que cambie el software.
-    void supabase.from('productores').select('*').eq('id', id).maybeSingle()
+    // A3: ya no hay prefill desde la ficha (el cuestionario se retiró); solo la cabecera.
+    void supabase.from('productores').select(COLUMNES_CAPCALERA).eq('id', id).maybeSingle()
       .then(({ data }) => {
         if (!viu) return
-        setFitxa((data as Record<string, unknown>) ?? null)
-        setFitxaCarregada(true)
+        setFitxa((data as Capcalera | null) ?? null)
       })
     return () => { viu = false }
   }, [id])
 
-  const nom = (fitxa?.empresa as string | null) || (fitxa?.name as string | null) || null
+  const nom = fitxa?.empresa || fitxa?.name || null
   // De vuelta a la ORGANIZACIÓN (la ficha única), no al id de la ficha de rol.
-  const orgId = (fitxa?.organizacion_id as string | null) ?? id
+  const orgId = fitxa?.organizacion_id ?? id
   const fitxaUrl = `/equip/entitats/${orgId}?pestanya=diagnostic`
 
   return (
@@ -89,9 +88,7 @@ function DiagnosticProductor({ id }: { id: string }) {
 
       <ExpedientDelDiagnostic productorId={id} />
 
-      {!fitxaCarregada ? <CarregantSeccio /> : (
-        <FormulariDiagnostic key={id} orgId={id} assistit prefill={fitxa} />
-      )}
+      <FormulariDiagnostic key={id} orgId={id} assistit />
     </div>
   )
 }

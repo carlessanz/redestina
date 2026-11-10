@@ -58,3 +58,10 @@ regenerados. Deuda 41 cerrada. Los PDF de
 `docs/nuevas-funcionalidades/` cambiaron de nombre pero no de contenido: son binarios y por dentro
 siguen diciendo POMA.
 
+
+**Pantallas retiradas por el Plan 2** (10-11-2026). A1: `PlaPrevencio`, «Prepara el pla», «Emet el pla» (el plan
+básico; el plan es el expediente). **A3** (`20270522100000`): la pestaña **Configuració › Diagnòstic**
+(`EditorDiagnostic`, «Qüestionari», claves `cfgd.*`) y las preguntas del motor genérico en el formulario del
+diagnóstico (`Pregunta`, `ControlFitxaViva`, el prefill): el cuestionario del productor quedó `vigente=false` sin v4 y
+el diagnóstico son la Operativa y las tablas de excedentes. Las funciones del motor siguen en la base sin pantalla
+(deuda 175).

@@ -8,7 +8,7 @@
 //
 // Lo usa `FormulariDiagnostic`: carga la fila, la edita en memoria y, al pulsar «Desa», escribe
 // SOLO lo que ha cambiado (UPDATE directo: el diagnóstico lo conduce el equipo, D5, y la
-// política `productores: edicio intern` lo deja) antes de llamar a `desar_diagnostic`.
+// política `productores: edicio intern` lo deja) antes de llamar a `desar_excedents_diagnostic` (A3).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { supabase } from '../../lib/supabase'

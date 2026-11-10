@@ -1,5 +1,5 @@
 // El PDF del DIAGNÒSTIC OPERATIU bajo demanda (Plan 2, A2): `renderDiagnostic()` con lo que
-// devuelve `diagnostic_datos()` (A1 + la `operativa` de A4). Prueba de Deno, como
+// devuelve `diagnostic_datos()` (A1 + la `operativa` de A4 + los `excedents` de A3). Prueba de Deno, como
 // expedient_test.ts. Con `PDF_SORTIDA=<carpeta>` deja los PDF para mirarlos.
 //
 //   deno test -A --config supabase/functions/generar-documento/deno.json tests/pdf/diagnostic_test.ts
@@ -75,7 +75,7 @@ const DATOS: DatosDiagnostic = {
 
 const ACTIVITATS: Record<string, string> = { produccio_agricola: "Producció agrícola" };
 
-Deno.test("diagnóstico en catalán: cabecera, Operativa, respuestas por sección, notas y sin número", async () => {
+Deno.test("diagnóstico en catalán sin excedentes: cabecera, Operativa, respuestas v3 (legado), notas y sin número", async () => {
   const r = await renderDiagnostic(activos, {
     datos: DATOS, generatEl: "2026-11-10", nomActivitat: (c) => ACTIVITATS[c] ?? c,
   }, "ca");
@@ -86,7 +86,7 @@ Deno.test("diagnóstico en catalán: cabecera, Operativa, respuestas por secció
   assertStringIncludes(t, "Incomplet");
   assertStringIncludes(t, "Generat el 10 de novembre de 2026.");
   assertStringIncludes(t, "Actualitzat l'1 de novembre de 2026 per Persona de l'equip.");
-  assertStringIncludes(t, "Falten 2 preguntes per completar-lo.");
+  assertStringIncludes(t, "Falten 2 dades per completar-lo.");
   // D2: informativo, sin número ni código de verificación; el provisional, en la misma caja.
   assertStringIncludes(t, "Document informatiu");
   assertStringIncludes(t, "no té número ni codi de verificació");
@@ -108,7 +108,10 @@ Deno.test("diagnóstico en catalán: cabecera, Operativa, respuestas por secció
   assertStringIncludes(t, "Finca · Gavà (Principal) — dl, dc · 08:00–12:00");
   assertStringIncludes(t, "Magatzem · Viladecans — Matins");
   assert(!t.includes("op.env_"), "ninguna clave sin traducir");
-  // Las respuestas, en el orden del cuestionario (Excedents antes que Causes).
+  // Sin bloques de excedentes (A3): las respuestas del v3, bajo su título, en el orden del
+  // cuestionario (Excedents antes que Causes).
+  assertStringIncludes(t, "Respostes del qüestionari anterior");
+  assert(t.indexOf("Respostes del qüestionari anterior") < t.indexOf("Calibre fora de norma"));
   assertStringIncludes(t, "Calibre fora de norma");
   assertStringIncludes(t, "Tomàquet: 3.000");
   assert(t.indexOf("Excedents") < t.indexOf("Causes"));
@@ -160,4 +163,154 @@ Deno.test("nomFitxerDiagnostic y avuiMadrid", () => {
   // 23:30 UTC del 31-12 ya es 1 de enero en Madrid.
   assertEquals(avuiMadrid(new Date("2026-12-31T23:30:00Z")), "2027-01-01");
   assertEquals(avuiMadrid(new Date("2026-07-15T10:00:00Z")), "2026-07-15");
+});
+
+// ------------------------------------------------------------------ A3: excedentes
+// Tal como los devuelve `diagnostic_excedents_json()`: principales en su orden, los
+// conservados («ja no és principal») al final; causas por código; acciones por destino.
+const EXCEDENTS = [
+  {
+    producte: "Tomàquet", principal: true, ordre: 1, sense_excedent: false,
+    observacions: "El calibre petit es repeteix cada estiu.",
+    causes: [
+      {
+        id: "c1", causa: "CE", causa_nom: { ca: "Criteris Estètics", es: "Criterios estéticos" },
+        frequencia: "setmanal", volum_kg: 1250.5, gestio_actual: ["donacio", "residu"],
+        destins: ["donacio", "maquila"], detall: "Calibre petit",
+        accions: [
+          { id: "a1", desti: "donacio", descripcio: "Acord amb el banc d'aliments", estat: "en_curs",
+            notes: "Primera recollida el dijous", feta_at: null, actualitzat_at: "2026-11-05T10:00:00+00:00" },
+          { id: "a2", desti: "maquila", descripcio: "Provar salsa amb l'obrador", estat: "pendent",
+            notes: null, feta_at: null, actualitzat_at: null },
+        ],
+      },
+      {
+        id: "c2", causa: "EX", causa_nom: { ca: "Excedent", es: "Excedente" },
+        frequencia: "varies_setmana", volum_kg: 500, gestio_actual: ["venda_alternativa", "altres"],
+        destins: ["venda"], detall: null,
+        accions: [
+          { id: "a3", desti: "venda", descripcio: "Venda a menjadors escolars", estat: "feta",
+            notes: null, feta_at: "2026-11-02T10:00:00+00:00", actualitzat_at: "2026-11-02T10:00:00+00:00" },
+        ],
+      },
+    ],
+  },
+  {
+    producte: "Pebrot", principal: true, ordre: 2, sense_excedent: true,
+    observacions: null, causes: [],
+  },
+  {
+    producte: "Carxofa", principal: false, ordre: null, sense_excedent: false, observacions: null,
+    causes: [
+      {
+        id: "c3", causa: "CL", causa_nom: { ca: "Clima", es: "Clima" },
+        frequencia: "estacional", volum_kg: 300, gestio_actual: ["transformacio"], destins: ["donacio"],
+        detall: null,
+        accions: [
+          { id: "a4", desti: "donacio", descripcio: "Avisar abans de la gelada", estat: "descartada",
+            notes: "No hi ha hagut gelades", feta_at: null, actualitzat_at: null },
+        ],
+      },
+    ],
+  },
+];
+
+const DATOS_A3: DatosDiagnostic = { ...DATOS, excedents: EXCEDENTS, complet: true, falten: [], provisional: false };
+
+Deno.test("A3 en catalán: Excedents por producto, causas, acciones, sense excedent y conservado; sin el v3", async () => {
+  const t = await text("a3-ca", await renderDiagnostic(activos, {
+    datos: DATOS_A3, generatEl: "2026-11-10", nomActivitat: (c) => ACTIVITATS[c] ?? c,
+  }, "ca"));
+  assertStringIncludes(t, "Excedents");
+  assert(t.indexOf("Operativa") < t.indexOf("Excedents"), "los excedentes, tras la Operativa");
+  assertStringIncludes(t, "Volum aproximat, cada vegada que es produeix l’excedent.");
+  // Las cabeceras de las tablas.
+  for (const x of ["Causa", "Freqüència", "Volum (kg)", "Gestió actual", "Destins d’interès", "Accions", "Acció", "Destí", "Estat"]) {
+    assertStringIncludes(t, x);
+  }
+  // Tomàquet: las dos causas con sus datos traducidos y el detalle junto a la causa.
+  assertStringIncludes(t, "Criteris Estètics");
+  assertStringIncludes(t, "Detall: Calibre petit");
+  assertStringIncludes(t, "Setmanal");
+  assertStringIncludes(t, "1.250,5");
+  assertStringIncludes(t, "Donació, Residu");
+  assertStringIncludes(t, "Donació, Maquila");
+  assertStringIncludes(t, "Excedent");
+  assertStringIncludes(t, "Diverses vegades per setmana");
+  assertStringIncludes(t, "500");
+  assertStringIncludes(t, "Venda alternativa, Altres");
+  // Las acciones: texto, destino, estado y la nota de seguimiento en la misma celda.
+  assertStringIncludes(t, "Acord amb el banc d'aliments — Seguiment: Primera recollida el dijous");
+  assertStringIncludes(t, "En curs");
+  assertStringIncludes(t, "Provar salsa amb l'obrador");
+  assertStringIncludes(t, "Pendent");
+  assertStringIncludes(t, "Venda a menjadors escolars");
+  assertStringIncludes(t, "Feta");
+  assertStringIncludes(t, "Observacions: El calibre petit es repeteix cada estiu.");
+  // Pebrot: «Sense excedent». Carxofa: al final, marcada, con sus acciones.
+  assertStringIncludes(t, "Pebrot");
+  assertStringIncludes(t, "Sense excedent");
+  assertStringIncludes(t, "Carxofa · ja no és principal");
+  assertStringIncludes(t, "Avisar abans de la gelada — Seguiment: No hi ha hagut gelades");
+  assertStringIncludes(t, "Descartada");
+  assert(t.indexOf("Tomàquet ") < t.indexOf("Pebrot"));
+  assert(t.indexOf("Pebrot") < t.indexOf("Carxofa · ja no és principal"));
+  // Con bloques, el cuestionario v3 no se imprime (ni su título).
+  assert(!t.includes("Respostes del qüestionari anterior"));
+  assert(!t.includes("Calibre fora de norma"));
+  assert(!t.includes("Encara no hi ha cap resposta"));
+  // Ninguna clave sin traducir.
+  assert(!/\b(dexc|od)\.[a-z_]+/.test(t), "ninguna clave dexc./od. sin traducir");
+  assert(!t.includes("[object Object]"));
+  assertStringIncludes(t, "Contestat");
+});
+
+Deno.test("A3 en castellano: los mismos bloques con las etiquetas en castellano", async () => {
+  const t = await text("a3-es", await renderDiagnostic(activos, { datos: DATOS_A3, generatEl: "2026-11-10" }, "es"));
+  assertStringIncludes(t, "Excedentes");
+  assertStringIncludes(t, "Volumen aproximado, cada vez que se produce el excedente.");
+  for (const x of ["Frecuencia", "Volumen (kg)", "Gestión actual", "Destinos de interés", "Acciones", "Acción", "Destino", "Estado"]) {
+    assertStringIncludes(t, x);
+  }
+  assertStringIncludes(t, "Criterios estéticos");
+  assertStringIncludes(t, "Detalle: Calibre petit");
+  assertStringIncludes(t, "Semanal");
+  assertStringIncludes(t, "Varias veces por semana");
+  assertStringIncludes(t, "Donación, Residuo");
+  assertStringIncludes(t, "Venta alternativa, Otros");
+  assertStringIncludes(t, "Excedente");
+  assertStringIncludes(t, "— Seguimiento: Primera recollida el dijous");
+  assertStringIncludes(t, "En curso");
+  assertStringIncludes(t, "Pendiente");
+  assertStringIncludes(t, "Hecha");
+  assertStringIncludes(t, "Sin excedente");
+  assertStringIncludes(t, "Carxofa · ya no es principal");
+  assertStringIncludes(t, "Observaciones: El calibre petit es repeteix cada estiu.");
+  assert(!t.includes("Respuestas del cuestionario anterior"));
+  assert(!/\b(dexc|od)\.[a-z_]+/.test(t));
+  assert(!t.includes("[object Object]"));
+});
+
+Deno.test("A3: un código desconocido sale como código, nunca como clave; basura descartada sin lanzar", async () => {
+  const t = await text("a3-raros", await renderDiagnostic(activos, {
+    datos: {
+      ...DATOS, provisional: false,
+      excedents: [
+        null, "x", { producte: "" },
+        {
+          producte: "Ceba", principal: true, ordre: 1, sense_excedent: false, observacions: null,
+          causes: [{ id: "c", causa: "ZZ", causa_nom: null, frequencia: "cada_lluna", volum_kg: null,
+            gestio_actual: null, destins: ["teletransport"], detall: null, accions: [{ id: "a", desti: "venda", descripcio: "" }] }],
+        },
+      ],
+    },
+    generatEl: "2026-11-10",
+  }, "ca"));
+  assertStringIncludes(t, "Ceba");
+  assertStringIncludes(t, "ZZ");
+  assertStringIncludes(t, "cada_lluna");
+  assertStringIncludes(t, "teletransport");
+  assert(!t.includes("dexc."));
+  assert(!t.includes("Accions"), "una acción sin texto no cuenta");
+  assert(!t.includes("Respostes del qüestionari anterior"));
 });

@@ -31,6 +31,8 @@ const HOJA = [
   'cortinaHash',
   // A2 (10-11-2026): la Operativa en lectura, la misma en el resumen y en el PDF del diagnóstico.
   'operativaLlegible',
+  // A3 (10-11-2026): los excedentes por producto y causa en lectura (resumen y PDF).
+  'excedentsLlegible',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

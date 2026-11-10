@@ -1,6 +1,7 @@
 // El PDF del EXPEDIENTE de prevención con el diagnóstico único del productor (A1). Prueba de
 // Deno, como fundacio_test.ts: `expedient_datos().diagnostic` pinta la sección «Diagnòstic
-// operatiu» (pregunta → respuesta por sección); sin él, nada. Y las medidas del plan básico
+// operatiu» —desde A3, los excedentes por producto y causa y sus acciones; sin bloques, las
+// respuestas del cuestionario v3 por sección—; sin él, nada. Y las medidas del plan básico
 // con `titol` bilingüe no imprimen `[object Object]`. Con `PDF_SORTIDA=<carpeta>` deja los PDF.
 //
 //   deno test -A --config supabase/functions/generar-documento/deno.json tests/pdf/expedient_test.ts
@@ -87,6 +88,8 @@ Deno.test("expediente con diagnóstico: la sección, la fecha, el aviso provisio
   };
   const t = await text("diagnostic-ca", await renderExpedient(activos, { datos, modo: "prueba" }, "ca"));
   assertStringIncludes(t, "Diagnòstic operatiu");
+  assertStringIncludes(t, "Respostes del qüestionari anterior");
+  assert(!t.includes("Excedents del diagnòstic"));
   assertStringIncludes(t, "Actualitzat l'1 de novembre de 2026.");
   assertStringIncludes(t, "Qüestionari provisional");
   assertStringIncludes(t, "Per què es genera l'excedent?");
@@ -135,4 +138,118 @@ Deno.test("expediente: las medidas del plan básico con título bilingüe no imp
   const es = await text("mesures-es", await renderExpedient(activos, { datos }, "es"));
   assertStringIncludes(es, "Registrar el excedente cada mes (obligatoria)");
   assert(!es.includes("[object Object]"));
+});
+
+// ------------------------------------------------------------------ A3: excedentes
+const EXCEDENTS = [
+  {
+    producte: "Tomàquet", principal: true, ordre: 1, sense_excedent: false, observacions: "Calibre petit cada estiu.",
+    causes: [
+      {
+        id: "c1", causa: "CE", causa_nom: { ca: "Criteris Estètics", es: "Criterios estéticos" },
+        frequencia: "setmanal", volum_kg: 1200, gestio_actual: ["donacio", "residu"], destins: ["donacio", "maquila"],
+        detall: "Calibre petit",
+        accions: [
+          { id: "a1", desti: "donacio", descripcio: "Acord amb el banc d'aliments", estat: "en_curs",
+            notes: "Primera recollida el dijous", feta_at: null, actualitzat_at: null },
+          { id: "a2", desti: "maquila", descripcio: "Provar salsa amb l'obrador", estat: "pendent",
+            notes: null, feta_at: null, actualitzat_at: null },
+        ],
+      },
+      {
+        id: "c2", causa: "EX", causa_nom: { ca: "Excedent", es: "Excedente" },
+        frequencia: "puntual", volum_kg: 500, gestio_actual: ["altres_aprofitaments"], destins: ["venda"], detall: null,
+        accions: [
+          { id: "a3", desti: "venda", descripcio: "Venda a menjadors escolars", estat: "feta",
+            notes: null, feta_at: "2026-11-02T10:00:00+00:00", actualitzat_at: null },
+        ],
+      },
+    ],
+  },
+  { producte: "Pebrot", principal: true, ordre: 2, sense_excedent: true, observacions: null, causes: [] },
+  {
+    producte: "Carxofa", principal: false, ordre: null, sense_excedent: false, observacions: null,
+    causes: [{
+      id: "c3", causa: "CL", causa_nom: { ca: "Clima", es: "Clima" }, frequencia: "mensual", volum_kg: 80,
+      gestio_actual: ["transformacio"], destins: ["donacio"], detall: null,
+      accions: [{ id: "a4", desti: "donacio", descripcio: "Avisar abans de la gelada", estat: "descartada",
+        notes: null, feta_at: null, actualitzat_at: null }],
+    }],
+  },
+];
+
+Deno.test("A3: el expediente imprime «Excedents del diagnòstic» y «Accions del diagnòstic» (ca y es), sin el v3", async () => {
+  const datos: DatosExpedient = {
+    ...BASE,
+    // Con respuestas v3 Y bloques: mandan los bloques; el provisional (del v3) no se avisa.
+    diagnostic: { respostes: RESPOSTES, excedents: EXCEDENTS, actualitzat_at: "2026-11-01T10:00:00+00:00", provisional: true },
+    accions: [{ mesura: "Mesura del pla", causa: "Calibre", estat: "pendent" }],
+  };
+  const t = await text("a3-ca", await renderExpedient(activos, { datos, modo: "prueba" }, "ca"));
+  assertStringIncludes(t, "Diagnòstic operatiu");
+  assertStringIncludes(t, "Excedents del diagnòstic");
+  assertStringIncludes(t, "Accions del diagnòstic");
+  for (const x of ["Producte", "Causa", "Freqüència", "Volum (kg)", "Volum aproximat, cada vegada", "Gestió actual", "Destins d’interès", "Destí", "Acció"]) {
+    assertStringIncludes(t, x);
+  }
+  assertStringIncludes(t, "Criteris Estètics");
+  assertStringIncludes(t, "Detall: Calibre petit");
+  assertStringIncludes(t, "Setmanal");
+  assertStringIncludes(t, "1.200");
+  assertStringIncludes(t, "Donació, Residu");
+  assertStringIncludes(t, "Donació, Maquila");
+  assertStringIncludes(t, "Excedent");
+  assertStringIncludes(t, "Altres aprofitaments");
+  assertStringIncludes(t, "Acord amb el banc d'aliments — Seguiment: Primera recollida el dijous");
+  assertStringIncludes(t, "En curs");
+  assertStringIncludes(t, "Feta");
+  assertStringIncludes(t, "Sense excedent");
+  assertStringIncludes(t, "(Ja no és principal)");
+  assertStringIncludes(t, "Descartada");
+  assertStringIncludes(t, "Tomàquet: Calibre petit cada estiu.");
+  // El orden: el diagnóstico antes de las visitas; sus acciones antes que el «Pla d'accions» del expediente.
+  assert(t.indexOf("Excedents del diagnòstic") < t.indexOf("Accions del diagnòstic"));
+  assert(t.indexOf("Accions del diagnòstic") < t.indexOf("Visites tècniques"));
+  assert(t.indexOf("Accions del diagnòstic") < t.indexOf("Pla d'accions"));
+  assertStringIncludes(t, "Mesura del pla");
+  // Con bloques, ni el cuestionario v3 ni su aviso de provisional.
+  assert(!t.includes("Respostes del qüestionari anterior"));
+  assert(!t.includes("Per què es genera l'excedent?"));
+  assert(!t.includes("Qüestionari provisional"));
+  assert(!/\b(dexc|od)\.[a-z_]+/.test(t), "ninguna clave sin traducir");
+  assert(!t.includes("[object Object]"));
+
+  const es = await text("a3-es", await renderExpedient(activos, { datos }, "es"));
+  assertStringIncludes(es, "Diagnóstico operativo");
+  assertStringIncludes(es, "Excedentes del diagnóstico");
+  assertStringIncludes(es, "Acciones del diagnóstico");
+  assertStringIncludes(es, "Criterios estéticos");
+  assertStringIncludes(es, "Semanal");
+  assertStringIncludes(es, "Donación, Residuo");
+  assertStringIncludes(es, "Otros aprovechamientos");
+  assertStringIncludes(es, "— Seguimiento: Primera recollida el dijous");
+  assertStringIncludes(es, "En curso");
+  assertStringIncludes(es, "Hecha");
+  assertStringIncludes(es, "Sin excedente");
+  assertStringIncludes(es, "(Ya no es principal)");
+  assert(!es.includes("Respuestas del cuestionario anterior"));
+  assert(!/\b(dexc|od)\.[a-z_]+/.test(es));
+  assert(!es.includes("[object Object]"));
+});
+
+Deno.test("A3: bloques sin acciones no pintan «Accions del diagnòstic»; solo bloques (sin cabecera) también salen", async () => {
+  const t = await text("a3-sense-accions", await renderExpedient(activos, {
+    datos: {
+      ...BASE,
+      diagnostic: {
+        respostes: [], actualitzat_at: null, provisional: false,
+        excedents: [{ producte: "Pebrot", principal: true, ordre: 1, sense_excedent: true, observacions: null, causes: [] }],
+      },
+    },
+  }, "ca"));
+  assertStringIncludes(t, "Diagnòstic operatiu");
+  assertStringIncludes(t, "Excedents del diagnòstic");
+  assertStringIncludes(t, "Sense excedent");
+  assert(!t.includes("Accions del diagnòstic"));
+  assert(!t.includes("Actualitzat"));
 });

@@ -220,13 +220,13 @@ criterio); el REC se reparte en proporción y se descarta lo no certificable. Á
 (`cierres_ejercicio`, `cierres_donante`, `datos_182()`), **intervalo** y **oferta** (`cierres_periodo`,
 serie `CDP`); el anual sustituye a los parciales. **CT retirado**. **Certificado de recepción**
 (`cierres_receptor`, serie `CR`, sin importes).
-**Diagnóstico y plan** (A1, `20270520100000`): **`diagnostics`, una fila por productor que se sobrescribe**
-(D1; `respostes` crudas + `sobre` compuesto, `complet`/`falten`, `actualitzat_*`; solo lectura por RLS, se
-escribe con `desar_diagnostic`, **solo equipo**, D5); `questionaris_diagnostic` (**v3** productor, sin productos ni lugares: A4; receptor
-retirado: su diagnóstico es el perfil de recepción, D3). **Plan básico retirado (D4)**: `planes_prevencion`
-conserva solo los emitidos (los borradores se copiaron y borraron), `mesures_prevencio`/`regles_pla` sin camino
-en pantalla, `diagnostics_historial` ya no se escribe (P10). El plan es el **expediente**
-`expedients_prevencion` (+ `diagnostic_id`) + 7 hijas. Impacto:
+**Diagnóstico y plan** (A1, A3; `context/04`; receptoras: perfil de recepción, D3): **`diagnostics`, uno por productor que se sobrescribe** (D1: cabecera,
+notas, `complet`/`falten`, `actualitzat_*`) y **excedentes en tablas propias** (A3, D7): `diagnostic_productes` →
+`diagnostic_excedents` (principal × `causas.codigo`: frecuencia, kg —P7—, gestión actual, destinos = modalidades,
+`detall`) → `diagnostic_accions` (una por destino, estado y nota que ve la organización). Solo lectura por RLS; escribe
+el equipo por RPC (D5). Un principal que deja de serlo **conserva** su bloque, que no cuenta para `complet` (en vivo:
+`diagnostic_falten_productor`). Cuestionario sin vigente (motor sin pantalla, deuda 175). **Plan básico retirado
+(D4)**: quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` + `diagnostic_id`). Impacto:
 `impacte_*` sobre kilos conciliados.
 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
@@ -272,10 +272,10 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `validar_recollida` del admin emite y concilia—, albaranes, convenios, organización y estado CRM, acceso, notas,
   RGPD, equipo, borrado, importación/exportación, firma, cierre, diagnóstico, interruptores y jobs) vive en
   `context/04bis`, «Familias de RPC».
-- **Diagnóstico (A1)**: `desar_diagnostic` solo `es_intern()` (un externo recibe `42501` también sobre lo suyo, D5);
-  lectura con `diagnostic_estat` y `diagnostic_datos(p_tipo_org, p_org, p_user)` (`puc_gestionar_pla`; con
-  `service_role`, `p_user` obligatorio; trae `operativa`, A4; la usa `diagnostic-pdf`, A2). `fixar_lloc_principal` (A4). El plan básico (`generar_pla_des_de_diagnostic`, `emitir_plan_basico`,
-  `desar_mesures_pla`, `fixar_nivell_pla`, `guardar_plan_basico`) queda **solo para `service_role`**.
+- **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
+  (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3); `desar_diagnostic` solo por compatibilidad.
+  Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
+  `diagnostic-pdf`). `fixar_lloc_principal` (A4). Plan básico: solo `service_role`.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
   `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`,
   `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una versión sustituida).
@@ -362,10 +362,9 @@ Lo que manda hoy, en una línea cada uno:
 - **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
 - **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió («Canviarà» por fila, «dubtosa» con candidatos) →
   Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
-  operatiu (A1: el equipo lo contesta en `/equip/diagnostics/productor/:id`, con el expediente arriba y, A4, la
-  Operativa de la ficha como sección 1; la ficha y
-  «El meu diagnòstic» lo leen y, A2, **descargan en PDF bajo demanda**: `diagnostic-pdf` devuelve los bytes, sin fila en
-  `documentos`, número ni código, D2), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
+  operatiu: el equipo lo contesta en `/equip/diagnostics/productor/:id` (expediente arriba; secciones Operativa ·
+  Excedents · Accions, A3; Accions también en «Gestió interna»); ficha y «El meu diagnòstic» lo leen y descargan en
+  PDF (`diagnostic-pdf`, sin fila en `documentos`, D2), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -419,7 +418,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270521100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270522100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -452,6 +451,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `sendEmail()`); `esCuentaPermitida` para acceso y recuperación (pasa el equipo). Documentos
   `modo='prueba'` → `destinatariosPrueba()` aunque el modo test esté apagado. Whitelists:
   con filas, solo a quien esté; vacías, no restringen.
+- **Diagnóstico = vocabulario de la oferta** (A3): causa = `causas.codigo`, destino = modalidad; cruza por
+  `(productor, producto, causa)`.
 - Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
   convenio, al final; `estat` solo excluye «No procedeix». Valor = kg × coste
   por kilo de la canalización (nunca `productos.eur_kg` para lo fiscal).
@@ -515,7 +516,7 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 ## 10bis · 10ter. Nombres retirados
 
 `pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Retirados en A1 (10-11-2026):
-`PlaPrevencio`, «Prepara el pla», «Emet el pla» (el plan básico; el plan es el expediente). Un cambio de dominio
+`PlaPrevencio`, «Prepara el pla», «Emet el pla» (el plan básico; el plan es el expediente); A3: Configuració › Diagnòstic. Un cambio de dominio
 exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
@@ -556,7 +557,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (79 vivas; la siguiente entrada nueva es la 175; los números no se renumeran ni
+**Deuda abierta (80 vivas; la siguiente entrada nueva es la 176; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -569,7 +570,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10) · **175** (motor del cuestionario y `desar_diagnostic` sin uso; `drop` pendiente, P11).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -581,11 +582,11 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.899 pruebas de Vitest en 85 ficheros (1 saltada a propósito) + 47 de Deno.**
+   **Referencia: 1.899 pruebas de Vitest en 87 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.470/2.470 y 40 sin datos; producción 2.474/2.474 y 36 «Sin fallos de
-   permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
+   **Referencia: clon 2.548/2.548 y 57 sin datos (A3); producción 2.474/2.474 y 36 (antes de A3) «Sin
+   fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

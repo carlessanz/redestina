@@ -414,6 +414,10 @@ supabase/
     _shared/operativaLlegible.ts  Módulo HOJA (A2): la Operativa en lectura (`filesOperativa`) + sus etiquetas
                                ca/es (`ETIQUETES_OPERATIVA`, paridad con i18n.tsx en
                                `tests/operativaLlegible.test.ts`); `src/lib/operativaLlegible.ts` lo reexporta
+    _shared/excedentsLlegible.ts  Módulo HOJA (A3): excedentes del diagnóstico en lectura (`filesCausa`,
+                               `filesAccions`, `titolBloc`, listas cerradas = CHECK) + `ETIQUETES_EXCEDENTS` ca/es
+                               (paridad en `tests/excedentsLlegible.test.ts`); lo usan `render/diagnostic.ts`,
+                               `render/expedient.ts` y la pantalla (`src/lib/excedentsLlegible.ts` lo reexporta)
     _shared/pdf/render/albara1p.ts  El albarán de UNA página (modelo de Espigoladors, fase 3):
                                REC/ENT/OPE con `datos.format = 'albara-1p'`. Los antiguos
                                (rec.ts, ent.ts, ope.ts) siguen pintando lo emitido antes

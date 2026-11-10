@@ -2,9 +2,14 @@
 //
 // Desde A1 (`20270520100000`, D1·D3·D4·D5) hay UN diagnóstico por productor, en la tabla
 // `diagnostics`, que se sobrescribe; el plan básico desapareció de la pantalla (el plan es el
-// expediente, `expedientApi.ts`) y solo el EQUIPO guarda (`desar_diagnostic`, D5): el
-// productor lo lee. Lo que escribe es una RPC, nunca un `update`: `authenticated` solo tiene
-// SELECT sobre `diagnostics`.
+// expediente, `expedientApi.ts`) y solo el EQUIPO guarda (D5): el productor lo lee. Lo que
+// escribe es una RPC, nunca un `update`: `authenticated` solo tiene SELECT sobre `diagnostics`
+// y sobre las tres tablas de excedentes.
+//
+// A3 (`20270522100000`): el cuestionario v3 ya no es vigente y el formulario deja de llamar a
+// `desar_diagnostic` (P11). Guarda `desar_excedents_diagnostic` (excedentes por producto ×
+// causa, notas e idioma en una transacción) y el estado de cada acción va aparte, al momento,
+// por `fixar_estat_accio`. Configuració › Diagnòstic (el editor del cuestionario) se retiró.
 //
 // Mismo contrato que `albarans.ts`, `canalitzacio.ts` y `documents.ts`: **nunca lanza**.
 // Devuelve `ok` y, cuando no, el mensaje que da la base —que ya viene en catalán y dice qué
@@ -13,9 +18,9 @@
 
 import { supabase } from './supabase'
 import type {
-  Diagnostic, DiagnosticDatos, DiagnosticEquip, DiagnosticEstat, QuestionariDiagnostic,
+  CausaCataleg, DiagnosticDatos, DiagnosticEquip, DiagnosticEstat, FilaAccioDiagnostic,
+  PayloadBlocDiagnostic, ResultatDesatExcedents,
 } from '../types'
-import type { Respostes } from './diagnostic'
 
 export type ResultatRpc<T> =
   | { ok: true; data: T }
@@ -43,20 +48,6 @@ export type TipusOrg = 'productor' | 'entidad'
 // Leer
 // ---------------------------------------------------------------------------
 
-/**
- * El cuestionario que toca contestar. `questionari_vigent()` es `setof`, así que devuelve
- * 0 o 1 fila; `null` significa **que no hay ninguno vigente para ese tipo**, que es un
- * estado real del sistema (`sense_questionari`) y no un error.
- */
-export async function questionariVigent(
-  tipus: TipusOrg,
-): Promise<ResultatRpc<QuestionariDiagnostic | null>> {
-  const r = await crida<QuestionariDiagnostic[]>(
-    'questionari_vigent', { p_tipo_org: tipus }, 'diag.err_generic')
-  if (!r.ok) return r
-  return { ok: true, data: (r.data ?? [])[0] ?? null }
-}
-
 export function diagnosticEstat(
   tipus: TipusOrg,
   org: string,
@@ -66,37 +57,6 @@ export function diagnosticEstat(
 
 export function diagnosticsEquip(): Promise<ResultatRpc<DiagnosticEquip[]>> {
   return crida('diagnostics_equip', {}, 'diag.err_generic')
-}
-
-/**
- * Las columnas de `diagnostics`, en UN literal (§7, deuda 46).
- *
- * ⚠️ Es una `const` y no un literal repetido porque TypeScript la estrecha a su tipo literal:
- *    supabase-js la puede analizar igual. Lo que NO se puede hacer nunca es componerla
- *    —concatenada o interpolada, la librería devuelve `GenericStringError`—.
- */
-const COLUMNES_DIAGNOSTIC =
-  'id, productor_id, questionari_id, versio_questionari, respostes, sobre, complet, falten, notes, idioma, actualitzat_at, actualitzat_per, created_at'
-
-/**
- * EL diagnóstico de un productor, o `null` si todavía no se ha guardado nunca.
- *
- * Se lee por `select` y no por RPC porque **la RLS ya dice exactamente lo que hay que
- * decir**: el equipo los ve todos y un productor el suyo (20270520100000). Es lo que abre el
- * formulario con lo último guardado (`respostes` es el mapa plano `{id: valor}`).
- */
-export async function diagnosticActual(org: string): Promise<ResultatRpc<Diagnostic | null>> {
-  try {
-    const { data, error } = await supabase
-      .from('diagnostics')
-      .select(COLUMNES_DIAGNOSTIC)
-      .eq('productor_id', org)
-      .maybeSingle()
-    if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as Diagnostic | null) ?? null }
-  } catch {
-    return { ok: false, missatge: 'diag.err_generic', codi: null }
-  }
 }
 
 /**
@@ -112,104 +72,60 @@ export function diagnosticDatos(
   return crida('diagnostic_datos', { p_tipo_org: tipus, p_org: org }, 'diag.err_generic')
 }
 
-// ---------------------------------------------------------------------------
-// Escribir
-// ---------------------------------------------------------------------------
-
-export interface ResultatDesat {
-  /** Siempre `null` desde A1: guardar ya no toca ningún plan */
-  pla: null
-  diagnostic_id: string
-  questionari_id: string
-  versio_questionari: number
-  questionari_provisional: boolean
-  falten: string[]
-  complet: boolean
-}
+/** Las columnas del catálogo de causas, en UN literal (§7). */
+const COLUMNES_CAUSES = 'codigo, nombre, nombre_es'
 
 /**
- * Guarda el diagnóstico (solo el equipo, D5: un productor recibe `42501`). **Guarda SIEMPRE**,
- * completo o no: un cuestionario largo no se contesta de una sentada, y perder lo tecleado
- * porque falta una obligatoria sería la forma más segura de que nadie lo termine. Si está
- * completo lo decide el servidor (`complet`, `falten`).
- *
- * ⚠️ Se manda el mapa PLANO `{pregunta_id: valor}`. El array autocontenido —con el texto de
- *    cada pregunta congelado dentro— lo compone el servidor: si lo compusiera el navegador,
- *    lo que queda impreso sería lo que el navegador dice haber enseñado, no lo que el
- *    cuestionario dice.
+ * El catálogo `causas` (el mismo de las ofertas, D7), por código. Lo puede leer cualquier
+ * sesión. `nombre_es` existe desde A3; si falta, la pantalla cae al catalán.
  */
-export function desarDiagnostic(
-  tipus: TipusOrg,
-  org: string,
-  respostes: Respostes,
-  notes: string | null,
-  idioma: 'ca' | 'es' | null,
-): Promise<ResultatRpc<ResultatDesat>> {
-  return crida('desar_diagnostic', {
-    p_tipo_org: tipus,
-    p_org: org,
-    p_respostes: respostes,
-    p_notes: notes,
-    p_idioma: idioma,
-  }, 'diag.err_generic')
-}
-
-/** Los cuestionarios de un tipo, el vigente y los retirados. Solo el equipo ve los viejos. */
-export async function questionarisDelTipus(
-  tipus: TipusOrg,
-): Promise<ResultatRpc<QuestionariDiagnostic[]>> {
+export async function causesDiagnostic(): Promise<ResultatRpc<CausaCataleg[]>> {
   try {
     const { data, error } = await supabase
-      .from('questionaris_diagnostic')
-      .select('id, tipo_org, versio, provisional, vigente, valida_desde, titol, preguntes, created_by, created_at')
-      .eq('tipo_org', tipus)
-      .order('versio', { ascending: false })
+      .from('causas')
+      .select(COLUMNES_CAUSES)
+      .order('codigo', { ascending: true })
     if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as QuestionariDiagnostic[] | null) ?? [] }
+    return { ok: true, data: (data as CausaCataleg[] | null) ?? [] }
   } catch {
     return { ok: false, missatge: 'diag.err_generic', codi: null }
   }
 }
 
-export interface ResultatPublicacio {
-  questionari: QuestionariDiagnostic
-  versio: number
-  vigent: boolean
-  provisional: boolean
-}
+// ---------------------------------------------------------------------------
+// Escribir (solo el equipo, D5: un externo recibe `42501`)
+// ---------------------------------------------------------------------------
 
 /**
- * Publica la versión siguiente del cuestionario y retira la anterior.
+ * Guarda los excedentes del diagnóstico, las notas y el idioma (A3). **REEMPLAZA el conjunto**:
+ * un bloque, una causa o una acción que no viaje se borra (las que viajan conservan id, estado,
+ * notas y `feta_*`). Guarda SIEMPRE, completo o no; si está completo lo dice el servidor.
  *
- * ⚠️ Editar uno que ya ha generado diagnósticos está prohibido por trigger, así que esta es
- *    la única forma de cambiar el texto: se publica la versión N+1. Es exactamente el
- *    camino de `plantillas_documento`, y por el mismo motivo — hay que poder responder con
- *    qué cuestionario EXACTO se hizo un diagnóstico de hace cinco años.
+ * ⚠️ `notes = null` BORRA las notas: hay que mandar siempre el valor actual del formulario.
  */
-export function publicarQuestionari(
-  tipus: TipusOrg,
-  titol: { ca: string; es: string },
-  preguntes: unknown[],
-  provisional: boolean,
-  vigent: boolean,
-): Promise<ResultatRpc<ResultatPublicacio>> {
-  return crida('publicar_questionari', {
-    p_tipo_org: tipus,
-    p_titol: titol,
-    p_preguntes: preguntes,
-    p_provisional: provisional,
-    p_vigent: vigent,
+export function desarExcedentsDiagnostic(
+  productor: string,
+  productes: PayloadBlocDiagnostic[],
+  notes: string | null,
+  idioma: 'ca' | 'es' | null,
+): Promise<ResultatRpc<ResultatDesatExcedents>> {
+  return crida('desar_excedents_diagnostic', {
+    p_productor: productor,
+    p_productes: productes,
+    p_notes: notes,
+    p_idioma: idioma,
   }, 'diag.err_generic')
 }
 
 /**
- * La lista de problemas de un cuestionario, **antes** de intentar publicarlo.
- *
- * Existe por lo mismo que `comprovaConvenis()` (§12.78): el editor tiene que poder avisar
- * antes, no enterarse con un error a mitad. La lista la compone SQL —es la misma función
- * que sostiene el CHECK de la tabla—, así que no hay una segunda definición de «qué es un
- * cuestionario válido».
+ * Cambia el estado de una acción (`pendent` · `en_curs` · `feta` · `descartada`) y, si llega,
+ * su nota de seguimiento (`''` = sin nota; `null` = no la toca). Va al momento, independiente
+ * de «Desa el diagnòstic».
  */
-export function problemesQuestionari(preguntes: unknown): Promise<ResultatRpc<string[]>> {
-  return crida('questionari_problemes', { p_preguntes: preguntes }, 'diag.err_generic')
+export function fixarEstatAccio(
+  accio: string,
+  estat: string,
+  notes: string | null = null,
+): Promise<ResultatRpc<FilaAccioDiagnostic>> {
+  return crida('fixar_estat_accio', { p_accio: accio, p_estat: estat, p_notes: notes }, 'diag.err_generic')
 }

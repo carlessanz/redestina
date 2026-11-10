@@ -2,11 +2,17 @@
 // descargan desde el resumen; es un `application/pdf` de verdad, no deja fila en `documentos`
 // ni fichero en el bucket, y un productor ajeno recibe 403.
 // Solo contra el CLON LOCAL (necesita las Edge Functions del clon: scripts/local/funciones-local.sh).
-// Solo LEE: corre también en móvil.
+// Solo LEE: corre también en móvil (salvo la prueba de los excedentes, que toca el fixture y va
+// solo en escritorio).
+//
+// A3 (`20270522100000`): con excedentes por producto × causa, el PDF lleva la sección
+// «Excedents». El texto va con la fuente incrustada (glifos, no letras), así que no se busca la
+// causa en los bytes: se compara el tamaño con el mismo PDF sin ningún bloque.
 
 import { readFileSync } from 'node:fs'
 import { expect, test, type Page } from '@playwright/test'
 import { compte, entra, motiuSaltClon, productorDe, sql } from './ajuda'
+import { fotoOperativa, restauraFixtureDiagnostic } from './fixtureDiagnostic'
 
 const API = 'http://127.0.0.1:55321'
 
@@ -98,4 +104,33 @@ test('un productor ajeno recibe 403, y sin sesión 401', async () => {
     body: JSON.stringify({ tipo_org: 'productor', org: altre }),
   })
   expect(sense.status).toBe(401)
+})
+
+test('con excedentes, el PDF lleva la sección «Excedents» (pesa más que sin ningún bloque)', async ({}, info) => {
+  test.skip(info.project.name !== 'escriptori', 'Toca el fixture del diagnòstic: només a escriptori')
+  const prod = productorDe('productor-titular')
+  const foto = fotoOperativa(prod)
+  // Las respuestas del v3 (legado) se apartan un momento: sin bloques, el PDF caería a ellas.
+  const sobre = sql(`select sobre::text from diagnostics where productor_id = '${prod}'`)
+  try {
+    // El fixture del arnés: Tomàquet × EX con su acción.
+    restauraFixtureDiagnostic(prod, foto)
+    sql(`update diagnostics set sobre = jsonb_set(sobre, '{respostes}', '[]'::jsonb) where productor_id = '${prod}'`)
+    const token = await jwt('productor-titular')
+    const amb = await pdf(token, prod)
+    expect(amb.status).toBe(200)
+    expect(amb.headers.get('content-type')).toBe('application/pdf')
+    const bytesAmb = new Uint8Array(await amb.arrayBuffer())
+    expect(Buffer.from(bytesAmb.subarray(0, 5)).toString('latin1')).toBe('%PDF-')
+
+    sql(`delete from diagnostic_productes where productor_id = '${prod}'`)
+    const sense = await pdf(token, prod)
+    expect(sense.status).toBe(200)
+    const bytesSense = new Uint8Array(await sense.arrayBuffer())
+    // La sección «Excedents» (tabla de causas y de acciones) es lo único que cambia.
+    expect(bytesAmb.length).toBeGreaterThan(bytesSense.length + 500)
+  } finally {
+    if (sobre) sql(`update diagnostics set sobre = '${sobre.replace(/'/g, "''")}'::jsonb where productor_id = '${prod}'`)
+    restauraFixtureDiagnostic(prod, foto)
+  }
 })

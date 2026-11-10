@@ -12,13 +12,14 @@ import { useT } from '../lib/i18n'
 import { useAppContext } from '../hooks/useAppContext'
 import DadesFundacio from './equip/DadesFundacio'
 import FactorsImpacte from './equip/FactorsImpacte'
-import EditorDiagnostic from './equip/EditorDiagnostic'
 import SeccioGeneral from './configuracio/SeccioGeneral'
 import SeccioNotificacions from './configuracio/SeccioNotificacions'
 import SeccioEquip from './configuracio/SeccioEquip'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
-const PESTANYES = ['general', 'notificacions', 'fundacio', 'impacte', 'diagnostic', 'equip'] as const
+// A3 (`20270522100000`): la pestaña «Diagnòstic» (el editor del cuestionario) se retiró; un
+// `?tab=diagnostic` antiguo cae en «General».
+const PESTANYES = ['general', 'notificacions', 'fundacio', 'impacte', 'equip'] as const
 
 export default function Settings() {
   const { t } = useT()
@@ -50,7 +51,6 @@ export default function Settings() {
             <TabsTrigger value="notificacions">{t('set.tab_notificacions')}</TabsTrigger>
             <TabsTrigger value="fundacio">{t('set.tab_fundacio')}</TabsTrigger>
             <TabsTrigger value="impacte">{t('set.tab_impacte')}</TabsTrigger>
-            <TabsTrigger value="diagnostic">{t('set.tab_diagnostic')}</TabsTrigger>
             {potCanviar && <TabsTrigger value="equip" data-testid="tab-equip">{t('set.tab_equip')}</TabsTrigger>}
           </TabsList>
         </div>
@@ -62,8 +62,6 @@ export default function Settings() {
         <TabsContent value="fundacio" className="pt-4"><DadesFundacio /></TabsContent>
         {/* Los factores del impacto (fase 10). */}
         <TabsContent value="impacte" className="pt-4"><FactorsImpacte /></TabsContent>
-        {/* El cuestionario, las medidas y las reglas del diagnóstico (F2). */}
-        <TabsContent value="diagnostic" className="pt-4"><EditorDiagnostic /></TabsContent>
         {/* Las cuentas del equipo y su rol (09-11-2026): solo el super_admin. */}
         {potCanviar && <TabsContent value="equip" className="pt-4"><SeccioEquip /></TabsContent>}
       </Tabs>

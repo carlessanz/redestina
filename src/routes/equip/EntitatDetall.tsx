@@ -50,6 +50,7 @@ import CampsPerfilReceptor from '../../components/CampsPerfilReceptor'
 import ConveniFitxa from '../../components/fitxa/ConveniFitxa'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
 import ResumDiagnostic from '../../components/diagnostic/ResumDiagnostic'
+import AccionsDiagnostic from '../../components/diagnostic/AccionsDiagnostic'
 import { CLAUS_PREFERENCIES, PERFIL_RECEPTOR, PREFERENCIES_RECEPCIO } from '../../lib/perfilReceptor'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
@@ -601,6 +602,13 @@ export default function EntitatDetall() {
             <section className="border-t border-border pt-6" data-testid="bloc-notes">
               <NotesInternes orgId={org.id} potEsborrar={potEsborrar} onCompte={setNNotes} />
             </section>
+            {/* Las acciones del diagnóstico (A3): estado y nota de seguimiento al momento. Solo
+                si la organización hace de productora (el diagnóstico es suyo). */}
+            {org.productor_id && (
+              <Seccio titol={t('dexc.accions_diagnostic')} ajuda={t('dexc.accions_diagnostic_h')} testid="bloc-accions-diagnostic">
+                <AccionsDiagnostic productorId={org.productor_id} editable />
+              </Seccio>
+            )}
             <Seccio titol={t('ef.sec_intern')} ajuda={t('ef.h_intern')} testid="bloc-intern">
               <BlocCamps {...blocProps} camps={camps('intern')} />
               <Consentiments organitzacioId={org.id} correu={correu} motiuCorreu={motiuEmail} />

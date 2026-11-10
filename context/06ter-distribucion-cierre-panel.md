@@ -2250,3 +2250,44 @@ con datos), igual que el resumen. `lib/diagnosticPdf.ts` (`descarregarDiagnostic
 
 Verificado en el clon: el PDF del productor de prueba, 2 páginas y 110.238 bytes; `documentos` y los objetos del
 bucket, iguales antes y después.
+
+### Excedentes por producto y causa en el diagnóstico (Plan 2, A3, `20270522100000`, 10-11-2026)
+
+**Formulario del equipo** (`/equip/diagnostics/productor/:id`, `FormulariDiagnostic`), con el expediente arriba y tres
+secciones navegables (`NavSeccionsDiagnostic`, chips `xip-seccio-operativa · excedents · accions`):
+1. **Operativa** (A4, sin cambios).
+2. **Excedents** (`diagnostic/BlocExcedentsProducte.tsx` + `CausaExcedent.tsx`): un bloque por producto principal de la
+   Operativa **viva** (marcar un principal arriba lo añade al momento). Por bloque: «Sense excedent» o chips de causas
+   del catálogo `causas` (nombre según idioma) → por causa: frecuencia (`Desplegable`), kg (con la nota «aproximat,
+   cada vegada que es produeix»), «Què en feu avui amb l'excedent d'aquesta causa?» (gestión actual, `XipsTria`),
+   «Quins destins us interessen?» (modalidades) y, por destino marcado, el texto de la acción; detalle opcional y
+   observaciones del producto. Los bloques ya guardados de productos que dejaron de ser principales salen aparte
+   («Ja no és principal», botón «Treu-lo»). Con «Sense excedent» marcado, las causas se quedan en memoria y no se
+   envían; un bloque vacío no se envía.
+3. **Accions** (`diagnostic/AccionsDiagnostic.tsx`): todas las acciones, agrupadas producto → causa → destino, con
+   estado y nota de seguimiento (la ve la organización), filtro por estado; se guardan **al momento**
+   (`fixar_estat_accio`), aparte de «Desa».
+
+**Un solo «Desa el diagnòstic»**: primero la Operativa (lo cambiado de la ficha) y después
+`desar_excedents_diagnostic` con las notas siempre (un `null` las borraría). Si el guardado va a borrar acciones ya
+guardadas (quitar una causa, un destino o un bloque), `perdues()` lo cuenta y se pide confirmación antes. El badge de
+estado y los textos de lo que falta (`textFalta`: `dexc.falta_*`) salen de los códigos del servidor; `faltenLocal()`
+(`lib/excedentsDiagnostic.ts`, espejo del SQL) pinta los chips antes de guardar, salvo el lugar principal, que se
+refresca al guardar (los lugares se guardan al momento en su componente).
+
+**Lectura** (`ResumDiagnostic`: ficha › «Diagnòstic i perfil» y «El meu diagnòstic» del productor, sin controles):
+Operativa → Excedents (producto → causa → frecuencia, kg, gestión, destinos, detalle → acciones con estado y nota) →
+notas. Las respuestas del cuestionario v3 solo salen, como «Respostes del qüestionari anterior», mientras no hay
+ningún bloque. Mismas funciones que los PDF (`_shared/excedentsLlegible.ts`, reexportado en `src/lib/`).
+**«Gestió interna»** de la ficha monta `AccionsDiagnostic` editable (`bloc-accions-diagnostic`) cuando la organización
+tiene papel productor.
+
+**PDF**: `diagnostic-pdf` añade «Excedents» tras la Operativa (por producto, tabla de causas y tabla de acciones) y el
+expediente (`generar-documento`) imprime «Excedents del diagnòstic» y «Accions del diagnòstic» (otro nombre que el
+«Pla d'accions» del expediente).
+
+**Retirado**: la pestaña Configuració › Diagnòstic (`EditorDiagnostic`), las preguntas del motor genérico del
+formulario y su prefill (la ficha ya no se carga para eso en `DiagnosticDetall`). E2E: `diagnostic.e2e.ts` (dos
+principales, causas, acciones, «Ja no és principal», «Feta» desde Gestió interna, lectura del productor y cruce con
+las ofertas por SQL; restaura el fixture del arnés con `tests/e2e/fixtureDiagnostic.ts`), `diagnostic-pdf.e2e.ts` y
+`pla-prevencio.e2e.ts`.

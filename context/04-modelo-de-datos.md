@@ -1688,3 +1688,48 @@ bloque `ofertant`). El cuestionario ya no las pregunta.
 - **`diagnostic_datos()`** añade la clave `operativa` (actividad, productos, principales, variedades, volumen,
   temporada, envases, canales, clientes, facturación, volumen comercializado, apoyo y `llocs` con alias, municipio,
   principal, días, franjas y horario, el principal primero). La pinta `ResumDiagnostic` con `lib/operativaLlegible.ts`.
+
+### Excedentes del diagnóstico por producto y causa (Plan 2, A3, `20270522100000`, 10-11-2026)
+
+Filas 2.3 y 2.4 de la Taula mestra y D7. Sustituye las 8 preguntas **generales** de excedentes del cuestionario v3
+(`situacions_excedent`, `frequencia_excedent`, `volum_excedent`, `previsio`, `antelacio`, `canals_actuals`, `causes`,
+`sortides_interes`), que tenían un vocabulario de causas propio, por un registro en **tablas propias** que habla el
+idioma de las ofertas: causa = `causas.codigo` (el mismo de `excedentes.causa_codigo`) y destino = modalidad.
+
+- **`diagnostic_productes`** (`productor_id` → `productores` cascade, `producte`, `sense_excedent`, `observacions`
+  ≤2000; único `(productor_id, producte)`): un bloque por producto principal (o conservado).
+- **`diagnostic_excedents`** (`productor_id`, `producte`, `causa_codi` → `causas`; FK compuesta
+  `(productor_id, producte)` → `diagnostic_productes` cascade; único `(productor_id, producte, causa_codi)`):
+  `frequencia` (puntual · estacional · mensual · setmanal · varies_setmana), `volum_kg ≥0` (**P7**: kg libres, «aproximat,
+  cada vegada que es produeix»), `gestio_actual text[]` (2.4, **por causa**: venda_alternativa · donacio · transformacio ·
+  altres_aprofitaments · residu · altres), `destins_interes text[]` (donacio · venda · maquila; puede quedar vacío) y
+  `detall` ≤500. Frecuencia, kg y gestión son **nullable**: se guarda a medias y `complet` los exige.
+- **`diagnostic_accions`** (`excedent_id` cascade, `desti`, `descripcio` ≤2000, `estat` pendent · en_curs · feta ·
+  descartada, `notes` ≤2000, `feta_at/per`, `actualitzat_at/per`; único `(excedent_id, desti)`): **una acción por
+  destino marcado** (decisión b de Carles). La nota de seguimiento **la ve la organización** (no es una nota interna).
+- **Dos capas**: solo `select` a `authenticated` (RLS «equip o propi»; las acciones, por su excedente) y todo a
+  `service_role`. El borrado de una ficha las arrastra por cascada (`borrar_ficha_completa()` no cambia). Las FK a
+  `auth.users` entran solas en el traspaso de autoría del equipo.
+- **`causas.nombre_es`**: los valores de `CAUSES_ES` (`_shared/camposOferta.ts`, que se conserva para el intake);
+  `tests/excedentsLlegible.test.ts` vigila la paridad.
+- **Productos que dejan de ser principales** (decisión a): su bloque, sus excedentes y sus acciones **se conservan**
+  (`principal:false`, `ordre:null`, al final), no cuentan para `complet` y la pantalla los pone aparte («Ja no és
+  principal», botón «Treu-lo»). Por eso `producte_fora_principals` solo salta al **crear** un bloque de un no-principal.
+  Se descartó podar como en A4 porque el productor también edita sus principales y un clic suyo borraría el seguimiento
+  del equipo.
+- **`complet` en vivo**: `diagnostic_falten_productor(p)` (invoker, bajo RLS) devuelve `operativa_productes`,
+  `operativa_principals`, `operativa_lloc` (sin lugar principal con días o franja), `excedents:<producte>` (principal sin
+  causas ni «sense excedent») y `dades:<producte>:<causa>` (falta frecuencia, kg o gestión). La usan `diagnostic_estat`,
+  `diagnostics_equip`, `diagnostic_datos` y el guardado; `diagnostics.complet/falten` quedan como foto del último
+  guardado. `diagnostic_estat` añade `excedents_n` y `accions_pendents`.
+- **`diagnostic_excedents_json(p)`** (interna, solo `service_role`): `[{producte, principal, ordre, sense_excedent,
+  observacions, causes:[{id, causa, causa_nom{ca,es}, frequencia, volum_kg, gestio_actual, destins, detall,
+  accions:[…]}]}]`; la sirven `diagnostic_datos.excedents` y `expedient_datos.diagnostic.excedents`.
+- **Cuestionario**: el v3 del productor pasa a `vigente=false` **sin v4**; `questionaris_diagnostic`, `regles_pla` y
+  `mesures_prevencio` quedan sin camino en pantalla (comentario de tabla). Las respuestas v3 guardadas se conservan en
+  `diagnostics.respostes/sobre` y solo se enseñan («Respostes del qüestionari anterior») mientras el productor no tenga
+  ningún bloque de excedentes. `provisional` sale `false` cuando el cuestionario con el que se contestó ya no es vigente.
+- **Ventana base → frontend**: `desar_diagnostic` (misma firma) ya no exige cuestionario vigente: guarda notas e idioma.
+  El frontend nuevo no la llama (deuda 175).
+- **Cruce con las ofertas** (aceptación de A3): `excedentes e join diagnostic_excedents d on d.productor_id =
+  e.productor_id and d.producte = e.producto and d.causa_codi = e.causa_codigo`.

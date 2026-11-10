@@ -25,6 +25,14 @@ import {
 import { avancAccions, comparativaAnual } from "../../expedient.ts";
 import { peuFundacio } from "../fundacio.ts";
 import { respostesLlegibles, textoIdioma, type TextoBilingue } from "./pla.ts";
+import {
+  blocsExcedents,
+  celaAccio,
+  celaCausa,
+  filesAccions,
+  filesCausa,
+  traduccioExcedents,
+} from "../../excedentsLlegible.ts";
 
 type Fila = Record<string, unknown>;
 
@@ -50,12 +58,16 @@ export interface DatosExpedient {
    */
   mesures_pla_basic?: { titol?: string | TextoBilingue | null; obligatoria?: boolean | null }[] | null;
   /**
-   * El diagnóstico único del productor (A1): `expedient_datos().diagnostic`, presente solo si
-   * lo hay. Cada respuesta es autocontenida, como en el plan (`RespuestaPlan` de `pla.ts`):
-   * `{id, tipus, seccio, pregunta:{ca,es}, valor, etiqueta?, etiquetes?}`.
+   * El diagnóstico único del productor (A1): `expedient_datos().diagnostic`, presente si hay
+   * cabecera o algún bloque de excedentes. `excedents` (A3, `20270522100000`) tiene la forma
+   * `BlocExcedentsLlegible[]` de `_shared/excedentsLlegible.ts`. `respostes` es el legado del
+   * cuestionario v3 y solo se imprime si no hay ningún bloque; cada respuesta es autocontenida,
+   * como en el plan (`RespuestaPlan` de `pla.ts`): `{id, tipus, seccio, pregunta:{ca,es}, valor,
+   * etiqueta?, etiquetes?}`.
    */
   diagnostic?: {
     respostes?: unknown[] | null;
+    excedents?: unknown[] | null;
     actualitzat_at?: string | null;
     provisional?: boolean | null;
   } | null;
@@ -109,6 +121,7 @@ const CA = {
   diagnostic_prov_t: "Qüestionari provisional",
   diagnostic_prov: "El qüestionari del diagnòstic és text de treball: encara no l'han validat la Fundació ni l'assessoria.",
   pregunta: "Pregunta", resposta: "Resposta",
+  diag_excedents: "Excedents del diagnòstic", diag_accions: "Accions del diagnòstic",
   buit: "Sense registres.",
   pagina: (n: number, t: number) => `pàg. ${n} de ${t}`, marca: "PROVA",
 };
@@ -142,6 +155,7 @@ const ES: typeof CA = {
   diagnostic_prov_t: "Cuestionario provisional",
   diagnostic_prov: "El cuestionario del diagnóstico es texto de trabajo: todavía no lo han validado la Fundació ni la asesoría.",
   pregunta: "Pregunta", resposta: "Respuesta",
+  diag_excedents: "Excedentes del diagnóstico", diag_accions: "Acciones del diagnóstico",
   buit: "Sin registros.",
   pagina: (n: number, t: number) => `pág. ${n} de ${t}`, marca: "PRUEBA",
 };
@@ -228,30 +242,87 @@ export async function renderExpedient(
 
   // ------------------------------------------------------ diagnóstico operativo
   // Tras el contexto y antes de las visitas: el diagnóstico es la foto de partida del
-  // productor (qué produce, cuánto excedente, por qué, qué salidas tiene) y es lo que
-  // explica los procesos, la cuantificación y las causas que vienen después. Sin
-  // diagnóstico, o sin ninguna respuesta con valor, la sección no existe (ni el título).
+  // productor (qué excedentes tiene por producto y causa, qué hace hoy con ellos, qué salidas
+  // le interesan y qué acciones se acordaron) y es lo que explica los procesos, la
+  // cuantificación y las causas que vienen después.
+  // A3: con bloques de excedentes se imprimen ellos («Excedents del diagnòstic» y «Accions del
+  // diagnòstic», nombres distintos de las `accions` del expediente, más abajo), con las mismas
+  // funciones que la pantalla y el PDF del diagnóstico (`_shared/excedentsLlegible.ts`). Sin
+  // bloques, las respuestas del cuestionario v3 (legado). Sin nada que imprimir, la sección
+  // no existe (ni el título).
   const diag = d.diagnostic;
-  const respostes = diag ? respostesLlegibles(diag.respostes, lengua) : [];
-  if (diag && respostes.length > 0) {
+  const blocs = diag ? blocsExcedents(diag.excedents) : [];
+  const respostes = diag && blocs.length === 0 ? respostesLlegibles(diag.respostes, lengua) : [];
+  if (diag && (blocs.length > 0 || respostes.length > 0)) {
     m.titulo(t.diagnostic, 2);
     const actualitzat = fechaLargaConArticulo(diag.actualitzat_at ?? null, { mesos: MESES[lengua] }, lengua);
     if (actualitzat) m.parrafo(t.actualitzat(actualitzat), { color: COLORES.verdeGris, tamano: 9, despues: 4 });
-    if (diag.provisional) {
+    if (diag.provisional && respostes.length > 0) {
       m.caja(t.diagnostic_prov, { titulo: t.diagnostic_prov_t, fondo: COLORES.crema, barra: COLORES.coral });
     }
-    // Una tabla por sección, como el plan: `respostesLlegibles` ya las devuelve en el orden
-    // del cuestionario, así que basta con cortar cuando cambia el rótulo.
-    let i = 0;
-    while (i < respostes.length) {
-      const seccio = respostes[i].seccio;
-      const filas: string[][] = [];
-      for (; i < respostes.length && respostes[i].seccio === seccio; i++) {
-        filas.push([respostes[i].pregunta, respostes[i].resposta]);
+  }
+  if (blocs.length > 0) {
+    const tEx = traduccioExcedents(lengua);
+    // Una sola tabla para todos los productos (aquí no hay un nivel de título más): el
+    // producto en la primera columna, marcado si ya no es principal; «Sense excedent» en
+    // lugar de las causas.
+    const filesExc: string[][] = [];
+    const observacions: string[] = [];
+    for (const b of blocs) {
+      const producte = b.principal ? b.producte : `${b.producte}\n(${tEx("dexc.ja_no_principal")})`;
+      if (b.sense_excedent || b.causes.length === 0) {
+        filesExc.push([producte, b.sense_excedent ? tEx("dexc.sense_excedent") : "", "", "", "", ""]);
+      } else {
+        for (const f of filesCausa(b, tEx, lengua)) {
+          filesExc.push([producte, celaCausa(f, tEx), f.frequencia, f.volum, f.gestio, f.destins]);
+        }
       }
-      m.titulo(seccio, 3);
-      taula([{ titulo: t.pregunta, ancho: 55 }, { titulo: t.resposta, ancho: 45 }], filas);
+      if (b.observacions) observacions.push(`${b.producte}: ${b.observacions}`);
     }
+    m.asegurar(100);
+    m.titulo(t.diag_excedents, 3);
+    m.parrafo(tEx("dexc.volum_nota"), { color: COLORES.verdeGris, tamano: 9, despues: 2 });
+    taula([
+      { titulo: t.producte, ancho: 13 },
+      { titulo: tEx("dexc.causa"), ancho: 18 },
+      { titulo: tEx("dexc.frequencia"), ancho: 14 },
+      { titulo: tEx("dexc.volum_kg"), ancho: 15, alinear: "derecha" },
+      { titulo: tEx("dexc.gestio"), ancho: 20 },
+      { titulo: tEx("dexc.destins"), ancho: 20 },
+    ], filesExc);
+    if (observacions.length > 0) {
+      m.parrafo(`${tEx("dexc.observacions")}:`, { tamano: 9.5, despues: 2 });
+      m.lista(observacions, { tamano: 9.5, despues: 6 });
+    }
+    const accions = blocs.flatMap((b) => filesAccions(b, tEx, lengua));
+    if (accions.length > 0) {
+      m.asegurar(100);
+      m.titulo(t.diag_accions, 3);
+      taula([
+        { titulo: t.producte, ancho: 15 },
+        { titulo: tEx("dexc.causa"), ancho: 17 },
+        { titulo: tEx("dexc.desti"), ancho: 12 },
+        { titulo: tEx("dexc.accio"), ancho: 42 },
+        { titulo: tEx("dexc.estat"), ancho: 14 },
+      ], accions.map((f) => [f.producte, f.causa, f.desti, celaAccio(f, tEx), f.estat]));
+    }
+  }
+  // Una tabla por sección, como el plan: `respostesLlegibles` ya las devuelve en el orden
+  // del cuestionario, así que basta con cortar cuando cambia el rótulo.
+  if (respostes.length > 0) {
+    m.parrafo(traduccioExcedents(lengua)("dexc.respostes_anteriors"), {
+      color: COLORES.verdeGris, tamano: 9.5, despues: 2,
+    });
+  }
+  let i = 0;
+  while (i < respostes.length) {
+    const seccio = respostes[i].seccio;
+    const filas: string[][] = [];
+    for (; i < respostes.length && respostes[i].seccio === seccio; i++) {
+      filas.push([respostes[i].pregunta, respostes[i].resposta]);
+    }
+    m.titulo(seccio, 3);
+    taula([{ titulo: t.pregunta, ancho: 55 }, { titulo: t.resposta, ancho: 45 }], filas);
   }
 
   // ------------------------------------------------------------- visitas
