@@ -12,6 +12,7 @@ import type { ReactNode } from 'react'
 import { Download, FileText, Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
 import BotoIcona from '../BotoIcona'
+import { FilaClicable, TitolFila } from '../FilaClicable'
 import BadgeSignatura from '../BadgeSignatura'
 import AccionsSignatura, { type SignaturaFila } from '../AccionsSignatura'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -103,10 +104,12 @@ export default function LlistaDocuments({
               <TableBody>
                 {files.map((d) => {
                   const gris = descarregador.ocupat === d.id || d.estado === 'error'
+                  // Clicar la fila es «Veure el PDF» (§2, «Tablas»); con el PDF en error, nada.
+                  const obre = d.estado === 'error' ? undefined : () => void descarregador.mostra(d.id)
                   return (
-                    <TableRow key={d.id}>
+                    <FilaClicable key={d.id} onObre={obre}>
                       <TableCell>
-                        <span className="font-medium whitespace-nowrap tabular-nums">{d.numero_completo}</span>
+                        <TitolFila onObre={obre} className="whitespace-nowrap tabular-nums">{d.numero_completo}</TitolFila>
                         {/* El tipo se esconde en `lg` y la fecha en `md`: por eso el «·» va
                             delante de la fecha y nunca queda colgando. */}
                         <span className="block text-xs text-muted-foreground lg:hidden">
@@ -152,7 +155,7 @@ export default function LlistaDocuments({
                             onCanvi={onSignatura} />
                         </div>
                       </TableCell>
-                    </TableRow>
+                    </FilaClicable>
                   )
                 })}
               </TableBody>

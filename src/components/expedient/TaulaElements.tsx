@@ -20,6 +20,7 @@ import {
 } from '../../lib/expedientApi'
 import { useConfirma } from '../DialegConfirma'
 import BotoIcona from '../BotoIcona'
+import { FilaClicable, TitolFila } from '../FilaClicable'
 import Desplegable from '../Desplegable'
 import { usePuntTall, type PuntTall } from '../../hooks/usePuntTall'
 import { Button } from '@/components/ui/button'
@@ -201,12 +202,17 @@ export default function TaulaElements({
             <TableBody>
               {files.map((f) => {
                 const editant = obert?.id === f.id
+                // El detalle de un elemento es su formulario: clicar la fila lo abre igual que
+                // el lápiz (§2, «Tablas»), y volver a clicarla lo cierra.
+                const obre = editable ? () => (editant ? setObert(null) : edita(f)) : undefined
                 return (
                   <Fragment key={f.id}>
-                    <TableRow className={editant ? 'bg-muted/50' : undefined}>
+                    <FilaClicable className={editant ? 'bg-muted/50' : undefined} onObre={obre}>
                       {columnes.map((c, i) => (
                         <TableCell key={c.clau} className={i > 0 && centrat(c) ? 'text-center' : undefined}>
-                          <span className={i === 0 ? 'font-medium' : undefined}>{textCel(c, f[c.clau])}</span>
+                          {i === 0
+                            ? <TitolFila onObre={obre}>{textCel(c, f[c.clau])}</TitolFila>
+                            : <span>{textCel(c, f[c.clau])}</span>}
                           {/* Lo que no tiene columna a este ancho, bajo la primera. */}
                           {i === 0 && sota.map((x) => {
                             const v = textCel(x, f[x.clau])
@@ -230,7 +236,7 @@ export default function TaulaElements({
                           </div>
                         </TableCell>
                       )}
-                    </TableRow>
+                    </FilaClicable>
                     {editant && (
                       <TableRow className="bg-muted/50 hover:bg-muted/50">
                         <TableCell colSpan={nCols}>{formulari()}</TableCell>

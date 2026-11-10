@@ -33,6 +33,7 @@ import LlegendaEstats from './proces/LlegendaEstats'
 import type { Excedente } from '../types'
 import CarregantSeccio from './CarregantSeccio'
 import BotoIcona from './BotoIcona'
+import { FilaClicable, TitolFila } from './FilaClicable'
 import { FotoOfertaResolta, useFotosOfertes } from './FotosOferta'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -186,7 +187,7 @@ export default function OffersList({ onOpen, accio }: Props) {
             const est = etiquetaEstatOferta(o.estado)
             const resumKg = `${fmtKg(canalizados)}/${fmtKg(total)} kg · ${faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}`
             return (
-              <TableRow key={o.id}>
+              <FilaClicable key={o.id} onObre={() => onOpen(o)}>
                 <TableCell className="hidden xl:table-cell"><code className="text-xs break-all">{o.id_excedente ?? '—'}</code></TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
@@ -194,7 +195,7 @@ export default function OffersList({ onOpen, accio }: Props) {
                       <FotoOfertaResolta foto={foto(o)} alt={o.producto ?? ''} className="size-10" />
                     </span>
                     <div className="min-w-0">
-                      <span className="font-medium">{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</span>
+                      <TitolFila onObre={() => onOpen(o)}>{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</TitolFila>
                       <code className="block text-xs break-all text-muted-foreground xl:hidden">{o.id_excedente ?? '—'}</code>
                       <span className="block text-xs text-muted-foreground md:hidden">{resumKg}</span>
                     </div>
@@ -227,7 +228,7 @@ export default function OffersList({ onOpen, accio }: Props) {
                     <BotoIcona icona={Eye} etiqueta={t('off.a_open')} onClick={() => onOpen(o)} />
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>

@@ -11,6 +11,7 @@ import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { useAppContext } from '../../hooks/useAppContext'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import Desplegable from '../../components/Desplegable'
 import { llistaExpedients, obrirExpedient, type Expedient } from '../../lib/expedientApi'
 import { Badge } from '@/components/ui/badge'
@@ -113,7 +114,7 @@ export default function Plans() {
                 {files.map((f) => {
                   const nivell = t(f.nivell === 'personalitzat' ? 'exp.nivell_personalitzat' : 'exp.nivell_basic')
                   return (
-                    <TableRow key={f.id}>
+                    <FilaClicable key={f.id} to={`/equip/plans/${f.id}`}>
                       <TableCell className="font-medium">
                         <Link to={`/equip/plans/${f.id}`} className="text-primary hover:underline">
                           {f.productores?.empresa || f.productores?.name || '—'}
@@ -132,7 +133,7 @@ export default function Plans() {
                           <BotoIcona icona={Eye} etiqueta={t('exp.a_veure')} onClick={() => navigate(`/equip/plans/${f.id}`)} />
                         </div>
                       </TableCell>
-                    </TableRow>
+                    </FilaClicable>
                   )
                 })}
               </TableBody>

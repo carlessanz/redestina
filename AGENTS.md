@@ -75,13 +75,17 @@ Prevenció (expediente provisional; el plan básico, retirado), espigueo, catál
 - Router como capa raíz con rutas públicas y privadas (§6quater). Sin librería de estado.
   `vercel.json` lleva el rewrite de SPA.
 - **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
-  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flags de ruta `fullBleed` y `ample` (Configuració: 2 columnas desde `xl`).
+  `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flag de ruta `fullBleed` (Mensajería).
+- 🔴 **Un solo ancho (10-11-2026)**: lo pone el shell, `w-[96%]` + `max(0.5rem, safe-area)`, igual en
+  listados, detalles y formularios de los tres paneles; `ample` retirado; ningún `max-w` de página.
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
 - **Siete reglas de móvil medidas** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap
   shrink-0`, `safe-area-inset`; **auditar `scrollWidth > clientWidth` en los hijos**.
 - **Tablas**: sin scroll horizontal (secundarias `hidden md:table-cell`), acciones en `BotoIcona`
-  (tooltip y `aria-label`); `colSpan` completo con `usePuntTall`.
+  (tooltip y `aria-label`); `colSpan` completo con `usePuntTall`. **Clicar la fila o el título abre
+  el detalle** (`FilaClicable`/`TitolFila`, `to` u `onObre`; el icono se queda; los controles y los
+  portales no la disparan); sin detalle o de selección, no (lista en el detalle).
 
 ## 2bis. Sistema de diseño
 
@@ -580,7 +584,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.882 pruebas de Vitest en 83 ficheros (1 saltada a propósito) + 43 de Deno.**
+   **Referencia: 1.887 pruebas de Vitest en 84 ficheros (1 saltada a propósito) + 43 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.470/2.470 y 40 sin datos; producción 2.443/2.443 y 36 «Sin fallos de

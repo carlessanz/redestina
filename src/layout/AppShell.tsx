@@ -38,8 +38,8 @@ export interface RouteHandle {
   titleKey?: string
   /** La pantalla gestiona su propio alto y scroll (Mensajería). */
   fullBleed?: boolean
-  /** Listados anchos, como el 90% que usaba el layout anterior. */
-  ample?: boolean
+  // Sin flag de ANCHO a propósito (10-11-2026): todas las pantallas miden lo mismo. Ver el
+  // contenedor de `main`, más abajo.
 }
 
 export default function AppShell() {
@@ -190,11 +190,16 @@ export default function AppShell() {
               // `min-h-full`: una sección que aún no ha cargado deja de desplomar el alto
               // de la página, que era la otra mitad del salto. Con el hueco de la barra ya
               // reservado arriba, esto evita el rebote vertical.
+              //
+              // 🔴 UN SOLO ANCHO para todas las pantallas —listados, detalles, formularios, los
+              // tres paneles— (10-11-2026, AGENTS.md §2). Antes un flag `ample` hacía anchos unos
+              // listados (96 %) y el resto se quedaba en `max-w-6xl`: al navegar, el contenido
+              // cambiaba de ancho y de margen. Ninguna pantalla escribe su propio `max-w` de página.
               <div
-                className={cn('mx-auto min-h-full w-full py-6', handle.ample ? 'w-[96%] px-2' : 'max-w-6xl px-4')}
+                className="mx-auto min-h-full w-[96%] py-6"
                 style={{
-                  paddingLeft: `max(${handle.ample ? '0.5rem' : '1rem'}, env(safe-area-inset-left))`,
-                  paddingRight: `max(${handle.ample ? '0.5rem' : '1rem'}, env(safe-area-inset-right))`,
+                  paddingLeft: 'max(0.5rem, env(safe-area-inset-left))',
+                  paddingRight: 'max(0.5rem, env(safe-area-inset-right))',
                 }}
               >
                 {/* Falta el convenio: se avisa aquí, encima de cualquier pantalla del

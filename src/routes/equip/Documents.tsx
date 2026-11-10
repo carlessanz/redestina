@@ -46,6 +46,7 @@ import { cn } from '../../lib/utils'
 import { useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable, TitolFila } from '../../components/FilaClicable'
 import { filtraCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { useDescarregaDocument } from '../../hooks/useDescarregaDocument'
@@ -415,12 +416,14 @@ export default function Documents() {
             const esperant = descarregador.generant === d.id
             const ocupat = descarregador.ocupat === d.id
             const fase = d.subtipo ? t(`doc.sub_${d.subtipo}`) : null
+            // Clicar la fila es «Veure el PDF» (§2, «Tablas»).
+            const obre = () => void descarregador.mostra(d.id)
             return (
-              <TableRow key={d.id}>
+              <FilaClicable key={d.id} onObre={obre}>
                 <TableCell>
                   {/* Sin `whitespace-nowrap`: un número de convenio («P-CONV-COL-PROD-…») no
                       cabe entero a 360 px y parte por los guiones. */}
-                  <span className="font-medium tabular-nums">{d.numero_completo ?? '—'}</span>
+                  <TitolFila onObre={obre} className="tabular-nums">{d.numero_completo ?? '—'}</TitolFila>
                   <Secundari peces={[
                     { text: fase, fins: 'xl' },
                     { text: `v${d.version}`, fins: 'xl' },
@@ -485,7 +488,7 @@ export default function Documents() {
                     )}
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>
@@ -518,7 +521,7 @@ export default function Documents() {
             const kilos = kg(a.kg_confirmados ?? a.kg_neto ?? a.kg_previstos)
             const espera = a.dias_esperando != null ? t('alb.days', { n: a.dias_esperando }) : dataCurta(a.emitido_at)
             return (
-              <TableRow key={a.id}>
+              <FilaClicable key={a.id} to={ruta}>
                 <TableCell>
                   <Link to={ruta} className="font-medium whitespace-nowrap text-primary tabular-nums hover:underline">
                     {a.numero_completo ?? t('alb.no_number')}
@@ -549,7 +552,7 @@ export default function Documents() {
                     <BotoIcona icona={Eye} etiqueta={t('alb.a_open')} onClick={() => navigate(ruta)} />
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>
@@ -676,11 +679,12 @@ export default function Documents() {
             const quan = dataCurta(x.tancat_at ?? x.signat_at ?? x.emitido_at)
             const via = x.via ? t(clauVia(x.via)) : null
             return (
-              <TableRow key={x.documento_id} data-testid="fila-signatura">
+              <FilaClicable key={x.documento_id} data-testid="fila-signatura"
+                to={ruta ?? undefined} onObre={() => void descarregador.mostra(x.documento_id)}>
                 <TableCell>
                   {ruta
                     ? <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline">{x.numero_completo}</Link>
-                    : <span className="font-medium tabular-nums">{x.numero_completo}</span>}
+                    : <TitolFila onObre={() => void descarregador.mostra(x.documento_id)} className="tabular-nums">{x.numero_completo}</TitolFila>}
                   <Secundari peces={[
                     { text: x.org_nom, fins: 'lg' },
                     { text: via, fins: 'md' },
@@ -719,7 +723,7 @@ export default function Documents() {
                       onCanvi={() => { void carregaSignatures(); void refresca() }} />
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>

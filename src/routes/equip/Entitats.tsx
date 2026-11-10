@@ -40,6 +40,7 @@ import { carregaMunicipis, llistesTerritori } from '../../lib/municipis'
 import { carregaTipusActivitat } from '../../lib/organitzacio'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable, TitolFila } from '../../components/FilaClicable'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
 import type { EntitatLlistat } from '../../types'
 import { Button } from '@/components/ui/button'
@@ -193,10 +194,10 @@ export default function Entitats() {
             const rols = [e.es_generadora && t('ef.paper_ofertant'), e.es_receptora && t('ef.paper_receptor')]
               .filter(Boolean).join(' · ')
             return (
-              <TableRow key={e.id} data-testid="entitat-fila">
+              <FilaClicable key={e.id} data-testid="entitat-fila" to={`/equip/entitats/${e.id}`}>
                 <TableCell className="font-medium">
                   <span className="flex flex-wrap items-center gap-2">
-                    {nom}
+                    <TitolFila to={`/equip/entitats/${e.id}`}>{nom}</TitolFila>
                     {marcarTest && <Badge variant="secondary">{t('badge.test')}</Badge>}
                     {/* El estado CRM de la organización (B1): solo se marca lo que no es Actiu. */}
                     {e.estat_crm !== 'actiu' && (
@@ -279,7 +280,7 @@ export default function Entitats() {
                     )}
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>

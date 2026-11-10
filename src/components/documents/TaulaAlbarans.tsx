@@ -16,6 +16,7 @@ import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { Documento } from '../../types'
 import BotoIcona from '../BotoIcona'
+import { FilaClicable, TitolFila } from '../FilaClicable'
 import BadgeSignatura from '../BadgeSignatura'
 import AccionsSignatura, { type SignaturaFila } from '../AccionsSignatura'
 import { Badge } from '@/components/ui/badge'
@@ -78,11 +79,14 @@ export default function TaulaAlbarans({
           const docId = perAlbara[f.id]
           const kilos = kg(f.kg_validados ?? f.kg_confirmados ?? f.kg_neto ?? f.kg_previstos)
           return (
-            <TableRow key={f.id}>
+            // El detalle de un albarán, para quien no es del equipo, es su PDF: la fila lo
+            // abre igual que «Veure el PDF». Sin PDF no hay nada que abrir.
+            <FilaClicable key={f.id} onObre={docId ? () => void descarregador.mostra(docId) : undefined}>
               <TableCell>
-                <span className="font-medium tabular-nums sm:whitespace-nowrap">
+                <TitolFila onObre={docId ? () => void descarregador.mostra(docId) : undefined}
+                  className="tabular-nums sm:whitespace-nowrap">
                   {f.numero_completo ?? t('alb.no_number')}
-                </span>
+                </TitolFila>
                 <span className="block text-xs text-muted-foreground lg:hidden">{f.producto ?? '—'}</span>
                 <span className="block text-xs text-muted-foreground tabular-nums md:hidden">
                   <span className="sm:hidden">{kilos} kg · </span>{dataCurta(f.emitido_at)}
@@ -127,7 +131,7 @@ export default function TaulaAlbarans({
                   )
                   : <p className="text-center text-xs text-muted-foreground">{t('mydoc.no_pdf')}</p>}
               </TableCell>
-            </TableRow>
+            </FilaClicable>
           )
         })}
       </TableBody>

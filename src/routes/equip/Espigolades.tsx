@@ -34,6 +34,7 @@ import { crearEspigolada, dataCurta, estilEstatAlbara, kg, repartirEspigolada } 
 import type { LiniaEntrada, LotEspigolada } from '../../lib/albarans'
 import type { Espigolada } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import Desplegable from '../../components/Desplegable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -204,7 +205,7 @@ export function Espigolades() {
               {visibles.map((f) => {
                 const ruta = `/equip/espigolades/${f.esp.id}`
                 return (
-                  <TableRow key={f.esp.id}>
+                  <FilaClicable key={f.esp.id} to={ruta}>
                     <TableCell className="hidden text-center font-medium whitespace-nowrap tabular-nums md:table-cell">
                       {dataCurta(f.esp.fecha)}
                     </TableCell>
@@ -243,7 +244,7 @@ export function Espigolades() {
                         <BotoIcona icona={Eye} etiqueta={t('esp.a_open')} onClick={() => navigate(ruta)} />
                       </div>
                     </TableCell>
-                  </TableRow>
+                  </FilaClicable>
                 )
               })}
             </TableBody>

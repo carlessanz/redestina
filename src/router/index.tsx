@@ -7,9 +7,10 @@
 // misma cuenta puede tener varios paneles (doble rol productor+entidad, §12.16) y así
 // la guarda es inequívoca y el enlace, compartible.
 //
-// Cada ruta declara en `handle` su título y cómo quiere el contenedor:
-//   · fullBleed → gestiona su propio alto (Mensajería)
-//   · ample     → listado ancho, como el 90% del layout anterior
+// Cada ruta declara en `handle` su título y, solo la Mensajería, `fullBleed` (gestiona su
+// propio alto). El ANCHO no se declara: es uno solo para todas las pantallas, listados,
+// detalles y formularios, y lo pone el shell (10-11-2026, AGENTS.md §2; el flag `ample`,
+// que hacía anchos unos listados y dejaba estrecho todo lo demás, se retiró).
 
 import { createBrowserRouter, Navigate } from 'react-router'
 import AppShell from '../layout/AppShell'
@@ -136,9 +137,9 @@ export const router = createBrowserRouter([
                   { path: 'tauler', element: <Dashboard />, handle: { titleKey: 'nav.dashboard' } },
                   // El ciclo guiado va ANTES de Ofertes, como en el menú: es el camino
                   // entero, y las demás pantallas son sus paradas.
-                  { path: 'canalitzacio', element: <Canalitzacio />, handle: { titleKey: 'nav.canalitzacio', ample: true } },
+                  { path: 'canalitzacio', element: <Canalitzacio />, handle: { titleKey: 'nav.canalitzacio' } },
                   { path: 'canalitzacio/:id', element: <CanalitzacioDetall />, handle: { titleKey: 'nav.canalitzacio' } },
-                  { path: 'ofertes', element: <Ofertes />, handle: { titleKey: 'nav.offers', ample: true } },
+                  { path: 'ofertes', element: <Ofertes />, handle: { titleKey: 'nav.offers' } },
                   { path: 'ofertes/:id', element: <OfertaDetall />, handle: { titleKey: 'nav.offers' } },
                   { path: 'aprovacions', element: <Aprovacions />, handle: { titleKey: 'nav.approvals' } },
                   // Las rutas de antes de 1C (plan 1, D1): el listado de productores es el de
@@ -147,38 +148,38 @@ export const router = createBrowserRouter([
                   { path: 'productors', element: <Navigate to="/equip/entitats?rol=ofertant" replace /> },
                   { path: 'productors/nou', element: <Navigate to="/equip/entitats/nova?rol=ofertant" replace /> },
                   { path: 'productors/:id', element: <RedireccioFitxa /> },
-                  { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entitats', ample: true } },
+                  { path: 'entitats', element: <Entitats />, handle: { titleKey: 'nav.entitats' } },
                   // «Nova entitat» en dos pasos (plan 1, 1B): buscar antes de dar de alta.
                   { path: 'entitats/nova', element: <NovaEntitat />, handle: { titleKey: 'nav.entitats' } },
-                  { path: 'entitats/importa', element: <ImportaEntitats />, handle: { titleKey: 'nav.entitats', ample: true } },
+                  { path: 'entitats/importa', element: <ImportaEntitats />, handle: { titleKey: 'nav.entitats' } },
                   // La ficha ÚNICA por organización (1C): `:id` es el de la organización; un id de
                   // ficha de antes se resuelve y redirige.
-                  { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats', ample: true } },
+                  { path: 'entitats/:id', element: <EntitatDetall />, handle: { titleKey: 'nav.entitats' } },
                   { path: 'missatgeria', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
-                  { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents', ample: true } },
-                  { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans', ample: true } },
+                  { path: 'documents', element: <Documents />, handle: { titleKey: 'nav.documents' } },
+                  { path: 'albarans', element: <Albarans />, handle: { titleKey: 'nav.albarans' } },
                   { path: 'albarans/:id', element: <AlbaraDetall />, handle: { titleKey: 'nav.albarans' } },
-                  { path: 'espigolades', element: <Espigolades />, handle: { titleKey: 'nav.espigolades', ample: true } },
+                  { path: 'espigolades', element: <Espigolades />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'espigolades/nova', element: <NovaEspigolada />, handle: { titleKey: 'nav.espigolades' } },
                   { path: 'espigolades/:id', element: <EspigoladaDetall />, handle: { titleKey: 'nav.espigolades' } },
-                  { path: 'tancament', element: <Tancament />, handle: { titleKey: 'nav.tancament', ample: true } },
-                  { path: 'tancament/:id', element: <TancamentDetall />, handle: { titleKey: 'nav.tancament', ample: true } },
-                  { path: 'productes', element: <Productes />, handle: { titleKey: 'nav.productes', ample: true } },
+                  { path: 'tancament', element: <Tancament />, handle: { titleKey: 'nav.tancament' } },
+                  { path: 'tancament/:id', element: <TancamentDetall />, handle: { titleKey: 'nav.tancament' } },
+                  { path: 'productes', element: <Productes />, handle: { titleKey: 'nav.productes' } },
                   { path: 'productes/:nom', element: <ProducteDetall />, handle: { titleKey: 'nav.productes' } },
                   // «Costos per quilo» se llamó así hasta el 27-09-2026: hay enlaces guardados.
                   { path: 'costos', element: <Navigate to="/equip/productes" replace /> },
-                  { path: 'convenis', element: <Convenis />, handle: { titleKey: 'nav.convenis', ample: true } },
-                  { path: 'convenis/campanya', element: <CampanyaConvenis />, handle: { titleKey: 'nav.convenis', ample: true } },
+                  { path: 'convenis', element: <Convenis />, handle: { titleKey: 'nav.convenis' } },
+                  { path: 'convenis/campanya', element: <CampanyaConvenis />, handle: { titleKey: 'nav.convenis' } },
                   { path: 'convenis/:id', element: <ConveniDetall />, handle: { titleKey: 'nav.convenis' } },
-                  { path: 'diagnostics', element: <Diagnostics />, handle: { titleKey: 'nav.diagnostics', ample: true } },
+                  { path: 'diagnostics', element: <Diagnostics />, handle: { titleKey: 'nav.diagnostics' } },
                   // `:tipus` decide el cuestionario y la tabla de la ficha; la pantalla lo
                   // valida antes de llamar a nada, para que una URL a mano no acabe en un
                   // `22023` de la RPC.
                   { path: 'diagnostics/:tipus/:id', element: <DiagnosticDetall />, handle: { titleKey: 'nav.diagnostics' } },
-                  { path: 'plans', element: <Plans />, handle: { titleKey: 'nav.plans', ample: true } },
-                  { path: 'plans/:id', element: <PlaDetall />, handle: { titleKey: 'nav.plans', ample: true } },
+                  { path: 'plans', element: <Plans />, handle: { titleKey: 'nav.plans' } },
+                  { path: 'plans/:id', element: <PlaDetall />, handle: { titleKey: 'nav.plans' } },
                   { path: 'missatgeria/:phone', element: <Missatgeria />, handle: { titleKey: 'nav.messaging', fullBleed: true } },
-                  { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings', ample: true } },
+                  { path: 'configuracio', element: <Settings />, handle: { titleKey: 'nav.settings' } },
                 ],
               },
               {

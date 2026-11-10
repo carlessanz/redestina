@@ -20,6 +20,7 @@ import { textError } from '../../lib/textError'
 import { useConfirma } from '../../components/DialegConfirma'
 import { useAppContext } from '../../hooks/useAppContext'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import {
   dataTancament, estilEstatTancament, euros, obrirTancament,
 } from '../../lib/tancament'
@@ -202,11 +203,11 @@ export default function Tancament() {
                 {files.map((f) => {
                   const s = totals[f.id]
                   return (
-                    <TableRow key={f.id}>
+                    <FilaClicable key={f.id} to={`/equip/tancament/${f.id}`}>
                       <TableCell>
                         <Link
                           to={`/equip/tancament/${f.id}`}
-                          className="font-medium tabular-nums underline-offset-4 hover:underline"
+                          className="font-medium text-primary tabular-nums hover:underline"
                         >
                           {f.ejercicio}
                         </Link>
@@ -254,7 +255,7 @@ export default function Tancament() {
                           />
                         </div>
                       </TableCell>
-                    </TableRow>
+                    </FilaClicable>
                   )
                 })}
               </TableBody>

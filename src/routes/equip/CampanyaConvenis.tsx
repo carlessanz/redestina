@@ -27,6 +27,7 @@ import { useCanals } from '../../hooks/useAppContext'
 import { motiuCanal } from '../../lib/canals'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import BotoIcona from '../../components/BotoIcona'
+import { TitolFila } from '../../components/FilaClicable'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
 import { textError } from '../../lib/textError'
@@ -402,7 +403,9 @@ export default function CampanyaConvenis() {
                           />
                         </TableCell>
                         <TableCell>
-                          <span className="font-medium">{f.nom ?? '—'}</span>
+                          {/* Tabla de SELECCIÓN: la fila no navega (se perdería lo marcado); el
+                              título sí es enlace a la ficha, como el ojo (§2, «Tablas»). */}
+                          <TitolFila to={`/equip/entitats/${f.org_id}`}>{f.nom ?? '—'}</TitolFila>
                           {f.es_test && <Badge className="ml-2 bg-secondary text-secondary-foreground">{t('camp.badge_test')}</Badge>}
                           {/* `wrap-anywhere`: el correo es una sola palabra y, en una tabla de
                               ancho automático, solo así deja de imponer su ancho. */}

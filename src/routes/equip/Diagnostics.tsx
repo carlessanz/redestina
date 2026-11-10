@@ -28,6 +28,7 @@ import { ESTATS_DIAGNOSTIC, estilEstatDiagnostic } from '../../lib/diagnostic'
 import { diagnosticsEquip } from '../../lib/diagnosticApi'
 import type { DiagnosticEquip } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -135,7 +136,7 @@ export default function Diagnostics() {
                   {visibles.map((f) => {
                     const ruta = `/equip/diagnostics/${f.tipo_org}/${f.org_id}`
                     return (
-                      <TableRow key={`${f.tipo_org}-${f.org_id}`}>
+                      <FilaClicable key={`${f.tipo_org}-${f.org_id}`} to={ruta}>
                         {/* Parte en líneas en vez de cortar: con `truncate` el nombre salía
                             «Comercial de Prova SL…» y la marca «Prova» desaparecía justo en
                             los nombres largos. */}
@@ -165,7 +166,7 @@ export default function Diagnostics() {
                             <BotoIcona icona={Eye} etiqueta={t('diagl.a_obre')} onClick={() => navigate(ruta)} />
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </FilaClicable>
                     )
                   })}
                 </TableBody>

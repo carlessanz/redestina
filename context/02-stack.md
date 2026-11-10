@@ -91,10 +91,27 @@ Lo que se movía era el contenido, y desde fuera se lee igual.
 línea de «Carregant…», así que la página se desplomaba y la barra desaparecía. Lo arreglan
 `min-h-full` en el contenedor y **`components/CarregantSeccio`**, un esqueleto con alto de verdad.
 **No es un spinner a propósito**: un spinner no ocupa alto, así que no arregla el salto, solo lo
-adorna. Hay un tercer flag de layout en el
-`RouteHandle`, **`ample`** (no confundir con `fullBleed`): cambia el contenedor de `main` de
-`max-w-6xl px-4` a `w-[96%] px-2` y lo llevan los tres listados del equipo (`productors`, `entitats`,
-`ofertes`), que necesitan más ancho.
+adorna. 
+
+🔴 **Un solo ancho para todas las pantallas (10-11-2026)**. Hasta esa fecha había un tercer flag en
+el `RouteHandle`, **`ample`**, que cambiaba el contenedor de `main` de `max-w-6xl px-4` a `w-[96%]
+px-2`; lo llevaban los listados del equipo y unos pocos detalles, y **todo lo demás** —Aprovacions,
+el Tauler, los detalles de albarán, producto, oferta, convenio, espigolada y diagnóstico,
+«Nova entitat», `/organitzacio/*` y las pantallas del productor y del receptor— se quedaba en
+1.152 px. Medido en el clon a 1.920 px (`main` = 1.664): los «amplis» medían 1.583 y empezaban en
+x = 289; los demás, 1.152 y empezaban en x = 505, así que **al navegar el contenido cambiaba de
+ancho y de margen** («varios apartados no ocupan el ancho que sí ocupan otros», Carles). Ahora:
+- **El ancho lo pone el shell y es uno solo** (`AppShell`, el `div` dentro de `main`): `mx-auto
+  w-[96%]` con `padding-inline: max(0.5rem, env(safe-area-inset-*))`. Es la geometría que ya tenían
+  los listados, así que ninguna de esas pantallas se mueve; las demás se ensanchan a ella.
+- **`ample` ya no existe**; el `RouteHandle` solo tiene `titleKey` y `fullBleed`. **Ninguna pantalla
+  escribe su propio `max-w-*` + `mx-auto` de página** (grep del 10-11-2026: cero fuera del shell y
+  de la parte pública). Un `max-w-*` es para un CAMPO (`sm:max-w-xs` en un selector, `max-w-sm`
+  en una casilla de texto corto) o para un párrafo (`max-w-prose`), nunca para la página.
+- **No se conserva ningún ancho de lectura de página**: los formularios largos (oferta nueva,
+  ficha, diagnóstico) ya parten en rejilla (`sm:grid-cols-2`, `lg:grid-cols-3`) y no pierden nada
+  con más ancho; un texto de párrafo largo, si lo hubiera, se limita él con `max-w-prose`.
+- La parte pública (`/`, `/privacitat`, accesos) **no va por el shell** y conserva su maqueta.
 
 **PWA instalable, SIN service worker desde el 29-09-2026** (`vite-plugin-pwa` con
 `selfDestroying: true`): manifest, iconos 192/512 + *maskable* (generados desde
@@ -272,6 +289,27 @@ y las listas de documentos, convenios y albaranes de los paneles externos). Cóm
   Las barras de pestañas (`-mx-1 overflow-x-auto`, Ofertes y Albarans) scrollean de lado a
   propósito: no son tablas. Medido el 03-11-2026 en el clon: 0 en los 13 listados y detalles con
   datos, a 360, 1024 y 1440 px.
+- 🔴 **Clicar la fila o el título abre el detalle (10-11-2026)**, en todas las tablas que tienen
+  uno: **`components/FilaClicable.tsx`** (`FilaClicable` en vez de `TableRow`, `TitolFila` para el
+  título), con `to` (una ruta) u `onObre` (una acción: el PDF, el desplegable, el formulario en
+  línea). El icono «Obre» de la columna de acciones **se conserva**. Reglas:
+  - la fila NO es enfocable (sería una parada más del tabulador por delante de sus botones): el
+    acceso por teclado es **`TitolFila`**, un `Link` o un `button` de verdad (`text-primary`);
+  - un clic que nace en un control de la fila (botón, enlace, casilla, menú, `data-no-fila`) **no**
+    abre la fila — **`lib/filaClicable.ts` `clicDinsControl()`**, con test — y tampoco uno que
+    nace en un **portal** (un diálogo o menú abierto desde la fila: los eventos de React suben por
+    el árbol de componentes, no por el del DOM) ni el que acaba de seleccionar texto;
+  - con `to`, Ctrl/Cmd-clic y el botón central abren otra pestaña;
+  - sin `to` ni `onObre` (un albarán sin PDF) se pinta como una fila normal.
+  Qué abre cada tabla: Ofertes → la oferta; Canalització, Espigolades, Albarans, Convenis,
+  Diagnòstics, Plans, Tancament, Productes, Entitats → su detalle; Documents → el PDF (las firmas,
+  su detalle si lo hay); albaranes, documentos y convenios de los paneles externos → el PDF;
+  elementos del expediente → su formulario en línea; Importa (revisión) → el desplegable; Importa
+  (resultado) → la ficha. **Sin fila clicable, a propósito**: las tablas sin detalle (comparativa
+  del expediente y del cierre, líneas del albarán, resumen por comarca de la campaña, registro de
+  envíos), las filas de trabajo con varias acciones y ninguna principal (donantes del cierre) y
+  la tabla de **selección** de la campaña de convenios (navegar perdería lo marcado; su título sí
+  es enlace a la ficha).
 - **Iconos, los mismos en toda la aplicación**: abrir/detalle `Eye`, editar `Pencil`, fijar
   `CirclePlus`, borrar `Trash2` (rojo), ver PDF `FileText`, descargar `Download`, correo `Mail`,
   WhatsApp `MessageCircle`, aprobar `Check`, emitir certificado `FileCheck`, rectificar

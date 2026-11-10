@@ -19,6 +19,7 @@ import { dataCurta } from '../../lib/albarans'
 import type { Convenio, Documento } from '../../types'
 import { Download, FileText, Loader2, PenLine } from 'lucide-react'
 import BotoIcona from '../BotoIcona'
+import { FilaClicable, TitolFila } from '../FilaClicable'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import {
@@ -106,10 +107,12 @@ export default function LlistaConvenis({
                   const declarat = c.origen === 'declarat' && c.estado === 'vigent'
                   const numero = c.numero_completo ?? (paper ? c.referencia_paper : null) ?? null
                   const data = dataCurta(c.contrafirmado_at ?? c.firmado_at ?? c.enviado_at ?? c.created_at)
+                  // Clicar la fila es «Veure el PDF» (§2, «Tablas»); sin PDF no abre nada.
+                  const obre = doc ? () => void descarregador.mostra(doc.id) : undefined
                   return (
-                    <TableRow key={c.id}>
+                    <FilaClicable key={c.id} onObre={obre}>
                       <TableCell>
-                        <span className="font-medium">{t(`sig.model_${c.tipo}`)}</span>
+                        <TitolFila onObre={obre}>{t(`sig.model_${c.tipo}`)}</TitolFila>
                         {/* El número se esconde en `md` y la fecha en `lg`: el «·» va delante
                             del número para que nunca quede colgando. */}
                         <span className="block text-xs text-muted-foreground lg:hidden">
@@ -185,7 +188,7 @@ export default function LlistaConvenis({
                           )}
                         </div>
                       </TableCell>
-                    </TableRow>
+                    </FilaClicable>
                   )
                 })}
               </TableBody>

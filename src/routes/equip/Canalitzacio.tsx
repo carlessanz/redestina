@@ -29,6 +29,7 @@ import type { ConvenioEstado, EstadoAlbaran, EstadoExcedente } from '../../types
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import DialegNovaOfertaAssistida from '../../components/equip/DialegNovaOfertaAssistida'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -205,7 +206,7 @@ export default function Canalitzacio() {
                     </>
                   ) : <span className="text-sm text-muted-foreground">{t('canalz.res_pendent')}</span>
                   return (
-                    <TableRow key={l.excedente_id}>
+                    <FilaClicable key={l.excedente_id} to={ruta}>
                       <TableCell>
                         <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline">
                           {l.id_excedente ?? '—'}
@@ -262,7 +263,7 @@ export default function Canalitzacio() {
                           <BotoIcona icona={Eye} etiqueta={t('canalz.a_open')} onClick={() => navega(ruta)} />
                         </div>
                       </TableCell>
-                    </TableRow>
+                    </FilaClicable>
                   )
                 })}
               </TableBody>

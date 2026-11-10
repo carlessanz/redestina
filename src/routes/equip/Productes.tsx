@@ -31,6 +31,7 @@ import type { CosteProducto } from '../../types'
 import { IconaProducte } from '../../components/FotosOferta'
 import DialegMotiu from '../../components/DialegMotiu'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -250,7 +251,7 @@ export default function Productes() {
                   const obert = editant === p.nombre
                   return (
                     <Fragment key={p.nombre}>
-                      <TableRow className={obert ? 'bg-muted/50' : undefined}>
+                      <FilaClicable className={obert ? 'bg-muted/50' : undefined} to={rutaProducte(p.nombre)}>
                         <TableCell className="hidden sm:table-cell">
                           <Link to={rutaProducte(p.nombre)} aria-label={t('prod.open', { p: p.nombre })}>
                             <IconaProducte producto={p.nombre} familia={p.familia} className="size-10" />
@@ -293,7 +294,7 @@ export default function Productes() {
                             </div>
                           </TableCell>
                         )}
-                      </TableRow>
+                      </FilaClicable>
                       {obert && (
                         <TableRow className="bg-muted/50 hover:bg-muted/50">
                           <TableCell colSpan={columnes} className="whitespace-normal">

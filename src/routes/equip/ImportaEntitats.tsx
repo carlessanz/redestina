@@ -45,6 +45,7 @@ import { importarEntitats, jaImportat, previsualitzarImportacio, type RespostaRp
 import { FilaCasella } from '../../components/Casella'
 import Desplegable from '../../components/Desplegable'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable, TitolFila } from '../../components/FilaClicable'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import type {
@@ -538,14 +539,15 @@ function FilaRevisio({
   const errors = p.errors.map((e) => textCodi(t, e))
   return (
     <>
-      <TableRow data-testid="ie-fila" data-fila={p.fila} data-estat={p.estat} data-accio={p.accio_prevista}>
+      <FilaClicable data-testid="ie-fila" data-fila={p.fila} data-estat={p.estat} data-accio={p.accio_prevista}
+        onObre={() => onObert(!obert)}>
         <TableCell className="text-left">
           <span className="flex flex-wrap items-center gap-2">
             <Badge className={CLASSE_ESTAT[p.estat]}>{t(`ie.est_${p.estat}`)}</Badge>
             <span className="text-xs text-muted-foreground">{t('ie.fila', { n: p.fila })}</span>
             {senseRol && <Badge className="bg-error-fondo text-error">{t('ie.sense_paper')}</Badge>}
           </span>
-          <span className="mt-1 block font-medium">{f?.nom ?? t('ie.sense_nom')}</span>
+          <span className="mt-1 block"><TitolFila onObre={() => onObert(!obert)}>{f?.nom ?? t('ie.sense_nom')}</TitolFila></span>
           {f?.nif && <span className="block text-xs tabular-nums text-muted-foreground">{f.nif}</span>}
           {p.identificada_per && (
             <span className="block text-xs text-muted-foreground" data-testid="ie-identificada" data-per={p.identificada_per}>
@@ -561,7 +563,7 @@ function FilaRevisio({
           <BotoIcona icona={obert ? ChevronUp : ChevronDown} etiqueta={t(obert ? 'ie.amaga_detall' : 'ie.mostra_detall')}
             aria-expanded={obert} onClick={() => onObert(!obert)} />
         </TableCell>
-      </TableRow>
+      </FilaClicable>
       {obert && (
         <TableRow className="hover:bg-transparent">
           <TableCell colSpan={colSpan} className="bg-muted/30 text-left">
@@ -700,13 +702,16 @@ function Resultat({ resultat, perFila }: { resultat: ResultatImportacio; perFila
             const errors = r.errors.map((e) => textCodi(t, e))
             const conveni = f?.conveni ? [f.conveni.data, f.conveni.signant].filter(Boolean).join(' · ') : null
             return (
-              <TableRow key={r.fila} data-testid="ie-res-fila" data-fila={r.fila} data-accio={r.accio}>
+              <FilaClicable key={r.fila} data-testid="ie-res-fila" data-fila={r.fila} data-accio={r.accio}
+                to={r.organizacion_id ? `${LLISTA}/${r.organizacion_id}` : undefined}>
                 <TableCell className="text-left">
                   <span className="flex flex-wrap items-center gap-2">
                     <Badge className={CLASSE_ACCIO[r.accio]}>{t(`ie.acc_${r.accio}`)}</Badge>
                     <span className="text-xs text-muted-foreground">{t('ie.fila', { n: r.fila })}</span>
                   </span>
-                  <span className="mt-1 block font-medium">{f?.nom ?? t('ie.sense_nom')}</span>
+                  <span className="mt-1 block">
+                    <TitolFila to={r.organizacion_id ? `${LLISTA}/${r.organizacion_id}` : undefined}>{f?.nom ?? t('ie.sense_nom')}</TitolFila>
+                  </span>
                   {r.accio !== 'creada' && <LlistaCanvis fila={r.fila} canvis={r.canvis} fet className="mt-1 text-xs" />}
                   {conveni && <span className="block text-xs text-aviso" data-testid="ie-conveni">{t('ie.conveni_info', { dades: conveni })}</span>}
                   {avisos.map((a, i) => <span key={`a${i}`} className="block text-xs text-aviso">{a}</span>)}
@@ -724,7 +729,7 @@ function Resultat({ resultat, perFila }: { resultat: ResultatImportacio; perFila
                     )}
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>

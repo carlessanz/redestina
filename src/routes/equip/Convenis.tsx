@@ -22,6 +22,7 @@ import { dataCurta } from '../../lib/albarans'
 import { ESTATS_CONVENI, TIPUS_CONVENI, estilEstatConveni, nomOrganitzacio } from '../../lib/convenis'
 import type { ConvenioEstado, ConvenioTipo } from '../../types'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import Desplegable from '../../components/Desplegable'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -229,7 +230,7 @@ export default function Convenis() {
                     const numero = f.numero_completo ?? t('conv.no_number')
                     const data = dataCurta(f.contrafirmado_at ?? f.firmado_at ?? f.enviado_at ?? f.created_at)
                     return (
-                      <TableRow key={f.id}>
+                      <FilaClicable key={f.id} to={ruta}>
                         <TableCell className="hidden text-center font-medium tabular-nums md:table-cell">
                           {numero}
                         </TableCell>
@@ -265,7 +266,7 @@ export default function Convenis() {
                             <BotoIcona icona={Eye} etiqueta={t('conv.a_open')} onClick={() => navigate(ruta)} />
                           </div>
                         </TableCell>
-                      </TableRow>
+                      </FilaClicable>
                     )
                   })}
                 </TableBody>

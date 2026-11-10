@@ -21,6 +21,7 @@ import { useCerca } from '../../hooks/useCerca'
 import { dataCurta, estilEstatAlbara, kg } from '../../lib/albarans'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import BotoIcona from '../../components/BotoIcona'
+import { FilaClicable } from '../../components/FilaClicable'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -164,7 +165,7 @@ export default function Albarans() {
               ? t('alb.days', { n: f.dias_esperando })
               : dataCurta(f.emitido_at)
             return (
-              <TableRow key={f.id}>
+              <FilaClicable key={f.id} to={ruta}>
                 <TableCell>
                   <Link to={ruta} className="font-medium text-primary tabular-nums hover:underline sm:whitespace-nowrap">
                     {f.numero_completo ?? t('alb.no_number')}
@@ -199,7 +200,7 @@ export default function Albarans() {
                     <BotoIcona icona={Eye} etiqueta={t('alb.a_open')} onClick={() => navigate(ruta)} />
                   </div>
                 </TableCell>
-              </TableRow>
+              </FilaClicable>
             )
           })}
         </TableBody>
