@@ -389,3 +389,20 @@ Revisió: bloque **«Canviarà»** por fila (agrupado: una organización de dobl
 «repetides» por nombre); pruebas de reglas con `rollback` (teléfono nuevo, NIF existente con otro nombre →
 actualiza, ID sin NIF, los tres errores, doble rol → las dos fichas, año → 01/01 en el ofertant, reimportar →
 `sense_canvis`). Arnés y E2E: §13 de AGENTS.md.
+
+## Resumen de §6 que vivía en AGENTS.md hasta A2 (10-11-2026)
+
+Se compactó en `AGENTS.md` para dejar sitio (tope de 48 KB); el texto tal como estaba, sin perder nada:
+
+- **Importador del panel** (`/equip/entitats/importa`, super_admin; `20270511100000` + B4 `20270519100000`; §6.2, §6.4):
+  el navegador mapea por cabecera (`lib/importEntitats.ts`); la base revalida (`previsualitzar_importacio_entitats` →
+  `importar_entitats`). Nueva = **`potencial`**. 🔴 **D11 (B4): idempotente y ACTUALIZA** — identidad **ID Redestina →
+  NIF → `AIRTABLE:` → hash `IMP:`** (débil = «dubtosa»); con ID o NIF existente nunca crea; **celda vacía no toca, valor
+  distinto sobrescribe**, salvo si es lo que ya vale la organización (`entitat_valors_org`: no pisa ni rellena ninguna
+  ficha, P-B4-2); la Revisió enseña `canvis` (`abans → després`), guardados en `importacions_entitats_files.canvis`. ID
+  inexistente/contradictorio con el NIF = error de fila. Nunca toca `activo`, `estat_crm`, `es_test`, `ref_externa`.
+  «Data d'alta» `dd/mm/aaaa`·ISO·**solo año** (ofertant: 1 de enero + aviso, P-B4-1). Plantilla con desplegables (B2).
+- **Exportación** (B3, `20270518110000`; §6.3): «Exporta a Excel», todo el equipo, filas visibles; `exportar_entitats`
+  (sobre `entitat_valors_org`) → `lib/exportEntitats.ts`: columnas de la plantilla (con «ID Redestina» y «Data d'alta»,
+  Z·AA), notas vacías, solo valores que el importador acepta; «Estat CRM» informativo (P9). **Exportar → reimportar =
+  `sense_canvis`** (clon: 731/731).

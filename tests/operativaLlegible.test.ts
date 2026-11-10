@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest'
 import { filesOperativa, textDiesFranges, textMesos } from '../src/lib/operativaLlegible'
 import { COLUMNES_OPERATIVA, campsOperativa, podaOperativa, normalitzaValor, CAMPS_FITXA } from '../src/lib/campsFitxa'
 import { DICTS } from '../src/lib/i18n'
+import { ETIQUETES_OPERATIVA, traduccioOperativa } from '../supabase/functions/_shared/operativaLlegible.ts'
 import type { OperativaDiagnostic } from '../src/types'
 
 const t = (clau: string, vars?: Record<string, string | number>) => {
@@ -90,5 +91,39 @@ describe('podaOperativa y normalitzaValor (A4)', () => {
     expect(normalitzaValor(kg, { A: '1200', B: -1, C: 'x' })).toEqual({ A: 1200 })
     const mes = CAMPS_FITXA.find((x) => x.clau === 'temporada')!
     expect(normalitzaValor(mes, { A: [3, 1, 1, 13] })).toEqual({ A: [1, 3] })
+  })
+})
+
+describe('ETIQUETES_OPERATIVA del PDF (A2) = el diccionario de la pantalla', () => {
+  const PREFIXOS = ['op.env_', 'op.canal_', 'op.client_', 'op.suport_']
+
+  for (const lang of ['ca', 'es'] as const) {
+    it(`${lang}: cada etiqueta del PDF es idéntica a la de i18n.tsx`, () => {
+      for (const [clau, text] of Object.entries(ETIQUETES_OPERATIVA[lang])) {
+        expect(DICTS[lang][clau], clau).toBe(text)
+      }
+    })
+
+    it(`${lang}: el PDF tiene todas las opciones que tiene la pantalla`, () => {
+      const pantalla = Object.keys(DICTS[lang]).filter((k) => PREFIXOS.some((p) => k.startsWith(p)))
+      expect(pantalla.length).toBeGreaterThan(20)
+      for (const k of pantalla) expect(ETIQUETES_OPERATIVA[lang][k], k).toBeDefined()
+    })
+  }
+
+  it('con una Operativa llena, el PDF no deja ninguna clave sin traducir', () => {
+    const tOp = traduccioOperativa('ca')
+    const files = filesOperativa({
+      ...BUIDA,
+      activitat: ['x'], productes: ['A'], principals: ['A'], varietats: { A: ['v'] }, volum: { A: 1 },
+      temporada: { A: [1] }, envasos: ['caixes'], canals: ['altres'], clients: ['altres'],
+      facturacio_eur: 1, facturacio_rang: '<100k', volum_comercialitzat_kg: 1, suport: ['altres'],
+      llocs: [{ alias: 'L', municipi: null, principal: true, dies: [1, 7], franges: null, horari: null }],
+    }, tOp, 'ca')
+    expect(files).toHaveLength(14)
+    for (const f of files) {
+      expect(tOp(f.clau), f.clau).not.toBe(f.clau)
+      expect(f.text).not.toMatch(/\b(op|org|diag)\.[a-z_0-9]+/)
+    }
   })
 })

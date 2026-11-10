@@ -13,7 +13,8 @@
 // parte del cuestionario sino columnas de `productores` (T4): `filesOperativa()` la pone en
 // filas. Se enseña aunque el cuestionario esté vacío.
 //
-// ⚠️ El botón del PDF llega en A2: aquí todavía no hay documento que descargar.
+// A2: «Descarrega el PDF» pide a `diagnostic-pdf` el PDF de ESTE estado (`lib/diagnosticPdf.ts`),
+// sin documento emitido (D2). Lo tienen las dos voces: el equipo y el propio productor.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useT } from '../../lib/i18n'
@@ -22,10 +23,13 @@ import { dataCurta } from '../../lib/format'
 import { agrupaRespostes, estilEstatDiagnostic, respostaLlegible, textBilingue } from '../../lib/diagnostic'
 import { diagnosticDatos } from '../../lib/diagnosticApi'
 import { filesOperativa } from '../../lib/operativaLlegible'
+import { descarregarDiagnosticPdf } from '../../lib/diagnosticPdf'
 import { carregaTipusActivitat, type TipusActivitat } from '../../lib/organitzacio'
 import type { DiagnosticDatos } from '../../types'
 import CarregantSeccio from '../CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
+import { Download, Loader2 } from 'lucide-react'
 
 export default function ResumDiagnostic({
   productorId, veu,
@@ -40,6 +44,16 @@ export default function ResumDiagnostic({
   const [carregant, setCarregant] = useState(true)
   const [activitats, setActivitats] = useState<TipusActivitat[]>([])
   useEffect(() => { void carregaTipusActivitat().then(setActivitats) }, [])
+  const [generantPdf, setGenerantPdf] = useState(false)
+  const [errorPdf, setErrorPdf] = useState<string | null>(null)
+
+  async function descarregaPdf() {
+    setGenerantPdf(true)
+    setErrorPdf(null)
+    const r = await descarregarDiagnosticPdf(productorId, lang)
+    setGenerantPdf(false)
+    if (!r.ok) setErrorPdf(r.motiuKey)
+  }
 
   useEffect(() => {
     let viu = true
@@ -62,6 +76,20 @@ export default function ResumDiagnostic({
   if (error || !dades) return <p className="text-sm text-destructive">{textError(t, error ?? 'diag.err_generic')}</p>
 
   const seccions = agrupaRespostes(dades.respostes ?? [])
+
+  // El PDF lleva lo mismo que esta pantalla: si no hay nada que enseñar, no hay botón.
+  const botoPdf = (dades.diagnostic_id || operativa.length > 0) && (
+    <div className="space-y-1">
+      <Button
+        type="button" variant="outline" size="sm" onClick={() => void descarregaPdf()}
+        disabled={generantPdf} data-testid="diagnostic-pdf"
+      >
+        {generantPdf ? <Loader2 className="size-4 animate-spin" aria-hidden /> : <Download className="size-4" aria-hidden />}
+        {generantPdf ? t('diag.pdf_generant') : t('diag.pdf_descarrega')}
+      </Button>
+      {errorPdf && <p className="text-sm text-destructive" role="alert">{t(errorPdf)}</p>}
+    </div>
+  )
 
   const seccioOperativa = operativa.length > 0 && (
     <section className="space-y-1" aria-labelledby="resum-operativa" data-testid="resum-operativa">
@@ -86,6 +114,7 @@ export default function ResumDiagnostic({
           {t(veu === 'equip' ? 'diag.resum_buit_equip' : 'diag.resum_buit_extern')}
         </p>
         {seccioOperativa}
+        {botoPdf}
       </div>
     )
   }
@@ -105,6 +134,8 @@ export default function ResumDiagnostic({
             : t('diag.actualitzat', { data })}
         </span>
       </div>
+
+      {botoPdf}
 
       {!dades.complet && dades.falten.length > 0 && (
         <p className="text-sm text-aviso">{t('diag.missing', { n: dades.falten.length })}</p>

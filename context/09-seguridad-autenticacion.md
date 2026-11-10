@@ -830,3 +830,12 @@ Los dos flags se gobiernan **solo desde el proyecto remoto**, con el Management 
 julio. Sigue prohibido. Y en el clon, `[auth.email] enable_signup` va a `true` a propósito: es el
 interruptor del proveedor, y en `false` el stack local apaga el login con contraseña.
 
+### El PDF del diagnóstico bajo demanda (`diagnostic-pdf`, Plan 2 A2, 10-11-2026)
+
+La primera función que devuelve los bytes de un PDF al navegador. No guarda nada: ni fila, ni fichero, ni enlace
+(D2), y responde `Cache-Control: no-store`. Permiso: `contextoUsuario()` + `diagnostic_datos(…, p_user)`
+(detalle en `context/04bis`); lo ajeno y lo inventado dan el mismo `403`. CORS: el de siempre (`corsPara`) más
+`Access-Control-Expose-Headers: Content-Disposition`, para que el panel lea el nombre del fichero. El nombre se
+compone en el servidor (`nomFitxerDiagnostic`: minúsculas, sin acentos ni signos) y el cliente solo acepta
+`[\w.-]+\.pdf`. Las notas internas (§8) no salen: `diagnostic_datos` no las lee (`notes` es la nota del
+diagnóstico, que el productor ya ve en su resumen).

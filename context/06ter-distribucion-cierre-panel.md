@@ -2224,3 +2224,29 @@ y **Equip** (cuentas | auditoría). Todas las rejillas llevan `grid-cols-1` expl
   de lugares marca el principal.
 - **Banda «Completa la teva Operativa»** (`useOperativaPendent`): también sale sin productos habituales
   (`avop.text_productes`); «sin lugar principal» no hace falta mirarlo: si hay lugares, el trigger garantiza uno.
+
+### El diagnóstico en PDF, bajo demanda (Plan 2, A2, 10-11-2026)
+
+«Descarrega el PDF» en el resumen del diagnóstico (`ResumDiagnostic`): lo tienen el equipo (ficha › «Diagnòstic i
+perfil») y el productor («El meu diagnòstic»). Sale cuando hay algo que imprimir (diagnóstico guardado u Operativa
+con datos), igual que el resumen. `lib/diagnosticPdf.ts` (`descarregarDiagnosticPdf`, nunca lanza) llama con
+`fetch` y la sesión a la Edge Function `diagnostic-pdf`, que devuelve los bytes; el nombre sale de
+`Content-Disposition` (`diagnostic-<organització>.pdf`, expuesta por CORS) y se guarda con `descarregarBlob()`
+(`lib/tancament.ts`). Los errores, con las frases de `doc.err_*`.
+
+**Decisiones aplicadas:**
+- **D2**: sin fila en `documentos`, sin número, sin serie, sin código de verificación, sin fichero en el bucket. El
+  PDF dice en una caja «Document informatiu» que se genera a demanda con los datos de hoy; si el cuestionario es
+  provisional, lo añade en la misma caja (es la «marca» del plan). El pie es «Fundació Espigoladors · REDESTINA»
+  (`diagnostic_datos` no trae la Fundació: `peuFundacio(null)` cae a su nombre por defecto).
+- **P4**: los activos se importan de `generar-documento/activos/incrustats.ts`; el empaquetado no protestó (el
+  bundle del clon lo sirve), así que no se movieron a `_shared/pdf/activos/`.
+- **Mismo contenido que la pantalla**: la Operativa con `filesOperativa()`, que pasó a ser el módulo hoja
+  `_shared/operativaLlegible.ts` (la pantalla lo reexporta desde `src/lib/operativaLlegible.ts`), con sus etiquetas
+  `ETIQUETES_OPERATIVA` vigiladas contra `i18n.tsx`; las respuestas con `respostesLlegibles()` de `pla.ts` (la misma
+  que la sección del expediente). Los excedentes por producto y causa llegarán con A3 y se añadirán al render.
+- **`fetch`, no `functions.invoke`**: es el patrón de `documents.ts` (status y cuerpo de error a mano). `invoke`
+  también habría dado un `Blob` (functions-js trata `application/pdf` como binario).
+
+Verificado en el clon: el PDF del productor de prueba, 2 páginas y 110.238 bytes; `documentos` y los objetos del
+bucket, iguales antes y después.

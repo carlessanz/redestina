@@ -60,7 +60,7 @@
   Supabase, ni WhatsApp, ni Resend), así que el navegador lo puede cargar: el panel importa
   directamente `textAvis.ts`, `textOferta.ts`, `textRespostes.ts`, `textIntake.ts`,
   `textOfertaRegistrada.ts`… para enseñar y copiar EXACTAMENTE el texto que el servidor manda (R4
-  del plan de gestión autónoma). La lista vive en `tests/puresa.test.ts`, que falla si un hoja
+  del plan de gestión autónoma). Desde A2 (10-11-2026) también `operativaLlegible.ts` (la Operativa en lectura, que comparten el resumen del diagnóstico y su PDF). La lista vive en `tests/puresa.test.ts`, que falla si un hoja
   importa algo de fuera o si `src/` importa de `supabase/functions/` un módulo que no está en ella.
   ⚠️ Cambia la convención anterior —copia en `src/lib` + test de paridad (`modalitats.ts`,
   `franja.ts`, `textosRgpd.ts`, `expedient.ts`)—: esas copias se quedan como están, pero lo nuevo

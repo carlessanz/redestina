@@ -427,3 +427,14 @@ Node— así que tienen su propio `tsconfig`. Meter `"node"` en los tipos del `t
 aplicación dejaría `process`, `Buffer` y `fs` visibles dentro de `src/`, que se empaqueta para el
 navegador: haría compilar código que revienta en producción.
 
+### `diagnostic-pdf` (Plan 2, A2, 10-11-2026)
+
+- Desplegar: `functions deploy diagnostic-pdf` **con** verificación de JWT (`verify_jwt = true` en `config.toml`).
+- Lleva los activos dentro del bundle importando `../generar-documento/activos/incrustats.ts` (P4): nada de
+  `static_files` ni `Deno.readFile` (lo que rompió `generar-documento` el 21-09-2026). Si se regeneran los activos
+  (`scripts/incrustar-activos.ts`), hay que redesplegar **las dos**.
+- Importa `_shared/` (`autorizacion`, `cors`, `http`, `pdf/fuentes`, `pdf/maquetador`, `pdf/fundacio`,
+  `pdf/render/{diagnostic,pla,cierre,comu}`, `operativaLlegible`): un cambio en cualquiera de esos obliga a
+  redesplegarla también.
+- Probarla en el clon: `bash scripts/local/funciones-local.sh` y `E2E_CLON=1 npx playwright test
+  tests/e2e/diagnostic-pdf.e2e.ts` (fuera del sandbox de Claude: Chromium no arranca dentro).

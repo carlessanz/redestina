@@ -2857,6 +2857,8 @@ const ca: Dict = {
   // la targeta d'estat
   'diag.card_t': 'Diagnòstic operatiu',
   'diag.provisional_badge': 'Qüestionari provisional',
+  // A2: el PDF del diagnóstico bajo demanda (`diagnostic-pdf`).
+  'diag.pdf_descarrega': 'Descarrega el PDF', 'diag.pdf_generant': 'Generant el PDF…',
   'diag.o_card_sense_questionari': 'Encara no hi ha qüestionari per al teu tipus d’organització.',
   'diag.o_card_sense_comencar': 'Encara no està fet. L’equip de Redestina el farà amb tu.',
   'diag.o_card_incomplet': 'Està a mitges. L’equip de Redestina l’acabarà amb tu.',
@@ -6680,6 +6682,7 @@ const es: Dict = {
 
   'diag.card_t': 'Diagnóstico operativo',
   'diag.provisional_badge': 'Cuestionario provisional',
+  'diag.pdf_descarrega': 'Descarga el PDF', 'diag.pdf_generant': 'Generando el PDF…',
   'diag.o_card_sense_questionari': 'Todavía no hay cuestionario para tu tipo de organización.',
   'diag.o_card_sense_comencar': 'Todavía no está hecho. El equipo de Redestina lo hará contigo.',
   'diag.o_card_incomplet': 'Está a medias. El equipo de Redestina lo terminará contigo.',

@@ -122,8 +122,8 @@ src/
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend, pujada; 24 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
-          enviar-*, *-documento, enlace-publico, priorizar-entidades, recordatorios-*… ; lista en `context/03`)
+          autorizacion, resend, pujada, operativaLlegible; 25 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
+          enviar-*, *-documento, diagnostic-pdf, enlace-publico, priorizar-entidades, recordatorios-*… ; lista en `context/03`)
 docs/ (ignorado por git)
 ```
 
@@ -274,7 +274,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `context/04bis`, «Familias de RPC».
 - **Diagnóstico (A1)**: `desar_diagnostic` solo `es_intern()` (un externo recibe `42501` también sobre lo suyo, D5);
   lectura con `diagnostic_estat` y `diagnostic_datos(p_tipo_org, p_org, p_user)` (`puc_gestionar_pla`; con
-  `service_role`, `p_user` obligatorio; trae `operativa`, A4). `fixar_lloc_principal` (A4). El plan básico (`generar_pla_des_de_diagnostic`, `emitir_plan_basico`,
+  `service_role`, `p_user` obligatorio; trae `operativa`, A4; la usa `diagnostic-pdf`, A2). `fixar_lloc_principal` (A4). El plan básico (`generar_pla_des_de_diagnostic`, `emitir_plan_basico`,
   `desar_mesures_pla`, `fixar_nivell_pla`, `guardar_plan_basico`) queda **solo para `service_role`**.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
   `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`,
@@ -307,18 +307,13 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
   NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
   `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
-- **Importador del panel** (`/equip/entitats/importa`, super_admin; `20270511100000` + B4 `20270519100000`; §6.2, §6.4):
-  el navegador mapea por cabecera (`lib/importEntitats.ts`); la base revalida (`previsualitzar_importacio_entitats` →
-  `importar_entitats`). Nueva = **`potencial`**. 🔴 **D11 (B4): idempotente y ACTUALIZA** — identidad **ID Redestina →
-  NIF → `AIRTABLE:` → hash `IMP:`** (débil = «dubtosa»); con ID o NIF existente nunca crea; **celda vacía no toca, valor
-  distinto sobrescribe**, salvo si es lo que ya vale la organización (`entitat_valors_org`: no pisa ni rellena ninguna
-  ficha, P-B4-2); la Revisió enseña `canvis` (`abans → després`), guardados en `importacions_entitats_files.canvis`. ID
-  inexistente/contradictorio con el NIF = error de fila. Nunca toca `activo`, `estat_crm`, `es_test`, `ref_externa`.
-  «Data d'alta» `dd/mm/aaaa`·ISO·**solo año** (ofertant: 1 de enero + aviso, P-B4-1). Plantilla con desplegables (B2).
-- **Exportación** (B3, `20270518110000`; §6.3): «Exporta a Excel», todo el equipo, filas visibles; `exportar_entitats`
-  (sobre `entitat_valors_org`) → `lib/exportEntitats.ts`: columnas de la plantilla (con «ID Redestina» y «Data d'alta»,
-  Z·AA), notas vacías, solo valores que el importador acepta; «Estat CRM» informativo (P9). **Exportar → reimportar =
-  `sense_canvis`** (clon: 731/731).
+- **Importador del panel** (`/equip/entitats/importa`, super_admin; B4 `20270519100000`; §6.2, §6.4): mapea el
+  navegador (`lib/importEntitats.ts`), revalida la base (`previsualitzar_importacio_entitats` → `importar_entitats`).
+  Nueva = **`potencial`**. 🔴 **D11: idempotente y ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o
+  NIF nunca crea; celda vacía no toca, valor distinto sobrescribe; la Revisió enseña `canvis`). Nunca toca `activo`,
+  `estat_crm`, `es_test`, `ref_externa`. Plantilla con desplegables (B2).
+- **Exportación** (B3, `20270518110000`; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
+  plantilla; **exportar → reimportar = `sense_canvis`**.
 
 🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
 de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
@@ -369,7 +364,8 @@ Lo que manda hoy, en una línea cada uno:
   Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
   operatiu (A1: el equipo lo contesta en `/equip/diagnostics/productor/:id`, con el expediente arriba y, A4, la
   Operativa de la ficha como sección 1; la ficha y
-  «El meu diagnòstic» lo leen), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
+  «El meu diagnòstic» lo leen y, A2, **descargan en PDF bajo demanda**: `diagnostic-pdf` devuelve los bytes, sin fila en
+  `documentos`, número ni código, D2), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -547,7 +543,8 @@ git config core.hooksPath .githooks            # una vez por clon
   `functions deploy <f> [--no-verify-jwt según config.toml]`, `secrets set`, Management API. El
   asistente **no pide ni lee el token**; una sola pestaña, scripts por fase en `scripts/data/` con log.
 - **Publicar**: skill `/publicar`, orden **base → Edge Functions → frontend** (`git push` el último).
-  Tras redesplegar `generar-documento`, `emitir_documento_prova()`. Tocar `_shared/` obliga a
+  Tras redesplegar `generar-documento`, `emitir_documento_prova()`. `diagnostic-pdf` importa los activos de
+  `generar-documento/activos/incrustats.ts` (P4): regenerarlos obliga a redesplegar las dos. Tocar `_shared/` obliga a
   redesplegar todas las que lo importan. Logs remotos por el Management API de analítica.
 - Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
@@ -584,7 +581,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.887 pruebas de Vitest en 84 ficheros (1 saltada a propósito) + 43 de Deno.**
+   **Referencia: 1.899 pruebas de Vitest en 85 ficheros (1 saltada a propósito) + 47 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.470/2.470 y 40 sin datos; producción 2.474/2.474 y 36 «Sin fallos de

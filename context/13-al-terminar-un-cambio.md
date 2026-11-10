@@ -8,8 +8,10 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.887 pruebas en 84 ficheros** de Vitest (1 saltada a propósito) **+ 43 de Deno** del PDF
-   (10-11-2026, Plan 2 A4: `tests/predeterminatsOferta.test.ts` y `tests/operativaLlegible.test.ts`, nuevos, y las
+   Referencia: **1.899 pruebas en 85 ficheros** de Vitest (1 saltada a propósito) **+ 47 de Deno** del PDF
+   (10-11-2026, Plan 2 A2: `tests/diagnosticPdf.test.ts` nuevo, la paridad de `ETIQUETES_OPERATIVA` en
+   `operativaLlegible.test.ts`, el hoja nuevo en `puresa.test.ts` y `tests/pdf/diagnostic_test.ts`, 4 de Deno; sin arnés:
+   ni RPC ni política nuevas. Antes, **1.887 en 84 + 43 de Deno**: 10-11-2026, Plan 2 A4: `tests/predeterminatsOferta.test.ts` y `tests/operativaLlegible.test.ts`, nuevos, y las
    columnas de la Operativa en `campsFitxa.test.ts`; arnés del clon **2.470/2.470 y 40 sin datos**, 30 checks nuevos de
    `fixar_lloc_principal`, la lista blanca y los CHECK de la Operativa. Antes, **1.863 en 81**: 10-11-2026, Plan 2 A1: `tests/diagnostic.test.ts` reescrito —fuera el punto del proceso y las medidas, dentro
    `seccionsAmbEstat`/`respostaLlegible`— y `tests/pdf/expedient_test.ts`, 4 nuevas de Deno; arnés del clon 2.440/2.440 y 39

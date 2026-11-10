@@ -408,6 +408,12 @@ supabase/
                                confirmación de un albarán por WhatsApp (fase 3, 11-10-2026)
     _shared/confirmacionsWhatsapp.ts  Lo consume el webhook ANTES de la respuesta de oferta y
                                del intake; `recollides-programades` manda la pregunta
+    _shared/pdf/render/diagnostic.ts  El diagnóstico operativo bajo demanda (A2): cabecera sin número, caja
+                               «Document informatiu», Operativa (`filesOperativa`), respuestas por sección
+                               (`respostesLlegibles` de pla.ts) y notas. Test: `tests/pdf/diagnostic_test.ts`
+    _shared/operativaLlegible.ts  Módulo HOJA (A2): la Operativa en lectura (`filesOperativa`) + sus etiquetas
+                               ca/es (`ETIQUETES_OPERATIVA`, paridad con i18n.tsx en
+                               `tests/operativaLlegible.test.ts`); `src/lib/operativaLlegible.ts` lo reexporta
     _shared/pdf/render/albara1p.ts  El albarán de UNA página (modelo de Espigoladors, fase 3):
                                REC/ENT/OPE con `datos.format = 'albara-1p'`. Los antiguos
                                (rec.ts, ent.ts, ope.ts) siguen pintando lo emitido antes
@@ -429,6 +435,11 @@ supabase/
                                static_files ya no llega al isolate (§11)
     descargar-documento/       POST (JWT): URL firmada de 60 s tras puede_ver_documento(); también
                                `{firma_document_id}` (el fichero subido de una firma) y extensión real
+    diagnostic-pdf/            POST (JWT; Plan 2 A2, 10-11-2026): el PDF del diagnóstico operativo de un
+                               productor BAJO DEMANDA. Devuelve los BYTES `application/pdf` (la primera
+                               función que lo hace), sin fila en `documentos` ni fichero (D2). Permiso:
+                               `diagnostic_datos(…, p_user)`. Activos: importa
+                               `generar-documento/activos/incrustats.ts` (P4)
     reenviar-documento/        POST (JWT, equipo): vuelve a mandar un documento emitido por
                                correo, al destinatario de su `envio` y con las mismas barreras (§4);
                                `manual` lo deja salir con las notificaciones apagadas (§8)

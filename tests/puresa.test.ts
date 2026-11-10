@@ -29,6 +29,8 @@ const HOJA = [
   'franja',
   'certificatDonacio',
   'cortinaHash',
+  // A2 (10-11-2026): la Operativa en lectura, la misma en el resumen y en el PDF del diagnóstico.
+  'operativaLlegible',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */
