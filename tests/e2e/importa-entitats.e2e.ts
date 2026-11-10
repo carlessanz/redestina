@@ -11,6 +11,10 @@
 // comparte el correo de `TEST-ENT-OBRADOR` y se resuelve «crea'n una de nova», así que
 // tampoco se toca.
 //
+// Plan 2 B3 (10-11-2026): la cuenta `equip` (un `tecnic`) exporta a Excel las fichas `TEST-IMP`
+// de esta pasada desde Entitats (formato de la plantilla, desplegables, «ID Redestina»); el
+// super_admin vuelve a subir ese fichero tal cual y todo sale «sense canvis».
+//
 // Capturas: con `E2E_CAPTURES=<carpeta>`, de los tres pasos a 360 px y en escritorio.
 
 import { expect, test } from '@playwright/test'
@@ -19,6 +23,7 @@ import { mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { strFromU8, unzipSync } from 'fflate' // la usa write-excel-file por dentro
+import readXlsxFile from 'read-excel-file/node'
 import writeXlsxFile from 'write-excel-file/node'
 import { entra, motiuSaltClon, sql, sqlCom, tria } from './ajuda'
 
@@ -38,6 +43,7 @@ let fitxer = ''
 let nifNou = ''
 let telNou = ''
 let fixNou = ''
+let exportat = ''
 
 const LLETRES = 'TRWAGMYFPDXBNJZSQVHLCKE'
 const enUs = (col: string, v: string) => sql(`select count(*) from (
@@ -112,7 +118,7 @@ test.afterAll(() => {
   if (!dir) return
   neteja()
   // Y el registro de los lotes de esta pasada (las fichas ya no están: sus filas quedaron sin ficha).
-  sql(`delete from importacions_entitats where fitxer_nom = 'airtable-${marca}.xlsx'`)
+  sql(`delete from importacions_entitats where fitxer_nom in ('airtable-${marca}.xlsx', 'exportacio-${marca}.xlsx')`)
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -264,4 +270,71 @@ test('la plantilla descarregada, pujada tal qual, es reconeix sencera', async ({
   await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(25)
   // Solo trae la fila de ejemplo, que se salta.
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^0 /)
+})
+
+test('B3: el tècnic exporta les files visibles amb el format de la plantilla (desplegables i «ID Redestina»)', async ({ page }) => {
+  await entra(page, 'equip') // `tecnic` al clon: exporta (D10) però no importa
+  await page.goto('/equip/entitats')
+  await expect(page.getByTestId('el-exporta')).toBeVisible()
+  await expect(page.getByTestId('el-importa')).toHaveCount(0)
+  // Las cuatro de esta pasada (las importadas nacen «Potencial»).
+  await page.getByRole('searchbox').fill('TEST-IMP')
+  await tria(page.locator('#ent-estat'), 'potencial')
+  await expect(page.getByTestId('entitat-fila')).toHaveCount(4)
+  const [baixada] = await Promise.all([page.waitForEvent('download'), page.getByTestId('el-exporta').click()])
+  expect(baixada.suggestedFilename()).toMatch(/^entitats-\d{4}-\d{2}-\d{2}\.xlsx$/)
+  exportat = join(dir, `exportacio-${marca}.xlsx`)
+  await baixada.saveAs(exportat)
+
+  // El fichero: las columnas de la plantilla y las cuatro informativas detrás; una fila por
+  // organización visible, con su id; las notas vacías; los seis desplegables de B2.
+  const [entitats, instruccions, llistes] = await readXlsxFile(exportat)
+  expect([entitats.sheet, instruccions.sheet, llistes.sheet]).toEqual(['Entitats', 'Instruccions', 'Llistes'])
+  const cap = entitats.data[0].map(String)
+  expect(cap.slice(0, 3)).toEqual(['Rol', 'Nom comercial', 'Raó social'])
+  expect(cap.slice(-4)).toEqual(['ID Redestina', "Data d'alta a l'organització", 'Estat CRM (ofertant)', 'Estat CRM (receptor)'])
+  const files = entitats.data.slice(1).filter((r) => r.some((c) => c !== null))
+  expect(files).toHaveLength(4)
+  const iId = cap.indexOf('ID Redestina')
+  const ids = sql(`select string_agg(organizacion_id::text, ',' order by organizacion_id) from (
+      select organizacion_id from productores where empresa like 'TEST-IMP % ${marca}'
+      union select organizacion_id from entidades where nombre like 'TEST-IMP % ${marca}') x`)
+  expect(files.map((r) => String(r[iId])).sort().join(',')).toBe(ids)
+  const iObs = cap.indexOf('Observacions')
+  expect(files.every((r) => r[iObs] === null)).toBe(true)
+  const iEstat = cap.indexOf('Estat CRM (receptor)')
+  expect(files.filter((r) => r[iEstat] === 'Potencial')).toHaveLength(3)
+  const fulla1 = strFromU8(unzipSync(new Uint8Array(readFileSync(exportat)))['xl/worksheets/sheet1.xml'])
+  expect(fulla1).toContain('<dataValidations count="6">')
+  expect(fulla1.indexOf('<dataValidations')).toBeGreaterThan(fulla1.indexOf('</sheetData>'))
+})
+
+test('B3: el fitxer exportat, pujat tal qual pel super_admin, surt tot «sense canvis»', async ({ page }) => {
+  test.skip(!exportat, 'Cal la prova anterior (exportació)')
+  const abans = sql(`select md5(string_agg(t, '|' order by t)) from (
+      select row_to_json(p)::text as t from productores p where empresa like 'TEST-IMP % ${marca}'
+      union all select row_to_json(e)::text from entidades e where nombre like 'TEST-IMP % ${marca}') x`)
+  await entra(page, 'superadmin')
+  await page.goto('/equip/entitats/importa')
+  await puja(page, exportat)
+  await expect(page.getByTestId('ie-falten')).toHaveCount(0)
+  await expect(page.getByTestId('ie-nfiles')).toHaveText(/^4 /)
+  // Las informativas se ignoran a propósito; las 25 de la plantilla se reconocen.
+  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(25)
+  await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(4)
+  await expect(page.getByTestId('ie-ignorades')).toContainText('ID Redestina')
+  await page.getByTestId('ie-continua').click()
+  await expect(page.getByTestId('ie-pas2')).toBeVisible()
+  await expect(page.getByTestId('ie-fila')).toHaveCount(4, { timeout: 20_000 })
+  for (const f of await page.getByTestId('ie-fila').all()) await expect(f).toHaveAttribute('data-estat', 'existent')
+  await expect(page.getByTestId('ie-importa')).toBeEnabled({ timeout: 20_000 })
+  await importa(page)
+  await expect(page.getByTestId('ie-xifra-sense_canvis')).toContainText('4')
+  await expect(page.getByTestId('ie-xifra-creades')).toContainText('0')
+  await expect(page.getByTestId('ie-xifra-actualitzades')).toContainText('0')
+  await expect(page.getByTestId('ie-xifra-errors')).toContainText('0')
+  // Y en la base, ni un byte distinto en las fichas.
+  expect(sql(`select md5(string_agg(t, '|' order by t)) from (
+      select row_to_json(p)::text as t from productores p where empresa like 'TEST-IMP % ${marca}'
+      union all select row_to_json(e)::text from entidades e where nombre like 'TEST-IMP % ${marca}') x`)).toBe(abans)
 })

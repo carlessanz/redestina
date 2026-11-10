@@ -11,11 +11,13 @@
 // las tarjetas del tablero). Como los listados de siempre: arriba las de prueba, buscador en
 // cliente (son cientos de filas, deuda §12.5), «Missatge» y «Correu» por fila (iconos). «Darrer
 // contacte» es la nota interna más reciente (1F, `notes_internes`). «Importa des d'Excel»
-// (06-11-2026, solo super_admin) lleva al importador, `/equip/entitats/importa`.
+// (06-11-2026, solo super_admin) lleva al importador, `/equip/entitats/importa`. «Exporta a
+// Excel» (Plan 2 B3, 10-11-2026; D10, todo el equipo) baja LAS FILAS VISIBLES con el formato de la
+// plantilla del importador (`lib/exportEntitats.ts`), para completarlas fuera y volver a subirlas.
 
 import { useEffect, useMemo, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router'
-import { Download, Eye, FileSpreadsheet, Mail, MessageCircle, Plus } from 'lucide-react'
+import { Download, Eye, FileDown, FileSpreadsheet, Mail, MessageCircle, Plus } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -30,7 +32,12 @@ import { avuiLocal, dataCurta } from '../../lib/format'
 import { estatSeguiment, faTemps } from '../../lib/notesInternes'
 import { classeEstatCrm, estatPerFiltre } from '../../lib/estatCrm'
 import { ambComunicacions, csvConsentiments, filesExport, llistaConsentiments } from '../../lib/consentiments'
-import { descarregarText } from '../../lib/tancament'
+import { descarregarBlob, descarregarText } from '../../lib/tancament'
+import { carregaExportacio } from '../../lib/importacions'
+import { MAX_FILES } from '../../lib/importEntitats'
+import { blobExportacio, enOrdre, nomFitxerExportacio } from '../../lib/exportEntitats'
+import { carregaMunicipis, llistesTerritori } from '../../lib/municipis'
+import { carregaTipusActivitat } from '../../lib/organitzacio'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoIcona from '../../components/BotoIcona'
 import DialegCorreu, { type DestinatariCorreu } from '../../components/DialegCorreu'
@@ -56,7 +63,7 @@ function seguimentDe(e: EntitatLlistat): 'vencut' | 'avui' | 'pendent' | 'cap' {
 }
 
 export default function Entitats() {
-  const { t } = useT()
+  const { t, lang } = useT()
   const navigate = useNavigate()
   const [params] = useSearchParams()
   const waActiu = useWhatsappActiu()
@@ -68,6 +75,7 @@ export default function Entitats() {
   const [files, setFiles] = useState<EntitatLlistat[]>([])
   const [loading, setLoading] = useState(true)
   const [exportant, setExportant] = useState(false)
+  const [exportantExcel, setExportantExcel] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [unanswered, setUnanswered] = useState<Record<string, number>>({})
   const { cerca, setCerca, q } = useCerca()
@@ -296,6 +304,29 @@ export default function Entitats() {
     toast.success(t('el.export_ok', { n: base.length }))
   }
 
+  // «Exporta a Excel» (B3): las filas que se ven (con los filtros y la búsqueda), en su orden.
+  // Sin nada filtrado se piden todas (`null`). Los catálogos dan las palabras de las listas,
+  // como en la plantilla.
+  async function exportaExcel() {
+    const visibles = [...test, ...resto].map((e) => e.id)
+    if (visibles.length === 0) { toast.info(t('el.export_excel_buit')); return }
+    setExportantExcel(true)
+    const [r, activitats, munis] = await Promise.all([
+      carregaExportacio(visibles.length === files.length ? null : visibles),
+      carregaTipusActivitat(),
+      carregaMunicipis(),
+    ])
+    if (!r.ok) { setExportantExcel(false); toast.error(t('el.export_excel_err')); return }
+    const filesExcel = enOrdre(r.dades, visibles)
+    const blob = await blobExportacio(filesExcel, { t, lang, activitats, ...llistesTerritori(munis) })
+    setExportantExcel(false)
+    if (!blob) { toast.error(t('el.export_excel_err')); return }
+    descarregarBlob(nomFitxerExportacio(avuiLocal()), blob)
+    toast.success(t('el.export_excel_ok', { n: filesExcel.length }))
+    // El importador acepta 1.000 filas por fichero: más, y habrá que partirlo para reimportarlo.
+    if (filesExcel.length > MAX_FILES) toast.warning(t('el.export_excel_massa', { n: MAX_FILES }))
+  }
+
   return (
     <Card>
       <CardHeader className="flex flex-row flex-wrap items-start justify-between gap-4">
@@ -308,6 +339,10 @@ export default function Entitats() {
               a alguna comunicación, con lo que dijo a cada una. */}
           <Button variant="outline" onClick={() => void exportaCorreus()} disabled={exportant}>
             <Download className="size-4" /> {t('el.export_correus')}
+          </Button>
+          {/* B3 (D10): todo el equipo exporta; importar sigue siendo del super_admin. */}
+          <Button variant="outline" onClick={() => void exportaExcel()} disabled={exportantExcel || loading} data-testid="el-exporta">
+            <FileDown className="size-4" /> {t('el.export_excel')}
           </Button>
           {esSuperAdmin && (
             <Button variant="outline" onClick={() => navigate('/equip/entitats/importa')} data-testid="el-importa">

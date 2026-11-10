@@ -30,7 +30,7 @@ import { useT } from '../../lib/i18n'
 import { useAppContext } from '../../hooks/useAppContext'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import { carregaTipusActivitat } from '../../lib/organitzacio'
-import { carregaMunicipis, nomLlegible } from '../../lib/municipis'
+import { carregaMunicipis, llistesTerritori } from '../../lib/municipis'
 import { dataCurta } from '../../lib/format'
 import { llegeixFitxer, type FitxerLlegit } from '../../lib/fitxerImportacio'
 import {
@@ -38,6 +38,7 @@ import {
   normalitzaFulla, type ActivitatCataleg, type FilaInforme, type FilaNormalitzada, type Paper,
 } from '../../lib/importEntitats'
 import { blobPlantilla } from '../../lib/plantillaEntitats'
+import { descarregarBlob } from '../../lib/tancament'
 import { importarEntitats, jaImportat, previsualitzarImportacio, type RespostaRpc } from '../../lib/importacions'
 import { FilaCasella } from '../../components/Casella'
 import Desplegable from '../../components/Desplegable'
@@ -90,17 +91,6 @@ const CLASSE_ACCIO: Record<ImportacioAccio, string> = {
   sense_canvis: 'bg-muted text-muted-foreground',
   omesa: 'bg-muted text-muted-foreground',
   error: 'bg-error-fondo text-error',
-}
-
-function descarregaBlob(nom: string, blob: Blob) {
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = nom
-  document.body.appendChild(a)
-  a.click()
-  a.remove()
-  setTimeout(() => URL.revokeObjectURL(url), 1_000)
 }
 
 export default function ImportaEntitats() {
@@ -210,15 +200,10 @@ function Importador() {
 
   async function descarregaPlantilla() {
     setGenerant(true)
-    const munis = await carregaMunicipis()
-    const comarques = [...new Set(munis.map((m) => m.comarca).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ca'))
-    // El desplegable de «Municipi» lleva el nombre como se escribe («l'Ametlla…», que el importador reconoce)
-    // pero ordenado por el oficial («Ametlla…, l'»), para que salga en la A y no en la L.
-    const municipis = [...new Set([...munis].sort((a, b) => a.nom.localeCompare(b.nom, 'ca')).map((m) => nomLlegible(m.nom)))]
-    const blob = await blobPlantilla({ t, lang, activitats, comarques, municipis })
+    const blob = await blobPlantilla({ t, lang, activitats, ...llistesTerritori(await carregaMunicipis()) })
     setGenerant(false)
     if (!blob) { toast.error(t('ie.plantilla_err')); return }
-    descarregaBlob(`${t('ie.plantilla_nom')}.xlsx`, blob)
+    descarregarBlob(`${t('ie.plantilla_nom')}.xlsx`, blob)
   }
 
   const botoPlantilla = (
@@ -283,7 +268,7 @@ function Importador() {
       }
     })
     const blob = new Blob([csvInforme(filesInf, capcaleres)], { type: 'text/csv;charset=utf-8' })
-    descarregaBlob(`${t('ie.informe_nom')}-${new Date().toISOString().slice(0, 10)}.csv`, blob)
+    descarregarBlob(`${t('ie.informe_nom')}-${new Date().toISOString().slice(0, 10)}.csv`, blob)
   }
 
   const titolPas = t(pas === 1 ? 'ie.pas_fitxer' : pas === 2 ? 'ie.pas_revisio' : 'ie.pas_resultat')

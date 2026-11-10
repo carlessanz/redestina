@@ -268,3 +268,72 @@ mismo fichero: 3 `sense_canvis` y aviso de «ja importat». En producción las 3
 (`alta_fitxa_interna(p_activo = false)` → el trigger de alta deriva `potencial`). Una ficha existente no cambia de
 estado al reimportar.
 
+
+## 6.3 Exportación de entidades a Excel con el formato de la plantilla (Plan 2 B3, `20270518110000`, 10-11-2026)
+
+**Para qué** (Teams de Sebas, 09-11; D10): sacar las entidades a Excel, completarlas fuera y volver a subirlas
+con el importador. La lanza **todo el equipo** (también `tecnic`) desde Entitats › «Exporta a Excel»; importar
+sigue siendo del super_admin. Exporta las filas **visibles** con los filtros y la búsqueda.
+
+**Base — `exportar_entitats(p_ids uuid[] default null)`** (T6: RPC y no ampliar `v_entitats_llistat`, que solo
+admite columnas al final y no necesita estos datos para pintar). `security definer`, guarda
+`if auth.uid() is not null and not es_intern() then 42501`; `revoke … from public, anon`, `grant … to
+authenticated, service_role`. Una fila por organización con alguna ficha, en **códigos** y ordenada por nombre.
+Los valores están elegidos para que **reimportar no cambie nada** (`importacio_aplica_fila` da `sense_canvis`
+si no rellena ningún hueco ni añade nota):
+- Campos que existen en las dos fichas: del ofertant primero, si no de la receptora (una diferencia entre las
+  dos fichas es un conflicto al reimportar, y un conflicto no cambia nada).
+- `persona_contacte`: el `name` del productor **no** cuenta si es igual que `empresa` (es el valor por defecto
+  del alta, y `importacio_aplica_fila` lo trata como hueco: exportarlo lo «rellenaría»).
+- `municipi`: `nom_municipi_llegible()` («l'Ametlla del Vallès», que `municipi_de_text` reconoce); sin
+  `municipio_ine`, la `ubicacio` (que la reimportación vuelve a dejar en `ubicacio`) o la `poblacion`.
+- `tipus_activitat`: la unión de las dos fichas en el orden del catálogo.
+- `airtable_id`: lo que sigue a `AIRTABLE:` en `ref_externa`.
+- **`data_alta` en texto**: `productores.data_alta` es `date`, pero `entidades.data_alta` es texto heredado del
+  Excel (en el clon, 69 filas con solo el año, «2021»). Sale `least()` de las dos como texto (un año suelto queda
+  antes que cualquier fecha de ese año o posterior).
+
+**Navegador — `src/lib/exportEntitats.ts`** (puro salvo `blobExportacio`, `import()` dinámico de
+`write-excel-file`):
+- Hoja «Entitats»: **las 25 columnas de la plantilla, en su orden** (`COLUMNES_DE_PLANTILLA`), con los valores en
+  el idioma de la interfaz (como «Llistes»: el lector entiende los dos) y **detrás cuatro informativas**
+  (`CAPCALERES_EXPORTACIO` en `importEntitats.ts`): «ID Redestina» (texto `@`), «Data d'alta a l'organització»
+  (una fecha `AAAA-MM-DD` va como fecha de Excel `dd/mm/yyyy`, construida en UTC para que no se corra un día;
+  lo demás, texto), «Estat CRM (ofertant)» y «Estat CRM (receptor)» (en palabras). Van **detrás** para que A–Y
+  sean las de la plantilla y los desplegables caigan en las mismas columnas. Después de los datos, 100 filas
+  vacías con formato texto (`FILES_BUIDES`) para añadir entidades.
+- **Columnas de nota vacías** (Càrrec, Web, Nombre de treballadors, Responsable intern, Conveni signat (data),
+  Signant del conveni, Observacions): reimportarlas añadiría el texto otra vez al comentario
+  (`importacio_bloc_nota`), y la nota de la ficha mezcla todo lo importado.
+- **Solo códigos conocidos**: una forma jurídica heredada que no es código (en el clon, productores con
+  `tipo_empresa = 'Explotació hortícola'`), una actividad fuera del catálogo o una modalidad desconocida **no
+  salen**; exportadas, la reimportación las mandaría a «Altres» + nota. Un ofertant sin papel de receptor no
+  saca tipo de receptor ni modalidades.
+- «Llistes» idéntica a la plantilla; «Instruccions» propia (título, cómo completarla y volver a subirla, notas
+  vacías, los puntos 3 y 4 de la plantilla, y las cuatro informativas) y la tabla de columnas de la plantilla más
+  una fila por informativa.
+- Desplegables: los **mismos de B2** (`validacionsPlantilla` + `featureValidacions`), en las filas con datos y en
+  las vacías (`filesAmbDesplegable(n)`: 2 … 1 + n + 100).
+- Las cuatro informativas están en `IGNORADES_A_PROPOSIT`: al reimportar salen en «Columnes que no s'importen»
+  como **ignoradas a propósito**, no como desconocidas. **B4** convertirá «ID Redestina» y «Data d'alta» en
+  columnas de `COLUMNES_PLANTILLA` (y las quitará de esa lista); «Estat CRM» no se importa nunca (P9).
+
+**Contrato garantizado** (`tests/exportEntitats.test.ts`, 15 pruebas): una fila exportada, leída con
+`llegeixFulla` + `normalitzaFila`, da exactamente la fila del contrato de la ficha, **sin avisos ni nota**, en
+memoria y como `.xlsx` real (escrito con `write-excel-file/node`, leído con `read-excel-file/node`), en catalán y
+en castellano; la fecha vuelve como fecha; las 25 columnas se reconocen y las 4 se ignoran a propósito.
+
+**E2E** (`importa-entitats.e2e.ts`, tras las pruebas del importador): la cuenta `equip` (un `tecnic`) busca
+`TEST-IMP`, filtra «Potencial», exporta 4 filas (cabeceras, ID de cada organización, notas vacías, 6
+desplegables); el super_admin sube ese fichero tal cual: 25 reconocidas, 4 ignoradas, las 4 filas `existent` y
+**4 `sense_canvis`**, y las fichas quedan idénticas byte a byte (`md5` de `row_to_json`).
+
+**Límites conocidos** (no rompen el `sense_canvis` en las fichas que se crean con el importador, pero sí pueden
+darse con datos heredados):
+- Una organización de **doble papel** cuyas dos fichas difieren: si una tiene un dato y la otra un hueco, la
+  reimportación **rellena el hueco** (`actualitzada`): es la regla de siempre del importador, no un error.
+- El lector pone el **móvil delante**: si una ficha tiene un fijo en `phone` y un móvil en `telefono_alt`, la
+  reimportación los ve cruzados (conflicto, no cambia nada).
+- **Más de 1.000 filas**: el importador acepta 1.000 por fichero; la pantalla avisa al exportar (deuda 173).
+- `data_alta` con solo el año: B4 tendrá que decidir qué hace con «2021» (el plan habla de `dd/mm/aaaa`, ISO o
+  serial).

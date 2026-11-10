@@ -958,6 +958,12 @@ privileges` de `20260721160000:66`, que actúa al crear la **tabla**, no al aña
 
 ### El certificado de donación según el modelo de la Fundació (`20270509100000`…`100700`, 05-11-2026)
 
+> Resumen que vivía en `AGENTS.md §4` hasta el 10-11-2026 (se compactó allí para hacer sitio a B3): lo no
+> certificable va a `cierre_exclosos_periodo`; el ejercicio lleva `revisio_estat` (§6ter) y prefijo `P-*` en
+> prueba, y `datos_182()` solo cuenta donación; el intervalo y la oferta usan `abast` y `excedente_id`;
+> `data_expedicio` y `annex` van en la fila; plantillas `CD`/`CD parcial`; la factura es opcional; lo emitido
+> del CT se conserva; el CR cumple D3 por CHECK.
+
 El modelo es `Certificat_Donacio_Tabaquet.pdf` (Drive › `1. Fuentes/Certificats donacio/`). Pasa a ser la
 **única** plantilla del certificado de donación: el diseño anterior de `render/cd.ts` y su texto provisional
 se retiraron (lo emitido antes conserva su PDF).

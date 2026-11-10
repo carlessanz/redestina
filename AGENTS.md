@@ -208,13 +208,10 @@ equivalencia; `origen` plataforma · paper · **declarat**; uno vigente por tipo
 firmar; `convenio_vigente()`/`exigir_convenio()`; **fecha de corte encendida** desde el
 16-09-2026: sin convenio no se publica ni se muestra interés). **Certificado de donación** (05-11-2026, modelo Tabaquet; detalle en §4 del fichero):
 🔴 **certificable = donación conciliada a entidad `social`** (`motiu_exclusio_certificat()`, único
-criterio; lo demás, en `cierre_exclosos_periodo`); el REC se reparte en proporción entre todas las
-conciliadas y luego se descarta lo no certificable. Tres ámbitos: **ejercicio** (`cierres_ejercicio`,
-`cierres_donante`, `revisio_estat`, `P-*` en prueba, `datos_182()` solo donación), **intervalo** y
-**oferta** (`cierres_periodo`, serie `CDP`, `abast`, `excedente_id`); `data_expedicio` y `annex` en la
-fila. Plantilla `CD`/`CD parcial` del modelo; el anual sustituye a los parciales; la factura es
-opcional. **CT retirado** (lo emitido se conserva). **Certificado de recepción** (`cierres_receptor`,
-serie `CR`, sin importes, D3 por CHECK).
+criterio); el REC se reparte en proporción y se descarta lo no certificable. Ámbitos **ejercicio**
+(`cierres_ejercicio`, `cierres_donante`, `datos_182()`), **intervalo** y **oferta** (`cierres_periodo`,
+serie `CDP`); el anual sustituye a los parciales. **CT retirado**. **Certificado de recepción**
+(`cierres_receptor`, serie `CR`, sin importes).
 **Diagnóstico y plan**: `questionaris_diagnostic` (v2 productor; receptor retirado),
 `mesures_prevencio`, `regles_pla`, `planes_prevencion` (sobre autocontenido),
 `diagnostics_historial`, y el **expediente** `expedients_prevencion` + 7 hijas. Impacto:
@@ -274,7 +271,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `firmar_convenio_por_enlace` solo servidor); organización
   (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
   `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` (1B, `es_intern()`: NIF válido, razón social y
-  `tipo_receptor`), `activar_/desactivar_fitxa`, `fixar_estat_crm` (B1),
+  `tipo_receptor`), `exportar_entitats` (B3, `es_intern()`), `activar_/desactivar_fitxa`, `fixar_estat_crm` (B1),
   `activar_/desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
   `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
   `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
@@ -318,15 +315,15 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
   NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
   `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
-- **Importador del panel** (`/equip/entitats/importa`, solo super_admin, `20270511100000`): el navegador lee
-  el `.xlsx`/`.csv` (`read-excel-file`/`write-excel-file` por `import()`), mapea por cabecera con alias de
-  Airtable (`lib/importEntitats.ts`) y la base revalida (`previsualitzar_importacio_entitats` →
-  `importar_entitats`): **`potencial`** (inactivo), identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
-  coincidencia débil = «dubtosa» que decide la persona, existente = solo rellena huecos; **reimportar = todo
-  `sense_canvis`**. Plantilla descargable (`lib/plantillaEntitats.ts`) **con desplegables** (B2, D9): en «Entitats»,
-  Rol, Forma jurídica, Tipus de receptor, Tipus d'activitat, Modalitats y Municipi apuntan a su columna de «Llistes»
-  (filas 2–302; **Comarca no**: sale del municipio); `lib/excelValidacions.ts` inserta `<dataValidations>` con una
-  feature de `write-excel-file`. Salirse de la lista **avisa, no bloquea**; en las de varios valores, ni avisa.
+- **Importador del panel** (`/equip/entitats/importa`, solo super_admin, `20270511100000`; §6.2): el navegador lee y
+  mapea por cabecera con alias de Airtable (`lib/importEntitats.ts`); la base revalida (`previsualitzar_importacio_entitats`
+  → `importar_entitats`): nace **`potencial`**, identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
+  débil = «dubtosa», existente = solo rellena huecos; **reimportar = todo `sense_canvis`**. Plantilla
+  (`lib/plantillaEntitats.ts`) **con desplegables** (B2, D9, `lib/excelValidacions.ts`): las listas menos Comarca; avisan, no bloquean.
+- **Exportación** (B3, D10, `20270518110000`; §6.3): «Exporta a Excel» en Entitats, **todo el equipo** (`tecnic` también),
+  las filas visibles. `exportar_entitats(p_ids)` da códigos por organización → `lib/exportEntitats.ts`: columnas y desplegables
+  de la plantilla, **notas vacías**, solo códigos conocidos y, detrás, «ID Redestina», «Data d'alta» y «Estat CRM» por papel,
+  **informativas** (P9; ignoradas a propósito hasta B4). **Exportar → reimportar = `sense_canvis`** (test de ida y vuelta).
 
 🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
 de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
@@ -373,7 +370,7 @@ Lo que manda hoy, en una línea cada uno:
   «Envia per correu» con «Inclou l'enllaç per signar».
 - **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
 - **Importa des d'Excel** (06-11, `ImportaEntitats`, super_admin): Fitxer → Revisió (estado por fila,
-  «dubtosa» con candidatos) → Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros
+  «dubtosa» con candidatos) → Resultat (CSV); «Exporta a Excel» (B3), todo el equipo. **Convenio único de col·laboració** por papel. Filtros
   comunes (`lib/filtres.ts`, `BarraFiltres`). Ficha de la organización con listas cerradas,
   `tipus_activitat`, contactos, NIF válido y único, razón social obligatoria, «afegir paper».
   Diagnòstic operatiu v2 y perfil de recepción; Pla de Prevenció como **expediente** (resto, `context/06ter`).
@@ -430,7 +427,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270518100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270518110000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -565,7 +562,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (77 vivas; la siguiente entrada nueva es la 173; los números no se renumeran ni
+**Deuda abierta (78 vivas; la siguiente entrada nueva es la 174; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -578,7 +575,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -590,10 +587,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.839 pruebas de Vitest en 80 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.854 pruebas de Vitest en 81 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.351/2.351 y 36 sin datos; producción 2.355/2.355 y 32 «Sin fallos de
+   **Referencia: clon 2.360/2.360 y 36 sin datos; producción 2.355/2.355 y 32 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

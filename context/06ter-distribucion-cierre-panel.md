@@ -2048,6 +2048,21 @@ para no confundirla con las notas internas del CRM. E2E `tests/e2e/importa-entit
 con las cabeceras de Airtable: 4 creadas + 1 sin cambios; reimportar = todo sin cambios; plantilla
 descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres pasos; limpia las `TEST-IMP`).
 
+### «Exporta a Excel» en Entitats (Plan 2, B3, 10-11-2026, `20270518110000`)
+
+Botón «Exporta a Excel» (`data-testid="el-exporta"`, icono `FileDown`) en la cabecera de `Entitats.tsx`, junto a
+«Correus amb consentiment». Lo ve **todo el equipo** (D10: `tecnic` incluido; «Importa des d'Excel» sigue siendo
+del super_admin). Exporta **las filas visibles** —filtros, `?rol=` y búsqueda aplicados, en el orden de la
+pantalla (primero las de prueba)—; si se ven todas, pide `null` (todas). Carga en paralelo
+`carregaExportacio()` (`lib/importacions.ts`, en páginas de 1.000 por el `max_rows` de PostgREST),
+`carregaTipusActivitat()` y `carregaMunicipis()`; compone el fichero con `blobExportacio()` y lo baja como
+`entitats-AAAA-MM-DD.xlsx` (`descarregarBlob`, nuevo en `lib/tancament.ts`, que ahora usa también el
+importador). Toasts: vacío, error, «Exportades N entitats» y, si pasan de 1.000, que el importador las acepta de
+1.000 en 1.000 (deuda 173). `llistesTerritori()` (en `lib/municipis.ts`) da comarcas y municipios para «Llistes»
+a la plantilla y a la exportación (antes, el cálculo vivía dentro de `ImportaEntitats`). Textos `el.export_excel*`
+y, para la hoja «Instruccions», `ex.*`. Formato del fichero y decisiones: `context/06` §6.3. E2E en
+`importa-entitats.e2e.ts` (exporta el `tecnic`, reimporta el super_admin).
+
 ### Revisión de la Taula mestra por la Fundació (09-11-2026, columna de Sebas)
 
 - **1.1 «Cada vez que pongo letra en sección me saca de sección»**: en «Nova entitat», `Seccio` estaba

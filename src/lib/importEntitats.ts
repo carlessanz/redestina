@@ -174,10 +174,24 @@ export const COLUMNES_PLANTILLA: readonly ColumnaPlantilla[] = [
     obligatoria: false, plantilla: true, multiple: true, etiquetaNota: 'Observacions', exemple: MARCA_EXEMPLE },
 ]
 
+/**
+ * Las columnas que la EXPORTACIÓN (Plan 2 B3, `lib/exportEntitats.ts`) añade detrás de las de la
+ * plantilla. En B3 son informativas: al reimportar se ignoran a propósito. B4 convertirá «ID
+ * Redestina» y «Data d'alta a l'organització» en columnas de `COLUMNES_PLANTILLA` (y las quitará de
+ * aquí); «Estat CRM» no se importa nunca (P9: el estado se cambia en la ficha).
+ */
+export const CAPCALERES_EXPORTACIO = {
+  redestina_id: 'ID Redestina',
+  data_alta: "Data d'alta a l'organització",
+  estat_crm_productor: 'Estat CRM (ofertant)',
+  estat_crm_entidad: 'Estat CRM (receptor)',
+} as const
+
 /** Cabeceras conocidas que se ignoran a propósito (no son una errata del fichero). */
 const IGNORADES_A_PROPOSIT = [
   // «Contactos» de Airtable es una lista de registros enlazados, no una persona.
   'Contactos', 'Provincia', 'Província', 'Provincia (from Municipio)', 'Coord', 'Coord 2', 'Codi', 'Código',
+  ...Object.values(CAPCALERES_EXPORTACIO),
 ]
 
 /** Valores que en el Excel quieren decir «no hay dato». */

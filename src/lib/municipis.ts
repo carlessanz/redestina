@@ -44,3 +44,15 @@ export function nomLlegible(nom: string): string {
 
 /** Sin acentos ni mayúsculas: «sant cugat» encuentra «Sant Cugat del Vallès». Vive en `cerca.ts`. */
 export const normalitza = senseAccents
+
+/**
+ * Comarcas y municipios para la hoja «Llistes» de los Excel de entidades (la plantilla del
+ * importador y la exportación, B3): los municipios con el nombre como se escribe («l'Ametlla…»,
+ * que el importador reconoce) pero ordenados por el oficial («Ametlla…, l'»), para que salgan en la
+ * A y no en la L.
+ */
+export function llistesTerritori(munis: readonly Municipi[]): { comarques: string[]; municipis: string[] } {
+  const comarques = [...new Set(munis.map((m) => m.comarca).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'ca'))
+  const municipis = [...new Set([...munis].sort((a, b) => a.nom.localeCompare(b.nom, 'ca')).map((m) => nomLlegible(m.nom)))]
+  return { comarques, municipis }
+}

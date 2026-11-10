@@ -1,9 +1,11 @@
-// Cliente de las dos RPC del importador de entidades (super_admin, migración 20270511100000).
+// Cliente de las dos RPC del importador de entidades (super_admin, migración 20270511100000) y de
+// la de la exportación (todo el equipo, 20270518110000).
 // Mismo contrato que el resto de `src/lib`: **nunca lanza**; devuelve `ok` y, si falla, el
 // código (`dades_invalides`, `massa_files`, `sense_permis`…) y el mensaje.
 
 import { supabase } from './supabase'
 import type { FilaContracte } from './importEntitats'
+import type { FilaExportacio } from './exportEntitats'
 import type { Previsualitzacio, ResultatImportacio } from '../types'
 
 export type RespostaRpc<T> =
@@ -52,5 +54,33 @@ export async function jaImportat(sha256: string): Promise<string | null> {
     return (data[0] as { creat_at: string }).creat_at
   } catch {
     return null
+  }
+}
+
+// ---------------------------------------------------------------------------
+// La exportación (Plan 2 B3, 10-11-2026): `exportar_entitats()`, todo el equipo.
+// ---------------------------------------------------------------------------
+
+/** Filas por petición: el `max_rows` de PostgREST (`config.toml`) corta en 1.000. */
+const PAGINA_EXPORTACIO = 1000
+
+/**
+ * Las organizaciones para la exportación a Excel (`ids` = las visibles; `null` = todas), en
+ * páginas de 1.000 para que el tope de PostgREST no corte la lista sin decir nada.
+ */
+export async function carregaExportacio(ids: string[] | null): Promise<RespostaRpc<FilaExportacio[]>> {
+  const out: FilaExportacio[] = []
+  try {
+    for (let desde = 0; desde < 100 * PAGINA_EXPORTACIO; desde += PAGINA_EXPORTACIO) {
+      const { data, error } = await supabase.rpc('exportar_entitats', { p_ids: ids })
+        .range(desde, desde + PAGINA_EXPORTACIO - 1)
+      if (error) return { ok: false, codi: codiDe(error), missatge: error.message ?? '' }
+      const pagina = (data ?? []) as FilaExportacio[]
+      out.push(...pagina)
+      if (pagina.length < PAGINA_EXPORTACIO) break
+    }
+    return { ok: true, dades: out }
+  } catch (e) {
+    return { ok: false, codi: null, missatge: e instanceof Error ? e.message : String(e) }
   }
 }

@@ -421,7 +421,11 @@ export function esborrarCostProducte(
 
 /** Descarga un texto como fichero. Sin dependencias: un blob y un `<a>` de un solo uso. */
 export function descarregarText(nom: string, contingut: string, mime: string) {
-  const blob = new Blob([contingut], { type: mime })
+  descarregarBlob(nom, new Blob([contingut], { type: mime }))
+}
+
+/** Descarga un fichero ya hecho (el Excel de la plantilla o de la exportación de entidades). */
+export function descarregarBlob(nom: string, blob: Blob) {
   const url = URL.createObjectURL(blob)
   const a = document.createElement('a')
   a.href = url

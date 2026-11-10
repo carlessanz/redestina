@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (Plan 2 B3, exportación a Excel, `20270518110000`): se abre la 173**: **78 vivas** y la siguiente entrada nueva es la 174.
 ⚠️ **10-11-2026 (Plan 2 B1, estado CRM, `20270518100000`): se abre la 172**: **77 vivas** y la siguiente entrada nueva es la 173.
 ⚠️ **09-11-2026 (Taula mestra, datos fiscales, `20270517100000`): se abre la 171**: **76 vivas** y la siguiente entrada nueva es la 172.
 ⚠️ **09-11-2026 (nombre de la Fundació desde el snapshot): se abre la 170**: **75 vivas** y la siguiente entrada nueva es la 171.
@@ -878,3 +879,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      (`NO_ES_MOSTRA`) ni lo mira `_shared/priorizacion.ts` (la exclusión es `activo`, derivado de `estat_crm`; el
      «No procedeix» pasó a `inactiu` en el backfill). La columna se conserva hasta que Carles autorice el `drop`
      (y con él, quitarla de `COLUMNES` en `tests/campsFitxa.test.ts`). Precio: una migración y un test.
+173. **La exportación a Excel puede pasar de 1.000 filas y el importador no las acepta de una vez** (10-11-2026,
+     Plan 2 B3, `20270518110000`). `exportar_entitats()` no tiene tope (el cliente pagina de 1.000 en 1.000 por el
+     `max_rows` de PostgREST), pero `importar_entitats()` acepta 1.000 filas por lote (`massa_files`, y el
+     `statement_timeout` de 8 s). Hoy no pasa (clon 731 organizaciones; producción, las de prueba) y la pantalla avisa
+     al exportar más de 1.000 («divideix-lo»). Si llega a pasar: partir el fichero en hojas o lotes de 1.000 en el
+     importador. Precio: medio día.

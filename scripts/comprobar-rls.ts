@@ -903,6 +903,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Plan 1, rebanada 1D (20270501500000): dar y quitar acceso es del equipo, y el estado de la
   // cuenta solo lo lee el equipo. Las dos del servidor no las ejecuta ninguna sesión.
   { tabla: "estat_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO veu l'estat d'accés d'una entitat" },
+  // Plan 2, B3 (20270518110000): la exportación a Excel es del equipo (también `tecnic`).
+  { tabla: "exportar_entitats", op: "rpc", esperado: "denegar", args: { p_ids: null }, descripcion: "NO exporta les entitats a Excel (és de l'equip)" },
   { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés a cap entitat" },
   { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
   { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -1591,6 +1593,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Plan 1, 1D (20270501500000): el técnico ve el estado de la cuenta, pero dar y quitar
     // acceso es de `pot_aprovar()` (crear una cuenta aprobada es aprobar un alta).
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
+    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
+    { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
     { tabla: "concedir_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_user: "00000000-0000-0000-0000-000000000000", p_email: "arnes@exemple.cat", p_per: null }, descripcion: "NO dona accés per la porta del servidor (només service_role)" },
     { tabla: "revertir_acces_org", op: "rpc", esperado: "denegar", args: { p_foto: {} }, descripcion: "NO reverteix accessos (només service_role)" },
@@ -1947,6 +1951,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "entidades", op: "insertar", esperado: "denegar", descripcion: "NO dona d'alta fitxes directament (només crear_entitat)" },
     // Plan 1, 1D (20270501500000): con un id inventado, 22023 `organitzacio_inexistent`.
     { tabla: "estat_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "veu l'estat d'accés d'una entitat (22023 si no existeix)" },
+    // Plan 2, B3 (20270518110000): todo el equipo exporta (D10), también `tecnic`.
+    { tabla: "exportar_entitats", op: "rpc", esperado: "permitir", args: { p_ids: null }, descripcion: "exporta les entitats a Excel (D10, tot l'equip)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
     // Plan 1, 1F (20270502100000): con ids inventados, 22023 (`organitzacio_inexistent`,
     // `nota_inexistent`): la guarda dejó pasar sin escribir ni borrar nada.
