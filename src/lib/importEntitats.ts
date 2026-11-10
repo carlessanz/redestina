@@ -10,7 +10,8 @@
 //     `importar_entitats()` (migración 20270511100000): CP con sus cinco cifras, teléfonos en
 //     E.164, correos extraídos del texto, la forma jurídica en su código, y lo que no tiene
 //     columna en la ficha, como líneas «Etiqueta: valor» de la nota.
-//   · La BASE revalida todo y decide la identidad (NIF → Airtable → clave sin NIF → candidatos):
+//   · La BASE revalida todo y decide la identidad (ID Redestina → NIF → Airtable → clave sin NIF →
+//     candidatos; B4, 20270519100000, y una existente se ACTUALIZA: D11):
 //     aquí no se decide si una fila es nueva o existente, ni se descarta nada por inválido.
 //
 // Lo que manda en el mapeo de columnas es `COLUMNES_PLANTILLA`: la cabecera de la plantilla
@@ -40,6 +41,7 @@ export type ClauContracte =
   | 'rols' | 'nom_comercial' | 'razon_social' | 'nif' | 'tipus_empresa' | 'tipus_activitat'
   | 'persona_contacte' | 'email' | 'email2' | 'telefon' | 'telefon2' | 'direccion' | 'codigo_postal'
   | 'municipi' | 'municipio_ine' | 'area_geografica' | 'tipo_receptor' | 'modalitats_interes' | 'airtable_id'
+  | 'redestina_id' | 'data_alta'
 /** Columnas sin sitio en la ficha: van a la nota como «Etiqueta: valor». */
 export type ClauNota =
   | 'carrec' | 'entitat' | 'registre_excedent' | 'web' | 'treballadors' | 'observacions'
@@ -70,6 +72,10 @@ export interface FilaContracte {
   tipo_receptor?: string
   modalitats_interes?: string[]
   airtable_id?: string
+  /** «ID Redestina» (B4): el `organizacion_id` que da la exportación; identifica antes que el NIF. */
+  redestina_id?: string
+  /** «Data d'alta a l'organització» (B4): `AAAA-MM-DD`, `D/M/AAAA` o solo el año (la base valida). */
+  data_alta?: string
   nota?: string
   decisio?: string
 }
@@ -172,17 +178,23 @@ export const COLUMNES_PLANTILLA: readonly ColumnaPlantilla[] = [
     obligatoria: false, plantilla: true, multiple: false, etiquetaNota: 'Signant del conveni', exemple: '' },
   { clau: 'observacions', capcalera: 'Observacions', alias: ['Observaciones', 'Comentari', 'Comentaris', 'Comentario', 'Comentarios', 'Notes', 'Nota', 'Notas'],
     obligatoria: false, plantilla: true, multiple: true, etiquetaNota: 'Observacions', exemple: MARCA_EXEMPLE },
+  // B4 (10-11-2026, D11): las dos que la exportación de B3 ya ponía en Z y AA, ahora importables.
+  // Van al final para no mover ninguna letra de la plantilla (los desplegables de B2). Sin
+  // `campFitxa`: los alias ya cubren las etiquetas de la ficha en los dos idiomas.
+  { clau: 'redestina_id', capcalera: 'ID Redestina', alias: ['Redestina ID', 'Id Redestina', 'ID de Redestina'],
+    obligatoria: false, plantilla: true, multiple: false, text: true, exemple: '' },
+  { clau: 'data_alta', capcalera: "Data d'alta a l'organització",
+    alias: ["Data d'alta", 'Fecha de alta', 'Fecha de alta en la organización', 'Alta'],
+    obligatoria: false, plantilla: true, multiple: false, text: true, exemple: '' },
 ]
 
 /**
  * Las columnas que la EXPORTACIÓN (Plan 2 B3, `lib/exportEntitats.ts`) añade detrás de las de la
- * plantilla. En B3 son informativas: al reimportar se ignoran a propósito. B4 convertirá «ID
- * Redestina» y «Data d'alta a l'organització» en columnas de `COLUMNES_PLANTILLA` (y las quitará de
- * aquí); «Estat CRM» no se importa nunca (P9: el estado se cambia en la ficha).
+ * plantilla: el estado CRM de cada papel. Son informativas y al reimportar se ignoran a propósito
+ * (P9: el estado se cambia en la ficha). «ID Redestina» y «Data d'alta a l'organització», que B3
+ * también ponía aquí, son desde B4 columnas de `COLUMNES_PLANTILLA`.
  */
 export const CAPCALERES_EXPORTACIO = {
-  redestina_id: 'ID Redestina',
-  data_alta: "Data d'alta a l'organització",
   estat_crm_productor: 'Estat CRM (ofertant)',
   estat_crm_entidad: 'Estat CRM (receptor)',
 } as const
@@ -267,6 +279,23 @@ export function valorCp(c: Cella): string | null {
   if (/^\d{4,5}$/.test(s)) return s.padStart(5, '0')
   const m = s.match(/(?:^|\D)(\d{5})(?:\D|$)/)
   return m ? m[1] : s
+}
+
+/** El día 0 de los seriales de Excel (30-12-1899), en milisegundos UTC. */
+const EPOCH_EXCEL = Date.UTC(1899, 11, 30)
+
+/**
+ * «Data d'alta a l'organització» (B4): una fecha de Excel → `AAAA-MM-DD` (UTC, como `valorText`);
+ * un entero entre 1900 y 2100 es un AÑO («2021», no un serial); un entero ≥ 20000 es un serial de
+ * Excel (una fecha guardada sin formato); el texto pasa tal cual: la base lo valida y avisa.
+ */
+export function valorData(c: Cella): string | null {
+  if (c instanceof Date) return valorText(c)
+  if (typeof c === 'number' && Number.isInteger(c)) {
+    if (c >= 1900 && c <= 2100) return String(c)
+    if (c >= 20000 && c < 2958466) return new Date(EPOCH_EXCEL + c * 86_400_000).toISOString().slice(0, 10)
+  }
+  return valorText(c)
 }
 
 // ---------------------------------------------------------------------------
@@ -656,6 +685,8 @@ export function normalitzaFila(fila: number, celles: readonly Cella[], mapa: Map
   posa('tipo_receptor', tipoReceptor)
   posa('modalitats_interes', modalitatsDeText(primer('modalitats_interes')))
   posa('airtable_id', primer('airtable_id'))
+  posa('redestina_id', primer('redestina_id')?.toLowerCase())
+  posa('data_alta', valorData(crua('data_alta')))
   posa('nota', linies.join('\n'))
 
   return {
@@ -731,13 +762,15 @@ export const CODIS_BASE = [
   'tipus_empresa_desconegut', 'tipus_activitat_desconegut', 'modalitat_desconeguda', 'sense_tipus_receptor',
   'tipus_receptor_desconegut', 'codi_postal_invalid', 'municipi_ine_desconegut', 'municipi_no_trobat',
   'area_desconeguda', 'area_no_coincideix', 'ref_externa_en_us', 'semblant_a_fila',
+  // B4 (20270519100000): «ID Redestina» y «Data d'alta a l'organització».
+  'id_redestina_invalid', 'id_redestina_inexistent', 'id_nif_contradictoris', 'data_alta_invalida', 'data_alta_nomes_any',
 ] as const
 
 /** Los errores de lote (22023) de las dos RPC. */
 export const ERRORS_LOT = ['dades_invalides', 'massa_files', 'fila_invalida', 'fila_repetida', 'sense_files'] as const
 
 /**
- * La columna real de un campo rellenado o en conflicto («entidades.telefono2») → la clave del
+ * La columna real de un campo escrito («omplira») («entidades.telefono2») → la clave del
  * contrato. Es el espejo de `importacio_camp()` de la migración.
  */
 export function campDeColumna(columna: string): string {
@@ -751,17 +784,56 @@ export function campDeColumna(columna: string): string {
   return mapa[c] ?? c
 }
 
-/** Los campos del contrato que pueden salir en «omplirà» y en los conflictos (`ie.camp_<x>`). */
+/** Los campos del contrato que pueden salir en los campos escritos y en `canvis[].camp` (`ie.camp_<x>`). */
 export const CAMPS_RESULTAT = [
   'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat', 'persona_contacte', 'email',
   'email2', 'telefon', 'telefon2', 'direccion', 'codigo_postal', 'municipi', 'area_geografica', 'tipo_receptor',
-  'modalitats_interes', 'nota',
+  'modalitats_interes', 'data_alta', 'nota',
 ] as const
 
 /** Los campos (sin repetir, en el orden del contrato) de una lista de columnas rellenadas. */
 export function campsOmplerts(columnes: readonly string[]): string[] {
   const set = new Set(columnes.map(campDeColumna))
   return CAMPS_RESULTAT.filter((c) => set.has(c))
+}
+
+/** Un cambio de `canvis` (B4) tal como lo usa la pantalla: el campo, el valor de antes y el nuevo. */
+export interface CanviCamp { camp: string; abans: string | null; despres: string | null }
+
+/**
+ * Los cambios sin repetir: una organización de doble rol da el mismo cambio dos veces (uno por
+ * ficha). Se agrupan por (campo, antes, después), en el orden en que llegan.
+ */
+export function agrupaCanvis<T extends CanviCamp>(canvis: readonly T[]): T[] {
+  const vistos = new Set<string>()
+  return canvis.filter((c) => {
+    const k = JSON.stringify([c.camp, c.abans, c.despres])
+    if (vistos.has(k)) return false
+    vistos.add(k)
+    return true
+  })
+}
+
+/** Los campos que cambian, sin repetir, en el orden del contrato (el resumen de la fila). */
+export function campsCanviats(canvis: readonly CanviCamp[]): string[] {
+  const set = new Set(canvis.map((c) => c.camp))
+  const coneguts: readonly string[] = CAMPS_RESULTAT
+  return [...coneguts.filter((c) => set.has(c)), ...[...set].filter((c) => !coneguts.includes(c))]
+}
+
+/** La primera línea con texto de un bloque (la nota se resume así en el informe). */
+export function primeraLinia(text: string | null): string {
+  return (text ?? '').split('\n').map((l) => l.trim()).find((l) => l !== '') ?? ''
+}
+
+/**
+ * Los cambios de una fila en una celda del informe: «camp: abans → després» separados por « | »
+ * (un hueco, «— → després»; la nota, «camp: +<primera línea>»). `nomCamp` da la etiqueta.
+ */
+export function textCanvisInforme(canvis: readonly CanviCamp[], nomCamp: (camp: string) => string): string {
+  return agrupaCanvis(canvis).map((c) => (c.camp === 'nota'
+    ? `${nomCamp(c.camp)}: +${primeraLinia(c.despres)}`
+    : `${nomCamp(c.camp)}: ${c.abans ?? '—'} → ${c.despres ?? '—'}`)).join(' | ')
 }
 
 // ---------------------------------------------------------------------------
@@ -788,13 +860,13 @@ export interface FilaInforme {
   accio: string
   organitzacio: string | null
   camps: string
-  conflictes: string
+  canvis: string
   avisos: string
   errors: string
   conveni: string
 }
 
-const COLUMNES_INFORME: (keyof FilaInforme)[] = ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'conflictes', 'avisos', 'errors', 'conveni']
+const COLUMNES_INFORME: (keyof FilaInforme)[] = ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'canvis', 'avisos', 'errors', 'conveni']
 
 /** El CSV del informe (con BOM, `;` y `\r\n`, para el Excel en español). */
 export function csvInforme(files: readonly FilaInforme[], capcaleres: Record<keyof FilaInforme, string>): string {

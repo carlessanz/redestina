@@ -8,6 +8,7 @@
 
 import { useEffect, useState } from 'react'
 import { useT } from '../../lib/i18n'
+import { dataCurta } from '../../lib/format'
 import { carregaMunicipis } from '../../lib/municipis'
 import { TIPUS_EMPRESA } from '../../lib/perfilReceptor'
 import { potEditar, type CampFitxa, type Veu } from '../../lib/campsFitxa'
@@ -74,8 +75,9 @@ export default function BlocCamps({
     const invalid = Boolean(errors[c.clau])
 
     if (c.edita === 'ningu') {
-      // Derivado (población, comarca): se enseña, no se teclea.
-      return <p id={id} className="text-sm font-medium">{v == null || v === '' ? '—' : String(v)}</p>
+      // Derivado o de sistema («Alta a la plataforma»): se enseña, no se teclea. Una fecha, dd/mm/aaaa.
+      const text = v == null || v === '' ? '—' : tp === 'data' ? dataCurta(String(v)) : String(v)
+      return <p id={id} className="text-sm font-medium tabular-nums">{text}</p>
     }
     if (tp === 'textarea') {
       return <Textarea id={id} name={c.clau} rows={3} value={(v as string) ?? ''} disabled={disabled}

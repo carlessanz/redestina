@@ -139,7 +139,8 @@ origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). `productor_ubicaciones`
 (lugares de recogida). Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
-convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` por trigger.
+convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
+l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
 
 **Estado de las fichas** (1A; **B1 `20270518100000`**): `estat_crm` (potencial · en_desenvolupament ·
 actiu · inactiu) **MANDA** y `activo = (estat_crm = 'actiu')` lo deriva `trg_fitxa_estat` (`update of
@@ -315,15 +316,18 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
   NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
   `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
-- **Importador del panel** (`/equip/entitats/importa`, solo super_admin, `20270511100000`; §6.2): el navegador lee y
-  mapea por cabecera con alias de Airtable (`lib/importEntitats.ts`); la base revalida (`previsualitzar_importacio_entitats`
-  → `importar_entitats`): nace **`potencial`**, identidad NIF → `ref_externa` (`AIRTABLE:`·`IMP:NIF:`·`IMP:<sha256>`),
-  débil = «dubtosa», existente = solo rellena huecos; **reimportar = todo `sense_canvis`**. Plantilla
-  (`lib/plantillaEntitats.ts`) **con desplegables** (B2, D9, `lib/excelValidacions.ts`): las listas menos Comarca; avisan, no bloquean.
-- **Exportación** (B3, D10, `20270518110000`; §6.3): «Exporta a Excel» en Entitats, **todo el equipo** (`tecnic` también),
-  las filas visibles. `exportar_entitats(p_ids)` da códigos por organización → `lib/exportEntitats.ts`: columnas y desplegables
-  de la plantilla, **notas vacías**, solo códigos conocidos y, detrás, «ID Redestina», «Data d'alta» y «Estat CRM» por papel,
-  **informativas** (P9; ignoradas a propósito hasta B4). **Exportar → reimportar = `sense_canvis`** (test de ida y vuelta).
+- **Importador del panel** (`/equip/entitats/importa`, super_admin; `20270511100000` + B4 `20270519100000`; §6.2, §6.4):
+  el navegador mapea por cabecera (`lib/importEntitats.ts`); la base revalida (`previsualitzar_importacio_entitats` →
+  `importar_entitats`). Nueva = **`potencial`**. 🔴 **D11 (B4): idempotente y ACTUALIZA** — identidad **ID Redestina →
+  NIF → `AIRTABLE:` → hash `IMP:`** (débil = «dubtosa»); con ID o NIF existente nunca crea; **celda vacía no toca, valor
+  distinto sobrescribe**, salvo si es lo que ya vale la organización (`entitat_valors_org`: no pisa ni rellena ninguna
+  ficha, P-B4-2); la Revisió enseña `canvis` (`abans → després`), guardados en `importacions_entitats_files.canvis`. ID
+  inexistente/contradictorio con el NIF = error de fila. Nunca toca `activo`, `estat_crm`, `es_test`, `ref_externa`.
+  «Data d'alta» `dd/mm/aaaa`·ISO·**solo año** (ofertant: 1 de enero + aviso, P-B4-1). Plantilla con desplegables (B2).
+- **Exportación** (B3, `20270518110000`; §6.3): «Exporta a Excel», todo el equipo, filas visibles; `exportar_entitats`
+  (sobre `entitat_valors_org`) → `lib/exportEntitats.ts`: columnas de la plantilla (con «ID Redestina» y «Data d'alta»,
+  Z·AA), notas vacías, solo valores que el importador acepta; «Estat CRM» informativo (P9). **Exportar → reimportar =
+  `sense_canvis`** (clon: 731/731).
 
 🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
 de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
@@ -369,11 +373,9 @@ Lo que manda hoy, en una línea cada uno:
   «Pendent de tu», Aprovacions › «Signatures per tancar» (super_admin), Documents › «Signatures»;
   «Envia per correu» con «Inclou l'enllaç per signar».
 - **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
-- **Importa des d'Excel** (06-11, `ImportaEntitats`, super_admin): Fitxer → Revisió (estado por fila,
-  «dubtosa» con candidatos) → Resultat (CSV); «Exporta a Excel» (B3), todo el equipo. **Convenio único de col·laboració** por papel. Filtros
-  comunes (`lib/filtres.ts`, `BarraFiltres`). Ficha de la organización con listas cerradas,
-  `tipus_activitat`, contactos, NIF válido y único, razón social obligatoria, «afegir paper».
-  Diagnòstic operatiu v2 y perfil de recepción; Pla de Prevenció como **expediente** (resto, `context/06ter`).
+- **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió («Canviarà» por fila, «dubtosa» con candidatos) →
+  Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
+  operatiu v2, perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -427,7 +429,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270518110000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270519100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -587,10 +589,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.854 pruebas de Vitest en 81 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.860 pruebas de Vitest en 81 ficheros (1 saltada a propósito) + 39 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.360/2.360 y 36 sin datos; producción 2.364/2.364 y 32 «Sin fallos de
+   **Referencia: clon 2.385/2.385 y 38 sin datos; producción 2.364/2.364 y 32 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

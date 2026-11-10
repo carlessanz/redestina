@@ -575,6 +575,22 @@ const IMPORTACIO_INTERNES: Check[] = [
     args: { p_f: {}, p_munis: {} },
     descripcion: "NO normalitza files directament (intern)",
   },
+  // Plan 2 B4 (20270519100000): la comparación que sobrescribe y los filtros de la exportación,
+  // internos como el resto.
+  {
+    tabla: "importacio_compara",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_taula: "productores", p_actual: {}, p_desitjat: {}, p_protegits: [] },
+    descripcion: "NO compara/sobreescriu una fitxa directament (intern, B4)",
+  },
+  {
+    tabla: "importacio_si_correu",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p: "a@b.cat" },
+    descripcion: "NO crida el filtre de correus de l'exportacio (intern, B4)",
+  },
   { tabla: "importacions_entitats", op: "insertar", esperado: "denegar", descripcion: "NO escriu el registre d'importacions directament" },
   { tabla: "importacions_entitats_files", op: "insertar", esperado: "denegar", descripcion: "NO escriu les files del registre directament" },
 ];
@@ -586,6 +602,7 @@ const IMPORTACIO_EXTERN: Check[] = [
   { tabla: "importar_entitats", op: "rpc", esperado: "denegar", args: { p_fitxer: {}, p_files: [] }, descripcion: "NO importa entitats (es del super_admin)" },
   { tabla: "importacions_entitats", op: "leer", esperado: "denegar", descripcion: "NO veu el registre d'importacions (0 files)" },
   { tabla: "importacions_entitats_files", op: "leer", esperado: "denegar", descripcion: "NO veu les files importades (0 files)" },
+  { tabla: "importacions_entitats_files", op: "leer", esperado: "denegar", columnas: "fila, canvis", descripcion: "NO veu els canvis (abans/després) de cap importacio (B4)" },
 ];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
@@ -1934,6 +1951,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "importar_entitats", op: "rpc", esperado: "denegar", args: { p_fitxer: {}, p_files: [] }, descripcion: "NO importa entitats (es del super_admin)" },
     { tabla: "importacions_entitats", op: "leer", esperado: "permitir", descripcion: "veu el registre d'importacions", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
     { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", descripcion: "veu les files importades", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
+    { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", columnas: "fila, canvis", descripcion: "veu els canvis (abans/després) de les importacions (B4)", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
   ],
   super_admin: [
     // Plan 1, 1A (20270501100000): con ids inventados la guarda de rol deja pasar y corta la
@@ -2520,6 +2538,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "importar_entitats", op: "rpc", esperado: "permitir", args: { p_fitxer: {}, p_files: [] }, descripcion: "pot importar entitats (22023 dades_invalides)" },
     { tabla: "importacions_entitats", op: "leer", esperado: "permitir", descripcion: "veu el registre d'importacions", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
     { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", descripcion: "veu les files importades", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
+    { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", columnas: "fila, canvis", descripcion: "veu els canvis (abans/després) de les importacions (B4)", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
   ],
   productor: [
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },

@@ -15,10 +15,11 @@ import writeXlsxFile from 'write-excel-file/node'
 import { lletraColumna } from '../src/lib/excelValidacions'
 import { DICTS } from '../src/lib/i18n'
 import {
-  activitatsDe, campDeColumna, campsOmplerts, CAMPS_RESULTAT, cellaCsv, clauCodi, CODIS_BASE, COLUMNES_PLANTILLA,
-  csvInforme, ERRORS_LOT, esExemple, filesPerEnviar, filesSensePaper, llegeixCsv, llegeixFulla, localitzaCapcalera,
-  mapaCapcaleres, MARCA_EXEMPLE, modalitatsDeText, normalitzaFila, normalitzaFulla, proposaRols, rolsDeText, sha256Hex,
-  telefonsDe, tipusEmpresaDe, tipusReceptorDe, valorCp, valorText, type ActivitatCataleg, type Cella,
+  activitatsDe, agrupaCanvis, campDeColumna, campsCanviats, campsOmplerts, CAMPS_RESULTAT, CAPCALERES_EXPORTACIO, cellaCsv,
+  clauCodi, CODIS_BASE, COLUMNES_PLANTILLA, csvInforme, ERRORS_LOT, esExemple, filesPerEnviar, filesSensePaper, llegeixCsv,
+  llegeixFulla, localitzaCapcalera, mapaCapcaleres, MARCA_EXEMPLE, modalitatsDeText, normalitzaFila, normalitzaFulla,
+  primeraLinia, proposaRols, rolsDeText, sha256Hex, telefonsDe, textCanvisInforme, tipusEmpresaDe, tipusReceptorDe, valorCp,
+  valorData, valorText, type ActivitatCataleg, type Cella,
 } from '../src/lib/importEntitats'
 import {
   COLUMNES_DE_PLANTILLA, dadesPlantilla, featurePlantilla, FILES_AMB_DESPLEGABLE, fullesPlantilla, LLISTES, LLISTES_MULTIPLES,
@@ -84,6 +85,20 @@ describe('cabeceras', () => {
     expect(m.reconegudes.map((r) => r.clau)).toEqual(['nom_comercial', 'tipus_activitat', 'codigo_postal'])
   })
 
+  it('B4: «ID Redestina» y «Data d\'alta a l\'organització» se importan (con sus alias); «Estat CRM» se ignora a propósito', () => {
+    const m = mapaCapcaleres([
+      'Nom comercial', 'ID Redestina', "Data d'alta a l'organització", ...Object.values(CAPCALERES_EXPORTACIO),
+    ])
+    expect(m.reconegudes.map((r) => r.clau)).toEqual(['nom_comercial', 'redestina_id', 'data_alta'])
+    expect(m.ignorades.map((i) => [i.capcalera, i.motiu])).toEqual([
+      ['Estat CRM (ofertant)', 'a_proposit'], ['Estat CRM (receptor)', 'a_proposit'],
+    ])
+    for (const h of ['Redestina ID', 'id redestina', 'ID de Redestina']) expect(mapaCapcaleres([h]).reconegudes[0]?.clau, h).toBe('redestina_id')
+    for (const h of ["Data d'alta", 'Data d’alta', 'Fecha de alta', 'Fecha de alta en la organización', 'Alta', 'Fecha de alta en la organizacion']) {
+      expect(mapaCapcaleres([h]).reconegudes[0]?.clau, h).toBe('data_alta')
+    }
+  })
+
   it('ningún alias choca con otro (el índice se construye sin lanzar)', () => {
     const totes = COLUMNES_PLANTILLA.flatMap((c) => [c.capcalera, ...c.alias])
     expect(mapaCapcaleres(totes).ignorades.filter((i) => i.motiu !== 'repetida')).toEqual([])
@@ -127,6 +142,25 @@ describe('valores de celda', () => {
     for (const v of ['No disponible', 'no localizada', ' - ', '', null, undefined, 'N/A']) expect(valorText(v)).toBeNull()
     expect(valorText(937620135)).toBe('937620135')
     expect(valorText(new Date(Date.UTC(2025, 2, 12)))).toBe('2025-03-12')
+  })
+
+  it('B4 · la fecha de alta: fecha de Excel, año, serial o texto tal cual', () => {
+    expect(valorData(new Date(Date.UTC(2019, 2, 15)))).toBe('2019-03-15')
+    // Un año, escrito o como número: NO es un serial de Excel.
+    expect(valorData('2021')).toBe('2021')
+    expect(valorData(2021)).toBe('2021')
+    expect(valorData(1900)).toBe('1900')
+    expect(valorData(2100)).toBe('2100')
+    // Un serial de Excel (una fecha guardada sin formato): 45000 = 15-03-2023; 43539 = 15-03-2019.
+    expect(valorData(45000)).toBe('2023-03-15')
+    expect(valorData(43539)).toBe('2019-03-15')
+    // El texto pasa tal cual: la base lo entiende o avisa (`data_alta_invalida`).
+    expect(valorData('15/03/2019')).toBe('15/03/2019')
+    expect(valorData('2019-03-15')).toBe('2019-03-15')
+    expect(valorData('fa molts anys')).toBe('fa molts anys')
+    expect(valorData(12.5)).toBe('12.5')
+    expect(valorData(150)).toBe('150')
+    for (const v of [null, undefined, '', '  ', 'No disponible']) expect(valorData(v)).toBeNull()
   })
 
   it('el código postal recupera el cero', () => {
@@ -260,6 +294,16 @@ describe('normalitzaFila (Excel de Airtable)', () => {
     expect(f.avisosLocals).toContain('nom_de_rao')
   })
 
+  it('B4 · «ID Redestina» (en minúsculas) y la fecha de alta van al contrato; vacías, no', () => {
+    const mp = mapaCapcaleres(['Nom comercial', 'Rol', 'ID Redestina', "Data d'alta a l'organització"])
+    const id = '1111AAAA-1111-4111-8111-111111111111'
+    const a = normalitzaFila(2, ['TEST-IMP Id', 'Ofertant', ` ${id} `, new Date(Date.UTC(2020, 4, 4))], mp, ctx)
+    expect(a.contracte).toEqual({ fila: 2, nom_comercial: 'TEST-IMP Id', redestina_id: id.toLowerCase(), data_alta: '2020-05-04' })
+    expect(a.avisosLocals).toEqual([])
+    expect(normalitzaFila(3, ['TEST-IMP Any', 'Ofertant', null, 2018], mp, ctx).contracte.data_alta).toBe('2018')
+    expect(normalitzaFila(4, ['TEST-IMP Text', 'Ofertant', '', '4/7/2017'], mp, ctx).contracte).toEqual({ fila: 4, nom_comercial: 'TEST-IMP Text', data_alta: '4/7/2017' })
+  })
+
   it('el conveni signat y quien lo firmó: a la nota y al resultado', () => {
     const mp = mapaCapcaleres(['Nom comercial', 'Rol', 'Conveni signat (data)', 'Signant del conveni'])
     const f = normalitzaFila(2, ['TEST-IMP Conv', 'Receptor', new Date(Date.UTC(2026, 0, 15)), 'Joan Prova'], mp, ctx)
@@ -300,16 +344,43 @@ describe('lo que contesta la base', () => {
     expect(campDeColumna('entidades.telefono2')).toBe('telefon2')
     expect(campDeColumna('entidades.comentarios')).toBe('nota')
     expect(campsOmplerts(['productores.comentario', 'entidades.email', 'productores.email'])).toEqual(['email', 'nota'])
+    expect(campsOmplerts(['entidades.data_alta', 'productores.area_geografica'])).toEqual(['area_geografica', 'data_alta'])
+  })
+
+  it('B4 · los cambios de doble rol (uno por ficha) salen una vez; el resumen, por campo', () => {
+    const canvis = [
+      { taula: 'productores', columna: 'phone', camp: 'telefon', abans: '34600000000', despres: '34611111111' },
+      { taula: 'productores', columna: 'data_alta', camp: 'data_alta', abans: null, despres: '15/03/2019' },
+      { taula: 'entidades', columna: 'telefono', camp: 'telefon', abans: '34600000000', despres: '34611111111' },
+      // La otra ficha decía otra cosa: es otro cambio (mismo campo, otro «antes»).
+      { taula: 'entidades', columna: 'data_alta', camp: 'data_alta', abans: '2018', despres: '15/03/2019' },
+      { taula: 'productores', columna: 'comentario', camp: 'nota', abans: null, despres: '\nImportat el 10/11/2026\nWeb: x.invalid' },
+    ]
+    expect(agrupaCanvis(canvis).map((c) => `${c.taula}.${c.columna}`)).toEqual([
+      'productores.phone', 'productores.data_alta', 'entidades.data_alta', 'productores.comentario',
+    ])
+    expect(campsCanviats(canvis)).toEqual(['telefon', 'data_alta', 'nota'])
+    expect(primeraLinia('\n  \nImportat el 10/11/2026\nWeb: x')).toBe('Importat el 10/11/2026')
+    expect(primeraLinia(null)).toBe('')
+    expect(textCanvisInforme(canvis, (c) => c.toUpperCase())).toBe(
+      'TELEFON: 34600000000 → 34611111111 | DATA_ALTA: — → 15/03/2019 | DATA_ALTA: 2018 → 15/03/2019 | NOTA: +Importat el 10/11/2026',
+    )
+    expect(textCanvisInforme([], (c) => c)).toBe('')
   })
 
   it('el informe protege de fórmulas', () => {
     expect(cellaCsv('=HYPERLINK("x")')).toBe('"\'=HYPERLINK(""x"")"')
     expect(cellaCsv('-3')).toBe("'-3")
     expect(cellaCsv(-3)).toBe('-3')
-    const csv = csvInforme([{ fila: 2, nom: '@Cal', nif: null, accio: 'Creada', organitzacio: null, camps: '', conflictes: '', avisos: 'a;b', errors: '', conveni: '' }],
-      { fila: 'Fila', nom: 'Nom', nif: 'NIF', accio: 'A', organitzacio: 'O', camps: 'C', conflictes: 'X', avisos: 'Av', errors: 'E', conveni: 'Cv' })
-    expect(csv.startsWith('﻿Fila;Nom;')).toBe(true)
+    const csv = csvInforme([
+      { fila: 2, nom: '@Cal', nif: null, accio: 'Creada', organitzacio: null, camps: '', canvis: '', avisos: 'a;b', errors: '', conveni: '' },
+      // Un cambio cuyo valor nuevo empieza por «=» (lo trae el Excel de otra persona): no es una fórmula.
+      { fila: 3, nom: 'Cal Pep', nif: null, accio: 'Actualitzada', organitzacio: null, camps: 'nota',
+        canvis: textCanvisInforme([{ camp: 'nota', abans: null, despres: '=1+1' }], () => '=nota'), avisos: '', errors: '', conveni: '' },
+    ], { fila: 'Fila', nom: 'Nom', nif: 'NIF', accio: 'A', organitzacio: 'O', camps: 'C', canvis: 'Canvis', avisos: 'Av', errors: 'E', conveni: 'Cv' })
+    expect(csv.startsWith('﻿Fila;Nom;NIF;A;O;C;Canvis;Av;E;Cv\r\n')).toBe(true)
     expect(csv).toContain("2;'@Cal;;Creada;;;;\"a;b\";;")
+    expect(csv).toContain("3;Cal Pep;;Actualitzada;;nota;'=nota: +=1+1;;;")
   })
 })
 
@@ -326,6 +397,10 @@ describe('la plantilla', () => {
 
   it('se reconoce entera al volver a subirla, y la fila de ejemplo se salta', () => {
     const files = entitats.data.map((r) => celles(r as unknown[]))
+    // B4: 27 columnas; «ID Redestina» y la fecha de alta, al final (Z y AA), donde ya las ponía la exportación.
+    expect(files[0]).toHaveLength(27)
+    expect(lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'redestina_id'))).toBe('Z')
+    expect(lletraColumna(COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'data_alta'))).toBe('AA')
     const m = mapaCapcaleres(files[0])
     expect(m.ignorades).toEqual([])
     expect(m.falten).toEqual([])
@@ -375,6 +450,8 @@ describe('la plantilla', () => {
     const ambLlista = COLUMNES_DE_PLANTILLA.filter((c) => c.llista && !SENSE_DESPLEGABLE.includes(c.llista))
     expect(v.map((x) => COLUMNES_DE_PLANTILLA[x.columna].clau)).toEqual(ambLlista.map((c) => c.clau))
     expect(ambLlista.map((c) => c.clau)).toEqual(['rols', 'tipus_empresa', 'tipo_receptor', 'tipus_activitat', 'modalitats_interes', 'municipi'])
+    // B4 añadió columnas al FINAL: las de lista siguen en las mismas letras que en B2.
+    expect(v.map((x) => lletraColumna(x.columna))).toEqual(['A', 'E', 'F', 'G', 'H', 'Q'])
     expect(v.some((x) => COLUMNES_DE_PLANTILLA[x.columna].llista === 'comarca')).toBe(false)
     for (const x of v) {
       const l = COLUMNES_DE_PLANTILLA[x.columna].llista!
@@ -465,6 +542,10 @@ describe('las claves compuestas existen en los dos idiomas', () => {
     ...CAMPS_RESULTAT.map((c) => `ie.camp_${c}`),
     ...['telefons_a_nota', 'telefon_no_reconegut', 'correus_a_nota', 'correu_no_reconegut', 'forma_juridica_a_nota',
       'activitat_a_nota', 'rol_desconegut', 'nom_de_rao'].map((c) => `ie.al_${c}`),
+    // B4: la revisión y el resultado de los cambios, y por qué se reconoció la fila.
+    'ie.canviara', 'ie.canviat', 'ie.canvi_nota', 'ie.canvi_nota_fet', 'ie.actualitzara_n', 'ie.actualitzara_n_1', 'ie.inf_canvis',
+    'ie.falta_redestina_id', 'ie.falta_data_alta',
+    ...['id', 'nif', 'airtable', 'ref', 'decisio'].map((p) => `ie.per_${p}`),
   ]
   it.each(['ca', 'es'] as const)('%s', (lang) => {
     expect(claus.filter((k) => DICTS[lang][k] === undefined)).toEqual([])

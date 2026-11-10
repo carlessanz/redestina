@@ -564,6 +564,13 @@ Arnés: `crear_entitat` denegado a las siete cuentas externas (`DOCUMENTAL_EXTER
   importación sobre la misma base. `volatile` (crean tablas temporales con índice btree y GIN de
   trigramas): **siempre por POST**, nunca `{get:true}`. Medido en el clon (~736 fichas): 1.000 filas en
   0,29 s (previsualizar), 0,43 s (importar) y 0,44 s (reimportar), dentro del `statement_timeout` de 8 s.
+  **B4 (`20270519100000`)**: la importación **actualiza** (celda vacía no toca, valor distinto sobrescribe salvo lo
+  que ya vale la organización) e identifica primero por «ID Redestina»; cada fila devuelve `canvis` y el registro
+  los guarda (`importacions_entitats_files.canvis`, lectura del equipo). Internas nuevas sin EXECUTE para nadie:
+  `entitat_valors_org(productores, entidades)` (también la usa `exportar_entitats`), `importacio_si_correu`,
+  `importacio_si_telefon`; `importacio_compara` pasa a 4 argumentos (`p_protegits`). El arnés comprueba que
+  `importacio_compara` e `importacio_si_correu` dan 42501 a todos y que `canvis` solo lo lee el equipo. Detalle en
+  `context/06` §6.4.
   - Errores de lote (`22023`): `dades_invalides`, `massa_files` (>1.000), `fila_invalida`, `fila_repetida`,
     y en `importar_entitats` además `sense_files` y `dades_invalides` si `p_fitxer` no trae `nom` (≤255) y
     `sha256` (64 hex).

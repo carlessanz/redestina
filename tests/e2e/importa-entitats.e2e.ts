@@ -15,6 +15,12 @@
 // de esta pasada desde Entitats (formato de la plantilla, desplegables, «ID Redestina»); el
 // super_admin vuelve a subir ese fichero tal cual y todo sale «sense canvis».
 //
+// Plan 2 B4 (10-11-2026): la importación ACTUALIZA (D11). Sobre ese fichero exportado se cambian dos
+// celdas (la persona de contacto de la fila con NIF y la dirección de la fila sin NIF, que se identifica
+// por «ID Redestina») y se vacía el correo de la primera: la Revisió enseña exactamente esos dos
+// cambios, la base los aplica, la celda vacía no borra nada y subirlo otra vez = todo «sense canvis».
+// Y una fila con un NIF que ya existe y otro nombre actualiza esa ficha: nunca crea otra.
+//
 // Capturas: con `E2E_CAPTURES=<carpeta>`, de los tres pasos a 360 px y en escritorio.
 
 import { expect, test } from '@playwright/test'
@@ -44,6 +50,7 @@ let nifNou = ''
 let telNou = ''
 let fixNou = ''
 let exportat = ''
+let modificat = ''
 
 const LLETRES = 'TRWAGMYFPDXBNJZSQVHLCKE'
 const enUs = (col: string, v: string) => sql(`select count(*) from (
@@ -118,7 +125,8 @@ test.afterAll(() => {
   if (!dir) return
   neteja()
   // Y el registro de los lotes de esta pasada (las fichas ya no están: sus filas quedaron sin ficha).
-  sql(`delete from importacions_entitats where fitxer_nom in ('airtable-${marca}.xlsx', 'exportacio-${marca}.xlsx')`)
+  sql(`delete from importacions_entitats where fitxer_nom in ('airtable-${marca}.xlsx', 'exportacio-${marca}.xlsx',
+      'modificat-${marca}.xlsx', 'nif-existent-${marca}.xlsx')`)
   rmSync(dir, { recursive: true, force: true })
 })
 
@@ -267,7 +275,8 @@ test('la plantilla descarregada, pujada tal qual, es reconeix sencera', async ({
   await puja(page, cami)
   await expect(page.getByTestId('ie-falten')).toHaveCount(0)
   await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(0)
-  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(25)
+  // B4: + «ID Redestina» y «Data d'alta a l'organització» (Z y AA).
+  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(27)
   // Solo trae la fila de ejemplo, que se salta.
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^0 /)
 })
@@ -319,10 +328,11 @@ test('B3: el fitxer exportat, pujat tal qual pel super_admin, surt tot «sense c
   await puja(page, exportat)
   await expect(page.getByTestId('ie-falten')).toHaveCount(0)
   await expect(page.getByTestId('ie-nfiles')).toHaveText(/^4 /)
-  // Las informativas se ignoran a propósito; las 25 de la plantilla se reconocen.
-  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(25)
-  await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(4)
-  await expect(page.getByTestId('ie-ignorades')).toContainText('ID Redestina')
+  // Desde B4, «ID Redestina» y la fecha de alta se importan (27 reconocidas); solo las dos de
+  // «Estat CRM» se ignoran a propósito (P9).
+  await expect(page.getByTestId('ie-reconegudes').locator('li')).toHaveCount(27)
+  await expect(page.getByTestId('ie-ignorades').locator('li')).toHaveCount(2)
+  await expect(page.getByTestId('ie-ignorades')).toContainText('Estat CRM')
   await page.getByTestId('ie-continua').click()
   await expect(page.getByTestId('ie-pas2')).toBeVisible()
   await expect(page.getByTestId('ie-fila')).toHaveCount(4, { timeout: 20_000 })
@@ -337,4 +347,106 @@ test('B3: el fitxer exportat, pujat tal qual pel super_admin, surt tot «sense c
   expect(sql(`select md5(string_agg(t, '|' order by t)) from (
       select row_to_json(p)::text as t from productores p where empresa like 'TEST-IMP % ${marca}'
       union all select row_to_json(e)::text from entidades e where nombre like 'TEST-IMP % ${marca}') x`)).toBe(abans)
+})
+
+/** Los cambios que la Revisió enseña de una fila: `camp` de cada uno. */
+async function canvisDe(page: Page, n: number): Promise<string[]> {
+  return page.locator(`[data-testid="ie-canvis"][data-fila="${n}"] [data-testid="ie-canvi"]`)
+    .evaluateAll((els) => els.map((e) => e.getAttribute('data-camp') ?? ''))
+}
+
+test('B4: el fitxer exportat amb dues cel·les canviades → la Revisió n\'ensenya exactament dues, la base les aplica i una cel·la buida no esborra res', async ({ page }) => {
+  test.skip(!exportat, 'Cal la prova d\'exportació (B3)')
+  const [entitats] = await readXlsxFile(exportat)
+  const cap = entitats.data[0].map(String)
+  const col = (h: string) => { const i = cap.indexOf(h); expect(i, h).toBeGreaterThanOrEqual(0); return i }
+  const iNom = col('Nom comercial'), iPers = col('Persona de contacte'), iAdr = col('Adreça'), iCorreu = col('Correu')
+  col('ID Redestina')
+  const rows = entitats.data.map((r) => [...r])
+  const iHort = rows.findIndex((r) => r[iNom] === `TEST-IMP Hort ${marca}`)
+  const iMenj = rows.findIndex((r) => r[iNom] === `TEST-IMP Menjador ${marca}`)
+  expect(iHort).toBeGreaterThan(0)
+  expect(iMenj).toBeGreaterThan(0)
+  expect(rows[iHort][iCorreu]).toBe(`hort-${marca}@exemple.invalid`)
+  rows[iHort][iPers] = 'Berta Canviada'          // canvi 1 (fila amb NIF)
+  rows[iHort][iCorreu] = null                    // buida: no ha d'esborrar el correu
+  rows[iMenj][iAdr] = 'Carrer Nou, 7'            // canvi 2 (fila sense NIF: per «ID Redestina»)
+  modificat = join(dir, `modificat-${marca}.xlsx`)
+  const cella = (v: unknown) => v instanceof Date ? { value: v, type: Date, format: 'dd/mm/yyyy' }
+    : v === null || v === undefined ? null : { value: String(v), type: String }
+  await writeXlsxFile([{ sheet: 'Entitats', data: rows.map((r) => r.map(cella)) }]).toFile(modificat)
+  const filaHort = iHort + 1 // número de fila del Excel (cabecera = 1)
+  const filaMenj = iMenj + 1
+
+  await entra(page, 'superadmin')
+  await page.goto('/equip/entitats/importa')
+  await puja(page, modificat)
+  await page.getByTestId('ie-continua').click()
+  await expect(page.getByTestId('ie-pas2')).toBeVisible()
+  await expect(page.getByTestId('ie-fila')).toHaveCount(4, { timeout: 20_000 })
+  await expect(page.getByTestId('ie-importa')).toBeEnabled({ timeout: 20_000 })
+  for (const f of await page.getByTestId('ie-fila').all()) await expect(f).toHaveAttribute('data-estat', 'existent')
+  // Exactamente los dos cambios, cada uno en su fila; la celda vacía no aparece.
+  await expect.poll(() => canvisDe(page, filaHort)).toEqual(['persona_contacte'])
+  await expect.poll(() => canvisDe(page, filaMenj)).toEqual(['direccion'])
+  await expect(page.locator('[data-testid="ie-canvi"]')).toHaveCount(2)
+  await expect(fila(page, filaHort)).toHaveAttribute('data-accio', 'actualitzar')
+  await expect(fila(page, filaMenj)).toHaveAttribute('data-accio', 'actualitzar')
+  await mesura(page, 'pas2-canvis')
+
+  await importa(page)
+  await expect(page.getByTestId('ie-xifra-actualitzades')).toContainText('2')
+  await expect(page.getByTestId('ie-xifra-sense_canvis')).toContainText('2')
+  await expect(page.getByTestId('ie-xifra-creades')).toContainText('0')
+  await expect(page.getByTestId('ie-xifra-errors')).toContainText('0')
+  expect(sql(`select name || '|' || coalesce(email, '<null>') from productores where empresa = 'TEST-IMP Hort ${marca}'`))
+    .toBe(`Berta Canviada|hort-${marca}@exemple.invalid`)
+  expect(sql(`select direccion from entidades where nombre = 'TEST-IMP Menjador ${marca}'`)).toBe('Carrer Nou, 7')
+  // El registro guarda el valor anterior.
+  expect(sql(`select string_agg(c->>'camp' || ':' || coalesce(c->>'abans', '-'), ',' order by c->>'camp')
+      from importacions_entitats i join importacions_entitats_files f on f.importacio_id = i.id, jsonb_array_elements(f.canvis) c
+     where i.fitxer_nom = 'modificat-${marca}.xlsx'`)).toBe('direccion:-,persona_contacte:Anna Prova')
+})
+
+test('B4: el mateix fitxer modificat una altra vegada → tot «sense canvis», res es toca', async ({ page }) => {
+  test.skip(!modificat, 'Cal la prova anterior')
+  const abans = sql(`select md5(string_agg(t, '|' order by t)) from (
+      select row_to_json(p)::text as t from productores p where empresa like 'TEST-IMP % ${marca}'
+      union all select row_to_json(e)::text from entidades e where nombre like 'TEST-IMP % ${marca}') x`)
+  await entra(page, 'superadmin')
+  await page.goto('/equip/entitats/importa')
+  await puja(page, modificat)
+  await page.getByTestId('ie-continua').click()
+  await expect(page.getByTestId('ie-fila')).toHaveCount(4, { timeout: 20_000 })
+  await expect(page.getByTestId('ie-importa')).toBeEnabled({ timeout: 20_000 })
+  await expect(page.locator('[data-testid="ie-canvi"]')).toHaveCount(0)
+  await importa(page)
+  await expect(page.getByTestId('ie-xifra-sense_canvis')).toContainText('4')
+  await expect(page.getByTestId('ie-xifra-actualitzades')).toContainText('0')
+  expect(sql(`select md5(string_agg(t, '|' order by t)) from (
+      select row_to_json(p)::text as t from productores p where empresa like 'TEST-IMP % ${marca}'
+      union all select row_to_json(e)::text from entidades e where nombre like 'TEST-IMP % ${marca}') x`)).toBe(abans)
+})
+
+test('B4: una fila amb un NIF que ja existeix i un altre nom actualitza aquella fitxa i no en crea cap', async ({ page }) => {
+  test.skip(!nifNou, 'Cal la primera prova')
+  const nOrgs = sql(`select count(*) from organizaciones`)
+  const cami = join(dir, `nif-existent-${marca}.xlsx`)
+  await writeXlsxFile([{ sheet: 'Entitats', data: [
+    ['Rol', 'Nom comercial', 'NIF'],
+    ['Ofertant', `TEST-IMP Hort ${marca} Nou`, nifNou],
+  ] }]).toFile(cami)
+  await entra(page, 'superadmin')
+  await page.goto('/equip/entitats/importa')
+  await puja(page, cami)
+  await page.getByTestId('ie-continua').click()
+  await expect(page.getByTestId('ie-fila')).toHaveCount(1, { timeout: 20_000 })
+  await expect(fila(page, 2)).toHaveAttribute('data-estat', 'existent')
+  await expect.poll(() => canvisDe(page, 2)).toEqual(['nom_comercial'])
+  await expect(page.getByTestId('ie-importa')).toBeEnabled({ timeout: 20_000 })
+  await importa(page)
+  await expect(page.getByTestId('ie-xifra-actualitzades')).toContainText('1')
+  await expect(page.getByTestId('ie-xifra-creades')).toContainText('0')
+  expect(sql(`select count(*) from organizaciones`)).toBe(nOrgs)
+  expect(sql(`select count(*) || '|' || max(empresa) from productores where nif = '${nifNou}'`)).toBe(`1|TEST-IMP Hort ${marca} Nou`)
 })

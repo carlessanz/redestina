@@ -1606,6 +1606,10 @@ Revisión de la Taula mestra por la Fundació (columna de Sebas, filas 1.3 y 1.5
   (`trg_fitxa_data_alta()`): si llega vacía, hoy en Europe/Madrid (`date` en productores; texto `AAAA-MM-DD` en entidades,
   donde conviven valores heredados como «2020»). Las vacías se rellenaron con `created_at` (en el clon, 398 productores y 95
   entidades; las del ARA quedan con la fecha de la importación). Sigue editable por el equipo.
+- **Dos fechas de alta (Plan 2 B4, `20270519100000`, 10-11-2026)**: `data_alta` = «Data d'alta a l'organització»
+  (cuándo entró en la red de la Fundació; editable por el equipo y por el importador, que acepta `dd/mm/aaaa`, ISO o
+  solo el año; en el ofertant un año se guarda como 1 de enero) y `created_at` = «Alta a la plataforma» (solo
+  lectura, Gestió interna). Las dos, solo equipo. Detalle en `context/06` §6.4.
 - **Forma jurídica `cb`** (Comunitat de béns) en `tipus_empresa_valid()`, junto a `sat` y `sc` (`20270512100000`).
 - **«Cooperativa agrària» fuera del catálogo `tipus_activitat`**: la Fundació pidió **eliminarla**; `20270512100100` había
   hecho lo contrario (ampliarla a los dos papeles, leyendo la petición sin la palabra «Eliminar»). Se quita de las fichas

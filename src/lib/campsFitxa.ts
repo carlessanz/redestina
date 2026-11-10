@@ -31,7 +31,7 @@ export const BLOCS: readonly Bloc[] = [
 
 /** Quién ve el campo: todos (equipo y actor) o solo el equipo. */
 export type Veu = 'tots' | 'equip'
-/** Quién lo edita: todos, solo el equipo o nadie (derivado: lo escribe un trigger). */
+/** Quién lo edita: todos, solo el equipo o nadie (derivado o de sistema: se enseña en solo lectura). */
 export type Edita = 'tots' | 'equip' | 'ningu'
 export type Rol = 'ofertant' | 'receptor' | 'ambdos'
 
@@ -44,7 +44,7 @@ export type TipusCamp =
   | 'comarca' // una comarca de `municipios`; conserva un valor antiguo del import
   | 'xips_activitat' // catálogo `tipus_activitat`, filtrado por papel
   | 'xips_modalitats' // donacio · venda · maquila
-  | 'data' // `yyyy-mm-dd` (productores.data_alta es date; entidades.data_alta, texto)
+  | 'data' // `yyyy-mm-dd` (productores.data_alta es date; entidades.data_alta, texto); en solo lectura, dd/mm/aaaa
 
 export interface CampFitxa {
   /** Clave única del campo en la ficha (no es el nombre de la columna). */
@@ -178,8 +178,14 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
   // cuenta para algo (`ef.hi_*`); la sección se titula como lo que es (`ef.sec_intern`).
   { clau: 'codigo', columnes: { productores: 'codigo', entidades: 'codigo' }, bloc: 'intern',
     labelKey: 'ef.fi_codi', ajudaKey: 'ef.hi_codi', veu: 'equip', edita: 'equip' },
+  // «Data d'alta a l'organització» (B4, 20270519100000): cuándo entró en la red de la Fundació. La
+  // corrige el equipo aquí y la actualiza el importador (columna de la plantilla).
   { clau: 'data_alta', columnes: { productores: 'data_alta', entidades: 'data_alta' }, bloc: 'intern', tipus: 'data',
-    labelKey: 'ef.fi_data_alta', veu: 'equip', edita: 'equip' },
+    labelKey: 'ef.fi_data_alta', ajudaKey: 'ef.hi_data_alta', veu: 'equip', edita: 'equip' },
+  // «Alta a la plataforma» (B4): cuándo se creó la ficha en Redestina (`created_at`). De sistema:
+  // nadie la edita y no entra en ninguna lista blanca. Con doble rol, la más antigua (`valorComu`).
+  { clau: 'alta_plataforma', columnes: { productores: 'created_at', entidades: 'created_at' }, bloc: 'intern', tipus: 'data',
+    labelKey: 'ef.fi_alta_plataforma', ajudaKey: 'ef.hi_alta_plataforma', veu: 'equip', edita: 'ningu' },
   { clau: 'es_test', columnes: { productores: 'es_test', entidades: 'es_test' }, bloc: 'intern', tipus: 'bool',
     labelKey: 'f.es_test', ajudaKey: 'ef.hi_es_test', veu: 'equip', edita: 'equip' },
   { clau: 'opt_in', columnes: { entidades: 'opt_in' }, bloc: 'intern', tipus: 'bool',
@@ -220,13 +226,13 @@ export const GESTIONATS_PER_COMPONENT: Readonly<Record<Taula, readonly string[]>
 /** Columnas que NO se enseñan en ninguna ficha, con el porqué. */
 export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
   productores: [
-    'id', 'organizacion_id', 'created_at',
+    'id', 'organizacion_id',
     'temporada', // la escribe el diagnóstico operativo (20270423100000); se ve en «Diagnòstic»
     'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
     'poblacion', // el nombre del municipio, que escribe el trigger: se ve en el selector de «Població»
   ],
   entidades: [
-    'id', 'organizacion_id', 'created_at', 'ref_externa', 'poblacion',
+    'id', 'organizacion_id', 'ref_externa', 'poblacion',
     // Texto libre del antiguo Excel del ARA («Signat», «Pendent», «No procedeix»…). Desde B1
     // (20270518100000) el estado lo lleva `estat_crm` y la priorización solo mira `activo`: la
     // columna se conserva sin uso hasta autorizar su `drop` (deuda §12.172).
@@ -345,6 +351,11 @@ export function valorComu(c: CampFitxa, prod: Record<string, unknown> | null, en
   const vp = c.columnes.productores && prod ? prod[c.columnes.productores] : undefined
   const ve = c.columnes.entidades && ent ? ent[c.columnes.entidades] : undefined
   const buit = (v: unknown) => v == null || v === '' || (Array.isArray(v) && v.length === 0)
+  // Una fecha de sistema (`created_at`, solo lectura) no es una discrepancia que corregir: la más
+  // antigua de las dos fichas es cuándo entró la organización.
+  if (c.edita === 'ningu' && c.tipus === 'data' && !buit(vp) && !buit(ve)) {
+    return { valor: String(vp) <= String(ve) ? vp : ve }
+  }
   if (!buit(vp) && !buit(ve) && !mateixValor(vp, ve)) {
     return { valor: vp, altre: { rol: 'receptor', valor: ve } }
   }

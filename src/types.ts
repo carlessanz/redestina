@@ -1457,7 +1457,7 @@ export interface SignaturaBandeja extends SignaturaDocument {
 }
 
 // ---------------------------------------------------------------------------
-// Importador de entidades desde Excel (20270511100000; AGENTS.md §4 y §6).
+// Importador de entidades desde Excel (20270511100000, B4 20270519100000; AGENTS.md §4 y §6).
 // Contrato de `previsualitzar_importacio_entitats` e `importar_entitats`.
 // ---------------------------------------------------------------------------
 export type ImportacioEstat = 'nova' | 'existent' | 'dubtosa' | 'error'
@@ -1472,6 +1472,7 @@ export interface ImportacioCandidat {
   motius: ImportacioMotiu[]
   similitud: number | null
 }
+/** Hasta 20270519100000: una diferencia que no se aplicaba. Desde B4 la base la devuelve siempre vacía. */
 export interface ImportacioConflicte {
   taula: 'productores' | 'entidades'
   columna: string
@@ -1479,15 +1480,30 @@ export interface ImportacioConflicte {
   actual: string | null
   fitxer: string | null
 }
+/**
+ * B4 (20270519100000, D11): un cambio de la fila. `camp` es la clave del contrato (`ie.camp_<camp>`);
+ * `abans` null = hueco que se rellena; `camp: 'nota'` = un bloque que se AÑADE al comentario
+ * (`despres`, multilínea). Una organización de doble rol da el mismo cambio una vez por tabla.
+ */
+export interface ImportacioCanvi {
+  taula: 'productores' | 'entidades'
+  columna: string
+  camp: string
+  abans: string | null
+  despres: string | null
+}
 export interface PrevisualitzacioFila {
   fila: number
   estat: ImportacioEstat
   accio_prevista: ImportacioAccioPrevista
-  identificada_per: 'nif' | 'airtable' | 'ref' | 'decisio' | null
+  /** `id` (B4): por la columna «ID Redestina». */
+  identificada_per: 'id' | 'nif' | 'airtable' | 'ref' | 'decisio' | null
   organizacion_id: string | null
   rols_existents: ('productor' | 'entidad')[]
   candidats: ImportacioCandidat[]
   omplira: string[]
+  canvis: ImportacioCanvi[]
+  /** Siempre `[]` desde B4: se conserva por el contrato. */
   conflictes: ImportacioConflicte[]
   avisos: string[]
   errors: string[]
@@ -1507,6 +1523,8 @@ export interface ImportacioFilaResultat {
   productor_id: string | null
   entidad_id: string | null
   camps_omplerts: string[]
+  canvis: ImportacioCanvi[]
+  /** Siempre `[]` desde B4: se conserva por el contrato. */
   conflictes: ImportacioConflicte[]
   avisos: string[]
   errors: string[]

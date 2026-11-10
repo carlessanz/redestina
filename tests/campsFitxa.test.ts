@@ -107,8 +107,13 @@ describe('campsFitxa: cobertura de las columnas', () => {
       if (c.veu === 'equip') expect(c.edita, `${c.clau}: el actor no lo ve, así que no puede editarlo`).not.toBe('tots')
     }
     // Desde 20270505100000 la población es el municipio elegido y el área se edita: no queda
-    // ningún campo derivado que se enseñe sin poder tocarse.
-    expect(CAMPS_FITXA.filter((c) => c.edita === 'ningu').map((c) => c.clau)).toEqual([])
+    // ningún campo derivado que se enseñe sin poder tocarse. Lo único de solo lectura es la fecha
+    // de sistema «Alta a la plataforma» (`created_at`, B4), que solo ve el equipo.
+    expect(CAMPS_FITXA.filter((c) => c.edita === 'ningu').map((c) => c.clau)).toEqual(['alta_plataforma'])
+    const alta = CAMPS_FITXA.find((c) => c.clau === 'alta_plataforma')!
+    expect(alta).toMatchObject({ columnes: { productores: 'created_at', entidades: 'created_at' }, veu: 'equip', bloc: 'intern', tipus: 'data' })
+    // Nunca entra en lo que se escribe: ni el actor ni el equipo.
+    for (const taula of ['productores', 'entidades'] as const) expect(columnesEditablesActor(taula)).not.toContain('created_at')
   })
 
   it('rolDe: común si tiene columna en las dos tablas', () => {
@@ -213,5 +218,13 @@ describe('campsFitxa: valores', () => {
     expect(valorComu(c, { empresa: null }, { nombre: 'Obrador' })).toEqual({ valor: 'Obrador' })
     expect(valorComu(c, { empresa: 'Mas' }, { nombre: 'Obrador' })).toEqual({ valor: 'Mas', altre: { rol: 'receptor', valor: 'Obrador' } })
     expect(valorComu(c, { empresa: 'Mas' }, null)).toEqual({ valor: 'Mas' })
+  })
+  it('«Alta a la plataforma» con doble rol: la más antigua de las dos fichas, sin discrepancia', () => {
+    const c = CAMPS_FITXA.find((x) => x.clau === 'alta_plataforma') as CampFitxa
+    const antiga = '2026-07-30T10:00:00.123+00:00'
+    const nova = '2026-09-01T08:00:00+00:00'
+    expect(valorComu(c, { created_at: nova }, { created_at: antiga })).toEqual({ valor: antiga })
+    expect(valorComu(c, { created_at: antiga }, { created_at: nova })).toEqual({ valor: antiga })
+    expect(valorComu(c, null, { created_at: nova })).toEqual({ valor: nova })
   })
 })

@@ -5,10 +5,11 @@
 // del super_admin. Los datos los da la RPC `exportar_entitats()` (una fila por organización, en
 // CÓDIGOS); aquí se ponen en palabras y se compone el fichero:
 //   · «Entitats»: las columnas de la plantilla (`COLUMNES_DE_PLANTILLA`), en su orden, con los
-//     valores en el idioma de la interfaz (como la hoja «Llistes»: el lector acepta los dos), y
-//     DETRÁS cuatro informativas (`CAPCALERES_EXPORTACIO`): «ID Redestina», «Data d'alta a
-//     l'organització» y el estado CRM de cada papel (P9: no se importa). Van detrás para que las
-//     columnas A–Y sean las de la plantilla y los desplegables de B2 caigan en el mismo sitio.
+//     valores en el idioma de la interfaz (como la hoja «Llistes»: el lector acepta los dos). Desde
+//     B4 (20270519100000) «ID Redestina» (Z) y «Data d'alta a l'organització» (AA) son columnas de
+//     la plantilla: el importador las lee (el ID identifica la organización; la fecha la actualiza).
+//     DETRÁS, dos informativas (`CAPCALERES_EXPORTACIO`): el estado CRM de cada papel (AB, AC; P9:
+//     no se importa). Las letras no se mueven: los desplegables de B2 caen en el mismo sitio.
 //   · Las columnas de NOTA (Càrrec, Web, Observacions…) salen VACÍAS: reimportarlas añadiría el
 //     texto otra vez al comentario interno.
 //   · «Instruccions» propias de la exportación y «Llistes» idéntica a la plantilla; los
@@ -60,10 +61,8 @@ export interface FilaExportacio {
 /** Filas vacías (con formato texto y desplegables) detrás de las exportadas, para añadir entidades. */
 export const FILES_BUIDES = 100
 
-/** Las columnas informativas, en su orden, detrás de las de la plantilla. */
+/** Las columnas informativas, en su orden, detrás de las de la plantilla (el importador las ignora). */
 export const COLUMNES_EXTRA = [
-  { clau: 'redestina_id', capcalera: CAPCALERES_EXPORTACIO.redestina_id },
-  { clau: 'data_alta', capcalera: CAPCALERES_EXPORTACIO.data_alta },
   { clau: 'estat_crm_productor', capcalera: CAPCALERES_EXPORTACIO.estat_crm_productor },
   { clau: 'estat_crm_entidad', capcalera: CAPCALERES_EXPORTACIO.estat_crm_entidad },
 ] as const
@@ -119,13 +118,18 @@ export function valorsFila(f: FilaExportacio, ctx: ContextPlantilla): Partial<Re
   posa('municipi', f.municipi)
   posa('area_geografica', f.area_geografica)
   posa('airtable_id', f.airtable_id)
+  posa('redestina_id', f.organizacion_id)
+  posa('data_alta', f.data_alta)
   return out
 }
 
 const negreta = (value: string) => ({ value, fontWeight: 'bold' as const })
 const text = (value: string | undefined) => ({ value, type: String, format: '@' as const })
 
-/** «Data d'alta»: una fecha `AAAA-MM-DD` va como fecha de Excel; cualquier otra cosa, como texto. */
+/**
+ * «Data d'alta»: una fecha `AAAA-MM-DD` va como fecha de Excel (`dd/mm/yyyy`); solo el año (lo que
+ * trajo el Excel del ARA), como texto. El importador lee las dos (`valorData`).
+ */
 function cellaData(v: string | null) {
   const s = net(v)
   const m = s?.match(/^(\d{4})-(\d{2})-(\d{2})$/)
@@ -138,9 +142,8 @@ function filaFulla(f: FilaExportacio, ctx: ContextPlantilla) {
   const v = valorsFila(f, ctx)
   const estat = (e: string | null) => ((ESTATS_CRM as readonly string[]).includes(e ?? '') ? ctx.t(`ef.estat_${e}`) : null)
   return [
-    ...COLUMNES_DE_PLANTILLA.map((c) => (c.text ? text(v[c.clau]) : v[c.clau] ?? null)),
-    text(f.organizacion_id),
-    cellaData(f.data_alta),
+    ...COLUMNES_DE_PLANTILLA.map((c) => (c.clau === 'data_alta' ? cellaData(v.data_alta ?? null)
+      : c.text ? text(v[c.clau]) : v[c.clau] ?? null)),
     estat(f.estat_crm_productor),
     estat(f.estat_crm_entidad),
   ]
@@ -151,6 +154,8 @@ export function dadesExportacio(files: readonly FilaExportacio[], ctx: ContextPl
   const { t } = ctx
   const [plantilla, instruccionsPlantilla, llistes] = dadesPlantilla(ctx)
   const n = COLUMNES_DE_PLANTILLA.length + COLUMNES_EXTRA.length
+  // El uuid no cabe en el ancho de la plantilla.
+  const iId = COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'redestina_id')
   const entitats: SheetData = [
     [...COLUMNES_DE_PLANTILLA.map((c) => negreta(c.capcalera)), ...COLUMNES_EXTRA.map((c) => negreta(c.capcalera))],
     ...files.map((f) => filaFulla(f, ctx)),
@@ -161,7 +166,8 @@ export function dadesExportacio(files: readonly FilaExportacio[], ctx: ContextPl
   ]
 
   // «Instruccions»: las de la exportación arriba y la tabla de columnas de la plantilla (que
-  // empieza en la fila de cabeceras «Columna»), más una fila por cada columna informativa.
+  // empieza en la fila de cabeceras «Columna»; ya explica «ID Redestina» y la fecha de alta), más
+  // una fila por cada columna informativa.
   const iTaula = instruccionsPlantilla.data.findIndex((r) => {
     const c = r[0] as { value?: unknown } | null
     return c !== null && typeof c === 'object' && c.value === t('ie.pl_columna')
@@ -186,7 +192,7 @@ export function dadesExportacio(files: readonly FilaExportacio[], ctx: ContextPl
   ]
 
   return [
-    { nom: NOM_FULLA.entitats, data: entitats, amples: [...plantilla.amples, 38, 16, 20, 20] },
+    { nom: NOM_FULLA.entitats, data: entitats, amples: [...plantilla.amples.map((a, i) => (i === iId ? 38 : a)), 20, 20] },
     { nom: NOM_FULLA.instruccions, data: instruccions, amples: instruccionsPlantilla.amples },
     { nom: NOM_FULLA.llistes, data: llistes.data, amples: llistes.amples },
   ]

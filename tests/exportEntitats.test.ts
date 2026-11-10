@@ -1,8 +1,9 @@
 // La exportación de entidades a Excel (Plan 2 B3, 10-11-2026): el fichero tiene el formato de la
 // plantilla del importador y, sobre todo, IDA Y VUELTA: una fila exportada, leída con el lector del
 // importador (`llegeixFulla` + `normalitzaFila`), da exactamente la fila del contrato que
-// corresponde a la ficha, sin avisos ni líneas de nota. Es lo que hace que reimportar lo exportado
-// salga `sense_canvis` (el E2E lo comprueba contra la base).
+// corresponde a la ficha, sin avisos ni líneas de nota, INCLUIDOS «ID Redestina» y la fecha de alta
+// (B4, 20270519100000: ahora se importan). Es lo que hace que reimportar lo exportado salga
+// `sense_canvis` (el E2E lo comprueba contra la base).
 //
 // Filas SINTÉTICAS con la forma de `exportar_entitats()`. Ningún dato real.
 
@@ -71,15 +72,19 @@ const ESPERAT: { rols: Paper[]; contracte: Omit<FilaContracte, 'rols' | 'fila'> 
     tipus_activitat: ['productor_agricola', 'majorista'], persona_contacte: 'Anna Prova', email: 'anna@exemple.invalid',
     telefon: '34600000000', telefon2: '34930000000', direccion: 'Carrer Major, 1', codigo_postal: '08380',
     municipi: "l'Ametlla del Vallès", area_geografica: 'Vallès Oriental', airtable_id: 'recABC123',
+    redestina_id: '11111111-1111-4111-8111-111111111111', data_alta: '2026-07-30',
   } },
   { rols: ['entidad'], contracte: {
     nom_comercial: 'Menjador de Prova', nif: '65000772N', tipus_empresa: 'fundacio', tipo_receptor: 'social',
     tipus_activitat: ['menjador_social'], modalitats_interes: ['donacio', 'venda'], email: 'hola@exemple.invalid',
     email2: 'general@exemple.invalid', telefon: '34611111111', municipi: 'Mataró', area_geografica: 'Maresme',
+    // Solo el año (lo que trajo el Excel del ARA): vuelve como año, no como fecha.
+    redestina_id: '22222222-2222-4222-8222-222222222222', data_alta: '2021',
   } },
   { rols: ['productor', 'entidad'], contracte: {
     nom_comercial: 'Cooperativa de Prova', tipus_empresa: 'cooperativa', tipo_receptor: 'transformador',
     tipus_activitat: ['majorista', 'menjador_social', 'productor_agricola'], modalitats_interes: ['maquila'], municipi: 'Olot',
+    redestina_id: '33333333-3333-4333-8333-333333333333', data_alta: '2026-11-02',
   } },
 ]
 
@@ -100,7 +105,7 @@ function comprovaIdaITornada(files: Cella[][]) {
   const m = mapaCapcaleres(files[0])
   expect(m.falten).toEqual([])
   expect(m.reconegudes.map((r) => r.clau)).toEqual(COLUMNES_DE_PLANTILLA.map((c) => c.clau))
-  // Las cuatro informativas se ignoran A PROPÓSITO (no «desconeguda»): la Revisió no las marca como errata.
+  // Las dos informativas (estado CRM) se ignoran A PROPÓSITO (no «desconeguda»): la Revisió no las marca como errata.
   expect(m.ignorades.map((x) => [x.capcalera, x.motiu])).toEqual(COLUMNES_EXTRA.map((c) => [c.capcalera, 'a_proposit']))
   const fulla = llegeixFulla(files)
   expect(fulla.exemples).toBe(0)
@@ -120,11 +125,17 @@ describe('la exportación tiene el formato de la plantilla', () => {
   const ctx = ctxDe('ca')
   const [entitats, instruccions, llistes] = dadesExportacio(FILES, ctx)
 
-  it('las mismas columnas y en el mismo orden que la plantilla, y detrás las cuatro informativas', () => {
+  it('las mismas columnas y en el mismo orden que la plantilla, y detrás las dos informativas', () => {
     const cap = celles(entitats.data[0] as unknown[])
     expect(cap.slice(0, COLUMNES_DE_PLANTILLA.length)).toEqual(COLUMNES_DE_PLANTILLA.map((c) => c.capcalera))
     expect(cap.slice(COLUMNES_DE_PLANTILLA.length)).toEqual(Object.values(CAPCALERES_EXPORTACIO))
     expect(entitats.amples).toHaveLength(cap.length)
+    // Las letras de B3 no se mueven: Z el ID, AA la fecha, AB y AC el estado CRM.
+    const lletra = (h: string) => lletraColumna(cap.indexOf(h))
+    expect(['ID Redestina', "Data d'alta a l'organització", 'Estat CRM (ofertant)', 'Estat CRM (receptor)'].map(lletra))
+      .toEqual(['Z', 'AA', 'AB', 'AC'])
+    // El uuid cabe.
+    expect(entitats.amples[cap.indexOf('ID Redestina')]).toBe(38)
   })
 
   it('las columnas de nota salen vacías (reimportarlas duplicaría el comentario)', () => {
@@ -136,33 +147,45 @@ describe('la exportación tiene el formato de la plantilla', () => {
     }
   })
 
-  it('el ID Redestina, en texto; el estado CRM por papel, en palabras; la fecha de alta, fecha de Excel', () => {
+  it('el ID Redestina, en texto; la fecha de alta, fecha de Excel (o texto si es un año); el estado CRM por papel, en palabras', () => {
     const extra = COLUMNES_DE_PLANTILLA.length
+    const iId = COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'redestina_id')
+    const iData = COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'data_alta')
     const f1 = entitats.data[1] as { value?: unknown; type?: unknown; format?: string }[]
-    expect(f1[extra]).toMatchObject({ value: FILES[0].organizacion_id, format: '@' })
-    expect(f1[extra + 1]).toMatchObject({ value: new Date(Date.UTC(2026, 6, 30)), type: Date, format: 'dd/mm/yyyy' })
-    expect(celles(f1).slice(extra + 2)).toEqual(['Actiu', null])
+    expect(f1[iId]).toMatchObject({ value: FILES[0].organizacion_id, format: '@' })
+    expect(f1[iData]).toMatchObject({ value: new Date(Date.UTC(2026, 6, 30)), type: Date, format: 'dd/mm/yyyy' })
+    expect(celles(f1).slice(extra)).toEqual(['Actiu', null])
     // Solo el año (lo que trajo el Excel del ARA): se queda como texto.
     const f2 = entitats.data[2] as { value?: unknown; format?: string }[]
-    expect(f2[extra + 1]).toMatchObject({ value: '2021', format: '@' })
-    expect(celles(f2).slice(extra + 2)).toEqual([null, 'Potencial'])
-    expect(celles(entitats.data[3] as unknown[]).slice(extra + 2)).toEqual(['En desenvolupament', 'Inactiu'])
+    expect(f2[iData]).toMatchObject({ value: '2021', format: '@' })
+    expect(celles(f2).slice(extra)).toEqual([null, 'Potencial'])
+    expect(celles(entitats.data[3] as unknown[]).slice(extra)).toEqual(['En desenvolupament', 'Inactiu'])
+    // Sin fecha: la celda vacía, en formato texto (lo que se escriba ahí no lo reinterpreta Excel).
+    const [sense] = dadesExportacio([fila({ data_alta: null })], ctx)
+    expect((sense.data[1] as { value?: unknown; format?: string }[])[iData]).toMatchObject({ value: undefined, format: '@' })
   })
 
   it('las columnas de NIF, CP, teléfonos e ID van en formato texto, también en las filas vacías de detrás', () => {
     for (const r of [entitats.data[1], entitats.data[entitats.data.length - 1]]) {
       const fila = r as { format?: string }[]
-      COLUMNES_DE_PLANTILLA.forEach((c, i) => { if (c.text) expect(fila[i]?.format, c.capcalera).toBe('@') })
+      // La fecha de alta completa es la excepción: va como fecha de Excel (`dd/mm/yyyy`, la prueba de arriba).
+      COLUMNES_DE_PLANTILLA.forEach((c, i) => {
+        if (c.text && !(c.clau === 'data_alta' && fila[i]?.format === 'dd/mm/yyyy')) expect(fila[i]?.format, c.capcalera).toBe('@')
+      })
     }
     expect(entitats.data).toHaveLength(1 + FILES.length + FILES_BUIDES)
   })
 
-  it('«Llistes» es la de la plantilla; «Instruccions» explica la exportación y las cuatro columnas de más', () => {
+  it('«Llistes» es la de la plantilla; «Instruccions» explica la exportación y las dos columnas de más', () => {
     expect(llistes.nom).toBe(NOM_FULLA.llistes)
     const textos = instruccions.data.flat().map((c) => (c && typeof c === 'object' && 'value' in c ? String(c.value) : String(c ?? '')))
     expect(textos.some((x) => x.startsWith('ex.') || x.startsWith('ie.'))).toBe(false)
     for (const c of [...COLUMNES_DE_PLANTILLA, ...COLUMNES_EXTRA]) expect(textos).toContain(c.capcalera)
     expect(textos).not.toContain(DICTS.ca['ie.pl_intro_1']) // la de «esborra la fila d'EXEMPLE» no aplica
+    // B4: el ID y la fecha ya no son «informativas»: se explican como columnas que se importan.
+    expect(textos).toContain(DICTS.ca['ie.h_redestina_id'])
+    expect(textos).toContain(DICTS.ca['ie.h_data_alta'])
+    expect(textos.filter((x) => x === DICTS.ca['ex.falta_informativa'])).toHaveLength(COLUMNES_EXTRA.length)
   })
 
   it('lo que no es un código conocido no sale (la reimportación lo mandaría al comentario)', () => {
@@ -191,9 +214,10 @@ describe('ida y vuelta: lo exportado lo entiende el importador tal cual', () => 
     const [entitats, , llistes] = await readXlsxFile(buffer)
     expect(llistes.sheet).toBe(NOM_FULLA.llistes)
     comprovaIdaITornada(entitats.data.map((r) => r.map((c) => c as Cella)))
-    // La fecha de alta vuelve como fecha (B4 la leerá): el 30-07-2026, sin correrse un día.
-    const iData = COLUMNES_DE_PLANTILLA.length + 1
+    // La fecha de alta vuelve como fecha (y `valorData` la lee): el 30-07-2026, sin correrse un día.
+    const iData = COLUMNES_DE_PLANTILLA.findIndex((c) => c.clau === 'data_alta')
     expect(entitats.data[1][iData]).toEqual(new Date(Date.UTC(2026, 6, 30)))
+    expect(entitats.data[2][iData]).toBe('2021')
 
     // Los mismos desplegables que la plantilla, en todas las filas con datos y en las vacías.
     const xml = strFromU8(unzipSync(new Uint8Array(buffer))['xl/worksheets/sheet1.xml'])

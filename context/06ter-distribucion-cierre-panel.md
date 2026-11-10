@@ -2048,6 +2048,13 @@ para no confundirla con las notas internas del CRM. E2E `tests/e2e/importa-entit
 con las cabeceras de Airtable: 4 creadas + 1 sin cambios; reimportar = todo sin cambios; plantilla
 descargada y subida = 25 columnas reconocidas; 0 desbordes a 360 px en los tres pasos; limpia las `TEST-IMP`).
 
+**B4 (10-11-2026, `20270519100000`): la importación actualiza.** En la Revisió cada fila enseña **«Canviarà»**
+(`camp: «abans» → «després»`; hueco `— → valor`; la nota que se añade), agrupado para que una organización de doble
+rol no repita el cambio; contador «Actualitzarà N fitxes»; `identificada_per = 'id'` → «per ID Redestina»; la
+confirmación dice que lo que trae valor sobrescribe y que una celda vacía no toca nada. Resultat y CSV con los
+cambios. En la ficha, Gestió interna enseña «Data d'alta a l'organització» (editable) y «Alta a la plataforma»
+(`created_at`, solo lectura). Reglas en `context/06` §6.4.
+
 ### «Exporta a Excel» en Entitats (Plan 2, B3, 10-11-2026, `20270518110000`)
 
 Botón «Exporta a Excel» (`data-testid="el-exporta"`, icono `FileDown`) en la cabecera de `Entitats.tsx`, junto a

@@ -16,8 +16,11 @@
 // las listas de un valor, salirse avisa (no bloquea: el lector tolera mayúsculas, acentos y los dos
 // idiomas); en las de varios (actividad, modalidades), el desplegable solo ayuda.
 //
-// Las columnas de NIF, CP, teléfonos e ID van en formato texto (`@`) en las primeras filas,
-// para que Excel no se coma el cero de «08380» ni convierta un móvil en notación científica.
+// Las columnas de NIF, CP, teléfonos, IDs y la fecha de alta van en formato texto (`@`) en las
+// primeras filas, para que Excel no se coma el cero de «08380», no convierta un móvil en notación
+// científica ni reinterprete «2021» o «15/03/2019» (la base entiende los dos; B4, 20270519100000).
+// «ID Redestina» y «Data d'alta a l'organització» (B4) van al final (Z, AA): las letras de las
+// columnas con desplegable no se mueven.
 
 import type { Feature, SheetData } from 'write-excel-file/browser'
 import {
@@ -90,7 +93,9 @@ export function dadesPlantilla(ctx: ContextPlantilla): { nom: string; data: Shee
   // «Instruccions»: unas líneas de cómo funciona y una tabla por columna.
   const falta = (c: ColumnaPlantilla) => t(c.obligatoria ? 'ie.falta_obligatoria'
     : c.clau === 'rols' ? 'ie.falta_rols'
-      : c.etiquetaNota ? 'ie.falta_nota' : 'ie.falta_opcional')
+      : c.clau === 'redestina_id' ? 'ie.falta_redestina_id'
+        : c.clau === 'data_alta' ? 'ie.falta_data_alta'
+          : c.etiquetaNota ? 'ie.falta_nota' : 'ie.falta_opcional')
   const instruccions: SheetData = [
     [negreta(t('ie.pl_titol'))],
     [t('ie.pl_intro_1')],

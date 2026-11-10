@@ -328,12 +328,64 @@ en castellano; la fecha vuelve como fecha; las 25 columnas se reconocen y las 4 
 desplegables); el super_admin sube ese fichero tal cual: 25 reconocidas, 4 ignoradas, las 4 filas `existent` y
 **4 `sense_canvis`**, y las fichas quedan idénticas byte a byte (`md5` de `row_to_json`).
 
-**Límites conocidos** (no rompen el `sense_canvis` en las fichas que se crean con el importador, pero sí pueden
-darse con datos heredados):
-- Una organización de **doble papel** cuyas dos fichas difieren: si una tiene un dato y la otra un hueco, la
-  reimportación **rellena el hueco** (`actualitzada`): es la regla de siempre del importador, no un error.
-- El lector pone el **móvil delante**: si una ficha tiene un fijo en `phone` y un móvil en `telefono_alt`, la
-  reimportación los ve cruzados (conflicto, no cambia nada).
+**Límites conocidos** (B4 resolvió los dos primeros que había aquí: ver §6.4):
 - **Más de 1.000 filas**: el importador acepta 1.000 por fichero; la pantalla avisa al exportar (deuda 173).
-- `data_alta` con solo el año: B4 tendrá que decidir qué hace con «2021» (el plan habla de `dd/mm/aaaa`, ISO o
-  serial).
+- Desde B4 la exportación **solo saca valores que el importador acepta** (NIF válido, correo con forma de correo,
+  teléfono de 9–15 cifras, CP de 5 cifras, `data_alta` año o fecha): lo demás saldría y, reimportado, iría a la nota.
+
+## 6.4 La importación ACTUALIZA, «ID Redestina» y las dos fechas de alta (Plan 2 B4, `20270519100000`, 10-11-2026)
+
+**Para qué** (D11, Carles, no negociable): la importación es **idempotente** y **actualiza**. Mismo NIF o mismo
+«ID Redestina» → actualiza esa organización, **nunca crea otra**; **celda vacía = no toca**; **celda con valor
+distinto = sobrescribe**; reimportar el mismo fichero (o lo exportado) = todo `sense_canvis`; la Revisió enseña los
+cambios campo a campo antes de confirmar. Hasta B4 (§6.2) un valor distinto era un «conflicte» que no se aplicaba.
+
+**Base** (todo interno salvo las dos RPC de siempre, que no cambian de firma):
+- `importacions_entitats_files.canvis jsonb` — `[{taula, columna, camp, abans, despres}]`, con el valor anterior
+  (deshacer a mano es posible). `conflictes` se queda, siempre `[]`, por el contrato del frontend publicado.
+- **`entitat_valors_org(p productores, e entidades)`**: lo que vale la organización (ofertant primero, receptora
+  después, `name` por defecto no cuenta, unión de actividades, `least` de las fechas…). **`exportar_entitats()` se
+  recrea encima** (misma `returns table`): una sola definición para exportar y para comparar. Solo saca valores que
+  el importador acepta (`importacio_si_correu`, `importacio_si_telefon`, NIF válido, CP, fecha).
+- **`importacio_compara(p_taula, p_actual, p_desitjat, p_protegits)`** (antes 3 argumentos): celda vacía → nada;
+  columna **protegida** → nada; hueco → rellena; distinto → **sobrescribe**. Cada escritura va a `patch`,
+  `omplira` y `canvis`. `productores.data_alta` (date) con solo el año → `AAAA-01-01`.
+- **Protegidas (P-B4-2)**: las celdas cuyo valor es igual a lo que vale la organización. **No pisan ni rellenan
+  ninguna de sus fichas.** Es lo que hace que exportar → reimportar no cambie nada aunque las dos fichas de una
+  organización de doble rol difieran (en el clon hay 5: p. ej. una con nombre y teléfono distintos en cada papel);
+  un valor nuevo en la celda sí se escribe en las dos fichas. Los dos teléfonos se comparan **como conjunto** (el
+  lector pone el móvil delante: una ficha con el fijo primero vuelve cruzada y no cambia nada). Consecuencia: si la
+  ofertant tiene correo y la receptora no, una fila con ese correo **no** rellena la receptora (antes sí): para
+  dejar valores distintos por papel, o completar uno, la ficha.
+- `importacio_normalitza_fila`: `redestina_id` (no-uuid → error `id_redestina_invalid`) y `data_alta`
+  (`AAAA-MM-DD`, `D/M/AAAA` con `/`, `-` o `.`, o **solo el año**; entre 1900 y hoy; si no → aviso
+  `data_alta_invalida` y línea de nota).
+- `importacio_igual('data_alta', actual, fichero)` es **asimétrica**: si el fichero trae solo el año, iguala por año
+  («2021» = 05/03/2021: no se pisa una fecha precisa con una aproximada); si trae fecha, compara la fecha entera.
+- `importacio_aplica_fila`: correo/teléfono únicos de `productores` se comprueban también al **sobrescribir**
+  (`correu_en_us`/`telefon_en_us` + nota); si cambia `empresa` y `name` era el valor por defecto, le sigue; si cambia
+  el municipio sin comarca en el fichero, la comarca que pondrá el trigger va a `canvis`; la nota añadida, también
+  (`camp: 'nota'`). Al añadir un papel, la fecha de alta sale de la ficha hermana si el fichero no trae.
+- `importacio_processa`: identidad **0 · ID Redestina** (organización con alguna ficha) → 1 · NIF → 2 · `AIRTABLE:`
+  → 3 · hash `IMP:`. Errores de fila: `id_redestina_inexistent` (no se cae al NIF ni crea: vaciar la celda para
+  crear) e `id_nif_contradictoris` (P-B4-3/4). `identificada_per = 'id'`. Con ID, el nombre (hash) y el Airtable no
+  hacen repetida la fila (dos organizaciones pueden llamarse igual en el mismo municipio).
+- El NIF también se sobrescribe si la fila llegó por ID/Airtable y trae otro NIF válido que nadie tiene (D11 manda;
+  se ve en «Canviarà»). Nunca: `activo`, `estat_crm`, `es_test`, `ref_externa`; el comentario solo crece.
+- `alta_fitxa_interna`: `data_alta` en los dos `insert` (sin ella, el trigger pone hoy).
+
+**Las dos fechas** (reunión 09-11): `data_alta` = **«Data d'alta a l'organització»** (cuándo entró en la red de la
+Fundació; editable por el equipo y por el importador); `created_at` = **«Alta a la plataforma»** (solo lectura, en
+Gestió interna). Las dos, solo equipo (P-B4-5). `entidades.data_alta` sigue siendo texto (año suelto heredado del ARA).
+
+**Navegador**: «ID Redestina» y «Data d'alta a l'organització» son columnas de `COLUMNES_PLANTILLA` (Z y AA, las
+mismas letras que ya usaba la exportación; la plantilla las lleva vacías); fuera de `IGNORADES_A_PROPOSIT` (quedan
+las dos «Estat CRM», P9). `valorData()`: `Date` → ISO; entero 1900–2100 → año; otro entero → serial de Excel.
+Revisió: bloque **«Canviarà»** por fila (agrupado: una organización de doble rol da el cambio una vez), contador
+«Actualitzarà N fitxes», confirmación «el que porti valor sobreescriu; una cel·la buida no toca res».
+
+**Verificado en el clon**: exportar las 731 organizaciones → `previsualitzar_importacio_entitats` = **731
+`sense_canvis`** (antes del ajuste salían 83 rellenos de huecos y notas por teléfonos y NIF inválidos, y 13
+«repetides» por nombre); pruebas de reglas con `rollback` (teléfono nuevo, NIF existente con otro nombre →
+actualiza, ID sin NIF, los tres errores, doble rol → las dos fichas, año → 01/01 en el ofertant, reimportar →
+`sense_canvis`). Arnés y E2E: §13 de AGENTS.md.

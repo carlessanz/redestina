@@ -205,18 +205,22 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
         'tipus_activitat_desconegut', 'modalitat_desconeguda', 'sense_tipus_receptor', 'tipus_receptor_desconegut',
         'codi_postal_invalid', 'municipi_ine_desconegut', 'municipi_no_trobat', 'area_desconeguda', 'area_no_coincideix',
         'ref_externa_en_us', 'semblant_a_fila',
+        // B4 (20270519100000): «ID Redestina» y «Data d'alta a l'organització».
+        'id_redestina_invalid', 'id_redestina_inexistent', 'id_nif_contradictoris', 'data_alta_invalida', 'data_alta_nomes_any',
       ],
     },
     {
-      que: 'importació · conflictes[].camp (importacio_camp)',
+      // B4 (20270519100000): `canvis[].camp`; `data_alta` y `area_geografica` también salen como campo.
+      que: 'importació · canvis[].camp (importacio_camp)',
       prefijo: 'ie.camp_',
       valores: [
         'nom_comercial', 'razon_social', 'nif', 'tipus_empresa', 'tipus_activitat', 'persona_contacte', 'email', 'email2',
         'telefon', 'telefon2', 'direccion', 'codigo_postal', 'municipi', 'area_geografica', 'tipo_receptor',
-        'modalitats_interes', 'nota',
+        'modalitats_interes', 'data_alta', 'nota',
       ],
     },
-    { que: 'importació · informe CSV', prefijo: 'ie.inf_', valores: ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'conflictes', 'avisos', 'errors', 'conveni'] },
+    { que: 'importació · informe CSV', prefijo: 'ie.inf_', valores: ['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'canvis', 'avisos', 'errors', 'conveni'] },
+    { que: 'importació · identificada_per', prefijo: 'ie.per_', valores: ['id', 'nif', 'airtable', 'ref', 'decisio'] },
     { que: 'notes_internes.canal', prefijo: 'ni.canal_', valores: ['telefon', 'whatsapp', 'email', 'visita', 'reunio', 'altres'] },
     { que: 'notes_internes.tipus', prefijo: 'ni.tipus_', valores: ['seguiment', 'captacio', 'operativa', 'incidencia', 'documentacio', 'altres'] },
     { que: 'estatSeguiment() (salvo «previst», que no se rotula)', prefijo: 'ni.seg_', valores: ['vencut', 'avui', 'fet'] },

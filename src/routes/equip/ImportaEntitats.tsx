@@ -9,8 +9,9 @@
 //   2. Revisió — `previsualitzar_importacio_entitats()` dice qué pasará con cada fila (nova,
 //      existent, dubtosa, error). Los papeles se pueden cambiar (casillas) y las dudosas se
 //      deciden (crear, «és aquesta», ometre); cada cambio vuelve a preguntar a la base. No se
-//      importa con filas sin papel. La confirmación avisa: entran inactivas y solo se rellenan
-//      huecos.
+//      importa con filas sin papel. Desde B4 (20270519100000, D11) una existente se ACTUALIZA:
+//      cada fila enseña «Canviarà» campo a campo (`canvis`: antes → después; la nota, lo que se
+//      añade), abierta por defecto si cambia algo. La confirmación lo recuerda.
 //   3. Resultat — `importar_entitats()` (la base RECALCULA todo, no se fía del paso 2): cifras,
 //      enlace a cada ficha, avisos y errores por fila, el informe en CSV y, para las filas con
 //      «Conveni signat», el enlace a la ficha › Documentació, donde ya está el flujo de
@@ -34,8 +35,9 @@ import { carregaMunicipis, llistesTerritori } from '../../lib/municipis'
 import { dataCurta } from '../../lib/format'
 import { llegeixFitxer, type FitxerLlegit } from '../../lib/fitxerImportacio'
 import {
-  campsOmplerts, clauCodi, csvInforme, ERRORS_LOT, filesPerEnviar, filesSensePaper, llegeixFulla, MAX_FILES,
-  normalitzaFulla, type ActivitatCataleg, type FilaInforme, type FilaNormalitzada, type Paper,
+  agrupaCanvis, campsCanviats, campsOmplerts, clauCodi, csvInforme, ERRORS_LOT, filesPerEnviar, filesSensePaper,
+  llegeixFulla, MAX_FILES, normalitzaFulla, textCanvisInforme, type ActivitatCataleg, type FilaInforme,
+  type FilaNormalitzada, type Paper,
 } from '../../lib/importEntitats'
 import { blobPlantilla } from '../../lib/plantillaEntitats'
 import { descarregarBlob } from '../../lib/tancament'
@@ -46,7 +48,7 @@ import BotoIcona from '../../components/BotoIcona'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import type {
-  ImportacioAccio, ImportacioConflicte, ImportacioEstat, Previsualitzacio, PrevisualitzacioFila, ResultatImportacio,
+  ImportacioAccio, ImportacioCanvi, ImportacioEstat, Previsualitzacio, PrevisualitzacioFila, ResultatImportacio,
 } from '../../types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -74,8 +76,9 @@ function textErrorLot(t: Traductor, r: Extract<RespostaRpc<unknown>, { ok: false
   return t(fallback)
 }
 
-function textConflicte(t: Traductor, c: ImportacioConflicte): string {
-  return t('ie.conflicte', { camp: t(`ie.camp_${c.camp}`), actual: c.actual ?? '—', fitxer: c.fitxer ?? '—' })
+/** ¿Se abre el detalle de la fila sin pedirlo? Las dudosas y las existentes que cambian (D11: se revisa). */
+function obertPerDefecte(p: PrevisualitzacioFila): boolean {
+  return p.estat === 'dubtosa' || (p.canvis.length > 0 && p.accio_prevista !== 'crear')
 }
 
 const CLASSE_ESTAT: Record<ImportacioEstat, string> = {
@@ -250,7 +253,7 @@ function Importador() {
 
   function informe() {
     if (!resultat) return
-    const capcaleres = Object.fromEntries((['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'conflictes', 'avisos', 'errors', 'conveni'] as const)
+    const capcaleres = Object.fromEntries((['fila', 'nom', 'nif', 'accio', 'organitzacio', 'camps', 'canvis', 'avisos', 'errors', 'conveni'] as const)
       .map((c) => [c, t(`ie.inf_${c}`)])) as Record<keyof FilaInforme, string>
     const filesInf: FilaInforme[] = resultat.files.map((r) => {
       const f = perFila.get(r.fila)
@@ -261,7 +264,7 @@ function Importador() {
         accio: t(`ie.acc_${r.accio}`),
         organitzacio: r.organizacion_id ? `${window.location.origin}${LLISTA}/${r.organizacion_id}` : null,
         camps: campsOmplerts(r.camps_omplerts).map((c) => t(`ie.camp_${c}`)).join(', '),
-        conflictes: r.conflictes.map((c) => textConflicte(t, c)).join(' | '),
+        canvis: textCanvisInforme(r.canvis, (c) => t(`ie.camp_${c}`)),
         avisos: [...(f?.avisosLocals ?? []).map((a) => t(`ie.al_${a}`)), ...r.avisos.map((a) => textCodi(t, a))].join(' | '),
         errors: r.errors.map((e) => textCodi(t, e)).join(' | '),
         conveni: f?.conveni ? [f.conveni.data, f.conveni.signant].filter(Boolean).join(' · ') : '',
@@ -460,6 +463,9 @@ function Revisio({
             <Badge key={e} className={CLASSE_ESTAT[e]} data-testid={`ie-resum-${e}`}>{t(`ie.est_${e}`)} · {previ.resum.per_estat[e]}</Badge>
           ))}
           {revisant && <Loader2 className="size-4 animate-spin text-muted-foreground" aria-label={t('ie.revisant')} />}
+          <span className="w-full text-muted-foreground" data-testid="ie-xifra-prev-actualitzar" data-n={previ.resum.per_accio.actualitzar}>
+            {t('ie.actualitzara_n', { n: previ.resum.per_accio.actualitzar })}
+          </span>
         </div>
         <div className="w-full space-y-1 sm:w-48">
           <label htmlFor="ie-filtre" className="block text-xs text-muted-foreground">{t('ie.filtre')}</label>
@@ -480,7 +486,7 @@ function Revisio({
         <TableBody>
           {visibles.map((p) => {
             const f = perFila.get(p.fila)
-            const obert = oberts[p.fila] ?? p.estat === 'dubtosa'
+            const obert = oberts[p.fila] ?? obertPerDefecte(p)
             const rolsFila = rols[p.fila] ?? f?.rols ?? []
             const casselles = (
               <div className="flex flex-wrap gap-x-4" data-testid="ie-rols">
@@ -494,9 +500,9 @@ function Revisio({
             const que = (
               <span className="text-sm">
                 {t(`ie.prev_${p.accio_prevista}`)}
-                {p.omplira.length > 0 && p.accio_prevista !== 'crear' && (
+                {p.canvis.length > 0 && p.accio_prevista !== 'crear' && (
                   <span className="block text-xs text-muted-foreground">
-                    {t('ie.omplira')}: {campsOmplerts(p.omplira).map((c) => t(`ie.camp_${c}`)).join(', ')}
+                    {t('ie.canviara')}: {campsCanviats(p.canvis).map((c) => t(`ie.camp_${c}`)).join(', ')}
                   </span>
                 )}
               </span>
@@ -532,7 +538,7 @@ function FilaRevisio({
   const errors = p.errors.map((e) => textCodi(t, e))
   return (
     <>
-      <TableRow data-testid="ie-fila" data-fila={p.fila} data-estat={p.estat}>
+      <TableRow data-testid="ie-fila" data-fila={p.fila} data-estat={p.estat} data-accio={p.accio_prevista}>
         <TableCell className="text-left">
           <span className="flex flex-wrap items-center gap-2">
             <Badge className={CLASSE_ESTAT[p.estat]}>{t(`ie.est_${p.estat}`)}</Badge>
@@ -541,6 +547,11 @@ function FilaRevisio({
           </span>
           <span className="mt-1 block font-medium">{f?.nom ?? t('ie.sense_nom')}</span>
           {f?.nif && <span className="block text-xs tabular-nums text-muted-foreground">{f.nif}</span>}
+          {p.identificada_per && (
+            <span className="block text-xs text-muted-foreground" data-testid="ie-identificada" data-per={p.identificada_per}>
+              {t(`ie.per_${p.identificada_per}`)}
+            </span>
+          )}
           <div className="mt-1 md:hidden">{casselles}</div>
           <div className="mt-1 lg:hidden">{que}</div>
         </TableCell>
@@ -587,17 +598,7 @@ function FilaRevisio({
                   </div>
                 </div>
               )}
-              {p.omplira.length > 0 && (
-                <p><span className="font-medium">{t('ie.omplira')}:</span> {campsOmplerts(p.omplira).map((c) => t(`ie.camp_${c}`)).join(', ')}</p>
-              )}
-              {p.conflictes.length > 0 && (
-                <div>
-                  <p className="font-medium">{t('ie.conflictes')}</p>
-                  <ul className="list-disc space-y-0.5 pl-5">
-                    {p.conflictes.map((c, i) => <li key={i} className="break-words">{textConflicte(t, c)}</li>)}
-                  </ul>
-                </div>
-              )}
+              {p.accio_prevista !== 'crear' && <LlistaCanvis fila={p.fila} canvis={p.canvis} />}
               {avisos.length > 0 && (
                 <div>
                   <p className="font-medium text-aviso">{t('ie.avisos')}</p>
@@ -610,7 +611,7 @@ function FilaRevisio({
                   <ul className="list-disc space-y-0.5 pl-5 text-error">{errors.map((a, i) => <li key={i} className="break-words">{a}</li>)}</ul>
                 </div>
               )}
-              {!avisos.length && !errors.length && !p.conflictes.length && !p.omplira.length && p.estat !== 'dubtosa' && (
+              {!avisos.length && !errors.length && (!p.canvis.length || p.accio_prevista === 'crear') && p.estat !== 'dubtosa' && (
                 <p className="text-muted-foreground">{t('ie.res_a_dir')}</p>
               )}
             </div>
@@ -618,6 +619,45 @@ function FilaRevisio({
         </TableRow>
       )}
     </>
+  )
+}
+
+// ---------------------------------------------------------------------------
+// Los cambios de una fila (B4): en la revisión, lo que cambiará; en el resultado, lo que cambió
+// ---------------------------------------------------------------------------
+
+/**
+ * «Canviarà» / «Ha canviat»: cada campo con su valor de antes y el nuevo (`— → …` si era un
+ * hueco); la nota, el bloque que se añade al comentario. Los cambios repetidos de una
+ * organización de doble rol (uno por ficha) salen una vez (`agrupaCanvis`).
+ */
+function LlistaCanvis({ fila, canvis, fet = false, className = '' }: {
+  fila: number; canvis: readonly ImportacioCanvi[]; fet?: boolean; className?: string
+}) {
+  const { t } = useT()
+  const llista = agrupaCanvis(canvis)
+  if (llista.length === 0) return null
+  return (
+    <div className={className} data-testid="ie-canvis" data-fila={fila}>
+      <p className="font-medium">{t(fet ? 'ie.canviat' : 'ie.canviara')}</p>
+      <ul className="list-disc space-y-0.5 pl-5">
+        {llista.map((c, i) => (
+          <li key={i} className="break-words" data-testid="ie-canvi" data-camp={c.camp}>
+            {c.camp === 'nota' ? (
+              <>
+                {t(fet ? 'ie.canvi_nota_fet' : 'ie.canvi_nota')}
+                <span className="mt-0.5 block whitespace-pre-line break-words text-xs text-muted-foreground">{c.despres}</span>
+              </>
+            ) : (
+              <>
+                <span className="font-medium">{t(`ie.camp_${c.camp}`)}</span>
+                {': '}{c.abans === null ? '—' : `«${c.abans}»`}{' → '}{c.despres === null ? '—' : `«${c.despres}»`}
+              </>
+            )}
+          </li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -667,13 +707,8 @@ function Resultat({ resultat, perFila }: { resultat: ResultatImportacio; perFila
                     <span className="text-xs text-muted-foreground">{t('ie.fila', { n: r.fila })}</span>
                   </span>
                   <span className="mt-1 block font-medium">{f?.nom ?? t('ie.sense_nom')}</span>
-                  {r.camps_omplerts.length > 0 && r.accio !== 'creada' && (
-                    <span className="block text-xs text-muted-foreground">
-                      {t('ie.omplira')}: {campsOmplerts(r.camps_omplerts).map((c) => t(`ie.camp_${c}`)).join(', ')}
-                    </span>
-                  )}
+                  {r.accio !== 'creada' && <LlistaCanvis fila={r.fila} canvis={r.canvis} fet className="mt-1 text-xs" />}
                   {conveni && <span className="block text-xs text-aviso" data-testid="ie-conveni">{t('ie.conveni_info', { dades: conveni })}</span>}
-                  {r.conflictes.map((c, i) => <span key={`c${i}`} className="block text-xs text-muted-foreground">{textConflicte(t, c)}</span>)}
                   {avisos.map((a, i) => <span key={`a${i}`} className="block text-xs text-aviso">{a}</span>)}
                   {errors.map((e, i) => <span key={`e${i}`} className="block text-xs text-error">{e}</span>)}
                 </TableCell>
