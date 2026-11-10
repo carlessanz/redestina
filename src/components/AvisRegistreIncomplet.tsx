@@ -21,7 +21,7 @@ import { useT } from '../lib/i18n'
 import { Button } from '@/components/ui/button'
 
 // La banda NO se pinta en la pantalla a la que manda (§6ter, mismo criterio que
-// `AvisDiagnostic`): en /organitzacio invitaba a ir donde ya estabas.
+// `AvisOperativa`): en /organitzacio invitaba a ir donde ya estabas.
 const RUTES_MUDES = ['/organitzacio']
 
 export default function AvisRegistreIncomplet({ falten }: { falten: string[] }) {

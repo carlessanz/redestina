@@ -15,6 +15,7 @@ import { toast } from 'sonner'
 import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
+import { refrescaAvisos } from '../lib/refrescAvisos'
 import { creaUbicacio } from '../lib/ofertes'
 import type { DadesLloc } from '../lib/ofertes'
 import { Textarea } from '@/components/ui/textarea'
@@ -101,6 +102,8 @@ export default function LlocsRecollida({
     setUbicacions((u) => [...u, { ...r.data!, gmaps_url: llocNou.maps.trim() || null, ...extraDe(llocNou) }])
     setLlocNou(null)
     toast.success(t('org.place_added'))
+    // La marca «Completa la teva Operativa» del menú vive en AppShell (`useOperativaPendent`).
+    refrescaAvisos()
   }
 
   async function esborra(u: Ubicacio) {
@@ -118,6 +121,7 @@ export default function LlocsRecollida({
     if (error) { toast.error(error.code === '23503' ? t('org.place_in_use') : textError(t, error.message)); return }
     if (!data || data.length === 0) { toast.error(t('c.error')); return }
     setUbicacions((l) => l.filter((x) => x.id !== u.id))
+    refrescaAvisos()
   }
 
   return (

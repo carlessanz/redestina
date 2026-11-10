@@ -1,4 +1,8 @@
-// `/equip/diagnostics` — en qué punto está el diagnóstico de cada organización.
+// `/equip/diagnostics` — en qué punto está el diagnóstico operativo de cada productor.
+//
+// Desde A1 (`20270520100000`) hay un diagnóstico por productor y cuatro estados (sin
+// cuestionario · sin empezar · a medias · contestado): las columnas del plan básico
+// (medidas, número) se fueron con él.
 //
 // Una sola llamada (`diagnostics_equip()`) trae las fichas con su estado ya calculado, igual
 // que `pendents_equip()` trae la cola de trabajo: el cálculo de «qué falta» vive en SQL y no
@@ -9,10 +13,8 @@
 //    las organizaciones y lo seguirán estando— y ahogaría las colas que sí bloquean el
 //    circuito. Aquí la cifra significa algo porque va junto al filtro que la explica.
 //
-// Los filtros son los tres con los que se reparte este trabajo: el **estado** dice qué hay
-// que hacer hoy, el **papel** separa a quien genera de quien recibe (son dos cuestionarios
-// distintos, no dos vistas del mismo) y el buscador encuentra una organización concreta.
-// Se filtra en cliente sobre lo ya cargado, como `Convenis` y `Albarans` (deuda §12.5).
+// Los filtros: el **estado** dice qué hay que hacer hoy y el buscador encuentra una
+// organización concreta. Se filtra en cliente sobre lo ya cargado, como `Convenis` y `Albarans` (deuda §12.5).
 
 import { useEffect, useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router'
@@ -62,18 +64,14 @@ export default function Diagnostics() {
   const visibles = useMemo(() => {
     return files.filter((f) => {
       if (estat !== TOTS && f.estat !== estat) return false
-      return casaCerca([f.nom, f.numero], q)
+      return casaCerca([f.nom], q)
     })
   }, [files, q, estat])
 
   // Lo que de verdad queda por hacer. `sense_questionari` no entra: eso no es trabajo de
   // esta pantalla sino de la configuración, y contarlo aquí lo convertiría en una cifra que
   // nadie puede bajar desde aquí.
-  // Desde la fase 9 el diagnóstico es del productor y el plan, un servicio: lo pendiente para
-  // el equipo es lo que no se ha empezado, lo que está a medias y el plan preparado sin emitir.
-  const pendents = files.filter(
-    (f) => f.estat === 'sense_comencar' || f.estat === 'incomplet' || f.estat === 'a_punt',
-  ).length
+  const pendents = files.filter((f) => f.estat === 'sense_comencar' || f.estat === 'incomplet').length
 
   return (
     <Card>
@@ -119,9 +117,8 @@ export default function Diagnostics() {
               </p>
             : (
               // El criterio de las tablas (03-11-2026, AGENTS.md §2): sin scroll horizontal a
-              // 360 px. En móvil, organización (enlazada, con la fecha y el número debajo mientras
-              // no tienen columna), estado y la acción; «Falten» desde `md`, la fecha y las
-              // medidas desde `lg`, el número desde `xl`.
+              // 360 px. En móvil, organización (enlazada, con la fecha debajo mientras no tiene
+              // columna), estado y la acción; «Falten» desde `md` y la fecha desde `lg`.
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -129,8 +126,6 @@ export default function Diagnostics() {
                     <TableHead className="hidden lg:table-cell">{t('diagl.c_updated')}</TableHead>
                     <TableHead>{t('diagl.c_status')}</TableHead>
                     <TableHead className="hidden md:table-cell">{t('diagl.c_missing')}</TableHead>
-                    <TableHead className="hidden lg:table-cell">{t('diagl.c_measures')}</TableHead>
-                    <TableHead className="hidden xl:table-cell">{t('diagl.c_number')}</TableHead>
                     <TableHead className="w-15">
                       <span className="sr-only md:not-sr-only">{t('doc.c_actions')}</span>
                     </TableHead>
@@ -152,9 +147,6 @@ export default function Diagnostics() {
                           <span className="block text-xs font-normal text-muted-foreground lg:hidden">
                             {dataCurta(f.darrera_actualitzacio)}
                           </span>
-                          {f.numero && (
-                            <span className="block text-xs font-normal tabular-nums text-muted-foreground xl:hidden">{f.numero}</span>
-                          )}
                         </TableCell>
                         {/* La ficha viva (fase 9): cuándo se actualizó por última vez. */}
                         <TableCell className="hidden text-center whitespace-nowrap text-muted-foreground lg:table-cell">
@@ -167,12 +159,6 @@ export default function Diagnostics() {
                         </TableCell>
                         <TableCell className="hidden text-center tabular-nums md:table-cell">
                           {f.falten_n > 0 ? f.falten_n : '—'}
-                        </TableCell>
-                        <TableCell className="hidden text-center tabular-nums lg:table-cell">
-                          {f.mesures_n > 0 ? f.mesures_n : '—'}
-                        </TableCell>
-                        <TableCell className="hidden text-center whitespace-nowrap tabular-nums text-muted-foreground xl:table-cell">
-                          {f.numero ?? '—'}
                         </TableCell>
                         <TableCell>
                           <div className="flex flex-col items-center justify-center gap-1 md:flex-row">

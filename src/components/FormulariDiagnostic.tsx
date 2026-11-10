@@ -1,32 +1,27 @@
-// EL formulario del diagnóstico de prevención. Uno solo, para los tres sitios donde se
-// contesta: el panel de la organización (`/organitzacio/diagnostic`), la ficha del equipo
-// (`/equip/diagnostics/:tipus/:id`) y cualquier acompañamiento asistido que venga después.
+// EL formulario del diagnóstico operativo del productor (A1, `20270520100000`).
 //
-// Es el patrón de `FirmaConveni` y `FormulariNovaOferta`: el formulario vive en
-// `components/`, la pantalla es el marco, y **el tipo y la organización entran por prop**.
-// No se deducen de `useOrganitzacio()` porque un interno no tiene ninguna organización
-// propia — y el diagnóstico es, antes que nada, un servicio asistido (§1bis).
+// Desde A1 lo rellena SOLO EL EQUIPO (D5), con la persona delante o al teléfono: se monta en
+// `/equip/diagnostics/productor/:id` (`DiagnosticDetall`). El productor lo LEE en «El meu
+// diagnòstic» (`ResumDiagnostic`), y `desar_diagnostic()` le respondería `42501`.
 //
-// 🔴 DESDE LA FASE 9 (revisión del 08-10-2026) EL DIAGNÓSTICO NO GENERA EL PLAN: es una
-//    ficha operativa viva. Se abre con la última versión guardada (`diagnostics_historial`)
-//    aunque el equipo ya haya emitido un plan y no quede borrador.
+// 🔴 HAY UN SOLO DIAGNÓSTICO POR PRODUCTOR (D1), en `diagnostics`, que se sobrescribe. El
+//    formulario se abre con lo último guardado (`diagnosticActual`) y guardar ya no toca
+//    ningún plan: el plan es el expediente (D4).
 //
-// 🔴 SE GUARDA SIEMPRE, COMPLETO O NO, y por eso hay dos botones y no uno. Doce preguntas no
-//    se contestan de una sentada: si «Desar» exigiera el cuestionario entero, lo tecleado se
-//    perdería cada vez que alguien se levanta. La base ya está construida así
-//    (`desar_diagnostic` guarda y **luego** decide si genera el plan), y esta pantalla solo
-//    tiene que no estropearlo.
+// 🔴 SE GUARDA SIEMPRE, COMPLETO O NO, con un solo botón. Si está completo lo dice el
+//    SERVIDOR (`complet`, `falten`) y se enseña como badge: un cuestionario largo no se
+//    contesta de una sentada, y exigirlo entero para guardar haría perder lo tecleado.
 //
 // ⚠️ LO QUE SE VE NO ES TODO LO QUE HAY. Las preguntas condicionales se ocultan con
 //    `preguntaAplica()`, que es una **reimplementación** de la gramática que vive en SQL
-//    (ver la cabecera de `lib/diagnostic.ts`). Por eso lo que decide si el plan se puede
-//    generar no es esta pantalla: es `falten` tal como lo devuelve el servidor. Aquí se
-//    calcula en local solo para poder señalar las preguntas en rojo mientras se escribe.
+//    (ver la cabecera de `lib/diagnostic.ts`). Lo que decide si está completo es `falten`
+//    tal como lo devuelve el servidor; aquí se calcula en local solo para señalar las
+//    preguntas pendientes y el punto de cada chip de sección mientras se escribe.
 //
-// ⚠️ EL PREFILL SE MARCA. Un valor propuesto desde la ficha se enseña con su nota («proposat
-//    des de la teva fitxa») hasta que alguien lo toca. Sin la marca sería indistinguible de
-//    una respuesta dada, y `prefill` existe justamente para no escribir en el diagnóstico
-//    algo que la persona no ha dicho (20270328101600).
+// ⚠️ EL PREFILL SE MARCA. Un valor propuesto desde la ficha se enseña con su nota hasta que
+//    alguien lo toca. Sin la marca sería indistinguible de una respuesta dada, y `prefill`
+//    existe justamente para no escribir en el diagnóstico algo que la persona no ha dicho
+//    (20270328101600).
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { AlertTriangle, Loader2 } from 'lucide-react'
@@ -35,26 +30,25 @@ import { useT } from '../lib/i18n'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { textError } from '../lib/textError'
 import { FilaCasella } from './Casella'
-import PasosProces from './proces/PasosProces'
-import QueTocaAra from './proces/QueTocaAra'
+import NavSeccionsDiagnostic from './diagnostic/NavSeccionsDiagnostic'
 import {
-  agrupaPerSeccio, esBuit, llistaDe, mesosValids, netejaRespostes, obligatoriesQueFalten,
-  opcionsProductes, opcionsVisibles, passosDiagnostic, prefillDesDeFitxa, progresDiagnostic,
-  puntDiagnostic, textBilingue,
+  agrupaPerSeccio, esBuit, estilEstatDiagnostic, idSeccio, llistaDe, mesosValids, netejaRespostes,
+  obligatoriesQueFalten, opcionsProductes, opcionsVisibles, prefillDesDeFitxa, progresDiagnostic,
+  seccionsAmbEstat, textBilingue,
 } from '../lib/diagnostic'
 import type { Respostes } from '../lib/diagnostic'
 import {
-  desarDiagnostic, diagnosticEstat, historialDiagnostic, plaEsborrany, questionariVigent,
+  desarDiagnostic, diagnosticActual, diagnosticEstat, questionariVigent,
 } from '../lib/diagnosticApi'
 import { carregaCataleg } from '../lib/fotosProducte'
 import { supabase } from '../lib/supabase'
-import { dataHora } from '../lib/format'
+import { dataCurta } from '../lib/format'
 import XipsTria from './XipsTria'
-import type { TipusOrg } from '../lib/diagnosticApi'
 import type {
-  DiagnosticEstat, OpcioPregunta, PreguntaDiagnostic, QuestionariDiagnostic, SobreDiagnostic,
+  DiagnosticEstat, OpcioPregunta, PreguntaDiagnostic, QuestionariDiagnostic,
 } from '../types'
 import { cn } from '../lib/utils'
+import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -68,22 +62,21 @@ import {
 const CAP = '__cap'
 
 export interface Props {
-  tipusOrg: TipusOrg
+  /** El productor (`productores.id`). Desde A1 el diagnóstico es solo de productores. */
   orgId: string
   /**
-   * `true` = lo conduce el equipo con la persona delante (modelo asistido). Solo cambia lo
-   * que se dice —quién contesta—, nunca lo que se guarda: la RPC es la misma y deja el
-   * mismo borrador, que es lo que hace que los dos caminos produzcan el mismo documento.
+   * `true` = lo conduce el equipo con la persona delante (modelo asistido): lo dice arriba.
+   * Desde A1 es el único caso real (D5); queda como prop para que el aviso sea explícito.
    */
   assistit?: boolean
-  /** La ficha de la organización, para proponer valores. Ver la nota de la cabecera. */
+  /** La ficha del productor, para proponer valores. Ver la nota de la cabecera. */
   prefill?: Record<string, unknown> | null
   /** Se llama después de cada guardado, para que la pantalla refresque lo que enseñe. */
-  onDesat?: (r: { complet: boolean; pla: string; mesuresN: number }) => void | Promise<void>
+  onDesat?: (r: { complet: boolean }) => void | Promise<void>
 }
 
 export default function FormulariDiagnostic({
-  tipusOrg, orgId, assistit = false, prefill = null, onDesat,
+  orgId, assistit = false, prefill = null, onDesat,
 }: Props) {
   const { t, lang } = useT()
   const [questionari, setQuestionari] = useState<QuestionariDiagnostic | null>(null)
@@ -93,23 +86,22 @@ export default function FormulariDiagnostic({
   const [notes, setNotes] = useState('')
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [desant, setDesant] = useState<null | 'parcial' | 'complet'>(null)
+  const [desant, setDesant] = useState(false)
   /** El catálogo y los lugares de la ficha: lo que necesitan los tipos de la fase 9. */
   const [dades, setDades] = useState<DadesControls>({ cataleg: [], llocs: [] })
 
   const carrega = useCallback(async () => {
     setCarregant(true)
-    const [q, pla, est, hist, cataleg, llocs] = await Promise.all([
-      questionariVigent(tipusOrg),
-      plaEsborrany(tipusOrg, orgId),
-      diagnosticEstat(tipusOrg, orgId),
-      historialDiagnostic(tipusOrg, orgId, 1),
+    const [q, diag, est, cataleg, llocs] = await Promise.all([
+      questionariVigent('productor'),
+      diagnosticActual(orgId),
+      diagnosticEstat('productor', orgId),
       carregaCataleg(),
-      tipusOrg === 'productor'
-        ? supabase.from('productor_ubicaciones').select('id, alias, municipio').eq('productor_id', orgId)
-        : Promise.resolve({ data: [] }),
+      supabase.from('productor_ubicaciones').select('id, alias, municipio').eq('productor_id', orgId),
     ])
     if (!q.ok) { setError(q.missatge); setCarregant(false); return }
+    // Sin poder leer lo guardado no se abre el formulario: guardarlo vacío pisaría la fila.
+    if (!diag.ok) { setError(diag.missatge); setCarregant(false); return }
     setError(null)
     setQuestionari(q.data)
     setEstat(est.ok ? est.data : null)
@@ -118,13 +110,9 @@ export default function FormulariDiagnostic({
       llocs: ((llocs.data ?? []) as { id: string; alias: string | null; municipio: string | null }[]),
     })
 
-    // La ficha viva: manda el borrador si lo hay; si no, la última versión guardada (el
-    // equipo puede haber emitido un plan y entonces ya no hay borrador).
-    const sobre = pla.ok ? (pla.data?.respuestas as SobreDiagnostic | undefined) : undefined
-    const darrera = hist.ok ? hist.data[0] : undefined
-    const desades: Respostes = (sobre?.respostes_crues as Respostes | undefined)
-      ?? darrera?.respostes ?? {}
-    setNotes(typeof sobre?.notes === 'string' ? sobre.notes : (darrera?.notes ?? ''))
+    // EL diagnóstico (D1): lo último guardado, tal cual se tecleó.
+    const desades: Respostes = diag.data?.respostes ?? {}
+    setNotes(diag.data?.notes ?? '')
 
     // La propuesta solo llena los huecos: lo que ya se contestó una vez manda siempre sobre
     // lo que diga la ficha. Al revés, corregir una respuesta y volver a entrar la
@@ -138,14 +126,15 @@ export default function FormulariDiagnostic({
     setRespostes(inicials)
     setProposats(marcats)
     setCarregant(false)
-  }, [tipusOrg, orgId, prefill])
+  }, [orgId, prefill])
 
   useEffect(() => { void carrega() }, [carrega])
 
   // En su propio `useMemo` y no un `??` suelto: un array nuevo en cada render haría que los
-  // tres `useMemo` de abajo recalcularan siempre, que es lo que `react-hooks` señala.
+  // `useMemo` de abajo recalcularan siempre, que es lo que `react-hooks` señala.
   const preguntes = useMemo(() => questionari?.preguntes ?? [], [questionari])
   const seccions = useMemo(() => agrupaPerSeccio(preguntes, respostes), [preguntes, respostes])
+  const estatSeccions = useMemo(() => seccionsAmbEstat(seccions, respostes), [seccions, respostes])
   const falten = useMemo(() => obligatoriesQueFalten(preguntes, respostes), [preguntes, respostes])
   const progres = useMemo(() => progresDiagnostic(preguntes, respostes), [preguntes, respostes])
 
@@ -165,13 +154,13 @@ export default function FormulariDiagnostic({
     })
   }
 
-  async function desa(mode: 'parcial' | 'complet') {
+  async function desa() {
     if (desant) return
-    setDesant(mode)
+    setDesant(true)
     const r = await desarDiagnostic(
-      tipusOrg, orgId, netejaRespostes(preguntes, respostes),
+      'productor', orgId, netejaRespostes(preguntes, respostes),
       notes.trim() === '' ? null : notes.trim(), lang)
-    setDesant(null)
+    setDesant(false)
     if (!r.ok) { toast.error(textError(t, r)); return }
 
     if (r.data.complet) {
@@ -179,12 +168,11 @@ export default function FormulariDiagnostic({
     } else {
       toast.success(t('diag.saved_partial', { n: r.data.falten.length }))
     }
-    // La banda del diagnóstico vive en AppShell y no se enteraría sola (refrescAvisos.ts).
+    // La banda de la Operativa vive en AppShell y no se enteraría sola (refrescAvisos.ts).
     refrescaAvisos()
-    // Se recarga SIEMPRE, también tras un guardado parcial: la respuesta trae `falten` tal
-    // como lo ve el servidor, y esa es la lista que manda sobre la que se calcula aquí.
+    // Se recarga SIEMPRE: el estado que manda es el que calcula el servidor.
     await carrega()
-    await onDesat?.({ complet: r.data.complet, pla: r.data.pla, mesuresN: r.data.mesures_n })
+    await onDesat?.({ complet: r.data.complet })
   }
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
@@ -203,35 +191,31 @@ export default function FormulariDiagnostic({
     )
   }
 
-  // La organización no puede leer «Diagnòstic contestat» con 0 respuestas y obligatorias por
-  // contestar: pasa cuando el estado del servidor viene de un plan emitido con el cuestionario
-  // ANTERIOR (v1) y el vigente es otro (v2). Lo que le dice la pantalla es lo que ve en ella.
-  let estatServidor = estat?.estat ?? 'sense_comencar'
-  if (!assistit && falten.length > 0
-    && (estatServidor === 'complet' || estatServidor === 'a_punt' || estatServidor === 'emes')) {
-    estatServidor = progres.contestades === 0 ? 'sense_comencar' : 'incomplet'
-  }
-
-  const punt = puntDiagnostic({
-    estat: estatServidor,
-    faltenN: falten.length,
-    mesuresN: estat?.mesures_n ?? 0,
-    numero: estat?.numero ?? null,
-  }, assistit ? 'equip' : 'org')
+  // El estado lo dice el servidor (lo GUARDADO), no lo que hay tecleado sin guardar.
+  const estatServidor = estat?.estat ?? 'sense_comencar'
 
   return (
-    <div className="space-y-4">
+    <div className="space-y-4" data-testid="formulari-diagnostic">
       <Card>
-        <CardHeader className="gap-3">
-          <CardTitle>{textBilingue(questionari.titol, lang)}</CardTitle>
-          <PasosProces etapes={passosDiagnostic(assistit ? 'equip' : 'org')} actual={punt.index} />
+        <CardHeader className="gap-2">
+          <CardTitle className="flex flex-wrap items-center gap-2">
+            <span>{textBilingue(questionari.titol, lang)}</span>
+            <Badge className={estilEstatDiagnostic(estatServidor)} data-testid="estat-diagnostic">
+              {t(`diag.st_${estatServidor}`)}
+            </Badge>
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">
+            {t('diag.progress', { n: progres.contestades, total: progres.total })}
+            {estat?.actualitzat_at && (
+              <> · {estat.actualitzat_per_nom
+                ? t('diag.actualitzat_per', { data: dataCurta(estat.actualitzat_at), nom: estat.actualitzat_per_nom })
+                : t('diag.actualitzat', { data: dataCurta(estat.actualitzat_at) })}</>
+            )}
+          </p>
         </CardHeader>
         <CardContent className="space-y-3">
-          <QueTocaAra punt={punt} compacte />
-
           {/* Que el cuestionario sea texto de trabajo se dice ARRIBA y no en letra pequeña:
-              un plan emitido con él lo lleva impreso, así que quien lo contesta tiene que
-              saberlo antes de empezar, no después. */}
+              lo que salga de él lo lleva impreso. */}
           {questionari.provisional && (
             <div className="flex items-start gap-2 rounded-lg border border-aviso/30 bg-aviso-fondo px-3 py-2 text-sm text-aviso">
               <AlertTriangle className="mt-0.5 size-4 shrink-0" aria-hidden />
@@ -244,20 +228,22 @@ export default function FormulariDiagnostic({
               {t('diag.assisted_hint')}
             </p>
           )}
-
-          <p className="text-sm text-muted-foreground">
-            {t('diag.progress', { n: progres.contestades, total: progres.total })}
-            {estat?.darrera_actualitzacio && (
-              <> · {t('diag.darrera', { data: dataHora(estat.darrera_actualitzacio) })}</>
-            )}
-          </p>
         </CardContent>
       </Card>
 
+      {/* Los chips, pegados arriba mientras se baja: es lo que deja saltar a una sección
+          sin recorrer la página entera. */}
+      <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur">
+        <NavSeccionsDiagnostic seccions={estatSeccions} />
+      </div>
+
       {seccions.map((s) => (
-        <Card key={s.seccio}>
+        <Card key={s.seccio} className="scroll-mt-24">
           <CardHeader>
-            <CardTitle className="text-base">{s.clau ? t(s.clau) : s.seccio}</CardTitle>
+            {/* `tabIndex={-1}`: el chip le lleva el foco al llegar (teclado y lector de pantalla). */}
+            <CardTitle id={idSeccio(s.seccio)} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
+              {s.clau ? t(s.clau) : s.seccio}
+            </CardTitle>
           </CardHeader>
           <CardContent className="space-y-6">
             {s.preguntes.map((p) => (
@@ -297,28 +283,16 @@ export default function FormulariDiagnostic({
             <p className="text-sm text-aviso">{t('diag.missing', { n: falten.length })}</p>
           )}
 
-          {/* Dos botones, y el de la izquierda NUNCA está gris: guardar a medias es
-              exactamente lo que esta pantalla tiene que permitir. El de la derecha sí se
-              apaga cuando falta algo, y entonces la línea de arriba dice cuánto. */}
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => void desa('complet')}
-              disabled={desant !== null || falten.length > 0}
-              className="min-h-11 whitespace-normal"
-            >
-              {desant === 'complet' && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {t('diag.save_generate')}
-            </Button>
-            <Button
-              variant="outline"
-              onClick={() => void desa('parcial')}
-              disabled={desant !== null}
-              className="min-h-11 whitespace-normal"
-            >
-              {desant === 'parcial' && <Loader2 className="size-4 animate-spin" aria-hidden />}
-              {t('diag.save_later')}
-            </Button>
-          </div>
+          {/* UN botón, y NUNCA gris por faltar algo: guardar a medias es exactamente lo que
+              esta pantalla tiene que permitir. Si queda completo lo dice el servidor. */}
+          <Button
+            onClick={() => void desa()}
+            disabled={desant}
+            className="min-h-11 w-full whitespace-normal sm:w-auto"
+          >
+            {desant && <Loader2 className="size-4 animate-spin" aria-hidden />}
+            {t('diag.save')}
+          </Button>
         </CardContent>
       </Card>
     </div>

@@ -145,7 +145,8 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
   { clau: 'tipo_receptor', columnes: { entidades: 'tipo_receptor' }, bloc: 'receptor', tipus: 'select',
     opcions: ['social', 'animal', 'transformador', 'comercial'], etiquetaOpcio: 'org.tr_',
     labelKey: 'f.tipo_receptor', veu: 'tots', edita: 'equip' },
-  { clau: 'modalitats_interes', columnes: { entidades: 'modalitats_interes' }, bloc: 'receptor', tipus: 'xips_modalitats',
+  // En «Diagnòstic i perfil» desde A1, junto a las preferencias de recepción (como en «El meu perfil de recepció»).
+  { clau: 'modalitats_interes', columnes: { entidades: 'modalitats_interes' }, bloc: 'diagnostic', tipus: 'xips_modalitats',
     labelKey: 'org.f_modalitats_interes', ajudaKey: 'org.h_modalitats_interes', veu: 'tots', edita: 'tots', ample: 'full' },
   { clau: 'horario', columnes: { entidades: 'horario' }, bloc: 'receptor',
     labelKey: 'org.f_horari', veu: 'tots', edita: 'tots' },

@@ -239,14 +239,16 @@ src/
     GestorWhitelist.tsx        Las dos whitelists de prueba (Meta y correo); vive en Configuració
     equip/DadesFundacio.tsx    Los datos fiscales de la Fundación, en Configuració: es lo que
                                desbloquea el certificado REAL (§12.10). Solo super_admin
-    FormulariDiagnostic.tsx    EL cuestionario, uno para los tres sitios (propio, asistido y
-                               ficha del equipo): el patrón de FirmaConveni
-    PlaPrevencio.tsx           Las medidas por bloque, la edición del equipo y la emisión
-    TargetaDiagnostic.tsx      El estado y el botón, en la ficha y en el panel externo
+    FormulariDiagnostic.tsx    EL cuestionario; desde A1 (10-11-2026) solo lo usa el equipo
+                               (/equip/diagnostics/productor/:id), con un botón «Desa» y chips de sección
+    diagnostic/                ResumDiagnostic (lectura: ficha y «El meu diagnòstic») y
+                               NavSeccionsDiagnostic (un chip por sección, clic = ir a ella) — A1
+    TargetaDiagnostic.tsx      La tarjeta de lectura en «La meva organització» (solo modo extern, A1)
     TargetaPerfilRecepcio.tsx  La tarjeta que lleva al perfil de recepción del receptor (fase 9)
     expedient/                 ExpedientVista y TaulaElements: el Pla de Prevenció como expediente (fase 11)
-    AvisDiagnostic.tsx         La banda, en tono aviso: el diagnóstico NO bloquea operar
-    equip/EditorDiagnostic.tsx El cuestionario, las medidas y las reglas, desde Configuració
+    AvisOperativa.tsx          La banda «Completa la teva Operativa» (A1: sin ningún lugar de recogida);
+                               sustituye a AvisDiagnostic. Con useOperativaPendent (hooks/)
+    equip/EditorDiagnostic.tsx El cuestionario, desde Configuració (medidas y reglas retiradas en A1)
     EnllacOrganitzacio.tsx     Con quién comparte organización una ficha, el botón de separarla y
                                el aviso si el nombre o el NIF no coinciden entre las dos (D1 del
                                plan de organización unificada, 22-09-2026). Solo del equipo: lee

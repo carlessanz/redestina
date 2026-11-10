@@ -553,6 +553,52 @@ function etiquetaBloque(t: DiccionarioPlan, bloc: string): string {
   return t.blocs[bloc] ?? (bloc !== "" ? bloc : t.bloc_altres);
 }
 
+/** Una respuesta del diagnóstico ya convertida en texto: sección, pregunta y respuesta. */
+export interface RespostaLlegible {
+  /** El rótulo de la sección en el idioma pedido («Productes», «Causas»…), no su código. */
+  seccio: string;
+  pregunta: string;
+  resposta: string;
+}
+
+/**
+ * Las respuestas de un diagnóstico (`diagnostics.sobre.respostes`, el mismo formato que
+ * `compondre_respostes()` deja en el plan) como filas legibles, para quien las pinte fuera
+ * de este módulo —hoy, el PDF del expediente (`expedient.ts`)—.
+ *
+ * Es la MISMA lógica que la tabla «Respostes del diagnòstic» de `renderPla()`
+ * (`textoIdioma` para la pregunta, `respuestaLegible` para la respuesta, el orden de
+ * `ORDEN_BLOQUES` para las secciones), sacada a una función pura para que los dos papeles
+ * no puedan contar lo mismo de dos maneras. `renderPla()` no la usa a propósito: los PLA
+ * emitidos se regeneran con él y su salida no se toca.
+ *
+ * Diferencia deliberada con el plan: aquí se descartan las respuestas sin valor (lo que
+ * saldría «—»). El expediente es un resumen del diagnóstico vivo, no el acta de un
+ * cuestionario cerrado, y una fila vacía no le dice nada a quien lo lee.
+ */
+export function respostesLlegibles(respostes: unknown, lengua: "ca" | "es"): RespostaLlegible[] {
+  if (!Array.isArray(respostes)) return [];
+  const t = lengua === "es" ? ES : CA;
+  const validas = (respostes as unknown[])
+    .filter((r): r is RespuestaPlan => r !== null && typeof r === "object")
+    .filter((r) => r.pregunta || r.id);
+  const salida: RespostaLlegible[] = [];
+  for (const grupo of agruparPorBloque(validas, (r) => (r.seccio ?? "").trim())) {
+    const seccio = etiquetaBloque(t, grupo.bloc);
+    for (const r of grupo.items) {
+      const resposta = respuestaLegible(r, t, lengua);
+      if (resposta === "" || resposta === t.buit) continue;
+      salida.push({
+        seccio,
+        // 🔴 `textoIdioma`, nunca `String(r.pregunta)`: es `{ca, es}` (ver cabecera).
+        pregunta: textoIdioma(r.pregunta, lengua) || String(r.id ?? ""),
+        resposta,
+      });
+    }
+  }
+  return salida;
+}
+
 // ---------------------------------------------------------------------------
 // El documento
 // ---------------------------------------------------------------------------

@@ -17,12 +17,14 @@ import {
   codigoVerificacion,
   domicilioCompleto,
   fechaLarga,
+  fechaLargaConArticulo,
   type OrganizacionCierre,
   paresLlenos,
   type Renderizado,
 } from "./cierre.ts";
 import { avancAccions, comparativaAnual } from "../../expedient.ts";
 import { peuFundacio } from "../fundacio.ts";
+import { respostesLlegibles, textoIdioma, type TextoBilingue } from "./pla.ts";
 
 type Fila = Record<string, unknown>;
 
@@ -42,7 +44,21 @@ export interface DatosExpedient {
   objectius_estrategics?: string[] | null;
   context?: string | null;
   equip?: { nom?: string; carrec?: string }[] | null;
-  mesures_pla_basic?: { titol?: string; obligatoria?: boolean }[] | null;
+  /**
+   * Las medidas del plan básico enlazado. Desde A1 (`20270520100000`) siempre llega, `[]`
+   * sin plan. `titol` puede ser `{ca, es}`: se imprime con `textoIdioma`, nunca con `String()`.
+   */
+  mesures_pla_basic?: { titol?: string | TextoBilingue | null; obligatoria?: boolean | null }[] | null;
+  /**
+   * El diagnóstico único del productor (A1): `expedient_datos().diagnostic`, presente solo si
+   * lo hay. Cada respuesta es autocontenida, como en el plan (`RespuestaPlan` de `pla.ts`):
+   * `{id, tipus, seccio, pregunta:{ca,es}, valor, etiqueta?, etiquetes?}`.
+   */
+  diagnostic?: {
+    respostes?: unknown[] | null;
+    actualitzat_at?: string | null;
+    provisional?: boolean | null;
+  } | null;
   visites?: Fila[];
   processos?: Fila[];
   quantificacio?: Fila[];
@@ -89,6 +105,10 @@ const CA = {
   seguiment: "Seguiment trimestral", trimestre: "Trimestre", resum: "Resum",
   verificacio: "Verificació anual", conclusio: "Conclusió",
   mesures: "Mesures del pla bàsic", obligatoria: "obligatòria", recomanada: "recomanada",
+  diagnostic: "Diagnòstic operatiu", actualitzat: (d: string) => `Actualitzat ${d}.`,
+  diagnostic_prov_t: "Qüestionari provisional",
+  diagnostic_prov: "El qüestionari del diagnòstic és text de treball: encara no l'han validat la Fundació ni l'assessoria.",
+  pregunta: "Pregunta", resposta: "Resposta",
   buit: "Sense registres.",
   pagina: (n: number, t: number) => `pàg. ${n} de ${t}`, marca: "PROVA",
 };
@@ -118,6 +138,10 @@ const ES: typeof CA = {
   seguiment: "Seguimiento trimestral", trimestre: "Trimestre", resum: "Resumen",
   verificacio: "Verificación anual", conclusio: "Conclusión",
   mesures: "Medidas del plan básico", obligatoria: "obligatoria", recomanada: "recomendada",
+  diagnostic: "Diagnóstico operativo", actualitzat: (d: string) => `Actualizado ${d}.`,
+  diagnostic_prov_t: "Cuestionario provisional",
+  diagnostic_prov: "El cuestionario del diagnóstico es texto de trabajo: todavía no lo han validado la Fundació ni la asesoría.",
+  pregunta: "Pregunta", resposta: "Respuesta",
   buit: "Sin registros.",
   pagina: (n: number, t: number) => `pág. ${n} de ${t}`, marca: "PRUEBA",
 };
@@ -202,6 +226,34 @@ export async function renderExpedient(
   taula([{ titulo: t.nom, ancho: 55 }, { titulo: t.carrec, ancho: 45 }],
     (d.equip ?? []).map((e) => [txt(e.nom), txt(e.carrec)]));
 
+  // ------------------------------------------------------ diagnóstico operativo
+  // Tras el contexto y antes de las visitas: el diagnóstico es la foto de partida del
+  // productor (qué produce, cuánto excedente, por qué, qué salidas tiene) y es lo que
+  // explica los procesos, la cuantificación y las causas que vienen después. Sin
+  // diagnóstico, o sin ninguna respuesta con valor, la sección no existe (ni el título).
+  const diag = d.diagnostic;
+  const respostes = diag ? respostesLlegibles(diag.respostes, lengua) : [];
+  if (diag && respostes.length > 0) {
+    m.titulo(t.diagnostic, 2);
+    const actualitzat = fechaLargaConArticulo(diag.actualitzat_at ?? null, { mesos: MESES[lengua] }, lengua);
+    if (actualitzat) m.parrafo(t.actualitzat(actualitzat), { color: COLORES.verdeGris, tamano: 9, despues: 4 });
+    if (diag.provisional) {
+      m.caja(t.diagnostic_prov, { titulo: t.diagnostic_prov_t, fondo: COLORES.crema, barra: COLORES.coral });
+    }
+    // Una tabla por sección, como el plan: `respostesLlegibles` ya las devuelve en el orden
+    // del cuestionario, así que basta con cortar cuando cambia el rótulo.
+    let i = 0;
+    while (i < respostes.length) {
+      const seccio = respostes[i].seccio;
+      const filas: string[][] = [];
+      for (; i < respostes.length && respostes[i].seccio === seccio; i++) {
+        filas.push([respostes[i].pregunta, respostes[i].resposta]);
+      }
+      m.titulo(seccio, 3);
+      taula([{ titulo: t.pregunta, ancho: 55 }, { titulo: t.resposta, ancho: 45 }], filas);
+    }
+  }
+
   // ------------------------------------------------------------- visitas
   m.titulo(t.visites, 2);
   taula([
@@ -283,10 +335,14 @@ export async function renderExpedient(
     (d.verificacions ?? []).map((v) => [txt(v.any), dataCurta(v.data), txt(v.resum), txt(v.conclusio)]));
 
   // --------------------------------------------- las medidas del plan básico
-  const mesures = (d.mesures_pla_basic ?? []).filter((x) => txt(x.titol));
+  // 🔴 `textoIdioma`, no `txt()`: el título puede llegar `{ca, es}` y `String()` imprimía
+  //    `[object Object]`. Sin plan llega `[]` y no se pinta nada, ni el título.
+  const mesures = (Array.isArray(d.mesures_pla_basic) ? d.mesures_pla_basic : [])
+    .map((x) => ({ titol: textoIdioma(x?.titol, lengua), obligatoria: x?.obligatoria === true }))
+    .filter((x) => x.titol !== "");
   if (mesures.length > 0) {
     m.titulo(t.mesures, 2);
-    m.lista(mesures.map((x) => `${txt(x.titol)} (${x.obligatoria ? t.obligatoria : t.recomanada})`), { tamano: 9.5, despues: 6 });
+    m.lista(mesures.map((x) => `${x.titol} (${x.obligatoria ? t.obligatoria : t.recomanada})`), { tamano: 9.5, despues: 6 });
   }
 
   const lugar = txt(d.lloc);

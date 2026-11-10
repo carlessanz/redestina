@@ -709,6 +709,42 @@ los kilos salen del **OPE** (1:1 con la canalización, sin el reparto proporcion
 REC). Un trigger `cierres_donante_tipo` impide cruzar los dos circuitos, y salta en el `update` que
 pide el número, así que el rollback devuelve el número a la serie.
 
+**Diagnóstico único (Plan 2 A1, `20270520100000`, 10-11-2026)** — decisiones D1, D3, D4, D5 y P10 del
+`2026-11-09-plan-2-diagnostic-operativa-excel.md`.
+- **`diagnostics`**: una fila por productor (`productor_id unique`, `on delete cascade`, así que
+  `borrar_ficha_completa()` la arrastra), que **se sobrescribe**. `respostes` = el mapa tecleado `{id: valor}`;
+  `sobre` = el mismo formato que `planes_prevencion.respuestas` (compuesto por `diagnostic_compon_sobre()`,
+  interno); `complet`/`falten` guardados; `notes`, `idioma`, `actualitzat_at`/`actualitzat_per`. RLS de lectura
+  «equip o propi»; ninguna escritura directa (solo `desar_diagnostic`, `service_role` aparte).
+- **Por qué sale de `planes_prevencion`**: el borrador del plan era el diagnóstico porque de él se generaba el plan
+  básico, que se retira (D4). **Un borrador no puede pasar a `substituit`** (`planes_control` solo deja
+  `esborrany→emes→substituit` y `planes_numero_segons_estat` exige número), así que el backfill **copió y borró**:
+  cada borrador de productor pasó a `diagnostics` (si no lo tenía, la última fila del historial; los sobres v0, por
+  `respostes_planes()`), cada borrador (también los de entidad) dejó una fila en `diagnostics_historial` si no había
+  una igual o más reciente, `expedients_prevencion.diagnostic_id` se rellenó y después
+  `delete … where estado = 'esborrany'` (`planes_no_esborrar` lo permite sin número). Los emitidos se conservan.
+- **`diagnostics_historial` ya no se escribe** (P10, deuda 174). Los triggers `trg_questionaris_inmutables` y
+  `trg_questionaris_no_esborrar` cuentan `diagnostics` **y** el historial: un cuestionario contestado no se edita.
+- **`desar_diagnostic`** (misma firma): tipo → `22023`; externo → `42501` (también sobre lo suyo, D5); entidad →
+  `22023 nomes_productors`; ficha inexistente → `22023 fitxa_inexistent`; validaciones de siempre; upsert. Devuelve
+  las claves de antes con `pla: null` y las de medidas a 0/false, más `diagnostic_id`. Sigue derivando
+  `productos_habituales`/`temporada` hasta A4.
+- **`diagnostic_estat`**: `sense_questionari · sense_comencar · incomplet · complet` (las claves del plan, a null);
+  `falten` contra el cuestionario **vigente** (una versión nueva lo devuelve a «incomplet»). `diagnostics_equip`,
+  igual y con el mismo `returns table`. **`diagnostic_datos(p_tipo_org, p_org, p_user)`**: el snapshot de lectura
+  (organización, cuestionario, `respostes` del sobre, `complet`/`falten` guardados, quién y cuándo — solo el
+  **nombre** del perfil, nunca el correo—); con `service_role` exige `p_user` (`22023 falta_usuari`) y comprueba ese
+  usuario (patrón `expedients_meus`).
+- **Expediente**: `obrir_expedient` enlaza `pla_id` solo al plan **vigente** y `diagnostic_id`; `expedient_datos`
+  añade `diagnostic {respostes, actualitzat_at, provisional}` (si no hay `diagnostic_id`, el actual del productor) y
+  `mesures_pla_basic` vale `[]` sin plan; `exportar_expedient` toma el idioma de `coalesce(pla, diagnòstic, 'ca')`.
+  El PDF lo imprime en la sección «Diagnòstic operatiu».
+- **Plan básico retirado (T2)**: `revoke execute` de `generar_pla_des_de_diagnostic`, `emitir_plan_basico`,
+  `desar_mesures_pla`, `fixar_nivell_pla` y `guardar_plan_basico` para `authenticated` (siguen para `service_role`:
+  `scripts/crear-datos-documentales-prueba.ts` los usa); `revoke insert, update` de `mesures_prevencio` y
+  `regles_pla` (el editor hacía `update` directo; sus políticas quedan sin alcance). Comentario de tabla «sense camí en
+  pantalla des de 20270520100000» en las tres tablas.
+
 **Convenios y firma (fase 2, `20270111*`)** — `convenios` es el convenio de colaboración de una
 organización con su ciclo de firma. `tipo` ∈ `don_gen`·`don_rec`·`com`; clave **excluyente**
 productor **o** entidad, como `membresias`; `estado` ∈ `esborrany`→`pendent_firma`→`firmat`→`vigent`,

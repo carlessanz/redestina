@@ -24,13 +24,17 @@ test('la productora sí tiene el enlace al diagnóstico y ningún texto con el n
   expect(text).not.toMatch(/certificat de transacci|certificado de transacci/i)
 })
 
-test('el diagnóstico de la productora no dice «contestat» con 0 respuestas', async ({ page }) => {
+test('el diagnóstico de la productora no dice «contestat» sin respuestas', async ({ page }) => {
   const m = motiuSalt('productor')
   test.skip(m !== null, m ?? '')
   await entra(page, 'productor')
   await page.goto('/organitzacio/diagnostic')
-  await expect(page.getByText(/respostes|respuestas/).first()).toBeVisible()
-  const text = await page.locator('main').last().innerText()
-  const sense = /\b0 de \d+ respost|\b0 de \d+ respuest/.test(text)
-  if (sense) expect(text).not.toMatch(/Diagnòstic contestat|Diagnóstico contestado/)
+  // Desde A1 la productora LEE un resumen: o hay respuestas, o el estado vacío.
+  const ple = page.getByTestId('resum-diagnostic')
+  const buit = page.getByTestId('resum-diagnostic-buit')
+  await expect(ple.or(buit).first()).toBeVisible()
+  if (await buit.count() > 0) {
+    const text = await page.locator('main').last().innerText()
+    expect(text).not.toMatch(/Diagnòstic contestat|Diagnóstico contestado|\bContestat\b|\bContestado\b/)
+  }
 })

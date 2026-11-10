@@ -40,13 +40,13 @@ interface Props {
    */
   fitxaIncompleta?: boolean
   /**
-   * ¿Queda diagnóstico por hacer? También booleano, y por el mismo motivo — pero **la marca
-   * es distinta**: la ficha incompleta pinta un triángulo de alerta porque impide operar (con
-   * un paso de por medio: sin NIF no se firma el convenio, y sin convenio no se publica); el
-   * diagnóstico no bloquea nada, así que su marca es un punto. Usar el triángulo aquí diría
-   * «esto está mal», y no lo está: solo está sin hacer.
+   * ¿Le falta la Operativa (ningún lugar de recogida, A1)? También booleano, y por el mismo
+   * motivo — pero **la marca es distinta**: la ficha incompleta pinta un triángulo de alerta
+   * porque impide operar (sin NIF no se firma el convenio, y sin convenio no se publica); la
+   * Operativa no bloquea nada, así que su marca es un punto. Va en la MISMA entrada, «La meva
+   * organització», porque es allí donde se arregla.
    */
-  diagnosticPendent?: boolean
+  operativaPendent?: boolean
 }
 
 /** Cabecera de cada panel cuando hay más de uno. */
@@ -57,7 +57,7 @@ const PANELL: Record<Rol, { clau: string; icona: LucideIcon }> = {
 }
 
 export default function AppSidebar({
-  comptadors, fitxaIncompleta = false, diagnosticPendent = false,
+  comptadors, fitxaIncompleta = false, operativaPendent = false,
 }: Props) {
   const { t } = useT()
   const { ctx, rolActiu, organitzacio } = useAppContext()
@@ -224,22 +224,21 @@ export default function AppSidebar({
                         <span className="sr-only">{t('reg_inc.badge')}</span>
                       </SidebarMenuBadge>
                     )}
-                    {/* Y el diagnóstico, en su propia entrada. La marca es un PUNTO y no el
-                        triángulo de arriba: aquello avisa de algo que impide operar, esto
-                        solo de algo que está sin hacer. Tampoco es una cifra —«12 preguntes»
-                        no es lo que hay que decir en 20 px— y las cifras de este menú
-                        significan «tienes N cosas que mirar» (design/DESIGN.md §6quater). */}
-                    {item.to === '/organitzacio/diagnostic' && diagnosticPendent && (
-                      <SidebarMenuBadge>
-                        {/* Un `span` redondo y no el icono `Dot` de lucide: aquel dibuja un
-                            círculo de radio 1 sobre una caja de 24, o sea ~3 px dentro de un
-                            chip de 20 —casi invisible, que es lo contrario de una marca—. Y
-                            además es la MISMA forma de decir «aquí dentro hay algo» que ya
-                            usa la barra inferior de móvil (`BottomNav`): una sola manera de
-                            pintar la misma señal. El color es `coral-texto` como el resto del
-                            chip: sobre blanco, el coral de marca solo da 2.67:1 (§2bis). */}
+                    {/* Y la Operativa (A1), en la MISMA entrada: es en «La meva organització» ›
+                        Operativa donde se añade el lugar de recogida. Antes el punto iba en «El meu
+                        diagnòstic», pero desde A1 el diagnóstico lo actualiza el equipo (D5) y
+                        marcarlo mandaba al productor a una pantalla donde no puede hacer nada.
+                        Si la ficha está incompleta manda el triángulo (bloquea; esto no), y una
+                        sola marca por entrada: dos símbolos en 20 px no se leen.
+                        La marca es un PUNTO y no una cifra (design/DESIGN.md §6quater): un
+                        `span` redondo y no el icono `Dot` de lucide (≈3 px, casi invisible),
+                        la misma forma que usa la barra inferior de móvil. El color es
+                        `coral-texto` como el resto del chip: sobre blanco, el coral de marca
+                        solo da 2.67:1 (§2bis). */}
+                    {item.to === '/organitzacio' && !fitxaIncompleta && operativaPendent && (
+                      <SidebarMenuBadge data-testid="marca-operativa">
                         <span className="size-2 rounded-full bg-coral-texto" aria-hidden />
-                        <span className="sr-only">{t('diag.badge')}</span>
+                        <span className="sr-only">{t('avop.badge')}</span>
                       </SidebarMenuBadge>
                     )}
                   </SidebarMenuItem>

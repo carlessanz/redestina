@@ -23,8 +23,8 @@
 // (global y por papel) va en Gestió interna desde el 04-11-2026, con el CRM completo (1.5).
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react'
-import { Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
-import { ArrowLeft, Mail, MessageCircle, Trash2 } from 'lucide-react'
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from 'react-router'
+import { ArrowLeft, ClipboardList, Mail, MessageCircle, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -49,7 +49,8 @@ import NotesInternes from '../../components/fitxa/NotesInternes'
 import CampsPerfilReceptor from '../../components/CampsPerfilReceptor'
 import ConveniFitxa from '../../components/fitxa/ConveniFitxa'
 import CertificatsFitxa from '../../components/equip/CertificatsFitxa'
-import TargetaDiagnostic from '../../components/TargetaDiagnostic'
+import ResumDiagnostic from '../../components/diagnostic/ResumDiagnostic'
+import { CLAUS_PREFERENCIES, PERFIL_RECEPTOR, PREFERENCIES_RECEPCIO } from '../../lib/perfilReceptor'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import DocumentacioOrganitzacio from '../../components/equip/DocumentacioOrganitzacio'
 import AlbaransFitxa from '../../components/fitxa/AlbaransFitxa'
@@ -361,6 +362,7 @@ export default function EntitatDetall() {
   const camps = (bloc: Parameters<typeof campsDelBloc>[0]) => campsDelBloc(bloc, 'equip', rols)
   const blocProps = { valors, onChange: setCamp, veu: 'equip' as const, potEditar: true, errors, idPrefix: 'ed', discrepancies, tresColumnes: true }
   const tipusReceptor = (valors.tipo_receptor as string | null) ?? null
+  const campsTipusReceptor = (PERFIL_RECEPTOR[tipusReceptor ?? ''] ?? []).filter((c) => !CLAUS_PREFERENCIES.has(c.clau))
   const doble = rols.ofertant && rols.receptor
   // Con doble rol, el rótulo de qué papel es cada parte; con uno solo, sobra.
   const rotolPaper = (rol: 'ofertant' | 'receptor') => doble
@@ -491,21 +493,41 @@ export default function EntitatDetall() {
           </CardContent></Card>
         </TabsContent>
 
-        {/* 4 · Diagnòstic i perfil (1.3 «diagnòstic», 2.9). */}
+        {/* 4 · Diagnòstic i perfil (1.3 «diagnòstic», 2.9; A1, 20270520100000). El productor:
+            el resumen de su diagnóstico operativo (lectura) y el botón para actualizarlo, que
+            lleva a la pantalla del equipo con el expediente. La receptora: su perfil de
+            recepción entero, como lo ve en «El meu perfil de recepció» —modalidades y
+            preferencias primero, condiciones de su tipo después—, guardado con el «Desa» de la
+            ficha. */}
         <TabsContent value="diagnostic" forceMount className={contingut}>
           <Card><CardContent className="space-y-6">
             {org.productor_id && (
               <Seccio titol={t('ef.sec_diagnostic')} testid="bloc-diagnostic">
-                <TargetaDiagnostic tipusOrg="productor" orgId={org.productor_id} mode="equip" />
+                <ResumDiagnostic productorId={org.productor_id} veu="equip" />
+                <Button asChild variant="outline" className="min-h-11 whitespace-normal md:min-h-8">
+                  <Link to={`/equip/diagnostics/productor/${org.productor_id}`}>
+                    <ClipboardList className="size-4" aria-hidden />
+                    {t('ef.actualitza_diagnostic')}
+                  </Link>
+                </Button>
               </Seccio>
             )}
             {rols.receptor && (
+              <Seccio titol={t('ef.sec_preferencies')} ajuda={t('ef.h_preferencies')} testid="bloc-preferencies">
+                <BlocCamps {...blocProps} camps={camps('diagnostic')} />
+                <CampsPerfilReceptor tipusReceptor={tipusReceptor} camps={PREFERENCIES_RECEPCIO} idPrefix="ed-pref"
+                  perfil={perfil} onChange={setPerfil} />
+              </Seccio>
+            )}
+            {/* Sin sección vacía: un tipo cuyas condiciones son todas preferencias no la pinta. */}
+            {rols.receptor && (!tipusReceptor || campsTipusReceptor.length > 0) && (
               <Seccio titol={t('ef.sec_perfil')} ajuda={t('ef.h_perfil')} testid="bloc-perfil">
                 {/* Los campos propios del tipo de receptor (`perfil_receptor`): dependen del
                     tipo que haya ahora en el formulario (pestaña Operativa); los del tipo
-                    anterior se quedan en el objeto, sin pintarse. */}
+                    anterior se quedan en el objeto, sin pintarse. Las preferencias, arriba. */}
                 {tipusReceptor
-                  ? <CampsPerfilReceptor tipusReceptor={tipusReceptor} idPrefix="ed-pr" perfil={perfil} onChange={setPerfil} />
+                  ? <CampsPerfilReceptor tipusReceptor={tipusReceptor} idPrefix="ed-pr" perfil={perfil} onChange={setPerfil}
+                      excloure={CLAUS_PREFERENCIES} />
                   : <p className="text-sm text-muted-foreground">{t('f.perfil_sense_tipus')}</p>}
               </Seccio>
             )}

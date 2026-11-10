@@ -604,6 +604,12 @@ Migración `20270422100000`.
 
 ### Revisión del cliente del 08-10-2026 — fase 11: el Pla de Prevenció como expediente (12-10-2026)
 
+> 🔴 **Plan 2 A1 (10-11-2026, `20270520100000`)**: el expediente **es** el plan (D4). `obrir_expedient` enlaza
+> `pla_id` solo a un plan básico **vigente** (ya no al borrador, que no existe) y rellena `diagnostic_id`; el PDF
+> exportado lleva la sección «Diagnòstic operatiu» (`render/expedient.ts`, `respostesLlegibles()` de `render/pla.ts`),
+> después de «Context/Objectius/Equip» y antes de «Visites». La pantalla del diagnóstico del equipo
+> (`/equip/diagnostics/productor/:id`) enseña arriba el expediente abierto (`ExpedientVista`) o «Obre l'expedient».
+
 Migración `20270425100000`. La Fundació (§7): «hauria de funcionar com un expedient de seguiment de
 l'empresa, no com un únic formulari», en una sección DISTINTA de «El meu diagnòstic». Recorrido:
 diagnòstic → visita tècnica → quantificació → anàlisi de causes → pla d'accions → seguiment trimestral →
@@ -661,6 +667,24 @@ Migración `20270424100000`.
   para esa cuenta.
 
 ### Revisión del cliente del 08-10-2026 — fase 9: «Diagnòstic operatiu» y «El meu perfil de recepció» (11-10-2026)
+
+> 🔴 **Plan 2 A1 (10-11-2026, `20270520100000`) cambia esta fase** (detalle de datos en `context/04`, «Diagnóstico
+> único»):
+> - **Un diagnóstico por productor que se sobrescribe** (`diagnostics`, D1), sin historial nuevo (P10) ni plan básico:
+>   «Prepara el pla», «Emet el pla» y `PlaPrevencio` se retiran (D4); Configuració › Diagnòstic conserva solo el
+>   «Qüestionari» (fuera «Mesures» y «Regles»).
+> - **Lo contesta el equipo** (D5): `FormulariDiagnostic` vive en `/equip/diagnostics/productor/:id`, con **un solo
+>   botón «Desa»** (completo o no lo dice el servidor, como badge) y **`NavSeccionsDiagnostic`** —un chip por sección,
+>   punto lleno si está completa, clic = ir a la sección— en lugar del stepper (`PasosProces` + `QueTocaAra`, T3):
+>   con un único diagnóstico no hay proceso que recorrer, solo longitud.
+> - **Lectura**: `ResumDiagnostic` (pregunta → respuesta por sección, «Actualitzat el … per …») en la ficha del
+>   equipo (pestaña «Diagnòstic i perfil») y en «El meu diagnòstic» del productor, que ya no edita: sus datos
+>   operativos los edita en «La meva organització». El PDF bajo demanda llega en A2.
+> - **Receptoras** (D3): su diagnóstico es el perfil de recepción; la pestaña «Diagnòstic i perfil» de la ficha
+>   enseña primero las modalidades (`modalitats_interes`, que pasa a `bloc: 'diagnostic'`) y las preferencias
+>   comunes (`PREFERENCIES_RECEPCIO`), y después los campos de su tipo.
+> - Bandeja `/equip/diagnostics`: cuatro estados (`sense_questionari · sense_comencar · incomplet · complet`) y la
+>   columna «Actualitzat».
 
 Migración `20270423100000`. Lo que pidió la Fundació (§6 y §3 del documento): **el diagnóstico no
 genera un plan** —«ara està redactat com si del diagnòstic et generés un pla»— y **el receptor no
@@ -1227,6 +1251,17 @@ bucle: la base se niega con `massa_linies`. Si algún día una jornada tiene que
 productos partiendo de una oferta, se añade explícito.
 
 ### Diagnòstic i pla de prevenció: la banda, la marca y la tarjeta (22-09-2026)
+
+> 🔴 **Plan 2 A1 (10-11-2026)**: la banda deja de pedir «fes el teu diagnòstic» (el productor ya no lo contesta,
+> D5) y pasa a **«Completa la teva Operativa»**, solo cuando el productor **no tiene ningún lugar de recogida**, con
+> enlace a la pestaña Operativa de «La meva organització». Es la parte de P3 que cabe en A1: los productos
+> habituales son `edita: 'equip'` hasta A4, así que pedírselos al productor le pediría algo que no puede hacer; A4
+> añade «sin productos habituales» y «sin lugar principal». La clave de descarte en `localStorage` cambia para que
+> la banda nueva no herede un descarte viejo (`redestina-operativa-descartat`). Componentes: `AvisOperativa` +
+> `useOperativaPendent` (sustituyen a `AvisDiagnostic`/`useDiagnosticPendent`); `LlocsRecollida` llama a
+> `refrescaAvisos()` al añadir o borrar un lugar. **El punto del menú pasa a «La meva organització»**: es donde se
+> arregla (en «El meu diagnòstic» el productor ya no puede hacer nada); si la ficha está incompleta manda el
+> triángulo rojo (una sola marca por entrada). `TargetaDiagnostic` queda solo en modo `extern` y en lectura.
 
 **El diagnóstico se pide en el panel TRAS validar el alta**, no en `/registre`: un formulario de
 doce preguntas en la puerta no lo termina nadie. Y **el equipo puede rellenarlo en nombre de la

@@ -56,8 +56,8 @@ con conciliación, albaranes REC/ENT/OPE sin huecos, documentos externos, certif
 roles y RLS, registro self-service validado, i18n ca/es, responsive, comunicación WhatsApp+correo,
 coste por kilo, PWA. Parcial 🟡: organización multirol (`organizaciones` es identidad común;
 faltan `usuario`/`rol_organizacion` propios y campos propios), `interes`, `sugerencia_match` (no
-persiste), plantillas en código, diagnóstico (ficha viva v2) y Pla de Prevenció (expediente
-provisional), espigueo, catálogos, back office, parte pública, indicadores (`kpis_equip`,
+persiste), plantillas en código, diagnóstico (**uno por productor, lo conduce el equipo**, A1) y Pla de
+Prevenció (expediente provisional; el plan básico, retirado), espigueo, catálogos, back office, parte pública, indicadores (`kpis_equip`,
 `impacte_*`). Pendiente ⬜: `demanda`, `notificacion` con fallback, encuestas,
 `historial_estado`, adjuntos de WhatsApp. **Lo que bloquea hoy es material de la fase 0**
 (textos legales, datos fiscales, taras, cuestionario), no código.
@@ -109,9 +109,9 @@ tests/  (unit Vitest · pdf/ Deno · e2e/ Playwright)   .githooks/pre-commit · 
 .claude/agents/ (dades, servidor, interficie) · .claude/skills/publicar/
 src/
   App.tsx · router/index.tsx · layout/ (AppShell, AppSidebar, BottomNav, UserMenu)
-  hooks/ (useSessio, useAppContext, useConveni, useMissatgesOferta…)
+  hooks/ (useSessio, useAppContext, useConveni, useMissatgesOferta, useOperativaPendent…)
   routes/ public/ · equip/ · productor/ · receptor/ · PerfilOrganitzacio · PerfilRecepcio · PlaOrganitzacio
-  components/ (ui/ shadcn · documents/ · proces/ · equip/ (fases/, diálogos asistidos) · expedient/ …)
+  components/ (ui/ shadcn · documents/ · proces/ · equip/ (fases/, diálogos asistidos) · expedient/ · diagnostic/ …)
   lib/ (módulos PUROS con test: importEntitats, normalitzaImport, procesOferta, passosCanalitzacio, seguentPas, validacio, format,
         cerca, filtres, missatgesOferta, destiFinal, registreRecollida, diagnostic, i18n…)
   types.ts · index.css
@@ -213,9 +213,13 @@ criterio); el REC se reparte en proporción y se descarta lo no certificable. Á
 (`cierres_ejercicio`, `cierres_donante`, `datos_182()`), **intervalo** y **oferta** (`cierres_periodo`,
 serie `CDP`); el anual sustituye a los parciales. **CT retirado**. **Certificado de recepción**
 (`cierres_receptor`, serie `CR`, sin importes).
-**Diagnóstico y plan**: `questionaris_diagnostic` (v2 productor; receptor retirado),
-`mesures_prevencio`, `regles_pla`, `planes_prevencion` (sobre autocontenido),
-`diagnostics_historial`, y el **expediente** `expedients_prevencion` + 7 hijas. Impacto:
+**Diagnóstico y plan** (A1, `20270520100000`): **`diagnostics`, una fila por productor que se sobrescribe**
+(D1; `respostes` crudas + `sobre` compuesto, `complet`/`falten`, `actualitzat_*`; solo lectura por RLS, se
+escribe con `desar_diagnostic`, **solo equipo**, D5); `questionaris_diagnostic` (v2 productor; receptor
+retirado: su diagnóstico es el perfil de recepción, D3). **Plan básico retirado (D4)**: `planes_prevencion`
+conserva solo los emitidos (los borradores se copiaron y borraron), `mesures_prevencio`/`regles_pla` sin camino
+en pantalla, `diagnostics_historial` ya no se escribe (P10). El plan es el **expediente**
+`expedients_prevencion` (+ `diagnostic_id`) + 7 hijas. Impacto:
 `impacte_*` sobre kilos conciliados.
 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
@@ -256,35 +260,15 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `authenticated` si es interna o de trigger); `auditoria_funcions_obertes()` debe seguir en
   **0 filas** (lo vigila el arnés). `create or replace` **no cambia `returns table`** ni el
   número de argumentos: drop + create + revoke/grant.
-- **Superficie de escritura de los paneles = RPC**, no políticas. Familias (nombres exactos en
-  el detalle): interés y aprobación (`manifestar_interes`, `manifestar_interes_assistit`,
-  `comprova_interes`, `aprovar_resposta`, `declinar_oferta`, `registrar_envio_manual`); ficha
-  propia (`actualitzar_fitxa_productor/entitat` con lista blanca, `actualizar_meu_canal`,
-  `afegir_paper_organitzacio`); ofertas (`cancelar_meva_oferta`, `validar_oferta`,
-  `rebutjar_oferta`, `editar_oferta` solo servidor, `fixar_fotos_oferta`, `registrar_desti_final`,
-  `desti_excedent`, `marcar_canvis_revisats`); recogida (`registrar_recollida` del receptor
-  **solo declara**; `validar_recollida`/`retornar_recollida` del admin emiten y concilian;
-  `registrar_recollida_assistida`, `confirmar_recollida` envoltorio, `fixar_hora_recollida`, `operacio_detall`); albaranes (`emitir_albaran` con candado
-  `recollida_no_validada`, `marcar_entregado`, `registrar_confirmacion`, `conciliar_albaran` en
-  cascada con motivo obligatorio ante incidencia, `anular_/rectificar_albaran`,
-  `crear_espigolada` —convierte una oferta `producte_al_camp`—, `repartir_espigolada`);
-  convenios (ciclo `*_convenio`, `*_conveni_*`, `iniciar_firma_asistida`, `acunar_enllac_*`;
-  `firmar_convenio_por_enlace` solo servidor); organización
-  (`organitzacions_candidates`, `enllacar_organitzacio`, `aprovar_/rebutjar_registre`,
-  `cerca_entitats` —equipo, NIF y nombre, D6—, `crear_entitat` (1B, `es_intern()`: NIF válido, razón social y
-  `tipo_receptor`), `exportar_entitats` (B3, `es_intern()`), `activar_/desactivar_fitxa`, `fixar_estat_crm` (B1),
-  `activar_/desactivar_organitzacio` y `afegir_paper_org_equip` —`pot_aprovar()`—; acceso (1D):
-  `estat_acces_org` (equipo, correo enmascarado), `desactivar_acces_org` (`pot_aprovar()`),
-  `concedir_/revertir_acces_org` (solo `service_role`, los usa `donar-acces`); notas (1F):
-  `afegir_nota_interna` y `tancar_seguiment` (`es_intern()` con sesión), `esborrar_nota_interna`
-  (`es_super_admin()`); RGPD: `demanar_consentiment`, `llista_consentiments` (equipo),
-  `registrar_consentiment_enllac` (servidor); albarán por correo: `preparar_enviament_albara` (servidor); equipo (`es_super_admin()`, nunca a uno mismo: `equip_*`, `canviar_rol_equip`, `*_membre_equip`, `traspassar_accions_equip`);
-  `borrar_ficha_completa`, `bloqueigs_esborrat_fitxa`); importación (`previsualitzar_importacio_entitats`,
-  `importar_entitats`: `es_super_admin()`, ≤1.000 filas); firma (`acunar_enllac_propi('firma_document',…)`
-  titular, `tancar_/rebutjar_signatura` super_admin, `puc_signar_document`; servidor: `signar_document_per_enllac`,
-  `registrar_document_signat`, `preparar_enviament_signatura`);
-  y las de cierre y certificados, diagnóstico y
-  plan, equipo, interruptores y jobs (solo `service_role`), con su nombre, en el detalle (§4bis, «Familias»).
+- **Superficie de escritura de los paneles = RPC**, no políticas. La lista de familias con los nombres exactos
+  (interés y aprobación, ficha propia, ofertas, recogida —`registrar_recollida` del receptor **solo declara**;
+  `validar_recollida` del admin emite y concilia—, albaranes, convenios, organización y estado CRM, acceso, notas,
+  RGPD, equipo, borrado, importación/exportación, firma, cierre, diagnóstico, interruptores y jobs) vive en
+  `context/04bis`, «Familias de RPC».
+- **Diagnóstico (A1)**: `desar_diagnostic` solo `es_intern()` (un externo recibe `42501` también sobre lo suyo, D5);
+  lectura con `diagnostic_estat` y `diagnostic_datos(p_tipo_org, p_org, p_user)` (`puc_gestionar_pla`; con
+  `service_role`, `p_user` obligatorio). El plan básico (`generar_pla_des_de_diagnostic`, `emitir_plan_basico`,
+  `desar_mesures_pla`, `fixar_nivell_pla`, `guardar_plan_basico`) queda **solo para `service_role`**.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
   `canalizaciones_protegeix_recollida`, `documentos_inmutable`, `convenios_control`,
   `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una versión sustituida).
@@ -375,7 +359,8 @@ Lo que manda hoy, en una línea cada uno:
 - **Configuració › Equip** (09-11, `SeccioEquip`): rol, editar, activar/desactivar y borrar con traspaso.
 - **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió («Canviarà» por fila, «dubtosa» con candidatos) →
   Resultat (CSV). **Convenio único de col·laboració** por papel. Filtros comunes (`lib/filtres.ts`). Diagnòstic
-  operatiu v2, perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
+  operatiu (A1: el equipo lo contesta en `/equip/diagnostics/productor/:id`, con el expediente arriba; la ficha y
+  «El meu diagnòstic» lo leen), perfil de recepción y Pla de Prevenció como **expediente** (resto, `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio
   **declarado**, interés asistido con hora, `registrar_recollida_assistida`, mensajes de cada
   paso para copiar (`missatgesOferta.ts`, `MissatgesDelPunt`) con las notificaciones apagadas;
@@ -429,7 +414,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270519100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270520100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -524,7 +509,8 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
-`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Un cambio de dominio
+`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Retirados en A1 (10-11-2026):
+`PlaPrevencio`, «Prepara el pla», «Emet el pla» (el plan básico; el plan es el expediente). Un cambio de dominio
 exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
@@ -564,7 +550,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (78 vivas; la siguiente entrada nueva es la 174; los números no se renumeran ni
+**Deuda abierta (79 vivas; la siguiente entrada nueva es la 175; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -577,7 +563,7 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -589,10 +575,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.860 pruebas de Vitest en 81 ficheros (1 saltada a propósito) + 39 de Deno.**
+   **Referencia: 1.863 pruebas de Vitest en 81 ficheros (1 saltada a propósito) + 43 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.385/2.385 y 38 sin datos; producción 2.389/2.389 y 34 «Sin fallos de
+   **Referencia: clon 2.440/2.440 y 39 sin datos; producción 2.389/2.389 y 34 «Sin fallos de
    permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

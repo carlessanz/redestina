@@ -83,7 +83,7 @@ export default function AvisConveni() {
       </p>
       {potSignar && (
         // En móvil baja a su propia línea: `shrink-0` no deja encoger el botón, así que
-        // sin esto el párrafo quedaba en 120 px y 8 líneas a 320 px. Ver `AvisDiagnostic`,
+        // sin esto el párrafo quedaba en 120 px y 8 líneas a 320 px. Ver `AvisOperativa`,
         // que lo sufría peor por llevar además el aspa de descarte.
         <Button
           size="sm"

@@ -13,22 +13,25 @@
 //    explícitamente en su propio cuerpo —el `buit` de cuatro formas, la respuesta ausente,
 //    el tipo que no cuadra— y se comparan con el resultado que esa función documenta.
 //
-// Lo segundo son las CLAVES i18n. Todas las de este módulo se componen
-// (`diag.${p}_${etapa}_t`), así que `cobertura.test.ts` —que lee el código como texto y solo
-// encuentra literales— no las ve. Es exactamente la puerta por la que se colaron cuatro
-// entradas de menú enseñando su identificador en la fase 4.
+// Lo segundo son las CLAVES i18n. Las de los estados y las secciones se componen
+// (`diag.st_${estat}`, `diag.sec_${seccio}`), así que `cobertura.test.ts` —que lee el código
+// como texto y solo encuentra literales— no las ve. Es exactamente la puerta por la que se
+// colaron cuatro entradas de menú enseñando su identificador en la fase 4.
+//
+// Y lo tercero, desde A1 (`20270520100000`): el estado de cada sección (los chips del
+// formulario) y cómo se LEE una respuesta en el resumen, que tiene que decir lo mismo que el
+// PDF (`respuestaLegible` de `_shared/pdf/render/pla.ts`).
 
 import { describe, it, expect } from 'vitest'
 import { DICTS } from '../src/lib/i18n'
 import {
-  BLOCS_MESURA, ETAPES_DIAGNOSTIC, ESTATS_DIAGNOSTIC, PASSOS_DIAGNOSTIC_CLAUS,
-  SECCIONS_CONEGUDES, agrupaPerSeccio, avaluarCondicio, clauSeccio, esBuit,
-  estatPerOrganitzacio, estilEstatDiagnostic, mesosValids, mesuresPerBloc, netejaRespostes,
-  obligatoriesQueFalten, opcionsProductes, opcionsVisibles, passosDiagnostic, prefillDesDeFitxa,
-  prefillPregunta, preguntaAplica, preguntesQueApliquen, progresDiagnostic,
-  puntDiagnostic, textBilingue,
+  ESTATS_DIAGNOSTIC, SECCIONS_CONEGUDES, agrupaPerSeccio, agrupaRespostes, avaluarCondicio,
+  clauSeccio, esBuit, estilEstatDiagnostic, idSeccio, mesosValids, netejaRespostes,
+  obligatoriesQueFalten, opcionsProductes, opcionsVisibles, prefillDesDeFitxa,
+  prefillPregunta, preguntaAplica, preguntesQueApliquen, progresDiagnostic, respostaLlegible,
+  seccionsAmbEstat, textBilingue,
 } from '../src/lib/diagnostic'
-import type { MesuraPla, PreguntaDiagnostic } from '../src/types'
+import type { PreguntaDiagnostic, RespostaDiagnostic } from '../src/types'
 
 const IDIOMES = ['ca', 'es'] as const
 
@@ -288,79 +291,9 @@ describe('prefill: proponer, nunca inventar', () => {
 })
 
 // ---------------------------------------------------------------------------
-describe('las medidas por bloque', () => {
-  const mesura = (codi: string, bloc: MesuraPla['bloc'], obligatoria = false): MesuraPla => ({
-    codi, bloc, titol: codi, descripcio: '', obligatoria, origen: 'regla',
-  })
-
-  it('van en el orden de BLOCS_MESURA y sin bloques vacíos', () => {
-    const grups = mesuresPerBloc([
-      mesura('c', 'seguiment'), mesura('a', 'planificacio'), mesura('b', 'seguiment'),
-    ])
-    expect(grups.map((g) => g.bloc)).toEqual(['planificacio', 'seguiment'])
-    expect(grups[1].mesures.map((m) => m.codi)).toEqual(['c', 'b'])
-  })
-
-  it('sin medidas no hay ningún grupo', () => {
-    expect(mesuresPerBloc([])).toEqual([])
-  })
-})
-
-// ---------------------------------------------------------------------------
-describe('el punto del proceso', () => {
-  const fets = (estat: Parameters<typeof puntDiagnostic>[0]['estat']) =>
-    puntDiagnostic({ estat, faltenN: 3, mesuresN: 5, numero: 'PLA-2026-0001' }, 'org')
-
-  it('la organización acaba en «contestat»: el plan es del equipo (fase 9)', () => {
-    expect(fets('sense_comencar').index).toBe(0)
-    expect(fets('incomplet').index).toBe(1)
-    expect(fets('complet').index).toBe(2)
-    expect(fets('a_punt').index).toBe(2)
-    expect(fets('emes').index).toBe(2)
-    expect(fets('a_punt').claus.titol).toBe('diag.o_complet_t')
-    expect(passosDiagnostic('org')).toEqual(['diag.pas_comencar', 'diag.pas_responent', 'diag.pas_complet'])
-  })
-
-  it('el equipo ve también el plan', () => {
-    const e = (estat: Parameters<typeof puntDiagnostic>[0]['estat']) =>
-      puntDiagnostic({ estat, faltenN: 0, mesuresN: 2 }, 'equip')
-    expect(e('complet').index).toBe(2)
-    expect(e('complet').emToca).toBe(false)
-    expect(e('a_punt').index).toBe(3)
-    expect(e('a_punt').emToca).toBe(true)
-    expect(e('emes').index).toBe(4)
-    expect(passosDiagnostic('equip')).toHaveLength(5)
-  })
-
-  it('a la organización los estados del plan se le enseñan como contestado', () => {
-    expect(estatPerOrganitzacio('a_punt')).toBe('complet')
-    expect(estatPerOrganitzacio('emes')).toBe('complet')
-    expect(estatPerOrganitzacio('incomplet')).toBe('incomplet')
-  })
-
-  it('`sense_questionari` sale del camino y NO le toca a la organización', () => {
-    // No es culpa de quien mira: significa que no hay cuestionario vigente, o sea un
-    // problema de configuración. Pintarlo en ámbar le diría que le toca algo que no puede
-    // hacer.
-    const p = fets('sense_questionari')
-    expect(p.index).toBe(-1)
-    expect(p.emToca).toBe(false)
-  })
-
-  it('lo que está hecho ya no le toca a nadie', () => {
-    expect(fets('emes').emToca).toBe(false)
-    expect(fets('complet').emToca).toBe(false)
-    expect(fets('sense_comencar').emToca).toBe(true)
-    expect(fets('incomplet').emToca).toBe(true)
-    // Desde la fase 9 un plan a punto ya no le toca a la organización.
-    expect(fets('a_punt').emToca).toBe(false)
-  })
-
-  it('las dos voces usan prefijos distintos', () => {
-    expect(fets('incomplet').claus.titol).toBe('diag.o_responent_t')
-    expect(puntDiagnostic(
-      { estat: 'incomplet', faltenN: 1, mesuresN: 0 }, 'equip',
-    ).claus.titol).toBe('diag.e_responent_t')
+describe('el estado (A1: cuatro, los del plan se fueron)', () => {
+  it('son exactamente cuatro', () => {
+    expect([...ESTATS_DIAGNOSTIC].sort()).toEqual(['complet', 'incomplet', 'sense_comencar', 'sense_questionari'])
   })
 
   it('el badge de estado sale de los tokens, nunca de un color suelto', () => {
@@ -368,6 +301,100 @@ describe('el punto del proceso', () => {
       const clase = estilEstatDiagnostic(e)
       expect(clase, e).toMatch(/^bg-(exito|aviso|secondary|muted)/)
     }
+    // `sense_questionari` no es de nadie que mire: nunca en `aviso`.
+    expect(estilEstatDiagnostic('sense_questionari')).not.toMatch(/aviso/)
+    expect(estilEstatDiagnostic('complet')).toMatch(/exito/)
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('seccionsAmbEstat: los chips del formulario (T3)', () => {
+  const preguntes = [
+    pregunta({ id: 'a', seccio: 'productes', obligatoria: true }),
+    pregunta({ id: 'b', seccio: 'productes' }),
+    pregunta({ id: 'c', seccio: 'causes', obligatoria: true }),
+    pregunta({ id: 'd', seccio: 'relacio' }),
+    // Condicional: solo aplica si `a` vale «si».
+    pregunta({ id: 'e', seccio: 'relacio', obligatoria: true, aplica_a: { pregunta: 'a', operador: '=', valor: 'si' } }),
+  ]
+  const estat = (r: Record<string, unknown>) => seccionsAmbEstat(agrupaPerSeccio(preguntes, r), r)
+
+  it('una sección por grupo, en el orden del cuestionario, con su clave', () => {
+    const e = estat({})
+    expect(e.map((s) => s.seccio)).toEqual(['productes', 'causes', 'relacio'])
+    expect(e[0].clau).toBe('diag.sec_productes')
+  })
+
+  it('cuenta lo que aplica, lo contestado y las obligatorias pendientes', () => {
+    const [prod, causes, rel] = estat({ a: 'no', b: 'x' })
+    expect(prod).toMatchObject({ n: 2, contestades: 2, falten: 0, completa: true })
+    expect(causes).toMatchObject({ n: 1, contestades: 0, falten: 1, completa: false })
+    // `e` no aplica (a ≠ si): no cuenta ni como pendiente.
+    expect(rel).toMatchObject({ n: 1, contestades: 0, falten: 0 })
+  })
+
+  it('una sección de opcionales sin tocar NO está completa: está sin empezar', () => {
+    const rel = estat({ a: 'no' })[2]
+    expect(rel.falten).toBe(0)
+    expect(rel.completa).toBe(false)
+  })
+
+  it('una condicional que pasa a aplicar vuelve a dejar la sección pendiente', () => {
+    const rel = estat({ a: 'si', d: 'ok' })[2]
+    expect(rel).toMatchObject({ n: 2, contestades: 1, falten: 1, completa: false })
+  })
+
+  it('el id del título es estable (el destino del chip)', () => {
+    expect(idSeccio('causes')).toBe('diag-sec-causes')
+  })
+})
+
+// ---------------------------------------------------------------------------
+describe('respostaLlegible: el resumen dice lo mismo que el PDF', () => {
+  const r = (x: Partial<RespostaDiagnostic>): RespostaDiagnostic => ({
+    id: 'x', tipus: 'text', seccio: 'productes', pregunta: { ca: 'P', es: 'P' }, valor: null, ...x,
+  })
+
+  it('primero las etiquetas (multi y productes), en el idioma pedido', () => {
+    expect(respostaLlegible(r({
+      tipus: 'multi', valor: ['a', 'b'],
+      etiquetes: [{ ca: 'Donació', es: 'Donación' }, { ca: 'Venda', es: 'Venta' }],
+    }), 'es')).toBe('Donación, Venta')
+  })
+
+  it('después la etiqueta (opció, booleà, per producte, mesos): nunca el código interno', () => {
+    expect(respostaLlegible(r({ tipus: 'opcio', valor: 'mes_20000', etiqueta: { ca: 'Més de 20.000 kg', es: 'Más de 20.000 kg' } }), 'ca'))
+      .toBe('Més de 20.000 kg')
+    expect(respostaLlegible(r({ tipus: 'boolea', valor: false, etiqueta: { ca: 'No', es: 'No' } }), 'ca')).toBe('No')
+  })
+
+  it('una etiqueta vacía cae al valor; una lista de etiquetas vacía, también', () => {
+    expect(respostaLlegible(r({ tipus: 'mesos', valor: [6, 7], etiqueta: { ca: '', es: '' } }), 'ca')).toBe('6, 7')
+    expect(respostaLlegible(r({ tipus: 'multi', valor: ['a'], etiquetes: [] }), 'ca')).toBe('a')
+  })
+
+  it('el valor crudo: texto, número con el formato del idioma, booleano y objeto', () => {
+    expect(respostaLlegible(r({ valor: '  Text lliure  ' }), 'ca')).toBe('Text lliure')
+    expect(respostaLlegible(r({ tipus: 'numero', valor: 12000 }), 'es')).toMatch(/^12[.\u202f\u00a0]?000$/)
+    expect(respostaLlegible(r({ tipus: 'numero', valor: 2.5 }), 'ca')).toBe('2,5')
+    expect(respostaLlegible(r({ tipus: 'boolea', valor: true }), 'es')).toBe('Sí')
+    expect(respostaLlegible(r({ tipus: 'per_producte_num', valor: { Poma: 3, Pera: null } }), 'ca')).toBe('Poma: 3')
+  })
+
+  it('sin nada que decir, cadena vacía (el guion lo pone quien pinta)', () => {
+    expect(respostaLlegible(r({ valor: null }), 'ca')).toBe('')
+    expect(respostaLlegible(r({ valor: '   ' }), 'ca')).toBe('')
+    expect(respostaLlegible(r({ valor: [] }), 'ca')).toBe('')
+  })
+
+  it('agrupaRespostes: por sección, en el orden en que llegan, con su clave', () => {
+    const g = agrupaRespostes([
+      r({ id: '1', seccio: 'causes' }), r({ id: '2', seccio: 'productes' }), r({ id: '3', seccio: 'causes' }),
+      r({ id: '4', seccio: '' }), r({ id: '5', seccio: 'inventada' }),
+    ])
+    expect(g.map((x) => x.seccio)).toEqual(['causes', 'productes', 'altres', 'inventada'])
+    expect(g[0].respostes.map((x) => x.id)).toEqual(['1', '3'])
+    expect(g[3].clau).toBeNull()
   })
 })
 
@@ -382,54 +409,36 @@ describe('claves i18n compuestas', () => {
     }
   }
 
-  it('los pasos de la escalera', () => {
-    expect(PASSOS_DIAGNOSTIC_CLAUS.length).toBe(ETAPES_DIAGNOSTIC.length)
-    for (const c of PASSOS_DIAGNOSTIC_CLAUS) existeix(c)
-  })
-
-  it('las secciones y los bloques', () => {
+  it('las secciones', () => {
     for (const s of SECCIONS_CONEGUDES) existeix(`diag.sec_${s}`)
-    for (const b of BLOCS_MESURA) existeix(`diag.bloc_${b}`)
   })
 
-  it('los cinco estados, con su badge y su línea de tarjeta en las dos voces', () => {
+  it('los cuatro estados, con su badge y la línea de la tarjeta del productor', () => {
     for (const e of ESTATS_DIAGNOSTIC) {
       existeix(`diag.st_${e}`)
       existeix(`diag.o_card_${e}`)
-      existeix(`diag.e_card_${e}`)
     }
   })
 
-  it('la banda solo tiene texto para lo que de verdad queda pendiente', () => {
-    for (const e of ['sense_comencar', 'incomplet', 'a_punt']) existeix(`diag.banner_${e}`)
-    for (const e of ['sense_comencar', 'incomplet']) existeix(`diag.banner_go_${e}`)
-  })
-
-  it('la cuarteta de cada punto del proceso, en las dos voces', () => {
-    for (const rol of ['org', 'equip'] as const) {
-      for (const estat of ESTATS_DIAGNOSTIC) {
-        const punt = puntDiagnostic({ estat, faltenN: 1, mesuresN: 1, numero: 'X' }, rol)
-        for (const clau of Object.values(punt.claus)) existeix(clau)
+  it('las claves de los estados retirados ya no existen (A1)', () => {
+    for (const idioma of IDIOMES) {
+      for (const k of ['diag.st_a_punt', 'diag.st_emes', 'diag.o_card_a_punt', 'diag.o_card_emes', 'diag.e_card_complet']) {
+        expect(DICTS[idioma][k], `${k} sobra en ${idioma}`).toBeUndefined()
       }
     }
   })
 
-  it('ningún texto del proceso usa un marcador que `vars` no pase', () => {
-    // Es el fallo que no da error: `t('x', {n: 3})` sobre un texto con `{kg}` deja el `{kg}`
-    // impreso tal cual en la pantalla.
-    for (const rol of ['org', 'equip'] as const) {
-      for (const estat of ESTATS_DIAGNOSTIC) {
-        const punt = puntDiagnostic({ estat, faltenN: 1, mesuresN: 1, numero: 'X' }, rol)
-        const passats = new Set(Object.keys(punt.vars))
-        for (const idioma of IDIOMES) {
-          for (const clau of Object.values(punt.claus)) {
-            const marcadors = DICTS[idioma][clau].match(/\{[a-zA-Z_][a-zA-Z0-9_]*\}/g) ?? []
-            for (const m of marcadors) {
-              expect(passats.has(m.slice(1, -1)), `${clau} (${idioma}) usa ${m}`).toBe(true)
-            }
-          }
-        }
-      }
+  it('la banda de la Operativa y los chips de sección, en los dos idiomas', () => {
+    for (const k of ['avop.titol', 'avop.text', 'avop.anar', 'avop.ara_no', 'avop.badge',
+      'diag.seccio_completa', 'diag.seccio_pendent', 'diag.seccio_buida', 'diag.nav_seccions',
+      'diag.actualitzat', 'diag.actualitzat_per', 'diag.resum_buit_equip', 'diag.resum_buit_extern']) existeix(k)
+  })
+
+  it('los marcadores de las claves nuevas son los que se pasan', () => {
+    for (const idioma of IDIOMES) {
+      expect(DICTS[idioma]['diag.actualitzat_per']).toContain('{data}')
+      expect(DICTS[idioma]['diag.actualitzat_per']).toContain('{nom}')
+      expect(DICTS[idioma]['diag.seccio_pendent']).toContain('{n}')
     }
   })
 })

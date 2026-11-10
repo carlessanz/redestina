@@ -8,8 +8,10 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.807 pruebas en 78 ficheros** de Vitest: 1.806 correctas y **1 saltada a propósito**, **+ 39 de Deno** del PDF
-   (09-11-2026, Taula mestra fiscal: +1 en `i18n.test.ts` por la familia `org.iva_*`, y más casos en `importEntitats`, `perfilReceptor` y `campsFitxa`; antes 1.806, auditoría del equipo: +4 en `tests/equip.test.ts`, y `tests/pdf/fundacio_test.ts`, 14 nuevas de Deno; antes 1.802, pestañas del equipo y destino del mismo rol: +2 en `tests/equip.test.ts`; antes, 1.800, Configuració › Equip: `tests/equip.test.ts`, 17 pruebas, y las claves compuestas `eq.*` en `i18n.test.ts`;
+   Referencia: **1.863 pruebas en 81 ficheros** de Vitest (1 saltada a propósito) **+ 43 de Deno** del PDF
+   (10-11-2026, Plan 2 A1: `tests/diagnostic.test.ts` reescrito —fuera el punto del proceso y las medidas, dentro
+   `seccionsAmbEstat`/`respostaLlegible`— y `tests/pdf/expedient_test.ts`, 4 nuevas de Deno; arnés del clon 2.440/2.440 y 39
+   sin datos, 56 checks nuevos y tres `permitir` del plan básico convertidos en `denegar`. Antes, 1.807 en 78 y 39 de Deno: 09-11-2026, Taula mestra fiscal: +1 en `i18n.test.ts` por la familia `org.iva_*`, y más casos en `importEntitats`, `perfilReceptor` y `campsFitxa`; antes 1.806, auditoría del equipo: +4 en `tests/equip.test.ts`, y `tests/pdf/fundacio_test.ts`, 14 nuevas de Deno; antes 1.802, pestañas del equipo y destino del mismo rol: +2 en `tests/equip.test.ts`; antes, 1.800, Configuració › Equip: `tests/equip.test.ts`, 17 pruebas, y las claves compuestas `eq.*` en `i18n.test.ts`;
    antes, 1.763 en 76 tras el importador de entidades). Antes, **1.763 en 76**:    (06-11-2026, importador de entidades: `tests/importEntitats.test.ts`, nuevo, 32 pruebas, y las familias
    `ie.c_*` en `i18n.test.ts`; antes, 1.720 en 75 tras el circuito de firma). Antes, **1.639 en 71**
    (04-11-2026, envío manual: +10 en `enviamentManual.test.ts`, nuevo, y +2 en `i18n.test.ts` por

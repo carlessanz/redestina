@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **10-11-2026 (Plan 2 A1, diagnóstico único, `20270520100000`): se abre la 174**: **79 vivas** y la siguiente entrada nueva es la 175.
 ⚠️ **10-11-2026 (Plan 2 B3, exportación a Excel, `20270518110000`): se abre la 173**: **78 vivas** y la siguiente entrada nueva es la 174.
 ⚠️ **10-11-2026 (Plan 2 B1, estado CRM, `20270518100000`): se abre la 172**: **77 vivas** y la siguiente entrada nueva es la 173.
 ⚠️ **09-11-2026 (Taula mestra, datos fiscales, `20270517100000`): se abre la 171**: **76 vivas** y la siguiente entrada nueva es la 172.
@@ -885,3 +886,9 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `statement_timeout` de 8 s). Hoy no pasa (clon 731 organizaciones; producción, las de prueba) y la pantalla avisa
      al exportar más de 1.000 («divideix-lo»). Si llega a pasar: partir el fichero en hojas o lotes de 1.000 en el
      importador. Precio: medio día.
+174. **`diagnostics_historial` ya no se escribe** (10-11-2026, Plan 2 A1, `20270520100000`, P10). Desde A1 el
+     diagnóstico es una fila por productor en `diagnostics` que se sobrescribe (D1); el historial se queda con lo que
+     había (más una fila por cada borrador del plan básico que el backfill copió antes de borrarlo, para no perder los
+     de las entidades). Nadie lo lee en pantalla. Los triggers de `questionaris_diagnostic` lo siguen contando para no
+     dejar editar un cuestionario ya contestado. Se puede hacer `drop` (y quitar esa condición de los triggers y sus
+     checks del arnés) cuando Carles lo autorice. Precio: una migración pequeña.

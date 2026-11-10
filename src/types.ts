@@ -1237,36 +1237,6 @@ export interface QuestionariDiagnostic {
   created_at: string
 }
 
-export interface MesuraPrevencio {
-  codi: string
-  tipo_org: 'productor' | 'entidad'
-  bloc: BlocMesura
-  titol: TextBilingue
-  descripcio: TextBilingue
-  /** Hoy solo las de registro (decisión del 22-09-2026) */
-  obligatoria_per_defecte: boolean
-  ordre: number
-  activa: boolean
-  provisional: boolean
-  created_at: string
-}
-
-export interface ReglaPla {
-  id: string
-  tipo_org: 'productor' | 'entidad'
-  /** null solo con `sempre`. Sin FK: las preguntas viven en jsonb */
-  pregunta_id: string | null
-  operador: OperadorRegla
-  valor: unknown | null
-  mesura_codi: string
-  /** Escala la medida a obligatoria en este caso. Nunca la rebaja */
-  obligatoria: boolean
-  prioritat: number
-  activa: boolean
-  motiu: string | null
-  created_at: string
-}
-
 /**
  * Una medida dentro del plan. 🔴 `titol` y `descripcio` van COPIADOS y ya resueltos al idioma
  * del plan: un plan de hace cinco años no puede depender de que el catálogo siga vivo, ni de
@@ -1323,27 +1293,31 @@ export interface SobreDiagnostic {
   desat_at?: string
 }
 
-export type EstatDiagnostic =
-  | 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'complet' | 'a_punt' | 'emes'
+/**
+ * El estado del diagnóstico operativo de un productor (A1, `20270520100000`). Desde A1 el plan
+ * básico ya no existe en pantalla: los estados `a_punt` y `emes` se retiraron con él.
+ */
+export type EstatDiagnostic = 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'complet'
 
+/**
+ * Lo que devuelve `diagnostic_estat()`. Las claves del plan básico (`pla_*`, `numero`,
+ * `mesures_*`) siguen llegando a `null`/`0`/`false` por compatibilidad con el frontend
+ * anterior, y por eso no se declaran aquí: nadie debe leerlas.
+ */
 export interface DiagnosticEstat {
   estat: EstatDiagnostic
-  pla_esborrany: string | null
-  pla_vigent: string | null
-  numero: string | null
-  versio: number | null
-  emes_at: string | null
-  nivell: 'basic' | 'personalitzat' | null
+  /** La fila de `diagnostics`, o `null` si todavía no se ha guardado nunca */
+  diagnostic_id: string | null
   idioma: 'ca' | 'es' | null
   /** Ids de las obligatorias que aplican y siguen sin contestar */
   falten: string[]
-  te_mesures: boolean
-  mesures_n: number
-  mesures_editades: boolean
   questionari_id: string | null
   versio_questionari: number | null
-  /** La última vez que se guardó el diagnóstico (`diagnostics_historial`, fase 9) */
+  /** Igual que `actualitzat_at` (se conserva por compatibilidad) */
   darrera_actualitzacio?: string | null
+  actualitzat_at: string | null
+  /** El nombre de quien lo guardó por última vez (`perfiles.nombre`), si lo tiene */
+  actualitzat_per_nom: string | null
   /**
    * Ante la duda, `true`: decir que un documento está validado cuando no lo está es el único
    * error caro.
@@ -1351,6 +1325,7 @@ export interface DiagnosticEstat {
   provisional: boolean
 }
 
+/** Una fila de `diagnostics_equip()`: solo productores desde A1. */
 export interface DiagnosticEquip {
   tipo_org: 'productor' | 'entidad'
   org_id: string
@@ -1358,15 +1333,47 @@ export interface DiagnosticEquip {
   es_test: boolean
   estat: EstatDiagnostic
   falten_n: number
-  mesures_n: number
-  pla_esborrany: string | null
-  pla_vigent: string | null
-  numero: string | null
-  versio: number | null
-  emes_at: string | null
   versio_questionari: number | null
   provisional: boolean
   darrera_actualitzacio?: string | null
+}
+
+/**
+ * Una fila de `diagnostics` (A1): EL diagnóstico de un productor, uno solo, que se sobrescribe.
+ * Solo lectura por RLS (el equipo todas, el productor la suya); se escribe por
+ * `desar_diagnostic()`, que solo puede llamar el equipo (D5).
+ */
+export interface Diagnostic {
+  id: string
+  productor_id: string
+  questionari_id: string | null
+  versio_questionari: number | null
+  /** El mapa plano `{pregunta_id: valor}`: lo que reabre el formulario */
+  respostes: Record<string, unknown>
+  /** El sobre autocontenido, mismo formato que `planes_prevencion.respuestas` */
+  sobre: SobreDiagnostic | Record<string, unknown>
+  complet: boolean
+  falten: string[]
+  notes: string | null
+  idioma: 'ca' | 'es' | null
+  actualitzat_at: string
+  actualitzat_per: string | null
+  created_at: string
+}
+
+/** Lo que devuelve `diagnostic_datos()`: el diagnóstico listo para leerlo (resumen y PDF). */
+export interface DiagnosticDatos {
+  /** `null` si el productor todavía no tiene diagnóstico (entonces `respostes` va vacío) */
+  diagnostic_id: string | null
+  organitzacio: { nom: string | null; nif: string | null; municipi: string | null }
+  questionari: { titol: TextBilingue; versio: number; provisional: boolean } | null
+  respostes: RespostaDiagnostic[]
+  notes: string | null
+  complet: boolean
+  falten: string[]
+  actualitzat_at: string | null
+  actualitzat_per_nom: string | null
+  provisional: boolean
 }
 
 // ---------------------------------------------------------------------------

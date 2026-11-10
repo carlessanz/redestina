@@ -1,15 +1,18 @@
-// El cuestionario, las medidas y las reglas, desde Configuració.
+// El cuestionario del diagnóstico, desde Configuració.
+//
+// Desde A1 (`20270520100000`, D4) solo el cuestionario: el catálogo de medidas y las reglas
+// del plan básico se quedaron sin camino en pantalla (el plan es el expediente) y la base ya
+// no deja escribirlas desde una sesión.
 //
 // POR QUÉ ES UN EDITOR MÍNIMO Y NO UN CONSTRUCTOR DE FORMULARIOS. Lo que se edita aquí es
-// **texto que redacta la Fundación** y una matriz de reglas de negocio; las dos cosas viven
-// en la base justamente para que cambiarlas no sea un despliegue (20270328101300,
-// 20270328101400). Lo que hace falta desde la aplicación es poder **publicar la versión
-// siguiente** y **retirar** una medida o una regla; inventar aquí un editor visual de doce
-// preguntas con sus opciones bilingües sería construir la mitad de un CMS para un contenido
-// que va a cambiar dos veces en cinco años.
+// **texto que redacta la Fundación**, que vive en la base justamente para que cambiarlo no
+// sea un despliegue (20270328101300). Lo que hace falta desde la aplicación es poder
+// **publicar la versión siguiente**; inventar aquí un editor visual de las preguntas con sus
+// opciones bilingües sería construir la mitad de un CMS para un contenido que va a cambiar
+// dos veces en cinco años.
 //
 // 🔴 UN CUESTIONARIO NO SE EDITA: SE PUBLICA LA VERSIÓN SIGUIENTE. Lo impide un trigger en
-//    cuanto un plan lo cita, y es lo correcto — hay que poder responder con qué cuestionario
+//    cuanto un diagnóstico lo cita, y es lo correcto — hay que poder responder con qué cuestionario
 //    EXACTO se hizo un diagnóstico de hace cinco años. Así que el botón dice «Publica la
 //    versió següent» y no «Desa».
 //
@@ -21,27 +24,21 @@
 // ⚠️ UN `tecnic` LO VE EN GRIS CON SU MOTIVO, no se le esconde. Es el criterio del proyecto
 //    (§6ter, el mismo «Només admin» de Aprovacions y de `DadesFundacio`): un control apagado
 //    con su porqué informa; un control ausente hace pensar que la función no existe.
-//
-// ⚠️ UNA MEDIDA NO SE BORRA, SE RETIRA (`activa = false`). Un plan emitido cita su código, y
-//    un código que desaparece convierte ese plan en un documento que habla de algo que ya no
-//    existe. Por eso las tablas no tienen GRANT de DELETE y aquí solo hay un interruptor.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useConfirma } from '../DialegConfirma'
-import { Casella } from '../Casella'
 import TriaPaper from '../TriaPaper'
 import { textBilingue } from '../../lib/diagnostic'
 import {
-  activarMesura, activarRegla, mesuresCataleg, problemesQuestionari,
-  publicarQuestionari, questionarisDelTipus, reglesCataleg,
+  problemesQuestionari, publicarQuestionari, questionarisDelTipus,
 } from '../../lib/diagnosticApi'
 import type { TipusOrg } from '../../lib/diagnosticApi'
-import type { MesuraPrevencio, QuestionariDiagnostic, ReglaPla } from '../../types'
+import type { QuestionariDiagnostic } from '../../types'
 import { cn } from '../../lib/utils'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -60,8 +57,6 @@ export default function EditorDiagnostic() {
 
   const [tipus, setTipus] = useState<TipusOrg>('productor')
   const [questionaris, setQuestionaris] = useState<QuestionariDiagnostic[]>([])
-  const [mesures, setMesures] = useState<MesuraPrevencio[]>([])
-  const [regles, setRegles] = useState<ReglaPla[]>([])
   const [esborrany, setEsborrany] = useState('')
   const [problemes, setProblemes] = useState<string[] | null>(null)
   const [carregant, setCarregant] = useState(true)
@@ -69,12 +64,8 @@ export default function EditorDiagnostic() {
 
   const carrega = useCallback(async () => {
     setCarregant(true)
-    const [q, m, r] = await Promise.all([
-      questionarisDelTipus(tipus), mesuresCataleg(tipus), reglesCataleg(tipus),
-    ])
+    const q = await questionarisDelTipus(tipus)
     setQuestionaris(q.ok ? q.data : [])
-    setMesures(m.ok ? m.data : [])
-    setRegles(r.ok ? r.data : [])
     // El borrador arranca con el cuestionario vigente: lo normal es retocar el que hay, no
     // escribir doce preguntas desde cero en un textarea.
     const vigent = (q.ok ? q.data : []).find((x) => x.vigente) ?? null
@@ -86,28 +77,6 @@ export default function EditorDiagnostic() {
   useEffect(() => { void carrega() }, [carrega])
 
   const vigent = questionaris.find((q) => q.vigente) ?? null
-
-  // Una regla que apunta a una pregunta que el cuestionario vigente ya no tiene NO dispara
-  // (28-09-2026: al publicar la versión 1 del productor quedaron cinco así, desactivadas).
-  // Sin marcarlo, activarla parecía arreglar algo y no hacía nada.
-  const idsPreguntes = useMemo(
-    () => new Set((vigent?.preguntes ?? []).map((p) => p.id)),
-    [vigent],
-  )
-  const esOrfe = useCallback(
-    (r: ReglaPla) => r.operador !== 'sempre' && r.pregunta_id != null && !idsPreguntes.has(r.pregunta_id),
-    [idsPreguntes],
-  )
-  /** Primero las que disparan; al final las retiradas y las huérfanas. */
-  const reglesOrdenades = useMemo(() => {
-    const pes = (r: ReglaPla) => (r.activa && !esOrfe(r) ? 0 : 1)
-    return [...regles].sort((a, b) => pes(a) - pes(b))
-  }, [regles, esOrfe])
-  /** Medidas activas que ninguna regla viva propone: nunca entrarán en un plan. */
-  const mesuresSenseRegla = useMemo(() => {
-    const vives = new Set(regles.filter((r) => r.activa && !esOrfe(r)).map((r) => r.mesura_codi))
-    return new Set(mesures.filter((m) => m.activa && !vives.has(m.codi)).map((m) => m.codi))
-  }, [regles, mesures, esOrfe])
 
   /** El JSON tecleado, o `null` si no es JSON. Sin excepciones hacia fuera. */
   function preguntesDelText(): unknown[] | null {
@@ -146,35 +115,7 @@ export default function EditorDiagnostic() {
     if (!r.ok) { toast.error(textError(t, r)); return }
 
     toast.success(t('cfgd.published', { v: r.data.versio }))
-    // Las reglas huérfanas NO bloquean la publicación, pero quien publica tiene que verlas:
-    // una regla que apunta a una pregunta que ya no existe no dispara, y el plan siguiente
-    // saldría con menos medidas sin que nadie supiera por qué.
-    const orfes = r.data.regles_orfes ?? []
-    if (orfes.length > 0) {
-      toast.warning(t('cfgd.orphan_rules', {
-        n: orfes.length,
-        preguntes: [...new Set(orfes.map((o) => o.pregunta))].join(', '),
-      }))
-    }
     await carrega()
-  }
-
-  /** Un rechazo por RLS llega como la CLAVE `cfgd.denied`, no como una frase de la base:
-   *  ahí no hay mensaje que enseñar, porque PostgREST responde éxito con cero filas. */
-  function avisa(missatge: string) {
-    toast.error(textError(t, missatge))
-  }
-
-  async function canviaMesura(codi: string, activa: boolean) {
-    const r = await activarMesura(codi, activa)
-    if (!r.ok) { avisa(r.missatge); return }
-    setMesures((l) => l.map((m) => (m.codi === codi ? { ...m, activa } : m)))
-  }
-
-  async function canviaRegla(id: string, activa: boolean) {
-    const r = await activarRegla(id, activa)
-    if (!r.ok) { avisa(r.missatge); return }
-    setRegles((l) => l.map((x) => (x.id === id ? { ...x, activa } : x)))
   }
 
   return (
@@ -197,135 +138,67 @@ export default function EditorDiagnostic() {
         ) : !vigent ? (
           <p className="text-sm text-muted-foreground">{t('cfgd.no_current')}</p>
         ) : (
-          <div className="grid grid-cols-1 items-start gap-6 xl:grid-cols-2">
-            {/* Columna 1: el cuestionario (JSON). Columna 2: las medidas y sus reglas. */}
-            <section className="space-y-2">
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="font-titulos text-sm font-semibold">
-                  {textBilingue(vigent.titol, lang)}
-                </h3>
-                <Badge variant="outline">{t('cfgd.version', { v: vigent.versio })}</Badge>
-                {vigent.provisional && (
-                  <Badge className="bg-aviso-fondo text-aviso">{t('diag.provisional_badge')}</Badge>
-                )}
-                <span className="text-sm text-muted-foreground">
-                  {t('cfgd.questions', { n: vigent.preguntes.length })}
-                </span>
-              </div>
-
-              <div>
-                <Label htmlFor="cfgd-json" className="mb-1.5 block text-xs text-muted-foreground">
-                  {t('cfgd.json_label')}
-                </Label>
-                <Textarea
-                  id="cfgd-json"
-                  rows={14}
-                  spellCheck={false}
-                  disabled={!potEditar}
-                  value={esborrany}
-                  onChange={(e) => { setEsborrany(e.target.value); setProblemes(null) }}
-                  className="max-h-[70vh] overflow-y-auto font-mono text-base md:text-xs"
-                />
-                <p className="mt-1 text-xs text-muted-foreground">{t('cfgd.json_help')}</p>
-              </div>
-
-              {problemes !== null && (
-                problemes.length === 0
-                  ? <p className="text-sm text-exito">{t('cfgd.check_ok')}</p>
-                  : (
-                    <ul className="space-y-1 rounded-lg border border-error bg-error-fondo p-3 text-sm text-error">
-                      {problemes.map((p) => <li key={p}>{p}</li>)}
-                    </ul>
-                  )
+          <section className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <h3 className="font-titulos text-sm font-semibold">
+                {textBilingue(vigent.titol, lang)}
+              </h3>
+              <Badge variant="outline">{t('cfgd.version', { v: vigent.versio })}</Badge>
+              {vigent.provisional && (
+                <Badge className="bg-aviso-fondo text-aviso">{t('diag.provisional_badge')}</Badge>
               )}
-
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="outline"
-                  onClick={() => void comprova()}
-                  disabled={!potEditar || ocupat !== null}
-                  className="min-h-11 whitespace-normal md:min-h-9"
-                >
-                  {ocupat === 'comprovar' && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                  {t('cfgd.check')}
-                </Button>
-                <Button
-                  onClick={() => void publica()}
-                  disabled={!potEditar || ocupat !== null}
-                  className="min-h-11 whitespace-normal md:min-h-9"
-                >
-                  {ocupat === 'publicar' && <Loader2 className="size-4 animate-spin" aria-hidden />}
-                  {t('cfgd.publish')}
-                </Button>
-              </div>
-              <p className="text-xs text-muted-foreground">{t('cfgd.publish_help')}</p>
-            </section>
-
-            <div className="space-y-6">
-            <section className="space-y-2 border-t border-border pt-6 xl:border-t-0 xl:pt-0">
-              <h3 className="font-titulos text-sm font-semibold">{t('cfgd.measures_t')}</h3>
-              <p className="text-xs text-muted-foreground">{t('cfgd.measures_help')}</p>
-              <ul className="space-y-1">
-                {mesures.map((m) => (
-                  <li key={m.codi} className="flex min-h-11 items-start gap-3 text-sm">
-                    <Casella
-                      checked={m.activa}
-                      disabled={!potEditar}
-                      aria-label={textBilingue(m.titol, lang)}
-                      className="mt-0.5"
-                      onChange={(v) => void canviaMesura(m.codi, v)}
-                    />
-                    <span className="min-w-0">
-                      <span className="font-medium">{textBilingue(m.titol, lang)}</span>{' '}
-                      <span className="text-muted-foreground">
-                        · {t(`diag.bloc_${m.bloc}`)} · <code>{m.codi}</code>
-                      </span>
-                      {m.obligatoria_per_defecte && (
-                        <Badge className="ml-2 bg-aviso-fondo text-aviso">{t('pla.required')}</Badge>
-                      )}
-                      {mesuresSenseRegla.has(m.codi) && (
-                        <Badge className="ml-2 whitespace-normal bg-aviso-fondo text-aviso">{t('cfgd.no_rule')}</Badge>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
-
-            <section className="space-y-2 border-t border-border pt-6">
-              <h3 className="font-titulos text-sm font-semibold">{t('cfgd.rules_t')}</h3>
-              <p className="text-xs text-muted-foreground">{t('cfgd.rules_help')}</p>
-              <ul className="space-y-1">
-                {reglesOrdenades.map((r) => (
-                  <li key={r.id} className="flex min-h-11 items-start gap-3 text-sm">
-                    <Casella
-                      checked={r.activa}
-                      disabled={!potEditar}
-                      aria-label={r.mesura_codi}
-                      className="mt-0.5"
-                      onChange={(v) => void canviaRegla(r.id, v)}
-                    />
-                    <span className={cn('min-w-0 font-mono text-xs break-words', (!r.activa || esOrfe(r)) && 'text-muted-foreground')}>
-                      {/* `sempre` no tiene pregunta ni valor: antes salía «sempre sempre». */}
-                      {r.operador === 'sempre'
-                        ? t('cfgd.always')
-                        : <>{r.pregunta_id} {r.operador}{' '}
-                          {r.valor === null || r.valor === undefined ? '' : JSON.stringify(r.valor)}</>}
-                      {' → '}
-                      {r.mesura_codi}
-                      {r.obligatoria && ' *'}
-                      {esOrfe(r) && (
-                        <Badge className={cn('ml-2 font-sans', r.activa ? 'bg-aviso-fondo text-aviso' : 'bg-secondary text-secondary-foreground')}>
-                          {t('cfgd.orphan')}
-                        </Badge>
-                      )}
-                    </span>
-                  </li>
-                ))}
-              </ul>
-            </section>
+              <span className="text-sm text-muted-foreground">
+                {t('cfgd.questions', { n: vigent.preguntes.length })}
+              </span>
             </div>
-          </div>
+
+            <div>
+              <Label htmlFor="cfgd-json" className="mb-1.5 block text-xs text-muted-foreground">
+                {t('cfgd.json_label')}
+              </Label>
+              <Textarea
+                id="cfgd-json"
+                rows={14}
+                spellCheck={false}
+                disabled={!potEditar}
+                value={esborrany}
+                onChange={(e) => { setEsborrany(e.target.value); setProblemes(null) }}
+                className="max-h-[70vh] overflow-y-auto font-mono text-base md:text-xs"
+              />
+              <p className="mt-1 text-xs text-muted-foreground">{t('cfgd.json_help')}</p>
+            </div>
+
+            {problemes !== null && (
+              problemes.length === 0
+                ? <p className="text-sm text-exito">{t('cfgd.check_ok')}</p>
+                : (
+                  <ul className="space-y-1 rounded-lg border border-error bg-error-fondo p-3 text-sm text-error">
+                    {problemes.map((p) => <li key={p}>{p}</li>)}
+                  </ul>
+                )
+            )}
+
+            <div className="flex flex-wrap gap-2">
+              <Button
+                variant="outline"
+                onClick={() => void comprova()}
+                disabled={!potEditar || ocupat !== null}
+                className="min-h-11 whitespace-normal md:min-h-9"
+              >
+                {ocupat === 'comprovar' && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                {t('cfgd.check')}
+              </Button>
+              <Button
+                onClick={() => void publica()}
+                disabled={!potEditar || ocupat !== null}
+                className="min-h-11 whitespace-normal md:min-h-9"
+              >
+                {ocupat === 'publicar' && <Loader2 className="size-4 animate-spin" aria-hidden />}
+                {t('cfgd.publish')}
+              </Button>
+            </div>
+            <p className="text-xs text-muted-foreground">{t('cfgd.publish_help')}</p>
+          </section>
         )}
         {dialeg}
       </CardContent>

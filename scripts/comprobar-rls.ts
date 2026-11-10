@@ -1224,6 +1224,14 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // `emitir_plan_basico` va antes de buscar el plan, así que un uuid inventado da 42501.
   { tabla: "diagnostics_historial", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial del diagnostic a ma" },
   { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap pla de prevencio (es de l'equip)" },
+  // A1 (20270520100000): el diagnóstico único vive en `diagnostics`, sin escritura directa para
+  // nadie (lo escribe `desar_diagnostic`, solo el equipo: D5). `diagnostic_datos` pone el
+  // permiso antes que la existencia, así que un uuid inventado da 42501 a un externo. Las RPC
+  // del plan básico quedan sin EXECUTE para `authenticated` (D4): 42501 para todos.
+  { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (A1)" },
+  { tabla: "diagnostic_datos", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el diagnostic d'una altra organitzacio (A1)" },
+  { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures de cap pla (retirat a A1, D4)" },
+  { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell de cap pla (retirat a A1, D4)" },
   // Circuito de firma (20270510100000–100200): ver `FIRMA_EXTERN`.
   ...FIRMA_EXTERN,
   // Importador de entidades (20270511100000): ver `IMPORTACIO_EXTERN`.
@@ -1498,11 +1506,24 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
     { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
-    { tabla: "emitir_plan_basico", op: "rpc", esperado: "permitir", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot emetre el pla de prevencio (22023 si no existeix)" },
+    // 🔴 Flip consciente `permitir → denegar` (A1, 20270520100000): el plan básico se retira
+    //    (D4) y la RPC queda solo para `service_role`. El plan es el expediente.
+    { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet el pla basic: retirat a A1 (D4)" },
     // ⚠️ Con un uuid INEXISTENTE a propósito: la guarda de rol deja pasar (es del equipo, y
-    //    el modelo es asistido), la RPC llega hasta el insert y la FK lo rechaza con `23503`.
-    //    O sea que mide la autorizacion y **no escribe nada**.
+    //    el modelo es asistido) y la RPC corta con `22023 fitxa_inexistent` (desde A1; antes,
+    //    la FK con `23503`). O sea que mide la autorizacion y **no escribe nada**.
     { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
+    // --- Diagnòstic únic (A1, 20270520100000) ---
+    // El equipo LEE `diagnostics` y no la escribe a mano (solo `desar_diagnostic`). Las RPC del
+    // plan básico quedan sin EXECUTE para `authenticated` (D4).
+    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (desar_diagnostic o el backfill d'A1)" },
+    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (va per desar_diagnostic)" },
+    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (va per desar_diagnostic)" },
+    { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot llegir el diagnostic de qualsevol productor (autoritza; 22023 fitxa_inexistent)" },
+    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla basic: retirat a A1 (D4)" },
+    { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
+    { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
+    { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2135,10 +2156,26 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "publicar_questionari", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "pot publicar un questionari (autoritza; 22023 per les preguntes buides)" },
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
     { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
-    { tabla: "emitir_plan_basico", op: "rpc", esperado: "permitir", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot emetre el pla de prevencio (22023 si no existeix)" },
+    // 🔴 Dos flips conscientes `permitir → denegar` (A1, 20270520100000): el plan básico se
+    //    retira (D4) y sus RPC quedan solo para `service_role`. El plan es el expediente.
+    { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet el pla basic: retirat a A1 (D4)" },
     { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
-    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot generar el pla en nom d'una organitzacio (22023 sense_esborrany)" },
+    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla basic: retirat a A1 (D4)" },
     { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },
+    // --- Diagnòstic únic (A1, 20270520100000) ---
+    // Ni el super_admin escribe `diagnostics` a mano ni toca el catálogo de medidas y reglas:
+    // el editor hacía `update` directo y A1 le quita el GRANT de escritura (hallazgo 2).
+    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (desar_diagnostic o el backfill d'A1)" },
+    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (va per desar_diagnostic)" },
+    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (va per desar_diagnostic)" },
+    { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot llegir el diagnostic de qualsevol productor (autoritza; 22023 fitxa_inexistent)" },
+    { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
+    { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
+    { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
+    { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura: sense cami en pantalla des d'A1 (D4)" },
+    { tabla: "mesures_prevencio", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap mesura: sense cami en pantalla des d'A1 (D4)" },
+    { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla: sense cami en pantalla des d'A1 (D4)" },
+    { tabla: "regles_pla", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap regla: sense cami en pantalla des d'A1 (D4)" },
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2795,6 +2832,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve EL SEU pla de prevencio (només el seu)",
       requiereFixture: "el pla de TEST-PROD-1 (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Diagnòstic únic (A1, 20270520100000): el productor LEE el suyo (tabla y `diagnostic_datos`)
+    // y no lo escribe, ni sobre su propia ficha (D5: lo conduce el equipo). La lectura de la
+    // tabla pide fixture: hoy solo Mas de Prova tiene diagnóstico, así que `productor-altre`
+    // sale SALTADA, que es lo correcto (si viera el de otro sería un escape).
+    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu EL SEU diagnostic (nomes el seu)", requiereFixture: "un diagnostic desat del seu productor (desar_diagnostic des de l'equip)" },
+    { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor" }, descripcion: "llegeix EL SEU diagnostic (buit si no en te)" },
+    { tabla: "desar_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor", p_respostes: {} }, descripcion: "NO desa el seu propi diagnostic: l'actualitza l'equip (A1, D5)" },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -2959,6 +3003,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       descripcion: "ve EL SEU pla de prevencio (només el seu)",
       requiereFixture: "el pla de TEST-ENT-SOCIAL (scripts/crear-datos-documentales-prueba.ts)",
     },
+    // Diagnòstic únic (A1): es del productor; una receptora no ve ninguno (0 filas).
+    { tabla: "diagnostics", op: "leer", esperado: "denegar", descripcion: "NO veu cap diagnostic de productor (A1)" },
     // Ni el cierre del donante del que ha recibido: el certificado es del donante.
     { tabla: "cierres_donante", op: "leer", esperado: "denegar", descripcion: "NO ve l'acumulat anual de cap donant" },
     { tabla: "cierre_donante_lineas", op: "leer", esperado: "denegar", descripcion: "NO ve les línies de cap tancament" },
@@ -3112,6 +3158,23 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     productor_id: "00000000-0000-0000-0000-000000000000",
     respuestas: {},
   },
+  // A1 (20270520100000): `diagnostics` no tiene GRANT de escritura para nadie. La fila cumple
+  // los `not null` y los dos checks de forma (`respostes` objeto, `sobre.respostes` array) para
+  // que lo que corte sea el permiso y no un dato.
+  diagnostics: {
+    productor_id: "00000000-0000-0000-0000-000000000000",
+    respostes: {},
+    sobre: { respostes: [] },
+  },
+  // Hasta A1 este insert caía en la fila por defecto (`nombre`) y moría en `PGRST204` («error
+  // de datos»): pasaba como denegación sin medir el permiso. Con una fila válida (cumple el
+  // check excluyente) lo que corta es el GRANT (42501).
+  diagnostics_historial: {
+    tipo_org: "productor",
+    productor_id: "00000000-0000-0000-0000-000000000000",
+    respostes: {},
+    complet: false,
+  },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
   plantillas_documento: {
@@ -3166,6 +3229,19 @@ const COLUMNA_INOCUA: Record<string, string> = {
   // que `vigente` es también la columna con la que se mide el permiso de escritura.
   plantillas_documento: "vigente",
   parametros_documentales: "caducidad_enlace_dias",
+  // A1 (20270520100000): sin GRANT de UPDATE para `authenticated` (42501 antes de mirar filas).
+  diagnostics: "notes",
+  mesures_prevencio: "activa",
+  regles_pla: "activa",
+};
+
+/**
+ * Columna con la que se identifica la fila en el UPDATE de `COLUMNA_INOCUA`, cuando no es
+ * `id`. `mesures_prevencio` tiene `codi` como clave: con `id` el UPDATE daría `42703` (la
+ * columna no existe) y el check no mediría el permiso sino un error de programación.
+ */
+const CLAVE_FILA: Record<string, string> = {
+  mesures_prevencio: "codi",
 };
 
 // ---------------------------------------------------------------------------
@@ -3347,7 +3423,8 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       const { data: filaCruda } = await cliente.from(check.tabla)
         .select(check.columnas ?? "*").limit(1).maybeSingle();
       const fila = filaCruda as Record<string, unknown> | null;
-      const id = (fila?.id as string | number | undefined) ?? UUID_NULO;
+      const clave = CLAVE_FILA[check.tabla] ?? "id";
+      const id = (fila?.[clave] as string | number | undefined) ?? UUID_NULO;
       const valor = fila ? fila[columna] : 0;
       // ⚠️ `.select()` DESPUÉS del update, y no por comodidad: cuando lo que deniega es la
       // política (y no el GRANT), PostgREST **no da error** —el UPDATE simplemente no
@@ -3356,7 +3433,7 @@ async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: b
       // §12.48 para las lecturas, del otro lado: aquí sí se puede distinguir, porque
       // «cero filas actualizadas sobre una fila que sé que existe» solo significa una cosa.
       const { data: tocadas, error } = await cliente.from(check.tabla)
-        .update({ [columna]: valor }).eq("id", id).select("id");
+        .update({ [columna]: valor }).eq(clave, id).select(clave);
       if (error) {
         return {
           ok: check.esperado === "denegar",

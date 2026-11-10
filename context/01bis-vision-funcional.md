@@ -77,7 +77,7 @@ derivacion_espigueo, historial_estado, webhook_log y catálogos.
 | `plantilla_mensaje` (tabla) | plantillas en código (`plantillas-meta.md`, `plantillas.ts`) | 🟡 |
 | `notificacion` (+ *fallback* de canal) | — (envíos directos) | ⬜ |
 | `encuesta_satisfaccion` | — | ⬜ |
-| `diagnostico`/`plan_prevencion`/`plan_revision` | **Diagnòstic operatiu** del productor (v2, ficha viva con `diagnostics_historial`, 11-10-2026); el receptor ya no tiene diagnóstico, tiene «El meu perfil de recepció». El **Pla de Prevenció es un expediente** (`expedients_prevencion` + visitas, procesos, cuantificación, objetivos, acciones, seguimiento trimestral y verificación anual; PDF `PLA` versionado, 12-10-2026); estructura provisional hasta el modelo PPPMA | 🟡 |
+| `diagnostico`/`plan_prevencion`/`plan_revision` | **Diagnòstic operatiu** del productor: desde el 10-11-2026 (Plan 2 A1) **uno por productor que se sobrescribe** (`diagnostics`), lo contesta el equipo y el productor lo lee; el plan básico se retiró de la interfaz; el receptor ya no tiene diagnóstico, tiene «El meu perfil de recepció». El **Pla de Prevenció es un expediente** (`expedients_prevencion` + visitas, procesos, cuantificación, objetivos, acciones, seguimiento trimestral y verificación anual; PDF `PLA` versionado, 12-10-2026); estructura provisional hasta el modelo PPPMA | 🟡 |
 | `derivacion_espigueo` | `espigoladas` con alta manual, **conversión desde una oferta «producte al camp»** y reparto en lotes | 🟡 |
 | `historial_estado` | — | ⬜ |
 | `webhook_log` | `wa_messages.raw` (jsonb) | 🟡 |

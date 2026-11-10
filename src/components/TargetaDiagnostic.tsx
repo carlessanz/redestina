@@ -1,42 +1,28 @@
-// El estado del diagnóstico de una organización, y el botón que lo mueve.
+// El estado del diagnóstico operativo del propio productor, encima de su ficha en
+// «La meva organització», con el enlace para consultarlo.
 //
-// Dos sitios, un componente, y por eso `mode`:
-//   · `equip`  → en el bloque «Diagnòstic» de la ficha del equipo (`EntitatDetall`).
-//   · `extern` → encima de la ficha propia, en `/organitzacio`.
+// Desde A1 (`20270520100000`, D5) el diagnóstico lo actualiza el equipo y el productor lo
+// LEE: la tarjeta ya no invita a hacerlo ni a continuarlo, invita a consultarlo. El equipo ya
+// no la usa: en su ficha ve el resumen entero (`ResumDiagnostic`).
 //
-// Lo que cambia entre los dos no es el dato sino la VOZ y el destino: al equipo se le habla
-// de esa organización en tercera persona y se le lleva a `/equip/diagnostics/:tipus/:id`; a
-// la organización se le habla de lo suyo y se la lleva a `/organitzacio/diagnostic`. El
-// estado sale de la misma RPC (`diagnostic_estat`), así que las dos pantallas no pueden
-// decir cosas distintas del mismo diagnóstico.
+// ⚠️ NUNCA EN ROJO. El diagnóstico **no bloquea operar**: el rojo está reservado a lo que sí
+//    corta —la ficha incompleta, el convenio que falta—, y gastarlo aquí devaluaría la única
+//    señal que dice «esto te impide trabajar».
 //
-// ⚠️ NUNCA EN ROJO. El diagnóstico **no bloquea operar**: se puede publicar una oferta y
-//    mostrar interés sin haberlo hecho. El rojo está reservado a lo que sí corta —la ficha
-//    incompleta, el convenio que falta desde la fecha de corte—, y gastarlo aquí devaluaría
-//    la única señal que dice «esto te impide trabajar».
-//
-// ⚠️ Y NO CARGA NADA SI FALTA EL `orgId`: en el alta de una ficha (`/equip/entitats/nova`)
-//    todavía no hay a qué colgar un diagnóstico, igual que `CertificatsFitxa`.
+// ⚠️ Y NO CARGA NADA SI FALTA EL `orgId`.
 
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router'
 import { ArrowRight, ClipboardList } from 'lucide-react'
 import { useT } from '../lib/i18n'
-import { estatPerOrganitzacio, estilEstatDiagnostic } from '../lib/diagnostic'
+import { estilEstatDiagnostic } from '../lib/diagnostic'
 import { diagnosticEstat } from '../lib/diagnosticApi'
-import type { TipusOrg } from '../lib/diagnosticApi'
 import type { DiagnosticEstat } from '../types'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 
-export default function TargetaDiagnostic({
-  tipusOrg, orgId, mode,
-}: {
-  tipusOrg: TipusOrg
-  orgId: string | null
-  mode: 'equip' | 'extern'
-}) {
+export default function TargetaDiagnostic({ orgId }: { orgId: string | null }) {
   const { t } = useT()
   const [estat, setEstat] = useState<DiagnosticEstat | null>(null)
   const [carregat, setCarregat] = useState(false)
@@ -45,30 +31,22 @@ export default function TargetaDiagnostic({
     if (!orgId) { setEstat(null); setCarregat(true); return }
     let viu = true
     setCarregat(false)
-    void diagnosticEstat(tipusOrg, orgId).then((r) => {
+    void diagnosticEstat('productor', orgId).then((r) => {
       if (!viu) return
       setEstat(r.ok ? r.data : null)
       setCarregat(true)
     })
     return () => { viu = false }
-  }, [tipusOrg, orgId])
+  }, [orgId])
 
   // Mientras carga no se pinta nada: una tarjeta que aparece con un texto y lo cambia dos
   // segundos después se lee como un fallo (§2, el salto de alto que arregló `CarregantSeccio`).
   if (!carregat || !estat) return null
 
-  const desti = mode === 'equip'
-    ? `/equip/diagnostics/${tipusOrg}/${orgId}`
-    : '/organitzacio/diagnostic'
-  const prefix = mode === 'equip' ? 'e' : 'o'
-  // A la organización los estados del plan (`a_punt`, `emes`) se le enseñan como
-  // «contestat»: desde la fase 9 el plan es cosa del equipo.
-  const e = mode === 'equip' ? estat.estat : estatPerOrganitzacio(estat.estat)
-  const fet = e === 'emes' || (mode === 'extern' && e === 'complet')
+  const e = estat.estat
 
   return (
-    // `py-0`: el `Card` de shadcn trae `py-6` y el contenido ya lleva su `py-4`; sumados
-    // dejaban la tarjeta con el doble de aire que su vecina de certificados.
+    // `py-0`: el `Card` de shadcn trae `py-6` y el contenido ya lleva su `py-4`.
     <Card className="border-border py-0">
       <CardContent className="flex flex-wrap items-center justify-between gap-3 py-4">
         <div className="flex min-w-0 items-start gap-3">
@@ -76,44 +54,22 @@ export default function TargetaDiagnostic({
           <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <span className="font-medium">{t('diag.card_t')}</span>
-              <Badge className={estilEstatDiagnostic(e)}>
-                {t(`diag.st_${e}`)}
-              </Badge>
-              {/* Que el cuestionario sea texto de trabajo se dice también aquí: es lo que
-                  determina si el PDF sale marcado como borrador. */}
+              <Badge className={estilEstatDiagnostic(e)}>{t(`diag.st_${e}`)}</Badge>
               {estat.provisional && (
                 <Badge variant="outline">{t('diag.provisional_badge')}</Badge>
               )}
             </div>
-            <p className="mt-1 text-sm text-muted-foreground">
-              {t(`diag.${prefix}_card_${e}`, {
-                n: estat.falten.length,
-                m: estat.mesures_n,
-                numero: estat.numero ?? '—',
-              })}
-            </p>
+            <p className="mt-1 text-sm text-muted-foreground">{t(`diag.o_card_${e}`)}</p>
           </div>
         </div>
 
-        <Button
-          asChild
-          variant={fet ? 'outline' : 'default'}
-          className="h-11 shrink-0 whitespace-normal md:h-8"
-        >
-          <Link to={desti}>
-            {t(clauBoto(e))}
+        <Button asChild variant="outline" className="h-11 shrink-0 whitespace-normal md:h-8">
+          <Link to="/organitzacio/diagnostic">
+            {t('diag.card_consulta')}
             <ArrowRight className="size-4" aria-hidden />
           </Link>
         </Button>
       </CardContent>
     </Card>
   )
-}
-
-/** El botón dice lo que queda por hacer: «Fes-lo» ante un plan a punto de emitir era falso. */
-function clauBoto(estat: DiagnosticEstat['estat']): string {
-  if (estat === 'incomplet') return 'diag.card_continue'
-  if (estat === 'a_punt') return 'diag.card_emit'
-  if (estat === 'emes' || estat === 'complet') return 'diag.card_open'
-  return 'diag.card_do'
 }

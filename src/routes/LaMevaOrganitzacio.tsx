@@ -86,7 +86,7 @@ function Diagnostic({ tipus }: { tipus: Tipus }) {
   const { ctx } = useAppContext()
   const org = ctx?.organitzacions.find((o) => o.tipo === tipus) ?? null
   if (tipus === 'entidad') return <TargetaPerfilRecepcio />
-  return <TargetaDiagnostic tipusOrg={tipus} orgId={org?.id ?? null} mode="extern" />
+  return <TargetaDiagnostic orgId={org?.id ?? null} />
 }
 
 /** `useT` y el contexto en una línea, que es lo único que esta pantalla necesita de fuera. */

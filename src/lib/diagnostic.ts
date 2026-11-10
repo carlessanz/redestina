@@ -1,18 +1,18 @@
-// El diagnóstico de prevención, del lado de la pantalla: qué se pregunta, qué aplica, qué
-// falta y en qué punto está. Puro y sin red, como `procesOferta.ts` y `priorizacion.ts`.
+// El diagnóstico operativo, del lado de la pantalla: qué se pregunta, qué aplica, qué falta,
+// cómo se pinta su estado y cómo se lee lo contestado. Puro y sin red, como `procesOferta.ts`.
 //
 // 🔴 LA GRAMÁTICA DE LAS CONDICIONES ESTÁ AQUÍ **POR SEGUNDA VEZ**, y eso es lo primero que
 //    hay que saber de este fichero. La primera vive en SQL (`avaluar_regla`,
-//    20270328101400) y es la que manda: decide qué medidas entran en el plan y qué
-//    obligatorias faltan. Esta copia existe para una sola cosa que SQL no puede hacer —
+//    20270328101400) y es la que manda: decide qué obligatorias faltan y, por tanto, si el
+//    diagnóstico está completo. Esta copia existe para una sola cosa que SQL no puede hacer —
 //    **ocultar una pregunta mientras se rellena el formulario**, sin una ida y vuelta por
 //    cada tecla.
 //
 //    El precio, y por eso hay test: **divergir no falla, MIENTE**. Si esta copia oculta una
 //    pregunta que el servidor considera aplicable, esa pregunta cuenta como obligatoria sin
-//    contestar y el plan no se genera nunca; la pantalla diría «ja està» y el botón de
-//    emitir respondería `falten_obligatories` sin que nada explicara cuál. Al revés es peor:
-//    se enseña una pregunta que no aplica y el plan sale con una respuesta que sobra.
+//    contestar y el diagnóstico no queda nunca completo sin que nada explique cuál falta. Al
+//    revés es peor: se enseña una pregunta que no aplica y el documento sale con una
+//    respuesta que sobra.
 //    `tests/diagnostic.test.ts` recorre los ocho operadores y los casos de borde que SQL
 //    declara explícitamente (el `buit` de cuatro formas, el tipo que no cuadra → `false`).
 //
@@ -22,10 +22,9 @@
 //    rellenar su diagnóstico por un dato de configuración.
 
 import type {
-  BlocMesura, CondicioPregunta, MesuraPla, OpcioPregunta, OperadorRegla, PreguntaDiagnostic,
-  TextBilingue, TipusPregunta,
+  CondicioPregunta, EstatDiagnostic, OpcioPregunta, OperadorRegla, PreguntaDiagnostic,
+  RespostaDiagnostic, TextBilingue, TipusPregunta,
 } from '../types'
-import type { PuntProces } from './procesOferta'
 
 /** El mapa plano `{pregunta_id: valor}` — lo natural de un formulario y lo que pide la RPC. */
 export type Respostes = Record<string, unknown>
@@ -260,12 +259,10 @@ export function progresDiagnostic(
 }
 
 // ---------------------------------------------------------------------------
-// 2. Secciones y bloques
+// 2. Secciones
 // ---------------------------------------------------------------------------
-// Los dos vocabularios son el mismo por diseño —la sección de una pregunta y el bloque de
-// una medida se llaman igual— pero NO son la misma columna: `seccio` es texto libre dentro
-// del jsonb del cuestionario y `bloc` tiene un CHECK. Por eso una sección desconocida se
-// pinta con su texto crudo en vez de con su identificador i18n: el día que la Fundación
+// `seccio` es texto libre dentro del jsonb del cuestionario. Por eso una sección desconocida
+// se pinta con su texto crudo en vez de con su identificador i18n: el día que la Fundación
 // publique su anexo B puede traer secciones que aquí nadie ha previsto, y eso no puede
 // dejar un título ilegible en la pantalla.
 
@@ -279,17 +276,9 @@ export const SECCIONS_CONEGUDES: readonly string[] = [
   'logistica', 'relacio',
 ] as const
 
-export const BLOCS_MESURA: readonly BlocMesura[] = [
-  'planificacio', 'collita', 'conservacio', 'canalitzacio', 'seguiment',
-] as const
-
 /** La clave i18n de una sección, o `null` si no la conocemos (entonces se pinta tal cual). */
 export function clauSeccio(seccio: string): string | null {
   return SECCIONS_CONEGUDES.includes(seccio) ? `diag.sec_${seccio}` : null
-}
-
-export function clauBloc(bloc: BlocMesura): string {
-  return `diag.bloc_${bloc}`
 }
 
 export interface SeccioDiagnostic {
@@ -326,21 +315,47 @@ export function agrupaPerSeccio(
   return fora
 }
 
-export interface GrupMesures {
-  bloc: BlocMesura
-  clau: string
-  mesures: MesuraPla[]
+/** El `id` del título de una sección del formulario: el destino de su chip. */
+export function idSeccio(seccio: string): string {
+  return `diag-sec-${seccio}`
 }
 
-/** Las medidas del plan por bloque, en el orden de `BLOCS_MESURA` y sin bloques vacíos. */
-export function mesuresPerBloc(llista: MesuraPla[]): GrupMesures[] {
-  return BLOCS_MESURA
-    .map((bloc) => ({
-      bloc,
-      clau: clauBloc(bloc),
-      mesures: llista.filter((m) => m.bloc === bloc),
-    }))
-    .filter((g) => g.mesures.length > 0)
+/** Una sección con su estado, para los chips de navegación del formulario (T3). */
+export interface EstatSeccio {
+  seccio: string
+  /** Clave i18n del título, o `null` si la sección no es una de las conocidas. */
+  clau: string | null
+  /** Preguntas que aplican en la sección */
+  n: number
+  /** Cuántas de ellas tienen respuesta */
+  contestades: number
+  /** Obligatorias que aplican y siguen sin contestar */
+  falten: number
+  /** Sin obligatorias pendientes y con algo contestado: el punto del chip va lleno */
+  completa: boolean
+}
+
+/**
+ * El estado de cada sección, en el mismo orden que `agrupaPerSeccio()` (que ya trae solo las
+ * preguntas que aplican).
+ *
+ * ⚠️ «Completa» exige ALGO contestado, no solo cero obligatorias pendientes: una sección de
+ *    preguntas opcionales sin tocar no está hecha, está sin empezar, y un punto lleno ahí
+ *    diría lo contrario.
+ */
+export function seccionsAmbEstat(seccions: SeccioDiagnostic[], respostes: Respostes): EstatSeccio[] {
+  return seccions.map((s) => {
+    const contestades = s.preguntes.filter((p) => !esBuit(respostes[p.id])).length
+    const falten = s.preguntes.filter((p) => p.obligatoria === true && esBuit(respostes[p.id])).length
+    return {
+      seccio: s.seccio,
+      clau: s.clau,
+      n: s.preguntes.length,
+      contestades,
+      falten,
+      completa: falten === 0 && contestades > 0,
+    }
+  })
 }
 
 // ---------------------------------------------------------------------------
@@ -419,130 +434,25 @@ export function prefillDesDeFitxa(
 }
 
 // ---------------------------------------------------------------------------
-// 4. El punto del proceso
+// 4. El estado
 // ---------------------------------------------------------------------------
-// Mismo contrato que `procesOferta.ts`: de los estados reales a «etapa + què passa + què
-// toca + qui», en CLAVES i18n, para que las tres pantallas cuenten lo mismo y el test pueda
-// exigir que existan en los dos idiomas (las claves se componen; `cobertura.test.ts` solo
-// ve literales).
+// Desde A1 (`20270520100000`) solo hay cuatro: el plan básico y sus `a_punt`/`emes` se
+// retiraron de la pantalla (el plan es el expediente). El estado lo calcula SIEMPRE el
+// servidor (`diagnostic_estat`, `diagnostics_equip`); aquí solo se pinta.
 
-/**
- * Las etapas del diagnóstico, en orden.
- *
- * 🔴 Desde la fase 9 (revisión del 08-10-2026) la ORGANIZACIÓN solo recorre las tres
- *    primeras: el diagnóstico es una ficha viva y ya no genera un plan. `a_punt` y `emes`
- *    son del equipo, que prepara el plan de prevención cuando es un servicio contratado.
- */
-export type EtapaDiagnostic = 'comencar' | 'responent' | 'complet' | 'a_punt' | 'emes'
-
-export const ETAPES_DIAGNOSTIC_ORG: readonly EtapaDiagnostic[] = [
-  'comencar', 'responent', 'complet',
-] as const
-
-export const ETAPES_DIAGNOSTIC: readonly EtapaDiagnostic[] = [
-  'comencar', 'responent', 'complet', 'a_punt', 'emes',
-] as const
-
-/** Los pasos que se pintan, según quién mira. */
-export function passosDiagnostic(rol: RolDiagnostic): string[] {
-  return (rol === 'org' ? ETAPES_DIAGNOSTIC_ORG : ETAPES_DIAGNOSTIC).map((e) => `diag.pas_${e}`)
-}
-
-/** Todas las claves de paso (para el test). */
-export const PASSOS_DIAGNOSTIC_CLAUS: readonly string[] =
-  ETAPES_DIAGNOSTIC.map((e) => `diag.pas_${e}`)
-
-/** Quién mira: la propia organización (segunda persona) o el equipo (tercera). */
-export type RolDiagnostic = 'org' | 'equip'
-
-/**
- * Como `PuntProces` pero con el vocabulario de etapas de este módulo.
- *
- * ⚠️ No se amplía `EtapaProces` (que es una unión cerrada a propósito, §procesOferta): eso
- *    obligaría a tocar un módulo compartido para meterle estados de otra máquina. Lo que se
- *    hizo en su lugar fue estrechar lo que `QueTocaAra` PIDE (`PuntPintable`, sin `etapa`),
- *    que es lo que de verdad lee. Así las dos máquinas se pintan con el mismo componente y
- *    ninguna tiene que fingir ser la otra.
- */
-export type PuntDiagnostic = Omit<PuntProces, 'etapa'> & { etapa: EtapaDiagnostic | 'sense_questionari' }
-
-/** Lo mínimo que hace falta saber. Es un subconjunto de `DiagnosticEstat` a propósito:
- *  así la fila del listado del equipo (`DiagnosticEquip`) también sirve. */
-export interface FetsDiagnostic {
-  estat: 'sense_questionari' | 'sense_comencar' | 'incomplet' | 'complet' | 'a_punt' | 'emes'
-  faltenN: number
-  mesuresN: number
-  numero?: string | null
-  provisional?: boolean
-}
-
-function claus(prefix: string): PuntProces['claus'] {
-  return { titol: `${prefix}_t`, passa: `${prefix}_passa`, toca: `${prefix}_toca`, qui: `${prefix}_qui` }
-}
-
-/**
- * En qué punto está el diagnóstico de una organización y qué toca hacer.
- *
- * ⚠️ `sense_questionari` NO es culpa de nadie que mire esta pantalla: significa que no hay
- *    cuestionario vigente para ese tipo de organización, o sea un problema de
- *    configuración. Por eso sale como salida del camino y **nunca** en `aviso`: pintarlo en
- *    ámbar le diría a la organización que le toca algo que no puede hacer.
- */
-export function puntDiagnostic(fets: FetsDiagnostic, rol: RolDiagnostic): PuntDiagnostic {
-  const p = rol === 'org' ? 'o' : 'e'
-  const vars = {
-    n: fets.faltenN,
-    m: fets.mesuresN,
-    numero: fets.numero ?? '—',
-  }
-
-  const fes = (
-    etapa: PuntDiagnostic['etapa'],
-    index: number,
-    emToca: boolean,
-    enllac?: string,
-  ): PuntDiagnostic => ({
-    etapa,
-    index,
-    variant: null,
-    claus: claus(`diag.${p}_${etapa}`),
-    vars,
-    emToca,
-    enllac,
-  })
-
-  if (fets.estat === 'sense_questionari') return fes('sense_questionari', -1, false)
-  if (fets.estat === 'sense_comencar') return fes('comencar', 0, true)
-  if (fets.estat === 'incomplet') return fes('responent', 1, true)
-  // Para la organización, contestado es el final: lo que pase con un plan es del equipo.
-  if (rol === 'org') return fes('complet', 2, false)
-  if (fets.estat === 'emes') return fes('emes', 4, false)
-  if (fets.estat === 'a_punt') return fes('a_punt', 3, true)
-  // `complet` visto por el equipo: no le toca nada salvo que la organización haya
-  // contratado el plan de prevención.
-  return fes('complet', 2, false)
-}
-
-/** El estado que se enseña a la ORGANIZACIÓN: los del plan son, para ella, «contestat». */
-export function estatPerOrganitzacio(estat: FetsDiagnostic['estat']): FetsDiagnostic['estat'] {
-  return estat === 'a_punt' || estat === 'emes' ? 'complet' : estat
-}
-
-/** El badge de estado. Mismo criterio que el resto: `aviso` = te toca, `exito` = hecho. */
-export function estilEstatDiagnostic(estat: FetsDiagnostic['estat']): string {
+/** El badge de estado. Mismo criterio que el resto: `aviso` = a medias, `exito` = hecho. */
+export function estilEstatDiagnostic(estat: EstatDiagnostic): string {
   switch (estat) {
-    case 'emes': return 'bg-exito-fondo text-exito'
     case 'complet': return 'bg-exito-fondo text-exito'
-    case 'a_punt': return 'bg-aviso-fondo text-aviso'
     case 'incomplet': return 'bg-aviso-fondo text-aviso'
     case 'sense_comencar': return 'bg-secondary text-secondary-foreground'
     default: return 'bg-muted text-muted-foreground'
   }
 }
 
-/** Los seis estados, para los filtros del listado del equipo. */
-export const ESTATS_DIAGNOSTIC: readonly FetsDiagnostic['estat'][] = [
-  'sense_comencar', 'incomplet', 'complet', 'a_punt', 'emes', 'sense_questionari',
+/** Los cuatro estados, para los filtros del listado del equipo. */
+export const ESTATS_DIAGNOSTIC: readonly EstatDiagnostic[] = [
+  'sense_comencar', 'incomplet', 'complet', 'sense_questionari',
 ] as const
 
 // ---------------------------------------------------------------------------
@@ -560,4 +470,78 @@ export const ESTATS_DIAGNOSTIC: readonly FetsDiagnostic['estat'][] = [
 export function textBilingue(text: TextBilingue | null | undefined, lang: 'ca' | 'es'): string {
   if (!text) return ''
   return text[lang] || text.ca || text.es || ''
+}
+
+// ---------------------------------------------------------------------------
+// 6. El resumen (lectura)
+// ---------------------------------------------------------------------------
+
+/**
+ * Lo que se enseña como respuesta en el resumen, a partir del sobre que compone el servidor.
+ *
+ * Mismo criterio que el PDF (`respuestaLegible` de `_shared/pdf/render/pla.ts`): primero las
+ * etiquetas —el texto que la persona vio y eligió—; `valor` solo cuando no hay ninguna (un
+ * número, un texto libre). Enseñar `valor` habiendo etiqueta pondría el código interno
+ * (`mes_20000`) en la pantalla. Devuelve `''` si no hay nada que decir: quien pinta decide el
+ * guion.
+ */
+export function respostaLlegible(r: Pick<RespostaDiagnostic, 'valor' | 'etiqueta' | 'etiquetes'>, lang: 'ca' | 'es'): string {
+  if (Array.isArray(r.etiquetes)) {
+    const parts = r.etiquetes.map((e) => textBilingue(e, lang).trim()).filter((x) => x !== '')
+    if (parts.length > 0) return parts.join(', ')
+  }
+  const etiqueta = textBilingue(r.etiqueta ?? null, lang).trim()
+  if (etiqueta !== '') return etiqueta
+  return valorLlegible(r.valor, lang)
+}
+
+/** Un valor crudo como texto: el espejo de `valorLegible` del PDF. */
+function valorLlegible(valor: unknown, lang: 'ca' | 'es'): string {
+  if (valor === null || valor === undefined) return ''
+  if (typeof valor === 'boolean') return valor ? 'Sí' : 'No'
+  if (typeof valor === 'number') {
+    if (!Number.isFinite(valor)) return ''
+    return new Intl.NumberFormat(lang === 'es' ? 'es-ES' : 'ca-ES', { maximumFractionDigits: 2 }).format(valor)
+  }
+  if (typeof valor === 'string') return valor.trim()
+  if (Array.isArray(valor)) {
+    return valor.map((v) => valorLlegible(v, lang)).filter((x) => x !== '').join(', ')
+  }
+  if (typeof valor === 'object') {
+    return Object.entries(valor as Record<string, unknown>)
+      .map(([k, v]) => [k, valorLlegible(v, lang)] as const)
+      .filter(([, v]) => v !== '')
+      .map(([k, v]) => `${k}: ${v}`)
+      .join(' · ')
+  }
+  return String(valor)
+}
+
+/** Una sección del resumen: sus respuestas, en el orden en que llegan del servidor. */
+export interface SeccioResum {
+  seccio: string
+  clau: string | null
+  respostes: RespostaDiagnostic[]
+}
+
+/**
+ * Las respuestas del sobre agrupadas por sección, en el orden en que aparece cada sección
+ * (el del cuestionario: el servidor las compone en ese orden). Mismo criterio que
+ * `agrupaPerSeccio()`.
+ */
+export function agrupaRespostes(respostes: RespostaDiagnostic[]): SeccioResum[] {
+  const fora: SeccioResum[] = []
+  const index = new Map<string, SeccioResum>()
+  for (const r of respostes) {
+    if (!r || typeof r !== 'object') continue
+    const seccio = r.seccio || 'altres'
+    let grup = index.get(seccio)
+    if (!grup) {
+      grup = { seccio, clau: clauSeccio(seccio), respostes: [] }
+      index.set(seccio, grup)
+      fora.push(grup)
+    }
+    grup.respostes.push(r)
+  }
+  return fora
 }

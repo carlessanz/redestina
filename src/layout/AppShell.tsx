@@ -27,9 +27,9 @@ import CampanaAvisos from '../components/CampanaAvisos'
 import AvisInstallacio from '../components/AvisInstallacio'
 import AvisConveni from '../components/AvisConveni'
 import AvisRegistreIncomplet from '../components/AvisRegistreIncomplet'
-import AvisDiagnostic from '../components/AvisDiagnostic'
+import AvisOperativa from '../components/AvisOperativa'
 import { useFitxaIncompleta } from '../hooks/useFitxaIncompleta'
-import { useDiagnosticPendent } from '../hooks/useDiagnosticPendent'
+import { useOperativaPendent } from '../hooks/useOperativaPendent'
 import { useTicAvisos } from '../lib/refrescAvisos'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
@@ -90,10 +90,11 @@ export default function AppShell() {
   // Una sola vez, aquí: lo miran la banda de aviso Y el badge del menú, y calculado por
   // separado podrían decir cosas distintas (§6ter, misma razón que `pendents_equip()`).
   const { falten } = useFitxaIncompleta()
-  // Lo mismo con el diagnóstico: una sola llamada aquí, repartida a la banda y a la marca
-  // del menú. Si cada uno lo pidiera por su cuenta podrían decir cosas distintas del mismo
-  // diagnóstico, que es el clásico contador que marca 1 y una pantalla que enseña 0.
-  const { estat: estatDiagnostic } = useDiagnosticPendent()
+  // Lo mismo con la Operativa (A1: el productor sin ningún lugar de recogida): una sola
+  // llamada aquí, repartida a la banda y a la marca del menú. Si cada uno lo pidiera por su
+  // cuenta podrían decir cosas distintas, el clásico contador que marca 1 y una pantalla que
+  // enseña 0.
+  const { pendent: operativaPendent } = useOperativaPendent()
 
   // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
   // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
@@ -147,7 +148,7 @@ export default function AppShell() {
       <AppSidebar
         comptadors={comptadors}
         fitxaIncompleta={falten.length > 0}
-        diagnosticPendent={estatDiagnostic !== null}
+        operativaPendent={operativaPendent}
       />
       <SidebarInset className="flex h-dvh min-h-0 flex-col overflow-hidden">
         {/* El `env(safe-area-inset-*)` lateral solo hace algo en iPhone con muesca EN
@@ -203,12 +204,12 @@ export default function AppShell() {
                     completar la ficha es lo que hace que firmar salga bien. Ese es el
                     orden en que importan. */}
                 {rolActiu !== 'intern' && <AvisRegistreIncomplet falten={falten} />}
-                {/* Y el diagnóstico, el último de los tres. Ese es el orden en que importan:
-                    firmar desbloquea operar, completar la ficha hace que firmar salga bien,
-                    y el diagnóstico es lo que aporta valor cuando lo demás ya está. Va en
-                    `aviso` y no en rojo porque, al revés que los dos de arriba, NO impide
-                    trabajar (ver `AvisDiagnostic`). */}
-                {rolActiu !== 'intern' && <AvisDiagnostic estat={estatDiagnostic} />}
+                {/* Y la Operativa, la última de las tres (A1; antes, el diagnóstico). Ese es el
+                    orden en que importan: firmar desbloquea operar, completar la ficha hace
+                    que firmar salga bien, y un lugar de recogida hace que la logística no haya
+                    que concretarla a mano. Va en `aviso` y no en rojo porque, al revés que los
+                    dos de arriba, NO impide trabajar (ver `AvisOperativa`). */}
+                {rolActiu !== 'intern' && <AvisOperativa pendent={operativaPendent} />}
                 <Outlet />
               </div>
             )}
