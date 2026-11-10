@@ -1,6 +1,7 @@
 // Alta de una oferta desde el panel del productor.
 //
-//   GET  /crear-oferta/campos?productor=<uuid>  -> los 15 pasos, sus secciones y catálogos
+//   GET  /crear-oferta/campos?productor=<uuid>  -> los pasos, sus secciones, catálogos y lo que
+//                                                  propone la ficha (`predeterminats`, A4)
 //   POST /crear-oferta  { productor_id, datos } -> crea el excedente
 //
 // Por qué una Edge Function y no un insert desde el navegador:
@@ -24,6 +25,7 @@ import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
 import { fotosValides, veuCostReferencia } from "./validacio.ts";
+import { predeterminatsDe, principalPrimer } from "../_shared/predeterminatsOferta.ts";
 
 Deno.serve(async (req) => {
   const cors = corsPara(req, "GET, POST, OPTIONS");
@@ -57,19 +59,33 @@ Deno.serve(async (req) => {
     // pegado a cada producto, sin abrir la tabla. `foto_mini` es para enseñar la foto del
     // catálogo junto a la casilla «fes servir la foto del producte».
     const veuCost = veuCostReferencia(ctx);
-    const [productos, causas, ubicaciones, costos] = await Promise.all([
+    const propi = Boolean(productorId && puedeOfertar(productorId));
+    // A4 (20270521100000): cada lugar trae si es el principal, sus días y franjas y el horario
+    // en texto; el principal va primero. Y la ficha, sus envases habituales: con eso se
+    // calcula lo que se propone en la oferta nueva (`predeterminats`).
+    const [productos, causas, ubicaciones, costos, fitxa] = await Promise.all([
       supabase.from("productos").select("nombre, familia, foto_mini").order("nombre"),
       supabase.from("causas").select("codigo, nombre").order("nombre"),
-      productorId && puedeOfertar(productorId)
+      propi
         ? supabase.from("productor_ubicaciones")
-          .select("id, alias, municipio").eq("productor_id", productorId)
+          .select("id, alias, municipio, es_principal, horario, dies_setmana, franges").eq("productor_id", productorId!)
+          .order("alias")
         : Promise.resolve({ data: [] }),
       // Solo el equipo o quien tiene ficha de productor (M8): a cualquier otra sesión
       // —receptora, cuenta pendiente— no se le sirve una tabla que la RLS le niega.
       veuCost
         ? supabase.from("costes_producto").select("producto, coste_kg")
         : Promise.resolve({ data: [] }),
+      propi
+        ? supabase.from("productores").select("envasos_habituals").eq("id", productorId!).maybeSingle()
+        : Promise.resolve({ data: null }),
     ]);
+    type Lloc = {
+      id: string; alias: string | null; municipio: string | null; es_principal: boolean | null;
+      horario: string | null; dies_setmana: number[] | null; franges: unknown;
+    };
+    const llocs = principalPrimer((ubicaciones.data ?? []) as Lloc[]);
+    const envasos = ((fitxa.data as { envasos_habituals: string[] | null } | null)?.envasos_habituals) ?? null;
     const referencia = new Map(
       ((costos.data ?? []) as { producto: string; coste_kg: number }[])
         .map((c) => [c.producto, Number(c.coste_kg)]),
@@ -105,8 +121,11 @@ Deno.serve(async (req) => {
         causas: ((causas.data ?? []) as { codigo: string; nombre: string | null }[])
           .map((c) => ({ ...c, nombre_es: CAUSES_ES[c.codigo] ?? null })),
         familias_es: FAMILIES_ES,
-        ubicaciones: ubicaciones.data ?? [],
+        ubicaciones: llocs,
       },
+      // A4: lo que la ficha propone (lugar principal, su primera franja, el formato de los
+      // envases habituales). Clave NUEVA: un panel anterior la ignora.
+      predeterminats: predeterminatsDe(llocs, envasos),
     });
   }
 

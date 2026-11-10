@@ -1651,3 +1651,40 @@ Revisión de la Taula mestra por la Fundació (columna de Sebas, filas 1.3 y 1.5
   hecho lo contrario (ampliarla a los dos papeles, leyendo la petición sin la palabra «Eliminar»). Se quita de las fichas
   (`array_remove`; no hay FK) y del catálogo. La forma jurídica `cooperativa` se queda: es la forma legal, no la actividad.
 
+
+### Operativa del productor (Plan 2, A4, `20270521100000`, 10-11-2026)
+
+**T4 · un solo origen**: lo que el productor hace (actividad, productos, comercialización, lugares) son columnas de
+`productores` y filas de `productor_ubicaciones`. La ficha del equipo (pestaña Operativa), «La meva organització» del
+productor y la sección 1 del diagnóstico editan **las mismas columnas** con los mismos controles (`campsFitxa.ts`,
+bloque `ofertant`). El cuestionario ya no las pregunta.
+
+- **Columnas nuevas de `productores`**: `productes_principals text[]` (⊆ habituales, sin tope; la pantalla recomienda
+  ≤5), `varietats jsonb` (`{producte: [varietats]}`, solo de habituales, ≤80 caracteres), `volum_produccio jsonb`
+  (`{producte: kg/any}`, solo de principales), `envasos_habituals text[]` (`caixes · palets · granel · sacs · altres`),
+  `canals_comercials text[]` (8 valores), `tipologia_clients text[]` (8 valores), `facturacio_anual_eur numeric ≥0` y
+  `facturacio_rang text` (`<100k · 100k-500k · 500k-2M · >2M`; **P2**: dos columnas, se rellena una o las dos),
+  `volum_comercialitzat_kg numeric ≥0`, `suport_interes text[]` (**P6**: se conserva como campo opcional; la Fundació
+  confirma si se quita). `productos_habituales` y `temporada` ya existían: desde A4 **son origen** (antes los derivaba
+  `desar_diagnostic`). Cada lista lleva su CHECK (`23514`).
+- **Trigger `productores_operativa`** (`before insert or update of productos_habituales, productes_principals,
+  varietats, volum_produccio, temporada`): **PODA, no rechaza** — limpia espacios y repetidos de los habituales, quita
+  de principales lo que no es habitual, de variedades lo que no es habitual y de volumen y temporada lo que no es
+  principal. Una forma incorrecta (un mapa que no es objeto, meses fuera de 1–12) sí da `22023 operativa_invalida:
+  <camp>`. Se eligió podar porque desmarcar un habitual en pantalla no debe obligar a limpiar a mano tres mapas
+  (`podaOperativa()` de `campsFitxa.ts` hace lo mismo en el navegador para que la pantalla no enseñe lo que se va a
+  podar).
+- **`productor_ubicaciones`**: `dies_setmana int[]` (⊆ 1..7, lunes = 1) y `franges jsonb` (`[{inici, fi}]`, como mucho
+  4, `HH:MM`, inicio < fin: `franges_valides()`, IMMUTABLE). **Un solo `es_principal` por productor**: índice único
+  parcial `productor_ubicaciones_un_principal`; el trigger `trg_ubicacio_principal` marca principal el primer lugar
+  (before insert) y, si se borra el principal, marca el primero por alias (after delete). La migración dejó uno por
+  productor (backfill) y limpió duplicados. Cambiarlo: `fixar_lloc_principal(p_lloc)` (§4bis).
+- **Cuestionario v3** del productor (vigente; la v2 queda `vigente=false`): la v2 sin `families`, `productes`,
+  `productes_principals`, `volum_producte`, `temporada`, `ubicacions`, `logistica_modes`, `condicions_logistiques` ni
+  `suport` (2.6: «sin transporte ni otras condiciones logísticas»). Quedan 8 preguntas (excedentes, previsión, gestión
+  actual, causas, salidas). Los diagnósticos ya guardados conservan sus respuestas.
+- **Backfill** desde `diagnostics.respostes`, solo a huecos: `productes_principals`, `volum_produccio` (de
+  `volum_producte`) y `suport_interes`.
+- **`diagnostic_datos()`** añade la clave `operativa` (actividad, productos, principales, variedades, volumen,
+  temporada, envases, canales, clientes, facturación, volumen comercializado, apoyo y `llocs` con alias, municipio,
+  principal, días, franjas y horario, el principal primero). La pinta `ResumDiagnostic` con `lib/operativaLlegible.ts`.

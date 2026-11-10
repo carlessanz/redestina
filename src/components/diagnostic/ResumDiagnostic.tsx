@@ -9,14 +9,20 @@
 // etiquetas `{ca, es}` congeladas en el sobre), así que esta pantalla no necesita el
 // cuestionario para leerlas y enseña exactamente lo que imprimirá el PDF (A2).
 //
+// A4 (`20270521100000`): arriba va la OPERATIVA de la ficha (clave `operativa`), que ya no es
+// parte del cuestionario sino columnas de `productores` (T4): `filesOperativa()` la pone en
+// filas. Se enseña aunque el cuestionario esté vacío.
+//
 // ⚠️ El botón del PDF llega en A2: aquí todavía no hay documento que descargar.
 
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { agrupaRespostes, estilEstatDiagnostic, respostaLlegible, textBilingue } from '../../lib/diagnostic'
 import { diagnosticDatos } from '../../lib/diagnosticApi'
+import { filesOperativa } from '../../lib/operativaLlegible'
+import { carregaTipusActivitat, type TipusActivitat } from '../../lib/organitzacio'
 import type { DiagnosticDatos } from '../../types'
 import CarregantSeccio from '../CarregantSeccio'
 import { Badge } from '@/components/ui/badge'
@@ -32,6 +38,8 @@ export default function ResumDiagnostic({
   const [dades, setDades] = useState<DiagnosticDatos | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [carregant, setCarregant] = useState(true)
+  const [activitats, setActivitats] = useState<TipusActivitat[]>([])
+  useEffect(() => { void carregaTipusActivitat().then(setActivitats) }, [])
 
   useEffect(() => {
     let viu = true
@@ -44,18 +52,41 @@ export default function ResumDiagnostic({
     return () => { viu = false }
   }, [productorId])
 
+  const operativa = useMemo(() => {
+    const noms = new Map(activitats.map((a) => [a.codi, lang === 'es' ? a.nom_es : a.nom_ca]))
+    return filesOperativa(dades?.operativa, t, lang, (c) => noms.get(c) ?? c)
+  }, [activitats, dades, lang, t])
+
   if (carregant) return <CarregantSeccio files={3} ambCapcalera={false} />
   // Se traduce al pintar: el mensaje puede ser una clave i18n.
   if (error || !dades) return <p className="text-sm text-destructive">{textError(t, error ?? 'diag.err_generic')}</p>
 
   const seccions = agrupaRespostes(dades.respostes ?? [])
 
-  // Sin ninguna respuesta guardada no hay resumen: se dice qué pasa y quién lo hace.
+  const seccioOperativa = operativa.length > 0 && (
+    <section className="space-y-1" aria-labelledby="resum-operativa" data-testid="resum-operativa">
+      <h4 id="resum-operativa" className="text-sm font-semibold">{t('diag.sec_operativa')}</h4>
+      <dl className="divide-y divide-border">
+        {operativa.map((f) => (
+          <div key={f.clau} className="grid gap-1 py-2 sm:grid-cols-2 sm:gap-4">
+            <dt className="text-sm text-muted-foreground">{t(f.clau)}</dt>
+            <dd className="text-sm break-words whitespace-pre-line">{f.text}</dd>
+          </div>
+        ))}
+      </dl>
+    </section>
+  )
+
+  // Sin ninguna respuesta guardada no hay resumen: se dice qué pasa y quién lo hace (y la
+  // Operativa, si la ficha ya la tiene, se enseña igual).
   if (!dades.diagnostic_id || seccions.length === 0) {
     return (
-      <p className="text-sm text-muted-foreground" data-testid="resum-diagnostic-buit">
-        {t(veu === 'equip' ? 'diag.resum_buit_equip' : 'diag.resum_buit_extern')}
-      </p>
+      <div className="space-y-4">
+        <p className="text-sm text-muted-foreground" data-testid="resum-diagnostic-buit">
+          {t(veu === 'equip' ? 'diag.resum_buit_equip' : 'diag.resum_buit_extern')}
+        </p>
+        {seccioOperativa}
+      </div>
     )
   }
 
@@ -78,6 +109,8 @@ export default function ResumDiagnostic({
       {!dades.complet && dades.falten.length > 0 && (
         <p className="text-sm text-aviso">{t('diag.missing', { n: dades.falten.length })}</p>
       )}
+
+      {seccioOperativa}
 
       {seccions.map((s) => (
         <section key={s.seccio} className="space-y-1" aria-labelledby={`resum-${s.seccio}`}>

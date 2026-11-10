@@ -94,7 +94,7 @@ export default function AppShell() {
   // llamada aquí, repartida a la banda y a la marca del menú. Si cada uno lo pidiera por su
   // cuenta podrían decir cosas distintas, el clásico contador que marca 1 y una pantalla que
   // enseña 0.
-  const { pendent: operativaPendent } = useOperativaPendent()
+  const { pendent: operativaPendent, motiu: motiuOperativa } = useOperativaPendent()
 
   // Lo que las organizaciones de la cuenta tienen pendiente de firmar o confirmar. Va en
   // un efecto aparte del de arriba porque es de las cuentas EXTERNAS, que son justo las
@@ -209,7 +209,7 @@ export default function AppShell() {
                     que firmar salga bien, y un lugar de recogida hace que la logística no haya
                     que concretarla a mano. Va en `aviso` y no en rojo porque, al revés que los
                     dos de arriba, NO impide trabajar (ver `AvisOperativa`). */}
-                {rolActiu !== 'intern' && <AvisOperativa pendent={operativaPendent} />}
+                {rolActiu !== 'intern' && <AvisOperativa pendent={operativaPendent} motiu={motiuOperativa} />}
                 <Outlet />
               </div>
             )}

@@ -46,10 +46,11 @@ import {
   aplicaCamp as aplica, carregaCamps, creaOferta, creaUbicacio, esBuit, etiquetaFamilia, localitzaDescriptor,
 } from '../lib/ofertes'
 import { modalitatsDe } from '../lib/modalitats'
-import { HORES, QUARTS, esFranjaValida } from '../lib/franja'
+import { esFranjaValida } from '../lib/franja'
 import type { Franja } from '../lib/franja'
 import type { Municipi } from '../lib/municipis'
 import SelectorMunicipi from './SelectorMunicipi'
+import SelectorFranja from './SelectorFranja'
 import Desplegable from './Desplegable'
 import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
@@ -64,12 +65,9 @@ import { Textarea } from '@/components/ui/textarea'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ddmmaaaaAIso, interpretaEsborrany, isoADdmmaaaa, type Esborrany } from '../lib/esborranyOferta'
+import { aplicaPredeterminats, treuProposatsQueNoApliquen } from '../lib/predeterminatsOferta'
 
 type Datos = Record<string, unknown>
-
-/** Las opciones de los desplegables de la franja: horas por un lado, cuartos por otro. */
-const OPCIONS_HORES = HORES.map((h) => ({ valor: h, text: h }))
-const OPCIONS_QUARTS = QUARTS.map((q) => ({ valor: q, text: q }))
 
 /** Quien ya ha publicado alguna vez no necesita releer el proceso cada vez. */
 const CLAU_PROCES_VIST = 'redestina-proces-vist'
@@ -212,6 +210,11 @@ export default function FormulariNovaOferta(
   /** El mini-formulario de «un lloc nou», dentro del paso de recogida. */
   const [llocNou, setLlocNou] = useState<{ alias: string; maps: string; municipi: Municipi | null } | null>(null)
   const [desantLloc, setDesantLloc] = useState(false)
+  /**
+   * Lo que la Operativa ha propuesto y nadie ha tocado todavía (A4): se marca «proposat des
+   * de la fitxa» y deja de estarlo en cuanto se cambia (`set`).
+   */
+  const [proposats, setProposats] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     if (!productorId) { setCarregant(false); return }
@@ -233,6 +236,14 @@ export default function FormulariNovaOferta(
           setPasMaxim(e.pasMaxim)
           setCostTocat(e.costTocat)
           toast.info(t('po.draft_restored'))
+        } else if (!recuperat.current) {
+          // Sin borrador, la Operativa propone el lugar principal, su franja y el formato
+          // (A4). Solo los huecos, y marcados.
+          const p = aplicaPredeterminats({}, r.data.predeterminats)
+          if (p.proposats.length > 0) {
+            setDatos((d) => aplicaPredeterminats(d, r.data!.predeterminats).datos)
+            setProposats(new Set(p.proposats))
+          }
         }
       }
       recuperat.current = true
@@ -264,6 +275,13 @@ export default function FormulariNovaOferta(
   }, [catalogos, datos.familia])
 
   function set(clave: string, valor: unknown) {
+    // Tocado deja de ser propuesto: a partir de aquí es una respuesta.
+    setProposats((p) => {
+      if (!p.has(clave)) return p
+      const n = new Set(p)
+      n.delete(clave)
+      return n
+    })
     setDatos((d) => {
       const nou = { ...d, [clave]: valor }
       // Cambiar de familia invalida el producto elegido, pero SOLO si no es de la nueva: en
@@ -398,7 +416,14 @@ export default function FormulariNovaOferta(
     setCampsFaltants(new Set())
     setEnviant(true)
     setError(null)
-    const r = await creaOferta(productorId, datos)
+    // Lo propuesto desde la ficha que no se ha tocado y ya no aplica (p. ej. el lugar si el
+    // productor lleva él el transporte) no se manda: no lo ha dicho nadie.
+    const porClau = new Map(campos.map((c) => [c.clave, c]))
+    const aEnviar = treuProposatsQueNoApliquen(datos, proposats, (clau) => {
+      const c = porClau.get(clau)
+      return c ? aplica(c, datos) : false
+    })
+    const r = await creaOferta(productorId, aEnviar)
     setEnviant(false)
     if (!r.ok || !r.data) {
       // El servidor puede saber de un campo que el cliente no vio a tiempo —el descriptor
@@ -481,7 +506,7 @@ export default function FormulariNovaOferta(
                 value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
                 opcions={ubis.map((u) => ({
                   valor: u.id,
-                  text: `${u.alias ?? u.municipio ?? t('po.place_unnamed')}${u.alias && u.municipio ? ` · ${u.municipio}` : ''}`,
+                  text: `${u.alias ?? u.municipio ?? t('po.place_unnamed')}${u.alias && u.municipio ? ` · ${u.municipio}` : ''}${u.es_principal ? ` (${t('org.place_principal')})` : ''}`,
                 }))} />
             )}
             {ubis.length === 0 && !llocNou && (
@@ -621,43 +646,9 @@ export default function FormulariNovaOferta(
           )
         }
         if (campo.format === 'franja') {
-          // De qué hora a qué hora (05-10-2026): cuatro desplegables, hora y cuarto. Un
-          // `<input type="time">` deja escribir cualquier minuto y en iOS sale una rueda de
-          // 60; la unidad mínima es el cuarto de hora (lo confirmó la Fundació).
-          const f = (valor && typeof valor === 'object' ? valor : {}) as Partial<Franja>
-          const [hi, mi] = (f.inici ?? '').split(':')
-          const [hf, mf] = (f.fi ?? '').split(':')
-          const posa = (clau: 'inici' | 'fi', h: string | undefined, m: string | undefined) => {
-            const nou: Partial<Franja> = { ...f }
-            nou[clau] = h ? `${h}:${m || '00'}` : ''
-            set(campo.clave, nou.inici || nou.fi ? nou : null)
-          }
-          // Cada punta («de hh:mm», «a hh:mm») va en un bloque que no se parte: en un móvil
-          // estrecho la fila salta entre las dos puntas, nunca entre la hora y sus minutos.
-          // Los minutos no tienen opción vacía: sin hora se leen «--» y están apagados. «De» y
-          // «a» con el mismo ancho mínimo, para que en móvil las dos filas queden alineadas.
-          return (
-            <div id={id} role="group" className="flex flex-wrap items-center gap-x-3 gap-y-2 text-sm">
-              <span className="flex items-center gap-1.5">
-                <span className="min-w-6 text-muted-foreground">{t('po.franja_de')}</span>
-                <Desplegable aria-label={t('po.franja_h_inici')} className="w-18" aria-invalid={invalid}
-                  value={hi ?? ''} onChange={(v) => posa('inici', v, mi)} buit="--" opcions={OPCIONS_HORES} />
-                <span aria-hidden>:</span>
-                <Desplegable aria-label={t('po.franja_m_inici')} className="w-18" aria-invalid={invalid}
-                  value={mi ?? ''} disabled={!hi} onChange={(v) => posa('inici', hi, v)} placeholder="--"
-                  opcions={OPCIONS_QUARTS} />
-              </span>
-              <span className="flex items-center gap-1.5">
-                <span className="min-w-6 text-muted-foreground">{t('po.franja_a')}</span>
-                <Desplegable aria-label={t('po.franja_h_fi')} className="w-18" aria-invalid={invalid}
-                  value={hf ?? ''} onChange={(v) => posa('fi', v, mf)} buit="--" opcions={OPCIONS_HORES} />
-                <span aria-hidden>:</span>
-                <Desplegable aria-label={t('po.franja_m_fi')} className="w-18" aria-invalid={invalid}
-                  value={mf ?? ''} disabled={!hf} onChange={(v) => posa('fi', hf, v)} placeholder="--"
-                  opcions={OPCIONS_QUARTS} />
-              </span>
-            </div>
-          )
+          // De qué hora a qué hora (05-10-2026): `SelectorFranja`, hora y cuarto.
+          return <SelectorFranja id={id} valor={valor as Partial<Franja> | null} invalid={invalid}
+            onChange={(f) => set(campo.clave, f)} />
         }
         if (campo.clave === 'varietat') {
           return (
@@ -791,6 +782,11 @@ export default function FormulariNovaOferta(
                   {!campo.obligatorio && <span className="ml-1">{t('po.optional')}</span>}
                 </Label>
                 {control(campo)}
+                {proposats.has(campo.clave) && (
+                  <p className="mt-1 text-xs text-muted-foreground" data-testid={`proposat-${campo.clave}`}>
+                    {t('po.proposat_fitxa')}
+                  </p>
+                )}
                 {campo.ayuda && <p className="mt-1 text-xs text-muted-foreground">{campo.ayuda}</p>}
               </div>
             ))}

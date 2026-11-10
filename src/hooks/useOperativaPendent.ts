@@ -4,8 +4,9 @@
 // que pedirle al productor «fes el teu diagnòstic» le mandaba a una pantalla donde ya no puede
 // hacer nada. Lo que sí le toca, y bloquea de verdad la logística, es tener al menos un LUGAR
 // DE RECOGIDA, que edita él mismo en «La meva organització» › Operativa (hallazgo 6 del plan
-// A1). A4 añadirá «sin productos habituales» y «sin lugar principal» cuando sean editables
-// por el productor.
+// A1). Desde A4 (`20270521100000`) también cuenta como pendiente no tener PRODUCTOS
+// HABITUALES, que el productor ya edita él mismo. «Sin lugar principal» no hace falta mirarlo
+// aparte: el trigger `trg_ubicacio_principal` garantiza que, si hay lugares, uno es principal.
 //
 // ES UN HOOK Y NO VIVE DENTRO DE LA BANDA, por lo mismo que `useFitxaIncompleta`: lo miran DOS
 // sitios —la banda de aviso y la marca del menú— y calculado por separado podrían decir cosas
@@ -21,14 +22,16 @@ import { useTicAvisos } from '../lib/refrescAvisos'
 import { clauOrganitzacions, organitzacionsDeClau } from '../lib/rols'
 
 export interface OperativaPendent {
-  /** ¿Hay algún productor de la cuenta sin ningún lugar de recogida? */
+  /** ¿Hay algún productor de la cuenta sin lugar de recogida o sin productos habituales? */
   pendent: boolean
+  /** Qué falta (el primero, para el texto de la banda): lugares antes que productos. */
+  motiu: 'llocs' | 'productes' | null
   carregant: boolean
 }
 
 export function useOperativaPendent(): OperativaPendent {
   const { ctx, rolActiu } = useAppContext()
-  const [pendent, setPendent] = useState(false)
+  const [motiu, setMotiu] = useState<OperativaPendent['motiu']>(null)
   const [carregant, setCarregant] = useState(true)
 
   const extern = rolActiu === 'productor' || rolActiu === 'receptor'
@@ -41,25 +44,32 @@ export function useOperativaPendent(): OperativaPendent {
 
   useEffect(() => {
     const productors = organitzacionsDeClau(clau).filter((o) => o.tipo === 'productor')
-    if (!extern || productors.length === 0) { setPendent(false); setCarregant(false); return }
+    if (!extern || productors.length === 0) { setMotiu(null); setCarregant(false); return }
     let viu = true
     setCarregant(true)
 
     void (async () => {
       // Como mucho una ficha de productor por cuenta: una llamada por ficha, solo la cuenta.
-      const comptes = await Promise.all(productors.map((o) => supabase
-        .from('productor_ubicaciones')
-        .select('id', { count: 'exact', head: true })
-        .eq('productor_id', o.id)))
+      const ids = productors.map((o) => o.id)
+      const [comptes, fitxes] = await Promise.all([
+        Promise.all(ids.map((id) => supabase
+          .from('productor_ubicaciones')
+          .select('id', { count: 'exact', head: true })
+          .eq('productor_id', id))),
+        supabase.from('productores').select('id, productos_habituales').in('id', ids),
+      ])
       if (!viu) return
       // Un error de lectura NO se convierte en banda: decir «te falta» sin saberlo es peor
       // que callar (la ficha lo enseña igual).
-      setPendent(comptes.some((r) => !r.error && (r.count ?? 0) === 0))
+      const senseLlocs = comptes.some((r) => !r.error && (r.count ?? 0) === 0)
+      const senseProductes = !fitxes.error && (fitxes.data ?? []).some((f) =>
+        !Array.isArray(f.productos_habituales) || f.productos_habituales.length === 0)
+      setMotiu(senseLlocs ? 'llocs' : senseProductes ? 'productes' : null)
       setCarregant(false)
     })()
 
     return () => { viu = false }
   }, [extern, clau, tic])
 
-  return { pendent, carregant }
+  return { pendent: motiu !== null, motiu, carregant }
 }

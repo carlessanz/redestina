@@ -8,8 +8,10 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.863 pruebas en 81 ficheros** de Vitest (1 saltada a propósito) **+ 43 de Deno** del PDF
-   (10-11-2026, Plan 2 A1: `tests/diagnostic.test.ts` reescrito —fuera el punto del proceso y las medidas, dentro
+   Referencia: **1.882 pruebas en 83 ficheros** de Vitest (1 saltada a propósito) **+ 43 de Deno** del PDF
+   (10-11-2026, Plan 2 A4: `tests/predeterminatsOferta.test.ts` y `tests/operativaLlegible.test.ts`, nuevos, y las
+   columnas de la Operativa en `campsFitxa.test.ts`; arnés del clon **2.470/2.470 y 40 sin datos**, 30 checks nuevos de
+   `fixar_lloc_principal`, la lista blanca y los CHECK de la Operativa. Antes, **1.863 en 81**: 10-11-2026, Plan 2 A1: `tests/diagnostic.test.ts` reescrito —fuera el punto del proceso y las medidas, dentro
    `seccionsAmbEstat`/`respostaLlegible`— y `tests/pdf/expedient_test.ts`, 4 nuevas de Deno; arnés del clon 2.440/2.440 y 39
    sin datos, 56 checks nuevos y tres `permitir` del plan básico convertidos en `denegar`. Antes, 1.807 en 78 y 39 de Deno: 09-11-2026, Taula mestra fiscal: +1 en `i18n.test.ts` por la familia `org.iva_*`, y más casos en `importEntitats`, `perfilReceptor` y `campsFitxa`; antes 1.806, auditoría del equipo: +4 en `tests/equip.test.ts`, y `tests/pdf/fundacio_test.ts`, 14 nuevas de Deno; antes 1.802, pestañas del equipo y destino del mismo rol: +2 en `tests/equip.test.ts`; antes, 1.800, Configuració › Equip: `tests/equip.test.ts`, 17 pruebas, y las claves compuestas `eq.*` en `i18n.test.ts`;
    antes, 1.763 en 76 tras el importador de entidades). Antes, **1.763 en 76**:    (06-11-2026, importador de entidades: `tests/importEntitats.test.ts`, nuevo, 32 pruebas, y las familias

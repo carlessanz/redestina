@@ -15,6 +15,7 @@ import { potEditar, type CampFitxa, type Veu } from '../../lib/campsFitxa'
 import type { TipusActivitat } from '../../lib/organitzacio'
 import SelectorMunicipi from '../SelectorMunicipi'
 import XipsTria from '../XipsTria'
+import ControlOperativa, { TIPUS_OPERATIVA } from './ControlsOperativa'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -181,6 +182,10 @@ export default function BlocCamps({
         </Select>
       )
     }
+    if (TIPUS_OPERATIVA.has(tp)) {
+      // A4: la Operativa del productor (listas cerradas, productos y mapas por producto).
+      return <ControlOperativa camp={c} valors={valors} onChange={onChange} disabled={disabled} id={id} />
+    }
     if (tp === 'xips_activitat') {
       if (activitats.length === 0) return null
       return (
@@ -220,7 +225,11 @@ export default function BlocCamps({
     )
   }
 
+  // Los controles de grupo (chips, filas por producto) se titulan con un `<p>`, no con un
+  // `<label>`: no hay un único control al que apuntar. Los productos habituales sí lo tienen
+  // (el desplegable de añadir), pero sus chips también son un grupo.
   const esXips = (c: CampFitxa) => c.tipus === 'xips_activitat' || c.tipus === 'xips_modalitats'
+    || (c.tipus !== undefined && TIPUS_OPERATIVA.has(c.tipus))
 
   return (
     <div className={`grid grid-cols-1 gap-4 sm:grid-cols-2${tresColumnes ? ' lg:grid-cols-3' : ''}`}>

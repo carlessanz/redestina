@@ -107,6 +107,10 @@ export interface DadesLloc {
   contacto_telefono: string | null
   horario: string | null
   observaciones: string | null
+  /** A4 (20270521100000): días de recogida, 1 = dilluns … 7 = diumenge. */
+  dies_setmana?: number[] | null
+  /** A4: franjas de recogida `[{inici, fi}]` (≤4). La primera del principal propone el horario de la oferta. */
+  franges?: { inici: string; fi: string }[] | null
 }
 
 export async function creaUbicacio(args: {
@@ -116,7 +120,7 @@ export async function creaUbicacio(args: {
   municipi: { codi_ine: string; nom: string } | null
   /** La ficha completa del lugar (fase 2 de la revisión del 08-10-2026): opcional. */
   extra?: DadesLloc
-}): Promise<Resultat<{ id: string; alias: string | null; municipio: string | null }>> {
+}): Promise<Resultat<{ id: string; alias: string | null; municipio: string | null; es_principal: boolean | null }>> {
   const { data, error } = await supabase
     .from('productor_ubicaciones')
     .insert({
@@ -127,7 +131,8 @@ export async function creaUbicacio(args: {
       municipio_ine: args.municipi?.codi_ine ?? null,
       ...(args.extra ?? {}),
     })
-    .select('id, alias, municipio')
+    // `es_principal`: el primer lugar de un productor nace principal (trigger, A4).
+    .select('id, alias, municipio, es_principal')
     .single()
   if (error || !data) return { ok: false, error: error?.message ?? 'c.error' }
   return { ok: true, data }
@@ -138,7 +143,11 @@ export interface CatalogosOferta {
   /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
   productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
   causas: { codigo: string; nombre: string | null; nombre_es?: string | null }[]
-  ubicaciones: { id: string; alias: string | null; municipio: string | null }[]
+  /** `es_principal`, `horario`, `dies_setmana` y `franges` llegan desde A4; un servidor anterior no los manda. */
+  ubicaciones: {
+    id: string; alias: string | null; municipio: string | null
+    es_principal?: boolean | null; horario?: string | null; dies_setmana?: number[] | null; franges?: unknown
+  }[]
   /** Familia (valor catalán, el que se guarda) → cómo se enseña en castellano. */
   familias_es?: Record<string, string>
 }
@@ -196,6 +205,13 @@ async function token(): Promise<string | null> {
 }
 
 /** Descriptor de los 14 pasos + catálogos. Nunca lanza. */
+/** Lo que la Operativa propone en una oferta nueva (A4; `_shared/predeterminatsOferta.ts`). */
+export interface PredeterminatsOferta {
+  ubicacio: string | null
+  horari: { inici: string; fi: string } | null
+  format_entrega: string | null
+}
+
 export async function carregaCamps(
   productorId: string,
 ): Promise<Resultat<{
@@ -203,6 +219,8 @@ export async function carregaCamps(
   /** Igual que `CampoOferta.seccion`: puede no llegar todavía. */
   secciones?: BlocOferta[]
   catalogos: CatalogosOferta
+  /** Lo que propone la ficha (A4, `predeterminats`): puede no llegar (función anterior). */
+  predeterminats?: PredeterminatsOferta
 }>> {
   try {
     const t = await token()

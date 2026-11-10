@@ -1,3 +1,4 @@
+// A4 (`20270521100000`): la sección 1 es la Operativa de la ficha (columnas de `productores`).
 // A1 (`20270520100000`): UN diagnóstico por productor (`diagnostics`, se sobrescribe), que
 // conduce el EQUIPO (D5) y el productor LEE. Guardar no genera ningún plan ni escribe en
 // `diagnostics_historial` (P10). En la ficha, la pestaña «Diagnòstic i perfil» enseña el
@@ -5,7 +6,7 @@
 // Solo contra el CLON LOCAL y solo en escritorio (escribe el diagnóstico de la cuenta de prueba).
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql } from './ajuda'
+import { entidadDe, entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 const RECEPTOR = 'receptor-carles'
@@ -18,9 +19,10 @@ test.beforeEach(({}, info) => {
 
 test('el equipo contesta desde su pantalla, guarda a medias y completa; no se genera ningún plan', async ({ page }) => {
   const prod = productorDe('productor')
-  // Se parte de un diagnóstico vacío y sin productos derivados.
+  // Se parte de un diagnóstico vacío y de una Operativa sin productos (A4: son columnas de la ficha).
   sql(`delete from diagnostics where productor_id = '${prod}'`)
-  sql(`update productores set productos_habituales = '{}', temporada = null where id = '${prod}'`)
+  sql(`update productores set productos_habituales = '{}', productes_principals = null, varietats = null,
+         volum_produccio = null, temporada = null, envasos_habituals = null where id = '${prod}'`)
   const historial0 = sql(`select count(*) from diagnostics_historial where productor_id = '${prod}'`)
   const plans0 = sql(`select count(*) from planes_prevencion where productor_id = '${prod}'`)
 
@@ -37,29 +39,38 @@ test('el equipo contesta desde su pantalla, guarda a medias y completa; no se ge
   await expect(page.locator('#diag-sec-excedents')).toBeFocused()
   await expect(page.locator('#diag-sec-excedents')).toBeInViewport()
 
-  // Sin familias no hay productos que elegir.
-  await expect(page.getByText(/Marca primer les famílies|Marca primero las familias/).first()).toBeVisible()
-  await page.getByRole('checkbox', { name: /^Hortalissa de fruit$|^Hortaliza de fruto$/ }).click()
-  await page.getByRole('button', { name: 'Tomàquet', exact: true }).first().click()
-  await page.getByRole('button', { name: 'Carbassó', exact: true }).first().click()
-
-  // Los principales salen de lo marcado arriba.
-  const principals = page.locator('[aria-labelledby="diag-productes_principals-etiqueta"]')
-  await principals.getByRole('button', { name: 'Tomàquet', exact: true }).click()
-  await page.locator('#diag-volum_producte-0').fill('12000')
-  const temporada = page.locator('[aria-labelledby="diag-temporada-0-l"]')
+  // A4: la sección 1 es la Operativa de la ficha, con su chip el primero y sin completar.
+  await expect(page.getByTestId('xip-seccio-operativa')).toBeVisible()
+  await expect(page.getByTestId('xip-seccio-operativa')).not.toContainText(/completa/)
+  await page.getByTestId('xip-seccio-operativa').click()
+  await expect(page.locator('#diag-sec-operativa')).toBeFocused()
+  const operativa = page.getByTestId('diag-operativa')
+  // Sin productos habituales no hay principales que elegir.
+  await expect(operativa.getByText(/Primer marca els productes habituals|Primero marca los productos habituales/).first()).toBeVisible()
+  await tria(page.locator('#diag-op-productos_habituales'), 'Tomàquet')
+  await tria(page.locator('#diag-op-productos_habituales'), 'Carbassó')
+  // Los principales salen de los habituales.
+  await page.locator('[aria-labelledby="diag-op-productes_principals-l"]').getByRole('button', { name: 'Tomàquet', exact: true }).click()
+  await page.locator('#diag-op-varietats-0').fill('Raf, Cor de bou')
+  await page.locator('#diag-op-volum_produccio-0').fill('12000')
+  const temporada = page.locator('[aria-labelledby="diag-op-temporada-0-l"]')
   for (const m of [/^jun$/, /^jul$/, /^ago$/]) await temporada.getByRole('button', { name: m }).click()
+  await page.locator('[aria-labelledby="diag-op-envasos_habituals-l"]').getByRole('button', { name: /^Caixes$|^Cajas$/ }).click()
+  await expect(page.getByTestId('xip-seccio-operativa')).toContainText(/completa/)
 
-  // La sección de productos ya está completa: su chip lo dice (también en texto).
-  await expect(page.getByTestId('xip-seccio-productes')).toContainText(/completa/)
-
-  // Guardar a medias: UN solo botón, que guarda aunque falten obligatorias.
+  // Guardar a medias: UN solo botón, que guarda aunque falten obligatorias, y escribe la
+  // Operativa en la ficha (T4).
   const desa = page.getByRole('button', { name: /^Desa el diagnòstic$|^Guarda el diagnóstico$/ })
   await expect(desa).toHaveCount(1)
   await desa.click()
   await expect(page.getByText(/Desat\. Preguntes obligatòries pendents|Guardado\. Preguntas obligatorias pendientes/).first()).toBeVisible()
   expect(sql(`select complet from diagnostics where productor_id = '${prod}'`)).toBe('f')
   await expect(page.getByTestId('estat-diagnostic')).toHaveText(/A mitges|A medias/)
+  expect(sql(`select array_to_string(productos_habituales, ',') || '|' || array_to_string(productes_principals, ',')
+                || '|' || (volum_produccio ->> 'Tomàquet') || '|' || (temporada -> 'Tomàquet')::text
+                || '|' || (varietats -> 'Tomàquet')::text || '|' || array_to_string(envasos_habituals, ',')
+              from productores where id = '${prod}'`))
+    .toBe('Tomàquet,Carbassó|Tomàquet|12000|[6, 7, 8]|["Raf", "Cor de bou"]|caixes')
 
   // Completar las obligatorias que quedan.
   await page.locator('[aria-labelledby="diag-situacions_excedent-etiqueta"]')
@@ -74,16 +85,14 @@ test('el equipo contesta desde su pantalla, guarda a medias y completa; no se ge
   await expect(page.getByText(/Diagnòstic desat i complet|Diagnóstico guardado y completo/).first()).toBeVisible()
   await expect(page.getByTestId('estat-diagnostic')).toHaveText(/Contestat|Contestado/)
 
-  // UNA fila, completa; productos y temporada derivados; y ni historial ni plan nuevos (P10, D4).
+  // UNA fila, completa; y ni historial ni plan nuevos (P10, D4).
   expect(sql(`select count(*) || ':' || bool_and(complet) from diagnostics where productor_id = '${prod}'`)).toBe('1:true')
-  expect(sql(`select array_to_string(productos_habituales, ',') from productores where id = '${prod}'`)).toMatch(/Tomàquet/)
-  expect(sql(`select temporada -> 'Tomàquet' from productores where id = '${prod}'`)).toBe('[6, 7, 8]')
   expect(sql(`select count(*) from diagnostics_historial where productor_id = '${prod}'`)).toBe(historial0)
   expect(sql(`select count(*) from planes_prevencion where productor_id = '${prod}'`)).toBe(plans0)
 
-  // Al volver a entrar se abre con lo guardado.
+  // Al volver a entrar se abre con lo guardado (la Operativa, desde la ficha).
   await page.reload()
-  await expect(page.locator('#diag-volum_producte-0')).toHaveValue('12000')
+  await expect(page.locator('#diag-op-volum_produccio-0')).toHaveValue('12000')
 })
 
 test('la ficha del productor enseña el resumen y el botón para actualizarlo', async ({ page }) => {
@@ -95,6 +104,9 @@ test('la ficha del productor enseña el resumen y el botón para actualizarlo', 
   await expect(resum).toBeVisible()
   await expect(resum).toContainText('Tomàquet')
   await expect(resum).toContainText(/Contestat|Contestado/)
+  // A4: la Operativa, arriba y en lectura.
+  await expect(page.getByTestId('resum-operativa')).toContainText(/Tomàquet: Raf, Cor de bou/)
+  await expect(page.getByTestId('resum-operativa')).toContainText(/Tomàquet: jun, jul, ago/)
   await expect(resum).toContainText(/Actualitzat el|Actualizado el/)
   // Lectura: ni un control de formulario dentro del resumen.
   await expect(resum.locator('input, textarea, [role="checkbox"], [role="combobox"]')).toHaveCount(0)

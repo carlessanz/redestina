@@ -18,6 +18,13 @@
 //    tal como lo devuelve el servidor; aquí se calcula en local solo para señalar las
 //    preguntas pendientes y el punto de cada chip de sección mientras se escribe.
 //
+// 🔴 LA SECCIÓN 1 ES LA OPERATIVA DE LA FICHA (A4, `20270521100000`, T4). Actividad,
+//    productos, principales, variedades, volumen, temporada, envases, comercialización, apoyo
+//    y lugares de recogida NO son respuestas del cuestionario: son columnas de `productores`
+//    y filas de `productor_ubicaciones`, con los mismos controles que la pestaña Operativa de
+//    la ficha (`useOperativaDiagnostic`, `BlocCamps`, `LlocsRecollida`). «Desa» escribe primero
+//    lo que haya cambiado de la Operativa y después el cuestionario (v3, sin esas preguntas).
+//
 // ⚠️ EL PREFILL SE MARCA. Un valor propuesto desde la ficha se enseña con su nota hasta que
 //    alguien lo toca. Sin la marca sería indistinguible de una respuesta dada, y `prefill`
 //    existe justamente para no escribir en el diagnóstico algo que la persona no ha dicho
@@ -31,6 +38,9 @@ import { refrescaAvisos } from '../lib/refrescAvisos'
 import { textError } from '../lib/textError'
 import { FilaCasella } from './Casella'
 import NavSeccionsDiagnostic from './diagnostic/NavSeccionsDiagnostic'
+import { useOperativaDiagnostic } from './diagnostic/useOperativaDiagnostic'
+import BlocCamps from './fitxa/BlocCamps'
+import LlocsRecollida from './LlocsRecollida'
 import {
   agrupaPerSeccio, esBuit, estilEstatDiagnostic, idSeccio, llistaDe, mesosValids, netejaRespostes,
   obligatoriesQueFalten, opcionsProductes, opcionsVisibles, prefillDesDeFitxa, progresDiagnostic,
@@ -57,6 +67,9 @@ import { Textarea } from '@/components/ui/textarea'
 import {
   Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
 } from '@/components/ui/select'
+
+/** La sección 1 (A4): no viene del cuestionario, es la Operativa de la ficha. */
+const SECCIO_OPERATIVA = 'operativa'
 
 /** Radix no admite `value=""`, así que «sense respondre» necesita un centinela. */
 const CAP = '__cap'
@@ -134,7 +147,16 @@ export default function FormulariDiagnostic({
   // `useMemo` de abajo recalcularan siempre, que es lo que `react-hooks` señala.
   const preguntes = useMemo(() => questionari?.preguntes ?? [], [questionari])
   const seccions = useMemo(() => agrupaPerSeccio(preguntes, respostes), [preguntes, respostes])
-  const estatSeccions = useMemo(() => seccionsAmbEstat(seccions, respostes), [seccions, respostes])
+  const operativa = useOperativaDiagnostic(orgId)
+  // El chip «Operativa» va primero: es la sección 1 (A4). Completa = productos habituales y
+  // algún principal (lo que la oferta y el plan necesitan saber).
+  const estatSeccions = useMemo(() => [
+    {
+      seccio: SECCIO_OPERATIVA, clau: 'diag.sec_operativa', n: operativa.camps.length,
+      contestades: operativa.contestades, falten: operativa.completa ? 0 : 1, completa: operativa.completa,
+    },
+    ...seccionsAmbEstat(seccions, respostes),
+  ], [seccions, respostes, operativa.camps.length, operativa.contestades, operativa.completa])
   const falten = useMemo(() => obligatoriesQueFalten(preguntes, respostes), [preguntes, respostes])
   const progres = useMemo(() => progresDiagnostic(preguntes, respostes), [preguntes, respostes])
 
@@ -157,6 +179,10 @@ export default function FormulariDiagnostic({
   async function desa() {
     if (desant) return
     setDesant(true)
+    // Primero la Operativa (columnas de la ficha): si la base la rechaza, no se guarda nada más
+    // y lo tecleado sigue en pantalla.
+    const op = await operativa.desa()
+    if (!op.ok) { setDesant(false); toast.error(textError(t, op.missatge)); return }
     const r = await desarDiagnostic(
       'productor', orgId, netejaRespostes(preguntes, respostes),
       notes.trim() === '' ? null : notes.trim(), lang)
@@ -236,6 +262,28 @@ export default function FormulariDiagnostic({
       <div className="sticky top-0 z-10 -mx-1 bg-background/95 px-1 py-2 backdrop-blur">
         <NavSeccionsDiagnostic seccions={estatSeccions} />
       </div>
+
+      {/* Sección 1: la Operativa de la ficha (A4). */}
+      <Card className="scroll-mt-24" data-testid="diag-operativa">
+        <CardHeader>
+          <CardTitle id={idSeccio(SECCIO_OPERATIVA)} tabIndex={-1} className="scroll-mt-24 text-base outline-none">
+            {t('diag.sec_operativa')}
+          </CardTitle>
+          <p className="text-sm text-muted-foreground">{t('diag.operativa_hint')}</p>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          {operativa.error
+            ? <p className="text-sm text-destructive">{textError(t, operativa.error)}</p>
+            : (
+              <BlocCamps camps={operativa.camps} valors={operativa.valors} onChange={operativa.onChange}
+                veu="equip" potEditar idPrefix="diag-op" activitats={operativa.activitats} />
+            )}
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{t('diag.operativa_llocs')}</p>
+            <LlocsRecollida productorId={orgId} idPrefix="diag-lloc" />
+          </div>
+        </CardContent>
+      </Card>
 
       {seccions.map((s) => (
         <Card key={s.seccio} className="scroll-mt-24">

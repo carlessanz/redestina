@@ -34,6 +34,9 @@ const COLUMNES: Record<Taula, string[]> = {
     'regim_iva', 'domicili_fiscal', 'codi_postal_fiscal', 'poblacio_fiscal', 'contacte_facturacio_nom', 'contacte_facturacio_email',
     // 20270518100000 (Plan 2, B1): estado CRM por papel.
     'estat_crm',
+    // 20270521100000 (Plan 2, A4): Operativa — actividad y comercialización.
+    'productes_principals', 'varietats', 'volum_produccio', 'envasos_habituals', 'canals_comercials',
+    'tipologia_clients', 'facturacio_anual_eur', 'facturacio_rang', 'volum_comercialitzat_kg', 'suport_interes',
   ],
   entidades: [
     'id', 'nombre', 'codigo', 'familia', 'prioritat', 'estat', 'gestio', 'comentarios', 'area_geografica',

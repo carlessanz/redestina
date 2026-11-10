@@ -1524,6 +1524,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
     { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
     { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
+    // --- Operativa (A4, 20270521100000) ---
+    // El equipo edita la Operativa de cualquier productor con UPDATE directo (ficha y sección 1
+    // del diagnóstico, T4) y marca su lugar principal por la RPC.
+    { tabla: "productores", op: "leer", esperado: "permitir", columnas: "id, productes_principals, varietats, volum_produccio, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes", descripcion: "veu la Operativa de tots els productors (A4)" },
+    { tabla: "productores", op: "actualizar", esperado: "permitir", columnas: "id, envasos_habituals", descripcion: "edita la Operativa d'una fitxa (A4, mateix valor)" },
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2172,6 +2178,12 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
     { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
     { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
+    // --- Operativa (A4, 20270521100000) ---
+    // El equipo edita la Operativa de cualquier productor con UPDATE directo (ficha y sección 1
+    // del diagnóstico, T4) y marca su lugar principal por la RPC.
+    { tabla: "productores", op: "leer", esperado: "permitir", columnas: "id, productes_principals, varietats, volum_produccio, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes", descripcion: "veu la Operativa de tots els productors (A4)" },
+    { tabla: "productores", op: "actualizar", esperado: "permitir", columnas: "id, envasos_habituals", descripcion: "edita la Operativa d'una fitxa (A4, mateix valor)" },
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura: sense cami en pantalla des d'A1 (D4)" },
     { tabla: "mesures_prevencio", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap mesura: sense cami en pantalla des d'A1 (D4)" },
     { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla: sense cami en pantalla des d'A1 (D4)" },
@@ -2712,6 +2724,21 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { contacte_facturacio_email: "no-es-un-correu" } }, descripcion: "el correu de facturació és a la llista blanca (i el CHECK el valida)" },
     { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { codi_postal_fiscal: "123" } }, descripcion: "el codi postal fiscal és a la llista blanca (i el CHECK el valida)" },
     { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_productor", p_dades: { tipus_activitat: ["cooperativa_agraria"] } }, descripcion: "«Cooperativa agrària» ja no és una activitat (retirada a petició de la Fundació)" },
+    // A4 (20270521100000): la Operativa del productor. La LEE en su ficha y la escribe SOLO por
+    // su RPC (D5): el UPDATE directo lo filtra la política `edicio intern`. Sin escribir nada: un
+    // valor fuera de lista tiene que llegar a la columna y chocar con su CHECK (si la clave no
+    // estuviera en la lista blanca, se ignoraría y daría éxito); una forma equivocada, 22023.
+    { tabla: "productores", op: "leer", esperado: "permitir", columnas: "id, productes_principals, varietats, volum_produccio, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes", descripcion: "veu la Operativa de la SEVA fitxa (A4)" },
+    { tabla: "productores", op: "actualizar", esperado: "denegar", columnas: "id, envasos_habituals", descripcion: "NO escriu la seva fitxa directament: nomes per actualitzar_fitxa_productor (A4)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { envasos_habituals: ["no_existeix"] } }, descripcion: "els envasos habituals son a la llista blanca (i el CHECK els valida) (A4)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { canals_comercials: ["no_existeix"] } }, descripcion: "els canals comercials son a la llista blanca (i el CHECK els valida) (A4)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { tipologia_clients: ["no_existeix"] } }, descripcion: "la tipologia de clients es a la llista blanca (i el CHECK la valida) (A4)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { facturacio_rang: "no_existeix" } }, descripcion: "el rang de facturacio es a la llista blanca (i el CHECK el valida) (A4)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_productor", p_dades: { suport_interes: ["no_existeix"] } }, descripcion: "el suport que vol es a la llista blanca (i el CHECK el valida) (A4, P6)" },
+    { tabla: "actualitzar_fitxa_productor", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_productor", p_dades: { varietats: "no_es_un_objecte" } }, descripcion: "les varietats van per producte: una forma equivocada es 22023 (A4)" },
+    // `fixar_lloc_principal`: con ficha de productor, un uuid inventado llega a la existencia.
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el seu lloc principal (autoritza; 22023 lloc_inexistent) (A4)" },
+    { tabla: "productor_ubicaciones", op: "leer", esperado: "permitir", columnas: "id, es_principal, dies_setmana, franges", descripcion: "veu els dies i franges dels SEUS llocs (A4)", requiereFixture: "algun lloc de recollida de la seva fitxa" },
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: ve la firma de SU documento (la que sube el fixture para
     // TEST-PROD-1) y el estado de firma de sus documentos. `productor-altre` (TEST-PROD-2) no
@@ -2949,6 +2976,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_entitat", p_dades: { contacte_facturacio_email: "no-es-un-correu" } }, descripcion: "el correu de facturació és a la llista blanca (i el CHECK el valida)" },
     { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "23514", args: { p_id: "@meva_fitxa_entitat", p_dades: { codi_postal_fiscal: "123" } }, descripcion: "el codi postal fiscal és a la llista blanca (i el CHECK el valida)" },
     { tabla: "actualitzar_fitxa_entitat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_fitxa_entitat", p_dades: { tipus_activitat: ["cooperativa_agraria"] } }, descripcion: "«Cooperativa agrària» ja no és una activitat (retirada a petició de la Fundació)" },
+    // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
+    // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
     ...DOCUMENTAL_EXTERN,
     // Circuito de firma: el estado de firma de SUS documentos (ENT, CR, convenio).
     {
@@ -3033,6 +3063,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     { tabla: "firmes_document", op: "leer", esperado: "denegar", descripcion: "no ve cap signatura" },
     { tabla: "v_signatura_document", op: "leer", esperado: "denegar", descripcion: "no ve l'estat de signatura de cap document" },
+    // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
+    // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
     ...DOCUMENTAL_EXTERN,
   ],
   // Registro público recién enviado: membresía `aprovacio = 'pendent'` + `activo =
@@ -3061,6 +3094,9 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "convenios", op: "leer", esperado: "denegar", descripcion: "no ve ningún convenio" },
     { tabla: "firmes_document", op: "leer", esperado: "denegar", descripcion: "no ve cap signatura" },
     { tabla: "v_signatura_document", op: "leer", esperado: "denegar", descripcion: "no ve l'estat de signatura de cap document" },
+    // A4 (20270521100000): sin ninguna ficha de productor, el lugar principal no es cosa suya
+    // (el permiso va antes que la existencia: 42501 aunque el uuid no exista).
+    { tabla: "fixar_lloc_principal", op: "rpc", esperado: "denegar", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO tria el lloc principal de cap productor (A4)" },
     ...DOCUMENTAL_EXTERN,
   ],
 };
@@ -3233,6 +3269,9 @@ const COLUMNA_INOCUA: Record<string, string> = {
   diagnostics: "notes",
   mesures_prevencio: "activa",
   regles_pla: "activa",
+  // A4 (20270521100000): la Operativa. El equipo la escribe directo (política `edicio intern`);
+  // el productor, no (0 filas: la política filtra) —él va por `actualitzar_fitxa_productor`—.
+  productores: "envasos_habituals",
 };
 
 /**

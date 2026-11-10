@@ -24,6 +24,7 @@ import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 import { enmascararTelefono } from "./enmascarar.ts";
 import { de } from "./textIntake.ts";
+import { principalPrimer, titolLlocLista } from "./predeterminatsOferta.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
 const CADUCIDAD_HORAS = 12;
@@ -256,11 +257,16 @@ async function preguntar(
         OPCIONS_TRANSPORT.map((o) => ({ id: `transport:${o.id}`, titulo: o.titulo })),
       )).ok;
     case "ubicacio": {
+      // A4 (P5): el lugar principal primero y marcado «(habitual)». No se salta la pregunta
+      // aunque haya principal: saltar pasos cambiaría el intake publicado.
       const { data } = await supabase
         .from("productor_ubicaciones")
-        .select("id, alias, municipio")
-        .eq("productor_id", sesion.productor_id);
-      const ubis = (data ?? []) as Array<{ id: string; alias: string; municipio: string }>;
+        .select("id, alias, municipio, es_principal")
+        .eq("productor_id", sesion.productor_id)
+        .order("alias");
+      const ubis = principalPrimer(
+        (data ?? []) as Array<{ id: string; alias: string; municipio: string; es_principal: boolean | null }>,
+      );
       // Con cero ubicaciones no se puede enviar una lista vacía: Meta la rechaza.
       if (ubis.length === 0) {
         return (await sendText(
@@ -271,7 +277,7 @@ async function preguntar(
       }
       const filas: FilaLista[] = ubis.map((u) => ({
         id: `ubicacio:${u.id}`,
-        titulo: u.alias ?? u.municipio ?? "Ubicació",
+        titulo: titolLlocLista(u.alias ?? u.municipio ?? "Ubicació", Boolean(u.es_principal)),
         descripcion: u.municipio ?? undefined,
       }));
       // ⚠️ Una lista admite 10 filas: con 10 ubicaciones o más, «Un altre lloc» se quedaría

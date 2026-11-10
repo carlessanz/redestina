@@ -1362,10 +1362,40 @@ export interface Diagnostic {
 }
 
 /** Lo que devuelve `diagnostic_datos()`: el diagnóstico listo para leerlo (resumen y PDF). */
+/** Un lugar de recogida tal como lo cuenta `diagnostic_datos()` (A4). */
+export interface LlocOperativa {
+  alias: string | null
+  municipi: string | null
+  principal: boolean
+  dies: number[] | null
+  franges: { inici: string; fi: string }[] | null
+  horari: string | null
+}
+
+/** La Operativa de la ficha dentro de `diagnostic_datos()` (A4, clave `operativa`). */
+export interface OperativaDiagnostic {
+  activitat: string[] | null
+  productes: string[] | null
+  principals: string[] | null
+  varietats: Record<string, string[]> | null
+  volum: Record<string, number> | null
+  temporada: Record<string, number[]> | null
+  envasos: string[] | null
+  canals: string[] | null
+  clients: string[] | null
+  facturacio_eur: number | null
+  facturacio_rang: string | null
+  volum_comercialitzat_kg: number | null
+  suport: string[] | null
+  llocs: LlocOperativa[]
+}
+
 export interface DiagnosticDatos {
   /** `null` si el productor todavía no tiene diagnóstico (entonces `respostes` va vacío) */
   diagnostic_id: string | null
   organitzacio: { nom: string | null; nif: string | null; municipi: string | null }
+  /** Desde A4; un servidor anterior no la manda. */
+  operativa?: OperativaDiagnostic | null
   questionari: { titol: TextBilingue; versio: number; provisional: boolean } | null
   respostes: RespostaDiagnostic[]
   notes: string | null

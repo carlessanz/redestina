@@ -45,6 +45,13 @@ export type TipusCamp =
   | 'xips_activitat' // catálogo `tipus_activitat`, filtrado por papel
   | 'xips_modalitats' // donacio · venda · maquila
   | 'data' // `yyyy-mm-dd` (productores.data_alta es date; entidades.data_alta, texto); en solo lectura, dd/mm/aaaa
+  // A4 (20270521100000), la Operativa del productor (`components/fitxa/ControlsOperativa.tsx`):
+  | 'xips' // text[] de una lista cerrada (`opcions` + `etiquetaOpcio`), selección múltiple
+  | 'productes' // text[] de productos del catálogo `productos`, por familia (conserva un valor antiguo)
+  | 'principals' // text[] ⊆ los productos habituales del mismo formulario
+  | 'varietats' // {producte: [text]} por producto habitual
+  | 'kg_producte' // {producte: kg} por producto principal
+  | 'mesos_producte' // {producte: [mes]} por producto principal
 
 export interface CampFitxa {
   /** Clave única del campo en la ficha (no es el nombre de la columna). */
@@ -136,9 +143,46 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
   { clau: 'contacte_facturacio_email', columnes: { productores: 'contacte_facturacio_email', entidades: 'contacte_facturacio_email' },
     bloc: 'fiscal', tipus: 'email', labelKey: 'org.f_email_facturacio', veu: 'tots', edita: 'tots' },
 
-  // ------------------------------------------------------------------ Ofertant
-  { clau: 'productos_habituales', columnes: { productores: 'productos_habituales' }, bloc: 'ofertant', tipus: 'list',
-    labelKey: 'f.productos_habituales', veu: 'tots', edita: 'equip', ample: 'full' },
+  // ------------------------------------------------------------------ Ofertant = Operativa
+  // A4 (20270521100000; filas 2.1, 2.2 y 2.5; D5): la Operativa la edita también el productor
+  // («La meva organització»). Se pinta igual en la pestaña Operativa de la ficha, en «La meva
+  // organització» y en la sección 1 del formulario del diagnóstico (T4: un solo origen). La
+  // coherencia entre productos (principales ⊆ habituales, volumen y temporada de principales)
+  // la poda el trigger `productores_operativa`; la pantalla hace lo mismo al cambiarlos.
+  { clau: 'productos_habituales', columnes: { productores: 'productos_habituales' }, bloc: 'ofertant', tipus: 'productes',
+    labelKey: 'f.productos_habituales', ajudaKey: 'op.h_productes', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'productes_principals', columnes: { productores: 'productes_principals' }, bloc: 'ofertant', tipus: 'principals',
+    labelKey: 'op.f_principals', ajudaKey: 'op.h_principals', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'varietats', columnes: { productores: 'varietats' }, bloc: 'ofertant', tipus: 'varietats',
+    labelKey: 'op.f_varietats', ajudaKey: 'op.h_varietats', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'volum_produccio', columnes: { productores: 'volum_produccio' }, bloc: 'ofertant', tipus: 'kg_producte',
+    labelKey: 'op.f_volum', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'temporada', columnes: { productores: 'temporada' }, bloc: 'ofertant', tipus: 'mesos_producte',
+    labelKey: 'op.f_temporada', veu: 'tots', edita: 'tots', ample: 'full' },
+  // Las opciones son las del CHECK de la base (mismo orden); se pintan con `etiquetaOpcio`.
+  { clau: 'envasos_habituals', columnes: { productores: 'envasos_habituals' }, bloc: 'ofertant', tipus: 'xips',
+    opcions: ['caixes', 'palets', 'granel', 'sacs', 'altres'], etiquetaOpcio: 'op.env_',
+    labelKey: 'op.f_envasos', ajudaKey: 'op.h_envasos', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'canals_comercials', columnes: { productores: 'canals_comercials' }, bloc: 'ofertant', tipus: 'xips',
+    opcions: ['mercats_majoristes', 'distribucio_gran_superficie', 'comerc_minorista', 'restauracio_catering',
+      'industria_alimentaria', 'venda_directa', 'cooperatives_productors', 'altres'], etiquetaOpcio: 'op.canal_',
+    labelKey: 'op.f_canals', veu: 'tots', edita: 'tots', ample: 'full' },
+  { clau: 'tipologia_clients', columnes: { productores: 'tipologia_clients' }, bloc: 'ofertant', tipus: 'xips',
+    opcions: ['majoristes_distribuidors', 'comercos_botigues', 'supermercats_cadenes', 'restaurants_catering',
+      'industria_transformadora', 'consumidors_finals', 'administracions', 'altres'], etiquetaOpcio: 'op.client_',
+    labelKey: 'op.f_clients', veu: 'tots', edita: 'tots', ample: 'full' },
+  // P2: cifra O rango (dos columnas; se rellena una, lo dice la ayuda).
+  { clau: 'facturacio_anual_eur', columnes: { productores: 'facturacio_anual_eur' }, bloc: 'ofertant', tipus: 'number',
+    labelKey: 'op.f_facturacio_eur', ajudaKey: 'op.h_facturacio', veu: 'tots', edita: 'tots' },
+  { clau: 'facturacio_rang', columnes: { productores: 'facturacio_rang' }, bloc: 'ofertant', tipus: 'select',
+    opcions: ['<100k', '100k-500k', '500k-2M', '>2M'],
+    labelKey: 'op.f_facturacio_rang', veu: 'tots', edita: 'tots' },
+  { clau: 'volum_comercialitzat_kg', columnes: { productores: 'volum_comercialitzat_kg' }, bloc: 'ofertant', tipus: 'number',
+    labelKey: 'op.f_volum_comercialitzat', veu: 'tots', edita: 'tots' },
+  // P6: «En què us agradaria que REDESTINA us ajudés?» (la pregunta `suport` del cuestionario v2).
+  { clau: 'suport_interes', columnes: { productores: 'suport_interes' }, bloc: 'ofertant', tipus: 'xips',
+    opcions: ['compradors', 'donacions', 'transformacio', 'logistica', 'prevencio', 'anticipar', 'altres'],
+    etiquetaOpcio: 'op.suport_', labelKey: 'op.f_suport', veu: 'tots', edita: 'tots', ample: 'full' },
 
   // ------------------------------------------------------------------ Receptor
   // Decide qué ofertas ve en el Mercat (§4bis): lo fija el equipo, el actor lo ve.
@@ -228,7 +272,6 @@ export const GESTIONATS_PER_COMPONENT: Readonly<Record<Taula, readonly string[]>
 export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
   productores: [
     'id', 'organizacion_id',
-    'temporada', // la escribe el diagnóstico operativo (20270423100000); se ve en «Diagnòstic»
     'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
     'poblacion', // el nombre del municipio, que escribe el trigger: se ve en el selector de «Població»
   ],
@@ -255,6 +298,21 @@ export function campsDelBloc(
     && (veu === 'equip' || c.veu === 'tots')
     && ((c.columnes.productores && rols.ofertant) || (c.columnes.entidades && rols.receptor)))
 }
+
+/**
+ * La sección Operativa del diagnóstico (A4, T4): la actividad (bloque identitat) y la
+ * Operativa entera, como columnas de `productores` (`useOperativaDiagnostic`).
+ */
+export function campsOperativa(): CampFitxa[] {
+  const activitat = CAMPS_FITXA.filter((c) => c.clau === 'tipus_activitat')
+  return [...activitat, ...campsDelBloc('ofertant', 'equip', { ofertant: true, receptor: false })]
+}
+
+/**
+ * Las columnas de `campsOperativa()` en un solo literal (§7: supabase-js deduce el tipo del
+ * literal). `tests/operativaLlegible.test.ts` comprueba que son exactamente esas.
+ */
+export const COLUMNES_OPERATIVA = 'tipus_activitat, productos_habituales, productes_principals, varietats, volum_produccio, temporada, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes'
 
 /** Los campos que tienen columna en una tabla (la ficha del actor, de un solo papel). */
 export function campsDeTaula(taula: Taula, veu: Veu): CampFitxa[] {
@@ -320,6 +378,11 @@ export function normalitzaValor(c: CampFitxa, v: unknown): unknown {
     return Array.isArray(v) && v.length ? v : null
   }
   if (tp === 'xips_activitat' || tp === 'xips_modalitats') return Array.isArray(v) ? v : []
+  if (tp === 'xips' || tp === 'productes' || tp === 'principals') {
+    const arr = Array.isArray(v) ? (v as unknown[]).map((x) => String(x).trim()).filter(Boolean) : []
+    return arr.length ? [...new Set(arr)] : null
+  }
+  if (tp === 'varietats' || tp === 'kg_producte' || tp === 'mesos_producte') return netejaMapa(tp, v)
   if (tp === 'number') return v == null || v === '' ? null : Number(v)
   if (tp === 'bool') return Boolean(v)
   if (tp === 'boolnull') return v == null || v === '' ? null : Boolean(v)
@@ -335,11 +398,72 @@ export function normalitzaValor(c: CampFitxa, v: unknown): unknown {
   return s === '' || s == null ? null : s
 }
 
+/**
+ * Un mapa por producto (A4) sin entradas vacías: variedades sin texto, kilos que no son un
+ * número ≥ 0, meses fuera de 1–12. Vacío → null. Las claves no se podan aquí (de eso se encarga
+ * `podaOperativa`, que sabe qué productos hay).
+ */
+function netejaMapa(tp: 'varietats' | 'kg_producte' | 'mesos_producte', v: unknown): Record<string, unknown> | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const out: Record<string, unknown> = {}
+  for (const [k, x] of Object.entries(v as Record<string, unknown>)) {
+    if (tp === 'kg_producte') {
+      const n = typeof x === 'number' ? x : x == null || x === '' ? NaN : Number(x)
+      if (Number.isFinite(n) && n >= 0) out[k] = n
+    } else if (tp === 'varietats' && typeof x === 'string') {
+      // Mientras se teclea es texto separado por comas (`ControlsOperativa`).
+      const arr = [...new Set(x.split(',').map((e) => e.trim()).filter(Boolean))]
+      if (arr.length) out[k] = arr
+    } else if (Array.isArray(x)) {
+      const arr = tp === 'varietats'
+        ? [...new Set(x.map((e) => String(e).trim()).filter(Boolean))]
+        : [...new Set(x.map(Number).filter((m) => Number.isInteger(m) && m >= 1 && m <= 12))].sort((a, b) => a - b)
+      if (arr.length) out[k] = arr
+    }
+  }
+  return Object.keys(out).length ? out : null
+}
+
+/**
+ * Lo mismo que hace el trigger `productores_operativa` (A4) con la coherencia entre productos,
+ * para que la pantalla no enseñe lo que la base va a podar: principales ⊆ habituales,
+ * variedades de habituales, volumen y temporada de principales. Devuelve solo las claves que
+ * cambian.
+ */
+export function podaOperativa(valors: Record<string, unknown>): Record<string, unknown> {
+  const hab = Array.isArray(valors.productos_habituales) ? (valors.productos_habituales as string[]) : []
+  const pri0 = Array.isArray(valors.productes_principals) ? (valors.productes_principals as string[]) : []
+  const pri = pri0.filter((p) => hab.includes(p))
+  const out: Record<string, unknown> = {}
+  if (pri.length !== pri0.length) out.productes_principals = pri.length ? pri : null
+  const poda = (clau: string, permesos: string[]) => {
+    const m = valors[clau]
+    if (!m || typeof m !== 'object' || Array.isArray(m)) return
+    const entrades = Object.entries(m as Record<string, unknown>)
+    const dins = entrades.filter(([k]) => permesos.includes(k))
+    if (dins.length !== entrades.length) out[clau] = dins.length ? Object.fromEntries(dins) : null
+  }
+  poda('varietats', hab)
+  poda('volum_produccio', pri)
+  poda('temporada', pri)
+  return out
+}
+
+/** Igualdad de valores para «ha cambiado»: listas por posición, objetos por contenido. */
+function igual(a: unknown, b: unknown): boolean {
+  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => igual(x, b[i]))
+  if (a && b && typeof a === 'object' && typeof b === 'object' && !Array.isArray(a) && !Array.isArray(b)) {
+    const ka = Object.keys(a as object).sort()
+    const kb = Object.keys(b as object).sort()
+    return igual(ka, kb) && ka.every((k) => igual((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k]))
+  }
+  return a === b
+}
+
 /** ¿Son el mismo valor, a efectos de «ha cambiado»? */
 export function mateixValor(a: unknown, b: unknown): boolean {
-  if (Array.isArray(a) && Array.isArray(b)) return a.length === b.length && a.every((x, i) => x === b[i])
   if (a == null && b == null) return true
-  return a === b
+  return igual(a, b)
 }
 
 /**

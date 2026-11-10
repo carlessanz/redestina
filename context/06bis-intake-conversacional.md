@@ -156,3 +156,14 @@ MODALITAT, CAUSA, ENVASOS, RESPONSABLE, OBSERVACIONS). Queda pendiente el de "RE
 CONFIRMADA" (🚚 con SDA/ENTITAT, DATA i HORA, KG RECOLLITS, KG FALTEN RECOLLIR, Comentaris),
 que corresponde al momento de cierre y todavía no está implementado.
 
+
+### El lugar principal en el intake (Plan 2, A4, `20270521100000`, 10-11-2026)
+
+En el paso `ubicacio` la lista de lugares sale con **el principal primero** y marcado «(habitual)»
+(`principalPrimer()` y `titolLlocLista()` de `_shared/predeterminatsOferta.ts`; el título nunca pasa de los 24
+caracteres de Meta: se recorta el nombre, no la marca). **P5: la pregunta no se salta** aunque haya principal: saltar
+preguntas cambiaría el intake publicado. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
+`GET crear-oferta/campos` devuelve `predeterminats` (`ubicacio` = el principal o el único, `horari` = su primera franja
+válida, `format_entrega` = el primer envase habitual con equivalente —`caixes`→`caixes`, `palets`→`palet`; `granel`,
+`sacs` y `altres` no se traducen—). Tocar `_shared/intake.ts` obliga a redesplegar `whatsapp-webhook` y
+`recollides-programades` (importa `confirmacionsWhatsapp.ts`, que importa `intake.ts`).

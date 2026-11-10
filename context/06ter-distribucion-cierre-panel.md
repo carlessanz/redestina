@@ -2205,3 +2205,22 @@ guardar | firma y sello, provisionales y regeneración), **Impacte** (una tarjet
 y **Equip** (cuentas | auditoría). Todas las rejillas llevan `grid-cols-1` explícito: sin él la columna
 única es `auto` y un hijo ancho (el JSON, una tabla) desbordaba la página a 390 px. Auditado
 `scrollWidth > clientWidth` a 390, 1024, 1280 y 1600 px en las seis pestañas: sin desbordes.
+
+### Operativa, diagnóstico y precarga de la oferta (Plan 2, A4, `20270521100000`, 10-11-2026)
+
+- **Pestaña Operativa** (ficha del equipo y «La meva organització»): `BlocCamps` del bloque `ofertant` con los
+  controles de `fitxa/ControlsOperativa.tsx` —productos habituales por familia (chips + desplegable), principales
+  (chips de los habituales; aviso si pasan de 5), variedades por habitual (texto con comas, se guarda como lista),
+  volumen y temporada por principal, envases, canales, clientes y apoyo (chips), facturación (cifra y/o rango) y
+  volumen comercializado— y `LlocsRecollida` con badge «Principal», «Fes-lo principal» (`fixar_lloc_principal`),
+  días (chips dl…dg) y hasta 4 franjas (`SelectorFranja`, extraído de `FormulariNovaOferta`).
+- **Diagnóstico**: la sección 1 es la Operativa (`diagnostic/useOperativaDiagnostic.ts`, chip «Operativa» el
+  primero, completa con habituales y algún principal). «Desa» guarda primero la ficha y después el cuestionario; si
+  la ficha falla, no se guarda nada más. El resumen (`ResumDiagnostic`) pone la Operativa arriba, también cuando el
+  cuestionario está vacío.
+- **Oferta nueva**: sin borrador, aplica los `predeterminats` del servidor solo a los huecos
+  (`lib/predeterminatsOferta.ts`), los marca «Proposat des de la fitxa» hasta que se tocan y, al publicar, quita lo
+  propuesto que no se ha tocado y ya no aplica (p. ej. el lugar si el productor lleva el transporte). El desplegable
+  de lugares marca el principal.
+- **Banda «Completa la teva Operativa»** (`useOperativaPendent`): también sale sin productos habituales
+  (`avop.text_productes`); «sin lugar principal» no hace falta mirarlo: si hay lugares, el trigger garantiza uno.

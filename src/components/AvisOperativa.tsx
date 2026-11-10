@@ -1,7 +1,8 @@
 // «Completa la teva Operativa» — la banda que lo recuerda en el panel externo (A1,
 // `20270520100000`). Sustituye a la del diagnóstico, que desde A1 actualiza el equipo (D5).
 //
-// Sale cuando un productor de la cuenta no tiene NINGÚN lugar de recogida (lo decide
+// Sale cuando un productor de la cuenta no tiene NINGÚN lugar de recogida o, desde A4, ningún
+// producto habitual (lo decide
 // `useOperativaPendent`, que también alimenta la marca del menú). Enlaza a la pestaña
 // Operativa de «La meva organització», donde el productor los añade él mismo.
 //
@@ -40,7 +41,9 @@ function descartatFaPoc(): boolean {
   }
 }
 
-export default function AvisOperativa({ pendent }: { pendent: boolean }) {
+export default function AvisOperativa({
+  pendent, motiu = 'llocs',
+}: { pendent: boolean; motiu?: 'llocs' | 'productes' | null }) {
   const { t } = useT()
   const { pathname } = useLocation()
   const [amagat, setAmagat] = useState(descartatFaPoc)
@@ -61,12 +64,12 @@ export default function AvisOperativa({ pendent }: { pendent: boolean }) {
       <MapPin className="mt-0.5 size-4 shrink-0" aria-hidden />
       <p className="min-w-0 flex-1">
         <span className="font-medium">{t('avop.titol')}</span>{' '}
-        <span>{t('avop.text')}</span>
+        <span>{t(motiu === 'productes' ? 'avop.text_productes' : 'avop.text')}</span>
       </p>
       {/* En móvil el botón baja a su propia línea (`w-full`): con `shrink-0` en la misma fila
           el texto se quedaba en una palabra por línea a 320 px (ver `AvisConveni`). */}
       <Button asChild size="sm" className="order-1 h-11 w-full shrink-0 whitespace-normal sm:order-none sm:ml-auto sm:h-8 sm:w-auto">
-        <Link to="/organitzacio?pestanya=operativa">{t('avop.anar')}</Link>
+        <Link to="/organitzacio?pestanya=operativa">{t(motiu === 'productes' ? 'avop.anar_productes' : 'avop.anar')}</Link>
       </Button>
       {/* 44 px de área táctil en móvil con `-m-2 p-2`, sin ocupar 44 px de ancho en la fila. */}
       <button
