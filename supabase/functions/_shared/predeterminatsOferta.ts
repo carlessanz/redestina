@@ -85,3 +85,48 @@ export function titolLlocLista(nom: string, principal: boolean): string {
   const max = MAX_TITOL_FILA - HABITUAL.length;
   return `${net.length > max ? `${net.slice(0, max - 1)}…` : net}${HABITUAL}`;
 }
+
+// ---------------------------------------------------------------------------
+// P5 (decidido por Carles el 10-11-2026): con un lugar principal, el intake de WhatsApp
+// pregunta **«confirma el lugar o cámbialo»**. Nunca se salta la pregunta: el productor ve
+// dónde se recogerá y lo confirma con un toque, o pide la lista completa.
+// ---------------------------------------------------------------------------
+
+/** Id del botón «Canvia el lloc»: no es una respuesta, es pedir la lista de lugares. */
+export const ID_CANVIA_LLOC = "ubicacio:canvia";
+
+/** El lugar principal, si lo hay (solo el marcado; con uno solo sin marcar, no se presupone). */
+export function llocHabitual<T extends { es_principal?: boolean | null }>(llocs: readonly T[]): T | null {
+  return llocs.find((l) => l.es_principal) ?? null;
+}
+
+/** El mensaje de botones que pide confirmar o cambiar el lugar habitual. */
+export function preguntaLlocHabitual(
+  lloc: { id: string; alias?: string | null; municipio?: string | null },
+): { cos: string; botons: Array<{ id: string; titulo: string }> } {
+  const nom = (lloc.alias ?? "").trim() || (lloc.municipio ?? "").trim() || "Ubicació";
+  const mun = (lloc.municipio ?? "").trim();
+  const on = mun && mun.toLowerCase() !== nom.toLowerCase() ? `${nom} (${mun})` : nom;
+  return {
+    cos: `On s'ha de recollir? El lloc habitual és *${on}*.\n\nEl confirmes o el canvies?`,
+    // Meta limita el título de un botón a 20 caracteres.
+    botons: [
+      { id: `ubicacio:${lloc.id}`, titulo: "Sí, aquí" },
+      { id: ID_CANVIA_LLOC, titulo: "Canvia el lloc" },
+    ],
+  };
+}
+
+/** Respuestas escritas que confirman el lugar habitual (quien escribe en vez de tocar el botón). */
+const CONFIRMA_LLOC = new Set([
+  "si", "si aqui", "aqui", "ok", "vale", "d acord", "dacord", "de acuerdo", "correcte", "correcto",
+  "confirmo", "confirmat", "confirmado", "el mateix", "el mismo", "alli", "alla",
+]);
+
+/** ¿El texto confirma el lugar habitual? Sin acentos ni signos, en catalán o castellano. */
+export function confirmaLlocHabitual(texto: string | null | undefined): boolean {
+  const t = (texto ?? "")
+    .normalize("NFD").replace(/[̀-ͯ]/g, "")
+    .toLowerCase().replace(/[!¡.,;:·’'?¿]/g, " ").replace(/\s+/g, " ").trim();
+  return CONFIRMA_LLOC.has(t);
+}

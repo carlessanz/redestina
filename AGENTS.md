@@ -330,7 +330,7 @@ en la whitelist de correo.
 ca/es en el descriptor, `tests/camposOferta.test.ts`): familia → producte → varietat → producte_al_camp
 → kg → format_entrega → caixes → retorn → transport → ubicacio → disponible_fins → horari → modalitat →
 preu_minim → cost_kg → causa → observacions. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
-`Stop` cancela; texto ≤400; ubicación por Maps o `location` (A4: el principal primero, «(habitual)», P5);
+`Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?» con botones; «Canvia» da la lista);
 convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 ## 6ter. Paneles y procesos (detalle, por fecha y fase, en `context/06ter-…md`)
@@ -581,7 +581,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.922 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.925 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.479/2.479 y 43 sin datos (deuda 140); producción 2.473/2.473 y 49 «Sin

@@ -7,7 +7,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  FORMAT_DE_ENVAS, predeterminatsDe, principalPrimer, titolLlocLista,
+  FORMAT_DE_ENVAS, ID_CANVIA_LLOC, confirmaLlocHabitual, llocHabitual, predeterminatsDe,
+  preguntaLlocHabitual, principalPrimer, titolLlocLista,
 } from '../supabase/functions/_shared/predeterminatsOferta.ts'
 import { FORMATS_ENTREGA } from '../supabase/functions/_shared/camposOferta.ts'
 import { aplicaPredeterminats, treuProposatsQueNoApliquen } from '../src/lib/predeterminatsOferta'
@@ -88,5 +89,29 @@ describe('aplicaPredeterminats (panel)', () => {
       .toEqual({ horari: { inici: '08:00', fi: '12:00' }, transport: 'si' })
     // Tocado = ya no está en `proposats`: se manda tal cual.
     expect(treuProposatsQueNoApliquen(datos, new Set(['horari']), aplica)).toEqual(datos)
+  })
+})
+
+// P5 (decidido el 10-11-2026): con lugar principal, el intake pide confirmarlo o cambiarlo.
+describe('P5 · confirma el lloc habitual o canvia’l', () => {
+  it('llocHabitual: solo el marcado; uno solo sin marcar no se presupone', () => {
+    expect(llocHabitual([{ id: 'a' }, { id: 'b', es_principal: true }])).toEqual({ id: 'b', es_principal: true })
+    expect(llocHabitual([{ id: 'a', es_principal: false }])).toBeNull()
+    expect(llocHabitual([])).toBeNull()
+  })
+
+  it('preguntaLlocHabitual: nombra el lugar y ofrece confirmar o cambiar', () => {
+    const p = preguntaLlocHabitual({ id: 'u1', alias: 'Magatzem', municipio: 'Vilafranca del Penedès' })
+    expect(p.cos).toContain('*Magatzem (Vilafranca del Penedès)*')
+    expect(p.botons.map((b) => b.id)).toEqual(['ubicacio:u1', ID_CANVIA_LLOC])
+    for (const b of p.botons) expect(b.titulo.length).toBeLessThanOrEqual(20)
+    // Sin alias, el municipio; sin repetirlo.
+    expect(preguntaLlocHabitual({ id: 'u2', alias: null, municipio: 'Sitges' }).cos).toContain('*Sitges*.')
+    expect(preguntaLlocHabitual({ id: 'u3' }).cos).toContain('*Ubicació*')
+  })
+
+  it('confirmaLlocHabitual: «sí» escrito confirma; lo demás, no', () => {
+    for (const t of ['Sí', 'si!', 'Sí, aquí', 'OK', "D'acord", 'vale']) expect(confirmaLlocHabitual(t)).toBe(true)
+    for (const t of ['no', 'Canvia', 'https://maps.app.goo.gl/x', '', null]) expect(confirmaLlocHabitual(t)).toBe(false)
   })
 })

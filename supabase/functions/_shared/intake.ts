@@ -24,7 +24,9 @@ import { TOTES, ambPreu, modalitatsDe } from "./modalitats.ts";
 import type { ClienteSupabase } from "./cliente.ts";
 import { enmascararTelefono } from "./enmascarar.ts";
 import { de } from "./textIntake.ts";
-import { principalPrimer, titolLlocLista } from "./predeterminatsOferta.ts";
+import {
+  ID_CANVIA_LLOC, confirmaLlocHabitual, llocHabitual, preguntaLlocHabitual, principalPrimer, titolLlocLista,
+} from "./predeterminatsOferta.ts";
 
 // Una sesión sin actividad se da por abandonada y se empieza de cero.
 const CADUCIDAD_HORAS = 12;
@@ -257,8 +259,9 @@ async function preguntar(
         OPCIONS_TRANSPORT.map((o) => ({ id: `transport:${o.id}`, titulo: o.titulo })),
       )).ok;
     case "ubicacio": {
-      // A4 (P5): el lugar principal primero y marcado «(habitual)». No se salta la pregunta
-      // aunque haya principal: saltar pasos cambiaría el intake publicado.
+      // P5 (10-11-2026): con lugar principal, primero «el confirmes o el canvies?» con dos
+      // botones; «Canvia el lloc» marca `_canvia_lloc` y trae la lista completa (el principal
+      // primero, «(habitual)»). Nunca se salta la pregunta.
       const { data } = await supabase
         .from("productor_ubicaciones")
         .select("id, alias, municipio, es_principal")
@@ -274,6 +277,11 @@ async function preguntar(
           "On s'ha de recollir? Envia la ubicació des de WhatsApp (📎 → Ubicació) o enganxa " +
             "l'enllaç de Google Maps.",
         )).ok;
+      }
+      const habitual = datos._canvia_lloc ? null : llocHabitual(ubis);
+      if (habitual) {
+        const p = preguntaLlocHabitual(habitual);
+        return (await sendBotones(supabase, to, p.cos, p.botons)).ok;
       }
       const filas: FilaLista[] = ubis.map((u) => ({
         id: `ubicacio:${u.id}`,
@@ -445,8 +453,16 @@ async function interpretar(
       if (t === "-") return null_ok();
       return t.match(/\d+/) ? Number(t.match(/\d+/)![0]) : null;
     case "ubicacio": {
-      if (id?.startsWith("ubicacio:") && id !== "ubicacio:nova") {
+      if (id?.startsWith("ubicacio:") && id !== "ubicacio:nova" && id !== ID_CANVIA_LLOC) {
         return id.slice("ubicacio:".length);
+      }
+      // P5: «sí» escrito en vez de tocar el botón confirma el lugar habitual (solo mientras se
+      // le está preguntando por él, no con la lista completa delante).
+      if (!sesion.datos_parciales?._canvia_lloc && confirmaLlocHabitual(t)) {
+        const { data: principal } = await supabase
+          .from("productor_ubicaciones").select("id")
+          .eq("productor_id", sesion.productor_id).eq("es_principal", true).maybeSingle();
+        if (principal?.id) return principal.id as string;
       }
       // Un enlace de Google Maps crea una ubicación nueva para el productor.
       const enlace = t.match(/https?:\/\/\S*(maps\.app\.goo\.gl|google\.[a-z.]+\/maps)\S*/i);
@@ -631,6 +647,18 @@ export async function procesarIntake(
   // quien tenía ubicaciones no podía añadir otra por aquí (§6bis). No cuenta como intento.
   if (paso === "ubicacio" && id === "ubicacio:nova") {
     await sendText(supabase, from, "Enganxa l'enllaç de Google Maps del lloc on s'ha de recollir.");
+    return true;
+  }
+
+  // P5: «Canvia el lloc» tampoco es una respuesta: pide la lista completa de lugares. Se
+  // pregunta ANTES de guardar la marca, como en «Més…»: si la lista no sale, nada cambia.
+  if (paso === "ubicacio" && id === ID_CANVIA_LLOC) {
+    datos._canvia_lloc = true;
+    if (!(await preguntar(supabase, { ...sesion, datos_parciales: datos }, paso))) {
+      console.error("intake: no se pudo enviar la lista de lugares a", enmascararTelefono(from));
+      return true;
+    }
+    await guardar(supabase, sesion, { datos_parciales: datos });
     return true;
   }
 

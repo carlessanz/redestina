@@ -161,8 +161,15 @@ que corresponde al momento de cierre y todavía no está implementado.
 
 En el paso `ubicacio` la lista de lugares sale con **el principal primero** y marcado «(habitual)»
 (`principalPrimer()` y `titolLlocLista()` de `_shared/predeterminatsOferta.ts`; el título nunca pasa de los 24
-caracteres de Meta: se recorta el nombre, no la marca). **P5: la pregunta no se salta** aunque haya principal: saltar
-preguntas cambiaría el intake publicado. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
+caracteres de Meta: se recorta el nombre, no la marca). **P5 (decidido por Carles el 10-11-2026): «confirma la
+ubicación o cámbiala; no la elimines».** Con un lugar **marcado** principal, la pregunta llega primero como dos botones
+—«On s'ha de recollir? El lloc habitual és *X (municipi)*. El confirmes o el canvies?», «Sí, aquí» (`ubicacio:<id>`) y
+«Canvia el lloc» (`ubicacio:canvia`)— (`llocHabitual()`, `preguntaLlocHabitual()`). «Canvia el lloc» no es una
+respuesta: pone `_canvia_lloc` en la sesión y manda la lista de siempre (el principal primero, «Un altre lloc» al
+final); con la marca puesta, un recordatorio o un reintento repiten la lista, no los botones. Un «sí» escrito
+(`confirmaLlocHabitual()`: sí, ok, d'acord, aquí…) confirma el principal mientras se pregunta por él. Sin principal
+marcado (aunque haya un solo lugar), la lista directa, como antes. **La pregunta nunca se salta.** Probado contra el
+clon con WhatsApp simulado (botón, «Sí» escrito y «Canvia»), y deshecho. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
 `GET crear-oferta/campos` devuelve `predeterminats` (`ubicacio` = el principal o el único, `horari` = su primera franja
 válida, `format_entrega` = el primer envase habitual con equivalente —`caixes`→`caixes`, `palets`→`palet`; `granel`,
 `sacs` y `altres` no se traducen—). Tocar `_shared/intake.ts` obliga a redesplegar `whatsapp-webhook` y
