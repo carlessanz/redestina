@@ -745,8 +745,10 @@ sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los no
 - **`diagnostic_falten_productor(p)`**: `security invoker`, `grant` a `authenticated` (bajo RLS: un externo solo
   calcula lo suyo; una ficha que no ve da los tres códigos de Operativa, nunca «completa»).
   **`diagnostic_excedents_json(p)`**: definer interna, `revoke` también de `authenticated`.
-- **El frontend ya no llama a `desar_diagnostic`** (P11): se conserva, sin exigir cuestionario vigente, solo para la
-  ventana base → frontend (deuda 175). `publicar_questionari` sigue como estaba (super_admin), sin pantalla.
+- **El frontend ya no llama a `desar_diagnostic`** (P11). Desde el 10-11-2026 (deuda 175, `20270524100000`)
+  `desar_diagnostic`, `publicar_questionari`, `questionari_vigent` y el resto del motor del cuestionario y del plan
+  básico (`guardar_plan_basico`, `emitir_plan_basico`, `plan_datos`, `plan_emet_document`, `desar_mesures_pla`,
+  `fixar_nivell_pla`, `generar_pla_des_de_diagnostic`) **ya no existen**; el arnés perdió sus checks (−145 en el clon).
 - **Arnés** (+95; ningún `permitir` pasa a `denegar`): bloques `DIAGNOSTIC_EXCEDENTS_EXTERN` (en `DOCUMENTAL_EXTERN`:
   las dos RPC con uuid nulo → denegar; insertar en las tres tablas → denegar), `DIAGNOSTIC_EXCEDENTS_EQUIP` (equip y
   super_admin: leen las tres con `requiereFixture`, no insertan ni actualizan, las RPC con uuid nulo → `errorExigit

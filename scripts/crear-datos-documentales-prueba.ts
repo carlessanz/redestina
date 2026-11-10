@@ -396,7 +396,8 @@ async function prepararTransaccio(cierre: string) {
 // Lo que el PLAN DE PREVENCIÓN necesita (fase 5)
 // ---------------------------------------------------------------------------
 // Un plan emitido por organización, para que «ve EL SEU pla» del arnés tenga con qué
-// probarse por los dos lados (un productor y una entidad).
+// probarse por los dos lados (un productor y una entidad). Desde la deuda 175 solo comprueba
+// que lo tengan: el plan básico se retiró de la base y no se emite ninguno nuevo.
 //
 // ⚠️ LAS RESPUESTAS SON UN RELLENO RECONOCIBLE. El cuestionario real es el anexo B del
 //    funcional y todavía no existe (ver la cabecera de 20270301100000): `versio_questionari`
@@ -423,37 +424,10 @@ async function prepararPlans() {
       continue;
     }
 
-    await rpc("guardar_plan_basico", {
-      p_tipo_org: org.tipo,
-      p_org: org.id,
-      p_respuestas: {
-        questionari: "basic",
-        versio_questionari: 0,
-        respostes: [
-          { id: "pendent-1", pregunta: "(pendent de l'annex B del funcional)", valor: null },
-          { id: "pendent-2", pregunta: "(pendent de l'annex B del funcional)", valor: null },
-          { id: "pendent-3", pregunta: "(pendent de l'annex B del funcional)", valor: null },
-        ],
-        notes: "Fixture de proves — el qüestionari real encara no existeix",
-      },
-      p_idioma: "ca",
-      p_nivel: "basic",
-    });
-
-    const { data: esborrany } = await db.from("planes_prevencion")
-      .select("id").eq(columna, org.id).eq("estado", "esborrany").single();
-
-    // ⚠️ (05-11-2026) Desde el diagnóstico operativo v2, `emitir_plan_basico` exige el
-    //    diagnóstico completo (`falten_obligatories`) y este relleno no lo está: la entidad
-    //    se queda con el borrador. Se avisa y se sigue, para que lo que va detrás del
-    //    fixture (la firma, 20270510100000) no dependa de este paso.
-    try {
-      const emitido = await rpc<{ numero: string; versio: number; document: string }>(
-        "emitir_plan_basico", { p_plan: esborrany!.id });
-      console.log(`  ${org.etiqueta}: ${emitido.numero} (v${emitido.versio}), document ${emitido.document}`);
-    } catch (e) {
-      console.log(`  ${org.etiqueta}: AVÍS, no s'emet el pla: ${(e as Error).message.slice(0, 120)}`);
-    }
+    // Desde la deuda 175 (20270524100000) el plan básico ya no existe en la base: no se puede
+    // emitir uno nuevo. Las organizaciones que ya tenían el suyo lo conservan; el plan de
+    // ahora es el expediente de prevención, que abre el equipo.
+    console.log(`  ${org.etiqueta}: sense pla vigent (el pla bàsic es va retirar: deute 175)`);
   }
 }
 

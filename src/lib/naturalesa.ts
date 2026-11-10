@@ -40,12 +40,18 @@ export const LLETRES_EMPRESA = 'ABCDEJNUW'
 export const FORMES_SOCIAL: readonly string[] = ['fundacio', 'associacio']
 export const FORMES_EMPRESA: readonly string[] = ['sl', 'sa', 'autonom', 'sc', 'cb', 'sat']
 
+/** Letras del NIF que pueden ser las dos cosas (cooperativas, comunidades, otros —las SAT—). */
+export const LLETRES_AMBIGUES = 'FHV'
+
 /**
- * La sugerencia, igual que `naturalesa_suggerida(p_nif, p_forma)`: la letra del NIF; si no dice
- * nada (vacío, forma rara, o F/H/V, que pueden ser las dos cosas), la forma jurídica; si tampoco,
- * `null` (lo decide una persona).
+ * La sugerencia, igual que `naturalesa_suggerida(p_nif, p_forma, p_tipo_receptor)`: la letra del
+ * NIF; si no dice nada (vacío, forma rara, o F/H/V), la forma jurídica; y para F/H/V sin forma que
+ * lo diga (deuda §12.177), entidad social si la receptora es de tipo `social` y empresa si no. Sin
+ * nada de eso, `null` (lo decide una persona).
  */
-export function naturalesaSuggerida(nif: string | null | undefined, forma?: string | null): Naturalesa | null {
+export function naturalesaSuggerida(
+  nif: string | null | undefined, forma?: string | null, tipoReceptor?: string | null,
+): Naturalesa | null {
   const n = (nif ?? '').replace(/[\s.-]/g, '').toUpperCase()
   if (new RegExp(`^[${LLETRES_SOCIAL}][0-9]{7}[0-9A-J]$`).test(n)) return 'entitat_social'
   if (new RegExp(`^[${LLETRES_EMPRESA}][0-9]{7}[0-9A-J]$`).test(n)
@@ -53,6 +59,9 @@ export function naturalesaSuggerida(nif: string | null | undefined, forma?: stri
   const f = (forma ?? '').trim().toLowerCase()
   if (FORMES_SOCIAL.includes(f)) return 'entitat_social'
   if (FORMES_EMPRESA.includes(f)) return 'empresa'
+  if (new RegExp(`^[${LLETRES_AMBIGUES}][0-9]{7}[0-9A-J]$`).test(n)) {
+    return (tipoReceptor ?? '').trim().toLowerCase() === 'social' ? 'entitat_social' : 'empresa'
+  }
   return null
 }
 

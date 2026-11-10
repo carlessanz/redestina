@@ -6,7 +6,7 @@
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **90** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026; la 85 y la 139, el 05-11-2026; la 168, el 09-11-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
+Las **95** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026; la 85 y la 139, el 05-11-2026; la 168, el 09-11-2026; de la 174 a la 178, el 10-11-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -113,6 +113,11 @@ se va solo **cómo se llegó hasta aquí**.
 | 125 | 22 migraciones con la fecha real del 21/22-09 iban por delante de tablas que usan: el repo no reconstruía producción | 07-10-2026 (renumeradas a `20270328100100`…`102200` en repo y en historial; el clon local lo comprueba) |
 | 145 | `reiniciar_cierre_prueba()` ponía a 0 `P-RES`/`P-CD`/`P-CT` del año aunque otro cierre de prueba conservara sus documentos: la siguiente emisión chocaba con `23505`. Ahora deja el último número vivo | `20270430100400` |
 | 150 | El equipo podía insertar fichas directo por REST (políticas `alta intern`) y saltarse las reglas de `crear_entitat()`: una ficha activa sin NIF | `20270501400000` |
+| 178 | Una empresa confirmada de tipo `animal` no tenía nada compatible (`animal` solo admitía donación) | `20270524100000` (`animal` admite también compra) |
+| 177 | Los NIF F, H y V sin forma jurídica se quedaban sin sugerencia de naturalesa | `20270524100000` (social si la receptora es `social`; empresa si no) |
+| 176 | `priorizar-entidades` no miraba la naturalesa y proponía donaciones a empresas confirmadas | 10-11-2026 (`admesaPerNaturalesa`, mismo cruce que el Mercat) |
+| 175 | El motor del cuestionario y el del plan básico seguían en la base sin uso | `20270524100000` (funciones y tablas `questionaris_diagnostic`, `regles_pla`, `mesures_prevencio` fuera) |
+| 174 | `diagnostics_historial` ya no se escribía | `20270524100000` (`drop`; el script de publicación lo volcó antes a `scripts/data/`) |
 | 168 | Un `entidades.estat` vacío (toda entidad nueva) dejaba la entidad fuera de `priorizar-entidades` | 09-11-2026 (el ranking mira el convenio que pide la modalidad) |
 | 144 | El trigger del NIF hacía fallar las filas de la importación masiva con un NIF mal escrito o repetido | 02-11-2026 (`import-ara-2026.ts`, 1E) |
 | 142 | Los consentimientos RGPD no tenían exportación ni forma de pedirse a quien no se registró | `20270506100000` (export en «Entitats», petición por correo desde la ficha) |

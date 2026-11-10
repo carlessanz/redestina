@@ -202,3 +202,37 @@ export function priorizar(
     return b.puntuacion - a.puntuacion;
   });
 }
+
+/**
+ * La regla P8 en el ranking (deuda §12.176, 10-11-2026): ¿puede recibir una entidad ESTA oferta
+ * por su naturalesa? Es el mismo cruce que hacen `modalitats_compatibles_meves()` (Mercat) y
+ * `comprova_interes()` (interés): solo restringe la naturalesa CONFIRMADA, y basta con que UNA de
+ * las modalidades de la oferta la admita. Una empresa confirmada no entra en una oferta que solo es
+ * de donación; en una de donación y compra, sí (puede comprarla).
+ *
+ * `regla` = `modalitat_naturalesa_compat` (naturalesa → modalidades). `null` = no se pudo leer:
+ * no se filtra, porque la base sigue siendo la que corta al mostrar interés.
+ */
+export function admesaPerNaturalesa(
+  modalitatsOferta: readonly string[],
+  naturalesa: string | null | undefined,
+  origen: string | null | undefined,
+  regla: ReadonlyMap<string, ReadonlySet<string>> | null,
+): boolean {
+  if (!regla || origen !== "confirmada" || !naturalesa || modalitatsOferta.length === 0) return true;
+  const admeses = regla.get(naturalesa);
+  if (!admeses) return true;
+  return modalitatsOferta.some((m) => admeses.has(m));
+}
+
+/** Las filas de `modalitat_naturalesa_compat` como mapa naturalesa → modalidades. */
+export function reglaNaturalesa(
+  files: readonly { modalitat: string; naturalesa: string }[],
+): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  for (const f of files) {
+    if (!m.has(f.naturalesa)) m.set(f.naturalesa, new Set());
+    m.get(f.naturalesa)!.add(f.modalitat);
+  }
+  return m;
+}

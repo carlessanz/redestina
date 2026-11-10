@@ -7,11 +7,13 @@ import { describe, it, expect } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import {
-  FORMES_EMPRESA, FORMES_SOCIAL, LLETRES_EMPRESA, LLETRES_SOCIAL,
+  FORMES_EMPRESA, FORMES_SOCIAL, LLETRES_AMBIGUES, LLETRES_EMPRESA, LLETRES_SOCIAL,
   modalitatsDeLaNaturalesa, modalitatsInteresDe, naturalesaDeText, naturalesaEfectiva, naturalesaSuggerida,
 } from '../src/lib/naturalesa'
 
 const SQL = readFileSync(join(__dirname, '..', 'supabase', 'migrations', '20270523100000_naturalesa.sql'), 'utf-8')
+// Desde la deuda 177 la función vive en esta migración (gana `p_tipo_receptor`).
+const SQL_177 = readFileSync(join(__dirname, '..', 'supabase', 'migrations', '20270524100000_deuda_naturalesa_cuestionario.sql'), 'utf-8')
 
 describe('naturalesaSuggerida', () => {
   it('por la letra del NIF', () => {
@@ -24,11 +26,16 @@ describe('naturalesaSuggerida', () => {
     expect(naturalesaSuggerida('X1234567L')).toBe('empresa')
   })
 
-  it('F, H y V pueden ser las dos cosas: decide la forma jurídica o nadie', () => {
-    expect(naturalesaSuggerida('F12345678')).toBeNull()
+  it('F, H y V: decide la forma jurídica; sin ella, el tipo de receptora (deuda 177)', () => {
     expect(naturalesaSuggerida('F12345678', 'associacio')).toBe('entitat_social')
     expect(naturalesaSuggerida('V12345678', 'sl')).toBe('empresa')
-    expect(naturalesaSuggerida('H12345678', 'cooperativa')).toBeNull()
+    expect(naturalesaSuggerida('F12345678')).toBe('empresa')
+    expect(naturalesaSuggerida('H12345678', 'cooperativa')).toBe('empresa')
+    expect(naturalesaSuggerida('F12345678', null, 'social')).toBe('entitat_social')
+    expect(naturalesaSuggerida('F12345678', 'cooperativa', 'social')).toBe('entitat_social')
+    expect(naturalesaSuggerida('V12345678', null, 'animal')).toBe('empresa')
+    // El tipo solo desempata F/H/V: no cambia una letra que ya dice algo.
+    expect(naturalesaSuggerida('B12345674', null, 'social')).toBe('empresa')
   })
 
   it('el NIF manda sobre la forma; sin NIF, la forma', () => {
@@ -39,11 +46,15 @@ describe('naturalesaSuggerida', () => {
     expect(naturalesaSuggerida('xx', 'altres')).toBeNull()
   })
 
-  it('las letras y las formas son las mismas que en la migración', () => {
-    expect(SQL).toContain(`n ~ '^[${LLETRES_SOCIAL}][0-9]{7}[0-9A-J]$'`)
-    expect(SQL).toContain(`n ~ '^[${LLETRES_EMPRESA}][0-9]{7}[0-9A-J]$'`)
-    expect(SQL).toContain(`f in (${FORMES_SOCIAL.map((f) => `'${f}'`).join(', ')})`)
-    expect(SQL).toContain(`f in (${FORMES_EMPRESA.map((f) => `'${f}'`).join(', ')})`)
+  it('las letras y las formas son las mismas que en la migración vigente (deuda 177)', () => {
+    for (const sql of [SQL, SQL_177]) {
+      expect(sql).toContain(`n ~ '^[${LLETRES_SOCIAL}][0-9]{7}[0-9A-J]$'`)
+      expect(sql).toContain(`n ~ '^[${LLETRES_EMPRESA}][0-9]{7}[0-9A-J]$'`)
+      expect(sql).toContain(`f in (${FORMES_SOCIAL.map((f) => `'${f}'`).join(', ')})`)
+      expect(sql).toContain(`f in (${FORMES_EMPRESA.map((f) => `'${f}'`).join(', ')})`)
+    }
+    expect(SQL_177).toContain(`n ~ '^[${LLETRES_AMBIGUES}][0-9]{7}[0-9A-J]$'`)
+    expect(SQL_177).toContain(`lower(btrim(coalesce(p_tipo_receptor, ''))) = 'social'`)
   })
 })
 

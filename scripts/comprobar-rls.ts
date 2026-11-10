@@ -1105,7 +1105,6 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "cierre_pendents_transaccion", op: "rpc", esperado: "denegar", args: { p_ejercicio: 1999 }, descripcion: "NO llegeix les transaccions pendents de conciliar" },
   { tabla: "cierre_datos_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un certificat de transaccio" },
   // El snapshot del plan de prevención (nombre, NIF y respuestas de la organización).
-  { tabla: "plan_datos", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un pla de prevencio" },
   // La ruta de un documento delata la organización propietaria del objeto.
   { tabla: "ruta_documento", op: "rpc", esperado: "denegar", args: { p_objeto_tipo: "prova", p_objeto_id: null, p_tipo: "PROVA", p_numero_completo: "PROVA-1999-0001", p_version: 1, p_modo: "prueba", p_ejercicio: 1999 }, descripcion: "NO compon rutes de documents (nomes servidor)" },
   // Las dos funciones de job (solo pg_cron). ⚠️ Si alguna vez volvieran a abrirse, este
@@ -1137,14 +1136,9 @@ const DOCUMENTAL_EXTERN: Check[] = [
   { tabla: "validar_codi_firma", op: "rpc", esperado: "denegar", args: { p_enlace: "00000000-0000-0000-0000-000000000000", p_codi: "000000" }, descripcion: "NO valida el codi de firma (això és del servidor)" },
   { tabla: "aprovar_resposta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO aprova cap resposta a una oferta" },
   // Plan de prevención (fase 5). Un externo LEE el suyo —eso va en su bloque, con su
-  // `requiereFixture`— y no escribe nada: ni la tabla ni el cuestionario de otra
-  // organización. `guardar_plan_basico` sobre un uuid ajeno corta en `puc_gestionar_pla()`,
-  // que es la comprobación que de verdad separa «el meu qüestionari» de «el d'algú altre».
-  //
-  // ⚠️ `plan_emet_document` NO se comprueba aquí, y no por olvido: tiene el EXECUTE
-  //    revocado a `authenticated`, así que PostgREST ni la ve y devolvería `PGRST202`
-  //    —indistinguible de «falta la migración»—. Que sea inalcanzable lo garantiza el
-  //    `revoke` de 20270301100200, no un check.
+  // `requiereFixture`— y no escribe nada. El motor del plan básico (`guardar_plan_basico`,
+  // `emitir_plan_basico`, `plan_datos`…) y el del cuestionario se retiraron de la base con la
+  // deuda 174/175 (20270524100000): sus checks se fueron con ellos.
   { tabla: "planes_prevencion", op: "insertar", esperado: "denegar", descripcion: "NO crea plans a mà (van per RPC)" },
   // Organización unificada (20270310100000). La tabla no tiene GRANT de escritura para
   // nadie: si alguien lo concediera, este check se pondría rojo antes de que llegara a
@@ -1156,13 +1150,6 @@ const DOCUMENTAL_EXTERN: Check[] = [
   //    cuatro comprobaciones en rojo describiendo lo que debe pasar. No salió antes porque
   //    esos dos bloques llevaban desde julio sin ninguna cuenta que los recorriera (§12.32).
   { tabla: "organizaciones", op: "insertar", esperado: "denegar", descripcion: "NO crea organitzacions a ma" },
-  {
-    tabla: "guardar_plan_basico",
-    op: "rpc",
-    esperado: "denegar",
-    args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} },
-    descripcion: "NO contesta el qüestionari d'una altra organitzacio",
-  },
   {
     tabla: "planes_meus",
     op: "rpc",
@@ -1276,38 +1263,17 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // decide qué medidas le tocan —el catálogo y las reglas—, que es configuración del
   // servicio: su plan lleva el título y la descripción de cada medida COPIADOS dentro, así
   // que cerrarlas no le quita nada que necesite para leer su propio plan.
-  { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "veu el questionari vigent que ha de contestar", requiereFixture: "el questionari sembrat (migració 20270328101600)" },
-  { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari (no hi ha GRANT per a ningu)" },
-  { tabla: "mesures_prevencio", op: "leer", esperado: "denegar", descripcion: "NO veu el cataleg de mesures de prevencio" },
-  { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura" },
-  { tabla: "regles_pla", op: "leer", esperado: "denegar", descripcion: "NO veu les regles que generen el pla" },
-  { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla" },
-  { tabla: "questionari_vigent", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor" }, descripcion: "pot demanar el questionari vigent", requiereFixture: "el questionari sembrat (migració 20270328101600)" },
-  // Publicar una versión del cuestionario es `pot_aprovar()`: decidir qué se le pregunta a
-  // una organización es una decisión, no una edición. Las preguntas van VACÍAS a propósito —
-  // el 42501 llega antes de validarlas, así que esto no escribe nada ni siendo del equipo.
-  { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
-  // Las tres que reciben (tipo_org, org): su guarda `puc_gestionar_pla()` va ANTES de buscar
+  // Las que reciben (tipo_org, org): su guarda `puc_gestionar_pla()` va ANTES de buscar
   // ninguna fila, así que el 42501 llega sin que la función mire si la organización existe —
   // que es lo que hace inofensivo apuntar a un uuid inventado.
-  { tabla: "desar_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "NO contesta el diagnostic d'una altra organitzacio" },
-  { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla d'una altra organitzacio" },
   { tabla: "diagnostic_estat", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO consulta el diagnostic d'una altra organitzacio" },
   // La bandeja de diagnósticos de TODA la base es del equipo, como `pendents_equip()`.
   { tabla: "diagnostics_equip", op: "rpc", esperado: "denegar", descripcion: "NO veu els diagnostics de tota la base" },
-  // Fase 9 (20270423100000): el historial de la ficha viva no se escribe a mano (lo escribe
-  // `desar_diagnostic`), y el plan de prevención lo emite el equipo. La guarda de
-  // `emitir_plan_basico` va antes de buscar el plan, así que un uuid inventado da 42501.
-  { tabla: "diagnostics_historial", op: "insertar", esperado: "denegar", descripcion: "NO escriu l'historial del diagnostic a ma" },
-  { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet cap pla de prevencio (es de l'equip)" },
   // A1 (20270520100000): el diagnóstico único vive en `diagnostics`, sin escritura directa para
-  // nadie (lo escribe `desar_diagnostic`, solo el equipo: D5). `diagnostic_datos` pone el
-  // permiso antes que la existencia, así que un uuid inventado da 42501 a un externo. Las RPC
-  // del plan básico quedan sin EXECUTE para `authenticated` (D4): 42501 para todos.
+  // nadie (lo escribe el equipo por RPC: D5). `diagnostic_datos` pone el permiso antes que la
+  // existencia, así que un uuid inventado da 42501 a un externo.
   { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (A1)" },
   { tabla: "diagnostic_datos", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el diagnostic d'una altra organitzacio (A1)" },
-  { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures de cap pla (retirat a A1, D4)" },
-  { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell de cap pla (retirat a A1, D4)" },
   // Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EXTERN`.
   ...DIAGNOSTIC_EXCEDENTS_EXTERN,
   // Circuito de firma (20270510100000–100200): ver `FIRMA_EXTERN`.
@@ -1571,37 +1537,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       columnaAusente: true,
       descripcion: "un certificat de recepcio NO te imports (la columna no existeix)",
     },
-    // --- Diagnostic i pla de prevencio (F2) ---
-    // El técnico LEE las tres tablas del servicio y no escribe ninguna: declarar obligatoria
-    // una medida o cambiar el cuestionario es `pot_aprovar()`, igual que publicar el texto de
-    // una plantilla documental.
-    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20270328101600)" },
-    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20270328101600)" },
-    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20270328101600)" },
-    { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura (nomes pot_aprovar)" },
-    { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla (nomes pot_aprovar)" },
-    { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
-    { tabla: "publicar_questionari", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "NO publica cap questionari" },
+    // --- Diagnostic (F2) ---
+    // El cuestionario, el catálogo de medidas y las reglas del plan básico se retiraron con la
+    // deuda 174/175 (20270524100000); queda la bandeja de diagnósticos.
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
-    { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
-    // 🔴 Flip consciente `permitir → denegar` (A1, 20270520100000): el plan básico se retira
-    //    (D4) y la RPC queda solo para `service_role`. El plan es el expediente.
-    { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet el pla basic: retirat a A1 (D4)" },
-    // ⚠️ Con un uuid INEXISTENTE a propósito: la guarda de rol deja pasar (es del equipo, y
-    //    el modelo es asistido) y la RPC corta con `22023 fitxa_inexistent` (desde A1; antes,
-    //    la FK con `23503`). O sea que mide la autorizacion y **no escribe nada**.
-    { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
     // --- Diagnòstic únic (A1, 20270520100000) ---
-    // El equipo LEE `diagnostics` y no la escribe a mano (solo `desar_diagnostic`). Las RPC del
-    // plan básico quedan sin EXECUTE para `authenticated` (D4).
-    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (desar_diagnostic o el backfill d'A1)" },
-    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (va per desar_diagnostic)" },
-    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (va per desar_diagnostic)" },
+    // El equipo LEE `diagnostics` y no la escribe a mano (solo por RPC).
+    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (per RPC o el backfill d'A1)" },
+    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (nomes per RPC)" },
+    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (nomes per RPC)" },
     { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot llegir el diagnostic de qualsevol productor (autoritza; 22023 fitxa_inexistent)" },
-    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla basic: retirat a A1 (D4)" },
-    { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
-    { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
-    { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
     // --- Operativa (A4, 20270521100000) ---
     // El equipo edita la Operativa de cualquier productor con UPDATE directo (ficha y sección 1
     // del diagnóstico, T4) y marca su lugar principal por la RPC.
@@ -1877,7 +1822,6 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "cierre_base_transaccion", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999, p_modo: "prueba" }, descripcion: "pot llegir la base de calcul del certificat de transaccio" },
     { tabla: "cierre_pendents_transaccion", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999 }, descripcion: "pot llegir les transaccions pendents de conciliar" },
     { tabla: "cierre_datos_certificado_transaccion", op: "rpc", esperado: "denegar", args: { p_cd: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot del CT (nomes servidor)" },
-    { tabla: "plan_datos", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO llegeix el snapshot d'un pla (nomes servidor)" },
     // `convenio_vigente()` la usan las pantallas del equipo (Aprovacions, OfferDetail,
     // CanalitzacioDetall) para avisar antes de aprobar: sobre cualquier ficha. Uuid de
     // ceros → `false`, sin error.
@@ -2238,36 +2182,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "reiniciar_recepcions_prova", op: "rpc", esperado: "permitir", args: { p_ejercicio: 1999 }, descripcion: "pot reiniciar els certificats de recepcio de prova (1999: no hi ha res)" },
     { tabla: "cierres_receptor", op: "leer", esperado: "permitir", descripcion: "ve els certificats de recepcio", requiereFixture: "algún certificado de recepción calculado (calcular_certificat_recepcio)" },
     { tabla: "kg_rebuts_exercici", op: "rpc", esperado: "permitir", args: {}, descripcion: "veu els quilos rebuts", requiereFixture: "alguna canalización conciliada del ejercicio en curso" },
-    // --- Diagnostic i pla de prevencio (F2) ---
-    { tabla: "questionaris_diagnostic", op: "leer", esperado: "permitir", descripcion: "llegeix els questionaris", requiereFixture: "el questionari sembrat (migracio 20270328101600)" },
-    { tabla: "mesures_prevencio", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de mesures", requiereFixture: "les mesures sembrades (migracio 20270328101600)" },
-    { tabla: "regles_pla", op: "leer", esperado: "permitir", descripcion: "llegeix les regles del pla", requiereFixture: "les regles sembrades (migracio 20270328101600)" },
-    // Ni el super_admin escribe la tabla a mano: publicar retira la version anterior y publica
-    // la nueva en una transaccion, y eso no se hace con dos `update` desde el navegador.
-    { tabla: "questionaris_diagnostic", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap questionari a ma (va per publicar_questionari)" },
-    // 🔴 `p_preguntes: []` NO es pereza: la guarda de rol deja pasar y entonces la validacion
-    //    levanta `22023` ANTES del insert. Asi se comprueba que el super_admin autoriza **sin
-    //    publicar una version de verdad**, que retiraria la vigente EN PRODUCCION. Mismo
-    //    criterio que `borrar_ficha_completa()`.
-    { tabla: "publicar_questionari", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_titol: { ca: "x", es: "x" }, p_preguntes: [] }, descripcion: "pot publicar un questionari (autoritza; 22023 per les preguntes buides)" },
+    // --- Diagnostic (F2) ---
+    // El cuestionario y el plan básico se retiraron con la deuda 174/175 (20270524100000).
     { tabla: "diagnostics_equip", op: "rpc", esperado: "permitir", descripcion: "veu els diagnostics de tota la base", requiereFixture: "alguna fitxa de productor o entitat" },
-    { tabla: "diagnostics_historial", op: "leer", esperado: "permitir", descripcion: "veu l'historial dels diagnostics", requiereFixture: "algun diagnostic desat (fase 9)" },
-    // 🔴 Dos flips conscientes `permitir → denegar` (A1, 20270520100000): el plan básico se
-    //    retira (D4) y sus RPC quedan solo para `service_role`. El plan es el expediente.
-    { tabla: "emitir_plan_basico", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO emet el pla basic: retirat a A1 (D4)" },
-    { tabla: "desar_diagnostic", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respostes: {} }, descripcion: "pot contestar el diagnostic en nom d'una organitzacio (model assistit)" },
-    { tabla: "generar_pla_des_de_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO genera el pla basic: retirat a A1 (D4)" },
     { tabla: "diagnostic_estat", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot consultar l'estat del diagnostic de qualsevol organitzacio" },
     // --- Diagnòstic únic (A1, 20270520100000) ---
-    // Ni el super_admin escribe `diagnostics` a mano ni toca el catálogo de medidas y reglas:
-    // el editor hacía `update` directo y A1 le quita el GRANT de escritura (hallazgo 2).
-    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (desar_diagnostic o el backfill d'A1)" },
-    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (va per desar_diagnostic)" },
-    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (va per desar_diagnostic)" },
+    // Ni el super_admin escribe `diagnostics` a mano (A1 le quitó el GRANT de escritura).
+    { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu els diagnostics (A1)", requiereFixture: "algun diagnostic desat (per RPC o el backfill d'A1)" },
+    { tabla: "diagnostics", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap diagnostic a ma (nomes per RPC)" },
+    { tabla: "diagnostics", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap diagnostic a ma (nomes per RPC)" },
     { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot llegir el diagnostic de qualsevol productor (autoritza; 22023 fitxa_inexistent)" },
-    { tabla: "desar_mesures_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_mesures: [] }, descripcion: "NO ajusta les mesures del pla basic: retirat a A1 (D4)" },
-    { tabla: "fixar_nivell_pla", op: "rpc", esperado: "denegar", args: { p_plan: "00000000-0000-0000-0000-000000000000", p_nivel: "basic" }, descripcion: "NO fixa el nivell del pla basic: retirat a A1 (D4)" },
-    { tabla: "guardar_plan_basico", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "00000000-0000-0000-0000-000000000000", p_respuestas: {} }, descripcion: "NO desa cap pla basic: retirat a A1 (D4)" },
     // --- Operativa (A4, 20270521100000) ---
     // El equipo edita la Operativa de cualquier productor con UPDATE directo (ficha y sección 1
     // del diagnóstico, T4) y marca su lugar principal por la RPC.
@@ -2276,10 +2200,6 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
-    { tabla: "mesures_prevencio", op: "insertar", esperado: "denegar", descripcion: "NO declara cap mesura: sense cami en pantalla des d'A1 (D4)" },
-    { tabla: "mesures_prevencio", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap mesura: sense cami en pantalla des d'A1 (D4)" },
-    { tabla: "regles_pla", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap regla: sense cami en pantalla des d'A1 (D4)" },
-    { tabla: "regles_pla", op: "actualizar", esperado: "denegar", descripcion: "NO activa ni modifica cap regla: sense cami en pantalla des d'A1 (D4)" },
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2970,7 +2890,6 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // sale SALTADA, que es lo correcto (si viera el de otro sería un escape).
     { tabla: "diagnostics", op: "leer", esperado: "permitir", descripcion: "veu EL SEU diagnostic (nomes el seu)", requiereFixture: "un diagnostic desat del seu productor (desar_diagnostic des de l'equip)" },
     { tabla: "diagnostic_datos", op: "rpc", esperado: "permitir", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor" }, descripcion: "llegeix EL SEU diagnostic (buit si no en te)" },
-    { tabla: "desar_diagnostic", op: "rpc", esperado: "denegar", args: { p_tipo_org: "productor", p_org: "@meva_fitxa_productor", p_respostes: {} }, descripcion: "NO desa el seu propi diagnostic: l'actualitza l'equip (A1, D5)" },
     // El nomenclátor sí: es catálogo público, como `productos`, y lo necesita el
     // formulario de ubicación.
     { tabla: "municipios", op: "leer", esperado: "permitir", descripcion: "lee el nomenclátor (catálogo público)" },
@@ -3271,30 +3190,6 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
     periodo_hasta: "1999-12-31",
     ejercicio: 1999,
   },
-  // Diagnóstico (F2, 20270328101300…231950). Se rellenan ENTERAS por el mismo motivo que las
-  // del cierre: lo que tiene que cortar es el permiso, no un `not null` ni un check de forma
-  // sobre el jsonb — y las tres tienen checks de forma que saltarían antes.
-  questionaris_diagnostic: {
-    tipo_org: "productor",
-    versio: 9999,
-    vigente: false,
-    titol: { ca: "TEST-RLS", es: "TEST-RLS" },
-    preguntes: [{
-      id: "test_rls", tipus: "text", seccio: "seguiment", obligatoria: false,
-      etiqueta: { ca: "TEST-RLS", es: "TEST-RLS" },
-    }],
-  },
-  mesures_prevencio: {
-    codi: "test_rls_mesura", tipo_org: "productor", bloc: "seguiment",
-    titol: { ca: "TEST-RLS", es: "TEST-RLS" },
-    descripcio: { ca: "TEST-RLS", es: "TEST-RLS" },
-  },
-  // `operador: 'sempre'` con pregunta y valor nulos cumple los tres checks, y la pareja
-  // (mesura_codi, tipo_org) existe en el seed: la FK compuesta no puede ser la que corte.
-  regles_pla: {
-    tipo_org: "productor", operador: "sempre",
-    mesura_codi: "registre_quantitats", obligatoria: false,
-  },
   espigoladas: { fecha: "1999-01-01" },
   // `convenios` no tiene GRANT de escritura para nadie: la fila se rellena lo justo para
   // que lo que corte sea el permiso y no un `not null` ni el check excluyente.
@@ -3325,15 +3220,6 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   diagnostic_productes: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS" },
   diagnostic_excedents: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS", causa_codi: "EX" },
   diagnostic_accions: { excedent_id: "00000000-0000-0000-0000-000000000000", desti: "donacio", descripcio: "TEST-RLS" },
-  // Hasta A1 este insert caía en la fila por defecto (`nombre`) y moría en `PGRST204` («error
-  // de datos»): pasaba como denegación sin medir el permiso. Con una fila válida (cumple el
-  // check excluyente) lo que corta es el GRANT (42501).
-  diagnostics_historial: {
-    tipo_org: "productor",
-    productor_id: "00000000-0000-0000-0000-000000000000",
-    respostes: {},
-    complet: false,
-  },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
   plantillas_documento: {
@@ -3390,8 +3276,6 @@ const COLUMNA_INOCUA: Record<string, string> = {
   parametros_documentales: "caducidad_enlace_dias",
   // A1 (20270520100000): sin GRANT de UPDATE para `authenticated` (42501 antes de mirar filas).
   diagnostics: "notes",
-  mesures_prevencio: "activa",
-  regles_pla: "activa",
   // A4 (20270521100000): la Operativa. El equipo la escribe directo (política `edicio intern`);
   // el productor, no (0 filas: la política filtra) —él va por `actualitzar_fitxa_productor`—.
   productores: "envasos_habituals",
@@ -3405,12 +3289,9 @@ const COLUMNA_INOCUA: Record<string, string> = {
 
 /**
  * Columna con la que se identifica la fila en el UPDATE de `COLUMNA_INOCUA`, cuando no es
- * `id`. `mesures_prevencio` tiene `codi` como clave: con `id` el UPDATE daría `42703` (la
- * columna no existe) y el check no mediría el permiso sino un error de programación.
+ * `id` (la tuvo `mesures_prevencio`, con `codi`, hasta que la deuda 175 retiró la tabla).
  */
-const CLAVE_FILA: Record<string, string> = {
-  mesures_prevencio: "codi",
-};
+const CLAVE_FILA: Record<string, string> = {};
 
 // ---------------------------------------------------------------------------
 // Ejecución

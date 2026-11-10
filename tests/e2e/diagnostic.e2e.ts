@@ -2,7 +2,7 @@
 // `20270521100000`, A3 `20270522100000`): la Operativa de la ficha, los EXCEDENTES por producto
 // principal × causa del catálogo `causas` (el de las ofertas, D7) con una acción por destino, y
 // las ACCIONES con su estado. Lo conduce el EQUIPO (D5) y el productor lo LEE. Guardar no genera
-// ningún plan ni escribe en `diagnostics_historial` (P10).
+// ningún plan (el historial se retiró con la deuda 174).
 //
 // Solo contra el CLON LOCAL y solo en escritorio (escribe el diagnóstico de la cuenta de prueba).
 // Al terminar deja el fixture del arnés como estaba (`fixtureDiagnostic.ts`).
@@ -58,7 +58,6 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
   sql(`update productores set productos_habituales = array['${producte}', '${segon}'],
          productes_principals = array['${producte}', '${segon}'] where id = '${prod}'`)
   sql(`delete from diagnostic_productes where productor_id = '${prod}'`)
-  const historial0 = sql(`select count(*) from diagnostics_historial where productor_id = '${prod}'`)
   const plans0 = sql(`select count(*) from planes_prevencion where productor_id = '${prod}'`)
 
   await entra(page, 'superadmin')
@@ -113,8 +112,7 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
   expect(Number(sql(`select count(*) from excedentes e join diagnostic_excedents d
                         on d.productor_id = e.productor_id and d.producte = e.producto and d.causa_codi = e.causa_codigo
                      where e.productor_id = '${prod}'`))).toBeGreaterThanOrEqual(1)
-  // Ni historial ni plan nuevos (P10, D4).
-  expect(sql(`select count(*) from diagnostics_historial where productor_id = '${prod}'`)).toBe(historial0)
+  // Ningún plan nuevo (D4). El historial ya no existe (deuda 174).
   expect(sql(`select count(*) from planes_prevencion where productor_id = '${prod}'`)).toBe(plans0)
 
   // La sección 3 enseña las tres acciones guardadas.

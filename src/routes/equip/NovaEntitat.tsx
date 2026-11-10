@@ -158,7 +158,7 @@ export default function NovaEntitat() {
   // A5: la naturalesa se SUGIERE del NIF y la forma jurídica (como hará la base al crear); solo si
   // el equipo elige una, se fija CONFIRMADA justo después del alta.
   const [natTriada, setNatTriada] = useState<Naturalesa | null>(null)
-  const natSuggerida = naturalesaSuggerida(String(valors.nif ?? ''), String(valors.tipus_empresa ?? ''))
+  const natSuggerida = naturalesaSuggerida(String(valors.nif ?? ''), String(valors.tipus_empresa ?? ''), String(valors.tipo_receptor ?? ''))
   // «Dona-li accés a la plataforma ara» (1D): apagada por defecto (D5: el alta es sin acceso).
   const [ambAcces, setAmbAcces] = useState(false)
   const motiuCorreu = motiuCanal(useCanals(), 'email')

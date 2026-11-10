@@ -114,7 +114,7 @@ export const GRUP_TAULA: Record<string, string> = {
   consentiments: 'consentiments',
   convenios: 'convenis',
   costes_producto: 'costos', costes_producto_hist: 'costos',
-  diagnostics_historial: 'diagnostic', questionaris_diagnostic: 'diagnostic',
+  diagnostics: 'diagnostic', diagnostic_accions: 'diagnostic',
   documentos: 'documents', documentos_externos: 'documents',
   enlaces_token: 'enllacos',
   espigoladas: 'espigolades',

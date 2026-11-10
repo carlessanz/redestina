@@ -6,7 +6,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { priorizar } from "../_shared/priorizacion.ts";
+import { admesaPerNaturalesa, priorizar, reglaNaturalesa } from "../_shared/priorizacion.ts";
 import type { EntidadPriorizable, ExcedenteContexto } from "../_shared/priorizacion.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
       // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
       // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
-      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat")
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat, organizacion_id")
       // Solo las activas (plan 1, 1A): una entidad importada inactiva (D2) no se prioriza ni
       // recibe la oferta hasta que el equipo la active con su NIF.
       .eq("activo", true);
@@ -112,7 +112,32 @@ Deno.serve(async (req) => {
       ambMembresia.add(m.entidad_id);
       if (m.aprovacio === "aprovada") aprovades.add(m.entidad_id);
     }
-    const entidades = (entidadesActives ?? []).filter((e: { id: string }) => !ambMembresia.has(e.id) || aprovades.has(e.id));
+    const revisades = (entidadesActives ?? []).filter((e: { id: string }) => !ambMembresia.has(e.id) || aprovades.has(e.id));
+
+    // P8 (deuda §12.176): fuera la entidad cuya naturalesa CONFIRMADA no admite ninguna modalidad
+    // de la oferta (una empresa, en una oferta solo de donación). La misma regla que el Mercat y
+    // `comprova_interes()`. Si no se puede leer, no se filtra: la base corta igualmente el interés.
+    const modalitatsOferta = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
+    const orgIds = [...new Set(revisades
+      .map((e: { organizacion_id: string | null }) => e.organizacion_id).filter(Boolean))] as string[];
+    const [{ data: orgs, error: orgError }, { data: reglaFiles, error: reglaError }] = await Promise.all([
+      orgIds.length
+        ? supabase.from("organizaciones").select("id, naturalesa, naturalesa_origen").in("id", orgIds)
+        : Promise.resolve({ data: [], error: null }),
+      supabase.from("modalitat_naturalesa_compat").select("modalitat, naturalesa"),
+    ]);
+    if (orgError || reglaError) {
+      console.error("naturalesa:", (orgError ?? reglaError)?.message);
+    }
+    const regla = orgError || reglaError ? null : reglaNaturalesa(reglaFiles ?? []);
+    const naturalesaOrg = new Map<string, { naturalesa: string | null; naturalesa_origen: string | null }>();
+    for (const o of (orgs ?? []) as { id: string; naturalesa: string | null; naturalesa_origen: string | null }[]) {
+      naturalesaOrg.set(o.id, o);
+    }
+    const entidades = revisades.filter((e: { organizacion_id: string | null }) => {
+      const o = e.organizacion_id ? naturalesaOrg.get(e.organizacion_id) : undefined;
+      return admesaPerNaturalesa(modalitatsOferta, o?.naturalesa, o?.naturalesa_origen, regla);
+    });
 
     const contexto: ExcedenteContexto = {
       familia: excedente.familia,
@@ -125,7 +150,7 @@ Deno.serve(async (req) => {
     // convenio de NINGUNA: con el de una, puede pedirla en esa modalidad (D2). Es la
     // intersección de los «sin convenio» de cada una.
     const ids = (entidades ?? []).map((e: { id: string }) => e.id);
-    const modalitats = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
+    const modalitats = modalitatsOferta;
     const sinPorModalitat: Set<string>[] = [];
     for (const m of modalitats) sinPorModalitat.push(await entidadesSinConvenio(supabase, m, ids));
     const sinConvenio: Set<string> = sinPorModalitat.length === 0

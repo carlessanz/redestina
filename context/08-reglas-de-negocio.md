@@ -299,13 +299,21 @@ con la lista de la jerarquía de usos (venda alternativa · donació · transfor
 altres); no vuelve a preguntar por los destinos de interés. Las acciones (una por destino) y su estado los mantiene el
 equipo; la organización los ve, nota de seguimiento incluida.
 
-### P8: qué puede recibir una empresa (Plan 2, A5, 10-11-2026, provisional)
+### P8: qué puede recibir una empresa (Plan 2, A5, 10-11-2026; confirmada por la Fundació el mismo día)
 
-Propuesta por defecto del plan (§8, P8), aplicada **hasta que la Fundació diga otra cosa**: una organización con
+**La Fundació la confirmó el 10-11-2026**: «una empresa no recibe donaciones; las donaciones son para las entidades
+sociales». Era la propuesta por defecto del plan (§8, P8): una organización con
 naturalesa **confirmada** «empresa» solo recibe **compra (`venda`) y maquila**; nunca donación. Una entidad social
 confirmada, las tres (no se le quita nada: los chips le proponen donació y compra, 2.8, pero la regla no la restringe).
 Sugerida o sin naturalesa: exactamente como antes (requisito de compatibilidad con el frontend publicado durante la
 ventana base → frontend). La regla vive en la tabla `modalitat_naturalesa_compat`, así que cambiarla es una fila.
-Se cruza con la de `tipo_receptor`: una empresa confirmada de tipo `animal` (solo donación) no tiene nada compatible
-(deuda 178). La priorización (`priorizar-entidades`) no la mira todavía (deuda 176): puede proponer una donación a una
-empresa confirmada, y `comprova_interes()` la rechazaría.
+Se cruza con la de `tipo_receptor`. Desde `20270524100000` (deuda 178) `animal` admite **donación y compra**, así que
+una empresa confirmada de tipo `animal` (una granja que compra para pienso) ve la compra; antes no veía nada. Y la
+priorización la aplica también (deuda 176, `admesaPerNaturalesa` en `_shared/priorizacion.ts`): una entidad con la
+naturalesa confirmada que no admite ninguna modalidad de la oferta no entra en el ranking. Si la regla no se puede
+leer, no se filtra (la base corta igualmente al mostrar interés).
+
+**Sugerencia para F, H y V** (deuda 177): sin forma jurídica que lo diga, entidad social si la ficha receptora es de
+tipo `social` (una cooperativa de iniciativa social que reparte alimentos) y empresa en cualquier otro caso (las SAT,
+las cooperativas agrarias). Sigue siendo sugerida: la confirma una persona. `naturalesa_suggerida(nif, forma,
+tipo_receptor)` y su espejo `naturalesaSuggerida()`; el trigger de `entidades` recalcula también al cambiar el tipo.

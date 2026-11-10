@@ -143,7 +143,7 @@ origen de la importación, 1E y §6; registro en `importacions_entitats[_files]`
 tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 `actualizar_meu_canal()`). Vista `v_organizaciones` (`security_invoker`). **Naturalesa (A5, `20270523100000`)**:
 `organizaciones.naturalesa` (entitat_social·empresa) + `naturalesa_origen` (suggerida·confirmada); la sugiere un trigger
-por el NIF (`naturalesa_suggerida()`; F·H·V solo por la forma) y **solo la confirmada surte efecto** (P8, §8; perfil y
+por el NIF (`naturalesa_suggerida()`; F·H·V: la forma o, si no, social si la receptora es `social`) y **solo la confirmada surte efecto** (P8, §8; perfil y
 chips por `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
 (lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4,
 `20270521100000`, T4)**: producción y comercialización (columnas en `context/04`); `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
@@ -226,8 +226,8 @@ notas, `complet`/`falten`, `actualitzat_*`) y **excedentes en tablas propias** (
 `diagnostic_excedents` (principal × `causas.codigo`: frecuencia, kg —P7—, gestión actual, destinos = modalidades,
 `detall`) → `diagnostic_accions` (una por destino, estado y nota que ve la organización). Solo lectura por RLS; escribe
 el equipo por RPC (D5). Un principal que deja de serlo **conserva** su bloque, que no cuenta para `complet` (en vivo:
-`diagnostic_falten_productor`). Cuestionario sin vigente (motor sin pantalla, deuda 175). **Plan básico retirado
-(D4)**: quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` + `diagnostic_id`). Impacto:
+`diagnostic_falten_productor`). **Cuestionario y plan básico, fuera de la base** (174/175, `20270524100000`;
+D4): quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` + `diagnostic_id`). Impacto:
 `impacte_*` sobre kilos conciliados.
 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
@@ -274,9 +274,9 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   RGPD, equipo, borrado, importación/exportación, firma, cierre, diagnóstico, interruptores y jobs) vive en
   `context/04bis`, «Familias de RPC».
 - **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
-  (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3); `desar_diagnostic` solo por compatibilidad.
+  (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
-  `diagnostic-pdf`). `fixar_lloc_principal` (A4). Plan básico: solo `service_role`.
+  `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
@@ -414,7 +414,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270523100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270524100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -447,9 +447,9 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `sendEmail()`); `esCuentaPermitida` para acceso y recuperación (pasa el equipo). Documentos
   `modo='prueba'` → `destinatariosPrueba()` aunque el modo test esté apagado. Whitelists:
   con filas, solo a quien esté; vacías, no restringen.
-- 🔴 **P8 (A5, provisional hasta que la Fundació diga otra cosa)**: una **empresa** con la naturalesa confirmada solo
-  recibe **compra y maquila**, nunca donación (Mercat y `comprova_interes()`); una entidad social, las tres; sugerida o
-  sin ella, **como antes** (compatibilidad con el frontend publicado).
+- 🔴 **P8 (confirmada por la Fundació, 10-11-2026)**: una **empresa** con la naturalesa confirmada solo recibe **compra
+  y maquila**, nunca donación (Mercat, `comprova_interes()` y ranking de `priorizar-entidades`); una entidad social, las
+  tres; sugerida o sin ella, **como antes**. `animal` admite donación y compra (178).
 - **Diagnóstico = vocabulario de la oferta** (A3): causa = `causas.codigo`, destino = modalidad; cruza por
   `(productor, producto, causa)`.
 - Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
@@ -556,7 +556,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (83 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
+**Deuda abierta (78 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -569,22 +569,22 @@ los expedientes) · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **174** (`diagnostics_historial` ya no se escribe; `drop` pendiente, P10) · **175** (motor del cuestionario y `desar_diagnostic` sin uso; `drop` pendiente, P11) · **176** (`priorizar-entidades` no mira la naturalesa) · **177** (NIF F·H·V sin sugerencia) · **178** (`animal` + empresa confirmada = nada compatible).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
 inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (90 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (95 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.917 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.922 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.609/2.609 y 57 sin datos (A5); producción 2.604/2.604 y 62 «Sin
+   **Referencia: clon 2.478/2.478 y 43 sin datos (deuda 174-178); producción 2.604/2.604 y 62 «Sin
    fallos de permisos» (A5).** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

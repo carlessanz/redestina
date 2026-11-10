@@ -63,5 +63,6 @@ siguen diciendo POMA.
 básico; el plan es el expediente). **A3** (`20270522100000`): la pestaña **Configuració › Diagnòstic**
 (`EditorDiagnostic`, «Qüestionari», claves `cfgd.*`) y las preguntas del motor genérico en el formulario del
 diagnóstico (`Pregunta`, `ControlFitxaViva`, el prefill): el cuestionario del productor quedó `vigente=false` sin v4 y
-el diagnóstico son la Operativa y las tablas de excedentes. Las funciones del motor siguen en la base sin pantalla
-(deuda 175).
+el diagnóstico son la Operativa y las tablas de excedentes. **Deuda 174/175** (`20270524100000`, 10-11-2026): fuera
+de la base `diagnostics_historial`, `questionaris_diagnostic`, `regles_pla`, `mesures_prevencio` y las funciones del
+motor del cuestionario y del plan básico; no reusar esos nombres.

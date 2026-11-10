@@ -12,7 +12,7 @@
 // pendiente» es el convenio real (`conveni_vigent`, deuda §12.168).
 
 import { describe, it, expect } from 'vitest'
-import { categoriaDeFamilia as catSrv, categoriesInteres, PESO_PRODUCTE } from '../supabase/functions/_shared/priorizacion.ts'
+import { admesaPerNaturalesa, categoriaDeFamilia as catSrv, categoriesInteres, PESO_PRODUCTE, reglaNaturalesa } from '../supabase/functions/_shared/priorizacion.ts'
 import { categoriaDeFamilia as catWeb } from '../src/lib/filtresMercat'
 import {
   puntuarEntidad,
@@ -379,5 +379,34 @@ describe('interés por producto (C3 v1)', () => {
     expect(altra.interessa_producte).toBe(false)
     expect(amb.puntuacion - sense.puntuacion).toBe(PESO_PRODUCTE)
     expect(amb.motivos).toContain('Li interessa aquest producte')
+  })
+})
+
+describe('P8 en el ranking (deuda 176): admesaPerNaturalesa', () => {
+  const regla = reglaNaturalesa([
+    { modalitat: 'donacio', naturalesa: 'entitat_social' },
+    { modalitat: 'venda', naturalesa: 'entitat_social' },
+    { modalitat: 'maquila', naturalesa: 'entitat_social' },
+    { modalitat: 'venda', naturalesa: 'empresa' },
+    { modalitat: 'maquila', naturalesa: 'empresa' },
+  ])
+
+  it('una empresa confirmada no entra en una oferta solo de donación', () => {
+    expect(admesaPerNaturalesa(['donacio'], 'empresa', 'confirmada', regla)).toBe(false)
+  })
+  it('sí entra si la oferta también es de compra o maquila', () => {
+    expect(admesaPerNaturalesa(['donacio', 'venda'], 'empresa', 'confirmada', regla)).toBe(true)
+    expect(admesaPerNaturalesa(['maquila'], 'empresa', 'confirmada', regla)).toBe(true)
+  })
+  it('la entidad social confirmada entra en todo', () => {
+    expect(admesaPerNaturalesa(['donacio'], 'entitat_social', 'confirmada', regla)).toBe(true)
+  })
+  it('solo restringe la confirmada: sugerida o sin naturalesa, como antes', () => {
+    expect(admesaPerNaturalesa(['donacio'], 'empresa', 'suggerida', regla)).toBe(true)
+    expect(admesaPerNaturalesa(['donacio'], null, null, regla)).toBe(true)
+  })
+  it('sin regla leída o sin modalidades, no filtra (la base corta al mostrar interés)', () => {
+    expect(admesaPerNaturalesa(['donacio'], 'empresa', 'confirmada', null)).toBe(true)
+    expect(admesaPerNaturalesa([], 'empresa', 'confirmada', regla)).toBe(true)
   })
 })

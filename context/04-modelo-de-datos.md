@@ -723,8 +723,12 @@ pide el número, así que el rollback devuelve el número a la serie.
   `respostes_planes()`), cada borrador (también los de entidad) dejó una fila en `diagnostics_historial` si no había
   una igual o más reciente, `expedients_prevencion.diagnostic_id` se rellenó y después
   `delete … where estado = 'esborrany'` (`planes_no_esborrar` lo permite sin número). Los emitidos se conservan.
-- **`diagnostics_historial` ya no se escribe** (P10, deuda 174). Los triggers `trg_questionaris_inmutables` y
-  `trg_questionaris_no_esborrar` cuentan `diagnostics` **y** el historial: un cuestionario contestado no se edita.
+- **`diagnostics_historial` ya no existe** (deuda 174, `20270524100000`, 10-11-2026; antes se volcó a `scripts/data/`).
+  Con la deuda 175 se fueron también `questionaris_diagnostic`, `regles_pla`, `mesures_prevencio` y sus triggers; las FK
+  de `planes_prevencion.questionari_id` y `diagnostics.questionari_id` se quitaron (las columnas se quedan como dato).
+  `diagnostic_estat`, `diagnostic_datos`, `diagnostics_equip` y `expedient_datos` leen el título y la versión del
+  cuestionario de la foto de `diagnostics.sobre`; `provisional` es siempre `false`. Los PDF PLA ya emitidos salen de
+  su snapshot y no dependen de nada de esto.
 - **`desar_diagnostic`** (misma firma): tipo → `22023`; externo → `42501` (también sobre lo suyo, D5); entidad →
   `22023 nomes_productors`; ficha inexistente → `22023 fitxa_inexistent`; validaciones de siempre; upsert. Devuelve
   las claves de antes con `pla: null` y las de medidas a 0/false, más `diagnostic_id`. Sigue derivando
@@ -1729,8 +1733,8 @@ idioma de las ofertas: causa = `causas.codigo` (el mismo de `excedentes.causa_co
   `mesures_prevencio` quedan sin camino en pantalla (comentario de tabla). Las respuestas v3 guardadas se conservan en
   `diagnostics.respostes/sobre` y solo se enseñan («Respostes del qüestionari anterior») mientras el productor no tenga
   ningún bloque de excedentes. `provisional` sale `false` cuando el cuestionario con el que se contestó ya no es vigente.
-- **Ventana base → frontend**: `desar_diagnostic` (misma firma) ya no exige cuestionario vigente: guarda notas e idioma.
-  El frontend nuevo no la llama (deuda 175).
+- **Ventana base → frontend**: `desar_diagnostic` se conservó hasta publicar A3; se retiró con la deuda 175
+  (`20270524100000`).
 - **Cruce con las ofertas** (aceptación de A3): `excedentes e join diagnostic_excedents d on d.productor_id =
   e.productor_id and d.producte = e.producto and d.causa_codi = e.causa_codigo`.
 
