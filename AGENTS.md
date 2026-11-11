@@ -233,8 +233,8 @@ D4): quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` 
 **Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
 rechaza con `22023 bloqueig_esborrat: <codis>` si hay **ofertas** (`ofertes`·`ofertes_rebudes`),
 documentos, albaranes, cierres o **expedientes de prevención con número** (`expedients`; deuda 140); si no,
-arrastra lo operativo (y los expedientes sin número), borra la ficha, retira la
-organización vacía y purga la whitelist. FK `NO ACTION` = última red; nunca un `.delete()` suelto
+arrastra lo operativo (y los expedientes sin número, el archivo y sus enlaces), borra la ficha, retira la
+organización vacía y purga la whitelist; los ficheros van a `fitxers_orfes`, que vacía `recordatorios-documentales`. FK `NO ACTION` = última red; nunca un `.delete()` suelto
 (§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
 🔴 **Una cuenta del equipo no tiene organizaciones** ni ofertas; **su autoría no es fiscal**. Desactivarla o borrarla **traspasa sus acciones** a otra cuenta activa con rastro por fila; borrar a quien ha hecho algo **exige destino** (`cal_desti`; detalle en `context/04`, «Gestión del equipo»).
@@ -415,7 +415,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270525100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270526100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -581,10 +581,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.929 pruebas de Vitest en 88 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.932 pruebas de Vitest en 89 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.479/2.479 y 43 sin datos (deuda 140); producción 2.473/2.473 y 49 «Sin
+   **Referencia: clon 2.497/2.497 y 43 sin datos; producción 2.473/2.473 y 49 «Sin
    fallos de permisos» (deuda 140).** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

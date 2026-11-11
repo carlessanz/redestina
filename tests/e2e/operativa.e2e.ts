@@ -155,3 +155,22 @@ for (const rol of ['superadmin', 'equip'] as const) {
     await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
   })
 }
+
+// Un borrador recuperado recuerda que el lugar era PROPUESTO: hay que confirmarlo igual (11-11-2026).
+test('un borrador con el lugar propuesto sin confirmar lo vuelve a pedir', async ({ page }) => {
+  const prod = productorDe('productor')
+  const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+  const clau = `redestina-oferta-esborrany:${prod}`
+  await entra(page, 'productor')
+  await page.evaluate(([k, lloc]) => {
+    localStorage.setItem(k, JSON.stringify({
+      datos: { familia: 'Fruita', producte: 'Poma', producte_al_camp: 'no', kg: 100, transport: 'no', ubicacio: lloc },
+      pas: 2, pasMaxim: 2, costTocat: false, desat: Date.now(), proposats: ['ubicacio'],
+    }))
+  }, [clau, b])
+  await page.goto('/productor/ofertes/nova')
+  const caixa = page.getByTestId('lloc-habitual')
+  await expect(caixa.getByRole('button', { name: /Sí, aquí/ })).toBeVisible()
+  await expect(caixa.getByText(/Confirmat|Confirmado/)).toHaveCount(0)
+  await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
+})

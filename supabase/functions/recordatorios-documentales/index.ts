@@ -91,6 +91,7 @@ import {
   type Vencido,
 } from "./enllacos.ts";
 import { cuerpoFactura, cuerpoFacturas, eur, type FacturaPendiente, facturasPendientes } from "./factures.ts";
+import { purgaFitxersOrfes } from "./fitxersOrfes.ts";
 
 Deno.serve(async (req) => {
   const t0 = performance.now();
@@ -105,6 +106,18 @@ Deno.serve(async (req) => {
     Deno.env.get("SUPABASE_URL")!,
     Deno.env.get("SB_SECRET_KEY")!,
   );
+
+  // Antes que nada (y aunque luego no haya recordatorios que mandar): los ficheros de Storage
+  // que se han quedado sin fila al borrar una ficha (`fitxers_orfes`, 20270526100000). No envía
+  // nada, así que no depende de los interruptores; un fallo aquí no para los recordatorios.
+  try {
+    const p = await purgaFitxersOrfes(supabase);
+    if (p.esborrats || p.pendents) {
+      console.log(`recordatorios-documentales: fitxers orfes esborrats ${p.esborrats}, pendents ${p.pendents}`);
+    }
+  } catch (e) {
+    console.error("recordatorios-documentales: purga de fitxers orfes:", e instanceof Error ? e.message : e);
+  }
 
   const ahoraMs = Date.now();
   const ahoraIso = new Date(ahoraMs).toISOString();

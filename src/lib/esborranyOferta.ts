@@ -15,6 +15,14 @@ export interface Esborrany<D = Record<string, unknown>> {
   costTocat: boolean
   /** `Date.now()` del momento en que se guardó. */
   desat: number
+  /**
+   * Lo propuesto desde la ficha que nadie ha tocado (11-11-2026). Sin esto, al recuperar el
+   * borrador el lugar propuesto parecía una respuesta y salía «Confirmat» sin que nadie lo
+   * hubiera confirmado (P5). Opcional: un borrador de antes no lo lleva.
+   */
+  proposats?: string[]
+  /** Si se había pulsado «Canvia el lloc» (P5): se vuelve a la lista, no a la confirmación. */
+  canviaLloc?: boolean
 }
 
 /**
@@ -40,7 +48,11 @@ export function interpretaEsborrany(
   // Un `desat` en el futuro (reloj cambiado) cuenta como recién guardado, no como eterno:
   // `ara - desat` negativo pasa la comprobación igual que uno de hace un minuto.
   if (ara - b.desat > VIDA_ESBORRANY_MS) return { esborrany: null, treu: true }
-  return { esborrany: b as Esborrany, treu: false }
+  // Los dos campos opcionales, solo si tienen su forma: un valor raro se ignora, no invalida.
+  const net: Esborrany = { ...(b as Esborrany) }
+  if (!Array.isArray(b.proposats) || !b.proposats.every((x) => typeof x === 'string')) delete net.proposats
+  if (typeof b.canviaLloc !== 'boolean') delete net.canviaLloc
+  return { esborrany: net, treu: false }
 }
 
 /** «2026-09-30» → «30/09/2026». Vacío si no es una fecha ISO. */

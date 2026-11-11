@@ -175,8 +175,8 @@ asistida del equipo—: con lugar principal, el campo es una caja «Lloc habitua
 «Canvia el lloc» (`estatLlocHabitual()` de `src/lib/predeterminatsOferta.ts`: `confirmar` · `confirmat` · `llista`).
 **El lugar propuesto desde la ficha no cuenta como respuesta hasta que se confirma** (`ubicacioPerConfirmar()`:
 falta como un campo vacío, «Continuar» no pasa); «Canvia el lloc» vacía el campo y enseña la lista y «Afegir un lloc
-nou». Sin principal marcado, la lista de siempre. Un borrador recuperado no recuerda qué era propuesto: su lugar sale
-como confirmado. E2E en `operativa.e2e.ts`: el productor y, en «Nova oferta assistida» de Ofertes, el
+nou». Sin principal marcado, la lista de siempre. El borrador guarda también lo propuesto (`proposats`) y si se pulsó «Canvia el lloc»
+(`canviaLloc`; `lib/esborranyOferta.ts`): al recuperarlo, un lugar sin confirmar se vuelve a pedir (11-11-2026). E2E en `operativa.e2e.ts`: el productor y, en «Nova oferta assistida» de Ofertes, el
 super_admin y el técnico (6/6 en el clon). Las dos entradas del equipo (Ofertes y Canalització) abren
 `DialegNovaOfertaAssistida`, que monta el mismo formulario; `crear-oferta/campos` da los lugares a toda cuenta interna. El panel, en cambio, sí **precarga** la oferta nueva desde la Operativa:
 `GET crear-oferta/campos` devuelve `predeterminats` (`ubicacio` = el principal o el único, `horari` = su primera franja

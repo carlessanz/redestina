@@ -243,6 +243,9 @@ export default function FormulariNovaOferta(
           setPas(e.pas)
           setPasMaxim(e.pasMaxim)
           setCostTocat(e.costTocat)
+          // P5: lo propuesto sigue siendo propuesto (hay que confirmarlo) y «Canvia» se recuerda.
+          setProposats(new Set(e.proposats ?? []))
+          setCanviaLloc(e.canviaLloc ?? false)
           toast.info(t('po.draft_restored'))
         } else if (!recuperat.current) {
           // Sin borrador, la Operativa propone el lugar principal, su franja y el formato
@@ -274,8 +277,8 @@ export default function FormulariNovaOferta(
 
   useEffect(() => {
     if (!productorId || !recuperat.current) return
-    desaEsborrany(productorId, { datos, pas, pasMaxim, costTocat })
-  }, [productorId, datos, pas, pasMaxim, costTocat])
+    desaEsborrany(productorId, { datos, pas, pasMaxim, costTocat, proposats: [...proposats], canviaLloc })
+  }, [productorId, datos, pas, pasMaxim, costTocat, proposats, canviaLloc])
 
   const productesDeFamilia = useMemo(() => {
     const familia = String(datos.familia ?? '')

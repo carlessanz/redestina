@@ -403,7 +403,8 @@ supabase/
     _shared/bustiaLocal.ts     Solo el clon: copia un correo simulado al Mailpit del stack (`MAILPIT_URL`)
                                para que el E2E lea el enlace. Sin `MAILPIT_URL` (producción) no hace nada
     _shared/textosRgpd.ts      Las tres declaraciones RGPD y su huella; copia en `src/lib/textosRgpd.ts`
-    recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días) y `factures.ts`
+    recordatorios-documentales/ `index.ts` + `enllacos.ts` (`tocaAviso`, avisos a 7 y 14 días), `factures.ts` y
+                               `fitxersOrfes.ts` (vacía la cola `fitxers_orfes` del borrado de fichas)
     _shared/priorizacion.ts    Puntuación de entidades (pura, sin red)
     _shared/respuestas.ts      Captura el sí/no de una entidad a una oferta (aceptación, §5);
                                los textos, de `textRespostes.ts`
@@ -460,7 +461,7 @@ supabase/
                                de Vercel; nunca la contraseña; 503 ante cualquier error (§9)
     cortina-config/            POST {contrasenya} (JWT, solo super_admin): calcula la huella
                                (`_shared/cortinaHash.ts`) y la guarda con `cortina_desar_contrasenya()`
-    recordatorios-documentales/ POST {}: enlaces sin usar a 7 y 14 días → aviso al equipo
+    recordatorios-documentales/ POST {}: purga `fitxers_orfes`; enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)

@@ -17,6 +17,19 @@ function guardat(desat: number, datos: Record<string, unknown> = { producte: 'To
 }
 
 describe('interpretaEsborrany', () => {
+  it('P5: recuerda lo propuesto y «Canvia el lloc»; una forma rara se ignora sin invalidar', () => {
+    const amb = JSON.stringify({ datos: { ubicacio: 'p' }, pas: 2, pasMaxim: 2, costTocat: false, desat: ARA,
+      proposats: ['ubicacio', 'horari'], canviaLloc: true })
+    expect(interpretaEsborrany(amb, ARA).esborrany).toMatchObject({ proposats: ['ubicacio', 'horari'], canviaLloc: true })
+    const rar = JSON.stringify({ datos: {}, pas: 0, pasMaxim: 0, costTocat: false, desat: ARA, proposats: 'ubicacio', canviaLloc: 'si' })
+    const r = interpretaEsborrany(rar, ARA)
+    expect(r.treu).toBe(false)
+    expect(r.esborrany).not.toHaveProperty('proposats')
+    expect(r.esborrany).not.toHaveProperty('canviaLloc')
+    // Uno de antes (sin los dos campos) sigue valiendo.
+    expect(interpretaEsborrany(guardat(ARA), ARA).esborrany).not.toBeNull()
+  })
+
   it('no hay nada guardado: ni borrador ni nada que retirar', () => {
     expect(interpretaEsborrany(null, ARA)).toEqual({ esborrany: null, treu: false })
   })

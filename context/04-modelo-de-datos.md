@@ -1150,6 +1150,16 @@ desde el 22-09-2026 se purga en el mismo paso, sin llevarse nunca
 Y lo que SQL no puede hacer: **retirar los ficheros de
 Storage**. Sus rutas salen en `fitxers_orfes` del resultado, para que lo haga quien llama.
 
+🔴 **Desde `20270526100000` (11-11-2026) nada se queda sin borrar ni sin fichero huérfano.** `borrar_una_fitxa()`
+borra también el **archivo de la ficha** (`documentos_externos` con `objeto_tipo` = el de la ficha), los documentos de
+sus **convenios sin número** y, al retirar la organización, sus **enlaces** (`enlaces_token` de `objeto_tipo='organizacion'`:
+consentimiento y acceso); el resultado suma `arxiu_fitxa`, `documents_conveni` y `enllacos_organitzacio`. Los
+ficheros (adjuntos y trazos de firma de `evidencias`) se apuntan además en la **cola `fitxers_orfes`** (`bucket`, `ruta`
+única, `origen`; RLS sin políticas y sin GRANT: solo `service_role`), que vacía cada mañana `recordatorios-documentales`
+(`fitxersOrfes.ts`, 500 por pasada, por la Storage API; lo que falla se queda para el día siguiente; no depende de los
+interruptores de notificaciones). La migración limpió los huérfanos que ya había: enlaces de organizaciones borradas
+y `documentos_externos` cuyo objeto ya no existe, con sus ficheros a la cola.
+
 🔴 **Desde `20270508100000` (04-11-2026, decisión de Carles) las OFERTAS también bloquean.**
 `bloqueigs_esborrat_fitxa()` suma dos motivos al principio: `ofertes` (el productor tiene algún
 `excedentes`, **en cualquier estado**, también `cancelada` o `borrador`) y `ofertes_rebudes` (la
