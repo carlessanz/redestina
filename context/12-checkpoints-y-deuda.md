@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 140, `20270525100000`): se cierra la 140** (el borrado conoce los expedientes de prevención; detalle en §12ter): **77 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 174-178, `20270524100000`): se cierran las cinco** (P8 confirmada por la Fundació; detalle en §12ter): **78 vivas** y la siguiente entrada nueva es la 179.
 ⚠️ **10-11-2026 (Plan 2 A5, naturalesa, `20270523100000`): se abren la 176, la 177 y la 178**: **83 vivas** y la siguiente entrada nueva es la 179.
@@ -595,19 +596,12 @@ panel del equipo y en el externo).
      El precio: el control de que la factura cuadre pasa de ser un bloqueo a ser el aviso
      `discrepancia`, que alguien tiene que mirar. Ver §12bis.
 
-115. **El cuestionario de diagnóstico, las 20 medidas y las 32 reglas son texto de trabajo
-     SIN validar por la Fundació.** Es la misma decisión que los seis convenios
-     (`20270111100200`) y el mismo precio: se emite con `provisional = true`, **sale impreso en
-     el PDF**, y se sustituye publicando la versión 1 desde la pantalla, nunca editando la 0.
-     Espera material de la fase 0 (anexo B).
-     🟡 **Del productor ya hay versión 1** (27-09-2026) con el contenido de la revisión, todavía
-     provisional por la lista de «suport» y las cuatro adaptaciones del motor (§4). El receptor
-     sigue en la 0. Las 20 medidas del catálogo siguen siendo texto de trabajo.
-116. **`desar_mesures_pla()` y `fixar_nivell_pla()` no tienen check en el arnés.** Su guarda
-     depende del plan, así que va **después** de buscarlo: con un uuid inventado responden
-     `22023 «no existe»` y no el `42501`, así que un `denegar` ahí **saldría verde por el motivo
-     equivocado**, que es peor que no tenerlo. Se cubren el día que el fixture documental deje
-     un plan con borrador.
+115. ~~Cuestionario, medidas y reglas sin validar~~ **Cerrada el 11-11-2026** (sin código): el cuestionario, las 20
+     medidas y las 32 reglas **se retiraron de la base** con la deuda 174-178 (`20270524100000`); el diagnóstico es
+     ahora el de A3 (Operativa + excedentes por producto y causa) y el plan, el expediente. Lo que queda por validar
+     con la Fundació vive en `3. Claude Code/2026-11-10-decisiones-diagnostic-pendientes.md`. Ver §12ter.
+116. ~~`desar_mesures_pla()` y `fixar_nivell_pla()` sin check en el arnés~~ **Cerrada el 11-11-2026** (sin código):
+     las dos funciones se borraron en `20270524100000`. Ver §12ter.
 
 113. **Una línea del certificado de recepción es una canalización entera, con un solo
      producto.** `cierre_receptor_lineas` tiene `unique (cierre_receptor_id, canalizacion_id)` y

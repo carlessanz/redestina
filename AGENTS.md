@@ -557,7 +557,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (77 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
+**Deuda abierta (75 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -576,7 +576,7 @@ Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), 
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
 inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (96 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (98 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 

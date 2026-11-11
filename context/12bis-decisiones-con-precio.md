@@ -36,7 +36,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 | 109 | La pantalla guiada llama a las RPC reales; los atajos de `OfferDetail` se retiraron el 27-10-2026, pero los GRANT siguen | «Salen los mismos documentos» es cierto **desde cualquier pantalla**; por la API, no. Cerrarlo es revocar GRANT (la 132) |
 | 110 | Una cuenta, un papel: se retiró el bloque `doble_rol` del arnés | Se pierde la cobertura de aislamiento entre dos fichas de una misma cuenta. Se recupera con una cuenta interna dedicada solo al arnés |
 | 113 | Una línea del CR = una canalización, con un solo producto | El **total es exacto**; lo que se reparte mal es la atribución por producto. La alternativa rompe la clave única que comparten las tres tablas de cierre |
-| 116 | `desar_mesures_pla` y `fixar_nivell_pla` sin check en el arnés | Su guarda va después de buscar el plan, así que con un uuid inventado un `denegar` saldría verde **por el motivo equivocado**. Se cubren con fixture |
 | 114 | Una canalización sin valorización cuenta como donación en el lado receptor | En el lado del receptor el fallo contrario es peor —negarle un kilo que recibió— y es lo que hace que `kg_donacio + kg_compra = kg_total` se cumpla siempre |
 | 111 | La factura deja de condicionar el certificado; D4 se retira como camino | El control de que la factura cuadre pasa de bloqueo a aviso (`discrepancia`). Nadie impide ya emitir un certificado cuya factura no ha llegado: lo que se conserva es que el PDF **no la cite** si no cuadra |
 | 21 | Sin fallback a correo dentro de `whatsapp-send`; el intake no tiene equivalente por correo | El primero es diseño (lo orquesta el llamante, que sabe qué texto tiene sentido); el segundo no puede tenerlo: no hay sesión de intake sin WhatsApp. La vía sin WhatsApp es el panel (§6ter) |
@@ -48,7 +47,6 @@ funcional (pasó el 15-09-2026 con la regla de los tipos de fila, que está en �
 |---|---|---|
 | 17 | Las dos whitelists de test conviven con `es_test`, y el Dashboard mide por las de Meta | **Meta**: se revisa al pasar su número a producción |
 | 71 · 77 · 84 | Los textos legales de RES, CD, CT, **CR**, PLA y los seis convenios | **La asesoría** |
-| **115** | El cuestionario de diagnóstico, sus 20 medidas y sus 32 reglas | **La fase 0** (anexo B). Mientras tanto se emite marcado como provisional, y el PDF lo dice |
 | 85 | Prueba end-to-end del CT | 🟡 **Ya no está bloqueada**: desde `20260921214526` el CT se emite en modo prueba (`P-CT`). Queda ejercitarlo, que es trabajo, no espera |
 
 ### Son interruptores de producción, no código
