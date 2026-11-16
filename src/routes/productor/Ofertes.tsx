@@ -19,6 +19,8 @@ import type { Contrapart } from '../../lib/avisos'
 import LiniesSortida from '../../components/LiniesSortida'
 import BarraFiltres from '../../components/BarraFiltres'
 import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
+import { modalitatsOferta } from '../../lib/modalitats'
+import { useTerritori } from '../../hooks/useTerritori'
 import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../../lib/filtres'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaDestins } from '../../lib/ofertes'
@@ -508,11 +510,15 @@ export function ProductorOfertes() {
   // Filtros y orden comunes (fase 6 de la revisión del 08-10-2026). El estado es el SIMPLE,
   // el mismo del badge; la fecha, la de alta. Orden: en marcha por disponibilidad, y después
   // las cerradas, la más reciente arriba.
+  // El municipio (16-11-2026) es el de sus propias ofertas: sirve a quien recoge en varios
+  // lugares. La modalidad mira todas las de la oferta, no solo la primera.
   const f = useFiltresLlistat(productorId ? `productor-ofertes:${productorId}` : null)
+  const territori = useTerritori()
   const dims: Dimensio<Excedente>[] = [
     { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (o) => estatSimpleOferta(puntDe(o)).estat },
+    { clau: 'municipi', etiquetaKey: 'fl.d_municipi', valor: (o) => territori.nomMunicipi(o.municipi_ine) },
     { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
-    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => o.modalitat },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => modalitatsOferta(o) },
   ]
   const rang = { data: (o: Excedente) => o.created_at, desDe: f.desDe, finsA: f.finsA }
   const filtrades = ordenaPerDisponibilitat(

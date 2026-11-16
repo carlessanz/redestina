@@ -236,3 +236,42 @@ export function reglaNaturalesa(
   }
   return m;
 }
+
+/** Las filas de `modalitat_receptor_compat` como mapa tipo de receptor → modalidades. */
+export function matriuReceptor(
+  files: readonly { modalitat: string; tipo_receptor: string }[],
+): Map<string, Set<string>> {
+  const m = new Map<string, Set<string>>();
+  for (const f of files) {
+    if (!m.has(f.tipo_receptor)) m.set(f.tipo_receptor, new Set());
+    m.get(f.tipo_receptor)!.add(f.modalitat);
+  }
+  return m;
+}
+
+/**
+ * Las modalidades de ESTA oferta que una entidad puede recibir, para el filtro «Modalitat» del
+ * ranking (fase 1 del feedback del 08-10-2026, informe del 16-11-2026). Solo filtra; no puntúa.
+ *
+ * - Por su tipo de receptor, la matriz `modalitat_receptor_compat` (la de la RLS del Mercat). Sin
+ *   tipo, o sin fila para su tipo, no se le quita ninguna: no se sabe.
+ * - Por su naturalesa CONFIRMADA, P8 (`modalitat_naturalesa_compat`), como `admesaPerNaturalesa`.
+ *
+ * Un mapa `null` = no se pudo leer: esa regla no recorta. Lo que diga la entidad que le interesa
+ * (`modalitats_interes`) va aparte: es preferencia, no permiso.
+ */
+export function modalitatsAdmeses(
+  modalitatsOferta: readonly string[],
+  tipoReceptor: string | null | undefined,
+  matriu: ReadonlyMap<string, ReadonlySet<string>> | null,
+  naturalesa: string | null | undefined,
+  origen: string | null | undefined,
+  regla: ReadonlyMap<string, ReadonlySet<string>> | null,
+): string[] {
+  let ms = [...modalitatsOferta];
+  const perTipus = matriu && tipoReceptor ? matriu.get(tipoReceptor) : undefined;
+  if (perTipus) ms = ms.filter((m) => perTipus.has(m));
+  const perNaturalesa = regla && origen === "confirmada" && naturalesa ? regla.get(naturalesa) : undefined;
+  if (perNaturalesa) ms = ms.filter((m) => perNaturalesa.has(m));
+  return ms;
+}

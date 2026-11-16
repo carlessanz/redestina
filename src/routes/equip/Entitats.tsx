@@ -37,6 +37,8 @@ import { carregaExportacio } from '../../lib/importacions'
 import { MAX_FILES } from '../../lib/importEntitats'
 import { blobExportacio, enOrdre, nomFitxerExportacio } from '../../lib/exportEntitats'
 import { carregaMunicipis, llistesTerritori } from '../../lib/municipis'
+import { provinciesDe } from '../../lib/territori'
+import { useTerritori } from '../../hooks/useTerritori'
 import { carregaTipusActivitat } from '../../lib/organitzacio'
 import BarraFiltres from '../../components/BarraFiltres'
 import BotoIcona from '../../components/BotoIcona'
@@ -117,14 +119,19 @@ export default function Entitats() {
   // El papel NO es una dimensión de `filtraLlistat` (una organización con doble rol cuenta en
   // los dos, y una dimensión solo admite un valor por fila): se filtra aparte, `perRol`.
   const rolFiltre = fl.valors.rol
+  // Provincia y municipio (16-11-2026), del `municipio_ine` de la ficha y del catálogo; sin él,
+  // la provincia sale de la comarca y el municipio no se sabe.
+  const territori = useTerritori()
   const dims = useMemo<Dimensio<EntitatLlistat>[]>(() => [
     { clau: 'estat', etiquetaKey: 'fl.d_estat', valor: (e) => estatPerFiltre(e, rolFiltre) },
+    { clau: 'provincia', etiquetaKey: 'fl.d_provincia', valor: (e) => provinciesDe(e.municipio_ine, e.comarca, territori.perComarca) },
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (e) => e.comarca },
+    { clau: 'municipi', etiquetaKey: 'fl.d_municipi', valor: (e) => territori.nomMunicipi(e.municipio_ine) },
     { clau: 'tipus', etiquetaKey: 'fl.d_tipus', valor: (e) => e.tipo_receptor },
     { clau: 'compte', etiquetaKey: 'fl.d_compte', valor: (e) => e.compte_estat },
     // Los seguimientos del CRM (1.5): con alguno vencido, para hoy, pendiente o sin ninguno.
     { clau: 'seguiment', etiquetaKey: 'fl.d_seguiment', valor: (e) => seguimentDe(e) },
-  ], [rolFiltre])
+  ], [rolFiltre, territori])
   const perRol = (e: EntitatLlistat) => !fl.valors.rol
     || (fl.valors.rol === 'ofertant' && e.es_generadora) || (fl.valors.rol === 'receptor' && e.es_receptora)
 

@@ -360,7 +360,7 @@ Lo que manda hoy, en una línea cada uno:
 - **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
   `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
 - **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió → Resultat. **Convenio único de col·laboració** por
-  papel. Filtros comunes (`lib/filtres.ts`). **Diagnòstic operatiu**: lo contesta el equipo en
+  papel. Filtros comunes (`lib/filtres.ts`; provincia, `lib/territori.ts`; ranking por modalidad y kg). **Diagnòstic operatiu**: lo contesta el equipo en
   `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions; «Falten dades» enlaza cada falta, `destiFalta`; sin lugares propone la dirección de la ficha); ficha y «El meu diagnòstic» lo leen y bajan en PDF
   (`diagnostic-pdf`, D2); Pla de Prevenció = **expediente** (detalle en `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
@@ -581,7 +581,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.938 pruebas de Vitest en 90 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.947 pruebas de Vitest en 91 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.497/2.497 y 43 sin datos; producción 2.507/2.507 y 33 «Sin

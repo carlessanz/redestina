@@ -49,6 +49,7 @@ src/
                                (§8). El panel activo se
                                DERIVA de la URL; useOrganitzacio(tipus) para las pantallas
   hooks/use-mobile.ts          Hook del breakpoint (lo usa el sidebar de shadcn)
+  hooks/useTerritori.ts        Catálogo de municipios para los filtros: comarca → provincias, INE → nombre
   hooks/useInstalacio.ts       ¿Se puede instalar la PWA, y cómo? (automática o manual iOS; §2)
   hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
   hooks/useMissatgesOferta.ts  Los mensajes de una oferta (`missatgesOferta.ts` + `avisos_de_oferta()`); con
@@ -92,10 +93,11 @@ src/
     plantillas.ts              plantillaPrimerContacte(): tría plantilla de 1r contacte per rol (§6ter)
     ofertaTemplate.ts          construirComponentsOferta(): variables de la plantilla oferta_excedent (§6ter)
     redestina.ts               priorizarEntidades(): llama a la Edge Function con el JWT
-    rankingEntitats.ts         PURO: filtro por `tipo_receptor` y «veure'n més» (de 15 en 15) del
-                               ranking de entidades del detalle de oferta (05-10-2026)
-    filtresMercat.ts           PURO: filtros del Mercat (comarca + categoría de producto, el mismo
-                               vocabulario que `perfil_receptor`), recordados por entidad (05-10-2026)
+    rankingEntitats.ts         PURO: filtros (tipo, zona, recepción, actividad, capacidad, modalidad, kg
+                               habituales) y «veure'n més» (de 15 en 15) del ranking del detalle de oferta
+    filtresMercat.ts           PURO: `categoriaDeFamilia` (el vocabulario de `perfil_receptor`); el Mercat
+                               filtra con `BarraFiltres` desde el 16-11-2026
+    territori.ts               PURO: provincia por prefijo INE o por comarca (D3: el receptor no ve el municipio)
     mensajes.ts                countUnanswered(): mensajes «sin contestar» por teléfono (§5)
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)

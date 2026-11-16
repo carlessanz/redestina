@@ -7,9 +7,9 @@ import { sendWhatsApp } from '../lib/whatsapp'
 import { enviarEmail } from '../lib/email'
 import { priorizarEntidades } from '../lib/redestina'
 import type { EntidadPuntuada } from '../lib/redestina'
-import { activitatsPresents, comarquesPresents, filtraRanking, FRANGES_RECEPCIO, hiHaCapacitat, hiHaInteresProducte, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
+import { activitatsPresents, comarquesPresents, filtraRanking, FRANGES_KG, FRANGES_RECEPCIO, hiHaCapacitat, hiHaInteresProducte, hiHaQuantitatHabitual, modalitatsPresents, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
 import { carregaTipusActivitat } from '../lib/organitzacio'
-import type { FranjaRecepcio } from '../lib/rankingEntitats'
+import type { FranjaKg, FranjaRecepcio } from '../lib/rankingEntitats'
 import { dataCurta } from '../lib/format'
 import BotoCopiar from './BotoCopiar'
 import Desplegable from './Desplegable'
@@ -140,6 +140,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Tipo de actividad y capacidad (fase 7).
   const [filtreActivitat, setFiltreActivitat] = useState('')
   const [nomesCapacitat, setNomesCapacitat] = useState(false)
+  // Modalidad y kilos habituales (fase 1 de filtros, 16-11-2026).
+  const [filtreModalitat, setFiltreModalitat] = useState('')
+  const [filtreKg, setFiltreKg] = useState<FranjaKg>('')
   const [nomsActivitat, setNomsActivitat] = useState<Record<string, string>>({})
   useEffect(() => {
     void carregaTipusActivitat().then((c) => setNomsActivitat(Object.fromEntries(c.map((a) => [a.codi, lang === 'es' ? a.nom_es : a.nom_ca]))))
@@ -282,8 +285,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const rankingFiltrat = useMemo(() => filtraRanking(rankingOrdenado, {
     tipus: filtreTipus, nomesProducte, comarca: filtreComarca, recepcio: filtreRecepcio,
     activitat: filtreActivitat, capacitatMinima: nomesCapacitat ? kgOferta : undefined,
+    modalitat: filtreModalitat, kgHabituals: filtreKg,
   }),
-  [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio, filtreActivitat, nomesCapacitat, kgOferta])
+  [rankingOrdenado, filtreTipus, nomesProducte, filtreComarca, filtreRecepcio, filtreActivitat, nomesCapacitat, kgOferta,
+    filtreModalitat, filtreKg])
+  const modalitatsDelRanking = useMemo(() => modalitatsPresents(ranking), [ranking])
+  const ambKgHabituals = useMemo(() => hiHaQuantitatHabitual(ranking), [ranking])
   const activitatsDelRanking = useMemo(() => activitatsPresents(ranking), [ranking])
   const ambCapacitat = useMemo(() => hiHaCapacitat(ranking), [ranking])
   const comarquesDelRanking = useMemo(() => comarquesPresents(ranking), [ranking])
@@ -879,6 +886,26 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     onChange={(v) => { setFiltreActivitat(v); setMostrats(PAS_RANKING) }}
                     buit={t('fl.tots')}
                     opcions={activitatsDelRanking.map((a) => ({ valor: a, text: nomsActivitat[a] ?? a }))} />
+                </>
+              )}
+              {modalitatsDelRanking.length > 1 && (
+                <>
+                  <label htmlFor="od-filtre-modalitat" className="text-sm text-muted-foreground">{t('fl.d_modalitat')}</label>
+                  <Desplegable id="od-filtre-modalitat" mida="sm" className="w-auto"
+                    value={filtreModalitat}
+                    onChange={(v) => { setFiltreModalitat(v); setMostrats(PAS_RANKING) }}
+                    buit={t('fl.tots')}
+                    opcions={modalitatsDelRanking.map((m) => ({ valor: m, text: t(`od.mod_${m}`) }))} />
+                </>
+              )}
+              {ambKgHabituals && (
+                <>
+                  <label htmlFor="od-filtre-kg" className="text-sm text-muted-foreground">{t('od.f_kg_habituals')}</label>
+                  <Desplegable id="od-filtre-kg" mida="sm" className="w-auto"
+                    value={filtreKg}
+                    onChange={(v) => { setFiltreKg(v as FranjaKg); setMostrats(PAS_RANKING) }}
+                    buit={t('fl.tots')}
+                    opcions={FRANGES_KG.map((f) => ({ valor: f, text: t(`od.kh_${f}`) }))} />
                 </>
               )}
             </div>

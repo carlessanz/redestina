@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { comarquesPresents, dinsFranja, filtraRanking, hiHaInteresProducte, tipusPresents } from '../src/lib/rankingEntitats'
+import { comarquesPresents, dinsFranja, dinsFranjaKg, filtraRanking, hiHaInteresProducte, hiHaQuantitatHabitual, modalitatsPresents, tipusPresents } from '../src/lib/rankingEntitats'
 import type { EntidadPuntuada } from '../src/lib/redestina'
 
 function ent(id: string, tipo_receptor: string | null, puntuacion = 1): EntidadPuntuada {
@@ -63,5 +63,43 @@ describe('zona y última recepción (fase 6)', () => {
     ] as unknown as Parameters<typeof filtraRanking>[0]
     expect(filtraRanking(r, { comarca: 'Osona' }).map((e) => e.id)).toEqual(['a'])
     expect(comarquesPresents(r)).toEqual(['Maresme', 'Osona'])
+  })
+})
+
+// Fase 1 de filtros (16-11-2026): modalidad y kilos habituales.
+describe('filtro por modalidad', () => {
+  const e = (id: string, possibles: string[] | undefined, interes: string[] = []) =>
+    ({ ...ent(id, 'social'), modalitats_possibles: possibles, modalitats_interes: interes }) as EntidadPuntuada
+  const r = [
+    e('pot-i-vol', ['donacio', 'venda'], ['donacio']),
+    e('pot-sense-dir', ['donacio']),
+    e('no-pot', ['venda']),
+    e('pot-no-vol', ['donacio', 'venda'], ['venda']),
+    e('servidor-vell', undefined),
+  ]
+  it('deja las que pueden y no han dicho que no les interesa; un servidor anterior no filtra', () => {
+    expect(filtraRanking(r, { modalitat: 'donacio' }).map((x) => x.id)).toEqual(['pot-i-vol', 'pot-sense-dir', 'servidor-vell'])
+  })
+  it('ofrece las modalidades presentes en el orden de siempre', () => {
+    expect(modalitatsPresents(r)).toEqual(['donacio', 'venda'])
+    expect(modalitatsPresents([ent('x', null)])).toEqual([])
+  })
+})
+
+describe('filtro por kilos habituales', () => {
+  it('franjas cerradas por abajo y abiertas por arriba; sin dato, fuera', () => {
+    expect(dinsFranjaKg(99, 'fins_100')).toBe(true)
+    expect(dinsFranjaKg(100, 'fins_100')).toBe(false)
+    expect(dinsFranjaKg(100, '100_500')).toBe(true)
+    expect(dinsFranjaKg(999, '500_1000')).toBe(true)
+    expect(dinsFranjaKg(1000, 'mes_1000')).toBe(true)
+    expect(dinsFranjaKg(null, 'mes_1000')).toBe(false)
+    expect(dinsFranjaKg(null, '')).toBe(true)
+  })
+  it('filtra el ranking y solo se ofrece si alguna lo ha declarado', () => {
+    const r = [{ ...ent('a', null), quantitat_habitual: 50 }, { ...ent('b', null), quantitat_habitual: 700 }, ent('c', null)] as EntidadPuntuada[]
+    expect(filtraRanking(r, { kgHabituals: '500_1000' }).map((x) => x.id)).toEqual(['b'])
+    expect(hiHaQuantitatHabitual(r)).toBe(true)
+    expect(hiHaQuantitatHabitual([ent('c', null)])).toBe(false)
   })
 })

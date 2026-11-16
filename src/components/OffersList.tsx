@@ -22,6 +22,9 @@ import { supabase } from '../lib/supabase'
 import { useT } from '../lib/i18n'
 import { filtraCerca } from '../lib/cerca'
 import { categoriaDeFamilia } from '../lib/filtresMercat'
+import { modalitatsOferta } from '../lib/modalitats'
+import { provinciesDe } from '../lib/territori'
+import { useTerritori } from '../hooks/useTerritori'
 import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimensio } from '../lib/filtres'
 import { useFiltresLlistat } from '../hooks/useFiltresLlistat'
 import BarraFiltres from './BarraFiltres'
@@ -126,17 +129,22 @@ export default function OffersList({ onOpen, accio }: Props) {
     }
   }, [load])
 
-  // Filtros y orden comunes (fase 6): zona, tipo de producto, producto, modalidad y fecha
-  // de alta, más el orden «disponibilidad» o «más recientes». Se aplican a las cuatro
-  // pestañas por igual, después del buscador.
+  // Filtros y orden comunes (fase 6): provincia, zona, municipio, tipo de producto, producto,
+  // modalidad y fecha de alta, más el orden «disponibilidad» o «más recientes». Se aplican a
+  // las cuatro pestañas por igual, después del buscador. Provincia y municipio (16-11-2026)
+  // salen del `municipi_ine` de la oferta y del catálogo; la modalidad mira TODAS las de la
+  // oferta (`modalitats`), no solo la primera.
   const f = useFiltresLlistat('equip-ofertes')
+  const territori = useTerritori()
   const [ordre, setOrdre] = useState<'disponibilitat' | 'recent'>('disponibilitat')
   const dims = useMemo<Dimensio<Excedente>[]>(() => [
+    { clau: 'provincia', etiquetaKey: 'fl.d_provincia', valor: (o) => provinciesDe(o.municipi_ine, o.comarca, territori.perComarca) },
     { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (o) => o.comarca },
+    { clau: 'municipi', etiquetaKey: 'fl.d_municipi', valor: (o) => territori.nomMunicipi(o.municipi_ine) },
     { clau: 'categoria', etiquetaKey: 'fl.d_categoria', valor: (o) => categoriaDeFamilia(o.familia) },
     { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
-    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => o.modalitat },
-  ], [])
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => modalitatsOferta(o) },
+  ], [territori])
   const rang = useMemo(() => ({ data: (o: Excedente) => o.created_at, desDe: f.desDe, finsA: f.finsA }), [f.desDe, f.finsA])
 
   const filtra = useCallback((files: Excedente[]) => {

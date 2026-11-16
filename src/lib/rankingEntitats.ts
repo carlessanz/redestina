@@ -9,6 +9,7 @@
 //    (primero las contactables); filtrar solo quita filas, así que la posición relativa de
 //    las que quedan es la misma que sin filtro.
 
+import { MODALITATS_IDS } from './modalitats'
 import type { EntidadPuntuada } from './redestina'
 
 /** Cuántas se enseñan de entrada y cuántas más en cada «veure'n més». */
@@ -38,6 +39,35 @@ export function dinsFranja(ultima: string | null | undefined, franja: FranjaRece
   return new Date(ultima) >= limit
 }
 
+/**
+ * Las franjas del filtro «Kg habituals» (fase 1 de filtros, 16-11-2026): lo que la entidad dice
+ * recibir normalmente de una vez (`perfil_receptor.quantitat_habitual`). Sin dato, fuera.
+ */
+export const FRANGES_KG = ['fins_100', '100_500', '500_1000', 'mes_1000'] as const
+export type FranjaKg = '' | typeof FRANGES_KG[number]
+
+export function dinsFranjaKg(kg: number | null | undefined, franja: FranjaKg): boolean {
+  if (!franja) return true
+  if (kg == null) return false
+  if (franja === 'fins_100') return kg < 100
+  if (franja === '100_500') return kg >= 100 && kg < 500
+  if (franja === '500_1000') return kg >= 500 && kg < 1000
+  return kg >= 1000
+}
+
+/**
+ * ¿Puede (y quiere) recibir esta oferta en esta modalidad? La puede recibir si está en
+ * `modalitats_possibles` (tipo de receptor + P8, lo calcula el servidor); la quiere si no ha
+ * dicho nada (`modalitats_interes` vacía) o la ha marcado. Un servidor anterior no manda las
+ * posibles: entonces no se filtra.
+ */
+export function acceptaModalitat(e: EntidadPuntuada, modalitat: string): boolean {
+  if (!modalitat || e.modalitats_possibles == null) return true
+  if (!e.modalitats_possibles.includes(modalitat)) return false
+  const interes = e.modalitats_interes ?? []
+  return interes.length === 0 || interes.includes(modalitat)
+}
+
 export interface FiltresRanking {
   tipus?: string
   nomesProducte?: boolean
@@ -48,6 +78,10 @@ export interface FiltresRanking {
   activitat?: string
   /** Fase 7: solo las que dicen poder recibir al menos estos kilos de una vez. */
   capacitatMinima?: number
+  /** Fase 1 de filtros: una modalidad de la oferta. */
+  modalitat?: string
+  /** Fase 1 de filtros: la franja de kilos habituales. */
+  kgHabituals?: FranjaKg
 }
 
 export function filtraRanking(
@@ -61,7 +95,9 @@ export function filtraRanking(
     && (!f.comarca || (e.comarca ?? null) === f.comarca)
     && dinsFranja(e.ultima_recepcio, f.recepcio ?? '')
     && (!f.activitat || (e.tipus_activitat ?? []).includes(f.activitat))
-    && (!f.capacitatMinima || (e.capacitat_maxima != null && e.capacitat_maxima >= f.capacitatMinima)))
+    && (!f.capacitatMinima || (e.capacitat_maxima != null && e.capacitat_maxima >= f.capacitatMinima))
+    && acceptaModalitat(e, f.modalitat ?? '')
+    && dinsFranjaKg(e.quantitat_habitual, f.kgHabituals ?? ''))
 }
 
 /** Las comarcas que aparecen en el ranking, para no ofrecer una que da cero. */
@@ -88,4 +124,18 @@ export function activitatsPresents(ranking: readonly EntidadPuntuada[]): string[
 /** ¿Alguna ha declarado su capacidad? Si no, el filtro no se ofrece. */
 export function hiHaCapacitat(ranking: readonly EntidadPuntuada[]): boolean {
   return ranking.some((e) => e.capacitat_maxima != null)
+}
+
+/**
+ * Las modalidades que alguna entidad del ranking puede recibir, en el orden de siempre. Con una
+ * sola (o un servidor anterior), el filtro no se ofrece: no acotaría nada.
+ */
+export function modalitatsPresents(ranking: readonly EntidadPuntuada[]): string[] {
+  const hi = new Set(ranking.flatMap((e) => e.modalitats_possibles ?? []))
+  return MODALITATS_IDS.filter((m) => hi.has(m))
+}
+
+/** ¿Alguna ha declarado sus kilos habituales? Si no, el filtro no se ofrece. */
+export function hiHaQuantitatHabitual(ranking: readonly EntidadPuntuada[]): boolean {
+  return ranking.some((e) => e.quantitat_habitual != null)
 }

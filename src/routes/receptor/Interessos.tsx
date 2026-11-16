@@ -12,6 +12,8 @@
 // traducción de estados a frases vive en `procesOferta.ts` y la comparten los tres paneles.
 
 import BarraFiltres from '../../components/BarraFiltres'
+import { useTerritori } from '../../hooks/useTerritori'
+import { provinciesDe } from '../../lib/territori'
 import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
 import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
 import { carregaContraparts, marcaLlegits } from '../../lib/avisos'
@@ -509,8 +511,11 @@ export function Historic() {
     .sort((a, b) => quanRebut(b).localeCompare(quanRebut(a)))
   // Filtros (fase 6 de la revisión del 08-10-2026): periodo, producto, modalidad, ofertante y
   // zona. El total de arriba es el de lo filtrado: es lo que se está mirando.
+  // La provincia (16-11-2026) sale de la comarca de la oferta, como en el Mercat (`territori.ts`).
   const fl = useFiltresLlistat(entidadId ? `receptor-historic:${entidadId}` : null)
+  const territori = useTerritori()
   const dims: Dimensio<CanalAmbOferta>[] = [
+    { clau: 'provincia', etiquetaKey: 'fl.d_provincia', valor: (f) => provinciesDe(null, f.excedentes?.comarca, territori.perComarca) },
     { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (f) => f.excedentes?.producto },
     { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (f) => f.excedentes?.modalitat },
     { clau: 'ofertant', etiquetaKey: 'fl.d_ofertant', valor: (f) => ofertants[f.id]?.contrapart },

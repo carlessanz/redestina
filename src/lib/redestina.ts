@@ -37,6 +37,13 @@ export interface EntidadPuntuada {
   capacitat_maxima?: number | null
   quantitat_habitual?: number | null
   /**
+   * Fase 1 de filtros (16-11-2026): las modalidades de ESTA oferta que puede recibir (tipo de
+   * receptor y naturalesa confirmada) y las que dice que le interesan. Solo filtran. Un servidor
+   * anterior no las manda.
+   */
+  modalitats_possibles?: string[] | null
+  modalitats_interes?: string[] | null
+  /**
    * ¿Ha declarado en su perfil que le interesa esta categoría de producto? `null` = no ha
    * declarado ninguna (C3 v1, 05-10-2026). Un servidor anterior no lo manda.
    */

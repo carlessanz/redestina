@@ -10,8 +10,19 @@ export interface Dimensio<T> {
   clau: string
   /** Clave i18n de la etiqueta del desplegable. */
   etiquetaKey: string
-  /** El valor de la fila para esta dimensión; null = no se puede filtrar por ella. */
-  valor: (fila: T) => string | null | undefined
+  /**
+   * El valor de la fila para esta dimensión; null = no se puede filtrar por ella. Una LISTA
+   * cuando la fila tiene varios a la vez (las modalidades de una oferta, las provincias de una
+   * comarca repartida): pasa el filtro si alguno coincide, y cada uno es una opción.
+   */
+  valor: (fila: T) => string | readonly string[] | null | undefined
+}
+
+/** Los valores de una fila para una dimensión, siempre como lista (vacía = sin valor). */
+function valorsDe<T>(d: Dimensio<T>, fila: T): readonly string[] {
+  const v = d.valor(fila)
+  if (v == null || v === '') return []
+  return typeof v === 'string' ? [v] : v.filter(Boolean)
 }
 
 /** `''` en una dimensión = todas. */
@@ -34,7 +45,7 @@ function dinsRang<T>(fila: T, r: RangData<T> | undefined): boolean {
 }
 
 function passa<T>(fila: T, dims: readonly Dimensio<T>[], valors: ValorsFiltre, excepte?: string): boolean {
-  return dims.every((d) => d.clau === excepte || !valors[d.clau] || (d.valor(fila) ?? '') === valors[d.clau])
+  return dims.every((d) => d.clau === excepte || !valors[d.clau] || valorsDe(d, fila).includes(valors[d.clau]))
 }
 
 export function filtraLlistat<T>(
@@ -56,8 +67,7 @@ export function opcionsDisponibles<T>(
   const vals = new Set<string>()
   for (const f of files) {
     if (!passa(f, dims, valors, clau) || !dinsRang(f, rang)) continue
-    const v = dim.valor(f)
-    if (v) vals.add(v)
+    for (const v of valorsDe(dim, f)) vals.add(v)
   }
   if (valors[clau]) vals.add(valors[clau])
   return [...vals].sort((a, b) => a.localeCompare(b, 'ca'))

@@ -2330,6 +2330,32 @@ las ofertas por SQL; restaura el fixture del arnés con `tests/e2e/fixtureDiagno
   `llocPrincipalAmbDies` (la misma regla que `diagnostic_falten_productor`) en vez de esperar al «Desa».
 - E2E `tests/e2e/diagnostic-pendents.e2e.ts` (clon, escritorio).
 
+### Fase 1 de filtros: provincia, municipio, el Mercat con la barra común y el ranking por modalidad (16-11-2026)
+
+Sin migración. Responde a los puntos 23, 25, 54 y 83 de la revisión del feedback del 08-10-2026 (informe
+`3. Claude Code/2026-11-16-revision-feedback-8-10.md`).
+
+- **Dimensiones con varios valores** (`lib/filtres.ts`): `Dimensio.valor` puede devolver una lista; la fila pasa si
+  CUALQUIERA coincide y las opciones salen de todas. Lo usan la **modalidad** (todas las de `modalitats[]`, no solo la
+  principal: `modalitatsOferta`) y la **provincia** cuando sale de una comarca.
+- **Provincia y Municipi** (`lib/territori.ts`, puro, con test; `hooks/useTerritori.ts` carga `municipios` una vez):
+  quien ve el municipio saca la provincia del prefijo INE (08 · 17 · 25 · 43). 🔴 **El receptor no ve el municipio
+  antes de la asignación (D3)**: en el Mercat y el Històric la provincia sale de la **comarca**, y las cuatro que
+  cruzan provincias (Selva, Cerdanya, Berguedà, Osona) dan todas las suyas (mejor que sobre una a que falte una). Provincia
+  y Municipi en Ofertes del equipo y Entitats; Municipi en «Les meves ofertes»; Provincia en el Històric.
+- **«Excedents disponibles»** (Mercat) pasa a `BarraFiltres` (`id="mk"`, recordada por entidad): provincia, zona,
+  tipo de producto, producto, modalidad (las compatibles con la entidad), estado (por pedir o el de su interés) y
+  rango «Disponible fins» sobre `disponible_hasta`. `lib/filtresMercat.ts` se queda con `categoriaDeFamilia`; las
+  claves `mk.f_zone/f_all_zones/f_type/f_all_types/f_clear` se retiran.
+- **Entitats prioritzades**: filtros **Modalitat** (con más de una posible) y **Kg habituals** (`FRANGES_KG`: fins a
+  100 · 100-500 · 500-1.000 · més de 1.000, sobre `perfil_receptor.quantitat_habitual`; sin dato, fuera). La familia ya
+  la cubría «Només les que diuen que els interessa aquest tipus de producte». `priorizar-entidades` devuelve por
+  entidad `modalitats_possibles` (las de la oferta ∩ `modalitat_receptor_compat` por su tipo ∩ P8 confirmada:
+  `modalitatsAdmeses`/`matriuReceptor` en `_shared/priorizacion.ts`) y `modalitats_interes`; la entidad pasa si la
+  puede recibir y no ha dicho que le interesan otras. Solo filtran, no puntúan. Un frontend con un servidor anterior
+  no filtra por modalidad. ⚠️ Redesplegar `priorizar-entidades`.
+- E2E `tests/e2e/filtres-territori.e2e.ts` (lectura; el ranking, solo en el clon).
+
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y

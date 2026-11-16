@@ -13,7 +13,7 @@
 // ⚠️ `estado === 'pendent'` SÍ enseña el botón: significa que el equipo le mandó la oferta
 // y todavía no ha contestado. Es la fila que existe justamente para que la conteste.
 
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
@@ -22,10 +22,12 @@ import { useConveni } from '../../hooks/useConveni'
 import { clauErrorInteres, manifestaInteres } from '../../lib/ofertes'
 import { estatSimpleInteres, puntInteres } from '../../lib/procesOferta'
 import { avuiMadrid, dataCurta, kg as fmtKg, preu as fmtPreu } from '../../lib/format'
-import {
-  desaFiltres, filtraMercat, llegeixFiltres, opcionsMercat, SENSE_FILTRES,
-} from '../../lib/filtresMercat'
-import type { FiltresMercat } from '../../lib/filtresMercat'
+import { categoriaDeFamilia } from '../../lib/filtresMercat'
+import { filtraLlistat, opcionsDisponibles, type Dimensio } from '../../lib/filtres'
+import { provinciesDe } from '../../lib/territori'
+import { useFiltresLlistat } from '../../hooks/useFiltresLlistat'
+import { useTerritori } from '../../hooks/useTerritori'
+import BarraFiltres from '../../components/BarraFiltres'
 import BadgeEstat from '../../components/proces/BadgeEstat'
 import { FotoOfertaResolta, useFotosOfertes } from '../../components/FotosOferta'
 import type { ConvenioTipo, Modalitat, OfertaRespuesta } from '../../types'
@@ -38,7 +40,6 @@ import CampsRecollida from '../../components/CampsRecollida'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import CarregantSeccio from '../../components/CarregantSeccio'
-import Desplegable from '../../components/Desplegable'
 import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
 import { Button } from '@/components/ui/button'
@@ -101,17 +102,14 @@ export default function Mercat() {
     return () => { viu = false }
   }, [entidadId])
 
-  // Zona y tipo de producto (reunión del 05-10-2026). Por defecto, sin filtro: se ve todo lo
-  // que la RLS deja ver. Recordado por entidad en este navegador (`filtresMercat.ts`).
-  const [filtres, setFiltres] = useState<FiltresMercat>(SENSE_FILTRES)
-  useEffect(() => { setFiltres(llegeixFiltres(entidadId)) }, [entidadId])
-  function canviaFiltres(f: FiltresMercat) {
-    setFiltres(f)
-    desaFiltres(entidadId, f)
-  }
-  const opcions = useMemo(() => opcionsMercat(ofertes), [ofertes])
-  const visibles = useMemo(() => filtraMercat(ofertes, filtres), [ofertes, filtres])
-  const ambFiltre = filtres.comarca !== '' || filtres.categoria !== ''
+  // La barra de filtros común (fase 1 del feedback del 08-10-2026, informe del 16-11): provincia,
+  // zona, tipo de producto, producto, modalidad, estado y «disponible fins». Por defecto, sin
+  // filtro: se ve todo lo que la RLS deja ver. Recordado por entidad en este navegador.
+  // ⚠️ D3: ni el municipio ni su código llegan aquí; la provincia sale de la COMARCA (las de una
+  //    comarca repartida, todas: `territori.ts`). Las dimensiones se montan más abajo, después de
+  //    `puntDe` y `compatibles`, sin hooks: van detrás del `return` temprano.
+  const territori = useTerritori()
+  const filtres = useFiltresLlistat(entidadId ? `mercat:${entidadId}` : null)
 
   const carrega = useCallback(async () => {
     // ⚠️ Columnas explícitas y en UN literal (§7): sin `texto_oferta`, `id_excedente`,
@@ -285,6 +283,28 @@ export default function Mercat() {
     ? fmtPreu(obert.preu_minim)
     : null
 
+  // Los filtros. La modalidad mira las que ESTA entidad puede recibir de la oferta, no todas
+  // las de la oferta; el estado, el de su interés («Per demanar» si todavía no lo ha pedido).
+  const dims: Dimensio<OfertaReceptor>[] = [
+    { clau: 'provincia', etiquetaKey: 'fl.d_provincia', valor: (o) => provinciesDe(null, o.comarca, territori.perComarca) },
+    { clau: 'comarca', etiquetaKey: 'fl.d_comarca', valor: (o) => o.comarca },
+    { clau: 'categoria', etiquetaKey: 'fl.d_categoria', valor: (o) => categoriaDeFamilia(o.familia) },
+    { clau: 'producte', etiquetaKey: 'fl.d_producte', valor: (o) => o.producto },
+    { clau: 'modalitat', etiquetaKey: 'fl.d_modalitat', valor: (o) => compatibles(o) },
+    {
+      clau: 'estat', etiquetaKey: 'fl.d_estat',
+      valor: (o) => { const p = puntDe(o); return p ? estatSimpleInteres(p).estat : 'per_demanar' },
+    },
+  ]
+  const rang = { data: (o: OfertaReceptor) => o.disponible_hasta, desDe: filtres.desDe, finsA: filtres.finsA }
+  const visibles = filtraLlistat(ofertes, dims, filtres.valors, rang)
+  const textDim = (clau: string) => (v: string): string => {
+    if (clau === 'categoria') return t(v === 'altres' ? 'mk.f_other' : `pr.o_${v}`)
+    if (clau === 'modalitat') return t(`od.mod_${v}`)
+    if (clau === 'estat') return v === 'per_demanar' ? t('fl.v_per_demanar') : t(`est.i_${v}`)
+    return v
+  }
+
   return (
     <Card>
       <CardHeader>
@@ -323,34 +343,20 @@ export default function Mercat() {
         {!carregant && !errorCarrega && ofertes.length === 0 && inactiva !== true && (
           <p className="text-sm text-muted-foreground">{t('mk.empty')}</p>
         )}
-        {!carregant && !errorCarrega && ofertes.length > 0 && (opcions.comarques.length > 1 || opcions.categories.length > 1 || ambFiltre) && (
-          <div className="flex flex-wrap items-end gap-2 pb-1">
-            <div className="min-w-0 flex-1 basis-48 space-y-1 sm:flex-none sm:basis-auto">
-              <Label htmlFor="mk-f-zona" className="text-xs text-muted-foreground">{t('mk.f_zone')}</Label>
-              {/* Una comarca recordada que hoy ya no tiene ofertas se sigue ofreciendo: si no,
-                  el desplegable no podría enseñar el valor elegido. */}
-              <Desplegable id="mk-f-zona" mida="sm" className="sm:w-48"
-                value={filtres.comarca}
-                onChange={(v) => canviaFiltres({ ...filtres, comarca: v })}
-                buit={t('mk.f_all_zones')}
-                opcions={[...new Set([...opcions.comarques, ...(filtres.comarca ? [filtres.comarca] : [])])]
-                  .map((c) => ({ valor: c, text: c }))} />
-            </div>
-            <div className="min-w-0 flex-1 basis-48 space-y-1 sm:flex-none sm:basis-auto">
-              <Label htmlFor="mk-f-tipus" className="text-xs text-muted-foreground">{t('mk.f_type')}</Label>
-              <Desplegable id="mk-f-tipus" mida="sm" className="sm:w-48"
-                value={filtres.categoria}
-                onChange={(v) => canviaFiltres({ ...filtres, categoria: v as FiltresMercat['categoria'] })}
-                buit={t('mk.f_all_types')}
-                opcions={[...new Set([...opcions.categories, ...(filtres.categoria ? [filtres.categoria] : [])])]
-                  .map((c) => ({ valor: c, text: t(c === 'altres' ? 'mk.f_other' : `pr.o_${c}`) }))} />
-            </div>
-            {ambFiltre && (
-              <Button variant="ghost" size="sm" className="text-muted-foreground" onClick={() => canviaFiltres(SENSE_FILTRES)}>
-                {t('mk.f_clear')}
-              </Button>
-            )}
-          </div>
+        {!carregant && !errorCarrega && ofertes.length > 0 && (
+          <BarraFiltres
+            id="mk"
+            desplegables={dims.map((d) => ({
+              clau: d.clau, etiquetaKey: d.etiquetaKey,
+              opcions: opcionsDisponibles(ofertes, dims, d.clau, filtres.valors, rang),
+              text: textDim(d.clau),
+            }))}
+            valors={filtres.valors}
+            onValors={filtres.setValors}
+            rang={{ etiquetaKey: 'fl.r_disponibilitat', desDe: filtres.desDe, finsA: filtres.finsA, onCanvi: filtres.setRang }}
+            mostrant={visibles.length}
+            total={ofertes.length}
+          />
         )}
         {!carregant && !errorCarrega && ofertes.length > 0 && visibles.length === 0 && (
           <p className="text-sm text-muted-foreground">{t('mk.f_empty', { n: ofertes.length })}</p>

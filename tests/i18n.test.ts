@@ -369,6 +369,12 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: ['3m', '12m', 'mai'],
     },
     {
+      // Los tramos del filtro «kg habituals» del ranking (fase 1 del feedback del 08-10): `FRANGES_KG`.
+      que: 'rankingEntitats.FRANGES_KG',
+      prefijo: 'od.kh_',
+      valores: ['fins_100', '100_500', '500_1000', 'mes_1000'],
+    },
+    {
       // `convenios.tipo` (CHECK de 20270420100000): el de col·laboració y los tres anteriores.
       que: 'convenios.tipo',
       prefijo: 'sig.model_',

@@ -40,3 +40,24 @@ describe('filtros comunes', () => {
     expect(o.map((f) => f.id)).toEqual(['aviat', 'tard', 'sense', 'tancada-nova', 'tancada-vella'])
   })
 })
+
+describe('dimensiones con varios valores (fase 1 del feedback del 08-10)', () => {
+  interface M { id: string; modalitats: string[]; comarca: string | null }
+  const OF: M[] = [
+    { id: 'a', modalitats: ['donacio', 'venda'], comarca: 'Osona' },
+    { id: 'b', modalitats: ['venda'], comarca: 'Maresme' },
+    { id: 'c', modalitats: [], comarca: null },
+  ]
+  const D: Dimensio<M>[] = [
+    { clau: 'modalitat', etiquetaKey: 'x', valor: (f) => f.modalitats },
+    { clau: 'comarca', etiquetaKey: 'y', valor: (f) => f.comarca },
+  ]
+  it('pasa el filtro si alguno de sus valores coincide', () => {
+    expect(filtraLlistat(OF, D, { modalitat: 'venda' }).map((f) => f.id)).toEqual(['a', 'b'])
+    expect(filtraLlistat(OF, D, { modalitat: 'donacio' }).map((f) => f.id)).toEqual(['a'])
+  })
+  it('cada valor de la lista es una opción, y una lista vacía no aporta ninguna', () => {
+    expect(opcionsDisponibles(OF, D, 'modalitat', {})).toEqual(['donacio', 'venda'])
+    expect(opcionsDisponibles(OF, D, 'modalitat', { comarca: 'Maresme' })).toEqual(['venda'])
+  })
+})

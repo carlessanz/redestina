@@ -1,4 +1,6 @@
-// Los filtros del Mercat del receptor: zona y tipo de producto (reunión del 05-10-2026).
+// El «tipo de producto» de los filtros (reunión del 05-10-2026). Desde el 16-11-2026 el Mercat
+// usa la barra común (`filtres.ts`); de aquí solo queda la categoría, que comparten el Mercat,
+// el listado de ofertas del equipo y la priorización.
 //
 // Por defecto se enseña TODO lo que la RLS deja ver (las ofertas compatibles con el tipo de
 // receptor, §4bis); el filtro solo acota, en cliente, sobre lo que ya ha llegado.
@@ -25,57 +27,4 @@ export function categoriaDeFamilia(familia: string | null | undefined): Categori
   if (f === 'Horta Tub/Bul/Arr') return 'tuberculs'
   if (f.startsWith('Horta')) return 'verdura'
   return 'altres'
-}
-
-export interface FiltresMercat {
-  /** `''` = todas. */
-  comarca: string
-  /** `''` = todas. */
-  categoria: '' | CategoriaProducte
-}
-
-export const SENSE_FILTRES: FiltresMercat = { comarca: '', categoria: '' }
-
-interface OfertaFiltrable { comarca?: string | null; familia?: string | null }
-
-export function filtraMercat<T extends OfertaFiltrable>(ofertes: readonly T[], f: FiltresMercat): T[] {
-  return ofertes.filter((o) =>
-    (!f.comarca || o.comarca === f.comarca)
-    && (!f.categoria || categoriaDeFamilia(o.familia) === f.categoria))
-}
-
-/** Las opciones que de verdad dan resultado: no se ofrece una comarca sin ofertas. */
-export function opcionsMercat(ofertes: readonly OfertaFiltrable[]): { comarques: string[]; categories: CategoriaProducte[] } {
-  const comarques = [...new Set(ofertes.map((o) => o.comarca).filter((c): c is string => !!c))]
-    .sort((a, b) => a.localeCompare(b, 'ca'))
-  const hi = new Set(ofertes.map((o) => categoriaDeFamilia(o.familia)))
-  return { comarques, categories: CATEGORIES_PRODUCTE.filter((c) => hi.has(c)) }
-}
-
-/**
- * Recordar el filtro por ENTIDAD en este navegador. Es comodidad, no estado: si
- * `localStorage` falla (Safari privado) o guarda algo raro, se vuelve a «sin filtro».
- */
-const CLAU = 'redestina-mercat-filtres:'
-
-export function llegeixFiltres(entidadId: string | null): FiltresMercat {
-  if (!entidadId) return SENSE_FILTRES
-  try {
-    const cru = localStorage.getItem(CLAU + entidadId)
-    if (!cru) return SENSE_FILTRES
-    const o = JSON.parse(cru) as Partial<FiltresMercat>
-    const categoria = (CATEGORIES_PRODUCTE as readonly string[]).includes(String(o.categoria))
-      ? o.categoria as CategoriaProducte : ''
-    return { comarca: typeof o.comarca === 'string' ? o.comarca : '', categoria }
-  } catch {
-    return SENSE_FILTRES
-  }
-}
-
-export function desaFiltres(entidadId: string | null, f: FiltresMercat): void {
-  if (!entidadId) return
-  try {
-    if (!f.comarca && !f.categoria) localStorage.removeItem(CLAU + entidadId)
-    else localStorage.setItem(CLAU + entidadId, JSON.stringify(f))
-  } catch { /* sin memoria del filtro, pero el Mercat funciona igual */ }
 }

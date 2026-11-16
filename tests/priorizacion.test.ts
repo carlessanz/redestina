@@ -12,7 +12,7 @@
 // pendiente» es el convenio real (`conveni_vigent`, deuda §12.168).
 
 import { describe, it, expect } from 'vitest'
-import { admesaPerNaturalesa, categoriaDeFamilia as catSrv, categoriesInteres, PESO_PRODUCTE, reglaNaturalesa } from '../supabase/functions/_shared/priorizacion.ts'
+import { admesaPerNaturalesa, categoriaDeFamilia as catSrv, categoriesInteres, matriuReceptor, modalitatsAdmeses, PESO_PRODUCTE, reglaNaturalesa } from '../supabase/functions/_shared/priorizacion.ts'
 import { categoriaDeFamilia as catWeb } from '../src/lib/filtresMercat'
 import {
   puntuarEntidad,
@@ -408,5 +408,37 @@ describe('P8 en el ranking (deuda 176): admesaPerNaturalesa', () => {
   it('sin regla leída o sin modalidades, no filtra (la base corta al mostrar interés)', () => {
     expect(admesaPerNaturalesa(['donacio'], 'empresa', 'confirmada', null)).toBe(true)
     expect(admesaPerNaturalesa([], 'empresa', 'confirmada', regla)).toBe(true)
+  })
+})
+
+// El filtro «Modalitat» del ranking (fase 1 del feedback del 08-10-2026): qué modalidades de la
+// oferta puede recibir cada entidad. Solo filtra la vista; no excluye del ranking.
+describe('modalitatsAdmeses', () => {
+  const matriu = matriuReceptor([
+    { modalitat: 'donacio', tipo_receptor: 'social' },
+    { modalitat: 'venda', tipo_receptor: 'social' },
+    { modalitat: 'venda', tipo_receptor: 'comercial' },
+    { modalitat: 'maquila', tipo_receptor: 'transformador' },
+  ])
+  const regla = reglaNaturalesa([
+    { modalitat: 'venda', naturalesa: 'empresa' },
+    { modalitat: 'maquila', naturalesa: 'empresa' },
+    { modalitat: 'donacio', naturalesa: 'entitat_social' },
+    { modalitat: 'venda', naturalesa: 'entitat_social' },
+  ])
+  const oferta = ['donacio', 'venda', 'maquila']
+
+  it('recorta por el tipo de receptor', () => {
+    expect(modalitatsAdmeses(oferta, 'social', matriu, null, null, regla)).toEqual(['donacio', 'venda'])
+    expect(modalitatsAdmeses(oferta, 'transformador', matriu, null, null, regla)).toEqual(['maquila'])
+  })
+  it('y por la naturalesa solo si está confirmada (P8)', () => {
+    expect(modalitatsAdmeses(oferta, 'social', matriu, 'empresa', 'confirmada', regla)).toEqual(['venda'])
+    expect(modalitatsAdmeses(oferta, 'social', matriu, 'empresa', 'suggerida', regla)).toEqual(['donacio', 'venda'])
+  })
+  it('sin tipo, tipo desconocido o matriz sin leer, no recorta por tipo', () => {
+    expect(modalitatsAdmeses(oferta, null, matriu, null, null, regla)).toEqual(oferta)
+    expect(modalitatsAdmeses(oferta, 'animal', matriu, null, null, regla)).toEqual(oferta)
+    expect(modalitatsAdmeses(oferta, 'social', null, null, null, null)).toEqual(oferta)
   })
 })

@@ -6,7 +6,7 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { admesaPerNaturalesa, priorizar, reglaNaturalesa } from "../_shared/priorizacion.ts";
+import { admesaPerNaturalesa, matriuReceptor, modalitatsAdmeses, priorizar, reglaNaturalesa } from "../_shared/priorizacion.ts";
 import type { EntidadPriorizable, ExcedenteContexto } from "../_shared/priorizacion.ts";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { decidirCanal } from "../_shared/canal.ts";
@@ -82,7 +82,7 @@ Deno.serve(async (req) => {
       // tipo de la fila analizando ese literal, y ante una expresión (dos cadenas con
       // `+`) se rinde y devuelve GenericStringError, que rompe todo uso posterior de
       // `entidades`. Es la diferencia entre `deno check` en verde y tres errores.
-      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat, organizacion_id")
+      .select("id, nombre, poblacion, telefono, email, es_test, opt_in, area_geografica, prioritat, productes_frescos, transport_plataforma, descarrega_toro, tipo_receptor, perfil_receptor, tipus_activitat, modalitats_interes, organizacion_id")
       // Solo las activas (plan 1, 1A): una entidad importada inactiva (D2) no se prioriza ni
       // recibe la oferta hasta que el equipo la active con su NIF.
       .eq("activo", true);
@@ -120,12 +120,18 @@ Deno.serve(async (req) => {
     const modalitatsOferta = modalitatsDe(excedente.modalitats ?? excedente.modalitat);
     const orgIds = [...new Set(revisades
       .map((e: { organizacion_id: string | null }) => e.organizacion_id).filter(Boolean))] as string[];
-    const [{ data: orgs, error: orgError }, { data: reglaFiles, error: reglaError }] = await Promise.all([
+    const [
+      { data: orgs, error: orgError }, { data: reglaFiles, error: reglaError }, { data: matriuFiles, error: matriuError },
+    ] = await Promise.all([
       orgIds.length
         ? supabase.from("organizaciones").select("id, naturalesa, naturalesa_origen").in("id", orgIds)
         : Promise.resolve({ data: [], error: null }),
       supabase.from("modalitat_naturalesa_compat").select("modalitat, naturalesa"),
+      // Para el filtro «Modalitat» del ranking (16-11-2026). Si no se puede leer, no recorta.
+      supabase.from("modalitat_receptor_compat").select("modalitat, tipo_receptor"),
     ]);
+    if (matriuError) console.error("modalitat_receptor_compat:", matriuError.message);
+    const matriu = matriuError ? null : matriuReceptor(matriuFiles ?? []);
     if (orgError || reglaError) {
       console.error("naturalesa:", (orgError ?? reglaError)?.message);
     }
@@ -181,6 +187,7 @@ Deno.serve(async (req) => {
     const porId = new Map<string, {
       telefono: string | null; email: string | null; es_test: boolean | null; tipo_receptor: string | null;
       area_geografica: string | null; tipus_activitat: string[] | null; perfil_receptor: Record<string, unknown> | null;
+      modalitats_interes: string[] | null; organizacion_id: string | null;
     }>();
     for (const e of entidades ?? []) porId.set(e.id, e);
 
@@ -242,6 +249,14 @@ Deno.serve(async (req) => {
         tipus_activitat: ficha?.tipus_activitat ?? [],
         capacitat_maxima: numeroOuNull(ficha?.perfil_receptor?.capacitat_maxima),
         quantitat_habitual: numeroOuNull(ficha?.perfil_receptor?.quantitat_habitual),
+        // Para el filtro «Modalitat» (16-11-2026): las de esta oferta que puede recibir (tipo y
+        // naturalesa) y las que dice que le interesan. Solo filtran.
+        modalitats_possibles: modalitatsAdmeses(
+          modalitatsOferta, ficha?.tipo_receptor, matriu,
+          naturalesaOrg.get(ficha?.organizacion_id ?? "")?.naturalesa,
+          naturalesaOrg.get(ficha?.organizacion_id ?? "")?.naturalesa_origen, regla,
+        ),
+        modalitats_interes: ficha?.modalitats_interes ?? [],
         canal: d.canal,
         motiu_canal: d.motivo,
         whatsapp_possible: d.whatsappPosible,
