@@ -1346,7 +1346,8 @@ export interface OperativaDiagnostic {
   envasos: string[] | null
   canals: string[] | null
   clients: string[] | null
-  facturacio_eur: number | null
+  /** Retirada (16-11-2026): siempre nula; no se pinta. */
+  facturacio_eur?: number | null
   facturacio_rang: string | null
   volum_comercialitzat_kg: number | null
   suport: string[] | null

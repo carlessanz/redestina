@@ -241,7 +241,7 @@ export default function BlocCamps({
         if (ctrl === null) return null
         const altre = discrepancies[c.clau]
         return (
-          <div key={c.clau} className={c.ample === 'full' ? (tresColumnes ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2') : undefined}>
+          <div key={c.clau} data-camp={c.clau} className={c.ample === 'full' ? (tresColumnes ? 'sm:col-span-2 lg:col-span-3' : 'sm:col-span-2') : undefined}>
             {esXips(c)
               ? <p id={`${idDe(c)}-l`} className="mb-1.5 text-xs text-muted-foreground">{t(c.labelKey)}</p>
               : <Label htmlFor={idDe(c)} className="mb-1.5 block text-xs text-muted-foreground">{t(c.labelKey)}</Label>}

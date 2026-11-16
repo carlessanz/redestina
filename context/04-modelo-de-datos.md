@@ -1678,8 +1678,9 @@ bloque `ofertant`). El cuestionario ya no las pregunta.
 - **Columnas nuevas de `productores`**: `productes_principals text[]` (⊆ habituales, sin tope; la pantalla recomienda
   ≤5), `varietats jsonb` (`{producte: [varietats]}`, solo de habituales, ≤80 caracteres), `volum_produccio jsonb`
   (`{producte: kg/any}`, solo de principales), `envasos_habituals text[]` (`caixes · palets · granel · sacs · altres`),
-  `canals_comercials text[]` (8 valores), `tipologia_clients text[]` (8 valores), `facturacio_anual_eur numeric ≥0` y
-  `facturacio_rang text` (`<100k · 100k-500k · 500k-2M · >2M`; **P2**: dos columnas, se rellena una o las dos),
+  `canals_comercials text[]` (8 valores), `tipologia_clients text[]` (8 valores), `facturacio_rang text`
+  (`<100k · 100k-500k · 500k-2M · >2M`; **P2**; desde el 16-11-2026, `20270527100000`, **solo el rango**: la cifra
+  `facturacio_anual_eur` se retiró por contradecirlo —5.000 € en «100k-500k»—, queda nula por trigger hasta su `drop`, deuda 179),
   `volum_comercialitzat_kg numeric ≥0`, `suport_interes text[]` (**P6**: se conserva como campo opcional; la Fundació
   confirma si se quita). `productos_habituales` y `temporada` ya existían: desde A4 **son origen** (antes los derivaba
   `desar_diagnostic`). Cada lista lleva su CHECK (`23514`).
@@ -1785,5 +1786,5 @@ con el excedente). Columnas en `organizaciones`:
 
 **Operativa (A4,
 `20270521100000`, T4)**: `productos_habituales`, `productes_principals`, `varietats`, `volum_produccio`, `temporada`,
-`envasos_habituals`, `canals_comercials`, `tipologia_clients`, `facturacio_anual_eur`|`_rang` (P2),
+`envasos_habituals`, `canals_comercials`, `tipologia_clients`, `facturacio_rang` (P2; la cifra, retirada el 16-11-2026),
 `volum_comercialitzat_kg`, `suport_interes` (P6); el trigger `productores_operativa` **poda** lo que no cuelga.

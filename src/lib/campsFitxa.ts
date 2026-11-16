@@ -171,12 +171,12 @@ export const CAMPS_FITXA: readonly CampFitxa[] = [
     opcions: ['majoristes_distribuidors', 'comercos_botigues', 'supermercats_cadenes', 'restaurants_catering',
       'industria_transformadora', 'consumidors_finals', 'administracions', 'altres'], etiquetaOpcio: 'op.client_',
     labelKey: 'op.f_clients', veu: 'tots', edita: 'tots', ample: 'full' },
-  // P2: cifra O rango (dos columnas; se rellena una, lo dice la ayuda).
-  { clau: 'facturacio_anual_eur', columnes: { productores: 'facturacio_anual_eur' }, bloc: 'ofertant', tipus: 'number',
-    labelKey: 'op.f_facturacio_eur', ajudaKey: 'op.h_facturacio', veu: 'tots', edita: 'tots' },
+  // P2: SOLO el rango (16-11-2026). La cifra exacta (`facturacio_anual_eur`) se retiró: con las dos se
+  // contradecían (5.000 € en «100k-500k») y el rango ya dice lo que hace falta. La columna sigue en la
+  // base, vacía, hasta su `drop` (deuda 179).
   { clau: 'facturacio_rang', columnes: { productores: 'facturacio_rang' }, bloc: 'ofertant', tipus: 'select',
     opcions: ['<100k', '100k-500k', '500k-2M', '>2M'],
-    labelKey: 'op.f_facturacio_rang', veu: 'tots', edita: 'tots' },
+    labelKey: 'op.f_facturacio_rang', ajudaKey: 'op.h_facturacio', veu: 'tots', edita: 'tots' },
   { clau: 'volum_comercialitzat_kg', columnes: { productores: 'volum_comercialitzat_kg' }, bloc: 'ofertant', tipus: 'number',
     labelKey: 'op.f_volum_comercialitzat', veu: 'tots', edita: 'tots' },
   // P6: «En què us agradaria que REDESTINA us ajudés?» (la pregunta `suport` del cuestionario v2).
@@ -274,6 +274,9 @@ export const NO_ES_MOSTRA: Readonly<Record<Taula, readonly string[]>> = {
     'id', 'organizacion_id',
     'ref_externa', // origen de una ficha importada (ARA26:<hoja>:<fila>, 1E): trazabilidad, no un dato
     'poblacion', // el nombre del municipio, que escribe el trigger: se ve en el selector de «Població»
+    // La cifra exacta de facturación, retirada el 16-11-2026 (20270527100000): solo cuenta el rango.
+    // Siempre nula (trigger) hasta su `drop` (deuda §12.179).
+    'facturacio_anual_eur',
   ],
   entidades: [
     'id', 'organizacion_id', 'ref_externa', 'poblacion',
@@ -312,7 +315,7 @@ export function campsOperativa(): CampFitxa[] {
  * Las columnas de `campsOperativa()` en un solo literal (§7: supabase-js deduce el tipo del
  * literal). `tests/operativaLlegible.test.ts` comprueba que son exactamente esas.
  */
-export const COLUMNES_OPERATIVA = 'tipus_activitat, productos_habituales, productes_principals, varietats, volum_produccio, temporada, envasos_habituals, canals_comercials, tipologia_clients, facturacio_anual_eur, facturacio_rang, volum_comercialitzat_kg, suport_interes'
+export const COLUMNES_OPERATIVA = 'tipus_activitat, productos_habituales, productes_principals, varietats, volum_produccio, temporada, envasos_habituals, canals_comercials, tipologia_clients, facturacio_rang, volum_comercialitzat_kg, suport_interes'
 
 /** Los campos que tienen columna en una tabla (la ficha del actor, de un solo papel). */
 export function campsDeTaula(taula: Taula, veu: Veu): CampFitxa[] {

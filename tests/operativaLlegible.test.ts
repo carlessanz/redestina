@@ -47,6 +47,9 @@ describe('filesOperativa', () => {
     expect(m['op.f_envasos']).toBe('Caixes')
     expect(m['op.f_canals']).toBe('Venda directa')
     expect(m['op.f_suport']).toBe('Canalitzar donacions')
+    // Solo el rango (16-11-2026): la cifra exacta, aunque llegue, ya no se pinta.
+    expect(m['op.f_facturacio_rang']).toBe('100k-500k')
+    expect(m['op.f_facturacio_eur']).toBeUndefined()
     expect(m['diag.operativa_llocs']).toBe('Magatzem · Lleida (Principal) — dl, dc · 08:00–12:00')
   })
 
@@ -117,10 +120,10 @@ describe('ETIQUETES_OPERATIVA del PDF (A2) = el diccionario de la pantalla', () 
       ...BUIDA,
       activitat: ['x'], productes: ['A'], principals: ['A'], varietats: { A: ['v'] }, volum: { A: 1 },
       temporada: { A: [1] }, envasos: ['caixes'], canals: ['altres'], clients: ['altres'],
-      facturacio_eur: 1, facturacio_rang: '<100k', volum_comercialitzat_kg: 1, suport: ['altres'],
+      facturacio_rang: '<100k', volum_comercialitzat_kg: 1, suport: ['altres'],
       llocs: [{ alias: 'L', municipi: null, principal: true, dies: [1, 7], franges: null, horari: null }],
     }, tOp, 'ca')
-    expect(files).toHaveLength(14)
+    expect(files).toHaveLength(13)
     for (const f of files) {
       expect(tOp(f.clau), f.clau).not.toBe(f.clau)
       expect(f.text).not.toMatch(/\b(op|org|diag)\.[a-z_0-9]+/)

@@ -14,6 +14,10 @@
 // pasa a ser otro: trigger). El principal y su primera franja son lo que la oferta nueva
 // propone (`predeterminats` de `crear-oferta`). Se monta igual en la ficha del equipo, en «La
 // meva organització» y en la sección Operativa del diagnóstico (T4).
+//
+// 16-11-2026: sin ningún lugar, se PROPONE la dirección de la ficha (`llocDeLaFitxa`) con el
+// formulario ya rellenado; quien lo edita añade días y franjas, la cambia si no es ahí, y guarda.
+// Y un principal sin días ni franjas lo dice: es justo lo que el diagnóstico echa en falta.
 
 import { useEffect, useState } from 'react'
 import { Pencil, Plus, Trash2 } from 'lucide-react'
@@ -23,9 +27,10 @@ import { useT } from '../lib/i18n'
 import { textError } from '../lib/textError'
 import { refrescaAvisos } from '../lib/refrescAvisos'
 import { creaUbicacio } from '../lib/ofertes'
+import { llocDeLaFitxa, type LlocProposat } from '../lib/llocFitxa'
 import type { DadesLloc } from '../lib/ofertes'
 import { Textarea } from '@/components/ui/textarea'
-import type { Municipi } from '../lib/municipis'
+import { carregaMunicipis, type Municipi } from '../lib/municipis'
 import { esFranjaValida, type Franja } from '../lib/franja'
 import SelectorMunicipi from './SelectorMunicipi'
 import SelectorFranja from './SelectorFranja'
@@ -73,14 +78,21 @@ const extraDe = (f: FormLloc): DadesLloc => {
   }
 }
 
+/** Lo que pide el diagnóstico (`operativa_lloc`): el principal, con días o franjas. */
+export function llocPrincipalAmbDies(u: Pick<Ubicacio, 'es_principal' | 'dies_setmana' | 'franges'>): boolean {
+  return Boolean(u.es_principal) && ((u.dies_setmana?.length ?? 0) > 0 || (u.franges?.length ?? 0) > 0)
+}
+
 /** El principal primero; el resto, por nombre (como los sirve `crear-oferta`). */
 const ordena = (u: Ubicacio[]) => [...u].sort((a, b) =>
   Number(Boolean(b.es_principal)) - Number(Boolean(a.es_principal)) || (a.alias ?? '').localeCompare(b.alias ?? '', 'ca'))
 
 export default function LlocsRecollida({
-  productorId, potEditar = true, idPrefix = 'lloc',
+  productorId, potEditar = true, idPrefix = 'lloc', onLlocs,
 }: {
   productorId: string
+  /** Cada vez que cambia la lista leída o guardada (el diagnóstico recalcula lo que falta). */
+  onLlocs?: (llocs: readonly Ubicacio[]) => void
   potEditar?: boolean
   /** Prefijo de los `id` del formulario de alta. */
   idPrefix?: string
@@ -93,6 +105,9 @@ export default function LlocsRecollida({
   const [errorCarrega, setErrorCarrega] = useState(false)
   /** Se vuelve a leer tras cambiar el principal o borrar (el trigger puede haber movido la marca). */
   const [versio, setVersio] = useState(0)
+  /** La dirección de la ficha, propuesta como primer lugar (solo se lee si no hay ninguno). */
+  const [proposta, setProposta] = useState<LlocProposat | null>(null)
+  const [carregat, setCarregat] = useState(false)
 
   useEffect(() => {
     let viu = true
@@ -102,9 +117,34 @@ export default function LlocsRecollida({
         if (!viu) return
         setErrorCarrega(Boolean(error))
         setUbicacions(ordena((data ?? []) as Ubicacio[]))
+        setCarregat(true)
       })
     return () => { viu = false }
   }, [productorId, versio])
+
+  useEffect(() => {
+    if (carregat && !errorCarrega) onLlocs?.(ubicacions)
+    // `onLlocs` fuera de las dependencias: una función nueva en cada render del padre no es un cambio.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ubicacions, carregat, errorCarrega])
+
+  const senseLlocs = carregat && !errorCarrega && ubicacions.length === 0
+  useEffect(() => {
+    if (!senseLlocs || !potEditar) { setProposta(null); return }
+    let viu = true
+    void supabase.from('productores').select('direccion, codigo_postal, poblacion, municipio_ine')
+      .eq('id', productorId).maybeSingle()
+      .then(({ data }) => { if (viu) setProposta(llocDeLaFitxa(data)) })
+    return () => { viu = false }
+  }, [senseLlocs, potEditar, productorId])
+
+  /** Abre el alta con la dirección de la ficha: el municipio, de la lista oficial (comarca exacta). */
+  async function usaProposta(p: LlocProposat) {
+    const municipi = p.municipio_ine
+      ? (await carregaMunicipis()).find((m) => m.codi_ine === p.municipio_ine) ?? null
+      : null
+    setLlocNou({ ...BUIT, id: null, alias: t('org.place_alias_fitxa'), municipi, direccion: p.direccion })
+  }
 
 
   async function fesPrincipal(u: Ubicacio) {
@@ -176,7 +216,17 @@ export default function LlocsRecollida({
     <>
       {dialeg}
       {errorCarrega && <p className="text-sm text-destructive">{t('c.error')}</p>}
-      {!errorCarrega && ubicacions.length === 0 && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
+      {!errorCarrega && ubicacions.length === 0 && !proposta && <p className="text-sm text-muted-foreground">{t('org.no_places')}</p>}
+      {proposta && !llocNou && (
+        <div className="space-y-2 rounded-lg border border-dashed p-3" data-testid="lloc-proposta">
+          <p className="text-sm">{t('org.place_from_fitxa')}</p>
+          <p className="text-sm font-medium break-words">{proposta.text}</p>
+          <Button className="h-11 whitespace-normal md:h-8" onClick={() => void usaProposta(proposta)}
+            data-testid="lloc-proposta-usa">
+            {t('org.place_use_fitxa')}
+          </Button>
+        </div>
+      )}
       <ul className="space-y-2">
         {ubicacions.map((u) => (
           <li key={u.id} className="flex flex-wrap items-center justify-between gap-2 rounded-lg border p-3">
@@ -184,6 +234,11 @@ export default function LlocsRecollida({
               <p className="flex flex-wrap items-center gap-2 font-medium">
                 {u.alias ?? '—'}
                 {u.es_principal && <Badge variant="secondary" data-testid="lloc-principal">{t('org.place_principal')}</Badge>}
+                {u.es_principal && !textDiesFranges(u) && (
+                  <Badge variant="outline" className="border-aviso text-aviso" data-testid="lloc-sense-dies">
+                    {t('org.place_no_days')}
+                  </Badge>
+                )}
               </p>
               <p className="text-xs text-muted-foreground">
                 {[u.direccion, u.municipio ?? '—'].filter(Boolean).join(', ')}
@@ -228,7 +283,7 @@ export default function LlocsRecollida({
       {potEditar && !llocNou && (
         <Button variant="outline" className="h-11 whitespace-normal md:h-8"
           onClick={() => setLlocNou({ ...BUIT, id: null })}>
-          <Plus className="size-4" aria-hidden /> {t('po.place_add')}
+          <Plus className="size-4" aria-hidden /> {proposta ? t('org.place_add_other') : t('po.place_add')}
         </Button>
       )}
       {llocNou && (

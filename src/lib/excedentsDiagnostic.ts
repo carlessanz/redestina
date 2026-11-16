@@ -21,7 +21,7 @@
 //    `falten` que devuelve el servidor al guardar.
 
 import { DESTINS, blocsExcedents, type BlocExcedentsLlegible } from './excedentsLlegible'
-import type { EstatSeccio } from './diagnostic'
+import { idSeccio, type EstatSeccio } from './diagnostic'
 import type {
   CausaCataleg, PayloadBlocDiagnostic, PayloadCausaDiagnostic,
 } from '../types'
@@ -356,6 +356,34 @@ export function textFalta(codi: string, t: Traductor, nomCausa: (codi: string) =
   const clau = `dexc.falta_${f.tipus}`
   const s = t(clau, { producte: f.producte ?? '', causa: f.causa ? nomCausa(f.causa) : '' })
   return s === clau ? codi : s
+}
+
+/** Un valor entre comillas para un selector de atributo CSS (un producto puede llevar comillas). */
+function valorAtribut(v: string): string {
+  return `"${v.replace(/\\/g, '\\\\').replace(/"/g, '\\"')}"`
+}
+
+/**
+ * Adónde lleva el enlace «Completa-ho» de un código de `falten` (16-11-2026): selectores CSS del
+ * formulario, del más concreto al más general. El último es SIEMPRE el título de la sección, para
+ * que un código que la pantalla aún no pinta (un principal sin bloque, una causa nueva) lleve al
+ * menos a su sección.
+ */
+export function destiFalta(codi: string): string[] {
+  const f = parteixFalta(codi)
+  const op = `#${idSeccio('operativa')}`
+  const exc = `#${idSeccio('excedents')}`
+  switch (f.tipus) {
+    case 'operativa_productes': return ['[data-camp="productos_habituales"]', op]
+    case 'operativa_principals': return ['[data-camp="productes_principals"]', '[data-camp="productos_habituales"]', op]
+    case 'operativa_lloc': return ['[data-desti="llocs"]', op]
+    case 'excedents': return [`[data-testid=${valorAtribut(`bloc-exc-${f.producte ?? ''}`)}]`, exc]
+    case 'dades': {
+      const bloc = `[data-testid=${valorAtribut(`bloc-exc-${f.producte ?? ''}`)}]`
+      return f.causa ? [`${bloc} [data-testid=${valorAtribut(`causa-${f.causa}`)}]`, bloc, exc] : [bloc, exc]
+    }
+    default: return codi.startsWith('operativa') ? [op] : [exc]
+  }
 }
 
 // ---------------------------------------------------------------------------

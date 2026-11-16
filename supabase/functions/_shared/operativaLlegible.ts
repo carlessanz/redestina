@@ -35,7 +35,8 @@ export interface OperativaLlegible {
   envasos: string[] | null
   canals: string[] | null
   clients: string[] | null
-  facturacio_eur: number | null
+  /** La cifra exacta se retiró (16-11-2026): `diagnostic_datos` aún la manda, siempre nula, y no se pinta. */
+  facturacio_eur?: number | null
   facturacio_rang: string | null
   volum_comercialitzat_kg: number | null
   suport: string[] | null
@@ -113,7 +114,6 @@ export function filesOperativa(
   posa('op.f_envasos', opcions(op.envasos, (x) => `op.env_${x}`))
   posa('op.f_canals', opcions(op.canals, (x) => `op.canal_${x}`))
   posa('op.f_clients', opcions(op.clients, (x) => `op.client_${x}`))
-  if (typeof op.facturacio_eur === 'number') posa('op.f_facturacio_eur', `${nombre(op.facturacio_eur, lang)} €`)
   if (op.facturacio_rang) posa('op.f_facturacio_rang', op.facturacio_rang)
   if (typeof op.volum_comercialitzat_kg === 'number') {
     posa('op.f_volum_comercialitzat', `${nombre(op.volum_comercialitzat_kg, lang)} kg`)
@@ -157,7 +157,6 @@ export const ETIQUETES_OPERATIVA: Record<'ca' | 'es', Record<string, string>> = 
     'op.client_supermercats_cadenes': 'Supermercats i cadenes', 'op.client_restaurants_catering': 'Restaurants i càtering',
     'op.client_industria_transformadora': 'Indústria transformadora', 'op.client_consumidors_finals': 'Consumidors finals',
     'op.client_administracions': 'Administracions', 'op.client_altres': 'Altres',
-    'op.f_facturacio_eur': 'Facturació anual (€)',
     'op.f_facturacio_rang': 'Rang de facturació',
     'op.f_volum_comercialitzat': 'Volum comercialitzat (kg/any)',
     'op.f_suport': 'En què us podem ajudar?',
@@ -188,7 +187,6 @@ export const ETIQUETES_OPERATIVA: Record<'ca' | 'es', Record<string, string>> = 
     'op.client_supermercats_cadenes': 'Supermercados y cadenas', 'op.client_restaurants_catering': 'Restaurantes y cáterin',
     'op.client_industria_transformadora': 'Industria transformadora', 'op.client_consumidors_finals': 'Consumidores finales',
     'op.client_administracions': 'Administraciones', 'op.client_altres': 'Otros',
-    'op.f_facturacio_eur': 'Facturación anual (€)',
     'op.f_facturacio_rang': 'Rango de facturación',
     'op.f_volum_comercialitzat': 'Volumen comercializado (kg/año)',
     'op.f_suport': '¿En qué os podemos ayudar?',

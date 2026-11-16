@@ -361,7 +361,7 @@ Lo que manda hoy, en una línea cada uno:
   `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
 - **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió → Resultat. **Convenio único de col·laboració** por
   papel. Filtros comunes (`lib/filtres.ts`). **Diagnòstic operatiu**: lo contesta el equipo en
-  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions); ficha y «El meu diagnòstic» lo leen y bajan en PDF
+  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions; «Falten dades» enlaza cada falta, `destiFalta`; sin lugares propone la dirección de la ficha); ficha y «El meu diagnòstic» lo leen y bajan en PDF
   (`diagnostic-pdf`, D2); Pla de Prevenció = **expediente** (detalle en `context/06ter`).
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
@@ -415,7 +415,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270526100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270527100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -557,7 +557,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (75 vivas; la siguiente entrada nueva es la 179; los números no se renumeran ni
+**Deuda abierta (76 vivas; la siguiente entrada nueva es la 180; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -569,7 +569,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -581,7 +581,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.932 pruebas de Vitest en 89 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.938 pruebas de Vitest en 90 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.497/2.497 y 43 sin datos; producción 2.491/2.491 y 49 «Sin

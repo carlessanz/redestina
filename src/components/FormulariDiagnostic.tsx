@@ -26,7 +26,7 @@
 // guardar no pierde lo tecleado.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { Loader2 } from 'lucide-react'
+import { ArrowUp, Loader2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { refrescaAvisos } from '../lib/refrescAvisos'
@@ -36,7 +36,7 @@ import { estilEstatDiagnostic, idSeccio } from '../lib/diagnostic'
 import { causesDiagnostic, desarExcedentsDiagnostic, diagnosticDatos } from '../lib/diagnosticApi'
 import { blocsExcedents } from '../lib/excedentsLlegible'
 import {
-  blocsAEdicio, faltenLocal, llistaTextos, payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses,
+  blocsAEdicio, destiFalta, faltenLocal, llistaTextos, payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses,
   posaDestins, posaGestio, posaObservacions, posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals,
   textFalta, treuBloc, type EstatExcedents,
 } from '../lib/excedentsDiagnostic'
@@ -47,7 +47,7 @@ import BlocExcedentsProducte from './diagnostic/BlocExcedentsProducte'
 import AccionsDiagnostic from './diagnostic/AccionsDiagnostic'
 import { useConfirma } from './DialegConfirma'
 import BlocCamps from './fitxa/BlocCamps'
-import LlocsRecollida from './LlocsRecollida'
+import LlocsRecollida, { llocPrincipalAmbDies } from './LlocsRecollida'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -99,9 +99,11 @@ export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }
   const blocs = useMemo(() => sincronitzaPrincipals(base, principals), [base, principals])
   const persistits = useMemo(() => blocsExcedents(dades?.excedents), [dades])
 
-  // Los lugares se guardan al momento en su componente: si hay un principal con días o franjas lo
-  // dice el servidor (se refresca al guardar).
-  const llocOk = !(dades?.falten ?? []).includes('operativa_lloc')
+  // Los lugares se guardan al momento en su componente. Hasta que avisa (`onLlocs`), manda lo que
+  // dijo el servidor; después, lo que hay en la lista: así «Falten dades» deja de pedir el lugar en
+  // cuanto se guarda, sin esperar al «Desa» (16-11-2026).
+  const [llocOkLocal, setLlocOkLocal] = useState<boolean | null>(null)
+  const llocOk = llocOkLocal ?? !(dades?.falten ?? []).includes('operativa_lloc')
   const falten = useMemo(
     () => faltenLocal(blocs, { habituals, principals, llocOk }), [blocs, habituals, principals, llocOk])
   const nAccions = persistits.reduce((n, b) => n + b.causes.reduce((m, c) => m + c.accions.length, 0), 0)
@@ -158,6 +160,23 @@ export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }
   const indexDe = (producte: string) => blocs.findIndex((b) => b.producte === producte)
   const faltenDe = (producte: string) =>
     falten.filter((f) => f === `excedents:${producte}` || f.startsWith(`dades:${producte}:`))
+
+  // El enlace de cada «falta»: baja (o sube) hasta el control, lo resalta un momento y le pasa el
+  // foco, para que el teclado y el lector de pantalla sigan desde allí.
+  function vesAFalta(codi: string) {
+    const arrel = document.querySelector('[data-testid="formulari-diagnostic"]')
+    const el = destiFalta(codi).map((s) => arrel?.querySelector<HTMLElement>(s)).find((x) => x)
+    if (!el) return
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const focus = el.matches('input, button, textarea, [tabindex]')
+      ? el
+      : el.querySelector<HTMLElement>('input:not([disabled]), button:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])')
+    ;(focus ?? el).focus({ preventScroll: true })
+    // Solo se quitan después las clases que no tenía (un bloque ya puede llevar `rounded-lg`).
+    const noves = ['ring-2', 'ring-aviso', 'ring-offset-2', 'rounded-lg'].filter((c) => !el.classList.contains(c))
+    el.classList.add(...noves)
+    window.setTimeout(() => el.classList.remove(...noves), 2000)
+  }
 
   const bloc = (b: (typeof blocs)[number]) => (
     <BlocExcedentsProducte
@@ -224,9 +243,10 @@ export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }
               <BlocCamps camps={operativa.camps} valors={operativa.valors} onChange={operativa.onChange}
                 veu="equip" potEditar idPrefix="diag-op" activitats={operativa.activitats} />
             )}
-          <div className="space-y-2">
+          <div className="scroll-mt-24 space-y-2" data-desti="llocs">
             <p className="text-sm font-medium">{t('diag.operativa_llocs')}</p>
-            <LlocsRecollida productorId={orgId} idPrefix="diag-lloc" />
+            <LlocsRecollida productorId={orgId} idPrefix="diag-lloc"
+              onLlocs={(ll) => setLlocOkLocal(ll.some(llocPrincipalAmbDies))} />
           </div>
         </CardContent>
       </Card>
@@ -289,7 +309,18 @@ export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }
             <div className="space-y-1" data-testid="diag-falten">
               <p className="text-sm text-aviso">{t('diag.missing', { n: falten.length })}</p>
               <ul className="list-disc space-y-0.5 pl-5 text-sm text-muted-foreground">
-                {falten.map((f) => <li key={f} className="break-words">{textFalta(f, t, nomCausa)}</li>)}
+                {falten.map((f) => (
+                  <li key={f} className="break-words">
+                    {textFalta(f, t, nomCausa)}{' '}
+                    {/* Lleva a donde se contesta, arriba, sin perder lo tecleado (16-11-2026). */}
+                    <Button type="button" variant="link" onClick={() => vesAFalta(f)}
+                      className="h-auto min-h-11 gap-1 px-1 py-0 align-baseline whitespace-nowrap md:min-h-0"
+                      data-testid="diag-falta-ves">
+                      <ArrowUp className="size-3.5" aria-hidden />
+                      {t('diag.falta_ves')}
+                    </Button>
+                  </li>
+                ))}
               </ul>
             </div>
           )}

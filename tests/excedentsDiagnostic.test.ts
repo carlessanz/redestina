@@ -14,7 +14,7 @@ import { blocsExcedents } from '../src/lib/excedentsLlegible'
 import {
   alternaCausa, blocsAEdicio, estatInicial, estilEstatAccio, faltenLocal, llistaTextos, parteixFalta,
   payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses, posaDestins, posaGestio, posaObservacions,
-  posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals, textFalta, treuBloc, volumDeText, volumValid,
+  destiFalta, posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals, textFalta, treuBloc, volumDeText, volumValid,
   type EstatExcedents,
 } from '../src/lib/excedentsDiagnostic'
 import type { CausaCataleg } from '../src/types'
@@ -292,5 +292,24 @@ describe('textos y chips', () => {
       expect(estilEstatAccio(e)).toMatch(/^bg-(aviso|secondary|exito|muted)/)
     }
     expect(estilEstatAccio('feta')).toMatch(/exito/)
+  })
+})
+
+describe('destiFalta: adónde lleva el enlace «Completa-ho» de cada falta (16-11-2026)', () => {
+  it('la Operativa lleva al campo y, si no está, al título de la sección', () => {
+    expect(destiFalta('operativa_productes')).toEqual(['[data-camp="productos_habituales"]', '#diag-sec-operativa'])
+    expect(destiFalta('operativa_principals')[0]).toBe('[data-camp="productes_principals"]')
+    expect(destiFalta('operativa_lloc')).toEqual(['[data-desti="llocs"]', '#diag-sec-operativa'])
+  })
+  it('los excedentes llevan al bloque del producto y, con causa, a la causa', () => {
+    expect(destiFalta('excedents:Pera')).toEqual(['[data-testid="bloc-exc-Pera"]', '#diag-sec-excedents'])
+    expect(destiFalta('dades:Pera:clima')).toEqual([
+      '[data-testid="bloc-exc-Pera"] [data-testid="causa-clima"]', '[data-testid="bloc-exc-Pera"]', '#diag-sec-excedents',
+    ])
+  })
+  it('un producto con comillas no rompe el selector, y un código desconocido va a su sección', () => {
+    expect(destiFalta('excedents:Poma "golden"')[0]).toBe('[data-testid="bloc-exc-Poma \\"golden\\""]')
+    expect(destiFalta('operativa_nova')).toEqual(['#diag-sec-operativa'])
+    expect(destiFalta('xyz')).toEqual(['#diag-sec-excedents'])
   })
 })

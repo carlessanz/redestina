@@ -2211,7 +2211,7 @@ y **Equip** (cuentas | auditoría). Todas las rejillas llevan `grid-cols-1` expl
 - **Pestaña Operativa** (ficha del equipo y «La meva organització»): `BlocCamps` del bloque `ofertant` con los
   controles de `fitxa/ControlsOperativa.tsx` —productos habituales por familia (chips + desplegable), principales
   (chips de los habituales; aviso si pasan de 5), variedades por habitual (texto con comas, se guarda como lista),
-  volumen y temporada por principal, envases, canales, clientes y apoyo (chips), facturación (cifra y/o rango) y
+  volumen y temporada por principal, envases, canales, clientes y apoyo (chips), facturación (solo el rango desde el 16-11-2026) y
   volumen comercializado— y `LlocsRecollida` con badge «Principal», «Fes-lo principal» (`fixar_lloc_principal`),
   días (chips dl…dg) y hasta 4 franjas (`SelectorFranja`, extraído de `FormulariNovaOferta`).
 - **Diagnóstico**: la sección 1 es la Operativa (`diagnostic/useOperativaDiagnostic.ts`, chip «Operativa» el
@@ -2310,6 +2310,25 @@ las ofertas por SQL; restaura el fixture del arnés con `tests/e2e/fixtureDiagno
   `comprova_interes()` va a rechazar (`modalitatsDeLaNaturalesa`).
 - E2E `tests/e2e/perfil-recepcio.e2e.ts` (clon, escritorio): sugerida no cambia nada; el titular confirma y queda
   bloqueado; empresa confirmada sin donación en Mercat ni interés y con perfil comercial; el equipo la cambia.
+
+### Lo que falta en el diagnóstico, con camino; el lugar desde la ficha; facturación por rango (16-11-2026)
+
+- **Facturación, solo el rango** (`20270527100000`): la Operativa enseñaba «Facturació anual (€)» y «Rang de facturació»
+  juntas y se contradecían (5.000 € en «100k-500k» en una ficha de prueba de producción). Queda el rango en la ficha, «La
+  meva organització», el diagnóstico y su PDF; la cifra, nula por trigger hasta su `drop` (deuda 179).
+- **«Completa-ho» en cada línea de «Falten dades»** (`FormulariDiagnostic`): `destiFalta(codi)` (`lib/excedentsDiagnostic.ts`,
+  puro, con test) da los selectores del control, del más concreto al título de la sección (`[data-camp=…]` que ahora
+  pone `BlocCamps` en cada campo, `[data-desti="llocs"]`, `bloc-exc-<producte>` › `causa-<codi>`). El enlace centra el
+  control, lo resalta 2 s (`ring-aviso`) y le pasa el foco.
+- **El lugar de recogida, propuesto desde la ficha** (`LlocsRecollida`, en los tres sitios donde se monta): sin ningún
+  lugar, propone la dirección de la ficha (`lib/llocFitxa.ts`: `direccion`, CP, población, `municipio_ine`) con
+  «Fes-la servir com a lloc de recollida», que abre el alta ya rellenada (nombre «Adreça de la fitxa», municipio de la
+  lista oficial, dirección) para añadir días y franjas o cambiarla. No crea nada sin guardar. En el clon, 2 de 557
+  productores tenían lugar y 432 dirección: el diagnóstico pedía un lugar y enseñaba la lista vacía. Un principal sin
+  días ni franjas lleva el badge «Sense dies ni franges».
+- **El aviso del lugar se recalcula al momento**: `LlocsRecollida` avisa (`onLlocs`) y el formulario usa
+  `llocPrincipalAmbDies` (la misma regla que `diagnostic_falten_productor`) en vez de esperar al «Desa».
+- E2E `tests/e2e/diagnostic-pendents.e2e.ts` (clon, escritorio).
 
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 

@@ -37,8 +37,7 @@ const DATOS: DatosDiagnostic = {
     envasos: ["caixes", "palets"],
     canals: ["venda_directa"],
     clients: ["consumidors_finals"],
-    facturacio_eur: 250000,
-    facturacio_rang: null,
+    facturacio_rang: "100k-500k",
     volum_comercialitzat_kg: 80000,
     suport: ["donacions"],
     llocs: [
@@ -102,7 +101,10 @@ Deno.test("diagnóstico en catalán sin excedentes: cabecera, Operativa, respues
   assertStringIncludes(t, "Caixes, Palets");
   assertStringIncludes(t, "Venda directa");
   assertStringIncludes(t, "Consumidors finals");
-  assertStringIncludes(t, "250.000 €");
+  // Solo el rango (16-11-2026): la cifra exacta ya no se imprime.
+  assertStringIncludes(t, "Rang de facturació");
+  assertStringIncludes(t, "100k-500k");
+  assert(!t.includes("Facturació anual (€)"), "la cifra exacta ya no sale");
   assertStringIncludes(t, "80.000 kg");
   assertStringIncludes(t, "Canalitzar donacions");
   assertStringIncludes(t, "Finca · Gavà (Principal) — dl, dc · 08:00–12:00");

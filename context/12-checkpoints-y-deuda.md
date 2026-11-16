@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 140, `20270525100000`): se cierra la 140** (el borrado conoce los expedientes de prevención; detalle en §12ter): **77 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 174-178, `20270524100000`): se cierran las cinco** (P8 confirmada por la Fundació; detalle en §12ter): **78 vivas** y la siguiente entrada nueva es la 179.
@@ -884,3 +885,10 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `statement_timeout` de 8 s). Hoy no pasa (clon 731 organizaciones; producción, las de prueba) y la pantalla avisa
      al exportar más de 1.000 («divideix-lo»). Si llega a pasar: partir el fichero en hojas o lotes de 1.000 en el
      importador. Precio: medio día.
+179. **`productores.facturacio_anual_eur` sin uso; `drop` pendiente** (16-11-2026, `20270527100000`). La facturación
+     va solo por rango (`facturacio_rang`): la cifra exacta se quitó de la ficha, «La meva organització», el
+     diagnóstico y su PDF porque contradecía al rango. La columna sigue, vacía (un trigger la anula y
+     `actualitzar_fitxa_productor` ya no la acepta), porque el frontend publicado la lee en su `select`. El `drop`,
+     cuando ese frontend ya no exista: columna, trigger `trg_productores_sense_facturacio_eur`, la clave
+     `facturacio_eur` de `diagnostic_datos()`, `COLUMNES` de `tests/campsFitxa.test.ts`, `NO_ES_MOSTRA` y las listas de
+     columnas de `scripts/comprobar-rls.ts`. Precio: una migración y tres tests.
