@@ -137,6 +137,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **17-11-2026 (`20270530100000`, fase C del punto 3): se abren la 181 y la 182** (el texto y el lugar; las fotos al cancelar una edición): **79 vivas** y la siguiente entrada nueva es la 183.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -904,3 +905,13 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      tiene que igualar el precio de venta. Hoy no rompe nada (los formularios de interés precargan `preu_minim`), pero
      no es lo que dice el negocio. Arreglo: una migración que deje la guarda solo en `venda` en esas RPC (y revisar
      `FormulariInteresAssistit`/`FormulariAprovacio`, que piden precio con maquila). Precio: una migración y el arnés.
+181. **El texto de una oferta no sigue a su lugar** (17-11-2026, `20270530100000`). `texto_oferta` se compone desde la
+     fila al publicar y al editar la oferta (`textoOfertaDeDades`), y el enlace de Maps sale del lugar si la oferta no
+     tiene uno propio. Si después se edita el LUGAR en la ficha (otro enlace, otro alias) o el nombre de la entidad, el
+     texto de las ofertas que ya circulan no se recompone hasta que alguien edita la oferta. Arreglo: recomponer al
+     cambiar el lugar (trigger que encole o paso en `actualitzar_fitxa_*`) solo para ofertas `publicada`/`parcial`.
+     Precio: decidir si un texto ya compartido puede cambiar sin aviso.
+182. **Fotos huérfanas al cancelar una edición** (17-11-2026, `20270530100000`). En el formulario de editar (y en el de
+     un esborrany), una foto NUEVA se sube al Storage al elegirla; si luego se cancela sin guardar, el fichero queda sin
+     fila que lo cite. Las quitadas no se pierden (se borran solo tras guardar). Arreglo: mandar a `fitxers_orfes` las
+     subidas de la sesión al cancelar, o un barrido de `fotos-ofertes` sin fila. Precio: poco; volumen, mínimo.

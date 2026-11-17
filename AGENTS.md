@@ -159,7 +159,8 @@ en_desenvolupament (`aprovar_registre` intenta actiu). Una entidad inactiva no e
 `v_entitats_llistat` (`security_invoker`) para «Entitats». **1F + 1.5**: `notes_internes` (CRM) solo
 por RPC; lectura `es_intern()` (externo: 0 filas); la vista suma el último contacto y los seguimientos.
 
-**Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` borrador · publicada ·
+**Ofertas**: `excedentes` (`id_excedente` `E-AAMMDD-XXX-YYY-N`; `estado` **esborrany** (sin `E-…` ni texto
+hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborrany_oferta`) · borrador (espigolada) · publicada ·
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
@@ -345,11 +346,10 @@ Lo que manda hoy, en una línea cada uno:
 - **Validación**: una oferta de productor nace `pendent_validacio` (interruptor
   `validacio_ofertes`); el equipo valida o rechaza. Modalidad múltiple; franja de recogida.
 - **Avisos** (`avisos` + `enviar-avis`, campana y badges); D1 tras aprobar (las partes se ven);
-  editar oferta por `crear-oferta/editar` con D4 (revalidación).
-- **La recogida la cierra el receptor y la valida el admin** (17-10-2026): el receptor declara
-  kg (coincideix/menys/més), el admin valida desde Aprovacions › «Recollides per validar» y
-  solo entonces se emiten ENT/OPE y REC con los kg reales y se concilia; con incidencia,
-  motivo obligatorio. El job de la hora ya no emite: avisa.
+  editar oferta = formulario del alta (`DialegEdicioOferta`: todo salvo producto y entidad) → `crear-oferta/editar`,
+  D4; esborranys `crear-oferta/esborrany`·`/publicar`; `FitxaOferta` (ficha, texto, «Comparteix»).
+- **Recogida** (17-10-2026): el receptor declara kg, el admin la valida (Aprovacions) y solo entonces
+  se emiten ENT/OPE y REC y se concilia (incidencia con motivo); el job de la hora solo avisa.
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
@@ -413,7 +413,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270529100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270530100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -428,10 +428,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un simulado); **no**
   lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
   una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
-  `{manual:true}`, traza `<funció>:manual`; el modo test sigue): RGPD y convenio a firmar
-  (`_shared/enviamentManual.ts`), «Reenvia», «Dona-li accés» y «Envia per correu» del albarán
-  (`enviar-albara`), «Envia per correu» con «Inclou l'enllaç per signar» (`reenviar-documento
-  {manual, amb_enllac_signatura}`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
+  `{manual:true}`, traza `<funció>:manual`; el modo test sigue; la tabla de botones, en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
   un canal apagado (Missatgeria; «Missatge» y «Correu» de Entitats) y deja gris lo demás
   (`BotoAmbMotiu`, `motiuCanal()`). **En producción, los tres apagados.**
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
@@ -556,7 +553,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (77 vivas; la siguiente entrada nueva es la 181; los números no se renumeran ni
+**Deuda abierta (79 vivas; la siguiente entrada nueva es la 183; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -568,7 +565,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -580,10 +577,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.005 pruebas de Vitest en 92 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 2.030 pruebas de Vitest en 93 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.533/2.533 y 43 sin datos; producción 2.507/2.507 y 33 «Sin
+   **Referencia: clon 2.551/2.551 y 44 sin datos; producción 2.507/2.507 y 33 «Sin
    fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

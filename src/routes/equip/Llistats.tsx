@@ -30,6 +30,8 @@ export function Ofertes() {
         obert={nova}
         onTancar={() => setNova(false)}
         onCreada={(r) => { setNova(false); navigate(`/equip/ofertes/${r.id}`) }}
+        // Guardado como esborrany (fase C): a la pestaña donde está.
+        onEsborranyDesat={() => { setNova(false); navigate('/equip/ofertes?tab=esborranys') }}
       />
     </>
   )

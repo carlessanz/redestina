@@ -73,3 +73,26 @@ export function mapsValid(v: unknown): boolean {
   const t = v.trim();
   return t === "" || (/^https?:\/\/\S+$/i.test(t) && t.length <= 500);
 }
+
+/**
+ * El primer error de FORMATO de lo que se ha contestado (fase C del punto 3, 17-11-2026), o
+ * null. Mira solo lo que hay: un campo vacío no es un error (eso lo decide `faltantes()` al
+ * publicar). Lo usan el guardado de un esborrany —que admite datos a medias pero no datos
+ * mal formados— y el alta, que lo llama además de `faltantes()`.
+ */
+export function errorFormatOferta(
+  d: Record<string, unknown>,
+  productorId: string,
+): "kg_invalid" | "retorn_quantitat_invalid" | "maps_invalid" | "fotos_invalides" | "cost_invalid" | "foto_producte_invalid" | null {
+  const buit = (v: unknown) => v === undefined || v === null || v === "";
+  if (!buit(d.kg) && !kgValid(d.kg)) return "kg_invalid";
+  if (!quantitatRetornValida(d)) return "retorn_quantitat_invalid";
+  if (!mapsValid(d.gmaps_url)) return "maps_invalid";
+  if (!fotosValides(d.fotos, productorId)) return "fotos_invalides";
+  if (!buit(d.cost_kg)) {
+    const n = Number(String(d.cost_kg).replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return "cost_invalid";
+  }
+  if (!buit(d.foto_producte) && typeof d.foto_producte !== "boolean") return "foto_producte_invalid";
+  return null;
+}

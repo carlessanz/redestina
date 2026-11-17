@@ -2,14 +2,16 @@
 
 import { sendText } from "./whatsapp.ts";
 import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
-import { ambPreu, etiquetaModalitats, modalitatsDe, principal } from "./modalitats.ts";
+import { ambPreu, modalitatsDe, principal } from "./modalitats.ts";
 import { llegeixHorari } from "./franja.ts";
-import { componerTextoOferta, diesValids, textCaixes, textDies, textoEnvasos } from "./textOferta.ts";
+import {
+  componerTextoOferta, diesValids, textCaixes, textoEnvasos, textoOfertaDeDades,
+} from "./textOferta.ts";
 import { TEXT_ERROR_INTAKE, textAgraimentIntake, textSenseConveniIntake } from "./textIntake.ts";
 
 // El texto de la oferta vive en `textOferta.ts` (módulo hoja, 27-10-2026); se reexporta para
 // que quien lo importaba de aquí no cambie nada.
-export { componerTextoOferta, textCaixes, textoEnvasos };
+export { componerTextoOferta, textCaixes, textoEnvasos, textoOfertaDeDades };
 
 // deno-lint-ignore no-explicit-any
 type Cliente = any;
@@ -240,6 +242,12 @@ export async function crearExcedente(
   d: Record<string, unknown>,
   productor: { id: string; name: string },
   origen: OrigenExcedente = "intake",
+  /**
+   * Fase C del punto 3 (17-11-2026): publicar un ESBORRANY ya guardado. La fila existe (estado
+   * `esborrany`, sin `id_excedente`): se reescribe entera con lo validado y pasa a `publicada`
+   * —la base decide si en realidad queda `pendent_validacio`, igual que en el alta directa—.
+   */
+  opcions: { esborranyId?: string } = {},
 ): Promise<ResultadoCreacion> {
   const producto = String(d.producte ?? "");
 
@@ -255,11 +263,90 @@ export async function crearExcedente(
   const { data: fichaProductor } = await supabase
     .from("productores").select("poblacion, empresa").eq("id", productor.id).maybeSingle();
 
-  const kg = Number(d.kg ?? 0);
+  // El nombre de la ORGANIZACIÓN (`empresa`, el «Nom comercial»), con `name` de respaldo:
+  // en una ficha del registro `name` es la persona de contacto, y el código de la oferta
+  // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplican en SQL
+  // `crear_espigolada()` y el alta de albaranes (`coalesce(p.empresa, p.name)`).
+  const nomOrganitzacio = fichaProductor?.empresa || productor.name;
+  const fila = filaDeDades(d, prod?.familia ?? null, causa);
+  const kg = Number(fila.kg_total ?? 0);
+  let idExcedente = await generarId(supabase, nomOrganitzacio, producto);
+
+  // 🔴 El texto sale de la FILA (fase C del punto 3): la misma función que al editar, así que
+  //    lo que se comparte dice siempre lo que dice la oferta.
+  const textoOferta = textoOfertaDeDades(fila, {
+    productor: nomOrganitzacio,
+    municipi: ubicacion?.municipio ?? fichaProductor?.poblacion ?? "",
+    mapsLloc: ubicacion?.gmaps_url ?? null,
+    causa: causa.causa ?? (d.causa ? String(d.causa) : null),
+    subcausa: causa.subcausa,
+    // Lo que se escribió, para cuando no es una fecha que se pueda leer (WhatsApp).
+    disponibleText: String(d.disponible_fins ?? ""),
+  });
+
+  // El alta, con reintento ante colisión del correlativo.
+  //
+  // ⚠️ POR QUÉ HACE FALTA AUNQUE EL CONTADOR SEA ATÓMICO. `siguiente_numero()` garantiza
+  //    que dos altas simultáneas reciben N distintas, pero no sabe nada de los
+  //    `id_excedente` que ya existen: los de antes de este cambio se numeraron contando
+  //    filas, y la serie `E-AAMMDD-XXX-YYY` de ese día nace con el contador a cero. Con el
+  //    reintento, ese caso se resuelve solo: el `unique` de `id_excedente` rechaza el
+  //    duplicado (23505), se pide el número siguiente y se vuelve a intentar. Tres intentos:
+  //    si tres números seguidos chocan, el problema no es una carrera.
+  let creada: { id: string; estado: string } | null = null;
+  let error: { message: string; code?: string } | null = null;
+  for (let intento = 0; intento < 3; intento++) {
+    const valors = {
+      ...fila,
+      id_excedente: idExcedente,
+      productor_id: productor.id,
+      valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
+      texto_oferta: textoOferta,
+      // De dónde viene esta oferta (check de cuatro valores, default `'intake'`). Un
+      // esborrany publicado toma el de quien lo publica.
+      origen,
+      // Se escribe `publicada` y la BASE decide si en realidad queda pendiente de validar
+      // (trigger `excedentes_validacio`, 05-10-2026; desde la fase C también al publicar un
+      // esborrany): la regla vive en un solo sitio aunque las ofertas entren por varios caminos.
+      estado: "publicada",
+    };
+    const r = opcions.esborranyId
+      ? await supabase.from("excedentes").update(valors)
+        .eq("id", opcions.esborranyId).eq("estado", "esborrany")
+        .select("id, estado").maybeSingle()
+      : await supabase.from("excedentes").insert(valors).select("id, estado").single();
+    creada = r.data;
+    error = r.error;
+    if (!error && !creada) error = { message: "esborrany_inexistent" };
+    if (!error) break;
+    if (error.code !== "23505") break;
+    console.warn("excedentes: id_excedente ocupado, reintentando:", idExcedente);
+    idExcedente = await generarId(supabase, nomOrganitzacio, producto);
+  }
+
+  if (error) {
+    console.error("excedentes alta:", error.message);
+    return { ok: false, error: error.message };
+  }
+  return { ok: true, idExcedente, excedenteId: creada?.id, estado: creada?.estado };
+}
+
+/**
+ * Las columnas de `excedentes` a partir de lo que contesta el cuestionario (intake o panel),
+ * SIN identificador, texto, origen ni estado. Pura: la usan el alta, la publicación de un
+ * esborrany y el guardado de un esborrany (que, con datos a medias, deja nulo lo que falta).
+ */
+export function filaDeDades(
+  d: Record<string, unknown>,
+  familiaCataleg: string | null,
+  causa: CausaResolta,
+): Record<string, unknown> {
+  const kgN = Number(String(d.kg ?? "").replace(",", "."));
+  const kg = Number.isFinite(kgN) && kgN > 0 ? kgN : null;
   // Las modalidades, en plural desde el 05-10-2026 (`modalitats.ts`). `modalitat` sigue
   // guardando la PRINCIPAL para todo lo que todavía lee una sola.
   const modalitats = modalitatsDe(d.modalitat);
-  const preuMinim = ambPreu(modalitats) && d.preu_minim != null && d.preu_minim !== ""
+  const preuN = ambPreu(modalitats) && d.preu_minim != null && d.preu_minim !== ""
     ? Number(String(d.preu_minim).replace(",", "."))
     : null;
   // El coste que declara el productor (27-09-2026). Solo se pregunta si se ofrece en
@@ -268,130 +355,92 @@ export async function crearExcedente(
   // La franja de recogida (05-10-2026): del panel llega `{inici, fi}`; del bot, texto, que
   // se intenta leer. El texto se guarda siempre (`horari_recollida`).
   const horari = llegeixHorari(d.horari);
-  // Se resuelve UNA vez. El texto que circula y la columna que decide el flujo tienen que
-  // decir lo mismo, y con dos lecturas del mismo campo eso deja de estar garantizado en
-  // cuanto alguien cambie una de las dos.
-  const alCamp = esProducteAlCamp(d.producte_al_camp);
-  // Tres valores, a propósito: sí, no, o no se preguntó (producto en el campo).
-  const transportPropi = d.transport === "si" ? true : d.transport === "no" ? false : null;
-  const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
   // 17-11-2026: el retorno con su detalle, los días de recogida (solo del panel) y el enlace de
   // Maps propio de la oferta, que manda sobre el del lugar (la ficha del lugar no se toca).
   const retorn = retornDetall(d);
   const dies = diesValids(d.dies_recollida);
-  const maps = mapsOferta(d.gmaps_url);
-  // El nombre de la ORGANIZACIÓN (`empresa`, el «Nom comercial»), con `name` de respaldo:
-  // en una ficha del registro `name` es la persona de contacto, y el código de la oferta
-  // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplican en SQL
-  // `crear_espigolada()` y el alta de albaranes (`coalesce(p.empresa, p.name)`).
-  const nomOrganitzacio = fichaProductor?.empresa || productor.name;
-  let idExcedente = await generarId(supabase, nomOrganitzacio, producto);
+  const caixes = Number(d.caixes);
+  return {
+    ubicacion_id: d.ubicacio || null,
+    familia: familiaCataleg ?? d.familia ?? null,
+    producto: String(d.producte ?? "").trim() || null,
+    variedad: typeof d.varietat === "string" && d.varietat.trim() ? d.varietat.trim().slice(0, 400) : null,
+    // Se resuelve UNA vez: el texto que circula y la columna que decide el flujo dicen lo mismo.
+    producte_al_camp: esProducteAlCamp(d.producte_al_camp),
+    kg_total: kg,
+    num_caixes: Number.isInteger(caixes) && caixes > 0 ? caixes : null,
+    // `tipo_caixa` ya no se pregunta (23-09-2026): el formato de entrega lo sustituye.
+    format_entrega: d.format_entrega || null,
+    retorn_envasos: d.retorn === "Sí" || d.retorn === "No" ? d.retorn : null,
+    retorn_envasos_detall: retorn.detall,
+    retorn_envasos_quantitat: retorn.quantitat,
+    dies_recollida: dies.length > 0 ? dies : null,
+    gmaps_url: mapsOferta(d.gmaps_url),
+    // Tres valores, a propósito: sí, no, o no se preguntó (la pregunta está oculta desde la
+    // fase A del punto 3; se conserva lo que llegue por compatibilidad).
+    transport_propi: d.transport === "si" ? true : d.transport === "no" ? false : null,
+    // Solo llegan del panel (el bot no recibe imágenes todavía, brecha 8); `crear-oferta`
+    // ya ha comprobado que son de la carpeta de este productor.
+    fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
+    // Sin fotos propias, ¿se enseña la del catálogo? Solo un `false` explícito lo apaga.
+    foto_producte: d.foto_producte !== false,
+    modalitat: principal(modalitats),
+    modalitats: modalitats.length > 0 ? modalitats : null,
+    preu_minim: preuN != null && Number.isFinite(preuN) ? preuN : null,
+    coste_kg: costKg,
+    // Fase B del punto 3: del panel llega una SUBCAUSA (`C4.2`) y de WhatsApp una categoría
+    // (`C4`). Con subcausa, la causa es la suya (el trigger `excedentes_subcausa` lo impone).
+    causa: causa.causa,
+    causa_codigo: causa.causaCodigo,
+    subcausa_codigo: causa.subcausaCodigo,
+    // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha reconocible queda
+    // null y el panel la normaliza a mano.
+    disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
+    horari_recollida: horari.text,
+    hora_recollida_inici: horari.franja?.inici ?? null,
+    hora_recollida_fi: horari.franja?.fi ?? null,
+    observacions: typeof d.observacions === "string" && d.observacions.trim() ? d.observacions.trim() : null,
+  };
+}
 
-  const textoOferta = componerTextoOferta({
-    producte: producto,
-    producteAlCamp: alCamp,
-    productor: nomOrganitzacio,
-    municipi: municipio,
-    ubicacio: maps || ubicacion?.gmaps_url || undefined,
-    quantitat: `${String(kg).replace(".", ",")} kg aprox${d.caixes ? ` · ${textCaixes(Number(d.caixes), d.format_entrega)}` : ""}`,
-    disponible: String(d.disponible_fins ?? ""),
-    dies: textDies(dies) || undefined,
-    horari: horari.text ?? undefined,
-    modalitat: etiquetaModalitats(modalitats),
-    // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
-    preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
-    causa: causa.causa ?? String(d.causa ?? ""),
-    subcausa: causa.subcausa ?? undefined,
-    envasos: textoEnvasos(d.format_entrega, d.retorn, retorn.detall, retorn.quantitat) || undefined,
-    transportPropi: transportPropi === true,
-    // Se asigna en el panel; el productor no lo elige.
-    responsable: "",
-    observacions: String(d.observacions ?? ""),
-  });
-
-  // El alta, con reintento ante colisión del correlativo.
-  //
-  // ⚠️ POR QUÉ HACE FALTA AUNQUE EL CONTADOR SEA ATÓMICO. `siguiente_numero()` garantiza
-  //    que dos altas simultáneas reciben N distintas, pero no sabe nada de los
-  //    `id_excedente` que ya existen: los de antes de este cambio se numeraron contando
-  //    filas, y la serie `E-AAMMDD-XXX-YYY` de ese día nace con el contador a cero. El
-  //    día del despliegue, una oferta creada por la mañana con el método viejo y otra por
-  //    la tarde con el nuevo pedirían las dos el N=1. La ventana es estrecha —el prefijo
-  //    lleva la fecha, así que solo afecta al mismo día— pero existe.
-  //
-  //    Con el reintento, ese caso se resuelve solo: el `unique` de `id_excedente` rechaza
-  //    el duplicado (23505), se pide el número siguiente y se vuelve a intentar. Es
-  //    exactamente lo que el comentario de esta función decía que pasaba desde julio y
-  //    no pasaba. Tres intentos: si tres números seguidos chocan, el problema no es una
-  //    carrera.
-  let fila: { id: string; estado: string } | null = null;
-  let error: { message: string; code?: string } | null = null;
-  for (let intento = 0; intento < 3; intento++) {
-    const r = await supabase.from("excedentes").insert({
-      id_excedente: idExcedente,
-      productor_id: productor.id,
-      ubicacion_id: d.ubicacio ?? null,
-      familia: prod?.familia ?? d.familia ?? null,
-      producto,
-      variedad: d.varietat ?? null,
-      producte_al_camp: alCamp,
-      kg_total: kg || null,
-      num_caixes: d.caixes ?? null,
-      // `tipo_caixa` ya no se pregunta (revisión del 23-09-2026): el formato de entrega lo
-      // sustituye, y las taras se fijan por línea en el albarán.
-      format_entrega: d.format_entrega ?? null,
-      retorn_envasos: d.retorn ?? null,
-      retorn_envasos_detall: retorn.detall,
-      retorn_envasos_quantitat: retorn.quantitat,
-      dies_recollida: dies.length > 0 ? dies : null,
-      gmaps_url: maps,
-      transport_propi: transportPropi,
-      // Solo llegan del panel (el bot no recibe imágenes todavía, brecha 8); `crear-oferta`
-      // ya ha comprobado que son de la carpeta de este productor.
-      fotos: Array.isArray(d.fotos) ? (d.fotos as string[]).slice(0, 3) : [],
-      // Sin fotos propias, ¿se enseña la del catálogo? Solo un `false` explícito lo apaga.
-      foto_producte: d.foto_producte !== false,
-      modalitat: principal(modalitats),
-      modalitats,
-      preu_minim: preuMinim,
-      coste_kg: costKg,
-      // Fase B del punto 3: del panel llega una SUBCAUSA (`C4.2`) y de WhatsApp una categoría
-      // (`C4`). Con subcausa, la causa es la suya (el trigger `excedentes_subcausa` lo impone).
-      causa: causa.causa,
-      causa_codigo: causa.causaCodigo,
-      subcausa_codigo: causa.subcausaCodigo,
-      // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha
-      // reconocible queda null y el panel la normaliza a mano.
-      disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
-      horari_recollida: horari.text,
-      hora_recollida_inici: horari.franja?.inici ?? null,
-      hora_recollida_fi: horari.franja?.fi ?? null,
-      observacions: d.observacions ?? null,
-      valor_eur: kg ? kg * Number(prod?.eur_kg ?? 1) : null,
-      texto_oferta: textoOferta,
-      // De dónde viene esta oferta. La columna la añadió `20261012100100` con un check de
-      // cuatro valores y default `'intake'`; escribirlo explícitamente es lo que hace que
-      // el default deje de ser una suposición sobre el caso mayoritario.
-      origen,
-      // Se escribe `publicada` y la BASE decide si en realidad queda pendiente de validar
-      // (trigger `excedentes_validacio`, 05-10-2026): así la regla vive en un solo sitio
-      // aunque las ofertas entren por cuatro caminos, y el interruptor de Configuració manda
-      // sobre todos ellos sin redesplegar nada.
-      estado: "publicada",
-    }).select("id, estado").single();
-    fila = r.data;
-    error = r.error;
-    if (!error) break;
-    if (error.code !== "23505") break;
-    console.warn("excedentes: id_excedente ocupado, reintentando:", idExcedente);
-    idExcedente = await generarId(supabase, nomOrganitzacio, producto);
+/**
+ * Guarda un ESBORRANY (fase C del punto 3, 17-11-2026): crea la fila o la reescribe. Basta con
+ * productor y producto; el resto se guarda tal cual en `dades_esborrany` (para reabrir el
+ * formulario como estaba) y, lo que se entiende, también en sus columnas. Sin identificador ni
+ * texto: los dos nacen al publicar. No dispara nada: ni validación, ni avisos, ni correo.
+ */
+export async function desarEsborrany(
+  supabase: Cliente,
+  d: Record<string, unknown>,
+  productorId: string,
+  origen: OrigenExcedente,
+  id?: string,
+): Promise<{ ok: true; id: string } | { ok: false; error: string }> {
+  const producto = String(d.producte ?? "").trim();
+  const [{ data: prod }, causa] = await Promise.all([
+    supabase.from("productos").select("familia").eq("nombre", producto).maybeSingle(),
+    resolCausa(supabase, d.causa),
+  ]);
+  const valors = {
+    ...filaDeDades(d, prod?.familia ?? null, causa),
+    // Un código de causa que no está en el catálogo no se guarda en la columna (la base lo
+    // rechazaría); se queda en `dades_esborrany` y la publicación lo volverá a mirar.
+    ...(causa.causa ? {} : { causa: null, causa_codigo: null, subcausa_codigo: null }),
+    dades_esborrany: d,
+  };
+  if (id) {
+    const { data, error } = await supabase.from("excedentes").update(valors)
+      .eq("id", id).eq("estado", "esborrany").eq("productor_id", productorId)
+      .select("id").maybeSingle();
+    if (error) return { ok: false, error: error.message };
+    if (!data) return { ok: false, error: "esborrany_inexistent" };
+    return { ok: true, id: data.id };
   }
-
-  if (error) {
-    console.error("excedentes insert:", error.message);
-    return { ok: false, error: error.message };
-  }
-  return { ok: true, idExcedente, excedenteId: fila?.id, estado: fila?.estado };
+  const { data, error } = await supabase.from("excedentes")
+    .insert({ ...valors, productor_id: productorId, origen, estado: "esborrany" })
+    .select("id").single();
+  if (error) return { ok: false, error: error.message };
+  return { ok: true, id: data.id };
 }
 
 /**
@@ -489,35 +538,12 @@ export async function textoOfertaDeFila(
     // Con subcausa (fase B del punto 3), «Categoria — Subcausa»; si no, la causa guardada.
     fila.subcausa_codigo ? resolCausa(supabase, fila.subcausa_codigo) : Promise.resolve(null),
   ]);
-  const modalitats = modalitatsDe(
-    Array.isArray(fila.modalitats) && fila.modalitats.length > 0 ? fila.modalitats : fila.modalitat,
-  );
-  const kg = Number(fila.kg_total ?? 0);
-  const preu = ambPreu(modalitats) && fila.preu_minim != null ? Number(fila.preu_minim) : null;
-  const data = typeof fila.disponible_hasta === "string" && /^\d{4}-\d{2}-\d{2}/.test(fila.disponible_hasta)
-    ? fila.disponible_hasta.slice(0, 10).split("-").reverse().join("/")
-    : "";
-  return componerTextoOferta({
-    producte: String(fila.producto ?? ""),
-    producteAlCamp: fila.producte_al_camp === true,
+  return textoOfertaDeDades(fila, {
     productor: prod?.empresa || prod?.name || "",
     municipi: ubi?.municipio ?? prod?.poblacion ?? "",
-    // El enlace propio de la oferta manda sobre el del lugar (17-11-2026).
-    ubicacio: mapsOferta(fila.gmaps_url) || ubi?.gmaps_url || undefined,
-    quantitat: `${String(kg).replace(".", ",")} kg aprox${fila.num_caixes ? ` · ${textCaixes(Number(fila.num_caixes), fila.format_entrega)}` : ""}`,
-    disponible: data,
-    dies: textDies(fila.dies_recollida) || undefined,
-    horari: fila.horari_recollida ? String(fila.horari_recollida) : undefined,
-    modalitat: etiquetaModalitats(modalitats),
-    preu: preu != null ? `${preu.toFixed(2).replace(".", ",")} €/kg` : undefined,
-    causa: causa?.causa ?? String(fila.causa ?? ""),
-    subcausa: causa?.subcausa ?? undefined,
-    envasos: textoEnvasos(
-      fila.format_entrega, fila.retorn_envasos, fila.retorn_envasos_detall, fila.retorn_envasos_quantitat,
-    ) || undefined,
-    transportPropi: fila.transport_propi === true,
-    responsable: "",
-    observacions: String(fila.observacions ?? ""),
+    mapsLloc: ubi?.gmaps_url ?? null,
+    causa: causa?.causa ?? null,
+    subcausa: causa?.subcausa ?? null,
   });
 }
 
@@ -554,5 +580,35 @@ export function canvisOferta(entrada: Record<string, unknown>): Record<string, u
     fora.hora_recollida_fi = h.franja?.fi ?? null;
     fora.horari_recollida = h.text;
   }
+  // Fase C del punto 3 (17-11-2026): todo lo de la ficha salvo producto y entidad. La RPC
+  // vuelve a comprobar cada valor (lugar del mismo productor, fotos de su carpeta…).
+  if ("ubicacion_id" in entrada) {
+    const v = String(entrada.ubicacion_id ?? "").trim();
+    fora.ubicacion_id = v || null;
+  }
+  if ("gmaps_url" in entrada) {
+    const v = String(entrada.gmaps_url ?? "").trim();
+    // Vacío = sin enlace propio; mal formado viaja tal cual y la RPC lo rechaza (`maps_invalid`).
+    fora.gmaps_url = v || null;
+  }
+  if ("format_entrega" in entrada) fora.format_entrega = entrada.format_entrega ? String(entrada.format_entrega) : null;
+  if ("retorn_envasos" in entrada) {
+    fora.retorn_envasos = entrada.retorn_envasos === "Sí" || entrada.retorn_envasos === "No"
+      ? entrada.retorn_envasos : entrada.retorn_envasos ? String(entrada.retorn_envasos) : null;
+  }
+  if ("retorn_envasos_detall" in entrada) {
+    const v = String(entrada.retorn_envasos_detall ?? "").trim();
+    fora.retorn_envasos_detall = v ? v.slice(0, 400) : null;
+  }
+  if ("retorn_envasos_quantitat" in entrada) {
+    const n = num(entrada.retorn_envasos_quantitat);
+    if (n !== undefined) fora.retorn_envasos_quantitat = n;
+  }
+  if ("producte_al_camp" in entrada) fora.producte_al_camp = esProducteAlCamp(entrada.producte_al_camp);
+  if ("dies_recollida" in entrada) fora.dies_recollida = diesValids(entrada.dies_recollida);
+  if ("fotos" in entrada) {
+    fora.fotos = Array.isArray(entrada.fotos) ? entrada.fotos.filter((f) => typeof f === "string") : [];
+  }
+  if ("foto_producte" in entrada) fora.foto_producte = entrada.foto_producte !== false;
   return fora;
 }

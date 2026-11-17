@@ -1829,6 +1829,41 @@ Fase B del punto 3 (fila 3.6): el mismo catálogo para la oferta y el Diagnòsti
 - Comprobado en el clon: `auditoria_funcions_obertes()` = 0; el arnés suma 4 checks por cuenta (`causas` leer;
   `subcausas` leer, insertar y actualizar denegados).
 
+### Esborranys de oferta y edición completa (17-11-2026, `20270530100000`)
+
+Fase C del punto 3 (filas 3.1.2 y 3.7 del Excel de la Fundació). Pantallas en `context/06ter`; RPC en `context/04bis`.
+
+- **`excedentes.estado = 'esborrany'`** (el check de estado lo admite). Es un estado NUEVO: `borrador` ya significaba
+  «oferta convertida en espigolada» (su etiqueta pasa a «En espigolada»). Un esborrany **no circula**: sin
+  `id_excedente` ni `texto_oferta` (se asignan al publicar: la fecha del `E-…` es la de publicación y no hay huecos), no
+  sale en el Mercat ni en ninguna política de lectura de externos que no sea la del propio productor (la RLS de
+  siempre: `mis_productores()` o `es_intern()`), no dispara avisos, correo, validación ni priorización.
+- **`dades_esborrany jsonb`**: las respuestas del formulario tal cual (claves del cuestionario, no columnas). Check
+  `excedentes_dades_esborrany` (solo con `estado = 'esborrany'`) y `excedentes_esborrany_minim` (un esborrany necesita
+  `productor_id` y `producto`). Índice parcial por productor sobre los esborranys. Las columnas se rellenan también
+  (`filaDeDades()`), para que la lista enseñe producto, kilos y foto.
+- **Trigger `excedentes_esborrany`** (`before update of estado`, función sin EXECUTE para nadie): un esborrany solo
+  pasa a `publicada` o `pendent_validacio` por la vía normal (`22023 esborrany_nomes_es_publica` para cualquier otro
+  estado), una oferta nunca vuelve a esborrany (`22023 esborrany_no_torna`) y al salir se anula `dades_esborrany`.
+- **`trg_excedentes_validacio`** se dispara también en `update of estado` desde esborrany (antes solo en insert): una
+  oferta de productor publicada desde su esborrany nace `pendent_validacio` igual que un alta directa.
+- **`trg_no_esborrany`** en `oferta_respuestas` y `canalizaciones` (before insert): `22023 oferta_esborrany`. Nadie
+  muestra interés en un esborrany ni lo canaliza, ni por RPC asistida.
+- **`trg_excedentes_fotos_orfes`** (after delete): las fotos de un esborrany borrado van a `fitxers_orfes` (las vacía
+  `recordatorios-documentales`), como las de una ficha borrada.
+- **`esborrar_esborrany_oferta(p_id uuid)`** (`security definer`, `revoke … from public, anon`): borra un esborrany. El
+  permiso va antes que la existencia (`42501` si no es de `mis_productores()` ni `es_intern()`), después `22023
+  oferta_inexistent` y `22023 no_es_esborrany` (una oferta publicada **no se borra nunca** por aquí).
+- **Excluyen los esborranys**: `kpis_equip()`, `canalitzacions_actives()`, `bloqueigs_esborrat_fitxa()` (un esborrany no
+  bloquea borrar la ficha: se arrastra) y `v_entitats_llistat` (contadores de ofertas).
+- **`editar_oferta()`** (misma firma, solo `service_role`) acepta además, con su validación: `ubicacion_id` (de la
+  misma entidad; `ubicacio_aliena`), `gmaps_url` (`maps_invalid`), `format_entrega` (`format_invalid`),
+  `retorn_envasos` Sí/No (`retorn_invalid`), `retorn_envasos_detall`, `retorn_envasos_quantitat` (`retorn_quantitat_invalid`),
+  `producte_al_camp`, `dies_recollida` (`dies_invalids`), `fotos` (≤3, de la carpeta de la entidad: `massa_fotos`,
+  `foto_aliena`) y `foto_producte`. Cada clave que llega queda en `excedentes_canvis`. **Nunca escribe la ficha de la
+  entidad ni sus lugares** (crear un lugar nuevo es «Afegir un lloc nou», que va por su RPC de siempre).
+- Comprobado en el clon: `auditoria_funcions_obertes()` = 0; el arnés suma checks de esborranys (ver `context/13`).
+
 ### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 **Operativa (A4,

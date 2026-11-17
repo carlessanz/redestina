@@ -39,13 +39,20 @@ test.describe('productor', () => {
     await entra(page, 'productor')
     await page.goto('/productor/ofertes')
     const obrir = page.getByRole('link').filter({ hasText: /kg/ }).first()
+    // La lista carga después de la página: sin esperar, `isVisible()` llegaba antes y la prueba
+    // se saltaba siempre con «no té cap oferta» (visto el 17-11-2026).
+    await obrir.waitFor({ timeout: 10_000 }).catch(() => { /* sin ofertas: se salta abajo */ })
     test.skip(!(await obrir.isVisible().catch(() => false)), 'Aquesta compte no té cap oferta')
     await obrir.click()
     const edita = page.getByRole('button', { name: /Edita l’oferta|Edita la oferta/ })
+    await page.getByTestId('fitxa-oferta').waitFor({ timeout: 10_000 }).catch(() => { /* se salta abajo */ })
     test.skip(!(await edita.isVisible().catch(() => false)), 'L’oferta ja no es pot editar')
     await edita.click()
+    // Fase C: el diálogo es el formulario del alta, con el producto fijo.
     await expect(page.getByRole('dialog')).toBeVisible()
-    await page.getByRole('button', { name: /Cancel·lar|Cancelar/ }).click()
+    await expect(page.getByTestId('producte-fix')).toBeVisible()
+    await page.getByRole('dialog').getByRole('button', { name: /^Cancel·lar$|^Cancelar$/ }).click()
+    await expect(page.getByRole('dialog')).toHaveCount(0)
   })
 })
 

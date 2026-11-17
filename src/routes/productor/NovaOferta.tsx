@@ -8,6 +8,9 @@
 //
 // Lo que esta página aporta es lo que la hace del productor: su título, de qué organización
 // es la oferta, el bloqueo por convenio de SU organización y a dónde se va al publicar.
+//
+// Y desde la fase C del punto 3 (17-11-2026), también el marco de un ESBORRANY: con `esborrany`,
+// el formulario se abre con lo guardado (lo monta `OfertaDetall` cuando la oferta lo es).
 
 import { useCallback, useEffect, useState } from 'react'
 import { useNavigate } from 'react-router'
@@ -18,10 +21,15 @@ import { useConveni } from '../../hooks/useConveni'
 import FormulariNovaOferta from '../../components/FormulariNovaOferta'
 import DialegFirmaConveni from '../../components/DialegFirmaConveni'
 import { Button } from '@/components/ui/button'
-import type { ConvenioTipo } from '../../types'
+import type { ConvenioTipo, Excedente } from '../../types'
 import { convenisQueFalten, type Equivalencia } from '../../lib/convenisEquivalents'
 
-export default function NovaOferta() {
+export default function NovaOferta({ esborrany = null, onPublicada }: {
+  /** El esborrany que se reabre (fase C). Sin él, un alta nueva. */
+  esborrany?: Excedente | null
+  /** Tras publicar el esborrany: la misma ruta pasa a ser el detalle, hay que releer. */
+  onPublicada?: () => void
+} = {}) {
   const { t } = useT()
   const navigate = useNavigate()
   const { bloqueja, tipusVigents, tallPassat, recarrega } = useConveni()
@@ -74,8 +82,10 @@ export default function NovaOferta() {
   return (
     <div className="space-y-4">
       <div>
-        <h1 className="text-2xl font-bold">{t('po.new_title')}</h1>
-        <p className="mt-1 text-sm text-muted-foreground">{t('po.new_intro')}</p>
+        <h1 className="text-2xl font-bold">
+          {esborrany ? t('esb.titol', { producte: esborrany.producto ?? '—' }) : t('po.new_title')}
+        </h1>
+        <p className="mt-1 text-sm text-muted-foreground">{esborrany ? t('esb.intro') : t('po.new_intro')}</p>
       </div>
 
       {faltaCol && !bloqueja && (
@@ -95,16 +105,26 @@ export default function NovaOferta() {
       />
 
       <FormulariNovaOferta
-        productorId={productorId}
+        key={esborrany?.id ?? 'nova'}
+        mode={esborrany ? 'esborrany' : 'crear'}
+        oferta={esborrany}
+        productorId={esborrany?.productor_id ?? productorId}
         bloqueja={bloqueja}
         motiuModalitat={motiuModalitat}
         // La referencia, qué pasa ahora y por dónde seguir los cuenta `BlocPublicada` en
         // el detalle, que además se puede volver a mirar. La confirmación por correo solo
         // se promete si ha salido de verdad.
-        onCreada={(r) => navigate(`/productor/ofertes/${r.id}`, {
-          state: { publicada: true, correuEnviat: r.confirmacio_email === 'enviat' },
-        })}
-        onCancel={() => navigate('/productor/ofertes')}
+        onCreada={(r) => {
+          navigate(`/productor/ofertes/${r.id}`, {
+            replace: Boolean(esborrany),
+            state: { publicada: true, correuEnviat: r.confirmacio_email === 'enviat' },
+          })
+          onPublicada?.()
+        }}
+        // Guardado como esborrany, o borrado: a la pestaña de los esborranys.
+        onEsborranyDesat={() => navigate('/productor/ofertes?tab=esborranys')}
+        onEsborrat={() => navigate('/productor/ofertes?tab=esborranys', { replace: true })}
+        onCancel={() => navigate(esborrany ? '/productor/ofertes?tab=esborranys' : '/productor/ofertes')}
       />
     </div>
   )

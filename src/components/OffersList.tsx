@@ -13,6 +13,10 @@
 // EL BADGE SALE DE `etiquetaEstatOferta` (`procesOferta.ts`) y ya no de una copia local:
 // había dos mapas idénticos —uno aquí, otro en el panel del productor— y dos sitios donde
 // un estado nuevo podía caer en el color equivocado. La leyenda plegada explica los siete.
+//
+// ESBORRANYS (fase C del punto 3, 17-11-2026, fila 3.1.2): las ofertas a medio rellenar, del
+// equipo (alta asistida) y de los productores, en su propia pestaña. No cuentan en «Totes»: no
+// son ofertas todavía (no circulan, no tienen `E-…`). Abrir una lleva al formulario.
 
 import { useSearchParams } from 'react-router'
 import { useCallback, useEffect, useMemo, useState } from 'react'
@@ -82,6 +86,7 @@ export default function OffersList({ onOpen, accio }: Props) {
   const { t } = useT()
   const [actives, setActives] = useState<Excedente[]>([])
   const [tancades, setTancades] = useState<Excedente[]>([])
+  const [esborranys, setEsborranys] = useState<Excedente[]>([])
   const [kg, setKg] = useState<KgPorExcedente>({})
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -90,15 +95,17 @@ export default function OffersList({ onOpen, accio }: Props) {
   const load = useCallback(async () => {
     setLoading(true)
     setError(null)
-    const [ofertas, cerradas, canalizaciones] = await Promise.all([
+    const [ofertas, cerradas, canalizaciones, esb] = await Promise.all([
       supabase.from('excedentes').select('*').in('estado', ACTIVOS).order('created_at', { ascending: false }),
       supabase.from('excedentes').select('*').in('estado', TANCADES)
         .order('created_at', { ascending: false }).limit(TOPE_TANCADES),
       supabase.from('canalizaciones').select('excedente_id, kg_confirmados'),
+      supabase.from('excedentes').select('*').eq('estado', 'esborrany').order('created_at', { ascending: false }),
     ])
     if (ofertas.error) { setError(ofertas.error.message); setActives([]) }
     else setActives(ofertas.data ?? [])
     setTancades(cerradas.data ?? [])
+    setEsborranys(esb.data ?? [])
     const acc: KgPorExcedente = {}
     for (const c of canalizaciones.data ?? []) {
       if (!c.excedente_id) continue
@@ -158,7 +165,8 @@ export default function OffersList({ onOpen, accio }: Props) {
   // La miniatura, con la misma regla que el resto de listas (fotoOferta.ts): la foto
   // propia, la del producto o el icono de su familia. Firmada en lote para las dos pestañas.
   const totes = useMemo(() => [...actives, ...tancades], [actives, tancades])
-  const foto = useFotosOfertes(totes)
+  const ambEsborranys = useMemo(() => [...totes, ...esborranys], [totes, esborranys])
+  const foto = useFotosOfertes(ambEsborranys)
 
   const grups = useMemo(() => ({
     // Las que esperan a que el equipo las valide (05-10-2026): son también activas, y esta
@@ -166,8 +174,9 @@ export default function OffersList({ onOpen, accio }: Props) {
     validar: filtra(actives.filter((o) => o.estado === 'pendent_validacio')),
     actives: filtra(actives),
     tancades: filtra(tancades),
+    esborranys: filtra(esborranys),
     totes: filtra([...actives, ...tancades]),
-  }), [actives, tancades, filtra])
+  }), [actives, tancades, esborranys, filtra])
 
   function taula(files: Excedente[], buitKey: string) {
     if (files.length === 0) return <p className="text-sm text-muted-foreground">{t(buitKey)}</p>
@@ -193,7 +202,10 @@ export default function OffersList({ onOpen, accio }: Props) {
             const faltan = Math.max(0, total - canalizados)
             const pct = total > 0 ? Math.min(100, Math.round((canalizados / total) * 100)) : 0
             const est = etiquetaEstatOferta(o.estado)
-            const resumKg = `${fmtKg(canalizados)}/${fmtKg(total)} kg · ${faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}`
+            // Un esborrany no tiene progreso: solo los kilos que lleva escritos, si los hay.
+            const resumKg = o.estado === 'esborrany'
+              ? (total > 0 ? `${fmtKg(total)} kg` : '')
+              : `${fmtKg(canalizados)}/${fmtKg(total)} kg · ${faltan > 0 ? t('off.falten', { n: fmtKg(faltan) }) : t('off.complet')}`
             return (
               <FilaClicable key={o.id} onObre={() => onOpen(o)}>
                 <TableCell className="hidden xl:table-cell"><code className="text-xs break-all">{o.id_excedente ?? '—'}</code></TableCell>
@@ -210,9 +222,11 @@ export default function OffersList({ onOpen, accio }: Props) {
                   </div>
                 </TableCell>
                 <TableCell className="hidden md:table-cell">
-                  <div className="mx-auto h-2 w-36 max-w-full overflow-hidden rounded-full bg-muted">
-                    <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
-                  </div>
+                  {o.estado !== 'esborrany' && (
+                    <div className="mx-auto h-2 w-36 max-w-full overflow-hidden rounded-full bg-muted">
+                      <div className="h-full bg-exito" style={{ width: `${pct}%` }} />
+                    </div>
+                  )}
                   <span className="mt-1 block text-center text-xs text-muted-foreground">{resumKg}</span>
                 </TableCell>
                 <TableCell className="text-center">
@@ -247,6 +261,15 @@ export default function OffersList({ onOpen, accio }: Props) {
   const senseCoincidencia = q !== ''
   const [params] = useSearchParams()
   const pestanyaInicial = params.get('tab')
+  // Controlada: al guardar un esborrany desde el diálogo se navega a `?tab=esborranys` sin
+  // desmontar la lista, y hay que cambiar de pestaña y releer (la nueva fila ya está).
+  const triaPestanya = (p: string | null) => (p === 'validar' || p === 'esborranys' ? p : 'actives')
+  const [pestanya, setPestanya] = useState(() => triaPestanya(pestanyaInicial))
+  useEffect(() => {
+    if (!pestanyaInicial) return
+    setPestanya(triaPestanya(pestanyaInicial))
+    void load()
+  }, [pestanyaInicial, load])
 
   return (
     <Card>
@@ -289,13 +312,14 @@ export default function OffersList({ onOpen, accio }: Props) {
         {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
 
         {!loading && !error && (
-          <Tabs defaultValue={pestanyaInicial === 'validar' ? 'validar' : 'actives'}>
+          <Tabs value={pestanya} onValueChange={setPestanya}>
             {/* A 360 px tres etiquetas con su cifra van justas: la lista scrollea sola en
                 vez de empujar la página entera hacia la derecha. */}
             <div className="-mx-1 overflow-x-auto px-1">
               <TabsList>
                 <TabsTrigger value="validar">{t('off.tab_validar', { n: grups.validar.length })}</TabsTrigger>
                 <TabsTrigger value="actives">{t('off.tab_active', { n: grups.actives.length })}</TabsTrigger>
+                <TabsTrigger value="esborranys">{t('off.tab_esborranys', { n: grups.esborranys.length })}</TabsTrigger>
                 <TabsTrigger value="tancades">{t('off.tab_closed', { n: grups.tancades.length })}</TabsTrigger>
                 <TabsTrigger value="totes">{t('off.tab_all', { n: grups.totes.length })}</TabsTrigger>
               </TabsList>
@@ -307,6 +331,10 @@ export default function OffersList({ onOpen, accio }: Props) {
             </TabsContent>
             <TabsContent value="actives" className="space-y-2">
               {taula(grups.actives, senseCoincidencia ? 'off.no_match' : 'off.empty_active')}
+            </TabsContent>
+            <TabsContent value="esborranys" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('off.esborranys_hint')}</p>
+              {taula(grups.esborranys, senseCoincidencia ? 'off.no_match' : 'off.empty_esborranys')}
             </TabsContent>
             <TabsContent value="tancades" className="space-y-2">
               <p className="text-sm text-muted-foreground">{t('off.closed_hint')}</p>

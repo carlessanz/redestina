@@ -231,7 +231,8 @@ test('crear-oferta: kg > 0 y guarda retorno, días y Maps de la oferta', async (
     from excedentes where observacions = '${marca}'`)
   expect(fila).toBe('Sí|caixes verdes|12|1,3|https://maps.app.goo.gl/e2eFaseA')
   const text = sql(`select texto_oferta from excedentes where observacions = '${marca}'`)
-  expect(text).toContain('🗓️ DIES DE RECOLLIDA: dl, dc')
+  // Fase C: los días y la franja van en UNA línea (sin franja, solo los días).
+  expect(text).toContain('⏰ HORARI DE RECOLLIDA: dl, dc')
   expect(text).toContain('cal retornar-los (12 · caixes verdes)')
   expect(text).toContain('https://maps.app.goo.gl/e2eFaseA')
   expect(text).toContain('🔴 CAUSA: Preu i rendibilitat — Preu de venda insuficient')
@@ -287,8 +288,9 @@ test('el alta elige la subcausa y la causa guardada es la suya', async ({ page }
   await page.goto(`/productor/ofertes/${id}`)
   await page.getByRole('button', { name: /^Edita l’oferta$|^Edita la oferta$/ }).click()
   const dlg = page.getByRole('dialog')
-  await expect(dlg.locator('#ed-subcausa')).toContainText('Qualitat o especificacions no acceptades pel comprador')
-  await tria(dlg.locator('#ed-subcausa'), 'C7.2')
+  // Fase C: el diálogo es el MISMO formulario del alta, así que el control es el del alta.
+  await expect(dlg.locator('#of-causa')).toContainText('Qualitat o especificacions no acceptades pel comprador')
+  await tria(dlg.locator('#of-causa'), 'C7.2')
   await expect(dlg).toContainText('Factors externs i sanitaris — Plagues o malalties')
   await dlg.getByRole('button', { name: /^Desa els canvis$|^Guardar los cambios$/ }).click()
   await expect(dlg).toHaveCount(0)

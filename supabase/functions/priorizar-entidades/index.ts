@@ -51,7 +51,7 @@ Deno.serve(async (req) => {
 
     const { data: excedente, error: exError } = await supabase
       .from("excedentes")
-      .select("familia, producto, kg_total, ubicacion_id, productor_id, modalitat, modalitats")
+      .select("familia, producto, kg_total, ubicacion_id, productor_id, modalitat, modalitats, estado")
       .eq("id", excedente_id)
       .maybeSingle();
     if (exError) {
@@ -59,6 +59,10 @@ Deno.serve(async (req) => {
       return json({ error: "Error consultando el excedente" }, 500);
     }
     if (!excedente) return json({ error: "Excedente no encontrado" }, 404);
+    // Un ESBORRANY (fase C del punto 3) no se prioriza: no circula ni se envía a nadie.
+    if (excedente.estado === "esborrany") {
+      return json({ error: "Una oferta en esborrany no es prioritza", code: "oferta_esborrany" }, 409);
+    }
 
     // El área/población de referencia salen de la ubicación del excedente y, si no,
     // de la ficha del productor.

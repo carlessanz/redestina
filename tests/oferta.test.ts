@@ -35,13 +35,12 @@ function campos(extra: Partial<Parameters<typeof componerTextoOferta>[0]> = {}) 
     productor: 'Can Prova SCP',
     municipi: 'Gavà',
     ubicacio: 'https://maps.app.goo.gl/prova',
-    quantitat: '300kg aprox · 12 caixes',
+    quantitat: '300 kg aprox',
     disponible: '23/07',
     horari: 'matí',
     modalitat: 'donació',
     causa: 'Excés de producció',
     envasos: 'No',
-    responsable: '',
     observacions: '',
     ...extra,
   }
@@ -217,20 +216,19 @@ describe('siglas', () => {
 
 describe('componerTextoOferta', () => {
   it('lleva la cabecera y las secciones en su orden', () => {
-    const t = componerTextoOferta(campos())
+    const t = componerTextoOferta(campos({ observacions: 'Cal trucar abans' }))
     expect(t.startsWith('📢 *OFERTA DISPONIBLE*')).toBe(true)
     const orden = [
       'PRODUCTE:',
       'PRODUCTOR:',
       'MUNICIPI:',
-      'UBICACIÓ:',
+      'PUNT DE RECOLLIDA:',
       'QUANTITAT:',
-      'DISPONIBLE:',
-      'HORARI RECOLLIDA:',
+      'DISPONIBLE FINS:',
+      'HORARI DE RECOLLIDA:',
       'MODALITAT:',
       'CAUSA:',
       'ENVASOS:',
-      'RESPONSABLE:',
       'OBSERVACIONS:',
     ]
     const posiciones = orden.map((s) => t.indexOf(s))
@@ -241,7 +239,7 @@ describe('componerTextoOferta', () => {
   it('la ubicación va en su propia línea, porque es un enlace', () => {
     const t = componerTextoOferta(campos())
     const lineas = t.split('\n')
-    const i = lineas.findIndex((l) => l.includes('UBICACIÓ:'))
+    const i = lineas.findIndex((l) => l.includes('PUNT DE RECOLLIDA:'))
     expect(lineas[i + 1]).toBe('https://maps.app.goo.gl/prova')
   })
 
@@ -266,15 +264,30 @@ describe('componerTextoOferta', () => {
     expect(t.indexOf('PREU MÍNIM:')).toBeLessThan(t.indexOf('CAUSA:'))
   })
 
-  // Un campo vacío deja la etiqueta sin nada detrás y eso es deliberado, PERO SOLO PARA
-  // `observacions`/`responsable`: son texto libre que alguien podría haber escrito, y una
-  // etiqueta vacía se lee como «no hi ha», mientras que una línea que desaparece se lee
-  // como un fallo. `ubicacio`/`horari`/`envasos` NO comparten esta regla: ver el bloque de
-  // abajo.
-  it('un campo vacío deja su etiqueta, no borra la línea', () => {
-    const t = componerTextoOferta(campos({ observacions: '', responsable: '' }))
-    expect(t).toContain('📝 OBSERVACIONS: ')
-    expect(t).toContain('👥 RESPONSABLE: ')
+  // 🔴 CAMBIADO A PROPÓSITO (fase C del punto 3, filas 3.7.5 y 3.7.6, 17-11-2026). Hasta
+  // entonces `observacions` y `responsable` dejaban su etiqueta vacía («se lee como no hi
+  // ha»). La Fundació pide lo contrario: ninguna etiqueta vacía y fuera «RESPONSABLE» del todo
+  // (y la línea de transporte, que ya no se pregunta).
+  it('ninguna etiqueta vacía: sin observaciones no sale la línea, y RESPONSABLE ya no existe', () => {
+    const t = componerTextoOferta(campos({ observacions: '' }))
+    expect(t).not.toContain('OBSERVACIONS')
+    expect(t).not.toContain('RESPONSABLE')
+    expect(t).not.toContain('TRANSPORT')
+    expect(componerTextoOferta(campos({ observacions: '  ' }))).not.toContain('OBSERVACIONS')
+    expect(componerTextoOferta(campos({ observacions: 'Cal trucar' }))).toContain('📝 OBSERVACIONS: Cal trucar')
+  })
+
+  it('ninguna línea acaba en «:» salvo PUNT DE RECOLLIDA, con el enlace en la siguiente', () => {
+    const buida = componerTextoOferta({ producte: 'Pera', productor: '', municipi: '', quantitat: '', modalitat: '' })
+    expect(buida.split('\n').filter((l) => /:\s*$/.test(l))).toEqual([])
+    const linies = componerTextoOferta(campos()).split('\n')
+    const sols = linies.map((l, i) => [l, i] as const).filter(([l]) => /:\s*$/.test(l))
+    expect(sols.map(([l]) => l)).toEqual(['🗺️ PUNT DE RECOLLIDA:'])
+    expect(linies[sols[0][1] + 1]).toMatch(/^https?:/)
+  })
+
+  it('la variedad va con el producto, entre paréntesis', () => {
+    expect(componerTextoOferta(campos({ varietat: 'Raf' }))).toContain('🌿 PRODUCTE: Tomàquet (Raf)')
   })
 
   it('los valores se imprimen tal cual, sin tocarlos', () => {
@@ -296,12 +309,12 @@ describe('componerTextoOferta', () => {
 describe('componerTextoOferta · etiquetas que desaparecen si no hay nada que decir', () => {
   it('sin enlace de ubicació no sale ni la etiqueta ni la línea', () => {
     const t = componerTextoOferta(campos({ ubicacio: undefined }))
-    expect(t).not.toContain('UBICACIÓ')
+    expect(t).not.toContain('PUNT DE RECOLLIDA')
   })
 
   it('sin horari no sale la línea', () => {
     const t = componerTextoOferta(campos({ horari: '' }))
-    expect(t).not.toContain('HORARI RECOLLIDA')
+    expect(t).not.toContain('HORARI')
   })
 
   it('sin envasos no sale la línea', () => {
@@ -311,8 +324,8 @@ describe('componerTextoOferta · etiquetas que desaparecen si no hay nada que de
 
   it('con los tres presentes, se imprimen los tres', () => {
     const t = componerTextoOferta(campos())
-    expect(t).toContain('🗺️ UBICACIÓ:')
-    expect(t).toContain('⏰ HORARI RECOLLIDA: matí')
+    expect(t).toContain('🗺️ PUNT DE RECOLLIDA:')
+    expect(t).toContain('⏰ HORARI DE RECOLLIDA: matí')
     expect(t).toContain('♻️ ENVASOS: No')
   })
 })
@@ -382,7 +395,7 @@ describe('componerTextoOferta · producte al camp', () => {
   it('el resto del mensaje sigue entero, con su cierre de SÍ/NO', () => {
     const t = componerTextoOferta(campos({ producteAlCamp: true, preu: '0.8 €/kg' }))
     for (const etiqueta of ['MUNICIPI:', 'QUANTITAT:', 'MODALITAT:', 'PREU MÍNIM:', 'CAUSA:',
-      'ENVASOS:', 'RESPONSABLE:', 'OBSERVACIONS:']) {
+      'ENVASOS:']) {
       expect(t, `falta ${etiqueta}`).toContain(etiqueta)
     }
     expect(t.trimEnd().endsWith(
@@ -410,12 +423,23 @@ describe('retorno con detalle, días y Maps de la oferta', () => {
     expect(textDies(null)).toBe('')
   })
 
-  it('la línea de días va tras DISPONIBLE y solo si hay días', () => {
-    const amb = componerTextoOferta(campos({ dies: 'dl, dc' }))
+  // Fase C del punto 3 (fila 3.7.6): días y franja en UNA línea, la del horario, tras la fecha.
+  it('los días van en la línea del horario, con la franja, tras DISPONIBLE FINS', () => {
+    const amb = componerTextoOferta(campos({ dies: 'dl, dc', horari: 'de 8:00 a 12:00' }))
     const linies = amb.split('\n')
-    const i = linies.findIndex((l) => l.startsWith('📅 DISPONIBLE'))
-    expect(linies[i + 1]).toBe('🗓️ DIES DE RECOLLIDA: dl, dc')
-    expect(componerTextoOferta(campos())).not.toContain('DIES DE RECOLLIDA')
+    const i = linies.findIndex((l) => l.startsWith('📅 DISPONIBLE FINS'))
+    expect(linies[i + 1]).toBe('⏰ HORARI DE RECOLLIDA: dl, dc · de 8:00 a 12:00')
+    expect(componerTextoOferta(campos({ dies: 'dl', horari: '' }))).toContain('⏰ HORARI DE RECOLLIDA: dl\n')
+    expect(componerTextoOferta(campos())).not.toContain('DIES')
+  })
+
+  it('textoEnvasos: formato, cuántos y retorno (fila 3.7.6)', () => {
+    expect(textoEnvasos('caixes', 'Sí', 'caixes verdes', 12, 20))
+      .toBe('20 caixes · cal retornar-los (12 · caixes verdes)')
+    expect(textoEnvasos('palet', 'No', '', null, 1)).toBe('1 palet · no cal retornar-los')
+    expect(textoEnvasos('caixes', 'No', '', null, null)).toBe('Caixes · no cal retornar-los')
+    expect(textoEnvasos('envasos_propis', undefined)).toBe('Cal portar envasos propis')
+    expect(textoEnvasos(undefined, undefined)).toBe('')
   })
 
   it('mapsOferta: solo http(s) de hasta 500 caracteres', () => {

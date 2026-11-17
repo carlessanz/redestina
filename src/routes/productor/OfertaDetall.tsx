@@ -1,8 +1,11 @@
 // Detalle de una oferta desde el panel del productor: qué publicó, en qué punto del
 // proceso está y qué le toca hacer (casi siempre, nada). Puede cancelarla y, desde el
-// 05-10-2026, EDITARLA (`DialegEditaOferta`): kilos, modalidades, precio, fechas, franja y
-// observaciones. El texto de la oferta se recompone en el servidor; si cambian los kilos o
-// las modalidades vuelve a validación (D4).
+// 05-10-2026, EDITARLA; desde la fase C del punto 3 (17-11-2026) con el mismo formulario del
+// alta (`DialegEdicioOferta`): todo menos el producto y la entidad. El texto de la oferta se
+// recompone en el servidor; si cambian los kilos o las modalidades vuelve a validación (D4).
+// La ficha completa de la oferta, su texto, «Copia» y «Comparteix», en `FitxaOferta`.
+//
+// Un ESBORRANY no tiene detalle: esta ruta monta el formulario con lo guardado (`NovaOferta`).
 //
 // ES TAMBIÉN LA PANTALLA DE «PUBLICADA». Publicar ya no termina en un toast: `NovaOferta`
 // navega aquí con `state.publicada`, y lo primero que se ve es la referencia, qué pasa
@@ -13,13 +16,14 @@
 //    devuelve cuántas, nunca cuáles (20270323100000). Lo que sí se enseña desde el
 //    05-10-2026 (D1) es a qué entidad va cada entrega ya APROBADA.
 
-import DialegEditaOferta from '../../components/DialegEditaOferta'
+import DialegEdicioOferta from '../../components/DialegEdicioOferta'
+import FitxaOferta from '../../components/FitxaOferta'
+import NovaOferta from './NovaOferta'
 import { carregaContraparts, marcaLlegits, useAvisos } from '../../lib/avisos'
 import type { Contrapart } from '../../lib/avisos'
 import LiniesSortida from '../../components/LiniesSortida'
 import FitxaOperacio from '../../components/FitxaOperacio'
 import MissatgesDelPunt from '../../components/MissatgesDelPunt'
-import BotoCopiar from '../../components/BotoCopiar'
 import CertificatOfertaPropi from '../../components/documents/CertificatOfertaPropi'
 import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
@@ -173,6 +177,9 @@ export default function ProductorOfertaDetall() {
 
   if (carregant) return <p className="text-sm text-muted-foreground">{t('c.loading')}</p>
   if (!oferta) return <p className="text-sm text-destructive">{t(errorCarrega ? 'po.err_load_one' : 'od.not_found')}</p>
+  if (oferta.estado === 'esborrany') {
+    return <NovaOferta key={oferta.id} esborrany={oferta} onPublicada={() => { setCarregant(true); void carrega() }} />
+  }
 
   // Las anuladas no cuentan: es la misma regla que `desti_excedent()` en la base.
   const vives = canalitzacions.filter((c) => c.estado !== 'anulada')
@@ -181,6 +188,7 @@ export default function ProductorOfertaDetall() {
   // Cancelar es para un error o una incidencia (revisión del 08-10-2026): con kilos ya
   // asignados lo que toca es registrar el destino del resto, y la base lo rechaza igual.
   const cancelable = ['borrador', 'pendent_validacio', 'publicada'].includes(oferta.estado) && vives.length === 0
+  const editable = ['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(oferta.estado)
   const kgSenseDesti = Math.max(0, total - canalitzats - kgExterns)
 
   // La fecha se compara en día, no en instante: una oferta disponible «hasta el 23» sigue
@@ -308,18 +316,10 @@ export default function ProductorOfertaDetall() {
         </div>
       )}
 
-      {oferta.texto_oferta && (
-        <Card>
-          <CardHeader><CardTitle className="text-base">{t('od.offer_text')}</CardTitle></CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-sm">
-              {oferta.texto_oferta}
-            </pre>
-            {/* El texto es suyo: lo puede pasar a su propio grupo o a quien quiera. */}
-            <BotoCopiar text={oferta.texto_oferta} className="mt-2 w-full sm:w-auto" />
-          </CardContent>
-        </Card>
-      )}
+      {/* Todo lo de la oferta, su texto y «Comparteix» (fase C, fila 3.7.2): el texto es suyo,
+          lo puede pasar a su propio grupo o a quien quiera. */}
+      <FitxaOferta oferta={oferta} ambCost vencida={vencuda}
+        onEdita={editable ? () => setEditant(true) : undefined} />
 
       <Card>
         <CardHeader>
@@ -350,13 +350,10 @@ export default function ProductorOfertaDetall() {
       {/* Su certificado de donación de esta oferta, si lo hay (05-11-2026). */}
       <CertificatOfertaPropi excedenteId={oferta.id} />
 
-      {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(oferta.estado) && (
-        <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={() => setEditant(true)}>
-          {t('edit.cta')}
-        </Button>
+      {editable && (
+        <DialegEdicioOferta obert={editant} onObert={setEditant} oferta={oferta}
+          kgCanalitzats={canalitzats} esEquip={false} onFet={carrega} />
       )}
-      <DialegEditaOferta obert={editant} onObert={setEditant} oferta={oferta}
-        kgCanalitzats={canalitzats} esEquip={false} onFet={carrega} />
 
       {cancelable && (
         <Button

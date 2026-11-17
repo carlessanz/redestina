@@ -343,6 +343,40 @@ paso("Albarán de entrega");
 console.log("  queda en borrador: se emitirá cuando un admin valide la recogida registrada");
 
 // ---------------------------------------------------------------------------
+// 6. Un ESBORRANY de TEST-PROD-1 (fase C del punto 3, 20270530100000)
+// ---------------------------------------------------------------------------
+// Sin él, los checks del arnés sobre los esborranys («el receptor no los ve», «un productor
+// no ve los de otro», «la RPC de borrar no toca una publicada») mirarían una tabla sin
+// ninguno, y 0 filas no demostraría nada. En la aplicación lo crea `crear-oferta/esborrany`;
+// aquí, la service key (como la segunda oferta: `excedentes` no tiene INSERT para nadie).
+// Idempotente por la marca de las observaciones.
+
+paso("Esborrany de TEST-PROD-1");
+
+const MARCA_ESBORRANY = "Fixture de proves: esborrany";
+const { data: esbYa } = await db.from("excedentes").select("id")
+  .eq("productor_id", donacio1.productor_id).eq("estado", "esborrany")
+  .eq("observacions", MARCA_ESBORRANY).limit(1).maybeSingle();
+if (esbYa) {
+  console.log("  ya existía");
+} else if (dryRun) {
+  console.log("  [dry-run] crearía un esborrany de pera, solo con el producto y los kilos");
+} else {
+  const { error } = await db.from("excedentes").insert({
+    productor_id: donacio1.productor_id,
+    familia: "Fruita Dolça",
+    producto: "Pera",
+    kg_total: 90,
+    estado: "esborrany",
+    origen: "panel",
+    observacions: MARCA_ESBORRANY,
+    dades_esborrany: { producte: "Pera", familia: "Fruita Dolça", kg: 90, observacions: MARCA_ESBORRANY },
+  });
+  if (error) throw new Error(`esborrany: ${error.message}`);
+  console.log("  esborrany de pera (90 kg), sin publicar");
+}
+
+// ---------------------------------------------------------------------------
 // Resumen
 // ---------------------------------------------------------------------------
 

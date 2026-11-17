@@ -459,6 +459,9 @@ export function etiquetaEstatOferta(estado: EstadoExcedente): { key: string; cla
     case 'publicada': return { key: 'off.st_published', clase: 'bg-secondary text-secondary-foreground' }
     case 'parcial': return { key: 'off.st_partial', clase: 'bg-aviso-fondo text-aviso' }
     case 'bloqueada': return { key: 'off.st_blocked', clase: 'bg-exito-fondo text-exito' }
+    // Fase C del punto 3: el ESBORRANY de verdad. `borrador` es otra cosa (la oferta convertida
+    // en espigolada mientras se cosecha) y desde entonces se dice así.
+    case 'esborrany': return { key: 'off.st_esborrany', clase: 'bg-muted text-muted-foreground' }
     case 'borrador': return { key: 'off.st_draft', clase: 'bg-muted text-muted-foreground' }
     case 'cancelada': return { key: 'off.st_cancelled', clase: 'bg-error-fondo text-error' }
     case 'no_colocada': return { key: 'off.st_uncoll', clase: 'bg-muted text-muted-foreground' }
@@ -468,7 +471,7 @@ export function etiquetaEstatOferta(estado: EstadoExcedente): { key: string; cla
 }
 
 export const ESTATS_OFERTA: readonly EstadoExcedente[] = [
-  'borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada', 'cerrada', 'no_colocada', 'cancelada',
+  'esborrany', 'borrador', 'pendent_validacio', 'publicada', 'parcial', 'bloqueada', 'cerrada', 'no_colocada', 'cancelada',
 ] as const
 
 /** Los siete estados con su badge y su explicación, para `LlegendaEstats`. */

@@ -2408,7 +2408,7 @@ Fila 3.6. Modelo y reglas en `context/04` y `context/08`; WhatsApp y `crear-ofer
   (`CE`) o una categoría llega vacío. Con un servidor anterior (sin subcausas) cae a la lista plana de causas.
 - **`Desplegable`**: la lista ya no es más ancha que la pantalla (`max-w-(--radix-select-content-available-width)`,
   `max-h-80`): una subcausa mide ~90 caracteres y se parte en líneas.
-- **«Edita l’oferta»** (`DialegEditaOferta`, productor y equipo): selector `#ed-subcausa` con el mismo catálogo; sin
+- **«Edita l’oferta»** (`DialegEditaOferta`, productor y equipo; desde la fase C, el formulario del alta, `#of-causa`): selector `#ed-subcausa` con el mismo catálogo; sin
   subcausa (oferta de WhatsApp o de antes) avisa `edit.sense_subcausa` con la causa actual. Manda `subcausa_codigo`
   solo si cambia y no está vacía; `editar_oferta()` la valida (`subcausa_invalida` → `edit.err_subcausa_invalida`) y
   el trigger cambia la causa. No revalida (D4 solo mira kilos y modalidades).
@@ -2419,6 +2419,45 @@ Fila 3.6. Modelo y reglas en `context/04` y `context/08`; WhatsApp y `crear-ofer
 - E2E: `operativa.e2e.ts` (alta con subcausa → causa = la de la subcausa, grupos y opciones, «Edita l’oferta» cambia de
   categoría; `crear-oferta` por API con `subcausa_obligatoria`/`subcausa_invalida`), `diagnostic.e2e.ts` (causas
   activas, subcausas guardadas y en el resumen del productor).
+
+### Fase C del punto 3: esborranys, edición completa y «Comparteix» (17-11-2026, `20270530100000`)
+
+Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `context/04bis`.
+
+- **Esborrany en el servidor.** `crear-oferta` gana dos rutas: `POST /esborrany` (`{productor_id, datos, id?}`) guarda lo
+  que haya con entidad y producto como mínimo (`falta_producte`, `producte_invalid`) y valida solo el FORMATO de lo
+  presente (`errorFormatOferta()`: kg, cantidad de envases, Maps, fotos, coste, `foto_producte`; y que el lugar sea de la
+  entidad); con `id`, solo el propio esborrany (`404 esborrany_inexistent`, `409 no_es_esborrany`, `400 productor_fix`).
+  No dispara nada. `POST /publicar` (`{id, datos?}`) valida **exactamente como el alta** (`validarPublicacio()`:
+  faltantes, kg, formato, subcausa, lugar, convenio y albarán si no es equipo) y publica la MISMA fila
+  (`crearExcedente(…, {esborranyId})`: `id_excedente`, texto, correo de confirmación; mismo cuerpo de respuesta que el
+  alta). `priorizar-entidades` rechaza un esborrany (`409 oferta_esborrany`). Cliente: `desaEsborranyOferta`,
+  `publicaEsborrany`, `esborraEsborranyOferta` (`lib/ofertes.ts`).
+- **Un solo formulario, tres modos** (`FormulariNovaOferta`, `mode` `crear|esborrany|editar`): «Desa com a esborrany»
+  (`data-testid="desa-esborrany"`) se activa con el producto elegido; reabrir un esborrany (`/productor/ofertes/:id` o
+  `/equip/ofertes/:id`, que montan el formulario en vez del detalle) lo carga de `dades_esborrany`; «Esborra
+  l'esborrany» lo borra. El `localStorage` queda solo como red del modo `crear`. Pestaña **«Esborranys»** en `OffersList`
+  (equipo) y en «Les meves ofertes» (`?tab=esborranys`, `FilaEsborrany`); «Inici» del productor avisa si tiene alguno.
+- **Editar = el formulario del alta** (`DialegEdicioOferta`, 80 × 88, sin cerrar al pinchar fuera; sustituye a
+  `DialegEditaOferta`): producto y entidad fijos (`producte-fix`), todo lo demás editable con las mismas comprobaciones.
+  `lib/edicioOferta.ts`: `datosDeFila()` (columnas → claves del cuestionario; ojo, `retorn_envasos` del formulario es el
+  DETALLE) y `canvisDeDatos()` (solo lo que cambia, con las claves de `editar_oferta`; una pregunta que deja de aplicar
+  viaja vacía). No obliga a contestar lo que ya estaba vacío (ofertas de WhatsApp sin subcausa); kg no baja de lo
+  canalizado (`edit.err_kg_menys`). Guardar → `crear-oferta/editar`, que recompone el texto. Las fotos quitadas se
+  borran del Storage solo tras guardar. Se retira el cambio directo de «Disponible fins» de `OfferDetail`.
+- **`FitxaOferta`** (equipo y productor): todo lo de la fila 3.7.2 en lectura (producto, al camp, kilos, formato,
+  retorno, lugar con Maps, disponible, días y franja, modalidades, precio solo con venta, coste solo para equipo y
+  productor, causa «Categoria — Subcausa», observaciones), el texto, «Copia el text» y **«Comparteix»** solo en
+  `publicada`/`parcial` (`lib/compartirOferta.ts`: Web Share con la foto como fichero si `navigator.canShare({files})`;
+  si no, copia el texto y descarga la foto).
+- **Texto de la oferta** (`_shared/textOferta.ts`, `textoOfertaDeDades(fila, ctx)`, una sola fuente para alta, publicar
+  y editar): sin RESPONSABLE ni TRANSPORT ni etiquetas vacías; variedad en la línea del producto; precio mínimo solo con
+  venta; «⏰ HORARI DE RECOLLIDA: dies · franja» y el enlace de Maps (el propio de la oferta manda sobre el del lugar);
+  causa «Categoria — Subcausa»; envases (formato, cantidad, retorno y detalle); observaciones solo si hay. Una oferta
+  `parcial` sigue diciendo los kilos de `kg_total`.
+- E2E: `esborrany-oferta.e2e.ts` (esborrany → reabrir → completar → publicar; el receptor no lo ve; editar kg, lugar y
+  subcausa cambia el texto y no la ficha; «Comparteix» solo donde circula; 375 px sin scroll horizontal);
+  `operativa.e2e.ts` adaptado (`#of-causa` en el diálogo, línea del horario).
 
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 

@@ -8,7 +8,15 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **1.947 pruebas en 91 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (16-11-2026, fase 1 de
+   Referencia: **2.030 pruebas en 93 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (17-11-2026, fase C
+   del punto 3: `tests/esborranyServidor.test.ts`, nuevo —`errorFormatOferta`, `filaDeDades`, «Comparteix»—, +16 en
+   `edicioOferta.test.ts` —claves nuevas de `canvisOferta`, `textoOfertaDeDades`, `datosDeFila`/`canvisDeDatos`— y
+   `oferta.test.ts` cambiado a propósito por el texto nuevo; arnés del clon **2.551/2.551 y 44 sin datos**: checks de
+   esborranys —el receptor no ve ninguno, un productor no ve los de otro, `esborrar_esborrany_oferta` denegada a todo
+   externo con uuid inventado y `22023` sobre una oferta publicada para productor y equipo—; el «sin datos» de más es
+   `productor-altre` sin esborrany propio, correcto; el fixture del esborrany lo crea `crear-respuestas-prueba.ts` §6;
+   E2E `esborrany-oferta` 4/4 y operativa, entitats, foto-oferta, paritat-assistida, lectura y missatges en verde).
+   Antes, **2.005 en 92** (fases A y B del punto 3). Antes, **1.947 en 91** (16-11-2026, fase 1 de
    filtros: +3 de `tests/territori.test.ts`, +3 de `modalitatsAdmeses`, +4 del ranking por modalidad y kg y +1 de las
    dimensiones con varios valores; −2 de `filtresMercat`, cuyo filtro pasó a `BarraFiltres`). Antes, **1.938 en 90**
    (16-11-2026, facturación solo

@@ -154,7 +154,7 @@ describe('la subcausa del panel (crear-oferta)', () => {
 describe('el texto de la oferta y la edición', () => {
   const base = {
     producte: 'Tomàquet', productor: 'Can Prova', municipi: 'Gavà', quantitat: '300 kg aprox',
-    disponible: '23/07', modalitat: 'Donació', causa: 'Preu i rendibilitat', responsable: '', observacions: '',
+    disponible: '23/07', modalitat: 'Donació', causa: 'Preu i rendibilitat', observacions: '',
   }
 
   it('con subcausa: «CAUSA: Categoria — Subcausa»; sin ella, la causa sola', () => {

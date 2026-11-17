@@ -30,13 +30,22 @@
 //    así que durante un rato la respuesta puede no traer `secciones` ni `seccion`. Sin
 //    ellas se pinta un solo bloque sin título; con ellas, los cinco bloques.
 //
+// TRES MODOS, UN SOLO FORMULARIO (fase C del punto 3, 17-11-2026, filas 3.1.2 y 3.7 del Excel):
+//   · `crear`: el alta. «Publicar» y, desde la fase C, «Desa com a esborrany» (basta el producto).
+//   · `esborrany`: reabre un esborrany guardado en el servidor; se sigue rellenando, se vuelve a
+//     guardar, se publica (mismas comprobaciones que el alta) o se borra.
+//   · `editar`: una oferta ya publicada. Producto y entidad fijos; todo lo demás, editable y con
+//     todos los bloques abiertos. Sustituye a `DialegEditaOferta` (que solo editaba ocho campos).
+//   El `localStorage` queda solo en `crear`, como red ante una recarga (la cámara del iPhone): el
+//   esborrany de verdad ya vive en el servidor.
+//
 // ⚠️ EL BLOQUEO POR CONVENIO ENTRA POR PROP, no se lee aquí. `useConveni` mira las
 //    organizaciones DE LA CUENTA, y la del equipo no tiene ninguna: leerlo dentro daría
 //    `false` siempre para el alta asistida y dejaría al dinamizador delante de un `42501`
 //    que la pantalla podía haber anticipado.
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { Check, ChevronDown, ExternalLink, Lock, MapPin, Plus } from 'lucide-react'
+import { Check, ChevronDown, ExternalLink, Lock, MapPin, Plus, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../lib/i18n'
 import { avuiMadrid } from '../lib/format'
@@ -45,8 +54,13 @@ import { varietatSemblaQuantitat } from '../lib/validacio'
 import { cn } from '../lib/utils'
 import { FilaCasella } from './Casella'
 import {
-  aplicaCamp, carregaCamps, creaOferta, creaUbicacio, esBuit, etiquetaFamilia, localitzaDescriptor,
+  CODIS_EDICIO, aplicaCamp, carregaCamps, creaOferta, creaUbicacio, desaEsborranyOferta, editaOferta,
+  esBuit, esborraEsborranyOferta, etiquetaFamilia, localitzaDescriptor, publicaEsborrany,
 } from '../lib/ofertes'
+import { canvisDeDatos, datosDeFila } from '../lib/edicioOferta'
+import { esborraFoto } from '../lib/fotos'
+import { useConfirma } from './DialegConfirma'
+import type { Excedente } from '../types'
 import { modalitatsDe } from '../lib/modalitats'
 import { esFranjaValida } from '../lib/franja'
 import type { Franja } from '../lib/franja'
@@ -184,7 +198,18 @@ export interface ResultatNovaOferta {
   confirmacio_email?: string | null
 }
 
+/** `crear` (alta), `esborrany` (reabrir uno guardado) o `editar` (una oferta publicada). */
+export type ModeFormulariOferta = 'crear' | 'esborrany' | 'editar'
+
 export interface PropsFormulariNovaOferta {
+  /** Por defecto, `crear`. Con `esborrany` o `editar` hace falta `oferta`. */
+  mode?: ModeFormulariOferta
+  /** La fila de la oferta (esborrany o publicada). */
+  oferta?: Excedente | null
+  /** En `editar`: el equipo no revalida (es quien valida). */
+  esEquip?: boolean
+  /** En `editar`: lo ya canalizado; los kilos no pueden bajar de aquí. */
+  kgCanalitzats?: number
   /** De quién es la oferta. En el panel sale de la organización; en el alta asistida, del
    *  productor que el equipo ha elegido. */
   productorId: string | null
@@ -202,15 +227,26 @@ export interface PropsFormulariNovaOferta {
    */
   motiuModalitat?: (modalitat: string) => string | null
   /** Qué hacer con la oferta recién creada. Quien monta el formulario decide a dónde va. */
-  onCreada: (r: ResultatNovaOferta) => void
+  onCreada?: (r: ResultatNovaOferta) => void
+  /** Tras guardar el esborrany (fase C): a dónde se va lo decide quien monta el formulario. */
+  onEsborranyDesat?: (id: string) => void
+  /** Tras borrar el esborrany. */
+  onEsborrat?: () => void
+  /** En `editar`, tras guardar (`estado` dice si ha vuelto a validación). */
+  onEditada?: (estado: string | null) => void | Promise<unknown>
   /** Si no se pasa, no se pinta el botón de cancelar. */
   onCancel?: () => void
 }
 
-export default function FormulariNovaOferta(
-  { productorId, bloqueja = false, motiuModalitat, onCreada, onCancel }: PropsFormulariNovaOferta,
-) {
+export default function FormulariNovaOferta({
+  productorId, bloqueja = false, motiuModalitat, onCreada, onCancel,
+  mode = 'crear', oferta = null, esEquip = false, kgCanalitzats = 0, onEsborranyDesat, onEsborrat, onEditada,
+}: PropsFormulariNovaOferta) {
   const { t, lang } = useT()
+  const { confirma, dialeg: dialegConfirma } = useConfirma()
+  const editar = mode === 'editar'
+  /** Lo que la oferta decía al abrirla (editar): para no exigir lo que ya faltaba antes. */
+  const original = useMemo<Datos>(() => (oferta ? datosDeFila(oferta) : {}), [oferta])
   // El descriptor tal como llega (catalán + castellano), y debajo, en el idioma de la pantalla.
   const [campsCrus, setCampos] = useState<CampoOferta[]>([])
   const [seccionsCrues, setSeccions] = useState<BlocOferta[]>([])
@@ -224,6 +260,7 @@ export default function FormulariNovaOferta(
   /** Hasta leer el borrador no se escribe: si no, el primer render lo pisaría con `{}`. */
   const recuperat = useRef(false)
   const [enviant, setEnviant] = useState(false)
+  const [desantEsb, setDesantEsb] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [procesObert, setProcesObert] = useState(() => !procesJaVist())
   // Qué claves faltan o están mal, para marcarlas en rojo y decir cuáles son (§12.123).
@@ -272,7 +309,22 @@ export default function FormulariNovaOferta(
         const ambData = (d0: Datos): Datos => {
           const d = teSubcauses(cataleg) && !esBuit(d0.causa) && !esSubcausaTriable(cataleg, d0.causa)
             ? { ...d0, causa: '' } : d0
-          return esBuit(d.disponible_fins) ? { ...d, disponible_fins: disponiblePerDefecte(avuiMadrid()) } : d
+          // Editando no se inventa una fecha: si la oferta no la tenía, no la tiene.
+          return esBuit(d.disponible_fins) && !editar ? { ...d, disponible_fins: disponiblePerDefecte(avuiMadrid()) } : d
+        }
+        // Un esborrany o una oferta publicada: se abre con lo suyo y todos los bloques abiertos;
+        // ni la red del `localStorage` ni lo que propone la ficha (ya se contestó).
+        if (mode !== 'crear' && oferta) {
+          if (!recuperat.current) {
+            const guardat = mode === 'esborrany' && oferta.dades_esborrany && typeof oferta.dades_esborrany === 'object'
+              ? oferta.dades_esborrany : datosDeFila(oferta)
+            setDatos(ambData(guardat))
+            setObertsFins(99)
+            setCostTocat(true)
+          }
+          recuperat.current = true
+          setCarregant(false)
+          return
         }
         // Lo que había a medias antes de una recarga (ver `PREFIX_ESBORRANY`).
         // Solo la primera carga: si el efecto se repite (cambio de idioma), no se pisa lo escrito.
@@ -297,7 +349,7 @@ export default function FormulariNovaOferta(
       setCarregant(false)
     })
     return () => { viu = false }
-  }, [productorId, t])
+  }, [productorId, t, mode, oferta, editar])
 
   const producteTriat = useMemo(
     () => (catalogos?.productos ?? []).find((p) => p.nombre === String(datos.producte ?? '')),
@@ -306,9 +358,10 @@ export default function FormulariNovaOferta(
   const referencia = producteTriat?.cost_referencia ?? null
 
   useEffect(() => {
-    if (!productorId || !recuperat.current) return
+    // La red local, solo en el alta: un esborrany o una edición ya están en el servidor.
+    if (!productorId || !recuperat.current || mode !== 'crear') return
     desaEsborrany(productorId, { datos, pas: 0, pasMaxim: obertsFins, costTocat, proposats: [...proposats], canviaLloc })
-  }, [productorId, datos, obertsFins, costTocat, proposats, canviaLloc])
+  }, [productorId, datos, obertsFins, costTocat, proposats, canviaLloc, mode])
 
   /** El producto con un buscador; la familia va de detalle (y se rellena sola al elegir). */
   const opcionsProducte = useMemo(
@@ -397,6 +450,12 @@ export default function FormulariNovaOferta(
     // P5: el lugar habitual propuesto desde la ficha no es una respuesta hasta que se confirma.
     const cu = camps.find((c) => c.tipo === 'ubicacio')
     if (cu && !f.includes(cu) && ubicacioPerConfirmar(estatLloc, aplica(cu))) f.push(cu)
+    // Editando, solo se exige lo que la oferta ya tenía (no se puede vaciar): una oferta de
+    // WhatsApp sin subcausa o sin días se corrige sin obligar a completarla entera. Lo que una
+    // respuesta nueva hace aplicar (p. ej. el retorno al pasar a cajas) sí se exige.
+    if (editar) {
+      return f.filter((c) => !esBuit(original[c.clave]) || !aplicaCamp(c, original, campos))
+    }
     return f
   }
 
@@ -412,6 +471,8 @@ export default function FormulariNovaOferta(
       if (!aplica(c)) continue
       const v = datos[c.clave]
       if (c.clave === 'kg' && !esBuit(v) && !(Number(v) > 0)) out.push(c.clave)
+      // Editando, los kilos no bajan de lo ya canalizado (la base lo impone igual).
+      else if (editar && c.clave === 'kg' && !esBuit(v) && Number(v) < kgCanalitzats) out.push(c.clave)
       if (c.clave === 'retorn_quantitat' && !esBuit(v) && !enterPositiu(v)) out.push(c.clave)
       if (c.format === 'franja' && v && typeof v === 'object' && !esBuit(v) && !esFranjaValida(v as Partial<Franja>)) {
         out.push(c.clave)
@@ -484,6 +545,10 @@ export default function FormulariNovaOferta(
         setError(t('po.franja_invalida'))
         return
       }
+      if (editar && invalids.length === 1 && invalids[0] === 'kg' && Number(datos.kg) > 0) {
+        setError(t('edit.err_kg_menys', { n: kgCanalitzats }))
+        return
+      }
       const noms = invalids.map((k) => (k === 'gmaps_url' ? t('po.offer_maps') : porClau.get(k)?.etiqueta ?? k))
       setError(t('po.invalid_fields', { camps: noms.join(', ') }))
       return
@@ -492,20 +557,16 @@ export default function FormulariNovaOferta(
     setEnviant(true)
     setError(null)
     // Lo propuesto desde la ficha que no se ha tocado y ya no aplica no se manda: no lo ha
-    // dicho nadie.
+    // dicho nadie. La familia, siempre la del producto (no se pregunta aquí; el servidor la exige).
     const porClau = new Map(campos.map((c) => [c.clave, c]))
-    const aEnviar = treuProposatsQueNoApliquen(datos, proposats, (clau) => {
-      const c = porClau.get(clau)
-      return c ? aplica(c) : false
-    })
-    // La familia, siempre la del producto (no se pregunta aquí; el servidor la exige).
-    if (producteTriat?.familia) aEnviar.familia = producteTriat.familia
-    if (typeof aEnviar.gmaps_url === 'string') {
-      const g = aEnviar.gmaps_url.trim()
-      if (g) aEnviar.gmaps_url = g
-      else delete aEnviar.gmaps_url
+    const aEnviar = preparaEnviament()
+    if (editar && oferta) {
+      await desaEdicio(aEnviar)
+      return
     }
-    const r = await creaOferta(productorId, aEnviar)
+    const r = mode === 'esborrany' && oferta
+      ? await publicaEsborrany(oferta.id, aEnviar)
+      : await creaOferta(productorId, aEnviar)
     setEnviant(false)
     if (!r.ok || !r.data) {
       // El servidor puede saber de un campo que el cliente no vio a tiempo —el descriptor
@@ -523,11 +584,104 @@ export default function FormulariNovaOferta(
       return
     }
     marcaProcesVist()
-    esborraEsborrany(productorId)
+    if (mode === 'crear') esborraEsborrany(productorId)
+    // Las fotos que se quitaron de un esborrany ya guardado: ahora que nada las cita, fuera.
+    if (mode === 'esborrany') await esborraFotesTretes(aEnviar)
     // Sin toast: lo que hay que decir —la referencia, qué pasa ahora y por dónde seguir—
     // no cabe en un aviso que se va solo. Lo cuenta `BlocPublicada` en el detalle. A dónde se
     // va después lo decide quien monta el formulario.
-    onCreada(r.data)
+    onCreada?.(r.data)
+  }
+
+  /** Lo que se manda: sin lo propuesto que ya no aplica, con la familia del producto. */
+  function preparaEnviament(): Datos {
+    const porClau = new Map(campos.map((c) => [c.clave, c]))
+    const aEnviar = treuProposatsQueNoApliquen(datos, proposats, (clau) => {
+      const c = porClau.get(clau)
+      return c ? aplica(c) : false
+    })
+    if (producteTriat?.familia) aEnviar.familia = producteTriat.familia
+    if (typeof aEnviar.gmaps_url === 'string') {
+      const g = aEnviar.gmaps_url.trim()
+      if (g) aEnviar.gmaps_url = g
+      else delete aEnviar.gmaps_url
+    }
+    return aEnviar
+  }
+
+  /**
+   * Las fotos que la fila citaba y ya no: se borran de Storage DESPUÉS de guardar (al quitarlas
+   * del formulario no se borran, porque cancelar dejaría la oferta citando un fichero borrado).
+   */
+  async function esborraFotesTretes(enviat: Datos) {
+    const ara = new Set(Array.isArray(enviat.fotos) ? (enviat.fotos as string[]) : [])
+    const abans = Array.isArray(oferta?.fotos) ? oferta!.fotos : []
+    await Promise.all(abans.filter((r) => !ara.has(r)).map((r) => esborraFoto(r)))
+  }
+
+  /** Guardar la edición de una oferta publicada (`crear-oferta/editar` → `editar_oferta()`). */
+  async function desaEdicio(aEnviar: Datos) {
+    if (!oferta) return
+    const porClau = new Map(campos.map((c) => [c.clave, c]))
+    const canvis = canvisDeDatos(oferta, aEnviar, (clau) => {
+      const c = porClau.get(clau)
+      return c ? aplica(c) : true
+    })
+    if (Object.keys(canvis).length === 0) {
+      setEnviant(false)
+      toast.info(t('edit.err_sense_canvis'))
+      await onEditada?.(oferta.estado)
+      return
+    }
+    const r = await editaOferta(oferta.id, canvis)
+    setEnviant(false)
+    if (!r.ok) {
+      const code = (r as { code?: string }).code
+      setError(code && (CODIS_EDICIO as readonly string[]).includes(code) ? t(`edit.err_${code}`) : textError(t, r.error))
+      return
+    }
+    await esborraFotesTretes(aEnviar)
+    toast.success(r.data?.estado === 'pendent_validacio' && oferta.estado !== 'pendent_validacio'
+      ? t('edit.ok_revalidar') : t('edit.ok'))
+    await onEditada?.(r.data?.estado ?? null)
+  }
+
+  /**
+   * «Desa com a esborrany» (fase C del punto 3, fila 3.1.2): basta con el producto. Lo que hay
+   * escrito tiene que tener buen formato (unos kilos a 0 no se guardan), pero puede faltar todo.
+   */
+  async function desaComEsborrany() {
+    if (!productorId || esBuit(datos.producte)) return
+    const invalids = invalidsDe()
+    if (invalids.length > 0) {
+      marcaIVeAlPrimer(invalids)
+      const porClau = new Map(campos.map((c) => [c.clave, c]))
+      const noms = invalids.map((k) => (k === 'gmaps_url' ? t('po.offer_maps') : porClau.get(k)?.etiqueta ?? k))
+      setError(t('po.invalid_fields', { camps: noms.join(', ') }))
+      return
+    }
+    setError(null)
+    setDesantEsb(true)
+    const aEnviar = preparaEnviament()
+    const r = await desaEsborranyOferta(productorId, aEnviar, mode === 'esborrany' ? oferta?.id : null)
+    setDesantEsb(false)
+    if (!r.ok || !r.data) { setError(textError(t, r.error)); return }
+    if (mode === 'crear') esborraEsborrany(productorId)
+    else await esborraFotesTretes(aEnviar)
+    toast.success(t('esb.desat'))
+    onEsborranyDesat?.(r.data.id)
+  }
+
+  /** Borrar el esborrany (con confirmación): la RPC solo borra lo que sigue en esborrany. */
+  async function esborraEsborranyServidor() {
+    if (!oferta) return
+    if (!(await confirma({
+      titol: t('esb.esborra_t'), descripcio: t('esb.esborra_d'), confirmar: t('esb.esborra'), destructiu: true,
+    }))) return
+    const r = await esborraEsborranyOferta(oferta.id)
+    if (!r.ok) { toast.error(textError(t, r.error)); return }
+    toast.success(t('esb.esborrat'))
+    onEsborrat?.()
   }
 
   // Sin productor no hay descriptor que pedir ni oferta que crear. Quién falta —«no tienes
@@ -590,6 +744,17 @@ export default function FormulariNovaOferta(
 
     switch (campo.tipo) {
       case 'producte':
+        // Editando, el producto no cambia: cambiaría la referencia y lo que ya vieron las
+        // entidades (para otro producto se cancela y se publica otra).
+        if (editar) {
+          return (
+            <p id={id} className="flex min-h-11 items-center gap-2 rounded-md border bg-muted/30 px-3 text-sm md:min-h-8"
+              data-testid="producte-fix">
+              <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+              <span className="min-w-0 break-words font-medium">{String(valor ?? '')}</span>
+            </p>
+          )
+        }
         // Un buscador (17-11-2026): se escribe un trozo y se toca la sugerencia; la familia sale
         // de detalle a la derecha y se rellena sola.
         return (
@@ -846,6 +1011,11 @@ export default function FormulariNovaOferta(
     : (motiuModalitat && modalitatsTriades.length > 0 && bloquejades.length === modalitatsTriades.length
       ? motiuModalitat(modalitatsTriades[0])
       : null)
+  // Editando: si el PRODUCTOR cambia kilos o modalidades, vuelve a validación (D4). Se dice antes.
+  const revalidara = editar && oferta !== null && !esEquip && oferta.estado !== 'pendent_validacio' && (
+    Number(datos.kg) !== Number(oferta.kg_total ?? 0)
+    || modalitatsTriades.join() !== modalitatsDe(oferta.modalitats?.length ? oferta.modalitats : oferta.modalitat).join()
+  )
   const avisModalitats = !motiuConveni && bloquejades.length > 0
     ? t('po.mod_sense_conveni', { mods: bloquejades.map((m) => t(`od.mod_${m}`)).join(', ') })
     : null
@@ -858,6 +1028,8 @@ export default function FormulariNovaOferta(
   return (
     <div className="space-y-4" data-testid="formulari-oferta">
       {/* --- Qué pasa cuando publicas. Abierto la primera vez; después, plegado. --- */}
+      {dialegConfirma}
+      {!editar && (
       <Collapsible open={procesObert} onOpenChange={setProcesObert}>
         {/* Tarjeta a mano y no `Card`: el disparador tiene que llevar ÉL el relleno para que el
             área táctil sea la fila entera. */}
@@ -878,6 +1050,7 @@ export default function FormulariNovaOferta(
           </CollapsibleContent>
         </div>
       </Collapsible>
+      )}
 
       {blocs.map((bloc, i) => {
         const obert = i <= obertsAra
@@ -936,7 +1109,13 @@ export default function FormulariNovaOferta(
                   <SelectorFotos
                     productorId={productorId}
                     rutes={Array.isArray(datos.fotos) ? (datos.fotos as string[]) : []}
-                    onChange={(r) => set('fotos', r)}
+                    onChange={(r) => {
+                      const treta = r.length < (Array.isArray(datos.fotos) ? datos.fotos.length : 0)
+                      set('fotos', r)
+                      // Con la oferta ya guardada, quitar una foto no la borra todavía: si se
+                      // cancela, la fila la sigue citando. Se borra al guardar (`esborraFotesTretes`).
+                      if (treta && mode !== 'crear') return false
+                    }}
                   />
                   {/* Sin fotos propias, la oferta se ve con el icono de su producto (29-09-2026). */}
                   {producteTriat && !(Array.isArray(datos.fotos) && datos.fotos.length > 0) && (
@@ -963,24 +1142,45 @@ export default function FormulariNovaOferta(
         {/* El error va DENTRO del pie fijo (29-09-2026): debajo de la tarjeta quedaba tapado por
             este mismo pie en el móvil. Aquí está siempre a la vista, junto al botón. */}
         {error && <p role="alert" className="w-full text-sm text-destructive">{error}</p>}
-        {/* Sin el convenio que toca, el botón se apaga y el motivo va escrito debajo. */}
+        {editar && revalidara && (
+          <p className="w-full rounded-md bg-aviso-fondo p-2 text-sm text-aviso">{t('edit.avis_revalidar')}</p>
+        )}
+        {/* Sin el convenio que toca, el botón se apaga y el motivo va escrito debajo. Editando
+            no: la oferta ya circula y el convenio se mira al canalizar. */}
         <Button
           className="h-11 whitespace-normal md:h-8"
           onClick={() => void enviar()}
-          disabled={enviant || motiuConveni !== null}
+          disabled={enviant || desantEsb || (!editar && motiuConveni !== null)}
         >
-          {enviant ? t('c.saving') : t('po.publish')}
+          {enviant ? t('c.saving') : editar ? t('edit.desa') : t('po.publish')}
         </Button>
+        {/* El esborrany (fase C): con el producto elegido basta para guardarlo. */}
+        {!editar && (
+          <Button variant="outline" className="h-11 whitespace-normal md:h-8" data-testid="desa-esborrany"
+            onClick={() => void desaComEsborrany()}
+            disabled={enviant || desantEsb || esBuit(datos.producte)}>
+            {desantEsb ? t('c.saving') : mode === 'esborrany' ? t('esb.desa') : t('esb.desa_com')}
+          </Button>
+        )}
         {onCancel && (
           <Button
             variant="ghost"
             className="h-11 whitespace-normal md:h-8"
-            onClick={() => { if (productorId) esborraEsborrany(productorId); onCancel() }}
+            onClick={() => { if (productorId && mode === 'crear') esborraEsborrany(productorId); onCancel() }}
           >
             {t('c.cancel')}
           </Button>
         )}
-        {motiuConveni && (
+        {mode === 'esborrany' && oferta && (
+          <Button variant="ghost" className="h-11 whitespace-normal text-error md:h-8" data-testid="esborra-esborrany"
+            onClick={() => void esborraEsborranyServidor()} disabled={enviant || desantEsb}>
+            <Trash2 className="size-4" aria-hidden /> {t('esb.esborra')}
+          </Button>
+        )}
+        {!editar && esBuit(datos.producte) && (
+          <p className="w-full text-xs text-muted-foreground">{t('esb.cal_producte')}</p>
+        )}
+        {motiuConveni && !editar && (
           <p className="w-full text-sm text-error">{t(motiuConveni)}</p>
         )}
       </div>

@@ -36,11 +36,16 @@ interface Props {
   onTancar: () => void
   /** La oferta recién creada: quien monta el diálogo decide a dónde lleva. */
   onCreada: (r: ResultatNovaOferta) => void
+  /**
+   * Tras «Desa com a esborrany» (fase C del punto 3): quien monta el diálogo decide a dónde
+   * lleva. Sin él, el diálogo se cierra.
+   */
+  onEsborranyDesat?: (id: string) => void
 }
 
 interface Fitxa { id: string; nom: string; poblacio: string | null }
 
-export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }: Props) {
+export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, onEsborranyDesat }: Props) {
   const { t } = useT()
   const [productors, setProductors] = useState<Fitxa[]>([])
   const [carregant, setCarregant] = useState(true)
@@ -124,6 +129,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
                 key={triat}
                 productorId={triat}
                 onCreada={onCreada}
+                onEsborranyDesat={(id) => (onEsborranyDesat ? onEsborranyDesat(id) : onTancar())}
                 onCancel={onTancar}
               />
             </div>

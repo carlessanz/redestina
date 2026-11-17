@@ -390,6 +390,13 @@ interface Check {
    * (20270510100200: diecisiete).
    */
   filasExactas?: number;
+  /**
+   * Solo `leer`: filtros sobre la lectura, `[columna, "eq"|"neq", valor]`. El valor admite los
+   * marcadores de `args` (`@meva_fitxa_productor`…). Sirve para afirmar sobre UN SUBCONJUNTO de
+   * la tabla: «el receptor no ve ningún esborrany» no es lo mismo que «no ve ninguna oferta»
+   * (las del Mercat sí las ve). Fase C del punto 3, 20270530100000.
+   */
+  filtros?: readonly (readonly [string, "eq" | "neq", string])[];
 }
 
 // Las funciones de `public` que pueden quedar abiertas de más A PROPÓSITO, en el formato
@@ -1141,6 +1148,10 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // Avisos y edición (05-10-2026, rebanada 2). `editar_oferta` es solo del servidor (la llama
   // `crear-oferta/editar` con el actor): un `authenticated` podría pasar el uuid de otro.
   { tabla: "editar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_canvis: {}, p_texto: "", p_actor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO edita ofertes directament (només el servidor)" },
+  // Esborranys (fase C del punto 3, 20270530100000). Borrar uno es `esborrar_esborrany_oferta`,
+  // `security definer`: el permiso va ANTES que la existencia (uuid inventado → 42501), y una
+  // oferta ya publicada no la borra nadie por aquí (eso lo afirman los bloques productor y equip).
+  { tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO esborra l'esborrany d'una altra entitat" },
   { tabla: "crear_avis", op: "rpc", esperado: "denegar", args: { p_destinatari_tipo: "productor", p_destinatari_id: "00000000-0000-0000-0000-000000000000", p_tipus: "oferta_validada", p_objecte_tipo: "excedente", p_objecte_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crea avisos (només triggers i servidor)" },
   // Recogida programada (rebanada 3): todo del servidor.
   { tabla: "programar_albarans_recollida", op: "rpc", esperado: "denegar", descripcion: "NO emet albarans programats (només el servidor)" },
@@ -1924,6 +1935,16 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "descartar_convenio_esborrany", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO descarta un conveni (és de pot_aprovar)" },
     { tabla: "validar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO valida una oferta (és de pot_aprovar)" },
     { tabla: "editar_oferta", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_canvis: {}, p_texto: "", p_actor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NI l'equip edita per RPC (només el servidor)" },
+    // Esborranys (fase C del punto 3, 20270530100000): el equipo los ve y los borra (uuid
+    // inventado → 22023 `oferta_inexistent`, autoriza), pero ni él borra una publicada.
+    {
+      tabla: "excedentes", op: "leer", esperado: "permitir", columnas: "id, estado",
+      filtros: [["estado", "eq", "esborrany"]],
+      descripcion: "veu els esborranys (per seguir-los en nom de l'entitat)",
+      requiereFixture: "un esborrany de TEST-PROD-1 (scripts/crear-respuestas-prueba.ts, §6)",
+    },
+    { tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot esborrar esborranys (autoritza; l'oferta no existeix)" },
+    { tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "@meva_oferta_publicada" }, descripcion: "NI l'equip esborra una oferta publicada (22023 no_es_esborrany)" },
     { tabla: "programar_albarans_recollida", op: "rpc", esperado: "denegar", descripcion: "NI l'equip emet albarans programats (només el servidor)" },
     { tabla: "resolver_convenio", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO resol un conveni (és de pot_aprovar)" },
     // Y NI EL EQUIPO firma por nadie: `firmar_convenio_por_enlace` y `validar_codi_firma`
@@ -2660,6 +2681,25 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "app_settings", op: "leer", esperado: "denegar", descripcion: "NO ve la configuración" },
     { tabla: "productos", op: "leer", esperado: "permitir", descripcion: "lee el catálogo (lo necesita el alta de oferta)" },
     { tabla: "excedentes", op: "insertar", esperado: "denegar", descripcion: "NO inserta ofertas a mano (van por la Edge Function)" },
+    // Esborranys (fase C del punto 3, 20270530100000). Ve los SUYOS (TEST-PROD-1 tiene uno;
+    // `productor-altre` sale SALTADA, y es correcto), nunca los de otro productor, y la RPC de
+    // borrar no toca una oferta suya ya publicada: `22023 no_es_esborrany`.
+    {
+      tabla: "excedentes", op: "leer", esperado: "permitir", columnas: "id, estado",
+      filtros: [["estado", "eq", "esborrany"]],
+      descripcion: "veu els SEUS esborranys",
+      requiereFixture: "un esborrany de TEST-PROD-1 (scripts/crear-respuestas-prueba.ts, §6)",
+    },
+    {
+      tabla: "excedentes", op: "leer", esperado: "denegar", columnas: "id, estado",
+      filtros: [["estado", "eq", "esborrany"], ["productor_id", "neq", "@meva_fitxa_productor"]],
+      descripcion: "NO veu els esborranys d'un altre productor",
+    },
+    {
+      tabla: "esborrar_esborrany_oferta", op: "rpc", esperado: "permitir", errorExigit: "22023",
+      args: { p_id: "@meva_oferta_publicada" },
+      descripcion: "NO esborra una oferta seva ja publicada (22023 no_es_esborrany)",
+    },
     {
       tabla: "excedentes",
       op: "leer",
@@ -2936,6 +2976,14 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // propiedad en sí no queda sin cubrir mientras haya otra cuenta receptora que sí
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
+    // Un esborrany no circula (fase C del punto 3, 20270530100000): ni en el Mercat ni por
+    // ninguna otra rama de la política de `excedentes`. Con el fixture de TEST-PROD-1 puesto,
+    // ver uno sería un escape de verdad.
+    {
+      tabla: "excedentes", op: "leer", esperado: "denegar", columnas: "id, estado",
+      filtros: [["estado", "eq", "esborrany"]],
+      descripcion: "NO veu cap esborrany (no circulen)",
+    },
     { tabla: "impacte_receptor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
     // --- Certificat de recepcio (CR): ve EL SEU. Mismo puente y misma regla que el del
     //     donante (`cierres_receptor_meus()`: los de prueba, solo si la ficha es es_test).
@@ -3413,6 +3461,12 @@ async function resolverArgs(
       // denegación se mide sobre una fila que EXISTE, no solo sobre un uuid inventado.
       const { data } = await cliente.from("diagnostic_accions").select("id").limit(1).maybeSingle();
       salida[clave] = (data as { id: string } | null)?.id ?? UUID_NULO;
+    } else if (valor === "@meva_oferta_publicada") {
+      // Fase C del punto 3: una oferta que la sesión VE y que no es un esborrany (al productor,
+      // la suya). Sirve para afirmar que `esborrar_esborrany_oferta` no la borra (22023).
+      const { data } = await cliente.from("excedentes").select("id")
+        .neq("estado", "esborrany").limit(1).maybeSingle();
+      salida[clave] = (data as { id: string } | null)?.id ?? UUID_NULO;
     } else if (valor === "@fitxa_amb_documents") {
       // Un productor con algún albarán que ya NO es borrador: por definición, su ficha no
       // se puede borrar (20270328100200). Se busca en vez de codificar `TEST-PROD-1` para
@@ -3446,8 +3500,12 @@ async function resolverArgs(
 
 async function comprobar(cliente: SupabaseClient, check: Check): Promise<{ ok: boolean; detalle: string }> {
   if (check.op === "leer") {
-    const { data, error } = await cliente.from(check.tabla)
-      .select(check.columnas ?? "*").limit(1);
+    let consulta = cliente.from(check.tabla).select(check.columnas ?? "*");
+    for (const [col, op, valor] of check.filtros ?? []) {
+      const v = String((await resolverArgs(cliente, { v: valor })).v);
+      consulta = op === "eq" ? consulta.eq(col, v) : consulta.neq(col, v);
+    }
+    const { data, error } = await consulta.limit(1);
     if (error) {
       // Afirmación de AUSENCIA: la columna no debe existir (importes en un albarán). El
       // 42703 es aquí el resultado correcto, y un éxito sería el fallo.

@@ -3,6 +3,9 @@
 //   GET  /crear-oferta/campos?productor=<uuid>  -> los pasos, sus secciones, catálogos y lo que
 //                                                  propone la ficha (`predeterminats`, A4)
 //   POST /crear-oferta  { productor_id, datos } -> crea el excedente
+//   POST /crear-oferta/esborrany { id?, productor_id, datos } -> guarda un esborrany (fase C)
+//   POST /crear-oferta/publicar  { id, datos? }  -> publica un esborrany, igual que el alta
+//   POST /crear-oferta/editar    { id, canvis }  -> edita una oferta ya publicada
 //
 // Por qué una Edge Function y no un insert desde el navegador:
 //   · `id_excedente` es un correlativo por productor, producto y día, y `texto_oferta`
@@ -17,7 +20,9 @@
 
 import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
-import { canvisOferta, crearExcedente, modalitatsAmbConveni, textoOfertaDeFila } from "../_shared/oferta.ts";
+import {
+  canvisOferta, crearExcedente, desarEsborrany, modalitatsAmbConveni, textoOfertaDeFila,
+} from "../_shared/oferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
 import { CAMPOS, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
 import { agrupaCauses, motiuSubcausa, type FilaCausa, type FilaSubcausa } from "../_shared/causes.ts";
@@ -25,7 +30,7 @@ import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
-import { fotosValides, kgValid, mapsValid, quantitatRetornValida, veuCostReferencia } from "./validacio.ts";
+import { errorFormatOferta, fotosValides, kgValid, mapsValid, veuCostReferencia } from "./validacio.ts";
 import { predeterminatsDe, principalPrimer } from "../_shared/predeterminatsOferta.ts";
 
 Deno.serve(async (req) => {
@@ -160,6 +165,14 @@ Deno.serve(async (req) => {
       }
       const c = canvisOferta(canvis as Record<string, unknown>);
       if (Object.keys(c).length === 0) return responder({ error: "Cap canvi", code: "sense_canvis" }, 400);
+      // Fase C: las fotos y el enlace de Maps, con las mismas reglas que el alta (la RPC lo vuelve
+      // a mirar, pero así el error dice qué campo es).
+      if ("fotos" in c && !fotosValides(c.fotos, fila.productor_id)) {
+        return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
+      }
+      if ("gmaps_url" in c && !mapsValid(c.gmaps_url)) {
+        return responder({ error: "L'enllaç de Maps no és vàlid", code: "maps_invalid" }, 400);
+      }
       const texto = await textoOfertaDeFila(supabase, { ...fila, ...c, modalitat: null });
       const { data, error } = await supabase.rpc("editar_oferta", {
         p_id: id, p_canvis: c, p_texto: texto, p_actor: ctx.userId,
@@ -177,42 +190,43 @@ Deno.serve(async (req) => {
     }
   }
 
-  // -------------------------------------------------------------------------
-  // POST — crear la oferta
-  // -------------------------------------------------------------------------
-  try {
-    const { productor_id: productorId, datos } = await req.json();
+  // Los mensajes de los errores de formato (los mismos códigos en el alta y en el esborrany).
+  const MISSATGE_FORMAT: Record<string, string> = {
+    kg_invalid: "Els kg han de ser un número positiu",
+    retorn_quantitat_invalid: "Quants envasos ha de ser un enter positiu",
+    maps_invalid: "L'enllaç de Maps no és vàlid",
+    fotos_invalides: "Fotos no vàlides",
+    cost_invalid: "El cost per quilo ha de ser un número positiu",
+    foto_producte_invalid: "foto_producte ha de ser booleà",
+  };
 
-    if (!productorId || typeof productorId !== "string") {
-      return responder({ error: "Falta 'productor_id'" }, 400);
-    }
-    if (!datos || typeof datos !== "object") {
-      return responder({ error: "Falta 'datos'" }, 400);
-    }
-    if (!puedeOfertar(productorId)) {
-      return responder(
-        { error: "No pots publicar ofertes en nom d'aquest productor", code: "forbidden" },
-        403,
-      );
-    }
+  /** La ubicación tiene que ser de ESTE productor (la función corre con `service_role`). */
+  const ubicacioAliena = async (ubicacio: unknown, productorId: string) => {
+    if (!ubicacio) return false;
+    const { data: ubi } = await supabase.from("productor_ubicaciones")
+      .select("id").eq("id", String(ubicacio)).eq("productor_id", productorId).maybeSingle();
+    return !ubi;
+  };
 
-    const faltan = faltantes(datos as Record<string, unknown>);
+  /**
+   * TODO lo que se comprueba antes de publicar, igual para el alta directa y para la publicación
+   * de un esborrany (fase C del punto 3): una sola lista, así que publicar un esborrany no puede
+   * ser más permisivo que el alta. Devuelve la respuesta de error o lo que hace falta para crear.
+   */
+  const validarPublicacio = async (
+    productorId: string,
+    d: Record<string, unknown>,
+  ): Promise<Response | { productor: { id: string; name: string; email: string | null }; senseConveni: string[] }> => {
+    const faltan = faltantes(d);
     if (faltan.length > 0) {
       return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan }, 400);
     }
-
-    // 17-11-2026: los kilos, positivos (un «0» pasaba `faltantes()`); los envases a devolver, un
-    // entero positivo; el enlace de Maps propio de la oferta, un http(s).
-    const d = datos as Record<string, unknown>;
-    if (!kgValid(d.kg)) {
-      return responder({ error: "Els kg han de ser un número positiu", code: "kg_invalid" }, 400);
-    }
-    if (!quantitatRetornValida(d)) {
-      return responder({ error: "Quants envasos ha de ser un enter positiu", code: "retorn_quantitat_invalid" }, 400);
-    }
-    if (!mapsValid(d.gmaps_url)) {
-      return responder({ error: "L'enllaç de Maps no és vàlid", code: "maps_invalid" }, 400);
-    }
+    // 17-11-2026: los kilos, positivos (un «0» pasaba `faltantes()`).
+    if (!kgValid(d.kg)) return responder({ error: MISSATGE_FORMAT.kg_invalid, code: "kg_invalid" }, 400);
+    // Los envases a devolver, un entero; el enlace de Maps, un http(s); las fotos, como mucho 3 y
+    // todas de la carpeta de ESTE productor (`<productor>/<uuid>.<ext>`, B7); el coste, positivo.
+    const format = errorFormatOferta(d, productorId);
+    if (format) return responder({ error: MISSATGE_FORMAT[format], code: format }, 400);
 
     // Fase B del punto 3 (fila 3.6): en el panel se elige una SUBCAUSA activa; la causa sale de
     // ella. Una categoría a secas (o una causa de las de antes) = falta la subcausa. El intake
@@ -230,41 +244,10 @@ Deno.serve(async (req) => {
       if (motiu) return responder({ error: "po.err_subcausa_invalida", code: motiu }, 400);
     }
 
-    // La ubicación tiene que ser de ESTE productor. La función corre con `service_role`, así
-    // que la RLS de `productor_ubicaciones` no lo comprueba por ella: sin esto, una oferta
-    // podría apuntar a la finca de otro con solo conocer su uuid (y el trigger de comarca
-    // copiaría además su municipio).
-    const ubicacio = (datos as Record<string, unknown>).ubicacio;
-    if (ubicacio) {
-      const { data: ubi } = await supabase.from("productor_ubicaciones")
-        .select("id").eq("id", String(ubicacio)).eq("productor_id", productorId).maybeSingle();
-      if (!ubi) {
-        return responder({ error: "Aquesta ubicació no és d'aquest productor", code: "ubicacio_aliena" }, 400);
-      }
-    }
-
-    // Las fotos (20270404100000): como mucho 3, y todas de la carpeta de ESTE productor. La
-    // subida ya la limitó la política de Storage; esto impide citar en una oferta la foto de
-    // otro, que el receptor vería como si fuera de esta.
-    // Forma exacta `<productor>/<uuid>.<ext>`: sin `..`, barras dobles ni subcarpetas (B7).
-    const fotos = (datos as Record<string, unknown>).fotos;
-    if (!fotosValides(fotos, productorId)) {
-      return responder({ error: "Fotos no vàlides", code: "fotos_invalides" }, 400);
-    }
-
-    // El coste que declara el productor (27-09-2026): un número positivo o nada. La base lo
-    // exige también (`excedentes_coste_kg_positiu`), pero así el error dice qué campo es.
-    const cost = (datos as Record<string, unknown>).cost_kg;
-    if (cost !== undefined && cost !== null && cost !== "") {
-      const n = Number(String(cost).replace(",", "."));
-      if (!Number.isFinite(n) || n <= 0) {
-        return responder({ error: "El cost per quilo ha de ser un número positiu", code: "cost_invalid" }, 400);
-      }
-    }
-    // `foto_producte` es un booleano o no viene (entonces, sí).
-    const fp = (datos as Record<string, unknown>).foto_producte;
-    if (fp !== undefined && fp !== null && typeof fp !== "boolean") {
-      return responder({ error: "foto_producte ha de ser booleà", code: "foto_producte_invalid" }, 400);
+    // Sin esto, una oferta podría apuntar a la finca de otro con solo conocer su uuid (y el
+    // trigger de comarca copiaría además su municipio).
+    if (await ubicacioAliena(d.ubicacio, productorId)) {
+      return responder({ error: "Aquesta ubicació no és d'aquest productor", code: "ubicacio_aliena" }, 400);
     }
 
     // ⚠️ La lista de columnas, en UN literal (§7, deuda 46).
@@ -272,17 +255,11 @@ Deno.serve(async (req) => {
       .from("productores").select("id, name, email").eq("id", productorId).maybeSingle();
     if (!productor) return responder({ error: "Productor no trobat" }, 404);
 
-    // El convenio que exige ESTA modalidad a quien entrega (28-09-2026). Hasta hoy solo lo
-    // comprobaba la pantalla: la oferta se publicaba igual y el choque llegaba al aprobar el
-    // primer interés, con la oferta ya circulando. `exigir_convenio()` es la misma regla que
-    // usan `aprovar_resposta()` y `manifestar_interes()`: antes de la fecha de corte avisa (y
-    // aquí no se hace nada con el aviso), desde la fecha de corte levanta 42501.
-    // ⚠️ El alta ASISTIDA no pasa por aquí: el equipo resuelve el convenio en la fase 1 del
-    //    ciclo guiado, con la persona delante (§6ter).
-    // Desde el 05-10-2026 una oferta puede ofrecerse en VARIAS modalidades, y basta con que
-    // UNA tenga su convenio vigente para publicarla: la que no lo tenga la para
-    // `aprovar_resposta()` al canalizar, y la pantalla avisa de cuáles son.
-    const modalitats = modalitatsDe((datos as Record<string, unknown>).modalitat);
+    // El convenio que exige ESTA modalidad a quien entrega (28-09-2026): `exigir_convenio()`, la
+    // misma regla que `aprovar_resposta()` y `manifestar_interes()`. Basta con que UNA modalidad
+    // tenga su convenio vigente (05-10-2026); la pantalla avisa de cuáles no.
+    // ⚠️ El alta ASISTIDA no pasa por aquí: el equipo resuelve el convenio con la persona delante.
+    const modalitats = modalitatsDe(d.modalitat);
     let senseConveni: string[] = [];
     if (!ctx.esIntern) {
       const cobertes = await modalitatsAmbConveni(supabase, productorId, modalitats);
@@ -296,12 +273,8 @@ Deno.serve(async (req) => {
       senseConveni = modalitats.filter((m) => !cobertes.includes(m));
     }
 
-    // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el
-    // equipo en su nombre, que es el modelo de operación del servicio (§1bis) y a la
-    // hora de leer los datos no es lo mismo que si la hubiera publicado él.
-    // G1 (05-10-2026, rebanada 3): con un albarán entregado y sin confirmar desde hace más
-    // de 48 h, primero se confirma. Solo la productora: el equipo opera en su nombre y es
-    // quien resuelve la confirmación, por eso el alta asistida no se bloquea.
+    // G1 (05-10-2026, rebanada 3): con un albarán entregado y sin confirmar desde hace más de
+    // 48 h, primero se confirma. Solo la productora: el equipo opera en su nombre.
     if (!ctx.esIntern) {
       const { data: pendents } = await supabase.rpc("bloqueig_per_albara", {
         p_tipo: "productor", p_org: productorId,
@@ -311,30 +284,144 @@ Deno.serve(async (req) => {
         return responder({ error: "po.err_albara_pendent", code: "albara_pendent", albarans: ids }, 409);
       }
     }
+    return { productor, senseConveni };
+  };
 
-    const r = await crearExcedente(
-      supabase,
-      datos as Record<string, unknown>,
-      productor,
-      ctx.esIntern ? "asistido" : "panel",
+  /** Crea (o publica el esborrany) y manda la confirmación: el MISMO efecto por los dos caminos. */
+  const publicar = async (
+    d: Record<string, unknown>,
+    v: { productor: { id: string; name: string; email: string | null }; senseConveni: string[] },
+    esborranyId?: string,
+  ) => {
+    // `panel` cuando la publica el propio productor; `asistido` cuando la introduce el equipo
+    // en su nombre (§1bis).
+    const r = await crearExcedente(supabase, d, v.productor, ctx.esIntern ? "asistido" : "panel", { esborranyId });
+    if (!r.ok) {
+      if (r.error === "esborrany_inexistent") {
+        return responder({ error: "Aquest esborrany ja no existeix", code: "esborrany_inexistent" }, 409);
+      }
+      return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
+    }
+    // La confirmación que el intake manda por WhatsApp, aquí por correo: quien publica desde el
+    // panel también tiene derecho a su referencia por escrito.
+    const confirmacio = await confirmarOfertaPerCorreu(
+      v.productor, r.idExcedente ?? "", r.excedenteId ?? "", d, supabase, "crear-oferta", r.estado,
     );
-    if (!r.ok) return responder({ error: r.error ?? "No s'ha pogut crear l'oferta" }, 500);
+    return responder({
+      ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio,
+      // `pendent_validacio` o `publicada` (05-10-2026): lo decide la base.
+      estado: r.estado ?? "publicada",
+      modalitats_sense_conveni: v.senseConveni,
+    }, 200);
+  };
 
-    // La confirmación que el intake manda por WhatsApp (`_shared/oferta.ts`), aquí por
-    // correo: quien publica desde el panel también tiene derecho a su referencia por
-    // escrito, y con WhatsApp apagado (§8) esta es la única que va a recibir.
-    const confirmacio = await confirmarOfertaPerCorreu(productor, r.idExcedente ?? "", r.excedenteId ?? "", datos, supabase, "crear-oferta", r.estado);
+  const ruta = new URL(req.url).pathname;
 
-    return responder(
-      {
-        ok: true, id: r.excedenteId, id_excedente: r.idExcedente, confirmacio_email: confirmacio,
-        // `pendent_validacio` o `publicada` (05-10-2026): lo decide la base, y la pantalla lo
-        // dice tal cual en vez de dar por publicada una oferta que nadie ve todavía.
-        estado: r.estado ?? "publicada",
-        modalitats_sense_conveni: senseConveni,
-      },
-      200,
-    );
+  // ── Guardar un ESBORRANY (fase C del punto 3, filas 3.1.2 y 3.7.1) ──
+  // POST /crear-oferta/esborrany { id?, productor_id, datos }
+  // Basta con productor y producto (del catálogo); lo demás se guarda como esté, pero lo que hay
+  // tiene que tener buen formato. No dispara nada: ni validación, ni avisos, ni correo.
+  if (ruta.endsWith("/esborrany")) {
+    try {
+      const { id, productor_id: productorId, datos } = await req.json();
+      if (!productorId || typeof productorId !== "string" || !datos || typeof datos !== "object") {
+        return responder({ error: "Falten 'productor_id' o 'datos'" }, 400);
+      }
+      if (id !== undefined && id !== null && typeof id !== "string") {
+        return responder({ error: "'id' no vàlid" }, 400);
+      }
+      if (!puedeOfertar(productorId)) {
+        return responder({ error: "No pots desar ofertes en nom d'aquest productor", code: "forbidden" }, 403);
+      }
+      const d = datos as Record<string, unknown>;
+      const producte = String(d.producte ?? "").trim();
+      if (!producte) {
+        return responder({ error: "Cal triar el producte", code: "falta_producte", faltan: ["producte"] }, 400);
+      }
+      const { data: prod } = await supabase.from("productos").select("nombre").eq("nombre", producte).maybeSingle();
+      if (!prod) return responder({ error: "Producte desconegut", code: "producte_invalid" }, 400);
+      const format = errorFormatOferta(d, productorId);
+      if (format) return responder({ error: MISSATGE_FORMAT[format], code: format }, 400);
+      if (await ubicacioAliena(d.ubicacio, productorId)) {
+        return responder({ error: "Aquesta ubicació no és d'aquest productor", code: "ubicacio_aliena" }, 400);
+      }
+      // Reescribir uno existente: tiene que ser un esborrany de ESTE productor (el productor de
+      // un esborrany no cambia; para otro, otro esborrany).
+      if (id) {
+        const { data: fila } = await supabase.from("excedentes")
+          .select("productor_id, estado").eq("id", id).maybeSingle();
+        if (!fila || !puedeOfertar(fila.productor_id)) {
+          return responder({ error: "Esborrany inexistent", code: "esborrany_inexistent" }, 404);
+        }
+        if (fila.estado !== "esborrany") {
+          return responder({ error: "Aquesta oferta ja no és un esborrany", code: "no_es_esborrany" }, 409);
+        }
+        if (fila.productor_id !== productorId) {
+          return responder({ error: "El productor d'un esborrany no canvia", code: "productor_fix" }, 400);
+        }
+      }
+      const r = await desarEsborrany(supabase, d, productorId, ctx.esIntern ? "asistido" : "panel", id ?? undefined);
+      if (!r.ok) {
+        const status = r.error === "esborrany_inexistent" ? 409 : 500;
+        return responder({ error: r.error, code: r.error === "esborrany_inexistent" ? r.error : undefined }, status);
+      }
+      return responder({ ok: true, id: r.id, estado: "esborrany" });
+    } catch (err) {
+      console.error("crear-oferta/esborrany:", err instanceof Error ? err.message : String(err));
+      return responder({ error: "Error interno o JSON inválido" }, 500);
+    }
+  }
+
+  // ── Publicar un ESBORRANY ──
+  // POST /crear-oferta/publicar { id, datos? }  (sin `datos`, lo guardado en el esborrany)
+  // Las MISMAS comprobaciones que el alta y el mismo efecto (correo de confirmación incluido);
+  // la validación del equipo la decide la base al pasar a `publicada`.
+  if (ruta.endsWith("/publicar")) {
+    try {
+      const { id, datos } = await req.json();
+      if (!id || typeof id !== "string") return responder({ error: "Falta 'id'" }, 400);
+      const { data: fila } = await supabase.from("excedentes")
+        .select("productor_id, estado, dades_esborrany").eq("id", id).maybeSingle();
+      // El permiso antes que la existencia: a quien no puede, lo mismo exista o no.
+      if (!fila || !puedeOfertar(fila.productor_id)) {
+        return responder({ error: "Esborrany inexistent", code: "esborrany_inexistent" }, 404);
+      }
+      if (fila.estado !== "esborrany") {
+        return responder({ error: "Aquesta oferta ja està publicada", code: "no_es_esborrany" }, 409);
+      }
+      const d = (datos && typeof datos === "object" ? datos : fila.dades_esborrany ?? {}) as Record<string, unknown>;
+      // El producto SÍ puede cambiar mientras es esborrany: el `E-…` (que lo lleva) nace aquí.
+      const v = await validarPublicacio(fila.productor_id, d);
+      if (v instanceof Response) return v;
+      return await publicar(d, v, id);
+    } catch (err) {
+      console.error("crear-oferta/publicar:", err instanceof Error ? err.message : String(err));
+      return responder({ error: "Error interno o JSON inválido" }, 500);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // POST — crear la oferta (alta directa)
+  // -------------------------------------------------------------------------
+  try {
+    const { productor_id: productorId, datos } = await req.json();
+
+    if (!productorId || typeof productorId !== "string") {
+      return responder({ error: "Falta 'productor_id'" }, 400);
+    }
+    if (!datos || typeof datos !== "object") {
+      return responder({ error: "Falta 'datos'" }, 400);
+    }
+    if (!puedeOfertar(productorId)) {
+      return responder(
+        { error: "No pots publicar ofertes en nom d'aquest productor", code: "forbidden" },
+        403,
+      );
+    }
+    const d = datos as Record<string, unknown>;
+    const v = await validarPublicacio(productorId, d);
+    if (v instanceof Response) return v;
+    return await publicar(d, v);
   } catch (err) {
     console.error("crear-oferta:", err instanceof Error ? err.message : String(err));
     return responder({ error: "Error interno o JSON inválido" }, 500);

@@ -36,7 +36,8 @@ import ValidacioOferta from './equip/ValidacioOferta'
 import DestiFinal from './DestiFinal'
 import CanvisOferta from './equip/CanvisOferta'
 import { carregaDestins } from '../lib/ofertes'
-import DialegEditaOferta from './DialegEditaOferta'
+import DialegEdicioOferta from './DialegEdicioOferta'
+import FitxaOferta from './FitxaOferta'
 import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
 import FormulariAprovacio from './equip/FormulariAprovacio'
 import CertificatOferta from './equip/CertificatOferta'
@@ -47,7 +48,6 @@ import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
 import { fixaFotos } from '../lib/fotos'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
 interface Props {
@@ -148,9 +148,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     void carregaTipusActivitat().then((c) => setNomsActivitat(Object.fromEntries(c.map((a) => [a.codi, lang === 'es' ? a.nom_es : a.nom_ca]))))
   }, [lang])
   const [mostrats, setMostrats] = useState(PAS_RANKING)
-  // Input de fecha controlado: se re-sincroniza cuando `exc` cambia tras recargar
-  // (p. ej. si el intake dejó una fecha parseada o el usuario la edita).
-  const [fecha, setFecha] = useState<string>(excedente.disponible_hasta ?? '')
   const [testMode, setTestMode] = useState(true)
   // Interruptor global de WhatsApp (§8). Sale del sobre de `priorizar-entidades`, igual
   // que `modoTest`: lo decide el servidor y el panel solo obedece.
@@ -255,7 +252,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     })
   }, [excedente.id])
 
-  useEffect(() => { setFecha(exc.disponible_hasta ?? '') }, [exc.disponible_hasta])
 
   useEffect(() => {
     // Productor + municipi para rellenar la plantilla oferta_excedent (fuera de ventana).
@@ -297,16 +293,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   const ambInteresProducte = useMemo(() => hiHaInteresProducte(ranking), [ranking])
   const tipusDelRanking = useMemo(() => tipusPresents(ranking), [ranking])
 
-  // Las dos escrituras piden las filas afectadas: un UPDATE que la RLS no deja pasar no da
+  // «Disponible fins» ya no se escribe aquí con un `update` directo (fase C del punto 3): se
+  // edita con el resto de la oferta, por `editar_oferta()`, que recompone el texto y deja rastro
+  // en `excedentes_canvis`. Un `update` suelto dejaba el texto compartido diciendo otra fecha.
+  // La escritura de abajo pide las filas afectadas: un UPDATE que la RLS no deja pasar no da
   // error, devuelve cero filas (§12.48), y la pantalla daba el cambio por hecho.
-  async function guardarFecha(valor: string) {
-    setFecha(valor)
-    const { data, error } = await supabase.from('excedentes')
-      .update({ disponible_hasta: valor || null }).eq('id', excedente.id).select('id')
-    if (error || !data || data.length === 0) toast.error(t('c.error'))
-    await recargar()
-  }
-
   async function toggleOptIn(entidadId: string, actual: boolean) {
     const { data, error } = await supabase.from('entidades')
       .update({ opt_in: !actual }).eq('id', entidadId).select('id')
@@ -586,6 +577,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Solo una oferta publicada (o a medias) admite todavía interés: es lo que comprueba
   // `manifestar_interes()`. Fuera de esos dos estados, enviarla no tiene sentido.
   const ofertaOberta = exc.estado === 'publicada' || exc.estado === 'parcial'
+  const editable = ['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado)
   const vencida = exc.disponible_hasta != null && new Date(exc.disponible_hasta) < new Date() && faltan > 0
 
   /**
@@ -742,12 +734,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             sortides={vives.map((c) => ({ entitat: nombrePorId(c.entidad_id), kg: Number(c.kg_confirmados ?? 0) }))}
             onDesat={() => void recargar()}
           />
-          {['pendent_validacio', 'publicada', 'parcial', 'bloqueada'].includes(exc.estado) && (
-            <>
-              <Button variant="outline" className="h-11 md:h-8" onClick={() => setEditant(true)}>{t('edit.cta')}</Button>
-              <DialegEditaOferta obert={editant} onObert={setEditant} oferta={exc}
-                kgCanalitzats={canalizados} esEquip onFet={recargar} />
-            </>
+          {editable && (
+            <DialegEdicioOferta obert={editant} onObert={setEditant} oferta={exc}
+              kgCanalitzats={canalizados} esEquip onFet={recargar} />
           )}
 
           {/* ── F3: convertir en espigolada ──
@@ -816,26 +805,10 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         </Card>
       )}
 
-      {exc.texto_oferta && (
-        <Card>
-          <CardHeader className="flex flex-row items-center justify-between">
-            <CardTitle className="text-base">{t('od.offer_text')}</CardTitle>
-            <BotoCopiar text={exc.texto_oferta ?? ''} etiqueta={t('od.copy_group')} />
-          </CardHeader>
-          <CardContent>
-            <pre className="whitespace-pre-wrap rounded-lg bg-muted p-3 font-sans text-sm">{exc.texto_oferta}</pre>
-          </CardContent>
-        </Card>
-      )}
-
-      <Card>
-        <CardHeader><CardTitle className="text-base">{t('od.available_until')}</CardTitle></CardHeader>
-        <CardContent className="flex items-center gap-3">
-          <Input type="date" className="w-auto" value={fecha}
-            onChange={(ev) => void guardarFecha(ev.target.value)} />
-          {vencida && <span className="text-sm text-destructive">{t('od.expired')}</span>}
-        </CardContent>
-      </Card>
+      {/* Todo lo de la oferta en lectura, su texto, «Copia» y «Comparteix» (fase C del punto
+          3, fila 3.7.2). «Edita l'oferta» abre el mismo formulario del alta en modo editar. */}
+      <FitxaOferta oferta={exc} ambCost vencida={vencida} etiquetaCopiar={t('od.copy_group')}
+        onEdita={editable ? () => setEditant(true) : undefined} />
 
       <Card>
         <CardHeader><CardTitle className="text-base">{t('od.prioritized')}</CardTitle></CardHeader>

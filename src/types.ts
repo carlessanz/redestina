@@ -272,6 +272,12 @@ export interface Entidad {
 }
 
 export type EstadoExcedente =
+  /**
+   * La oferta a medio rellenar, guardada en el servidor (fase C del punto 3, 20270530100000):
+   * solo la ven su productor y el equipo, no circula y no tiene `E-…` ni texto hasta publicarla.
+   */
+  | 'esborrany'
+  /** ⚠️ No es el esborrany: es la oferta convertida en espigolada mientras se cosecha. */
   | 'borrador'
   /** Espera a que el equipo la valide antes de salir al Mercat (05-10-2026). */
   | 'pendent_validacio'
@@ -350,6 +356,15 @@ export interface Excedente {
   tancada_at?: string | null
   /** Cuándo el job de vencidas pidió al productor el destino de lo que quedaba. */
   desti_reclamat_at?: string | null
+  /** 17-11-2026: qué envases devolver y cuántos (solo con retorno «Sí»). */
+  retorn_envasos_detall?: string | null
+  retorn_envasos_quantitat?: number | null
+  /** 17-11-2026: los días de recogida (1 = dilluns … 7 = diumenge). */
+  dies_recollida?: number[] | null
+  /** 17-11-2026: el enlace de Maps PROPIO de la oferta (manda sobre el del lugar). */
+  gmaps_url?: string | null
+  /** Fase C del punto 3: el formulario tal cual, solo mientras es `esborrany`. */
+  dades_esborrany?: Record<string, unknown> | null
 }
 
 export interface Canalizacion {

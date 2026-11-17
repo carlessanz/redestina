@@ -356,7 +356,69 @@ export async function editaOferta(
 export const CODIS_EDICIO = [
   'kg_menys_canalitzats', 'kg_invalids', 'modalitats_buides', 'modalitat_amb_canalitzacions',
   'oferta_no_editable', 'sense_canvis', 'forbidden', 'subcausa_invalida',
+  // Fase C del punto 3 (17-11-2026): lo que se edita ahora además.
+  'ubicacio_aliena', 'maps_invalid', 'format_invalid', 'retorn_invalid', 'retorn_quantitat_invalid',
+  'dies_invalids', 'massa_fotos', 'foto_aliena', 'fotos_invalides',
 ] as const
+
+/**
+ * Guarda un ESBORRANY de oferta en el servidor (fase C del punto 3, 17-11-2026): sin `id`, lo
+ * crea; con `id`, lo reescribe. Basta con el producto; lo demás se guarda como esté. `code` es
+ * el motivo del rechazo (`falta_producte`, `kg_invalid`…).
+ */
+export async function desaEsborranyOferta(
+  productorId: string,
+  datos: Record<string, unknown>,
+  id?: string | null,
+): Promise<Resultat<{ id: string }> & { code?: string }> {
+  try {
+    const t = await token()
+    if (!t) return { ok: false, error: 'unauthorized' }
+    const res = await fetch(`${supabaseUrl}/functions/v1/crear-oferta/esborrany`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: id ?? undefined, productor_id: productorId, datos }),
+    })
+    const body = await res.json().catch(() => null) as { error?: string; code?: string; id?: string } | null
+    if (!res.ok || !body?.id) return { ok: false, error: body?.error ?? 'error', code: body?.code }
+    return { ok: true, data: { id: body.id } }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/**
+ * Publica un esborrany con lo que hay en el formulario: las MISMAS comprobaciones y el mismo
+ * resultado que `creaOferta()` (la referencia `E-…` nace aquí).
+ */
+export async function publicaEsborrany(
+  id: string,
+  datos: Record<string, unknown>,
+): ReturnType<typeof creaOferta> {
+  try {
+    const t = await token()
+    if (!t) return { ok: false, error: 'unauthorized' }
+    const res = await fetch(`${supabaseUrl}/functions/v1/crear-oferta/publicar`, {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${t}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, datos }),
+    })
+    const body = await res.json().catch(() => null)
+    if (!res.ok) {
+      const b = body as { error?: string; faltan?: string[] } | null
+      return { ok: false, error: b?.error ?? 'error', faltan: b?.faltan }
+    }
+    return { ok: true, data: body }
+  } catch (err) {
+    return { ok: false, error: err instanceof Error ? err.message : String(err) }
+  }
+}
+
+/** Borra un esborrany (RPC: el productor, los suyos; el equipo, todos; nunca una publicada). */
+export async function esborraEsborranyOferta(id: string): Promise<Resultat<null>> {
+  const { error } = await supabase.rpc('esborrar_esborrany_oferta', { p_id: id })
+  return error ? { ok: false, error: error.message } : { ok: true, data: null }
+}
 
 /** El productor cancela su propia oferta (RPC con comprobación de pertenencia). */
 export async function cancelaOferta(excedenteId: string, motiu: string): Promise<Resultat<Excedente>> {

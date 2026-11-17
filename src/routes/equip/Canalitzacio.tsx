@@ -276,6 +276,8 @@ export default function Canalitzacio() {
         obert={dlgNova}
         onTancar={() => setDlgNova(false)}
         onCreada={(r) => { setDlgNova(false); navega(`/equip/canalitzacio/${r.id}`) }}
+        // Un esborrany no entra en el ciclo: se sigue desde Ofertes › Esborranys.
+        onEsborranyDesat={() => { setDlgNova(false); navega('/equip/ofertes?tab=esborranys') }}
       />
     </div>
   )

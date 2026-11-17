@@ -6,85 +6,134 @@
 // nadie que ya lo usaba cambia su import.
 
 import { textCausa } from "./causes.ts";
+import { ambPreu, etiquetaModalitats, modalitatsDe } from "./modalitats.ts";
+
+/** Lo que el texto necesita y la fila de `excedentes` no tiene: nombres resueltos en la base. */
+export interface ContextTextOferta {
+  /** El nombre de la organización (`empresa`, o `name` de respaldo). */
+  productor: string;
+  /** El municipio del lugar o, si no, el de la ficha. */
+  municipi: string;
+  /** El enlace de Maps del LUGAR (el propio de la oferta, `gmaps_url`, manda sobre él). */
+  mapsLloc?: string | null;
+  /** Nombre de la causa y de la subcausa, ya resueltos contra el catálogo. */
+  causa?: string | null;
+  subcausa?: string | null;
+  /**
+   * La fecha límite tal como la escribió quien la dio, para cuando `disponible_hasta` no se pudo
+   * leer como fecha (un «finals de juliol» por WhatsApp). Con fecha, se imprime la fecha.
+   */
+  disponibleText?: string | null;
+}
 
 /**
- * Texto que se publica en el grupo de canalizaciones.
+ * 🔴 EL texto de una oferta a partir de su FILA (fase C del punto 3, 17-11-2026): una sola
+ * función para el alta, la publicación de un esborrany y la edición, así que el mensaje que se
+ * comparte dice siempre lo que dice la fila (fila 3.7.4 del Excel). Pura: la prueban
+ * `tests/oferta.test.ts` y `tests/edicioOferta.test.ts`.
+ */
+export function textoOfertaDeDades(fila: Record<string, unknown>, ctx: ContextTextOferta): string {
+  const modalitats = modalitatsDe(
+    Array.isArray(fila.modalitats) && fila.modalitats.length > 0 ? fila.modalitats : fila.modalitat,
+  );
+  const kg = Number(fila.kg_total ?? 0);
+  const preu = ambPreu(modalitats) && fila.preu_minim != null && fila.preu_minim !== ""
+    ? Number(fila.preu_minim) : null;
+  const data = typeof fila.disponible_hasta === "string" && /^\d{4}-\d{2}-\d{2}/.test(fila.disponible_hasta)
+    ? fila.disponible_hasta.slice(0, 10).split("-").reverse().join("/")
+    : String(ctx.disponibleText ?? "").trim();
+  const mapsPropi = typeof fila.gmaps_url === "string" && /^https?:\/\/\S+$/i.test(fila.gmaps_url.trim())
+    ? fila.gmaps_url.trim() : "";
+  return componerTextoOferta({
+    producte: String(fila.producto ?? ""),
+    varietat: fila.variedad ? String(fila.variedad) : undefined,
+    producteAlCamp: fila.producte_al_camp === true,
+    productor: ctx.productor,
+    municipi: ctx.municipi,
+    ubicacio: mapsPropi || ctx.mapsLloc || undefined,
+    // Con coma decimal, como se escribe en catalán.
+    quantitat: kg > 0 ? `${String(kg).replace(".", ",")} kg aprox` : undefined,
+    disponible: data || undefined,
+    dies: textDies(fila.dies_recollida) || undefined,
+    horari: fila.horari_recollida ? String(fila.horari_recollida) : undefined,
+    modalitat: modalitats.length > 0 ? etiquetaModalitats(modalitats) : undefined,
+    preu: preu != null && Number.isFinite(preu) ? `${preu.toFixed(2).replace(".", ",")} €/kg` : undefined,
+    causa: ctx.causa ?? (fila.causa ? String(fila.causa) : undefined),
+    subcausa: ctx.subcausa ?? undefined,
+    envasos: textoEnvasos(
+      fila.format_entrega, fila.retorn_envasos, fila.retorn_envasos_detall,
+      fila.retorn_envasos_quantitat, fila.num_caixes,
+    ) || undefined,
+    observacions: fila.observacions ? String(fila.observacions) : undefined,
+  });
+}
+
+/**
+ * Texto que se publica en el grupo de canalizaciones y que se comparte (botón «Comparteix»).
  * Reproduce el formato que el equipo usa hoy a mano, emojis incluidos.
+ *
+ * 🔴 NINGUNA LÍNEA CON LA ETIQUETA VACÍA (punto 3, fase C, filas 3.7.5 y 3.7.6 del Excel de la
+ *    Fundació, 17-11-2026): un campo sin valor no imprime su línea. Hasta entonces
+ *    `responsable` y `observacions` se imprimían siempre (una etiqueta vacía «se lee como no hi
+ *    ha»); la Fundació pide lo contrario y quitar «RESPONSABLE» del todo. Fuera también la
+ *    línea de TRANSPORTE (la pregunta está oculta desde la fase A).
+ *
+ * Orden de la fila 3.7.6: producto, productor, municipio, punto de recogida (enlace), cantidad,
+ * fecha límite, horario (días y franja), modalidad, precio mínimo (solo con venta, lo decide quien
+ * llama), causa, envases y observaciones.
  */
 export function componerTextoOferta(campos: {
   producte: string;
+  /** La variedad va con el producto, entre paréntesis. */
+  varietat?: string;
   /** Solo cuando es cierto se imprime la línea: el silencio significa «ja està collit». */
   producteAlCamp?: boolean;
-  productor: string;
-  municipi: string;
-  /** Sin enlace de Maps no se imprime el bloque entero (ver más abajo). */
+  productor?: string;
+  municipi?: string;
+  /** El enlace de Maps (el propio de la oferta o, si no, el del lugar). */
   ubicacio?: string;
-  quantitat: string;
-  disponible: string;
-  /** Días de recogida ya compuestos (`textDies`, 17-11-2026). Sin días, no se imprime la línea. */
+  quantitat?: string;
+  disponible?: string;
+  /** Días de recogida ya compuestos (`textDies`). Van en la línea del horario. */
   dies?: string;
-  /** Campo libre y opcional del panel: sin respuesta, no se imprime la línea. */
+  /** La franja en texto («de 8:00 a 12:00»). */
   horari?: string;
-  modalitat: string;
+  modalitat?: string;
+  /** Solo con venta (quien llama lo decide con `ambPreu`). */
   preu?: string;
-  causa: string;
+  causa?: string;
   /** La subcausa (fase B del punto 3): con ella, «CAUSA: Categoria — Subcausa». */
   subcausa?: string;
-  /** Formato de entrega y retorno, ya compuestos (`textoEnvasos`). Sin nada, no se imprime. */
+  /** Formato, cantidad y retorno, ya compuestos (`textoEnvasos`). */
   envasos?: string;
-  /** Solo cuando el productor lo lleva: el silencio significa «cal venir a buscar-lo». */
-  transportPropi?: boolean;
-  /**
-   * `responsable` y `observacions` SIEMPRE se imprimen, aunque estén vacías —al revés que
-   * `ubicacio`/`horari`/`envasos` de aquí arriba—, y es una decisión distinta y ya tomada
-   * (`tests/oferta.test.ts`, «un campo vacío deja su etiqueta, no borra la línea»): son
-   * texto libre que alguien podría haber escrito, y una etiqueta vacía se lee como «no hi
-   * ha», mientras que una línea que desaparece se lee como un fallo. No tocar sin revisar
-   * ese test.
-   */
-  responsable: string;
-  observacions: string;
+  observacions?: string;
 }): string {
+  const ple = (v: string | undefined | null): v is string => typeof v === "string" && v.trim() !== "";
+  const varietat = ple(campos.varietat) ? ` (${campos.varietat.trim()})` : "";
   const lineas = [
     "📢 *OFERTA DISPONIBLE*",
     "",
-    `🌿 PRODUCTE: ${campos.producte}`,
+    `🌿 PRODUCTE: ${campos.producte}${varietat}`,
   ];
-  // Va pegada al producto, y no al final con las observaciones, porque califica QUÉ se
-  // ofrece: la entidad tiene que saber que todavía no está collit **antes** de decir que
-  // le interesa, no cuando llegue a la finca.
-  //
-  // ⚠️ Solo se imprime cuando es cierto, igual que el `preu mínim` de más abajo. Una línea
-  //    «PRODUCTE AL CAMP: no» en el caso normal —que es la inmensa mayoría de las ofertas—
-  //    sería ruido en un mensaje que se lee en un móvil, y esa asimetría es deliberada: el
-  //    silencio significa «ja està collit», que es lo que la oferta ya daba a entender
-  //    antes de que este campo existiera.
+  // Va pegada al producto porque califica QUÉ se ofrece: la entidad tiene que saber que
+  // todavía no está collit antes de decir que le interesa.
   if (campos.producteAlCamp) {
     lineas.push("🌱 PRODUCTE AL CAMP: sí (encara no s'ha collit)");
   }
+  if (ple(campos.productor)) lineas.push(`👩‍🌾 PRODUCTOR: ${campos.productor}`);
+  if (ple(campos.municipi)) lineas.push(`📍 MUNICIPI: ${campos.municipi}`);
+  // El enlace en su propia línea: así WhatsApp y el correo lo hacen pulsable entero.
+  if (ple(campos.ubicacio)) lineas.push("🗺️ PUNT DE RECOLLIDA:", campos.ubicacio.trim());
+  if (ple(campos.quantitat)) lineas.push(`📦 QUANTITAT: ${campos.quantitat}`);
+  if (ple(campos.disponible)) lineas.push(`📅 DISPONIBLE FINS: ${campos.disponible}`);
+  const horari = [campos.dies, campos.horari].filter(ple).map((x) => x.trim()).join(" · ");
+  if (horari) lineas.push(`⏰ HORARI DE RECOLLIDA: ${horari}`);
+  if (ple(campos.modalitat)) lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
+  if (ple(campos.preu)) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
+  if (ple(campos.causa)) lineas.push(`🔴 CAUSA: ${textCausa(campos.causa, campos.subcausa)}`);
+  if (ple(campos.envasos)) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
+  if (ple(campos.observacions)) lineas.push(`📝 OBSERVACIONS: ${campos.observacions.trim()}`);
   lineas.push(
-    `👩‍🌾 PRODUCTOR: ${campos.productor}`,
-    `📍 MUNICIPI: ${campos.municipi}`,
-  );
-  // Sin enlace de Maps no hay nada que poner bajo la etiqueta: un guion suelto en su
-  // propia línea no dice nada y ocupa sitio en un mensaje que se lee en el móvil (mismo
-  // criterio que `producte_al_camp`/`preu_minim`, deuda §12.122).
-  if (campos.ubicacio) {
-    lineas.push(`🗺️ UBICACIÓ:`, campos.ubicacio);
-  }
-  lineas.push(`📦 QUANTITAT: ${campos.quantitat}`, `📅 DISPONIBLE: ${campos.disponible}`);
-  if (campos.dies) lineas.push(`🗓️ DIES DE RECOLLIDA: ${campos.dies}`);
-  if (campos.horari) lineas.push(`⏰ HORARI RECOLLIDA: ${campos.horari}`);
-  lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
-  // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
-  if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
-  lineas.push(`🔴 CAUSA: ${textCausa(campos.causa, campos.subcausa)}`);
-  if (campos.envasos) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
-  // Misma asimetría que `producte_al_camp`: solo se dice cuando cambia lo que hay que hacer.
-  if (campos.transportPropi) lineas.push("🚚 TRANSPORT: el porta la productora");
-  lineas.push(
-    `👥 RESPONSABLE: ${campos.responsable}`,
-    `📝 OBSERVACIONS: ${campos.observacions}`,
     "",
     "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
   );
@@ -106,14 +155,19 @@ const ETIQUETA_FORMAT: Record<string, string> = {
 };
 
 /**
- * La línea ENVASOS: formato de entrega y, si aplica, si hay que devolverlos. Vacía si no se
- * preguntó (producto en el campo) — y entonces la línea no se imprime.
+ * La línea ENVASOS: formato de entrega, cuántos (cajas o palets) y, si aplica, si hay que
+ * devolverlos. Vacía si no se preguntó (producto en el campo) — y entonces la línea no se imprime.
  *
- * Desde el 17-11-2026, con retorno, también QUÉ y CUÁNTOS, entre paréntesis y en una línea
- * breve: «Caixes · cal retornar-los (20 · caixes de plàstic verdes)».
+ * Con retorno, también QUÉ y CUÁNTOS, entre paréntesis: «12 caixes · cal retornar-los (20 ·
+ * caixes de plàstic verdes)». Desde la fase C del punto 3 el número de cajas va aquí y no en
+ * QUANTITAT (fila 3.7.6: «formato y cantidad de envases»).
  */
-export function textoEnvasos(format: unknown, retorn: unknown, detall?: unknown, quantitat?: unknown): string {
-  const f = ETIQUETA_FORMAT[String(format ?? "")] ?? "";
+export function textoEnvasos(
+  format: unknown, retorn: unknown, detall?: unknown, quantitat?: unknown, caixes?: unknown,
+): string {
+  const n = Number(caixes);
+  const ambNombre = (format === "caixes" || format === "palet") && Number.isInteger(n) && n > 0;
+  const f = ambNombre ? textCaixes(n, format) : ETIQUETA_FORMAT[String(format ?? "")] ?? "";
   const r = String(retorn ?? "");
   let ret = r === "Sí" ? "cal retornar-los" : r === "No" ? "no cal retornar-los" : "";
   if (r === "Sí") {

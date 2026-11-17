@@ -3,9 +3,13 @@
 // Son las mismas `excedentes` que ve el equipo, filtradas por RLS a las suyas: no hay
 // una segunda fuente de datos ni una copia del estado. El progreso y los badges
 // reutilizan el mismo criterio visual que OffersList.
+//
+// Los ESBORRANYS (fase C del punto 3, 17-11-2026) llegan en la misma consulta pero van
+// aparte: no son ofertas todavía (no circulan, no tienen proceso), así que no cuentan en el
+// resumen ni en el histórico; tienen su pestaña en el listado.
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Link, useNavigate } from 'react-router'
+import { Link, useNavigate, useSearchParams } from 'react-router'
 import { ArrowRight, PlusCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { cn } from '../../lib/utils'
@@ -37,6 +41,7 @@ import type { FotoResolta } from '../../components/FotosOferta'
 import type { EstadoAlbaran, Excedente } from '../../types'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 
 /**
  * Lo que cuenta el estado de una oferta, además del propio excedente: su albarán de
@@ -49,6 +54,7 @@ interface RecResum { id: string; estado: EstadoAlbaran; numero: string | null; d
 /** Hook compartido por las dos pantallas: las ofertas de mi organización. */
 function useMevesOfertes(productorId: string | null) {
   const [ofertes, setOfertes] = useState<Excedente[]>([])
+  const [esborranys, setEsborranys] = useState<Excedente[]>([])
   const [kg, setKg] = useState<Record<string, number>>({})
   /** Kilos con destino externo registrado, por oferta (fase 1 de la revisión del 08-10-2026). */
   const [externs, setExterns] = useState<Record<string, number>>({})
@@ -87,7 +93,9 @@ function useMevesOfertes(productorId: string | null) {
       .order('created_at', { ascending: false })
     if (error) { setErrorCarrega(true); setCarregant(false); return }
     setErrorCarrega(false)
-    const files = (data ?? []) as Excedente[]
+    const totes = (data ?? []) as Excedente[]
+    setEsborranys(totes.filter((o) => o.estado === 'esborrany'))
+    const files = totes.filter((o) => o.estado !== 'esborrany')
     const ids = files.map((o) => o.id)
     meusIds.current = new Set(ids)
     const espIds = [...new Set(files.map((o) => o.espigolada_id).filter((v): v is string => !!v))]
@@ -223,7 +231,7 @@ function useMevesOfertes(productorId: string | null) {
     }, 'productor')
   }, [kg, externs, progres, recs, recsPendents, perValidar])
 
-  return { ofertes, kg, destins, sortides, puntDe, carregant, errorCarrega }
+  return { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega }
 }
 
 /** «1.320» y no «1320»: los kilos se leen de un vistazo, y ahí los miles importan. Sin decimales. */
@@ -281,6 +289,31 @@ function FilaOferta({
           )}
         <BadgeEstat clase={est.clase} gran={ambCodi}>{t(est.key)}</BadgeEstat>
       </div>
+    </Link>
+  )
+}
+
+/** Un esborrany en la lista: producto, lo que lleva escrito y desde cuándo. Abre el formulario. */
+function FilaEsborrany({ o, foto }: { o: Excedente; foto?: FotoResolta }) {
+  const { t } = useT()
+  const total = Number(o.kg_total ?? 0)
+  return (
+    <Link
+      to={`/productor/ofertes/${o.id}`}
+      data-testid="fila-esborrany"
+      className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-dashed p-3 hover:bg-muted/40"
+    >
+      <div className="flex min-w-0 items-center gap-3">
+        {foto && <FotoOfertaResolta foto={foto} alt={o.producto ?? ''} className="size-12" />}
+        <div className="min-w-0">
+          <div className="font-medium">{o.producto ?? '—'}{o.variedad ? ` · ${o.variedad}` : ''}</div>
+          <div className="text-xs text-muted-foreground">
+            {t('esb.desat_el', { data: dataCurta(o.created_at) })}
+            {total > 0 ? ` · ${fmtKg(total)} kg` : ''}
+          </div>
+        </div>
+      </div>
+      <BadgeEstat clase="bg-muted text-muted-foreground">{t('off.st_esborrany')}</BadgeEstat>
     </Link>
   )
 }
@@ -407,7 +440,7 @@ export function ProductorInici() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, destins, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
   const foto = useFotosOfertes(ofertes)
 
   // Las dos secciones ya NO se solapan (revisión del 23-09-2026): arriba lo que está en
@@ -440,6 +473,15 @@ export function ProductorInici() {
 
       {/* Sin ninguna oferta, los tres contadores a cero y la lista vacía solo repiten lo
           mismo tres veces: se enseña el estado vacío y nada más. */}
+      {/* Los esborranys no son ofertas: aquí solo se recuerda que hay alguno a medias. */}
+      {!carregant && esborranys.length > 0 && (
+        <Link to="/productor/ofertes?tab=esborranys" data-testid="avis-esborranys"
+          className="flex items-center justify-between gap-2 rounded-lg border border-dashed p-3 text-sm hover:bg-muted/40">
+          <span>{t(esborranys.length === 1 ? 'esb.tens_1' : 'esb.tens', { n: esborranys.length })}</span>
+          <ArrowRight className="size-4 shrink-0" aria-hidden />
+        </Link>
+      )}
+
       {buit && <CapOferta />}
 
       {!carregant && !errorCarrega && !buit && (
@@ -504,8 +546,12 @@ export function ProductorOfertes() {
   const navigate = useNavigate()
   const organitzacio = useOrganitzacio('productor')
   const productorId = organitzacio?.id ?? null
-  const { ofertes, kg, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
-  const foto = useFotosOfertes(ofertes)
+  const { ofertes, esborranys, kg, sortides, puntDe, carregant, errorCarrega } = useMevesOfertes(productorId)
+  const foto = useFotosOfertes([...ofertes, ...esborranys])
+  // La pestaña, de la URL (`?tab=esborranys` al guardar uno) y controlada: se puede llegar aquí
+  // desde la misma pantalla.
+  const [params, setParams] = useSearchParams()
+  const pestanya = params.get('tab') === 'esborranys' ? 'esborranys' : 'ofertes'
 
   // Filtros y orden comunes (fase 6 de la revisión del 08-10-2026). El estado es el SIMPLE,
   // el mismo del badge; la fecha, la de alta. Orden: en marcha por disponibilidad, y después
@@ -548,7 +594,19 @@ export function ProductorOfertes() {
       <CardContent className="space-y-2">
         {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
         {!carregant && errorCarrega && <p className="text-sm text-destructive">{t('po.err_load')}</p>}
-        {!carregant && !errorCarrega && ofertes.length === 0 && <CapOferta />}
+        {!carregant && !errorCarrega && ofertes.length === 0 && esborranys.length === 0 && <CapOferta />}
+        {!carregant && !errorCarrega && (ofertes.length > 0 || esborranys.length > 0) && (
+          <Tabs value={pestanya} onValueChange={(v) => setParams(v === 'esborranys' ? { tab: v } : {}, { replace: true })}>
+            <TabsList>
+              <TabsTrigger value="ofertes">{t('po.tab_ofertes', { n: ofertes.length })}</TabsTrigger>
+              <TabsTrigger value="esborranys">{t('off.tab_esborranys', { n: esborranys.length })}</TabsTrigger>
+            </TabsList>
+            <TabsContent value="esborranys" className="space-y-2">
+              <p className="text-sm text-muted-foreground">{t('po.esborranys_hint')}</p>
+              {esborranys.length === 0 && <p className="text-sm text-muted-foreground">{t('off.empty_esborranys')}</p>}
+              {esborranys.map((o) => <FilaEsborrany key={o.id} o={o} foto={foto(o)} />)}
+            </TabsContent>
+            <TabsContent value="ofertes" className="space-y-2">
         {ofertes.length > 0 && (
           <BarraFiltres
             id="po"
@@ -568,6 +626,9 @@ export function ProductorOfertes() {
           <FilaOferta key={o.id} o={o} canalitzats={kg[o.id] ?? 0} punt={puntDe(o)} sortides={sortides[o.id]} ambCodi
             foto={foto(o)} />
         ))}
+            </TabsContent>
+          </Tabs>
+        )}
       </CardContent>
     </Card>
   )
