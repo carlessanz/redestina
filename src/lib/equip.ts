@@ -114,6 +114,9 @@ export const GRUP_TAULA: Record<string, string> = {
   consentiments: 'consentiments',
   convenios: 'convenis',
   costes_producto: 'costos', costes_producto_hist: 'costos',
+  // Precios de referencia por mes (punto 3, D1): las columnas de autoría del equipo.
+  preus_carregues: 'costos', preus_referencia: 'costos', preus_referencia_hist: 'costos',
+  productes_fonts: 'costos', preus_fonts_estat: 'costos',
   diagnostics: 'diagnostic', diagnostic_accions: 'diagnostic',
   documentos: 'documents', documentos_externos: 'documents',
   enlaces_token: 'enllacos',

@@ -652,7 +652,7 @@ el autor del cambio tiene que quedar en el historial.
 
 Triggers de respaldo nuevos: `documentos_firma_substituida` (rechaza sola la firma que esperaba sobre una
 versión sustituida), `firmes_document_avis` (aviso al cerrar), `documentos_esborra_enllacos_firma`.
-Arnés: bloques `FIRMA_SERVIDOR` y `FIRMA_EXTERN`; `filasExactas` para las 17 colas de `pendents_equip`.
+Arnés: bloques `FIRMA_SERVIDOR` y `FIRMA_EXTERN`; `filasExactas` para las colas de `pendents_equip` (18 desde D1, `20270531100000`).
 
 ## Familias de RPC que el canónico ya no enumera (movidas de `AGENTS.md` el 02-11-2026, 1E)
 
@@ -780,3 +780,24 @@ sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los no
   desconocido, y al equipo y al super_admin con `22023` (organización inexistente y valor desconocido). El efecto en el
   Mercat no se prueba en el arnés (habría que confirmar una ficha compartida): lo cubren la E2E `perfil-recepcio` y la
   prueba SQL de la sesión.
+
+### Precios de referencia (punto 3, D1, `20270531100000`, 17-11-2026)
+
+| RPC | Quién | Qué |
+| --- | --- | --- |
+| `preus_proposta_mes(p_exercici, p_mes)` | `es_intern()` | La propuesta y lo validado de cada producto del catálogo en ese mes, con el mes anterior |
+| `noms_fonts_preus()` | `es_intern()` | Los nombres de las últimas cargas (Gencat: la última; Mercabarna: 90 días) y a qué productos ya van |
+| `validar_preus_mes(p_exercici, p_mes, p_canvis jsonb = '[]')` | `pot_aprovar()` | Valida lo no validado que tiene propuesta; `p_canvis` cambia filas (motivo si difiere de la propuesta o ya estaba validado). `22023 mes_futur`/`mes_invalid` |
+| `validar_preus_periode(des…, fins…)` | `pot_aprovar()` | Lo mismo mes a mes; ≤ 120 meses (`periode_invalid`, `periode_massa_llarg`) |
+| `fixar_preu_referencia(p_producto, p_exercici, p_mes, p_font, p_eur_kg, p_motiu)` | `pot_aprovar()` | Una celda; motivo obligatorio |
+| `afegir_equivalencia_preu` / `treure_equivalencia_preu` | `pot_aprovar()` | Equivalencias; añadir es idempotente |
+| `fixar_preu_manual(p_producto, p_manual)` | `pot_aprovar()` | Marca o quita «preu manual» |
+| `crear_producte(p_nombre, p_familia, p_nombre_es)` | `pot_aprovar()` | Alta en el catálogo (`23505 producte_existent`, `22023 nom_invalid`/`familia_desconeguda`) |
+| `marcar_carrega_preus(p_id, p_estat, p_motiu)` | `pot_aprovar()` | Descartar (con motivo) o recuperar; una carga `validada` no se descarta |
+| `fixar_font_preus(p_font, p_automatic, p_url)` | `es_super_admin()` | Automático y URL (solo `https://agricultura.gencat.cat/` o `https://www.mercabarna.es/`) |
+
+Internas (sin EXECUTE para `authenticated`): `preus_fonts_mes`, `preus_calcula_mes`, `preus_comprova_mes`,
+`preus_desa_mes`, `registrar_carrega_preus` (la llama la Edge Function con `service_role`; devuelve null si el fichero
+es un duplicado), `preu_referencia_de` (D2) y `disparar_preus_fonts` (los jobs). El arnés las cubre en `PREUS_INTERNES`,
+`PREUS_EXTERN`, `PREUS_TECNIC` y `PREUS_SUPER`; la lógica, `scripts/sql/prova-preus-referencia.sql` (transacción con
+`rollback`).

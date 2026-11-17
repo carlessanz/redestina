@@ -120,7 +120,7 @@ src/
 scripts/  comprobar-rls.ts (arnés) · aplicar-migracion.ts · local/ (clon) · import-ara-2026.ts + ara2026/ · crear-*.ts ·
           escenari-demo.ts · historial-migraciones.ts · huellas-funciones.ts · data/ (ignorado)
 supabase/ config.toml · migrations/ · functions/ (_shared/ con pdf/, hojas de texto, gate, canal,
-          autorizacion, resend, pujada, operativaLlegible; 25 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
+          autorizacion, resend, pujada, operativaLlegible, preusFonts; 26 funciones: whatsapp-*, crear-oferta, registro, donar-acces,
           enviar-*, *-documento, diagnostic-pdf, enlace-publico, priorizar-entidades, recordatorios-*… ; lista en `context/03`)
 docs/ (ignorado por git)
 ```
@@ -173,6 +173,9 @@ cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas
 
 **Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas` (C1–C7; las 8 de antes, inactivas) + `subcausas` (`C<n>.<m>`),
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
+**precios de referencia por mes** (D1, `20270531100000`; `context/04`): `preus_referencia` (producto × año × mes
+validado, +hist), `preus_carregues`/`preus_observats` (original en el bucket `preus-fonts`), `productes_fonts`,
+`preus_fonts_estat`; `productos.preu_manual`/`nombre_es`. `preu_referencia_de()` (interna) es para D2: **aún no valora nada**.
 `tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
 `modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**), `convenis_equivalents`.
 Whitelists `meta_test_recipients`, `email_test_recipients` (vacía = sin límite). `app_config`
@@ -274,6 +277,9 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
   `diagnostic-pdf`). `fixar_lloc_principal` (A4).
+- **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
+  (motivo si difiere), equivalencias, `fixar_preu_manual`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
+  `fixar_font_preus` (super_admin). Propuesta: Gencat → media de Mercabarna → manual.
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
@@ -282,13 +288,10 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
 - **Edge Functions**: `service_role` ignora RLS, así que `_shared/autorizacion.ts`
   (`contextoUsuario`, `exigirEquipo`: `401`/`403`) se aplica en las que lo necesitan;
   `rolesActivos()` **falla cerrado** ante un error de lectura.
-- **Verificación**: `deno run -A scripts/comprobar-rls.ts` abre sesión real con cada cuenta de
-  `scripts/data/cuentas-prueba.json` (fuera de git) y comprueba la matriz (cuenta, tabla,
-  operación). `Check.columnas` para tablas con GRANT por columnas; un `permitir` con uuid
-  inventado solo acepta **errores de negocio** (`22023`, `PT4xx`, `235xx`): la clase `42` es
-  FALLA; un UPDATE denegado por RLS devuelve 0 filas y se trata como denegación; cierra con
-  `signOut({scope:'local'})`. **Cualquier FALLA es una regresión.** Emergencia: nivel 0
-  `roles_activos=false`; nivel 1 `scripts/sql/rls-emergencia.sql`.
+- **Verificación**: `scripts/comprobar-rls.ts` abre sesión real con cada cuenta de `scripts/data/cuentas-prueba.json`
+  y comprueba la matriz (cuenta, tabla, operación); un `permitir` con uuid inventado solo acepta **errores de
+  negocio** (`22023`, `PT4xx`, `235xx`; la clase `42` es FALLA). **Cualquier FALLA es una regresión.** Detalle en
+  `context/04bis`. Emergencia: nivel 0 `roles_activos=false`; nivel 1 `scripts/sql/rls-emergencia.sql`.
 
 ## 5. Flujos (detalle en `context/05-flujos.md`)
 
@@ -307,12 +310,10 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
   `scripts/data/2026/` (nunca en git), por cabecera, **todo inactivo** (D2; `estatCrmDeHoja`), `ref_externa = ARA26:<hoja>:<línea>`,
   NIF inválido o repetido → sin NIF y nota, segunda pasada solo rellena huecos; fuera del clon solo
   `--dry-run` salvo `--produccio`. **El clon lleva las 721 importadas**; refrescarlo desde producción las quita.
-- **Importador del panel** (`/equip/entitats/importa`, super_admin; B4 `20270519100000`; §6.2, §6.4): mapea el
-  navegador (`lib/importEntitats.ts`), revalida la base (`previsualitzar_importacio_entitats` → `importar_entitats`).
-  Nueva = **`potencial`**. 🔴 **D11: idempotente y ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o
-  NIF nunca crea; celda vacía no toca, valor distinto sobrescribe; la Revisió enseña `canvis`). Nunca toca `activo`,
-  `estat_crm`, `es_test`, `ref_externa`. Plantilla con desplegables (B2). Columna opcional **«Naturalesa»** (A5, AB):
-  importada queda confirmada; la exportación solo saca la confirmada.
+- **Importador del panel** (`/equip/entitats/importa`, super_admin; §6.2, §6.4): `lib/importEntitats.ts` →
+  `previsualitzar_importacio_entitats` → `importar_entitats`; nueva = **`potencial`**. 🔴 **D11: idempotente y
+  ACTUALIZA** (ID Redestina → NIF → `AIRTABLE:` → hash `IMP:`; con ID o NIF nunca crea; celda vacía no toca). Nunca
+  toca `activo`, `estat_crm`, `es_test`, `ref_externa`. «Naturalesa» importada = confirmada.
 - **Exportación** (B3, `20270518110000`; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
   plantilla; **exportar → reimportar = `sense_canvis`**.
 
@@ -361,6 +362,8 @@ Lo que manda hoy, en una línea cada uno:
 - **Alta de oferta por bloques** (17-11-2026): `FormulariNovaOferta`, cada bloque se abre al completar el anterior;
   `CercadorOpcions`, `TriaSiNo`; el lugar trae municipio, Maps, días y franja; disponible = hoy + 2; **causa por su
   subcausa** en un `Desplegable` agrupado (`lib/causes.ts`; también en «Edita l’oferta» y, varias, en el Diagnòstic).
+- **Productes** (D1): pestañas Catàleg · Preus de referència · Càrregues (`?pestanya=`), «Nou producte» con las
+  coincidencias de `_shared/preusFonts.ts`; la ficha del producto, `PreusProducte` (equivalencias y rejilla año × mes).
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
@@ -413,7 +416,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270530100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270531100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -428,9 +431,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `email_desactivat`/`notificacions_desactivades`/`whatsapp_desactivat`, nunca un simulado); **no**
   lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
   una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
-  `{manual:true}`, traza `<funció>:manual`; el modo test sigue; la tabla de botones, en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz esconde el apartado de
-  un canal apagado (Missatgeria; «Missatge» y «Correu» de Entitats) y deja gris lo demás
-  (`BotoAmbMotiu`, `motiuCanal()`). **En producción, los tres apagados.**
+  `{manual:true}`, traza `<funció>:manual`; el modo test sigue; la tabla de botones, en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz
+  esconde o deja gris lo de un canal apagado (`motiuCanal()`). **En producción, los tres apagados.**
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
@@ -467,13 +469,9 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 
 ## 9. Seguridad (detalle en `context/09-…md`)
 
-- 🔴 **Cortina de contraseña** («pantalla de protección previa a la home»; `middleware.js` generado de
-  `cortina/`; cookie 7 días). **Desde el 09-11-2026 el super_admin la enciende, apaga y cambia en
-  Configuració › General** (`cortina_config`; contraseña en claro solo para él; RPC `cortina_config/activar`,
-  Edge Function `cortina-config` calcula la huella; **nace APAGADA**). El middleware lee la Edge Function pública
-  `cortina-estat` (caché 20 s, **fail-closed**: solo un `activa:false` explícito abre; `HASH_TOKEN` del repo =
-  respaldo). Libres solo `logo-email.png`, sello, favicon y `sw.js`; con ella puesta, los enlaces de correo y
-  `/verificar` piden la contraseña primero.
+- 🔴 **Cortina de contraseña** (`middleware.js` generado de `cortina/`; cookie 7 días): la enciende, apaga y
+  cambia el super_admin en Configuració › General (`cortina_config`, `cortina-config`; **nace APAGADA**). El
+  middleware lee `cortina-estat` (caché 20 s, **fail-closed**; `HASH_TOKEN` = respaldo). Detalle en `context/09`.
 - Todo dato exige sesión de Supabase Auth; `anon` sin privilegios. Login `signInWithPassword`;
   recuperación por `recuperar-password` + `admin.generateLink` + Resend; `enable_signup=false` y el
   **mailer nativo apagado** (nunca `resetPasswordForEmail`, `inviteUserByEmail` ni magic links). Resend
@@ -487,11 +485,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
   `concedir_acces_org` → enlace `recovery` por correo; si falla, `revertir_acces_org`. Correo apagado
   409 salvo `manual` (§8); modo test, solo `es_test`. Sin consentimientos (deuda 152).
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
-  (convenio: el texto; CD/CR/REC/ENT: `sha256_datos`; `409 document_canviat`), nombre, cargo y DNI
-  (`MIN_NOM`/`MIN_DNI` de `lib/signatures.ts`), trazo PNG ≤1 MB en `evidencies/`, IP y UA en
-  `evidencias`; tres vías —correo, asistida, panel— y el PDF las distingue. `pujar-document-signat`:
-  formato por **bytes** (`_shared/pujada.ts`, también en `subir-documento-externo`), permiso antes de
-  leer el fichero, se guarda tal cual. Confirmación de albarán: `sha256_texto` del acta; D3 en la API.
+  (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
+  asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
 - Cuentas de prueba: 5 organizaciones `TEST-*`, 7 cuentas + 5 de WhatsApp, `hola+pendent-arnes@`
   (**pendiente, no aprobar**) y `hola+senserol-arnes@`; credenciales en `scripts/data/cuentas-prueba.json`
   (las del bundle de `/login`, solo con `VITE_ACCESSOS_TEST`; detalle en `context/09`).
@@ -543,6 +538,7 @@ git config core.hooksPath .githooks            # una vez por clon
   Tras redesplegar `generar-documento`, `emitir_documento_prova()`. `diagnostic-pdf` comparte activos con
   `generar-documento` (P4: regenerarlos obliga a redesplegar las dos). Tocar `_shared/` obliga a
   redesplegar todas las que lo importan (fase B: `diagnostic-pdf` y `generar-documento` juntas, y tres más: `context/11`). Logs remotos por el Management API de analítica.
+  D1: `preus-fonts` con `--no-verify-jwt`; jobs `preus-gencat`/`preus-mercabarna` con `app_config.documentos_secret`.
 - Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
 ## 12. Checkpoints y deuda técnica (cuerpo completo en `context/12-…md`)
@@ -553,7 +549,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (79 vivas; la siguiente entrada nueva es la 183; los números no se renumeran ni
+**Deuda abierta (80 vivas; la siguiente entrada nueva es la 184; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -565,7 +561,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -577,10 +573,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.030 pruebas de Vitest en 93 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 2.066 pruebas de Vitest en 95 ficheros (1 saltada a propósito) + 58 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.551/2.551 y 44 sin datos; producción 2.554/2.554 y 41 «Sin
+   **Referencia: clon 2.747/2.747 y 45 sin datos; producción 2.554/2.554 y 41 (antes de D1) «Sin
    fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

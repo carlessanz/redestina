@@ -13,11 +13,17 @@
 // valor sobrescrito con el suyo.
 //
 // Los iconos no se editan desde la aplicación: salen de `scripts/icones-productes.ts`.
+//
+// Desde el 17-11-2026 (punto 3, fase D1) la pantalla tiene tres pestañas (`?pestanya=`):
+// «Catàleg» (lo de siempre), «Preus de referència» (el precio de cada producto por mes, con
+// la propuesta de Gencat/Mercabarna/manual y la validación del equipo: `PestanyaPreus`) y
+// «Càrregues» (los ficheros que se han descargado de cada fuente: `PestanyaCarregues`). Y el
+// botón «Nou producte» (`DialegNouProducte`). Los precios por mes AÚN NO valoran nada (D2).
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
-import { Link } from 'react-router'
-import { CirclePlus, Pencil, Trash2 } from 'lucide-react'
+import { Link, useNavigate, useSearchParams } from 'react-router'
+import { CirclePlus, Pencil, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { casaCerca } from '../../lib/cerca'
@@ -32,6 +38,10 @@ import { IconaProducte } from '../../components/FotosOferta'
 import DialegMotiu from '../../components/DialegMotiu'
 import BotoIcona from '../../components/BotoIcona'
 import { FilaClicable } from '../../components/FilaClicable'
+import PestanyaPreus from '../../components/preus/PestanyaPreus'
+import PestanyaCarregues from '../../components/preus/PestanyaCarregues'
+import DialegNouProducte from '../../components/preus/DialegNouProducte'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -56,8 +66,12 @@ function num(v: string): number | null {
   return Number.isNaN(n) ? null : n
 }
 
+const PESTANYES = ['cataleg', 'preus', 'carregues'] as const
+type Pestanya = typeof PESTANYES[number]
+
 export default function Productes() {
   const { t } = useT()
+  const navigate = useNavigate()
   const { ctx } = useAppContext()
   const potAprovar = ctx?.potAprovar ?? false
   // Fijar el coste es de `pot_aprovar()`, pero BORRARLO exige `es_super_admin()`
@@ -65,6 +79,96 @@ export default function Productes() {
   const esSuperAdmin = ctx?.esSuperAdmin ?? false
 
   const [productes, setProductes] = useState<Producte[]>([])
+  const [errorProductes, setErrorProductes] = useState<string | null>(null)
+  const [nouObert, setNouObert] = useState(false)
+
+  // La pestaña activa, en la URL: un enlace o «atrás» vuelven al mismo sitio.
+  const [params, setParams] = useSearchParams()
+  const enUrl = params.get('pestanya')
+  const pestanya: Pestanya = (PESTANYES as readonly string[]).includes(enUrl ?? '') ? enUrl as Pestanya : 'cataleg'
+  function triaPestanya(p: Pestanya) {
+    setParams((prev) => {
+      const n = new URLSearchParams(prev)
+      if (p === 'cataleg') n.delete('pestanya'); else n.set('pestanya', p)
+      return n
+    }, { replace: true })
+  }
+
+  useEffect(() => {
+    let viu = true
+    void (async () => {
+      // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
+      const { data, error: err } = await supabase
+        .from('productos')
+        .select('nombre, familia')
+        .order('familia', { ascending: true, nullsFirst: false })
+        .order('nombre', { ascending: true })
+      if (!viu) return
+      if (err) setErrorProductes(err.message)
+      else setProductes((data as Producte[] | null) ?? [])
+    })()
+    return () => { viu = false }
+  }, [])
+
+  const families = useMemo(
+    () => [...new Set(productes.map((p) => p.familia).filter((f): f is string => !!f))].sort((a, b) => a.localeCompare(b, 'ca')),
+    [productes],
+  )
+
+  return (
+    <div className="space-y-4">
+      <Card>
+        <CardHeader>
+          <div className="flex flex-wrap items-start justify-between gap-3">
+            <div className="min-w-0">
+              <CardTitle>{t('cost.title')}</CardTitle>
+              <p className="mt-1 text-sm text-muted-foreground">{t('cost.subtitle')}</p>
+            </div>
+            {potAprovar && (
+              <Button className="h-11 md:h-8" onClick={() => setNouObert(true)} data-testid="nou-producte">
+                <Plus className="size-4" aria-hidden /> {t('preu.a_new_product')}
+              </Button>
+            )}
+          </div>
+        </CardHeader>
+      </Card>
+
+      <Tabs value={pestanya} onValueChange={(v) => triaPestanya(v as Pestanya)}>
+        {/* En móvil la barra se desliza en horizontal, sin desbordar la página. */}
+        <div className="min-w-0 overflow-x-auto pb-1">
+          <TabsList variant="line" className="w-max">
+            <TabsTrigger value="cataleg">{t('preu.tab_catalog')}</TabsTrigger>
+            <TabsTrigger value="preus">{t('preu.tab_prices')}</TabsTrigger>
+            <TabsTrigger value="carregues">{t('preu.tab_loads')}</TabsTrigger>
+          </TabsList>
+        </div>
+        <TabsContent value="cataleg" className="mt-4">
+          <Cataleg productes={productes} errorProductes={errorProductes}
+            potAprovar={potAprovar} esSuperAdmin={esSuperAdmin} />
+        </TabsContent>
+        <TabsContent value="preus" className="mt-4">
+          <PestanyaPreus potAprovar={potAprovar} />
+        </TabsContent>
+        <TabsContent value="carregues" className="mt-4">
+          <PestanyaCarregues potAprovar={potAprovar} esSuperAdmin={esSuperAdmin} />
+        </TabsContent>
+      </Tabs>
+
+      <DialegNouProducte obert={nouObert} onObert={setNouObert} families={families}
+        onCreat={(nom) => navigate(rutaProducte(nom))} />
+    </div>
+  )
+}
+
+interface PropsCataleg {
+  productes: Producte[]
+  errorProductes: string | null
+  potAprovar: boolean
+  esSuperAdmin: boolean
+}
+
+function Cataleg({ productes, errorProductes, potAprovar, esSuperAdmin }: PropsCataleg) {
+  const { t } = useT()
   const [costos, setCostos] = useState<CosteProducto[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -81,22 +185,6 @@ export default function Productes() {
   // La fila de editar ocupa las columnas VISIBLES, que cambian con el ancho (usePuntTall).
   const columnes = 2 + Number(usePuntTall('sm')) + Number(usePuntTall('md'))
     + Number(usePuntTall('xl')) + Number(potAprovar)
-
-  useEffect(() => {
-    let viu = true
-    void (async () => {
-      // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
-      const { data, error: err } = await supabase
-        .from('productos')
-        .select('nombre, familia')
-        .order('familia', { ascending: true, nullsFirst: false })
-        .order('nombre', { ascending: true })
-      if (!viu) return
-      if (err) setError(err.message)
-      else setProductes((data as Producte[] | null) ?? [])
-    })()
-    return () => { viu = false }
-  }, [])
 
   const carrega = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -176,11 +264,7 @@ export default function Productes() {
   return (
     <div className="space-y-4">
       <Card>
-        <CardHeader>
-          <CardTitle>{t('cost.title')}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{t('cost.subtitle')}</p>
-        </CardHeader>
-        <CardContent className="space-y-4">
+        <CardContent className="space-y-4 pt-6">
           {/* El aviso que evita una tarde de desconcierto: sin coste, el donante entero se
               bloquea y el mensaje que sale en el cierre habla de otra pantalla. */}
           <div className="rounded-md border border-aviso bg-aviso-fondo p-3 text-sm text-aviso">
@@ -218,7 +302,7 @@ export default function Productes() {
           </div>
 
           {carregant && <p className="text-sm text-muted-foreground">{t('c.loading')}</p>}
-          {error && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
+          {(error || errorProductes) && <p className="text-sm text-destructive">{t('c.load_error')}</p>}
           {!potAprovar && <p className="text-sm text-muted-foreground">{t('cost.readonly')}</p>}
 
           {!carregant && files.length === 0 && (

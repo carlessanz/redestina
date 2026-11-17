@@ -695,6 +695,89 @@ const DIAGNOSTIC_EXCEDENTS_EQUIP: Check[] = [
   { tabla: "diagnostic_excedents_json", op: "rpc", esperado: "denegar", args: { p_productor: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida el json intern dels excedents (nomes les funcions del servidor) (A3)" },
 ];
 
+// PRECIOS DE REFERENCIA POR MES (punto 3, fase D1, 20270531100000). Lo que el arnés afirma:
+//
+//   · las seis tablas (`preus_fonts_estat`, `preus_carregues`, `preus_observats`,
+//     `productes_fonts`, `preus_referencia`, `preus_referencia_hist`) son del EQUIPO: se leen con
+//     `es_intern()` (un externo, 0 filas) y nadie las escribe desde el navegador (sin GRANT de
+//     escritura: 42501 antes de evaluar ninguna política);
+//   · leer la propuesta del mes es de todo el equipo; validar, fijar, equivalencias, precio
+//     manual, alta de productos y revisar cargas, de `pot_aprovar()`; la fuente (URL y
+//     automático), solo del super_admin;
+//   · las funciones internas (el cálculo, el guardado, el registro de una carga, el disparador
+//     del job y `preu_referencia_de`, reservada a D2) no tienen EXECUTE para ninguna sesión.
+//
+// 🔴 Los argumentos de los «permitir» del super_admin están elegidos para que la RPC corte con
+//    22023 ANTES de escribir (mes 13, motivo vacío, producto o carga inexistentes, nombre vacío).
+const PREUS_INTERNES: Check[] = [
+  { tabla: "preus_calcula_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "NO crida el calcul intern de la proposta (D1)" },
+  { tabla: "preus_desa_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2025, p_mes: 13, p_canvis: [], p_nomes_canvis: true }, descripcion: "NO crida el desat intern dels preus (D1)" },
+  { tabla: "registrar_carrega_preus", op: "rpc", esperado: "denegar", args: { p_font: "x", p_meta: {}, p_observats: [] }, descripcion: "NO registra cap carrega de preus (nomes la Edge Function) (D1)" },
+  { tabla: "preu_referencia_de", op: "rpc", esperado: "denegar", args: { p_producto: "Poma", p_data: "2026-09-15" }, descripcion: "NO crida preu_referencia_de (intern, per a D2) (D1)" },
+  { tabla: "disparar_preus_fonts", op: "rpc", esperado: "denegar", args: { p_accio: "x" }, descripcion: "NO dispara el job de les fonts de preus (D1)" },
+  { tabla: "preus_carregues", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap carrega de preus a ma (D1)" },
+  { tabla: "preus_referencia", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap preu de referencia a ma (va per RPC) (D1)" },
+  { tabla: "preus_referencia", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap preu de referencia a ma (D1)" },
+  { tabla: "productes_fonts", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap equivalencia a ma (D1)" },
+  { tabla: "preus_fonts_estat", op: "actualizar", esperado: "denegar", descripcion: "NO toca l'estat de les fonts a ma (D1)" },
+];
+
+// Lo que se añade a `DOCUMENTAL_EXTERN` (los cinco perfiles externos).
+const PREUS_EXTERN: Check[] = [
+  ...PREUS_INTERNES,
+  { tabla: "preus_fonts_estat", op: "leer", esperado: "denegar", descripcion: "NO veu les fonts de preus (D1)" },
+  { tabla: "preus_carregues", op: "leer", esperado: "denegar", descripcion: "NO veu les carregues de preus (D1)" },
+  { tabla: "preus_observats", op: "leer", esperado: "denegar", descripcion: "NO veu els preus observats (D1)" },
+  { tabla: "productes_fonts", op: "leer", esperado: "denegar", descripcion: "NO veu les equivalencies de preus (D1)" },
+  { tabla: "preus_referencia", op: "leer", esperado: "denegar", descripcion: "NO veu els preus de referencia (D1)" },
+  { tabla: "preus_referencia_hist", op: "leer", esperado: "denegar", descripcion: "NO veu l'historic dels preus (D1)" },
+  { tabla: "preus_proposta_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "NO llegeix la proposta de preus (es de l'equip) (D1)" },
+  { tabla: "noms_fonts_preus", op: "rpc", esperado: "denegar", descripcion: "NO llegeix els noms de les fonts (D1)" },
+  { tabla: "validar_preus_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2025, p_mes: 13 }, descripcion: "NO valida cap mes de preus (D1)" },
+  { tabla: "crear_producte", op: "rpc", esperado: "denegar", args: { p_nombre: "", p_familia: "x" }, descripcion: "NO dona d'alta productes (D1)" },
+  { tabla: "afegir_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_font: "x", p_nom_font: "" }, descripcion: "NO afegeix equivalencies de preus (D1)" },
+];
+
+// El técnico: lee todo y la propuesta, pero no valida ni da de alta (es de `pot_aprovar()`).
+const PREUS_TECNIC: Check[] = [
+  ...PREUS_INTERNES,
+  { tabla: "preus_fonts_estat", op: "leer", esperado: "permitir", descripcion: "veu les fonts de preus (D1)" },
+  { tabla: "productes_fonts", op: "leer", esperado: "permitir", descripcion: "veu les equivalencies de preus (D1)" },
+  { tabla: "preus_carregues", op: "leer", esperado: "permitir", descripcion: "veu les carregues de preus (D1)", requiereFixture: "alguna carrega (job preus-gencat o «Actualitza ara»)" },
+  { tabla: "preus_observats", op: "leer", esperado: "permitir", descripcion: "veu els preus observats (D1)", requiereFixture: "alguna carrega amb files" },
+  { tabla: "preus_referencia", op: "leer", esperado: "permitir", descripcion: "veu els preus de referencia validats (D1)", requiereFixture: "algun mes validat (validar_preus_mes)" },
+  { tabla: "preus_proposta_mes", op: "rpc", esperado: "permitir", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "llegeix la proposta de preus d'un mes (D1)" },
+  { tabla: "noms_fonts_preus", op: "rpc", esperado: "permitir", descripcion: "llegeix els noms de les fonts (D1)" },
+  { tabla: "validar_preus_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2025, p_mes: 13 }, descripcion: "NO valida cap mes (es de pot_aprovar) (D1)" },
+  { tabla: "validar_preus_periode", op: "rpc", esperado: "denegar", args: { p_des_exercici: 2026, p_des_mes: 5, p_fins_exercici: 2026, p_fins_mes: 1 }, descripcion: "NO valida en bloc (D1)" },
+  { tabla: "fixar_preu_referencia", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_exercici: 2025, p_mes: 1, p_font: "manual", p_eur_kg: 1, p_motiu: "" }, descripcion: "NO fixa cap preu de referencia (D1)" },
+  { tabla: "crear_producte", op: "rpc", esperado: "denegar", args: { p_nombre: "", p_familia: "x" }, descripcion: "NO dona d'alta productes (D1)" },
+  { tabla: "afegir_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_font: "x", p_nom_font: "" }, descripcion: "NO afegeix equivalencies (D1)" },
+  { tabla: "treure_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu equivalencies (D1)" },
+  { tabla: "fixar_preu_manual", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_manual: false }, descripcion: "NO marca preu manual (D1)" },
+  { tabla: "marcar_carrega_preus", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_estat: "descartada", p_motiu: "arnes" }, descripcion: "NO descarta carregues (D1)" },
+  { tabla: "fixar_font_preus", op: "rpc", esperado: "denegar", args: { p_font: "x", p_automatic: null }, descripcion: "NO toca les fonts (es del super_admin) (D1)" },
+];
+
+// El super_admin (y, por `pot_aprovar()`, un admin): todo, con argumentos que cortan en 22023.
+const PREUS_SUPER: Check[] = [
+  ...PREUS_INTERNES,
+  { tabla: "preus_fonts_estat", op: "leer", esperado: "permitir", descripcion: "veu les fonts de preus (D1)" },
+  { tabla: "productes_fonts", op: "leer", esperado: "permitir", descripcion: "veu les equivalencies de preus (D1)" },
+  { tabla: "preus_carregues", op: "leer", esperado: "permitir", descripcion: "veu les carregues de preus (D1)", requiereFixture: "alguna carrega (job preus-gencat o «Actualitza ara»)" },
+  { tabla: "preus_referencia_hist", op: "leer", esperado: "permitir", descripcion: "veu l'historic dels preus (D1)", requiereFixture: "algun preu validat i canviat despres" },
+  { tabla: "preus_proposta_mes", op: "rpc", esperado: "permitir", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "llegeix la proposta de preus d'un mes (D1)" },
+  { tabla: "validar_preus_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2025, p_mes: 13 }, descripcion: "pot validar un mes (autoritza; 22023 mes_invalid) (D1)" },
+  { tabla: "validar_preus_periode", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_des_exercici: 2026, p_des_mes: 5, p_fins_exercici: 2026, p_fins_mes: 1 }, descripcion: "pot validar en bloc (autoritza; 22023 periode_invalid) (D1)" },
+  { tabla: "fixar_preu_referencia", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_producto: "TEST-ARNES-INEXISTENT", p_exercici: 2025, p_mes: 1, p_font: "manual", p_eur_kg: 1, p_motiu: "" }, descripcion: "pot fixar un preu (autoritza; 22023 motiu_obligatori) (D1)" },
+  { tabla: "crear_producte", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_nombre: "", p_familia: "x" }, descripcion: "pot donar d'alta productes (autoritza; 22023 nom_invalid) (D1)" },
+  { tabla: "afegir_equivalencia_preu", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_producto: "TEST-ARNES-INEXISTENT", p_font: "mercabarna", p_nom_font: "ARNES" }, descripcion: "pot afegir equivalencies (autoritza; 22023 producte_inexistent) (D1)" },
+  { tabla: "treure_equivalencia_preu", op: "rpc", esperado: "permitir", args: { p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure equivalencies (uuid inexistent: 0, no escriu) (D1)" },
+  { tabla: "fixar_preu_manual", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_producto: "TEST-ARNES-INEXISTENT", p_manual: false }, descripcion: "pot marcar preu manual (autoritza; 22023 producte_inexistent) (D1)" },
+  { tabla: "marcar_carrega_preus", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_estat: "descartada", p_motiu: "arnes" }, descripcion: "pot descartar carregues (autoritza; 22023 carrega_inexistent) (D1)" },
+  { tabla: "fixar_font_preus", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_font: "x", p_automatic: null }, descripcion: "pot configurar les fonts (autoritza; 22023 font_invalida) (D1)" },
+];
+
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
 // afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
@@ -1307,6 +1390,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...FIRMA_EXTERN,
   // Importador de entidades (20270511100000): ver `IMPORTACIO_EXTERN`.
   ...IMPORTACIO_EXTERN,
+  // Precios de referencia por mes (20270531100000): ver `PREUS_EXTERN`.
+  ...PREUS_EXTERN,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1582,6 +1667,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
+    // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_TECNIC` ---
+    ...PREUS_TECNIC,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -1965,7 +2052,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 17, descripcion: "consulta la cua de treball de l'equip (17 cues)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: +preus, D1)" },
     // Borrado de una ficha (20270328100100, deuda §12.108). El técnico SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
@@ -2245,6 +2332,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "fixar_lloc_principal", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_lloc: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot triar el lloc principal de qualsevol productor (autoritza; 22023 lloc_inexistent) (A4)" },
     // --- Excedentes del diagnóstico (A3, 20270522100000): ver `DIAGNOSTIC_EXCEDENTS_EQUIP` ---
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
+    // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_SUPER` ---
+    ...PREUS_SUPER,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2542,7 +2631,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_id: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot validar una oferta (autoritza; l'oferta no existeix, 22023)",
     },
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 17, descripcion: "consulta la cua de treball de l'equip (17 cues)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: +preus, D1)" },
     {
       tabla: "convenios",
       op: "leer",

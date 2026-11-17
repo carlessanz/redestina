@@ -39,6 +39,9 @@ const HOJA = [
   // Fase B del punto 3 (17-11-2026): el catálogo de causas y subcausas, el mismo en la oferta,
   // en el intake de WhatsApp y en el diagnóstico.
   'causes',
+  // Fase D1 del punto 3 (17-11-2026): normalizar nombres y proponer equivalencias con las
+  // fuentes de precios al dar de alta un producto (los lectores de Gencat y Mercabarna, puros).
+  'preusFonts',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

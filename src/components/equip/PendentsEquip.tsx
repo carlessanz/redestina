@@ -69,6 +69,8 @@ const FILES: readonly FilaCua[] = [
   { cua: 'albarans_esborrany', desti: '/equip/albarans?tab=esborranys' },
   { cua: 'albarans_conciliar', desti: '/equip/albarans?tab=conciliar' },
   { cua: 'costos', desti: '/equip/productes' },
+  // Punto 3, D1: la pestaña de las cargas, donde se ve qué fuente falla o qué fichero ha llegado.
+  { cua: 'preus', desti: '/equip/productes?pestanya=carregues' },
   { cua: 'tancament', desti: '/equip/tancament' },
   { cua: 'documents_error', desti: '/equip/documents?tab=error' },
 ] as const
@@ -76,7 +78,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'espigolades_per_convertir', 'recollides_per_validar', 'signatures_per_tancar',
+  'ofertes_vencudes', 'costos', 'preus', 'espigolades_per_convertir', 'recollides_per_validar', 'signatures_per_tancar',
   // Fase 8: «què ha passat → què falta → acció» en todas las filas.
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]

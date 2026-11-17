@@ -1,5 +1,6 @@
 // El detalle de un producto del catálogo (27-09-2026): su icono —el que sale en las ofertas
-// sin foto propia— y su coste de referencia con el histórico.
+// sin foto propia—, su coste de referencia con el histórico y (punto 3, D1, 17-11-2026) sus
+// precios de referencia por mes con las equivalencias en Gencat y Mercabarna (`PreusProducte`).
 //
 // ⚠️ Hasta el 29-09-2026 aquí se subía una FOTO por producto. Se sustituyeron por iconos
 // propios (`scripts/icones-productes.ts`), que no se editan desde la aplicación.
@@ -16,6 +17,7 @@ import { dataCurta } from '../../lib/albarans'
 import { eurKg, fixarCostProducte } from '../../lib/tancament'
 import { IconaProducte } from '../../components/FotosOferta'
 import CarregantSeccio from '../../components/CarregantSeccio'
+import PreusProducte from '../../components/preus/PreusProducte'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
@@ -24,6 +26,8 @@ import { Label } from '@/components/ui/label'
 interface Fitxa {
   nombre: string
   familia: string | null
+  nombre_es: string | null
+  preu_manual: boolean
 }
 interface Cost { coste_kg: number; motivo: string; updated_at: string }
 interface Hist { id: string; coste_kg: number; motivo: string; vigente_desde: string | null; vigente_hasta: string }
@@ -45,7 +49,7 @@ export default function ProducteDetall() {
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7, deuda 46).
     const [p, c, h] = await Promise.all([
-      supabase.from('productos').select('nombre, familia')
+      supabase.from('productos').select('nombre, familia, nombre_es, preu_manual')
         .eq('nombre', nom).maybeSingle(),
       supabase.from('costes_producto').select('coste_kg, motivo, updated_at')
         .eq('producto', nom).maybeSingle(),
@@ -95,7 +99,9 @@ export default function ProducteDetall() {
       <Card>
         <CardHeader>
           <CardTitle>{fitxa.nombre}</CardTitle>
-          <p className="mt-1 text-sm text-muted-foreground">{fitxa.familia ?? '—'}</p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            {fitxa.familia ?? '—'}{fitxa.nombre_es && ` · ${fitxa.nombre_es}`}
+          </p>
         </CardHeader>
         <CardContent>
           <IconaProducte producto={fitxa.nombre} familia={fitxa.familia} className="size-40 sm:size-48" />
@@ -150,6 +156,9 @@ export default function ProducteDetall() {
           )}
         </CardContent>
       </Card>
+
+      <PreusProducte producte={fitxa.nombre} nomEs={fitxa.nombre_es} preuManual={fitxa.preu_manual}
+        potAprovar={potAprovar} onCanviat={() => void carrega()} />
     </div>
   )
 }

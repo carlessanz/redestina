@@ -56,6 +56,9 @@ export type CuaEquip =
   | 'costos' | 'tancament' | 'documents_error'
   // F3: ofertas que declaran producto sin cosechar y todavía no son una jornada.
   | 'espigolades_per_convertir'
+  // 17-11-2026 (punto 3, D1; la 18.ª): cargas de Gencat por revisar y fuentes de precios
+  // cuya última comprobación dio error. Suma al badge de Productes.
+  | 'preus'
 
 export interface PendentEquip {
   cua: CuaEquip
@@ -140,7 +143,8 @@ export function comptadorsDePendents(p: PendentEquip[]): Partial<Record<Comptado
     // Lo que espera al EQUIPO: borradores por emitir y REC por conciliar. Los que esperan
     // la confirmación de la otra parte (`albarans_esperant`) no cuentan aquí.
     albarans: n('albarans_esborrany') + n('albarans_conciliar'),
-    costos: n('costos'),
+    // Productes: costes que faltan + precios de referencia por revisar (D1).
+    costos: n('costos') + n('preus'),
     // Solo PDFs con error, como antes: es lo único de Documents que necesita una persona.
     documents: n('documents_error'),
   }

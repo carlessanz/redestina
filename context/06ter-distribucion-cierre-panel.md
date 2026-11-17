@@ -2459,6 +2459,31 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
   subcausa cambia el texto y no la ficha; «Comparteix» solo donde circula; 375 px sin scroll horizontal);
   `operativa.e2e.ts` adaptado (`#of-causa` en el diálogo, línea del horario).
 
+### Fase D1 del punto 3: precios de referencia por mes (17-11-2026, `20270531100000`)
+
+«Productes» (`/equip/productes`) pasa a tener tres pestañas (`?pestanya=`) y un botón «Nou producte»:
+
+- **Catàleg**: lo de antes (iconos y coste de referencia).
+- **Preus de referència** (`components/preus/PestanyaPreus`): año y mes (por defecto, el anterior al actual),
+  buscador, resumen (validados · por validar · sin precio · saltos ≥ 30 %), «Valida el mes» (confirma), «Valida en
+  bloc» (intervalo) y la tabla: producto, precio (validado en negrita; propuesto en gris), fuente con el nombre y los
+  días, mes anterior, variación, estado y, con `pot_aprovar`, editar una celda (fuente o precio a mano + motivo). Un
+  aviso si la fuente ya no dice lo validado o si el salto es grande. La fila abre la ficha del producto.
+- **Càrregues** (`PestanyaCarregues`): una tarjeta por fuente (URL, último resultado, última comprobación, error,
+  días de Mercabarna del mes; el super_admin enciende/apaga el automático y cambia la URL de Gencat; «Actualitza ara»)
+  y la tabla de cargas (fuente, fecha de la fuente, «fins a <mes>» en Gencat, filas y productos, estado; descargar el
+  original, descartar con motivo, recuperar).
+- **«Nou producte»** (`DialegNouProducte`): nombre, nombre en castellano y familia → `crear_producte`; después, las
+  coincidencias con los nombres de las fuentes (`coincidencies()`: 3 = igual, 2 = primera palabra o prefijo de ≥ 4
+  letras, 1 = palabra común; normaliza acentos y plurales), con las de 2 o más ya marcadas. Sin ninguna marcada, pide
+  el precio manual (`fixar_preu_manual` + `fijar_coste_producto`).
+- **Ficha del producto** (`ProducteDetall` + `PreusProducte`): «preu manual», las equivalencias (sugerencias, buscador
+  por fuente con `CercadorOpcions`, quitar) y la rejilla año × mes de lo validado (3/6/12 columnas, sin scroll).
+- La cola **`preus`** de `pendents_equip()` suma al badge de Productes (`costos + preus`) y en el tablero lleva a
+  `?pestanya=carregues`. i18n: claves `preu.*` (compuestas declaradas en `tests/i18n.test.ts`).
+- E2E: `tests/e2e/preus.e2e.ts` (clon, `E2E_ESCRIU=1`): ver un mes, validar diciembre de 2025, «Nou producte» con
+  ALCACHOFA marcada, descargar el original y 375 px sin scroll.
+
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y

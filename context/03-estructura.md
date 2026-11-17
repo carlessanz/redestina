@@ -213,6 +213,9 @@ src/
                                alta, lo que contesta el bot, RECOLLIDA CONFIRMADA), con su correo y
                                si salió. `tests/missatgesOferta.test.ts`
   components/
+    preus/                     Precios de referencia (D1): PestanyaPreus (el mes), PestanyaCarregues (las
+                               fuentes y las cargas), DialegNouProducte, PreusProducte (la ficha). Datos en
+                               `lib/preus.ts` (tipos, piezas puras y RPC; `tests/preus.test.ts`)
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
     TriaPaper.tsx              El conmutador «productora / receptora» del doble rol. Estaba
                                copiado TRES veces y una copia ya había divergido (sin icono y
@@ -469,6 +472,13 @@ supabase/
                                (`_shared/cortinaHash.ts`) y la guarda con `cortina_desar_contrasenya()`
     recordatorios-documentales/ POST {}: purga `fitxers_orfes`; enlaces sin usar a 7 y 14 días → aviso al equipo
                                (el token no se puede reenviar, §9)
+    preus-fonts/               POST (SIN JWT de pasarela; 17-11-2026, punto 3 D1): descarga Gencat (XLS,
+                               condicional por ETag) y Mercabarna (tabla HTML del día), guarda el original
+                               en el bucket `preus-fonts` y llama a `registrar_carrega_preus()`. Job con
+                               `x-documentos-secret`; «Actualitza ara» con JWT y `pot_aprovar`;
+                               `accio:'fitxer'` = URL firmada del original (equipo). `npm:xlsx` en su deno.json
+    _shared/preusFonts.ts      PURO (D1): lectores de Gencat y Mercabarna, unidades → €/kg, URL candidatas,
+                               CSV caducado de Mercabarna y `coincidencies()` (también lo importa el panel)
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)

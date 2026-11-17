@@ -138,6 +138,7 @@ conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 ⚠️ **17-11-2026 (`20270530100000`, fase C del punto 3): se abren la 181 y la 182** (el texto y el lugar; las fotos al cancelar una edición): **79 vivas** y la siguiente entrada nueva es la 183.
+⚠️ **17-11-2026 (`20270531100000`, fase D1 del punto 3): se abre la 183** (Mercabarna, solo el día de la página): **80 vivas** y la siguiente entrada nueva es la 184.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -915,3 +916,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      un esborrany), una foto NUEVA se sube al Storage al elegirla; si luego se cancela sin guardar, el fichero queda sin
      fila que lo cite. Las quitadas no se pierden (se borran solo tras guardar). Arreglo: mandar a `fitxers_orfes` las
      subidas de la sesión al cancelar, o un barrido de `fotos-ofertes` sin fila. Precio: poco; volumen, mínimo.
+183. **Mercabarna: solo el día de la página** (17-11-2026, `20270531100000`). El job captura la tabla del día que
+     enseña la página de estadísticas; no hay histórico (el formulario de fechas no se usa y el CSV de exportar va
+     desfasado). Un día sin job (caída, fuente con error) se pierde y la media del mes sale de menos días (la pantalla
+     enseña cuántos). Arreglo: rellenar días pasados con el formulario de fecha, si la página lo permite de forma
+     estable. Precio: más peticiones a un tercero; hoy, una al día.

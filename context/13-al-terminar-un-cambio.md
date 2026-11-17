@@ -8,7 +8,15 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **2.030 pruebas en 93 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (17-11-2026, fase C
+   Referencia: **2.066 pruebas en 95 ficheros** de Vitest (1 saltada a propósito) **+ 58 de Deno** (17-11-2026, fase D1
+   del punto 3, `20270531100000`: +36 —`tests/preusFonts.test.ts` 15 (unidades, Gencat sintético, URL candidatas,
+   Mercabarna con el fixture real, el CSV roto, coincidencias), `tests/preus.test.ts` 12 (mes en Madrid, variación,
+   fila, resumen) y 9 de claves compuestas `preu.*` en `i18n.test.ts`—, y +6 de Deno en `tests/preus/` (el XLS real
+   de Gencat con SheetJS); arnés del clon **2.747/2.747 y 45 sin datos** (+196: `PREUS_INTERNES` en todos los perfiles,
+   `PREUS_EXTERN` en los cinco externos, `PREUS_TECNIC` y `PREUS_SUPER`; `pendents_equip` pasa a 18 colas; el «sin
+   datos» nuevo es `preus_referencia_hist` del super_admin, vacía hasta que se cambie un precio validado); SQL
+   `scripts/sql/prova-preus-referencia.sql` en verde; E2E `preus.e2e.ts` 5/5 en el clon). Antes:
+   **2.030 pruebas en 93 ficheros** de Vitest (1 saltada a propósito) **+ 52 de Deno** (17-11-2026, fase C
    del punto 3: `tests/esborranyServidor.test.ts`, nuevo —`errorFormatOferta`, `filaDeDades`, «Comparteix»—, +16 en
    `edicioOferta.test.ts` —claves nuevas de `canvisOferta`, `textoOfertaDeDades`, `datosDeFila`/`canvisDeDatos`— y
    `oferta.test.ts` cambiado a propósito por el texto nuevo; arnés del clon **2.551/2.551 y 44 sin datos**: checks de

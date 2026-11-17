@@ -100,3 +100,22 @@ reanuda el paso; **Cancel·lar** (o la palabra **`Stop`**) borra la sesión. Det
 posteriores al último `outbound` de ese teléfono. Lo usan `ProducersList` (badge) y `ContactList`
 (ordena los contactos con pendientes arriba y muestra el contador).
 
+### Precios de referencia: descarga de las fuentes (17-11-2026, punto 3 D1)
+
+`pg_cron` → `disparar_preus_fonts(accio)` → `pg_net` → Edge Function **`preus-fonts`** (sin JWT de pasarela; cabecera
+`x-documentos-secret` = `app_config.documentos_secret`, la misma de los jobs documentales):
+
+- **`preus-gencat`** (`20 6 * * *`): GET condicional (`If-None-Match`/`If-Modified-Since`). 304 → `sense_canvis`. Si la
+  URL da 404, prueba la misma con el año actual y el siguiente (el nombre lleva el último año). Un fichero con el mismo
+  sha256 que una carga anterior → `duplicat`. Si es nuevo: original a `preus-fonts/gencat/<data>-<sha12>.xls`, lectura
+  con SheetJS (`npm:xlsx`), `registrar_carrega_preus()` y estado de la fuente. Una carga nueva de Gencat queda
+  `pendent` (cola `preus`) hasta que se valida un mes con ella.
+- **`preus-mercabarna`** (`15 10 * * *`): POST del formulario de la página (familia 0, sector 3) y lectura de la tabla
+  HTML del día (`llegeixMercabarna`). El CSV de «exportar» **no se usa**: va desfasado (devuelve un día viejo;
+  `exportMercabarnaCaducat()` lo detecta). Un día por carga; la página solo da el día de hoy (deuda 183).
+- **«Actualitza ara»** (panel, `pot_aprovar()`) llama a la misma función con el JWT del usuario; **«Baixa el fitxer»**
+  (`accio: 'fitxer'`, todo el equipo) devuelve una URL firmada de 60 s con `download`.
+- Un fallo de la fuente responde 200 `{ok:false, error}` y deja `darrer_resultat = 'error'` (cola `preus`). Con
+  `automatic = false`, el job no descarga (`desactivat`). User-Agent genérico, sin datos de nadie; una petición al día.
+- El parser es puro (`_shared/preusFonts.ts`, también lo importa el panel para las coincidencias); fixtures reales en
+  `tests/fixtures/preus/` (Gencat XLS del 12-11-2026, Mercabarna del 16-11-2026, el CSV roto).

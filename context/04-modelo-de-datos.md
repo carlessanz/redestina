@@ -1864,6 +1864,40 @@ Fase C del punto 3 (filas 3.1.2 y 3.7 del Excel de la Fundació). Pantallas en `
   entidad ni sus lugares** (crear un lugar nuevo es «Afegir un lloc nou», que va por su RPC de siempre).
 - Comprobado en el clon: `auditoria_funcions_obertes()` = 0; el arnés suma checks de esborranys (ver `context/13`).
 
+### Precios de referencia por producto, año y mes (17-11-2026, punto 3 fase D1, `20270531100000`)
+
+**Para qué**: un precio de referencia por producto y mes que el equipo valida, sacado de dos fuentes públicas, para
+valorar más adelante (D2) las canalizaciones, albaranes y certificados. **Hoy no valora nada**: el coste de una
+canalización sigue saliendo de `excedentes.coste_kg` / `costes_producto` como antes.
+
+- **`productos`** gana `preu_manual boolean not null default false` (no se busca en ninguna fuente: cada mes vale el
+  manual vigente, `costes_producto`) y `nombre_es` (nombre en castellano, para casar con Mercabarna).
+- **`preus_fonts_estat`** (PK `font` gencat·mercabarna): `url`, `automatic`, `etag`, `last_modified`,
+  `darrera_comprovacio_at`, `darrer_resultat` (nou · sense_canvis · duplicat · error), `darrer_error`,
+  `darrera_carrega_at`, `actualitzat_per`. Sembrada con la URL del XLS de Gencat («preus percebuts pels pagesos»,
+  €/100 kg, mensual) y la página de estadísticas diarias de Mercabarna (€/kg, precio más frecuente del día).
+- **`preus_carregues`**: cada fichero descargado, tal cual (`fitxer_path` en el bucket privado **`preus-fonts`**,
+  sin políticas, 20 MB; `sha256`, `etag`, `last_modified`, `data_font`, `periode_fins` —el último mes con dato de
+  Gencat—, `files`, `productes`, `estat` pendent · validada · descartada, `origen` job · manual, `motiu`). Únicos
+  `(font, sha256)` y, en Mercabarna, `(font, data_font)`: una carga por día.
+- **`preus_observats`**: las filas leídas (`codi_font`, `nom_font`, `exercici`, `mes`, `dia` —solo Mercabarna—,
+  `valor_original`, `unitat`, `eur_kg` normalizado, máx./mín. de Mercabarna). Solo unidades de peso: «€/unitat»
+  (CALÇOTS) o «€/dotzena» quedan con `eur_kg` null y no proponen nada.
+- **`productes_fonts`**: la equivalencia producto ↔ nombre (y código Gencat) en cada fuente; `origen` sembra · equip.
+  Sembradas 29 de Gencat por código y 105 de Mercabarna por nombre en mayúsculas. Única `(producto, font, upper(nom_font))`.
+- **`preus_referencia`** (PK `producto, exercici, mes`): `eur_kg` (> 0), `font` gencat · mercabarna · manual,
+  `font_nom`, `font_dies` (días de Mercabarna promediados), `proposta_eur_kg` (lo que proponía la fuente al validar:
+  así se ve si la fuente cambia después), `carrega_id`, `motiu`, `validat_per`, `validat_at`.
+  **`preus_referencia_hist`**: cada valor sobrescrito o borrado (trigger `trg_preus_referencia_hist`).
+- **Precedencia** (`preus_fonts_mes` → `preus_calcula_mes`): producto `preu_manual` → el manual vigente; si no,
+  Gencat del mes (de la carga no descartada más reciente) → media de los días de Mercabarna del mes → manual. Un
+  fichero nuevo de Gencat puede revisar meses ya publicados: la pantalla avisa si la fuente ya no dice lo validado.
+- **`preu_referencia_de(p_producto, p_data)`** (interna, sin EXECUTE para sesiones; para D2): el validado del mes;
+  si no lo hay, el último validado anterior (`provisional`, `origen = anterior`); si tampoco, el manual vigente.
+- RLS en las seis tablas: SELECT con `es_intern()`; `authenticated` solo SELECT; `anon` nada. Se escribe por RPC
+  (§4bis) y la Edge Function `preus-fonts`. Las columnas de autoría del equipo entran solas en `equip_columnes_autoria()`.
+- `pendents_equip()` gana la cola 18.ª **`preus`**: cargas de Gencat `pendent` + fuentes con `darrer_resultat = 'error'`.
+
 ### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 **Operativa (A4,

@@ -447,3 +447,19 @@ navegador: haría compilar código que revienta en producción.
   `camposOferta.ts` o `excedentsLlegible.ts`): **`crear-oferta`**, **`whatsapp-webhook`**, **`recollides-programades`**,
   **`diagnostic-pdf`** y **`generar-documento`** (estas dos, juntas, P4; tras `generar-documento`,
   `emitir_documento_prova()`).
+
+### Publicar la fase D1 del punto 3: precios de referencia (17-11-2026, `20270531100000`)
+
+Orden: **base → función → frontend**.
+1. `aplicar-migracion.ts supabase/migrations/20270531100000_preus_referencia.sql` (crea las tablas, el bucket
+   `preus-fonts`, las RPC, los dos jobs `pg_cron` y la cola `preus` de `pendents_equip()`).
+2. Comprobar que `app_config` tiene `documentos_secret` y `url_funciones` (los usan los jobs; ya existen para los
+   documentales) y que la Edge Function tiene `DOCUMENTOS_SECRET` y `URL_PUBLICA_STORAGE` si hace falta.
+3. `functions deploy preus-fonts --no-verify-jwt` (lleva su `deno.json` con `npm:xlsx@0.18.5`). Toca `_shared/` solo
+   con un módulo hoja nuevo (`preusFonts.ts`): no obliga a redesplegar las demás.
+4. Primera carga: `select disparar_preus_fonts('gencat')` (y `'mercabarna'`) o «Actualitza ara» en Productes ›
+   Càrregues; validar los meses con «Valida en bloc».
+5. `git push` (frontend) y el arnés contra producción.
+
+En el clon: `select disparar_preus_fonts('gencat')` llama a la función local por `url_funciones()`
+(`http://kong:8000/functions/v1`); el servidor de funciones del clon recoge la función nueva sin reiniciar.

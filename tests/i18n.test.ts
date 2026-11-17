@@ -169,6 +169,22 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // El certificado de donación (05-11-2026): el ámbito (`clauAbast`) y el tipo de la
     // entidad no social de una exclusión (`clauTipus`). Los motivos los vigila su propio test.
     { que: 'certificat de donació · abast', prefijo: 'cdon.abast_', valores: ['oferta', 'periode', 'exercici'] },
+    // Precios de referencia por mes (punto 3, D1, 20270531100000; `lib/preus.ts` y `components/preus/`).
+    { que: 'preus_referencia.font', prefijo: 'preu.font_', valores: ['gencat', 'mercabarna', 'manual'] },
+    { que: 'preus_referencia.font (corta)', prefijo: 'preu.font_', valores: ['gencat_curt', 'mercabarna_curt', 'manual_curt', 'gencat_long', 'mercabarna_long', 'gencat_desc', 'mercabarna_desc'] },
+    { que: 'mes (1-12)', prefijo: 'preu.mes_', valores: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] },
+    { que: 'mes corto (1-12)', prefijo: 'preu.mes_curt_', valores: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] },
+    { que: 'preus_carregues.estat', prefijo: 'preu.estat_', valores: ['pendent', 'validada', 'descartada'] },
+    { que: 'preus_carregues.origen', prefijo: 'preu.origen_', valores: ['job', 'manual'] },
+    { que: 'preus_fonts_estat.darrer_resultat', prefijo: 'preu.res_', valores: ['nou', 'sense_canvis', 'duplicat', 'error'] },
+    { que: 'preus-fonts resultat', prefijo: 'preu.update_', valores: ['nou', 'sense_canvis', 'duplicat', 'desactivat'] },
+    {
+      que: 'RPC de preus · codis (lib/preus CODIS)',
+      prefijo: 'preu.err_',
+      valores: ['mes_futur', 'mes_invalid', 'motiu_obligatori', 'preu_invalid', 'font_invalida', 'producte_inexistent',
+        'producte_existent', 'familia_desconeguda', 'nom_invalid', 'nom_font_buit', 'carrega_validada',
+        'carrega_inexistent', 'url_invalida', 'periode_invalid', 'periode_massa_llarg', 'permis', 'generic', 'font'],
+    },
     // Lo que impide borrar una ficha: los `codi` de `bloqueigs_esborrat_fitxa()` (desde
     // 20270508100000 también las ofertas), compuestos en `useEsborrarFitxa.tsx`.
     { que: 'bloqueigs_esborrat_fitxa().codi', prefijo: 'rec.block_', valores: ['ofertes', 'ofertes_rebudes', 'albarans', 'tancaments', 'linies_tancament', 'convenis', 'plans', 'expedients', 'documents'] },

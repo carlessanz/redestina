@@ -374,3 +374,12 @@ enabled = true
 verify_jwt = false
 import_map = "./functions/recollides-programades/deno.json"
 entrypoint = "./functions/recollides-programades/index.ts"
+
+# Precios de referencia (punto 3, fase D1, 17-11-2026). La llama pg_cron una vez al día por
+# fuente (`disparar_preus_fonts()`, secreto `x-documentos-secret`) y el equipo con su sesión
+# («Actualitza ara», «Descarrega»): por eso va sin verify_jwt y autoriza dentro.
+[functions.preus-fonts]
+enabled = true
+verify_jwt = false
+import_map = "./functions/preus-fonts/deno.json"
+entrypoint = "./functions/preus-fonts/index.ts"
