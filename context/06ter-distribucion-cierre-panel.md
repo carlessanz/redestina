@@ -2356,6 +2356,44 @@ Sin migración. Responde a los puntos 23, 25, 54 y 83 de la revisión del feedba
   no filtra por modalidad. ⚠️ Redesplegar `priorizar-entidades`.
 - E2E `tests/e2e/filtres-territori.e2e.ts` (lectura; el ranking, solo en el clon).
 
+### Fase A del punto 3: el alta de oferta por bloques y con buscadores (17-11-2026, `20270528100000`)
+
+Filas 3.1–3.5 del Excel de revisión de la Fundació (plan del 17-11 en `3. Claude Code/`). No toca causas ni
+subcausas, borradores en servidor, edición tras publicar ni precios por mes (otras fases).
+
+- **Buscadores** (`components/CercadorOpcions.tsx`): campo de texto con sugerencias, sin acentos (`senseAccents`), opciones
+  `{valor, text, detall?, claus?}`; el valor solo cambia al elegir (clic o flechas + Intro) y al perder el foco sin elegir
+  vuelve al texto elegido. Combobox accesible (`role="combobox"`, lista `<id>-llista`, opciones con `data-valor`). Lo usan
+  `SelectorMunicipi` (por debajo, mismo comportamiento: dos letras, ocho sugerencias, «comarca · provincia» debajo), el
+  **producto** del alta (con la familia como `detall`) y la **entidad** de `DialegNovaOfertaAssistida` (un solo
+  buscador de productores activos, con su población; antes, campo de búsqueda + desplegable).
+- **La familia ya no se pregunta en el panel**: sale del producto elegido y se manda igual (el servidor la exige).
+  WhatsApp la sigue preguntando (acota la lista de productos).
+- **`FormulariNovaOferta` por bloques progresivos**: sin «Continuar», «Enrere» ni lista de pasos (claves `po.steps`,
+  `po.step_of`, `po.back`, `po.continue` retiradas). Los bloques van en orden; el siguiente se abre cuando los
+  obligatorios que aplican del anterior están completos y valen (kg > 0, envases a devolver enteros, franja entera,
+  Maps propio bien formado). Abierto una vez, se queda abierto (el borrador guarda el más avanzado en `pasMaxim`; `pas`
+  se escribe 0). Cerrado: título con candado y `po.bloc_tancat` (`data-testid="bloc-<clau>"`, `data-obert`). Pie:
+  «Publicar oferta» (marca a la vez lo que falta y lo que no vale y lleva al primero) y «Cancel·lar». El pie ya no
+  lleva `-mx-4` (sobresalía 16 px a 375 desde el ancho único del shell).
+- **`components/TriaSiNo.tsx`**: dos botones con `aria-pressed` para `producte_al_camp` y `retorn` (el valor que viaja no
+  cambia: «si»/«no», «Sí»/«No»).
+- **El lugar**: debajo del elegido (o del habitual de P5), su municipio y su enlace de Maps (pestaña nueva,
+  `data-testid="lloc-maps"`); si el lugar no tiene enlace, un campo `of-gmaps_url` para el de **esta oferta** (se guarda
+  en `excedentes.gmaps_url`, no en la ficha). «Afegir un lloc nou» sigue. Los **días** (`dies_recollida`, chips) y la
+  franja llegan del lugar y se editan; al cambiar de lugar se recalculan los dos (`recalculaDelLloc` en
+  `lib/predeterminatsOferta.ts`: el lugar nuevo manda, y lo que no tenga se vacía).
+- **`disponible_fins`** propone hoy + 2 días naturales en Madrid (`disponiblePerDefecte(avuiMadrid())`,
+  `lib/esborranyOferta.ts`), también en un borrador que no lo tenga.
+- Descriptor y servidor: ver `context/06bis` (pasos nuevos, transport oculto, precio solo en venta) y `context/04`
+  (columnas). `crear-oferta`: `400 kg_invalid`, `retorn_quantitat_invalid`, `maps_invalid`; `GET /campos` sirve el
+  `gmaps_url` de los lugares, los `dies_recollida` del lugar en `predeterminats` y no sirve los campos `oculto`.
+- E2E en `tests/e2e/operativa.e2e.ts` (bloques, buscador, lugar con días y Maps, 375 px sin desbordes, y `crear-oferta`
+  por API); `entitats.e2e.ts` adaptado al buscador de entidades.
+- ⚠️ Al publicar: migración, y redesplegar **`crear-oferta`, `whatsapp-webhook`, `recollides-programades`** (importan
+  `intake.ts`/`oferta.ts`/`camposOferta.ts`/`predeterminatsOferta.ts`) **y `priorizar-entidades`** (importa
+  `modalitats.ts`). Sin redesplegar, el panel nuevo llama a un `crear-oferta` viejo que ignora los campos nuevos.
+
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y

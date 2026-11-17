@@ -66,3 +66,31 @@ export function ddmmaaaaAIso(txt: string): string {
   const m = txt.match(/^(\d{2})\/(\d{2})\/(\d{4})$/)
   return m ? `${m[3]}-${m[2]}-${m[1]}` : ''
 }
+
+/**
+ * «2026-11-17» + 2 → «2026-11-19», en días NATURALES (17-11-2026: «Fins quin dia està
+ * disponible» propone hoy + 2, con el «hoy» de Madrid). Se calcula en UTC para que el cambio de
+ * hora no reste un día. Vacío si no es una fecha ISO.
+ */
+export function sumaDiesIso(iso: string, n: number): string {
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})$/)
+  if (!m) return ''
+  const d = new Date(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3]) + n))
+  return d.toISOString().slice(0, 10)
+}
+
+/** Lo que propone el formulario para «disponible fins»: hoy (Madrid) + 2 días, en «dd/mm/aaaa». */
+export const DIES_DISPONIBLE_PER_DEFECTE = 2
+export function disponiblePerDefecte(avuiIso: string): string {
+  return isoADdmmaaaa(sumaDiesIso(avuiIso, DIES_DISPONIBLE_PER_DEFECTE))
+}
+
+/**
+ * ¿Un enlace de Maps propio de la oferta vale? http(s), sin espacios y ≤500 (el mismo criterio
+ * que `mapsValid` de `crear-oferta` y el check de la base). Vacío vale: es opcional.
+ */
+export function mapsOfertaValid(v: unknown): boolean {
+  if (v == null) return true
+  const t = String(v).trim()
+  return t === '' || (/^https?:\/\/\S+$/i.test(t) && t.length <= 500)
+}

@@ -4,7 +4,7 @@ import { sendText } from "./whatsapp.ts";
 import { confirmarOfertaPerCorreu } from "./correu-oferta.ts";
 import { ambPreu, etiquetaModalitats, modalitatsDe, principal } from "./modalitats.ts";
 import { llegeixHorari } from "./franja.ts";
-import { componerTextoOferta, textCaixes, textoEnvasos } from "./textOferta.ts";
+import { componerTextoOferta, diesValids, textCaixes, textDies, textoEnvasos } from "./textOferta.ts";
 import { TEXT_ERROR_INTAKE, textAgraimentIntake, textSenseConveniIntake } from "./textIntake.ts";
 
 // El texto de la oferta vive en `textOferta.ts` (módulo hoja, 27-10-2026); se reexporta para
@@ -47,6 +47,27 @@ export function costDeclarat(v: unknown): number | null {
   if (v === undefined || v === null || v === "") return null;
   const n = Number(String(v).replace(",", "."));
   return Number.isFinite(n) && n > 0 ? n : null;
+}
+
+/**
+ * El enlace de Maps PROPIO de la oferta (17-11-2026), o null: http(s) y como mucho 500
+ * caracteres (el check `excedentes_gmaps_url` de la base dice lo mismo). Lo que no lo es se
+ * descarta: el campo es opcional y `crear-oferta` ya rechaza antes un valor mal formado.
+ */
+export function mapsOferta(v: unknown): string | null {
+  const t = typeof v === "string" ? v.trim() : "";
+  return /^https?:\/\/\S+$/i.test(t) && t.length <= 500 ? t : null;
+}
+
+/**
+ * Qué envases hay que devolver y cuántos (17-11-2026), solo si la respuesta al retorno es «Sí»:
+ * con «No» o sin retorno, lo que quede escrito de antes no se guarda.
+ */
+export function retornDetall(d: Record<string, unknown>): { detall: string | null; quantitat: number | null } {
+  if (d.retorn !== "Sí") return { detall: null, quantitat: null };
+  const detall = String(d.retorn_envasos ?? "").trim().slice(0, 400) || null;
+  const q = Number(d.retorn_quantitat);
+  return { detall, quantitat: Number.isInteger(q) && q > 0 ? q : null };
 }
 
 export function esProducteAlCamp(valor: unknown): boolean {
@@ -226,6 +247,11 @@ export async function crearExcedente(
   // Tres valores, a propósito: sí, no, o no se preguntó (producto en el campo).
   const transportPropi = d.transport === "si" ? true : d.transport === "no" ? false : null;
   const municipio = ubicacion?.municipio ?? fichaProductor?.poblacion ?? "";
+  // 17-11-2026: el retorno con su detalle, los días de recogida (solo del panel) y el enlace de
+  // Maps propio de la oferta, que manda sobre el del lugar (la ficha del lugar no se toca).
+  const retorn = retornDetall(d);
+  const dies = diesValids(d.dies_recollida);
+  const maps = mapsOferta(d.gmaps_url);
   // El nombre de la ORGANIZACIÓN (`empresa`, el «Nom comercial»), con `name` de respaldo:
   // en una ficha del registro `name` es la persona de contacto, y el código de la oferta
   // salía con sus iniciales (28-09-2026). Es el mismo criterio que ya aplican en SQL
@@ -238,15 +264,16 @@ export async function crearExcedente(
     producteAlCamp: alCamp,
     productor: nomOrganitzacio,
     municipi: municipio,
-    ubicacio: ubicacion?.gmaps_url || undefined,
+    ubicacio: maps || ubicacion?.gmaps_url || undefined,
     quantitat: `${String(kg).replace(".", ",")} kg aprox${d.caixes ? ` · ${textCaixes(Number(d.caixes), d.format_entrega)}` : ""}`,
     disponible: String(d.disponible_fins ?? ""),
+    dies: textDies(dies) || undefined,
     horari: horari.text ?? undefined,
     modalitat: etiquetaModalitats(modalitats),
     // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
     preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
     causa: causa?.nombre ?? String(d.causa ?? ""),
-    envasos: textoEnvasos(d.format_entrega, d.retorn) || undefined,
+    envasos: textoEnvasos(d.format_entrega, d.retorn, retorn.detall, retorn.quantitat) || undefined,
     transportPropi: transportPropi === true,
     // Se asigna en el panel; el productor no lo elige.
     responsable: "",
@@ -285,6 +312,10 @@ export async function crearExcedente(
       // sustituye, y las taras se fijan por línea en el albarán.
       format_entrega: d.format_entrega ?? null,
       retorn_envasos: d.retorn ?? null,
+      retorn_envasos_detall: retorn.detall,
+      retorn_envasos_quantitat: retorn.quantitat,
+      dies_recollida: dies.length > 0 ? dies : null,
+      gmaps_url: maps,
       transport_propi: transportPropi,
       // Solo llegan del panel (el bot no recibe imágenes todavía, brecha 8); `crear-oferta`
       // ya ha comprobado que son de la carpeta de este productor.
@@ -437,14 +468,18 @@ export async function textoOfertaDeFila(
     producteAlCamp: fila.producte_al_camp === true,
     productor: prod?.empresa || prod?.name || "",
     municipi: ubi?.municipio ?? prod?.poblacion ?? "",
-    ubicacio: ubi?.gmaps_url || undefined,
+    // El enlace propio de la oferta manda sobre el del lugar (17-11-2026).
+    ubicacio: mapsOferta(fila.gmaps_url) || ubi?.gmaps_url || undefined,
     quantitat: `${String(kg).replace(".", ",")} kg aprox${fila.num_caixes ? ` · ${textCaixes(Number(fila.num_caixes), fila.format_entrega)}` : ""}`,
     disponible: data,
+    dies: textDies(fila.dies_recollida) || undefined,
     horari: fila.horari_recollida ? String(fila.horari_recollida) : undefined,
     modalitat: etiquetaModalitats(modalitats),
     preu: preu != null ? `${preu.toFixed(2).replace(".", ",")} €/kg` : undefined,
     causa: String(fila.causa ?? ""),
-    envasos: textoEnvasos(fila.format_entrega, fila.retorn_envasos) || undefined,
+    envasos: textoEnvasos(
+      fila.format_entrega, fila.retorn_envasos, fila.retorn_envasos_detall, fila.retorn_envasos_quantitat,
+    ) || undefined,
     transportPropi: fila.transport_propi === true,
     responsable: "",
     observacions: String(fila.observacions ?? ""),

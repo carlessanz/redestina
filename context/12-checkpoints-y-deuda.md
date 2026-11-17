@@ -133,6 +133,7 @@ cerradas, y muchos viven en migraciones aplicadas, que no se pueden editar (§7)
 conserva el número de cada cerrada aunque su cuerpo se haya ido: sin esa línea, esos 48 punteros
 apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
+⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
 ⚠️ **10-11-2026 (deuda 140, `20270525100000`): se cierra la 140** (el borrado conoce los expedientes de prevención; detalle en §12ter): **77 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -892,3 +893,10 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      cuando ese frontend ya no exista: columna, trigger `trg_productores_sense_facturacio_eur`, la clave
      `facturacio_eur` de `diagnostic_datos()`, `COLUMNES` de `tests/campsFitxa.test.ts`, `NO_ES_MOSTRA` y las listas de
      columnas de `scripts/comprobar-rls.ts`. Precio: una migración y tres tests.
+180. **El interés en maquila aún compara con `preu_minim`** (17-11-2026, `20270528100000`). Desde la fase A del punto 3,
+     el precio de la oferta es solo el de **venta** (`ambPreu` = incluye venta) y la maquila no lleva campos económicos en
+     el alta. Pero `manifestar_interes()`, `manifestar_interes_assistit()` y la aprobación siguen con
+     `v_mod in ('venda','maquila') and ex.preu_minim is not null`: en una oferta venta + maquila, un interés en maquila
+     tiene que igualar el precio de venta. Hoy no rompe nada (los formularios de interés precargan `preu_minim`), pero
+     no es lo que dice el negocio. Arreglo: una migración que deje la guarda solo en `venda` en esas RPC (y revisar
+     `FormulariInteresAssistit`/`FormulariAprovacio`, que piden precio con maquila). Precio: una migración y el arnés.

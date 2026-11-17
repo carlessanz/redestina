@@ -7,8 +7,8 @@
 // Todo ocurre dentro de la ventana de servicio de 24 h —la abre el propio
 // productor al escribir—, así que no hacen falta plantillas ni opt-in.
 //
-// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son diecisiete pasos —varios
-// condicionales, como el `preu_minim` (venda y maquila) o el `cost_kg` (donació)— con paginación,
+// Vive fuera de `whatsapp-webhook/index.ts` a propósito: son veinte pasos —varios
+// condicionales, como el `preu_minim` (solo venda) o el `cost_kg` (donació)— con paginación,
 // reintentos y caducidad, y embutirlos en el bucle del webhook lo haría inmanejable.
 
 import { sendBotones, sendLista, sendText } from "./whatsapp.ts";
@@ -119,6 +119,9 @@ export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso 
       return PASOS[j];
     }
     const campo = CAMPOS.find((c) => c.clave === PASOS[j]);
+    // Lo que solo pregunta el panel (`dies_recollida`, 17-11-2026) el bot lo salta; lo oculto
+    // (`transport`) ya lo descarta `aplica()`.
+    if (campo?.soloPanel) continue;
     if (!campo || aplica(campo, datos)) return PASOS[j];
   }
   return null;
@@ -253,6 +256,13 @@ async function preguntar(
         { id: "retorn:Sí", titulo: "Sí" },
         { id: "retorn:No", titulo: "No" },
       ])).ok;
+    // Con retorno, qué y cuántos (17-11-2026, fila 3.2 del Excel).
+    case "retorn_envasos":
+      return (await sendText(
+        supabase, to, "Quins envasos s'han de retornar? (per exemple «caixes de plàstic verdes»)",
+      )).ok;
+    case "retorn_quantitat":
+      return (await sendText(supabase, to, "Quants envasos s'han de retornar? Escriu un número (p. ex. 20).")).ok;
     case "transport":
       return (await sendBotones(
         supabase, to, "Pots encarregar-te del transport? Si el portes tu, no cal dir on es recull.",
@@ -332,7 +342,7 @@ async function preguntar(
     case "preu_minim":
       return (await sendText(
         supabase, to,
-        "A quin preu mínim (€/kg) la vols oferir? Escriu un número (p. ex. 0,80).",
+        "A quin preu de venda (€/kg) la vols oferir? Escriu un número (p. ex. 0,80).",
       )).ok;
     case "cost_kg": {
       // El coste lo decide el productor; la pantalla «Productes» solo da la REFERENCIA
@@ -342,7 +352,7 @@ async function preguntar(
       if (ref !== null) {
         return (await sendBotones(
           supabase, to,
-          `Quin és el cost per quilo? És el valor amb què es calcula la donació al certificat.\n\n` +
+          `Quin és el valor de cost per quilo? És el valor amb què es calcula la donació al certificat.\n\n` +
             `El valor de referència ${de(String(datos.producte ?? ""))} és ${eurKg(ref)}.`,
           [
             { id: "cost_kg:ref", titulo: `Mantenir ${eurKg(ref)}`.slice(0, 20) },
@@ -352,7 +362,7 @@ async function preguntar(
       }
       return (await sendText(
         supabase, to,
-        "Quin és el cost per quilo (€/kg)? És el valor amb què es calcula la donació al " +
+        "Quin és el valor de cost per quilo (€/kg)? És el valor amb què es calcula la donació al " +
           "certificat. Escriu un número (p. ex. 0,60) o '-' si no el saps.",
       )).ok;
     }
@@ -430,7 +440,8 @@ async function interpretar(
         if (!factor?.kg_por_unidad) return SENSE_FACTOR;
         kg = kg * Number(factor.kg_por_unidad);
       }
-      return kg;
+      // Una oferta de 0 kg no es una oferta (17-11-2026; `crear-oferta` da `400 kg_invalid`).
+      return kg > 0 ? kg : null;
     }
     case "cost_kg": {
       if (id === "cost_kg:ref") {
@@ -452,6 +463,11 @@ async function interpretar(
     case "caixes":
       if (t === "-") return null_ok();
       return t.match(/\d+/) ? Number(t.match(/\d+/)![0]) : null;
+    case "retorn_quantitat": {
+      // Un entero > 0: «20», «unes 20 caixes». Sin número, o 0, se vuelve a preguntar.
+      const n = t.match(/\d+/) ? Number(t.match(/\d+/)![0]) : 0;
+      return n > 0 ? n : null;
+    }
     case "ubicacio": {
       if (id?.startsWith("ubicacio:") && id !== "ubicacio:nova" && id !== ID_CANVIA_LLOC) {
         return id.slice("ubicacio:".length);
@@ -670,7 +686,7 @@ export async function procesarIntake(
 
   // Un texto libre demasiado largo haría que el mensaje de la oferta pasara de los 1024
   // caracteres que admite un interactivo de Meta, y la entidad no lo recibiría.
-  if ((paso === "observacions" || paso === "varietat" || paso === "horari") &&
+  if ((paso === "observacions" || paso === "varietat" || paso === "horari" || paso === "retorn_envasos") &&
     (texto ?? "").trim().length > MAX_TEXT_LLIURE) {
     await sendText(supabase, from, `És massa llarg: escriu-ho en menys de ${MAX_TEXT_LLIURE} caràcters.`);
     return true;

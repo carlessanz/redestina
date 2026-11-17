@@ -9,7 +9,7 @@ import { supabase, supabaseUrl } from './supabase'
 import type { Canalizacion, Excedente, OfertaRespuesta } from '../types'
 import { CODIS_DESTI } from './destiFinal'
 
-export type TipoCampo = 'familia' | 'producte' | 'text' | 'numero' | 'opcions' | 'ubicacio' | 'causa'
+export type TipoCampo = 'familia' | 'producte' | 'text' | 'numero' | 'opcions' | 'ubicacio' | 'causa' | 'dies'
 
 /** Los cinco bloques del cuestionario, en el orden en que se pintan. */
 export type SeccioOferta = 'producte' | 'quantitat' | 'recollida' | 'modalitat' | 'causa'
@@ -30,6 +30,9 @@ export interface OpcioOferta {
   descripcion?: string
   titulo_es?: string
   descripcion_es?: string
+  /** El título largo del panel cuando el de WhatsApp es corto (17-11-2026, maquila). */
+  titulo_panel?: string
+  titulo_panel_es?: string
 }
 
 export interface CampoOferta {
@@ -60,6 +63,10 @@ export interface CampoOferta {
    * en `condicion` solo la primera, para no romper el panel anterior durante la publicación.
    */
   condicions?: CondicioCamp[]
+  /** Oculto temporalmente (17-11-2026, `transport`): no se pregunta. El servidor ya no lo sirve. */
+  oculto?: boolean
+  /** Solo lo pregunta el panel (17-11-2026, `dies_recollida`). */
+  soloPanel?: boolean
 }
 
 export interface CondicioCamp { campo: string; en: string[] }
@@ -68,12 +75,22 @@ export interface CondicioCamp { campo: string; en: string[] }
  * ¿Este campo se pregunta, dados los datos? Espejo de `aplica()` en
  * `_shared/camposOferta.ts` —que es Deno y no entra en el bundle—; divergir no rompería
  * nada (el servidor valida con el suyo), pero la pantalla preguntaría otra cosa que el bot.
+ *
+ * Con `campos` (el descriptor entero), la condición se ENCADENA como en el servidor (17-11-2026):
+ * solo cuenta si el campo del que depende también se pregunta. Lo `oculto` no se pregunta nunca.
  */
-export function aplicaCamp(campo: CampoOferta, datos: Record<string, unknown>): boolean {
+export function aplicaCamp(
+  campo: CampoOferta, datos: Record<string, unknown>, campos?: readonly CampoOferta[],
+): boolean {
+  if (campo.oculto) return false
   const conds = campo.condicions
     ?? (campo.condicion ? (Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion]) : [])
   if (conds.length === 0) return true
-  return conds.some((c) => valorsDe(datos[c.campo]).some((v) => c.en.includes(v)))
+  return conds.some((c) => {
+    const del = campos?.find((x) => x.clave === c.campo)
+    if (del && del !== campo && !aplicaCamp(del, datos, campos)) return false
+    return valorsDe(datos[c.campo]).some((v) => c.en.includes(v))
+  })
 }
 
 /** Espejo de `valorsDe()` de `camposOferta.ts`: una lista cuenta valor por valor. */
@@ -143,9 +160,12 @@ export interface CatalogosOferta {
   /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
   productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
   causas: { codigo: string; nombre: string | null; nombre_es?: string | null }[]
-  /** `es_principal`, `horario`, `dies_setmana` y `franges` llegan desde A4; un servidor anterior no los manda. */
+  /**
+   * `es_principal`, `horario`, `dies_setmana` y `franges` llegan desde A4; `gmaps_url`, desde el
+   * 17-11-2026. Un servidor anterior no los manda.
+   */
   ubicaciones: {
-    id: string; alias: string | null; municipio: string | null
+    id: string; alias: string | null; municipio: string | null; gmaps_url?: string | null
     es_principal?: boolean | null; horario?: string | null; dies_setmana?: number[] | null; franges?: unknown
   }[]
   /** Familia (valor catalán, el que se guarda) → cómo se enseña en castellano. */
@@ -164,7 +184,11 @@ export function localitzaDescriptor(
   catalogos: CatalogosOferta | null,
   lang: string,
 ): { campos: CampoOferta[]; seccions: BlocOferta[]; catalogos: CatalogosOferta | null } {
-  if (lang !== 'es') return { campos, seccions, catalogos }
+  // El título largo del panel (`titulo_panel`, 17-11-2026) manda en los dos idiomas.
+  const ambTitolPanel = (cs: CampoOferta[]) => cs.map((c) => (c.opciones?.some((o) => o.titulo_panel)
+    ? { ...c, opciones: c.opciones.map((o) => (o.titulo_panel ? { ...o, titulo: o.titulo_panel } : o)) }
+    : c))
+  if (lang !== 'es') return { campos: ambTitolPanel(campos), seccions, catalogos }
   return {
     campos: campos.map((c) => ({
       ...c,
@@ -172,7 +196,7 @@ export function localitzaDescriptor(
       ayuda: c.ayuda_es ?? c.ayuda,
       opciones: c.opciones?.map((o) => ({
         ...o,
-        titulo: o.titulo_es ?? o.titulo,
+        titulo: o.titulo_panel_es ?? o.titulo_panel ?? o.titulo_es ?? o.titulo,
         descripcion: o.descripcion_es ?? o.descripcion,
       })),
     })),
@@ -204,14 +228,16 @@ async function token(): Promise<string | null> {
   return data.session?.access_token ?? null
 }
 
-/** Descriptor de los 14 pasos + catálogos. Nunca lanza. */
 /** Lo que la Operativa propone en una oferta nueva (A4; `_shared/predeterminatsOferta.ts`). */
 export interface PredeterminatsOferta {
   ubicacio: string | null
   horari: { inici: string; fi: string } | null
   format_entrega: string | null
+  /** Los días del lugar propuesto (17-11-2026); un servidor anterior no los manda. */
+  dies_recollida?: number[] | null
 }
 
+/** Descriptor de los pasos + catálogos. Nunca lanza. */
 export async function carregaCamps(
   productorId: string,
 ): Promise<Resultat<{

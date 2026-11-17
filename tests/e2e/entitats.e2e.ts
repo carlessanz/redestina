@@ -79,10 +79,15 @@ async function cerca(page: Page, text: string) {
 async function productorsOfertaAssistida(page: Page, nom: string): Promise<number> {
   await page.goto('/equip/canalitzacio')
   await page.getByRole('button', { name: /^Nova oferta assistida$|^Nueva oferta asistida$/ }).first().click()
+  // 17-11-2026: un buscador (`CercadorOpcions`). Cargadas las fichas (hay otras activas), se
+  // escribe el nombre y se cuentan las sugerencias que lo llevan.
   const sel = page.locator('#dnoa-productor')
-  await expect(sel).toBeVisible()
+  await expect(sel).toBeEnabled()
   await expect.poll(async () => (await opcionsDe(sel)).length).toBeGreaterThan(1)
-  return (await opcionsDe(sel)).filter((o) => o.includes(nom)).length
+  await sel.fill(nom)
+  await page.waitForTimeout(100)
+  return (await page.locator('#dnoa-productor-llista [role="option"]').allTextContents())
+    .filter((o) => o.includes(nom)).length
 }
 
 test('una inactiva: sin NIF no se activa; con NIF se activa y aparece en «Nova oferta assistida»', async ({ page }) => {

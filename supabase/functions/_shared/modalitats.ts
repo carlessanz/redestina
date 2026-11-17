@@ -64,7 +64,11 @@ export function etiquetaModalitats(ms: readonly Modalitat[]): string {
   return `${noms.slice(0, -1).join(", ")} o ${noms[noms.length - 1]}`;
 }
 
-/** ¿Incluye alguna modalidad con precio (venda o maquila)? Es lo que decide pedir el preu mínim. */
+/**
+ * ¿Incluye alguna modalidad con precio? Desde el 17-11-2026 (fase A del punto 3, fila 3.3) solo
+ * la VENTA: el campo es el «preu de venda» y la maquila se queda sin campos económicos. Decide
+ * si se pregunta y se guarda el precio (`preu_minim`) y si sale en el texto de la oferta.
+ */
 export function ambPreu(ms: readonly Modalitat[]): boolean {
-  return ms.includes("venda") || ms.includes("maquila");
+  return ms.includes("venda");
 }

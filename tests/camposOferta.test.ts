@@ -1,4 +1,4 @@
-// El cuestionario de la oferta: los 16 pasos, cuáles son obligatorios y cuáles se saltan.
+// El cuestionario de la oferta: los 20 pasos, cuáles son obligatorios y cuáles se saltan.
 //
 // Por qué importa: este módulo es la ÚNICA definición del cuestionario, y la comparten dos
 // interfaces que no se parecen en nada —el intake conversacional de WhatsApp (`intake.ts`,
@@ -11,7 +11,7 @@
 //
 // `faltantes()` es además el guardia de `crear-oferta`: lo que devuelve vacío se da de alta.
 
-import { describe, it, expect } from 'vitest'
+import { describe, it, expect, vi } from 'vitest'
 import {
   PASOS,
   CAMPOS,
@@ -25,6 +25,9 @@ import {
   type CampoOferta,
   type Paso,
 } from '../supabase/functions/_shared/camposOferta.ts'
+// `lib/ofertes` importa el cliente de Supabase; aquí solo interesan sus funciones puras.
+vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
+import { aplicaCamp, localitzaDescriptor, type CampoOferta as CampoWeb } from '../src/lib/ofertes'
 
 /** Busca el descriptor de un paso; falla la prueba si no existe (no devuelve undefined). */
 function campo(clave: Paso): CampoOferta {
@@ -61,10 +64,10 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
     expect(CAMPOS.map((c) => c.clave)).toEqual([...PASOS])
   })
 
-  it('son 17 pasos, siete de ellos condicionales', () => {
-    expect(PASOS).toHaveLength(17)
+  it('son 20 pasos, ocho de ellos condicionales', () => {
+    expect(PASOS).toHaveLength(20)
     expect(CAMPOS.filter((c) => c.condicion).map((c) => c.clave)).toEqual([
-      'format_entrega', 'caixes', 'retorn', 'transport', 'ubicacio', 'preu_minim', 'cost_kg',
+      'format_entrega', 'caixes', 'retorn', 'retorn_envasos', 'retorn_quantitat', 'transport', 'preu_minim', 'cost_kg',
     ])
   })
 
@@ -93,6 +96,8 @@ describe('qué es obligatorio', () => {
       'kg',
       'format_entrega',
       'retorn',
+      'retorn_envasos',
+      'retorn_quantitat',
       'transport',
       'ubicacio',
       'disponible_fins',
@@ -102,8 +107,8 @@ describe('qué es obligatorio', () => {
     ])
   })
 
-  it('varietat, caixes, horari y observacions son opcionales', () => {
-    for (const c of ['varietat', 'caixes', 'horari', 'observacions'] as Paso[]) {
+  it('varietat, caixes, dies_recollida, horari y observacions son opcionales', () => {
+    for (const c of ['varietat', 'caixes', 'dies_recollida', 'horari', 'observacions'] as Paso[]) {
       expect(campo(c).obligatorio, `${c} no debería ser obligatorio`).toBe(false)
     }
   })
@@ -164,9 +169,19 @@ describe('aplica: el preu mínim se salta en donació', () => {
     expect(campo('cost_kg').obligatorio).toBe(false)
   })
 
-  it('en venda y en maquila SÍ se pregunta', () => {
+  // Fase A del punto 3 (17-11-2026): el precio es el de VENTA; la maquila no lleva importes.
+  it('en venda SÍ se pregunta; en maquila, ya no', () => {
     expect(aplica(campo('preu_minim'), { modalitat: 'venda' })).toBe(true)
-    expect(aplica(campo('preu_minim'), { modalitat: 'maquila' })).toBe(true)
+    expect(aplica(campo('preu_minim'), { modalitat: 'maquila' })).toBe(false)
+    expect(aplica(campo('preu_minim'), { modalitat: ['donacio', 'maquila'] })).toBe(false)
+    expect(aplica(campo('preu_minim'), { modalitat: ['maquila', 'venda'] })).toBe(true)
+  })
+
+  it('las etiquetas del precio y del coste son las que pidió la Fundació', () => {
+    expect(campo('preu_minim').etiqueta).toBe('Preu de venda (€/kg)')
+    expect(campo('preu_minim').etiqueta_es).toBe('Precio de venta (€/kg)')
+    expect(campo('cost_kg').etiqueta).toBe('Valor de cost (€/kg)')
+    expect(campo('cost_kg').etiqueta_es).toBe('Valor de coste (€/kg)')
   })
 
   // Sin modalidad todavía no se puede saber, y el paso va DESPUÉS de `modalitat` en
@@ -213,6 +228,8 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
       'producte',
       'producte_al_camp',
       'kg',
+      // Sin condición desde el 17-11-2026: la ubicación se pide siempre.
+      'ubicacio',
       'disponible_fins',
       'modalitat',
       'causa',
@@ -228,10 +245,16 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
     expect(faltantes({ ...d, format_entrega: 'palet' })).toEqual(['retorn', 'ubicacio'])
   })
 
-  it('si el porta la productora, no cal ubicació', () => {
+  // 17-11-2026: el transporte está OCULTO y la ubicación se pide siempre, diga lo que diga
+  // un `transport` que llegue de un panel anterior.
+  it('el transport ja no es pregunta i la ubicació sempre cal', () => {
     const d = donacionCompleta()
     delete d.ubicacio
-    expect(faltantes({ ...d, transport: 'si' })).toEqual([])
+    delete d.transport
+    expect(faltantes(d)).toEqual(['ubicacio'])
+    expect(faltantes({ ...d, transport: 'si' })).toEqual(['ubicacio'])
+    expect(aplica(campo('transport'), { producte_al_camp: 'no' })).toBe(false)
+    expect(campo('transport').oculto).toBe(true)
   })
 
   it('si el receptor porta els seus envasos, no hi ha retorn', () => {
@@ -271,10 +294,10 @@ describe('faltantes: qué impide dar de alta la oferta', () => {
     expect(faltantes({ ...donacionCompleta(), kg: '300' })).toEqual([])
   })
 
-  // ⚠️ Comportamiento medido, no deseado: `kg: 0` NO se considera ausente, porque el
-  // guardia mira `String(v).trim() === ''` y "0" no lo es. Una oferta de 0 kg pasaría este
-  // filtro; quien la corta después es `crearExcedente`, que guarda `kg_total: kg || null`.
-  it('un 0 pasa el guardia (lo corta después crearExcedente)', () => {
+  // `kg: 0` NO se considera ausente, porque el guardia mira `String(v).trim() === ''` y "0" no
+  // lo es. Desde el 17-11-2026 lo corta `crear-oferta` con `400 kg_invalid` (`kgValid`) y el
+  // intake vuelve a preguntar (`tests/crearOferta.test.ts`).
+  it('un 0 pasa el guardia (lo corta después kgValid)', () => {
     expect(faltantes({ ...donacionCompleta(), kg: 0 })).toEqual([])
   })
 })
@@ -406,8 +429,10 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
     expect(porSeccion('producte')).toEqual([
       'familia', 'producte', 'varietat', 'producte_al_camp',
     ])
-    expect(porSeccion('quantitat')).toEqual(['kg', 'format_entrega', 'caixes', 'retorn'])
-    expect(porSeccion('recollida')).toEqual(['transport', 'ubicacio', 'disponible_fins', 'horari'])
+    expect(porSeccion('quantitat')).toEqual([
+      'kg', 'format_entrega', 'caixes', 'retorn', 'retorn_envasos', 'retorn_quantitat',
+    ])
+    expect(porSeccion('recollida')).toEqual(['transport', 'ubicacio', 'disponible_fins', 'dies_recollida', 'horari'])
     expect(porSeccion('modalitat')).toEqual(['modalitat', 'preu_minim', 'cost_kg'])
     expect(porSeccion('causa')).toEqual(['causa', 'observacions'])
   })
@@ -434,10 +459,11 @@ import { siguientePaso } from '../supabase/functions/_shared/intake.ts'
 
 describe('siguientePaso: el recorrido del cuestionario', () => {
   it('cuando todo aplica, va en el orden de PASOS', () => {
-    // Ya collit, en caixes, sense transport: se pregunta todo menos lo que depende de otra cosa.
-    // En venda: el coste por kilo (solo donació) es el único paso que no aplica.
-    const datos = { producte_al_camp: 'no', format_entrega: 'caixes', transport: 'no', modalitat: 'venda' }
-    const passos = PASOS.filter((p) => p !== 'cost_kg')
+    // Ya collit, en caixes, con retorno: se pregunta todo menos lo que depende de otra cosa.
+    // En venda: el coste por kilo (solo donació) no aplica; el transporte está oculto y los
+    // días de recogida son solo del panel.
+    const datos = { producte_al_camp: 'no', format_entrega: 'caixes', retorn: 'Sí', modalitat: 'venda' }
+    const passos = PASOS.filter((p) => !['cost_kg', 'transport', 'dies_recollida'].includes(p))
     for (let i = 0; i < passos.length - 1; i++) {
       expect(siguientePaso(passos[i], datos), `después de ${passos[i]}`).toBe(passos[i + 1])
     }
@@ -447,13 +473,24 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
     expect(siguientePaso('kg', { producte_al_camp: 'si' })).toBe('ubicacio')
   })
 
-  it('si el porta la productora, salta la ubicació', () => {
-    expect(siguientePaso('transport', { producte_al_camp: 'no', transport: 'si' })).toBe('disponible_fins')
+  it('el transport (oculto) no se pregunta: del retorno se va a la ubicació', () => {
+    expect(siguientePaso('retorn', { producte_al_camp: 'no', format_entrega: 'caixes', retorn: 'No' })).toBe('ubicacio')
   })
 
   it('amb envasos del receptor no pregunta ni caixes ni retorn', () => {
     expect(siguientePaso('format_entrega', { producte_al_camp: 'no', format_entrega: 'envasos_propis' }))
-      .toBe('transport')
+      .toBe('ubicacio')
+  })
+
+  it('amb retorn «Sí» pregunta quins envasos i quants; amb «No», no', () => {
+    const d = { producte_al_camp: 'no', format_entrega: 'caixes' }
+    expect(siguientePaso('retorn', { ...d, retorn: 'Sí' })).toBe('retorn_envasos')
+    expect(siguientePaso('retorn_envasos', { ...d, retorn: 'Sí' })).toBe('retorn_quantitat')
+    expect(siguientePaso('retorn_quantitat', { ...d, retorn: 'Sí' })).toBe('ubicacio')
+  })
+
+  it('els dies de recollida són només del panell: el bot va de la data a la franja', () => {
+    expect(siguientePaso('disponible_fins', {})).toBe('horari')
   })
 
   it('en donació NO se pregunta el preu mínim, sino el cost per quilo', () => {
@@ -461,14 +498,15 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
     expect(siguientePaso('cost_kg', { modalitat: 'donacio' })).toBe('causa')
   })
 
-  it('en venda y maquila, después del preu mínim no se pregunta el coste', () => {
+  it('en venda, después del preu de venda no se pregunta el coste', () => {
     expect(siguientePaso('preu_minim', { modalitat: 'venda' })).toBe('causa')
-    expect(siguientePaso('preu_minim', { modalitat: 'maquila' })).toBe('causa')
   })
 
-  it('en venda y en maquila SÍ', () => {
+  it('en venda SÍ; en maquila sola, ni precio ni coste (17-11-2026)', () => {
     expect(siguientePaso('modalitat', { modalitat: 'venda' })).toBe('preu_minim')
-    expect(siguientePaso('modalitat', { modalitat: 'maquila' })).toBe('preu_minim')
+    expect(siguientePaso('modalitat', { modalitat: ['maquila'] })).toBe('causa')
+    expect(siguientePaso('modalitat', { modalitat: ['donacio', 'maquila'] })).toBe('cost_kg')
+    expect(siguientePaso('modalitat', { modalitat: 'totes' })).toBe('preu_minim')
   })
 
   // Si la modalidad no llegara —un id que `interpretar()` no hubiera guardado— el salto NO
@@ -513,5 +551,77 @@ describe('el formulario también en castellano (28-09-2026)', () => {
   it('el castellano no es una copia del catalán (salvo las palabras que coinciden)', () => {
     const iguals = CAMPOS.filter((c) => c.etiqueta_es === c.etiqueta).map((c) => c.clave)
     expect(iguals).toEqual([])
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Fase A del punto 3 (17-11-2026): retorno con detalle, días solo del panel, transporte oculto,
+// la condición encadenada y el nombre largo de la maquila en el panel.
+// ---------------------------------------------------------------------------
+describe('fase A del punto 3', () => {
+  it('con retorno «Sí» hacen falta qué envases y cuántos', () => {
+    const d = donacionCompleta()
+    expect(faltantes({ ...d, retorn: 'Sí' })).toEqual(['retorn_envasos', 'retorn_quantitat'])
+    expect(faltantes({ ...d, retorn: 'Sí', retorn_envasos: 'Caixes verdes', retorn_quantitat: 12 })).toEqual([])
+    expect(faltantes({ ...d, retorn: 'No' })).toEqual([])
+  })
+
+  it('la condición se encadena: un «Sí» que se quedó escrito no pide nada si el retorno ya no aplica', () => {
+    const d = { ...donacionCompleta(), format_entrega: 'envasos_propis', retorn: 'Sí' }
+    expect(aplica(campo('retorn'), d)).toBe(false)
+    expect(aplica(campo('retorn_envasos'), d)).toBe(false)
+    expect(faltantes(d)).toEqual([])
+  })
+
+  it('los días son solo del panel, opcionales, en la sección de recogida y antes de la franja', () => {
+    const c = campo('dies_recollida')
+    expect(c.soloPanel).toBe(true)
+    expect(c.obligatorio).toBe(false)
+    expect(c.tipo).toBe('dies')
+    expect(PASOS.indexOf('dies_recollida')).toBe(PASOS.indexOf('horari') - 1)
+  })
+
+  it('todo campo solo del panel es opcional, y faltantes por WhatsApp no lo exige', () => {
+    for (const c of CAMPOS.filter((x) => x.soloPanel)) expect(c.obligatorio, c.clave).toBe(false)
+    expect(faltantes(donacionCompleta(), 'whatsapp')).toEqual([])
+  })
+
+  it('la ubicació no tiene condición: se pregunta siempre', () => {
+    expect(campo('ubicacio').condicion).toBeUndefined()
+    expect(aplica(campo('ubicacio'), { producte_al_camp: 'no', transport: 'si' })).toBe(true)
+  })
+
+  it('la maquila: título corto para WhatsApp y largo para el panel', () => {
+    const m = MODALITATS.find((x) => x.id === 'maquila')!
+    expect(m.titulo).toBe('Maquila')
+    expect(m.titulo.length).toBeLessThanOrEqual(MAX_TITULO_FILA_LISTA)
+    expect(m.titulo_panel).toBe('Transformació en obrador (maquila)')
+    expect(m.titulo_panel_es).toBe('Transformación en obrador (maquila)')
+  })
+})
+
+// El panel no llama a `aplica()` del servidor: usa su espejo `aplicaCamp()` sobre el descriptor
+// servido. Tienen que decir lo mismo en cascada (retorno → detalle) y con lo oculto.
+describe('aplicaCamp (panel) = aplica (servidor)', () => {
+  const escenaris: Record<string, unknown>[] = [
+    {},
+    { producte_al_camp: 'no', format_entrega: 'caixes', retorn: 'Sí' },
+    { producte_al_camp: 'si', format_entrega: 'caixes', retorn: 'Sí' },
+    { modalitat: ['donacio', 'maquila'] },
+    { modalitat: ['venda'], transport: 'Sí' },
+    { modalitat: 'totes' },
+  ]
+  for (const d of escenaris) {
+    it(JSON.stringify(d), () => {
+      const campos = CAMPOS as unknown as CampoWeb[]
+      for (const c of campos) expect(aplicaCamp(c, d, campos), c.clave).toBe(aplica(c as never, d))
+    })
+  }
+  it('localitzaDescriptor pone el título largo de la maquila en los dos idiomas', () => {
+    const campos = CAMPOS as unknown as CampoWeb[]
+    for (const lang of ['ca', 'es']) {
+      const m = localitzaDescriptor(campos, [], null, lang).campos.find((c) => c.clave === 'modalitat')
+      expect(m?.opciones?.find((o) => o.id === 'maquila')?.titulo, lang).toMatch(/\(maquila\)$/)
+    }
   })
 })

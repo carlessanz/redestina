@@ -13,6 +13,9 @@
 //   cuando el productor lleva él el transporte) se quita: no se manda algo que no se ha dicho.
 
 import type { PredeterminatsOferta } from './ofertes'
+// Módulo hoja del servidor (§7, `tests/puresa.test.ts`): la misma lectura de días y franjas de
+// un lugar que usa `crear-oferta` para proponerlos, importada y no copiada.
+import { diesDelLloc, primeraFranja } from '../../supabase/functions/_shared/predeterminatsOferta.ts'
 
 type Datos = Record<string, unknown>
 
@@ -34,7 +37,28 @@ export function aplicaPredeterminats(
   posa('ubicacio', pred.ubicacio)
   posa('horari', pred.horari ? { inici: pred.horari.inici, fi: pred.horari.fi } : null)
   posa('format_entrega', pred.format_entrega)
+  posa('dies_recollida', pred.dies_recollida && pred.dies_recollida.length > 0 ? [...pred.dies_recollida] : null)
   return { datos: out, proposats }
+}
+
+/**
+ * Al ELEGIR otro lugar (17-11-2026, fila 3.4): los días y la franja se recalculan desde el lugar
+ * nuevo —también si ya había algo, porque lo de antes era del lugar anterior— y quedan marcados
+ * como propuestos. Lo que el lugar nuevo no tiene se vacía. Puro: devuelve los datos nuevos y
+ * qué claves pasan a ser propuestas o dejan de serlo.
+ */
+export function recalculaDelLloc(
+  datos: Datos,
+  lloc: { dies_setmana?: unknown; franges?: unknown } | null | undefined,
+): { datos: Datos; proposats: string[]; buidats: string[] } {
+  const out: Datos = { ...datos }
+  const proposats: string[] = []
+  const buidats: string[] = []
+  const dies = lloc ? diesDelLloc(lloc.dies_setmana) : null
+  const franja = lloc ? primeraFranja(lloc.franges) : null
+  if (dies) { out.dies_recollida = dies; proposats.push('dies_recollida') } else { delete out.dies_recollida; buidats.push('dies_recollida') }
+  if (franja) { out.horari = { ...franja }; proposats.push('horari') } else { delete out.horari; buidats.push('horari') }
+  return { datos: out, proposats, buidats }
 }
 
 /**

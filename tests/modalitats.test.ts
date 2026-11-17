@@ -39,9 +39,18 @@ describe('modalitats · servidor', () => {
     expect(srv.etiquetaModalitats(['venda', 'donacio'])).toBe('Donació o venda')
     expect(srv.etiquetaModalitats(['donacio', 'venda', 'maquila'])).toBe('Donació, venda o maquila')
   })
-  it('precio solo si hay venta o maquila', () => {
+  // Fase A del punto 3 (17-11-2026): el precio es el de venta; la maquila no lleva importes.
+  it('precio solo si hay venta', () => {
     expect(srv.ambPreu(['donacio'])).toBe(false)
-    expect(srv.ambPreu(['donacio', 'maquila'])).toBe(true)
+    expect(srv.ambPreu(['donacio', 'maquila'])).toBe(false)
+    expect(srv.ambPreu(['maquila'])).toBe(false)
+    expect(srv.ambPreu(['venda'])).toBe(true)
+    expect(srv.ambPreu(['donacio', 'venda', 'maquila'])).toBe(true)
+  })
+  it('las dos copias de ambPreu dicen lo mismo', () => {
+    for (const ms of [[], ['donacio'], ['venda'], ['maquila'], ['donacio', 'maquila'], ['venda', 'maquila']] as const) {
+      expect(web.ambPreu([...ms]), JSON.stringify(ms)).toBe(srv.ambPreu([...ms]))
+    }
   })
 })
 

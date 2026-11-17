@@ -4,7 +4,30 @@
 // Solo contra el CLON LOCAL y solo en escritorio (edita la ficha de la cuenta de prueba).
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
+import { readFileSync } from 'node:fs'
+import type { APIRequestContext, Page } from '@playwright/test'
+import { compte, entra, motiuSaltClon, productorDe, sql, tria } from './ajuda'
+
+const API = 'http://127.0.0.1:55321'
+
+/** La sesión del equipo en el clon, para llamar a `crear-oferta` como lo hace el panel. */
+async function jwtEquip(request: APIRequestContext): Promise<{ jwt: string; clau: string }> {
+  const clau = /VITE_SUPABASE_PUBLISHABLE_KEY=(.+)/.exec(readFileSync('.env.supabase-local.local', 'utf8'))![1].trim()
+  const c = compte('superadmin')!
+  const r = await request.post(`${API}/auth/v1/token?grant_type=password`, {
+    headers: { apikey: clau }, data: { email: c.email, password: c.password },
+  })
+  expect(r.ok(), 'login del equipo en el clon').toBeTruthy()
+  return { jwt: (await r.json()).access_token as string, clau }
+}
+
+/** Elige la entidad en el buscador de la oferta asistida: escribe su nombre y toca la sugerencia. */
+async function triaProductor(page: Page, prod: string) {
+  const nom = sql(`select coalesce(nullif(empresa, ''), name) from productores where id = '${prod}'`)
+  const dlg = page.getByRole('dialog')
+  await dlg.locator('#dnoa-productor').fill(nom)
+  await dlg.locator(`#dnoa-productor-llista [data-valor="${prod}"]`).click()
+}
 
 test.describe.configure({ mode: 'serial' })
 
@@ -76,13 +99,127 @@ test('la oferta nueva nace con el lugar principal, su franja y el formato del en
   const resposta = page.waitForResponse((r) => r.url().includes('/crear-oferta/campos') && r.request().method() === 'GET')
   await page.goto('/productor/ofertes/nova')
   const cos = await (await resposta).json() as { predeterminats?: { ubicacio: string | null; horari: unknown; format_entrega: string | null } }
-  expect(cos.predeterminats).toEqual({ ubicacio: b, horari: { inici: '08:00', fi: '12:00' }, format_entrega: 'caixes' })
+  // Fase A del punto 3 (17-11-2026): también los DÍAS del lugar (lunes y miércoles).
+  expect(cos.predeterminats).toEqual({
+    ubicacio: b, horari: { inici: '08:00', fi: '12:00' }, format_entrega: 'caixes', dies_recollida: [1, 3],
+  })
 
   // El borrador que guarda el formulario ya lleva lo propuesto.
   await expect.poll(async () => page.evaluate((p) => {
     try { return JSON.parse(localStorage.getItem(`redestina-oferta-esborrany:${p}`) ?? 'null')?.datos ?? null } catch { return null }
-  }, prod)).toMatchObject({ ubicacio: b, horari: { inici: '08:00', fi: '12:00' }, format_entrega: 'caixes' })
+  }, prod)).toMatchObject({ ubicacio: b, horari: { inici: '08:00', fi: '12:00' }, format_entrega: 'caixes', dies_recollida: [1, 3] })
   await page.evaluate((p) => { try { localStorage.removeItem(`redestina-oferta-esborrany:${p}`) } catch { /* */ } }, prod)
+})
+
+// Fase A del punto 3 (17-11-2026): el formulario va por BLOQUES que se abren al completar el
+// anterior (sin «Continuar»), el producto se busca escribiendo, las preguntas de sí o no son dos
+// botones, el lugar enseña su municipio y su enlace (o pide uno para esta oferta), los días y la
+// franja llegan del lugar y «disponible fins» propone hoy + 2. Y a 375 px nada se sale de ancho.
+test('el alta va por bloques, con buscador de producto y el lugar con días y Maps', async ({ page }) => {
+  const prod = productorDe('productor')
+  const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+  const clau = `redestina-oferta-esborrany:${prod}`
+  await entra(page, 'productor')
+  await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
+  await page.setViewportSize({ width: 375, height: 800 })
+  await page.goto('/productor/ofertes/nova')
+
+  await expect(page.getByTestId('bloc-producte')).toHaveAttribute('data-obert', 'true')
+  await expect(page.getByTestId('bloc-quantitat')).toHaveAttribute('data-obert', 'false')
+  await expect(page.getByRole('button', { name: 'Continuar' })).toHaveCount(0)
+
+  // Producto por buscador, sin acentos; la familia no se pregunta.
+  await expect(page.locator('#of-familia')).toHaveCount(0)
+  await page.locator('#of-producte').fill('poma')
+  await page.locator('#of-producte-llista [role="option"]').filter({ hasText: /^Poma/ }).first().click()
+  await page.locator('#of-producte_al_camp [data-valor="no"]').click()
+  await expect(page.locator('#of-producte_al_camp [data-valor="no"]')).toHaveAttribute('aria-pressed', 'true')
+  await expect(page.getByTestId('bloc-quantitat')).toHaveAttribute('data-obert', 'true')
+
+  // Kilos que no valen: «Publicar» lo marca y no publica.
+  await page.locator('#of-kg').fill('0')
+  await page.getByRole('button', { name: 'Publicar oferta' }).click()
+  await expect(page.locator('#of-kg')).toHaveAttribute('aria-invalid', 'true')
+  await page.locator('#of-kg').fill('120')
+
+  // El retorno con «Sí» pide qué envases y cuántos.
+  const retorn = page.locator('#of-retorn')
+  if (await retorn.count() === 0) {
+    await tria(page.locator('#of-format_entrega'), 'caixes')
+  }
+  await page.locator('#of-retorn [data-valor="Sí"]').click()
+  await expect(page.locator('#of-retorn_envasos')).toBeVisible()
+  await expect(page.locator('#of-retorn_quantitat')).toBeVisible()
+  await page.locator('#of-retorn_envasos').fill('caixes verdes')
+  await page.locator('#of-retorn_quantitat').fill('12')
+
+  // Recogida: el lugar principal con su municipio y, sin enlace propio, el campo para uno;
+  // días y franja del lugar; «disponible fins» = hoy + 2.
+  await expect(page.getByTestId('bloc-recollida')).toHaveAttribute('data-obert', 'true')
+  await page.getByTestId('lloc-habitual').getByRole('button', { name: /Sí, aquí/ }).click()
+  await expect.poll(() => page.evaluate((k) => {
+    try { return JSON.parse(localStorage.getItem(k) ?? 'null')?.datos?.ubicacio ?? null } catch { return null }
+  }, clau)).toBe(b)
+  await expect(page.getByTestId('lloc-detall')).toBeVisible()
+  const llocMaps = sql(`select coalesce(gmaps_url, '') from productor_ubicaciones where id = '${b}'`)
+  if (llocMaps) await expect(page.getByTestId('lloc-maps')).toHaveAttribute('target', '_blank')
+  else await expect(page.locator('#of-gmaps_url')).toBeVisible()
+  await expect(page.locator('#of-dies_recollida [aria-pressed="true"]')).toHaveCount(2)
+  const avui = new Intl.DateTimeFormat('en-CA', { timeZone: 'Europe/Madrid' }).format(new Date())
+  const esperat = new Date(`${avui}T12:00:00Z`)
+  esperat.setUTCDate(esperat.getUTCDate() + 2)
+  await expect(page.locator('#of-disponible_fins')).toHaveValue(esperat.toISOString().slice(0, 10))
+
+  // A 375 px, ningún hijo del formulario más ancho que su caja.
+  const desborden = await page.evaluate(() => {
+    const out: string[] = []
+    const main = document.querySelector('main')
+    if (main && main.scrollWidth > main.clientWidth + 1) out.push(`MAIN ${main.scrollWidth}>${main.clientWidth}`)
+    for (const el of document.querySelectorAll('[data-testid="formulari-oferta"], [data-testid="formulari-oferta"] *')) {
+      const h = el as HTMLElement
+      if (h.scrollWidth > h.clientWidth + 1 && getComputedStyle(h).overflowX === 'visible' && h.clientWidth > 0) {
+        out.push(`${h.tagName}#${h.id} ${h.scrollWidth}>${h.clientWidth} «${(h.textContent ?? '').slice(0, 40)}» ${h.className}`.slice(0, 200))
+      }
+    }
+    return { doc: document.documentElement.scrollWidth > document.documentElement.clientWidth, out }
+  })
+  expect(desborden.doc).toBe(false)
+  expect(desborden.out).toEqual([])
+  await page.evaluate((k) => { try { localStorage.removeItem(k) } catch { /* */ } }, clau)
+})
+
+// Fase A del punto 3 en el servidor: `crear-oferta` rechaza 0 kg (`kg_invalid`) y guarda el
+// detalle del retorno, los días y el enlace de Maps propio, que el texto de la oferta enseña.
+test('crear-oferta: kg > 0 y guarda retorno, días y Maps de la oferta', async ({ request }) => {
+  const prod = productorDe('productor')
+  const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+  const { jwt, clau } = await jwtEquip(request)
+  const marca = `[E2E fase A ${Date.now()}]`
+  const datos = {
+    familia: 'Fruita Dolça', producte: 'Poma', producte_al_camp: 'no', kg: 0, format_entrega: 'caixes',
+    retorn: 'Sí', retorn_envasos: 'caixes verdes', retorn_quantitat: 12, ubicacio: b,
+    gmaps_url: 'https://maps.app.goo.gl/e2eFaseA', disponible_fins: '31/12/2027', dies_recollida: [3, 1],
+    modalitat: 'donacio', causa: 'CE', observacions: marca,
+  }
+  const crida = (d: Record<string, unknown>) => request.post(`${API}/functions/v1/crear-oferta`, {
+    headers: { Authorization: `Bearer ${jwt}`, apikey: clau }, data: { productor_id: prod, datos: d },
+  })
+  const zero = await crida(datos)
+  expect(zero.status()).toBe(400)
+  expect((await zero.json()).code).toBe('kg_invalid')
+  const mitja = await crida({ ...datos, kg: 50, retorn_quantitat: 2.5 })
+  expect((await mitja.json()).code).toBe('retorn_quantitat_invalid')
+
+  const ok = await crida({ ...datos, kg: 50 })
+  expect(ok.status(), JSON.stringify(await ok.json())).toBe(200)
+  const fila = sql(`select retorn_envasos || '|' || retorn_envasos_detall || '|' || retorn_envasos_quantitat || '|'
+      || array_to_string(dies_recollida, ',') || '|' || gmaps_url
+    from excedentes where observacions = '${marca}'`)
+  expect(fila).toBe('Sí|caixes verdes|12|1,3|https://maps.app.goo.gl/e2eFaseA')
+  const text = sql(`select texto_oferta from excedentes where observacions = '${marca}'`)
+  expect(text).toContain('🗓️ DIES DE RECOLLIDA: dl, dc')
+  expect(text).toContain('cal retornar-los (12 · caixes verdes)')
+  expect(text).toContain('https://maps.app.goo.gl/e2eFaseA')
 })
 
 // P5 en el panel (11-11-2026): como en WhatsApp, el lugar habitual se confirma o se cambia; el
@@ -108,8 +245,8 @@ test('la oferta nueva pide confirmar el lugar habitual o cambiarlo', async ({ pa
     try { return JSON.parse(localStorage.getItem(k) ?? 'null')?.datos?.ubicacio ?? null } catch { return null }
   }, clau)
 
-  // Sin confirmar no se pasa de sección.
-  await page.getByRole('button', { name: 'Continuar' }).click()
+  // Sin confirmar no se publica (17-11-2026: ya no hay «Continuar»; «Publicar» lo marca).
+  await page.getByRole('button', { name: 'Publicar oferta' }).click()
   await expect(caixa).toHaveClass(/border-error/)
 
   await caixa.getByRole('button', { name: /Sí, aquí/ }).click()
@@ -142,11 +279,12 @@ for (const rol of ['superadmin', 'equip'] as const) {
     await page.goto('/equip/ofertes')
     await page.getByRole('button', { name: /Nova oferta|Nueva oferta/ }).first().click()
     const dlg = page.getByRole('dialog')
-    await tria(dlg.locator('#dnoa-productor'), prod)
+    // 17-11-2026: un solo buscador de entidades (`CercadorOpcions`).
+    await triaProductor(page, prod)
     const caixa = dlg.getByTestId('lloc-habitual')
     await expect(caixa).toBeVisible()
     await expect(caixa).toContainText(alias)
-    await dlg.getByRole('button', { name: 'Continuar' }).click()
+    await dlg.getByRole('button', { name: 'Publicar oferta' }).click()
     await expect(caixa).toHaveClass(/border-error/)
     await caixa.getByRole('button', { name: /Sí, aquí/ }).click()
     await expect(caixa.getByText(/Confirmat|Confirmado/)).toBeVisible()

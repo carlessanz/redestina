@@ -22,7 +22,11 @@ import {
   siglas,
   componerTextoOferta,
   esProducteAlCamp,
+  mapsOferta,
+  retornDetall,
+  textoEnvasos,
 } from '../supabase/functions/_shared/oferta.ts'
+import { diesValids, textDies } from '../supabase/functions/_shared/textOferta.ts'
 
 /** Campos mínimos de una oferta, para variar solo lo que cada prueba mira. */
 function campos(extra: Partial<Parameters<typeof componerTextoOferta>[0]> = {}) {
@@ -384,5 +388,49 @@ describe('componerTextoOferta · producte al camp', () => {
     expect(t.trimEnd().endsWith(
       "✅ Si t'interessa, prem *M'interessa* (o respon *SÍ*); si no, *Ara no*.",
     )).toBe(true)
+  })
+})
+
+// Fase A del punto 3 (17-11-2026): qué envases y cuántos, los días de recogida y el enlace de
+// Maps propio de la oferta. El resto del texto no cambia.
+describe('retorno con detalle, días y Maps de la oferta', () => {
+  it('textoEnvasos: con retorno, cantidad y envase entre paréntesis', () => {
+    expect(textoEnvasos(undefined, 'Sí', 'caixes de plàstic verdes', 20))
+      .toBe('cal retornar-los (20 · caixes de plàstic verdes)')
+    expect(textoEnvasos(undefined, 'Sí', '', '')).toBe('cal retornar-los')
+    expect(textoEnvasos(undefined, 'Sí', '  ', 2.5)).toBe('cal retornar-los')
+    // Con «No», lo que quedara escrito no se imprime.
+    expect(textoEnvasos(undefined, 'No', 'caixes', 20)).toBe('no cal retornar-los')
+  })
+
+  it('textDies y diesValids: en orden, sin repetir y descartando lo raro', () => {
+    expect(diesValids([5, 1, 3, 1, 0, 8, '2', 'x'])).toEqual([1, 2, 3, 5])
+    expect(diesValids('dl')).toEqual([])
+    expect(textDies([7, 1, 3])).toBe('dl, dc, dg')
+    expect(textDies(null)).toBe('')
+  })
+
+  it('la línea de días va tras DISPONIBLE y solo si hay días', () => {
+    const amb = componerTextoOferta(campos({ dies: 'dl, dc' }))
+    const linies = amb.split('\n')
+    const i = linies.findIndex((l) => l.startsWith('📅 DISPONIBLE'))
+    expect(linies[i + 1]).toBe('🗓️ DIES DE RECOLLIDA: dl, dc')
+    expect(componerTextoOferta(campos())).not.toContain('DIES DE RECOLLIDA')
+  })
+
+  it('mapsOferta: solo http(s) de hasta 500 caracteres', () => {
+    expect(mapsOferta(' https://maps.app.goo.gl/x ')).toBe('https://maps.app.goo.gl/x')
+    expect(mapsOferta('maps.app.goo.gl/x')).toBeNull()
+    expect(mapsOferta(`https://x.y/${'a'.repeat(500)}`)).toBeNull()
+    expect(mapsOferta(undefined)).toBeNull()
+  })
+
+  it('retornDetall: solo con retorno «Sí»', () => {
+    expect(retornDetall({ retorn: 'Sí', retorn_envasos: ' caixes ', retorn_quantitat: '20' }))
+      .toEqual({ detall: 'caixes', quantitat: 20 })
+    expect(retornDetall({ retorn: 'Sí', retorn_envasos: '', retorn_quantitat: 0 }))
+      .toEqual({ detall: null, quantitat: null })
+    expect(retornDetall({ retorn: 'No', retorn_envasos: 'caixes', retorn_quantitat: 20 }))
+      .toEqual({ detall: null, quantitat: null })
   })
 })

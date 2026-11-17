@@ -7,7 +7,8 @@
 
 import { describe, it, expect } from 'vitest'
 import {
-  VIDA_ESBORRANY_MS, ddmmaaaaAIso, interpretaEsborrany, isoADdmmaaaa,
+  VIDA_ESBORRANY_MS, ddmmaaaaAIso, disponiblePerDefecte, interpretaEsborrany, isoADdmmaaaa, mapsOfertaValid,
+  sumaDiesIso,
 } from '../src/lib/esborranyOferta'
 
 const ARA = Date.UTC(2026, 9, 7, 12, 0, 0)
@@ -75,5 +76,30 @@ describe('la fecha del control ↔ la de la oferta', () => {
     expect(ddmmaaaaAIso('fins al 30/09')).toBe('')
     expect(ddmmaaaaAIso('2026-09-30')).toBe('')
     expect(ddmmaaaaAIso('1/9/2026')).toBe('')
+  })
+})
+
+// Fase A del punto 3 (17-11-2026): «disponible fins» propone hoy + 2 días naturales.
+describe('sumaDiesIso y disponiblePerDefecte', () => {
+  it('suma días naturales, cruzando mes, año y el cambio de hora', () => {
+    expect(sumaDiesIso('2026-11-17', 2)).toBe('2026-11-19')
+    expect(sumaDiesIso('2026-11-30', 2)).toBe('2026-12-02')
+    expect(sumaDiesIso('2026-12-31', 2)).toBe('2027-01-02')
+    expect(sumaDiesIso('2026-10-24', 2)).toBe('2026-10-26')
+    expect(sumaDiesIso('2028-02-28', 2)).toBe('2028-03-01')
+    expect(sumaDiesIso('17/11/2026', 2)).toBe('')
+  })
+  it('lo que propone el formulario va en dd/mm/aaaa', () => {
+    expect(disponiblePerDefecte('2026-11-17')).toBe('19/11/2026')
+  })
+})
+
+describe('mapsOfertaValid', () => {
+  it('vacío o un http(s) valen; lo demás, no', () => {
+    expect(mapsOfertaValid(undefined)).toBe(true)
+    expect(mapsOfertaValid('')).toBe(true)
+    expect(mapsOfertaValid('https://maps.app.goo.gl/x')).toBe(true)
+    expect(mapsOfertaValid('maps.app.goo.gl/x')).toBe(false)
+    expect(mapsOfertaValid('https://a b')).toBe(false)
   })
 })

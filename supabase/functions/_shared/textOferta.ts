@@ -19,6 +19,8 @@ export function componerTextoOferta(campos: {
   ubicacio?: string;
   quantitat: string;
   disponible: string;
+  /** Días de recogida ya compuestos (`textDies`, 17-11-2026). Sin días, no se imprime la línea. */
+  dies?: string;
   /** Campo libre y opcional del panel: sin respuesta, no se imprime la línea. */
   horari?: string;
   modalitat: string;
@@ -67,6 +69,7 @@ export function componerTextoOferta(campos: {
     lineas.push(`🗺️ UBICACIÓ:`, campos.ubicacio);
   }
   lineas.push(`📦 QUANTITAT: ${campos.quantitat}`, `📅 DISPONIBLE: ${campos.disponible}`);
+  if (campos.dies) lineas.push(`🗓️ DIES DE RECOLLIDA: ${campos.dies}`);
   if (campos.horari) lineas.push(`⏰ HORARI RECOLLIDA: ${campos.horari}`);
   lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
   // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
@@ -101,10 +104,47 @@ const ETIQUETA_FORMAT: Record<string, string> = {
 /**
  * La línea ENVASOS: formato de entrega y, si aplica, si hay que devolverlos. Vacía si no se
  * preguntó (producto en el campo) — y entonces la línea no se imprime.
+ *
+ * Desde el 17-11-2026, con retorno, también QUÉ y CUÁNTOS, entre paréntesis y en una línea
+ * breve: «Caixes · cal retornar-los (20 · caixes de plàstic verdes)».
  */
-export function textoEnvasos(format: unknown, retorn: unknown): string {
+export function textoEnvasos(format: unknown, retorn: unknown, detall?: unknown, quantitat?: unknown): string {
   const f = ETIQUETA_FORMAT[String(format ?? "")] ?? "";
   const r = String(retorn ?? "");
-  const ret = r === "Sí" ? "cal retornar-los" : r === "No" ? "no cal retornar-los" : "";
+  let ret = r === "Sí" ? "cal retornar-los" : r === "No" ? "no cal retornar-los" : "";
+  if (r === "Sí") {
+    const q = Number(quantitat);
+    const que = [
+      Number.isInteger(q) && q > 0 ? String(q) : "",
+      String(detall ?? "").trim(),
+    ].filter(Boolean).join(" · ");
+    if (que) ret = `${ret} (${que})`;
+  }
   return [f, ret].filter(Boolean).join(" · ");
+}
+
+/** Los días, como se escriben en catalán: 1 = dl … 7 = dg (los de `productor_ubicaciones`). */
+const DIES_CURTS = ["dl", "dt", "dc", "dj", "dv", "ds", "dg"];
+
+/**
+ * Los días de recogida en una línea («dl, dc, dv»), en orden y sin repetir; lo que no es un día
+ * válido se descarta. Vacío si no hay ninguno (y la línea no se imprime).
+ */
+export function textDies(dies: unknown): string {
+  return diesValids(dies).map((d) => DIES_CURTS[d - 1]).join(", ");
+}
+
+/**
+ * Los días de recogida que llegan del panel, normalizados: enteros del 1 al 7, ordenados y sin
+ * repetir. Cualquier otra cosa (un texto de un panel anterior, un 8…) se descarta en silencio:
+ * el campo es opcional y un valor raro no puede impedir publicar.
+ */
+export function diesValids(dies: unknown): number[] {
+  if (!Array.isArray(dies)) return [];
+  const ok = new Set<number>();
+  for (const d of dies) {
+    const n = Number(d);
+    if (Number.isInteger(n) && n >= 1 && n <= 7) ok.add(n);
+  }
+  return [...ok].sort((a, b) => a - b);
 }

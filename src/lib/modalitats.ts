@@ -24,9 +24,9 @@ export function modalitatsOferta(o: Pick<Excedente, 'modalitat'> & { modalitats?
   return modalitatsDe(o.modalitats && o.modalitats.length > 0 ? o.modalitats : o.modalitat)
 }
 
-/** ¿Alguna con precio (venda o maquila)? */
+/** ¿Alguna con precio? Solo la venta desde el 17-11-2026 (la maquila no lleva importes). */
 export function ambPreu(ms: readonly Modalitat[]): boolean {
-  return ms.includes('venda') || ms.includes('maquila')
+  return ms.includes('venda')
 }
 
 /**

@@ -2,8 +2,8 @@
 // Taula mestra 3.1/3.4, fila 2.5 «reutilitzar en crear ofertes»).
 //
 // Lo calcula el servidor (`GET /crear-oferta/campos`, clave `predeterminats`) desde la
-// Operativa: el lugar de recogida PRINCIPAL, su primera franja horaria y el primer envase
-// habitual que tiene equivalente en `FORMATS_ENTREGA`. El panel lo aplica solo a los huecos y
+// Operativa: el lugar de recogida PRINCIPAL, su primera franja horaria, sus días de recogida
+// (17-11-2026) y el primer envase habitual que tiene equivalente en `FORMATS_ENTREGA`. El panel lo aplica solo a los huecos y
 // lo marca «proposat des de la fitxa» (`src/lib/predeterminatsOferta.ts`).
 //
 // PURO y sin red, con pruebas en `tests/predeterminatsOferta.test.ts`.
@@ -18,6 +18,8 @@ export interface LlocPredeterminat {
   id: string;
   es_principal?: boolean | null;
   franges?: unknown;
+  /** 1 = dilluns … 7 = diumenge (A4). */
+  dies_setmana?: unknown;
 }
 
 export interface PredeterminatsOferta {
@@ -27,6 +29,8 @@ export interface PredeterminatsOferta {
   horari: Franja | null;
   /** Un `FORMATS_ENTREGA[].id`, o null. */
   format_entrega: string | null;
+  /** Los días de recogida del lugar propuesto (1–7, ordenados), o null (17-11-2026). */
+  dies_recollida: number[] | null;
 }
 
 /** Envase habitual (`productores.envasos_habituals`) → formato de entrega de la oferta. */
@@ -37,7 +41,19 @@ export const FORMAT_DE_ENVAS: Readonly<Record<string, string>> = {
 
 const HORA = /^([01][0-9]|2[0-3]):[0-5][0-9]$/;
 
-function primeraFranja(franges: unknown): Franja | null {
+/**
+ * Los días de un lugar (`dies_setmana`), como los quiere la oferta: enteros del 1 al 7, en orden
+ * y sin repetir; null si no tiene ninguno. Lo usa también el panel al cambiar de lugar.
+ */
+export function diesDelLloc(dies: unknown): number[] | null {
+  if (!Array.isArray(dies)) return null;
+  const ok = [...new Set(dies.map(Number).filter((n) => Number.isInteger(n) && n >= 1 && n <= 7))]
+    .sort((a, b) => a - b);
+  return ok.length > 0 ? ok : null;
+}
+
+/** La primera franja válida de un lugar (`franges`), o null. La usa también el panel. */
+export function primeraFranja(franges: unknown): Franja | null {
   if (!Array.isArray(franges)) return null;
   for (const f of franges) {
     if (!f || typeof f !== "object") continue;
@@ -63,6 +79,7 @@ export function predeterminatsDe(
     ubicacio: lloc?.id ?? null,
     horari: lloc ? primeraFranja(lloc.franges) : null,
     format_entrega: format,
+    dies_recollida: lloc ? diesDelLloc(lloc.dies_setmana) : null,
   };
 }
 

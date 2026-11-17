@@ -76,8 +76,7 @@ Prevenció (expediente provisional; el plan básico, retirado), espigueo, catál
   `vercel.json` lleva el rewrite de SPA.
 - **Contrato de alturas**: shell `h-dvh overflow-hidden`; `main` `min-h-0 flex-1` scrollea con
   `scrollbar-gutter: stable`; ninguna pantalla escribe `h-dvh`. Flag de ruta `fullBleed` (Mensajería).
-- 🔴 **Un solo ancho (10-11-2026)**: lo pone el shell, `w-[96%]` + `max(0.5rem, safe-area)`, igual en
-  listados, detalles y formularios de los tres paneles; `ample` retirado; ningún `max-w` de página.
+- 🔴 **Un solo ancho**: el del shell, `w-[96%]` + `max(0.5rem, safe-area)`; ningún `max-w` de página (`ample`, retirado).
 - **Barra inferior de móvil: cuatro entradas como máximo** (`barra: false`, `labelBarraKey`).
 - **PWA sin service worker** (`selfDestroying`); `/version.json` + `useVersioNova` avisan de versión.
 - **Siete reglas de móvil medidas** (en el detalle): controles ≥16 px, `Button` `whitespace-nowrap
@@ -95,9 +94,8 @@ Reglas: **ningún hex ni clase de la paleta genérica de Tailwind**; solo las cl
 `error` y sus `-fondo`, `chart-1…5`, `font-titulos`, `text-nav` solo para la barra inferior).
 `accent` no es el coral; el error es rojo; títulos en Sora; nombres de shadcn no se renombran;
 `index.css` se deriva a mano de `tokens.json` (y los colores del correo viven en
-`_shared/resend.ts`). Logo en seis variantes en `public/` (y el de la Fundació, `logo-espigoladors.svg`, que lleva el
-CD); `logo-email.png` es el logo en color
-(cabecera de correo clara); el sello `segell-redestina.svg` va sin texto. Ningún control de
+`_shared/resend.ts`). Logo: seis variantes en `public/`, `logo-espigoladors.svg` (el del CD), `logo-email.png`
+(color, correo) y el sello `segell-redestina.svg` (sin texto). Ningún control de
 formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
 `<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
 color = chip blanco, texto en color. `{n}` reservado a contadores (singular `<clau>_1`). Sin
@@ -146,7 +144,7 @@ tipo por organización; solo guarda identidad y `canal_preferido`, escrito por
 por el NIF (`naturalesa_suggerida()`; F·H·V: la forma o, si no, social si la receptora es `social`) y **solo la confirmada surte efecto** (P8, §8; perfil y
 chips por `naturalesaEfectiva()`). Regla en tabla `modalitat_naturalesa_compat`. `productor_ubicaciones`
 (lugares; A4: `dies_setmana`, `franges` ≤4 y **un solo `es_principal`**, índice + trigger). **Operativa (A4,
-`20270521100000`, T4)**: producción y comercialización (columnas en `context/04`); `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
+`20270521100000`, T4)**: producción y comercialización; `productores_operativa` **poda** lo que no cuelga. Fiscal (`20270517100000`): `regim_iva`, `*_fiscal` (si hay domicilio fiscal,
 convenio y certificados lo usan: `dada_fiscal()`), `contacte_facturacio_*`; `data_alta` («Data d'alta a
 l'organització», editable, trigger si falta) y `created_at` («Alta a la plataforma», solo lectura), equipo.
 
@@ -165,14 +163,14 @@ por RPC; lectura `es_intern()` (externo: 0 filas); la vista suma el último cont
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
+`disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg`
 congelado al conciliar, `data_hora_recollida`, columnas de la recogida protegidas por trigger);
 `excedente_destins` + catálogo `destins_finals`; `excedentes_canvis`; `avisos` (lo que se le
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
-**Catálogos**: `productos` (iconos propios en `public/icones-productes/`), `causas`,
+**Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas`,
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
 `tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
 `modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**), `convenis_equivalents`.
@@ -202,7 +200,7 @@ firma CD·CR·REC·ENT (trazo en panel/enlace, o PDF firmado subido) y CONV (sol
 correu; estat signat·tancat·rebutjat; sin DNI) lo registra, «pendent» lo deriva
 `document_part_signant()` y lo sirven `v_signatura_document`/`v_signatures_bandeja`. Trazo y subida
 del super_admin cierran al momento; la subida de la organización espera en «Signatures per tancar».
-Un externo nunca firma en prueba. Nada se bloquea por la firma. El nombre de la Fundació sale del snapshot (`_shared/pdf/fundacio.ts`). **Lo emitido no se reescribe**; solo en
+Un externo nunca firma en prueba. Nada se bloquea por la firma. **Lo emitido no se reescribe**; solo en
 modo test el super_admin lo regenera con los datos de la Fundació de ahora (`regenerar_documents_fundacio`:
 versión n+1, salta los firmados; Configuració › Fundació).
 
@@ -212,8 +210,7 @@ canalización; estados borrador→emitido→entregado→confirmado→conciliado,
 `R-`). PDF de una página (`albara1p`); el REC de donación imprime valor por kilo (decisión del
 cliente). `documentos_externos` (albarán del productor, factura, fotos, archivo previo de la
 ficha, evidencias de expediente). **Convenios** (`convenios`: tipos `col_productor`/
-`col_receptor` desde el 11-10-2026, los anteriores `don_gen`/`don_rec`/`com` valen por
-equivalencia; `origen` plataforma · paper · **declarat**; uno vigente por tipo; número al
+`col_receptor` (los antiguos valen por equivalencia); `origen` plataforma · paper · **declarat**; uno vigente por tipo; número al
 firmar; `convenio_vigente()`/`exigir_convenio()`; **fecha de corte encendida** desde el
 16-09-2026: sin convenio no se publica ni se muestra interés). **Certificado de donación** (05-11-2026, modelo Tabaquet; detalle en §4 del fichero):
 🔴 **certificable = donación conciliada a entidad `social`** (`motiu_exclusio_certificat()`, único
@@ -221,7 +218,7 @@ criterio); el REC se reparte en proporción y se descarta lo no certificable. Á
 (`cierres_ejercicio`, `cierres_donante`, `datos_182()`), **intervalo** y **oferta** (`cierres_periodo`,
 serie `CDP`); el anual sustituye a los parciales. **CT retirado**. **Certificado de recepción**
 (`cierres_receptor`, serie `CR`, sin importes).
-**Diagnóstico y plan** (A1, A3; `context/04`; receptoras: perfil de recepción, D3): **`diagnostics`, uno por productor que se sobrescribe** (D1: cabecera,
+**Diagnóstico y plan** (A1, A3; `context/04`): **`diagnostics`, uno por productor que se sobrescribe** (D1: cabecera,
 notas, `complet`/`falten`, `actualitzat_*`) y **excedentes en tablas propias** (A3, D7): `diagnostic_productes` →
 `diagnostic_excedents` (principal × `causas.codigo`: frecuencia, kg —P7—, gestión actual, destinos = modalidades,
 `detall`) → `diagnostic_accions` (una por destino, estado y nota que ve la organización). Solo lectura por RLS; escribe
@@ -237,7 +234,7 @@ arrastra lo operativo (y los expedientes sin número, el archivo y sus enlaces),
 organización vacía y purga la whitelist; los ficheros van a `fitxers_orfes`, que vacía `recordatorios-documentales`. FK `NO ACTION` = última red; nunca un `.delete()` suelto
 (§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
 
-🔴 **Una cuenta del equipo no tiene organizaciones** ni ofertas; **su autoría no es fiscal**. Desactivarla o borrarla **traspasa sus acciones** a otra cuenta activa con rastro por fila; borrar a quien ha hecho algo **exige destino** (`cal_desti`; detalle en `context/04`, «Gestión del equipo»).
+🔴 **Una cuenta del equipo no tiene organizaciones** ni ofertas; **su autoría no es fiscal**. Desactivarla o borrarla **traspasa sus acciones** a otra activa (rastro por fila); borrar a quien ha hecho algo **exige destino** (`cal_desti`).
 
 **RLS y GRANT — dos capas**: `service_role` todo (y `BYPASSRLS`); `anon` **ningún privilegio**
 de tabla; `authenticated` nace con **SELECT y nada más** en una tabla nueva (los `alter default
@@ -326,11 +323,12 @@ en la whitelist de correo.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
-17 pasos (`_shared/camposOferta.ts`, compartidos con el panel vía `GET crear-oferta/campos`; textos
-ca/es en el descriptor, `tests/camposOferta.test.ts`): familia → producte → varietat → producte_al_camp
-→ kg → format_entrega → caixes → retorn → transport → ubicacio → disponible_fins → horari → modalitat →
-preu_minim → cost_kg → causa → observacions. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
-`Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; «Canvia» da la lista; igual en el panel, `estatLlocHabitual`);
+20 pasos (`_shared/camposOferta.ts`, servidos al panel por `GET crear-oferta/campos`; ca/es en el descriptor):
+familia → producte → varietat → producte_al_camp → kg (>0) → format_entrega → caixes → retorn → retorn_envasos →
+retorn_quantitat (con «Sí») → transport (**`oculto`**) → ubicacio (siempre) → disponible_fins → dies_recollida
+(**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
+cost») → causa → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
+`Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; igual en el panel);
 convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 ## 6ter. Paneles y procesos (detalle, por fecha y fase, en `context/06ter-…md`)
@@ -338,7 +336,7 @@ convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Op
 | Panel | Rutas | Qué ve |
 | --- | --- | --- |
 | Equip | `/equip/tauler · canalitzacio[/:id] · ofertes[/:id] · espigolades · aprovacions · missatgeria · albarans · productes · tancament · entitats[/nova · /importa · /:orgId] · convenis · documents · diagnostics · plans · configuracio` | Todo; badges de `pendents_equip()` |
-| Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo agregado, alta con el cuestionario del intake |
+| Productor | `/productor/inici · ofertes · ofertes/nova · ofertes/:id · documents` | Sus ofertas, embudo, alta (descriptor del intake) |
 | Receptor | `/receptor/mercat · interessos · historic · impacte · documents` | Ofertas compatibles (RLS con `modalitat_receptor_compat`), interés, histórico |
 | Organització | `/organitzacio · perfil-recepcio · diagnostic · pla` | Ficha propia por secciones (el equipo no la ve) |
 
@@ -361,8 +359,11 @@ Lo que manda hoy, en una línea cada uno:
   `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
 - **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió → Resultat. **Convenio único de col·laboració** por
   papel. Filtros comunes (`lib/filtres.ts`; provincia, `lib/territori.ts`; ranking por modalidad y kg). **Diagnòstic operatiu**: lo contesta el equipo en
-  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions; «Falten dades» enlaza cada falta, `destiFalta`; sin lugares propone la dirección de la ficha); ficha y «El meu diagnòstic» lo leen y bajan en PDF
+  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions; «Falten dades» enlaza cada falta); ficha y «El meu diagnòstic» lo leen y bajan en PDF
   (`diagnostic-pdf`, D2); Pla de Prevenció = **expediente** (detalle en `context/06ter`).
+- **Alta de oferta por bloques** (17-11-2026): `FormulariNovaOferta` sin «Continuar»; cada bloque se abre al completar el
+  anterior y «Publicar» marca todo; `CercadorOpcions` (producto, entidad del asistido, municipio) y `TriaSiNo`; el lugar
+  enseña municipio y Maps (o pide uno para la oferta), días y franja suyos (`recalculaDelLloc`); disponible = hoy + 2.
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
@@ -415,7 +416,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270527100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270528100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -515,8 +516,8 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
-`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Retirados en A1 (10-11-2026):
-`PlaPrevencio`, «Prepara el pla», «Emet el pla» (el plan básico; el plan es el expediente); A3: Configuració › Diagnòstic. Un cambio de dominio
+`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Retirados: `PlaPrevencio`,
+«Prepara/Emet el pla» (A1), Configuració › Diagnòstic (A3), «Continuar» del alta (17-11-2026). Un cambio de dominio
 exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
@@ -557,7 +558,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
 
-**Deuda abierta (76 vivas; la siguiente entrada nueva es la 180; los números no se renumeran ni
+**Deuda abierta (77 vivas; la siguiente entrada nueva es la 181; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
@@ -569,7 +570,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta de cuentas del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat` sin uso; `drop` pendiente) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -581,7 +582,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.947 pruebas de Vitest en 91 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 1.983 pruebas de Vitest en 91 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.497/2.497 y 43 sin datos; producción 2.507/2.507 y 33 «Sin

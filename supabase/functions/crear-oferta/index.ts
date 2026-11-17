@@ -24,7 +24,7 @@ import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 import { corsPara } from "../_shared/cors.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
-import { fotosValides, veuCostReferencia } from "./validacio.ts";
+import { fotosValides, kgValid, mapsValid, quantitatRetornValida, veuCostReferencia } from "./validacio.ts";
 import { predeterminatsDe, principalPrimer } from "../_shared/predeterminatsOferta.ts";
 
 Deno.serve(async (req) => {
@@ -68,7 +68,8 @@ Deno.serve(async (req) => {
       supabase.from("causas").select("codigo, nombre").order("nombre"),
       propi
         ? supabase.from("productor_ubicaciones")
-          .select("id, alias, municipio, es_principal, horario, dies_setmana, franges").eq("productor_id", productorId!)
+          // `gmaps_url` (17-11-2026): el formulario enseña el enlace del lugar elegido.
+          .select("id, alias, municipio, gmaps_url, es_principal, horario, dies_setmana, franges").eq("productor_id", productorId!)
           .order("alias")
         : Promise.resolve({ data: [] }),
       // Solo el equipo o quien tiene ficha de productor (M8): a cualquier otra sesión
@@ -81,8 +82,8 @@ Deno.serve(async (req) => {
         : Promise.resolve({ data: null }),
     ]);
     type Lloc = {
-      id: string; alias: string | null; municipio: string | null; es_principal: boolean | null;
-      horario: string | null; dies_setmana: number[] | null; franges: unknown;
+      id: string; alias: string | null; municipio: string | null; gmaps_url: string | null;
+      es_principal: boolean | null; horario: string | null; dies_setmana: number[] | null; franges: unknown;
     };
     const llocs = principalPrimer((ubicaciones.data ?? []) as Lloc[]);
     const envasos = ((fitxa.data as { envasos_habituals: string[] | null } | null)?.envasos_habituals) ?? null;
@@ -102,7 +103,9 @@ Deno.serve(async (req) => {
     //    reventaba. Las funciones se publican antes que el frontend (§11), así que durante
     //    esa ventana el panel viejo lee este descriptor. Se sirve `condicion` con la PRIMERA
     //    (lo que el viejo entiende) y `condicions` con todas (lo que usa el nuevo).
-    const campos = CAMPOS.map((c) =>
+    // Lo OCULTO (17-11-2026, `transport`) no se sirve: ni el panel nuevo ni el publicado lo
+    // pintan, y el servidor tampoco lo exige (`aplica()` devuelve false).
+    const campos = CAMPOS.filter((c) => !c.oculto).map((c) =>
       Array.isArray(c.condicion) ? { ...c, condicion: c.condicion[0], condicions: c.condicion } : c
     );
 
@@ -187,6 +190,19 @@ Deno.serve(async (req) => {
     const faltan = faltantes(datos as Record<string, unknown>);
     if (faltan.length > 0) {
       return responder({ error: "Falten camps obligatoris", code: "campos_faltantes", faltan }, 400);
+    }
+
+    // 17-11-2026: los kilos, positivos (un «0» pasaba `faltantes()`); los envases a devolver, un
+    // entero positivo; el enlace de Maps propio de la oferta, un http(s).
+    const d = datos as Record<string, unknown>;
+    if (!kgValid(d.kg)) {
+      return responder({ error: "Els kg han de ser un número positiu", code: "kg_invalid" }, 400);
+    }
+    if (!quantitatRetornValida(d)) {
+      return responder({ error: "Quants envasos ha de ser un enter positiu", code: "retorn_quantitat_invalid" }, 400);
+    }
+    if (!mapsValid(d.gmaps_url)) {
+      return responder({ error: "L'enllaç de Maps no és vàlid", code: "maps_invalid" }, 400);
     }
 
     // La ubicación tiene que ser de ESTE productor. La función corre con `service_role`, así

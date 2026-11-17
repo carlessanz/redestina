@@ -119,8 +119,8 @@ function Dada({ etiqueta, valor }: { etiqueta: string; valor: string }) {
 
 /** El precio, solo si la modalidad lo tiene: una donación no lleva precio. */
 export function preuDe(o: Pick<Excedente, 'modalitat' | 'modalitats' | 'preu_minim'>): string | null {
-  // Con varias modalidades (05-10-2026) el precio vale para la venta o la maquila, no para
-  // la donación: basta con que la oferta incluya una con precio.
+  // Con varias modalidades (05-10-2026) el precio vale para la venta (desde el 17-11-2026, la
+  // maquila ya no lleva precio), no para la donación: basta con que la oferta incluya la venta.
   if (!ambPreu(modalitatsOferta(o)) || o.preu_minim == null) return null
   return `${preu(o.preu_minim)} €/kg`
 }

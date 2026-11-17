@@ -33,6 +33,9 @@ const HOJA = [
   'operativaLlegible',
   // A3 (10-11-2026): los excedentes por producto y causa en lectura (resumen y PDF).
   'excedentsLlegible',
+  // Fase A del punto 3 (17-11-2026): días y franja de un lugar, los mismos al proponerlos
+  // (`crear-oferta`) y al cambiar de lugar en el panel.
+  'predeterminatsOferta',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

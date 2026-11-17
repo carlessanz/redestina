@@ -2,7 +2,9 @@
 // a una sesión, aunque la función corra con `service_role` (§4bis).
 
 import { describe, it, expect } from 'vitest'
-import { fotosValides, veuCostReferencia } from '../supabase/functions/crear-oferta/validacio.ts'
+import {
+  fotosValides, kgValid, mapsValid, quantitatRetornValida, veuCostReferencia,
+} from '../supabase/functions/crear-oferta/validacio.ts'
 
 const P = '11111111-2222-3333-4444-555555555555'
 const ALTRE = '99999999-8888-7777-6666-555555555555'
@@ -61,5 +63,44 @@ describe('veuCostReferencia', () => {
   })
   it('una receptora o una cuenta pendiente, no', () => {
     expect(veuCostReferencia({ esIntern: false, productores: [] })).toBe(false)
+  })
+})
+
+// Fase A del punto 3 (17-11-2026): kilos positivos (`400 kg_invalid`), envases a devolver
+// enteros y el enlace de Maps propio de la oferta.
+describe('kgValid', () => {
+  it('acepta un número positivo, también en texto y con coma', () => {
+    expect(kgValid(300)).toBe(true)
+    expect(kgValid('300')).toBe(true)
+    expect(kgValid('12,5')).toBe(true)
+  })
+  it('rechaza 0, negativos, vacío y lo que no es un número', () => {
+    for (const v of [0, '0', -5, '', null, undefined, 'molts']) expect(kgValid(v), String(v)).toBe(false)
+  })
+})
+
+describe('quantitatRetornValida', () => {
+  it('sin retorno no se mira', () => {
+    expect(quantitatRetornValida({ retorn: 'No', retorn_quantitat: -3 })).toBe(true)
+  })
+  it('con retorno: entero positivo (vacío lo decide faltantes)', () => {
+    expect(quantitatRetornValida({ retorn: 'Sí', retorn_quantitat: 20 })).toBe(true)
+    expect(quantitatRetornValida({ retorn: 'Sí', retorn_quantitat: '' })).toBe(true)
+    expect(quantitatRetornValida({ retorn: 'Sí', retorn_quantitat: 0 })).toBe(false)
+    expect(quantitatRetornValida({ retorn: 'Sí', retorn_quantitat: 2.5 })).toBe(false)
+    expect(quantitatRetornValida({ retorn: 'Sí', retorn_quantitat: 'vint' })).toBe(false)
+  })
+})
+
+describe('mapsValid', () => {
+  it('vacío vale; un http(s) también', () => {
+    for (const v of [undefined, null, '', '  ', 'https://maps.app.goo.gl/abc', 'http://www.google.com/maps?q=41,2']) {
+      expect(mapsValid(v), String(v)).toBe(true)
+    }
+  })
+  it('rechaza lo que no es un enlace, con espacios o de más de 500', () => {
+    for (const v of ['maps.app.goo.gl/abc', 'javascript:alert(1)', 'https://a b', `https://x.y/${'a'.repeat(500)}`, 42]) {
+      expect(mapsValid(v), String(v)).toBe(false)
+    }
   })
 })

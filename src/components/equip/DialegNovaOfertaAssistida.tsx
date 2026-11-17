@@ -15,17 +15,17 @@
 //    un botón apagado que no le corresponde. Quien conoce el convenio del productor elegido
 //    es la escalera del lote, que aún no existe: por eso aquí se publica y el bloqueo, si lo
 //    hay, lo dice la base con su `42501` y lo explica la fase 1 del ciclo.
+//
+// 17-11-2026 (fase A del punto 3): la entidad se elige con UN buscador (`CercadorOpcions`), en
+// vez de un campo de búsqueda y un desplegable aparte que había que usar uno detrás del otro.
 
 import { useEffect, useMemo, useState } from 'react'
 import { Loader2 } from 'lucide-react'
 import { useT } from '../../lib/i18n'
-import { filtraCerca } from '../../lib/cerca'
-import { useCerca } from '../../hooks/useCerca'
 import { supabase } from '../../lib/supabase'
 import FormulariNovaOferta from '../FormulariNovaOferta'
-import Desplegable from '../Desplegable'
+import CercadorOpcions from '../CercadorOpcions'
 import type { ResultatNovaOferta } from '../FormulariNovaOferta'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import {
   Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
@@ -38,37 +38,37 @@ interface Props {
   onCreada: (r: ResultatNovaOferta) => void
 }
 
-interface Fitxa { id: string; nom: string }
+interface Fitxa { id: string; nom: string; poblacio: string | null }
 
 export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }: Props) {
   const { t } = useT()
   const [productors, setProductors] = useState<Fitxa[]>([])
   const [carregant, setCarregant] = useState(true)
-  const { cerca, setCerca, q } = useCerca()
   const [triat, setTriat] = useState('')
 
   useEffect(() => {
-    if (!obert) { setTriat(''); setCerca(''); return }
+    if (!obert) { setTriat(''); return }
     let viu = true
     void (async () => {
       setCarregant(true)
       const { data } = await supabase
         .from('productores')
-        .select('id, name, empresa')
+        .select('id, name, empresa, poblacion')
         .eq('activo', true)
         .order('name')
       if (!viu) return
-      const files = (data as { id: string; name: string | null; empresa: string | null }[] | null) ?? []
-      setProductors(files.map((x) => ({ id: x.id, nom: x.empresa || x.name || '—' })))
+      const files = (data as { id: string; name: string | null; empresa: string | null; poblacion: string | null }[] | null) ?? []
+      setProductors(files.map((x) => ({ id: x.id, nom: x.empresa || x.name || '—', poblacio: x.poblacion })))
       setCarregant(false)
     })()
     return () => { viu = false }
-    // `setCerca` es el setter de un `useState` (estable): no relanza nada.
-  }, [obert, setCerca])
+  }, [obert])
 
-  const visibles = useMemo(() => {
-    return filtraCerca(productors, q, (p) => [p.nom])
-  }, [productors, q])
+  // Por nombre (y la población de detalle, en la que también se busca), sin acentos.
+  const opcions = useMemo(
+    () => productors.map((p) => ({ valor: p.id, text: p.nom, detall: p.poblacio ?? undefined })),
+    [productors],
+  )
 
   return (
     <Dialog open={obert} onOpenChange={(v) => { if (!v) onTancar() }}>
@@ -90,32 +90,19 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada }:
         <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
           {/* Primero de quién es. Sin productor no hay descriptor que pedir: los catálogos
               de `crear-oferta/campos` dependen de sus ubicaciones. */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div>
-              <Label htmlFor="dnoa-cerca" className="mb-1 block text-xs text-muted-foreground">
-                {t('canalz.nova_cerca')}
-              </Label>
-              <Input
-                id="dnoa-cerca"
-                name="cerca"
-                value={cerca}
-                onChange={(e) => setCerca(e.target.value)}
-                placeholder={t('canalz.nova_cerca')}
-              />
-            </div>
-            <div>
-              <Label htmlFor="dnoa-productor" className="mb-1 block text-xs text-muted-foreground">
-                {t('canalz.c_productor')}
-              </Label>
-              <Desplegable
-                id="dnoa-productor"
-                name="productor"
-                value={triat}
-                onChange={setTriat}
-                buit="—"
-                opcions={visibles.map((p) => ({ valor: p.id, text: p.nom }))}
-              />
-            </div>
+          <div className="max-w-xl">
+            <Label htmlFor="dnoa-productor" className="mb-1 block text-xs text-muted-foreground">
+              {t('canalz.c_productor')}
+            </Label>
+            <CercadorOpcions
+              id="dnoa-productor"
+              name="productor"
+              opcions={opcions}
+              valor={triat || null}
+              onChange={setTriat}
+              placeholder={t('canalz.nova_cerca')}
+              disabled={carregant}
+            />
           </div>
 
           {carregant && (

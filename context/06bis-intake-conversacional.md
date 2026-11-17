@@ -183,3 +183,27 @@ super_admin y el técnico (6/6 en el clon). Las dos entradas del equipo (Ofertes
 válida, `format_entrega` = el primer envase habitual con equivalente —`caixes`→`caixes`, `palets`→`palet`; `granel`,
 `sacs` y `altres` no se traducen—). Tocar `_shared/intake.ts` obliga a redesplegar `whatsapp-webhook` y
 `recollides-programades` (importa `confirmacionsWhatsapp.ts`, que importa `intake.ts`).
+
+### Fase A del punto 3: veinte pasos (17-11-2026, `20270528100000`)
+
+- **Pasos nuevos** tras `retorn`: `retorn_envasos` (texto, qué envases) y `retorn_quantitat` (entero > 0, cuántos), los
+  dos obligatorios solo con `retorn = «Sí»`. Preguntas del bot: «Quins envasos s'han de retornar? (per exemple «caixes de
+  plàstic verdes»)» y «Quants envasos s'han de retornar? Escriu un número (p. ex. 20).». El texto de la oferta lo dice en
+  la línea ENVASOS: «cal retornar-los (20 · caixes de plàstic verdes)» (`textoEnvasos`).
+- **`dies_recollida`** (tipo `dies`, 1 = dl … 7 = dg, opcional) en «Recollida» antes de `horari`, con `soloPanel`: el bot lo
+  salta (`siguientePaso`) y `faltantes(datos, 'whatsapp')` no lo cuenta. El texto lo imprime tras DISPONIBLE
+  («🗓️ DIES DE RECOLLIDA: dl, dc»), solo si hay días.
+- **`transport` oculto** (`oculto: true`): `aplica()` da false, no se pregunta ni se sirve al panel; lo que llegue de un
+  panel anterior se sigue guardando. **`ubicacio` sin condición**: se pide siempre.
+- **`aplica()` en cascada**: una condición solo cuenta si el campo del que depende aplica (un `retorn` que quedó de
+  cuando el producto no estaba en el campo ya no pide el detalle). Espejo en el panel: `aplicaCamp(campo, datos, campos)`.
+- **Precio solo en venta**: `preu_minim` con condición `modalitat ∈ [venda]`, etiqueta «Preu de venda (€/kg)» / «Precio
+  de venta (€/kg)»; `ambPreu()` (las dos copias) = la oferta incluye venta. La maquila no lleva campos económicos.
+  `cost_kg` se llama «Valor de cost (€/kg)» / «Valor de coste (€/kg)». La línea «PREU MÍNIM» del texto no cambia.
+- **Maquila**: en el panel, «Transformació en obrador (maquila)» / «Transformación en obrador (maquila)»
+  (`titulo_panel`/`titulo_panel_es` de la opción, que aplica `localitzaDescriptor`); WhatsApp sigue con el título corto
+  (límites de 24 y 20 caracteres de fila y botón).
+- **kg > 0**: el bot rechaza 0 (repite la pregunta) y `crear-oferta` responde `400 kg_invalid`.
+- **Predeterminados**: `predeterminatsDe()` propone también `dies_recollida` = los `dies_setmana` del lugar
+  (`diesDelLloc`: 1–7, en orden, sin repetir; si no hay, null).
+

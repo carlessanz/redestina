@@ -7,12 +7,12 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  FORMAT_DE_ENVAS, ID_CANVIA_LLOC, confirmaLlocHabitual, llocHabitual, predeterminatsDe,
+  FORMAT_DE_ENVAS, ID_CANVIA_LLOC, confirmaLlocHabitual, diesDelLloc, llocHabitual, predeterminatsDe,
   preguntaLlocHabitual, principalPrimer, titolLlocLista,
 } from '../supabase/functions/_shared/predeterminatsOferta.ts'
 import { FORMATS_ENTREGA } from '../supabase/functions/_shared/camposOferta.ts'
 import {
-  aplicaPredeterminats, estatLlocHabitual, treuProposatsQueNoApliquen, ubicacioPerConfirmar,
+  aplicaPredeterminats, estatLlocHabitual, recalculaDelLloc, treuProposatsQueNoApliquen, ubicacioPerConfirmar,
 } from '../src/lib/predeterminatsOferta'
 
 describe('predeterminatsDe (servidor)', () => {
@@ -21,13 +21,13 @@ describe('predeterminatsDe (servidor)', () => {
       { id: 'a', es_principal: false, franges: [{ inici: '07:00', fi: '09:00' }] },
       { id: 'b', es_principal: true, franges: [{ inici: '10:00', fi: '09:00' }, { inici: '08:00', fi: '12:30' }] },
     ], null)
-    expect(p).toEqual({ ubicacio: 'b', horari: { inici: '08:00', fi: '12:30' }, format_entrega: null })
+    expect(p).toEqual({ ubicacio: 'b', horari: { inici: '08:00', fi: '12:30' }, format_entrega: null, dies_recollida: null })
   })
 
   it('sin principal: el único lugar; con varios y ninguno principal, nada', () => {
     expect(predeterminatsDe([{ id: 'x' }], null).ubicacio).toBe('x')
     expect(predeterminatsDe([{ id: 'x' }, { id: 'y' }], null).ubicacio).toBeNull()
-    expect(predeterminatsDe([], null)).toEqual({ ubicacio: null, horari: null, format_entrega: null })
+    expect(predeterminatsDe([], null)).toEqual({ ubicacio: null, horari: null, format_entrega: null, dies_recollida: null })
   })
 
   it('franjas mal formadas no se proponen', () => {
@@ -82,6 +82,7 @@ describe('aplicaPredeterminats (panel)', () => {
   it('sin predeterminados (servidor anterior) no cambia nada', () => {
     expect(aplicaPredeterminats({ a: 1 }, undefined)).toEqual({ datos: { a: 1 }, proposats: [] })
     expect(aplicaPredeterminats({}, { ubicacio: null, horari: null, format_entrega: null }).proposats).toEqual([])
+    expect(aplicaPredeterminats({}, { ubicacio: null, horari: null, format_entrega: null, dies_recollida: [] }).proposats).toEqual([])
   })
 
   it('al publicar quita lo propuesto que no aplica y respeta lo tocado', () => {
@@ -145,5 +146,49 @@ describe('P5 · panel: confirma el lloc habitual o canvia’l', () => {
     expect(ubicacioPerConfirmar(estatLlocHabitual('p', false, ubis, false), true)).toBe(false)
     // Un único lugar sin marcar, propuesto en la lista: vale como antes.
     expect(ubicacioPerConfirmar(estatLlocHabitual('a', true, [{ id: 'a' }], false), true)).toBe(false)
+  })
+})
+
+// Fase A del punto 3 (17-11-2026): los DÍAS de recogida salen del lugar, como la franja; y al
+// cambiar de lugar en el panel, los dos se recalculan desde el nuevo.
+describe('días de recogida desde el lugar', () => {
+  it('diesDelLloc: 1–7, en orden y sin repetir; vacío o raro, null', () => {
+    expect(diesDelLloc([5, 1, 3, 3])).toEqual([1, 3, 5])
+    expect(diesDelLloc([0, 8, '2', 'x', 2.5])).toEqual([2])
+    expect(diesDelLloc([])).toBeNull()
+    expect(diesDelLloc(null)).toBeNull()
+    expect(diesDelLloc('dl')).toBeNull()
+  })
+
+  it('el servidor propone los días del lugar principal', () => {
+    const p = predeterminatsDe([
+      { id: 'a', dies_setmana: [6] },
+      { id: 'b', es_principal: true, dies_setmana: [3, 1], franges: [{ inici: '08:00', fi: '12:00' }] },
+    ], null)
+    expect(p.dies_recollida).toEqual([1, 3])
+    expect(predeterminatsDe([{ id: 'a' }, { id: 'b' }], null).dies_recollida).toBeNull()
+  })
+
+  it('el panel los aplica a los huecos y los marca', () => {
+    const r = aplicaPredeterminats({}, { ubicacio: 'u1', horari: null, format_entrega: null, dies_recollida: [1, 3] })
+    expect(r.datos.dies_recollida).toEqual([1, 3])
+    expect(r.proposats).toContain('dies_recollida')
+    expect(aplicaPredeterminats({ dies_recollida: [5] }, { ubicacio: null, horari: null, format_entrega: null, dies_recollida: [1] }).datos.dies_recollida)
+      .toEqual([5])
+  })
+
+  it('recalculaDelLloc: el lugar nuevo manda, y lo que no tiene se vacía', () => {
+    const abans = { ubicacio: 'a', dies_recollida: [6], horari: { inici: '15:00', fi: '18:00' }, kg: 100 }
+    const r = recalculaDelLloc(abans, { dies_setmana: [2, 4], franges: [{ inici: '09:00', fi: '11:00' }] })
+    expect(r.datos).toMatchObject({ dies_recollida: [2, 4], horari: { inici: '09:00', fi: '11:00' }, kg: 100 })
+    expect(r.proposats.sort()).toEqual(['dies_recollida', 'horari'])
+    expect(r.buidats).toEqual([])
+
+    const buit = recalculaDelLloc(abans, { dies_setmana: null, franges: [] })
+    expect(buit.datos.dies_recollida).toBeUndefined()
+    expect(buit.datos.horari).toBeUndefined()
+    expect(buit.buidats.sort()).toEqual(['dies_recollida', 'horari'])
+    // No toca lo que había: devuelve una copia.
+    expect(abans.dies_recollida).toEqual([6])
   })
 })

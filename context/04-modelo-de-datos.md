@@ -1782,6 +1782,24 @@ con el excedente). Columnas en `organizaciones`:
   `canvi` en `organizaciones.naturalesa` (antes = la confirmada, o nulo si solo era sugerida) y al aplicar queda
   confirmada.
 
+### Detalle del retorno, días de recogida y Maps propio de la oferta (17-11-2026, `20270528100000`)
+
+Fase A del punto 3. Cuatro columnas nuevas en `excedentes`, todas opcionales (nada se rellena hacia atrás) y sin
+cambios de GRANT (la tabla ya da SELECT/UPDATE a `authenticated`, sin INSERT: escribe `crear-oferta` con
+`service_role`):
+
+- `retorn_envasos_detall text` (≤ 400, `excedentes_retorn_detall_llarg`): QUÉ envases hay que devolver. El nombre es
+  distinto porque `retorn_envasos` ya existía y guarda la respuesta «Sí»/«No».
+- `retorn_envasos_quantitat integer` (> 0, `excedentes_retorn_quantitat_positiva`): CUÁNTOS.
+  Las dos solo se guardan con `retorn = «Sí»` (`retornDetall()` de `_shared/oferta.ts`).
+- `dies_recollida smallint[]` (`<@ {1..7}`, `excedentes_dies_recollida`): días de la semana, 1 = dl … 7 = dg (los de
+  `productor_ubicaciones.dies_setmana`); vacío = null. Solo lo pregunta el panel.
+- `gmaps_url text` (`^https?://`, ≤ 500, `excedentes_gmaps_url`): el enlace de Maps de **esta oferta**, para cuando su
+  lugar no tiene uno; en el texto manda sobre el del lugar (`mapsOferta(fila.gmaps_url) || ubi.gmaps_url`).
+
+`textoOfertaDeFila` y `crearExcedente` los leen y escriben; ningún trigger los toca. Detalle del formulario en
+`context/06ter` y de los pasos en `context/06bis`.
+
 ### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 **Operativa (A4,

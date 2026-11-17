@@ -24,9 +24,12 @@ export const PASOS = [
   "format_entrega",
   "caixes",
   "retorn",
+  "retorn_envasos",
+  "retorn_quantitat",
   "transport",
   "ubicacio",
   "disponible_fins",
+  "dies_recollida",
   "horari",
   "modalitat",
   "preu_minim",
@@ -175,15 +178,20 @@ export const MODALITATS = [
   {
     id: "venda",
     titulo: "Venda",
-    descripcion: "La vens a un preu mínim per kg. Comerços, obradors i entitats socials.",
+    // Fase A del punto 3 (17-11-2026): el precio es el de VENTA, y solo lo lleva la venta.
+    descripcion: "La vens a un preu per kg. Comerços, obradors i entitats socials.",
     titulo_es: "Venta",
-    descripcion_es: "La vendes a un precio mínimo por kg. Comercios, obradores y entidades sociales.",
+    descripcion_es: "La vendes a un precio por kg. Comercios, obradores y entidades sociales.",
   },
   {
     id: "maquila",
+    // En WhatsApp, «Maquila» (el título de una fila de lista admite 24 caracteres); en el panel,
+    // el nombre largo que pidió la Fundació (fila 3.3 del Excel). Sin campos económicos.
     titulo: "Maquila",
+    titulo_panel: "Transformació en obrador (maquila)",
     descripcion: "Et transformen el producte i te'l tornen. Obradors, comerços, entitats.",
     titulo_es: "Maquila",
+    titulo_panel_es: "Transformación en obrador (maquila)",
     descripcion_es: "Te transforman el producto y te lo devuelven. Obradores, comercios, entidades.",
   },
 ];
@@ -197,11 +205,17 @@ export const MAX_DESC_FILA_LISTA = 72;
 /** Y lo que admite el `title` de esa misma fila. */
 export const MAX_TITULO_FILA_LISTA = 24;
 
-export type TipoCampo = "familia" | "producte" | "text" | "numero" | "opcions" | "ubicacio" | "causa";
+export type TipoCampo = "familia" | "producte" | "text" | "numero" | "opcions" | "ubicacio" | "causa" | "dies";
 
 export interface OpcionCampo {
   id: string;
   titulo: string;
+  /**
+   * El título en el PANEL cuando el de WhatsApp tiene que ser corto (17-11-2026, maquila): el
+   * bot usa `titulo` (≤24 en una fila de lista, ≤20 en un botón); el panel, este si lo hay.
+   */
+  titulo_panel?: string;
+  titulo_panel_es?: string;
   /** El título en castellano, para el panel. El bot pregunta siempre en catalán. */
   titulo_es?: string;
   descripcion_es?: string;
@@ -249,6 +263,17 @@ export interface CampoOferta {
    * producto sigue en el campo.
    */
   condicion?: CondicionCampo | CondicionCampo[];
+  /**
+   * Oculto TEMPORALMENTE (17-11-2026, `transport`): `aplica()` devuelve false, así que ni se
+   * pregunta (panel ni WhatsApp) ni se exige. El campo no se borra: volver a preguntarlo es
+   * quitar esta marca. `crear-oferta` tampoco lo sirve al panel.
+   */
+  oculto?: boolean;
+  /**
+   * Solo lo pregunta el PANEL (17-11-2026, `dies_recollida`): el intake de WhatsApp lo salta y
+   * `faltantes(…, "whatsapp")` no lo exige. Por eso un campo así tiene que ser opcional (test).
+   */
+  soloPanel?: boolean;
 }
 
 /**
@@ -286,7 +311,10 @@ export const CAUSES_ES: Record<string, string> = {
   PR: "Precio",
 };
 
-/** Descriptor de los 17 pasos, con las mismas preguntas que hace el bot. */
+/**
+ * Descriptor de los 20 pasos, con las mismas preguntas que hace el bot. Desde el 17-11-2026 uno
+ * está oculto (`transport`) y otro es solo del panel (`dies_recollida`).
+ */
 export const CAMPOS: CampoOferta[] = [
   {
     clave: "familia",
@@ -379,6 +407,31 @@ export const CAMPOS: CampoOferta[] = [
     // Si el receptor porta els seus envasos, no hi ha res a retornar.
     condicion: { campo: "format_entrega", en: ["caixes", "palet", "altres"] },
   },
+  // Con retorno, QUÉ y CUÁNTOS (fila 3.2 del Excel, 17-11-2026): «Sí» a secas no le decía a
+  // quien recoge qué tenía que traer de vuelta. Se guardan en `retorn_envasos_detall` y
+  // `retorn_envasos_quantitat` (la columna `retorn_envasos` ya era la respuesta Sí/No).
+  {
+    clave: "retorn_envasos",
+    tipo: "text",
+    etiqueta: "Quins envasos s'han de retornar?",
+    ayuda: "P. ex. caixes de plàstic verdes, palots, palets europeus…",
+    etiqueta_es: "¿Qué envases hay que devolver?",
+    ayuda_es: "P. ej. cajas de plástico verdes, palots, palés europeos…",
+    seccion: "quantitat",
+    obligatorio: true,
+    condicion: { campo: "retorn", en: ["Sí"] },
+  },
+  {
+    clave: "retorn_quantitat",
+    tipo: "numero",
+    etiqueta: "Quants envasos s'han de retornar?",
+    ayuda: "Un nombre enter; aproximat, si no ho saps del cert.",
+    etiqueta_es: "¿Cuántos envases hay que devolver?",
+    ayuda_es: "Un número entero; aproximado, si no lo sabes con certeza.",
+    seccion: "quantitat",
+    obligatorio: true,
+    condicion: { campo: "retorn", en: ["Sí"] },
+  },
   {
     clave: "transport",
     tipo: "opcions",
@@ -391,6 +444,9 @@ export const CAMPOS: CampoOferta[] = [
     opciones: OPCIONS_TRANSPORT,
     // Un producte al camp s'ha d'anar a collir: no es pot portar.
     condicion: { campo: "producte_al_camp", en: ["no"] },
+    // OCULTO desde el 17-11-2026 (fila 3.4 del Excel): de momento siempre se recoge en un lugar,
+    // así que la ubicación se pregunta siempre. Se conserva para volver a activarlo.
+    oculto: true,
   },
   {
     clave: "ubicacio",
@@ -401,10 +457,7 @@ export const CAMPOS: CampoOferta[] = [
     ayuda_es: "Elige uno de tus lugares o añade uno nuevo (campo, almacén…).",
     seccion: "recollida",
     obligatorio: true,
-    condicion: [
-      { campo: "transport", en: ["no"] },
-      { campo: "producte_al_camp", en: ["si"] },
-    ],
+    // Sin condición desde el 17-11-2026: con el transporte oculto, siempre hay que decir dónde.
   },
   {
     clave: "disponible_fins",
@@ -415,6 +468,20 @@ export const CAMPOS: CampoOferta[] = [
     ayuda_es: "Pasado este día, si no se ha colocado, la oferta se cierra sola.",
     seccion: "recollida",
     obligatorio: true,
+  },
+  {
+    // Los DÍAS en que se puede recoger (fila 3.4, 17-11-2026), 1 = dilluns … 7 = diumenge. Solo
+    // en el panel, con casillas, precargados del lugar (`dies_setmana`); por WhatsApp serían
+    // siete botones más para algo que el lugar ya sabe.
+    clave: "dies_recollida",
+    tipo: "dies",
+    soloPanel: true,
+    etiqueta: "Quins dies es pot recollir?",
+    ayuda: "Et proposem els del lloc de recollida; els pots canviar per a aquesta oferta.",
+    etiqueta_es: "¿Qué días se puede recoger?",
+    ayuda_es: "Te proponemos los del lugar de recogida; los puedes cambiar para esta oferta.",
+    seccion: "recollida",
+    obligatorio: false,
   },
   {
     clave: "horari",
@@ -445,30 +512,33 @@ export const CAMPOS: CampoOferta[] = [
     opciones: MODALITATS,
   },
   {
+    // El PREU DE VENDA (fila 3.3, 17-11-2026): solo en venda. La maquila se queda sin campos
+    // económicos (`ambPreu()` en `modalitats.ts` dice lo mismo). La clave sigue siendo
+    // `preu_minim` —la columna y todo lo que la lee—; cambia lo que se pregunta.
     clave: "preu_minim",
     tipo: "numero",
-    etiqueta: "A quin preu mínim (€/kg) la vols oferir?",
-    ayuda: "Les entitats el veuran i no la podran demanar per sota d'aquest preu.",
-    etiqueta_es: "¿A qué precio mínimo (€/kg) quieres ofrecerla?",
-    ayuda_es: "Las entidades lo verán y no podrán pedirla por debajo de este precio.",
+    etiqueta: "Preu de venda (€/kg)",
+    ayuda: "El preu per quilo al qual la vens. Les entitats el veuran i no la podran demanar per sota.",
+    etiqueta_es: "Precio de venta (€/kg)",
+    ayuda_es: "El precio por kilo al que la vendes. Las entidades lo verán y no podrán pedirla por debajo.",
     seccion: "modalitat",
     obligatorio: true,
-    condicion: { campo: "modalitat", en: ["venda", "maquila"] },
+    condicion: { campo: "modalitat", en: ["venda"] },
   },
   {
     // El COSTE POR KILO lo decide el productor (27-09-2026). El de la pantalla «Productes»
     // es solo una REFERENCIA: el panel lo prellena y el bot lo ofrece con un botón
     // «Mantenir», y el productor lo deja o pone otro. Es lo que valora la donación en el
-    // certificado, así que solo se pregunta en donació: venda y maquila ya tienen su
-    // `preu_minim`, y el certificado de transacción no lleva importes.
+    // certificado, así que solo se pregunta en donació: la venda tiene su preu de venda
+    // (`preu_minim`), la maquila no lleva importes, y el certificado de transacción tampoco.
     //
     // No es obligatorio: sin él, la canalización toma la referencia vigente del producto
     // (`trg_canalizaciones_valoriza`, 20270405100200).
     clave: "cost_kg",
     tipo: "numero",
-    etiqueta: "Quin és el cost per quilo (€/kg)?",
+    etiqueta: "Valor de cost (€/kg)",
     ayuda: "És el valor amb què es calcula la donació al certificat. Et proposem el de referència del producte; el pots canviar.",
-    etiqueta_es: "¿Cuál es el coste por kilo (€/kg)?",
+    etiqueta_es: "Valor de coste (€/kg)",
     ayuda_es: "Es el valor con el que se calcula la donación en el certificado. Te proponemos el de referencia del producto; lo puedes cambiar.",
     seccion: "modalitat",
     obligatorio: false,
@@ -496,11 +566,23 @@ export const CAMPOS: CampoOferta[] = [
   },
 ];
 
-/** ¿Este campo se pregunta, dados los datos ya introducidos? Una lista es un «o». */
+/**
+ * ¿Este campo se pregunta, dados los datos ya introducidos? Una lista es un «o».
+ *
+ * Un campo `oculto` no se pregunta nunca. Y desde el 17-11-2026 la condición se ENCADENA: solo
+ * cuenta si el campo del que depende también se pregunta. Sin eso, un «Sí» al retorno que se
+ * quedó escrito antes de cambiar el formato a «envasos de qui ho rep» seguiría pidiendo qué
+ * envases devolver, aunque el retorno ya no se pregunte.
+ */
 export function aplica(campo: CampoOferta, datos: Record<string, unknown>): boolean {
+  if (campo.oculto) return false;
   if (!campo.condicion) return true;
   const conds = Array.isArray(campo.condicion) ? campo.condicion : [campo.condicion];
-  return conds.some((c) => valorsDe(datos[c.campo]).some((v) => c.en.includes(v)));
+  return conds.some((c) => {
+    const del = CAMPOS.find((x) => x.clave === c.campo);
+    if (del && del !== campo && !aplica(del, datos)) return false;
+    return valorsDe(datos[c.campo]).some((v) => c.en.includes(v));
+  });
 }
 
 /**
@@ -521,10 +603,14 @@ export function esBuit(v: unknown): boolean {
   return v === undefined || v === null || String(v).trim() === "";
 }
 
-/** Campos obligatorios que faltan. Lista vacía = se puede crear la oferta. */
-export function faltantes(datos: Record<string, unknown>): Paso[] {
+/**
+ * Campos obligatorios que faltan. Lista vacía = se puede crear la oferta. Por WhatsApp
+ * (`canal = "whatsapp"`) no se exige lo que solo pregunta el panel (`soloPanel`).
+ */
+export function faltantes(datos: Record<string, unknown>, canal: "panel" | "whatsapp" = "panel"): Paso[] {
   return CAMPOS
     .filter((c) => c.obligatorio && aplica(c, datos))
+    .filter((c) => !(canal === "whatsapp" && c.soloPanel))
     .filter((c) => esBuit(datos[c.clave]))
     .map((c) => c.clave);
 }
