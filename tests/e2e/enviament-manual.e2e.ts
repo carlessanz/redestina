@@ -7,7 +7,8 @@
 //   2. `reenviar-documento`: sin `manual`, 409 `desactivat`; con él, sale y la traza dice
 //      `reenviar-documento:manual`.
 //   3. «Envia per correu» de un albarán conciliado: el diálogo avisa de que las notificaciones
-//      están apagadas; al aceptar sale el PDF, sin enlace.
+//      están apagadas; al aceptar sale el PDF, sin enlace (con la casilla de firma desmarcada,
+//      si el albarán espera la firma).
 //   4. El mismo botón con el albarán entregado: además acuña un enlace de confirmación nuevo.
 
 import { readFileSync } from 'node:fs'
@@ -112,6 +113,14 @@ test('«Envia per correu» d’un albarà conciliat: el PDF, sense enllaç', asy
   await page.getByRole('button', { name: /^Envia per correu$|^Envía por correo$/ }).click()
   const dialeg = page.getByRole('dialog')
   await expect(dialeg).toContainText(/només aturen els enviaments automàtics|solo paran los envíos automáticos/)
+  // Circuito de firma (05-11-2026): si el albarán espera la firma con trazo, el diálogo trae
+  // MARCADA la casilla del enlace para firmar y el envío va por `reenviar-documento`, que acuña
+  // un enlace. Aquí se prueba el otro camino —el PDF solo, por `enviar-albara`—: se desmarca.
+  const casella = dialeg.getByRole('checkbox', { name: /Inclou l’enllaç per signar|Incluye el enlace para firmar/ })
+  if (await casella.count()) {
+    await expect(casella).toBeChecked()
+    await casella.uncheck()
+  }
   await dialeg.getByRole('button', { name: /^Envia per correu$|^Envía por correo$/ }).click()
   await expect(page.getByText(/Correu simulat: no ha sortit|Correo simulado: no ha salido|Albarà enviat a|Albarán enviado a/).first()).toBeVisible()
 

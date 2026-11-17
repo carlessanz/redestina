@@ -125,7 +125,10 @@ Cómo funciona:
   o `manual` en la función propia, el botón con `acceptaEnviament`, una línea en esta tabla y en
   AGENTS.md §8. Nunca para algo que se dispare solo o en masa.
 - E2E: `tests/e2e/enviament-manual.e2e.ts` (oferta cortada aunque diga `manual`; convenio, reenvío y
-  albarán, conciliado y entregado, con el correo apagado).
+  albarán, conciliado y entregado, con el correo apagado). Desde el circuito de firma (05-11-2026), un albarán
+  que espera la firma con trazo abre el diálogo con la casilla «Inclou l’enllaç per signar» **marcada** y entonces
+  sale por `reenviar-documento:manual` con un enlace `firma_document`; la prueba la desmarca para seguir probando
+  `enviar-albara:manual` (estuvo en rojo hasta el 17-11-2026 por no saberlo: era la prueba, no la aplicación).
 
 ### Interruptor global `whatsapp_activo` (14-09-2026)
 
