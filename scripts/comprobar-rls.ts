@@ -560,6 +560,16 @@ const NATURALESA_COMUNS: Check[] = [
   { tabla: "organizaciones", op: "actualizar", esperado: "denegar", descripcion: "NO escriu la naturalesa a ma (nomes fixar_naturalesa) (A5)" },
 ];
 
+// Fase B del punto 3 (20270529100000): el catálogo de causas y SUBCAUSAS. Para todas las cuentas
+// (también sin rol y pendiente, como `causas`): se lee, nadie lo escribe (solo SELECT para
+// `authenticated`; sin GRANT de escritura, 42501 antes de mirar filas).
+const SUBCAUSES_COMUNS: Check[] = [
+  { tabla: "causas", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de causes (C1-C7) (punt 3, fase B)" },
+  { tabla: "subcausas", op: "leer", esperado: "permitir", descripcion: "llegeix el cataleg de subcauses (punt 3, fase B)" },
+  { tabla: "subcausas", op: "insertar", esperado: "denegar", descripcion: "NO afegeix cap subcausa (punt 3, fase B)" },
+  { tabla: "subcausas", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap subcausa (punt 3, fase B)" },
+];
+
 const IMPORTACIO_INTERNES: Check[] = [
   {
     tabla: "alta_fitxa_interna",
@@ -987,6 +997,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // organización; un uuid inventado da 42501 (el permiso va antes que la existencia). La regla
   // naturalesa ↔ modalidad (P8) es catálogo; el recálculo de la sugerencia es interno.
   ...NATURALESA_COMUNS,
+  ...SUBCAUSES_COMUNS,
   { tabla: "fixar_naturalesa", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "NO fixa la naturalesa d'una organitzacio que no es seva (A5)" },
   { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
@@ -1672,6 +1683,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
     ...NATURALESA_COMUNS,
+    ...SUBCAUSES_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
@@ -2038,6 +2050,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // Plan 2, A5 (20270523100000): todo el equipo confirma la naturalesa (`es_intern()`); con un
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
     ...NATURALESA_COMUNS,
+    ...SUBCAUSES_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },
@@ -3242,6 +3255,8 @@ const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // destino de la lista) para que lo que corte sea el permiso (42501) y no un dato.
   diagnostic_productes: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS" },
   diagnostic_excedents: { productor_id: "00000000-0000-0000-0000-000000000000", producte: "TEST-RLS", causa_codi: "EX" },
+  // Fase B del punto 3: una subcausa que no existe (C1.9), de una causa que sí.
+  subcausas: { codigo: "C1.9", causa_codigo: "C1", nombre: "TEST-RLS", nombre_es: "TEST-RLS", orden: 99 },
   diagnostic_accions: { excedent_id: "00000000-0000-0000-0000-000000000000", desti: "donacio", descripcio: "TEST-RLS" },
   // `vigente: false` a propósito: con `true` chocaría con el índice único parcial
   // (tipo, idioma) where vigente y el corte vendría de un dato, no del permiso.
@@ -3308,13 +3323,15 @@ const COLUMNA_INOCUA: Record<string, string> = {
   diagnostic_accions: "notes",
   // A5 (20270523100000): sin GRANT de UPDATE para `authenticated` (42501 antes de mirar filas).
   organizaciones: "naturalesa",
+  // Fase B del punto 3 (20270529100000): catálogo sin GRANT de UPDATE (42501 antes de mirar filas).
+  subcausas: "nombre",
 };
 
 /**
  * Columna con la que se identifica la fila en el UPDATE de `COLUMNA_INOCUA`, cuando no es
  * `id` (la tuvo `mesures_prevencio`, con `codi`, hasta que la deuda 175 retiró la tabla).
  */
-const CLAVE_FILA: Record<string, string> = {};
+const CLAVE_FILA: Record<string, string> = { subcausas: "codigo" };
 
 // ---------------------------------------------------------------------------
 // Ejecución

@@ -79,6 +79,10 @@ Redestina en producción real quedan pasos de configuración y negocio.
 12. **Casar `productor_ubicaciones.municipio_ine`** con el texto libre que hay hoy (script aparte,
     con ambigüedades reales: hay nombres de municipio repetidos entre provincias). Hasta entonces
     la columna es nula en las 12 ubicaciones y la priorización sigue comparando cadenas.
+13. **Casar «Final de cultiu» (FC) y «Gestió deficient» (GD) con el catálogo nuevo de causas** (fase B del punto 3,
+    17-11-2026, `20270529100000`). Decisión de la Fundació, no deuda de código: hoy quedan inactivas, lo guardado con
+    ellas se sigue leyendo y nada se migra. Cuando se decida, una migración las reasigna (o crea la subcausa que falte).
+    También por confirmar: los títulos cortos y las descripciones de las 7 categorías en WhatsApp (`CAUSES_WHATSAPP`).
 
 **Deuda técnica: aquí vive solo lo ABIERTO.** Lo cerrado se retiró de esta lista el 15-09-2026 y
 queda indexado en **§12ter**, una línea por entrada. Hasta ese día convivían las dos cosas —65

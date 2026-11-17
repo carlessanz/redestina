@@ -19,7 +19,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
 export default function BlocExcedentsProducte({
-  bloc, index, cataleg, falten, onSenseExcedent, onCauses, onCamp, onGestio, onDestins, onAccio,
+  bloc, index, cataleg, falten, onSenseExcedent, onCauses, onSubcauses, onCamp, onGestio, onDestins, onAccio,
   onObservacions, onTreu,
 }: {
   bloc: BlocEdicio
@@ -30,6 +30,8 @@ export default function BlocExcedentsProducte({
   falten: readonly string[]
   onSenseExcedent: (v: boolean) => void
   onCauses: (codis: string[]) => void
+  /** Fase B del punto 3: las subcausas de una causa, en el orden del catálogo (`ordre`). */
+  onSubcauses: (causa: string, codis: string[], ordre: string[]) => void
   onCamp: (causa: string, camp: CampCausa, valor: string) => void
   onGestio: (causa: string, gestio: string[]) => void
   onDestins: (causa: string, destins: string[]) => void
@@ -46,9 +48,17 @@ export default function BlocExcedentsProducte({
     const propi = bloc.causes.find((x) => x.causa === codi)?.causa_nom
     return (lang === 'es' ? propi?.es || propi?.ca : propi?.ca || propi?.es) || codi
   }
-  // Las causas guardadas que el catálogo ya no tiene, también como chip (para poder quitarlas).
-  const codis = [...cataleg.map((c) => c.codigo)]
+  // Solo se ofrecen las causas ACTIVAS (fase B del punto 3); las guardadas que ya no lo son (o
+  // que el catálogo ya no tiene) también salen como chip, para verlas y poder quitarlas.
+  const codis = cataleg.filter((c) => c.activa !== false).map((c) => c.codigo)
   for (const c of bloc.causes) if (!codis.includes(c.causa)) codis.push(c.causa)
+  /** Las subcausas que se ofrecen para una causa: las activas y las ya marcadas (aunque no lo sean). */
+  const subcausesDe = (causa: string, triades: readonly string[]) => {
+    const totes = cataleg.find((x) => x.codigo === causa)?.subcausas ?? []
+    return totes
+      .filter((x) => x.activa !== false || triades.includes(x.codigo))
+      .map((x) => ({ valor: x.codigo, text: (lang === 'es' ? x.nombre_es || x.nombre : x.nombre) || x.codigo }))
+  }
   const faltaBloc = falten.includes(`excedents:${bloc.producte}`)
 
   return (
@@ -96,6 +106,8 @@ export default function BlocExcedentsProducte({
           nom={nomDe(c.causa)}
           idPrefix={`${id}-${c.causa}`}
           falta={falten.includes(`dades:${bloc.producte}:${c.causa}`)}
+          subcausesOpcions={subcausesDe(c.causa, c.subcausas)}
+          onSubcauses={(codis) => onSubcauses(c.causa, codis, subcausesDe(c.causa, codis).map((o) => o.valor))}
           onCamp={(camp, valor) => onCamp(c.causa, camp, valor)}
           onGestio={(g) => onGestio(c.causa, g)}
           onDestins={(d) => onDestins(c.causa, d)}

@@ -31,6 +31,8 @@ export interface CausaEdicio {
   /** Código del catálogo `causas`. */
   causa: string
   causa_nom: { ca: string; es: string } | null
+  /** Fase B del punto 3: códigos de `subcausas` de esta causa (varias, opcionales). */
+  subcausas: string[]
   /** `''` = sin contestar. */
   frequencia: string
   /** El texto del campo de kilos (`''` = sin contestar). */
@@ -89,6 +91,7 @@ export function blocsAEdicio(blocs: readonly BlocExcedentsLlegible[]): EstatExce
     causes: b.causes.map((c) => ({
       causa: c.causa,
       causa_nom: c.causa_nom,
+      subcausas: (c.subcausas ?? []).map((x) => x.codi),
       frequencia: c.frequencia ?? '',
       volum: textKg(c.volum_kg),
       gestio: [...c.gestio_actual],
@@ -166,6 +169,7 @@ export function posaCauses(
       return {
         causa: codi,
         causa_nom: cat ? { ca: cat.nombre, es: cat.nombre_es || cat.nombre } : null,
+        subcausas: [],
         frequencia: '', volum: '', gestio: [], destins: [], detall: '', accions: {},
       }
     })
@@ -182,6 +186,19 @@ export function alternaCausa(
   const actuals = (b?.causes ?? []).map((c) => c.causa)
   const seg = actuals.includes(codi) ? actuals.filter((c) => c !== codi) : [...actuals, codi]
   return posaCauses(estat, producte, seg, cataleg)
+}
+
+/**
+ * Las subcausas marcadas de una causa (fase B del punto 3), en el orden del catálogo de ESA causa
+ * si se pasa (las que no están en él —guardadas y ya retiradas— van al final). Sin repetidos.
+ */
+export function posaSubcausas(
+  estat: EstatExcedents, producte: string, causa: string, codis: readonly string[], ordre: readonly string[] = [],
+): EstatExcedents {
+  const triats = llistaTextos(codis)
+  const pos = (c: string) => { const i = ordre.indexOf(c); return i < 0 ? Number.MAX_SAFE_INTEGER : i }
+  triats.sort((a, b) => pos(a) - pos(b))
+  return ambCausa(estat, producte, causa, (c) => ({ ...c, subcausas: triats }))
 }
 
 export type CampCausa = 'frequencia' | 'volum' | 'detall'
@@ -266,6 +283,7 @@ export function payloadExcedents(estat: EstatExcedents): PayloadBlocDiagnostic[]
       observacions: net(b.observacions) || null,
       causes: b.sense_excedent ? [] : b.causes.map((c): PayloadCausaDiagnostic => ({
         causa: c.causa,
+        subcausas: [...c.subcausas],
         frequencia: c.frequencia || null,
         // Un texto no numérico viaja tal cual: el servidor responde `volum_negatiu` y se dice.
         volum_kg: volumDeText(c.volum) as number | null,

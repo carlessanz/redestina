@@ -61,6 +61,7 @@ import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
+import { catalegDelDescriptor, esSubcausaTriable, opcionsSubcausa, teSubcauses, textSubcausa } from '../lib/causes'
 import PasosProces from './proces/PasosProces'
 import QueTocaAra from './proces/QueTocaAra'
 import { Button } from '@/components/ui/button'
@@ -265,8 +266,14 @@ export default function FormulariNovaOferta(
         setSeccions(r.data.secciones ?? [])
         setCatalogos(r.data.catalogos)
         // «Disponible fins»: hoy (Madrid) + 2 días naturales, si no hay nada (fila 3.4).
-        const ambData = (d: Datos): Datos => (esBuit(d.disponible_fins)
-          ? { ...d, disponible_fins: disponiblePerDefecte(avuiMadrid()) } : d)
+        // Y un borrador de antes de la fase B del punto 3 traía una causa vieja (`CE`) o una
+        // categoría: no es una subcausa que se pueda elegir, así que se vacía.
+        const cataleg = catalegDelDescriptor(r.data.catalogos?.causas)
+        const ambData = (d0: Datos): Datos => {
+          const d = teSubcauses(cataleg) && !esBuit(d0.causa) && !esSubcausaTriable(cataleg, d0.causa)
+            ? { ...d0, causa: '' } : d0
+          return esBuit(d.disponible_fins) ? { ...d, disponible_fins: disponiblePerDefecte(avuiMadrid()) } : d
+        }
         // Lo que había a medias antes de una recarga (ver `PREFIX_ESBORRANY`).
         // Solo la primera carga: si el efecto se repite (cambio de idioma), no se pisa lo escrito.
         const e = recuperat.current ? null : llegeixEsborrany(productorId)
@@ -591,12 +598,25 @@ export default function FormulariNovaOferta(
             placeholder={t('po.product_search')}
             onChange={(v) => set(campo.clave, v)} />
         )
-      case 'causa':
+      case 'causa': {
+        // Fase B del punto 3 (fila 3.6): un solo control con las 7 categorías como grupos y sus
+        // subcausas como opciones; se guarda la SUBCAUSA y la causa sale de ella. Debajo, la
+        // pareja entera («Categoria — Subcausa»): a 375 px el control la recorta.
+        const cataleg = catalegDelDescriptor(catalogos?.causas)
+        const triat = String(valor ?? '')
+        const opcions = teSubcauses(cataleg)
+          ? opcionsSubcausa(cataleg, lang)
+          : cataleg.map((c) => ({ valor: c.codigo, text: c.nombre }))
+        const complet = textSubcausa(cataleg, triat, lang)
         return (
-          <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
-            value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
-            opcions={(catalogos?.causas ?? []).map((c) => ({ valor: c.codigo, text: c.nombre ?? c.codigo }))} />
+          <div className="min-w-0">
+            <Desplegable id={id} name={campo.clave} aria-invalid={invalid} data-testid="of-subcausa"
+              value={triat} onChange={(v) => set(campo.clave, v)} placeholder={t('po.subcausa_ph')}
+              opcions={opcions} />
+            {complet && <p className="mt-1 text-xs text-muted-foreground break-words">{complet}</p>}
+          </div>
         )
+      }
       case 'dies':
         // Los días de recogida (17-11-2026, solo panel): los del lugar, editables.
         return (

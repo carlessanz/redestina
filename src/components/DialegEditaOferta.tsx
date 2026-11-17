@@ -2,7 +2,9 @@
 // detalle de su oferta, y el equipo, desde el suyo.
 //
 // Solo lo que se puede cambiar sin rehacer la oferta: kilos, modalidades, precio mínimo,
-// disponibilidad, franja de recogida, variedad y observaciones. El producto no: cambiaría
+// disponibilidad, franja de recogida, variedad, observaciones y (fase B del punto 3) la
+// SUBCAUSA, que es como el equipo completa la de una oferta llegada por WhatsApp (allí solo se
+// pregunta la categoría); la causa la deriva la base de la subcausa. El producto no: cambiaría
 // la referencia y lo que ya vieron las entidades (para eso se cancela y se publica otra).
 //
 // La regla vive en la base (`editar_oferta()`): los kilos no bajan de lo ya canalizado, no
@@ -26,6 +28,7 @@ import {
   Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle,
 } from '@/components/ui/dialog'
 import Desplegable from './Desplegable'
+import { carregaCatalegCauses, opcionsSubcausa, textSubcausa, type CausaAmbSubcauses } from '../lib/causes'
 
 // Las horas de la franja, de cuarto en cuarto («07:00», «07:15»…): las dos puntas eligen de aquí.
 const OPCIONS_HORA = HORES.flatMap((h) => QUARTS.map((q) => `${h}:${q}`)).map((v) => ({ valor: v, text: v }))
@@ -42,8 +45,10 @@ export default function DialegEditaOferta({
   esEquip: boolean
   onFet: () => void | Promise<unknown>
 }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   const [kg, setKg] = useState('')
+  const [subcausa, setSubcausa] = useState('')
+  const [cataleg, setCataleg] = useState<CausaAmbSubcauses[]>([])
   const [mods, setMods] = useState<Modalitat[]>([])
   const [preu, setPreu] = useState('')
   const [fins, setFins] = useState('')
@@ -64,7 +69,16 @@ export default function DialegEditaOferta({
     setFi(hhmm(oferta.hora_recollida_fi))
     setVarietat(oferta.variedad ?? '')
     setObs(oferta.observacions ?? '')
+    setSubcausa(oferta.subcausa_codigo ?? '')
   }, [obert, oferta])
+
+  // El catálogo de causas y subcausas, al abrir (una vez).
+  useEffect(() => {
+    if (!obert || cataleg.length > 0) return
+    let viu = true
+    void carregaCatalegCauses().then((r) => { if (viu && r.ok) setCataleg(r.data) })
+    return () => { viu = false }
+  }, [obert, cataleg.length])
 
   const kgNum = Number(kg.replace(',', '.'))
   const modsAbans = modalitatsOferta(oferta)
@@ -88,6 +102,7 @@ export default function DialegEditaOferta({
     }
     if (varietat.trim() !== (oferta.variedad ?? '')) canvis.variedad = varietat.trim()
     if (obs.trim() !== (oferta.observacions ?? '')) canvis.observacions = obs.trim()
+    if (subcausa && subcausa !== (oferta.subcausa_codigo ?? '')) canvis.subcausa_codigo = subcausa
     if (Object.keys(canvis).length === 0) { onObert(false); return }
 
     setDesant(true)
@@ -162,6 +177,21 @@ export default function DialegEditaOferta({
             <Label htmlFor="ed-var">{t('edit.varietat')}</Label>
             <Input id="ed-var" value={varietat} maxLength={400} onChange={(e) => setVarietat(e.target.value)} />
           </div>
+          {cataleg.length > 0 && (
+            <div className="min-w-0 space-y-1.5">
+              <Label htmlFor="ed-subcausa">{t('edit.subcausa')}</Label>
+              <Desplegable id="ed-subcausa" data-testid="ed-subcausa" value={subcausa} onChange={setSubcausa}
+                placeholder={t('po.subcausa_ph')} opcions={opcionsSubcausa(cataleg, lang, oferta.subcausa_codigo)} />
+              {subcausa
+                ? <p className="text-xs text-muted-foreground break-words">{textSubcausa(cataleg, subcausa, lang)}</p>
+                : (
+                  <p className="text-xs text-aviso break-words">
+                    {t('edit.sense_subcausa', { causa: oferta.causa ?? '—' })}
+                  </p>
+                )}
+            </div>
+          )}
+
           <div className="space-y-1.5">
             <Label htmlFor="ed-obs">{t('edit.obs')}</Label>
             <Textarea id="ed-obs" value={obs} maxLength={400} onChange={(e) => setObs(e.target.value)} />

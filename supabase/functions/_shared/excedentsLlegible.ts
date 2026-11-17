@@ -49,12 +49,21 @@ export interface AccioExcedentLlegible {
   actualitzat_at: string | null;
 }
 
+/** Una subcausa de un excedente (fase B del punto 3, 20270529100000). */
+export interface SubcausaExcedentLlegible {
+  /** Código de `subcausas` (C1.1…). */
+  codi: string;
+  nom: { ca: string; es: string } | null;
+}
+
 /** Un excedente: producto × causa del catálogo `causas`. */
 export interface CausaExcedentLlegible {
   id: string;
-  /** Código del catálogo `causas` (CE, CL, EX…). */
+  /** Código del catálogo `causas` (C1…C7; las de antes, CE, CL, EX…, se siguen leyendo). */
   causa: string;
   causa_nom: { ca: string; es: string } | null;
+  /** Fase B del punto 3: varias, opcionales, de esta causa (en el orden del catálogo). */
+  subcausas: SubcausaExcedentLlegible[];
   frequencia: string | null;
   /** Kilos aproximados cada vez (P7). */
   volum_kg: number | null;
@@ -119,10 +128,19 @@ export function blocsExcedents(v: unknown): BlocExcedentsLlegible[] {
           actualitzat_at: textONull(oa.actualitzat_at),
         });
       }
+      const subcausas: SubcausaExcedentLlegible[] = [];
+      for (const sc of Array.isArray(oc.subcausas) ? oc.subcausas : []) {
+        const os = objecte(sc);
+        const codi = typeof sc === "string" ? text(sc) : text(os?.codi);
+        if (!codi) continue;
+        const n = objecte(os?.nom);
+        subcausas.push({ codi, nom: n ? { ca: text(n.ca), es: text(n.es) } : null });
+      }
       causes.push({
         id: text(oc.id),
         causa,
         causa_nom: nom ? { ca: text(nom.ca), es: text(nom.es) } : null,
+        subcausas,
         frequencia: textONull(oc.frequencia),
         volum_kg: nombreONull(oc.volum_kg),
         gestio_actual: llista(oc.gestio_actual),
@@ -161,6 +179,17 @@ export function nomCausa(
 ): string {
   const n = c.causa_nom;
   return (lang === "es" ? n?.es || n?.ca : n?.ca || n?.es) || c.causa;
+}
+
+/** El nombre de una subcausa en el idioma (si falta, el otro; si no, el código). */
+export function nomSubcausa(s: SubcausaExcedentLlegible, lang: LlenguaExcedents): string {
+  const n = s.nom;
+  return (lang === "es" ? n?.es || n?.ca : n?.ca || n?.es) || s.codi;
+}
+
+/** Las subcausas de un excedente, separadas por «; » (vacío si no hay). */
+export function textSubcausas(c: Pick<CausaExcedentLlegible, "subcausas">, lang: LlenguaExcedents): string {
+  return (c.subcausas ?? []).map((s) => nomSubcausa(s, lang)).join("; ");
 }
 
 export function textFrequencia(f: string | null | undefined, t: TraduccioExcedents): string {
@@ -205,6 +234,8 @@ export interface FilaCausaExcedent {
   /** Código del catálogo. */
   codi: string;
   causa: string;
+  /** Las subcausas en texto («a; b»), vacío si no hay. */
+  subcausas: string;
   detall: string;
   frequencia: string;
   volum: string;
@@ -220,6 +251,7 @@ export function filaCausa(
   return {
     codi: c.causa,
     causa: nomCausa(c, lang),
+    subcausas: textSubcausas(c, lang),
     detall: text(c.detall),
     frequencia: textFrequencia(c.frequencia, t),
     volum: textVolum(c.volum_kg, lang),
@@ -237,9 +269,18 @@ export function filesCausa(
   return b.causes.map((c) => filaCausa(c, t, lang));
 }
 
-/** «Excedent» o, con detalle, «Excedent\nDetall: …» (una celda de tabla en el PDF). */
-export function celaCausa(f: Pick<FilaCausaExcedent, "causa" | "detall">, t: TraduccioExcedents): string {
-  return f.detall ? `${f.causa}\n${t("dexc.detall")}: ${f.detall}` : f.causa;
+/**
+ * «Preu i rendibilitat», con las subcausas («Preu i rendibilitat\nSubcausa: Preu de venda
+ * insuficient») y con el detalle («…\nDetall: …»): una celda de tabla en el PDF.
+ */
+export function celaCausa(
+  f: Pick<FilaCausaExcedent, "causa" | "detall"> & { subcausas?: string },
+  t: TraduccioExcedents,
+): string {
+  const linies = [f.causa];
+  if (f.subcausas) linies.push(`${t("dexc.subcausas")}: ${f.subcausas}`);
+  if (f.detall) linies.push(`${t("dexc.detall")}: ${f.detall}`);
+  return linies.join("\n");
 }
 
 /** Una acción lista para una fila. */
@@ -300,6 +341,7 @@ export const ETIQUETES_EXCEDENTS: Record<LlenguaExcedents, Record<string, string
     "dexc.sense_excedent": "Sense excedent",
     "dexc.ja_no_principal": "Ja no és principal",
     "dexc.causa": "Causa",
+    "dexc.subcausas": "Subcausa",
     "dexc.detall": "Detall",
     "dexc.frequencia": "Freqüència",
     "dexc.volum_kg": "Volum (kg)",
@@ -327,6 +369,7 @@ export const ETIQUETES_EXCEDENTS: Record<LlenguaExcedents, Record<string, string
     "dexc.sense_excedent": "Sin excedente",
     "dexc.ja_no_principal": "Ya no es principal",
     "dexc.causa": "Causa",
+    "dexc.subcausas": "Subcausa",
     "dexc.detall": "Detalle",
     "dexc.frequencia": "Frecuencia",
     "dexc.volum_kg": "Volumen (kg)",

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 
 export default function CausaExcedent({
-  causa, nom, idPrefix, falta, onCamp, onGestio, onDestins, onAccio,
+  causa, nom, idPrefix, falta, subcausesOpcions = [], onSubcauses, onCamp, onGestio, onDestins, onAccio,
 }: {
   causa: CausaEdicio
   /** El nombre de la causa en el idioma de la interfaz. */
@@ -23,6 +23,9 @@ export default function CausaExcedent({
   idPrefix: string
   /** Le falta frecuencia, kilos o gestión actual (se señala, no bloquea). */
   falta: boolean
+  /** Fase B del punto 3: las subcausas de esta causa que se pueden marcar (varias, opcionales). */
+  subcausesOpcions?: { valor: string; text: string }[]
+  onSubcauses?: (codis: string[]) => void
   onCamp: (camp: CampCausa, valor: string) => void
   onGestio: (gestio: string[]) => void
   onDestins: (destins: string[]) => void
@@ -37,6 +40,18 @@ export default function CausaExcedent({
       data-testid={`causa-${causa.causa}`}
     >
       <h5 className="text-sm font-semibold break-words">{nom}</h5>
+
+      {subcausesOpcions.length > 0 && onSubcauses && (
+        <div className="space-y-1.5" data-testid={`subcauses-${causa.causa}`}>
+          <p id={`${idPrefix}-subcauses-l`} className="text-sm font-medium">{t('dexc.pregunta_subcausas')}</p>
+          <XipsTria
+            etiquetaId={`${idPrefix}-subcauses-l`}
+            opcions={subcausesOpcions}
+            triats={causa.subcausas}
+            onChange={onSubcauses}
+          />
+        </div>
+      )}
 
       <div className="grid gap-4 sm:grid-cols-2">
         <div className="min-w-0 space-y-1.5">

@@ -14,7 +14,7 @@ import { blocsExcedents } from '../src/lib/excedentsLlegible'
 import {
   alternaCausa, blocsAEdicio, estatInicial, estilEstatAccio, faltenLocal, llistaTextos, parteixFalta,
   payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses, posaDestins, posaGestio, posaObservacions,
-  destiFalta, posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals, textFalta, treuBloc, volumDeText, volumValid,
+  destiFalta, posaSenseExcedent, posaSubcausas, seccionsDiagnostic, sincronitzaPrincipals, textFalta, treuBloc, volumDeText, volumValid,
   type EstatExcedents,
 } from '../src/lib/excedentsDiagnostic'
 import type { CausaCataleg } from '../src/types'
@@ -135,6 +135,34 @@ describe('operaciones', () => {
   })
 })
 
+describe('subcausas (fase B del punto 3, 20270529100000)', () => {
+  const GUARDAT_SUB = [{
+    producte: 'Tomàquet', principal: true, ordre: 1, sense_excedent: false, observacions: null,
+    causes: [{
+      id: 'e1', causa: 'C3', causa_nom: { ca: 'Preu i rendibilitat', es: 'Precio y rentabilidad' },
+      subcausas: [{ codi: 'C3.1', nom: { ca: 'Preu de venda insuficient', es: 'Precio de venta insuficiente' } }],
+      frequencia: 'puntual', volum_kg: 10, gestio_actual: ['residu'], destins: [], detall: null, accions: [],
+    }],
+  }]
+
+  it('lo guardado llega con sus códigos; una causa nueva, sin ninguna', () => {
+    let e = estatInicial(GUARDAT_SUB, P('Tomàquet'))
+    expect(e[0].causes[0].subcausas).toEqual(['C3.1'])
+    e = posaCauses(e, 'Tomàquet', ['C3', 'C1'], CATALEG)
+    expect(e[0].causes.find((c) => c.causa === 'C1')?.subcausas).toEqual([])
+    expect(e[0].causes.find((c) => c.causa === 'C3')?.subcausas).toEqual(['C3.1'])
+  })
+
+  it('marcar: sin repetidos y en el orden del catálogo de la causa; viajan en el payload', () => {
+    let e = estatInicial(GUARDAT_SUB, P('Tomàquet'))
+    e = posaSubcausas(e, 'Tomàquet', 'C3', ['C3.2', 'C3.1', 'C3.2'], ['C3.1', 'C3.2'])
+    expect(e[0].causes[0].subcausas).toEqual(['C3.1', 'C3.2'])
+    expect(payloadExcedents(e)[0].causes[0].subcausas).toEqual(['C3.1', 'C3.2'])
+    e = posaSubcausas(e, 'Tomàquet', 'C3', [])
+    expect(payloadExcedents(e)[0].causes[0].subcausas).toEqual([])
+  })
+})
+
 describe('payloadExcedents', () => {
   it('con «sense excedent», sin causas; textos limpios; acciones solo con texto y destino marcado', () => {
     let e = estatInicial([], P('Tomàquet', 'Pera'))
@@ -151,8 +179,8 @@ describe('payloadExcedents', () => {
       {
         producte: 'Tomàquet', sense_excedent: false, observacions: null,
         causes: [{
-          causa: 'EX', frequencia: null, volum_kg: 250.5, gestio_actual: [], destins: ['donacio', 'venda'], detall: null,
-          accions: [{ desti: 'donacio', descripcio: 'Banc' }],
+          causa: 'EX', subcausas: [], frequencia: null, volum_kg: 250.5, gestio_actual: [], destins: ['donacio', 'venda'],
+          detall: null, accions: [{ desti: 'donacio', descripcio: 'Banc' }],
         }],
       },
       { producte: 'Pera', sense_excedent: true, observacions: null, causes: [] },

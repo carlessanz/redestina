@@ -207,3 +207,29 @@ válida, `format_entrega` = el primer envase habitual con equivalente —`caixes
 - **Predeterminados**: `predeterminatsDe()` propone también `dies_recollida` = los `dies_setmana` del lugar
   (`diesDelLloc`: 1–7, en orden, sin repetir; si no hay, null).
 
+
+### Fase B del punto 3: causas y subcausas (17-11-2026, `20270529100000`)
+
+Fila 3.6 del Excel de la Fundació: el mismo catálogo de causas que el Diagnòstic, en **7 categorías (C1–C7)** con
+**20 subcausas** (`C<n>.<m>`); la oferta lleva UNA causa principal, elegida por su subcausa. «Observacions» sigue siendo
+texto libre. Excedent (EX), Canalització (CN) y Maquila (MQ) dejan de ser causas (con CE, CL, FC, GD y PR, `activa = false`;
+no se borran: las citan ofertas, diagnósticos y documentos).
+
+- **Sin paso nuevo** (siguen 20): el campo `causa` cambia de contenido según el canal.
+  - **WhatsApp** pregunta solo la **categoría**: una lista de 7 filas (`filesCausaWhatsApp(agrupaCauses(...))`,
+    `_shared/causes.ts`), id `causa:Cn`, con título corto ≤ 24 y descripción ≤ 72 (`CAUSES_WHATSAPP`; textos míos,
+    pendientes de confirmar por la Fundació). La subcausa queda vacía; el equipo la completa desde «Edita l’oferta».
+  - **Panel**: `datos.causa` es el **código de la subcausa** (obligatoria). `crear-oferta` responde `400
+    subcausa_obligatoria` (vacía —antes cae en `campos_faltantes`—, una categoría a secas o una causa vieja, con
+    `faltan: ["causa"]`) o `400 subcausa_invalida` (no existe o inactiva).
+- **El servidor resuelve** con `resolCausa()` (`_shared/oferta.ts`): primero `subcausas`, luego `causas`; inserta
+  `causa_codigo`, `subcausa_codigo` y `causa` (nombre de la categoría en catalán). El trigger `excedentes_subcausa` lo
+  vuelve a derivar en la base (red para cualquier escritura).
+- **Texto de la oferta**: «🔴 CAUSA: Categoria — Subcausa» (`textCausa`); sin subcausa, la categoría sola.
+- **Descriptor**: `catalogos.causas` = las categorías ACTIVAS en orden, cada una con `subcausas` (activas, en orden);
+  `localitzaDescriptor` pasa los nombres al castellano. Un panel anterior a la fase B (que pinta la lista de causas)
+  recibe las 7 categorías y un `400 subcausa_obligatoria` hasta que se publique el frontend: **ventana de
+  compatibilidad**, se publica funciones y frontend seguidos.
+- **`CAUSES_ES`** (`camposOferta.ts`) se queda solo por su test de paridad: son las 8 causas viejas, inactivas.
+- 🟡 **Decisión de negocio pendiente** (no es deuda de código): a qué causa nueva corresponden «Final de cultiu» (FC) y
+  «Gestió deficient» (GD). Hoy quedan inactivas y se leen con su nombre donde ya estaban.

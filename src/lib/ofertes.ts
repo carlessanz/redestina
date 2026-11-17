@@ -159,7 +159,15 @@ export interface CatalogosOferta {
   familias: string[]
   /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
   productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
-  causas: { codigo: string; nombre: string | null; nombre_es?: string | null }[]
+  /**
+   * Fase B del punto 3 (20270529100000): las causas ACTIVAS en orden, cada una con sus
+   * `subcausas`. El panel elige una subcausa y la manda en `datos.causa`. Un servidor anterior
+   * manda las causas sin `subcausas`.
+   */
+  causas: {
+    codigo: string; nombre: string | null; nombre_es?: string | null; activa?: boolean
+    subcausas?: { codigo: string; nombre: string; nombre_es: string | null; activa?: boolean }[]
+  }[]
   /**
    * `es_principal`, `horario`, `dies_setmana` y `franges` llegan desde A4; `gmaps_url`, desde el
    * 17-11-2026. Un servidor anterior no los manda.
@@ -207,7 +215,11 @@ export function localitzaDescriptor(
     })),
     catalogos: catalogos && {
       ...catalogos,
-      causas: catalogos.causas.map((c) => ({ ...c, nombre: c.nombre_es ?? c.nombre })),
+      causas: catalogos.causas.map((c) => ({
+        ...c,
+        nombre: c.nombre_es ?? c.nombre,
+        subcausas: c.subcausas?.map((x) => ({ ...x, nombre: x.nombre_es ?? x.nombre })),
+      })),
     },
   }
 }
@@ -343,7 +355,7 @@ export async function editaOferta(
 /** Los códigos de rechazo de `editar_oferta()` que tienen texto propio. */
 export const CODIS_EDICIO = [
   'kg_menys_canalitzats', 'kg_invalids', 'modalitats_buides', 'modalitat_amb_canalitzacions',
-  'oferta_no_editable', 'sense_canvis', 'forbidden',
+  'oferta_no_editable', 'sense_canvis', 'forbidden', 'subcausa_invalida',
 ] as const
 
 /** El productor cancela su propia oferta (RPC con comprobación de pertenencia). */

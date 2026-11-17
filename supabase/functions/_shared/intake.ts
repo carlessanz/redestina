@@ -12,6 +12,7 @@
 // reintentos y caducidad, y embutirlos en el bucle del webhook lo haría inmanejable.
 
 import { sendBotones, sendLista, sendText } from "./whatsapp.ts";
+import { agrupaCauses, filesCausaWhatsApp, type FilaCausa } from "./causes.ts";
 import type { FilaLista } from "./whatsapp.ts";
 import { crearExcedenteDesdeSesion } from "./oferta.ts";
 // Los pasos y los vocabularios cerrados viven en camposOferta.ts, compartidos con el
@@ -367,14 +368,12 @@ async function preguntar(
       )).ok;
     }
     case "causa": {
-      const { data } = await supabase.from("causas").select("codigo, nombre").order("nombre");
-      const causas = (data ?? []) as Array<{ codigo: string; nombre: string }>;
+      // Fase B del punto 3 (fila 3.6): por WhatsApp solo la CATEGORÍA (las 7 activas, en orden,
+      // con título corto y descripción: `_shared/causes.ts`). La subcausa la completa el equipo.
+      const { data } = await supabase.from("causas").select("codigo, nombre, nombre_es, activa, orden");
       const r = await sendLista(
         supabase, to, "Quina és la causa de l'excedent?", "Tria causa",
-        paginar(
-          causas.map((c) => ({ id: `causa:${c.codigo}`, titulo: c.nombre, descripcion: c.codigo })),
-          pagina, "causa",
-        ),
+        paginar(filesCausaWhatsApp(agrupaCauses((data ?? []) as FilaCausa[], [])), pagina, "causa"),
       );
       return r.ok;
     }

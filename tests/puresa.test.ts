@@ -36,6 +36,9 @@ const HOJA = [
   // Fase A del punto 3 (17-11-2026): días y franja de un lugar, los mismos al proponerlos
   // (`crear-oferta`) y al cambiar de lugar en el panel.
   'predeterminatsOferta',
+  // Fase B del punto 3 (17-11-2026): el catálogo de causas y subcausas, el mismo en la oferta,
+  // en el intake de WhatsApp y en el diagnóstico.
+  'causes',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

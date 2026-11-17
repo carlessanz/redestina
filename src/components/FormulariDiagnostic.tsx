@@ -37,7 +37,7 @@ import { causesDiagnostic, desarExcedentsDiagnostic, diagnosticDatos } from '../
 import { blocsExcedents } from '../lib/excedentsLlegible'
 import {
   blocsAEdicio, destiFalta, faltenLocal, llistaTextos, payloadExcedents, perdues, posaAccio, posaCampCausa, posaCauses,
-  posaDestins, posaGestio, posaObservacions, posaSenseExcedent, seccionsDiagnostic, sincronitzaPrincipals,
+  posaDestins, posaGestio, posaObservacions, posaSenseExcedent, posaSubcausas, seccionsDiagnostic, sincronitzaPrincipals,
   textFalta, treuBloc, type EstatExcedents,
 } from '../lib/excedentsDiagnostic'
 import type { CausaCataleg, DiagnosticDatos, EstatDiagnostic } from '../types'
@@ -187,6 +187,7 @@ export default function FormulariDiagnostic({ orgId, assistit = false, onDesat }
       falten={faltenDe(b.producte)}
       onSenseExcedent={(v) => canvia((e) => posaSenseExcedent(e, b.producte, v))}
       onCauses={(codis) => canvia((e) => posaCauses(e, b.producte, codis, cataleg))}
+      onSubcauses={(causa, codis, ordre) => canvia((e) => posaSubcausas(e, b.producte, causa, codis, ordre))}
       onCamp={(causa, camp, valor) => canvia((e) => posaCampCausa(e, b.producte, causa, camp, valor))}
       onGestio={(causa, g) => canvia((e) => posaGestio(e, b.producte, causa, g))}
       onDestins={(causa, d) => canvia((e) => posaDestins(e, b.producte, causa, d))}

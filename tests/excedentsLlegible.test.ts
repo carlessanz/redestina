@@ -182,7 +182,7 @@ describe('textos y filas', () => {
   it('filas de causas y de acciones (con el detalle y la nota de seguimiento)', () => {
     const files = filesCausa(blocs[0], t, 'ca')
     expect(files[0]).toEqual({
-      codi: 'CE', causa: 'Criteris Estètics', detall: 'Calibre petit', frequencia: 'Setmanal', volum: '1.250,5',
+      codi: 'CE', causa: 'Criteris Estètics', subcausas: '', detall: 'Calibre petit', frequencia: 'Setmanal', volum: '1.250,5',
       gestio: 'Donació, Residu', destins: 'Donació, Maquila',
     })
     expect(celaCausa(files[0], t)).toBe('Criteris Estètics\nDetall: Calibre petit')
@@ -196,6 +196,30 @@ describe('textos y filas', () => {
     expect(celaAccio(accions[0], t)).toBe('Banc d’aliments — Seguiment: Dijous')
     expect(celaAccio(accions[1], t)).toBe('Salsa')
     expect(filesAccions(blocs[1], t, 'ca')).toEqual([])
+  })
+
+  it('subcausas (fase B del punto 3): leídas del JSON, en la fila y en la celda del PDF', () => {
+    const [b] = blocsExcedents([{
+      producte: 'Pera', principal: true, ordre: 1, sense_excedent: false, observacions: null,
+      causes: [{
+        id: 'x', causa: 'C4', causa_nom: { ca: 'Qualitat i requisits comercials', es: 'Calidad y requisitos comerciales' },
+        subcausas: [
+          { codi: 'C4.1', nom: { ca: 'Criteris estètics o de calibre', es: 'Criterios estéticos o de calibre' } },
+          { codi: 'C4.3', nom: null },
+          { codi: '' },
+        ],
+        frequencia: null, volum_kg: null, gestio_actual: [], destins: [], detall: 'Massa petites', accions: [],
+      }],
+    }])
+    expect(b.causes[0].subcausas.map((s) => s.codi)).toEqual(['C4.1', 'C4.3'])
+    const f = filaCausa(b.causes[0], t, 'ca')
+    expect(f.subcausas).toBe('Criteris estètics o de calibre; C4.3')
+    expect(celaCausa(f, t)).toBe('Qualitat i requisits comercials\nSubcausa: Criteris estètics o de calibre; C4.3\nDetall: Massa petites')
+    const tEs = traduccioExcedents('es')
+    expect(celaCausa(filaCausa(b.causes[0], tEs, 'es'), tEs))
+      .toBe('Calidad y requisitos comerciales\nSubcausa: Criterios estéticos o de calibre; C4.3\nDetalle: Massa petites')
+    // Un JSON de antes de la fase B (sin `subcausas`) se sigue leyendo.
+    expect(blocs[0].causes[0].subcausas).toEqual([])
   })
 
   it('con la traducción del PDF (es), ninguna clave sin traducir', () => {

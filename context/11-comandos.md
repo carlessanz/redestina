@@ -438,3 +438,12 @@ navegador: haría compilar código que revienta en producción.
   redesplegarla también.
 - Probarla en el clon: `bash scripts/local/funciones-local.sh` y `E2E_CLON=1 npx playwright test
   tests/e2e/diagnostic-pdf.e2e.ts` (fuera del sandbox de Claude: Chromium no arranca dentro).
+
+### Publicar la fase B del punto 3: causas y subcausas (17-11-2026, `20270529100000`)
+
+- Orden: migración (`aplicar-migracion.ts 20270529100000_causes_subcauses.sql`) → funciones → frontend, **seguidos**:
+  entre la función y el frontend, el panel publicado pinta las 7 categorías y recibe `400 subcausa_obligatoria`.
+- Funciones a redesplegar (por import de `_shared/causes.ts`, `oferta.ts`, `textOferta.ts`, `intake.ts`,
+  `camposOferta.ts` o `excedentsLlegible.ts`): **`crear-oferta`**, **`whatsapp-webhook`**, **`recollides-programades`**,
+  **`diagnostic-pdf`** y **`generar-documento`** (estas dos, juntas, P4; tras `generar-documento`,
+  `emitir_documento_prova()`).

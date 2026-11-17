@@ -17,6 +17,7 @@
 // SQLSTATE) queda para que la pantalla pueda decidir.
 
 import { supabase } from './supabase'
+import { carregaCatalegCauses } from './causes'
 import type {
   CausaCataleg, DiagnosticDatos, DiagnosticEquip, DiagnosticEstat, FilaAccioDiagnostic,
   PayloadBlocDiagnostic, ResultatDesatExcedents,
@@ -72,24 +73,15 @@ export function diagnosticDatos(
   return crida('diagnostic_datos', { p_tipo_org: tipus, p_org: org }, 'diag.err_generic')
 }
 
-/** Las columnas del catálogo de causas, en UN literal (§7). */
-const COLUMNES_CAUSES = 'codigo, nombre, nombre_es'
-
 /**
- * El catálogo `causas` (el mismo de las ofertas, D7), por código. Lo puede leer cualquier
- * sesión. `nombre_es` existe desde A3; si falta, la pantalla cae al catalán.
+ * El catálogo `causas` con sus `subcausas` (el mismo de las ofertas, D7; fase B del punto 3), en
+ * orden: primero las activas, después las de antes (`activa: false`), que la pantalla no ofrece
+ * pero con las que nombra lo ya guardado. Lo puede leer cualquier sesión.
  */
 export async function causesDiagnostic(): Promise<ResultatRpc<CausaCataleg[]>> {
-  try {
-    const { data, error } = await supabase
-      .from('causas')
-      .select(COLUMNES_CAUSES)
-      .order('codigo', { ascending: true })
-    if (error) return { ok: false, missatge: error.message, codi: error.code ?? null }
-    return { ok: true, data: (data as CausaCataleg[] | null) ?? [] }
-  } catch {
-    return { ok: false, missatge: 'diag.err_generic', codi: null }
-  }
+  const r = await carregaCatalegCauses()
+  if (!r.ok) return { ok: false, missatge: r.missatge === 'c.error' ? 'diag.err_generic' : r.missatge, codi: r.codi }
+  return { ok: true, data: r.data }
 }
 
 // ---------------------------------------------------------------------------

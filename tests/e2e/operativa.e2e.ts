@@ -44,7 +44,10 @@ test('el productor añade dos lugares, con días y franja, y cambia el principal
   const prod = productorDe('productor')
   sql(`delete from productor_ubicaciones where productor_id = '${prod}' and alias like 'E2E A4 %'
          and not exists (select 1 from excedentes e where e.ubicacion_id = productor_ubicaciones.id)`)
-  sql(`update productor_ubicaciones set alias = alias || ' (vell)' where productor_id = '${prod}' and alias like 'E2E A4 %'`)
+  // Los que no se pueden borrar (los citan ofertas de otras pruebas) se renombran SIN contener el
+  // alias de ahora: «E2E A4 Camp (vell)» seguía casando con el filtro de fila de abajo.
+  sql(`update productor_ubicaciones set alias = replace(alias, 'E2E A4 ', 'E2E vell A4 ')
+        where productor_id = '${prod}' and alias like 'E2E A4 %'`)
   await entra(page, 'productor')
   await page.goto('/organitzacio?pestanya=operativa')
 
@@ -199,7 +202,7 @@ test('crear-oferta: kg > 0 y guarda retorno, días y Maps de la oferta', async (
     familia: 'Fruita Dolça', producte: 'Poma', producte_al_camp: 'no', kg: 0, format_entrega: 'caixes',
     retorn: 'Sí', retorn_envasos: 'caixes verdes', retorn_quantitat: 12, ubicacio: b,
     gmaps_url: 'https://maps.app.goo.gl/e2eFaseA', disponible_fins: '31/12/2027', dies_recollida: [3, 1],
-    modalitat: 'donacio', causa: 'CE', observacions: marca,
+    modalitat: 'donacio', causa: 'C3.1', observacions: marca,
   }
   const crida = (d: Record<string, unknown>) => request.post(`${API}/functions/v1/crear-oferta`, {
     headers: { Authorization: `Bearer ${jwt}`, apikey: clau }, data: { productor_id: prod, datos: d },
@@ -210,8 +213,19 @@ test('crear-oferta: kg > 0 y guarda retorno, días y Maps de la oferta', async (
   const mitja = await crida({ ...datos, kg: 50, retorn_quantitat: 2.5 })
   expect((await mitja.json()).code).toBe('retorn_quantitat_invalid')
 
+  // Fase B del punto 3: el panel manda la SUBCAUSA; una causa vieja o una categoría a secas
+  // piden elegirla, y una que no existe no vale.
+  for (const [causa, code] of [['CE', 'subcausa_obligatoria'], ['C3', 'subcausa_obligatoria'], ['', 'campos_faltantes'], ['C9.9', 'subcausa_invalida']]) {
+    const r = await crida({ ...datos, kg: 50, causa })
+    expect(r.status(), causa).toBe(400)
+    expect((await r.json()).code, causa).toBe(code)
+  }
+
   const ok = await crida({ ...datos, kg: 50 })
   expect(ok.status(), JSON.stringify(await ok.json())).toBe(200)
+  // La causa sale de la subcausa (trigger `excedentes_subcausa`) y el texto lleva las dos.
+  expect(sql(`select causa_codigo || '|' || subcausa_codigo || '|' || causa from excedentes where observacions = '${marca}'`))
+    .toBe('C3|C3.1|Preu i rendibilitat')
   const fila = sql(`select retorn_envasos || '|' || retorn_envasos_detall || '|' || retorn_envasos_quantitat || '|'
       || array_to_string(dies_recollida, ',') || '|' || gmaps_url
     from excedentes where observacions = '${marca}'`)
@@ -220,6 +234,66 @@ test('crear-oferta: kg > 0 y guarda retorno, días y Maps de la oferta', async (
   expect(text).toContain('🗓️ DIES DE RECOLLIDA: dl, dc')
   expect(text).toContain('cal retornar-los (12 · caixes verdes)')
   expect(text).toContain('https://maps.app.goo.gl/e2eFaseA')
+  expect(text).toContain('🔴 CAUSA: Preu i rendibilitat — Preu de venda insuficient')
+})
+
+// Fase B del punto 3 (fila 3.6): en el alta del panel la causa se elige por su SUBCAUSA, en un
+// solo desplegable agrupado por las 7 categorías; la causa guardada es la de la subcausa. Un
+// borrador de antes con una causa vieja (`CE`) llega vacío.
+test('el alta elige la subcausa y la causa guardada es la suya', async ({ page }) => {
+  const prod = productorDe('productor')
+  const b = sql(`select id from productor_ubicaciones where productor_id = '${prod}' and es_principal`)
+  const clau = `redestina-oferta-esborrany:${prod}`
+  const marca = `[E2E fase B ${Date.now()}]`
+  await entra(page, 'productor')
+  await page.evaluate(([k, lloc, obs]) => {
+    localStorage.setItem(k, JSON.stringify({
+      datos: {
+        familia: 'Fruita Dolça', producte: 'Poma', producte_al_camp: 'no', kg: 80, format_entrega: 'caixes',
+        retorn: 'No', ubicacio: lloc, dies_recollida: [1, 3], horari: { inici: '08:00', fi: '12:00' },
+        disponible_fins: '2027-12-31', modalitat: ['donacio'], cost_kg: 0.4, causa: 'CE', observacions: obs,
+      },
+      pas: 0, pasMaxim: 99, costTocat: true, proposats: [], canviaLloc: false, desat: Date.now(),
+    }))
+  }, [clau, b, marca])
+  await page.goto('/productor/ofertes/nova')
+  const control = page.locator('#of-causa')
+  await expect(control).toBeVisible()
+  await expect(control).toHaveAttribute('data-testid', 'of-subcausa')
+  // La causa vieja del borrador no es una subcausa: el control llega vacío.
+  await expect(control).not.toContainText(/Criteris/)
+
+  // Siete grupos (las categorías activas, en orden) y una opción por subcausa activa.
+  await control.click()
+  const llista = page.getByRole('listbox')
+  await expect(llista.getByRole('option')).toHaveCount(Number(sql('select count(*) from subcausas where activa')))
+  const grups = await llista.locator('[data-slot="select-label"]').allTextContents()
+  expect(grups).toEqual(sql('select string_agg(nombre, \'|\' order by orden) from causas where activa').split('|'))
+  await page.keyboard.press('Escape')
+  await llista.waitFor({ state: 'hidden' })
+
+  await tria(control, 'C4.2')
+  await expect(page.getByTestId('formulari-oferta'))
+    .toContainText('Qualitat i requisits comercials — Qualitat o especificacions no acceptades pel comprador')
+  await page.getByRole('button', { name: 'Publicar oferta' }).click()
+  await expect.poll(() => sql(`select count(*) from excedentes where observacions = '${marca}'`), { timeout: 15_000 }).toBe('1')
+  expect(sql(`select causa_codigo || '|' || subcausa_codigo || '|' || causa from excedentes where observacions = '${marca}'`))
+    .toBe('C4|C4.2|Qualitat i requisits comercials')
+  expect(sql(`select causa_codigo = (select causa_codigo from subcausas where codigo = 'C4.2') from excedentes where observacions = '${marca}'`))
+    .toBe('t')
+
+  // Y se cambia desde «Edita l’oferta»: otra subcausa, otra categoría (`editar_oferta()`).
+  const id = sql(`select id from excedentes where observacions = '${marca}'`)
+  await page.goto(`/productor/ofertes/${id}`)
+  await page.getByRole('button', { name: /^Edita l’oferta$|^Edita la oferta$/ }).click()
+  const dlg = page.getByRole('dialog')
+  await expect(dlg.locator('#ed-subcausa')).toContainText('Qualitat o especificacions no acceptades pel comprador')
+  await tria(dlg.locator('#ed-subcausa'), 'C7.2')
+  await expect(dlg).toContainText('Factors externs i sanitaris — Plagues o malalties')
+  await dlg.getByRole('button', { name: /^Desa els canvis$|^Guardar los cambios$/ }).click()
+  await expect(dlg).toHaveCount(0)
+  expect(sql(`select causa_codigo || '|' || subcausa_codigo || '|' || causa from excedentes where id = '${id}'`))
+    .toBe('C7|C7.2|Factors externs i sanitaris')
 })
 
 // P5 en el panel (11-11-2026): como en WhatsApp, el lugar habitual se confirma o se cambia; el

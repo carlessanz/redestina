@@ -87,7 +87,9 @@ export default function Desplegable({
         <SelectTrigger id={id} size={mida} className={cn('w-full min-w-0', className)} {...aria}>
           <SelectValue placeholder={placeholder} />
         </SelectTrigger>
-        <SelectContent position="popper" className="max-h-80">
+        {/* Nunca más ancho que la pantalla (fase B del punto 3: una subcausa mide ~90 caracteres):
+            el texto de la opción se parte en líneas en vez de sacar la lista por el lado. */}
+        <SelectContent position="popper" className="max-h-80 max-w-(--radix-select-content-available-width)">
           {buit !== undefined && <SelectItem value={BUIT} data-valor="">{buit}</SelectItem>}
           {trams.map((tram, i) => (
             <Fragment key={`${tram.grup ?? ''}-${i}`}>

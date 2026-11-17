@@ -198,6 +198,36 @@ export interface ResultadoCreacion {
   error?: string;
 }
 
+/** La causa de una oferta, resuelta contra el catálogo (fase B del punto 3). */
+export interface CausaResolta {
+  causaCodigo: string | null;
+  subcausaCodigo: string | null;
+  /** Nombre catalán de la causa (la columna `causa` y la línea CAUSA del texto). */
+  causa: string | null;
+  subcausa: string | null;
+}
+
+/**
+ * El código que llega en `causa` puede ser una SUBCAUSA (`C4.2`, el panel) o una CAUSA (`C4`,
+ * WhatsApp; o una de las de antes en una sesión de intake a medias). Se mira primero en
+ * `subcausas`; si no está, en `causas`. Un código que no está en ninguna se guarda tal cual
+ * como `causa_codigo` (como hasta hoy) y sin nombre.
+ */
+export async function resolCausa(supabase: Cliente, valor: unknown): Promise<CausaResolta> {
+  const codi = typeof valor === "string" ? valor.trim() : "";
+  if (!codi) return { causaCodigo: null, subcausaCodigo: null, causa: null, subcausa: null };
+  const { data: sub } = await supabase.from("subcausas")
+    .select("codigo, causa_codigo, nombre").eq("codigo", codi).maybeSingle();
+  const causaCodigo = (sub as { causa_codigo: string } | null)?.causa_codigo ?? codi;
+  const { data: c } = await supabase.from("causas").select("nombre").eq("codigo", causaCodigo).maybeSingle();
+  return {
+    causaCodigo,
+    subcausaCodigo: sub ? codi : null,
+    causa: (c as { nombre: string | null } | null)?.nombre ?? null,
+    subcausa: (sub as { nombre: string } | null)?.nombre ?? null,
+  };
+}
+
 /**
  * Alta de un excedente a partir de los datos del cuestionario, vengan de donde vengan:
  * del intake por WhatsApp o del formulario del panel del productor.
@@ -214,14 +244,12 @@ export async function crearExcedente(
   const producto = String(d.producte ?? "");
 
   // Datos que no se le piden al productor porque ya están en la base.
-  const [{ data: prod }, { data: ubicacion }, { data: causa }] = await Promise.all([
+  const [{ data: prod }, { data: ubicacion }, causa] = await Promise.all([
     supabase.from("productos").select("eur_kg, familia").eq("nombre", producto).maybeSingle(),
     d.ubicacio
       ? supabase.from("productor_ubicaciones").select("*").eq("id", d.ubicacio).maybeSingle()
       : Promise.resolve({ data: null }),
-    d.causa
-      ? supabase.from("causas").select("nombre").eq("codigo", d.causa).maybeSingle()
-      : Promise.resolve({ data: null }),
+    resolCausa(supabase, d.causa),
   ]);
 
   const { data: fichaProductor } = await supabase
@@ -272,7 +300,8 @@ export async function crearExcedente(
     modalitat: etiquetaModalitats(modalitats),
     // Con coma decimal, como se escribe en catalán: «0,45 €/kg» y no «0.45 €/kg».
     preu: preuMinim != null ? `${preuMinim.toFixed(2).replace(".", ",")} €/kg` : undefined,
-    causa: causa?.nombre ?? String(d.causa ?? ""),
+    causa: causa.causa ?? String(d.causa ?? ""),
+    subcausa: causa.subcausa ?? undefined,
     envasos: textoEnvasos(d.format_entrega, d.retorn, retorn.detall, retorn.quantitat) || undefined,
     transportPropi: transportPropi === true,
     // Se asigna en el panel; el productor no lo elige.
@@ -326,8 +355,11 @@ export async function crearExcedente(
       modalitats,
       preu_minim: preuMinim,
       coste_kg: costKg,
-      causa: causa?.nombre ?? null,
-      causa_codigo: d.causa ?? null,
+      // Fase B del punto 3: del panel llega una SUBCAUSA (`C4.2`) y de WhatsApp una categoría
+      // (`C4`). Con subcausa, la causa es la suya (el trigger `excedentes_subcausa` lo impone).
+      causa: causa.causa,
+      causa_codigo: causa.causaCodigo,
+      subcausa_codigo: causa.subcausaCodigo,
       // Se intenta parsear la respuesta libre ("23/07"); si no es una fecha
       // reconocible queda null y el panel la normaliza a mano.
       disponible_hasta: parseDisponibleFins(String(d.disponible_fins ?? "")),
@@ -449,11 +481,13 @@ export async function textoOfertaDeFila(
   supabase: Cliente,
   fila: Record<string, unknown>,
 ): Promise<string> {
-  const [{ data: prod }, { data: ubi }] = await Promise.all([
+  const [{ data: prod }, { data: ubi }, causa] = await Promise.all([
     supabase.from("productores").select("name, empresa, poblacion").eq("id", fila.productor_id).maybeSingle(),
     fila.ubicacion_id
       ? supabase.from("productor_ubicaciones").select("municipio, gmaps_url").eq("id", fila.ubicacion_id).maybeSingle()
       : Promise.resolve({ data: null }),
+    // Con subcausa (fase B del punto 3), «Categoria — Subcausa»; si no, la causa guardada.
+    fila.subcausa_codigo ? resolCausa(supabase, fila.subcausa_codigo) : Promise.resolve(null),
   ]);
   const modalitats = modalitatsDe(
     Array.isArray(fila.modalitats) && fila.modalitats.length > 0 ? fila.modalitats : fila.modalitat,
@@ -476,7 +510,8 @@ export async function textoOfertaDeFila(
     horari: fila.horari_recollida ? String(fila.horari_recollida) : undefined,
     modalitat: etiquetaModalitats(modalitats),
     preu: preu != null ? `${preu.toFixed(2).replace(".", ",")} €/kg` : undefined,
-    causa: String(fila.causa ?? ""),
+    causa: causa?.causa ?? String(fila.causa ?? ""),
+    subcausa: causa?.subcausa ?? undefined,
     envasos: textoEnvasos(
       fila.format_entrega, fila.retorn_envasos, fila.retorn_envasos_detall, fila.retorn_envasos_quantitat,
     ) || undefined,
@@ -508,6 +543,8 @@ export function canvisOferta(entrada: Record<string, unknown>): Record<string, u
     const v = String(entrada.disponible_hasta ?? "");
     fora.disponible_hasta = /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : null;
   }
+  // La subcausa (fase B del punto 3): un código; vacío viaja vacío y la RPC lo rechaza.
+  if ("subcausa_codigo" in entrada) fora.subcausa_codigo = String(entrada.subcausa_codigo ?? "").trim();
   for (const k of ["observacions", "variedad"]) {
     if (k in entrada) fora[k] = entrada[k] == null ? null : String(entrada[k]).trim().slice(0, 400);
   }

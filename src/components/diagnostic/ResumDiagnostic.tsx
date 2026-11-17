@@ -220,6 +220,7 @@ function ResumBlocExcedents({ bloc }: { bloc: BlocExcedentsLlegible }) {
           <p className="text-sm font-medium break-words">{c.causa}</p>
           <dl className="grid gap-x-4 gap-y-1 sm:grid-cols-2">
             {([
+              ['dexc.subcausas', c.subcausas],
               ['dexc.frequencia', c.frequencia],
               ['dexc.volum_kg', c.volum],
               ['dexc.gestio', c.gestio],

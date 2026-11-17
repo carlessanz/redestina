@@ -277,10 +277,9 @@ export interface CampoOferta {
 }
 
 /**
- * Las familias y las causas vienen de la base (`productos.familia`, `causas.nombre`) y
- * están en catalán. En el panel en castellano se ENSEÑAN traducidas; lo que se guarda sigue
- * siendo el valor catalán (la familia) o el código (la causa). Una familia o una causa nueva
- * sin traducción sale tal cual.
+ * Las familias vienen de la base (`productos.familia`) y están en catalán. En el panel en
+ * castellano se ENSEÑAN traducidas; lo que se guarda sigue siendo el valor catalán. Una familia
+ * nueva sin traducción sale tal cual. (Las causas y subcausas traen su `nombre_es` de la base.)
  * ⚠️ Los nombres de PRODUCTO no se traducen: son el nombre del catálogo, el mismo que sale
  *    en el Mercat, en los albaranes y en los certificados.
  */
@@ -299,7 +298,11 @@ export const FAMILIES_ES: Record<string, string> = {
   "Varis": "Varios",
 };
 
-/** Por código de `causas`. */
+/**
+ * Por código de `causas`: las OCHO DE ANTES, inactivas desde la fase B del punto 3
+ * (20270529100000). Ya no se sirve (`crear-oferta` lee `causas.nombre_es`); se conserva porque
+ * su test de paridad vigila el `nombre_es` sembrado en A3.
+ */
 export const CAUSES_ES: Record<string, string> = {
   CE: "Criterios estéticos",
   CL: "Clima",
@@ -545,12 +548,16 @@ export const CAMPOS: CampoOferta[] = [
     condicion: { campo: "modalitat", en: ["donacio"] },
   },
   {
+    // Fase B del punto 3 (fila 3.6, 17-11-2026): el catálogo de causas y subcausas del
+    // Diagnòstic operatiu (`_shared/causes.ts`). En el PANEL el valor es una SUBCAUSA (`C4.2`,
+    // obligatoria: `crear-oferta` responde `subcausa_obligatoria`) y la causa sale de ella; por
+    // WHATSAPP, solo la categoría (`C4`), y la subcausa la completa el equipo al editar.
     clave: "causa",
     tipo: "causa",
     etiqueta: "Quina és la causa de l'excedent?",
-    ayuda: "Per què no va pel canal habitual. Només per a estadística.",
+    ayuda: "Per què no va pel canal habitual. Tria la que s'hi acosti més.",
     etiqueta_es: "¿Cuál es la causa del excedente?",
-    ayuda_es: "Por qué no va por el canal habitual. Solo para estadística.",
+    ayuda_es: "Por qué no va por el canal habitual. Elige la que más se acerque.",
     seccion: "causa",
     obligatorio: true,
   },

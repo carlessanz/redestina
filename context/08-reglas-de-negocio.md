@@ -299,6 +299,19 @@ con la lista de la jerarquía de usos (venda alternativa · donació · transfor
 altres); no vuelve a preguntar por los destinos de interés. Las acciones (una por destino) y su estado los mantiene el
 equipo; la organización los ve, nota de seguimiento incluida.
 
+**Causas y subcausas (fase B del punto 3, 17-11-2026, `20270529100000`; fila 3.6 de la Fundació).** El catálogo
+común son **7 categorías (C1–C7) con 20 subcausas**; Excedent, Canalització y Maquila **no son causas** (con las otras
+cinco de antes, inactivas: se leen, no se eligen). Reglas:
+
+- **Una oferta tiene UNA causa principal**, la categoría de su subcausa: la causa **se deriva** de la subcausa (trigger
+  `excedentes_subcausa`), nunca se elige aparte. En el panel la subcausa es **obligatoria**; por WhatsApp se pregunta
+  solo la categoría (la lista no cabe) y el equipo completa la subcausa al editar. «Observacions» sigue libre.
+- **Un excedente del diagnóstico** (producto × causa) puede marcar **varias subcausas, opcionales**, siempre de su causa.
+  El cruce con las ofertas sigue siendo por `(productor, producto, causa)`: las subcausas no lo cambian.
+- Un excedente del diagnóstico con una causa vieja se conserva y se edita; uno nuevo solo con una causa activa.
+- 🟡 **Pendiente de la Fundació (decisión de negocio, no deuda)**: a qué causa nueva corresponden «Final de cultiu» (FC)
+  y «Gestió deficient» (GD); hasta entonces, inactivas, y lo guardado con ellas no se migra.
+
 ### P8: qué puede recibir una empresa (Plan 2, A5, 10-11-2026; confirmada por la Fundació el mismo día)
 
 **La Fundació la confirmó el 10-11-2026**: «una empresa no recibe donaciones; las donaciones son para las entidades

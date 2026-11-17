@@ -98,6 +98,8 @@ src/
     filtresMercat.ts           PURO: `categoriaDeFamilia` (el vocabulario de `perfil_receptor`); el Mercat
                                filtra con `BarraFiltres` desde el 16-11-2026
     territori.ts               PURO: provincia por prefijo INE o por comarca (D3: el receptor no ve el municipio)
+    causes.ts                  Causas y subcausas (fase B del punto 3): reexporta `_shared/causes.ts`; opciones agrupadas
+                               del `Desplegable`, «Categoria — Subcausa» y `carregaCatalegCauses()` (nunca lanza)
     mensajes.ts                countUnanswered(): mensajes «sin contestar» por teléfono (§5)
     metaTest.ts                Lista de números de prueba de Meta (whitelist de envío, §9)
     emailTest.ts               Lista de correos de prueba (whitelist del canal email)
@@ -420,6 +422,8 @@ supabase/
     _shared/operativaLlegible.ts  Módulo HOJA (A2): la Operativa en lectura (`filesOperativa`) + sus etiquetas
                                ca/es (`ETIQUETES_OPERATIVA`, paridad con i18n.tsx en
                                `tests/operativaLlegible.test.ts`); `src/lib/operativaLlegible.ts` lo reexporta
+    _shared/causes.ts          Módulo HOJA (fase B del punto 3): agrupar causas/subcausas, validar la subcausa del panel,
+                               las 7 filas de WhatsApp (`CAUSES_WHATSAPP`, ≤24/≤72) y `textCausa` (`tests/causes.test.ts`)
     _shared/excedentsLlegible.ts  Módulo HOJA (A3): excedentes del diagnóstico en lectura (`filesCausa`,
                                `filesAccions`, `titolBloc`, listas cerradas = CHECK) + `ETIQUETES_EXCEDENTS` ca/es
                                (paridad en `tests/excedentsLlegible.test.ts`); lo usan `render/diagnostic.ts`,

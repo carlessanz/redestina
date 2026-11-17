@@ -1800,6 +1800,35 @@ cambios de GRANT (la tabla ya da SELECT/UPDATE a `authenticated`, sin INSERT: es
 `textoOfertaDeFila` y `crearExcedente` los leen y escriben; ningún trigger los toca. Detalle del formulario en
 `context/06ter` y de los pasos en `context/06bis`.
 
+### Causas y subcausas (17-11-2026, `20270529100000`)
+
+Fase B del punto 3 (fila 3.6): el mismo catálogo para la oferta y el Diagnòstic operatiu.
+
+- **`causas`** gana `activa boolean not null default true` y `orden smallint`. Siembra (upsert) **C1–C7** con orden 1–7:
+  Oferta i planificació · Demanda i comercialització · Preu i rendibilitat · Qualitat i requisits comercials ·
+  Capacitat operativa · Logística i conservació · Factors externs i sanitaris (y su `nombre_es`). Las 8 de antes (CE,
+  CL, CN, EX, FC, GD, MQ, PR) quedan `activa = false`, `orden = null`; **no se borran** (las citan ofertas, diagnósticos,
+  albaranes y snapshots de documentos).
+- **`subcausas`** (`codigo` pk `C<n>.<m>`, `causa_codigo` → `causas`, `nombre`, `nombre_es`, `orden`, `activa`; check
+  `codigo like causa_codigo || '.%'` y nombres no vacíos): 20 filas sembradas. RLS activada, política `"subcausas:
+  lectura"` (`using (true)`), **solo SELECT para `authenticated`** (sin escritura; `anon` nada).
+- **`excedentes.subcausa_codigo`** (fk a `subcausas`, índice parcial). Trigger **`excedentes_subcausa`** (`before insert
+  or update of subcausa_codigo, causa_codigo`; función `trg_excedentes_subcausa()`, sin EXECUTE para nadie): con
+  subcausa, **deriva `causa_codigo` (su categoría) y `causa` (el nombre en catalán)**; rechaza con `22023`
+  `subcausa_invalida` (no existe), `subcausa_inactiva` (solo al elegirla) o `subcausa_incoherent` (una `causa_codigo`
+  explícita distinta). En un UPDATE que no toca ninguna de las dos, no hace nada. Sin subcausa (WhatsApp, ofertas de
+  antes), la causa queda como venga.
+- **`editar_oferta()`** (misma firma, solo `service_role`): admite `subcausa_codigo` en `p_canvis` (activa y existente,
+  si no `22023 subcausa_invalida: …`); la causa la cambia el trigger.
+- **`diagnostic_excedents.subcausas text[] not null default '{}'`**: varias subcausas de la causa del excedente,
+  opcionales. `desar_excedents_diagnostic()` (cuerpo completo recreado) las valida —`subcausa_desconeguda`,
+  `subcausa_incoherent: <causa>:<sub>`, `subcausa_inactiva` salvo que ya estuviera guardada— y las guarda en el orden
+  del catálogo; además rechaza `causa_inactiva` al **crear** un excedente con una causa vieja (uno guardado se
+  conserva). `diagnostic_excedents_json()` añade `subcausas: [{codi, nom: {ca, es}}]` en orden (lo leen el PDF del
+  diagnóstico y el expediente: «Subcausa: …» en la celda de la causa, `celaCausa` de `_shared/excedentsLlegible.ts`).
+- Comprobado en el clon: `auditoria_funcions_obertes()` = 0; el arnés suma 4 checks por cuenta (`causas` leer;
+  `subcausas` leer, insertar y actualizar denegados).
+
 ### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 **Operativa (A4,

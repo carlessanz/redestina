@@ -300,6 +300,8 @@ export interface Excedente {
   modalitat: Modalitat | null
   causa: string | null
   causa_codigo: string | null
+  /** Fase B del punto 3 (20270529100000): la subcausa; nula en lo antiguo y en lo de WhatsApp. */
+  subcausa_codigo?: string | null
   disponible_desde: string | null
   disponible_hasta: string | null
   horari_recollida: string | null
@@ -1405,6 +1407,10 @@ export interface CausaCataleg {
   nombre: string
   /** Desde A3; si falta, se cae al catalán. */
   nombre_es: string | null
+  /** Fase B del punto 3 (20270529100000): false = una causa de antes (se lee, no se elige). */
+  activa?: boolean
+  /** Fase B del punto 3: sus subcausas, en orden (con `activa`). */
+  subcausas?: { codigo: string; nombre: string; nombre_es: string | null; activa?: boolean }[]
 }
 
 /** Una acción en el payload de `desar_excedents_diagnostic()`: una por destino marcado. */
@@ -1416,6 +1422,8 @@ export interface PayloadAccioDiagnostic {
 /** Una causa en el payload de `desar_excedents_diagnostic()`. */
 export interface PayloadCausaDiagnostic {
   causa: string
+  /** Fase B del punto 3: subcausas de esta causa (varias, opcionales). */
+  subcausas: string[]
   frequencia: string | null
   volum_kg: number | null
   gestio_actual: string[]

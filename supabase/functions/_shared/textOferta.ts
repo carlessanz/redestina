@@ -5,6 +5,8 @@
 // los módulos hoja; lo vigila `tests/puresa.test.ts`). `oferta.ts` lo reexporta, así que
 // nadie que ya lo usaba cambia su import.
 
+import { textCausa } from "./causes.ts";
+
 /**
  * Texto que se publica en el grupo de canalizaciones.
  * Reproduce el formato que el equipo usa hoy a mano, emojis incluidos.
@@ -26,6 +28,8 @@ export function componerTextoOferta(campos: {
   modalitat: string;
   preu?: string;
   causa: string;
+  /** La subcausa (fase B del punto 3): con ella, «CAUSA: Categoria — Subcausa». */
+  subcausa?: string;
   /** Formato de entrega y retorno, ya compuestos (`textoEnvasos`). Sin nada, no se imprime. */
   envasos?: string;
   /** Solo cuando el productor lo lleva: el silencio significa «cal venir a buscar-lo». */
@@ -74,7 +78,7 @@ export function componerTextoOferta(campos: {
   lineas.push(`💰 MODALITAT: ${campos.modalitat}`);
   // Preu mínim solo en venda/maquila (el productor lo fija en l'intake).
   if (campos.preu) lineas.push(`💶 PREU MÍNIM: ${campos.preu}`);
-  lineas.push(`🔴 CAUSA: ${campos.causa}`);
+  lineas.push(`🔴 CAUSA: ${textCausa(campos.causa, campos.subcausa)}`);
   if (campos.envasos) lineas.push(`♻️ ENVASOS: ${campos.envasos}`);
   // Misma asimetría que `producte_al_camp`: solo se dice cuando cambia lo que hay que hacer.
   if (campos.transportPropi) lineas.push("🚚 TRANSPORT: el porta la productora");

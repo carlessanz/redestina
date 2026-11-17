@@ -2394,6 +2394,32 @@ subcausas, borradores en servidor, edición tras publicar ni precios por mes (ot
   `intake.ts`/`oferta.ts`/`camposOferta.ts`/`predeterminatsOferta.ts`) **y `priorizar-entidades`** (importa
   `modalitats.ts`). Sin redesplegar, el panel nuevo llama a un `crear-oferta` viejo que ignora los campos nuevos.
 
+### Fase B del punto 3: causas y subcausas en el panel (17-11-2026, `20270529100000`)
+
+Fila 3.6. Modelo y reglas en `context/04` y `context/08`; WhatsApp y `crear-oferta` en `context/06bis`.
+
+- **`lib/causes.ts`** (reexporta `_shared/causes.ts`, §7): `opcionsSubcausa(cataleg, lang, actual?)` da las opciones
+  del `Desplegable` con `grup` = nombre de la categoría (solo activas, más la guardada si ya no lo está);
+  `textSubcausa` («Categoria — Subcausa»), `esSubcausaTriable`, `carregaCatalegCauses()` (catálogo ENTERO, también
+  inactivas, para nombrar lo guardado; nunca lanza), `catalegDelDescriptor`, `teSubcauses`.
+- **Alta** (`FormulariNovaOferta`, campo `causa`): un solo `Desplegable` (`#of-causa`, `data-testid="of-subcausa"`,
+  placeholder `po.subcausa_ph`) con las 7 categorías como grupos y sus subcausas como opciones; debajo, la pareja entera
+  (a 375 px el control la recorta). Se guarda la SUBCAUSA en `datos.causa`. Un borrador de antes con una causa vieja
+  (`CE`) o una categoría llega vacío. Con un servidor anterior (sin subcausas) cae a la lista plana de causas.
+- **`Desplegable`**: la lista ya no es más ancha que la pantalla (`max-w-(--radix-select-content-available-width)`,
+  `max-h-80`): una subcausa mide ~90 caracteres y se parte en líneas.
+- **«Edita l’oferta»** (`DialegEditaOferta`, productor y equipo): selector `#ed-subcausa` con el mismo catálogo; sin
+  subcausa (oferta de WhatsApp o de antes) avisa `edit.sense_subcausa` con la causa actual. Manda `subcausa_codigo`
+  solo si cambia y no está vacía; `editar_oferta()` la valida (`subcausa_invalida` → `edit.err_subcausa_invalida`) y
+  el trigger cambia la causa. No revalida (D4 solo mira kilos y modalidades).
+- **Diagnòstic operatiu**: los chips de causa enseñan las activas y, además, las inactivas ya guardadas; cada causa
+  marcada abre «Quines subcauses?» (`dexc.pregunta_subcausas`, `XipsTria`, varias, opcionales,
+  `data-testid="subcauses-<causa>"`), que se guardan en el orden del catálogo (`posaSubcausas`,
+  `lib/excedentsDiagnostic.ts`). El resumen y los PDF (diagnóstico, expediente) las enseñan («Subcausa: …», `celaCausa`).
+- E2E: `operativa.e2e.ts` (alta con subcausa → causa = la de la subcausa, grupos y opciones, «Edita l’oferta» cambia de
+  categoría; `crear-oferta` por API con `subcausa_obligatoria`/`subcausa_invalida`), `diagnostic.e2e.ts` (causas
+  activas, subcausas guardadas y en el resumen del productor).
+
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y

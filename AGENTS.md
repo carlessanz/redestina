@@ -163,14 +163,14 @@ por RPC; lectura `es_intern()` (externo: 0 filas); la vista suma el último cont
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
+`disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg`
 congelado al conciliar, `data_hora_recollida`, columnas de la recogida protegidas por trigger);
 `excedente_destins` + catálogo `destins_finals`; `excedentes_canvis`; `avisos` (lo que se le
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
-**Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas`,
+**Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas` (C1–C7; las 8 de antes, inactivas) + `subcausas` (`C<n>.<m>`),
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
 `tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
 `modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**), `convenis_equivalents`.
@@ -227,12 +227,10 @@ el equipo por RPC (D5). Un principal que deja de serlo **conserva** su bloque, q
 D4): quedan los emitidos; el plan es el **expediente** (`expedients_prevencion` + `diagnostic_id`). Impacto:
 `impacte_*` sobre kilos conciliados.
 
-**Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`):
-rechaza con `22023 bloqueig_esborrat: <codis>` si hay **ofertas** (`ofertes`·`ofertes_rebudes`),
-documentos, albaranes, cierres o **expedientes de prevención con número** (`expedients`; deuda 140); si no,
-arrastra lo operativo (y los expedientes sin número, el archivo y sus enlaces), borra la ficha, retira la
-organización vacía y purga la whitelist; los ficheros van a `fitxers_orfes`, que vacía `recordatorios-documentales`. FK `NO ACTION` = última red; nunca un `.delete()` suelto
-(§7). La ficha pregunta antes: con bloqueo propone **desactivar**; si no, pide escribir «esborrar».
+**Borrado de una ficha: una sola puerta, `borrar_ficha_completa()`** (`es_super_admin()`; detalle en `context/04`):
+`22023 bloqueig_esborrat: <codis>` si hay ofertas, documentos, albaranes, cierres o expedientes con número; si no,
+arrastra lo operativo y retira la organización vacía (ficheros a `fitxers_orfes`). Nunca un `.delete()` suelto (§7);
+con bloqueo, la ficha propone **desactivar**.
 
 🔴 **Una cuenta del equipo no tiene organizaciones** ni ofertas; **su autoría no es fiscal**. Desactivarla o borrarla **traspasa sus acciones** a otra activa (rastro por fila); borrar a quien ha hecho algo **exige destino** (`cal_desti`).
 
@@ -327,7 +325,7 @@ en la whitelist de correo.
 familia → producte → varietat → producte_al_camp → kg (>0) → format_entrega → caixes → retorn → retorn_envasos →
 retorn_quantitat (con «Sí») → transport (**`oculto`**) → ubicacio (siempre) → disponible_fins → dies_recollida
 (**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
-cost») → causa → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
+cost») → causa (WhatsApp: la categoría; panel: la subcausa, obligatoria) → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
 `Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; igual en el panel);
 convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
@@ -357,13 +355,12 @@ Lo que manda hoy, en una línea cada uno:
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa».
 - **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
   `DialegCertificatDonacio`, `DialegSignaDocument`/`AccionsSignatura` (**`accionsSignatura()` decide el botón**), `SeccioEquip`.
-- **Importa des d'Excel** (`ImportaEntitats`, §6): Fitxer → Revisió → Resultat. **Convenio único de col·laboració** por
-  papel. Filtros comunes (`lib/filtres.ts`; provincia, `lib/territori.ts`; ranking por modalidad y kg). **Diagnòstic operatiu**: lo contesta el equipo en
-  `/equip/diagnostics/productor/:id` (Operativa · Excedents · Accions; «Falten dades» enlaza cada falta); ficha y «El meu diagnòstic» lo leen y bajan en PDF
-  (`diagnostic-pdf`, D2); Pla de Prevenció = **expediente** (detalle en `context/06ter`).
-- **Alta de oferta por bloques** (17-11-2026): `FormulariNovaOferta` sin «Continuar»; cada bloque se abre al completar el
-  anterior y «Publicar» marca todo; `CercadorOpcions` (producto, entidad del asistido, municipio) y `TriaSiNo`; el lugar
-  enseña municipio y Maps (o pide uno para la oferta), días y franja suyos (`recalculaDelLloc`); disponible = hoy + 2.
+- **Importa des d'Excel** (`ImportaEntitats`, §6). **Convenio único de col·laboració** por papel. Filtros comunes
+  (`lib/filtres.ts`, `lib/territori.ts`). **Diagnòstic operatiu**: lo contesta el equipo en `/equip/diagnostics/productor/:id`
+  (Operativa · Excedents · Accions); ficha y «El meu diagnòstic» lo leen y bajan en PDF (`diagnostic-pdf`); Pla = **expediente**.
+- **Alta de oferta por bloques** (17-11-2026): `FormulariNovaOferta`, cada bloque se abre al completar el anterior;
+  `CercadorOpcions`, `TriaSiNo`; el lugar trae municipio, Maps, días y franja; disponible = hoy + 2; **causa por su
+  subcausa** en un `Desplegable` agrupado (`lib/causes.ts`; también en «Edita l’oferta» y, varias, en el Diagnòstic).
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
@@ -416,7 +413,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270528100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270529100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -453,7 +450,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
   y maquila**, nunca donación (Mercat, `comprova_interes()` y ranking de `priorizar-entidades`); una entidad social, las
   tres; sugerida o sin ella, **como antes**. `animal` admite donación y compra (178).
 - **Diagnóstico = vocabulario de la oferta** (A3): causa = `causas.codigo`, destino = modalidad; cruza por
-  `(productor, producto, causa)`.
+  `(productor, producto, causa)`. **Causas (fase B)**: 7 categorías; la oferta, UNA subcausa (la causa sale de ella);
+  el diagnóstico, varias por causa, opcionales. EX, CN y MQ no son causas.
 - Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
   convenio, al final; `estat` solo excluye «No procedeix». Valor = kg × coste
   por kilo de la canalización (nunca `productos.eur_kg` para lo fiscal).
@@ -547,7 +545,7 @@ git config core.hooksPath .githooks            # una vez por clon
 - **Publicar**: skill `/publicar`, orden **base → Edge Functions → frontend** (`git push` el último).
   Tras redesplegar `generar-documento`, `emitir_documento_prova()`. `diagnostic-pdf` comparte activos con
   `generar-documento` (P4: regenerarlos obliga a redesplegar las dos). Tocar `_shared/` obliga a
-  redesplegar todas las que lo importan. Logs remotos por el Management API de analítica.
+  redesplegar todas las que lo importan (fase B: `diagnostic-pdf` y `generar-documento` juntas, y tres más: `context/11`). Logs remotos por el Management API de analítica.
 - Fixtures (orden, en el detalle) y emergencias: `scripts/roles-activos.ts off`; apagar `whatsapp_activo`.
 
 ## 12. Checkpoints y deuda técnica (cuerpo completo en `context/12-…md`)
@@ -556,7 +554,7 @@ git config core.hooksPath .githooks            # una vez por clon
 `PLANTILLES_CA_APROVADES`, `PLANTILLA_OFERTA_APROVADA`); 3 opt-in real; 4 formato legal del albarán;
 5 reexportar `prod_actius.csv`; 6 Meta a producción; 7 apagar `VITE_ACCESSOS_TEST`; 8-9 validación de
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
-(Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones.
+(Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
 **Deuda abierta (77 vivas; la siguiente entrada nueva es la 181; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
@@ -582,10 +580,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 1.983 pruebas de Vitest en 91 ficheros (1 saltada a propósito) + 52 de Deno.**
+   **Referencia: 2.005 pruebas de Vitest en 92 ficheros (1 saltada a propósito) + 52 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.497/2.497 y 43 sin datos; producción 2.507/2.507 y 33 «Sin
+   **Referencia: clon 2.533/2.533 y 43 sin datos; producción 2.507/2.507 y 33 «Sin
    fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

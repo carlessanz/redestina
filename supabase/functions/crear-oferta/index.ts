@@ -19,7 +19,8 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { canvisOferta, crearExcedente, modalitatsAmbConveni, textoOfertaDeFila } from "../_shared/oferta.ts";
 import { modalitatsDe } from "../_shared/modalitats.ts";
-import { CAMPOS, CAUSES_ES, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
+import { CAMPOS, FAMILIES_ES, SECCIONES, faltantes } from "../_shared/camposOferta.ts";
+import { agrupaCauses, motiuSubcausa, type FilaCausa, type FilaSubcausa } from "../_shared/causes.ts";
 import { contextoUsuario } from "../_shared/autorizacion.ts";
 import { confirmarOfertaPerCorreu } from "../_shared/correu-oferta.ts";
 import { corsPara } from "../_shared/cors.ts";
@@ -63,9 +64,11 @@ Deno.serve(async (req) => {
     // A4 (20270521100000): cada lugar trae si es el principal, sus días y franjas y el horario
     // en texto; el principal va primero. Y la ficha, sus envases habituales: con eso se
     // calcula lo que se propone en la oferta nueva (`predeterminats`).
-    const [productos, causas, ubicaciones, costos, fitxa] = await Promise.all([
+    const [productos, causas, subcausas, ubicaciones, costos, fitxa] = await Promise.all([
       supabase.from("productos").select("nombre, familia, foto_mini").order("nombre"),
-      supabase.from("causas").select("codigo, nombre").order("nombre"),
+      // Fase B del punto 3: las causas ACTIVAS por orden, cada una con sus subcausas activas.
+      supabase.from("causas").select("codigo, nombre, nombre_es, activa, orden"),
+      supabase.from("subcausas").select("codigo, causa_codigo, nombre, nombre_es, orden, activa"),
       propi
         ? supabase.from("productor_ubicaciones")
           // `gmaps_url` (17-11-2026): el formulario enseña el enlace del lugar elegido.
@@ -119,10 +122,16 @@ Deno.serve(async (req) => {
         familias,
         productos: ((productos.data ?? []) as { nombre: string; familia: string | null; foto_mini: string | null }[])
           .map((p) => veuCost ? { ...p, cost_referencia: referencia.get(p.nombre) ?? null } : p),
-        // `nombre_es` y `familias_es`: solo para enseñarlas en castellano; el valor que se
-        // guarda no cambia (camposOferta.ts, FAMILIES_ES / CAUSES_ES).
-        causas: ((causas.data ?? []) as { codigo: string; nombre: string | null }[])
-          .map((c) => ({ ...c, nombre_es: CAUSES_ES[c.codigo] ?? null })),
+        // `familias_es`: solo para enseñarlas en castellano; el valor que se guarda no cambia.
+        // Las causas (fase B del punto 3, 20270529100000): `[{codigo, nombre, nombre_es,
+        // subcausas: [{codigo, nombre, nombre_es}]}]`, solo activas y en orden. El panel elige
+        // la SUBCAUSA y manda su código en `causa`. ⚠️ Un panel anterior pinta `codigo/nombre`
+        // de cada causa (las 7 categorías) y manda una categoría: `subcausa_obligatoria` (400)
+        // hasta que se publique el frontend.
+        causas: agrupaCauses(
+          (causas.data ?? []) as FilaCausa[],
+          (subcausas.data ?? []) as FilaSubcausa[],
+        ),
         familias_es: FAMILIES_ES,
         ubicaciones: llocs,
       },
@@ -203,6 +212,22 @@ Deno.serve(async (req) => {
     }
     if (!mapsValid(d.gmaps_url)) {
       return responder({ error: "L'enllaç de Maps no és vàlid", code: "maps_invalid" }, 400);
+    }
+
+    // Fase B del punto 3 (fila 3.6): en el panel se elige una SUBCAUSA activa; la causa sale de
+    // ella. Una categoría a secas (o una causa de las de antes) = falta la subcausa. El intake
+    // de WhatsApp no pasa por aquí: allí basta la categoría y la completa el equipo.
+    {
+      const codi = String(d.causa ?? "").trim();
+      const [{ data: sub }, { data: causa }] = await Promise.all([
+        supabase.from("subcausas").select("activa").eq("codigo", codi).maybeSingle(),
+        supabase.from("causas").select("codigo").eq("codigo", codi).maybeSingle(),
+      ]);
+      const motiu = motiuSubcausa(codi, sub as { activa: boolean | null } | null, Boolean(causa));
+      if (motiu === "subcausa_obligatoria") {
+        return responder({ error: "po.err_subcausa_obligatoria", code: motiu, faltan: ["causa"] }, 400);
+      }
+      if (motiu) return responder({ error: "po.err_subcausa_invalida", code: motiu }, 400);
     }
 
     // La ubicación tiene que ser de ESTE productor. La función corre con `service_role`, así

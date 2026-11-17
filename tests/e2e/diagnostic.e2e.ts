@@ -19,6 +19,8 @@ let foto: string | null = null
 /** El producto y la causa de una oferta real del productor (el cruce con las ofertas). */
 let oferta: { producte: string; causa: string; nomCausa: string } | null = null
 let segon = ''
+/** El nombre de una subcausa marcada en la causa de la oferta (fase B del punto 3). */
+let subcausa = ''
 
 test.beforeEach(({}, info) => {
   const m = motiuSaltClon('superadmin', 'productor', RECEPTOR, 'receptor-social')
@@ -35,24 +37,34 @@ test.afterAll(() => {
 test('el equipo registra excedentes por producto y causa, con una acción por destino', async ({ page }) => {
   const prod = productorDe('productor')
   foto = fotoOperativa(prod)
-  // Una oferta del productor con causa: su producto será el primer principal (el cruce, D7).
+  // Una oferta del productor con una causa ACTIVA (C1…C7, fase B del punto 3): su producto será
+  // el primer principal (el cruce, D7). Las causas de antes (EX, CE…) ya no se pueden elegir en
+  // un excedente nuevo (`causa_inactiva`).
   let fila = sql(`select e.producto || '|' || e.causa_codigo from excedentes e
                    join productos p on p.nombre = e.producto
-                  where e.productor_id = '${prod}' and e.causa_codigo is not null
+                   join causas c on c.codigo = e.causa_codigo and c.activa
+                  where e.productor_id = '${prod}'
                   order by (e.producto = 'Tomàquet') desc, e.producto, e.causa_codigo limit 1`)
   if (!fila) {
-    // Sin ninguna, se le pone causa a la primera oferta suya de un producto del catálogo.
-    sql(`update excedentes set causa_codigo = 'EX' where id = (
+    // Sin ninguna, se le pone una SUBCAUSA a la primera oferta suya de un producto del catálogo:
+    // el trigger `excedentes_subcausa` le deriva la causa (C4).
+    sql(`update excedentes set subcausa_codigo = 'C4.1' where id = (
            select e.id from excedentes e join productos p on p.nombre = e.producto
             where e.productor_id = '${prod}' order by e.created_at limit 1)`)
     fila = sql(`select e.producto || '|' || e.causa_codigo from excedentes e
-                 where e.productor_id = '${prod}' and e.causa_codigo is not null limit 1`)
+                 where e.productor_id = '${prod}' and e.subcausa_codigo = 'C4.1' limit 1`)
   }
   const [producte, causa] = fila.split('|')
   oferta = { producte, causa, nomCausa: sql(`select nombre from causas where codigo = '${causa}'`) }
   segon = producte === 'Carbassó' ? 'Tomàquet' : 'Carbassó'
-  // La otra causa: la primera del catálogo que no sea la de la oferta.
-  const altra = sql(`select codigo || '|' || nombre from causas where codigo <> '${causa}' order by codigo limit 1`).split('|')
+  // La otra causa: la primera ACTIVA del catálogo que no sea la de la oferta.
+  const altra = sql(`select codigo || '|' || nombre from causas where activa and codigo <> '${causa}' order by orden limit 1`).split('|')
+  // Las dos primeras subcausas de la causa de la oferta (se marcan en orden inverso: se guardan
+  // en el orden del catálogo).
+  const subs = sql(`select string_agg(codigo || '|' || nombre, ';' order by orden) from (
+                      select * from subcausas where causa_codigo = '${causa}' and activa order by orden limit 2) s`)
+    .split(';').map((x) => x.split('|'))
+  subcausa = subs[0][1]
 
   // Dos habituales y dos principales; sin bloques de excedentes.
   sql(`update productores set productos_habituales = array['${producte}', '${segon}'],
@@ -87,6 +99,11 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
     for (const d of destins) await page.locator(`[aria-labelledby="diag-exc-0-${codi}-destins-l"]`).getByRole('button', { name: d }).click()
     for (const [desti, text] of Object.entries(accions)) await page.locator(`#diag-exc-0-${codi}-accio-${desti}`).fill(text)
   }
+  // Fase B del punto 3: las subcausas de la causa (varias, opcionales); solo las de SU causa.
+  const xipsSub = b1.locator(`[aria-labelledby="diag-exc-0-${causa}-subcauses-l"]`)
+  await expect(xipsSub.getByRole('button')).toHaveCount(Number(sql(`select count(*) from subcausas where causa_codigo = '${causa}' and activa`)))
+  await xipsSub.getByRole('button', { name: subs[1][1], exact: true }).click()
+  await xipsSub.getByRole('button', { name: subs[0][1], exact: true }).click()
   await omple(causa, 'estacional', '300', [/^Donació$/, /^Residu$/], [/^Donació$/, /^Venda$/],
     { donacio: 'E2E: conveni amb un banc d’aliments', venda: 'E2E: venda de segona al mercat' })
   await omple(altra[0], 'puntual', '120', [/^Venda alternativa$/], [/^Maquila$/], { maquila: 'E2E: maquila de conserves' })
@@ -105,6 +122,10 @@ test('el equipo registra excedentes por producto y causa, con una acción por de
   expect(sql(`select string_agg(causa_codi || ':' || frequencia || ':' || volum_kg, ',' order by causa_codi)
                 from diagnostic_excedents where productor_id = '${prod}'`))
     .toBe([`${causa}:estacional:300`, `${altra[0]}:puntual:120`].sort().join(','))
+  // Las subcausas, en el orden del catálogo; la otra causa, sin ninguna.
+  expect(sql(`select causa_codi || ':' || array_to_string(subcausas, ',') from diagnostic_excedents
+                where productor_id = '${prod}' order by causa_codi = '${causa}' desc, causa_codi`).split('\n'))
+    .toEqual([`${causa}:${subs[0][0]},${subs[1][0]}`, `${altra[0]}:`])
   expect(sql(`select count(*) || ':' || bool_and(a.estat = 'pendent') from diagnostic_accions a
                 join diagnostic_excedents e on e.id = a.excedent_id where e.productor_id = '${prod}'`)).toBe('3:true')
   expect(sql(`select complet from diagnostics where productor_id = '${prod}'`)).toBe('t')
@@ -186,6 +207,7 @@ test('el productor lee su diagnóstico: causas, la acción «Feta» y ningún co
   await expect(resum).toBeVisible()
   const exc = resum.getByTestId('resum-excedents')
   await expect(exc).toContainText(oferta!.nomCausa)
+  await expect(exc).toContainText(subcausa)
   await expect(exc).toContainText(/ja no és principal/)
   await expect(exc).toContainText(segon)
   await expect(exc).toContainText(/Sense excedent/)
