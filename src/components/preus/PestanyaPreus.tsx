@@ -17,9 +17,10 @@ import { useCerca } from '../../hooks/useCerca'
 import { usePuntTall } from '../../hooks/usePuntTall'
 import { textError } from '../../lib/textError'
 import { eurKg } from '../../lib/tancament'
+import { textOrigenManual } from '../../lib/valoracio'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import {
-  MESOS, carregaCanalitzacionsMes, carregaPropostaMes, esDunAltreMes, esMesFutur, mesDeData, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu,
+  MESOS, carregaCanalitzacionsMes, carregaOrigensManuals, carregaPropostaMes, esDunAltreMes, esMesFutur, mesDeData, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu,
   fontHaCanviat, mesActual, mesAnterior, mesFontDeFila, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
   type CanalitzacionsMes, type FontPreu, type PropostaPreu,
 } from '../../lib/preus'
@@ -163,7 +164,7 @@ function FilaEdicio({ fila, columnes, ocupat, onDesa, onCancel }: PropsEdicio) {
 }
 
 export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   // `?mes=aaaa-mm` (D2): los enlaces de un certificado bloqueado traen aquí el mes que falta.
   const [params] = useSearchParams()
   const mesParam = params.get('mes')
@@ -180,6 +181,8 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   /** Las canalizaciones que esperan el precio de este mes, por producto (D2). */
   const [esperen, setEsperen] = useState<CanalitzacionsMes[]>([])
   const [files, setFiles] = useState<PropostaPreu[]>([])
+  /** El origen de los precios manuales, que no son oficiales (20270604100000). */
+  const [origens, setOrigens] = useState<Map<string, { criteri: string | null; font_origen: string | null }>>(new Map())
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [ocupat, setOcupat] = useState(false)
@@ -191,7 +194,10 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   const columnes = 3 + Number(usePuntTall('sm')) + Number(usePuntTall('md')) + Number(usePuntTall('lg')) + Number(potAprovar)
 
   const carrega = useCallback(async () => {
-    const [r, c] = await Promise.all([carregaPropostaMes(exercici, mes), carregaCanalitzacionsMes(exercici, mes)])
+    const [r, c, o] = await Promise.all([
+      carregaPropostaMes(exercici, mes), carregaCanalitzacionsMes(exercici, mes), carregaOrigensManuals(),
+    ])
+    setOrigens(o)
     // Lo que espera es un aviso: si falla, la tabla de precios sigue sirviendo.
     setEsperen(c.ok ? (c.data ?? []) : [])
     if (!r.ok) { setError(textError(t, r)); setFiles([]); return }
@@ -364,6 +370,11 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
                       <Link to={rutaProducte(p.producto)} className="font-medium text-primary hover:underline">{p.producto}</Link>
                       {p.familia && <span className="block text-xs text-muted-foreground">{p.familia}</span>}
                       {p.preu_manual && <span className="block text-xs text-muted-foreground">{t('preu.manual_product')}</span>}
+                      {(p.preu_manual || preu.font === 'manual') && (
+                        <span className="block text-xs text-aviso" data-testid="preu-origen-manual">
+                          {textOrigenManual(origens.get(p.producto), lang)}
+                        </span>
+                      )}
                       {(esperaPerProducte.get(p.producto)?.provisionals ?? 0) > 0 && (
                         <Badge className="mt-1 bg-aviso-fondo text-aviso" data-testid="preu-espera-fila">
                           {t('preu.waiting_row', { n: esperaPerProducte.get(p.producto)!.provisionals })}

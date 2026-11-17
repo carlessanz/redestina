@@ -20,6 +20,8 @@
 --   e. Idempotencia de `registrar_carrega_preus` (mismo fichero; mismo día de Mercabarna).
 --   f. Alta de producto: duplicado (23505) y familia desconocida (22023).
 --   g. Permisos: técnico (lee, no valida), cuenta externa (42501), internas sin EXECUTE.
+--   h. Origen de un precio manual (20270604100000): criterio y fuente, el historial guarda el
+--      anterior, `cal_font`/`criteri_invalid`/`sense_cost`, y solo quien puede aprobar.
 
 \set QUIET on
 \set ON_ERROR_STOP on
@@ -285,5 +287,31 @@ select pg_temp.ok(pg_temp.com(:'u_equip', $q$select fixar_font_preus('gencat', f
                   and pg_temp.com(:'u_super', $q$select fixar_font_preus('gencat', null, 'https://example.com/x.xls')::text$q$) like 'ERR 22023%url_invalida%',
                   'la URL de una fuente: solo super_admin y solo de su dominio');
 select pg_temp.ok((select count(*) = 0 from auditoria_funcions_obertes()), 'auditoria_funcions_obertes() en 0 filas');
+
+\echo '== h. Origen de un precio manual =='
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select (fixar_origen_cost_producte('TEST-PREU', 'producte_semblant', '  Préssec — Gencat, setembre 2025 ')).font_origen$q$)
+                  = 'Préssec — Gencat, setembre 2025',
+                  'producto parecido con su fuente (recortada)');
+select pg_temp.ok((select criteri = 'producte_semblant' and coste_kg = 0.5 from costes_producto where producto = 'TEST-PREU'),
+                  'el origen no toca el valor');
+-- En dos sentencias: dentro de una sola, la subconsulta puede evaluarse ANTES de la llamada.
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select (fixar_origen_cost_producte('TEST-PREU', 'fixat_equip', '')).criteri$q$) = 'fixat_equip',
+                  'fijado por el equipo sin fuente');
+select pg_temp.ok((select font_origen is null from costes_producto where producto = 'TEST-PREU'),
+                  'sin fuente queda null: «sense font disponible»');
+select pg_temp.ok((select count(*) = 1 from costes_producto_hist
+                    where producto = 'TEST-PREU' and criteri = 'producte_semblant' and font_origen like 'Préssec%'),
+                  'el historial guarda el origen anterior');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select fixar_origen_cost_producte('TEST-PREU', 'font_externa', null)::text$q$) like 'ERR 22023%cal_font%',
+                  'una fuente externa sin decir cuál: cal_font');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select fixar_origen_cost_producte('TEST-PREU', 'gencat', 'x')::text$q$) like 'ERR 22023%criteri_invalid%',
+                  'criterio fuera de la lista: criteri_invalid');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select fixar_origen_cost_producte('TEST-PREU-M', 'fixat_equip')::text$q$) like 'ERR 22023%sense_cost%',
+                  'sin coste no hay origen: sense_cost');
+select pg_temp.ok(pg_temp.com(:'u_equip', $q$select fixar_origen_cost_producte('TEST-PREU', 'fixat_equip')::text$q$) like 'ERR 42501%'
+                  and pg_temp.com(:'u_prod1', $q$select fixar_origen_cost_producte('NO-EXISTEIX', 'fixat_equip')::text$q$) like 'ERR 42501%',
+                  'el técnico y una cuenta externa no lo fijan (42501, antes que la existencia)');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$update costes_producto set criteri = 'mediana_global' where producto = 'TEST-PREU' returning 'x'$q$) like 'ERR 42501%',
+                  'nadie escribe directo en costes_producto (42501)');
 
 rollback;

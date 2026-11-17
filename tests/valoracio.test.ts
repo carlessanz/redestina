@@ -7,7 +7,10 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 
-import { costADeclarar, mateixValor, rotulReferenciaOferta, textFontValor, textMes } from '../src/lib/valoracio'
+import {
+  CRITERIS_ORIGEN, costADeclarar, esCriteriOrigen, mateixValor, rotulReferenciaOferta, textCriteriOrigen, textFontValor, textMes,
+  textOrigenManual,
+} from '../src/lib/valoracio'
 import { notaFontsCertificat } from '../supabase/functions/_shared/fontValor'
 import { mesDeParam, rutaPreusMes } from '../src/lib/preus'
 
@@ -125,12 +128,13 @@ describe('rotulReferenciaOferta (alta de oferta, 17-11-2026)', () => {
   it('validado del mismo mes o manual: solo la fuente', () => {
     expect(rotulReferenciaOferta({ font: 'gencat', mes: '2026-11-01', provisional: false }, nov).font)
       .toBe('Gencat, preus percebuts pel pagès')
+    // 20270604100000: el manual dice siempre que no es oficial (aquí, sin origen guardado).
     expect(rotulReferenciaOferta({ font: 'manual', mes: '2026-11-01', provisional: false }, nov).font)
-      .toBe('Preu fixat per la Fundació')
+      .toBe('Preu fixat per la Fundació (No oficial · origen sense documentar)')
   })
   it('provisional: la fuente con el mes del que sale', () => {
     expect(rotulReferenciaOferta({ font: 'manual', mes: '2026-10-01', provisional: true }, nov)).toEqual({
-      mes: 'novembre 2026', font: 'Preu fixat per la Fundació, octubre 2026',
+      mes: 'novembre 2026', font: 'Preu fixat per la Fundació (No oficial · origen sense documentar), octubre 2026',
     })
   })
   it('sin fuente (servidor anterior): font null', () => {
@@ -144,5 +148,57 @@ describe('rotulReferenciaOferta: solo Mercabarna, el precio del día (2027060310
       { exercici: 2026, mes: 11 })).toEqual({ mes: 'novembre 2026', font: 'Mercabarna, preu del 16/11/2026' })
     expect(rotulReferenciaOferta({ font: 'mercabarna', mes: '2026-11-01', provisional: true, dia: '2026-11-16' },
       { exercici: 2026, mes: 11 }, 'es').font).toBe('Mercabarna, precio del 16/11/2026')
+  })
+})
+
+describe('el origen de un precio manual: siempre «No oficial» (20270604100000)', () => {
+  it('con criterio y fuente: el criterio y de dónde sale', () => {
+    expect(textOrigenManual({ criteri: 'producte_semblant', font_origen: 'Préssec — Gencat, setembre 2026' }))
+      .toBe("No oficial · preu oficial d'un producte semblant: Préssec — Gencat, setembre 2026")
+    expect(textOrigenManual({ criteri: 'producte_semblant', font_origen: 'Melocotón — Gencat' }, 'es'))
+      .toBe('No oficial · precio oficial de un producto parecido: Melocotón — Gencat')
+  })
+  it('sin fuente: lo dice («sense font disponible»)', () => {
+    expect(textOrigenManual({ criteri: 'fixat_equip', font_origen: null }))
+      .toBe("No oficial · fixat per l'equip · sense font disponible")
+    expect(textOrigenManual({ criteri: 'fixat_equip', font_origen: '   ' }, 'es'))
+      .toBe('No oficial · fijado por el equipo · sin fuente disponible')
+  })
+  it('sin criterio (un manual de antes): origen sin documentar, pero «No oficial» igual', () => {
+    expect(textOrigenManual(null)).toBe('No oficial · origen sense documentar')
+    expect(textOrigenManual({ criteri: 'inventat', font_origen: null }, 'es')).toBe('No oficial · origen sin documentar')
+    expect(textOrigenManual({ criteri: null, font_origen: 'IDESCAT' })).toBe('No oficial · IDESCAT')
+  })
+  it('los cinco criterios, los mismos que el check de la base, con texto en las dos lenguas', () => {
+    expect([...CRITERIS_ORIGEN]).toEqual(['producte_semblant', 'mediana_familia', 'mediana_global', 'font_externa', 'fixat_equip'])
+    for (const c of CRITERIS_ORIGEN) {
+      expect(esCriteriOrigen(c)).toBe(true)
+      expect(textCriteriOrigen(c, 'ca')).not.toBe('')
+      expect(textCriteriOrigen(c, 'es')).not.toBe('')
+    }
+    expect(esCriteriOrigen('manual')).toBe(false)
+  })
+  it('paridad con la migración: el check y la RPC aceptan exactamente estos criterios', async () => {
+    const { readFileSync } = await import('node:fs')
+    const sql = readFileSync('supabase/migrations/20270604100000_origen_preu_manual.sql', 'utf8')
+    for (const c of CRITERIS_ORIGEN) expect(sql.match(new RegExp(`'${c}'`, 'g'))?.length ?? 0).toBeGreaterThanOrEqual(2)
+  })
+})
+
+describe('rotulReferenciaOferta: un precio manual dice que no es oficial (20270604100000)', () => {
+  const avui = { exercici: 2026, mes: 11 }
+  it('con origen', () => {
+    expect(rotulReferenciaOferta({
+      font: 'manual', mes: '2026-11-01', provisional: false,
+      origen: { criteri: 'mediana_familia', font_origen: "Mediana d'11 productes d'Horta Tub/Bul/Arr" },
+    }, avui).font).toBe("Preu fixat per la Fundació (No oficial · mediana dels preus de la seva família: Mediana d'11 productes d'Horta Tub/Bul/Arr)")
+  })
+  it('sin origen (servidor anterior): «No oficial» igual', () => {
+    expect(rotulReferenciaOferta({ font: 'manual', mes: '2026-11-01', provisional: false }, avui, 'es').font)
+      .toBe('Precio fijado por la Fundació (No oficial · origen sin documentar)')
+  })
+  it('Gencat no cambia', () => {
+    expect(rotulReferenciaOferta({ font: 'gencat', mes: '2026-11-01', provisional: false }, avui).font)
+      .toBe('Gencat, preus percebuts pel pagès')
   })
 })

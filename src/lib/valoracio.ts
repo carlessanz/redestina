@@ -21,6 +21,71 @@ export interface ReferenciaOferta {
   provisional: boolean | null | undefined
   /** Solo Mercabarna sin el mes validado: el día del precio (`aaaa-mm-dd`). */
   dia?: string | null
+  /** Solo con `font = 'manual'` (20270604100000): cómo se decidió y de qué fuente sale. */
+  origen?: OrigenManual | null
+}
+
+/**
+ * Cómo se decidió un precio MANUAL, que no sale de una fuente oficial (20270604100000,
+ * `costes_producto.criteri`). El orden es el del selector.
+ */
+export const CRITERIS_ORIGEN = [
+  'producte_semblant', 'mediana_familia', 'mediana_global', 'font_externa', 'fixat_equip',
+] as const
+export type CriteriOrigen = typeof CRITERIS_ORIGEN[number]
+
+const TXT_ORIGEN: Record<IdiomaFont, Record<CriteriOrigen | 'no_oficial' | 'sense_font' | 'sense_criteri', string>> = {
+  ca: {
+    no_oficial: 'No oficial',
+    producte_semblant: "preu oficial d'un producte semblant",
+    mediana_familia: 'mediana dels preus de la seva família',
+    mediana_global: 'mediana de tots els preus de referència',
+    font_externa: 'font externa no oficial',
+    fixat_equip: "fixat per l'equip",
+    sense_font: 'sense font disponible',
+    sense_criteri: 'origen sense documentar',
+  },
+  es: {
+    no_oficial: 'No oficial',
+    producte_semblant: 'precio oficial de un producto parecido',
+    mediana_familia: 'mediana de los precios de su familia',
+    mediana_global: 'mediana de todos los precios de referencia',
+    font_externa: 'fuente externa no oficial',
+    fixat_equip: 'fijado por el equipo',
+    sense_font: 'sin fuente disponible',
+    sense_criteri: 'origen sin documentar',
+  },
+}
+
+export function esCriteriOrigen(v: unknown): v is CriteriOrigen {
+  return typeof v === 'string' && (CRITERIS_ORIGEN as readonly string[]).includes(v)
+}
+
+/** El nombre de un criterio, para el selector y los rótulos. */
+export function textCriteriOrigen(criteri: CriteriOrigen, idioma: IdiomaFont = 'ca'): string {
+  return TXT_ORIGEN[idioma][criteri]
+}
+
+/** El origen de un precio manual, tal como lo guarda `costes_producto`. */
+export interface OrigenManual {
+  criteri: string | null | undefined
+  font_origen: string | null | undefined
+}
+
+/**
+ * El origen de un precio manual en una línea, siempre con «No oficial» delante:
+ *   «No oficial · preu oficial d'un producte semblant: Préssec — Gencat, setembre 2026»
+ *   «No oficial · fixat per l'equip · sense font disponible»
+ * Sin criterio (un precio manual de antes de 20270604100000): «No oficial · origen sense documentar».
+ */
+export function textOrigenManual(o: OrigenManual | null | undefined, idioma: IdiomaFont = 'ca'): string {
+  const T = TXT_ORIGEN[idioma]
+  const font = typeof o?.font_origen === 'string' && o.font_origen.trim() ? o.font_origen.trim() : null
+  if (!esCriteriOrigen(o?.criteri)) {
+    return font ? `${T.no_oficial} · ${font}` : `${T.no_oficial} · ${T.sense_criteri}`
+  }
+  const criteri = T[o.criteri]
+  return font ? `${T.no_oficial} · ${criteri}: ${font}` : `${T.no_oficial} · ${criteri} · ${T.sense_font}`
 }
 
 /**
@@ -43,8 +108,10 @@ export function rotulReferenciaOferta(
   if (dia) {
     return { mes, font: `Mercabarna, ${idioma === 'es' ? 'precio del' : 'preu del'} ${dia[3]}/${dia[2]}/${dia[1]}` }
   }
-  const nom = ref.font ? nomDeFont({ font: ref.font }, idioma) : null
-  if (!nom) return { mes, font: null }
+  const nomBase = ref.font ? nomDeFont({ font: ref.font }, idioma) : null
+  if (!nomBase) return { mes, font: null }
+  // Un precio manual dice siempre que no es oficial, y de dónde sale (20270604100000).
+  const nom = ref.font === 'manual' ? `${nomBase} (${textOrigenManual(ref.origen, idioma)})` : nomBase
   const origen = mesEnText(ref.mes, idioma)
   const delMesDAvui = typeof ref.mes === 'string'
     && ref.mes.startsWith(`${avui.exercici}-${String(avui.mes).padStart(2, '0')}`)

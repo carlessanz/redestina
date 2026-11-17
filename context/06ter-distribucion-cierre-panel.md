@@ -2506,6 +2506,15 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
   provisional); sin ningún validado ni coste manual, el campo queda vacío (`po.cost_no_ref`). Un producto solo de
   Mercabarna sin el mes validado propone el **precio del día** (`cost_referencia_dia`, `20270603100000`): «Valor de
   referència provisional: 0,65 €/kg (Mercabarna, preu del 16/11/2026); novembre 2026 encara no està validat».
+- **Un precio manual dice que no es oficial** (`20270604100000`): `textOrigenManual` (`lib/valoracio.ts`) lo escribe
+  siempre igual, «No oficial · preu oficial d'un producte semblant: Préssec — Gencat, …, setembre 2026» o «No oficial
+  · fixat per l'equip · sense font disponible» (sin criterio: «origen sense documentar»). Sale en tres sitios:
+  **Preus** (bajo el nombre del producto, en `aviso`, para los `preu_manual` o con fuente `manual`;
+  `carregaOrigensManuals`), la **ficha del producto** (tarjeta del coste: badge «Origen del preu (no oficial)» y, para
+  quien puede aprobar, «Com s'ha decidit» + «Font utilitzada» → `fixar_origen_cost_producte`; el historial lo
+  repite) y el **alta de oferta** (`crear-oferta/campos` manda `cost_referencia_origen` solo con fuente `manual`;
+  el rótulo queda «Preu fixat per la Fundació (No oficial · …)»). Los PDF no cambian: ya imprimen «Preu fixat per la
+  Fundació» (la nota legal es el checkpoint 11).
 - E2E: `tests/e2e/preus-provisionals.e2e.ts` (bloqueo → enlace → fijar el precio → ajuste con rastro → emitir y leer
   la fuente en el PDF). `certificats.e2e.ts` elige donantes/ofertas sin provisionales.
 

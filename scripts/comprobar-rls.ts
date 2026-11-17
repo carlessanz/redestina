@@ -962,6 +962,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // saldría en rojo) en vez de escribir la foto o el coste de un producto real.
   { tabla: "fixar_foto_producte", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_foto: null, p_foto_mini: null }, descripcion: "NO canvia la foto d'un producte (només super_admin)" },
   { tabla: "fijar_coste_producto", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" }, descripcion: "NO fija costes por kilo" },
+  { tabla: "fixar_origen_cost_producte", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_criteri: "fixat_equip" }, descripcion: "NO fija l'origen d'un preu manual" },
   // Los envases sí: son catálogo, como `productos` y `municipios`, y los necesita el alta
   // de una oferta.
   { tabla: "tipos_caja", op: "leer", esperado: "permitir", descripcion: "lee el catálogo de envases" },
@@ -1738,6 +1739,13 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_producto: "TEST-ARNES-INEXISTENT", p_coste: 1, p_motivo: "arnes" },
       descripcion: "NO fija el coste por kilo (es de pot_aprovar)",
     },
+    {
+      tabla: "fixar_origen_cost_producte",
+      op: "rpc",
+      esperado: "denegar",
+      args: { p_producto: "TEST-ARNES-INEXISTENT", p_criteri: "fixat_equip" },
+      descripcion: "NO fija el origen de un precio manual (es de pot_aprovar)",
+    },
     // El destino final lo registra también el equipo, en nombre del productor (modelo
     // asistido). Con un id inventado, la guarda de rol deja pasar y corta la existencia.
     {
@@ -2429,6 +2437,15 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       esperado: "permitir",
       args: { p_producto: "Tomàquet", p_coste: 0, p_motivo: "Comprobación del arnés de RLS" },
       descripcion: "puede fijar el coste por kilo (autoriza; el coste 0 no se escribe)",
+    },
+    // 20270604100000: un criterio fuera de la lista pasa la guarda de rol y lo rechaza la
+    // validación (22023 criteri_invalid): no escribe nada.
+    {
+      tabla: "fixar_origen_cost_producte",
+      op: "rpc",
+      esperado: "permitir",
+      args: { p_producto: "Tomàquet", p_criteri: "comprovacio-arnes" },
+      descripcion: "puede fijar el origen de un precio manual (autoriza; el criterio inválido no se escribe)",
     },
     // Borrar un coste que no existe devuelve 0 sin tocar nada.
     {

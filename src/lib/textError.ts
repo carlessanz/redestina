@@ -57,6 +57,9 @@ const CODIS: Record<string, string> = {
   // `cancelar_meva_oferta()` desde la fase 1 de la revisión del 08-10-2026.
   te_canalitzacions: 'po.err_te_canalitzacions',
   cal_motiu: 'po.err_cal_motiu',
+  cal_font: 'cost.err_cal_font',
+  criteri_invalid: 'cost.err_criteri',
+  sense_cost: 'cost.err_sense_cost',
   // `confirmar_recollida()`, fase 3 de la revisión del 08-10-2026.
   canalitzacio_inexistent: 'recol.err_inexistent',
   canalitzacio_anulada: 'recol.err_anulada',

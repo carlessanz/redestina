@@ -407,6 +407,23 @@ export function fixarCostProducte(camps: {
   }, 'cost.err_generic')
 }
 
+/**
+ * El ORIGEN de un precio manual (20270604100000): cómo se decidió y de qué fuente sale, sin
+ * tocar el valor. Vacía la fuente = «sense font disponible» (la base lo rechaza con
+ * `cal_font` si el criterio es un producto parecido o una fuente externa).
+ */
+export function fixarOrigenCost(camps: {
+  producte: string
+  criteri: string
+  font: string | null
+}): Promise<ResultatRpc<Record<string, unknown>>> {
+  return crida('fixar_origen_cost_producte', {
+    p_producto: camps.producte,
+    p_criteri: camps.criteri,
+    p_font_origen: camps.font?.trim() || null,
+  }, 'cost.err_generic')
+}
+
 export function esborrarCostProducte(
   producte: string,
   motiu: string,

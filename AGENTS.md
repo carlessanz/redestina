@@ -172,7 +172,7 @@ del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), 
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
 **Catálogos**: `productos` (iconos en `public/icones-productes/`), `causas` (C1–C7; las 8 de antes, inactivas) + `subcausas` (`C<n>.<m>`),
-`factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
+`factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist; un manual **no es oficial**: `criteri`+`font_origen`),
 **precios de referencia por mes** (D1, `20270531100000`; `context/04`): `preus_referencia` (producto × año × mes
 validado, +hist), `preus_carregues`/`preus_observats` (original en el bucket `preus-fonts`), `productes_fonts`,
 `preus_fonts_estat`; `productos.preu_manual`/`nombre_es`. `preu_referencia_de()` (interna) valora las canalizaciones (D2).
@@ -271,7 +271,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
   `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
-  (motivo si difiere), equivalencias, `fixar_preu_manual`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
+  (motivo si difiere), equivalencias, `fixar_preu_manual`, `fixar_origen_cost_producte`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
   `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes`
   (equipo); nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
@@ -412,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270603100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270604100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -550,15 +550,14 @@ altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_
 **Deuda abierta (83 vivas; la siguiente entrada nueva es la 188; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
-(`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
-ofreciendo la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
+(`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
-(entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso) · **149**
-(dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
+(entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
+(dos vistas sin uso) · **151** (rama muerta en `registro/alta.ts`)
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
-· **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
-(una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`).
+· **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
+(rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -570,10 +569,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.090 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.098 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.866/2.866 y 43 (17-11-2026) «Sin
+   **Referencia: clon 2.874/2.874 y 44 sin datos; producción 2.866/2.866 y 43 (17-11-2026) «Sin
    fallos de permisos».** Cifra que cambia sin checks nuevos = cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

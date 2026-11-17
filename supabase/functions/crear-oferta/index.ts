@@ -69,7 +69,7 @@ Deno.serve(async (req) => {
     // A4 (20270521100000): cada lugar trae si es el principal, sus días y franjas y el horario
     // en texto; el principal va primero. Y la ficha, sus envases habituales: con eso se
     // calcula lo que se propone en la oferta nueva (`predeterminats`).
-    const [productos, causas, subcausas, ubicaciones, costos, fitxa] = await Promise.all([
+    const [productos, causas, subcausas, ubicaciones, costos, fitxa, origens] = await Promise.all([
       supabase.from("productos").select("nombre, familia, foto_mini").order("nombre"),
       // Fase B del punto 3: las causas ACTIVAS por orden, cada una con sus subcausas activas.
       supabase.from("causas").select("codigo, nombre, nombre_es, activa, orden"),
@@ -91,6 +91,11 @@ Deno.serve(async (req) => {
       propi
         ? supabase.from("productores").select("envasos_habituals").eq("id", productorId!).maybeSingle()
         : Promise.resolve({ data: null }),
+      // 20270604100000: un precio MANUAL dice que no es oficial, cómo se decidió y de qué fuente
+      // sale. Solo el origen (criterio y fuente), nunca el `motivo` ni quién lo fijó.
+      veuCost
+        ? supabase.from("costes_producto").select("producto, criteri, font_origen")
+        : Promise.resolve({ data: [] }),
     ]);
     type Lloc = {
       id: string; alias: string | null; municipio: string | null; gmaps_url: string | null;
@@ -106,6 +111,8 @@ Deno.serve(async (req) => {
     const referencia = new Map(
       ((costos.data ?? []) as Vigent[]).map((c) => [c.producto, c]),
     );
+    type Origen = { producto: string; criteri: string | null; font_origen: string | null };
+    const origen = new Map(((origens.data ?? []) as Origen[]).map((o) => [o.producto, o]));
 
     const familias = [
       ...new Set((productos.data ?? [])
@@ -145,6 +152,9 @@ Deno.serve(async (req) => {
               cost_referencia_mes: r?.mes_font ?? null,
               cost_referencia_provisional: r ? Boolean(r.provisional) : null,
               cost_referencia_dia: r?.dia ?? null,
+              cost_referencia_origen: r?.font === "manual" && origen.has(p.nombre)
+                ? { criteri: origen.get(p.nombre)!.criteri, font_origen: origen.get(p.nombre)!.font_origen }
+                : null,
             };
           }),
         // `familias_es`: solo para enseñarlas en castellano; el valor que se guarda no cambia.

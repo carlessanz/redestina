@@ -273,6 +273,21 @@ async function rpc<T>(nom: string, args: Record<string, unknown>): Promise<Resul
   }
 }
 
+/**
+ * El origen de los precios manuales (20270604100000): criterio y fuente por producto. Lo lee el
+ * equipo (`costes_producto`, RLS `es_intern`). Si falla, la tabla de precios sigue sirviendo.
+ */
+export async function carregaOrigensManuals(): Promise<Map<string, { criteri: string | null; font_origen: string | null }>> {
+  try {
+    const { data, error } = await supabase.from('costes_producto').select('producto, criteri, font_origen')
+    if (error || !data) return new Map()
+    return new Map((data as { producto: string; criteri: string | null; font_origen: string | null }[])
+      .map((o) => [o.producto, { criteri: o.criteri, font_origen: o.font_origen }]))
+  } catch {
+    return new Map()
+  }
+}
+
 export function carregaPropostaMes(exercici: number, mes: number) {
   return rpc<PropostaPreu[]>('preus_proposta_mes', { p_exercici: exercici, p_mes: mes })
 }

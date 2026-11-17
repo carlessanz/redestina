@@ -1905,6 +1905,19 @@ canalizaciones** con el precio del mes de su albarán.
   **precio del día** (`preu_dia_mercabarna`: el último día capturado hasta hoy, media de sus equivalencias),
   provisional y con su fecha; si no, como antes (último validado o manual). Solo es la PROPUESTA: la tabla de
   referencia sigue mensual y la donación toma el precio validado del mes de su albarán (`preu_referencia_de`).
+- **Origen de un precio manual** (`20270604100000`, 17-11-2026, petición del cliente): un precio `manual` **no es
+  oficial** (ni Gencat ni Mercabarna) y tiene que decirlo siempre, con **cómo se decidió** y **de qué fuente sale**.
+  `costes_producto` gana `criteri` (check: `producte_semblant` · `mediana_familia` · `mediana_global` · `font_externa`
+  · `fixat_equip`) y `font_origen` (texto; NULL = «sense font disponible»); las dos también en `costes_producto_hist`,
+  y el trigger `trg_costes_producto_hist` guarda la fila anterior cuando cambia el valor **o** el origen. Se fija con
+  `fixar_origen_cost_producte(producto, criteri, font_origen)` (`pot_aprovar`; `criteri_invalid`, `cal_font` —un
+  producto parecido o una fuente externa sin decir cuál—, `sense_cost`; 22023). No cambia ningún valor ni documento.
+  Producción: los 19 manuales del 17-11-2026 con su origen (`scripts/data/origen-preus-manuals.sql`, fuera de git):
+  7 producto parecido (Paraguaià←Préssec, Fesol←Mongeta, Xicòria←Escarola, Colrave←Col, Calçot←Ceba de Gencat;
+  Nyora←Pebrot, Yuca←Moniato de Mercabarna), 4 mediana de familia, 6 mediana global, Nabiu y Garrofa fijados por el
+  equipo sin fuente. **Unidades de Gencat**: vienen en €/100 kg y se guardan en €/kg (`eur_kg = valor/100`; 1.747
+  filas comprobadas el 17-11-2026, 0 mal convertidas; el safrà ya viene en €/kg); de Mercabarna solo cuenta lo que da
+  en €/kg (el calçot, por manat, queda con `eur_kg` nulo y no se usa).
 - **`preu_referencia_de(p_producto, p_data)`** (interna, sin EXECUTE para sesiones; para D2): el validado del mes;
   si no lo hay, el último validado anterior (`provisional`, `origen = anterior`); si tampoco, el manual vigente.
 - RLS en las seis tablas: SELECT con `es_intern()`; `authenticated` solo SELECT; `anon` nada. Se escribe por RPC

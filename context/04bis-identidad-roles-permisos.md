@@ -792,6 +792,7 @@ sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los no
 | `fixar_preu_referencia(p_producto, p_exercici, p_mes, p_font, p_eur_kg, p_motiu)` | `pot_aprovar()` | Una celda; motivo obligatorio |
 | `afegir_equivalencia_preu` / `treure_equivalencia_preu` | `pot_aprovar()` | Equivalencias; añadir es idempotente |
 | `fixar_preu_manual(p_producto, p_manual)` | `pot_aprovar()` | Marca o quita «preu manual» |
+| `fixar_origen_cost_producte(p_producto, p_criteri, p_font_origen)` | `pot_aprovar()` | Origen (no oficial) de un precio manual: criterio y fuente (20270604100000); no toca el valor |
 | `crear_producte(p_nombre, p_familia, p_nombre_es)` | `pot_aprovar()` | Alta en el catálogo (`23505 producte_existent`, `22023 nom_invalid`/`familia_desconeguda`) |
 | `marcar_carrega_preus(p_id, p_estat, p_motiu)` | `pot_aprovar()` | Descartar (con motivo) o recuperar; una carga `validada` no se descarta |
 | `fixar_font_preus(p_font, p_automatic, p_url)` | `es_super_admin()` | Automático y URL (solo `https://agricultura.gencat.cat/` o `https://www.mercabarna.es/`) |

@@ -8,8 +8,12 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **2.090 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026,
-   `20270603100000`: +1 del precio del día en el rótulo; `prova-preus-referencia.sql` 65 ok con la sección f2).
+   Referencia: **2.098 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026,
+   `20270604100000`, origen de los precios manuales: +8 en `tests/valoracio.test.ts` —`textOrigenManual`, criterios,
+   paridad con la migración y el rótulo del alta—; `prova-preus-referencia.sql` 75 ok con la sección h). Arnés del
+   clon **2.874/2.874 y 44 sin datos** (+9 checks de `fixar_origen_cost_producte`: 7 externas y el técnico deniegan,
+   el super_admin autoriza con un criterio inválido que no escribe).
+   Antes, **2.090** (`20270603100000`: +1 del precio del día en el rótulo; `prova-preus-referencia.sql` 65 ok con la sección f2).
    **Producción, tras publicar `20270603100000` y validar sep-nov 2026: 2.866/2.866 y 43 sin datos** (mismo total,
    2.909: los datos de precios y canalizaciones validadas dan a dos checks qué mirar).
    Antes, **2.089** (17-11-2026: +4 de

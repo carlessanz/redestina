@@ -348,6 +348,10 @@ la oferta). Reglas:
    precios no cambian cada día). Si no, manual. Lo validado con el último Gencat **no se actualiza** cuando Gencat
    publica después el mes. **En el alta de oferta** (solo la propuesta, 17-11-2026, `20270603100000`): un producto
    solo de Mercabarna sin el mes validado propone el precio del último día capturado; aceptarlo no guarda nada.
+   🔴 **Un precio manual no es oficial** (17-11-2026, `20270604100000`, petición del cliente): donde se enseñe
+   (Preus, ficha del producto, alta de oferta) dice «No oficial», **cómo se decidió** (producto parecido, mediana de
+   la familia, mediana global, fuente externa o fijado por el equipo) y **de qué fuente sale**, o «sense font
+   disponible». Gencat publica en €/100 kg: se divide entre 100 al cargar (comprobado el 17-11-2026).
 3. Si ese mes aún no está validado (Gencat publica con dos meses de retraso): el último validado, **provisional**.
    Al validar el mes, se ajusta solo, con rastro (anterior, nuevo, motivo, quién, cuándo).
 4. Lo **certificado** (sellado al emitir, también en prueba) no se mueve aunque se revalide el mes.

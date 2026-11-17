@@ -164,6 +164,8 @@ export interface CatalogosOferta {
     cost_referencia_mes?: string | null; cost_referencia_font?: string | null; cost_referencia_provisional?: boolean | null
     /** Solo Mercabarna sin el mes validado: el día del precio propuesto (`aaaa-mm-dd`). */
     cost_referencia_dia?: string | null
+    /** Solo con fuente `manual` (20270604100000): cómo se decidió y de qué fuente sale. */
+    cost_referencia_origen?: { criteri: string | null; font_origen: string | null } | null
   }[]
   /**
    * Fase B del punto 3 (20270529100000): las causas ACTIVAS en orden, cada una con sus
