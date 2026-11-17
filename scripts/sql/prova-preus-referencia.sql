@@ -8,10 +8,13 @@
 -- Cada caso imprime «ok · …»; el primero que no se cumple aborta con «FALLA · …».
 --
 -- Casos:
---   a. Precedencia: Gencat del mes → media de los días de Mercabarna → manual vigente; un
---      producto `preu_manual` va siempre al manual.
---   b. Validar en bloque (2025-01 a 2025-03) y por mes: no sobrescribe lo validado; el mes
---      futuro se niega; las cargas usadas quedan `validada`.
+--   a. Precedencia (ajuste 20270602100000): Gencat del mes → si no lo tiene, el ÚLTIMO precio
+--      de Gencat del producto (con su mes de origen) y Mercabarna no se mira → Mercabarna solo
+--      sin Gencat: el ÚLTIMO día capturado del mes (no la media) y solo con el mes cerrado →
+--      manual vigente; un producto `preu_manual` va siempre al manual.
+--   b. Validar en bloque (2025-01 a 2025-03) y por mes: guarda el mes de origen (`font_mes`);
+--      no sobrescribe lo validado (tampoco cuando Gencat publica después el mes); el mes futuro
+--      se niega; las cargas usadas quedan `validada`.
 --   c. Cambiar una celda exige motivo y deja el anterior en el historial.
 --   d. `preu_referencia_de()`: validado → anterior (provisional) → manual.
 --   e. Idempotencia de `registrar_carrega_preus` (mismo fichero; mismo día de Mercabarna).
@@ -78,6 +81,8 @@ select pg_temp.ok(pg_temp.com(:'u_super', $q$select crear_producte('TEST-PREU-2'
                   'una familia que no existe es 22023');
 select pg_temp.ok(pg_temp.com(:'u_equip', $q$select crear_producte('TEST-PREU-3', 'Varis')$q$) like 'ERR 42501%',
                   'el técnico no da de alta productos (42501)');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select crear_producte('TEST-PREU-M', 'Varis')$q$) = 'TEST-PREU-M',
+                  'un segundo producto, solo con Mercabarna');
 
 -- Cargas: una de Gencat (enero de 2025 = 100 €/100 kg) y dos días de Mercabarna en febrero.
 select registrar_carrega_preus('gencat',
@@ -85,9 +90,11 @@ select registrar_carrega_preus('gencat',
   '[{"codi_font":"T-001","nom_font":"Test producte","exercici":2025,"mes":1,"valor_original":100,"unitat":"€/100 kg","eur_kg":1.0}]')
   as carrega_g \gset
 select registrar_carrega_preus('mercabarna', '{"sha256":"test-merca-1","data_font":"2025-02-03"}',
-  '[{"nom_font":"TEST PREU","exercici":2025,"mes":2,"dia":3,"valor_original":2,"unitat":"€/kg","eur_kg":2}]') as carrega_m1 \gset
+  '[{"nom_font":"TEST PREU","exercici":2025,"mes":2,"dia":3,"valor_original":2,"unitat":"€/kg","eur_kg":2},
+    {"nom_font":"TEST PREU M","exercici":2025,"mes":2,"dia":3,"valor_original":2,"unitat":"€/kg","eur_kg":2}]') as carrega_m1 \gset
 select registrar_carrega_preus('mercabarna', '{"sha256":"test-merca-2","data_font":"2025-02-10"}',
-  '[{"nom_font":"TEST PREU","exercici":2025,"mes":2,"dia":10,"valor_original":3,"unitat":"€/kg","eur_kg":3}]') as carrega_m2 \gset
+  '[{"nom_font":"TEST PREU","exercici":2025,"mes":2,"dia":10,"valor_original":3,"unitat":"€/kg","eur_kg":3},
+    {"nom_font":"TEST PREU M","exercici":2025,"mes":2,"dia":10,"valor_original":3,"unitat":"€/kg","eur_kg":3}]') as carrega_m2 \gset
 select pg_temp.ok(:'carrega_g' <> '' and :'carrega_m1' <> '' and :'carrega_m2' <> '', 'tres cargas registradas');
 select pg_temp.ok(registrar_carrega_preus('gencat', '{"sha256":"test-gencat-1"}', '[]') is null,
                   'el mismo fichero de Gencat no crea otra carga (null)');
@@ -104,26 +111,49 @@ select pg_temp.ok(pg_temp.com(:'u_super', $q$select afegir_equivalencia_preu('TE
                   'añadirla otra vez (en minúsculas) devuelve la misma: idempotente');
 select pg_temp.ok(pg_temp.com(:'u_super', $q$select fijar_coste_producto('TEST-PREU', 0.5, 'prova')::text$q$) not like 'ERR%',
                   'precio manual vigente 0,50');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select afegir_equivalencia_preu('TEST-PREU-M', 'mercabarna', 'TEST PREU M')::text$q$) not like 'ERR%',
+                  'TEST-PREU-M: solo equivalencia con Mercabarna');
 
 \echo '== a. Precedencia =='
 select pg_temp.ok((select proposta_font = 'gencat' and proposta_eur_kg = 1.0 and manual_eur_kg = 0.5
+                          and gencat_mes = '2025-01-01' and proposta_mes_font = '2025-01-01'
                      from preus_calcula_mes(2025, 1) where producto = 'TEST-PREU'),
-                  'enero: Gencat manda sobre el manual');
-select pg_temp.ok((select proposta_font = 'mercabarna' and proposta_eur_kg = 2.5 and mercabarna_dies = 2
+                  'enero: Gencat manda sobre el manual, con su mes');
+select pg_temp.ok((select proposta_font = 'gencat' and proposta_eur_kg = 1.0 and proposta_mes_font = '2025-01-01'
+                          and mercabarna_eur_kg = 3
                      from preus_calcula_mes(2025, 2) where producto = 'TEST-PREU'),
-                  'febrero: sin Gencat, la media de los 2 días de Mercabarna (2,50)');
-select pg_temp.ok((select proposta_font = 'manual' and proposta_eur_kg = 0.5
+                  'febrero: Gencat no lo tiene → su ÚLTIMO precio (enero, 1,00); Mercabarna existe pero no se usa');
+select pg_temp.ok((select proposta_font = 'gencat' and proposta_eur_kg = 1.0 and proposta_mes_font = '2025-01-01'
                      from preus_calcula_mes(2025, 3) where producto = 'TEST-PREU'),
-                  'marzo: sin fuentes, el manual');
+                  'marzo: también el último de Gencat (enero), no el manual');
+select pg_temp.ok((select proposta_font = 'manual' and gencat_eur_kg is null and proposta_mes_font is null
+                     from preus_calcula_mes(2024, 12) where producto = 'TEST-PREU'),
+                  'Gencat nunca mira meses POSTERIORES al pedido');
+select pg_temp.ok((select proposta_font = 'mercabarna' and proposta_eur_kg = 3 and mercabarna_dies = 2
+                          and proposta_mes_font = '2025-02-01'
+                     from preus_calcula_mes(2025, 2) where producto = 'TEST-PREU-M'),
+                  'sin Gencat: el ÚLTIMO valor de Mercabarna del mes (día 10: 3,00), no la media; 2 días capturados');
+select pg_temp.ok((select proposta_font is null and proposta_eur_kg is null
+                     from preus_calcula_mes(2025, 3) where producto = 'TEST-PREU-M'),
+                  'sin Gencat ni Mercabarna ni manual: sin propuesta');
 update productos set preu_manual = true where nombre = 'TEST-PREU';
-select pg_temp.ok((select proposta_font = 'manual' and proposta_eur_kg = 0.5
+select pg_temp.ok((select proposta_font = 'manual' and proposta_eur_kg = 0.5 and proposta_mes_font is null
                      from preus_calcula_mes(2025, 1) where producto = 'TEST-PREU'),
                   'un producto preu_manual va al manual aunque Gencat tenga el mes');
 update productos set preu_manual = false where nombre = 'TEST-PREU';
 update preus_carregues set estat = 'descartada' where id = :'carrega_m2';
-select pg_temp.ok((select mercabarna_eur_kg = 2 and mercabarna_dies = 1 from preus_calcula_mes(2025, 2) where producto = 'TEST-PREU'),
-                  'una carga descartada no cuenta en la media');
+select pg_temp.ok((select mercabarna_eur_kg = 2 and mercabarna_dies = 1 from preus_calcula_mes(2025, 2) where producto = 'TEST-PREU-M'),
+                  'una carga descartada no cuenta: el último valor pasa a ser el del día 3');
 update preus_carregues set estat = 'pendent' where id = :'carrega_m2';
+-- El mes en curso: Mercabarna no propone nada hasta que el mes se cierra.
+select extract(year from now() at time zone 'Europe/Madrid')::int as ara_e,
+       extract(month from now() at time zone 'Europe/Madrid')::int as ara_m \gset
+select registrar_carrega_preus('mercabarna', '{"sha256":"test-merca-ara","data_font":"2025-02-20"}',
+  format('[{"nom_font":"TEST PREU M","exercici":%s,"mes":%s,"dia":1,"valor_original":9,"unitat":"€/kg","eur_kg":9}]',
+         :ara_e, :ara_m)::jsonb) as carrega_ara \gset
+select pg_temp.ok((select mercabarna_eur_kg is null from preus_calcula_mes(:ara_e, :ara_m) where producto = 'TEST-PREU-M'),
+                  'el mes en curso: Mercabarna no propone (el precio no cambia cada día)');
+delete from preus_carregues where id = :'carrega_ara';
 
 \echo '== b. Validar =='
 select pg_temp.ok(pg_temp.com(:'u_equip', $q$select validar_preus_mes(2025, 1)::text$q$) like 'ERR 42501%',
@@ -132,11 +162,19 @@ select pg_temp.ok(pg_temp.com(:'u_super', $q$select validar_preus_periode(2025, 
                   'el super_admin valida 2025-01..03 en bloque');
 select pg_temp.ok((select string_agg(mes || ':' || font || ':' || eur_kg::numeric(6,2), ',' order by mes)
                      from preus_referencia where producto = 'TEST-PREU')
-                  = '1:gencat:1.00,2:mercabarna:2.50,3:manual:0.50',
-                  'cada mes con su fuente y su precio');
-select pg_temp.ok((select font_dies = 2 and font_nom = 'TEST PREU' and validat_per = :'u_super'
-                     from preus_referencia where producto = 'TEST-PREU' and mes = 2),
-                  'febrero guarda los días, el nombre en la fuente y quién validó');
+                  = '1:gencat:1.00,2:gencat:1.00,3:gencat:1.00',
+                  'TEST-PREU: los tres meses con Gencat (1,00)');
+select pg_temp.ok((select string_agg(mes || ':' || coalesce(font_mes::text, '-'), ',' order by mes)
+                     from preus_referencia where producto = 'TEST-PREU')
+                  = '1:2025-01-01,2:2025-01-01,3:2025-01-01',
+                  'y cada uno dice de qué mes sale: enero');
+select pg_temp.ok((select string_agg(mes || ':' || font || ':' || eur_kg::numeric(6,2) || ':' || font_mes, ',' order by mes)
+                     from preus_referencia where producto = 'TEST-PREU-M')
+                  = '2:mercabarna:3.00:2025-02-01',
+                  'TEST-PREU-M: solo febrero, con Mercabarna (último valor) y su mes');
+select pg_temp.ok((select font_dies = 2 and font_nom = 'TEST PREU M' and validat_per = :'u_super'
+                     from preus_referencia where producto = 'TEST-PREU-M' and mes = 2),
+                  'febrero guarda los días capturados, el nombre en la fuente y quién validó');
 select pg_temp.ok((select count(*) = 3 from preus_carregues
                     where id in (:'carrega_g', :'carrega_m1', :'carrega_m2') and estat = 'validada'),
                   'las cargas usadas quedan validada');
@@ -150,6 +188,19 @@ select pg_temp.ok(pg_temp.com(:'u_super', $q$select validar_preus_mes(2025, 1)->
                   'volver a validar el mes');
 select pg_temp.ok((select eur_kg = 1.0 from preus_referencia where producto = 'TEST-PREU' and mes = 1 and exercici = 2025),
                   'no sobrescribe lo validado');
+-- Gencat publica después febrero: lo validado (con el precio de enero) se queda sin actualizar.
+select registrar_carrega_preus('gencat', '{"sha256":"test-gencat-3","data_font":"2025-05-15"}',
+  '[{"codi_font":"T-001","nom_font":"Test producte","exercici":2025,"mes":2,"valor_original":150,"unitat":"€/100 kg","eur_kg":1.5}]')
+  as carrega_g3 \gset
+select pg_temp.ok((select proposta_eur_kg = 1.5 and proposta_mes_font = '2025-02-01'
+                          and validat_eur_kg = 1.0 and validat_font_mes = '2025-01-01'
+                     from preus_calcula_mes(2025, 2) where producto = 'TEST-PREU'),
+                  'Gencat publica febrero: la propuesta pasa a febrero (1,50); lo validado sigue con enero (1,00)');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select validar_preus_mes(2025, 2)->>'validats'$q$) = '0',
+                  'volver a validar febrero no toca lo validado');
+select pg_temp.ok((select eur_kg = 1.0 and font_mes = '2025-01-01' from preus_referencia
+                    where producto = 'TEST-PREU' and exercici = 2025 and mes = 2),
+                  'febrero: 1,00 de enero, sin actualizar');
 select pg_temp.ok(pg_temp.com(:'u_super', $q$select validar_preus_mes(2099, 1)::text$q$) like 'ERR 22023%mes_futur%',
                   'un mes futuro se niega (22023 mes_futur)');
 select pg_temp.ok(pg_temp.com(:'u_super', $q$select validar_preus_mes(2025, 13)::text$q$) like 'ERR 22023%mes_invalid%',
@@ -180,7 +231,7 @@ select pg_temp.ok((select font = 'manual' and eur_kg = 0.75 and proposta_eur_kg 
 select pg_temp.ok((select eur_kg = 0.75 and font = 'manual' and not provisional and origen = 'validat'
                      from preu_referencia_de('TEST-PREU', '2025-02-15')),
                   'mes validado: el suyo, no provisional');
-select pg_temp.ok((select eur_kg = 0.5 and provisional and origen = 'anterior' and exercici = 2025 and mes = 3
+select pg_temp.ok((select eur_kg = 1.0 and font = 'gencat' and provisional and origen = 'anterior' and exercici = 2025 and mes = 3
                      from preu_referencia_de('TEST-PREU', '2025-06-01')),
                   'mes sin validar: el último anterior, provisional y con su mes');
 select pg_temp.ok((select eur_kg = 0.5 and font = 'manual' and provisional and origen = 'manual'

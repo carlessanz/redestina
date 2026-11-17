@@ -7,7 +7,8 @@
 //
 // 🔴 La regla (opción A del cliente, «el certificat agafa els preus del mes en què es van generar
 //    els albarans»): cada canalización guarda su valor, su FUENTE, el MES DEL ALBARÁN (el del REC
-//    de su oferta) y el mes del que sale el precio. Si el mes del albarán aún no estaba validado
+//    de su oferta) y el MES DEL QUE SALE el precio (`mes_font`: el del albarán o, si Gencat aún
+//    no lo había publicado, su último mes publicado; 20270602100000). Si el mes del albarán aún no estaba validado
 //    (Gencat publica con dos meses de retraso), el valor es el último validado y queda
 //    PROVISIONAL hasta que el equipo valide ese mes; entonces se ajusta solo. Aquí solo se decide
 //    cómo se ESCRIBE eso; qué valor es lo decide la base (`valoracio_canalitzacio`).
@@ -29,7 +30,7 @@ export interface ValorFont {
   mes_font?: string | null;
   /** El mes del albarán: el que el certificado aplicará. */
   mes_albara?: string | null;
-  /** Días de Mercabarna promediados, si la fuente es Mercabarna. */
+  /** Días de Mercabarna capturados en el mes (informativo: el valor es el ÚLTIMO del mes). */
   dies?: number | null;
   provisional?: boolean | null;
 }
@@ -42,7 +43,7 @@ const MESOS: Record<IdiomaFont, string[]> = {
 const TXT = {
   ca: {
     gencat: "Gencat, preus percebuts pel pagès",
-    mercabarna: (n: number | null) => n && n > 0 ? `Mercabarna, mitjana de ${n} ${n === 1 ? "dia" : "dies"}` : "Mercabarna",
+    mercabarna: "Mercabarna (darrer preu del mes)",
     referencia: "Valor de referència",
     manual: "Preu fixat per la Fundació",
     fixat: "Preu fixat per la Fundació",
@@ -55,7 +56,7 @@ const TXT = {
   },
   es: {
     gencat: "Gencat, precios percibidos por los agricultores",
-    mercabarna: (n: number | null) => n && n > 0 ? `Mercabarna, media de ${n} ${n === 1 ? "día" : "días"}` : "Mercabarna",
+    mercabarna: "Mercabarna (último precio del mes)",
     referencia: "Valor de referencia",
     manual: "Precio fijado por la Fundació",
     fixat: "Precio fijado por la Fundació",
@@ -77,12 +78,12 @@ export function textMes(mes: string | null | undefined, idioma: IdiomaFont = "ca
   return `${MESOS[idioma][n - 1]} ${m[1]}`;
 }
 
-/** La fuente sin el mes: «Gencat, preus percebuts pel pagès», «Mercabarna, mitjana de 18 dies»… */
+/** La fuente sin el mes: «Gencat, preus percebuts pel pagès», «Mercabarna (darrer preu del mes)»… */
 export function nomFont(v: ValorFont, idioma: IdiomaFont = "ca"): string | null {
   const t = TXT[idioma];
   switch (v.font) {
     case "gencat": return t.gencat;
-    case "mercabarna": return t.mercabarna(v.dies ?? null);
+    case "mercabarna": return t.mercabarna;
     case "manual": return t.manual;
     case "fixat": return t.fixat;
     case "declarat": return t.declarat;
@@ -102,7 +103,7 @@ function fontAmbMes(v: ValorFont, idioma: IdiomaFont): string | null {
 /**
  * La línea que se imprime junto al valor por kilo (REC de donación) y que enseña el panel:
  *   · «Valor de referència: Gencat, preus percebuts pel pagès, setembre 2026»
- *   · «Valor de referència: Mercabarna, mitjana de 18 dies, novembre 2026»
+ *   · «Valor de referència: Mercabarna (darrer preu del mes), novembre 2026»
  *   · «Preu fixat per la Fundació» · «Valor declarat pel donant»
  *   · provisional: «Valor de referència provisional (darrer publicat: …); el certificat aplicarà
  *     el del mes de l'albarà.»

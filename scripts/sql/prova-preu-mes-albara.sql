@@ -21,6 +21,9 @@
 --   d. Revalidar M con otro precio: la canalización certificada no se mueve; una sin certificar sí
 --      (`mes_revalidat`).
 --   e. Deuda 128: la de sin precio bloquea; un precio manual de M la valora.
+--   e2. Gencat sin el mes (20270602100000): validar M toma el último Gencat (M-2); la fila
+--      guarda `font_mes = M-2`, la canalización `preu_mes_font = M-2` con albarán de M, y
+--      `preus_vigents_oferta` lo devuelve.
 --   f. Canalizaciones de antes de la D2: intactas. Permisos: el historial y la lectura del mes son
 --      del equipo; las funciones internas no tienen EXECUTE; `auditoria_funcions_obertes()` en 0.
 
@@ -285,6 +288,40 @@ select pg_temp.ok((select coste_kg = 0.40 and not preu_provisional from pg_temp.
                   and (select valor_total = 40.00 and not exists (select 1 from jsonb_array_elements(bloqueos) b where (b->>'bloqueja')::boolean)
                          from cierres_periodo where excedente_id = pg_temp.id('ex5')),
                   'la conciliada sin coste se valora (0,40) y el certificado se desbloquea');
+
+\echo '== e2. Gencat sin el mes: su último precio, con el mes de origen (20270602100000) =='
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select crear_producte('TEST-D2G', 'Varis')$q$) = 'TEST-D2G',
+                  'un producto con Gencat');
+select registrar_carrega_preus('gencat', '{"sha256":"test-d2g","data_font":"2025-01-15"}',
+  format('[{"codi_font":"T-D2G","nom_font":"Test D2G","exercici":%s,"mes":%s,"valor_original":110,"unitat":"€/100 kg","eur_kg":1.10}]',
+         :m2_any, :m2_mes)::jsonb) as carrega_d2g \gset
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select afegir_equivalencia_preu('TEST-D2G', 'gencat', 'Test D2G', 'T-D2G')::text$q$) not like 'ERR%',
+                  'su equivalencia con Gencat');
+do $d$
+declare v_e uuid; v_c uuid;
+begin
+  insert into excedentes (id_excedente, productor_id, producto, kg_total, modalitat, estado, origen)
+  values ('E-PROVA-D2-6', pg_temp.id('prod'), 'TEST-D2G', 100, 'donacio', 'publicada', 'asistido')
+  returning id into v_e;
+  insert into t_ids values ('ex6', v_e);
+  insert into canalizaciones (excedente_id, entidad_id, kg_confirmados, valorizacion, estado)
+  values (v_e, pg_temp.id('ent'), 100, 'donacio', 'confirmada') returning id into v_c;
+  insert into t_ids values ('c6', v_c);
+end $d$;
+select pg_temp.ok((select coste_kg is null and preu_provisional from pg_temp.c('c6')),
+                  'sin ningún mes validado: sin valor y provisional');
+select pg_temp.ok(pg_temp.com(:'u_super', format($q$select validar_preus_mes(%s, %s)::text$q$, :m_any, :m_mes)) not like 'ERR%',
+                  'validar M: Gencat aún no tiene M');
+select pg_temp.ok((select font = 'gencat' and eur_kg = 1.10 and font_mes = :'m2'::date
+                     from preus_referencia where producto = 'TEST-D2G' and exercici = :m_any and mes = :m_mes),
+                  'M queda validado con el último Gencat (M-2) y lo dice (font_mes)');
+select pg_temp.ok((select coste_kg = 1.10 and preu_font = 'gencat' and not preu_provisional
+                          and preu_mes_albara = :'m'::date and preu_mes_font = :'m2'::date
+                     from pg_temp.c('c6')),
+                  'la canalización hereda el valor, la fuente y el mes de ORIGEN (M-2); su albarán sigue en M');
+select pg_temp.ok((select mes_font = :'m2'::date and font = 'gencat' and not provisional
+                     from preus_vigents_oferta() where producto = 'TEST-D2G'),
+                  'la propuesta de la oferta también dice el mes de origen');
 
 \echo '== f. Lo de antes y los permisos =='
 select pg_temp.ok((select count(*) = 0 from t_antiga a join canalizaciones c on c.id = a.id

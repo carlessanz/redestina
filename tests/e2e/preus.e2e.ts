@@ -66,7 +66,18 @@ test('1 · enseña los precios validados de un mes', async ({ page }) => {
   // El mismo número que la base (formato es-ES, hasta 4 decimales).
   const text = Number(poma).toLocaleString('es-ES', { minimumFractionDigits: 2, maximumFractionDigits: 4 })
   await expect(fila).toContainText(text)
-  await expect(page.getByTestId('preu-resum')).toContainText(/0 per validar|0 por validar/)
+  // De qué mes sale (20270602100000): Poma, de septiembre mismo.
+  await expect(fila.getByTestId('preu-mes-font')).toHaveText(/^(Preu de setembre|Precio de septiembre) 2026$/)
+  // Un producto que Gencat no tiene en septiembre y aún sin validar: se propone su ÚLTIMO precio
+  // de Gencat y la fila dice de qué mes es.
+  const darrer = sql(`select producto || '|' || to_char(proposta_mes_font, 'YYYY-MM') from preus_calcula_mes(2026, 9)
+    where validat_eur_kg is null and proposta_font = 'gencat' and proposta_mes_font < '2026-09-01'
+    order by producto limit 1`)
+  if (darrer) {
+    const [prod] = darrer.split('|')
+    await expect(page.locator(`[data-producte="${prod}"]`).getByTestId('preu-mes-font'))
+      .toContainText(/^(Darrer publicat|Último publicado): /)
+  }
 })
 
 test('2 · valida un mes entero', async ({ page }) => {

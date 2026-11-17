@@ -917,8 +917,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      subidas de la sesión al cancelar, o un barrido de `fotos-ofertes` sin fila. Precio: poco; volumen, mínimo.
 183. **Mercabarna: solo el día de la página** (17-11-2026, `20270531100000`). El job captura la tabla del día que
      enseña la página de estadísticas; no hay histórico (el formulario de fechas no se usa y el CSV de exportar va
-     desfasado). Un día sin job (caída, fuente con error) se pierde y la media del mes sale de menos días (la pantalla
-     enseña cuántos). Arreglo: rellenar días pasados con el formulario de fecha, si la página lo permite de forma
+     desfasado). Un día sin job (caída, fuente con error) se pierde; desde `20270602100000` el mes vale el último día
+     capturado, así que solo duele si se pierden los últimos días del mes (la pantalla enseña cuántos hay). Arreglo: rellenar días pasados con el formulario de fecha, si la página lo permite de forma
      estable. Precio: más peticiones a un tercero; hoy, una al día.
 184. **El recálculo de los certificados tras validar un mes es «best effort»** (17-11-2026, `20270601100000`). Validar
      un mes ajusta las canalizaciones y recalcula los cierres abiertos y los certificados en borrador afectados

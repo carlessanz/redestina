@@ -2,15 +2,16 @@
 // hora de Madrid, la variación entre meses y el aviso de salto, qué precio enseña una fila,
 // cuándo la fuente ha cambiado desde la validación y el resumen de la cabecera.
 //
-// Lo que DECIDE la propuesta (precedencia Gencat → Mercabarna → manual, `preu_manual`, el mes
-// futuro, el motivo obligatorio) vive en la base y lo prueba `scripts/sql/prova-preus-referencia.sql`.
+// Lo que DECIDE la propuesta (precedencia Gencat del mes o su último publicado → Mercabarna,
+// último valor del mes cerrado → manual, `preu_manual`, el mes futuro, el motivo obligatorio) vive en la base y lo prueba `scripts/sql/prova-preus-referencia.sql`.
 
 import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 
 import {
-  esMesFutur, esSaltGran, exercicisDisponibles, fontHaCanviat, mesActual, mesAnterior, mesDeData, preuDeFila,
+  esDunAltreMes, esMesFutur, esSaltGran, exercicisDisponibles, fontHaCanviat, mesActual, mesAnterior, mesDeData,
+  mesFontDeFila, preuDeFila,
   resumMes, textVariacio, valorDeFont, variacio, type PropostaPreu,
 } from '../src/lib/preus'
 
@@ -22,6 +23,7 @@ const fila = (p: Partial<PropostaPreu>): PropostaPreu => ({
   validat_eur_kg: null, validat_font: null, validat_nom: null, validat_dies: null, validat_motiu: null,
   validat_at: null, validat_proposta: null,
   anterior_eur_kg: null, anterior_exercici: null, anterior_mes: null,
+  gencat_mes: null, proposta_mes_font: null, validat_font_mes: null,
   ...p,
 })
 
@@ -90,6 +92,19 @@ describe('la fila', () => {
     // Un manual no tiene fuente que cambie; sin valor hoy, tampoco se avisa.
     expect(fontHaCanviat(fila({ ...base, validat_font: 'manual', gencat_eur_kg: 0.71 }))).toBe(false)
     expect(fontHaCanviat(fila({ ...base, gencat_eur_kg: null }))).toBe(false)
+  })
+  it('validado con el último Gencat de otro mes: cuando Gencat publica este, no avisa (se queda así)', () => {
+    const base = { validat_eur_kg: 0.6, validat_font: 'gencat' as const, validat_proposta: 0.6, validat_font_mes: '2026-09-01' }
+    expect(fontHaCanviat(fila({ ...base, gencat_eur_kg: 0.9, gencat_mes: '2026-10-01' }))).toBe(false)
+    // Gencat revisa el MISMO mes del que salía: sí avisa.
+    expect(fontHaCanviat(fila({ ...base, gencat_eur_kg: 0.9, gencat_mes: '2026-09-01' }))).toBe(true)
+  })
+  it('de qué mes sale el precio de la fila y si es de otro mes', () => {
+    expect(mesFontDeFila(fila({ proposta_mes_font: '2026-09-01' }))).toBe('2026-09-01')
+    expect(mesFontDeFila(fila({ proposta_mes_font: '2026-10-01', validat_eur_kg: 1, validat_font_mes: '2026-09-01' }))).toBe('2026-09-01')
+    expect(esDunAltreMes('2026-09-01', 2026, 10)).toBe(true)
+    expect(esDunAltreMes('2026-10-01', 2026, 10)).toBe(false)
+    expect(esDunAltreMes(null, 2026, 10)).toBe(false)
   })
   it('valorDeFont da el de cada fuente', () => {
     const f = fila({ gencat_eur_kg: 0.5, mercabarna_eur_kg: 0.8, manual_eur_kg: 1 })

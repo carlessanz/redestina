@@ -785,7 +785,7 @@ sesión 401). Además de la RPC, solo lee el catálogo `tipus_activitat` (los no
 
 | RPC | Quién | Qué |
 | --- | --- | --- |
-| `preus_proposta_mes(p_exercici, p_mes)` | `es_intern()` | La propuesta y lo validado de cada producto del catálogo en ese mes, con el mes anterior |
+| `preus_proposta_mes(p_exercici, p_mes)` | `es_intern()` | La propuesta y lo validado de cada producto del catálogo en ese mes, con el mes anterior y **de qué mes sale** cada valor (`gencat_mes`, `proposta_mes_font`, `validat_font_mes`; `20270602100000`) |
 | `noms_fonts_preus()` | `es_intern()` | Los nombres de las últimas cargas (Gencat: la última; Mercabarna: 90 días) y a qué productos ya van |
 | `validar_preus_mes(p_exercici, p_mes, p_canvis jsonb = '[]')` | `pot_aprovar()` | Valida lo no validado que tiene propuesta; `p_canvis` cambia filas (motivo si difiere de la propuesta o ya estaba validado). `22023 mes_futur`/`mes_invalid` |
 | `validar_preus_periode(des…, fins…)` | `pot_aprovar()` | Lo mismo mes a mes; ≤ 120 meses (`periode_invalid`, `periode_massa_llarg`) |

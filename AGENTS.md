@@ -41,7 +41,7 @@ certificados. Dos fases construidas: **1. infraestructura WhatsApp** y **2. Rede
   Drive `…/03-Redestina/` (se escribe solo en `3. Claude Code/`, nunca datos personales; detalle en
   `CLAUDE.md`). Jerarquía: *Definición de producto v3* (porqué) › *funcional 2026 v3* (qué) › guía
   técnica (cómo).
-- **Planes vivos** (`3. Claude Code/`): plan 1 CRM (**1E solo en el clon**, carga en producción antes del 31-12).
+- **Planes vivos** (`3. Claude Code/`): plan 1 CRM (**1E solo en el clon**; a producción antes del 31-12).
 - Vocabulario: la tabla `excedentes` es la «oferta» de los textos («AFCV» en el funcional).
 
 ## 1bis. Visión funcional (objetivo ↔ construido)
@@ -272,7 +272,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
   (motivo si difiere), equivalencias, `fixar_preu_manual`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
-  `fixar_font_preus` (super_admin). Propuesta: Gencat → media de Mercabarna → manual. **D2**: `preus_canalitzacions_mes`
+  `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes. **D2**: `preus_canalitzacions_mes`
   (equipo); nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
@@ -412,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270601100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270602100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -452,6 +452,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   por kilo de la canalización (nunca `productos.eur_kg` para lo fiscal).
 - 🔴 **Precio del mes del albarán (D2, opción A)**: declarado en la oferta → definitivo; si no, `preu_referencia_de` del mes
   del REC; sin validar = **provisional**, se ajusta solo al validarlo (no lo certificado); con provisionales no se certifica.
+  Validado con un Gencat anterior, **no se actualiza**.
 
 ## 8bis. Canal preferente
 
@@ -504,9 +505,8 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
-`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos. Retirados: `PlaPrevencio`,
-«Prepara/Emet el pla» (A1), Configuració › Diagnòstic (A3), «Continuar» del alta (17-11-2026). Un cambio de dominio
-exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
+`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos (ni los de la lista del
+detalle). Un cambio de dominio exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
 
@@ -570,11 +570,11 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.083 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
+   **Referencia: 2.085 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.862/2.862 y 47 sin datos; producción 2.864/2.864 y 45 (tras D2, 17-11-2026) «Sin
-   fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
+   **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.864/2.864 y 45 (tras D2, 17-11-2026) «Sin
+   fallos de permisos».** Cifra que cambia sin checks nuevos = cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

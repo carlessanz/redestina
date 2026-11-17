@@ -1,8 +1,11 @@
 // Los precios de referencia por producto, año y mes (punto 3, fase D1, 17-11-2026).
 //
 // Lo que la base decide (20270531100000) y aquí solo se pinta:
-//   · la PROPUESTA de cada mes (`preus_proposta_mes`): Gencat del mes → media de los días de
-//     Mercabarna → manual vigente; un producto `preu_manual` va siempre al manual;
+//   · la PROPUESTA de cada mes (`preus_proposta_mes`, ajuste 20270602100000): Gencat del mes →
+//     si Gencat aún no lo tiene, su ÚLTIMO precio publicado (y Mercabarna no se mira) → solo sin
+//     Gencat, el ÚLTIMO valor de Mercabarna del mes, con el mes cerrado → manual vigente; un
+//     producto `preu_manual` va siempre al manual. Cada precio dice de qué MES sale
+//     (`*_mes_font`, `font_mes`): validado con el último Gencat, se queda así;
 //   · VALIDAR el mes, en bloque o una celda con motivo (`validar_preus_mes`,
 //     `validar_preus_periode`, `fixar_preu_referencia`), las equivalencias con las fuentes,
 //     el precio manual y el alta de productos (`crear_producte`).
@@ -42,6 +45,12 @@ export interface PropostaPreu {
   anterior_eur_kg: number | null
   anterior_exercici: number | null
   anterior_mes: number | null
+  /** Mes (`aaaa-mm-dd`) del que sale el valor de Gencat: el pedido o el último publicado. */
+  gencat_mes: string | null
+  /** Mes del que sale la propuesta (null si es manual). */
+  proposta_mes_font: string | null
+  /** Mes del que sale lo validado (null si es manual). */
+  validat_font_mes: string | null
 }
 
 /** Una fila de `preus_carregues` (sin las observaciones). */
@@ -94,10 +103,12 @@ export interface PreuValidat {
   font: FontPreu
   font_nom: string | null
   font_dies: number | null
+  /** Mes del que sale el valor; null = el propio mes (o manual). */
+  font_mes: string | null
   motiu: string | null
   validat_at: string
 }
-export const COLUMNES_PREU_VALIDAT = 'producto, exercici, mes, eur_kg, font, font_nom, font_dies, motiu, validat_at'
+export const COLUMNES_PREU_VALIDAT = 'producto, exercici, mes, eur_kg, font, font_nom, font_dies, font_mes, motiu, validat_at'
 
 /** Un nombre visto en las últimas cargas (`noms_fonts_preus()`). */
 export interface NomFontVist {
@@ -173,9 +184,15 @@ export function preuDeFila(p: PropostaPreu): { eur_kg: number | null; font: Font
   return { eur_kg: p.proposta_eur_kg === null ? null : Number(p.proposta_eur_kg), font: p.proposta_font, validat: false }
 }
 
-/** ¿La fuente ha cambiado desde que se validó? (un fichero nuevo de Gencat revisa meses). */
+/**
+ * ¿La fuente ha cambiado desde que se validó? (un fichero nuevo de Gencat revisa meses). No avisa
+ * si lo validado salía de OTRO mes (el último Gencat publicado) y Gencat ya ha publicado este: es
+ * lo previsto, y lo validado se queda sin actualizar (decisión del 17-11-2026).
+ */
 export function fontHaCanviat(p: PropostaPreu): boolean {
   if (p.validat_eur_kg === null || p.validat_font === null || p.validat_font === 'manual') return false
+  if (p.validat_font === 'gencat' && p.validat_font_mes !== null && p.gencat_mes !== null
+      && p.validat_font_mes.slice(0, 7) !== p.gencat_mes.slice(0, 7)) return false
   const ara = p.validat_font === 'gencat' ? p.gencat_eur_kg : p.mercabarna_eur_kg
   if (ara === null || p.validat_proposta === null) return false
   return Math.abs(Number(ara) - Number(p.validat_proposta)) > 0.00005
@@ -208,6 +225,17 @@ export function resumMes(files: readonly PropostaPreu[]): ResumMes {
     if (esSaltGran(variacio(preuDeFila(p).eur_kg, p.anterior_eur_kg))) salts++
   }
   return { total: files.length, validats, perValidar, sensePreu, salts }
+}
+
+/** El mes del que sale el precio de la fila (el validado si lo hay; si no, la propuesta). */
+export function mesFontDeFila(p: PropostaPreu): string | null {
+  return p.validat_eur_kg !== null ? p.validat_font_mes : p.proposta_mes_font
+}
+
+/** ¿El precio sale de un mes distinto del de la fila? (el último Gencat publicado) */
+export function esDunAltreMes(mesFont: string | null | undefined, exercici: number, mes: number): boolean {
+  const m = mesDeData(mesFont ?? null)
+  return m !== null && (m.exercici !== exercici || m.mes !== mes)
 }
 
 /** «2026-09-01» → { exercici: 2026, mes: 9 }. */

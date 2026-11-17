@@ -2466,8 +2466,8 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
 - **Catàleg**: lo de antes (iconos y coste de referencia).
 - **Preus de referència** (`components/preus/PestanyaPreus`): año y mes (por defecto, el anterior al actual),
   buscador, resumen (validados · por validar · sin precio · saltos ≥ 30 %), «Valida el mes» (confirma), «Valida en
-  bloc» (intervalo) y la tabla: producto, precio (validado en negrita; propuesto en gris), fuente con el nombre y los
-  días, mes anterior, variación, estado y, con `pot_aprovar`, editar una celda (fuente o precio a mano + motivo). Un
+  bloc» (intervalo) y la tabla: producto, precio (validado en negrita; propuesto en gris), fuente con el nombre y **de qué mes
+  sale** («Preu de setembre 2026» o «Darrer publicat: gener 2026», `preu-mes-font`; 17-11-2026), mes anterior, variación, estado y, con `pot_aprovar`, editar una celda (fuente o precio a mano + motivo). Un
   aviso si la fuente ya no dice lo validado o si el salto es grande. La fila abre la ficha del producto.
 - **Càrregues** (`PestanyaCarregues`): una tarjeta por fuente (URL, último resultado, última comprobación, error,
   días de Mercabarna del mes; el super_admin enciende/apaga el automático y cambia la URL de Gencat; «Actualitza ara»)

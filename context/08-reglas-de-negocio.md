@@ -341,14 +341,19 @@ la oferta). Reglas:
 1. Coste **declarado** por el productor en la oferta → manda, es definitivo y no se ajusta nunca. Solo se declara si el
    productor **cambia** la propuesta (el formulario y el bot proponen el precio de referencia de hoy; aceptarlo no
    guarda nada).
-2. Sin declarar: el precio validado del mes del albarán (Gencat, Mercabarna o manual) → definitivo.
+2. Sin declarar: el precio validado del mes del albarán → definitivo. Cómo se propone ese precio (17-11-2026,
+   `20270602100000`): **Gencat va por encima de Mercabarna**. Si el producto está en Gencat, vale el del mes o, si
+   Gencat no lo trae ese mes, **el último que haya publicado** (de un mes anterior; se dice cuál). Mercabarna solo
+   para lo que Gencat no tiene, y como **un valor por mes**: el del último día capturado, con el mes cerrado (los
+   precios no cambian cada día). Si no, manual. Lo validado con el último Gencat **no se actualiza** cuando Gencat
+   publica después el mes.
 3. Si ese mes aún no está validado (Gencat publica con dos meses de retraso): el último validado, **provisional**.
    Al validar el mes, se ajusta solo, con rastro (anterior, nuevo, motivo, quién, cuándo).
 4. Lo **certificado** (sellado al emitir, también en prueba) no se mueve aunque se revalide el mes.
 5. Un certificado (anual, intervalo u oferta) con algún valor provisional **no se emite**: `22023
    preus_provisionals` con la lista producto (mes); la pantalla enlaza a Productes › Preus de ese mes.
 6. El REC de donación imprime la fuente bajo el total («Valor de referència: Gencat, preus percebuts pel pagès, setembre
-   2026», «Mercabarna, mitjana de N dies, …», «Preu fixat per la Fundació», «Valor declarat pel donant» o la frase
+   2026» —con el mes de origen, que puede ser anterior—, «Mercabarna (darrer preu del mes), …», «Preu fixat per la Fundació», «Valor declarat pel donant» o la frase
    de provisional); el certificado, una nota «Fonts dels valors: …» y, en el anexo, la columna «Font del valor».
    La nota legal fija del REC (`nota_valor`) no cambia (deuda 187).
 

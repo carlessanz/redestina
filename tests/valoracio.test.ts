@@ -51,10 +51,14 @@ describe('textFontValor: la misma frase en el papel y en la pantalla', () => {
       'Valor de referencia: Gencat, precios percibidos por los agricultores, septiembre 2026')
   })
   it('Mercabarna con los días', () => {
+    // El valor de Mercabarna es el ÚLTIMO del mes (20270602100000): los días no se imprimen.
     expect(textFontValor({ font: 'mercabarna', mes_font: '2026-11-01', dies: 18 })).toBe(
-      'Valor de referència: Mercabarna, mitjana de 18 dies, novembre 2026')
-    expect(textFontValor({ font: 'mercabarna', mes_font: '2026-11-01', dies: 1 })).toBe(
-      'Valor de referència: Mercabarna, mitjana de 1 dia, novembre 2026')
+      'Valor de referència: Mercabarna (darrer preu del mes), novembre 2026')
+    expect(textFontValor({ font: 'mercabarna', mes_font: '2026-11-01', dies: 1 }, 'es')).toBe(
+      'Valor de referencia: Mercabarna (último precio del mes), noviembre 2026')
+    // Octubre validado con el último Gencat (septiembre): el texto dice el mes de ORIGEN.
+    expect(textFontValor({ font: 'gencat', mes_font: '2026-09-01', mes_albara: '2026-10-01' })).toBe(
+      'Valor de referència: Gencat, preus percebuts pel pagès, setembre 2026')
   })
   it('manual, fijado, declarado e histórico', () => {
     expect(textFontValor({ font: 'manual', mes_font: '2026-10-01' })).toBe('Preu fixat per la Fundació')

@@ -1,7 +1,8 @@
 // «Preus» (punto 3, fase D1): la revisión de los precios de referencia de un mes.
 //
-// Una fila por producto con lo que propone la base (Gencat → Mercabarna → manual, o el manual
-// si el producto es `preu_manual`), lo ya validado, el mes anterior validado y la variación
+// Una fila por producto con lo que propone la base (Gencat del mes o su último publicado →
+// Mercabarna, último valor del mes → manual, o el manual si el producto es `preu_manual`), de
+// qué fuente y de qué MES sale, lo ya validado, el mes anterior validado y la variación
 // (aviso si salta un 30 % o más). «Valida el mes» guarda lo que tenga propuesta y aún no esté
 // validado; nada ya validado cambia sin motivo (el lápiz de cada fila). «Valida en bloc» es para
 // la carga inicial de Gencat: rellena los meses pasados que falten, sin tocar lo validado.
@@ -18,8 +19,8 @@ import { textError } from '../../lib/textError'
 import { eurKg } from '../../lib/tancament'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import {
-  MESOS, carregaCanalitzacionsMes, carregaPropostaMes, esMesFutur, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu, fontHaCanviat, mesActual,
-  mesAnterior, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
+  MESOS, carregaCanalitzacionsMes, carregaPropostaMes, esDunAltreMes, esMesFutur, mesDeData, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu,
+  fontHaCanviat, mesActual, mesAnterior, mesFontDeFila, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
   type CanalitzacionsMes, type FontPreu, type PropostaPreu,
 } from '../../lib/preus'
 import { useConfirma } from '../DialegConfirma'
@@ -349,6 +350,12 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
               const canviat = fontHaCanviat(p)
               const detall = (preu.validat ? p.validat_nom : (p.proposta_font === 'gencat' ? p.gencat_nom : p.proposta_font === 'mercabarna' ? p.mercabarna_nom : null))
               const dies = preu.validat ? p.validat_dies : (p.proposta_font === 'mercabarna' ? p.mercabarna_dies : null)
+              const mesFont = mesFontDeFila(p)
+              const mf = mesDeData(mesFont)
+              const textMesFont = mf
+                ? t(esDunAltreMes(mesFont, exercici, mes) ? 'preu.source_last' : 'preu.source_month',
+                  { mes: `${t(`preu.mes_${mf.mes}`)} ${mf.exercici}` })
+                : null
               const obert = editant === p.producto
               return (
                 <Fragment key={p.producto}>
@@ -368,10 +375,12 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
                         ? <Badge className="bg-error-fondo text-error">{t('preu.without')}</Badge>
                         : <span className={preu.validat ? 'font-medium' : 'text-muted-foreground'}>{eurKg(preu.eur_kg)}</span>}
                       <span className="block text-xs sm:hidden"><BadgeFont font={preu.font} /></span>
+                      {textMesFont && <span className="block text-xs text-muted-foreground sm:hidden" data-testid="preu-mes-font-mobil">{textMesFont}</span>}
                     </TableCell>
                     <TableCell className="hidden text-center whitespace-normal sm:table-cell">
                       <BadgeFont font={preu.font} />
                       {detall && <span className="block text-xs text-muted-foreground">{detall}</span>}
+                      {textMesFont && <span className="block text-xs text-muted-foreground" data-testid="preu-mes-font">{textMesFont}</span>}
                       {dies !== null && dies !== undefined && (
                         <span className="block text-xs text-muted-foreground">{t('preu.days', { n: dies })}</span>
                       )}

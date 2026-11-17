@@ -1886,12 +1886,19 @@ canalizaciones** con el precio del mes de su albarán.
 - **`productes_fonts`**: la equivalencia producto ↔ nombre (y código Gencat) en cada fuente; `origen` sembra · equip.
   Sembradas 29 de Gencat por código y 105 de Mercabarna por nombre en mayúsculas. Única `(producto, font, upper(nom_font))`.
 - **`preus_referencia`** (PK `producto, exercici, mes`): `eur_kg` (> 0), `font` gencat · mercabarna · manual,
-  `font_nom`, `font_dies` (días de Mercabarna promediados), `proposta_eur_kg` (lo que proponía la fuente al validar:
+  `font_nom`, `font_dies` (días de Mercabarna capturados en el mes), **`font_mes`** (de qué mes sale el valor; null =
+  el mismo mes o manual; `20270602100000`), `proposta_eur_kg` (lo que proponía la fuente al validar:
   así se ve si la fuente cambia después), `carrega_id`, `motiu`, `validat_per`, `validat_at`.
   **`preus_referencia_hist`**: cada valor sobrescrito o borrado (trigger `trg_preus_referencia_hist`).
-- **Precedencia** (`preus_fonts_mes` → `preus_calcula_mes`): producto `preu_manual` → el manual vigente; si no,
-  Gencat del mes (de la carga no descartada más reciente) → media de los días de Mercabarna del mes → manual. Un
-  fichero nuevo de Gencat puede revisar meses ya publicados: la pantalla avisa si la fuente ya no dice lo validado.
+- **Precedencia** (`preus_fonts_mes` → `preus_calcula_mes`; regla del cliente del 17-11-2026, `20270602100000`):
+  producto `preu_manual` → el manual vigente; si no, **Gencat manda**: el mes pedido o, si Gencat no lo trae, **el
+  último mes publicado de ese producto hasta el mes pedido** (nunca uno posterior), de la carga no descartada más
+  reciente; un producto con Gencat no mira Mercabarna. Solo sin Gencat: **Mercabarna, un valor por mes** = la media
+  de los precios del **último día capturado** del mes, y solo con el mes **cerrado** (hora de Madrid); después, manual.
+  La propuesta devuelve `gencat_mes`, `proposta_mes_font` y `validat_font_mes`; `preus_desa_mes` guarda `font_mes`.
+- **Lo validado no se actualiza solo**: si se validó con el último Gencat de un mes anterior y después Gencat publica
+  el mes, la pantalla no lo da por «la fuente ha cambiado» (`fontHaCanviat` lo excluye). Un fichero nuevo que revise
+  el MISMO mes sí avisa. Cambiarlo es decisión del equipo (editar la celda con motivo).
 - **`preu_referencia_de(p_producto, p_data)`** (interna, sin EXECUTE para sesiones; para D2): el validado del mes;
   si no lo hay, el último validado anterior (`provisional`, `origen = anterior`); si tampoco, el manual vigente.
 - RLS en las seis tablas: SELECT con `es_intern()`; `authenticated` solo SELECT; `anon` nada. Se escribe por RPC
@@ -1905,7 +1912,8 @@ canalización guarda su valor por kilo, su FUENTE, el MES DEL ALBARÁN y si es P
 guardado; si algo es provisional, no se emite.
 
 - **`canalizaciones`** gana `preu_font` (declarat · gencat · mercabarna · manual · fixat · historic), `preu_mes_albara`
-  (día 1 del mes del albarán), `preu_mes_font` (de qué mes sale el precio), `preu_font_dies` (Mercabarna),
+  (día 1 del mes del albarán), `preu_mes_font` (mes de ORIGEN del precio: hereda `preus_referencia.font_mes`, así
+  que con el último Gencat puede ser anterior al del albarán), `preu_font_dies` (Mercabarna),
   `preu_provisional boolean not null default false`, `preu_certificat` (número del certificado emitido que lo congeló)
   y `preu_certificat_at`. Índice parcial por `preu_mes_albara` (no anuladas).
 - **Mes del albarán** (`mes_albara_canalitzacio`): el mes (Madrid) del **REC de la oferta** (el primero creado; o el

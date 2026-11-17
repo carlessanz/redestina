@@ -16,7 +16,7 @@ import { textError } from '../../lib/textError'
 import { eurKg } from '../../lib/tancament'
 import { coincidencies } from '../../../supabase/functions/_shared/preusFonts.ts'
 import {
-  COLUMNES_EQUIVALENCIA, COLUMNES_PREU_VALIDAT, MESOS, afegeixEquivalencia, carregaNomsFonts, fixaPreuManual,
+  COLUMNES_EQUIVALENCIA, COLUMNES_PREU_VALIDAT, MESOS, afegeixEquivalencia, carregaNomsFonts, esDunAltreMes, fixaPreuManual, mesDeData,
   treuEquivalencia, type EquivalenciaPreu, type FontDescarrega, type NomFontVist, type PreuValidat,
 } from '../../lib/preus'
 import Desplegable from '../Desplegable'
@@ -183,15 +183,23 @@ export default function PreusProducte({ producte, nomEs, preuManual, potAprovar,
               <div className="grid grid-cols-3 gap-1 sm:grid-cols-6 lg:grid-cols-12">
                 {MESOS.map((m) => {
                   const p = mesos.get(m)
+                  // Validado con el último Gencat publicado: de qué mes sale.
+                  const origen = p && esDunAltreMes(p.font_mes, any, m) ? mesDeData(p.font_mes) : null
+                  const textOrigen = origen ? t('preu.source_last', { mes: `${t(`preu.mes_${origen.mes}`)} ${origen.exercici}` }) : null
                   return (
                     <div key={m} className="min-w-0 rounded-md border p-1.5 text-center text-xs"
-                      title={p ? `${p.font_nom ?? ''}${p.motiu ? ` · ${p.motiu}` : ''}` : undefined}>
+                      title={p ? [p.font_nom, textOrigen, p.motiu].filter(Boolean).join(' · ') || undefined : undefined}>
                       <span className="block text-muted-foreground">{t(`preu.mes_curt_${m}`)}</span>
                       <span className="block tabular-nums font-medium">{p ? eurKg(p.eur_kg).replace(' €/kg', '') : '—'}</span>
                       {p && (
                         <Badge className="mt-0.5 bg-secondary px-1 text-[0.625rem] text-secondary-foreground">
                           {t(`preu.font_${p.font}_curt`)}
                         </Badge>
+                      )}
+                      {origen && (
+                        <span className="block text-[0.625rem] text-muted-foreground" data-testid="preu-graella-origen">
+                          {t('preu.from_curt', { mes: t(`preu.mes_curt_${origen.mes}`) })}
+                        </span>
                       )}
                     </div>
                   )

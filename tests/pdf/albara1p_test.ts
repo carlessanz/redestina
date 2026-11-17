@@ -95,7 +95,7 @@ Deno.test("el REC de donación imprime la fuente del valor (definitivo y provisi
   const r2 = await render("rec-font-provisional", provisional);
   assertEquals(r2.paginas, 1);
   const t2 = enUnaLinia((await textPerPagina(r2.bytes, activos)).join("\n"));
-  assert(t2.includes("Valor de referència provisional (darrer publicat: Mercabarna, mitjana de 18 dies, setembre 2026); el certificat aplicarà el del mes de l'albarà."), t2);
+  assert(t2.includes("Valor de referència provisional (darrer publicat: Mercabarna (darrer preu del mes), setembre 2026); el certificat aplicarà el del mes de l'albarà."), t2);
 
   // Un REC de antes de la D2 (sin `valor_font`) no cambia.
   assertEquals(textsFontValor(REC, "ca"), []);
