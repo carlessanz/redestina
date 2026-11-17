@@ -139,6 +139,7 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 
 ⚠️ **17-11-2026 (`20270530100000`, fase C del punto 3): se abren la 181 y la 182** (el texto y el lugar; las fotos al cancelar una edición): **79 vivas** y la siguiente entrada nueva es la 183.
 ⚠️ **17-11-2026 (`20270531100000`, fase D1 del punto 3): se abre la 183** (Mercabarna, solo el día de la página): **80 vivas** y la siguiente entrada nueva es la 184.
+⚠️ **17-11-2026 (`20270601100000`, fase D2 del punto 3): se cierra la 128 y se abren de la 184 a la 187** (flecos del precio del mes del albarán): **83 vivas** y la siguiente entrada nueva es la 188.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -657,12 +658,10 @@ contexto (§6quater) y el `sense_conveni` que el servidor mandaba y la pantalla 
      tocó porque es backend del cierre (RPC + `enlace-publico`) y hay que decidir si se retira
      del todo o se deja como vía opcional.
 
-128. **Una canalización conciliada SIN coste no tiene forma de recibirlo después.** La destapó el
-     análisis del coste sin ejercicio (27-09-2026), pero es anterior: `conciliar_albaran()` exige
-     el albarán entregado o confirmado, y `conciliacion_retroactiva()` rechaza las ya conciliadas,
-     así que fijar después la referencia (o el coste de la oferta) no llega a esa canalización y su
-     bloqueo `sense_cost` del cierre no se levanta. Hoy no hay ninguna en ese estado que importe
-     (son fixtures); cuando la haya hará falta una RPC de «valorar a posteriori» con motivo.
+128. ~~**Una canalización conciliada SIN coste no tiene forma de recibirlo después.**~~ **Cerrada el 17-11-2026
+     (`20270601100000`, D2):** nace provisional (o, si ya existía sin coste, el backfill la marca provisional) y se
+     valora sola al validar el mes de su albarán en Productes › Preus, con rastro en `canalizaciones_preu_hist`; la
+     conciliación ya no pisa el coste. Índice en §12ter.
 
 **Abiertas por la revisión completa del 07-10-2026** (auditoría de seguridad y de calidad del frontend,
 más el trazado de los flujos contra el código; informe en `3. Claude Code/2026-10-07-auditoria-completa.md`).
@@ -921,3 +920,23 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      desfasado). Un día sin job (caída, fuente con error) se pierde y la media del mes sale de menos días (la pantalla
      enseña cuántos). Arreglo: rellenar días pasados con el formulario de fecha, si la página lo permite de forma
      estable. Precio: más peticiones a un tercero; hoy, una al día.
+184. **El recálculo de los certificados tras validar un mes es «best effort»** (17-11-2026, `20270601100000`). Validar
+     un mes ajusta las canalizaciones y recalcula los cierres abiertos y los certificados en borrador afectados
+     (`preus_recalcula_certificats`), cada uno en su bloque de excepción: si uno falla, la validación sigue y ese
+     certificado se queda con su bloqueo `preus_provisionals` hasta que alguien pulse «Calcula». La emisión lo vuelve a
+     comprobar (`preus_canviats`), así que nunca sale un importe viejo. Arreglo: avisar en la pantalla de Preus de los
+     certificados que no se pudieron recalcular. Precio: poco.
+185. **El sello `preu_certificat` también lo pone un certificado de PRUEBA** (17-11-2026, `20270601100000`). Emitir uno
+     de prueba congela el valor de esas canalizaciones (no se ajustan al revalidar el mes) hasta que
+     `reiniciar_periodes_prova()`/`reiniciar_cierre_prueba()` lo quitan. Decisión: es lo prudente (lo que se ha
+     enseñado en papel no cambia por debajo), pero en producción, mientras todo es de prueba, puede dejar valores
+     viejos. Arreglo, si molesta: sellar solo en modo real.
+186. **Las canalizaciones provisionales no tienen badge en `pendents_equip()`** (17-11-2026, `20270601100000`). El
+     aviso vive en Productes › Preus (por mes) y en el bloqueo del certificado; el badge de Productes sigue contando
+     `costos` y `preus` (cargas). Arreglo: una cola `preus_provisionals` (meses pasados con provisionales). Precio: una
+     consulta más en el contador.
+187. **La nota legal fija del REC no habla de la fuente del valor** (17-11-2026, `20270601100000`). La línea de la
+     fuente se imprime bajo el total, pero la nota `nota_valor` de `pdf/render/albara1p.ts` (código, no plantilla)
+     sigue diciendo «a partir dels albarans de recepció i de preus de referència oficials (Observatori Agrari …)», que
+     no casa con «Preu fixat per la Fundació» ni con Mercabarna. Es texto legal: decisión de la Fundació (checkpoint 11).
+     Cambiarla solo afecta a lo que se emita después (lo emitido no se reescribe).

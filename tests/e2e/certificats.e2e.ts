@@ -36,6 +36,9 @@ test.beforeAll(({}, info) => {
   const fila = sql(`select cd.cierre_id || '|' || cd.id from cierres_donante cd
                      join cierres_ejercicio ce on ce.id = cd.cierre_id and ce.modo = 'prueba'
                     where cd.tipo = 'donacio' and cd.certificado_numero is null and cd.kg_total > 0
+                      -- D2 (20270601100000): con valores provisionales no se emite (esperan a que
+                      -- se valide el mes de su albarán); lo prueba «preus-provisionals.e2e.ts».
+                      and public.preus_provisionals_certificat('cierres_donante', cd.id) = '[]'::jsonb
                     order by ce.created_at desc, cd.kg_total desc limit 1`)
   ;[tancament, donant] = fila.split('|')
   sql(`update cierres_donante set bloqueos = '[]', valor_total = greatest(valor_total, 1), revisio_estat = null where id = '${donant}'`)
@@ -137,6 +140,9 @@ test.describe('certificat de donació d’una oferta', () => {
                      and exists (select 1 from canalizaciones c left join entidades en on en.id = c.entidad_id
                                   where c.excedente_id = e.id and c.estado = 'conciliada'
                                     and (c.valorizacion <> 'donacio' or en.tipo_receptor is distinct from 'social'))
+                     -- D2: sin donaciones provisionales (ver «preus-provisionals.e2e.ts»).
+                     and not exists (select 1 from canalizaciones c where c.excedente_id = e.id
+                                       and c.valorizacion = 'donacio' and c.estado <> 'anulada' and c.preu_provisional)
                    order by e.created_at desc limit 1`)
     if (!oferta) return
     // Si una pasada anterior lo dejó emitido, se vuelve al punto de partida (solo prueba).

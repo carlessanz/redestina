@@ -47,6 +47,7 @@ import type { Canalizacion, EstadoAlbaran, Excedente, OfertaRespuesta } from '..
 import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
 import { fixaFotos } from '../lib/fotos'
+import ValorCanalitzacio from './ValorCanalitzacio'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 
@@ -1075,6 +1076,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   </span>
                 )}
                 {difiere && <span className="text-xs text-aviso">{t('od.differs')}</span>}
+                {/* D2: el valor por kilo con su fuente, su mes y si es provisional. Solo las
+                    donaciones (las ventas y maquilas no van al certificado). */}
+                {c.valorizacion === 'donacio' && <ValorCanalitzacio c={c} />}
                 {/* El albarán ya no es un texto que compone el panel con marcadores y sin
                     número: es una fila numerada de `albaranes` con su PDF. Aquí solo se
                     enlaza (checkpoint §12.4 y deuda 40, cerradas). */}

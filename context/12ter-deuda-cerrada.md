@@ -6,7 +6,7 @@
 
 ## 12ter. Deuda cerrada (el índice, no el cuerpo)
 
-Las **98** entradas de §12 que están resueltas (la 106 se cerró el 11-10-2026; la 85 y la 139, el 05-11-2026; la 168, el 09-11-2026; de la 174 a la 178 y la 140, el 10-11-2026; la 115 y la 116, el 11-11-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
+Las **99** entradas de §12 que están resueltas (la 128, el 17-11-2026 con la D2 del punto 3; la 106 se cerró el 11-10-2026; la 85 y la 139, el 05-11-2026; la 168, el 09-11-2026; de la 174 a la 178 y la 140, el 10-11-2026; la 115 y la 116, el 11-11-2026) (recontado el 07-10-2026). Su cuerpo se retiró del documento el 15-09-2026;
 lo que queda es esta línea, y el detalle vive en `git log -- AGENTS.md`.
 
 **Para qué sirve esta tabla, que no es nostalgia.** 🔴 **48 de estos números están citados desde el
@@ -24,6 +24,7 @@ se va solo **cómo se llegó hasta aquí**.
 
 | # | Qué era | Cerrada |
 |---|---|---|
+| 128 | Una canalización conciliada sin coste no podía recibirlo después (su `sense_cost` no se levantaba) | `20270601100000` (D2: nace provisional y se valora al validar el mes de su albarán; la conciliación ya no pisa el coste) |
 | 1 | Sin linter y sin CI | 11-09-2026 |
 | 2 | No hay roles | 30-07-2026 |
 | 3 | El intake avanza de paso aunque falle el envío | 11-09-2026 |

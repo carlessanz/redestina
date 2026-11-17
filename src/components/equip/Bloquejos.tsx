@@ -9,12 +9,15 @@
 //    cual. Es el mismo criterio que con los mensajes de error de las RPC: quien conoce el dato
 //    exacto es quien lo calculó, y reescribirlo aquí solo puede empeorarlo.
 
+import { Link } from 'react-router'
 import { useT } from '../../lib/i18n'
+import { rutaPreusMes } from '../../lib/preus'
+import { textMes } from '../../lib/valoracio'
 import type { BloqueigCierre } from '../../types'
 import { Badge } from '@/components/ui/badge'
 
 export default function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
-  const { t } = useT()
+  const { t, lang } = useT()
   if (llista.length === 0) return <span className="text-sm text-muted-foreground">—</span>
   return (
     <ul className="space-y-1">
@@ -26,6 +29,21 @@ export default function Bloquejos({ llista }: { llista: BloqueigCierre[] }) {
             {t(`tan.bl_${b.codigo}`)}
           </Badge>
           <p className="mt-0.5 text-xs text-muted-foreground">{b.detall}</p>
+          {/* D2: cada mes por validar, con su enlace a Productes › Preus de ese mes. */}
+          {b.codigo === 'preus_provisionals' && Array.isArray(b.mesos) && b.mesos.length > 0 && (
+            <ul className="mt-0.5 space-y-0.5 text-xs" data-testid="bloqueig-mesos">
+              {[...new Set(b.mesos.map((m) => m.mes))].map((mes) => (
+                <li key={mes}>
+                  <Link to={rutaPreusMes(mes)} className="font-medium text-primary hover:underline">
+                    {t('tan.bl_validate_month', {
+                      m: textMes(mes, lang === 'es' ? 'es' : 'ca') ?? mes,
+                      p: b.mesos!.filter((x) => x.mes === mes).map((x) => x.producto).join(', '),
+                    })}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
         </li>
       ))}
     </ul>

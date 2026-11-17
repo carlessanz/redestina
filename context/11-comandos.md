@@ -463,3 +463,17 @@ Orden: **base → función → frontend**.
 
 En el clon: `select disparar_preus_fonts('gencat')` llama a la función local por `url_funciones()`
 (`http://kong:8000/functions/v1`); el servidor de funciones del clon recoge la función nueva sin reiniciar.
+
+### Publicar la fase D2 del punto 3: el precio del mes del albarán (17-11-2026, `20270601100000`)
+
+Orden: **base → funciones → frontend**.
+1. `aplicar-migracion.ts supabase/migrations/20270601100000_preu_mes_albara.sql` (columnas, rastro, triggers, backfill:
+   lo que tenga coste queda `historic`; lo que no, provisional). Antes, `--dry-run`.
+2. `functions deploy generar-documento` (REC y CD imprimen la fuente; activos sin tocar: `diagnostic-pdf` NO hace
+   falta) y después `select emitir_documento_prova()`; `functions deploy crear-oferta` (propuesta de coste),
+   `functions deploy whatsapp-webhook` y `functions deploy recollides-programades` (importan `_shared/intake.ts` y
+   `camposOferta.ts`), cada una con su `--no-verify-jwt` según `config.toml`.
+3. `git push` (frontend) y el arnés contra producción.
+Prueba en el clon: `PGPASSWORD=postgres psql -h 127.0.0.1 -p 55322 -U postgres -d postgres -X -v ON_ERROR_STOP=1 -f
+scripts/sql/prova-preu-mes-albara.sql` («TOT CORRECTE»).
+

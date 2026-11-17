@@ -42,6 +42,9 @@ const HOJA = [
   // Fase D1 del punto 3 (17-11-2026): normalizar nombres y proponer equivalencias con las
   // fuentes de precios al dar de alta un producto (los lectores de Gencat y Mercabarna, puros).
   'preusFonts',
+  // Fase D2 del punto 3 (17-11-2026): cómo se escribe la fuente del valor por kilo, la misma en
+  // el REC, en el certificado y en el panel del equipo.
+  'fontValor',
 ]
 
 /** El código sin comentarios: «sin red ni Deno.» en un comentario no es un uso. */

@@ -166,8 +166,8 @@ pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
 `disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
-`recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg`
-congelado al conciliar, `data_hora_recollida`, columnas de la recogida protegidas por trigger);
+`recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg` = **precio del mes
+del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, columnas de la recogida protegidas por trigger);
 `excedente_destins` + catálogo `destins_finals`; `excedentes_canvis`; `avisos` (lo que se le
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
@@ -175,7 +175,7 @@ cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas
 `factores_conversion`, `costes_producto` (coste de **referencia**, uno por producto, +hist),
 **precios de referencia por mes** (D1, `20270531100000`; `context/04`): `preus_referencia` (producto × año × mes
 validado, +hist), `preus_carregues`/`preus_observats` (original en el bucket `preus-fonts`), `productes_fonts`,
-`preus_fonts_estat`; `productos.preu_manual`/`nombre_es`. `preu_referencia_de()` (interna) es para D2: **aún no valora nada**.
+`preus_fonts_estat`; `productos.preu_manual`/`nombre_es`. `preu_referencia_de()` (interna) valora las canalizaciones (D2).
 `tipos_caja`, `municipios` (947, INE), `codis_postals`, `tipus_activitat`, `factors_impacte`,
 `modalitat_receptor_compat` y `convenios_exigidos` (reglas **en tabla**), `convenis_equivalents`.
 Whitelists `meta_test_recipients`, `email_test_recipients` (vacía = sin límite). `app_config`
@@ -198,13 +198,9 @@ sin borrado salvo `reiniciar_documentos_prova()`), `documento_envios` (solo corr
 `pg_cron` `documentos-pendientes` (5 intentos, dos contadores). **Cinco columnas fuera del GRANT
 de SELECT**: `enlaces_token.token_hash/codigo_hash`, `evidencias.documento_identidad`,
 `parametros_documentales.apoderada_dni`, `documentos.envio` → `select('*')` da `42501`; toda
-columna nueva de `documentos` nace sin SELECT. **Circuito de firma (05-11-2026)**: la contraparte
-firma CD·CR·REC·ENT (trazo en panel/enlace, o PDF firmado subido) y CONV (solo subido); una firma =
-**versión n+1 `subtipo='signat'` con el mismo `sha256_datos`**; `firmes_document` (vía canvas·pujat·
-correu; estat signat·tancat·rebutjat; sin DNI) lo registra, «pendent» lo deriva
-`document_part_signant()` y lo sirven `v_signatura_document`/`v_signatures_bandeja`. Trazo y subida
-del super_admin cierran al momento; la subida de la organización espera en «Signatures per tancar».
-Un externo nunca firma en prueba. Nada se bloquea por la firma. **Lo emitido no se reescribe**; solo en
+columna nueva de `documentos` nace sin SELECT. **Firma** (05-11-2026; `context/04`): la contraparte firma CD·CR·REC·ENT
+(trazo o PDF subido) y CONV (subido); firma = **versión n+1 `subtipo='signat'`, mismo `sha256_datos`**, en
+`firmes_document`; un externo nunca firma en prueba; nada se bloquea por la firma. **Lo emitido no se reescribe**; solo en
 modo test el super_admin lo regenera con los datos de la Fundació de ahora (`regenerar_documents_fundacio`:
 versión n+1, salta los firmados; Configuració › Fundació).
 
@@ -268,18 +264,16 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `authenticated` si es interna o de trigger); `auditoria_funcions_obertes()` debe seguir en
   **0 filas** (lo vigila el arnés). `create or replace` **no cambia `returns table`** ni el
   número de argumentos: drop + create + revoke/grant.
-- **Superficie de escritura de los paneles = RPC**, no políticas. La lista de familias con los nombres exactos
-  (interés y aprobación, ficha propia, ofertas, recogida —`registrar_recollida` del receptor **solo declara**;
-  `validar_recollida` del admin emite y concilia—, albaranes, convenios, organización y estado CRM, acceso, notas,
-  RGPD, equipo, borrado, importación/exportación, firma, cierre, diagnóstico, interruptores y jobs) vive en
-  `context/04bis`, «Familias de RPC».
+- **Superficie de escritura de los paneles = RPC**, no políticas (familias y nombres exactos: `context/04bis`,
+  «Familias de RPC»; `registrar_recollida` del receptor **solo declara**, `validar_recollida` del admin emite y concilia).
 - **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos(p_tipo_org, p_org, p_user)` (`operativa`, `excedents`; la usa
   `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
   (motivo si difiere), equivalencias, `fixar_preu_manual`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
-  `fixar_font_preus` (super_admin). Propuesta: Gencat → media de Mercabarna → manual.
+  `fixar_font_preus` (super_admin). Propuesta: Gencat → media de Mercabarna → manual. **D2**: `preus_canalitzacions_mes`
+  (equipo); nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
 - Triggers de respaldo: `respuestas_control_aprovacio`, `membresias_control_aprovacio`,
@@ -364,6 +358,8 @@ Lo que manda hoy, en una línea cada uno:
   subcausa** en un `Desplegable` agrupado (`lib/causes.ts`; también en «Edita l’oferta» y, varias, en el Diagnòstic).
 - **Productes** (D1): pestañas Catàleg · Preus de referència · Càrregues (`?pestanya=`), «Nou producte» con las
   coincidencias de `_shared/preusFonts.ts`; la ficha del producto, `PreusProducte` (equivalencias y rejilla año × mes).
+  **D2**: Preus `?mes=` avisa de lo que espera; `ValorCanalitzacio` (valor, fuente, mes, «Provisional»); el bloqueo
+  `preus_provisionals` enlaza al mes.
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
   para copiar (`MissatgesDelPunt`); **Ciclo guiado** `/equip/canalitzacio/:id` (17 pasos, 6 fases, RPC reales).
 - Otros: doble rol = todos los paneles, el activo por la URL (`useOrganitzacio(tipus)`); el
@@ -416,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270531100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270601100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -454,6 +450,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
 - Proceso de canalización: intake → distribución → confirmación → cierre. Ranking: sin
   convenio, al final; `estat` solo excluye «No procedeix». Valor = kg × coste
   por kilo de la canalización (nunca `productos.eur_kg` para lo fiscal).
+- 🔴 **Precio del mes del albarán (D2, opción A)**: declarado en la oferta → definitivo; si no, `preu_referencia_de` del mes
+  del REC; sin validar = **provisional**, se ajusta solo al validarlo (no lo certificado); con provisionales no se certifica.
 
 ## 8bis. Canal preferente
 
@@ -549,34 +547,33 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (80 vivas; la siguiente entrada nueva es la 184; los números no se renumeran ni
+**Deuda abierta (83 vivas; la siguiente entrada nueva es la 188; los números no se renumeran ni
 se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
 cliente, aceptado) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el correo del resumen sigue
-ofreciendo la factura) · **128** (canalización conciliada sin coste no se puede valorar después)
-· **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
+ofreciendo la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado no los ve nadie) · **146** (`organizacion_contactos` sin uso) · **149**
 (dos vistas sin uso desde 1C) · **151** (rama muerta `alta_assistida` en `registro/alta.ts`)
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA 2026 no crea `productor_ubicaciones`) · **154** (código muerto del CT) · **155**
 (una rectificación reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (el interés en maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
 (backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
 inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 
-**§12bis** y **§12ter** (98 cerradas, indexadas) viven en `context/`.
+**§12bis** y **§12ter** (99 cerradas, indexadas) viven en `context/`.
 
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.066 pruebas de Vitest en 95 ficheros (1 saltada a propósito) + 58 de Deno.**
+   **Referencia: 2.083 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.747/2.747 y 45 sin datos; producción 2.554/2.554 y 41 (antes de D1) «Sin
+   **Referencia: clon 2.862/2.862 y 47 sin datos; producción 2.554/2.554 y 41 (antes de D1) «Sin
    fallos de permisos».** Una cifra que cambia sin checks nuevos es cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).

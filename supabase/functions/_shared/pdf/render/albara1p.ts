@@ -28,6 +28,7 @@ import {
   lineasDe, num, type OpcionesAlbaran, type ParteAlbaran, type Renderizado, textoIncidencias,
 } from "./comu.ts";
 import { dataSignatura, embeberTrazo, textosSignatura, viaSignatura } from "./signatura.ts";
+import { textFontValor, type ValorFont } from "../../fontValor.ts";
 
 type Idioma = "ca" | "es";
 
@@ -37,7 +38,22 @@ export interface DatosAlbara1p extends DatosAlbaran {
   data_elaboracio?: string | null;
   modalitat?: string | null;
   fundacio?: { razon_social?: string | null; nif?: string | null; domicilio?: string | null } | null;
-  linies?: (LineaAlbaran & { valor_kg?: number | null })[] | null;
+  linies?: (LineaAlbaran & { valor_kg?: number | null; valor_font?: ValorFont | null })[] | null;
+}
+
+/**
+ * De dónde sale el valor por kilo de las líneas (punto 3, fase D2): una frase por fuente
+ * distinta, en el orden de las líneas. Vacío si el snapshot no lo trae (un REC de antes de la
+ * D2) o si la tabla no lleva euros. Exportada para la prueba: es exactamente lo que se imprime.
+ */
+export function textsFontValor(datos: DatosAlbara1p, idioma: "ca" | "es"): string[] {
+  const out: string[] = [];
+  for (const l of lineasDe(datos) as (LineaAlbaran & { valor_kg?: number | null; valor_font?: ValorFont | null })[]) {
+    if (l.valor_kg == null && !l.valor_font?.provisional) continue;
+    const txt = textFontValor(l.valor_font ?? null, idioma);
+    if (txt && !out.includes(txt)) out.push(txt);
+  }
+  return out;
 }
 
 const TXT = {
@@ -328,6 +344,13 @@ export async function renderAlbara1p(activos: BytesActivos, op: OpcionesAlbaran)
     ? ["", "", t.total, num(totalKg, totalKg % 1 === 0 ? 0 : 1), t.total, `${num(totalImport, 2)} €`]
     : ["", "", t.total, "", num(totalKg, totalKg % 1 === 0 ? 0 : 1)], { negreta: true });
   y -= 14;
+
+  // De dónde sale el valor por kilo (D2): «Valor de referència: Gencat, preus percebuts pel
+  // pagès, setembre 2026», o provisional con el último publicado.
+  if (ambEuros) {
+    for (const f of textsFontValor(datos, idioma)) y = parrafo(f, MARGEN, y, ANCHO, { size: 8, color: COLORES.verdeGris }) - 2;
+    y -= 6;
+  }
 
   // ------------------------------------------------------ lo que pasó
   // Lo mínimo de la entrega, en una o dos líneas: cuándo y dónde, el origen del ENT (D3:

@@ -1867,8 +1867,8 @@ Fase C del punto 3 (filas 3.1.2 y 3.7 del Excel de la Fundació). Pantallas en `
 ### Precios de referencia por producto, año y mes (17-11-2026, punto 3 fase D1, `20270531100000`)
 
 **Para qué**: un precio de referencia por producto y mes que el equipo valida, sacado de dos fuentes públicas, para
-valorar más adelante (D2) las canalizaciones, albaranes y certificados. **Hoy no valora nada**: el coste de una
-canalización sigue saliendo de `excedentes.coste_kg` / `costes_producto` como antes.
+valorar las canalizaciones, albaranes y certificados. **Desde la D2 (`20270601100000`, sección siguiente) valora las
+canalizaciones** con el precio del mes de su albarán.
 
 - **`productos`** gana `preu_manual boolean not null default false` (no se busca en ninguna fuente: cada mes vale el
   manual vigente, `costes_producto`) y `nombre_es` (nombre en castellano, para casar con Mercabarna).
@@ -1897,6 +1897,56 @@ canalización sigue saliendo de `excedentes.coste_kg` / `costes_producto` como a
 - RLS en las seis tablas: SELECT con `es_intern()`; `authenticated` solo SELECT; `anon` nada. Se escribe por RPC
   (§4bis) y la Edge Function `preus-fonts`. Las columnas de autoría del equipo entran solas en `equip_columnes_autoria()`.
 - `pendents_equip()` gana la cola 18.ª **`preus`**: cargas de Gencat `pendent` + fuentes con `darrer_resultat = 'error'`.
+
+### El precio del mes del albarán (17-11-2026, punto 3 fase D2, `20270601100000`)
+
+**La regla (opción A del cliente, «el certificat agafa els preus del mes en què es van generar els albarans»)**: cada
+canalización guarda su valor por kilo, su FUENTE, el MES DEL ALBARÁN y si es PROVISIONAL. El certificado aplica lo
+guardado; si algo es provisional, no se emite.
+
+- **`canalizaciones`** gana `preu_font` (declarat · gencat · mercabarna · manual · fixat · historic), `preu_mes_albara`
+  (día 1 del mes del albarán), `preu_mes_font` (de qué mes sale el precio), `preu_font_dies` (Mercabarna),
+  `preu_provisional boolean not null default false`, `preu_certificat` (número del certificado emitido que lo congeló)
+  y `preu_certificat_at`. Índice parcial por `preu_mes_albara` (no anuladas).
+- **Mes del albarán** (`mes_albara_canalitzacio`): el mes (Madrid) del **REC de la oferta** (el primero creado; o el
+  de la jornada si es espigolada); sin REC, el de la canalización. Todas las salidas de una oferta comparten el valor
+  de su único REC, que es el que imprime.
+- **Al crear la canalización** (`trg_canalizaciones_valoriza` → `valoracio_canalitzacio`): coste declarado en la
+  oferta → `declarat`, definitivo; si no, `preu_referencia_de(producto, mes del albarán)`: validado del mes →
+  definitivo con su fuente; si no, el último validado → **provisional**; sin ninguno → null y provisional. Un coste
+  explícito al insertar (sin sesión) → `fixat`. Venta y maquila se valoran igual (no van al certificado).
+- **Protección** (`canalizaciones_protegeix_preu`, BEFORE INSERT/UPDATE): con sesión, nadie escribe `preu_*`; el coste
+  de una conciliada o certificada no se cambia (`42501 preu_canalitzacio_protegit` / `canalitzacio_certificada`); un
+  cambio directo del equipo en una no conciliada la deja `fixat`. Bypass solo `redestina.ajust_preus` (los ajustes de
+  esta sección) y `redestina.traspas_autoria`.
+- **Rastro** `canalizaciones_preu_hist` (coste/fuente/mes/provisional anterior y nuevo, `motiu` mes_validat ·
+  mes_revalidat · conciliacio · conciliacio_retroactiva · canvi_directe, `detall`, `canviat_per`, `canviat_at`): trigger
+  AFTER UPDATE si cambia algo de eso. RLS: SELECT `es_intern()`; sin escritura para sesiones. `canviat_per` entra en
+  `equip_columnes_autoria()`.
+- **Al validar un mes** (triggers por sentencia `preus_referencia_aplica_ins/_upd` → `preus_ajusta_canalitzacions`):
+  las provisionales de ese mes de albarán y producto, no anuladas ni certificadas, pasan al precio validado
+  (`mes_validat`); las definitivas del mismo mes con fuente de referencia cuyo precio cambia (revalidar) también
+  (`mes_revalidat`). Nunca `declarat`, `fixat`, `historic` ni lo certificado. Después, `preus_recalcula_certificats`
+  recalcula (best effort) los cierres abiertos y los certificados de intervalo/oferta en borrador afectados.
+- **Certificados** (`trg_cierre_preus` en `cierres_donante` y `cierres_periodo`, antes de `*_revisio`): al calcular,
+  bloqueo `preus_provisionals` (`bloqueja`, `detall`, `mesos` = [{producto, mes aaaa-mm, n, sense_preu}]; quita el
+  `sense_cost` que ya explica); al emitir (o rectificar), `22023 preus_provisionals: <producto (mm/aaaa)…>` y `22023
+  preus_canviats` si una línea no coincide con el coste de su canalización; al emitir, sella `preu_certificat`; al
+  reiniciar uno de prueba, lo quita. Snapshots: `cierre_datos_certificado`/`periodo_datos_certificado` añaden
+  `fonts_valor` (fuentes distintas) y `detall_fonts` (por línea); `albaran_datos` lleva por línea del REC de donación
+  `valor_kg` y `valor_font` (`valor_linia_rec`).
+- **Conciliación**: `conciliar_albaran` y `conciliacion_retroactiva` ya no pisan el coste: si falta, lo valoran
+  (`valora_canalitzacio_si_cal`); un coste explícito en la retroactiva queda `fixat`.
+- **Backfill** (deuda 128, cerrada): todas con `preu_mes_albara`; con coste → `historic` (no se mueven); las de
+  certificados emitidos, selladas; sin coste ni certificado → provisionales (se valoran al validar su mes).
+- **Lectura del equipo**: `preus_canalitzacions_mes(p_exercici, p_mes)` (producto, provisionales, sense_preu, kg, ids).
+  Internas sin EXECUTE: `mes_albara_canalitzacio`, `valoracio_canalitzacio`, `preus_vigents_oferta` (solo
+  `crear-oferta`), `valora_canalitzacio_si_cal`, `preus_ajusta_canalitzacions`, `preus_recalcula_certificats`,
+  `preus_provisionals_certificat`, `preus_provisionals_text`, `fonts_valor_certificat`, `valor_linia_rec`.
+- **La oferta**: `crear-oferta/campos` propone `cost_referencia` = `preus_vigents_oferta()` (el precio de referencia de
+  hoy) con `cost_referencia_mes`, `_font` y `_provisional`; el panel solo manda `cost_kg` si el productor lo cambia
+  (`lib/valoracio.ts`, `costADeclarar`) y WhatsApp «Mantenir» guarda null. Así, sin cambiarlo, manda el mes del albarán.
+- Prueba: `scripts/sql/prova-preu-mes-albara.sql` (con ROLLBACK).
 
 ### Resumen de §4 movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 

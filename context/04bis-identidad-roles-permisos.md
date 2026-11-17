@@ -801,3 +801,16 @@ Internas (sin EXECUTE para `authenticated`): `preus_fonts_mes`, `preus_calcula_m
 es un duplicado), `preu_referencia_de` (D2) y `disparar_preus_fonts` (los jobs). El arnés las cubre en `PREUS_INTERNES`,
 `PREUS_EXTERN`, `PREUS_TECNIC` y `PREUS_SUPER`; la lógica, `scripts/sql/prova-preus-referencia.sql` (transacción con
 `rollback`).
+
+### El precio del mes del albarán (punto 3, D2, `20270601100000`, 17-11-2026)
+
+| RPC | Quién | Qué |
+| --- | --- | --- |
+| `preus_canalitzacions_mes(p_exercici, p_mes)` | `es_intern()` | Por producto, las canalizaciones de ese mes de albarán que esperan precio (provisionales sin certificar) y las que no tienen ninguno. `22023 mes_invalid`; un externo, `42501` |
+
+Sin escritura nueva para sesiones: el valor de una canalización lo ponen triggers (al crearla, al validar un mes en
+`validar_preus_mes`/`validar_preus_periode`/`fixar_preu_referencia`, al conciliar). `canalizaciones_protegeix_preu`
+corta con `42501` cualquier `preu_*` escrito desde una sesión y el coste de una conciliada (`preu_canalitzacio_protegit`)
+o certificada (`canalitzacio_certificada`). `canalizaciones_preu_hist`: SELECT solo `es_intern()`, sin GRANT de
+escritura. Internas (sin EXECUTE para `authenticated`): las diez de `context/04`, D2. Arnés: 13 checks nuevos por
+perfil (internas denegadas, rastro y lectura del mes solo del equipo).

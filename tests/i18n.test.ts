@@ -369,6 +369,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       valores: [
         'sense_conciliar', 'sense_cost', 'dades_fiscals', 'sense_rec',
         'certificat_desactualitzat', 'sense_ope', 'sense_nif',
+        // D2 (20270601100000): `trg_cierre_preus` lo pone en CD y en los de intervalo/oferta.
+        'preus_provisionals',
       ],
     },
     {

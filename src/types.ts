@@ -394,7 +394,20 @@ export interface Canalizacion {
   conciliada_por: string | null
   motivo_conciliacion: string | null
   conciliacion_retroactiva: boolean
-
+  /**
+   * Punto 3, fase D2 (20270601100000): de dónde sale `coste_kg`. Los escribe solo la base
+   * (trigger `canalizaciones_protegeix_preu`); opcionales porque un `select` explícito puede no
+   * pedirlos. `preu_provisional` = el mes del albarán aún no estaba validado: el valor es el
+   * último publicado y se ajustará solo al validarlo.
+   */
+  preu_font?: 'declarat' | 'gencat' | 'mercabarna' | 'manual' | 'fixat' | 'historic' | null
+  preu_mes_albara?: string | null
+  preu_mes_font?: string | null
+  preu_font_dies?: number | null
+  preu_provisional?: boolean
+  /** El certificado emitido que congeló el valor (número); null = aún se puede ajustar. */
+  preu_certificat?: string | null
+  preu_certificat_at?: string | null
 }
 
 export interface OfertaRespuesta {
@@ -866,6 +879,8 @@ export interface BloqueigCierre {
   codigo: string
   detall: string
   bloqueja: boolean
+  /** Solo `preus_provisionals` (D2): los productos y meses (`aaaa-mm`) que faltan por validar. */
+  mesos?: { producto: string; mes: string; n: number; sense_preu: number }[]
 }
 
 export interface CierreDonante {

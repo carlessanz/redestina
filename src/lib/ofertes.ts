@@ -158,7 +158,11 @@ export async function creaUbicacio(args: {
 export interface CatalogosOferta {
   familias: string[]
   /** `foto_mini` y `cost_referencia` llegan desde el 27-09-2026; un servidor anterior no los manda. */
-  productos: { nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null }[]
+  productos: {
+    nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null
+    /** D2 (17-11-2026): de qué mes y fuente sale la propuesta y si es provisional (mes sin validar). */
+    cost_referencia_mes?: string | null; cost_referencia_font?: string | null; cost_referencia_provisional?: boolean | null
+  }[]
   /**
    * Fase B del punto 3 (20270529100000): las causas ACTIVAS en orden, cada una con sus
    * `subcausas`. El panel elige una subcausa y la manda en `datos.causa`. Un servidor anterior

@@ -720,6 +720,20 @@ const PREUS_INTERNES: Check[] = [
   { tabla: "preus_referencia", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap preu de referencia a ma (D1)" },
   { tabla: "productes_fonts", op: "insertar", esperado: "denegar", descripcion: "NO escriu cap equivalencia a ma (D1)" },
   { tabla: "preus_fonts_estat", op: "actualizar", esperado: "denegar", descripcion: "NO toca l'estat de les fonts a ma (D1)" },
+  // D2 (20270601100000): el precio del mes del albarán. Las funciones internas (valorar,
+  // ajustar al validar, recalcular certificados, componer el snapshot) no tienen EXECUTE para
+  // ninguna sesión; el rastro de los cambios no se escribe a mano.
+  { tabla: "mes_albara_canalitzacio", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_creada: "2026-09-15T10:00:00Z" }, descripcion: "NO crida el mes de l'albara (intern) (D2)" },
+  { tabla: "valoracio_canalitzacio", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_mes: "2026-09-01" }, descripcion: "NO crida la valoracio d'una canalitzacio (intern) (D2)" },
+  { tabla: "preus_vigents_oferta", op: "rpc", esperado: "denegar", args: { p_data: "2026-09-15" }, descripcion: "NO llegeix els preus vigents (nomes crear-oferta) (D2)" },
+  { tabla: "valora_canalitzacio_si_cal", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "conciliacio" }, descripcion: "NO valora una canalitzacio a ma (intern) (D2)" },
+  { tabla: "preus_ajusta_canalitzacions", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_exercici: 2025, p_mes: 1 }, descripcion: "NO ajusta canalitzacions a ma (intern) (D2)" },
+  { tabla: "preus_recalcula_certificats", op: "rpc", esperado: "denegar", args: { p_ids: [] }, descripcion: "NO recalcula certificats a ma (intern) (D2)" },
+  { tabla: "preus_provisionals_certificat", op: "rpc", esperado: "denegar", args: { p_taula: "cierres_periodo", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida els provisionals d'un certificat (intern) (D2)" },
+  { tabla: "preus_provisionals_text", op: "rpc", esperado: "denegar", args: { p_items: [] }, descripcion: "NO crida el text dels provisionals (intern) (D2)" },
+  { tabla: "fonts_valor_certificat", op: "rpc", esperado: "denegar", args: { p_taula: "cierres_periodo", p_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida les fonts d'un certificat (intern) (D2)" },
+  { tabla: "valor_linia_rec", op: "rpc", esperado: "denegar", args: { p_albaran: "00000000-0000-0000-0000-000000000000", p_producto: "x" }, descripcion: "NO crida el valor d'una linia del REC (intern) (D2)" },
+  { tabla: "canalizaciones_preu_hist", op: "insertar", esperado: "denegar", descripcion: "NO escriu el rastre dels preus a ma (D2)" },
 ];
 
 // Lo que se añade a `DOCUMENTAL_EXTERN` (los cinco perfiles externos).
@@ -736,6 +750,8 @@ const PREUS_EXTERN: Check[] = [
   { tabla: "validar_preus_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2025, p_mes: 13 }, descripcion: "NO valida cap mes de preus (D1)" },
   { tabla: "crear_producte", op: "rpc", esperado: "denegar", args: { p_nombre: "", p_familia: "x" }, descripcion: "NO dona d'alta productes (D1)" },
   { tabla: "afegir_equivalencia_preu", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_font: "x", p_nom_font: "" }, descripcion: "NO afegeix equivalencies de preus (D1)" },
+  { tabla: "canalizaciones_preu_hist", op: "leer", esperado: "denegar", descripcion: "NO veu el rastre dels preus de les canalitzacions (D2)" },
+  { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "denegar", args: { p_exercici: 2026, p_mes: 9 }, descripcion: "NO llegeix les canalitzacions que esperen preu (D2)" },
 ];
 
 // El técnico: lee todo y la propuesta, pero no valida ni da de alta (es de `pot_aprovar()`).
@@ -757,6 +773,8 @@ const PREUS_TECNIC: Check[] = [
   { tabla: "fixar_preu_manual", op: "rpc", esperado: "denegar", args: { p_producto: "TEST-ARNES-INEXISTENT", p_manual: false }, descripcion: "NO marca preu manual (D1)" },
   { tabla: "marcar_carrega_preus", op: "rpc", esperado: "denegar", args: { p_id: "00000000-0000-0000-0000-000000000000", p_estat: "descartada", p_motiu: "arnes" }, descripcion: "NO descarta carregues (D1)" },
   { tabla: "fixar_font_preus", op: "rpc", esperado: "denegar", args: { p_font: "x", p_automatic: null }, descripcion: "NO toca les fonts (es del super_admin) (D1)" },
+  { tabla: "canalizaciones_preu_hist", op: "leer", esperado: "permitir", descripcion: "veu el rastre dels preus de les canalitzacions (D2)", requiereFixture: "alguna canalitzacio ajustada en validar un mes" },
+  { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2026, p_mes: 13 }, descripcion: "llegeix les canalitzacions que esperen preu (autoritza; 22023 mes_invalid) (D2)" },
 ];
 
 // El super_admin (y, por `pot_aprovar()`, un admin): todo, con argumentos que cortan en 22023.
@@ -776,6 +794,8 @@ const PREUS_SUPER: Check[] = [
   { tabla: "fixar_preu_manual", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_producto: "TEST-ARNES-INEXISTENT", p_manual: false }, descripcion: "pot marcar preu manual (autoritza; 22023 producte_inexistent) (D1)" },
   { tabla: "marcar_carrega_preus", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_id: "00000000-0000-0000-0000-000000000000", p_estat: "descartada", p_motiu: "arnes" }, descripcion: "pot descartar carregues (autoritza; 22023 carrega_inexistent) (D1)" },
   { tabla: "fixar_font_preus", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_font: "x", p_automatic: null }, descripcion: "pot configurar les fonts (autoritza; 22023 font_invalida) (D1)" },
+  { tabla: "canalizaciones_preu_hist", op: "leer", esperado: "permitir", descripcion: "veu el rastre dels preus de les canalitzacions (D2)", requiereFixture: "alguna canalitzacio ajustada en validar un mes" },
+  { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2026, p_mes: 13 }, descripcion: "llegeix les canalitzacions que esperen preu (autoritza; 22023 mes_invalid) (D2)" },
 ];
 
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
@@ -3312,6 +3332,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
 const FILA_PRUEBA: Record<string, Record<string, unknown>> = {
   // A5: una fila VÁLIDA de la regla, para que el rechazo sea el GRANT y no una columna que no existe.
   modalitat_naturalesa_compat: { modalitat: "donacio", naturalesa: "empresa" },
+  // D2: una fila con las columnas reales, para que el rechazo sea el GRANT (sin INSERT).
+  canalizaciones_preu_hist: { canalizacion_id: "00000000-0000-0000-0000-000000000000", motiu: "canvi_directe" },
   excedentes: { producto: "TEST-RLS", estado: "borrador" },
   excedente_destins: { excedente_id: "00000000-0000-0000-0000-000000000000", desti_codi: "venda", kg: 1, origen: "productor" },
   canalizaciones: { kg_confirmados: 1 },

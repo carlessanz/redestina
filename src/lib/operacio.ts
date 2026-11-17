@@ -80,6 +80,33 @@ export async function carregaOperacio(canalizacionId: string): Promise<Operacio 
 }
 
 /**
+ * El valor por kilo de una canalización con su fuente (D2, 20270601100000). Solo el equipo: la
+ * ficha lo pide cuando `rol === 'equip'` (la RLS de `canalizaciones` deja leerla a las partes,
+ * pero el valor de la donación es cosa del equipo y del certificado). Null si no se puede leer.
+ */
+export interface ValorOperacio {
+  coste_kg: number | null
+  preu_font: string | null
+  preu_mes_albara: string | null
+  preu_mes_font: string | null
+  preu_font_dies: number | null
+  preu_provisional: boolean
+  preu_certificat: string | null
+}
+
+export async function carregaValorOperacio(canalizacionId: string): Promise<ValorOperacio | null> {
+  try {
+    const { data, error } = await supabase.from('canalizaciones')
+      .select('coste_kg, preu_font, preu_mes_albara, preu_mes_font, preu_font_dies, preu_provisional, preu_certificat')
+      .eq('id', canalizacionId).maybeSingle()
+    if (error) return null
+    return (data as ValorOperacio | null) ?? null
+  } catch {
+    return null
+  }
+}
+
+/**
  * Lo que devuelve `registrar_recollida()` desde el 17-10-2026: el registro, y nada más. Los
  * albaranes los genera la validación del equipo (`validar_recollida()`).
  */

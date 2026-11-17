@@ -249,6 +249,35 @@ export function carregaPropostaMes(exercici: number, mes: number) {
   return rpc<PropostaPreu[]>('preus_proposta_mes', { p_exercici: exercici, p_mes: mes })
 }
 
+/**
+ * Una fila de `preus_canalitzacions_mes()` (D2, 20270601100000): las canalizaciones cuyo
+ * albarán es de ese mes y aún esperan su precio (provisionales, sin certificar). Al validar el
+ * mes se ajustan solas; `sense_preu` = ni siquiera tienen uno provisional.
+ */
+export interface CanalitzacionsMes {
+  producto: string
+  provisionals: number
+  sense_preu: number
+  kg: number | null
+}
+
+export function carregaCanalitzacionsMes(exercici: number, mes: number) {
+  return rpc<CanalitzacionsMes[]>('preus_canalitzacions_mes', { p_exercici: exercici, p_mes: mes })
+}
+
+/** `aaaa-mm` → `{exercici, mes}` (el `?mes=` de Productes › Preus). Null si no se lee. */
+export function mesDeParam(v: string | null): { exercici: number; mes: number } | null {
+  const m = v?.match(/^(\d{4})-(\d{2})$/)
+  if (!m) return null
+  const mes = Number(m[2])
+  return mes >= 1 && mes <= 12 ? { exercici: Number(m[1]), mes } : null
+}
+
+/** El enlace a Productes › Preus de un mes (`aaaa-mm`). */
+export function rutaPreusMes(mes: string): string {
+  return `/equip/productes?pestanya=preus&mes=${encodeURIComponent(mes)}`
+}
+
 export interface CanviPreu { producto: string; font?: FontPreu; eur_kg?: number | null; motiu?: string }
 
 export function validaMes(exercici: number, mes: number, canvis: CanviPreu[] = []) {

@@ -10,12 +10,13 @@ import { AlertTriangle, Clock, MapPin, Phone, Undo2, User } from 'lucide-react'
 import { useT } from '../lib/i18n'
 import { kg } from '../lib/format'
 import { quanAvis } from '../lib/avisos'
-import { carregaOperacio } from '../lib/operacio'
-import type { Operacio } from '../lib/operacio'
+import { carregaOperacio, carregaValorOperacio } from '../lib/operacio'
+import type { Operacio, ValorOperacio } from '../lib/operacio'
 import { estatValidacio } from '../lib/registreRecollida'
 import CarregantSeccio from './CarregantSeccio'
 import RegistraRecollida from './RegistraRecollida'
 import MissatgesDelPunt from './MissatgesDelPunt'
+import ValorCanalitzacio from './ValorCanalitzacio'
 import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
 
 /** Las clases del estado de la recogida, sin colores fuera de los tokens (§2bis). */
@@ -34,6 +35,15 @@ export default function FitxaOperacio(
 ) {
   const { t } = useT()
   const [op, setOp] = useState<Operacio | null | undefined>(undefined)
+  // D2: el valor por kilo y su fuente, solo para el equipo y en una donación.
+  const [valor, setValor] = useState<ValorOperacio | null>(null)
+  const ambValor = op?.rol === 'equip' && op.modalitat === 'donacio'
+  useEffect(() => {
+    if (!ambValor) { setValor(null); return }
+    let viu = true
+    void carregaValorOperacio(canalizacionId).then((v) => { if (viu) setValor(v) })
+    return () => { viu = false }
+  }, [ambValor, canalizacionId, op?.estat_recollida])
 
   useEffect(() => {
     let viu = true
@@ -176,6 +186,7 @@ export default function FitxaOperacio(
       <dl className="space-y-2">
         {fila(t('op.producte'), [op.producte, op.varietat].filter(Boolean).join(' · '))}
         {fila(t('op.modalitat'), op.modalitat ? t(`od.mod_${op.modalitat}`) : null)}
+        {valor && fila(t('vcan.c_value'), <ValorCanalitzacio c={valor} />)}
         {fila(contrapart.titol, contrapart.nom)}
         {fila(t('op.persona'), contrapart.contacte ? (
           <span className="inline-flex items-center gap-1"><User className="size-3.5" aria-hidden />{contrapart.contacte}</span>

@@ -216,6 +216,9 @@ src/
     preus/                     Precios de referencia (D1): PestanyaPreus (el mes), PestanyaCarregues (las
                                fuentes y las cargas), DialegNouProducte, PreusProducte (la ficha). Datos en
                                `lib/preus.ts` (tipos, piezas puras y RPC; `tests/preus.test.ts`)
+    ValorCanalitzacio.tsx      D2: el valor por kilo de una canalización con su fuente, mes del albarán y
+                               «Provisional» (oferta, ficha de la operación, albarán). Textos de `lib/valoracio.ts`
+                               (puro: `costADeclarar` y reexporta `_shared/fontValor.ts`; `tests/valoracio.test.ts`)
     AvisInstallacio.tsx        Banner de «instal·la Redestina» en móvil, productor y receptor (§2)
     TriaPaper.tsx              El conmutador «productora / receptora» del doble rol. Estaba
                                copiado TRES veces y una copia ya había divergido (sin icono y
@@ -479,6 +482,8 @@ supabase/
                                `accio:'fitxer'` = URL firmada del original (equipo). `npm:xlsx` en su deno.json
     _shared/preusFonts.ts      PURO (D1): lectores de Gencat y Mercabarna, unidades → €/kg, URL candidatas,
                                CSV caducado de Mercabarna y `coincidencies()` (también lo importa el panel)
+    _shared/fontValor.ts       PURO (D2): cómo se escribe la fuente del valor por kilo («Valor de referència:
+                               Gencat…», provisional, declarat…); lo usan el REC, el CD y el panel
     limpiar-documentos-prueba/ POST (JWT, super_admin): borra los PDF huérfanos de proves/.
                                La otra mitad de reiniciar_documentos_prova() (§12.51)
     _shared/resend.ts          sendEmail() + plantillaEmail(): el maquetado de TODOS los correos (§9bis)

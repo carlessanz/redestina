@@ -60,6 +60,7 @@ import {
   type Renderizado,
 } from "./cierre.ts";
 import { pintarSignaturaDocument } from "./signatura.ts";
+import { notaFontsCertificat, textMes, type ValorFont } from "../../fontValor.ts";
 
 // ---------------------------------------------------------------------------
 // Medidas del modelo (escaneo A4 a 935 px de ancho → 0,636 pt/px)
@@ -82,7 +83,7 @@ const TEXTOS: Record<IdiomaCierre, {
   annex: string;
   annex_text: (numero: string) => string;
   total: string;
-  col: { producte: string; kg: string; valor: string };
+  col: { producte: string; kg: string; valor: string; eur_kg: string; font: string };
 }> = {
   ca: {
     rectificatiu: (motiu) => `Certificat rectificatiu${motiu ? ` · Motiu: ${motiu}` : ""}`,
@@ -91,7 +92,7 @@ const TEXTOS: Record<IdiomaCierre, {
     annex_text: (numero) =>
       `Detall dels aliments donats que suma el certificat de donació${numero ? ` ${numero}` : ""}. Quilos nets conciliats i valor segons el cost per quilo de cada producte.`,
     total: "Total",
-    col: { producte: "Producte", kg: "Quilos", valor: "Valor" },
+    col: { producte: "Producte", kg: "Quilos", valor: "Valor", eur_kg: "€/kg", font: "Font del valor" },
   },
   es: {
     rectificatiu: (motiu) => `Certificado rectificativo${motiu ? ` · Motivo: ${motiu}` : ""}`,
@@ -100,7 +101,7 @@ const TEXTOS: Record<IdiomaCierre, {
     annex_text: (numero) =>
       `Detalle de los alimentos donados que suma el certificado de donación${numero ? ` ${numero}` : ""}. Kilos netos conciliados y valor según el coste por kilo de cada producto.`,
     total: "Total",
-    col: { producte: "Producto", kg: "Kilos", valor: "Valor" },
+    col: { producte: "Producto", kg: "Kilos", valor: "Valor", eur_kg: "€/kg", font: "Fuente del valor" },
   },
 };
 
@@ -278,6 +279,15 @@ export async function renderCd(
     await pintarSignaturaDocument(m, doc, op.signatura, lengua, { tamano: TAM_CUERPO });
   }
 
+  // ------------------------------------------- de dónde salen los valores (D2)
+  // Una línea discreta con las fuentes usadas; los certificados de antes de la D2 no traen
+  // `fonts_valor` y no cambian ni un punto.
+  const nota = notaFontsCertificat(fontsDe(datos), lengua);
+  if (nota) {
+    m.espacio(4);
+    m.parrafo(nota, { tamano: 7.5, color: COLORES.verdeGris });
+  }
+
   // ------------------------------------------------------------------ anexo
   if (datos.annex === true) pintarAnnex(ctx);
 
@@ -298,13 +308,41 @@ function pintarAnnex(ctx: ContextoCierre): void {
     despues: 12,
   });
 
+  const kgTotal = typeof datos.kg === "number" ? datos.kg : Number(datos.kg ?? 0);
+  const importe = typeof datos.import === "number" ? datos.import : Number(datos.import ?? 0);
+
+  // Con la D2, una fila por producto, fuente y mes, con su €/kg y de dónde sale.
+  const perFont = detallFontsDe(datos);
+  if (perFont.length > 0) {
+    m.tabla({
+      columnas: [
+        { titulo: x.col.producte, ancho: 26 },
+        { titulo: x.col.kg, ancho: 15, alinear: "derecha" },
+        { titulo: x.col.eur_kg, ancho: 11, alinear: "derecha" },
+        { titulo: x.col.font, ancho: 32 },
+        { titulo: x.col.valor, ancho: 16, alinear: "derecha" },
+      ],
+      filas: [
+        ...perFont.map((l) => [
+          l.producte ?? "",
+          `${kgText(l.kg)} kg`,
+          eurKgText(l.eur_kg),
+          textFontLinia(l, idioma),
+          importEnXifres(Number(l.valor ?? 0)),
+        ]),
+        [x.total, `${kgText(kgTotal)} kg`, "", "", importEnXifres(importe)],
+      ],
+      tamano: 8.5,
+      despues: 6,
+    });
+    return;
+  }
+
   const columnas: Columna[] = [
     { titulo: x.col.producte, ancho: 50 },
     { titulo: x.col.kg, ancho: 25, alinear: "derecha" },
     { titulo: x.col.valor, ancho: 25, alinear: "derecha" },
   ];
-  const kgTotal = typeof datos.kg === "number" ? datos.kg : Number(datos.kg ?? 0);
-  const importe = typeof datos.import === "number" ? datos.import : Number(datos.import ?? 0);
   m.tabla({
     columnas,
     filas: [
@@ -318,4 +356,46 @@ function pintarAnnex(ctx: ContextoCierre): void {
     tamano: 9,
     despues: 6,
   });
+}
+
+/** Una fila del anexo por producto, fuente y mes (snapshot `detall_fonts`, desde la D2). */
+interface LiniaFont extends ValorFont {
+  producte?: string | null;
+  kg?: number | string | null;
+  eur_kg?: number | string | null;
+  valor?: number | string | null;
+}
+
+function fontsDe(datos: unknown): ValorFont[] {
+  const f = (datos as { fonts_valor?: unknown }).fonts_valor;
+  return Array.isArray(f) ? (f as ValorFont[]) : [];
+}
+
+function detallFontsDe(datos: unknown): LiniaFont[] {
+  const f = (datos as { detall_fonts?: unknown }).detall_fonts;
+  return Array.isArray(f) ? (f as LiniaFont[]).filter((l) => l && l.producte) : [];
+}
+
+/** «Gencat, setembre 2026» / «Mercabarna (18 dies), novembre 2026» / «Declarat pel donant». */
+export function textFontLinia(l: ValorFont, idioma: IdiomaCierre): string {
+  const ca = idioma === "ca";
+  const mes = textMes(l.mes_font, idioma);
+  switch (l.font) {
+    case "gencat": return mes ? `Gencat, ${mes}` : "Gencat";
+    case "mercabarna": {
+      const dies = l.dies ? ` (${l.dies} ${ca ? "dies" : "días"})` : "";
+      return `Mercabarna${dies}${mes ? `, ${mes}` : ""}`;
+    }
+    case "manual": case "fixat": return ca ? "Fixat per la Fundació" : "Fijado por la Fundació";
+    case "declarat": return ca ? "Declarat pel donant" : "Declarado por el donante";
+    case "historic": return ca ? "Referència del producte" : "Referencia del producto";
+    default: return "—";
+  }
+}
+
+/** El valor por kilo con 2 a 4 decimales y coma: «0,80», «0,8235». */
+export function eurKgText(v: number | string | null | undefined): string {
+  const n = Number(v);
+  if (v == null || !isFinite(n)) return "—";
+  return n.toFixed(4).replace(/0{1,2}$/, "").replace(".", ",");
 }

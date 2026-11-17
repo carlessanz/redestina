@@ -82,8 +82,11 @@ Deno.serve(async (req) => {
         : Promise.resolve({ data: [] }),
       // Solo el equipo o quien tiene ficha de productor (M8): a cualquier otra sesión
       // —receptora, cuenta pendiente— no se le sirve una tabla que la RLS le niega.
+      // Punto 3, fase D2 (20270601100000): la propuesta es el PRECIO DE REFERENCIA de hoy
+      // (`preu_referencia_de`: el validado del mes o el último publicado, provisional), no
+      // `costes_producto`. Solo se guarda en la oferta si el productor lo cambia.
       veuCost
-        ? supabase.from("costes_producto").select("producto, coste_kg")
+        ? supabase.rpc("preus_vigents_oferta", {})
         : Promise.resolve({ data: [] }),
       propi
         ? supabase.from("productores").select("envasos_habituals").eq("id", productorId!).maybeSingle()
@@ -95,9 +98,9 @@ Deno.serve(async (req) => {
     };
     const llocs = principalPrimer((ubicaciones.data ?? []) as Lloc[]);
     const envasos = ((fitxa.data as { envasos_habituals: string[] | null } | null)?.envasos_habituals) ?? null;
+    type Vigent = { producto: string; eur_kg: number; font: string | null; mes_font: string | null; provisional: boolean };
     const referencia = new Map(
-      ((costos.data ?? []) as { producto: string; coste_kg: number }[])
-        .map((c) => [c.producto, Number(c.coste_kg)]),
+      ((costos.data ?? []) as Vigent[]).map((c) => [c.producto, c]),
     );
 
     const familias = [
@@ -126,7 +129,19 @@ Deno.serve(async (req) => {
       catalogos: {
         familias,
         productos: ((productos.data ?? []) as { nombre: string; familia: string | null; foto_mini: string | null }[])
-          .map((p) => veuCost ? { ...p, cost_referencia: referencia.get(p.nombre) ?? null } : p),
+          .map((p) => {
+            if (!veuCost) return p;
+            const r = referencia.get(p.nombre);
+            // `cost_referencia` sigue siendo un número (el panel publicado lo lee así); el mes,
+            // la fuente y si es provisional viajan aparte.
+            return {
+              ...p,
+              cost_referencia: r ? Number(r.eur_kg) : null,
+              cost_referencia_font: r?.font ?? null,
+              cost_referencia_mes: r?.mes_font ?? null,
+              cost_referencia_provisional: r ? Boolean(r.provisional) : null,
+            };
+          }),
         // `familias_es`: solo para enseñarlas en castellano; el valor que se guarda no cambia.
         // Las causas (fase B del punto 3, 20270529100000): `[{codigo, nombre, nombre_es,
         // subcausas: [{codigo, nombre, nombre_es}]}]`, solo activas y en orden. El panel elige

@@ -2484,6 +2484,23 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
 - E2E: `tests/e2e/preus.e2e.ts` (clon, `E2E_ESCRIU=1`): ver un mes, validar diciembre de 2025, «Nou producte» con
   ALCACHOFA marcada, descargar el original y 375 px sin scroll.
 
+### Fase D2 del punto 3: el valor de la donación, con su fuente (17-11-2026, `20270601100000`)
+
+- **`components/ValorCanalitzacio`**: el valor por kilo, badge «Provisional» (ámbar) o «Certificat <núm.>», la misma
+  frase de la fuente que imprime el REC (`_shared/fontValor.ts` vía `lib/valoracio.ts`), el mes del albarán y, si es
+  provisional, «Valida el mes a Preus» (`/equip/productes?pestanya=preus&mes=aaaa-mm`). Lo usan el detalle de la
+  oferta del equipo (cada canalización de donación), la ficha de la operación (solo `rol = equip`, en donación;
+  `carregaValorOperacio`) y el detalle del albarán (tarjeta «Valor de la donació»: REC, todas las de su oferta; ENT, la
+  suya).
+- **Productes › Preus**: lee `?mes=aaaa-mm`; aviso ámbar «N canalitzacions esperen el preu de <mes>» (y las que no
+  tienen ninguno) y badge por fila (`preus_canalitzacions_mes`). Validar el mes o fijar la celda las ajusta.
+- **Certificados**: el bloqueo `preus_provisionals` sale en `Bloquejos` (cierre anual, diálogo del certificado) con un
+  enlace por mes a Preus; los errores `preus_provisionals`/`preus_canviats` los traduce `textError`.
+- **Alta de oferta**: el «Valor de cost» se prellena con la propuesta (`cost_referencia`) y dice el mes y si es
+  provisional (`po.cost_ref_mes[_prov]`); igual a la propuesta no se guarda (`costADeclarar`).
+- E2E: `tests/e2e/preus-provisionals.e2e.ts` (bloqueo → enlace → fijar el precio → ajuste con rastro → emitir y leer
+  la fuente en el PDF). `certificats.e2e.ts` elige donantes/ofertas sin provisionales.
+
 ### Resumen de §6ter movido de `AGENTS.md` (10-11-2026, A5, para hacer sitio)
 
 - **Certificat de donació** (05-11): `DialegCertificatDonacio` (super_admin; ficha › Certificats y

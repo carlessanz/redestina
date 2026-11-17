@@ -128,12 +128,18 @@ export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso 
   return null;
 }
 
-/** El coste de referencia de un producto (pantalla «Productes»), o null si no tiene. */
+/**
+ * El valor de referencia que se le PROPONE al productor (punto 3, fase D2): el precio de
+ * referencia de hoy (`preu_referencia_de`, el validado del mes o el último publicado). Null si
+ * no hay ninguno. «Mantenir» NO lo guarda en la oferta (queda null y la canalización toma el
+ * precio del mes de su albarán); solo «Un altre valor» guarda un coste declarado.
+ */
 async function referenciaCost(supabase: Cliente, producte: string): Promise<number | null> {
   if (!producte) return null;
-  const { data } = await supabase
-    .from("costes_producto").select("coste_kg").eq("producto", producte).limit(1).maybeSingle();
-  return data?.coste_kg != null ? Number(data.coste_kg) : null;
+  const avui = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
+  const { data } = await supabase.rpc("preu_referencia_de", { p_producto: producte, p_data: avui });
+  const fila = Array.isArray(data) ? data[0] as { eur_kg?: number | null } | undefined : undefined;
+  return fila?.eur_kg != null ? Number(fila.eur_kg) : null;
 }
 
 // `de()` («de Tomàquet» / «d'Albercoc») vive en `textIntake.ts`, que es «hoja»: la usa
@@ -346,15 +352,15 @@ async function preguntar(
         "A quin preu de venda (€/kg) la vols oferir? Escriu un número (p. ex. 0,80).",
       )).ok;
     case "cost_kg": {
-      // El coste lo decide el productor; la pantalla «Productes» solo da la REFERENCIA
-      // (27-09-2026). Con referencia, dos botones: quedársela o dar otro valor. Sin ella, se
+      // El coste lo decide el productor; la referencia es el precio del mes (D2, 17-11-2026). Con referencia, dos botones: quedársela o dar otro valor. Sin ella, se
       // le pide el número directamente, y puede decir que no lo sabe.
       const ref = await referenciaCost(supabase, String(datos.producte ?? ""));
       if (ref !== null) {
         return (await sendBotones(
           supabase, to,
           `Quin és el valor de cost per quilo? És el valor amb què es calcula la donació al certificat.\n\n` +
-            `El valor de referència ${de(String(datos.producte ?? ""))} és ${eurKg(ref)}.`,
+            `El valor de referència ${de(String(datos.producte ?? ""))} és ${eurKg(ref)}. Si el mantens, ` +
+            `el certificat aplicarà el preu de referència del mes de l'albarà.`,
           [
             { id: "cost_kg:ref", titulo: `Mantenir ${eurKg(ref)}`.slice(0, 20) },
             { id: "cost_kg:altre", titulo: "Un altre valor" },
@@ -443,10 +449,9 @@ async function interpretar(
       return kg > 0 ? kg : null;
     }
     case "cost_kg": {
-      if (id === "cost_kg:ref") {
-        const ref = await referenciaCost(supabase, String(sesion.datos_parciales.producte ?? ""));
-        return ref ?? null_ok();
-      }
+      // «Mantenir» la propuesta = sin coste declarado (D2): la canalización tomará el precio
+      // del mes de su albarán, que es lo que el certificado tiene que aplicar.
+      if (id === "cost_kg:ref") return null_ok();
       if (t === "-") return null_ok();
       const num = t.match(/\d+([.,]\d+)?/);
       if (!num) return null;

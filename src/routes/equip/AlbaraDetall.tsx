@@ -56,6 +56,8 @@ import DialegConciliar from '../../components/equip/DialegConciliar'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import ValorCanalitzacio from '../../components/ValorCanalitzacio'
+import type { DadesValor } from '../../components/ValorCanalitzacio'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
@@ -231,6 +233,8 @@ export default function AlbaraDetall() {
   // La diferencia de kilos que declaró la entidad receptora al registrar la recogida
   // (17-10-2026). Mientras exista, el albarán no se concilia solo.
   const [incidencies, setIncidencies] = useState<IncidenciaFila[]>([])
+  /** D2: el valor por kilo de las donaciones de este albarán, con su fuente (sin repetir). */
+  const [valors, setValors] = useState<DadesValor[]>([])
   // 17-10-2026 (regla de Carles): los albaranes de una recogida —no de una espigolada— solo
   // se emiten cuando un admin valida lo que registró el receptor (`validar_recollida()`). Aquí
   // se decide si este albarán es de ese flujo, y si su recogida ya espera en la cola.
@@ -363,6 +367,29 @@ export default function AlbaraDetall() {
     } else {
       setFluxRecollida(false)
       setRecollidaPerValidar(false)
+    }
+
+    // D2: el valor de las donaciones (el REC, todas las de su oferta; un ENT, la suya). Las
+    // canalizaciones de una oferta comparten el mes del REC, así que casi siempre es uno.
+    const consultaValor = fila.tipo !== 'REC' && fila.canalizacion_id
+      ? supabase.from('canalizaciones')
+        .select('coste_kg, valorizacion, estado, preu_font, preu_mes_albara, preu_mes_font, preu_font_dies, preu_provisional, preu_certificat')
+        .eq('id', fila.canalizacion_id)
+      : fila.tipo === 'REC' && fila.excedente_id
+        ? supabase.from('canalizaciones')
+          .select('coste_kg, valorizacion, estado, preu_font, preu_mes_albara, preu_mes_font, preu_font_dies, preu_provisional, preu_certificat')
+          .eq('excedente_id', fila.excedente_id)
+        : null
+    if (consultaValor) {
+      const { data: vs, error: errValor } = await consultaValor
+      const unics = new Map<string, DadesValor>()
+      for (const v of (errValor ? [] : (vs as (DadesValor & { valorizacion: string | null; estado: string | null })[] | null) ?? [])) {
+        if (v.valorizacion !== 'donacio' || v.estado === 'anulada') continue
+        unics.set(JSON.stringify([v.coste_kg, v.preu_font, v.preu_mes_font, v.preu_provisional, v.preu_certificat]), v)
+      }
+      setValors([...unics.values()])
+    } else {
+      setValors([])
     }
 
     if (llistaEnllacos.length) {
@@ -992,6 +1019,17 @@ export default function AlbaraDetall() {
           </p>
         </CardContent>
       </Card>
+
+      {/* ── D2: el valor por kilo de la donación y de dónde sale ── */}
+      {valors.length > 0 && (
+        <Card data-testid="albara-valor">
+          <CardHeader><CardTitle className="text-base">{t('vcan.title')}</CardTitle></CardHeader>
+          <CardContent className="space-y-2 text-sm">
+            {valors.map((v, i) => <div key={i}><ValorCanalitzacio c={v} /></div>)}
+            <p className="text-xs text-muted-foreground">{t('vcan.help')}</p>
+          </CardContent>
+        </Card>
+      )}
 
       {/* ── Acciones ── */}
       <Card>

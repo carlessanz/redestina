@@ -73,6 +73,7 @@ import TriaSiNo from './TriaSiNo'
 import XipsTria from './XipsTria'
 import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
+import { costADeclarar, textMes } from '../lib/valoracio'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import { catalegDelDescriptor, esSubcausaTriable, opcionsSubcausa, teSubcauses, textSubcausa } from '../lib/causes'
@@ -601,6 +602,13 @@ export default function FormulariNovaOferta({
       return c ? aplica(c) : false
     })
     if (producteTriat?.familia) aEnviar.familia = producteTriat.familia
+    // D2 (17-11-2026): el coste solo se DECLARA si el productor cambia la propuesta; igual a
+    // ella, la oferta no guarda nada y el certificado aplica el precio del mes del albarán.
+    if ('cost_kg' in aEnviar) {
+      const cost = costADeclarar(aEnviar.cost_kg, referencia, oferta?.coste_kg != null ? Number(oferta.coste_kg) : null)
+      if (cost === null) delete aEnviar.cost_kg
+      else aEnviar.cost_kg = cost
+    }
     if (typeof aEnviar.gmaps_url === 'string') {
       const g = aEnviar.gmaps_url.trim()
       if (g) aEnviar.gmaps_url = g
@@ -948,7 +956,12 @@ export default function FormulariNovaOferta({
                   set(campo.clave, e.target.value === '' ? null : Number(e.target.value))
                 }} />
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
-                {referencia != null ? t('po.cost_ref', { v: eurKg(referencia) }) : t('po.cost_no_ref')}
+                {referencia == null ? t('po.cost_no_ref')
+                  : producteTriat?.cost_referencia_mes
+                    ? t(producteTriat.cost_referencia_provisional ? 'po.cost_ref_mes_prov' : 'po.cost_ref_mes', {
+                        v: eurKg(referencia), mes: textMes(producteTriat.cost_referencia_mes, lang) ?? '',
+                      })
+                    : t('po.cost_ref', { v: eurKg(referencia) })}
                 {referencia != null && Number(valor) !== referencia && (
                   <button type="button" className="font-medium text-primary hover:underline"
                     onClick={() => { setCostTocat(false); set(campo.clave, referencia) }}>

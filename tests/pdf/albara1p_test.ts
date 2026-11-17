@@ -71,3 +71,35 @@ Deno.test("con muchas líneas (una espigolada grande) sigue saliendo, en más p�
   const r = await render("rec-llarg", { ...REC, linies });
   assert(r.paginas >= 2);
 });
+
+// Punto 3, fase D2: de dónde sale el valor por kilo, impreso junto a la tabla del REC.
+Deno.test("el REC de donación imprime la fuente del valor (definitivo y provisional)", async () => {
+  const { textPerPagina, enUnaLinia } = await import("./textPdf.ts");
+  const { textsFontValor } = await import("../../supabase/functions/_shared/pdf/render/albara1p.ts");
+  const definitiu: DatosAlbara1p = {
+    ...REC,
+    linies: [{ ordre: 1, producte: "Cogombre", kg_net: 107, valor_kg: 1.06,
+      valor_font: { font: "gencat", mes_font: "2026-09-01", mes_albara: "2026-09-01", provisional: false } }],
+  };
+  assertEquals(textsFontValor(definitiu, "ca"), ["Valor de referència: Gencat, preus percebuts pel pagès, setembre 2026"]);
+  const r1 = await render("rec-font-gencat", definitiu);
+  assertEquals(r1.paginas, 1);
+  const t1 = enUnaLinia((await textPerPagina(r1.bytes, activos)).join("\n"));
+  assert(t1.includes("Valor de referència: Gencat, preus percebuts pel pagès, setembre 2026"), t1);
+
+  const provisional: DatosAlbara1p = {
+    ...REC,
+    linies: [{ ordre: 1, producte: "Cogombre", kg_net: 107, valor_kg: 0.5,
+      valor_font: { font: "mercabarna", dies: 18, mes_font: "2026-09-01", mes_albara: "2026-11-01", provisional: true } }],
+  };
+  const r2 = await render("rec-font-provisional", provisional);
+  assertEquals(r2.paginas, 1);
+  const t2 = enUnaLinia((await textPerPagina(r2.bytes, activos)).join("\n"));
+  assert(t2.includes("Valor de referència provisional (darrer publicat: Mercabarna, mitjana de 18 dies, setembre 2026); el certificat aplicarà el del mes de l'albarà."), t2);
+
+  // Un REC de antes de la D2 (sin `valor_font`) no cambia.
+  assertEquals(textsFontValor(REC, "ca"), []);
+  // En castellano, el valor declarado.
+  assertEquals(textsFontValor({ ...REC, linies: [{ producte: "Cogombre", kg_net: 1, valor_kg: 0.65, valor_font: { font: "declarat" } }] }, "es"),
+    ["Valor declarado por el donante"]);
+});

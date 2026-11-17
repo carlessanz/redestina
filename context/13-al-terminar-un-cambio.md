@@ -8,7 +8,15 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **2.066 pruebas en 95 ficheros** de Vitest (1 saltada a propósito) **+ 58 de Deno** (17-11-2026, fase D1
+   Referencia: **2.083 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026, fase D2
+   del punto 3, `20270601100000`: +17 —`tests/valoracio.test.ts` 16 (coste a declarar, frases de la fuente, nota del
+   certificado, `?mes=`) y `fontValor` en `puresa.test.ts`—, +2 de Deno en `tests/pdf/` (el REC y el CD imprimen la
+   fuente); arnés del clon **2.862/2.862 y 47 sin datos** (+115: diez internas de D2 y el INSERT del rastro denegados
+   en todos los perfiles; rastro y `preus_canalitzacions_mes` denegados a los externos y permitidos al equipo; los dos
+   «sin datos» nuevos son `canalizaciones_preu_hist` del técnico y del super_admin, vacía hasta que se ajuste algo);
+   SQL `scripts/sql/prova-preu-mes-albara.sql` «TOT CORRECTE»; E2E `preus-provisionals.e2e.ts` 3/3 y `certificats`
+   5/5 en el clon). Antes:
+   **2.066 pruebas en 95 ficheros** de Vitest (1 saltada a propósito) **+ 58 de Deno** (17-11-2026, fase D1
    del punto 3, `20270531100000`: +36 —`tests/preusFonts.test.ts` 15 (unidades, Gencat sintético, URL candidatas,
    Mercabarna con el fixture real, el CSV roto, coincidencias), `tests/preus.test.ts` 12 (mes en Madrid, variación,
    fila, resumen) y 9 de claves compuestas `preu.*` en `i18n.test.ts`—, y +6 de Deno en `tests/preus/` (el XLS real

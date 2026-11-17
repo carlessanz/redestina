@@ -154,3 +154,26 @@ Deno.test("tiempo de CPU: un CD con anexo, muy por debajo de los 2 s del runtime
   console.log(`renderCd: ${ms.toFixed(1)} ms de media`);
   assert(ms < 1000, `renderCd tarda ${ms.toFixed(0)} ms`);
 });
+
+// Punto 3, fase D2: las fuentes de los valores, en una nota del certificado y por línea en el anexo.
+Deno.test("el CD imprime las fuentes de los valores (nota y anexo)", async () => {
+  const r = await render("cd-fonts", {
+    ...OFERTA,
+    fonts_valor: [
+      { font: "gencat", mes_font: "2026-09-01", dies: null },
+      { font: "declarat", mes_font: null, dies: null },
+    ],
+    detall_fonts: [
+      { producte: "Cogombre", font: "gencat", mes_font: "2026-09-01", mes_albara: "2026-09-01", eur_kg: 1.06, kg: 100, valor: 106 },
+      { producte: "Cogombre", font: "declarat", mes_font: null, mes_albara: "2026-10-01", eur_kg: 1.06, kg: 7, valor: 7.42 },
+    ],
+  } as DatosCierre);
+  assertEquals(r.paginas, 2);
+  assertStringIncludes(enUnaLinia(r.pagines[0]), "Fonts dels valors: Gencat, preus percebuts pel pagès (setembre 2026); Valor declarat pel donant.");
+  const annex = enUnaLinia(r.pagines[1]);
+  assertStringIncludes(annex, "Font del valor");
+  assertStringIncludes(annex, "Gencat, setembre 2026");
+  assertStringIncludes(annex, "Declarat pel donant");
+  assertStringIncludes(annex, "1,06");
+  senseRestes(r.text);
+});

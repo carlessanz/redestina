@@ -330,3 +330,22 @@ leer, no se filtra (la base corta igualmente al mostrar interés).
 tipo `social` (una cooperativa de iniciativa social que reparte alimentos) y empresa en cualquier otro caso (las SAT,
 las cooperativas agrarias). Sigue siendo sugerida: la confirma una persona. `naturalesa_suggerida(nif, forma,
 tipo_receptor)` y su espejo `naturalesaSuggerida()`; el trigger de `entidades` recalcula también al cambiar el tipo.
+
+### El valor de una donación: el precio del mes del albarán (punto 3, D2, 17-11-2026)
+
+Opción A del cliente: **el certificado aplica el precio de referencia del mes en que se generó el albarán** (el REC de
+la oferta). Reglas:
+1. Coste **declarado** por el productor en la oferta → manda, es definitivo y no se ajusta nunca. Solo se declara si el
+   productor **cambia** la propuesta (el formulario y el bot proponen el precio de referencia de hoy; aceptarlo no
+   guarda nada).
+2. Sin declarar: el precio validado del mes del albarán (Gencat, Mercabarna o manual) → definitivo.
+3. Si ese mes aún no está validado (Gencat publica con dos meses de retraso): el último validado, **provisional**.
+   Al validar el mes, se ajusta solo, con rastro (anterior, nuevo, motivo, quién, cuándo).
+4. Lo **certificado** (sellado al emitir, también en prueba) no se mueve aunque se revalide el mes.
+5. Un certificado (anual, intervalo u oferta) con algún valor provisional **no se emite**: `22023
+   preus_provisionals` con la lista producto (mes); la pantalla enlaza a Productes › Preus de ese mes.
+6. El REC de donación imprime la fuente bajo el total («Valor de referència: Gencat, preus percebuts pel pagès, setembre
+   2026», «Mercabarna, mitjana de N dies, …», «Preu fixat per la Fundació», «Valor declarat pel donant» o la frase
+   de provisional); el certificado, una nota «Fonts dels valors: …» y, en el anexo, la columna «Font del valor».
+   La nota legal fija del REC (`nota_valor`) no cambia (deuda 187).
+

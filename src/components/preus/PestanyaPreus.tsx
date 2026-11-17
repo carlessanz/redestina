@@ -7,7 +7,7 @@
 // la carga inicial de Gencat: rellena los meses pasados que falten, sin tocar lo validado.
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
-import { Link } from 'react-router'
+import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
 import { AlertTriangle, CheckCheck, Pencil } from 'lucide-react'
 import { useT } from '../../lib/i18n'
@@ -18,9 +18,9 @@ import { textError } from '../../lib/textError'
 import { eurKg } from '../../lib/tancament'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import {
-  MESOS, carregaPropostaMes, esMesFutur, esSaltGran, exercicisDisponibles, fixaPreu, fontHaCanviat, mesActual,
+  MESOS, carregaCanalitzacionsMes, carregaPropostaMes, esMesFutur, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu, fontHaCanviat, mesActual,
   mesAnterior, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
-  type FontPreu, type PropostaPreu,
+  type CanalitzacionsMes, type FontPreu, type PropostaPreu,
 } from '../../lib/preus'
 import { useConfirma } from '../DialegConfirma'
 import Desplegable from '../Desplegable'
@@ -163,10 +163,21 @@ function FilaEdicio({ fila, columnes, ocupat, onDesa, onCancel }: PropsEdicio) {
 
 export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   const { t } = useT()
+  // `?mes=aaaa-mm` (D2): los enlaces de un certificado bloqueado traen aquí el mes que falta.
+  const [params] = useSearchParams()
+  const mesParam = params.get('mes')
   const actual = mesActual()
-  const inicial = mesAnterior(actual.exercici, actual.mes)
+  const inicial = mesDeParam(mesParam) ?? mesAnterior(actual.exercici, actual.mes)
   const [exercici, setExercici] = useState(inicial.exercici)
   const [mes, setMes] = useState(inicial.mes)
+  useEffect(() => {
+    const m = mesDeParam(mesParam)
+    if (!m) return
+    setExercici(m.exercici)
+    setMes(m.mes)
+  }, [mesParam])
+  /** Las canalizaciones que esperan el precio de este mes, por producto (D2). */
+  const [esperen, setEsperen] = useState<CanalitzacionsMes[]>([])
   const [files, setFiles] = useState<PropostaPreu[]>([])
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -179,7 +190,9 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   const columnes = 3 + Number(usePuntTall('sm')) + Number(usePuntTall('md')) + Number(usePuntTall('lg')) + Number(potAprovar)
 
   const carrega = useCallback(async () => {
-    const r = await carregaPropostaMes(exercici, mes)
+    const [r, c] = await Promise.all([carregaPropostaMes(exercici, mes), carregaCanalitzacionsMes(exercici, mes)])
+    // Lo que espera es un aviso: si falla, la tabla de precios sigue sirviendo.
+    setEsperen(c.ok ? (c.data ?? []) : [])
     if (!r.ok) { setError(textError(t, r)); setFiles([]); return }
     setError(null)
     setFiles(r.data ?? [])
@@ -199,6 +212,9 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
     return casaCerca([p.producto, p.familia, p.gencat_nom, p.mercabarna_nom], q)
   }), [files, nomesPendents, q])
   const futur = esMesFutur(exercici, mes)
+  const esperaPerProducte = useMemo(() => new Map(esperen.map((e) => [e.producto, e])), [esperen])
+  const totalEsperen = esperen.reduce((a, e) => a + e.provisionals, 0)
+  const senseCapPreu = esperen.filter((e) => e.sense_preu > 0).map((e) => e.producto)
 
   async function validaTot() {
     const ok = await confirma({
@@ -273,6 +289,18 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
         </Button>
       </div>
 
+      {totalEsperen > 0 && (
+        <div className="rounded-md border border-aviso bg-aviso-fondo p-3 text-sm" data-testid="preu-esperen">
+          <p className="font-medium text-aviso">
+            {t('preu.waiting', { n: totalEsperen, m: `${t(`preu.mes_${mes}`)} ${exercici}` })}
+          </p>
+          <p className="mt-1 text-muted-foreground">{t('preu.waiting_desc')}</p>
+          {senseCapPreu.length > 0 && (
+            <p className="mt-1 text-error">{t('preu.waiting_without', { p: senseCapPreu.join(', ') })}</p>
+          )}
+        </div>
+      )}
+
       {potAprovar && (
         <div className="flex flex-wrap gap-2">
           <Button className="h-11 md:h-8" disabled={ocupat || futur || resum.perValidar === 0}
@@ -329,6 +357,11 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
                       <Link to={rutaProducte(p.producto)} className="font-medium text-primary hover:underline">{p.producto}</Link>
                       {p.familia && <span className="block text-xs text-muted-foreground">{p.familia}</span>}
                       {p.preu_manual && <span className="block text-xs text-muted-foreground">{t('preu.manual_product')}</span>}
+                      {(esperaPerProducte.get(p.producto)?.provisionals ?? 0) > 0 && (
+                        <Badge className="mt-1 bg-aviso-fondo text-aviso" data-testid="preu-espera-fila">
+                          {t('preu.waiting_row', { n: esperaPerProducte.get(p.producto)!.provisionals })}
+                        </Badge>
+                      )}
                     </TableCell>
                     <TableCell className="text-center tabular-nums whitespace-normal">
                       {preu.eur_kg === null
