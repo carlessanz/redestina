@@ -2497,7 +2497,13 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
 - **Certificados**: el bloqueo `preus_provisionals` sale en `Bloquejos` (cierre anual, diálogo del certificado) con un
   enlace por mes a Preus; los errores `preus_provisionals`/`preus_canviats` los traduce `textError`.
 - **Alta de oferta**: el «Valor de cost» se prellena con la propuesta (`cost_referencia`) y dice el mes y si es
-  provisional (`po.cost_ref_mes[_prov]`); igual a la propuesta no se guarda (`costADeclarar`).
+  provisional (`po.cost_ref_mes[_prov]`); igual a la propuesta no se guarda (`costADeclarar`). Desde el 17-11-2026
+  (`rotulReferenciaOferta`, `lib/valoracio.ts`) el rótulo dice el **mes de hoy** (Madrid), al que se aplica el valor, y
+  la fuente con su mes de origen si es otro: «Valor de referència de novembre 2026: 0,6858 €/kg (Gencat, preus
+  percebuts pel pagès, darrer publicat: setembre 2026)»; provisional: «… (Gencat, …, setembre 2026); novembre 2026
+  encara no està validat». Antes ponía solo el mes de origen y parecía que se usaba el de septiembre. El valor lo da
+  `crear-oferta/campos` (`preus_vigents_oferta()` de hoy: el validado del mes en curso o, si falta, el último validado,
+  provisional); sin ningún validado ni coste manual, el campo queda vacío (`po.cost_no_ref`).
 - E2E: `tests/e2e/preus-provisionals.e2e.ts` (bloqueo → enlace → fijar el precio → ajuste con rastro → emitir y leer
   la fuente en el PDF). `certificats.e2e.ts` elige donantes/ofertas sin provisionales.
 

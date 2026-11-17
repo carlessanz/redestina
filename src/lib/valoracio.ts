@@ -10,6 +10,43 @@
 export { textFontValor, textMes, nomFont } from '../../supabase/functions/_shared/fontValor.ts'
 export type { ValorFont, FontValor, IdiomaFont } from '../../supabase/functions/_shared/fontValor.ts'
 
+import { nomFont as nomDeFont, textMes as mesEnText } from '../../supabase/functions/_shared/fontValor.ts'
+import type { IdiomaFont } from '../../supabase/functions/_shared/fontValor.ts'
+
+/** Lo que `crear-oferta/campos` manda pegado a cada producto (`preus_vigents_oferta` de hoy). */
+export interface ReferenciaOferta {
+  font: string | null | undefined
+  /** Mes del que SALE el valor (`aaaa-mm-dd`): con el último Gencat, anterior al de hoy. */
+  mes: string | null | undefined
+  provisional: boolean | null | undefined
+}
+
+/**
+ * Cómo se rotula en el alta de oferta el valor que se propone (17-11-2026). El valor es el
+ * del MES DE HOY (Madrid) si está validado; si no, el último validado, provisional. Devuelve:
+ *   · `mes`: el mes de hoy, «novembre 2026» (al que se aplica el valor);
+ *   · `font`: la fuente y, si el valor sale de otro mes, cuál: «Gencat, preus percebuts pel
+ *     pagès, darrer publicat: setembre 2026» o, provisional, «Preu fixat per la Fundació,
+ *     octubre 2026».
+ * `font` es null sin fuente (un servidor anterior no la manda).
+ */
+export function rotulReferenciaOferta(
+  ref: ReferenciaOferta,
+  avui: { exercici: number; mes: number },
+  idioma: IdiomaFont = 'ca',
+): { mes: string; font: string | null } {
+  const mes = mesEnText(`${avui.exercici}-${String(avui.mes).padStart(2, '0')}`, idioma) ?? ''
+  const nom = ref.font ? nomDeFont({ font: ref.font }, idioma) : null
+  if (!nom) return { mes, font: null }
+  const origen = mesEnText(ref.mes, idioma)
+  const delMesDAvui = typeof ref.mes === 'string'
+    && ref.mes.startsWith(`${avui.exercici}-${String(avui.mes).padStart(2, '0')}`)
+  if (!origen || delMesDAvui) return { mes, font: nom }
+  if (ref.provisional) return { mes, font: `${nom}, ${origen}` }
+  const darrer = idioma === 'es' ? 'último publicado' : 'darrer publicat'
+  return { mes, font: `${nom}, ${darrer}: ${origen}` }
+}
+
 /** Dos valores por kilo son el mismo si coinciden a 4 decimales (la precisión de la base). */
 export function mateixValor(a: number | null | undefined, b: number | null | undefined): boolean {
   if (a == null || b == null || !Number.isFinite(a) || !Number.isFinite(b)) return false

@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 
-import { costADeclarar, mateixValor, textFontValor, textMes } from '../src/lib/valoracio'
+import { costADeclarar, mateixValor, rotulReferenciaOferta, textFontValor, textMes } from '../src/lib/valoracio'
 import { notaFontsCertificat } from '../supabase/functions/_shared/fontValor'
 import { mesDeParam, rutaPreusMes } from '../src/lib/preus'
 
@@ -109,5 +109,31 @@ describe('el enlace a Productes › Preus de un mes', () => {
   })
   it('rutaPreusMes', () => {
     expect(rutaPreusMes('2026-09')).toBe('/equip/productes?pestanya=preus&mes=2026-09')
+  })
+})
+
+describe('rotulReferenciaOferta (alta de oferta, 17-11-2026)', () => {
+  const nov = { exercici: 2026, mes: 11 }
+  it('validado con el último Gencat: el mes de hoy y de qué mes sale', () => {
+    expect(rotulReferenciaOferta({ font: 'gencat', mes: '2026-09-01', provisional: false }, nov)).toEqual({
+      mes: 'novembre 2026', font: 'Gencat, preus percebuts pel pagès, darrer publicat: setembre 2026',
+    })
+    expect(rotulReferenciaOferta({ font: 'gencat', mes: '2026-09-01', provisional: false }, nov, 'es')).toEqual({
+      mes: 'noviembre 2026', font: 'Gencat, precios percibidos por los agricultores, último publicado: septiembre 2026',
+    })
+  })
+  it('validado del mismo mes o manual: solo la fuente', () => {
+    expect(rotulReferenciaOferta({ font: 'gencat', mes: '2026-11-01', provisional: false }, nov).font)
+      .toBe('Gencat, preus percebuts pel pagès')
+    expect(rotulReferenciaOferta({ font: 'manual', mes: '2026-11-01', provisional: false }, nov).font)
+      .toBe('Preu fixat per la Fundació')
+  })
+  it('provisional: la fuente con el mes del que sale', () => {
+    expect(rotulReferenciaOferta({ font: 'manual', mes: '2026-10-01', provisional: true }, nov)).toEqual({
+      mes: 'novembre 2026', font: 'Preu fixat per la Fundació, octubre 2026',
+    })
+  })
+  it('sin fuente (servidor anterior): font null', () => {
+    expect(rotulReferenciaOferta({ font: null, mes: null, provisional: null }, nov).font).toBeNull()
   })
 })

@@ -73,7 +73,8 @@ import TriaSiNo from './TriaSiNo'
 import XipsTria from './XipsTria'
 import { IconaProducte, SelectorFotos } from './FotosOferta'
 import { eurKg } from '../lib/tancament'
-import { costADeclarar, textMes } from '../lib/valoracio'
+import { costADeclarar, rotulReferenciaOferta } from '../lib/valoracio'
+import { mesActual } from '../lib/preus'
 import type { BlocOferta, CampoOferta, CatalogosOferta } from '../lib/ofertes'
 import { PASSOS_OFERTA_CLAUS, puntOferta } from '../lib/procesOferta'
 import { catalegDelDescriptor, esSubcausaTriable, opcionsSubcausa, teSubcauses, textSubcausa } from '../lib/causes'
@@ -357,6 +358,14 @@ export default function FormulariNovaOferta({
     [catalogos, datos.producte],
   )
   const referencia = producteTriat?.cost_referencia ?? null
+  // El valor propuesto es el del MES DE HOY (Madrid); el rótulo dice ese mes, la fuente y, si
+  // sale de otro mes (el último Gencat publicado, o provisional), cuál (17-11-2026).
+  const rotulRef = producteTriat && referencia != null
+    ? rotulReferenciaOferta({
+        font: producteTriat.cost_referencia_font, mes: producteTriat.cost_referencia_mes,
+        provisional: producteTriat.cost_referencia_provisional,
+      }, mesActual(), lang)
+    : null
 
   useEffect(() => {
     // La red local, solo en el alta: un esborrany o una edición ya están en el servidor.
@@ -957,9 +966,9 @@ export default function FormulariNovaOferta({
                 }} />
               <p className="mt-1 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
                 {referencia == null ? t('po.cost_no_ref')
-                  : producteTriat?.cost_referencia_mes
-                    ? t(producteTriat.cost_referencia_provisional ? 'po.cost_ref_mes_prov' : 'po.cost_ref_mes', {
-                        v: eurKg(referencia), mes: textMes(producteTriat.cost_referencia_mes, lang) ?? '',
+                  : rotulRef?.font
+                    ? t(producteTriat?.cost_referencia_provisional ? 'po.cost_ref_mes_prov' : 'po.cost_ref_mes', {
+                        v: eurKg(referencia), mes: rotulRef.mes, font: rotulRef.font,
                       })
                     : t('po.cost_ref', { v: eurKg(referencia) })}
                 {referencia != null && Number(valor) !== referencia && (

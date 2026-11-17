@@ -570,7 +570,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.085 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
+   **Referencia: 2.089 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.864/2.864 y 45 (tras D2, 17-11-2026) «Sin

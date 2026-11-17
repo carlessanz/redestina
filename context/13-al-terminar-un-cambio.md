@@ -8,7 +8,8 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **2.085 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026,
+   Referencia: **2.089 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026: +4 de
+   `rotulReferenciaOferta` en `tests/valoracio.test.ts`, el rótulo del valor en el alta). Antes, **2.085** (17-11-2026,
    `20270602100000`, fuente y mes del precio: +2 en `tests/preus.test.ts` —`mesFontDeFila`, `esDunAltreMes` y el último
    Gencat que no avisa—; las SQL `prova-preus-referencia.sql` 59 ok y `prova-preu-mes-albara.sql` con el caso e2). Arnés del clon
    **2.865/2.865 y 44 sin datos** (mismo total, 2.909: cambio de datos por las E2E, no de checks).
