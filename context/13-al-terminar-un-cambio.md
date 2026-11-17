@@ -10,6 +10,8 @@
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
    Referencia: **2.090 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026,
    `20270603100000`: +1 del precio del día en el rótulo; `prova-preus-referencia.sql` 65 ok con la sección f2).
+   **Producción, tras publicar `20270603100000` y validar sep-nov 2026: 2.866/2.866 y 43 sin datos** (mismo total,
+   2.909: los datos de precios y canalizaciones validadas dan a dos checks qué mirar).
    Antes, **2.089** (17-11-2026: +4 de
    `rotulReferenciaOferta` en `tests/valoracio.test.ts`, el rótulo del valor en el alta). Antes, **2.085** (17-11-2026,
    `20270602100000`, fuente y mes del precio: +2 en `tests/preus.test.ts` —`mesFontDeFila`, `esDunAltreMes` y el último

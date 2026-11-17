@@ -573,7 +573,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
    **Referencia: 2.090 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.864/2.864 y 45 (tras D2, 17-11-2026) «Sin
+   **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.866/2.866 y 43 (17-11-2026) «Sin
    fallos de permisos».** Cifra que cambia sin checks nuevos = cambio de **datos**; `pendent-arnes`
    aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
