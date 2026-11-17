@@ -98,7 +98,11 @@ Deno.serve(async (req) => {
     };
     const llocs = principalPrimer((ubicaciones.data ?? []) as Lloc[]);
     const envasos = ((fitxa.data as { envasos_habituals: string[] | null } | null)?.envasos_habituals) ?? null;
-    type Vigent = { producto: string; eur_kg: number; font: string | null; mes_font: string | null; provisional: boolean };
+    // `dia` (20270603100000): solo Mercabarna sin el mes validado → el precio de ese día.
+    type Vigent = {
+      producto: string; eur_kg: number; font: string | null; mes_font: string | null; provisional: boolean;
+      dia?: string | null;
+    };
     const referencia = new Map(
       ((costos.data ?? []) as Vigent[]).map((c) => [c.producto, c]),
     );
@@ -140,6 +144,7 @@ Deno.serve(async (req) => {
               cost_referencia_font: r?.font ?? null,
               cost_referencia_mes: r?.mes_font ?? null,
               cost_referencia_provisional: r ? Boolean(r.provisional) : null,
+              cost_referencia_dia: r?.dia ?? null,
             };
           }),
         // `familias_es`: solo para enseñarlas en castellano; el valor que se guarda no cambia.

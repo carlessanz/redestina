@@ -130,14 +130,14 @@ export function siguientePaso(paso: Paso, datos: Record<string, unknown>): Paso 
 
 /**
  * El valor de referencia que se le PROPONE al productor (punto 3, fase D2): el precio de
- * referencia de hoy (`preu_referencia_de`, el validado del mes o el último publicado). Null si
- * no hay ninguno. «Mantenir» NO lo guarda en la oferta (queda null y la canalización toma el
+ * referencia de hoy (`preu_proposta_oferta`: el validado del mes; si el producto solo está en
+ * Mercabarna, el precio del día; si no, el último validado o el manual). Null si no hay ninguno. «Mantenir» NO lo guarda en la oferta (queda null y la canalización toma el
  * precio del mes de su albarán); solo «Un altre valor» guarda un coste declarado.
  */
 async function referenciaCost(supabase: Cliente, producte: string): Promise<number | null> {
   if (!producte) return null;
   const avui = new Date().toLocaleDateString("sv-SE", { timeZone: "Europe/Madrid" });
-  const { data } = await supabase.rpc("preu_referencia_de", { p_producto: producte, p_data: avui });
+  const { data } = await supabase.rpc("preu_proposta_oferta", { p_producto: producte, p_data: avui });
   const fila = Array.isArray(data) ? data[0] as { eur_kg?: number | null } | undefined : undefined;
   return fila?.eur_kg != null ? Number(fila.eur_kg) : null;
 }

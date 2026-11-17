@@ -363,7 +363,7 @@ export default function FormulariNovaOferta({
   const rotulRef = producteTriat && referencia != null
     ? rotulReferenciaOferta({
         font: producteTriat.cost_referencia_font, mes: producteTriat.cost_referencia_mes,
-        provisional: producteTriat.cost_referencia_provisional,
+        provisional: producteTriat.cost_referencia_provisional, dia: producteTriat.cost_referencia_dia,
       }, mesActual(), lang)
     : null
 

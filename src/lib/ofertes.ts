@@ -162,6 +162,8 @@ export interface CatalogosOferta {
     nombre: string; familia: string | null; foto_mini?: string | null; cost_referencia?: number | null
     /** D2 (17-11-2026): de qué mes y fuente sale la propuesta y si es provisional (mes sin validar). */
     cost_referencia_mes?: string | null; cost_referencia_font?: string | null; cost_referencia_provisional?: boolean | null
+    /** Solo Mercabarna sin el mes validado: el día del precio propuesto (`aaaa-mm-dd`). */
+    cost_referencia_dia?: string | null
   }[]
   /**
    * Fase B del punto 3 (20270529100000): las causas ACTIVAS en orden, cada una con sus

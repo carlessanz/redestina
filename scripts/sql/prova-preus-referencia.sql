@@ -243,6 +243,27 @@ select pg_temp.ok((select not provisional from preu_referencia_de('TEST-PREU', '
 select pg_temp.ok((select count(*) = 0 from preu_referencia_de('Producte inexistent', '2025-01-01')),
                   'sin nada: cero filas');
 
+\echo '== f2. Propuesta del alta de oferta: solo Mercabarna = precio del día (20270603100000) =='
+select pg_temp.ok((select eur_kg = 3 and font = 'mercabarna' and not provisional and dia is null
+                     from preu_proposta_oferta('TEST-PREU-M', '2025-02-15')),
+                  'solo Mercabarna con el mes validado: manda el validado');
+select pg_temp.ok((select eur_kg = 3 and font = 'mercabarna' and provisional and dia = '2025-02-10'
+                          and mes_font = '2025-02-01'
+                     from preu_proposta_oferta('TEST-PREU-M', '2025-03-15')),
+                  'solo Mercabarna sin el mes validado: el precio del último día capturado, provisional');
+select pg_temp.ok((select eur_kg = 3 and dia is null from preu_proposta_oferta('TEST-PREU-M', '2025-02-05')),
+                  'con el mes validado no se mira el día (aunque haya precio de ese día)');
+update productos set preu_manual = false where nombre = 'TEST-PREU';
+select pg_temp.ok((select dia is null from preu_proposta_oferta('TEST-PREU', '2025-03-15')),
+                  'un producto con Gencat no toma el precio del día de Mercabarna');
+select pg_temp.ok((select count(*) = 1 from preus_vigents_oferta('2025-03-15')
+                    where producto = 'TEST-PREU-M' and dia = '2025-02-10'),
+                  'preus_vigents_oferta lleva el día');
+select pg_temp.ok(pg_temp.com(:'u_super', $q$select preu_proposta_oferta('TEST-PREU-M', current_date)::text$q$) like 'ERR 42501%'
+                  and pg_temp.com(:'u_super', $q$select preu_dia_mercabarna('TEST-PREU-M', current_date)::text$q$) like 'ERR 42501%',
+                  'preu_proposta_oferta y preu_dia_mercabarna son internas');
+update productos set preu_manual = true where nombre = 'TEST-PREU';
+
 \echo '== g. Permisos =='
 select pg_temp.ok(pg_temp.com(:'u_equip', $q$select count(*)::text from preus_proposta_mes(2025, 1)$q$)::int > 0,
                   'el técnico lee la propuesta del mes');

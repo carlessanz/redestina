@@ -346,7 +346,8 @@ la oferta). Reglas:
    Gencat no lo trae ese mes, **el último que haya publicado** (de un mes anterior; se dice cuál). Mercabarna solo
    para lo que Gencat no tiene, y como **un valor por mes**: el del último día capturado, con el mes cerrado (los
    precios no cambian cada día). Si no, manual. Lo validado con el último Gencat **no se actualiza** cuando Gencat
-   publica después el mes.
+   publica después el mes. **En el alta de oferta** (solo la propuesta, 17-11-2026, `20270603100000`): un producto
+   solo de Mercabarna sin el mes validado propone el precio del último día capturado; aceptarlo no guarda nada.
 3. Si ese mes aún no está validado (Gencat publica con dos meses de retraso): el último validado, **provisional**.
    Al validar el mes, se ajusta solo, con rastro (anterior, nuevo, motivo, quién, cuándo).
 4. Lo **certificado** (sellado al emitir, también en prueba) no se mueve aunque se revalide el mes.

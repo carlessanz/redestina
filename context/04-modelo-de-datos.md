@@ -1899,6 +1899,12 @@ canalizaciones** con el precio del mes de su albarán.
 - **Lo validado no se actualiza solo**: si se validó con el último Gencat de un mes anterior y después Gencat publica
   el mes, la pantalla no lo da por «la fuente ha cambiado» (`fontHaCanviat` lo excluye). Un fichero nuevo que revise
   el MISMO mes sí avisa. Cambiarlo es decisión del equipo (editar la celda con motivo).
+- **Propuesta del alta de oferta** (`20270603100000`, 17-11-2026, petición del cliente): `preu_proposta_oferta(producto,
+  fecha)` (interna) → `preus_vigents_oferta()` (gana la columna `dia`) y el bot (`_shared/intake.ts`). Orden: el validado
+  del mes de hoy manda; si no, para un producto **solo de Mercabarna** (sin Gencat con datos y sin `preu_manual`), el
+  **precio del día** (`preu_dia_mercabarna`: el último día capturado hasta hoy, media de sus equivalencias),
+  provisional y con su fecha; si no, como antes (último validado o manual). Solo es la PROPUESTA: la tabla de
+  referencia sigue mensual y la donación toma el precio validado del mes de su albarán (`preu_referencia_de`).
 - **`preu_referencia_de(p_producto, p_data)`** (interna, sin EXECUTE para sesiones; para D2): el validado del mes;
   si no lo hay, el último validado anterior (`provisional`, `origen = anterior`); si tampoco, el manual vigente.
 - RLS en las seis tablas: SELECT con `es_intern()`; `authenticated` solo SELECT; `anon` nada. Se escribe por RPC

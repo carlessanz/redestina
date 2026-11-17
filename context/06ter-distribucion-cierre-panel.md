@@ -2503,7 +2503,9 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
   percebuts pel pagès, darrer publicat: setembre 2026)»; provisional: «… (Gencat, …, setembre 2026); novembre 2026
   encara no està validat». Antes ponía solo el mes de origen y parecía que se usaba el de septiembre. El valor lo da
   `crear-oferta/campos` (`preus_vigents_oferta()` de hoy: el validado del mes en curso o, si falta, el último validado,
-  provisional); sin ningún validado ni coste manual, el campo queda vacío (`po.cost_no_ref`).
+  provisional); sin ningún validado ni coste manual, el campo queda vacío (`po.cost_no_ref`). Un producto solo de
+  Mercabarna sin el mes validado propone el **precio del día** (`cost_referencia_dia`, `20270603100000`): «Valor de
+  referència provisional: 0,65 €/kg (Mercabarna, preu del 16/11/2026); novembre 2026 encara no està validat».
 - E2E: `tests/e2e/preus-provisionals.e2e.ts` (bloqueo → enlace → fijar el precio → ajuste con rastro → emitir y leer
   la fuente en el PDF). `certificats.e2e.ts` elige donantes/ofertas sin provisionales.
 

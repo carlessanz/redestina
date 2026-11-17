@@ -19,6 +19,8 @@ export interface ReferenciaOferta {
   /** Mes del que SALE el valor (`aaaa-mm-dd`): con el último Gencat, anterior al de hoy. */
   mes: string | null | undefined
   provisional: boolean | null | undefined
+  /** Solo Mercabarna sin el mes validado: el día del precio (`aaaa-mm-dd`). */
+  dia?: string | null
 }
 
 /**
@@ -36,6 +38,11 @@ export function rotulReferenciaOferta(
   idioma: IdiomaFont = 'ca',
 ): { mes: string; font: string | null } {
   const mes = mesEnText(`${avui.exercici}-${String(avui.mes).padStart(2, '0')}`, idioma) ?? ''
+  // Solo Mercabarna (20270603100000): el precio de un DÍA, «Mercabarna, preu del 16/11/2026».
+  const dia = typeof ref.dia === 'string' ? ref.dia.match(/^(\d{4})-(\d{2})-(\d{2})/) : null
+  if (dia) {
+    return { mes, font: `Mercabarna, ${idioma === 'es' ? 'precio del' : 'preu del'} ${dia[3]}/${dia[2]}/${dia[1]}` }
+  }
   const nom = ref.font ? nomDeFont({ font: ref.font }, idioma) : null
   if (!nom) return { mes, font: null }
   const origen = mesEnText(ref.mes, idioma)

@@ -272,7 +272,7 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   `diagnostic-pdf`). `fixar_lloc_principal` (A4).
 - **Precios (D1)**: `preus_proposta_mes`, `noms_fonts_preus` (equipo); validar mes/periodo, `fixar_preu_referencia`
   (motivo si difiere), equivalencias, `fixar_preu_manual`, `crear_producte`, `marcar_carrega_preus` (`pot_aprovar`);
-  `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes. **D2**: `preus_canalitzacions_mes`
+  `fixar_font_preus` (super_admin). Propuesta: Gencat (el mes o su último) → Mercabarna (último día, mes cerrado) → manual; `font_mes`: su mes; alta, solo Mercabarna: precio del día. **D2**: `preus_canalitzacions_mes`
   (equipo); nadie escribe `preu_*` ni el coste de una conciliada o certificada (`42501`, `canalizaciones_protegeix_preu`).
 - **Naturalesa (A5)**: `fixar_naturalesa(p_org, p_naturalesa)` la deja **confirmada**; el equipo siempre, el titular solo
   mientras no lo esté (`42501 naturalesa_confirmada`). Nadie escribe `organizaciones` directo.
@@ -412,7 +412,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270602100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270603100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -505,7 +505,7 @@ funciones sin). Scripts: `SUPABASE_URL`, `SB_SECRET_KEY`.
 
 ## 10bis · 10ter. Nombres retirados
 
-`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar los nombres viejos (ni los de la lista del
+`pdApp-wp` → `P0MA` → `Redestina` (10-09-2026); no reusar nombres viejos (lista en el
 detalle). Un cambio de dominio exige 308. CORS se verifica en la cabecera `Access-Control-Allow-Origin` del preflight, no en el estado.
 
 ## 11. Comandos (detalle en `context/11-comandos.md`)
@@ -570,7 +570,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.089 pruebas de Vitest en 96 ficheros (1 saltada a propósito) + 60 de Deno.**
+   **Referencia: 2.090 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.865/2.865 y 44 sin datos; producción 2.864/2.864 y 45 (tras D2, 17-11-2026) «Sin

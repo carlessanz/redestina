@@ -137,3 +137,12 @@ describe('rotulReferenciaOferta (alta de oferta, 17-11-2026)', () => {
     expect(rotulReferenciaOferta({ font: null, mes: null, provisional: null }, nov).font).toBeNull()
   })
 })
+
+describe('rotulReferenciaOferta: solo Mercabarna, el precio del día (20270603100000)', () => {
+  it('dice el día del precio', () => {
+    expect(rotulReferenciaOferta({ font: 'mercabarna', mes: '2026-11-01', provisional: true, dia: '2026-11-16' },
+      { exercici: 2026, mes: 11 })).toEqual({ mes: 'novembre 2026', font: 'Mercabarna, preu del 16/11/2026' })
+    expect(rotulReferenciaOferta({ font: 'mercabarna', mes: '2026-11-01', provisional: true, dia: '2026-11-16' },
+      { exercici: 2026, mes: 11 }, 'es').font).toBe('Mercabarna, precio del 16/11/2026')
+  })
+})
