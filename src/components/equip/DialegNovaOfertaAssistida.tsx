@@ -85,9 +85,12 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, o
         onPointerDownOutside={(e) => e.preventDefault()}
         onInteractOutside={(e) => e.preventDefault()}
       >
-        <DialogHeader className="shrink-0 pr-8">
-          <DialogTitle>{t('canalz.nova_title')}</DialogTitle>
-          <DialogDescription>{t('canalz.nova_hint')}</DialogDescription>
+        {/* En el móvil la cabecera se comía media pantalla (título centrado en tres líneas y la
+            explicación en cinco) y al formulario le quedaba una tira: a la izquierda y la
+            explicación solo para el lector de pantalla (18-11-2026). */}
+        <DialogHeader className="shrink-0 pr-8 text-left">
+          <DialogTitle className="text-left">{t('canalz.nova_title')}</DialogTitle>
+          <DialogDescription className="max-sm:sr-only">{t('canalz.nova_hint')}</DialogDescription>
         </DialogHeader>
 
         {/* `overflow-x-hidden`: el pie fijo del formulario lleva `-mx-4` para ocupar el ancho
@@ -96,7 +99,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, o
           {/* Primero de quién es. Sin productor no hay descriptor que pedir: los catálogos
               de `crear-oferta/campos` dependen de sus ubicaciones. */}
           <div className="max-w-xl">
-            <Label htmlFor="dnoa-productor" className="mb-1 block text-xs text-muted-foreground">
+            <Label htmlFor="dnoa-productor" className="mb-1.5 block leading-snug">
               {t('canalz.c_productor')}
             </Label>
             <CercadorOpcions
@@ -128,6 +131,7 @@ export default function DialegNovaOfertaAssistida({ obert, onTancar, onCreada, o
               <FormulariNovaOferta
                 key={triat}
                 productorId={triat}
+                esEquip
                 onCreada={onCreada}
                 onEsborranyDesat={(id) => (onEsborranyDesat ? onEsborranyDesat(id) : onTancar())}
                 onCancel={onTancar}

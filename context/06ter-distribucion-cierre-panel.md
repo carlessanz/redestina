@@ -2393,6 +2393,22 @@ subcausas, borradores en servidor, edición tras publicar ni precios por mes (ot
 - ⚠️ Al publicar: migración, y redesplegar **`crear-oferta`, `whatsapp-webhook`, `recollides-programades`** (importan
   `intake.ts`/`oferta.ts`/`camposOferta.ts`/`predeterminatsOferta.ts`) **y `priorizar-entidades`** (importa
   `modalitats.ts`). Sin redesplegar, el panel nuevo llama a un `crear-oferta` viejo que ignora los campos nuevos.
+- **Repaso de diseño del alta (18-11-2026, petición del cliente; solo frontend)**:
+  - **Familia en su propia fila**: el buscador de producto va con `detallSota={false}` y, tras la ayuda «Si no hi
+    és…», una fila «Família assignada: <familia>» (`familiaAssignada()`, `data-testid="familia-assignada"`). Antes
+    salía pegada al campo en `xs`, sin decir qué era, y se leía como parte de la ayuda.
+  - **Etiquetas según DESIGN.md** (Inter 500 `sm`, color del texto; constantes `ETIQUETA`/`OPCIONAL`): iban en `xs`
+    gris, igual que las ayudas. «(opcional)» y «(molt recomanada)», sin peso y en gris.
+  - **Botón «Afegir foto»** (`FotosOferta`, `data-testid="afegir-foto"`): hueco de 96 px con borde discontinuo e
+    icono `ImagePlus`. Estaba roto en escritorio: `size-24` no pisa el `md:h-8` del tamaño `default` del botón y el
+    icono y el texto quedaban apretados en 32 px (hace falta `md:size-24` y los `md:px-*`).
+  - **Desplegables**: «Tria una opció» / «Tria el lloc de recollida» en vez de «—» (obligatorio = `placeholder`;
+    opcional = opción vacía elegible).
+  - **Valor de coste** a todo el ancho (el campo, de media columna) y sin repetir la frase del certificado, que ya
+    dice la ayuda del descriptor (`po.cost_ref_mes[_prov]` acortadas).
+  - **Alta asistida** (`DialegNovaOfertaAssistida` pasa `esEquip`): sin la tarjeta «Què passa quan publiques» (le
+    hablaba al productor), «Aquesta entitat encara no té cap lloc…» (`po.no_locations_equip`), etiqueta de la entidad
+    con el mismo estilo, y en el móvil cabecera a la izquierda con la explicación solo para lector de pantalla.
 
 ### Fase B del punto 3: causas y subcausas en el panel (17-11-2026, `20270529100000`)
 

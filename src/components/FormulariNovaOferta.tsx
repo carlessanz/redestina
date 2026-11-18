@@ -104,6 +104,11 @@ const SI_NO = new Set(['producte_al_camp', 'retorn'])
 /** Los días de la semana, 1 = dilluns … 7 = diumenge (los de `productor_ubicaciones`). */
 const DIES = [1, 2, 3, 4, 5, 6, 7] as const
 
+/** La etiqueta de un campo: Inter 500 `sm`, color del texto (DESIGN.md «Formulario», 18-11-2026). */
+const ETIQUETA = 'mb-1.5 block leading-snug'
+/** «(opcional)» al lado de la etiqueta, sin peso y en gris. */
+const OPCIONAL = 'ml-1 font-normal text-muted-foreground'
+
 function procesJaVist(): boolean {
   try { return localStorage.getItem(CLAU_PROCES_VIST) === 'si' } catch { return false }
 }
@@ -733,8 +738,8 @@ export default function FormulariNovaOferta({
         </p>
         {!u.gmaps_url && ambCamp && (
           <div>
-            <Label htmlFor={idDe('gmaps_url')} className="mb-1.5 block text-xs text-muted-foreground">
-              {t('po.offer_maps')} <span className="ml-1">{t('po.optional')}</span>
+            <Label htmlFor={idDe('gmaps_url')} className={ETIQUETA}>
+              {t('po.offer_maps')} <span className={OPCIONAL}>{t('po.optional')}</span>
             </Label>
             <Input id={idDe('gmaps_url')} name="gmaps_url" type="url" inputMode="url" aria-invalid={invalidMaps}
               value={String(datos.gmaps_url ?? '')} placeholder="https://maps.app.goo.gl/…" maxLength={500}
@@ -748,6 +753,24 @@ export default function FormulariNovaOferta({
             )}
           </div>
         )}
+      </div>
+    )
+  }
+
+  /**
+   * La familia del producto elegido, en su propia fila y con su nombre (18-11-2026, petición del
+   * cliente): antes salía pegada al buscador, en letra pequeña y sin decir qué era, y se mezclaba
+   * con la ayuda «Si no hi és…», que es del producto. No se pregunta: sale del producto.
+   */
+  function familiaAssignada() {
+    if (!producteTriat?.familia) return null
+    return (
+      <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 rounded-md border bg-muted/30 px-3 py-2"
+        data-testid="familia-assignada">
+        <span className="text-sm text-muted-foreground">{t('po.familia_assignada')}</span>
+        <span className="text-sm font-medium break-words">
+          {etiquetaFamilia(producteTriat.familia, catalogos, lang)}
+        </span>
       </div>
     )
   }
@@ -774,11 +797,13 @@ export default function FormulariNovaOferta({
           )
         }
         // Un buscador (17-11-2026): se escribe un trozo y se toca la sugerencia; la familia sale
-        // de detalle a la derecha y se rellena sola.
+        // de detalle a la derecha de cada sugerencia y se rellena sola. Una vez elegida NO va
+        // debajo del campo (18-11-2026): se mezclaba con la ayuda del producto; va en su propia
+        // fila, «Família assignada», después de la ayuda (`familiaAssignada`).
         return (
           <CercadorOpcions id={id} name={campo.clave} invalid={invalid}
             opcions={opcionsProducte} valor={String(valor ?? '') || null}
-            placeholder={t('po.product_search')}
+            placeholder={t('po.product_search')} detallSota={false}
             onChange={(v) => set(campo.clave, v)} />
         )
       case 'causa': {
@@ -851,7 +876,7 @@ export default function FormulariNovaOferta({
           <div className="space-y-2">
             {ubis.length > 0 && (
               <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
-                value={String(valor ?? '')} onChange={triaLloc} buit="—"
+                value={String(valor ?? '')} onChange={triaLloc} placeholder={t('po.tria_lloc')}
                 opcions={ubis.map((u) => ({
                   valor: u.id,
                   text: `${u.alias ?? u.municipio ?? t('po.place_unnamed')}${u.alias && u.municipio ? ` · ${u.municipio}` : ''}${u.es_principal ? ` (${t('org.place_principal')})` : ''}`,
@@ -859,7 +884,7 @@ export default function FormulariNovaOferta({
             )}
             {typeof valor === 'string' && valor !== '' && detallLloc(valor, true)}
             {ubis.length === 0 && !llocNou && (
-              <p className="text-sm text-muted-foreground">{t('po.no_locations')}</p>
+              <p className="text-sm text-muted-foreground">{t(esEquip ? 'po.no_locations_equip' : 'po.no_locations')}</p>
             )}
             {/* Un lloc nou sense sortir del formulari: un productor pot tenir diversos
                 camps i magatzems, i obligar-lo a anar a la fitxa a mig alta és perdre'l. */}
@@ -871,19 +896,19 @@ export default function FormulariNovaOferta({
             ) : (
               <div className="grid grid-cols-1 gap-3 rounded-lg border bg-muted/30 p-3 sm:grid-cols-2">
                 <div>
-                  <Label htmlFor="of-lloc-nom" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_name')}</Label>
+                  <Label htmlFor="of-lloc-nom" className={ETIQUETA}>{t('po.place_name')}</Label>
                   <Input id="of-lloc-nom" name="lloc-nom" value={llocNou.alias}
                     placeholder={t('po.place_name_ph')}
                     onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
                 </div>
                 <div>
-                  <Label htmlFor="of-lloc-municipi" className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
+                  <Label htmlFor="of-lloc-municipi" className={ETIQUETA}>{t('po.place_town')}</Label>
                   <SelectorMunicipi id="of-lloc-municipi" valor={llocNou.municipi?.codi_ine ?? null}
                     onChange={(m) => setLlocNou((l) => (l ? { ...l, municipi: m } : l))} />
                 </div>
                 <div className="sm:col-span-2">
-                  <Label htmlFor="of-lloc-maps" className="mb-1.5 block text-xs text-muted-foreground">
-                    {t('po.place_maps')} <span className="ml-1">{t('po.optional')}</span>
+                  <Label htmlFor="of-lloc-maps" className={ETIQUETA}>
+                    {t('po.place_maps')} <span className={OPCIONAL}>{t('po.optional')}</span>
                   </Label>
                   <Input id="of-lloc-maps" name="lloc-maps" type="url" inputMode="url" value={llocNou.maps}
                     placeholder="https://maps.app.goo.gl/…"
@@ -942,7 +967,8 @@ export default function FormulariNovaOferta({
                 opcions={(campo.opciones ?? []).map((o) => ({ valor: o.id, text: o.titulo }))} />
             ) : (
               <Desplegable id={id} name={campo.clave} aria-invalid={invalid}
-                value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)} buit="—"
+                value={String(valor ?? '')} onChange={(v) => set(campo.clave, v)}
+                {...(campo.obligatorio ? { placeholder: t('po.tria_opcio') } : { buit: t('po.tria_opcio') })}
                 opcions={(campo.opciones ?? []).map((o) => ({ valor: o.id, text: o.titulo }))} />
             )}
             {triada?.descripcion && (
@@ -959,7 +985,9 @@ export default function FormulariNovaOferta({
         if (campo.clave === 'cost_kg') {
           return (
             <>
+              {/* El campo, del ancho de media columna (como sus vecinos); la explicación, a todo el ancho. */}
               <Input id={id} name={campo.clave} type="number" step="0.01" min="0" aria-invalid={invalid}
+                className="sm:max-w-[calc(50%-0.5rem)]"
                 value={valor == null ? '' : String(valor)}
                 onChange={(e) => {
                   setCostTocat(true)
@@ -1052,7 +1080,9 @@ export default function FormulariNovaOferta({
     <div className="space-y-4" data-testid="formulari-oferta">
       {/* --- Qué pasa cuando publicas. Abierto la primera vez; después, plegado. --- */}
       {dialegConfirma}
-      {!editar && (
+      {/* Solo para el productor: le cuenta qué pasará con SU oferta («Podràs seguir-ho des de Les
+          meves ofertes»). En el alta asistida del equipo sobraba y le hablaba a quien no era. */}
+      {!editar && !esEquip && (
       <Collapsible open={procesObert} onOpenChange={setProcesObert}>
         {/* Tarjeta a mano y no `Card`: el disparador tiene que llevar ÉL el relleno para que el
             área táctil sea la fila entera. */}
@@ -1104,13 +1134,18 @@ export default function FormulariNovaOferta({
                 <div
                   key={campo.clave}
                   className={cn('min-w-0', (campo.clave === 'observacions' || campo.tipo === 'ubicacio' || campo.tipo === 'dies'
-                    || campo.tipo === 'producte' || campo.multiple || campo.format === 'franja') && 'sm:col-span-2')}
+                    || campo.tipo === 'producte' || campo.multiple || campo.format === 'franja'
+                    // El valor de coste lleva dos líneas de explicación (fuente y mes): en media
+                    // columna quedaban en una tira estrecha y larga (18-11-2026).
+                    || campo.clave === 'cost_kg') && 'sm:col-span-2')}
                 >
                   {/* Sin asterisco: el formulario es mínimo y todo lo que aparece hace falta,
-                      así que lo que se marca es lo que se puede dejar en blanco (DESIGN.md §6). */}
-                  <Label id={`${idDe(campo.clave)}-l`} htmlFor={idDe(campo.clave)} className="mb-1.5 block text-xs text-muted-foreground">
+                      así que lo que se marca es lo que se puede dejar en blanco (DESIGN.md §6).
+                      La etiqueta, Inter 500 `sm` en el color del texto (DESIGN.md «Formulario»;
+                      hasta el 18-11-2026 iba en `xs` gris y se confundía con las ayudas). */}
+                  <Label id={`${idDe(campo.clave)}-l`} htmlFor={idDe(campo.clave)} className={ETIQUETA}>
                     {campo.etiqueta}
-                    {!campo.obligatorio && <span className="ml-1">{t('po.optional')}</span>}
+                    {!campo.obligatorio && <span className={OPCIONAL}>{t('po.optional')}</span>}
                   </Label>
                   {control(campo)}
                   {proposats.has(campo.clave) && !(campo.tipo === 'ubicacio' && estatLloc.tipus !== 'llista') && (
@@ -1119,6 +1154,7 @@ export default function FormulariNovaOferta({
                     </p>
                   )}
                   {campo.ayuda && <p className="mt-1 text-xs text-muted-foreground">{campo.ayuda}</p>}
+                  {campo.tipo === 'producte' && familiaAssignada()}
                 </div>
               ))}
               {/* La FOTO va en el bloque del producto, que es donde se piensa en qué se ofrece.
@@ -1126,8 +1162,8 @@ export default function FormulariNovaOferta({
                   imágenes (brecha 8): viaja en `datos.fotos` y `crear-oferta` la valida aparte. */}
               {(bloc.clau === 'producte' || (blocs.length === 1)) && productorId && (
                 <div className="min-w-0 sm:col-span-2">
-                  <p className="mb-1.5 text-xs text-muted-foreground">
-                    {t('foto.label')} <span className="ml-1">{t('foto.recommended')}</span>
+                  <p className={cn(ETIQUETA, 'text-sm font-medium')}>
+                    {t('foto.label')} <span className={OPCIONAL}>{t('foto.recommended')}</span>
                   </p>
                   <SelectorFotos
                     productorId={productorId}

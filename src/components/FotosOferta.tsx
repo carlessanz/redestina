@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
-  Apple, Camera, Carrot, Cherry, Citrus, Banana, LeafyGreen, Loader2, Nut, Salad, Sprout, Wheat, X,
+  Apple, Carrot, Cherry, Citrus, Banana, ImagePlus, LeafyGreen, Loader2, Nut, Salad, Sprout, Wheat, X,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { toast } from 'sonner'
@@ -218,9 +218,13 @@ export function SelectorFotos({
           </div>
         ))}
         {!disabled && rutes.length < MAX_FOTOS && (
-          <Button type="button" variant="outline" className="size-24 flex-col gap-1 whitespace-normal text-xs"
+          // Un hueco del mismo tamaño que una foto, con borde discontinuo. ⚠️ `md:size-24` y los
+          // `md:px-*` hacen falta: el tamaño `default` del botón trae `md:h-8`, que `size-24` no
+          // pisa, y en escritorio dejaba el icono y el texto apretados en 32 px (18-11-2026).
+          <Button type="button" variant="outline" data-testid="afegir-foto"
+            className="size-24 flex-col gap-1.5 border-dashed px-2 text-xs whitespace-normal text-muted-foreground hover:text-foreground has-[>svg]:px-2 md:size-24 md:px-2 md:has-[>svg]:px-2"
             disabled={pujant} onClick={() => input.current?.click()}>
-            {pujant ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <Camera className="size-5" aria-hidden />}
+            {pujant ? <Loader2 className="size-6 animate-spin" aria-hidden /> : <ImagePlus className="size-6" strokeWidth={1.75} aria-hidden />}
             {pujant ? t('foto.uploading') : t('foto.add')}
           </Button>
         )}
