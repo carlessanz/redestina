@@ -99,7 +99,7 @@ Reglas: **ningún hex ni clase de la paleta genérica de Tailwind**; solo las cl
 formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
 `<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
 color = chip blanco, texto en color. `{n}` reservado a contadores (singular `<clau>_1`). Sin
-modo oscuro. Dos h2 de la portada, en `coral-oscuro` por decisión del cliente.
+modo oscuro (detalle de la portada en `context/02bis`).
 
 ## 3. Estructura (resumen; árbol completo en `context/03-estructura.md`)
 
@@ -357,7 +357,8 @@ Lo que manda hoy, en una línea cada uno:
   `CercadorOpcions`, `TriaSiNo`; el lugar trae municipio, Maps, días y franja; disponible = hoy + 2; **causa por su
   subcausa** en un `Desplegable` agrupado (`lib/causes.ts`; también en «Edita l’oferta» y, varias, en el Diagnòstic).
 - **Productes** (D1): pestañas Catàleg · Preus de referència · Càrregues (`?pestanya=`), «Nou producte» con las
-  coincidencias de `_shared/preusFonts.ts`; la ficha del producto, `PreusProducte` (equivalencias y rejilla año × mes).
+  coincidencias de `_shared/preusFonts.ts`; la ficha del producto, `PreusProducte` (equivalencias confirmadas; rejilla año × mes). «Què cal fer» en
+  Càrregues y el motivo de «Sense preu» (`pasCarrega`, `motiuSensePreu`).
   **D2**: Preus `?mes=` avisa de lo que espera; `ValorCanalitzacio` (valor, fuente, mes, «Provisional»); el bloqueo
   `preus_provisionals` enlaza al mes.
 - **Gestión autónoma del super_admin**: convenio **declarado**, interés asistido con hora, recogida asistida, mensajes
@@ -569,12 +570,11 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.098 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.111 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.874/2.874 y 44 sin datos; producción 2.866/2.866 y 43 (17-11-2026) «Sin
-   fallos de permisos».** Cifra que cambia sin checks nuevos = cambio de **datos**; `pendent-arnes`
-   aprobada por error da cuatro FALLA. `prueba-numeracion.ts` si toca la numeración.
+   **Referencia: clon 2.874/2.874 y 44 sin datos; producción 2.883/2.883 y 35 (18-11-2026).** Cifra
+   que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).
 6. Estilos solo con tokens; un token nuevo va a `tokens.json`, `index.css` y `preview.html`.

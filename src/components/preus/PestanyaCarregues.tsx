@@ -7,16 +7,18 @@
 // capturados. Una carga `pendent` se puede descartar (con motivo): sus precios dejan de proponerse.
 
 import { useCallback, useEffect, useMemo, useState } from 'react'
+import { Link } from 'react-router'
 import { toast } from 'sonner'
-import { Download, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
+import { AlertTriangle, Download, Info, RefreshCw, RotateCcw, XCircle } from 'lucide-react'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
 import { dataCurta, dataHora } from '../../lib/format'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import {
-  COLUMNES_CARREGA, COLUMNES_ESTAT_FONT, actualitzaFont, descarregaFitxerCarrega, fixaFont, marcaCarrega,
-  mesActual, mesDeData, type CarregaPreus, type EstatFont, type FontDescarrega,
+  COLUMNES_CARREGA, COLUMNES_ESTAT_FONT, accionsCarregues, actualitzaFont, claveMes, descarregaFitxerCarrega, fixaFont,
+  marcaCarrega, mesActual, mesDeData, pasCarrega, rutaPreusMes,
+  type AccionsCarregues, type CarregaPreus, type EstatFont, type FontDescarrega,
 } from '../../lib/preus'
 import Desplegable from '../Desplegable'
 import BotoIcona from '../BotoIcona'
@@ -71,6 +73,12 @@ function TargetaFont({ estat, potAprovar, esSuperAdmin, ocupat, diesMes, onActua
             {t('preu.last_check', { d: estat.darrera_comprovacio_at ? dataHora(estat.darrera_comprovacio_at) : '—' })}
           </span>
         </div>
+        {/* Qué quiere decir el resultado: «Duplicada» parecía un error y no lo es (18-11-2026). */}
+        {estat.darrer_resultat && (
+          <p className="text-muted-foreground" data-testid={`font-${estat.font}-resultat`}>
+            {t(`preu.res_${estat.darrer_resultat}_desc`)}
+          </p>
+        )}
         {estat.darrer_error && <p className="break-words text-error">{estat.darrer_error}</p>}
         {estat.font === 'mercabarna' && <p className="text-muted-foreground">{t('preu.days_month', { n: diesMes })}</p>}
         <p className="text-muted-foreground">{t(estat.automatic ? 'preu.auto_on' : 'preu.auto_off')}</p>
@@ -98,6 +106,60 @@ function TargetaFont({ estat, potAprovar, esSuperAdmin, ocupat, diesMes, onActua
         )}
       </CardContent>
     </Card>
+  )
+}
+
+/** Bajo el estado de una carga pendiente: a qué espera, o el enlace al mes que la valida. */
+function PasDeCarrega({ carrega }: { carrega: CarregaPreus }) {
+  const { t } = useT()
+  const pas = pasCarrega(carrega)
+  if (!pas) return null
+  const m = `${t(`preu.mes_${pas.mes.mes}`)} ${pas.mes.exercici}`
+  if (pas.tipus === 'esperar_mes') {
+    return <span className="mt-1 block text-xs text-muted-foreground" data-testid="carrega-pas">{t('preu.pas_esperar', { m })}</span>
+  }
+  return (
+    <Link to={rutaPreusMes(claveMes(pas.mes))} className="mt-1 block text-xs font-medium text-primary hover:underline"
+      data-testid="carrega-pas">
+      {t('preu.pas_validar', { m })}
+    </Link>
+  )
+}
+
+/**
+ * «Què cal fer» (18-11-2026): el equipo veía «Pendent» en Mercabarna y no sabía si tenía que
+ * hacer algo. Lo dice en una frase por caso, con el enlace al mes que se puede validar.
+ */
+function QueCalFer({ accions }: { accions: AccionsCarregues }) {
+  const { t } = useT()
+  const nomMes = (m: { exercici: number; mes: number }) => `${t(`preu.mes_${m.mes}`)} ${m.exercici}`
+  const res = accions.validar.length === 0 && accions.esperar.length === 0 && accions.errors.length === 0
+  const urgent = accions.validar.length > 0 || accions.errors.length > 0
+  return (
+    <div className={urgent ? 'rounded-md border border-aviso bg-aviso-fondo p-3 text-sm' : 'rounded-md border bg-muted/30 p-3 text-sm'}
+      data-testid="carregues-que-cal-fer">
+      <p className={urgent ? 'flex items-center gap-2 font-medium text-aviso' : 'flex items-center gap-2 font-medium'}>
+        {urgent ? <AlertTriangle className="size-4 shrink-0" aria-hidden /> : <Info className="size-4 shrink-0" aria-hidden />}
+        {t('preu.todo_title')}
+      </p>
+      <ul className="mt-1.5 space-y-1.5 text-foreground">
+        {res && <li>{t('preu.todo_res')}</li>}
+        {accions.errors.map((f) => (
+          <li key={`e-${f}`} className="text-error">{t('preu.todo_error', { f: t(`preu.font_${f}`) })}</li>
+        ))}
+        {accions.validar.map((m) => (
+          <li key={`v-${claveMes(m)}`}>
+            {t('preu.todo_validar', { m: nomMes(m) })}{' '}
+            <Link to={rutaPreusMes(claveMes(m))} className="font-medium text-primary hover:underline">
+              {t('preu.pas_validar', { m: nomMes(m) })}
+            </Link>
+          </li>
+        ))}
+        {accions.esperar.map((m) => (
+          <li key={`w-${claveMes(m)}`} className="text-muted-foreground">{t('preu.todo_esperar', { m: nomMes(m) })}</li>
+        ))}
+      </ul>
+    </div>
   )
 }
 
@@ -136,6 +198,7 @@ export default function PestanyaCarregues({ potAprovar, esSuperAdmin }: { potApr
       return c.font === 'mercabarna' && c.estat !== 'descartada' && m?.exercici === ara.exercici && m.mes === ara.mes
     }).length
   }, [carregues])
+  const accions = useMemo(() => accionsCarregues(carregues, fonts), [carregues, fonts])
 
   async function actualitza(font: FontDescarrega) {
     setOcupat(true)
@@ -181,6 +244,7 @@ export default function PestanyaCarregues({ potAprovar, esSuperAdmin }: { potApr
   return (
     <div className="space-y-4">
       <p className="text-sm text-muted-foreground">{t('preu.loads_subtitle')}</p>
+      {!carregant && !error && <QueCalFer accions={accions} />}
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         {fonts.map((f) => (
           <TargetaFont key={f.font} estat={f} potAprovar={potAprovar} esSuperAdmin={esSuperAdmin} ocupat={ocupat}
@@ -235,8 +299,9 @@ export default function PestanyaCarregues({ potAprovar, esSuperAdmin }: { potApr
                   <span className="block text-xs text-muted-foreground">{t('preu.n_products', { n: c.productes })}</span>
                 </TableCell>
                 <TableCell className="text-center whitespace-normal">
-                  <Badge className={ESTIL_ESTAT[c.estat]}>{t(`preu.estat_${c.estat}`)}</Badge>
+                  <Badge className={ESTIL_ESTAT[c.estat]} title={t(`preu.estat_${c.estat}_desc`)}>{t(`preu.estat_${c.estat}`)}</Badge>
                   {c.motiu && <span className="block text-xs break-words text-muted-foreground">{c.motiu}</span>}
+                  <PasDeCarrega carrega={c} />
                 </TableCell>
                 <TableCell>
                   <div className="flex flex-col items-center justify-center gap-1 md:flex-row">

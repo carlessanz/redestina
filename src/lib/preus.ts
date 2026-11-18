@@ -245,6 +245,90 @@ export function mesDeData(d: string | null): { exercici: number; mes: number } |
   return m ? { exercici: Number(m[1]), mes: Number(m[2]) } : null
 }
 
+/** `aaaa-mm` de un mes, para `rutaPreusMes`. */
+export function claveMes(m: { exercici: number; mes: number }): string {
+  return `${m.exercici}-${String(m.mes).padStart(2, '0')}`
+}
+
+/**
+ * Por qué una fila de un mes no tiene precio, para decírselo al equipo (18-11-2026: «hay muchos
+ * productos sin coste» y nadie sabía si era un fallo de la lectura). null = sí tiene.
+ * - `manual`: el producto no tiene ninguna fuente (o está marcado manual): lo pone el equipo.
+ * - `mercabarna_mes_obert`: solo está en Mercabarna y el mes no ha acabado; su precio del mes es
+ *   el último día capturado y sale el día 1 del mes siguiente.
+ * - `mercabarna_sense_dies`: solo está en Mercabarna y de ese mes no hay ningún día capturado
+ *   (la captura diaria empezó el 16-11-2026): o se pone a mano, o se queda sin precio.
+ * - `gencat_sense_dades`: tiene Gencat pero Gencat aún no había publicado nada hasta ese mes.
+ */
+export type MotiuSensePreu = 'manual' | 'mercabarna_mes_obert' | 'mercabarna_sense_dies' | 'gencat_sense_dades'
+
+export function motiuSensePreu(
+  p: PropostaPreu,
+  fonts: ReadonlySet<FontDescarrega> | undefined,
+  exercici: number,
+  mes: number,
+  ara: Date = new Date(),
+): MotiuSensePreu | null {
+  if (p.validat_eur_kg !== null || p.proposta_eur_kg !== null) return null
+  if (p.preu_manual || !fonts || fonts.size === 0) return 'manual'
+  if (fonts.has('gencat')) return 'gencat_sense_dades'
+  const a = mesActual(ara)
+  const obert = exercici > a.exercici || (exercici === a.exercici && mes >= a.mes)
+  return obert ? 'mercabarna_mes_obert' : 'mercabarna_sense_dies'
+}
+
+/** Lo que una carga pendiente espera del equipo. */
+export type PasCarrega =
+  | { tipus: 'esperar_mes'; mes: { exercici: number; mes: number } }
+  | { tipus: 'validar_mes'; mes: { exercici: number; mes: number } }
+  | null
+
+/**
+ * Una carga pasa a «Validada» sola, cuando el equipo valida en «Preus de referència» el mes al
+ * que da precio (`validar_preus_mes`). Mercabarna de un mes abierto no se puede validar todavía;
+ * Gencat y Mercabarna de un mes cerrado, sí. Las validadas y descartadas no esperan nada.
+ */
+export function pasCarrega(c: Pick<CarregaPreus, 'font' | 'estat' | 'data_font'>,
+  ara: Date = new Date()): PasCarrega {
+  if (c.estat !== 'pendent') return null
+  const a = mesActual(ara)
+  // Gencat da precio a todos los meses cerrados (el suyo o, si no ha publicado, su último):
+  // lo que toca es validar el último mes cerrado.
+  if (c.font === 'gencat') return { tipus: 'validar_mes', mes: mesAnterior(a.exercici, a.mes) }
+  const m = mesDeData(c.data_font)
+  if (!m) return null
+  const obert = m.exercici > a.exercici || (m.exercici === a.exercici && m.mes >= a.mes)
+  return { tipus: obert ? 'esperar_mes' : 'validar_mes', mes: m }
+}
+
+/** El resumen de «Què cal fer» de la pestaña Càrregues. */
+export interface AccionsCarregues {
+  /** Meses que ya se pueden validar (más reciente primero). */
+  validar: { exercici: number; mes: number }[]
+  /** Meses abiertos de Mercabarna: se validan al acabar. */
+  esperar: { exercici: number; mes: number }[]
+  /** Fuentes cuya última comprobación falló. */
+  errors: FontDescarrega[]
+}
+
+export function accionsCarregues(carregues: readonly CarregaPreus[], fonts: readonly EstatFont[],
+  ara: Date = new Date()): AccionsCarregues {
+  const validar = new Map<string, { exercici: number; mes: number }>()
+  const esperar = new Map<string, { exercici: number; mes: number }>()
+  for (const c of carregues) {
+    const p = pasCarrega(c, ara)
+    if (!p) continue
+    ;(p.tipus === 'validar_mes' ? validar : esperar).set(claveMes(p.mes), p.mes)
+  }
+  const ordre = (m: Map<string, { exercici: number; mes: number }>) =>
+    [...m.entries()].sort((x, y) => y[0].localeCompare(x[0])).map(([, v]) => v)
+  return {
+    validar: ordre(validar),
+    esperar: ordre(esperar),
+    errors: fonts.filter((f) => f.darrer_resultat === 'error').map((f) => f.font),
+  }
+}
+
 // ---------------------------------------------------------------------------
 // Llamadas
 // ---------------------------------------------------------------------------

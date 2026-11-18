@@ -10,7 +10,8 @@
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router'
 import { toast } from 'sonner'
-import { AlertTriangle, CheckCheck, Pencil } from 'lucide-react'
+import { AlertTriangle, CheckCheck, Info, Pencil } from 'lucide-react'
+import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { casaCerca } from '../../lib/cerca'
 import { useCerca } from '../../hooks/useCerca'
@@ -21,8 +22,8 @@ import { textOrigenManual } from '../../lib/valoracio'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import {
   MESOS, carregaCanalitzacionsMes, carregaOrigensManuals, carregaPropostaMes, esDunAltreMes, esMesFutur, mesDeData, mesDeParam, esSaltGran, exercicisDisponibles, fixaPreu,
-  fontHaCanviat, mesActual, mesAnterior, mesFontDeFila, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
-  type CanalitzacionsMes, type FontPreu, type PropostaPreu,
+  fontHaCanviat, mesActual, mesAnterior, mesFontDeFila, motiuSensePreu, preuDeFila, resumMes, textVariacio, validaMes, validaPeriode, valorDeFont, variacio,
+  type CanalitzacionsMes, type FontDescarrega, type FontPreu, type MotiuSensePreu, type PropostaPreu,
 } from '../../lib/preus'
 import { useConfirma } from '../DialegConfirma'
 import Desplegable from '../Desplegable'
@@ -185,6 +186,8 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   const [origens, setOrigens] = useState<Map<string, { criteri: string | null; font_origen: string | null }>>(new Map())
   const [carregant, setCarregant] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  /** De qué fuentes sale cada producto: para decir por qué un mes no tiene precio (18-11-2026). */
+  const [fontsProducte, setFontsProducte] = useState<Map<string, Set<FontDescarrega>>>(new Map())
   const [ocupat, setOcupat] = useState(false)
   const [editant, setEditant] = useState<string | null>(null)
   const [nomesPendents, setNomesPendents] = useState(false)
@@ -207,6 +210,21 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
 
   useEffect(() => {
     let viu = true
+    // Solo explica; si falla, la fila dice «Sense preu» como antes.
+    void supabase.from('productes_fonts').select('producto, font').then(({ data }) => {
+      if (!viu) return
+      const m = new Map<string, Set<FontDescarrega>>()
+      for (const f of (data as { producto: string; font: FontDescarrega }[] | null) ?? []) {
+        if (!m.has(f.producto)) m.set(f.producto, new Set())
+        m.get(f.producto)!.add(f.font)
+      }
+      setFontsProducte(m)
+    })
+    return () => { viu = false }
+  }, [])
+
+  useEffect(() => {
+    let viu = true
     setCarregant(true)
     setEditant(null)
     void carrega().finally(() => { if (viu) setCarregant(false) })
@@ -222,6 +240,21 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
   const esperaPerProducte = useMemo(() => new Map(esperen.map((e) => [e.producto, e])), [esperen])
   const totalEsperen = esperen.reduce((a, e) => a + e.provisionals, 0)
   const senseCapPreu = esperen.filter((e) => e.sense_preu > 0).map((e) => e.producto)
+  const motius = useMemo(() => {
+    const m = new Map<string, MotiuSensePreu>()
+    for (const p of files) {
+      const x = motiuSensePreu(p, fontsProducte.get(p.producto), exercici, mes)
+      if (x) m.set(p.producto, x)
+    }
+    return m
+  }, [files, fontsProducte, exercici, mes])
+  const perMotiu = useMemo(() => {
+    const c: Record<MotiuSensePreu, number> = {
+      mercabarna_mes_obert: 0, mercabarna_sense_dies: 0, manual: 0, gencat_sense_dades: 0,
+    }
+    for (const x of motius.values()) c[x]++
+    return c
+  }, [motius])
 
   async function validaTot() {
     const ok = await confirma({
@@ -308,6 +341,22 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
         </div>
       )}
 
+      {/* Por qué faltan precios y si hay que hacer algo (18-11-2026: «muchos productos sin
+          coste» parecía un fallo de la lectura, y es que Mercabarna da el mes al cerrarlo). */}
+      {!carregant && motius.size > 0 && (
+        <div className="rounded-md border bg-muted/30 p-3 text-sm" data-testid="preu-sense-motius">
+          <p className="flex items-center gap-2 font-medium">
+            <Info className="size-4 shrink-0" aria-hidden />{t('preu.without_title', { n: motius.size })}
+          </p>
+          <ul className="mt-1.5 list-disc space-y-1 pl-5">
+            {perMotiu.mercabarna_mes_obert > 0 && <li>{t('preu.without_mb_open', { n: perMotiu.mercabarna_mes_obert })}</li>}
+            {perMotiu.mercabarna_sense_dies > 0 && <li>{t('preu.without_mb_none', { n: perMotiu.mercabarna_sense_dies })}</li>}
+            {perMotiu.manual > 0 && <li>{t('preu.without_manual', { n: perMotiu.manual })}</li>}
+            {perMotiu.gencat_sense_dades > 0 && <li>{t('preu.without_gencat', { n: perMotiu.gencat_sense_dades })}</li>}
+          </ul>
+        </div>
+      )}
+
       {potAprovar && (
         <div className="flex flex-wrap gap-2">
           <Button className="h-11 md:h-8" disabled={ocupat || futur || resum.perValidar === 0}
@@ -370,6 +419,12 @@ export default function PestanyaPreus({ potAprovar }: { potAprovar: boolean }) {
                       <Link to={rutaProducte(p.producto)} className="font-medium text-primary hover:underline">{p.producto}</Link>
                       {p.familia && <span className="block text-xs text-muted-foreground">{p.familia}</span>}
                       {p.preu_manual && <span className="block text-xs text-muted-foreground">{t('preu.manual_product')}</span>}
+                      {/* Por qué no tiene precio (18-11-2026): bajo el nombre, que es la columna ancha. */}
+                      {motius.has(p.producto) && (
+                        <span className="block text-xs text-muted-foreground" data-testid="preu-motiu">
+                          {t(`preu.motiu_${motius.get(p.producto)!}`)}
+                        </span>
+                      )}
                       {(p.preu_manual || preu.font === 'manual') && (
                         <span className="block text-xs text-aviso" data-testid="preu-origen-manual">
                           {textOrigenManual(origens.get(p.producto), lang)}

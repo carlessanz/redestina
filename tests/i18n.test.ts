@@ -177,6 +177,10 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     { que: 'preus_carregues.estat', prefijo: 'preu.estat_', valores: ['pendent', 'validada', 'descartada'] },
     { que: 'preus_carregues.origen', prefijo: 'preu.origen_', valores: ['job', 'manual'] },
     { que: 'preus_fonts_estat.darrer_resultat', prefijo: 'preu.res_', valores: ['nou', 'sense_canvis', 'duplicat', 'error'] },
+    // Qué significa cada estado y resultado, y por qué un mes no tiene precio (18-11-2026).
+    { que: 'preus_carregues.estat (explicación)', prefijo: 'preu.estat_', valores: ['pendent_desc', 'validada_desc', 'descartada_desc'] },
+    { que: 'darrer_resultat (explicación)', prefijo: 'preu.res_', valores: ['nou_desc', 'sense_canvis_desc', 'duplicat_desc', 'error_desc'] },
+    { que: 'motiuSensePreu()', prefijo: 'preu.motiu_', valores: ['manual', 'mercabarna_mes_obert', 'mercabarna_sense_dies', 'gencat_sense_dades'] },
     { que: 'preus-fonts resultat', prefijo: 'preu.update_', valores: ['nou', 'sense_canvis', 'duplicat', 'desactivat'] },
     {
       que: 'RPC de preus · codis (lib/preus CODIS)',

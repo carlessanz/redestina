@@ -8,7 +8,12 @@
 
 1. **`npm run check`** en verde: tipos de la aplicación **y de las pruebas**, `vitest run` y
    `deno check` de los scripts y las 19 funciones. Sustituye a lanzar los tres a mano.
-   Referencia: **2.098 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (17-11-2026,
+   Referencia: **2.111 pruebas en 96 ficheros** de Vitest (1 saltada a propósito) **+ 60 de Deno** (18-11-2026,
+   sin migración: +10 en `tests/preus.test.ts` —`motiuSensePreu`, `pasCarrega`, `accionsCarregues`, `claveMes`— y +3
+   familias de claves compuestas en `tests/i18n.test.ts`). **Producción, tras publicar `20270604100000` y rellenar el
+   origen de 19 precios manuales: 2.883/2.883 y 35 sin datos** (mismo total, 2.918: cambio de datos). Una aprobación
+   por error de `hola+pendent-arnes@` da cuatro FALLA (§6).
+   Antes, **2.098** (17-11-2026,
    `20270604100000`, origen de los precios manuales: +8 en `tests/valoracio.test.ts` —`textOrigenManual`, criterios,
    paridad con la migración y el rótulo del alta—; `prova-preus-referencia.sql` 75 ok con la sección h). Arnés del
    clon **2.874/2.874 y 44 sin datos** (+9 checks de `fixar_origen_cost_producte`: 7 externas y el técnico deniegan,

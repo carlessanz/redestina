@@ -24,6 +24,7 @@ import CercadorOpcions from '../CercadorOpcions'
 import BotoIcona from '../BotoIcona'
 import { FilaCasella } from '../Casella'
 import { BadgeFont } from './PestanyaPreus'
+import { useConfirma } from '../DialegConfirma'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -44,6 +45,7 @@ export default function PreusProducte({ producte, nomEs, preuManual, potAprovar,
   const [noms, setNoms] = useState<NomFontVist[]>([])
   const [font, setFont] = useState<FontDescarrega>('mercabarna')
   const [ocupat, setOcupat] = useState(false)
+  const { confirma, dialeg } = useConfirma()
 
   const carrega = useCallback(async () => {
     // ⚠️ Cada lista de columnas, en UN literal (§7).
@@ -83,6 +85,14 @@ export default function PreusProducte({ producte, nomEs, preuManual, potAprovar,
     })), [noms, font, jaHi])
 
   async function afegeix(f: FontDescarrega, nom: string, codi: string | null) {
+    // Antes se añadía al primer clic, y un clic despistado en el buscador dejó la Llimona con el
+    // precio de la «BERENJENA REDONDA» (17-11-2026). Ahora se confirma diciendo qué se casa.
+    const ok = await confirma({
+      titol: t('preu.equiv_confirm_t', { nom, f: t(`preu.font_${f}`), p: producte }),
+      descripcio: t('preu.equiv_confirm_d', { f: t(`preu.font_${f}`), p: producte }),
+      confirmar: t('c.add'),
+    })
+    if (!ok) return
     setOcupat(true)
     const r = await afegeixEquivalencia(producte, f, nom, codi)
     setOcupat(false)
@@ -110,6 +120,7 @@ export default function PreusProducte({ producte, nomEs, preuManual, potAprovar,
 
   return (
     <Card data-testid="preus-producte">
+      {dialeg}
       <CardHeader>
         <CardTitle className="text-base">{t('preu.product_title')}</CardTitle>
         <p className="mt-1 text-sm text-muted-foreground">{t('preu.product_hint')}</p>

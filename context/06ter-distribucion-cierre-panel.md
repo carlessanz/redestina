@@ -2410,6 +2410,29 @@ subcausas, borradores en servidor, edición tras publicar ni precios por mes (ot
     hablaba al productor), «Aquesta entitat encara no té cap lloc…» (`po.no_locations_equip`), etiqueta de la entidad
     con el mismo estilo, y en el móvil cabecera a la izquierda con la explicación solo para lector de pantalla.
 
+- **Precios: qué hay que hacer y por qué falta un precio (18-11-2026, pregunta del cliente; solo frontend)**. «Hay
+  muchos productos sin coste» y «¿por qué Mercabarna está Pendent?». La lectura de las dos fuentes era correcta
+  (Gencat, 47 productos; Mercabarna, 132 nombres al día, solo CALÇOTS sin valor); lo que faltaba era decirlo:
+  - **Por qué faltan precios**: 38 productos solo están en Mercabarna, que se captura desde el 16-11-2026 y da el
+    mes con el último día capturado **cuando el mes ya ha acabado**; octubre no tiene días y noviembre llega el 1-12.
+    `motiuSensePreu()` (`lib/preus.ts`, con test) da el motivo por fila (`manual` · `mercabarna_mes_obert` ·
+    `mercabarna_sense_dies` · `gencat_sense_dades`; lee `productes_fonts`, que el equipo puede leer) y
+    `PestanyaPreus` lo pone bajo el nombre (`preu-motiu`) y lo resume encima de la tabla (`preu-sense-motius`).
+  - **«Pendent» en Càrregues**: una carga pasa a «Validada» sola cuando se valida en Preus el mes al que da precio
+    (`validar_preus_mes`); una de Mercabarna del mes en curso **no se puede validar todavía**, y sus precios ya entran
+    en la propuesta. `pasCarrega()` dice qué espera cada carga (`esperar_mes` o `validar_mes`, con enlace al mes;
+    Gencat, siempre el último mes cerrado) y `accionsCarregues()` arma el recuadro «Què cal fer»
+    (`carregues-que-cal-fer`), que dice también si una fuente falló o que no hay nada que hacer. El estado lleva su
+    explicación en `title` (`preu.estat_*_desc`) y la tarjeta de cada fuente explica el último resultado
+    (`preu.res_*_desc`): **«Duplicada» no es un error**, es pulsar «Actualitza ara» el mismo día (una captura de
+    Mercabarna por día, `unique (font, data_font)`) o el mismo fichero de Gencat.
+  - **Equivalencia con confirmación** (`PreusProducte`): añadir un nombre de fuente (sugerido o del buscador) pregunta
+    «“LIMÓN” de Mercabarna és Llimona?». Antes bastaba un clic, y uno despistado del 17-11 casó la **Llimona con la
+    «BERENJENA REDONDA»** (corregido en producción el 18-11 por `treure_equivalencia_preu` + `afegir_equivalencia_preu`
+    → «LIMÓN»; ningún precio validado ni oferta lo había usado). Las demás equivalencias son las sembradas y casan.
+  - Pendiente de criterio del cliente, no de código: Gencat publica «Mongetes seques» (011000) y el catálogo tiene
+    «Fesol» manual sin fuente; si fesol es la mongeta seca, se añade la equivalencia desde la ficha.
+
 ### Fase B del punto 3: causas y subcausas en el panel (17-11-2026, `20270529100000`)
 
 Fila 3.6. Modelo y reglas en `context/04` y `context/08`; WhatsApp y `crear-oferta` en `context/06bis`.

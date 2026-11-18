@@ -10,6 +10,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('../src/lib/supabase', () => ({ supabase: {}, supabaseUrl: '' }))
 
 import {
+  accionsCarregues, claveMes, motiuSensePreu, pasCarrega,
   esDunAltreMes, esMesFutur, esSaltGran, exercicisDisponibles, fontHaCanviat, mesActual, mesAnterior, mesDeData,
   mesFontDeFila, preuDeFila,
   resumMes, textVariacio, valorDeFont, variacio, type PropostaPreu,
@@ -122,5 +123,67 @@ describe('el resumen del mes', () => {
       fila({}),
     ])
     expect(r).toEqual({ total: 3, validats: 1, perValidar: 1, sensePreu: 1, salts: 1 })
+  })
+})
+
+// 18-11-2026: «muchos productos sin coste» y «¿por qué Pendent?». Lo que la pantalla le dice al
+// equipo sale de estas tres piezas.
+describe('por qué un mes no tiene precio', () => {
+  const nov18 = new Date('2026-11-18T10:00:00Z')
+  const gc = new Set(['gencat'] as const)
+  const mb = new Set(['mercabarna'] as const)
+
+  it('con precio (propuesto o validado), ningún motivo', () => {
+    expect(motiuSensePreu(fila({ proposta_eur_kg: 1 }), mb, 2026, 11, nov18)).toBeNull()
+    expect(motiuSensePreu(fila({ validat_eur_kg: 1 }), mb, 2026, 10, nov18)).toBeNull()
+  })
+  it('sin fuentes o marcado manual: lo pone el equipo', () => {
+    expect(motiuSensePreu(fila({}), new Set(), 2026, 10, nov18)).toBe('manual')
+    expect(motiuSensePreu(fila({}), undefined, 2026, 10, nov18)).toBe('manual')
+    expect(motiuSensePreu(fila({ preu_manual: true }), mb, 2026, 10, nov18)).toBe('manual')
+  })
+  it('solo Mercabarna: el mes en curso espera a cerrarse; uno pasado no tiene días', () => {
+    expect(motiuSensePreu(fila({}), mb, 2026, 11, nov18)).toBe('mercabarna_mes_obert')
+    expect(motiuSensePreu(fila({}), mb, 2026, 10, nov18)).toBe('mercabarna_sense_dies')
+    expect(motiuSensePreu(fila({}), mb, 2027, 1, nov18)).toBe('mercabarna_mes_obert')
+  })
+  it('con Gencat y sin valor: Gencat aún no lo había publicado', () => {
+    expect(motiuSensePreu(fila({}), gc, 2020, 1, nov18)).toBe('gencat_sense_dades')
+  })
+})
+
+describe('qué espera una carga', () => {
+  const nov18 = new Date('2026-11-18T10:00:00Z')
+  const carrega = (font: 'gencat' | 'mercabarna', data_font: string, estat: 'pendent' | 'validada' | 'descartada' = 'pendent') =>
+    ({ id: data_font + font, font, data_font, periode_fins: null, estat, fitxer_nom: null, mida_bytes: null, files: 1,
+      productes: 1, origen: 'job' as const, created_at: data_font, motiu: null })
+
+  it('Mercabarna del mes en curso: espera a que acabe', () => {
+    expect(pasCarrega(carrega('mercabarna', '2026-11-17'), nov18)).toEqual({ tipus: 'esperar_mes', mes: { exercici: 2026, mes: 11 } })
+  })
+  it('Mercabarna de un mes cerrado: se valida ese mes', () => {
+    expect(pasCarrega(carrega('mercabarna', '2026-10-30'), nov18)).toEqual({ tipus: 'validar_mes', mes: { exercici: 2026, mes: 10 } })
+  })
+  it('Gencat pendiente: el último mes cerrado', () => {
+    expect(pasCarrega(carrega('gencat', '2026-08-01'), nov18)).toEqual({ tipus: 'validar_mes', mes: { exercici: 2026, mes: 10 } })
+  })
+  it('validada o descartada: nada', () => {
+    expect(pasCarrega(carrega('mercabarna', '2026-10-30', 'validada'), nov18)).toBeNull()
+    expect(pasCarrega(carrega('gencat', '2026-08-01', 'descartada'), nov18)).toBeNull()
+  })
+  it('el resumen agrupa por mes, el más reciente primero, y cuenta las fuentes con error', () => {
+    const a = accionsCarregues([
+      carrega('mercabarna', '2026-11-16'), carrega('mercabarna', '2026-11-17'),
+      carrega('mercabarna', '2026-09-30'), carrega('mercabarna', '2026-10-31'), carrega('gencat', '2026-08-01', 'validada'),
+    ], [
+      { font: 'gencat', url: '', automatic: true, darrera_comprovacio_at: null, darrer_resultat: 'sense_canvis', darrer_error: null, darrera_carrega_at: null },
+      { font: 'mercabarna', url: '', automatic: true, darrera_comprovacio_at: null, darrer_resultat: 'error', darrer_error: 'x', darrera_carrega_at: null },
+    ], nov18)
+    expect(a.esperar).toEqual([{ exercici: 2026, mes: 11 }])
+    expect(a.validar).toEqual([{ exercici: 2026, mes: 10 }, { exercici: 2026, mes: 9 }])
+    expect(a.errors).toEqual(['mercabarna'])
+  })
+  it('claveMes', () => {
+    expect(claveMes({ exercici: 2026, mes: 3 })).toBe('2026-03')
   })
 })
