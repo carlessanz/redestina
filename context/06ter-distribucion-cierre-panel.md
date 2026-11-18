@@ -2430,8 +2430,9 @@ subcausas, borradores en servidor, edición tras publicar ni precios por mes (ot
     «“LIMÓN” de Mercabarna és Llimona?». Antes bastaba un clic, y uno despistado del 17-11 casó la **Llimona con la
     «BERENJENA REDONDA»** (corregido en producción el 18-11 por `treure_equivalencia_preu` + `afegir_equivalencia_preu`
     → «LIMÓN»; ningún precio validado ni oferta lo había usado). Las demás equivalencias son las sembradas y casan.
-  - Pendiente de criterio del cliente, no de código: Gencat publica «Mongetes seques» (011000) y el catálogo tiene
-    «Fesol» manual sin fuente; si fesol es la mongeta seca, se añade la equivalencia desde la ficha.
+  - **Fesol ≠ «Mongetes seques»** (Gencat 011000), decidido por Carles el 18-11-2026: son productos distintos, así
+    que **no se casan**. El fesol sigue con su precio manual provisional (proxy de la mongeta) hasta que la Fundació
+    fije el suyo. No volver a proponer esa equivalencia.
 
 ### Fase B del punto 3: causas y subcausas en el panel (17-11-2026, `20270529100000`)
 
