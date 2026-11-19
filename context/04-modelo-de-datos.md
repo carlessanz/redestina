@@ -2026,3 +2026,24 @@ Fase 2 de los puntos 4-6 (RPC y códigos en `context/04bis`, «Asignación en un
 - **Documentos propios de una venta o maquila (D4)**: `documentos_externos.objeto_tipo = 'canalizacion'`, visibles al
   equipo y a las dos partes (`canalitzacions_de_les_meves_orgs()`), carpeta del productor; `subir-documento-externo`
   acepta `canalizacion`; `borrar_una_fitxa` se los lleva a `fitxers_orfes`.
+
+### Propuesta de cambios, origen de la recogida y Realtime (19-11-2026, fase 5 de los puntos 4-6)
+
+- `20270610100000_proposar_canvis.sql`: `oferta_respuestas.aprovacio` admite **`proposada`** (el equipo propuso cambios y
+  espera a la entidad). Columnas `proposta_kg`, `proposta_modalitat`, `proposta_recollida_at`, `proposta_motiu`,
+  `proposta_at`, `proposta_per` (valores efectivos completos), `proposta_original` jsonb (lo que pidió la entidad:
+  `kg_solicitados`, `modalitat`, `recollida_at`, `preu_ofert`), `proposta_resposta` (acceptada·rebutjada),
+  `proposta_resposta_at/_motiu/_per`. Check `oferta_respuestas_proposada_completa`. Trigger
+  `respuestas_protegeix_proposta`: con sesión y sin la marca `redestina.escriu_proposta`, nadie escribe `proposta_*`
+  ni pone `proposada` (`42501 proposta_protegida`). Aviso nuevo `canvis_proposats`. La cola `respostes` de
+  `pendents_equip()` solo cuenta `pendent`, así que una propuesta sale de ella sola; `pendents_meus()` tiene la rama
+  `resposta_proposta`; `progres_meves_ofertes()` cuenta `proposada` como «per aprovar»; `canalitzacio_assistida()`
+  devuelve `proposta_*`; `manifestar_interes*` sobre una propuesta → `22023 proposta_pendent`.
+- `20270610100100_recollida_origen.sql`: `canalizaciones.recollida_origen` (`entitat_receptora` · `equip` · null), escrita
+  por `registrar_recollida_escriu()` (el receptor → entitat_receptora; la asistida → equip), rellenada para las ya
+  registradas (incidencia; si no, ¿quien registró es miembro de la entidad?), a null con `retornar_recollida`
+  (trigger `canalizaciones_origen_recollida`) y protegida como el resto de la recogida. Interna
+  `albarans_recollida(p_canalizacion)` (solo `service_role`): los ENT/REC emitidos de esa recogida con su documento vigente.
+- `20270610100200_realtime_comptadors.sql`: `supabase_realtime` publica además `avisos`, `convenios`, `albaranes`,
+  `firmes_document`, `excedentes_canvis` y `documentos`. Realtime filtra por RLS y por `has_column_privilege`, así que
+  las columnas fuera del GRANT (`documentos.envio`…) no salen; un DELETE solo manda la clave primaria.

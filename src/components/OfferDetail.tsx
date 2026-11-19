@@ -42,6 +42,7 @@ import DialegEdicioOferta from './DialegEdicioOferta'
 import FitxaOferta from './FitxaOferta'
 import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
 import FormulariAprovacio from './equip/FormulariAprovacio'
+import { PropostaEsperant } from './equip/PropostaCanvis'
 import AccionsAssignacio, { PreuAcordat } from './equip/AccionsAssignacio'
 import CertificatOferta from './equip/CertificatOferta'
 import { registrarEnviamentManual } from '../lib/canalitzacio'
@@ -1170,8 +1171,14 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                     faltan={faltan}
                     potAprovar={potAprovar}
                     idPrefix={`od-apr-${r.id}`}
+                    entitat={nombre}
                     onFet={() => void trasAprovacio()}
                   />
+                )}
+                {/* Fase 5 de los puntos 4-6: el equipo propuso cambios y espera a la entidad. Se
+                    puede aceptar en su nombre o retirar (rechazarla por ella, con motivo). */}
+                {r.estado === 'acceptada' && r.aprovacio === 'proposada' && (
+                  <PropostaEsperant resposta={r} potAprovar={potAprovar} onFet={() => void trasAprovacio()} />
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'aprovada' && (
                   <span className="text-xs font-medium text-primary">{t('od.approved_kg', { n: kgCa(Number(r.kg_aprovats ?? r.kg_solicitados ?? 0)) })}</span>
@@ -1223,6 +1230,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                   <span className="text-xs text-muted-foreground">{t('appr.recollida')}: {fechaCorta(c.data_hora_recollida)}</span>
                 )}
                 {!anulada && <PreuAcordat c={fila} />}
+                {/* Quién registró la recogida: la entidad desde su panel (nivel 2) o el equipo
+                    en su nombre (nivel 1). 20270610100100. */}
+                {!anulada && fila.recollida_registrada_at && c.recollida_origen && (
+                  <span className="text-xs text-muted-foreground" data-testid="od-origen-recollida">
+                    {t(`rrec.origen_${c.recollida_origen}`)}
+                  </span>
+                )}
                 {/* Los kilos reales ya no se teclean aquí: los fija la recogida (registrada y
                     validada) y la base protege la columna. Se enseñan, nada más. */}
                 {c.kg_reales != null && (

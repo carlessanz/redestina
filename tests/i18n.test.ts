@@ -280,6 +280,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
         'recollida_retornada',
         // 05-11-2026 (circuito de firma): la firma de un documento quedó cerrada.
         'document_signat',
+        // Puntos 4-6: el equipo anula una asignación (fase 2) y propone cambios a un interés (fase 5).
+        'assignacio_anulada', 'canvis_proposats',
       ],
     },
     {
@@ -289,6 +291,26 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
       prefijo: 'op.estat_',
       // `registrada` (17-10-2026): declarada por el receptor, pendiente de validar por el equipo.
       valores: ['pendent', 'programada', 'registrada', 'entregada', 'confirmada', 'conciliada'],
+    },
+    {
+      // CHECK de `oferta_respuestas.aprovacio` (`proposada` desde 20270610100000). Se compone en
+      // `OfferDetail.tsx` (el badge del equipo junto a cada respuesta).
+      que: 'oferta_respuestas.aprovacio',
+      prefijo: 'od.ap_',
+      valores: ['pendent', 'aprovada', 'rebutjada', 'proposada'],
+    },
+    {
+      // CHECK de `canalizaciones.recollida_origen` (20270610100100). Se compone en `OfferDetail.tsx`
+      // y en la cola «Recollides per validar» de `Aprovacions.tsx`.
+      que: 'canalizaciones.recollida_origen',
+      prefijo: 'rrec.origen_',
+      valores: ['entitat_receptora', 'equip'],
+    },
+    {
+      // Los campos de una propuesta de cambios (`canvisProposta()`, `CanvisProposta.tsx`).
+      que: 'propostaCanvis · CampProposta',
+      prefijo: 'prop.camp_',
+      valores: ['kg', 'modalitat', 'recollida'],
     },
     {
       // CHECK de `oferta_respuestas.canal`. Se compone en `Aprovacions.tsx` y `OfferDetail.tsx`.

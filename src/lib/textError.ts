@@ -30,6 +30,20 @@ const CODIS: Record<string, string> = {
   recollida_no_validada: 'alb.err_recollida_no_validada',
   // `validar_recollida()`: antes que `cal_motiu`, que lo contiene.
   cal_motiu_validacio: 'vrec.err_cal_motiu',
+  // La propuesta de cambios (fase 5 de los puntos 4-6, 20270610100000). Los dos primeros son
+  // `codi` que pone `propostaCanvisApi.ts` (en el mensaje llegan como `cal_motiu` y
+  // `hora_passada`, que en la tabla común significan otra cosa); van antes que `cal_motiu`.
+  cal_motiu_proposta: 'prop.err_cal_motiu',
+  hora_proposta_passada: 'prop.err_hora_vencuda',
+  no_proposable: 'prop.err_no_proposable',
+  sense_proposta: 'prop.err_sense_proposta',
+  proposta_pendent: 'prop.err_proposta_pendent',
+  proposta_protegida: 'prop.err_protegida',
+  cal_resposta: 'prop.err_cal_resposta',
+  resposta_inexistent: 'prop.err_inexistent',
+  motiu_llarg: 'prop.err_motiu_llarg',
+  modalitat_invalida: 'prop.err_modalitat',
+  cal_modalitat: 'appr.cal_modalitat',
   // `conciliar_albaran()` con una incidencia de recogida y sin motivo (17-10-2026).
   cal_motiu_incidencia: 'alb.err_cal_motiu_incidencia',
   sense_conveni: 'od.conv_blocked',

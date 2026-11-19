@@ -28,14 +28,28 @@ export type TipusAvis =
   | "recollida_retornada"
   | "document_signat"
   // 19-11-2026 (fase 2 de los puntos 4-6): el equipo anula una asignación antes de la recogida.
-  | "assignacio_anulada";
+  | "assignacio_anulada"
+  // 19-11-2026 (fase 5 de los puntos 4-6): el equipo propone cambios a un interés y la entidad
+  // los acepta o los rechaza (`proposar_canvis`, 20270610100000).
+  | "canvis_proposats";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
   "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
-  "recollida_retornada", "document_signat", "assignacio_anulada",
+  "recollida_retornada", "document_signat", "assignacio_anulada", "canvis_proposats",
 ];
+
+/** La modalidad en palabras, para los avisos (el vocabulario de `_shared/modalitats.ts`). */
+function nomModalitat(m: string, idioma: Idioma): string {
+  const es = idioma === "es";
+  switch (m) {
+    case "donacio": return es ? "donación" : "donació";
+    case "venda": return es ? "venta" : "venda";
+    case "maquila": return es ? "transformación en obrador (maquila)" : "transformació en obrador (maquila)";
+    default: return m;
+  }
+}
 
 /** El nombre del documento por su sigla, para los avisos del circuito de firma. */
 export function nomDocument(tipus: string, idioma: Idioma): string {
@@ -149,6 +163,43 @@ export function textAvis(
           + (motiu ? `\n${es ? "Motivo" : "Motiu"}: ${motiu}` : ""),
         boton: botoParts,
         ruta: rutaParts,
+      };
+    }
+    case "canvis_proposats": {
+      // Va SOLO a la entidad (`proposar_canvis`). Cada dato se dice como «antes → ahora» si la
+      // propuesta lo cambia, o tal cual si no; el motivo es obligatorio en la RPC. El enlace abre
+      // la propuesta directamente (`?resposta=`), igual que los enlaces directos del panel.
+      const linies = [es
+        ? `El equipo de Redestina te propone cambios en tu interés por ${producte}:`
+        : `L’equip de Redestina et proposa canvis en el teu interès per ${producte}:`];
+      const n = (v: unknown) => (v == null || v === "" ? NaN : Number(v));
+      const kgAra = n(params.kg);
+      const kgAbans = n(params.kg_sol);
+      if (Number.isFinite(kgAra)) {
+        linies.push(`${es ? "Kilos" : "Quilos"}: ${Number.isFinite(kgAbans) && kgAbans !== kgAra
+          ? `${kg(kgAbans, idioma)} → ` : ""}${kg(kgAra, idioma)} kg`);
+      }
+      const modAra = s(params.modalitat);
+      const modAbans = s(params.modalitat_abans);
+      if (modAra) {
+        linies.push(`${es ? "Modalidad" : "Modalitat"}: ${modAbans && modAbans !== modAra
+          ? `${nomModalitat(modAbans, idioma)} → ` : ""}${nomModalitat(modAra, idioma)}`);
+      }
+      const qAra = quan(params.recollida_at, idioma);
+      const qAbans = quan(params.recollida_abans, idioma);
+      if (qAra) {
+        linies.push(`${es ? "Recogida" : "Recollida"}: ${qAbans && qAbans !== qAra ? `${qAbans} → ` : ""}${qAra}`);
+      }
+      const motiu = s(params.motiu);
+      if (motiu) linies.push(`${es ? "Motivo" : "Motiu"}: ${motiu}`);
+      linies.push(es ? "Acepta o rechaza la propuesta en Redestina." : "Accepta o rebutja la proposta a Redestina.");
+      const resposta = s(params.resposta_id) || objecteId;
+      return {
+        asunto: es ? `Propuesta de cambios: ${producte}` : `Proposta de canvis: ${producte}`,
+        titulo: es ? "Cambios propuestos" : "Canvis proposats",
+        cuerpo: linies.join("\n"),
+        boton: es ? "Responder la propuesta" : "Respon la proposta",
+        ruta: `/receptor/interessos?resposta=${encodeURIComponent(resposta)}`,
       };
     }
     case "kg_assignats_canviats":

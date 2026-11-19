@@ -153,7 +153,8 @@ export interface RespostaCanal {
   entidad_id: string | null
   entitat: string
   estado: 'pendent' | 'acceptada' | 'rebutjada'
-  aprovacio: 'pendent' | 'aprovada' | 'rebutjada'
+  /** `proposada`: el equipo propuso cambios y espera a la entidad (20270610100000). */
+  aprovacio: 'pendent' | 'aprovada' | 'rebutjada' | 'proposada'
   canalizacion_id: string | null
   conveni_rec: ConveniCanal | null
 }

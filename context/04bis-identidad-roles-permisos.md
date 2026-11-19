@@ -862,3 +862,17 @@ corta con `42501` cualquier `preu_*` escrito desde una sesión y el coste de una
 o certificada (`canalitzacio_certificada`). `canalizaciones_preu_hist`: SELECT solo `es_intern()`, sin GRANT de
 escritura. Internas (sin EXECUTE para `authenticated`): las diez de `context/04`, D2. Arnés: 13 checks nuevos por
 perfil (internas denegadas, rastro y lectura del mes solo del equipo).
+
+### Propuesta de cambios (19-11-2026, fase 5 de los puntos 4-6)
+
+- `proposar_canvis(p_resposta uuid, p_kg numeric, p_modalitat text, p_recollida_at timestamptz, p_motiu text) returns
+  oferta_respuestas` — `pot_aprovar()` (permiso antes que existencia); nulos = lo pedido; motivo obligatorio; sobre
+  `acceptada`+`pendent` o `proposada`. `22023`: `cal_motiu`, `motiu_llarg`, `resposta_inexistent`, `no_proposable`,
+  `modalitat_invalida`, `cal_canvi`, `hora_passada` y los de `comprova_interes`. Hora: solo «no pasada».
+- `respondre_proposta(p_resposta uuid, p_accepta boolean, p_motiu text) returns jsonb` `{resposta_id, resultat:
+  aprovada|pendent_preu|rebutjada, aprovacio, canalizacion_id}` — un miembro activo de la entidad o `pot_aprovar()`
+  (vía asistida; así el equipo también retira, deuda 193); el técnico no. Aceptar fuera de venta copia la propuesta y
+  aprueba con `aprova_resposta_intern` **sin claims** (como `validar_recollida`: con la sesión de la entidad
+  `convenio_vigente()` del productor daría 42501); `aprovat_per` = quien propuso. En venta deja `pendent` con los
+  valores propuestos para que el equipo apruebe con precio. Rechazar → `pendent` con lo pedido.
+- Arnés: bloques `PROPOSTA_*` (35 checks; clon 3.001/3.001).

@@ -2697,3 +2697,31 @@ Excel 4.2, 4.4 y 5.4: a cada acción se llega por un enlace, aunque sea un pop-u
   respuestas, no de la cola, y se sigue viendo.
 - E2E `tests/e2e/enllacos-directes.e2e.ts` (6); adaptadas `missatges` y `gestio-autonoma`. Sin comprobar en pantalla:
   una entidad sin cuenta en el ranking (en el clon todas la tienen; el test f lo mira si aparece).
+
+### Proposa canvis, contadores en vivo y albaranes por correo (19-11-2026, fase 5 de los puntos 4-6, `20270610100000`…`100200`)
+
+Excel 5.2 (nivel 2), 6.3 y 6.5 (nivel 2).
+- **Equipo**: «Proposa canvis» (solo `pot_aprovar`) en Aprovacions (`FormulariAprovacio`), en la ficha de la oferta y en el
+  paso «Aprovació» del ciclo guiado: diálogo `components/equip/PropostaCanvis.tsx` (kg, modalidad, día y hora con la
+  franja como guía, motivo obligatorio; solo se manda lo que cambia). Una propuesta pendiente se ve «Canvis proposats ·
+  esperant l'entitat» con «Accepta en nom de l'entitat» y «Retira la proposta» (con motivo). Si la entidad la rechaza,
+  vuelve a la cola con su motivo; si acepta una venta, la cola dice que falta el precio.
+- **Entidad** (`routes/receptor/Interessos.tsx`, `components/PropostaEntitat.tsx`, `CanvisProposta.tsx`): tarjeta con lo
+  pedido tachado → lo propuesto y el motivo; «Accepta» (confirmación; texto propio en venta) y «Rebutja» (motivo
+  opcional). Enlace directo `/receptor/interessos?resposta=<id>` (`useDialegPerUrl`; si ya no aplica, «no disponible»).
+  El Mercat la trata como interés en curso con «Respon»; «Pendent de tu» enlaza a ella; cuenta en el badge de
+  Interessos. Lógica pura en `lib/propostaCanvis.ts`; llamadas en `lib/propostaCanvisApi.ts` (nunca lanzan).
+- **Contadores en vivo** (`hooks/useComptadorsEnViu.ts`, `lib/comptadorsEnViu.ts` con test): un canal Realtime por
+  sesión, debounce de 1 s; el equipo refresca los badges del menú y el externo sus pendientes, avisos y el badge del
+  Mercat. Si Realtime falla, como antes (al navegar y tras cada acción).
+- **Origen de la recogida**: Aprovacions y la ficha dicen «Registrada per l'entitat / l'equip». El diálogo de validar
+  avisa de que los albaranes salen por correo solo si la registró la entidad, no es venta ni maquila y el correo está
+  activo (`vrec.avis_correu`).
+- **Albaranes por correo** (servidor, `_shared/envia-albara.ts`): al generarse el PDF de la versión `conciliat` de un
+  ENT/REC de una recogida `entitat_receptora`, `generar-documento` lo manda a las partes con correo (destinatarios de
+  `preparar_enviament_albara`, `proposito='albara'`). Motivos de no envío en el log: `no_conciliat`, `regeneracio`,
+  `no_vigent`, `sense_recollida`, `origen_equip`, `no_validada`, `estat_<x>`, `ja_enviat`, `sense_correu`. Es automático:
+  los interruptores lo cortan. `enviar-albara` usa el mismo bucle y ahora aplica `destinatariosPrueba()` a un albarán de
+  prueba (antes no: contra §8).
+- E2E `tests/e2e/proposar-canvis.e2e.ts` (8: aceptar por enlace, rechazar con motivo, el técnico no ve el botón, badge
+  por Realtime sin navegar, 360 px).

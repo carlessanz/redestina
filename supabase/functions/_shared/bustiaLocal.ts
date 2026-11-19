@@ -15,6 +15,8 @@ export interface CorreuLocal {
   subject: string;
   html?: string;
   text?: string;
+  /** Adjuntos en base64, como los lleva `sendEmail()` (el albarán, 19-11-2026). */
+  attachments?: { filename: string; content: string }[];
 }
 
 export async function copiaBustiaLocal(c: CorreuLocal): Promise<void> {
@@ -30,6 +32,9 @@ export async function copiaBustiaLocal(c: CorreuLocal): Promise<void> {
         Subject: c.subject,
         ...(c.html ? { HTML: c.html } : {}),
         ...(c.text ? { Text: c.text } : {}),
+        ...(c.attachments?.length
+          ? { Attachments: c.attachments.map((a) => ({ Filename: a.filename, Content: a.content })) }
+          : {}),
       }),
     });
     if (!res.ok) console.warn("[bustiaLocal] Mailpit ha respost", res.status);

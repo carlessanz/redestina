@@ -183,3 +183,45 @@ describe('el producto, apostrofado en catalán (27-10-2026)', () => {
     expect(textAvis('interes_aprovat', p, 'es', 'x').cuerpo).toContain('kg de Alvocat')
   })
 })
+
+describe('canvis_proposats: el equipo propone cambios a un interés (fase 5 de los puntos 4-6)', () => {
+  const P = {
+    producte: 'Carbassó', kg: 300, kg_sol: 500, modalitat: 'venda', modalitat_abans: 'donacio',
+    recollida_at: '2026-11-21T09:00:00Z', recollida_abans: '2026-11-20T08:00:00Z',
+    motiu: 'El productor només en pot donar 300', excedente_id: 'exc-1', resposta_id: 'resp-9',
+  }
+  it('dice antes → ahora de lo que cambia, el motivo y lleva a la propuesta (ca)', () => {
+    const t = textAvis('canvis_proposats', P, 'ca', 'resp-9', 'entidad')
+    expect(t.asunto).toBe('Proposta de canvis: Carbassó')
+    expect(t.titulo).toBe('Canvis proposats')
+    expect(t.cuerpo).toBe(
+      'L’equip de Redestina et proposa canvis en el teu interès per Carbassó:\n'
+      + 'Quilos: 500 → 300 kg\n'
+      + 'Modalitat: donació → venda\n'
+      + 'Recollida: 20/11 · 09:00 → 21/11 · 10:00\n'
+      + 'Motiu: El productor només en pot donar 300\n'
+      + 'Accepta o rebutja la proposta a Redestina.')
+    expect(t.boton).toBe('Respon la proposta')
+    expect(t.ruta).toBe('/receptor/interessos?resposta=resp-9')
+  })
+  it('en castellano', () => {
+    const t = textAvis('canvis_proposats', P, 'es', 'resp-9', 'entidad')
+    expect(t.cuerpo).toContain('Kilos: 500 → 300 kg')
+    expect(t.cuerpo).toContain('Modalidad: donación → venta')
+    expect(t.cuerpo).toContain('Motivo: El productor només en pot donar 300')
+    expect(t.cuerpo).toContain('Acepta o rechaza la propuesta en Redestina.')
+    expect(t.ruta).toBe('/receptor/interessos?resposta=resp-9')
+  })
+  it('lo que no cambia se dice sin flecha', () => {
+    const t = textAvis('canvis_proposats',
+      { ...P, kg: 500, modalitat: 'donacio', recollida_at: P.recollida_abans }, 'ca', 'resp-9', 'entidad')
+    expect(t.cuerpo).toContain('Quilos: 500 kg')
+    expect(t.cuerpo).toContain('Modalitat: donació')
+    expect(t.cuerpo).toContain('Recollida: 20/11 · 09:00')
+    expect(t.cuerpo).not.toContain('→')
+  })
+  it('sin resposta_id en los params, el enlace usa el objeto del aviso', () => {
+    expect(textAvis('canvis_proposats', { producte: 'Carbassó', kg: 10, motiu: 'x' }, 'ca', 'resp-1', 'entidad').ruta)
+      .toBe('/receptor/interessos?resposta=resp-1')
+  })
+})

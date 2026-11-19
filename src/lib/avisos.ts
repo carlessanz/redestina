@@ -10,6 +10,7 @@
 
 import { useSyncExternalStore } from 'react'
 import { supabase } from './supabase'
+import { rutaPropostaCanvis } from './enllacosDirectes'
 
 export type TipusAvis =
   | 'oferta_validada' | 'oferta_rebutjada' | 'sortida_trobada' | 'interes_aprovat' | 'interes_rebutjat'
@@ -23,6 +24,8 @@ export type TipusAvis =
   | 'document_signat'
   // 19-11-2026 (puntos 4-6, fase 2): el equipo anula una asignación antes de la recogida.
   | 'assignacio_anulada'
+  // Puntos 4-6, fase 5: el equipo propone cambios a un interés (`objecte_id` = la respuesta).
+  | 'canvis_proposats'
 
 export interface Avis {
   id: string
@@ -95,7 +98,9 @@ export function noLlegitsPerPanell(llista: Avis[]): { ofertes: number; interesso
 }
 
 /** A dónde lleva un aviso en la aplicación. */
-export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'> & Partial<Pick<Avis, 'destinatari_tipo'>>): string {
+export function rutaAvis(a: Pick<Avis, 'objecte_tipo' | 'objecte_id'> & Partial<Pick<Avis, 'destinatari_tipo' | 'tipus'>>): string {
+  // Una propuesta de cambios se abre directamente para aceptarla o rechazarla (fase 5).
+  if (a.tipus === 'canvis_proposats' && a.objecte_tipo === 'oferta_resposta') return rutaPropostaCanvis(a.objecte_id)
   // Un documento firmado (`document_signat`) va a «Els meus documents» del papel que firmó.
   if (a.objecte_tipo === 'documento') {
     return a.destinatari_tipo === 'entidad' ? '/receptor/documents' : '/productor/documents'

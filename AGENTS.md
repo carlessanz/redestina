@@ -94,8 +94,7 @@ Reglas: **ningún hex ni clase de la paleta genérica de Tailwind**; solo las cl
 `error` y sus `-fondo`, `chart-1…5`, `font-titulos`, `text-nav` solo para la barra inferior).
 `accent` no es el coral; el error es rojo; títulos en Sora; nombres de shadcn no se renombran;
 `index.css` se deriva a mano de `tokens.json` (y los colores del correo viven en
-`_shared/resend.ts`). Logo: seis variantes en `public/`, `logo-espigoladors.svg` (el del CD), `logo-email.png`
-(color, correo) y el sello `segell-redestina.svg` (sin texto). Ningún control de
+`_shared/resend.ts`). Logo: seis variantes en `public/` (`context/02bis`). Ningún control de
 formulario estilado a mano (`components/Casella`, `ui/input`, `components/Desplegable`, nunca
 `<select>`; E2E con `tria()`); controles de 32 px en escritorio. Badge sobre fondo de
 color = chip blanco, texto en color. `{n}` reservado a contadores (singular `<clau>_1`). Sin
@@ -163,10 +162,10 @@ hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborra
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
+`disponible_hasta`; `dies_recollida[]`, `gmaps_url` propio (envases: deuda 188); `hectarees`; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo, `proposada` = cambios del equipo que espera a la entidad, `proposta_*`;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg` = **precio del mes
-del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, columnas de la recogida protegidas por trigger);
+del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, `recollida_origen` (entitat_receptora·equip), columnas de la recogida protegidas por trigger);
 `excedente_destins` + catálogo `destins_finals`; `excedentes_canvis`; `avisos` (lo que se le
 cuenta a una organización; los crean triggers); `intake_sessions`; `espigoladas`.
 
@@ -266,7 +265,8 @@ tabla nueva: `has_table_privilege('authenticated','public.X','SELECT')`.
   «Familias de RPC»; `registrar_recollida` del receptor **solo declara**, `validar_recollida` del admin emite y concilia).
   **Asignación** (`context/04bis`): `assignar_directe` (nivel 1; venta: precio y aceptación),
   `modificar_assignacio`, `anular_assignacio` (motivo; aviso `assignacio_anulada`), `fixar_preu_acordat`. Estado de la
-  oferta solo por `recalcula_estat_excedent()`; **las anuladas no cuentan**.
+  oferta solo por `recalcula_estat_excedent()`; **las anuladas no cuentan**. **Propuesta** (fase 5): `proposar_canvis`
+  (`pot_aprovar`) y `respondre_proposta` (la entidad o el equipo; aceptar aprueba, en venta vuelve a `pendent` por el precio).
 - **Diagnóstico**: escribe solo `es_intern()` (`42501` también sobre lo suyo, D5): `desar_excedents_diagnostic`
   (reemplaza el conjunto, conserva acciones) y `fixar_estat_accio` (A3).
   Lectura: `diagnostic_estat`, `diagnostic_datos` (la usa `diagnostic-pdf`). `fixar_lloc_principal` (A4).
@@ -317,13 +317,10 @@ en la whitelist de correo.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
-21 pasos (`_shared/camposOferta.ts`, servidos por `GET crear-oferta/campos`; ca/es en el descriptor):
-familia → producte → varietat → producte_al_camp (Sí/No) → hectarees (**`soloPanel`**, opcional) → kg (>0) →
-format_entrega → caixes → retorn (sus dos detalles, **`oculto`**: deuda 188) → transport (**`oculto`**)
-→ ubicacio (siempre) → disponible_fins → dies_recollida (**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
-cost») → causa (WhatsApp: la categoría; panel: la subcausa, obligatoria) → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
-`Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; igual en el panel);
-convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
+21 pasos (`_shared/camposOferta.ts`, servidos por `GET crear-oferta/campos`; ca/es en el descriptor; la lista
+con sus `soloPanel`/`oculto`, en `context/06bis`). `aplica()` en cascada; guía Sí/Ara no; listas de 9 + «Més…»;
+3 fallos → repite; `Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5); convenio al final. Bot en
+catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
 
 ## 6ter. Paneles y procesos (detalle, por fecha y fase, en `context/06ter-…md`)
 
@@ -347,6 +344,7 @@ Lo que manda hoy, en una línea cada uno:
   concilia el ENT y el REC de esa recogida (venta/maquila: sin albarán, documentos propios); el job solo avisa.
 - **Destino final de los kilos** (`excedente_destins`, `DestiFinal`): `cerrada` = todo con
   destino; `no_colocada` = falta decir qué pasó; `cancelada` = error o incidencia con motivo.
+- **Proposa canvis** (fase 5, `context/06ter`): la entidad responde en Interessos (`?resposta=<id>`). **Contadores en vivo** por Realtime (`useComptadorsEnViu`).
 - **Ficha de la operación** (`operacio_detall`), ofertas «per a tu», «No m'interessa». **Enlaces directos** (fase 4,
   `context/06ter`): la URL abre el diálogo (`useDialegPerUrl`); «Copia amb/sense enllaç»; en el ranking, enlace si `te_compte`.
 - **Certificat de donació, firma y Configuració › Equip** (05-11 y 09-11; detalle en `context/06ter`):
@@ -412,7 +410,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270609100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270610100200`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -428,7 +426,8 @@ un alta manda el acceso por correo (`enviar-acceso`).
   lo transaccional (`enviar-acceso`, `recuperar-password`: `{transaccional:true}`) **ni lo MANUAL**:
   una lista cerrada de botones del equipo sale si quien pulsa lo acepta (`acceptaEnviament`,
   `{manual:true}`, traza `<funció>:manual`; el modo test sigue; la tabla de botones, en `context/08`); lo masivo, la oferta y el correo libre, no. La interfaz
-  esconde o deja gris lo de un canal apagado (`motiuCanal()`). **En producción, los tres apagados.**
+  esconde o deja gris lo de un canal apagado (`motiuCanal()`). **En producción, los tres apagados.** Automático también:
+  el ENT/REC conciliado de una recogida **declarada por la entidad** sale por correo con su PDF (`_shared/envia-albara.ts`).
 - 🔴 **Las notas internas (`notes_internes`) nunca salen por ningún canal**: ni correo, WhatsApp,
   documento, aviso ni ficha del actor; ninguna Edge Function ni plantilla las lee.
 - `WHATSAPP_ENVIO_REAL` (secreto; `"true"` exacto o simula) y `RESEND_ENVIO_REAL` (ídem).
@@ -544,7 +543,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (87 vivas; siguiente: 193; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
+**Deuda abierta (92 vivas; siguiente: 198; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
@@ -552,7 +551,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
 (rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193-197** (flecos de la fase 5: `context/12`).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -564,10 +563,10 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.204 de Vitest (102 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 2.966/2.966 y 49 sin datos; producción 2.975/2.975 y 40 (19-11-2026).** Cifra
+   **Referencia: clon 3.001/3.001 y 49 sin datos; producción 2.975/2.975 y 40 (19-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

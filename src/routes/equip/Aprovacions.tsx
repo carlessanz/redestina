@@ -52,7 +52,8 @@ import { toast } from 'sonner'
 import { supabase } from '../../lib/supabase'
 import { useT } from '../../lib/i18n'
 import { textError } from '../../lib/textError'
-import { useAppContext } from '../../hooks/useAppContext'
+import { useAppContext, useCanals } from '../../hooks/useAppContext'
+import { motiuCanal } from '../../lib/canals'
 import { useCerca } from '../../hooks/useCerca'
 import { filtraCerca } from '../../lib/cerca'
 import { contrafirmarConveni, nomOrganitzacio, retornarConveni } from '../../lib/convenis'
@@ -60,7 +61,7 @@ import { kgPerOferta } from '../../lib/ofertes'
 import { refrescaComptadors } from '../../lib/pendentsEquip'
 import { FilaCasella } from '../../components/Casella'
 import { enviarAcces } from '../../lib/acces'
-import type { Convenio, Membresia } from '../../types'
+import type { Convenio, Membresia, OfertaRespuesta } from '../../types'
 import DialegMotiu from '../../components/DialegMotiu'
 import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
@@ -96,6 +97,14 @@ interface Fila {
   canal: string
   respondido_at: string | null
   enviado_at: string
+  /** Si vuelve de una propuesta de cambios (fase 5): `aprovacio` siempre `pendent` en esta cola. */
+  aprovacio: OfertaRespuesta['aprovacio']
+  proposta_kg: number | null
+  proposta_modalitat: Modalitat | null
+  proposta_recollida_at: string | null
+  proposta_original: OfertaRespuesta['proposta_original']
+  proposta_resposta: OfertaRespuesta['proposta_resposta']
+  proposta_resposta_motiu: string | null
   entidades: { nombre: string; poblacion: string | null } | null
   excedentes: {
     id_excedente: string | null
@@ -107,6 +116,9 @@ interface Fila {
     modalitats: Modalitat[] | null
     productor_id: string | null
     preu_minim: number | null
+    /** La franja, como guía al proponer otra hora. */
+    hora_recollida_inici: string | null
+    hora_recollida_fi: string | null
   } | null
 }
 
@@ -197,6 +209,8 @@ interface RecollidaPendent {
   recollida_validada_at: string | null
   recollida_retornada_at: string | null
   valorizacion: string | null
+  /** Quién la registró: la entidad desde su panel (nivel 2) o el equipo (nivel 1). 20270610100100. */
+  recollida_origen: 'entitat_receptora' | 'equip' | null
   entidades: { nombre: string | null } | null
   excedentes: {
     id_excedente: string | null
@@ -300,7 +314,7 @@ export default function Aprovacions() {
     // concatenadas, que es justo lo que hace que supabase-js se rinda con el tipo de la fila.
     const { data, error } = await supabase
       .from('oferta_respuestas')
-      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, recollida_at, canal, respondido_at, enviado_at, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim)')
+      .select('id, excedente_id, entidad_id, kg_solicitados, preu_ofert, modalitat, recollida_at, canal, respondido_at, enviado_at, aprovacio, proposta_kg, proposta_modalitat, proposta_recollida_at, proposta_original, proposta_resposta, proposta_resposta_motiu, entidades(nombre, poblacion), excedentes(id_excedente, producto, kg_total, modalitat, modalitats, productor_id, preu_minim, hora_recollida_inici, hora_recollida_fi)')
       .eq('estado', 'acceptada')
       .eq('aprovacio', 'pendent')
       .order('respondido_at', { ascending: true, nullsFirst: false })
@@ -396,7 +410,7 @@ export default function Aprovacions() {
     // oferta (`excedentes.productor_id → productores`), y la receptora por la de la canalización.
     const { data, error } = await supabase
       .from('canalizaciones')
-      .select('id, excedente_id, kg_confirmados, kg_reales, kg_declarats, resultat_recollida, incidencia_recollida, observacions_recollida, data_hora_recollida, recollida_real_at, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, valorizacion, entidades(nombre), excedentes(id_excedente, producto, productores(name, empresa))')
+      .select('id, excedente_id, kg_confirmados, kg_reales, kg_declarats, resultat_recollida, incidencia_recollida, observacions_recollida, data_hora_recollida, recollida_real_at, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, valorizacion, recollida_origen, entidades(nombre), excedentes(id_excedente, producto, productores(name, empresa))')
       .not('recollida_registrada_at', 'is', null)
       .is('recollida_validada_at', null)
       .neq('estado', 'anulada')
@@ -898,7 +912,7 @@ export default function Aprovacions() {
           {filesVisibles.map((f) => {
             const total = Number(f.excedentes?.kg_total ?? 0)
             return (
-              <div key={f.id} className="rounded-lg border p-3">
+              <div key={f.id} className="rounded-lg border p-3" data-testid="appr-resposta" data-resposta={f.id}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   {/* `basis-80`, no `flex-1` a secas: con base 0 el texto nunca obliga a
                       saltar de línea y los controles —que no encogen— se lo comían entero
@@ -932,10 +946,13 @@ export default function Aprovacions() {
                       modalitats: f.excedentes?.modalitats ?? null,
                       productor_id: f.excedentes?.productor_id ?? null,
                       preu_minim: f.excedentes?.preu_minim ?? null,
+                      hora_recollida_inici: f.excedentes?.hora_recollida_inici ?? null,
+                      hora_recollida_fi: f.excedentes?.hora_recollida_fi ?? null,
                     }}
                     faltan={faltenDe(f)}
                     potAprovar={potAprovar}
                     idPrefix={`appr-${f.id}`}
+                    entitat={f.entidades?.nombre ?? null}
                     onFet={() => {
                       // La fila se va de la cola al momento: esperar al refresco de Realtime
                       // deja el botón pulsable un instante más, que es como se aprueba dos veces.
@@ -1011,6 +1028,7 @@ export default function Aprovacions() {
                         t(`vrec.res_${resultatDe(r)}`),
                         quanRecollida ? t('vrec.quan', { quan: quan(quanRecollida) }) : null,
                         r.recollida_registrada_at ? t('vrec.registrada', { quan: quan(r.recollida_registrada_at) }) : null,
+                        r.recollida_origen ? t(`rrec.origen_${r.recollida_origen}`) : null,
                       ].filter(Boolean).join(' · ')}
                     </div>
                     {motiuReceptor && (
@@ -1140,6 +1158,11 @@ function DialegValidacio({
   const dif = kgFinal != null && assignats != null ? Math.round((kgFinal - assignats) * 100) / 100 : null
   const venda = r?.valorizacion === 'venda' || r?.valorizacion === 'maquila'
   const fet = estat?.fet ?? null
+  // Fase 5 de los puntos 4-6: si la registró la ENTIDAD (nivel 2), validar manda los albaranes
+  // por correo a las partes. Solo se dice con el correo encendido (§8): con él apagado no sale
+  // nada solo, y en nivel 1 (la registró el equipo) no se promete ningún envío.
+  const correuActiu = motiuCanal(useCanals(), 'email') === null
+  const enviaraCorreu = r?.recollida_origen === 'entitat_receptora' && !venda && correuActiu
 
   return (
     <Dialog open={estat !== null} onOpenChange={(v) => { if (!v && !ocupat) onTancar() }}>
@@ -1202,6 +1225,9 @@ function DialegValidacio({
             <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
               {t(venda ? 'vrec.avis_venda' : 'vrec.avis', { kg: kgFinal != null ? kgFmt(kgFinal) : '—' })}
             </p>
+            {enviaraCorreu && (
+              <p className="text-sm text-muted-foreground" data-testid="validacio-avis-correu">{t('vrec.avis_correu')}</p>
+            )}
             {estat!.error && <p role="alert" className="text-sm text-error">{estat!.error}</p>}
           </div>
         )}

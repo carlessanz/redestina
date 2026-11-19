@@ -418,6 +418,8 @@ export interface Canalizacion {
   preu_acordat_kg?: number | null
   preu_acceptat_at?: string | null
   preu_acceptat_per?: string | null
+  /** Quién registró la recogida: la entidad (nivel 2) o el equipo (nivel 1). 20270610100100. */
+  recollida_origen?: 'entitat_receptora' | 'equip' | null
 }
 
 export interface OfertaRespuesta {
@@ -440,10 +442,28 @@ export interface OfertaRespuesta {
   /** Cuándo quiere recoger quien muestra interés (rebanada 3). */
   recollida_at?: string | null
   /** Decisión del SUPERADMIN (aprueba y convierte en canalización) */
-  aprovacio: 'pendent' | 'aprovada' | 'rebutjada'
+  /** `proposada`: el equipo propuso cambios y espera a la entidad (20270610100000). */
+  aprovacio: 'pendent' | 'aprovada' | 'rebutjada' | 'proposada'
   aprovat_at: string | null
   motiu_aprovacio: string | null
   canalizacion_id: string | null
+  /** Propuesta de cambios del equipo (20270610100000): valores efectivos; los pedidos, en `proposta_original`. */
+  proposta_kg?: number | null
+  proposta_modalitat?: Modalitat | null
+  proposta_recollida_at?: string | null
+  proposta_motiu?: string | null
+  proposta_at?: string | null
+  proposta_per?: string | null
+  proposta_original?: {
+    kg_solicitados: number | null
+    modalitat: Modalitat | null
+    recollida_at: string | null
+    preu_ofert: number | null
+  } | null
+  proposta_resposta?: 'acceptada' | 'rebutjada' | null
+  proposta_resposta_at?: string | null
+  proposta_resposta_motiu?: string | null
+  proposta_resposta_per?: string | null
   /** Quién aprobó o asignó (20270607100000). */
   aprovat_per?: string | null
   /** true = asignación directa de nivel 1 (`assignar_directe`), sin pasar por Aprovacions. */

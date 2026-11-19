@@ -19,8 +19,8 @@
 // quitaría sitio a lo que sí hay que ver.
 
 import { useCallback, useEffect, useState } from 'react'
-import { useNavigate } from 'react-router'
-import { FileSignature, Loader2, PackageCheck, PenLine, Upload } from 'lucide-react'
+import { Link, useNavigate } from 'react-router'
+import { FileSignature, Handshake, Loader2, PackageCheck, PenLine, Upload } from 'lucide-react'
 import { toast } from 'sonner'
 import { useT } from '../../lib/i18n'
 import { acunarEnllacPropi, carregaPendents } from '../../lib/pendents'
@@ -30,6 +30,7 @@ import DialegSignaDocument, { type PestanyaSignatura } from '../DialegSignaDocum
 import { useAppContext } from '../../hooks/useAppContext'
 import type { Pendent } from '../../lib/pendents'
 import { rutaPerProposit } from '../../lib/documentsPanell'
+import { rutaPropostaCanvis } from '../../lib/enllacosDirectes'
 import { dataCurta } from '../../lib/albarans'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -84,6 +85,8 @@ export default function PendentsDeTu({
 
   async function obre(p: Pendent) {
     if (obrint) return
+    // Una propuesta de cambios no tiene enlace ni token: se responde en «Els meus interessos».
+    if (p.proposito === 'resposta_proposta') return
     if (p.proposito === 'firma_convenio') {
       setFirmant({ tipus: p.tipo_org === 'entidad' ? 'entidad' : 'productor', org: p.org_id, conveni: p.objeto_id })
       return
@@ -123,6 +126,12 @@ export default function PendentsDeTu({
       </CardHeader>
       <CardContent className="space-y-3">
         {files.map((p) => {
+          // Una propuesta de cambios del equipo (fase 5 de los puntos 4-6): no es un documento ni
+          // tiene enlace; se abre en «Els meus interessos» para aceptarla o rechazarla. Antes de
+          // esta rama, la fila se habría pintado como un albarán por confirmar.
+          if (p.proposito === 'resposta_proposta') {
+            return <FilaProposta key={clau(p)} p={p} />
+          }
           if (p.proposito === 'firma_document') {
             return (
               <FilaDocument key={clau(p)} p={p} titular={esTitular(p.org_id)}
@@ -239,6 +248,29 @@ function FilaDocument({ p, titular, onObre }: {
           </Button>
         </div>
       )}
+    </div>
+  )
+}
+
+/** Una fila de «Pendent de tu» con una propuesta de cambios del equipo por responder. */
+function FilaProposta({ p }: { p: Pendent }) {
+  const { t } = useT()
+  return (
+    <div
+      className="flex flex-col gap-2 rounded-lg border bg-card p-3 sm:flex-row sm:items-center sm:justify-between"
+      data-testid="pendent-proposta"
+    >
+      <div className="min-w-0 space-y-1">
+        <div className="flex flex-wrap items-center gap-2">
+          <Handshake className="size-4 shrink-0 text-muted-foreground" aria-hidden />
+          <span className="font-medium">{t('prop.pendent_titol')}</span>
+        </div>
+        {p.etiqueta && <p className="text-sm text-muted-foreground">{p.etiqueta}</p>}
+        {p.motiu && <p className="min-w-0 break-words text-sm text-aviso">{t('prop.motiu_equip', { motiu: p.motiu })}</p>}
+      </div>
+      <Button asChild className="h-11 shrink-0 whitespace-normal">
+        <Link to={rutaPropostaCanvis(p.objeto_id)}>{t('prop.respon')}</Link>
+      </Button>
     </div>
   )
 }

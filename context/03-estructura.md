@@ -54,6 +54,7 @@ src/
   hooks/useComptadorsEquip.ts  Los badges del equipo, derivados del store de pendentsEquip.ts
   hooks/useMissatgesOferta.ts  Los mensajes de una oferta (`missatgesOferta.ts` + `avisos_de_oferta()`); con
                                `perspectiva` productor/entidad solo pide los avisos (§6ter, gestión autónoma)
+  hooks/useComptadorsEnViu.ts  Realtime: un canal por sesión refresca badges, pendientes y avisos (fase 5)
   hooks/useDialegPerUrl.ts     Abrir y cerrar un diálogo desde la URL (`replace`), fase 4 de los puntos 4-6
   routes/Comuns.tsx            ArrelApp, RequireSessio, raíz por rol, RoleGuard y «sense accés» (+ NavegaAlDesti)
   routes/public/               Landing, LoginUsuaris (/login), LoginEquip (/admin),
@@ -211,6 +212,8 @@ src/
     conveniDeclarat.ts         PURO: los rechazos de `declarar_conveni()` por su código, con prueba
     copiar.ts                  Copiar al portapapeles como text/plain + text/html (un <div> por
                                línea, que es lo que WhatsApp conserva al pegar). Salió de OfferDetail
+    propostaCanvis.ts          PURO, con test: la propuesta de cambios (qué cambió, textos); su API en propostaCanvisApi.ts
+    comptadorsEnViu.ts         PURO, con test: qué tabla de Realtime refresca qué contador
     destiLogin.ts              PURO, con test: la ruta pedida antes del login (sessionStorage, solo internas)
     enllacosDirectes.ts        PURO, con test: rutas de los enlaces directos y `textOfertaPerCopiar` (de _shared)
     missatgesOferta.ts         PURO: los mensajes del ciclo de una oferta para avisar a mano
@@ -503,6 +506,8 @@ supabase/
     _shared/correu-document.ts Qué dice el correo que acompaña a un documento emitido (puro, §4)
     _shared/correu-albara.ts   Qué dice el correo de «Envia per correu» del albarán (puro)
     _shared/enviamentManual.ts PROPOSITS_MANUALS: qué puede salir a mano por enviar-email (puro, §8)
+    _shared/envia-albara.ts    El bucle de «Envia per correu» del albarán y el envío automático tras validar
+                               una recogida declarada por la entidad (fase 5 de los puntos 4-6)
     _shared/envia-document.ts  Lo manda: barreras + PDF adjunto + traza. Uno solo para
                                generar-documento y reenviar-documento (§4)
     _shared/plantillas-meta.md Contenido de las plantillas de Meta (oferta_excedent…) listo

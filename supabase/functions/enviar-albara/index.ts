@@ -10,8 +10,11 @@
 //
 // Es un envío MANUAL (§8, `_shared/enviamentManual.ts`): con las notificaciones apagadas sale
 // si el botón manda `manual: true`, que es lo que hace cuando quien pulsa lo acepta. El modo
-// test y la lista blanca siguen mandando. Lo automático (el PDF al generarse, el correo de
-// «Marcar entregat») no pasa por aquí.
+// test y la lista blanca siguen mandando; desde el 19-11-2026, también la barrera de los
+// documentos de PRUEBA (`destinatariosPrueba()`: un albarán `modo='prueba'` solo va a fichas
+// `es_test` o al buzón del equipo, aunque el modo test esté apagado; sale como `no_test_user`).
+// Lo automático no pasa por aquí: el correo tras validar una recogida declarada por la entidad
+// lo manda `generar-documento` con el mismo bucle (`_shared/envia-albara.ts`).
 //
 // Los datos —documento vigente, destinatarios y enlaces nuevos— los prepara
 // `preparar_enviament_albara()` (solo `service_role`), con la misma regla de destinatarios que
@@ -21,25 +24,12 @@ import "@supabase/functions-js/edge-runtime.d.ts";
 import { createClient } from "@supabase/supabase-js";
 import { exigirEquipo } from "../_shared/autorizacion.ts";
 import { corsPara } from "../_shared/cors.ts";
-import { composaCorreuAlbara } from "../_shared/correu-albara.ts";
-import { encodeBase64, MAX_ADJUNT_BYTES } from "../_shared/envia-document.ts";
-import { bustiaEquip, enLlistaCorreuTest } from "../_shared/gate.ts";
+import { type AlbaraPreparat, enviaAlbaraAParts } from "../_shared/envia-albara.ts";
 import { preflight, respondedor } from "../_shared/http.ts";
-import { plantillaEmail, sendEmail } from "../_shared/resend.ts";
 
 const BUCKET = "documentos";
 const MIN_ENTRE_ENVIAMENTS_MS = 2 * 60 * 1000;
-const APP_URL = (Deno.env.get("APP_URL") ?? "https://redestina.carlessanz.com").replace(/\/$/, "");
 const RE_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-
-interface Preparat {
-  numero: string | null;
-  tipo: string;
-  estado: string;
-  idioma: string | null;
-  document: { id: string; ruta: string | null; estado: string; fichero_at: string | null; modo: string } | null;
-  destinataris: { rol: string; email: string; nom: string | null; token: string | null }[];
-}
 
 Deno.serve(async (req) => {
   const cors = corsPara(req);
@@ -96,7 +86,7 @@ Deno.serve(async (req) => {
     console.error("enviar-albara: rpc:", missatge);
     return responder({ error: "Error preparant l'enviament", code: "error_bd" }, 500);
   }
-  const p = data as Preparat;
+  const p = data as AlbaraPreparat;
   if (!p.document?.ruta) return responder({ error: "El PDF encara no s'ha generat", code: "sense_fitxer" }, 409);
   if (p.destinataris.length === 0) {
     return responder({ error: "Cap part té correu", code: "sense_destinatari" }, 409);
@@ -108,40 +98,13 @@ Deno.serve(async (req) => {
     return responder({ error: "No s'ha pogut llegir el PDF", code: "error_storage" }, 500);
   }
   const bytes = new Uint8Array(await fitxer.arrayBuffer());
-  const adjunt = bytes.length <= MAX_ADJUNT_BYTES;
-  const replyTo = await bustiaEquip(supabase);
 
-  const resultats: { rol: string; destinatari: string; resultat: string; amb_enllac: boolean }[] = [];
-  for (const d of p.destinataris) {
-    const ambEnllac = d.token !== null;
-    if (!(await enLlistaCorreuTest(supabase, d.email))) {
-      resultats.push({ rol: d.rol, destinatari: d.email, resultat: "fora_llista_test", amb_enllac: ambEnllac });
-      continue;
-    }
-    const c = composaCorreuAlbara({
-      tipo: p.tipo, numero: p.numero, idioma: p.idioma, rol: d.rol, nom: d.nom,
-      urlConfirmar: d.token ? `${APP_URL}/confirmar/${d.token}` : null,
-      urlPanell: `${APP_URL}/login`,
-    });
-    const r = await sendEmail({
-      to: d.email,
-      subject: c.assumpte,
-      html: plantillaEmail({
-        titulo: c.titol, preheader: c.preheader, cuerpoHtml: c.cosHtml,
-        boton: c.boto, nota: c.nota, idioma: c.idioma,
-      }),
-      replyTo,
-      ...(adjunt ? { attachments: [{ filename: c.fitxer, content: encodeBase64(bytes) }] } : {}),
-    }, {
-      supabase, proposito: "albara", documentoId: p.document.id,
-      objetoTipo: "albaran", objetoId: albaranId, funcion: "enviar-albara",
-    }, { manual });
-    const tall = (r.data as { code?: string } | null)?.code;
-    const resultat = r.desactivado
-      ? (tall === "no_test_user" ? "no_test_user" : "desactivat")
-      : !r.ok ? "error" : r.simulado ? "simulat" : adjunt ? "enviat" : "enviat_sense_adjunt";
-    resultats.push({ rol: d.rol, destinatari: d.email, resultat, amb_enllac: ambEnllac });
-  }
+  // El bucle de envío vive en `_shared/envia-albara.ts` (19-11-2026): lo comparte con el envío
+  // automático de `generar-documento`, para que los dos pasen por las mismas barreras.
+  const resultats = await enviaAlbaraAParts(supabase, {
+    albaranId, preparat: p, bytes, documentoId: p.document.id, modo: p.document.modo,
+    funcion: "enviar-albara", manual,
+  });
 
   console.log(JSON.stringify({
     fn: "enviar-albara", albaran: albaranId, per: auth.ctx.userId, manual,

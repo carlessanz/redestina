@@ -41,6 +41,15 @@ export interface ExtraCanal {
     tipo_receptor?: string | null
     /** El convenio que ESTA receptora necesita para esta modalidad, si lo tiene. */
     conveni_rec: ConveniFase | null
+    /** La propuesta de cambios del equipo (20270610100000), si la hay. */
+    proposta_kg?: number | null
+    proposta_modalitat?: Modalitat | null
+    proposta_recollida_at?: string | null
+    proposta_motiu?: string | null
+    proposta_at?: string | null
+    proposta_resposta?: 'acceptada' | 'rebutjada' | null
+    proposta_resposta_at?: string | null
+    proposta_resposta_motiu?: string | null
   }[]
   albarans: {
     id: string; tipo: string; estado: string; numero: string | null

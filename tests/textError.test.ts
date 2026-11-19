@@ -24,6 +24,30 @@ describe('textError', () => {
     expect(textError(t, { missatge: 'cal_motiu', codi: '22023' })).toBe('T(po.err_cal_motiu)')
   })
 
+  // Fase 5 de los puntos 4-6: la propuesta de cambios. `cal_motiu` y `hora_passada` llegan en el
+  // mensaje igual que en otras pantallas; `propostaCanvisApi` los distingue por `codi`.
+  it('los códigos de la propuesta de cambios', () => {
+    expect(textError(t, { missatge: 'no_proposable: aquesta resposta no admet una proposta (aprovada)', codi: '22023' }))
+      .toBe('T(prop.err_no_proposable)')
+    expect(textError(t, { missatge: 'sense_proposta: aquesta resposta no te cap proposta per respondre', codi: '22023' }))
+      .toBe('T(prop.err_sense_proposta)')
+    expect(textError(t, { missatge: 'proposta_pendent: respon primer la proposta de l\'equip', codi: '22023' }))
+      .toBe('T(prop.err_proposta_pendent)')
+    expect(textError(t, { missatge: 'cal_motiu: cal indicar el motiu de la proposta', codi: 'cal_motiu_proposta' }))
+      .toBe('T(prop.err_cal_motiu)')
+    expect(textError(t, { missatge: 'hora_passada: l\'hora proposada ja ha passat', codi: 'hora_proposta_passada' }))
+      .toBe('T(prop.err_hora_vencuda)')
+    expect(textError(t, { missatge: 'cal_canvi: la proposta ha de canviar alguna cosa', codi: '22023' }))
+      .toBe('T(asg.err_cal_canvi)')
+    // Sin el `codi` propio, `cal_motiu` sigue siendo el de cancelar una oferta.
+    expect(textError(t, { missatge: 'cal_motiu', codi: '22023' })).toBe('T(po.err_cal_motiu)')
+    for (const c of ['prop.err_no_proposable', 'prop.err_sense_proposta', 'prop.err_proposta_pendent', 'prop.err_cal_motiu',
+      'prop.err_hora_vencuda', 'prop.err_protegida', 'prop.err_cal_resposta', 'prop.err_inexistent', 'prop.err_motiu_llarg',
+      'prop.err_modalitat']) {
+      expect(esClau(c), c).toBe(true)
+    }
+  })
+
   it('sin mensaje, el respaldo (por defecto `c.error`)', () => {
     expect(textError(t, null)).toBe('T(c.error)')
     expect(textError(t, undefined)).toBe('T(c.error)')

@@ -148,6 +148,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **19-11-2026 (`20270607100000`, fase 2 de los puntos 4-6): se cierra la 180 y se abre la 190** (anular una canalización de espigolada no reabre la jornada): **85 vivas** y la siguiente es la 191.
 
 ⚠️ **19-11-2026 (`20270608100000`…`100400`, fase 3 de los puntos 4-6): se abren la 191 y la 192** (fixture de externos de canalización; el modelo heredado convive): **87 vivas** y la siguiente es la 193. La condición de la 154 («una venta sin albarán») ya se da: el CT retirado sigue marcando como retroactiva una venta sin OPE, parte del código muerto.
+
+⚠️ **19-11-2026 (`20270610100000`…`100200`, fase 5 de los puntos 4-6): se abren de la 193 a la 197** (flecos de la propuesta de cambios y del envío automático de albaranes): **92 vivas** y la siguiente es la 198.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -962,3 +964,13 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      con REC por oferta (sin `canalizacion_id`) y los OPE ya emitidos siguen el camino viejo: REC que espera a todas las
      recogidas, «Concilia» manual y el defecto de que el REC heredado suma kilos de venta en una oferta mixta. Se
      resuelve solo con el vaciado de la fase 6; después, retirar las ramas heredadas. Precio: una migración de limpieza.
+193. **No hay «retirar propuesta» propia** (19-11-2026, fase 5). El equipo la retira con `respondre_proposta(id, false)`
+     por la vía asistida y en el rastro queda como un rechazo (`proposta_resposta_per` = quien del equipo). Precio: una RPC.
+194. **Dos recogidas registradas sin `recollida_registrada_per`** se quedan con `recollida_origen` a null (no se puede
+     saber quién las registró). Sin efecto práctico: no envían albaranes solos. Desaparece con el vaciado de la fase 6.
+195. **Sin aviso al equipo cuando la entidad responde una propuesta** (decidido). Si la rechaza, vuelve a la cola de
+     Aprovacions; si acepta fuera de venta, el equipo solo lo ve por la canalización nueva y los contadores en vivo.
+196. **El envío automático de albaranes no se reintenta** (19-11-2026, fase 5): si el isolate muere tras
+     `marcar_documento_generado` o el correo da `error`, no vuelve a salir (como `enviaDocument`). Queda «Envia per correu».
+197. **Si `validar_recollida` no llega a conciliar**, no hay versión `conciliat` y no se envía nada (caso que no debería
+     darse). Queda el botón manual.

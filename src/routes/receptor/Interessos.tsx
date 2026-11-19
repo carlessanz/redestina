@@ -15,6 +15,11 @@
 // `?operacio=<canalizacion_id>&accio=recollida` abre su ficha con «Registra la recollida»
 // desplegado. Es el enlace del mensaje RECOLLIDA CONFIRMADA (`lib/enllacosDirectes.ts`). Si la
 // operación no es de esta entidad (o ya no la ve), se dice arriba.
+//
+// 🔗 PROPUESTA DE CAMBIOS (fase 5 de los puntos 4-6, Excel 5.2 nivel 2): `?resposta=<id>` abre
+// el interés con la propuesta del equipo (otros kilos, modalidad u hora, con motivo) para
+// aceptarla o rechazarla (`PropostaEntitat`). Es el enlace del aviso `canvis_proposats` y de
+// «Pendent de tu». Si no es de esta entidad o ya no está `proposada`, se dice arriba.
 
 import BarraFiltres from '../../components/BarraFiltres'
 import { useTerritori } from '../../hooks/useTerritori'
@@ -42,6 +47,8 @@ import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor from '../../components/DetallOfertaReceptor'
 import FitxaOperacio from '../../components/FitxaOperacio'
 import MissatgesDelPunt from '../../components/MissatgesDelPunt'
+import PropostaEntitat from '../../components/PropostaEntitat'
+import { refrescaAvisos } from '../../lib/refrescAvisos'
 import { useMissatgesOferta } from '../../hooks/useMissatgesOferta'
 import { declinaOferta } from '../../lib/operacio'
 import { estatValidacio } from '../../lib/registreRecollida'
@@ -62,6 +69,8 @@ type AmbOferta = Pick<
   OfertaRespuesta,
   | 'id' | 'estado' | 'aprovacio' | 'kg_solicitados' | 'preu_ofert' | 'motiu_aprovacio'
   | 'canalizacion_id' | 'enviado_at' | 'respondido_at' | 'kg_aprovats' | 'modalitat' | 'recollida_at'
+  // La propuesta de cambios del equipo (20270610100000).
+  | 'proposta_kg' | 'proposta_modalitat' | 'proposta_recollida_at' | 'proposta_motiu' | 'proposta_original'
 > & { excedentes: OfertaReceptor | null }
 
 /**
@@ -138,9 +147,11 @@ export function Interessos() {
   const [pestanya, setPestanya] = useState<'interessos' | 'per_a_tu'>('interessos')
   const [declinant, setDeclinant] = useState(false)
   const entidadId = organitzacio?.id ?? null
-  const dialeg = useDialegPerUrl(['operacio', 'accio'] as const)
+  const dialeg = useDialegPerUrl(['operacio', 'accio', 'resposta'] as const)
   const operacioUrl = dialeg.valors.operacio
   const accioUrl = dialeg.valors.accio
+  /** La propuesta de cambios de la URL (`?resposta=<id>`). */
+  const respostaUrl = dialeg.valors.resposta
   /** La operación de la URL que ya se ha abierto: los refrescos de la lista no la reabren. */
   const aplicada = useRef<string | null>(null)
 
@@ -154,7 +165,7 @@ export function Interessos() {
     const [resp, alb, inc] = await Promise.all([
       supabase
         .from('oferta_respuestas')
-        .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, recollida_at, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, aprovacio, kg_solicitados, kg_aprovats, modalitat, recollida_at, preu_ofert, motiu_aprovacio, canalizacion_id, enviado_at, respondido_at, proposta_kg, proposta_modalitat, proposta_recollida_at, proposta_motiu, proposta_original, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         .order('enviado_at', { ascending: false })
         .overrideTypes<AmbOferta[], { merge: false }>(),
@@ -209,11 +220,33 @@ export function Interessos() {
   const operacioNoDisponible = operacioUrl != null && !carregant && !errorCarrega
     && !files.some((x) => x.canalizacion_id === operacioUrl && x.aprovacio === 'aprovada' && x.excedentes)
 
+  // Lo mismo con la propuesta: se abre una vez, solo si sigue `proposada` y es de esta entidad
+  // (la RLS ya no devuelve las de otras). Ya respondida o ajena, el aviso de arriba.
+  const respostaAplicada = useRef<string | null>(null)
+  useEffect(() => {
+    if (!respostaUrl) { respostaAplicada.current = null; return }
+    if (carregant || respostaAplicada.current === respostaUrl) return
+    const f = files.find((x) => x.id === respostaUrl && x.aprovacio === 'proposada' && x.excedentes)
+    if (!f) return
+    respostaAplicada.current = respostaUrl
+    setObert(f)
+    setRegistraObert(false)
+  }, [respostaUrl, carregant, files])
+  const propostaNoDisponible = respostaUrl != null && !carregant && !errorCarrega
+    && !files.some((x) => x.id === respostaUrl && x.aprovacio === 'proposada' && x.excedentes)
+
+  /** Tras responder a una propuesta: se cierra, se relee y bajan los contadores del menú. */
+  const trasResposta = () => {
+    tancaFitxa()
+    void carrega()
+    refrescaAvisos()
+  }
+
   /** Cierra la ficha y, si la abrió un enlace, lo quita de la URL. */
   const tancaFitxa = () => {
     setObert(null)
     setRegistraObert(false)
-    if (operacioUrl) dialeg.tanca()
+    if (operacioUrl || respostaUrl) dialeg.tanca()
   }
 
   // Abrir la pantalla da por leídos los avisos de intereses (05-10-2026): el badge del
@@ -334,6 +367,15 @@ export function Interessos() {
             </Button>
           </div>
         )}
+        {propostaNoDisponible && (
+          <div role="status" data-testid="proposta-no-disponible"
+            className="flex flex-wrap items-center gap-x-3 gap-y-2 rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
+            <p className="min-w-0 flex-1">{t('int.proposta_no_disponible')}</p>
+            <Button variant="outline" className="h-11 whitespace-normal md:h-8" onClick={dialeg.tanca}>
+              {t('c.ok')}
+            </Button>
+          </div>
+        )}
         {!carregant && !errorCarrega && visibles.length === 0 && (
           <p className="text-sm text-muted-foreground">{t(pestanya === 'per_a_tu' ? 'int.per_a_tu_empty' : 'int.empty')}</p>
         )}
@@ -376,7 +418,8 @@ export function Interessos() {
           // Toda la tarjeta abre el detalle de la oferta: antes no se podía abrir y el
           // interés no decía ni dónde estaba ni en qué formato venía.
           return (
-            <button type="button" key={f.id} onClick={() => f.excedentes && setObert(f)}
+            <div key={f.id} className="space-y-2">
+            <button type="button" onClick={() => f.excedentes && setObert(f)}
               className="block w-full rounded-lg border p-3 text-left hover:bg-muted/40 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex min-w-0 items-center gap-3">
@@ -411,6 +454,11 @@ export function Interessos() {
                 </p>
               )}
             </button>
+            {/* La propuesta del equipo, a la vista y con sus dos botones: es lo que le toca. */}
+            {f.aprovacio === 'proposada' && (
+              <PropostaEntitat resposta={f} onFet={trasResposta} />
+            )}
+            </div>
           )
         })}
       </CardContent>
@@ -441,6 +489,9 @@ export function Interessos() {
               <DialogHeader>
                 <DialogTitle>{t(obert.aprovacio === 'aprovada' && obert.canalizacion_id ? 'op.title' : 'mk.detail_title')}</DialogTitle>
               </DialogHeader>
+              {obert.aprovacio === 'proposada' && (
+                <PropostaEntitat resposta={obert} onFet={trasResposta} />
+              )}
               {obert.aprovacio === 'aprovada' && obert.canalizacion_id ? (
                 <>
                   <FitxaOperacio canalizacionId={obert.canalizacion_id} onCanvi={() => void carrega()}

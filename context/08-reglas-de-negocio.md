@@ -362,3 +362,10 @@ la oferta). Reglas:
    de provisional); el certificado, una nota «Fonts dels valors: …» y, en el anexo, la columna «Font del valor».
    La nota legal fija del REC (`nota_valor`) no cambia (deuda 187).
 
+### Albaranes automáticos por correo en el nivel 2 (19-11-2026, fase 5 de los puntos 4-6)
+
+Lo AUTOMÁTICO (§8, cortado por los interruptores) incluye ahora el ENT y el REC conciliados de una recogida **declarada
+por la entidad** (`canalizaciones.recollida_origen='entitat_receptora'`), en cuanto existe el PDF de su versión
+`conciliat` (primera y vigente). Solo correo, con el PDF; la parte sin correo lo tiene en «Documents». En el nivel 1
+(registra el equipo) no sale nada: el super_admin comparte a mano. Modo test, `destinatariosPrueba()` y
+`email_test_recipients` mandan igual. Condiciones y motivos, en `context/06ter`.

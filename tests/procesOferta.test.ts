@@ -100,6 +100,8 @@ function totsElsPunts(): { nom: string; punt: PuntProces }[] {
     // 17-10-2026: registrada y esperando al equipo, y devuelta por el equipo.
     { nom: 'registrada per validar', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 40, recollida: 'registrada', kgDeclarats: 38 } },
     { nom: 'retornada', fets: { estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 40, recollida: 'retornada', motiuRetorn: 'Falta el pes' } },
+    // Fase 5 de los puntos 4-6: el equipo propone cambios y espera a la entidad.
+    { nom: 'proposta de canvis', fets: { estado: 'acceptada', aprovacio: 'proposada', ofertaEstado: 'parcial' } },
   ]
   for (const c of interessos) fora.push({ nom: `receptor/${c.nom}`, punt: puntInteres(c.fets) })
   return fora
@@ -323,6 +325,20 @@ describe('puntInteres: la lectura del receptor', () => {
     expect(puntInteres({ ...b, estado: 'acceptada', ofertaEstado: 'cancelada' }).variant).toBeNull()
   })
 
+  // Fase 5 de los puntos 4-6: una propuesta del equipo es un interés EN CURSO (misma etapa, el
+  // indicador no se mueve), pero ahora le toca a la entidad: badge propio, en coral.
+  it('una propuesta de cambios: interés en curso, le toca a la entidad', () => {
+    const p = puntInteres({ ...b, estado: 'acceptada', aprovacio: 'proposada' })
+    expect([p.etapa, p.variant, p.index, p.emToca]).toEqual(['interes_enviat', 'proposta', 1, true])
+    expect(p.claus.toca).toBe('proc.r_interes_enviat_proposta_toca')
+    const e = estatSimpleInteres(p)
+    expect(e.estat).toBe('proposta')
+    expect(e.clase).toBe(estatSimpleInteres(puntInteres(b)).clase)
+    // Si la oferta se cancela o se cubre entre medias, la propuesta ya no importa.
+    expect(puntInteres({ ...b, estado: 'acceptada', aprovacio: 'proposada', ofertaEstado: 'cancelada' }).etapa).toBe('retirada')
+    expect(puntInteres({ ...b, estado: 'acceptada', aprovacio: 'proposada', ofertaEstado: 'bloqueada' }).variant).toBe('coberta')
+  })
+
   it('una oferta cubierta NO retira un interés ya aprobado', () => {
     const p = puntInteres({ ...b, estado: 'acceptada', aprovacio: 'aprovada', ofertaEstado: 'bloqueada', kg: 30 })
     expect(p.etapa).toBe('assignada')
@@ -506,12 +522,13 @@ describe('emToca dice la verdad sobre quién actúa', () => {
     expect(puntOferta({ ...fets, kgSenseDesti: 0 }, 'productor').notaClau).toBeUndefined()
   })
 
-  it('el receptor actúa al pedir la oferta, al registrar la recogida y al confirmar la entrega', () => {
+  it('el receptor actúa al pedir la oferta, al responder una propuesta, al registrar la recogida y al confirmar la entrega', () => {
     // Desde el 17-10-2026 la recogida la cierra el receptor: con el interés asignado, le toca
     // registrar los kilos reales, y volver a hacerlo si el equipo se lo devuelve. Registrada y
-    // pendiente de validar, ya no le toca: es del equipo.
+    // pendiente de validar, ya no le toca: es del equipo. Con una propuesta de cambios del
+    // equipo (fase 5 de los puntos 4-6), le toca aceptarla o rechazarla.
     const ambToca = PUNTS.filter((p) => p.nom.startsWith('receptor/') && p.punt.emToca)
-    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/assignada', 'receptor/ent entregat', 'receptor/rebuda', 'receptor/retornada'])
+    expect(ambToca.map((p) => p.nom).sort()).toEqual(['receptor/assignada', 'receptor/ent entregat', 'receptor/proposta de canvis', 'receptor/rebuda', 'receptor/retornada'])
   })
 
   it('cada punto con enlace apunta a la ruta del panel que lo mira', () => {

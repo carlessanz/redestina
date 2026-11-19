@@ -6,8 +6,12 @@
 
 import type { ConvenioEstado, DocumentoTipo } from '../types'
 
-/** Para qué sirve un enlace pendiente. Mismo vocabulario que `enlaces_token.proposito`. */
-export type ProposicPendent = 'firma_convenio' | 'confirmacion_albaran' | 'firma_document'
+/**
+ * Para qué sirve un enlace pendiente. Mismo vocabulario que `enlaces_token.proposito`, más
+ * `resposta_proposta` (20270610100000), que no tiene enlace: es una propuesta de cambios del
+ * equipo que la entidad responde desde «Els meus interessos» (`rutaPropostaCanvis`).
+ */
+export type ProposicPendent = 'firma_convenio' | 'confirmacion_albaran' | 'firma_document' | 'resposta_proposta'
 
 /**
  * La ruta pública que le toca a cada propósito.

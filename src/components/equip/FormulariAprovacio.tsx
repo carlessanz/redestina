@@ -16,6 +16,10 @@
 //     20270607100000, deuda 180), con la casilla opcional «L'ofertant ha acceptat el preu»
 //     (`p_preu_acceptat`); si no se marca aquí, se fija después en la ficha de la oferta.
 //
+// Y una tercera vía, «Proposa canvis» (fase 5 de los puntos 4-6, nivel 2): otros kilos, otra
+// modalidad u otra hora, con motivo, que la entidad acepta o rechaza desde su panel
+// (`PropostaCanvis.tsx`). Solo quien puede aprobar la ve; el técnico, no.
+//
 // ⚠️ `text-base md:text-sm` en todo control (§2, regla 1) y botones a 44 px en móvil.
 
 import { useState } from 'react'
@@ -32,11 +36,14 @@ import { useConfirma } from '../DialegConfirma'
 import DialegMotiu from '../DialegMotiu'
 import SelectorModalitat from '../SelectorModalitat'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
+import DialegProposarCanvis, { AvisPropostaResposta } from './PropostaCanvis'
+import type { RespostaAmbProposta } from '../../lib/propostaCanvis'
 import { FilaCasella } from '../Casella'
+import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 
-/** Lo que hace falta de la respuesta: lo que pidió la entidad. */
-export interface RespostaAprovable {
+/** Lo que hace falta de la respuesta: lo que pidió la entidad (y, si viene de una, su propuesta). */
+export interface RespostaAprovable extends Partial<Omit<RespostaAmbProposta, 'kg_solicitados' | 'modalitat' | 'recollida_at'>> {
   id: string
   entidad_id: string | null
   kg_solicitados: number | null
@@ -51,6 +58,9 @@ export interface OfertaAprovable {
   modalitats?: Modalitat[] | string[] | null
   productor_id: string | null
   preu_minim: number | null
+  /** La franja, como guía al proponer otra hora (`PropostaCanvis`). */
+  hora_recollida_inici?: string | null
+  hora_recollida_fi?: string | null
 }
 
 interface Props {
@@ -63,14 +73,16 @@ interface Props {
   bloqueig?: string
   /** Prefijo de los `id` de los campos. */
   idPrefix: string
-  /** Tras aprobar o rechazar: la pantalla relee lo suyo. */
-  onFet: (resultat: 'aprovada' | 'rebutjada') => void
+  /** El nombre de la entidad, para el diálogo de «Proposa canvis». */
+  entitat?: string | null
+  /** Tras aprobar, rechazar o proponer cambios: la pantalla relee lo suyo. */
+  onFet: (resultat: 'aprovada' | 'rebutjada' | 'proposada') => void
   /** Acciones de más al lado de los botones (p. ej. «Obre l'oferta» en la cola). */
   children?: ReactNode
 }
 
 export default function FormulariAprovacio({
-  resposta, oferta, faltan, potAprovar, bloqueig, idPrefix, onFet, children,
+  resposta, oferta, faltan, potAprovar, bloqueig, idPrefix, entitat, onFet, children,
 }: Props) {
   const { t } = useT()
   const { confirma, dialeg } = useConfirma()
@@ -91,6 +103,7 @@ export default function FormulariAprovacio({
   const [acceptat, setAcceptat] = useState(false)
   const [ocupat, setOcupat] = useState(false)
   const [rebutjant, setRebutjant] = useState(false)
+  const [proposant, setProposant] = useState(false)
 
   const triada: Modalitat | '' = modalitat || (mods.length === 1 ? mods[0] : '')
   const ambPreuTriat = triada === 'venda'
@@ -161,6 +174,10 @@ export default function FormulariAprovacio({
   return (
     // Cada campo con su etiqueta y su unidad a la vista (revisión del 08-10-2026, §3.3).
     <div className="flex flex-wrap items-end gap-2">
+      {/* Viene de una propuesta: la entidad la rechazó, o la aceptó y falta el precio. */}
+      {resposta.aprovacio && (
+        <div className="w-full empty:hidden"><AvisPropostaResposta resposta={resposta as RespostaAmbProposta} /></div>
+      )}
       <label htmlFor={`${idPrefix}-kg`} className="flex flex-col gap-1 text-xs text-muted-foreground">
         {t('od.f_kg_assignats')}
         <Input id={`${idPrefix}-kg`} type="number" inputMode="decimal" min="0" step="0.01"
@@ -201,7 +218,26 @@ export default function FormulariAprovacio({
         onClick={() => setRebutjant(true)}>
         {t('od.reject_appr')}
       </BotoAmbMotiu>
+      {/* Solo quien puede aprobar propone: el técnico no lo ve (la base lo vuelve a mirar). */}
+      {potAprovar && (
+        <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8" disabled={ocupat}
+          onClick={() => setProposant(true)}>
+          {t('prop.boto')}
+        </Button>
+      )}
       {children}
+
+      {potAprovar && (
+        <DialegProposarCanvis
+          obert={proposant}
+          onObert={setProposant}
+          resposta={resposta}
+          oferta={oferta}
+          entitat={entitat}
+          idPrefix={`${idPrefix}-prop`}
+          onFet={() => onFet('proposada')}
+        />
+      )}
 
       <DialegMotiu
         obert={rebutjant}

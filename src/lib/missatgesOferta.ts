@@ -122,6 +122,8 @@ export const FASE_AVIS: Record<TipusAvis, FaseMissatge> = {
   interes_aprovat: 'aprovacio',
   interes_rebutjat: 'aprovacio',
   sortida_trobada: 'aprovacio',
+  // Fase 5 de los puntos 4-6: el equipo propone otros kilos, modalidad u hora a un interés.
+  canvis_proposats: 'aprovacio',
   recollida_canviada: 'lliurament',
   kg_assignats_canviats: 'lliurament',
   assignacio_anulada: 'lliurament',

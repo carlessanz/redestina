@@ -46,6 +46,8 @@ import CampsRecollida from '../../components/CampsRecollida'
 import { llegeixMercatVist, marcaMercatVist } from '../../lib/avisos'
 import { useAppContext } from '../../hooks/useAppContext'
 import { useDialegPerUrl } from '../../hooks/useDialegPerUrl'
+import { rutaPropostaCanvis } from '../../lib/enllacosDirectes'
+import { Link } from 'react-router'
 import CarregantSeccio from '../../components/CarregantSeccio'
 import DetallOfertaReceptor, { preuDe } from '../../components/DetallOfertaReceptor'
 import type { OfertaReceptor } from '../../components/DetallOfertaReceptor'
@@ -58,7 +60,7 @@ import {
 } from '@/components/ui/dialog'
 
 /** Lo único que hace falta de la respuesta propia para contar su etapa. */
-type RespostaMeva = Pick<OfertaRespuesta, 'excedente_id' | 'estado' | 'aprovacio' | 'kg_solicitados'>
+type RespostaMeva = Pick<OfertaRespuesta, 'id' | 'excedente_id' | 'estado' | 'aprovacio' | 'kg_solicitados'>
 
 /** `disponible_hasta` ya pasada: la oferta sigue publicada, pero no se puede pedir. */
 function vencuda(o: Pick<OfertaReceptor, 'disponible_hasta'>, avui: string): boolean {
@@ -134,7 +136,7 @@ export default function Mercat() {
         .in('estado', ['publicada', 'parcial'])
         .order('created_at', { ascending: false }),
       entidadId
-        ? supabase.from('oferta_respuestas').select('excedente_id, estado, aprovacio, kg_solicitados').eq('entidad_id', entidadId)
+        ? supabase.from('oferta_respuestas').select('id, excedente_id, estado, aprovacio, kg_solicitados').eq('entidad_id', entidadId)
         : Promise.resolve({ data: [], error: null }),
       supabase.from('convenios_exigidos').select('valorizacion, tipo_convenio').eq('parte', 'recibe'),
     ])
@@ -448,9 +450,18 @@ export default function Mercat() {
                 </div>
               </button>
               {punt ? (
-                <BadgeEstat clase={estatSimpleInteres(punt).clase}>
-                  {t(estatSimpleInteres(punt).key)}
-                </BadgeEstat>
+                <div className="flex flex-wrap items-center gap-2">
+                  <BadgeEstat clase={estatSimpleInteres(punt).clase}>
+                    {t(estatSimpleInteres(punt).key)}
+                  </BadgeEstat>
+                  {/* El equipo ha propuesto cambios: el interés sigue en curso y la respuesta
+                      se da en «Els meus interessos» (fase 5 de los puntos 4-6). */}
+                  {meves[o.id]?.aprovacio === 'proposada' && (
+                    <Button asChild size="sm" className="h-11 whitespace-normal md:h-8">
+                      <Link to={rutaPropostaCanvis(meves[o.id].id)}>{t('prop.respon')}</Link>
+                    </Button>
+                  )}
+                </div>
               ) : (
                 // Sin `size="sm"` y a 44px en móvil: es la única acción del panel del
                 // receptor y se repite en cada fila. En escritorio vuelve a la altura
@@ -541,9 +552,16 @@ export default function Mercat() {
                   {enviant ? t('c.sending') : t('mk.send')}
                 </Button>
               ) : obertPunt ? (
-                <BadgeEstat clase={estatSimpleInteres(obertPunt).clase}>
-                  {t(estatSimpleInteres(obertPunt).key)}
-                </BadgeEstat>
+                <div className="flex flex-wrap items-center gap-2">
+                  <BadgeEstat clase={estatSimpleInteres(obertPunt).clase}>
+                    {t(estatSimpleInteres(obertPunt).key)}
+                  </BadgeEstat>
+                  {meves[obert.id]?.aprovacio === 'proposada' && (
+                    <Button asChild className="h-11 whitespace-normal md:h-8">
+                      <Link to={rutaPropostaCanvis(meves[obert.id].id)}>{t('prop.respon')}</Link>
+                    </Button>
+                  )}
+                </div>
               ) : (
                 <Button
                   className="h-11 md:h-8"

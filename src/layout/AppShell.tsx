@@ -31,6 +31,8 @@ import AvisOperativa from '../components/AvisOperativa'
 import { useFitxaIncompleta } from '../hooks/useFitxaIncompleta'
 import { useOperativaPendent } from '../hooks/useOperativaPendent'
 import { useTicAvisos } from '../lib/refrescAvisos'
+import { useComptadorsEnViu } from '../hooks/useComptadorsEnViu'
+import { comptaInteressos } from '../lib/comptadorsEnViu'
 import { SidebarInset, SidebarProvider, SidebarTrigger } from '@/components/ui/sidebar'
 
 /** Metadatos que cada ruta puede declarar en su `handle`. */
@@ -71,10 +73,10 @@ export default function AppShell() {
   // por sesión, y no se refrescaban nunca: aprobar un registro bajaba la cola pero el
   // badge seguía igual hasta recargar.
   //
-  // Se refrescan en cada cambio de ruta —cubre «actúo y navego»— y las pantallas llaman a
-  // `refrescaComptadors()` tras cada acción —cubre «actúo y me quedo»—. Sin Realtime: un
-  // canal más por sesión para unos números que solo tienen que ser correctos cuando se
-  // miran no compensa.
+  // Se refrescan en cada cambio de ruta —cubre «actúo y navego»—, las pantallas llaman a
+  // `refrescaComptadors()` tras cada acción —cubre «actúo y me quedo»— y, desde la fase 5 de
+  // los puntos 4-6, un canal de Realtime los vuelve a pedir cuando otra persona cambia algo
+  // —cubre «lo hace otro y yo miro»— (`useComptadorsEnViu`, más abajo).
   //
   // Depende de TENER el panel de equipo, no de estar mirándolo: desde que el menú los
   // enseña todos a la vez, el grupo del equipo se ve también desde /productor y sus
@@ -101,23 +103,37 @@ export default function AppShell() {
   // que no entran en aquel; y con una sola llamada, porque la base ya sabe repartir por
   // tipo de organización.
   const esExtern = (ctx?.rols.includes('productor') || ctx?.rols.includes('receptor')) ?? false
+  // Los contadores en vivo (fase 5 de los puntos 4-6): un canal por sesión. Al equipo le
+  // refresca el store directamente; a los paneles externos les da tics que entran en las
+  // dependencias de los efectos de abajo (pendientes, avisos y Mercat), y nada más.
+  const enViu = useComptadorsEnViu({
+    userId: ctx?.userId ?? null,
+    intern: esIntern,
+    extern: esExtern,
+    receptor: ctx?.rols.includes('receptor') ?? false,
+  })
   // Se recalcula al navegar y tras firmar o confirmar (`refrescaAvisos()`): antes se leía
   // una sola vez al montar y el contador seguía pidiendo lo ya firmado.
   const ticAvisos = useTicAvisos()
+  // Las propuestas de cambios por responder (fase 5): no son documentos, así que no cuentan en
+  // el badge de Documents sino en el de «Els meus interessos», que es donde se responden.
+  const [propostes, setPropostes] = useState<string[]>([])
   useEffect(() => {
     if (!esExtern) return
     let viu = true
     void (async () => {
       const r = await carregaPendents()
       if (!viu || !r.ok) return
+      const documents = r.data.filter((p) => p.proposito !== 'resposta_proposta')
+      setPropostes(r.data.filter((p) => p.proposito === 'resposta_proposta').map((p) => p.objeto_id))
       setComptadorsExterns((c) => ({
         ...c,
-        pendents_productor: r.data.filter((p) => p.tipo_org === 'productor').length,
-        pendents_receptor: r.data.filter((p) => p.tipo_org === 'entidad').length,
+        pendents_productor: documents.filter((p) => p.tipo_org === 'productor').length,
+        pendents_receptor: documents.filter((p) => p.tipo_org === 'entidad').length,
       }))
     })()
     return () => { viu = false }
-  }, [esExtern, pathname, ticAvisos])
+  }, [esExtern, pathname, ticAvisos, enViu.pendents])
 
   // Los avisos (05-10-2026, rebanada 2): se recargan al navegar, como los pendientes. Los
   // badges salen del store, así que bajan en cuanto una pantalla los marca como leídos.
@@ -125,7 +141,7 @@ export default function AppShell() {
   useEffect(() => {
     if (!esExtern) return
     void carregaAvisos(fitxesMeves ? fitxesMeves.split(',') : [])
-  }, [esExtern, fitxesMeves, pathname])
+  }, [esExtern, fitxesMeves, pathname, enViu.avisos])
   const avisos = useAvisos()
   const noLlegits = noLlegitsPerPanell(avisos)
   // El badge «noves» del Mercat: no en el propio Mercat (allí cada tarjeta dice «Nova»).
@@ -138,9 +154,9 @@ export default function AppShell() {
     let viu = true
     void comptaMercatNou(userId).then((n) => { if (viu) setMercatNou(n) })
     return () => { viu = false }
-  }, [esReceptor, userId, pathname])
+  }, [esReceptor, userId, pathname, enViu.mercat])
   comptadors.avisos_ofertes = noLlegits.ofertes
-  comptadors.avisos_interessos = noLlegits.interessos
+  comptadors.avisos_interessos = comptaInteressos(noLlegits.interessos, avisos, propostes)
   comptadors.mercat_noves = mercatNou
 
   return (

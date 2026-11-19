@@ -21,6 +21,7 @@ import MissatgesDelPunt from '../../MissatgesDelPunt'
 import FormulariAprovacio from '../FormulariAprovacio'
 import FormulariInteresAssistit from '../FormulariInteresAssistit'
 import AccionsAssignacio, { PreuAcordat } from '../AccionsAssignacio'
+import { PropostaEsperant } from '../PropostaCanvis'
 import type { AssignacioFila } from '../AccionsAssignacio'
 import { Badge } from '@/components/ui/badge'
 import AccionsConveni from './AccionsConveni'
@@ -46,6 +47,8 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
     .reduce((s, x) => s + Number(x.kg_confirmados ?? 0), 0)
   const faltan = Math.max(0, Number(fets.oferta.kg_total ?? 0) - kgCanalitzats)
   const pendents = extra.respostes.filter((r) => r.estado === 'acceptada' && r.aprovacio === 'pendent')
+  // Fase 5 de los puntos 4-6: los intereses con una propuesta de cambios esperando a la entidad.
+  const proposades = extra.respostes.filter((r) => r.estado === 'acceptada' && r.aprovacio === 'proposada')
 
   return (
     <div className="space-y-3">
@@ -86,11 +89,14 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
                 modalitats: extra.oferta.modalitats ?? null,
                 productor_id: extra.productor?.id ?? null,
                 preu_minim: oferta?.preu_minim ?? null,
+                hora_recollida_inici: oferta?.hora_recollida_inici ?? null,
+                hora_recollida_fi: oferta?.hora_recollida_fi ?? null,
               }}
               faltan={faltan}
               potAprovar={c.potAprovar}
               bloqueig={vigent ? undefined : t('canalz.rec_sense_conveni')}
               idPrefix={`cd-apr-${r.id}`}
+              entitat={r.entitat}
               onFet={c.onCanvi}
             />
 
@@ -114,6 +120,13 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
           </div>
         )
       })}
+
+      {proposades.map((r) => (
+        <div key={r.id} className="space-y-2 rounded-md border p-2">
+          <span className="min-w-0 text-sm">{r.entitat}</span>
+          <PropostaEsperant resposta={r} potAprovar={c.potAprovar} onFet={c.onCanvi} />
+        </div>
+      ))}
 
       <MissatgesDelPunt missatges={c.missatges} fase="aprovacio" />
     </div>

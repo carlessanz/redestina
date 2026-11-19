@@ -253,3 +253,14 @@ Flecos del proceso 3 que pidió la Fundació (Excel «Taula mestra — revisió 
 - **Lugares de recogida ya creados** (`components/LlocsRecollida.tsx`): al editarlos se pueden cambiar también el
   municipio (precargado desde `municipio_ine`) y el enlace de Maps. Solo se escribe el municipio si cambia; las ofertas
   ya publicadas conservan el suyo (el trigger `excedentes_ubica` copia municipio y comarca al crear la oferta).
+
+
+### Resumen de §6bis movido de `AGENTS.md` (19-11-2026, fase 5 de los puntos 4-6, para hacer sitio)
+
+21 pasos (`_shared/camposOferta.ts`, servidos por `GET crear-oferta/campos`; ca/es en el descriptor):
+familia → producte → varietat → producte_al_camp (Sí/No) → hectarees (**`soloPanel`**, opcional) → kg (>0) →
+format_entrega → caixes → retorn (sus dos detalles, **`oculto`**: deuda 188) → transport (**`oculto`**)
+→ ubicacio (siempre) → disponible_fins → dies_recollida (**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
+cost») → causa (WhatsApp: la categoría; panel: la subcausa, obligatoria) → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
+`Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; igual en el panel);
+convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).

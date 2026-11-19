@@ -4,8 +4,8 @@
 
 import { describe, expect, it } from 'vitest'
 import {
-  enllacInteresOferta, enllacRegistreRecollida, rutaAssignaOferta, rutaInteresOferta, rutaRecollidaEquip,
-  rutaRegistreRecollida,
+  enllacInteresOferta, enllacPropostaCanvis, enllacRegistreRecollida, rutaAssignaOferta, rutaInteresOferta,
+  rutaPropostaCanvis, rutaRecollidaEquip, rutaRegistreRecollida,
 } from '../src/lib/enllacosDirectes'
 import { destiValid } from '../src/lib/destiLogin'
 
@@ -22,6 +22,12 @@ describe('enlaces directos', () => {
     expect(enllacRegistreRecollida('https://x.test', ['c1'])).toBe('https://x.test/receptor/interessos?operacio=c1&accio=recollida')
   })
 
+  it('la propuesta de cambios del equipo, abierta en «Els meus interessos» (fase 5)', () => {
+    expect(rutaPropostaCanvis('r1')).toBe('/receptor/interessos?resposta=r1')
+    expect(enllacPropostaCanvis('https://x.test/', 'r1')).toBe('https://x.test/receptor/interessos?resposta=r1')
+    expect(rutaPropostaCanvis('a&b')).toBe('/receptor/interessos?resposta=a%26b')
+  })
+
   it('los del equipo', () => {
     expect(rutaAssignaOferta('o1')).toBe('/equip/ofertes/o1?accio=assigna')
     expect(rutaRecollidaEquip('o1', 'c1')).toBe('/equip/ofertes/o1?accio=recollida&canalitzacio=c1')
@@ -33,7 +39,7 @@ describe('enlaces directos', () => {
 
   it('todas las rutas son destinos válidos tras el login', () => {
     for (const r of [rutaInteresOferta('a'), rutaRegistreRecollida(['c']), rutaRegistreRecollida([]),
-      rutaAssignaOferta('o'), rutaRecollidaEquip('o', 'c')]) {
+      rutaAssignaOferta('o'), rutaRecollidaEquip('o', 'c'), rutaPropostaCanvis('r')]) {
       expect(destiValid(r)).toBe(r)
     }
   })

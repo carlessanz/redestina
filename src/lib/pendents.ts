@@ -34,8 +34,9 @@ export type { ProposicPendent }
 /** Una fila de `pendents_meus()`. */
 export interface Pendent {
   proposito: ProposicPendent
-  /** `documento` = un documento que firmar (circuito de firma, `firma_document`). */
-  objeto_tipo: 'convenio' | 'albaran' | 'documento'
+  /** `documento` = un documento que firmar (circuito de firma, `firma_document`).
+   *  `oferta_resposta` = una propuesta de cambios por responder (`resposta_proposta`, sin enlace). */
+  objeto_tipo: 'convenio' | 'albaran' | 'documento' | 'oferta_resposta'
   objeto_id: string
   tipo_org: 'productor' | 'entidad'
   org_id: string

@@ -35,6 +35,19 @@ export function enllacRegistreRecollida(appUrl: string, canalitzacioIds: readonl
   return `${origen(appUrl)}${rutaRegistreRecollida(canalitzacioIds)}`
 }
 
+/**
+ * La propuesta de cambios del equipo a un interés (fase 5 de los puntos 4-6), abierta para
+ * aceptarla o rechazarla: «Els meus interessos» con `?resposta=<oferta_respuestas.id>`. Es el
+ * enlace del aviso `canvis_proposats` y de «Pendent de tu».
+ */
+export function rutaPropostaCanvis(respostaId: string): string {
+  return `/receptor/interessos?resposta=${encodeURIComponent(respostaId)}`
+}
+
+export function enllacPropostaCanvis(appUrl: string, respostaId: string): string {
+  return `${origen(appUrl)}${rutaPropostaCanvis(respostaId)}`
+}
+
 /** Equipo: la ficha de la oferta con el formulario «Assigna l’oferta» a la vista. */
 export function rutaAssignaOferta(excedenteId: string): string {
   return `/equip/ofertes/${encodeURIComponent(excedenteId)}?accio=assigna`

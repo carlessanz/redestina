@@ -48,6 +48,7 @@ import type { DatosConvenio } from "../_shared/pdf/convenio.ts";
 import { type IdentidadEvidencia, renderConv } from "../_shared/pdf/render/conv.ts";
 import type { SignaturaDocument } from "../_shared/pdf/render/signatura.ts";
 import { enviaDocument } from "../_shared/envia-document.ts";
+import { enviaAlbaraRecollidaValidada } from "../_shared/envia-albara.ts";
 import { exigirSecreto, json } from "../_shared/http.ts";
 
 // Sin tipos generados de la base: anotar el cliente con `ReturnType<typeof createClient>`
@@ -198,7 +199,16 @@ Deno.serve(async (req) => {
     // porque el documento existe y está bien. Solo corre cuando el fichero se genera por
     // primera vez —la idempotencia de arriba corta antes—, así que los documentos que ya
     // existían el día que se estrenó esto no se reenvían de golpe.
-    const correu = await enviaDocument(supabase, doc, bytes, "generar-documento");
+    //
+    // Los ALBARANES no van por `enviaDocument()` (para ellos devuelve `no_s_envia`): desde el
+    // 19-11-2026 (fase 5 de los puntos 4-6) el ENT y el REC conciliados de una recogida que
+    // declaró la entidad y validó el equipo salen solos a sus partes, con el mismo bucle que
+    // «Envia per correu» (`_shared/envia-albara.ts`, que decide cuándo y por qué no).
+    const tCorreu = performance.now();
+    const correu = doc.objeto_tipo === "albaran"
+      ? await enviaAlbaraRecollidaValidada(supabase, doc, bytes, "generar-documento")
+      : await enviaDocument(supabase, doc, bytes, "generar-documento");
+    const msCorreu = performance.now() - tCorreu;
 
     // Desglose de CPU: el límite del runtime es 2 s por petición y el criterio de
     // salida del spike, 800 ms. Sin este log no hay forma de saber dónde se va.
@@ -215,6 +225,7 @@ Deno.serve(async (req) => {
       ms_total: Number((performance.now() - t0).toFixed(1)),
       activos_en_frio: msActivos > 1,
       correu,
+      ms_correu: Number(msCorreu.toFixed(1)),
     };
 
     // Por encima del presupuesto del spike, el mismo JSON pero en `warn`, para que se

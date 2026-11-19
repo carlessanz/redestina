@@ -140,7 +140,8 @@ export interface FetsOferta {
 
 export interface FetsInteres {
   estado: 'pendent' | 'acceptada' | 'rebutjada'
-  aprovacio: 'pendent' | 'aprovada' | 'rebutjada'
+  /** `proposada` (20270610100000): el equipo propuso cambios y espera a la entidad. */
+  aprovacio: 'pendent' | 'aprovada' | 'rebutjada' | 'proposada'
   kg?: number | null
   ofertaEstado: EstadoExcedente
   albaraEnt?: { estado: EstadoAlbaran; numero: string | null } | null
@@ -426,6 +427,10 @@ export function puntInteres(fets: FetsInteres): PuntProces {
     return fes('oferta_rebuda', null, 0, {}, true, '/receptor/mercat')
   }
   if (fets.aprovacio === 'pendent') return fes('interes_enviat', null, 1, {}, false)
+  // El equipo ha propuesto otros kilos, otra modalidad u otra hora (fase 5 de los puntos 4-6,
+  // nivel 2): el interés sigue «en curso» —misma etapa, el indicador no se mueve—, pero ahora
+  // le toca a la entidad aceptarlo o rechazarlo.
+  if (fets.aprovacio === 'proposada') return fes('interes_enviat', 'proposta', 1, {}, true)
 
   // Aprobada: a partir de aquí lo cuenta el albarán de entrega.
   if (ent?.estado === 'conciliado') {
@@ -542,7 +547,7 @@ export type EstatSimpleOferta =
 
 /** Los estados simples de un interés, tal como los ve la entidad receptora. */
 export type EstatSimpleInteres =
-  'per_respondre' | 'interes_enviat' | 'assignada' | 'tancada' | 'no_disponible' | 'declinada'
+  'per_respondre' | 'interes_enviat' | 'proposta' | 'assignada' | 'tancada' | 'no_disponible' | 'declinada'
 
 /**
  * Los colores de los estados simples. Cuatro estados que se tienen que distinguir de un
@@ -596,7 +601,10 @@ export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleIntere
   const fes = (estat: EstatSimpleInteres, clase: string) => ({ estat, key: `est.i_${estat}`, clase })
   switch (punt.etapa) {
     case 'oferta_rebuda': return fes('per_respondre', CLASSE_SIMPLE.toca)
-    case 'interes_enviat': return fes('interes_enviat', CLASSE_SIMPLE.espera)
+    // Con una propuesta del equipo por responder, le toca a la entidad: en coral, como «Per respondre».
+    case 'interes_enviat': return punt.variant === 'proposta'
+      ? fes('proposta', CLASSE_SIMPLE.toca)
+      : fes('interes_enviat', CLASSE_SIMPLE.espera)
     case 'assignada':
     case 'entrega':
     case 'confirmada':
@@ -613,14 +621,14 @@ export function estatSimpleInteres(punt: PuntProces): { estat: EstatSimpleIntere
 export const ESTATS_SIMPLES_OFERTA: readonly EstatSimpleOferta[] =
   ['validacio', 'buscant', 'gestio', 'sortida', 'finalitzada', 'tancada_desti', 'cancellada', 'sense_sortida'] as const
 export const ESTATS_SIMPLES_INTERES: readonly EstatSimpleInteres[] =
-  ['per_respondre', 'interes_enviat', 'assignada', 'tancada', 'no_disponible', 'declinada'] as const
+  ['per_respondre', 'interes_enviat', 'proposta', 'assignada', 'tancada', 'no_disponible', 'declinada'] as const
 
 const CLASSE_PER_ESTAT_OFERTA: Record<EstatSimpleOferta, string> = {
   validacio: CLASSE_SIMPLE.espera, buscant: CLASSE_SIMPLE.espera, gestio: CLASSE_SIMPLE.gestio, sortida: CLASSE_SIMPLE.fet,
   finalitzada: CLASSE_SIMPLE.tancat, tancada_desti: CLASSE_SIMPLE.tancat, cancellada: CLASSE_SIMPLE.ko, sense_sortida: CLASSE_SIMPLE.ko,
 }
 const CLASSE_PER_ESTAT_INTERES: Record<EstatSimpleInteres, string> = {
-  per_respondre: CLASSE_SIMPLE.toca, interes_enviat: CLASSE_SIMPLE.espera, assignada: CLASSE_SIMPLE.fet,
+  per_respondre: CLASSE_SIMPLE.toca, interes_enviat: CLASSE_SIMPLE.espera, proposta: CLASSE_SIMPLE.toca, assignada: CLASSE_SIMPLE.fet,
   tancada: CLASSE_SIMPLE.tancat, no_disponible: CLASSE_SIMPLE.ko, declinada: CLASSE_SIMPLE.tancat,
 }
 
