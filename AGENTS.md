@@ -566,7 +566,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
    **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 3.001/3.001 y 49 sin datos; producción 2.975/2.975 y 40 (19-11-2026).** Cifra
+   **Referencia: clon 3.001/3.001 y 49 sin datos; producción 3.010/3.010 y 40 (19-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).
