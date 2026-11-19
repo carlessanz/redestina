@@ -15,7 +15,7 @@ const RECEPTOR = 'receptor-carles'
 const marca = Date.now()
 
 test.beforeEach(({}, info) => {
-  const m = motiuSaltClon('super_admin', 'productor', RECEPTOR)
+  const m = motiuSaltClon('super_admin', 'equip', 'productor', RECEPTOR)
   test.skip(m !== null, m ?? '')
   test.skip(info.project.name !== 'escriptori', 'escriu al clon: una sola passada')
 })
@@ -50,7 +50,7 @@ test('el super_admin dona per vigent el conveni d’una receptora des de la seva
   await expect(page.getByText(/declarat \(sense signatura\)|declarado \(sin firma\)/).first()).toBeVisible()
 })
 
-test('des del detall de l’oferta: copia i marca enviada, registra l’interès i l’aprova', async ({ page, context }) => {
+test('des del detall de l’oferta: copia i marca enviada, registra l’interès i l’aprova', async ({ page, context, browser }) => {
   const prod = productorDe('productor')
   const ent = entidadDe(RECEPTOR)
   // Albaranes viejos de esta receptora con el enlace sin usar la bloquean (G1): no es lo que se prueba.
@@ -66,6 +66,8 @@ test('des del detall de l’oferta: copia i marca enviada, registra l’interès
   await entra(page, 'super_admin')
   await page.goto(`/equip/ofertes/${oferta}`)
 
+  // Las entidades priorizadas van plegadas (puntos 4-6, fase 2): se abren para copiar.
+  await page.getByTestId('od-ranking').locator('summary').click()
   // «Copia i marca com a enviada»: no sale nada; queda la fila con canal manual.
   const copia = page.getByRole('button', { name: /Copia i marca com a enviada|Copia y marca como enviada/ }).first()
   await expect(copia).toBeVisible({ timeout: 30_000 })
@@ -74,17 +76,25 @@ test('des del detall de l’oferta: copia i marca enviada, registra l’interès
     .toBe('1')
   await expect.poll(() => page.evaluate(() => navigator.clipboard.readText())).toBe('[E2E] Avellana')
 
-  // «Registra l'interès»: el mismo formulario y las mismas guardas que el Mercat.
-  const form = page.locator('#od-interes')
+  // «Registra l'interès» (nivel 2): lo hace el TÉCNICO, en su propia sesión. Quien puede aprobar
+  // ya no ve este botón sino «Registrar i confirmar recollida», que asigna en un acto
+  // (`assignacio-directa.e2e.ts`). El mismo formulario y las mismas guardas que el Mercat.
+  const ctxTec = await browser.newContext({ baseURL: test.info().project.use.baseURL })
+  const tec = await ctxTec.newPage()
+  await entra(tec, 'equip')
+  await tec.goto(`/equip/ofertes/${oferta}`)
+  const form = tec.locator('#od-interes')
   // Un buscador (19-11-2026): se escribe el nombre y se toca la sugerencia de esa entidad.
   await triaCercador(form.locator('#od-interes-entitat'), sql(`select nombre from entidades where id = '${ent}'`), ent)
   await form.locator('#od-interes-kg').fill('50')
   await form.getByRole('button', { name: /Registra l’interès|Registra el interés/ }).click()
-  await expect(page.getByText(/Interès registrat|Interés registrado/)).toBeVisible()
+  await expect(tec.getByText(/Interès registrat|Interés registrado/)).toBeVisible()
+  await ctxTec.close()
   await expect.poll(() => sql(`select canal || ':' || estado || ':' || aprovacio || ':' || (kg_solicitados = 50)
     from oferta_respuestas where excedente_id = '${oferta}' and entidad_id = '${ent}'`)).toBe('asistido:acceptada:pendent:true')
 
-  // Y se aprueba con el formulario compartido: nace la canalización con lo aprobado.
+  // Y el super_admin lo aprueba con el formulario compartido: nace la canalización con lo aprobado.
+  await page.reload()
   await page.getByRole('button', { name: /Aprovar i canalitzar|Aprobar y canalizar/ }).click()
   await expect(page.getByText(/Oferta aprovada i convertida en canalització|aprobada y convertida/)).toBeVisible()
   await expect.poll(() => sql(`select (kg_confirmados = 50) || ':' || valorizacion from canalizaciones where excedente_id = '${oferta}'`))

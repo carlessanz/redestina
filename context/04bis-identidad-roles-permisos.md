@@ -654,6 +654,37 @@ Triggers de respaldo nuevos: `documentos_firma_substituida` (rechaza sola la fir
 versión sustituida), `firmes_document_avis` (aviso al cerrar), `documentos_esborra_enllacos_firma`.
 Arnés: bloques `FIRMA_SERVIDOR` y `FIRMA_EXTERN`; `filasExactas` para las colas de `pendents_equip` (18 desde D1, `20270531100000`).
 
+## Asignación en un acto, modificar y anular (19-11-2026, fase 2 de los puntos 4-6)
+
+Migraciones `20270606100000` (B1), `20270606100100` (B2) y `20270607100000` (A1). Dos flujos sobre las mismas
+tablas: **nivel 1**, el equipo asigna en un acto; **nivel 2**, la entidad muestra interés y el admin aprueba
+(`aprovar_resposta`, sin cambios de flujo). Todas devuelven la fila de `canalizaciones` y exigen `pot_aprovar()`
+(`42501`; el `tecnic` no puede); los errores de negocio son `22023` con el código en el mensaje.
+
+| RPC | Qué hace | Códigos |
+| --- | --- | --- |
+| `assignar_directe(excedente, entidad, kg, modalitat, recollida, caixes, preu, preu_acceptat, motiu)` | Interés + aprobación + canalización confirmada en una transacción (`oferta_respuestas.assignacio_directa = true`, `canal='asistido'`, `aprovat_per`). No pasa por Aprovacions. Si la respuesta de esa entidad estaba rechazada, la reabre | los de `comprova_interes` (`entitat_inactiva`, `cal_modalitat`, `kg_maxim`…), `sense_conveni` (42501), `cal_preu_acordat`, `cal_preu_acceptat`, `preu_invalid` (solo venta), `ja_assignada`, `hora_passada` |
+| `modificar_assignacio(canalizacion, kg, recollida)` | Kg y/o hora antes de registrar la recogida y con el ENT/OPE en borrador; ajusta líneas, `kg_aprovats`, `recollida_at`; si cambia la hora, `registre_demanat_at = null` | `cal_canvi`, `canalitzacio_inexistent`, `canalitzacio_anulada`, `ja_registrada`, `albara_emes`, `kg_maxim`, `hora_passada` |
+| `anular_assignacio(canalizacion, motiu)` | Por la interna `anula_canalitzacio`: canalización `anulada` (`anulada_at/_per`, `motiu_anulacio`), respuesta `rebutjada` («anul·lada: …»), ENT/OPE anulados, aviso `assignacio_anulada` a las dos partes (params `producte, kg, motiu, entitat, excedente_id`; sin `interes_rebutjat`), estado recalculado | `cal_motiu`, `canalitzacio_anulada`, `ja_validada` |
+| `fixar_preu_acordat(canalizacion, preu, acceptat)` | Precio acordado de una venta ya asignada; sin `acceptat` borra la aceptación anterior | `no_es_venda`, `ja_validada`, `preu_invalid` |
+| `aprovar_resposta(…, p_preu_acceptat)` | Siete argumentos (drop + create); con nombre, las llamadas de seis siguen valiendo. Rellena `aprovat_per` y, en venta, el precio acordado; en maquila `preu_ofert` queda null. Guarda sin salida para `service_role` (acto con autor) | los de siempre + `preu_invalid`, `cal_preu_acordat` |
+
+- **Estado de la oferta: una sola fuente**, `recalcula_estat_excedent(uuid)` (interna): todo con destino y nada
+  abierto → `cerrada`; todo con destino y algo abierto → `bloqueada`; algo vivo o destino externo → `parcial`; si no,
+  `publicada`. Solo sobre `publicada/parcial/bloqueada`; **las anuladas no cuentan** (antes sumaban y una `bloqueada`
+  no volvía a `parcial`). La llaman aprobar, asignar, modificar, anular y `editar_oferta`.
+- **Precio en venta** (`canalizaciones.preu_acordat_kg`, `preu_acceptat_at/_per`; checks: solo venta, aceptación con
+  precio). **Maquila sin precio** en `comprova_interes`, `manifestar_interes[_assistit]` (deuda 180 cerrada).
+- **Protección**: trigger `canalizaciones_protegeix_assignacio` (anulación y `preu_*` solo con la marca
+  `redestina.escriu_assignacio`, sin sesión o en un traspaso de autoría); `trg_respuestas_control_aprovacio` exige
+  `pot_aprovar` para `aprovat_per`/`assignacio_directa`.
+- **`anular_albaran`** sobre un ENT/OPE de canalización viva **anula la asignación** (misma interna); un ENT
+  `confirmado` ya no se anula (`ja_validada`); el REC, como antes.
+- **`canalitzacions_actives`**: sin anuladas en las sumas, `rec_estado` = el REC vivo menos avanzado y **sin las
+  `cerrada`**.
+- Arnés: bloques `ASSIGNACIO_*` (internas denegadas a todos; técnico deniega las cuatro RPC y `aprovar_resposta`;
+  super_admin con `errorExigit: "22023"`; lectura de las columnas nuevas por productor y receptor).
+
 ## Familias de RPC que el canónico ya no enumera (movidas de `AGENTS.md` el 02-11-2026, 1E)
 
 ### Lista de familias movida de `AGENTS.md` (10-11-2026, A1, para hacer sitio)

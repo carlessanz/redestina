@@ -26,13 +26,15 @@ export type TipusAvis =
   | "certificat_per_revisar"
   | "recollida_per_registrar"
   | "recollida_retornada"
-  | "document_signat";
+  | "document_signat"
+  // 19-11-2026 (fase 2 de los puntos 4-6): el equipo anula una asignación antes de la recogida.
+  | "assignacio_anulada";
 
 export const TIPUS_AVIS: readonly TipusAvis[] = [
   "oferta_validada", "oferta_rebutjada", "sortida_trobada", "interes_aprovat", "interes_rebutjat",
   "oferta_sense_desti", "recollida_canviada", "kg_assignats_canviats", "recollida_confirmada",
   "oferta_modificada", "oferta_enviada", "certificat_per_revisar", "recollida_per_registrar",
-  "recollida_retornada", "document_signat",
+  "recollida_retornada", "document_signat", "assignacio_anulada",
 ];
 
 /** El nombre del documento por su sigla, para los avisos del circuito de firma. */
@@ -124,6 +126,27 @@ export function textAvis(
         cuerpo: es
           ? `La recogida de ${producte} ahora es ${q || "en otra fecha"}.`
           : `La recollida ${deProducte(producte)} ara és ${q || "en una altra data"}.`,
+        boton: botoParts,
+        ruta: rutaParts,
+      };
+    }
+    case "assignacio_anulada": {
+      // Va a las dos partes; `entitat` solo se nombra al productor (a la entidad, «la teva»).
+      const motiu = s(params.motiu);
+      const entitat = s(params.entitat);
+      const quilos = params.kg != null && params.kg !== "" ? ` (${kg(params.kg, idioma)} kg)` : "";
+      const aQui = destinatari === "productor" && entitat ? ` a ${entitat}` : "";
+      return {
+        asunto: es ? `Asignación anulada: ${producte}` : `Assignació anul·lada: ${producte}`,
+        titulo: es ? "Asignación anulada" : "Assignació anul·lada",
+        cuerpo: (destinatari === "productor"
+          ? (es
+            ? `El equipo de Redestina ha anulado la asignación de ${producte}${aQui}${quilos}. Los kilos vuelven a estar disponibles.`
+            : `L’equip de Redestina ha anul·lat l’assignació ${deProducte(producte)}${aQui}${quilos}. Els quilos tornen a estar disponibles.`)
+          : (es
+            ? `El equipo de Redestina ha anulado tu asignación de ${producte}${quilos}: ya no hace falta que pases a recogerla.`
+            : `L’equip de Redestina ha anul·lat la teva assignació ${deProducte(producte)}${quilos}: ja no cal que passis a recollir-la.`))
+          + (motiu ? `\n${es ? "Motivo" : "Motiu"}: ${motiu}` : ""),
         boton: botoParts,
         ruta: rutaParts,
       };

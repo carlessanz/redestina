@@ -14,6 +14,13 @@
 // Lo usan el ciclo guiado (`CanalitzacioDetall`, fase 4) y el detalle de la oferta
 // (`OfferDetail`), donde sustituye a los atajos que escribían directo en `canalizaciones` y
 // `oferta_respuestas` (deuda §12.109).
+//
+// DOS NIVELES (puntos 4-6, fase 2, 20270607100000). Quien puede aprobar (`pot_aprovar()`:
+// admin o super_admin) registra y confirma en UN acto con `assignar_directe()`: el botón dice
+// «Registrar i confirmar recollida» y no queda nada en Aprovacions. En VENTA pide además el
+// precio ACORDADO y que el ofertante lo ha aceptado (los dos obligatorios, la base también
+// los exige); en maquila y donación no hay precio. El técnico conserva el flujo de siempre:
+// «Registra l'interès» → `manifestar_interes_assistit()` → lo aprueba un admin (nivel 2).
 
 import { useEffect, useMemo, useState } from 'react'
 import { toast } from 'sonner'
@@ -25,18 +32,24 @@ import { isoRecollida } from '../../lib/franja'
 import { modalitatsDelTipus, modalitatsOferta, modalitatsPossibles } from '../../lib/modalitats'
 import { clauErrorInteres } from '../../lib/ofertes'
 import { modalitatsDeLaNaturalesa } from '../../lib/naturalesa'
-import { interesAssistit } from '../../lib/canalitzacio'
+import { assignarDirecte, interesAssistit } from '../../lib/canalitzacio'
+import { comprovaConvenis } from '../../lib/aprovarResposta'
 import type { Excedente, Modalitat } from '../../types'
 import SelectorModalitat from '../SelectorModalitat'
 import CampsRecollida from '../CampsRecollida'
 import SelectorEntitat from '../SelectorEntitat'
 import { opcioFitxa } from '../../lib/opcionsSelector'
+import { FilaCasella } from '../Casella'
+import { useConfirma } from '../DialegConfirma'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 export type OfertaInteres = Pick<Excedente, 'id' | 'modalitat' | 'kg_total' | 'preu_minim' | 'disponible_hasta'>
-  & Partial<Pick<Excedente, 'modalitats' | 'hora_recollida_inici' | 'hora_recollida_fi'>>
+  & Partial<Pick<Excedente, 'modalitats' | 'hora_recollida_inici' | 'hora_recollida_fi' | 'productor_id'>>
+
+/** Códigos de `assignar_directe()` que traduce `textError()` (antes que `clauErrorInteres()`). */
+const CODIS_DIRECTE = /^(cal_preu_acordat|cal_preu_acceptat|preu_invalid|ja_assignada|hora_passada)/
 
 interface EntitatTria {
   id: string
@@ -57,12 +70,22 @@ interface Props {
   idPrefix: string
   /** La entidad preseleccionada (p. ej. la de una fila «pendent» de las respuestas). */
   entitatInicial?: string
+  /**
+   * Quien lo usa puede aprobar (`pot_aprovar()`): asigna en un acto (`assignar_directe`).
+   * Sin él, registra el interés y lo aprueba un admin (nivel 2).
+   */
+  potAprovar: boolean
+  /** Lo que falta por cubrir: al asignar de más se pregunta (como al aprobar). */
+  faltan?: number
   /** Tras registrar: la pantalla relee las respuestas. */
   onFet?: () => void
 }
 
-export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInicial = '', onFet }: Props) {
+export default function FormulariInteresAssistit({
+  oferta, idPrefix, entitatInicial = '', potAprovar, faltan, onFet,
+}: Props) {
   const { t } = useT()
+  const { confirma, dialeg } = useConfirma()
   const [entitats, setEntitats] = useState<EntitatTria[]>([])
   /** `modalitat_receptor_compat`; `null` = no se pudo leer (no se filtra: decide la base). */
   const [matriu, setMatriu] = useState<{ modalitat: string; tipo_receptor: string }[] | null>(null)
@@ -73,6 +96,8 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
   const [modalitat, setModalitat] = useState<Modalitat | ''>('')
   const [preu, setPreu] = useState(oferta.preu_minim != null ? String(oferta.preu_minim) : '')
   const [caixes, setCaixes] = useState('')
+  // Venta en un acto: el ofertante ha aceptado el precio acordado (obligatorio).
+  const [acceptat, setAcceptat] = useState(false)
   const [dia, setDia] = useState('')
   const [hora, setHora] = useState('')
   const [ocupat, setOcupat] = useState(false)
@@ -114,9 +139,11 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
     return perNat ? perTipus.filter((m) => perNat.includes(m)) : perTipus
   }, [oferta, triadaEnt, matriu, reglaNat])
   const triada: Modalitat | '' = modalitat && mods.includes(modalitat) ? modalitat : mods.length === 1 ? mods[0] : ''
-  // El precio, solo si la entrega ELEGIDA lleva precio: una donación no lo tiene aunque la
-  // oferta también se ofrezca en venta.
-  const ambPreuTriat = triada === 'venda' || triada === 'maquila'
+  // El precio, solo si la entrega ELEGIDA es una venta: una donación no lo tiene aunque la
+  // oferta también se ofrezca en venta, y la maquila tampoco (deuda 180, 20270607100000).
+  const ambPreuTriat = triada === 'venda'
+  // En un acto, la venta exige además la aceptación del ofertante.
+  const calAcceptat = potAprovar && ambPreuTriat
   const senseCompat = triadaEnt !== null && mods.length === 0
 
   function canviaEntitat(v: string) {
@@ -133,6 +160,7 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
     }
     if (mods.length > 1 && !triada) { toast.error(t('mk.need_mode')); return }
     if ((dia && !hora) || (!dia && hora)) { toast.error(t('mk.need_dia_hora')); return }
+    if (potAprovar) { await assigna(nKg); return }
     setOcupat(true)
     const r = await interesAssistit({
       excedenteId: oferta.id,
@@ -152,15 +180,65 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
       return
     }
     toast.success(t('canalz.ok_interes'))
-    setEntitat(''); setKg(''); setModalitat(''); setCaixes(''); setDia(''); setHora('')
+    buida()
+    onFet?.()
+  }
+
+  function buida() {
+    setEntitat(''); setKg(''); setModalitat(''); setCaixes(''); setDia(''); setHora(''); setAcceptat(false)
     setPreu(oferta.preu_minim != null ? String(oferta.preu_minim) : '')
+  }
+
+  /** Nivel 1: interés + aprobación + canalización confirmada, en un acto. */
+  async function assigna(nKg: number) {
+    const nPreu = ambPreuTriat && preu.trim() !== '' ? Number(preu.replace(',', '.')) : null
+    if (ambPreuTriat && (nPreu == null || Number.isNaN(nPreu) || nPreu < 0)) { toast.error(t('asg.err_cal_preu')); return }
+    if (calAcceptat && !acceptat) { toast.error(t('asg.err_cal_acceptat')); return }
+    // Aviso no bloqueante, igual que al aprobar: asignar más de lo que falta puede ser querido.
+    if (faltan != null && nKg > faltan && !(await confirma({
+      titol: t('od.over_alloc_t'),
+      descripcio: t('od.over_alloc', { n: fmtKg(faltan) }),
+    }))) return
+    // Los convenios, antes: desde la fecha de corte la base corta con `sense_conveni`.
+    const perConveni = { modalitat: triada || oferta.modalitat, productor_id: oferta.productor_id ?? null }
+    const falta = await comprovaConvenis(perConveni, entitat, t)
+    if (falta && !(await confirma({
+      titol: t('od.conv_missing_t'),
+      descripcio: t('od.conv_missing', { parts: falta }),
+    }))) return
+
+    setOcupat(true)
+    const r = await assignarDirecte({
+      excedenteId: oferta.id,
+      entitatId: entitat,
+      kg: nKg,
+      modalitat: triada || null,
+      recollida: isoRecollida(dia, hora),
+      caixes: caixes.trim() !== '' ? Number(caixes) : null,
+      preu: nPreu,
+      preuAcceptat: calAcceptat && acceptat,
+    })
+    setOcupat(false)
+    if (!r.ok) {
+      // A quién le falta el convenio, si es eso (el genérico mandaba a mirar la ficha equivocada).
+      if (r.missatge.includes('sense_conveni')) {
+        const qui = await comprovaConvenis(perConveni, entitat, t)
+        if (qui) { toast.error(t('od.conv_missing', { parts: qui })); return }
+      }
+      if (CODIS_DIRECTE.test(r.missatge)) { toast.error(textError(t, r)); return }
+      const e = clauErrorInteres(r.missatge)
+      toast.error(e.clau === 'c.error' ? textError(t, r) : t(e.clau, e.vars))
+      return
+    }
+    toast.success(t('asg.ok'))
+    buida()
     onFet?.()
   }
 
   return (
     <div className="space-y-3 rounded-md border p-3">
-      <p className="text-sm font-medium">{t('canalz.interes_title')}</p>
-      <p className="text-xs text-muted-foreground">{t('canalz.interes_hint')}</p>
+      <p className="text-sm font-medium">{t(potAprovar ? 'asg.titol' : 'canalz.interes_title')}</p>
+      <p className="text-xs text-muted-foreground">{t(potAprovar ? 'asg.hint' : 'canalz.interes_hint')}</p>
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <div className="sm:col-span-2">
           <Label htmlFor={`${idPrefix}-entitat`} className="mb-1.5 block text-xs text-muted-foreground">
@@ -203,7 +281,7 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
         {ambPreuTriat && (
           <div>
             <Label htmlFor={`${idPrefix}-preu`} className="mb-1.5 block text-xs text-muted-foreground">
-              {t('canalz.interes_preu')}
+              {t(potAprovar ? 'asg.preu_acordat' : 'canalz.interes_preu')}
             </Label>
             <Input id={`${idPrefix}-preu`} name="preu" type="number" min="0" step="0.01" inputMode="decimal"
               placeholder={oferta.preu_minim != null ? String(oferta.preu_minim) : undefined}
@@ -219,17 +297,23 @@ export default function FormulariInteresAssistit({ oferta, idPrefix, entitatInic
         </div>
       </div>
 
+      {calAcceptat && (
+        <FilaCasella checked={acceptat} onChange={setAcceptat}>{t('asg.preu_acceptat')}</FilaCasella>
+      )}
+
       <CampsRecollida idPrefix={idPrefix} dia={dia} hora={hora} onDia={setDia} onHora={setHora}
         disponibleFins={oferta.disponible_hasta} inici={oferta.hora_recollida_inici} fi={oferta.hora_recollida_fi}
-        ajuda={t('canalz.interes_rec_help')} />
+        ajuda={t(potAprovar ? 'asg.rec_help' : 'canalz.interes_rec_help')} />
 
       <Button
         className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
-        disabled={ocupat || !entitat || kg.trim() === '' || senseCompat || (ambPreuTriat && preu.trim() === '')}
+        disabled={ocupat || !entitat || kg.trim() === '' || senseCompat || (ambPreuTriat && preu.trim() === '')
+          || (calAcceptat && !acceptat)}
         onClick={() => void registra()}
       >
-        {t('canalz.b_interes_assistit')}
+        {t(potAprovar ? 'asg.b_assignar' : 'canalz.b_interes_assistit')}
       </Button>
+      {dialeg}
     </div>
   )
 }

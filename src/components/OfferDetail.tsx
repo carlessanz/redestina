@@ -40,6 +40,7 @@ import DialegEdicioOferta from './DialegEdicioOferta'
 import FitxaOferta from './FitxaOferta'
 import FormulariInteresAssistit from './equip/FormulariInteresAssistit'
 import FormulariAprovacio from './equip/FormulariAprovacio'
+import AccionsAssignacio, { PreuAcordat } from './equip/AccionsAssignacio'
 import CertificatOferta from './equip/CertificatOferta'
 import { registrarEnviamentManual } from '../lib/canalitzacio'
 import { ambPreu, modalitatsOferta, textModalitats } from '../lib/modalitats'
@@ -175,11 +176,11 @@ export default function OfferDetail({ excedente, onBack }: Props) {
   // Alguna de las lecturas de la ficha falló. Se conserva lo último que se leyó (no se pinta
   // «sin canalizaciones» por un error de red) y se avisa encima.
   const [errorCarrega, setErrorCarrega] = useState(false)
-  const canalizados = canalizaciones.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
-  // Para el destino final (fase 1 de la revisión del 08-10-2026): las anuladas no cuentan,
-  // igual que en `desti_excedent()`.
+  // Las anuladas no cuentan en ningún sitio: ni en lo canalizado, ni en lo que falta, ni en el
+  // destino final (igual que `desti_excedent()` y `recalcula_estat_excedent()` en la base).
   const vives = canalizaciones.filter((c) => c.estado !== 'anulada')
   const kgVives = vives.reduce((s, c) => s + Number(c.kg_confirmados ?? 0), 0)
+  const canalizados = kgVives
   const total = Number(exc.kg_total ?? 0)
   const faltan = Math.max(0, total - canalizados)
 
@@ -574,7 +575,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     void refrescaComptadors()
   }
 
-  const nombrePorId = (id: string | null) => ranking.find((e) => e.id === id)?.nombre ?? id ?? '—'
+  // El nombre: del ranking o, si no está (una asignación directa a otra entidad), de su respuesta.
+  const nombrePorId = (id: string | null) => ranking.find((e) => e.id === id)?.nombre
+    ?? respuestas.find((r) => r.entidad_id === id)?.entidades?.nombre ?? id ?? '—'
   // Solo una oferta publicada (o a medias) admite todavía interés: es lo que comprueba
   // `manifestar_interes()`. Fuera de esos dos estados, enviarla no tiene sentido.
   const ofertaOberta = exc.estado === 'publicada' || exc.estado === 'parcial'
@@ -720,6 +723,24 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             <ValidacioOferta excedenteId={exc.id} potAprovar={potAprovar} onFet={recargar} />
           )}
 
+          {/* Asignar es «lo que toca ahora» mientras la oferta está abierta: va aquí arriba, no al
+              final de la ficha (puntos 4-6, fase 2). Quien puede aprobar asigna en un acto
+              (`assignar_directe`); el técnico registra el interés y lo aprueba un admin. Mismas
+              guardas que el Mercat (§12.109). */}
+          {ofertaOberta && (
+            <div id="od-interes" className="scroll-mt-20">
+              <FormulariInteresAssistit
+                key={entitatInteres}
+                oferta={exc}
+                idPrefix="od-interes"
+                entitatInicial={entitatInteres}
+                potAprovar={potAprovar}
+                faltan={faltan}
+                onFet={() => { setEntitatInteres(''); void trasAprovacio() }}
+              />
+            </div>
+          )}
+
           {/* Lo que el productor ha cambiado de la oferta y nadie del equipo ha revisado
               (fase 2 de la revisión del 08-10-2026; cola `ofertes_modificades`). */}
           <CanvisOferta excedenteId={exc.id} />
@@ -811,9 +832,13 @@ export default function OfferDetail({ excedente, onBack }: Props) {
       <FitxaOferta oferta={exc} ambCost vencida={vencida} etiquetaCopiar={t('od.copy_group')}
         onEdita={editable ? () => setEditant(true) : undefined} />
 
+      {/* Las entidades priorizadas, plegadas por defecto (mismo patrón que los mensajes): con la
+          asignación arriba, el ranking es una consulta, no el primer paso. */}
       <Card>
-        <CardHeader><CardTitle className="text-base">{t('od.prioritized')}</CardTitle></CardHeader>
-        <CardContent className="space-y-2">
+        <CardContent className="pt-6">
+          <details data-testid="od-ranking">
+            <summary className="cursor-pointer font-titulos text-base font-semibold">{t('od.prioritized')}</summary>
+            <div className="mt-3 space-y-2">
           {cargandoRanking && <p className="text-sm text-muted-foreground">{t('od.calculating')}</p>}
           {/* El texto de `priorizarEntidades` va en castellano escrito a mano o crudo del
               servidor: la pantalla dice lo suyo, traducido. */}
@@ -970,6 +995,8 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               {t('od.more', { n: Math.min(PAS_RANKING, rankingFiltrat.length - mostrats), total: rankingFiltrat.length })}
             </Button>
           )}
+            </div>
+          </details>
         </CardContent>
       </Card>
 
@@ -1016,7 +1043,7 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                       setEntitatInteres(r.entidad_id!)
                       document.getElementById('od-interes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
                     }}>
-                    {t('canalz.b_interes_assistit')}
+                    {t(potAprovar ? 'asg.b_assignar' : 'canalz.b_interes_assistit')}
                   </Button>
                 )}
                 {r.estado === 'acceptada' && r.aprovacio === 'pendent' && (
@@ -1040,21 +1067,6 @@ export default function OfferDetail({ excedente, onBack }: Props) {
               </div>
             )
           })}
-
-          {/* «Registra l'interès»: el mismo formulario asistido del ciclo guiado, con las
-              mismas guardas que el Mercat. Sustituye al alta directa de canalizaciones que
-              había aquí abajo, que se saltaba modalidad, convenio, precio y hora (§12.109). */}
-          {ofertaOberta && (
-            <div id="od-interes" className="scroll-mt-20 pt-2">
-              <FormulariInteresAssistit
-                key={entitatInteres}
-                oferta={exc}
-                idPrefix="od-interes"
-                entitatInicial={entitatInteres}
-                onFet={() => { setEntitatInteres(''); void recargarRespuestas(); void refrescaComptadors() }}
-              />
-            </div>
-          )}
         </CardContent>
       </Card>
 
@@ -1064,10 +1076,25 @@ export default function OfferDetail({ excedente, onBack }: Props) {
           {canalizaciones.length === 0 && <p className="text-sm text-muted-foreground">{t('od.none_yet')}</p>}
           {canalizaciones.map((c) => {
             const difiere = c.kg_reales != null && Number(c.kg_reales) !== Number(c.kg_confirmados)
+            // Una anulada se queda a la vista, tachada y con su motivo, pero no suma (arriba).
+            const anulada = c.estado === 'anulada'
+            // `canalizaciones` se lee con `*`: las fechas de la recogida ya vienen en la fila.
+            const fila = c as Canalizacion & DatesValidacio
             return (
-              <div key={c.id} className="flex flex-wrap items-center gap-3 border-b pb-2 text-sm">
-                <span className="font-medium">{nombrePorId(c.entidad_id)}</span>
-                <span>{c.kg_confirmados} kg</span>
+              <div key={c.id} data-testid="od-canalitzacio"
+                className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b pb-2 text-sm">
+                <span className={`font-medium ${anulada ? 'text-muted-foreground' : ''}`}>{nombrePorId(c.entidad_id)}</span>
+                <span className={anulada ? 'text-muted-foreground line-through' : ''}>{kgCa(Number(c.kg_confirmados ?? 0))} kg</span>
+                {anulada && (
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-xs font-medium text-muted-foreground">{t('asg.anulada')}</span>
+                )}
+                {anulada && c.motiu_anulacio && (
+                  <span className="min-w-0 break-words text-xs text-muted-foreground">{c.motiu_anulacio}</span>
+                )}
+                {!anulada && c.data_hora_recollida && (
+                  <span className="text-xs text-muted-foreground">{t('appr.recollida')}: {fechaCorta(c.data_hora_recollida)}</span>
+                )}
+                {!anulada && <PreuAcordat c={fila} />}
                 {/* Los kilos reales ya no se teclean aquí: los fija la recogida (registrada y
                     validada) y la base protege la columna. Se enseñan, nada más. */}
                 {c.kg_reales != null && (
@@ -1090,7 +1117,19 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                       </Link>
                     </Button>
                   )
-                  : <span className="text-xs text-muted-foreground">{t('od.albara_pending')}</span>}
+                  : !anulada && <span className="text-xs text-muted-foreground">{t('od.albara_pending')}</span>}
+                {!anulada && (
+                  <div className="ml-auto flex items-center gap-1">
+                    <AccionsAssignacio
+                      c={fila}
+                      estatsAlbarans={albarans.filter((a) => a.canalizacion_id === c.id).map((a) => a.estado)}
+                      kgMaxim={exc.kg_total}
+                      potAprovar={potAprovar}
+                      idPrefix={`od-asg-${c.id}`}
+                      onFet={() => void trasAprovacio()}
+                    />
+                  </div>
+                )}
               </div>
             )
           })}

@@ -21,6 +21,8 @@ export type TipusAvis =
   | 'recollida_retornada'
   // 05-11-2026 (circuito de firma): la firma de un documento de la organización quedó cerrada.
   | 'document_signat'
+  // 19-11-2026 (puntos 4-6, fase 2): el equipo anula una asignación antes de la recogida.
+  | 'assignacio_anulada'
 
 export interface Avis {
   id: string

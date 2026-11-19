@@ -5,13 +5,23 @@
 // Aprovacions y el detalle de la oferta, y CON EL CONVENIO DE CADA RECEPTORA al lado:
 // `aprovar_resposta()` lo exige desde la fecha de corte (42501 `sense_conveni`), así que los
 // botones que lo resuelven viven en la misma fila.
+//
+// Puntos 4-6, fase 2: quien puede aprobar asigna en un acto desde el mismo formulario
+// («Registrar i confirmar recollida», `assignar_directe`), y debajo están las asignaciones
+// vivas con «Modifica», «Anul·la l'assignació» y el precio acordado de las ventas: los mismos
+// componentes que la ficha de la oferta (`AccionsAssignacio`).
 
+import { useEffect, useState } from 'react'
+import { supabase } from '../../../lib/supabase'
 import { useT } from '../../../lib/i18n'
+import { kg as fmtKg } from '../../../lib/format'
 import { cn } from '../../../lib/utils'
 import type { ConvenioTipo } from '../../../types'
 import MissatgesDelPunt from '../../MissatgesDelPunt'
 import FormulariAprovacio from '../FormulariAprovacio'
 import FormulariInteresAssistit from '../FormulariInteresAssistit'
+import AccionsAssignacio, { PreuAcordat } from '../AccionsAssignacio'
+import type { AssignacioFila } from '../AccionsAssignacio'
 import { Badge } from '@/components/ui/badge'
 import AccionsConveni from './AccionsConveni'
 import type { ContextFase } from './tipus'
@@ -40,8 +50,11 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
   return (
     <div className="space-y-3">
       {oferta && (
-        <FormulariInteresAssistit oferta={oferta} idPrefix="cd-interes" onFet={c.onCanvi} />
+        <FormulariInteresAssistit oferta={oferta} idPrefix="cd-interes"
+          potAprovar={c.potAprovar} faltan={faltan} onFet={c.onCanvi} />
       )}
+
+      <AssignacionsVives c={c} />
 
       {pendents.map((r) => {
         const cv = r.conveni_rec
@@ -103,6 +116,63 @@ export default function FaseAprovacio({ c }: { c: ContextFase }) {
       })}
 
       <MissatgesDelPunt missatges={c.missatges} fase="aprovacio" />
+    </div>
+  )
+}
+
+/** Una asignación viva con lo que hace falta para sus acciones (fila de `canalizaciones`). */
+type FilaAssignacio = AssignacioFila & { entidad_id: string | null }
+
+/**
+ * Las asignaciones vivas del lote con «Modifica», «Anul·la l'assignació» y el precio acordado.
+ * `canalitzacio_assistida()` no trae el precio acordado: se leen aquí, de la tabla, cada vez que
+ * el orquestador relee el lote (`extra.canalitzacions` cambia de identidad).
+ */
+function AssignacionsVives({ c }: { c: ContextFase }) {
+  const { t } = useT()
+  const { extra, oferta } = c
+  const ofertaId = extra.oferta.id
+  const [files, setFiles] = useState<FilaAssignacio[]>([])
+
+  useEffect(() => {
+    let viu = true
+    void (async () => {
+      // ⚠️ La lista de columnas en UN literal (§7).
+      const { data, error } = await supabase.from('canalizaciones')
+        .select('id, estado, entidad_id, kg_confirmados, data_hora_recollida, valorizacion, recollida_registrada_at, recollida_validada_at, preu_acordat_kg, preu_acceptat_at')
+        .eq('excedente_id', ofertaId).neq('estado', 'anulada').order('created_at', { ascending: true })
+      if (!viu) return
+      if (error) { console.warn('AssignacionsVives:', error.message); return }
+      setFiles((data ?? []) as FilaAssignacio[])
+    })()
+    return () => { viu = false }
+  }, [ofertaId, extra.canalitzacions])
+
+  if (files.length === 0) return null
+  const nomDe = (id: string | null) => extra.canalitzacions.find((x) => x.entidad_id === id)?.entitat
+    ?? extra.respostes.find((r) => r.entidad_id === id)?.entitat ?? '—'
+
+  return (
+    <div className="space-y-2 rounded-md border p-2" data-testid="cd-assignacions">
+      <p className="text-sm font-medium">{t('od.channelings')}</p>
+      {files.map((f) => (
+        <div key={f.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b pb-2 text-sm last:border-b-0 last:pb-0">
+          <span className="min-w-0 font-medium">{nomDe(f.entidad_id)}</span>
+          <span className="tabular-nums">{fmtKg(f.kg_confirmados)} kg</span>
+          {f.valorizacion && <span className="text-xs text-muted-foreground">{t(`od.mod_${f.valorizacion}`)}</span>}
+          <PreuAcordat c={f} />
+          <div className="ml-auto flex items-center gap-1">
+            <AccionsAssignacio
+              c={f}
+              estatsAlbarans={extra.albarans.filter((a) => a.canalizacion_id === f.id).map((a) => a.estado)}
+              kgMaxim={oferta?.kg_total ?? null}
+              potAprovar={c.potAprovar}
+              idPrefix={`cd-asg-${f.id}`}
+              onFet={c.onCanvi}
+            />
+          </div>
+        </div>
+      ))}
     </div>
   )
 }

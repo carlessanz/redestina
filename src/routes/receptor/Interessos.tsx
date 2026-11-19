@@ -463,6 +463,8 @@ export function Historic() {
         .from('canalizaciones')
         .select('id, kg_confirmados, kg_reales, incidencia_recollida, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
+        // Una asignación anulada no es una recepción: fuera del histórico (puntos 4-6, fase 2).
+        .neq('estado', 'anulada')
         .order('created_at', { ascending: false })
         .overrideTypes<CanalAmbOferta[], { merge: false }>(),
       supabase

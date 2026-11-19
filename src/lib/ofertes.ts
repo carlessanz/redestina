@@ -571,11 +571,12 @@ export function clauErrorInteres(missatge: string | null | undefined): {
   return { clau: 'c.error' }
 }
 
-/** Kg ya canalizados por oferta, para pintar el progreso. */
+/** Kg ya canalizados por oferta, para pintar el progreso. Sin las anuladas (no cubren nada). */
 export async function kgPerOferta(ids: string[]): Promise<Record<string, number>> {
   if (ids.length === 0) return {}
   const { data } = await supabase
     .from('canalizaciones').select('excedente_id, kg_confirmados').in('excedente_id', ids)
+    .neq('estado', 'anulada')
   const acc: Record<string, number> = {}
   for (const c of (data ?? []) as Pick<Canalizacion, 'excedente_id' | 'kg_confirmados'>[]) {
     if (!c.excedente_id) continue

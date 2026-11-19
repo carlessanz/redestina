@@ -2626,3 +2626,26 @@ Filas 3.1.2 y 3.7 del Excel de la Fundació. Modelo en `context/04`; RPC en `con
   con las 1.000 filas de PostgREST con muchos envíos activos.
 - **Canalització** (`/equip/canalitzacio`) filtra las `cerrada` en cliente y enlaza a Ofertes › Històric; la RPC
   `canalitzacions_actives` no cambia (se tocará en la fase 2).
+
+### Asignación en un acto, Modifica y Anul·la (19-11-2026, fase 2 de los puntos 4-6)
+
+Dos flujos sobre las mismas RPC (`context/04bis`, «Asignación en un acto»):
+- **Nivel 1 (quien puede aprobar)**: `FormulariInteresAssistit` (prop `potAprovar`, `faltan`) titula «Assigna l’oferta»
+  y su botón es **«Registrar i confirmar recollida»** → `assignar_directe`. En **venta**, «Preu acordat (€/kg)» y la
+  casilla «L’ofertant ha acceptat el preu» son obligatorios (botón gris sin los dos); en maquila y donación no hay
+  precio. Avisa si se asigna más de lo que falta y comprueba convenios antes de llamar.
+- **Nivel 2**: el `tecnic` conserva «Registra l’interès» (`manifestar_interes_assistit`) y el admin aprueba en
+  Aprovacions; `FormulariAprovacio` pide precio solo en venta, con la aceptación opcional (`p_preu_acceptat`).
+- **Ficha de la oferta** (`OfferDetail`): el formulario sube a la tarjeta de «lo que toca ahora» (bajo `QueTocaAra`,
+  `#od-interes`); «Entitats prioritzades» va en un `<details>` plegado (`data-testid="od-ranking"`); en «Canalitzacions
+  assignades» cada fila (`od-canalitzacio`) lleva hora, precio acordado (`PreuAcordat`) y las acciones de
+  `components/equip/AccionsAssignacio.tsx`: **Modifica** (kg y fecha/hora; solo manda lo cambiado), **Fixa el preu
+  acordat** (venta) y **Anul·la l’assignació** (`DialegMotiu`, motivo obligatorio). Cada icono gris dice por qué
+  (`ja_registrada`, `albara_emes`, `ja_validada` o falta de permiso). Una anulada: kg tachados, «Anul·lada» y motivo.
+- **Ciclo guiado** (`fases/Aprovacio.tsx`): mismo formulario y `AssignacionsVives` con las mismas acciones (lee las
+  canalizaciones vivas; `canalitzacio_assistida()` no trae el precio).
+- **Sumas sin anuladas**: `Dashboard`, `kgPerOferta` (`lib/ofertes.ts`), `Espigolades`, Històric del receptor.
+- **Mercat**: el precio solo se pide en venta. **AlbaraDetall**: «Anul·la» gris en un ENT `confirmado` o con la
+  recogida validada; en un ENT/OPE vivo, el diálogo avisa de que anula también la asignación.
+- E2E: `tests/e2e/assignacio-directa.e2e.ts` (donación: asignar, modificar, anular; venta bloqueada sin precio o
+  aceptación) y `gestio-autonoma.e2e.ts` (el interés lo registra el técnico y lo aprueba el super_admin).

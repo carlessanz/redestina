@@ -257,6 +257,9 @@ export default function AlbaraDetall() {
   const fitxer = useRef<HTMLInputElement | null>(null)
 
   const [dialegAnullar, setDialegAnullar] = useState(false)
+  // Un ENT/OPE de una canalización VIVA: anularlo anula también la asignación (20270606100100),
+  // y si la recogida ya está validada la base se niega (`ja_validada`). `null` = no aplica.
+  const [assignacioViva, setAssignacioViva] = useState<{ validada: boolean } | null>(null)
   const [dialegRectificar, setDialegRectificar] = useState(false)
   const [dialegConciliar, setDialegConciliar] = useState(false)
   const [proposta, setProposta] = useState<PropostaConciliacio | null>(null)
@@ -350,14 +353,14 @@ export default function AlbaraDetall() {
     // ¿Es un albarán del flujo de recogida? ENT/OPE de una canalización que no viene de una
     // espigolada, o REC de una oferta (no de una jornada). La base lo impone igual
     // (`recollida_no_validada`); esto solo lo dice antes de pulsar.
-    type CanalValidacio = DatesValidacio & { id: string; excedentes: { espigolada_id: string | null } | null }
+    type CanalValidacio = DatesValidacio & { id: string; estado: string | null; excedentes: { espigolada_id: string | null } | null }
     const consultaVal = fila.tipo !== 'REC' && fila.canalizacion_id
       ? supabase.from('canalizaciones')
-        .select('id, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
+        .select('id, estado, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
         .eq('id', fila.canalizacion_id)
       : fila.tipo === 'REC' && fila.excedente_id && !fila.espigolada_id
         ? supabase.from('canalizaciones')
-          .select('id, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
+          .select('id, estado, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
           .eq('excedente_id', fila.excedente_id).neq('estado', 'anulada')
         : null
     if (consultaVal) {
@@ -366,9 +369,14 @@ export default function AlbaraDetall() {
       // Si la lectura falla (migración sin aplicar), no se apaga nada: manda la base.
       setFluxRecollida(!errVal && canals.length > 0 && canals.every((c) => !c.excedentes?.espigolada_id))
       setRecollidaPerValidar(!errVal && canals.some((c) => estatValidacio(c) === 'pendent_validacio'))
+      const propia = fila.tipo !== 'REC' && !errVal ? canals.find((c) => c.id === fila.canalizacion_id) : undefined
+      setAssignacioViva(propia && propia.estado !== 'anulada'
+        ? { validada: Boolean(propia.recollida_validada_at) || propia.estado === 'conciliada' }
+        : null)
     } else {
       setFluxRecollida(false)
       setRecollidaPerValidar(false)
+      setAssignacioViva(null)
     }
 
     // D2: el valor de las donaciones (el REC, todas las de su oferta; un ENT, la suya). Las
@@ -742,13 +750,18 @@ export default function AlbaraDetall() {
       : esBorrador ? 'alb.why_only_emitted'
         : 'alb.why_inactive')
 
+  // Un ENT/OPE confirmado (o de una recogida ya validada) de una asignación viva ya no se anula:
+  // la base lo rechaza con `ja_validada` (20270606100100). El botón ni se ofrece.
+  const sortidaValidada = assignacioViva !== null
+    && (assignacioViva.validada || albara.estado === 'confirmado')
   const potAnullar = potAprovar
-    && albara.estado !== 'anulado' && albara.estado !== 'conciliado'
+    && albara.estado !== 'anulado' && albara.estado !== 'conciliado' && !sortidaValidada
   const motiuAnullar = potAnullar
     ? undefined
     : t(!potAprovar ? 'alb.need_approver'
       : albara.estado === 'conciliado' ? 'alb.why_no_cancel'
-        : 'alb.why_already_cancelled')
+        : sortidaValidada ? 'asg.err_ja_validada'
+          : 'alb.why_already_cancelled')
 
   return (
     <div className="space-y-4">
@@ -1354,7 +1367,8 @@ export default function AlbaraDetall() {
 
       <DialegMotiu
         obert={dialegAnullar} onObert={setDialegAnullar}
-        titol={t('alb.cancel')} descripcio={t('alb.cancel_desc')}
+        titol={t('alb.cancel')}
+        descripcio={assignacioViva ? `${t('alb.cancel_desc')} ${t('alb.cancel_desc_assig')}` : t('alb.cancel_desc')}
         etiqueta={t('alb.reason')} confirmar={t('alb.cancel')}
         destructiu ocupat={ocupat} onConfirma={(m) => void anulla(m)}
       />

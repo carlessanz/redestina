@@ -1989,3 +1989,15 @@ cuando el producto sigue en el campo. Sin cambios de GRANT. `editar_oferta()` se
 `service_role`) con `hectarees` en la lista `permeses`: número > 0 (si no, `22023 hectarees_invalid`), redondeado a 2
 decimales. Las columnas `retorn_envasos_detall`/`retorn_envasos_quantitat` siguen existiendo pero el intake ya no las
 pide (deuda 188).
+
+### Asignación viva, anulación y precio acordado (19-11-2026, `20270606100000`…`20270607100000`)
+
+Fase 2 de los puntos 4-6 (RPC y códigos en `context/04bis`, «Asignación en un acto»).
+- `canalizaciones`: `anulada_at`, `anulada_per` (FK `auth.users`, set null), `motiu_anulacio`; en **venta**
+  `preu_acordat_kg` (≥ 0), `preu_acceptat_at`, `preu_acceptat_per`. Checks `canalizaciones_preu_acordat_check`,
+  `_preu_acordat_venda` (fuera de venta, null) y `_preu_acceptat_amb_preu`. Las escribe solo el camino de las RPC
+  (trigger `canalizaciones_protegeix_assignacio`).
+- `oferta_respuestas`: `aprovat_per` y `assignacio_directa` (true = nivel 1, `assignar_directe`).
+- `avisos_tipus_check` admite `assignacio_anulada`.
+- 🔴 **Una canalización `anulada` no cuenta para nada**: ni kg cubiertos, ni estado de la oferta
+  (`recalcula_estat_excedent`), ni `canalitzacions_actives`, ni las sumas de las pantallas.

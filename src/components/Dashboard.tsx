@@ -111,7 +111,8 @@ export default function Dashboard() {
       // Filas: los kg pendientes son `kg_total − canalizado` **por oferta**, así que hace
       // falta la pareja (id, kg_total) y no un recuento por estado.
       supabase.from('excedentes').select('id, estado, kg_total'),
-      supabase.from('canalizaciones').select('excedente_id, kg_confirmados'),
+      // Sin las anuladas: una asignación anulada no ha canalizado nada (puntos 4-6, fase 2).
+      supabase.from('canalizaciones').select('excedente_id, kg_confirmados').neq('estado', 'anulada'),
       supabase.from('wa_messages').select('id', { count: 'exact', head: true }).eq('direction', 'inbound'),
       // Los «sin contestar» los agrega `missatges_sense_contestar()`, la misma RPC que ya
       // usan `Entitats`, `ContactList` y el badge del menú. La regla no se reimplementa.

@@ -214,7 +214,8 @@ export default function Mercat() {
       excedenteId: obert.id,
       entidadId,
       kg: nKg,
-      preu: preu === '' || triada === 'donacio' ? null : Number(preu.replace(',', '.')),
+      // Solo la venta lleva precio: ni la donación ni la maquila (deuda 180, 20270607100000).
+      preu: preu === '' || triada !== 'venda' ? null : Number(preu.replace(',', '.')),
       modalitat: triada || null,
       recollida,
     })
@@ -275,8 +276,9 @@ export default function Mercat() {
 
   const obertPunt = obert ? puntDe(obert) : null
   const obertMods = obert ? possibles(obert) : []
-  // El precio se pide si la entrega elegida lleva precio; sin elegir todavía, si alguna lo lleva.
-  const obertVenda = modalitat ? modalitat !== 'donacio' : ambPreu(obertMods)
+  // El precio se pide si la entrega elegida es una VENTA (la maquila no lleva precio desde
+  // 20270607100000); sin elegir todavía, si la venta es una de las posibles.
+  const obertVenda = modalitat ? modalitat === 'venda' : ambPreu(obertMods)
   const obertMotiu = obert ? motiuNoPot(obert) : null
   // El precio mínimo con coma y dos decimales, como lo escribe la gente; sin mínimo, sin cifra.
   const preuMinim = obert?.preu_minim != null

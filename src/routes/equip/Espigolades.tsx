@@ -547,17 +547,18 @@ export function EspigoladaDetall() {
         .select('id, tipo, numero_completo, estado, excedente_id, canalizacion_id')
         .or(`espigolada_id.eq.${id}${ids.length ? `,excedente_id.in.(${ids.join(',')})` : ''}`),
       ids.length
-        ? supabase.from('canalizaciones').select('id, excedente_id, entidad_id, kg_confirmados, kg_reales').in('excedente_id', ids)
+        ? supabase.from('canalizaciones').select('id, excedente_id, entidad_id, kg_confirmados, kg_reales, estado').in('excedente_id', ids)
         : Promise.resolve({ data: [] }),
     ])
     setAlbarans((alb.data as AlbaraFila[] | null) ?? [])
 
     const suma: Record<string, number> = {}
     const perCanal: Record<string, { entidad_id: string | null; kg: number }> = {}
-    for (const c of (can.data ?? []) as { id: string; excedente_id: string | null; entidad_id: string | null; kg_confirmados: number | null; kg_reales: number | null }[]) {
+    for (const c of (can.data ?? []) as { id: string; excedente_id: string | null; entidad_id: string | null; kg_confirmados: number | null; kg_reales: number | null; estado: string | null }[]) {
       // Los kilos de la entrega: los reales si ya los hay, si no los asignados.
       perCanal[c.id] = { entidad_id: c.entidad_id, kg: Number(c.kg_reales ?? c.kg_confirmados ?? 0) }
-      if (!c.excedente_id) continue
+      // Una asignación anulada no reparte nada (puntos 4-6, fase 2).
+      if (!c.excedente_id || c.estado === 'anulada') continue
       suma[c.excedente_id] = (suma[c.excedente_id] ?? 0) + Number(c.kg_confirmados ?? 0)
     }
     setRepartit(suma)

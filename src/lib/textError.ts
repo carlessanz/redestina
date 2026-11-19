@@ -60,6 +60,19 @@ const CODIS: Record<string, string> = {
   cal_font: 'cost.err_cal_font',
   criteri_invalid: 'cost.err_criteri',
   sense_cost: 'cost.err_sense_cost',
+  // Asignar, modificar y anular en un acto (puntos 4-6, fase 2: 20270606100100, 20270607100000).
+  // `cal_motiu` de `anular_assignacio` no llega: el diálogo exige el motivo antes de llamar.
+  cal_preu_acordat: 'asg.err_cal_preu',
+  cal_preu_acceptat: 'asg.err_cal_acceptat',
+  preu_invalid: 'asg.err_preu_invalid',
+  ja_assignada: 'asg.err_ja_assignada',
+  cal_canvi: 'asg.err_cal_canvi',
+  ja_registrada: 'asg.err_ja_registrada',
+  albara_emes: 'asg.err_albara_emes',
+  ja_validada: 'asg.err_ja_validada',
+  no_es_venda: 'asg.err_no_es_venda',
+  hora_passada: 'rrec.err_hora_passada',
+  kg_maxim: 'asg.err_kg_maxim',
   // `confirmar_recollida()`, fase 3 de la revisión del 08-10-2026.
   canalitzacio_inexistent: 'recol.err_inexistent',
   canalitzacio_anulada: 'recol.err_anulada',

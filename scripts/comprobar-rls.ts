@@ -798,6 +798,58 @@ const PREUS_SUPER: Check[] = [
   { tabla: "preus_canalitzacions_mes", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_exercici: 2026, p_mes: 13 }, descripcion: "llegeix les canalitzacions que esperen preu (autoritza; 22023 mes_invalid) (D2)" },
 ];
 
+// ASIGNACIÓN DIRECTA, MODIFICAR Y ANULAR (fase 2 de los puntos 4-6; 20270606100000,
+// 20270606100100, 20270607100000). Lo que el arnés afirma:
+//
+//   · las tres funciones internas (`recalcula_estat_excedent`, `aprova_resposta_intern`,
+//     `anula_canalitzacio`) no tienen EXECUTE para ninguna sesión (42501 a todos);
+//   · las cuatro RPC (`assignar_directe`, `modificar_assignacio`, `anular_assignacio`,
+//     `fixar_preu_acordat`) son de `pot_aprovar()`: externos y técnico, 42501; el super_admin con
+//     uuid inventado, 22023 (autoriza y corta por existencia);
+//   · `aprovar_resposta` sigue resolviendo con los SEIS argumentos con nombre del frontend
+//     publicado aunque la firma tenga siete (el último con default): 22023 «no es pot aprovar».
+const ASSIGNACIO_INTERNES: Check[] = [
+  { tabla: "recalcula_estat_excedent", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO crida el recalcul intern de l'estat d'una oferta (B1)" },
+  { tabla: "aprova_resposta_intern", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_motiu: null, p_modalitat: null, p_recollida: null, p_preu_acceptat: null, p_directa: false }, descripcion: "NO crida l'aprovacio interna (A1)" },
+  { tabla: "anula_canalitzacio", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO crida l'anul.lacio interna (B2)" },
+];
+
+// Externos (en `DOCUMENTAL_EXTERN`) y técnico: nada de asignar, modificar, anular ni fijar precio.
+const ASSIGNACIO_SENSE_APROVAR: Check[] = [
+  ...ASSIGNACIO_INTERNES,
+  { tabla: "assignar_directe", op: "rpc", esperado: "denegar", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO assigna directament (es de pot_aprovar) (A1)" },
+  { tabla: "modificar_assignacio", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "NO modifica cap assignacio (B2)" },
+  { tabla: "anular_assignacio", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "NO anul.la cap assignacio (B2)" },
+  { tabla: "fixar_preu_acordat", op: "rpc", esperado: "denegar", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_preu: 1, p_acceptat: true }, descripcion: "NO fixa el preu acordat d'una venda (A1)" },
+];
+
+// El técnico, además: tampoco aprueba (con los seis argumentos con nombre del frontend publicado).
+const ASSIGNACIO_TECNIC: Check[] = [
+  ...ASSIGNACIO_SENSE_APROVAR,
+  { tabla: "aprovar_resposta", op: "rpc", esperado: "denegar", args: { p_resposta: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_motiu: null, p_modalitat: null, p_recollida: null }, descripcion: "NO aprova cap resposta (es de pot_aprovar) (A1)" },
+];
+
+// El super_admin (y, por `pot_aprovar()`, un admin): autoriza y corta en 22023 por existencia.
+const ASSIGNACIO_SUPER: Check[] = [
+  ...ASSIGNACIO_INTERNES,
+  { tabla: "assignar_directe", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_excedente: "00000000-0000-0000-0000-000000000000", p_entidad: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "pot assignar directament (autoritza; 22023 oferta no disponible) (A1)" },
+  { tabla: "modificar_assignacio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_kg: 1 }, descripcion: "pot modificar una assignacio (autoritza; 22023 canalitzacio_inexistent) (B2)" },
+  { tabla: "anular_assignacio", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_motiu: "arnes" }, descripcion: "pot anul.lar una assignacio (autoritza; 22023 canalitzacio_inexistent) (B2)" },
+  { tabla: "fixar_preu_acordat", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_canalizacion: "00000000-0000-0000-0000-000000000000", p_preu: 1, p_acceptat: true }, descripcion: "pot fixar el preu acordat (autoritza; 22023 canalitzacio_inexistent) (A1)" },
+  // 🔴 Los SEIS argumentos con nombre de antes: así llama el frontend publicado. Si PostgREST no
+  //    los resolviera contra la firma de siete, saldría PGRST202 (FALLA), no 22023.
+  { tabla: "aprovar_resposta", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_resposta: "00000000-0000-0000-0000-000000000000", p_kg: 1, p_preu: null, p_motiu: null, p_modalitat: null, p_recollida: null }, descripcion: "aprova amb els sis arguments del frontend publicat (autoritza; 22023 no es pot aprovar) (A1)" },
+];
+
+// Las dos partes leen las columnas nuevas de SUS canalizaciones (y la entidad, las de su respuesta).
+const ASSIGNACIO_LECTURA_PRODUCTOR: Check[] = [
+  { tabla: "canalizaciones", op: "leer", esperado: "permitir", columnas: "id, preu_acordat_kg, preu_acceptat_at, anulada_at, motiu_anulacio", descripcion: "veu el preu acordat i l'anul.lacio de les canalitzacions de les seves ofertes (A1/B2)", requiereFixture: "alguna canalitzacio d'una oferta seva" },
+];
+const ASSIGNACIO_LECTURA_RECEPTOR: Check[] = [
+  { tabla: "canalizaciones", op: "leer", esperado: "permitir", columnas: "id, preu_acordat_kg, preu_acceptat_at, anulada_at, motiu_anulacio", descripcion: "veu el preu acordat i l'anul.lacio de les seves canalitzacions (A1/B2)", requiereFixture: "alguna canalitzacio de la seva entitat" },
+  { tabla: "oferta_respuestas", op: "leer", esperado: "permitir", columnas: "id, aprovat_per, assignacio_directa", descripcion: "veu qui va aprovar i si va ser assignacio directa (A1)", requiereFixture: "alguna resposta de la seva entitat" },
+];
+
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
 // afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
@@ -1413,6 +1465,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...IMPORTACIO_EXTERN,
   // Precios de referencia por mes (20270531100000): ver `PREUS_EXTERN`.
   ...PREUS_EXTERN,
+  // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): ver `ASSIGNACIO_SENSE_APROVAR`.
+  ...ASSIGNACIO_SENSE_APROVAR,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1690,6 +1744,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
     // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_TECNIC` ---
     ...PREUS_TECNIC,
+    // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): el técnico no tiene `pot_aprovar()`.
+    ...ASSIGNACIO_TECNIC,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2362,6 +2418,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...DIAGNOSTIC_EXCEDENTS_EQUIP,
     // --- Precios de referencia por mes (D1, 20270531100000): ver `PREUS_SUPER` ---
     ...PREUS_SUPER,
+    // Asignación directa, modificar y anular (fase 2 de los puntos 4-6).
+    ...ASSIGNACIO_SUPER,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2784,6 +2842,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     { tabla: "importacions_entitats_files", op: "leer", esperado: "permitir", columnas: "fila, canvis", descripcion: "veu els canvis (abans/després) de les importacions (B4)", requiereFixture: "alguna importacio d'entitats (importar_entitats)" },
   ],
   productor: [
+    ...ASSIGNACIO_LECTURA_PRODUCTOR,
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
     // El archivo que el equipo guarda de SU organización (20270329100000): convenios
@@ -3102,6 +3161,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // propiedad en sí no queda sin cubrir mientras haya otra cuenta receptora que sí
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
+    ...ASSIGNACIO_LECTURA_RECEPTOR,
     // Un esborrany no circula (fase C del punto 3, 20270530100000): ni en el Mercat ni por
     // ninguna otra rama de la política de `excedentes`. Con el fixture de TEST-PROD-1 puesto,
     // ver uno sería un escape de verdad.

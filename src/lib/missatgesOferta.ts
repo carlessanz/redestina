@@ -123,6 +123,7 @@ export const FASE_AVIS: Record<TipusAvis, FaseMissatge> = {
   sortida_trobada: 'aprovacio',
   recollida_canviada: 'lliurament',
   kg_assignats_canviats: 'lliurament',
+  assignacio_anulada: 'lliurament',
   recollida_per_registrar: 'lliurament',
   recollida_retornada: 'lliurament',
   recollida_confirmada: 'tancament',

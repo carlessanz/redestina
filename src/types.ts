@@ -410,6 +410,14 @@ export interface Canalizacion {
   /** El certificado emitido que congeló el valor (número); null = aún se puede ajustar. */
   preu_certificat?: string | null
   preu_certificat_at?: string | null
+  /** Anulación de la asignación (20270606100100): solo por anular_assignacio / anular_albaran. */
+  anulada_at?: string | null
+  anulada_per?: string | null
+  motiu_anulacio?: string | null
+  /** Venta: precio acordado (EUR/kg) y aceptación del ofertante (20270607100000). */
+  preu_acordat_kg?: number | null
+  preu_acceptat_at?: string | null
+  preu_acceptat_per?: string | null
 }
 
 export interface OfertaRespuesta {
@@ -436,6 +444,10 @@ export interface OfertaRespuesta {
   aprovat_at: string | null
   motiu_aprovacio: string | null
   canalizacion_id: string | null
+  /** Quién aprobó o asignó (20270607100000). */
+  aprovat_per?: string | null
+  /** true = asignación directa de nivel 1 (`assignar_directe`), sin pasar por Aprovacions. */
+  assignacio_directa?: boolean
   /** Estado del diálogo de aceptación por WhatsApp */
   dialeg_pas: string | null
   dialeg_dades: Record<string, unknown>

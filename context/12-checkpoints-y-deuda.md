@@ -144,6 +144,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **19-11-2026 (`20270605100000`, fase 0 de los puntos 4-6): se abre la 188** (columnas de envases sin uso): **84 vivas** y la siguiente es la 189.
 
 ⚠️ **19-11-2026 (fase 1 de los puntos 4-6): se abre la 189** (E2E de precios provisionales): **85 vivas** y la siguiente es la 190.
+
+⚠️ **19-11-2026 (`20270607100000`, fase 2 de los puntos 4-6): se cierra la 180 y se abre la 190** (anular una canalización de espigolada no reabre la jornada): **85 vivas** y la siguiente es la 191.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -902,13 +904,7 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      cuando ese frontend ya no exista: columna, trigger `trg_productores_sense_facturacio_eur`, la clave
      `facturacio_eur` de `diagnostic_datos()`, `COLUMNES` de `tests/campsFitxa.test.ts`, `NO_ES_MOSTRA` y las listas de
      columnas de `scripts/comprobar-rls.ts`. Precio: una migración y tres tests.
-180. **El interés en maquila aún compara con `preu_minim`** (17-11-2026, `20270528100000`). Desde la fase A del punto 3,
-     el precio de la oferta es solo el de **venta** (`ambPreu` = incluye venta) y la maquila no lleva campos económicos en
-     el alta. Pero `manifestar_interes()`, `manifestar_interes_assistit()` y la aprobación siguen con
-     `v_mod in ('venda','maquila') and ex.preu_minim is not null`: en una oferta venta + maquila, un interés en maquila
-     tiene que igualar el precio de venta. Hoy no rompe nada (los formularios de interés precargan `preu_minim`), pero
-     no es lo que dice el negocio. Arreglo: una migración que deje la guarda solo en `venda` en esas RPC (y revisar
-     `FormulariInteresAssistit`/`FormulariAprovacio`, que piden precio con maquila). Precio: una migración y el arnés.
+180. ~~**El interés en maquila aún compara con `preu_minim`**~~ — cerrada el 19-11-2026 (`20270607100000`): el precio solo cuenta en venta (índice en §12ter).
 181. **El texto de una oferta no sigue a su lugar** (17-11-2026, `20270530100000`). `texto_oferta` se compone desde la
      fila al publicar y al editar la oferta (`textoOfertaDeDades`), y el enlace de Maps sale del lugar si la oferta no
      tiene uno propio. Si después se edita el LUGAR en la ficha (otro enlace, otro alias) o el nombre de la entidad, el
@@ -952,3 +948,7 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
 189. **El E2E `preus-provisionals.e2e.ts` falla en el clon** (visto el 19-11-2026, también sin los cambios de ese día):
      el primer paso espera `coste_kg = 0,50` (M-2 validado) y obtiene 0,80 (el manual vigente). Depende del mes en curso
      y de los precios que dejan otras pasadas en el clon. Arreglo: que el `beforeAll` limpie o fije M-1 y la propuesta.
+190. **Anular una canalización de espigolada no reabre la jornada** (19-11-2026, `20270606100100`).
+     `anula_canalitzacio()` recalcula la oferta, pero `recalcula_estat_espigolada()` suma también las anuladas y su
+     trigger no salta al cambiar el `estado`. Hoy la pantalla no ofrece anular las de espigolada. Arreglo: excluir
+     `anulada` en esa suma y disparar el recálculo desde `anula_canalitzacio()`. Precio: una migración y el arnés.

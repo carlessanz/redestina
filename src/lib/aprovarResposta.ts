@@ -79,6 +79,12 @@ export async function aprovarResposta(args: {
   modalitat?: string | null
   /** Cuándo se recoge (ISO). Sin ella, la que pidió la entidad (rebanada 3). */
   recollida?: string | null
+  /**
+   * Venta: el ofertante ha aceptado el precio (`p_preu_acceptat`, 20270607100000). Opcional en
+   * el nivel 2; con `true` la base exige el precio (`cal_preu_acordat`). Solo viaja si es
+   * `true`: sin él, la llamada es la de seis argumentos de siempre.
+   */
+  preuAcceptat?: boolean
 }): Promise<ResultatRpc<Canalizacion>> {
   try {
     const { data, error } = await supabase.rpc('aprovar_resposta', {
@@ -88,6 +94,7 @@ export async function aprovarResposta(args: {
       p_motiu: args.motiu ?? null,
       p_modalitat: args.modalitat ?? null,
       p_recollida: args.recollida ?? null,
+      ...(args.preuAcceptat ? { p_preu_acceptat: true } : {}),
     })
     if (error) {
       const esConveni = (error.message ?? '').includes('sense_conveni')

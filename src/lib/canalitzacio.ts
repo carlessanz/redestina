@@ -18,6 +18,7 @@
 
 import { supabase } from './supabase'
 import type { FetsCanal } from './passosCanalitzacio'
+import type { Canalizacion } from '../types'
 
 export type ResultatRpc<T> =
   | { ok: true; data: T }
@@ -170,6 +171,87 @@ export function interesAssistit(args: {
     p_modalitat: args.modalitat ?? null,
     p_recollida: args.recollida ?? null,
   }, 'canalz.err_interes')
+}
+
+/**
+ * Asignación en un acto (nivel 1, `assignar_directe()`, 20270607100000): interés, aprobación y
+ * canalización confirmada en una sola transacción. Solo `pot_aprovar()`; el técnico sigue con
+ * `interesAssistit()` y la aprobación de Aprovacions (nivel 2).
+ *
+ * En venta, `preu` (precio ACORDADO, EUR/kg) y `preuAcceptat` son obligatorios
+ * (`cal_preu_acordat` / `cal_preu_acceptat`); en maquila y donación no hay precio (la base lo
+ * ignora si llega). Los rechazos los traduce `textError()` (códigos `asg.err_*`) o, los de
+ * `comprova_interes()`, `clauErrorInteres()`.
+ */
+export function assignarDirecte(args: {
+  excedenteId: string
+  entitatId: string
+  kg: number
+  modalitat?: string | null
+  /** Cuándo la recoge (ISO); la base solo exige que no sea pasada. */
+  recollida?: string | null
+  caixes?: number | null
+  preu?: number | null
+  preuAcceptat?: boolean
+  motiu?: string | null
+}): Promise<ResultatRpc<Canalizacion>> {
+  return crida('assignar_directe', {
+    p_excedente: args.excedenteId,
+    p_entidad: args.entitatId,
+    p_kg: args.kg,
+    p_modalitat: args.modalitat ?? null,
+    p_recollida: args.recollida ?? null,
+    p_caixes: args.caixes ?? null,
+    p_preu: args.preu ?? null,
+    p_preu_acceptat: args.preuAcceptat ?? false,
+    p_motiu: args.motiu ?? null,
+  }, 'canalz.err_interes')
+}
+
+/**
+ * Cambiar los kilos y/o la fecha y hora de recogida de una asignación viva
+ * (`modificar_assignacio()`, 20270606100100). Solo antes de registrar la recogida y con el
+ * ENT/OPE todavía en borrador (`ja_registrada`, `albara_emes`). Lo que no cambia va a `null`.
+ */
+export function modificarAssignacio(args: {
+  canalitzacioId: string
+  kg?: number | null
+  recollida?: string | null
+}): Promise<ResultatRpc<Canalizacion>> {
+  return crida('modificar_assignacio', {
+    p_canalizacion: args.canalitzacioId,
+    p_kg: args.kg ?? null,
+    p_recollida: args.recollida ?? null,
+  }, 'c.error')
+}
+
+/**
+ * Anular una asignación con su motivo (`anular_assignacio()`): anula sus albaranes vivos,
+ * rechaza la respuesta, avisa a las dos partes y recalcula el estado de la oferta. No después
+ * de validar la recogida (`ja_validada`).
+ *
+ * ⚠️ El motivo se exige ANTES de llamar (el diálogo no deja confirmar vacío): el `cal_motiu`
+ *    de la base lo comparte la cancelación de una oferta y se traduciría con su texto.
+ */
+export function anularAssignacio(canalitzacioId: string, motiu: string): Promise<ResultatRpc<Canalizacion>> {
+  return crida('anular_assignacio', { p_canalizacion: canalitzacioId, p_motiu: motiu }, 'c.error')
+}
+
+/**
+ * El precio acordado de una VENTA ya asignada (p. ej. aprobada en Aprovacions sin precio):
+ * `fixar_preu_acordat()`. Sin `acceptat`, la aceptación anterior se borra: un precio nuevo
+ * hay que volver a aceptarlo.
+ */
+export function fixarPreuAcordat(
+  canalitzacioId: string,
+  preu: number,
+  acceptat: boolean,
+): Promise<ResultatRpc<Canalizacion>> {
+  return crida('fixar_preu_acordat', {
+    p_canalizacion: canalitzacioId,
+    p_preu: preu,
+    p_acceptat: acceptat,
+  }, 'c.error')
 }
 
 /** Los rechazos de `registrar_envio_manual()`, por su código (20270430100100). */

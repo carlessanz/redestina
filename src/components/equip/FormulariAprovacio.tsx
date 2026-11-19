@@ -12,7 +12,9 @@
 //   · kilos asignados (por defecto, los solicitados);
 //   · modalidad de la entrega, si la oferta tiene varias (la que pidió, o la única);
 //   · fecha y hora de recogida (`datetime-local`, la que pidió; solo se manda si se cambia);
-//   · precio, solo si la modalidad elegida es venta o maquila.
+//   · precio, solo si la modalidad elegida es VENTA (la maquila no lleva precio desde
+//     20270607100000, deuda 180), con la casilla opcional «L'ofertant ha acceptat el preu»
+//     (`p_preu_acceptat`); si no se marca aquí, se fija después en la ficha de la oferta.
 //
 // ⚠️ `text-base md:text-sm` en todo control (§2, regla 1) y botones a 44 px en móvil.
 
@@ -30,6 +32,7 @@ import { useConfirma } from '../DialegConfirma'
 import DialegMotiu from '../DialegMotiu'
 import SelectorModalitat from '../SelectorModalitat'
 import BotoAmbMotiu from '../proces/BotoAmbMotiu'
+import { FilaCasella } from '../Casella'
 import { Input } from '@/components/ui/input'
 
 /** Lo que hace falta de la respuesta: lo que pidió la entidad. */
@@ -85,11 +88,12 @@ export default function FormulariAprovacio({
   // Si la entidad no dijo precio, se parte del mínimo del productor, que es el suelo.
   const preuDefecte = resposta.preu_ofert ?? oferta.preu_minim
   const [preu, setPreu] = useState(preuDefecte != null ? String(preuDefecte) : '')
+  const [acceptat, setAcceptat] = useState(false)
   const [ocupat, setOcupat] = useState(false)
   const [rebutjant, setRebutjant] = useState(false)
 
   const triada: Modalitat | '' = modalitat || (mods.length === 1 ? mods[0] : '')
-  const ambPreuTriat = triada === 'venda' || triada === 'maquila'
+  const ambPreuTriat = triada === 'venda'
   const motiuRol = potAprovar ? undefined : t('appr.need_approver')
   const motiu = motiuRol ?? bloqueig
   const bloquejat = ocupat || !potAprovar || Boolean(bloqueig)
@@ -98,6 +102,8 @@ export default function FormulariAprovacio({
     const nKg = Number(kg.replace(',', '.'))
     if (!resposta.entidad_id || !nKg || nKg <= 0) { toast.error(t('appr.need_kg')); return }
     if (mods.length > 1 && !triada) { toast.error(t('appr.cal_modalitat')); return }
+    // Aceptado sin precio: la base lo rechaza (`cal_preu_acordat`); se dice antes.
+    if (ambPreuTriat && acceptat && preu.trim() === '') { toast.error(t('asg.err_cal_preu')); return }
     // Aviso no bloqueante: canalizar más de lo que falta puede ser intencionado.
     if (nKg > faltan && !(await confirma({
       titol: t('od.over_alloc_t'),
@@ -122,6 +128,7 @@ export default function FormulariAprovacio({
       modalitat: triada || null,
       // Solo si se ha cambiado: si no, vale la que pidió la entidad.
       recollida: recollida && recollida !== recollidaInicial ? new Date(recollida).toISOString() : null,
+      preuAcceptat: ambPreuTriat && acceptat,
     })
     setOcupat(false)
     if (!res.ok) {
@@ -180,6 +187,9 @@ export default function FormulariAprovacio({
             className="h-11 w-24 text-base md:h-8 md:text-sm"
             value={preu} placeholder={t('od.rs_preu')} onChange={(e) => setPreu(e.target.value)} />
         </label>
+      )}
+      {ambPreuTriat && (
+        <FilaCasella checked={acceptat} onChange={setAcceptat}>{t('asg.preu_acceptat')}</FilaCasella>
       )}
       <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-8"
         disabled={bloquejat} motiu={motiu}
