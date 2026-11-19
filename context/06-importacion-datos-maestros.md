@@ -415,3 +415,47 @@ confirmada, sigue la sugerencia por NIF). Con valor: la Revisió enseña el `can
 exportación solo saca la confirmada, en palabras, así que exportar → reimportar sigue siendo `sense_canvis`. Al ir
 detrás de «Data d'alta», las dos columnas informativas del estado CRM pasan de AB·AC a **AC·AD** (se leen por cabecera:
 el importador las ignora igual).
+
+### Vaciado de los datos operativos y fichas ficticias (19-11-2026, fase 6 de los puntos 4-6, `20270611100000`)
+
+**La puerta**: `reiniciar_dades_operatives(p_executar boolean default false) returns jsonb` (security definer; EXECUTE solo
+`service_role`; con sesión `42501`). Con `false` devuelve el inventario sin escribir: `pot_executar`, `bloquejos[{codi,n,
+detall}]`, `taules{tabla:n}`, `conserva{…}`, `fitxers{…}`, `organitzacions[…]` y `comptes_externs_sense_organitzacio[…]`;
+con `true` borra y devuelve además `esborrat` y `fitxers_a_la_cua`. Se niega (`22023 hi_ha_dades_reals: <codis>`) con
+`dades_fundacio_definitives` (`parametros_documentales.datos_provisionales = false`), `certificats_reals` (CD/CT/CR/RES o
+cierre en modo real) u `operativa_fitxes_reals` (operaciones o documentos con número de fichas no `es_test`). REC, ENT,
+CONV y PLA siempre se emiten en `modo='real'`, por eso el criterio no es «todo en prueba». Si al acabar queda alguna fila,
+`23000 reinici_incomplet` y se revierte todo.
+- **By-pass de la inmutabilidad**: marca local `redestina.reinicio_dades` + `datos_provisionales`, comprobados por
+  `reinici_dades_permes()` en `trg_documentos_no_esborrar`, `trg_albaranes_no_esborrar`, `trg_convenios_no_esborrar` y
+  `trg_planes_no_esborrar` (la marca vieja `redestina.reinicio_prueba` sigue igual).
+- **Orden** (`v_ordre`; una tabla operativa nueva se añade aquí: si su FK es `restrict`, el vaciado falla y se revierte;
+  si es `set null`, quedarían filas sueltas): firmas y regeneraciones → cierres y líneas → envíos, documentos, albaranes,
+  convenios → consentimientos de organización, evidencias, enlaces, externos → respuestas, historial de precio,
+  canalizaciones → destinos, cambios, intake, ofertas, espigoladas → plan retirado y expedientes → diagnóstico → ficha y
+  CRM (lugares, avisos, notas, contactos, historial de estado, importaciones, traspasos) → membresías y fichas →
+  `wa_messages` y los `wa_contacts` que no están en `meta_test_recipients`. Un `delete … where true` por tabla
+  (pg-safeupdate). Después `series_documentales.ultimo = 0` (sin filas numeradas y nada real: la regla «el número es de
+  la fila» se mantiene).
+- **Storage**: los ficheros de `documentos` y `fotos-ofertes` (salvo firma y sello de la Fundació) van a `fitxers_orfes`
+  (origen `reinici_dades`); el script vacía la cola por la API y borra lo suelto.
+- **Se conserva**: catálogos, precios, `app_settings`, `app_config`, whitelists, `parametros_documentales`, plantillas,
+  cortina, buckets `fotos-productes`/`activos`/`preus-fonts`, `auth.users` (ninguna cuenta se borra), `perfiles`,
+  `usuario_roles` y los consentimientos de cuenta.
+- **Scripts**: `scripts/reiniciar-dades.ts` (dry-run por defecto; `--executar`; fuera del clon, `--executar --produccio`;
+  log `scripts/data/reiniciar-dades-<clon|produccio>-<dryrun|executar>.log`) y `scripts/sembrar-entitats-ficticies.ts`
+  (idempotente; `--dry-run`, `--produccio`; usa la cuenta `superadmin` de `cuentas-prueba.json` y la clave publicable).
+- **Fichas sembradas** (`es_test`, `actiu`, naturalesa confirmada, datos fiscales y de facturación en `@example.com`,
+  convenio de colaboración **declarado**): «Ofertant de prova» (TEST-PROD-1, Gavà) → `productor-titular`; «Segon
+  ofertant de prova» (TEST-PROD-2, Mollerussa) → `productor-altre`; «Entitat social receptora de prova» (TEST-ENT-SOCIAL)
+  → `receptor-social`; «Empresa receptora de prova» (TEST-ENT-COMERCIAL, empresa: solo compra y maquila) →
+  `receptor-comercial`; «Obrador de prova (maquila)» (TEST-ENT-OBRADOR, Sabadell, transformador) → `receptor-carles`;
+  «Doble rol de prova» (TEST-DOBLE-PROD/TEST-DOBLE-ENT, Vic) → `hola+productor-receptor@`; TEST-PENDENT-ARNES (pendiente,
+  **no aprobar nunca**) → `pendent-arnes`. Lugares de recogida en los ofertantes y el doble rol; diagnóstico y perfil
+  vacíos. Una cuenta del equipo no puede tener membresías (`trg_membresia_no_equip`), por eso el doble rol va a una
+  cuenta de pruebas y no a la de Carles. La siembra añade los correos de las cuentas de prueba a `email_test_recipients`.
+- **Clon (19-11-2026)**: 734 organizaciones (720 del ARA) y 6.398 filas operativas → 0; 662 ficheros borrados; series a
+  0; ninguna cuenta borrada. Tras siembra y fixtures: arnés 3.021/3.021 y 47 sin datos; E2E de escritorio en verde.
+- **Producción**: pendiente de que Carles vea el dry-run y lo confirme. Pasos: migración con `aplicar-migracion.ts` →
+  `reiniciar-dades.ts` (dry-run; BLOQUEOS «cap») → `--executar --produccio` → `sembrar-entitats-ficticies.ts --dry-run` y
+  `--produccio` → arnés (nueva referencia). **Sin fixtures en producción.**

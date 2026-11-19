@@ -30,10 +30,12 @@ const actiu = () => process.env.E2E_CLON === '1' && process.env.E2E_ESCRIU === '
 
 test.beforeAll(({}, info) => {
   if (!actiu() || motiuSaltClon('super_admin') || info.project.name !== 'escriptori') return
-  const [m, mAny, mMes, m2Any, m2Mes] = sql(`select to_char(m, 'YYYY-MM') || '|' || extract(year from m) || '|' || extract(month from m)
+  const [m, mAny, mMes, m2Any, m2Mes, m1Any, m1Mes] = sql(`select to_char(m, 'YYYY-MM') || '|' || extract(year from m) || '|' || extract(month from m)
        || '|' || extract(year from m2) || '|' || extract(month from m2)
+       || '|' || extract(year from m1) || '|' || extract(month from m1)
      from (select date_trunc('month', now() at time zone 'Europe/Madrid')::date as m,
-                  (date_trunc('month', now() at time zone 'Europe/Madrid') - interval '2 months')::date as m2) x`).split('|')
+                  (date_trunc('month', now() at time zone 'Europe/Madrid') - interval '2 months')::date as m2,
+                  (date_trunc('month', now() at time zone 'Europe/Madrid') - interval '1 month')::date as m1) x`).split('|')
   mes = m
   // El producto, su manual vigente (0,80: la propuesta de M) y M-2 validado a 0,50.
   if (sql(`select count(*) from productos where nombre = '${PROD}'`) === '0') {
@@ -42,6 +44,9 @@ test.beforeAll(({}, info) => {
   sql(`insert into costes_producto (producto, coste_kg, motivo) values ('${PROD}', 0.80, 'E2E D2')
        on conflict (producto) do update set coste_kg = 0.80`)
   sql(`delete from preus_referencia where producto = '${PROD}' and exercici = ${mAny} and mes = ${mMes}`)
+  // Ni M-1: si está validado (una validación del mes entero lo incluye, el producto es del
+  // catálogo), «el último validado» es M-1 y no M-2. En el clon lo estaba desde el 17-11-2026.
+  sql(`delete from preus_referencia where producto = '${PROD}' and exercici = ${m1Any} and mes = ${m1Mes}`)
   sqlCom('super_admin', `select fixar_preu_referencia('${PROD}', ${m2Any}, ${m2Mes}, 'manual', 0.50, 'E2E D2')`)
   // Ficha de productor y entidad social sintéticas (de prueba), reutilizadas entre pasadas.
   sql(`do $d$

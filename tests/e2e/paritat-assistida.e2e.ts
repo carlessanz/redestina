@@ -7,7 +7,7 @@
 // tanda, `scripts/local/cargar-local.sh` devuelve el clon a la copia de producción.
 
 import { expect, test } from '@playwright/test'
-import { compte, entidadDe, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { asseguraConveniVigent, compte, entidadDe, motiuSaltClon, productorDe, resolConveniVigent, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -114,8 +114,19 @@ test('la recogida asistida deja los mismos albaranes y líneas que la del recept
 
 test('el convenio declarado deja la organización operando y ella lo ve vigente', () => {
   const ent = entidadDe('receptor-social')
-  test.skip(sql(`select count(*) from convenios where entidad_id = '${ent}' and tipo = 'col_receptor' and estado = 'vigent'`) !== '0',
-    'esta receptora ya tiene el conveni vigent (recarrega el clon)')
+  // Desde la siembra de la fase 6 de los puntos 4-6 ya nace con el suyo DECLARAT vigente: se le
+  // resuelve antes, la prueba le declara otro y, si se corta a medias, el `finally` se lo repone.
+  resolConveniVigent('entidad', ent)
+  try {
+    declaraIComprova(ent)
+  } finally {
+    asseguraConveniVigent('entidad', ent)
+  }
+})
+
+function declaraIComprova(ent: string) {
+  expect(sql(`select count(*) from convenios where entidad_id = '${ent}' and tipo = 'col_receptor' and estado = 'vigent'`)).toBe('0')
+  expect(sql(`select public.convenio_vigente('entidad', '${ent}', 'donacio', 'recibe')`)).toBe('f')
 
   // Un técnico no puede: es del super_admin.
   expect(() => sqlCom('equip', `select declarar_conveni('entidad', '${ent}', 'col_receptor', 'Persona Prova', 'Presidenta')`))
@@ -133,4 +144,4 @@ test('el convenio declarado deja la organización operando y ella lo ve vigente'
   // Un declarado no impide firmar el de verdad (lo sustituirá la contrafirma).
   expect(sql(`select public.conveni_cobreix_tot('entidad', '${ent}')`)).toBe('f')
   expect(compte('receptor-social')).toBeTruthy()
-})
+}

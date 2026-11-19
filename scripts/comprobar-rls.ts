@@ -577,6 +577,25 @@ const SUBCAUSES_COMUNS: Check[] = [
   { tabla: "subcausas", op: "actualizar", esperado: "denegar", descripcion: "NO modifica cap subcausa (punt 3, fase B)" },
 ];
 
+// Fase 6 de los puntos 4-6 (20270611100000): vaciar los datos operativos es cosa de `service_role`
+// (scripts/reiniciar-dades.ts). Ninguna sesión, ni la del super_admin, puede llamarla: sin EXECUTE
+// para `authenticated`, 42501 antes de entrar. Con `p_executar: false` aunque se colara solo leería.
+const REINICI_COMUNS: Check[] = [
+  {
+    tabla: "reiniciar_dades_operatives",
+    op: "rpc",
+    esperado: "denegar",
+    args: { p_executar: false },
+    descripcion: "NO pot buidar les dades operatives (nomes service_role) (fase 6)",
+  },
+  {
+    tabla: "reinici_dades_permes",
+    op: "rpc",
+    esperado: "denegar",
+    descripcion: "NO consulta el permis intern del reinici (nomes triggers) (fase 6)",
+  },
+];
+
 const IMPORTACIO_INTERNES: Check[] = [
   {
     tabla: "alta_fitxa_interna",
@@ -1219,6 +1238,7 @@ const DOCUMENTAL_EXTERN: Check[] = [
   // naturalesa ↔ modalidad (P8) es catálogo; el recálculo de la sugerencia es interno.
   ...NATURALESA_COMUNS,
   ...SUBCAUSES_COMUNS,
+  ...REINICI_COMUNS,
   { tabla: "fixar_naturalesa", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "NO fixa la naturalesa d'una organitzacio que no es seva (A5)" },
   { tabla: "desactivar_organitzacio", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO desactiva cap organització" },
   { tabla: "afegir_paper_org_equip", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000", p_paper: "entidad" }, descripcion: "NO afegeix papers per la porta de l'equip" },
@@ -1932,6 +1952,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
     ...NATURALESA_COMUNS,
     ...SUBCAUSES_COMUNS,
+    ...REINICI_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "denegar", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "NO treu l'accés (és de l'admin)" },
@@ -2309,6 +2330,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // uuid inventado, 22023 `organitzacio_inexistent`; con un valor raro, 22023 antes de escribir.
     ...NATURALESA_COMUNS,
     ...SUBCAUSES_COMUNS,
+    ...REINICI_COMUNS,
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "empresa" }, descripcion: "pot fixar la naturalesa de qualsevol organitzacio (autoritza; 22023 organitzacio_inexistent) (A5)" },
     { tabla: "fixar_naturalesa", op: "rpc", esperado: "permitir", errorExigit: "22023", args: { p_org: "00000000-0000-0000-0000-000000000000", p_naturalesa: "no_existeix" }, descripcion: "una naturalesa desconeguda es 22023 (A5)" },
     { tabla: "desactivar_acces_org", op: "rpc", esperado: "permitir", args: { p_org: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot treure l'accés a una entitat (22023 si no existeix)" },

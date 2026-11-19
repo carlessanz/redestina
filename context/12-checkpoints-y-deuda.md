@@ -150,6 +150,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **19-11-2026 (`20270608100000`…`100400`, fase 3 de los puntos 4-6): se abren la 191 y la 192** (fixture de externos de canalización; el modelo heredado convive): **87 vivas** y la siguiente es la 193. La condición de la 154 («una venta sin albarán») ya se da: el CT retirado sigue marcando como retroactiva una venta sin OPE, parte del código muerto.
 
 ⚠️ **19-11-2026 (`20270610100000`…`100200`, fase 5 de los puntos 4-6): se abren de la 193 a la 197** (flecos de la propuesta de cambios y del envío automático de albaranes): **92 vivas** y la siguiente es la 198.
+
+⚠️ **19-11-2026 (`20270611100000`, fase 6 de los puntos 4-6, vaciado): se abren de la 198 a la 202**: **97 vivas** y la siguiente es la 203. La **192** queda redefinida (en el clon ya no hay REC heredado de oferta ni OPE; falta retirar las ramas heredadas, sin olvidar que la espigolada usa REC sin canalización) y la **194** se cierra cuando se vacíe producción.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -974,3 +976,13 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `marcar_documento_generado` o el correo da `error`, no vuelve a salir (como `enviaDocument`). Queda «Envia per correu».
 197. **Si `validar_recollida` no llega a conciliar**, no hay versión `conciliat` y no se envía nada (caso que no debería
      darse). Queda el botón manual.
+198. **El plan de prevención retirado deja 4 checks «sin datos» para siempre** (fase 6): `planes_prevencion` y `pla_*` ya
+     no tienen forma legítima de crear filas. Arreglo: `drop` de esas tablas (con la 175) y retirar sus checks.
+199. **El fixture ya no da el caso «donante bloqueado por datos fiscales»**: TEST-PROD-2 nace completo de la siembra.
+     Arreglo: un tercer ofertante incompleto, solo en el clon.
+200. **El fixture de convenios ya no recorre la firma por enlace**: los de la siembra nacen declarados y vigentes.
+201. **Cuentas sin organización tras el vaciado** (`recowner-obrador`, `wa-sebas/raquel/anna/laura`): se quitaron de
+     `/login` (`lib/accessosTest.ts`); se enganchan con «Dona-li accés» si hacen falta. La de doble rol no tiene botón
+     (su contraseña no está en `cuentas-prueba.json`).
+202. **Los checks de albaranes de `receptor-comercial` son estructuralmente «sin datos»**: desde la fase 3 una venta no
+     tiene albarán y una empresa confirmada no recibe donaciones. Arreglo: cambiar de cuenta o retirarlos.

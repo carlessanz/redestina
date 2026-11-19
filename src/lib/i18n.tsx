@@ -282,7 +282,7 @@ const ca: Dict = {
   'test.title': 'Usuaris de prova',
   'test.hint': 'Un clic i entres amb aquest compte. Són comptes de prova: desapareixeran quan s’apagui la demo.',
   'test.grp_prod': 'Entitats productores', 'test.grp_rec': 'Entitats receptores',
-  'test.grp_wa': "Fitxes reals de l'equip",
+  'test.grp_wa': 'Compte de proves de Carles',
   // registre públic
   'reg.title': 'Registra’t a Redestina',
   'reg.subtitle': 'Crea el compte de la teva organització. L’equip de Redestina validarà l’alta abans d’activar-la.',
@@ -4735,7 +4735,7 @@ const es: Dict = {
   'test.title': 'Usuarios de prueba',
   'test.hint': 'Un clic y entras con esa cuenta. Son cuentas de prueba: desaparecerán cuando se apague la demo.',
   'test.grp_prod': 'Entidades productoras', 'test.grp_rec': 'Entidades receptoras',
-  'test.grp_wa': 'Fichas reales del equipo',
+  'test.grp_wa': 'Cuenta de pruebas de Carles',
   'reg.title': 'Regístrate en Redestina',
   'reg.subtitle': 'Crea la cuenta de tu organización. El equipo de Redestina validará el alta antes de activarla.',
   'reg.rol_label': '¿Quiénes sois?', 'reg.rol_prod': 'Entidad productora', 'reg.rol_ent': 'Entidad receptora',

@@ -5,14 +5,21 @@
 // prueba tiene un convenio ANTERIOR de donación vigente: con él puede donar pero no vender.
 // El equipo le prepara el de col·laboració, ella lo firma desde «Pendent de tu», el equipo lo
 // contrafirma, y entonces ya puede vender; y no se le puede abrir otro encima.
+//
+// Desde el vaciado del clon (fase 6 de los puntos 4-6) la productora nace con el Conveni de
+// col·laboració DECLARAT y sin ningún convenio anterior: la prueba se pone el de donación
+// (`don_gen`, en papel) ella misma y, al acabar, deja SIEMPRE un col·laboració vigente —el que ha
+// firmado o, si la prueba se ha quedado a medias, uno declarado—: las pruebas que vienen detrás
+// asignan donaciones de esta productora y sin convenio fallarían todas con `sense_conveni`.
 
 import { expect, test } from '@playwright/test'
-import { entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
+import { asseguraConveniVigent, entra, motiuSaltClon, productorDe, sql, sqlCom } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
 let prod = ''
 let conveni = ''
+let anterior = ''
 
 test.beforeAll(({}, info) => {
   if (motiuSaltClon('productor', 'super_admin') || info.project.name !== 'escriptori') return
@@ -23,13 +30,25 @@ test.beforeAll(({}, info) => {
   sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E' where productor_id = '${prod}' and tipo in ('col_productor', 'com') and estado = 'vigent'`)
   sql(`delete from enlaces_token where objeto_tipo = 'convenio' and objeto_id in (select id from convenios where productor_id = '${prod}' and tipo = 'col_productor' and estado in ('esborrany', 'pendent_firma'))`)
   sql(`delete from convenios where productor_id = '${prod}' and tipo = 'col_productor' and estado in ('esborrany', 'pendent_firma')`)
+  // El convenio ANTERIOR de donación: en papel (sin número), como los que se firmaron antes de la
+  // plataforma. Ya no hay plantilla de `don_gen`, así que no se puede emitir por el camino normal.
+  anterior = sql(`select id from convenios where productor_id = '${prod}' and tipo = 'don_gen' and estado = 'vigent'`)
+  if (!anterior) {
+    anterior = sql(`insert into convenios (tipo, tipo_org, productor_id, estado, origen, referencia_paper, firmado_at, idioma)
+      values ('don_gen', 'productor', '${prod}', 'vigent', 'paper', 'TEST-E2E conveni anterior de donació', now(), 'ca')
+      returning id`).split('\n')[0]
+  }
   conveni = sqlCom('super_admin', `select (preparar_convenio('productor', '${prod}', 'col_productor')).id`)
   sqlCom('super_admin', `select enviar_convenio('${conveni}', null)`)
 })
 
 test.afterAll(() => {
-  if (!conveni) return
-  sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E' where id = '${conveni}' and estado = 'vigent'`)
+  if (!prod) return
+  // El anterior de donación, fuera (si la contrafirma no lo ha sustituido ya).
+  if (anterior) sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E' where id = '${anterior}' and estado = 'vigent'`)
+  // Y la productora se queda con su Conveni de col·laboració vigente: el firmado aquí (contrafirmado
+  // si se quedó en `firmat`) o, si la prueba no llegó a firmarlo, uno declarado.
+  asseguraConveniVigent('productor', prod)
 })
 
 test.beforeEach(({}, info) => {

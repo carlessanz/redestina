@@ -23,19 +23,36 @@ test.beforeEach(({}, info) => {
   test.skip(info.project.name !== 'escriptori', 'Edita les fitxes de prova compartides: només a escriptori')
 })
 
-/** La organización de doble rol de las pruebas (Carles): su id y el de cada ficha. */
-function orgCarles() {
-  const ent = entidadDe(RECEPTOR)
-  const org = sql(`select organizacion_id from entidades where id = '${ent}'`)
-  const prod = sql(`select id from productores where organizacion_id = '${org}'`)
+/**
+ * La organización de DOBLE ROL de las pruebas, por el `codigo` de su ficha de productor
+ * (`TEST-DOBLE-PROD`, `sembrar-entitats-ficticies.ts`): su id y el de cada ficha. Hasta la fase 6
+ * de los puntos 4-6 era la de `receptor-carles`; desde la siembra, esa cuenta lleva solo el Obrador
+ * (una receptora) y el doble rol es una organización propia cuya cuenta no está en el arnés. Las
+ * pruebas del equipo van sobre ella; las del actor (1.6), sobre la organización de su cuenta.
+ */
+function orgDoble() {
+  const prod = sql(`select id from productores where codigo = 'TEST-DOBLE-PROD'`)
+  const org = prod ? sql(`select organizacion_id from productores where id = '${prod}'`) : ''
+  const ent = org ? sql(`select id from entidades where organizacion_id = '${org}'`) : ''
+  if (!prod || !ent) throw new Error('Falta l’organització de doble rol TEST-DOBLE-PROD/ENT (sembrar-entitats-ficticies.ts)')
   return { org, ent, prod }
 }
 
+/** La organización de la cuenta `receptor-carles` (el actor de 1.6): su id y su ficha de entidad. */
+function orgActor() {
+  const ent = entidadDe(RECEPTOR)
+  const org = sql(`select organizacion_id from entidades where id = '${ent}'`)
+  return { org, ent }
+}
+
+/** Lo que las pruebas del actor tocan de su ficha, para dejarlo como estaba. */
+let originalActor: { telefon2: string; direccio: string } | null = null
+
 test('el listado abre con solo las activas, lo dice, y una desactivada deja de salir', async ({ page }) => {
-  const { ent, prod } = orgCarles()
+  const { ent, prod } = orgDoble()
   // Volver a activarlas exige NIF válido y razón social (trigger de 1A): los datos de prueba
   // de la ficha de productor no los tenían, y se dejan puestos (las dos fichas comparten NIF).
-  sql(`update productores set razon_social = coalesce(razon_social, 'Organització Carles Sanz'),
+  sql(`update productores set razon_social = coalesce(razon_social, empresa, name),
          nif = case when nif_valid(nif) then nif else '22222222J' end where id = '${prod}'`)
   sql(`update entidades set razon_social = coalesce(razon_social, nombre),
          nif = case when nif_valid(nif) then nif else '22222222J' end where id = '${ent}'`)
@@ -46,7 +63,7 @@ test('el listado abre con solo las activas, lo dice, y una desactivada deja de s
   await expect(page.getByText(new RegExp(`Mostrant ${actives} de ${total}|Mostrando ${actives} de ${total}`))).toBeVisible()
   await expect(page.getByTestId('entitat-fila')).toHaveCount(Number(actives))
 
-  // Desactivar el papel de receptor de Carles no la quita (sigue activa como ofertante, D7);
+  // Desactivar su papel de receptora no la quita (sigue activa como ofertante, D7);
   // desactivar la organización entera, sí.
   sqlCom('super_admin', `select desactivar_fitxa('entidad', '${ent}')`)
   await page.reload()
@@ -62,7 +79,7 @@ test('el listado abre con solo las activas, lo dice, y una desactivada deja de s
 })
 
 test('las rutas de antes de 1C redirigen al listado y a la organización', async ({ page }) => {
-  const { org, ent, prod } = orgCarles()
+  const { org, ent, prod } = orgDoble()
   await entra(page, 'super_admin')
   await page.goto('/equip/productors')
   await page.waitForURL((u) => u.pathname === '/equip/entitats' && u.searchParams.get('rol') === 'ofertant')
@@ -76,7 +93,7 @@ test('las rutas de antes de 1C redirigen al listado y a la organización', async
 })
 
 test('la ficha única enseña los dos papeles y un campo común se escribe en las dos fichas', async ({ page }) => {
-  const { org, ent, prod } = orgCarles()
+  const { org, ent, prod } = orgDoble()
   sql(`update productores set telefono_alt = null where id = '${prod}'`)
   sql(`update entidades set telefono2 = null where id = '${ent}'`)
   await entra(page, 'super_admin')
@@ -95,10 +112,28 @@ test('la ficha única enseña los dos papeles y un campo común se escribe en la
   await expect(page.getByText(/Canvis desats|Cambios guardados/).first()).toBeVisible()
   expect(sql(`select telefono_alt from productores where id = '${prod}'`)).toBe(TEL)
   expect(sql(`select telefono2 from entidades where id = '${ent}'`)).toBe(TEL)
+  // Se deja como estaba.
+  sql(`update productores set telefono_alt = null where id = '${prod}'`)
+  sql(`update entidades set telefono2 = null where id = '${ent}'`)
+})
+
+test('1.6 (equipo): el equipo cambia un campo de la ficha de la receptora', async ({ page }) => {
+  const { org, ent } = orgActor()
+  originalActor = {
+    telefon2: sql(`select coalesce(telefono2, '') from entidades where id = '${ent}'`),
+    direccio: sql(`select coalesce(direccion, '') from entidades where id = '${ent}'`),
+  }
+  sql(`update entidades set telefono2 = null where id = '${ent}'`)
+  await entra(page, 'super_admin')
+  await page.goto(`/equip/entitats/${org}?pestanya=contacte`)
+  await page.locator('#ed-telefon2').fill(TEL)
+  await page.getByRole('button', { name: /^Desar$|^Guardar$/ }).first().click()
+  await expect(page.getByText(/Canvis desats|Cambios guardados/).first()).toBeVisible()
+  expect(sql(`select telefono2 from entidades where id = '${ent}'`)).toBe(TEL)
 })
 
 test('1.6: el actor ve lo que cambió el equipo, no ve la gestión interna, y lo que cambia lo ve el equipo', async ({ page }) => {
-  const { ent } = orgCarles()
+  const { ent } = orgActor()
   // Para poder guardar: raó social y NIF válido (los exige la ficha del actor).
   sql(`update entidades set razon_social = coalesce(razon_social, nombre),
          nif = case when nif_valid(nif) then nif else '22222222J' end, direccion = null where id = '${ent}'`)
@@ -116,15 +151,16 @@ test('1.6: el actor ve lo que cambió el equipo, no ve la gestión interna, y lo
 })
 
 test('…y el equipo ve la dirección que puso el actor', async ({ page }) => {
-  const { org, ent, prod } = orgCarles()
+  const { org } = orgActor()
   await entra(page, 'super_admin')
   await page.goto(`/equip/entitats/${org}`)
-  // La dirección es un campo común: la de productor manda si la tiene; se vació para que
-  // la ficha enseñe la de la entidad (`valorComu`).
-  sql(`update productores set direccion = null where id = '${prod}'`)
-  await page.reload()
   await expect(page.locator('#ed-direccion')).toHaveValue('Carrer de la Prova, 16')
-  // Se deja como estaba.
-  sql(`update productores set telefono_alt = null where id = '${prod}'`)
-  sql(`update entidades set telefono2 = null, direccion = null where id = '${ent}'`)
+})
+
+test.afterAll(() => {
+  // La ficha del actor, como estaba (teléfono 2 y dirección de la siembra).
+  if (!originalActor) return
+  const { ent } = orgActor()
+  const lit = (v: string) => (v ? `'${v.replace(/'/g, "''")}'` : 'null')
+  sql(`update entidades set telefono2 = ${lit(originalActor.telefon2)}, direccion = ${lit(originalActor.direccio)} where id = '${ent}'`)
 })

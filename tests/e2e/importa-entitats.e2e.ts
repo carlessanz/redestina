@@ -7,9 +7,9 @@
 // Solo en el clon y con `E2E_ESCRIU=1` (crea fichas); solo en el proyecto de escritorio (el
 // móvil se mide poniendo el viewport a 360 px dentro de la prueba). Las fichas creadas se
 // llaman `TEST-IMP …` y se borran antes y después con `borrar_ficha_completa()`. La ficha
-// existente es la de `TEST-ENT-SOCIAL` (NIF 65000772N) y la fila no le cambia nada; la dudosa
-// comparte el correo de `TEST-ENT-OBRADOR` y se resuelve «crea'n una de nova», así que
-// tampoco se toca.
+// existente es la de `TEST-ENT-SOCIAL` (su nombre y su NIF se leen de la base: desde la siembra
+// de la fase 6 ya no son los de antes) y la fila no le cambia nada; la dudosa comparte el correo
+// de `TEST-ENT-OBRADOR` (también leído) y se resuelve «crea'n una de nova», así que tampoco se toca.
 //
 // Plan 2 B3 (10-11-2026): la cuenta `equip` (un `tecnic`) exporta a Excel las fichas `TEST-IMP`
 // de esta pasada desde Entitats (formato de la plantilla, desplegables, «ID Redestina»); el
@@ -51,6 +51,10 @@ let telNou = ''
 let fixNou = ''
 let exportat = ''
 let modificat = ''
+/** La ficha existente (`TEST-ENT-SOCIAL`) y el correo de la dudosa (`TEST-ENT-OBRADOR`), de la base. */
+let nomSocial = ''
+let nifSocial = ''
+let correuObrador = ''
 
 const LLETRES = 'TRWAGMYFPDXBNJZSQVHLCKE'
 const enUs = (col: string, v: string) => sql(`select count(*) from (
@@ -89,6 +93,11 @@ function neteja() {
 test.beforeAll(async ({}, info) => {
   if (motiuSaltClon('superadmin') || info.project.name !== 'escriptori' || process.env.E2E_ESCRIU !== '1') return
   neteja()
+  const social = sql(`select nombre || '|' || coalesce(nif, '') from entidades where codigo = 'TEST-ENT-SOCIAL'`).split('|')
+  nomSocial = social[0] ?? ''
+  nifSocial = social[1] ?? ''
+  correuObrador = sql(`select coalesce(email, '') from entidades where codigo = 'TEST-ENT-OBRADOR'`)
+  if (!nomSocial || !nifSocial || !correuObrador) throw new Error('Falten TEST-ENT-SOCIAL (amb NIF) o el correu de TEST-ENT-OBRADOR al clon')
   nifNou = dniLliure()
   telNou = telefonLliure('6')
   fixNou = telefonLliure('93')
@@ -109,9 +118,9 @@ test.beforeAll(async ({}, info) => {
     // 3 · nova sense NIF: receptora social.
     fila({ 'Nombre comercial': `TEST-IMP Menjador ${marca}`, 'Tipo de entidad': 'Entidad social', Municipio: 'Mataró', 'Forma jurídica': 'Asociación' }),
     // 4 · existent per NIF (la de TEST-ENT-SOCIAL), sin nada que rellenar.
-    fila({ 'Nombre comercial': 'Menjador Social de Prova', 'Tipo de entidad': 'Entidad social', NIF: '65000772N' }),
+    fila({ 'Nombre comercial': nomSocial, 'Tipo de entidad': 'Entidad social', NIF: nifSocial }),
     // 5 · dubtosa: sin NIF y con el correo de TEST-ENT-OBRADOR.
-    fila({ 'Nombre comercial': `TEST-IMP Dubtosa ${marca}`, 'Tipo de entidad': 'Entidad social', 'Correo (contacto)': 'hola+recowner-obrador@carlessanz.com' }),
+    fila({ 'Nombre comercial': `TEST-IMP Dubtosa ${marca}`, 'Tipo de entidad': 'Entidad social', 'Correo (contacto)': correuObrador }),
     // 6 · sin papel deducible («Empresa»): la revisión obliga a elegirlo.
     fila({ 'Nombre comercial': `TEST-IMP Empresa ${marca}`, 'Tipo de entidad': 'Empresa', 'Registro excedente': '' }),
     [],
@@ -240,7 +249,7 @@ test('Airtable → revisió → importa: 4 creades inactives, la existent sense 
   expect(sql(`select activo || '|' || tipo_receptor || '|' || tipo_entidad from entidades where nombre = 'TEST-IMP Menjador ${marca}'`)).toBe('false|social|associacio')
   expect(sql(`select count(*) from entidades where nombre in ('TEST-IMP Dubtosa ${marca}', 'TEST-IMP Empresa ${marca}') and not activo`)).toBe('2')
   // La existente no se ha tocado.
-  expect(sql(`select coalesce(comentarios, '<null>') from entidades where nif = '65000772N'`)).toBe('<null>')
+  expect(sql(`select coalesce(comentarios, '<null>') from entidades where nif = '${nifSocial}'`)).toBe('<null>')
 })
 
 test('el mateix fitxer una altra vegada: avisa que ja es va importar i tot surt «sense canvis»', async ({ page }) => {

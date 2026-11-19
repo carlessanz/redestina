@@ -119,6 +119,38 @@ export function sqlCom(rol: string, consulta: string): string {
 }
 
 /**
+ * Desde la siembra de la fase 6 de los puntos 4-6 TODAS las fichas de prueba tienen su Conveni de
+ * col·laboració DECLARAT vigente, y las pruebas que asignan donaciones lo necesitan. Una prueba que
+ * quiera recorrer el camino que lo crea (declararlo, firmarlo) se lo quita antes con
+ * `resolConveniVigent` y, al acabar, `asseguraConveniVigent` lo repone si ella no llegó a hacerlo:
+ * contrafirma el que se quedó firmado o, si no hay, declara uno (como el super_admin en la ficha).
+ */
+function tipusConveni(tipoOrg: 'productor' | 'entidad'): string {
+  return tipoOrg === 'productor' ? 'col_productor' : 'col_receptor'
+}
+function columnaOrg(tipoOrg: 'productor' | 'entidad'): string {
+  return tipoOrg === 'productor' ? 'productor_id' : 'entidad_id'
+}
+
+/** Resuelve el Conveni de col·laboració vigente de la ficha (si lo tiene). */
+export function resolConveniVigent(tipoOrg: 'productor' | 'entidad', id: string): void {
+  sql(`update convenios set estado = 'resolt', motivo_resolucion = 'Prova E2E'
+        where ${columnaOrg(tipoOrg)} = '${id}' and tipo = '${tipusConveni(tipoOrg)}' and estado = 'vigent'`)
+}
+
+/** Deja la ficha con su Conveni de col·laboració vigente: no toca nada si ya lo tiene. */
+export function asseguraConveniVigent(tipoOrg: 'productor' | 'entidad', id: string): void {
+  const on = `${columnaOrg(tipoOrg)} = '${id}' and tipo = '${tipusConveni(tipoOrg)}'`
+  if (sql(`select count(*) from convenios where ${on} and estado = 'vigent'`) !== '0') return
+  const signat = sql(`select id from convenios where ${on} and estado = 'firmat' order by created_at desc limit 1`)
+  if (signat) {
+    sqlCom('super_admin', `select contrafirmar_convenio('${signat}')`)
+    return
+  }
+  sqlCom('super_admin', `select (declarar_conveni('${tipoOrg}', '${id}', '${tipusConveni(tipoOrg)}', 'Persona de Prova', 'Gerent', null, 'Prova E2E', null)).id`)
+}
+
+/**
  * Elige una opción de un `Desplegable` (el Select de Radix, `components/Desplegable.tsx`):
  * `selectOption` solo sirve para `<select>` nativos. Por valor (string, el `data-valor` de la
  * opción), por texto o por posición (la 0 es la opción vacía si la hay, como en el nativo).

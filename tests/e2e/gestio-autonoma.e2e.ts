@@ -7,7 +7,7 @@
 // `scripts/local/cargar-local.sh` devuelve el clon a la copia de producción.
 
 import { expect, test } from '@playwright/test'
-import { entidadDe, entra, motiuSaltClon, productorDe, sql, triaCercador } from './ajuda'
+import { asseguraConveniVigent, entidadDe, entra, motiuSaltClon, productorDe, resolConveniVigent, sql, triaCercador } from './ajuda'
 
 test.describe.configure({ mode: 'serial' })
 
@@ -15,7 +15,7 @@ const RECEPTOR = 'receptor-carles'
 const marca = Date.now()
 
 test.beforeEach(({}, info) => {
-  const m = motiuSaltClon('super_admin', 'equip', 'productor', RECEPTOR)
+  const m = motiuSaltClon('super_admin', 'equip', 'productor', RECEPTOR, 'receptor-comercial')
   test.skip(m !== null, m ?? '')
   test.skip(info.project.name !== 'escriptori', 'escriu al clon: una sola passada')
 })
@@ -23,17 +23,21 @@ test.beforeEach(({}, info) => {
 test('el super_admin dona per vigent el conveni d’una receptora des de la seva fitxa', async ({ page }) => {
   // Una receptora de prueba que se pueda declarar: sin el convenio ya vigente, ni firmado por
   // ella a falta de contrafirma, ni devuelto (`declarar_conveni` niega esos tres), y con NIF y
-  // domicilio. Antes era siempre el Obrador de Prova, y un convenio que firmó en otra prueba y
-  // nadie contrafirmó (26-10-2026) la dejaba fallando en `ja_signat`. Cada pasada consume una.
-  // El Menjador Social de Prova queda fuera: otras pruebas lo quieren sin convenio.
-  const ent = sql(`select e.id from entidades e
-    where e.es_test and e.activo and e.nif is not null and coalesce(btrim(e.direccion), '') <> ''
-      and e.id <> '${entidadDe(RECEPTOR)}' and e.nombre <> 'Menjador Social de Prova'
-      and not exists (select 1 from convenios c where c.entidad_id = e.id and c.tipo = 'col_receptor'
-                        and c.estado in ('vigent', 'firmat', 'retornat'))
-    order by e.nombre like '%de Prova%' desc, e.nombre limit 1`)
-  test.skip(!ent, 'cap receptora de prova sense conveni de col·laboració (recarrega el clon)')
+  // domicilio. Desde la siembra de la fase 6 de los puntos 4-6 todas nacen con el suyo DECLARAT
+  // vigente: se usa la comercial de prueba y se le resuelve antes (la propia prueba le declara
+  // otro, así que queda como estaba; si se corta a medias, el `finally` se lo repone).
+  const ent = entidadDe('receptor-comercial')
+  expect(ent).toMatch(/^[0-9a-f-]{36}$/)
+  expect(sql(`select count(*) from convenios where entidad_id = '${ent}' and tipo = 'col_receptor' and estado in ('firmat', 'retornat')`)).toBe('0')
+  resolConveniVigent('entidad', ent)
+  try {
+    await declaraDesDeLaFitxa(page, ent)
+  } finally {
+    asseguraConveniVigent('entidad', ent)
+  }
+})
 
+async function declaraDesDeLaFitxa(page: import('@playwright/test').Page, ent: string) {
   await entra(page, 'super_admin')
   await page.goto(`/equip/entitats/${ent}?pestanya=documentacio`)
   // En el convenio de su papel de receptora (Documentació › Convenis): con doble rol hay dos.
@@ -48,7 +52,7 @@ test('el super_admin dona per vigent el conveni d’una receptora des de la seva
   expect(sql(`select origen || ':' || estado from convenios
     where entidad_id = '${ent}' and tipo = 'col_receptor' and estado = 'vigent'`)).toBe('declarat:vigent')
   await expect(page.getByText(/declarat \(sense signatura\)|declarado \(sin firma\)/).first()).toBeVisible()
-})
+}
 
 test('des del detall de l’oferta: copia i marca enviada, registra l’interès i l’aprova', async ({ page, context, browser }) => {
   const prod = productorDe('productor')

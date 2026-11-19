@@ -24,8 +24,8 @@
 //                                                     -> el productor ve SU firma y la cola
 //                                                        «Signatures per tancar» tiene una
 //   · un **cierre de prueba de 2026 ya calculado**     -> los dos productores ven su
-//     acumulado anual y sus líneas (fase 4), con TEST-PROD-1 certificable y TEST-PROD-2
-//     bloqueado por datos fiscales: los dos casos de la pantalla de cierre
+//     acumulado anual y sus líneas (fase 4). Hasta la fase 6, TEST-PROD-2 salía bloqueado
+//     por datos fiscales; desde la siembra de organizaciones completas ya los tiene (deuda)
 //
 // TODO LO QUE TOCA LLEVA PREFIJO `TEST-`. No crea ni modifica ninguna organización real, y
 // el tipo de caja que activa es uno inventado (`TEST-CAIXA`): las taras de verdad las
@@ -36,7 +36,7 @@
 // no vuelve a crear nada y sale diciendo qué hay. Para volver a empezar hay que borrar a
 // mano (los albaranes emitidos no se borran a propósito: son documentos con número).
 
-import { createClient } from "npm:@supabase/supabase-js@2";
+import { createClient, type SupabaseClient } from "npm:@supabase/supabase-js@2";
 
 const url = Deno.env.get("SUPABASE_URL");
 const key = Deno.env.get("SB_SECRET_KEY");
@@ -120,6 +120,15 @@ async function rpc<T>(nombre: string, args: Record<string, unknown>): Promise<T>
  * `validar_recollida` (un admin), que con la service key responden 42501.
  */
 async function rpcCom<T>(etiqueta: string, nombre: string, args: Record<string, unknown>): Promise<T> {
+  return await ambSessio(etiqueta, async (cliente) => {
+    const { data, error } = await cliente.rpc(nombre, args);
+    if (error) throw new Error(`rpc ${nombre} (${etiqueta}): ${error.message} (${error.code ?? "?"})`);
+    return data as T;
+  });
+}
+
+/** Abre la sesión de una cuenta de prueba, ejecuta `fn` con ella y la cierra (solo esta sesión). */
+async function ambSessio<T>(etiqueta: string, fn: (cliente: SupabaseClient) => Promise<T>): Promise<T> {
   const publishable = Deno.env.get("VITE_SUPABASE_PUBLISHABLE_KEY");
   if (!publishable) throw new Error("Falta VITE_SUPABASE_PUBLISHABLE_KEY (sale de .env.local)");
   const cuentas: { etiqueta: string; email: string; password: string }[] = JSON.parse(
@@ -135,9 +144,7 @@ async function rpcCom<T>(etiqueta: string, nombre: string, args: Record<string, 
   });
   if (errLogin) throw new Error(`login ${etiqueta}: ${errLogin.message}`);
   try {
-    const { data, error } = await cliente.rpc(nombre, args);
-    if (error) throw new Error(`rpc ${nombre} (${etiqueta}): ${error.message} (${error.code ?? "?"})`);
-    return data as T;
+    return await fn(cliente);
   } finally {
     // Solo esta sesión: el `signOut()` por defecto cerraría las de la cuenta en el navegador.
     await cliente.auth.signOut({ scope: "local" });
@@ -157,8 +164,8 @@ async function rpcCom<T>(etiqueta: string, nombre: string, args: Record<string, 
 //      `conciliada_at`, así que el cierre saldría igual — pero entonces el camino
 //      principal no lo probaría nadie. Aquí se rellena.
 //   2. **Datos fiscales.** Sin NIF y domicilio, `calcular_cierre()` bloquea al donante y
-//      no se puede llegar al certificado. TEST-PROD-1 los recibe; **TEST-PROD-2 no**, a
-//      propósito: es el caso bloqueado que hay que ver en la pantalla.
+//      no se puede llegar al certificado. TEST-PROD-1 los recibe aquí; TEST-PROD-2 ya los trae
+//      de `sembrar-entitats-ficticies.ts` (fase 6), así que ese caso bloqueado ya no sale.
 //   3. **Un donante con conciliación retroactiva.** Es la fuente 2 del plan (las
 //      canalizaciones de 2026 que no tienen albarán). Sirve para comprobar lo único que
 //      distingue un cierre de prueba de uno real: en prueba entra, en real no.
@@ -184,7 +191,15 @@ async function prepararCierre() {
   // (1) Datos fiscales del donante que sí certifica.
   await db.from("productores").update(FISCAL_PROD_1).eq("id", productor);
   console.log(`  TEST-PROD-1: NIF ${FISCAL_PROD_1.nif}, ${FISCAL_PROD_1.codigo_postal} ${FISCAL_PROD_1.poblacion}`);
-  console.log("  TEST-PROD-2: SIN dades fiscals (cas bloquejat, a propòsit)");
+  // Desde la fase 6 (sembrar-entitats-ficticies.ts) el segundo ofertante nace COMPLETO, con sus
+  // datos fiscales: el caso «donante bloqueado por falta de datos fiscales» ya no lo da este
+  // fixture (queda anotado como deuda). Aquí solo se informa de lo que hay.
+  {
+    const { data: p2 } = await db.from("productores").select("nif, domicili_fiscal").eq("id", productor2).maybeSingle();
+    console.log(p2?.nif && p2?.domicili_fiscal
+      ? "  TEST-PROD-2: amb dades fiscals (sembra de la fase 6; el cas bloquejat per dades fiscals ja no es dona)"
+      : "  TEST-PROD-2: SENSE dades fiscals (cas bloquejat)");
+  }
 
   // (2) Coste del segundo producto.
   await rpc("fijar_coste_producto", {
@@ -328,7 +343,24 @@ async function prepararTransaccio(cierre: string) {
     .select("id").eq("id_excedente", idCT).maybeSingle();
 
   if (ya) {
-    console.log("  la venda del fixture ja existeix; no es refà");
+    // Si una pasada anterior se quedó a medias (registrada y sin validar), se termina aquí.
+    const { data: canYa } = await db.from("canalizaciones")
+      .select("id, estado, recollida_registrada_at, recollida_validada_at").eq("excedente_id", ya.id).maybeSingle();
+    if (canYa && !canYa.recollida_validada_at && canYa.estado !== "conciliada" && canYa.estado !== "anulada") {
+      if (!canYa.recollida_registrada_at) {
+        await rpcCom("receptor-comercial", "registrar_recollida", {
+          p_canalizacion: canYa.id, p_resultat: "menys", p_kg_reals: 195, p_data: null,
+          p_observacions: "Fixture: 5 kg no aptes en arribar",
+        });
+      }
+      await rpcCom("superadmin", "fixar_preu_acordat", { p_canalizacion: canYa.id, p_preu: 0.4, p_acceptat: true });
+      await rpcCom("superadmin", "validar_recollida", {
+        p_canalizacion: canYa.id, p_kg: null, p_motiu: "Fixture: diferència revisada amb l'entitat",
+      });
+      console.log("  la venda del fixture estava a mitges: preu acordat i recollida validada");
+    } else {
+      console.log("  la venda del fixture ja existeix; no es refà");
+    }
   } else {
     const entComercial = await idOrg("entidades", "TEST-ENT-COMERCIAL");
     const { data: exc, error: errExc } = await db.from("excedentes").insert({
@@ -372,6 +404,9 @@ async function prepararTransaccio(cierre: string) {
       p_data: null,
       p_observacions: "Fixture: 5 kg no aptes en arribar",
     });
+    // Desde la asignación en un acto (20270607100000) una venta no se valida sin el precio
+    // acordado y ACEPTADO por el ofertante (`cal_preu_acceptat`): lo fija el super_admin.
+    await rpcCom("superadmin", "fixar_preu_acordat", { p_canalizacion: can.id, p_preu: 0.4, p_acceptat: true });
     const val = await rpcCom<{ albara: string | null; conciliat: boolean }>(
       "superadmin", "validar_recollida", {
         p_canalizacion: can.id,
@@ -437,7 +472,7 @@ async function prepararConvenis() {
   async function ciclo(
     tipoOrg: "productor" | "entidad",
     orgId: string,
-    tipo: "don_gen" | "don_rec" | "com",
+    tipo: "col_productor" | "col_receptor",
     etiqueta: string,
     hastaVigent: boolean,
   ) {
@@ -512,9 +547,12 @@ async function prepararConvenis() {
     console.log(`  ${etiqueta}: ${vigent.numero_completo} ${vigent.estado}`);
   }
 
-  await ciclo("productor", productor, "don_gen", "TEST-PROD-1 (donació generador)", true);
-  await ciclo("entidad", await idOrg("entidades", "TEST-ENT-SOCIAL"), "don_rec",
-              "TEST-ENT-SOCIAL (entitat receptora)", false);
+  // Desde la fase 6 de los puntos 4-6 las fichas nacen con el Conveni de col·laboració DECLARAT
+  // vigent (`sembrar-entitats-ficticies.ts`), así que los dos ciclos encuentran el suyo y no hacen
+  // nada. Los modelos `don_gen`/`don_rec` ya no tienen plantilla vigente.
+  await ciclo("productor", productor, "col_productor", "TEST-PROD-1 (col·laboració)", true);
+  await ciclo("entidad", await idOrg("entidades", "TEST-ENT-SOCIAL"), "col_receptor",
+              "TEST-ENT-SOCIAL (col·laboració)", false);
 
   const { data: camp } = await db.from("v_campanya_convenis")
     .select("tipo_org, tipo, comarca, organitzacions, vigents, pendents_firma, sense_conveni");
@@ -591,6 +629,188 @@ async function prepararSignatura() {
     await db.storage.from("documentos").remove([ruta]);
     throw e;
   }
+}
+
+// ---------------------------------------------------------------------------
+// Lo que la base vaciada ya no trae y el arnés necesita (fase 6 de los puntos 4-6)
+// ---------------------------------------------------------------------------
+// Hasta el vaciado de `reiniciar_dades_operatives()` (20270611100000), estos checks del arnés se
+// sostenían con datos copiados de producción. Ahora los pone el fixture, por los caminos reales:
+//   · un DIAGNÓSTICO de TEST-PROD-1 (`desar_excedents_diagnostic`, el equipo) → A1/A3;
+//   · un EXPEDIENTE de prevención con número (`obrir_expedient` + `exportar_expedient`) → el equipo lo
+//     ve y el bloqueo `expedients` de `bloqueigs_esborrat_fitxa`;
+//   · una DONACIÓN de TEST-PROD-2 al Obrador asignada y recogida en un acto (`assignar_directe` +
+//     `registrar_recollida_assistida`) → el segundo ofertante tiene su REC y `receptor-carles` su
+//     respuesta (asignación directa) y su ENT;
+//   · un contacto, un mensaje y un intake de WhatsApp FICTICIOS (número inventado, fuera de la
+//     whitelist de Meta: no recibe nada) → la Mensajería y los intakes del equipo. En la
+//     aplicación los escribe el webhook con `service_role`, que es la clave que usa este script.
+// Idempotente: cada pieza mira antes si ya está.
+
+async function prepararDiagnostic() {
+  paso("Diagnòstic de TEST-PROD-1 (A1/A3)");
+  const { count } = await db.from("diagnostic_excedents")
+    .select("id", { count: "exact", head: true }).eq("productor_id", productor);
+  if ((count ?? 0) > 0) {
+    console.log("  ja hi ha excedents al diagnòstic: no es toca");
+    return;
+  }
+  const { data: p } = await db.from("productores").select("productes_principals").eq("id", productor).maybeSingle();
+  const principal = ((p?.productes_principals ?? []) as string[])[0];
+  if (!principal) {
+    console.log("  TEST-PROD-1 no té cap producte principal a l'Operativa: no es crea");
+    return;
+  }
+  await rpcCom("superadmin", "desar_excedents_diagnostic", {
+    p_productor: productor,
+    p_productes: [{
+      producte: principal,
+      sense_excedent: false,
+      causes: [{
+        causa: "C1",
+        frequencia: "estacional",
+        volum_kg: 500,
+        gestio_actual: ["donacio", "residu"],
+        destins: ["donacio", "venda"],
+        accions: [{ desti: "donacio", descripcio: "TEST arnes: conveni amb un banc d'aliments" }],
+      }],
+    }],
+    p_notes: "Diagnòstic de prova (fixture)",
+    p_idioma: "ca",
+  });
+  console.log(`  ${principal} × C1: 500 kg estacionals, una acció de donació`);
+}
+
+async function prepararExpedient() {
+  paso("Expedient de prevenció amb número de TEST-PROD-1");
+  const { data: ja } = await db.from("expedients_prevencion")
+    .select("id, numero_completo").eq("productor_id", productor).order("created_at").limit(1).maybeSingle();
+  let id = ja?.id as string | undefined;
+  if (ja?.numero_completo) {
+    console.log(`  ja existeix (${ja.numero_completo})`);
+    return;
+  }
+  if (!id) id = await rpcCom<string>("superadmin", "obrir_expedient", { p_tipo_org: "productor", p_org: productor, p_nivell: "basic" });
+  await rpcCom("superadmin", "exportar_expedient", { p_id: id });
+  const { data: ex } = await db.from("expedients_prevencion").select("numero_completo").eq("id", id).maybeSingle();
+  console.log(`  expedient ${ex?.numero_completo ?? id} (exportat: PLA en modo real)`);
+}
+
+async function prepararRecollidaProd2() {
+  paso("Donació de TEST-PROD-2 a l'Obrador, assignada i recollida en un acte");
+  const idDon = `E-TEST-DONACIO-P2-${ejercicio}`;
+  const obrador = await idOrg("entidades", "TEST-ENT-OBRADOR");
+  let { data: exc } = await db.from("excedentes").select("id").eq("id_excedente", idDon).maybeSingle();
+  if (!exc) {
+    const { data: lloc } = await db.from("productor_ubicaciones").select("id")
+      .eq("productor_id", productor2).eq("es_principal", true).maybeSingle();
+    const { data, error } = await db.from("excedentes").insert({
+      id_excedente: idDon,
+      productor_id: productor2,
+      ubicacion_id: lloc?.id ?? null,
+      familia: "Fruita Dolça",
+      producto: "Poma",
+      variedad: "Golden",
+      kg_total: 300,
+      modalitat: "donacio",
+      causa: "Excedent de collita",
+      estado: "publicada",
+      origen: "asistido",
+      texto_oferta: "OFERTA DISPONIBLE (fixture de proves — recollida en un acte)",
+    }).select("id").single();
+    if (error) throw new Error(`oferta de donació de TEST-PROD-2: ${error.message}`);
+    exc = data;
+  }
+  const { data: can } = await db.from("canalizaciones").select("id, estado")
+    .eq("excedente_id", exc!.id).eq("entidad_id", obrador).neq("estado", "anulada").maybeSingle();
+  let canal = can?.id as string | undefined;
+  if (!canal) {
+    const c = await rpcCom<{ id: string }>("superadmin", "assignar_directe", {
+      p_excedente: exc!.id, p_entidad: obrador, p_kg: 120, p_modalitat: "donacio",
+    });
+    canal = c.id;
+  }
+  if (can?.estado === "conciliada") {
+    console.log(`  ${idDon}: ja recollida i conciliada`);
+    return;
+  }
+  // Antes de recoger, el equipo FIJA el precio a mano (lo que hace la ficha de la operación sobre
+  // una canalización aún sin conciliar: `preu_font = 'fixat'`). Deja su rastro en
+  // `canalizaciones_preu_hist` (trigger, motivo `canvi_directe`), que la base vaciada ya no traía.
+  await ambSessio("superadmin", async (cliente) => {
+    const { error } = await cliente.from("canalizaciones").update({ coste_kg: 0.55 }).eq("id", canal!);
+    if (error) throw new Error(`preu fixat de la donació de TEST-PROD-2: ${error.message}`);
+  });
+  const r = await rpcCom<Record<string, unknown>>("superadmin", "registrar_recollida_assistida", {
+    p_canalizacion: canal, p_resultat: "coincideix",
+  });
+  console.log(`  ${idDon}: 120 kg de poma → Obrador; recollida registrada i validada (${JSON.stringify(r).slice(0, 80)}…)`);
+}
+
+/**
+ * Una regeneración de documentos con los datos de la Fundació (Configuració › Fundació), la que el
+ * super_admin hace en modo test. Solo si no hay ninguna: deja su fila en `regeneracions_documents`
+ * (con 0 documentos si los datos no han cambiado, que es lo normal en el fixture). En modo test
+ * apagado la RPC se niega (`nomes_en_mode_test`) y aquí no se intenta.
+ */
+async function prepararRegeneracio() {
+  paso("Regeneració de documents amb les dades de la Fundació (mode test)");
+  const { count } = await db.from("regeneracions_documents").select("id", { count: "exact", head: true });
+  if ((count ?? 0) > 0) {
+    console.log("  ja n'hi ha alguna: no se'n fa cap altra");
+    return;
+  }
+  const { data: tm } = await db.from("app_settings").select("value").eq("key", "test_mode").maybeSingle();
+  if (tm?.value !== "true") {
+    console.log("  mode test apagat: no es regenera res");
+    return;
+  }
+  const r = await rpcCom<{ total: number; signats: number }>("superadmin", "regenerar_documents_fundacio", { p_accepto: true });
+  console.log(`  ${r.total} documents regenerats, ${r.signats} signats intactes`);
+}
+
+async function prepararCobertura() {
+  await prepararDiagnostic();
+  await prepararExpedient();
+  await prepararRecollidaProd2();
+  await prepararMissatgeria();
+  await prepararRegeneracio();
+}
+
+/** Número inventado (34, diez cifras de ceros y un 1): no es de nadie y no está en `meta_test_recipients`. */
+const TELEFON_FICTICI = "340000000001";
+
+async function prepararMissatgeria() {
+  paso("Missatgeria i intake de WhatsApp ficticis");
+  const { error: errC } = await db.from("wa_contacts")
+    .upsert({ phone: TELEFON_FICTICI, name: "Contacte de prova (fixture)", opt_in: false }, { onConflict: "phone", ignoreDuplicates: true });
+  if (errC) throw new Error(`wa_contacts: ${errC.message}`);
+  const wamid = "TEST-FIXTURE-MISSATGE-1";
+  const { data: ja } = await db.from("wa_messages").select("id").eq("wa_message_id", wamid).maybeSingle();
+  if (!ja) {
+    const { error } = await db.from("wa_messages").insert({
+      wa_message_id: wamid,
+      contact_phone: TELEFON_FICTICI,
+      direction: "inbound",
+      type: "text",
+      body: "Missatge de prova del fixture (ningú no l'ha enviat)",
+      status: "received",
+    });
+    if (error) throw new Error(`wa_messages: ${error.message}`);
+  }
+  const { data: intake } = await db.from("intake_sessions").select("id").eq("telefono", TELEFON_FICTICI).maybeSingle();
+  if (!intake) {
+    // `recordatorio_enviado_at` ya puesto: el job de los 10 minutos no le escribe a nadie.
+    const { error } = await db.from("intake_sessions").insert({
+      telefono: TELEFON_FICTICI,
+      productor_id: productor,
+      paso_actual: "kg",
+      datos_parciales: { producte: "Tomàquet", fixture: true },
+      recordatorio_enviado_at: new Date().toISOString(),
+    });
+    if (error) throw new Error(`intake_sessions: ${error.message}`);
+  }
+  console.log(`  contacte ${TELEFON_FICTICI}, un missatge entrant i un intake a mitges`);
 }
 
 // ---------------------------------------------------------------------------
@@ -762,6 +982,7 @@ if (yaExiste) {
   await prepararPlans();
   await prepararConvenis();
   await prepararSignatura();
+  await prepararCobertura();
   console.log();
   Deno.exit(0);
 }
@@ -1047,6 +1268,7 @@ await prepararCertificatPeriode();
 await prepararPlans();
 await prepararConvenis();
 await prepararSignatura();
+await prepararCobertura();
 
 const { count: nDocs } = await db.from("documentos")
   .select("id", { count: "exact", head: true }).eq("objeto_tipo", "albaran");

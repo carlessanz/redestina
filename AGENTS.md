@@ -186,7 +186,7 @@ Whitelists `meta_test_recipients`, `email_test_recipients` (vacía = sin límite
 fichero**; `siguiente_numero(serie, ejercicio)` se llama dentro de la transacción que crea la
 fila (`series_documentales`, sin `sequence`). `documentos` (polimórfica, `modo` real/prueba en
 el dato, dos huellas `sha256_datos` —la impresa— y `sha256_fichero`, **inmutable por trigger**,
-sin borrado salvo `reiniciar_documentos_prova()`), `documento_envios` (solo correo),
+sin borrado salvo `reiniciar_documentos_prova()` y `reiniciar_dades_operatives()`, §6), `documento_envios` (solo correo),
 `plantillas_documento` (texto versionado en la base, congelado al emitir), `enlaces_token`
 (firmar y confirmar sin cuenta: solo el hash; canales email·asistido·panel·whatsapp),
 `evidencias`, `parametros_documentales` (fila única, **sembrada provisional**;
@@ -311,9 +311,10 @@ Catálogos por migración (`20260721120300_seed_catalogos.sql`). Fichas, dos ví
 - **Exportación** (B3, `20270518110000`; §6.3): `exportar_entitats` → `lib/exportEntitats.ts`, formato de la
   plantilla; **exportar → reimportar = `sense_canvis`**.
 
-🔴 **En producción, los datos importados del ARA se borraron el 16-09-2026**: quedan 6 productores + 8 entidades
-de prueba, `TEST-PENDENT-ARNES` (**no aprobar nunca**: sostiene 73 checks) y `tecnologia@espigoladors.com`
-en la whitelist de correo.
+🔴 **Vaciado (fase 6, `context/06`)**: `reiniciar_dades_operatives(p_executar)` (solo `service_role`; con algo real se
+niega: `22023 hi_ha_dades_reals`) vía `scripts/reiniciar-dades.ts` (dry-run por defecto) borra la operativa y **todas** las fichas, conserva
+catálogos, configuración y cuentas, y reinicia las series; `scripts/sembrar-entitats-ficticies.ts` siembra 7 fichas
+`es_test` con el tipo en el nombre (TEST-PENDENT-ARNES, **no aprobar nunca**). Clon: hecho. Producción: pendiente.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
@@ -410,7 +411,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270610100200`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270611100000`. Tabla operativa nueva → `v_ordre` del vaciado (§6).
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -485,9 +486,8 @@ correo; sin ninguno, `cap`. `canal_preferido` se respeta si es viable. Lo decide
 - **Firma electrónica simple en todos los documentos**: el servidor compone y hashea lo firmado
   (`409 document_canviat`), nombre, cargo y DNI, trazo PNG ≤1 MB, IP y UA en `evidencias`; vías correo,
   asistida y panel. `pujar-document-signat`: formato por **bytes** (`_shared/pujada.ts`), permiso antes de leer.
-- Cuentas de prueba: 5 organizaciones `TEST-*`, 7 cuentas + 5 de WhatsApp, `hola+pendent-arnes@`
-  (**pendiente, no aprobar**) y `hola+senserol-arnes@`; credenciales en `scripts/data/cuentas-prueba.json`
-  (las del bundle de `/login`, solo con `VITE_ACCESSOS_TEST`; detalle en `context/09`).
+- Cuentas de prueba (fase 6): 7 fichas ficticias, 9 cuentas del arnés + la de doble rol; `pendent-arnes`
+  (**pendiente, no aprobar**) y `senserol-arnes`; credenciales en `scripts/data/cuentas-prueba.json` (`context/09`).
 - ⚠️ **Nunca `supabase config push`** (apagaría el login por email y subiría el Auth local); los
   flags de Auth van por Management API.
 
@@ -543,7 +543,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (92 vivas; siguiente: 198; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
+**Deuda abierta (97 vivas; siguiente: 203; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
@@ -551,12 +551,9 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
 (rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193-197** (flecos de la fase 5: `context/12`).
-Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
-`tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
-`recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
-(backfill de `data_hora_recollida`), **141** (sin freno de 48 h, decidido), **148** (la entidad
-inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2) · **188** (envases: columnas sin uso) · **189** (E2E de precios provisionales) · **190** (anular en espigolada no reabre) · **191** (fixture de externos) · **192** (modelo heredado hasta la fase 6) · **193-202** (flecos de las fases 5 y 6).
+Decisiones de negocio pendientes (en `context/12`): **69**, **131**, **132** (el `tecnic` escribe directo),
+**133·134** (frenos), **137**, **141**, **148**. El resto (entradas 4–116), en §12bis.
 
 **§12bis** y **§12ter** (99 cerradas, indexadas) viven en `context/`.
 
@@ -566,7 +563,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
    **Referencia: 2.235 de Vitest (104 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
-   **Referencia: clon 3.001/3.001 y 49 sin datos; producción 3.010/3.010 y 40 (19-11-2026).** Cifra
+   **Referencia: clon 3.021/3.021 y 47 sin datos; producción 3.010/3.010 y 40 (19-11-2026).** Cifra
    que cambia sin checks nuevos = cambio de **datos**. `prueba-numeracion.ts` si toca la numeración.
 4. E2E de lo tocado contra el clon (`tests/e2e/*.e2e.ts`; helpers en `ajuda.ts`).
 5. Publicar con `/publicar` (base → funciones → frontend).

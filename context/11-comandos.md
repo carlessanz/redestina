@@ -477,3 +477,17 @@ Orden: **base → funciones → frontend**.
 Prueba en el clon: `PGPASSWORD=postgres psql -h 127.0.0.1 -p 55322 -U postgres -d postgres -X -v ON_ERROR_STOP=1 -f
 scripts/sql/prova-preu-mes-albara.sql` («TOT CORRECTE»).
 
+### Fixtures del clon tras el vaciado (19-11-2026, fase 6)
+
+```bash
+eval "$(bash scripts/local/entorno-local.sh)"
+deno run -A scripts/reiniciar-dades.ts               # dry-run: inventario y bloqueos
+deno run -A scripts/reiniciar-dades.ts --executar    # vacía (solo clon sin --produccio)
+deno run -A scripts/sembrar-entitats-ficticies.ts    # 7 fichas ficticias (idempotente)
+deno run -A scripts/crear-datos-documentales-prueba.ts   # DOS pasadas: el PDF del REC es asíncrono y la firma
+deno run -A scripts/crear-datos-documentales-prueba.ts   # subida necesita la segunda
+deno run -A scripts/crear-respuestas-prueba.ts
+```
+
+Las E2E consumen datos de los fixtures (certificados, convenios): tras una pasada completa, el arnés del clon puede
+subir de «sin datos»; volver a correr los dos fixtures lo devuelve a la referencia.

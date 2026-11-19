@@ -3,14 +3,10 @@
 // ⚠️ ESTO SON CREDENCIALES EN CLARO EN EL CÓDIGO DEL CLIENTE. Se acepta a propósito y con
 // dos límites que no se pueden relajar:
 //
-//   1. NINGUNA cuenta con rol de plataforma (`usuario_roles`). Esas ven las 452 fichas
-//      reales, con nombre, NIF, teléfono y dirección de gente que existe; el acceso del
-//      equipo es /admin, con contraseña y sin atajos.
-//      La mayoría son además organizaciones FICTICIAS `TEST-*`, pero el grupo de WhatsApp
-//      no puede serlo: los únicos móviles verificados en Meta están en fichas de personas
-//      reales del equipo. Esas cuentas son externas y creadas aparte
-//      (`scripts/crear-usuarios-whatsapp.ts`), así que cada una ve solo su propia ficha —
-//      contacto profesional del equipo, no de los 345 productores externos.
+//   1. NINGUNA cuenta con rol de plataforma (`usuario_roles`). Esas ven todas las fichas,
+//      reales o no; el acceso del equipo es /admin, con contraseña y sin atajos.
+//      Desde la fase 6 de los puntos 4-6 todas las de aquí gestionan organizaciones
+//      FICTICIAS `TEST-*` (`scripts/sembrar-entitats-ficticies.ts`), y cada una ve solo la suya.
 //   2. Todo el bloque va detrás de `VITE_ACCESSOS_TEST`. Con la variable apagada, Vite
 //      sustituye la constante por `false`, el `&&` de LoginUsuaris queda en código muerto
 //      y este módulo se cae del bundle al hacer tree-shaking. Hay que comprobarlo con un
@@ -37,25 +33,15 @@ export interface GrupAccessos {
 
 export const GRUPS_ACCESSOS: GrupAccessos[] = [
   {
-    // Primero porque es el grupo con el que de verdad se prueba el producto entero: son
-    // las únicas fichas con móvil verificado en Meta. No son las cuentas de equipo de esas
-    // personas —esas siguen entrando por /admin—, sino cuentas externas creadas aparte
-    // (`scripts/crear-usuarios-whatsapp.ts`), así que cada una ve solo su propia ficha.
-    //
-    // ⚠️ **Hasta el 21-09-2026 cuatro de las cinco tenían ficha de productor Y de entidad**
-    //    (`scripts/escenari-demo.ts`, «una cuenta, un papel»): tenerlo en cuatro de once
-    //    cuentas de prueba hacía imposible enseñar el panel de un productor sin que saliera
-    //    también el de receptor. Las FICHAS del papel retirado siguen existiendo —no se
-    //    borra ninguna organización—, solo se desactivó la membresía; las opera el equipo,
-    //    que es el modelo asistido (§1bis). El reparto: Sebas y Raquel se quedan como
-    //    productores; Carles y Laura, como receptores.
+    // La cuenta de pruebas de Carles: externa, creada aparte (`scripts/crear-usuarios-whatsapp.ts`),
+    // no la suya del equipo, que entra por /admin. Desde la fase 6 de los puntos 4-6 (vaciado del
+    // clon y siembra de organizaciones ficticias, `scripts/sembrar-entitats-ficticies.ts`) gestiona
+    // el Obrador de prova. Las otras cuatro del grupo (Sebas, Raquel, Anna y Laura) y la del
+    // Obrador de antes se quedaron sin organización y se retiraron de aquí: su botón llevaba a
+    // `/sense-acces`. El doble rol de prueba no está porque su contraseña no está en el arnés.
     titolKey: 'test.grp_wa',
     comptes: [
-      { organitzacio: 'Carles Sanz', tipus: 'Només Receptora (social)', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
-      { organitzacio: 'Sebas Sale', tipus: 'Només Entitat productora', email: 'hola+wa-sebas@carlessanz.com', password: '4MQGu-aUxNb-6rV5s' },
-      { organitzacio: 'Raquel Diaz', tipus: 'Només Entitat productora', email: 'hola+wa-raquel@carlessanz.com', password: 'uavod-gDiVJ-VqKT5' },
-      { organitzacio: 'Anna Garreta', tipus: 'Només Receptora (social)', email: 'hola+wa-anna@carlessanz.com', password: 'EYFOH-HT0qK-neQbS' },
-      { organitzacio: 'Laura Masdeu', tipus: 'Només Receptora (social) · SENSE WhatsApp', email: 'hola+wa-laura@carlessanz.com', password: 'zTfJ0-Yo9aG-doIjq' },
+      { organitzacio: 'Obrador de prova (maquila)', tipus: 'Entitat de transformació', email: 'hola+wa-carles@carlessanz.com', password: 'I4261-jWy0M-yefs7' },
     ],
   },
   // Un solo usuario por organización: el producto no tiene cargos dentro de la empresa,
@@ -63,17 +49,16 @@ export const GRUPS_ACCESSOS: GrupAccessos[] = [
   {
     titolKey: 'test.grp_prod',
     comptes: [
-      { organitzacio: 'Mas de Prova SCP', tipus: 'Entitat productora', email: 'hola+prodowner-masprova@carlessanz.com', password: 'PyaCL-ia5jD-E6Ba9' },
-      { organitzacio: 'Horta de Prova SL', tipus: 'Entitat productora', email: 'hola+prodowner-hortaprova@carlessanz.com', password: 'VUQPK-k4sLa-hSZWE' },
+      { organitzacio: 'Ofertant de prova', tipus: 'Entitat productora', email: 'hola+prodowner-masprova@carlessanz.com', password: 'PyaCL-ia5jD-E6Ba9' },
+      { organitzacio: 'Segon ofertant de prova', tipus: 'Entitat productora', email: 'hola+prodowner-hortaprova@carlessanz.com', password: 'VUQPK-k4sLa-hSZWE' },
     ],
   },
   // Sin receptor de alimentación animal: esa línea de servicio no se usa todavía.
   {
     titolKey: 'test.grp_rec',
     comptes: [
-      { organitzacio: 'Menjador Social de Prova', tipus: 'Entitat social', email: 'hola+recowner-social@carlessanz.com', password: 'UDBib-ABb7Y-eaqMg' },
-      { organitzacio: 'Obrador de Prova', tipus: 'Entitat de transformació', email: 'hola+recowner-obrador@carlessanz.com', password: 'HKfYQ-Vq4MH-W6Aqz' },
-      { organitzacio: 'Comercial de Prova SL', tipus: 'Entitat comercial', email: 'hola+recowner-comercial@carlessanz.com', password: 'FmJMZ-QJzC4-r7aYg' },
+      { organitzacio: 'Entitat social receptora de prova', tipus: 'Entitat social', email: 'hola+recowner-social@carlessanz.com', password: 'UDBib-ABb7Y-eaqMg' },
+      { organitzacio: 'Empresa receptora de prova', tipus: 'Empresa (compra i maquila)', email: 'hola+recowner-comercial@carlessanz.com', password: 'FmJMZ-QJzC4-r7aYg' },
     ],
   },
 ]

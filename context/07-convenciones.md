@@ -242,3 +242,9 @@
   campos pierden el foco con cada tecla (pasó en «Nova entitat», Taula mestra 1.1). Se ve solo al
   escribir, ni en tipos ni en build: lo vigila `tests/componentsNiats.test.ts`. Y en E2E, un campo de texto
   que importa se rellena con `pressSequentially`, no con `fill()`, que lo escribe de golpe y no lo detecta.
+
+### Tabla operativa nueva → vaciado (19-11-2026, fase 6)
+
+Toda tabla operativa nueva (que cuelgue de una ficha, una oferta o un documento) se añade a `v_ordre` de
+`reiniciar_dades_operatives()` en la misma migración que la crea; si no, el vaciado falla (FK `restrict`, se revierte
+entero) o deja filas sueltas (FK `set null`). Detalle en `context/06`.

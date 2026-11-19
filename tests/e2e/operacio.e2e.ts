@@ -60,9 +60,13 @@ test('el receptor ve la cantidad asignada destacada y la ficha completa de la re
 })
 
 test('el productor ve a quién va, cuánto y cuándo, sin entrar a la oferta', async ({ page }) => {
+  // El nombre de la receptora, de la base (`contraparts_canalitzacions` da `entidades.nombre`): desde
+  // la siembra de la fase 6 ya no es «Organització Carles Sanz».
+  const nomReceptora = sql(`select nombre from entidades where id = '${entidadDe(RECEPTOR)}'`)
+  expect(nomReceptora).not.toBe('')
   await entra(page, 'productor')
   await page.goto('/productor/ofertes')
-  await expect(page.getByTestId('linies-sortida').filter({ hasText: 'Organització Carles Sanz' })
+  await expect(page.getByTestId('linies-sortida').filter({ hasText: nomReceptora })
     .filter({ hasText: /80 kg/ }).filter({ hasText: /10:00/ }).first()).toBeVisible()
 })
 

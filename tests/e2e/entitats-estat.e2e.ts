@@ -23,7 +23,8 @@ let ofertaId = ''
 let orgDoble = ''
 
 /**
- * Vuelve una entidad a `activo = true` sin pasar por el trigger (su NIF de prueba no es válido).
+ * Vuelve una entidad a `activo = true` con su NIF original sin pasar por el trigger (la prueba del
+ * NIF le deja uno inválido o ninguno).
  * Desde B1 (20270518100000) el estado CRM manda: se repone también `estat_crm = 'actiu'`, que el
  * trigger no deriva con él apagado.
  */
@@ -120,7 +121,12 @@ test('reactivarla le devuelve las ofertas nuevas del Mercat', async ({ page }) =
 
 test('activar exige un NIF válido y, si no hay, el NIF', () => {
   sqlCom('super_admin', `select desactivar_fitxa('entidad', '${comercial}')`)
-  // El NIF de prueba de la comercial no pasa el dígito de control.
+  // Un NIF que no pasa el dígito de control. Desde la siembra de la fase 6 la comercial de prueba
+  // lo tiene VÁLIDO, así que se le pone uno inválido sin el trigger (`entidades_nif` lo rechazaría);
+  // `reactivaSenseTrigger` le devuelve el suyo al acabar.
+  sql(`begin; set local session_replication_role = replica;
+       update entidades set nif = 'B00000001' where id = '${comercial}'; commit;`)
+  expect(sql(`select nif_valid('B00000001')`)).toBe('f')
   expect(() => sqlCom('super_admin', `select activar_fitxa('entidad', '${comercial}')`)).toThrow(/nif_invalid/)
   sql(`update entidades set nif = null where id = '${comercial}'`)
   expect(() => sqlCom('super_admin', `select activar_fitxa('entidad', '${comercial}')`)).toThrow(/falta_nif/)

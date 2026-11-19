@@ -839,3 +839,11 @@ La primera función que devuelve los bytes de un PDF al navegador. No guarda nad
 compone en el servidor (`nomFitxerDiagnostic`: minúsculas, sin acentos ni signos) y el cliente solo acepta
 `[\w.-]+\.pdf`. Las notas internas (§8) no salen: `diagnostic_datos` no las lee (`notes` es la nota del
 diagnóstico, que el productor ya ve en su resumen).
+
+### Cuentas de prueba tras el vaciado (19-11-2026, fase 6)
+
+Las 9 cuentas de `scripts/data/cuentas-prueba.json` siguen; sus fichas son ahora las sembradas por
+`scripts/sembrar-entitats-ficticies.ts` (`context/06`). `hola+productor-receptor@` lleva «Doble rol de prova». Sin
+organización: `senserol-arnes` (a propósito), `recowner-obrador` y `wa-sebas/raquel/anna/laura` (deuda 201). Los
+botones de `/login` (`src/lib/accessosTest.ts`, solo con `VITE_ACCESSOS_TEST`) dicen los nombres nuevos y ya no
+ofrecen las cuentas sin organización; el grupo `test.grp_wa` se titula «Compte de proves de Carles».

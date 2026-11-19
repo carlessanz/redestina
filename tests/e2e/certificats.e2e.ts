@@ -88,7 +88,8 @@ test('el equipo aprueba en nombre del donante con una nota, y después emite', a
   // La fila del donante de la prueba, no la primera de la tabla: el clon puede tener otros
   // donantes con certificados por revisar (05-11-2026).
   const nomDonant = sql(`select coalesce(datos_fiscales->>'raó_social', datos_fiscales->>'nombre') from cierres_donante where id = '${donant}'`)
-  const filaDonant = page.getByRole('row').filter({ hasText: nomDonant }).first()
+  // Por el nombre EXACTO: «Segon ofertant de prova» contiene «Ofertant de prova» (fase 6).
+  const filaDonant = page.getByRole('row').filter({ has: page.getByText(nomDonant, { exact: true }) }).first()
   await filaDonant.getByRole('button', { name: /Aprova en nom del donant|Aprobar en nombre del donante/ }).click()
   const dlg = page.getByRole('dialog')
   await dlg.getByRole('textbox').fill('Confirmat per telèfon amb la gerent (prova E2E)')

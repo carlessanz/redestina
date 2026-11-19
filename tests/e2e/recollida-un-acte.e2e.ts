@@ -22,14 +22,16 @@ const RECEPTOR = 'receptor-carles'
 const marca = Date.now()
 const BOTO_ASSIGNAR = /Registrar i confirmar recollida|Registrar y confirmar recogida/
 const BOTO_REGISTRAR = /^Registrar la recollida$|^Registrar la recogida$/
-// La venta: productor y compradora de prueba del clon con los convenios vigentes.
-const PRODUCTOR_VENDA = '1c3f4274-cae5-47f3-b1a3-503045e5d7be' // Laura Masdeu
-const COMPRADORA = '11cdfdbb-37c4-4a70-bcb1-6d0c9c251b58' // Comercial de Prova SL
+// La venta: el segundo ofertante y la empresa receptora de prueba, los dos con convenio vigente
+// (los siembra `scripts/sembrar-entitats-ficticies.ts`). Se resuelven por la cuenta, no por uuid:
+// tras el vaciado de la fase 6 los ids del clon cambian cada vez que se siembra.
+const PRODUCTOR_VENDA = 'productor-altre'
+const COMPRADORA = 'receptor-comercial'
 /** La oferta del caso a, para mirarla a 360 px al final. */
 let ofertaA = ''
 
 test.beforeEach(({}, info) => {
-  const m = motiuSaltClon('super_admin', 'productor', RECEPTOR)
+  const m = motiuSaltClon('super_admin', 'productor', RECEPTOR, PRODUCTOR_VENDA, COMPRADORA)
   test.skip(m !== null, m ?? '')
   test.skip(info.project.name !== 'escriptori', 'escriu al clon: una sola passada')
 })
@@ -158,15 +160,16 @@ test('b. dues recollides de la mateixa oferta → dos REC, un per canalització'
 })
 
 test('c. venda amb el preu acceptat: registrar la deixa conciliada sense albarà i tanca l’oferta', async ({ page }) => {
-  desbloqueja(COMPRADORA)
-  const oferta = novaOferta('C', PRODUCTOR_VENDA, 'venda', 40, 0.5)
+  const compradora = entidadDe(COMPRADORA)
+  desbloqueja(compradora)
+  const oferta = novaOferta('C', productorDe(PRODUCTOR_VENDA), 'venda', 40, 0.5)
   try {
     await entra(page, 'super_admin')
     await page.goto(`/equip/ofertes/${oferta}`)
     const form = page.locator('#od-interes')
     const boto = form.getByRole('button', { name: BOTO_ASSIGNAR })
     await expect(boto).toBeVisible({ timeout: 30_000 })
-    await triaCercador(form.locator('#od-interes-entitat'), sql(`select nombre from entidades where id = '${COMPRADORA}'`), COMPRADORA)
+    await triaCercador(form.locator('#od-interes-entitat'), sql(`select nombre from entidades where id = '${compradora}'`), compradora)
     await form.locator('#od-interes-kg').fill('40')
     await expect(form.locator('#od-interes-preu')).toBeVisible()
     await form.getByText(/L’ofertant ha acceptat el preu|El ofertante ha aceptado el precio/).click()
