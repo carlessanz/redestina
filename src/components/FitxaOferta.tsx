@@ -115,6 +115,9 @@ export default function FitxaOferta({ oferta, ambCost = false, onEdita, vencida 
             {oferta.producte_al_camp && <span className="ml-2 text-xs text-aviso">{t('fo.al_camp')}</span>}
           </Dada>
           {kgTotal > 0 && <Dada etiqueta={t('fo.quantitat')}>{kgTotal.toLocaleString('ca-ES')} kg</Dada>}
+          {oferta.producte_al_camp && Number(oferta.hectarees) > 0 && (
+            <Dada etiqueta={t('fo.hectarees')}>{Number(oferta.hectarees).toLocaleString('ca-ES')} ha</Dada>
+          )}
           {format && <Dada etiqueta={t('fo.format')}>{format}</Dada>}
           {retorn && <Dada etiqueta={t('fo.retorn')}>{retorn}</Dada>}
           {(lloc || maps) && (

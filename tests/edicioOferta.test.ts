@@ -161,3 +161,41 @@ describe('el formulario en modo editar: de la fila a las respuestas y vuelta', (
       .toEqual({ modalitats: ['venda'], coste_kg: null })
   })
 })
+
+// ---------------------------------------------------------------------------
+// Fase 0 de los puntos 4-6 (19-11-2026): hectáreas y envases ocultos
+// ---------------------------------------------------------------------------
+import { hectareesDe } from '../supabase/functions/_shared/oferta.ts'
+
+describe('hectáreas (19-11-2026)', () => {
+  it('el alta solo las guarda con el producto en el campo y > 0', () => {
+    expect(hectareesDe({ producte_al_camp: 'si', hectarees: '2,5' })).toBe(2.5)
+    expect(hectareesDe({ producte_al_camp: 'si', hectarees: 1.234 })).toBe(1.23)
+    expect(hectareesDe({ producte_al_camp: 'si', hectarees: '' })).toBeNull()
+    expect(hectareesDe({ producte_al_camp: 'si', hectarees: 0 })).toBeNull()
+    expect(hectareesDe({ producte_al_camp: 'no', hectarees: 3 })).toBeNull()
+  })
+
+  it('la edición las lee, las cambia y las vacía si el producto deja de estar en el campo', () => {
+    const f: FilaEditable = { producto: 'Poma', producte_al_camp: true, hectarees: 2 }
+    expect(datosDeFila(f).hectarees).toBe(2)
+    expect(canvisDeDatos(f, { ...datosDeFila(f), hectarees: 3 }).hectarees).toBe(3)
+    expect(canvisDeDatos(f, { ...datosDeFila(f), producte_al_camp: 'no' }).hectarees).toBeNull()
+    expect('hectarees' in canvisDeDatos(f, datosDeFila(f))).toBe(false)
+  })
+
+  it('canvisOferta pasa las hectáreas a número (con coma) y vacío a null', () => {
+    expect(canvisOferta({ hectarees: '1,5' }).hectarees).toBe(1.5)
+    expect(canvisOferta({ hectarees: '' }).hectarees).toBeNull()
+  })
+
+  it('con retorno «Sí» y las preguntas de envases ocultas, editar otra cosa no las vacía', () => {
+    const f: FilaEditable = {
+      producto: 'Poma', format_entrega: 'caixes', retorn_envasos: 'Sí',
+      retorn_envasos_detall: 'Palots', retorn_envasos_quantitat: 4, kg_total: 100,
+    }
+    const ocultes = new Set(['retorn_envasos', 'retorn_quantitat'])
+    const c = canvisDeDatos(f, { ...datosDeFila(f), kg: 120 }, (k) => !ocultes.has(k))
+    expect(c).toEqual({ kg_total: 120 })
+  })
+})

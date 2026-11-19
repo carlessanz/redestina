@@ -224,6 +224,7 @@ Deno.serve(async (req) => {
   const MISSATGE_FORMAT: Record<string, string> = {
     kg_invalid: "Els kg han de ser un número positiu",
     retorn_quantitat_invalid: "Quants envasos ha de ser un enter positiu",
+    hectarees_invalid: "Les hectàrees han de ser un número positiu",
     maps_invalid: "L'enllaç de Maps no és vàlid",
     fotos_invalides: "Fotos no vàlides",
     cost_invalid: "El cost per quilo ha de ser un número positiu",

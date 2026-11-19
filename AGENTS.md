@@ -164,7 +164,7 @@ hasta publicar; `dades_esborrany`; solo → publicada; borrar: `esborrar_esborra
 pendent_validacio · parcial · bloqueada · cerrada · no_colocada · cancelada; `modalitat` +
 `modalitats[]`; `preu_minim`, `coste_kg`, `fotos[]`, `producte_al_camp`, `format_entrega`,
 `transport_propi`, `municipi_ine`/`comarca` por trigger, franja `hora_recollida_*`,
-`disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
+`disponible_hasta`; `20270528100000`: `retorn_envasos_detall`/`_quantitat`, `dies_recollida[]`, `gmaps_url` propio; `hectarees`; `subcausa_codigo` → la causa, por trigger); `oferta_respuestas` (`estado` de la entidad × `aprovacio` del equipo;
 `canal` whatsapp·email·panel·asistido·manual; `kg_solicitados/kg_aprovats`, `modalitat`,
 `recollida_at`); `canalizaciones` (kg confirmados/reales/conciliados, `valorizacion`, `coste_kg` = **precio del mes
 del albarán** (D2: `preu_*`, rastro `canalizaciones_preu_hist`; `context/04`), `data_hora_recollida`, columnas de la recogida protegidas por trigger);
@@ -317,10 +317,10 @@ en la whitelist de correo.
 
 ## 6bis. Intake conversacional (detalle en `context/06bis-…md`)
 
-20 pasos (`_shared/camposOferta.ts`, servidos al panel por `GET crear-oferta/campos`; ca/es en el descriptor):
-familia → producte → varietat → producte_al_camp → kg (>0) → format_entrega → caixes → retorn → retorn_envasos →
-retorn_quantitat (con «Sí») → transport (**`oculto`**) → ubicacio (siempre) → disponible_fins → dies_recollida
-(**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
+21 pasos (`_shared/camposOferta.ts`, servidos por `GET crear-oferta/campos`; ca/es en el descriptor):
+familia → producte → varietat → producte_al_camp (Sí/No) → hectarees (**`soloPanel`**, opcional) → kg (>0) →
+format_entrega → caixes → retorn (sus dos detalles, **`oculto`**: deuda 188) → transport (**`oculto`**)
+→ ubicacio (siempre) → disponible_fins → dies_recollida (**`soloPanel`**) → horari → modalitat → preu_minim (**solo venda**, «Preu de venda»; `ambPreu`) → cost_kg («Valor de
 cost») → causa (WhatsApp: la categoría; panel: la subcausa, obligatoria) → observacions. `aplica()` en cascada. Guía Sí/Ara no; listas de 9 + «Més…»; 3 fallos → repite;
 `Stop` cancela; texto ≤400; ubicación por Maps o `location` (P5: con principal, «el confirmes o el canvies?»; igual en el panel);
 convenio al final. Bot en catalán. La oferta del panel se **precarga** de la Operativa (`predeterminats`).
@@ -413,7 +413,7 @@ un alta manda el acceso por correo (`enviar-acceso`).
   `select`; **la lista de columnas de un `.select()` va en un solo literal**.
 - Migraciones `AAAAMMDDHHMMSS_desc.sql`, nunca editar una aplicada; **su número es el del
   fichero** (`aplicar-migracion.ts` lo registra así; `apply_migration` del MCP no se usa).
-  Compatibles hacia atrás con el frontend publicado. Última: `20270604100000`.
+  Compatibles hacia atrás con el frontend publicado. Última: `20270605100000`.
 - **Una sola rama en git (`main`) y en Supabase** (branching desactivado: las Edge Functions
   **no se despliegan con el push**).
 - El CLI dentro del sandbox necesita `HOME` escribible y `api.supabase.com` permitido; `db push`
@@ -548,9 +548,7 @@ git config core.hooksPath .githooks            # una vez por clon
 altas y checklist de ficha; 10 **datos reales de la Fundación** en `parametros_documentales`
 (Configuració › Fundació); 11 textos legales; 12 casar `municipio_ine` de las ubicaciones; 13 a qué causa nueva van FC y GD.
 
-**Deuda abierta (83 vivas; la siguiente entrada nueva es la 188; los números no se renumeran ni
-se reutilizan)**. Casi todas, **decisiones con precio, espera de material o interruptores** (§12bis). Defectos o trabajo real pendiente: **5** (filtros en
-cliente, aceptado) · **126**
+**Deuda abierta (84 vivas; siguiente: 189; los números no se reutilizan)**. Casi todas, decisiones con precio o a la espera (§12bis). Defectos o trabajo pendiente: **5** (filtros en cliente) · **126**
 (`documentos_objeto_existe` no conoce `cierre_periodo`) · **127** (el resumen aún ofrece la factura) · **135** (D3 residual en snapshots y `v_albaranes_bandeja`) · **136** (sin code
 splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 (entrantes con WhatsApp apagado: nadie los ve) · **146** (`organizacion_contactos` sin uso) · **149**
@@ -558,7 +556,7 @@ splitting) · **138** (CR sin rectificar ni «enviat») · **143**
 · **152** (privacidad en el primer acceso de «Dona-li accés»; P3)
 · **153** (el ARA no crea ubicaciones) · **154** (código muerto del CT) · **155**
 (rectificar reimprime la fecha de expedición) · **156** (selector de ámbito del certificado) ·
-**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`).
+**157-164** (flecos de la firma) · **165-167** (flecos del importador) · **169** (alta del equipo) · **170** (artículo) · **171** (importador sin datos fiscales) · **172** (`entidades.estat`, `drop`) · **173** (exportar >1.000 filas) · **179** (`facturacio_anual_eur`, `drop`) · **180** (maquila aún mira `preu_minim`) · **181** (el texto no sigue al lugar) · **182** (fotos huérfanas al cancelar) · **183** (Mercabarna: un día sin job se pierde) · **184-187** (flecos de D2: `context/12`) · **188** (envases: columnas sin uso).
 Decisiones de negocio pendientes: **131** (D3 en la capa REST de `excedentes`), **132** (el
 `tecnic` escribe directo en `canalizaciones`/`excedentes`), **133·134** (frenos de
 `recuperar-password` y `registro`), **137** (privilegios por defecto de funciones), **69**
@@ -570,7 +568,7 @@ inactiva sigue viendo lo ya enviado). El resto (entradas 4–116), en §12bis.
 ## 13. Al terminar cualquier cambio
 
 1. **`npm run check`** en verde (tipos, `lint`, `vitest run`, `deno check`, `deno test` del PDF).
-   **Referencia: 2.111 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
+   **Referencia: 2.118 de Vitest (96 ficheros, 1 saltada) + 60 de Deno.**
 2. `npm run build` si toca `src/`.
 3. `deno run -A scripts/comprobar-rls.ts` si toca datos, políticas o roles.
    **Referencia: clon 2.874/2.874 y 44 sin datos; producción 2.883/2.883 y 35 (18-11-2026).** Cifra

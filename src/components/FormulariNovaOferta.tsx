@@ -490,6 +490,8 @@ export default function FormulariNovaOferta({
       // Editando, los kilos no bajan de lo ya canalizado (la base lo impone igual).
       else if (editar && c.clave === 'kg' && !esBuit(v) && Number(v) < kgCanalitzats) out.push(c.clave)
       if (c.clave === 'retorn_quantitat' && !esBuit(v) && !enterPositiu(v)) out.push(c.clave)
+      // Hectáreas (19-11-2026): opcionales, pero si se escriben, > 0.
+      if (c.clave === 'hectarees' && !esBuit(v) && !(Number(v) > 0)) out.push(c.clave)
       if (c.format === 'franja' && v && typeof v === 'object' && !esBuit(v) && !esFranjaValida(v as Partial<Franja>)) {
         out.push(c.clave)
       }

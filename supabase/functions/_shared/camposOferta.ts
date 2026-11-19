@@ -20,6 +20,7 @@ export const PASOS = [
   "producte",
   "varietat",
   "producte_al_camp",
+  "hectarees",
   "kg",
   "format_entrega",
   "caixes",
@@ -135,10 +136,11 @@ export const OPCIONS_TRANSPORT = [
 // ⚠️ Mismo tope de 72 caracteres que `MODALITATS`: el intake lo pregunta con lista.
 export const OPCIONS_AL_CAMP = [
   {
+    // «Sí» a secas (reunión del 18-11-2026): «és a la planta» confundía a los técnicos en campo.
     id: "si",
-    titulo: "Sí, és a la planta",
+    titulo: "Sí",
     descripcion: "Cal collir-ho. Es pot organitzar com a espigolada.",
-    titulo_es: "Sí, está en la planta",
+    titulo_es: "Sí",
     descripcion_es: "Hay que cosecharlo. Se puede organizar como espigoleo.",
   },
   {
@@ -315,8 +317,9 @@ export const CAUSES_ES: Record<string, string> = {
 };
 
 /**
- * Descriptor de los 20 pasos, con las mismas preguntas que hace el bot. Desde el 17-11-2026 uno
- * está oculto (`transport`) y otro es solo del panel (`dies_recollida`).
+ * Descriptor de los 21 pasos, con las mismas preguntas que hace el bot. Ocultos: `transport`
+ * (17-11-2026), `retorn_envasos` y `retorn_quantitat` (19-11-2026). Solo del panel:
+ * `dies_recollida` y `hectarees`.
  */
 export const CAMPOS: CampoOferta[] = [
   {
@@ -364,6 +367,21 @@ export const CAMPOS: CampoOferta[] = [
     obligatorio: true,
     opciones: OPCIONS_AL_CAMP,
   },
+  // Las HECTÁREAS aproximadas (reunión del 18-11-2026): opcionales, solo con el producto en el
+  // campo y solo en el panel (el técnico dimensiona la recogida o la espigolada). Columna
+  // `excedentes.hectarees` (20270605100000).
+  {
+    clave: "hectarees",
+    tipo: "numero",
+    etiqueta: "Quantes hectàrees aproximadament?",
+    ayuda: "Opcional. Ajuda a calcular la feina de collir-ho.",
+    etiqueta_es: "¿Cuántas hectáreas aproximadamente?",
+    ayuda_es: "Opcional. Ayuda a calcular el trabajo de cosecharlo.",
+    seccion: "producte",
+    obligatorio: false,
+    condicion: { campo: "producte_al_camp", en: ["si"] },
+    soloPanel: true,
+  },
   {
     clave: "kg",
     tipo: "numero",
@@ -410,9 +428,10 @@ export const CAMPOS: CampoOferta[] = [
     // Si el receptor porta els seus envasos, no hi ha res a retornar.
     condicion: { campo: "format_entrega", en: ["caixes", "palet", "altres"] },
   },
-  // Con retorno, QUÉ y CUÁNTOS (fila 3.2 del Excel, 17-11-2026): «Sí» a secas no le decía a
-  // quien recoge qué tenía que traer de vuelta. Se guardan en `retorn_envasos_detall` y
-  // `retorn_envasos_quantitat` (la columna `retorn_envasos` ya era la respuesta Sí/No).
+  // Con retorno, QUÉ y CUÁNTOS (fila 3.2 del Excel, 17-11-2026). Se guardan en
+  // `retorn_envasos_detall` y `retorn_envasos_quantitat` (la columna `retorn_envasos` ya era la
+  // respuesta Sí/No). OCULTOS desde el 19-11-2026 (reunión del 18-11): siempre se retornan todos
+  // los envases, así que el «Sí» basta. Se conservan para volver a activarlos.
   {
     clave: "retorn_envasos",
     tipo: "text",
@@ -423,6 +442,7 @@ export const CAMPOS: CampoOferta[] = [
     seccion: "quantitat",
     obligatorio: true,
     condicion: { campo: "retorn", en: ["Sí"] },
+    oculto: true,
   },
   {
     clave: "retorn_quantitat",
@@ -434,6 +454,7 @@ export const CAMPOS: CampoOferta[] = [
     seccion: "quantitat",
     obligatorio: true,
     condicion: { campo: "retorn", en: ["Sí"] },
+    oculto: true,
   },
   {
     clave: "transport",

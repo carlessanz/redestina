@@ -359,6 +359,8 @@ export interface Excedente {
   /** 17-11-2026: qué envases devolver y cuántos (solo con retorno «Sí»). */
   retorn_envasos_detall?: string | null
   retorn_envasos_quantitat?: number | null
+  /** Hectáreas aproximadas, con el producto en el campo (19-11-2026, opcional). */
+  hectarees?: number | string | null
   /** 17-11-2026: los días de recogida (1 = dilluns … 7 = diumenge). */
   dies_recollida?: number[] | null
   /** 17-11-2026: el enlace de Maps PROPIO de la oferta (manda sobre el del lugar). */

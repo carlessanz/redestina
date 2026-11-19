@@ -140,6 +140,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **17-11-2026 (`20270530100000`, fase C del punto 3): se abren la 181 y la 182** (el texto y el lugar; las fotos al cancelar una edición): **79 vivas** y la siguiente entrada nueva es la 183.
 ⚠️ **17-11-2026 (`20270531100000`, fase D1 del punto 3): se abre la 183** (Mercabarna, solo el día de la página): **80 vivas** y la siguiente entrada nueva es la 184.
 ⚠️ **17-11-2026 (`20270601100000`, fase D2 del punto 3): se cierra la 128 y se abren de la 184 a la 187** (flecos del precio del mes del albarán): **83 vivas** y la siguiente entrada nueva es la 188.
+
+⚠️ **19-11-2026 (`20270605100000`, fase 0 de los puntos 4-6): se abre la 188** (columnas de envases sin uso): **84 vivas** y la siguiente es la 189.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -940,3 +942,8 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      sigue diciendo «a partir dels albarans de recepció i de preus de referència oficials (Observatori Agrari …)», que
      no casa con «Preu fixat per la Fundació» ni con Mercabarna. Es texto legal: decisión de la Fundació (checkpoint 11).
      Cambiarla solo afecta a lo que se emita después (lo emitido no se reescribe).
+188. **Columnas de detalle de envases sin uso** (19-11-2026, `20270605100000`). La Fundació devuelve siempre todos
+     los envases, así que `retorn_envasos` y `retorn_quantitat` quedan `oculto` en el descriptor y nadie rellena ya
+     `excedentes.retorn_envasos_detall` ni `retorn_envasos_quantitat`. Se conservan por compatibilidad (lo guardado se
+     sigue imprimiendo en el texto de la oferta). Arreglo: `drop` de las dos columnas y de su rama en `textoEnvasos`
+     cuando se confirme que no vuelven.

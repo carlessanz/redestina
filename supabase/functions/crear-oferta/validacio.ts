@@ -83,10 +83,14 @@ export function mapsValid(v: unknown): boolean {
 export function errorFormatOferta(
   d: Record<string, unknown>,
   productorId: string,
-): "kg_invalid" | "retorn_quantitat_invalid" | "maps_invalid" | "fotos_invalides" | "cost_invalid" | "foto_producte_invalid" | null {
+): "kg_invalid" | "retorn_quantitat_invalid" | "hectarees_invalid" | "maps_invalid" | "fotos_invalides" | "cost_invalid" | "foto_producte_invalid" | null {
   const buit = (v: unknown) => v === undefined || v === null || v === "";
   if (!buit(d.kg) && !kgValid(d.kg)) return "kg_invalid";
   if (!quantitatRetornValida(d)) return "retorn_quantitat_invalid";
+  if (!buit(d.hectarees)) {
+    const n = Number(String(d.hectarees).replace(",", "."));
+    if (!Number.isFinite(n) || n <= 0) return "hectarees_invalid";
+  }
   if (!mapsValid(d.gmaps_url)) return "maps_invalid";
   if (!fotosValides(d.fotos, productorId)) return "fotos_invalides";
   if (!buit(d.cost_kg)) {

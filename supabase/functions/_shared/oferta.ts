@@ -65,6 +65,19 @@ export function mapsOferta(v: unknown): string | null {
  * Qué envases hay que devolver y cuántos (17-11-2026), solo si la respuesta al retorno es «Sí»:
  * con «No» o sin retorno, lo que quede escrito de antes no se guarda.
  */
+/**
+ * Las hectáreas aproximadas (19-11-2026, columna `hectarees`): un número > 0 con dos decimales
+ * como mucho, o null. Acepta la coma decimal. Solo cuentan con el producto en el campo: si no,
+ * null aunque llegue un valor (la pregunta no se hace y el dato no tendría sentido).
+ */
+export function hectareesDe(d: Record<string, unknown>): number | null {
+  if (!esProducteAlCamp(d.producte_al_camp)) return null;
+  const v = d.hectarees;
+  if (v === undefined || v === null || v === "") return null;
+  const n = Number(String(v).replace(",", "."));
+  return Number.isFinite(n) && n > 0 ? Math.round(n * 100) / 100 : null;
+}
+
 export function retornDetall(d: Record<string, unknown>): { detall: string | null; quantitat: number | null } {
   if (d.retorn !== "Sí") return { detall: null, quantitat: null };
   const detall = String(d.retorn_envasos ?? "").trim().slice(0, 400) || null;
@@ -367,6 +380,7 @@ export function filaDeDades(
     variedad: typeof d.varietat === "string" && d.varietat.trim() ? d.varietat.trim().slice(0, 400) : null,
     // Se resuelve UNA vez: el texto que circula y la columna que decide el flujo dicen lo mismo.
     producte_al_camp: esProducteAlCamp(d.producte_al_camp),
+    hectarees: hectareesDe(d),
     kg_total: kg,
     num_caixes: Number.isInteger(caixes) && caixes > 0 ? caixes : null,
     // `tipo_caixa` ya no se pregunta (23-09-2026): el formato de entrega lo sustituye.
@@ -605,6 +619,11 @@ export function canvisOferta(entrada: Record<string, unknown>): Record<string, u
     if (n !== undefined) fora.retorn_envasos_quantitat = n;
   }
   if ("producte_al_camp" in entrada) fora.producte_al_camp = esProducteAlCamp(entrada.producte_al_camp);
+  // Hectáreas (19-11-2026): vacío = sin dato; mal formado viaja tal cual y la RPC lo rechaza.
+  if ("hectarees" in entrada) {
+    const n = num(entrada.hectarees);
+    fora.hectarees = n === undefined ? String(entrada.hectarees) : n;
+  }
   if ("dies_recollida" in entrada) fora.dies_recollida = diesValids(entrada.dies_recollida);
   if ("fotos" in entrada) {
     fora.fotos = Array.isArray(entrada.fotos) ? entrada.fotos.filter((f) => typeof f === "string") : [];

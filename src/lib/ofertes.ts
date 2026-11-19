@@ -367,6 +367,8 @@ export const CODIS_EDICIO = [
   // Fase C del punto 3 (17-11-2026): lo que se edita ahora además.
   'ubicacio_aliena', 'maps_invalid', 'format_invalid', 'retorn_invalid', 'retorn_quantitat_invalid',
   'dies_invalids', 'massa_fotos', 'foto_aliena', 'fotos_invalides',
+  // 19-11-2026: las hectáreas.
+  'hectarees_invalid',
 ] as const
 
 /**

@@ -42,7 +42,7 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 
 interface Ubicacio extends Partial<DadesLloc> {
-  id: string; alias: string | null; municipio: string | null; gmaps_url: string | null
+  id: string; alias: string | null; municipio: string | null; municipio_ine?: string | null; gmaps_url: string | null
   es_principal: boolean | null
 }
 
@@ -50,6 +50,8 @@ interface Ubicacio extends Partial<DadesLloc> {
 interface FormLloc {
   id: string | null
   alias: string; maps: string; municipi: Municipi | null
+  /** Editando: el municipio con que se abrió (INE). Solo se escribe si cambia (19-11-2026). */
+  municipiInicial?: string | null
   direccion: string; contacto_nombre: string; contacto_telefono: string; horario: string; observaciones: string
   /** A4: días (1–7) y franjas; una franja a medias se queda en el formulario y no se guarda. */
   dies: number[]
@@ -112,7 +114,7 @@ export default function LlocsRecollida({
   useEffect(() => {
     let viu = true
     void supabase.from('productor_ubicaciones')
-      .select('id, alias, municipio, gmaps_url, direccion, contacto_nombre, contacto_telefono, horario, observaciones, es_principal, dies_setmana, franges').eq('productor_id', productorId).order('alias')
+      .select('id, alias, municipio, municipio_ine, gmaps_url, direccion, contacto_nombre, contacto_telefono, horario, observaciones, es_principal, dies_setmana, franges').eq('productor_id', productorId).order('alias')
       .then(({ data, error }) => {
         if (!viu) return
         setErrorCarrega(Boolean(error))
@@ -147,6 +149,21 @@ export default function LlocsRecollida({
   }
 
 
+  /** Abre la edición de un lugar, con su municipio de la lista oficial si lo tiene. */
+  async function obreEdicio(u: Ubicacio) {
+    const municipi = u.municipio_ine
+      ? (await carregaMunicipis()).find((m) => m.codi_ine === u.municipio_ine) ?? null
+      : null
+    setLlocNou({
+      ...BUIT, id: u.id, alias: u.alias ?? '', maps: u.gmaps_url ?? '',
+      municipi, municipiInicial: u.municipio_ine ?? null,
+      direccion: u.direccion ?? '', contacto_nombre: u.contacto_nombre ?? '',
+      contacto_telefono: u.contacto_telefono ?? '', horario: u.horario ?? '',
+      observaciones: u.observaciones ?? '',
+      dies: u.dies_setmana ?? [], franges: u.franges ?? [],
+    })
+  }
+
   async function fesPrincipal(u: Ubicacio) {
     const { error } = await supabase.rpc('fixar_lloc_principal', { p_lloc: u.id })
     if (error) { toast.error(textError(t, error.message)); return }
@@ -165,10 +182,21 @@ export default function LlocsRecollida({
   async function afegeix() {
     if (!llocNou) return
     if (!llocNou.alias.trim()) { toast.error(t('po.place_need_name')); return }
-    // Editar uno que ya existe: sus datos de contacto y condiciones (el municipio y el mapa
-    // no se tocan aquí: cambiarlos movería la comarca de las ofertas que ya lo usan).
+    // Editar uno que ya existe. Desde el 19-11-2026 (reunión del 18-11) también el enlace de
+    // Maps y el municipio: las ofertas guardan su propia copia del municipio y la comarca
+    // (trigger `excedentes_ubica`, al crearse o al cambiar de lugar), así que las que ya
+    // existen no se mueven. El municipio solo se escribe si cambia: un lugar antiguo con
+    // municipio en texto y sin INE no lo pierde por editar el teléfono.
     if (llocNou.id) {
-      const canvis = { alias: llocNou.alias.trim(), ...extraDe(llocNou) }
+      const municipiNou = llocNou.municipi?.codi_ine ?? null
+      const canvis = {
+        alias: llocNou.alias.trim(),
+        gmaps_url: net(llocNou.maps),
+        ...(municipiNou !== (llocNou.municipiInicial ?? null)
+          ? { municipio: llocNou.municipi?.nom ?? null, municipio_ine: municipiNou }
+          : {}),
+        ...extraDe(llocNou),
+      }
       const { data, error } = await supabase.from('productor_ubicaciones')
         .update(canvis).eq('id', llocNou.id).select('id')
       if (error || !data || data.length === 0) { toast.error(textError(t, error?.message)); return }
@@ -262,13 +290,7 @@ export default function LlocsRecollida({
                 )}
                 <Button variant="ghost" size="sm" className="h-11 md:h-8"
                   aria-label={t('org.place_edit', { x: u.alias ?? '' })}
-                  onClick={() => setLlocNou({
-                    ...BUIT, id: u.id, alias: u.alias ?? '', maps: u.gmaps_url ?? '',
-                    direccion: u.direccion ?? '', contacto_nombre: u.contacto_nombre ?? '',
-                    contacto_telefono: u.contacto_telefono ?? '', horario: u.horario ?? '',
-                    observaciones: u.observaciones ?? '',
-                    dies: u.dies_setmana ?? [], franges: u.franges ?? [],
-                  })}>
+                  onClick={() => void obreEdicio(u)}>
                   <Pencil className="size-4" aria-hidden />
                 </Button>
                 <Button variant="ghost" size="sm" className="h-11 md:h-8" onClick={() => void esborra(u)}
@@ -293,10 +315,9 @@ export default function LlocsRecollida({
             <Input id={`${idPrefix}-nom`} value={llocNou.alias} placeholder={t('po.place_name_ph')}
               onChange={(e) => setLlocNou((l) => (l ? { ...l, alias: e.target.value } : l))} />
           </div>
-          {/* Municipio y mapa solo al dar de alta: cambiarlos después movería la comarca de
-              las ofertas que ya lo usan. */}
-          {!llocNou.id && (
-            <>
+          {/* Municipio y mapa, también al editar (19-11-2026): las ofertas que ya usan el lugar
+              guardan su propia copia del municipio y la comarca. */}
+          <>
               <div>
                 <Label htmlFor={`${idPrefix}-municipi`} className="mb-1.5 block text-xs text-muted-foreground">{t('po.place_town')}</Label>
                 <SelectorMunicipi id={`${idPrefix}-municipi`} valor={llocNou.municipi?.codi_ine ?? null}
@@ -309,8 +330,7 @@ export default function LlocsRecollida({
                 <Input id={`${idPrefix}-maps`} type="url" inputMode="url" value={llocNou.maps} placeholder="https://maps.app.goo.gl/…"
                   onChange={(e) => setLlocNou((l) => (l ? { ...l, maps: e.target.value } : l))} />
               </div>
-            </>
-          )}
+          </>
           {([
             ['direccion', 'org.place_address', 300],
             ['contacto_nombre', 'org.place_contact', 120],

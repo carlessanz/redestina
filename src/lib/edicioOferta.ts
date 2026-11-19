@@ -21,6 +21,7 @@ export interface FilaEditable {
   familia?: string | null
   variedad?: string | null
   producte_al_camp?: boolean | null
+  hectarees?: number | string | null
   kg_total?: number | string | null
   num_caixes?: number | null
   format_entrega?: string | null
@@ -63,6 +64,7 @@ export function datosDeFila(f: FilaEditable): Datos {
   pon('familia', f.familia)
   pon('varietat', f.variedad)
   d.producte_al_camp = f.producte_al_camp ? 'si' : 'no'
+  pon('hectarees', num(f.hectarees))
   pon('kg', num(f.kg_total))
   pon('format_entrega', f.format_entrega)
   pon('caixes', f.num_caixes)
@@ -119,6 +121,9 @@ export function canvisDeDatos(
 
   const alCamp = d.producte_al_camp === 'si' || d.producte_al_camp === true
   if (alCamp !== Boolean(f.producte_al_camp)) c.producte_al_camp = alCamp
+  // Hectáreas (19-11-2026): solo con el producto en el campo; si deja de estarlo, se vacían.
+  const hect = alCamp ? num(val('hectarees')) : null
+  if (hect !== num(f.hectarees)) c.hectarees = hect
 
   const format = text(val('format_entrega'))
   if (format !== (f.format_entrega ?? null)) c.format_entrega = format
@@ -127,10 +132,17 @@ export function canvisDeDatos(
   if (caixes !== (f.num_caixes ?? null)) c.num_caixes = caixes
   const retorn = val('retorn') === 'Sí' || val('retorn') === 'No' ? String(val('retorn')) : null
   if (retorn !== (f.retorn_envasos ?? null)) c.retorn_envasos = retorn
-  const detall = retorn === 'Sí' ? text(val('retorn_envasos')) : null
-  if (detall !== (f.retorn_envasos_detall ?? null)) c.retorn_envasos_detall = detall
-  const qN = retorn === 'Sí' ? num(val('retorn_quantitat')) : null
-  if (qN !== (f.retorn_envasos_quantitat ?? null)) c.retorn_envasos_quantitat = qN
+  // Qué y cuántos envases están OCULTOS desde el 19-11-2026: con retorno «Sí» y la pregunta
+  // oculta, lo que ya hubiera no se toca (sin `aplica`, se vaciaría al editar cualquier otra
+  // cosa). Sin «Sí», se vacían como siempre (la RPC también lo hace).
+  if (retorn !== 'Sí' || aplica('retorn_envasos')) {
+    const detall = retorn === 'Sí' ? text(val('retorn_envasos')) : null
+    if (detall !== (f.retorn_envasos_detall ?? null)) c.retorn_envasos_detall = detall
+  }
+  if (retorn !== 'Sí' || aplica('retorn_quantitat')) {
+    const qN = retorn === 'Sí' ? num(val('retorn_quantitat')) : null
+    if (qN !== (f.retorn_envasos_quantitat ?? null)) c.retorn_envasos_quantitat = qN
+  }
 
   const ubi = text(d.ubicacio)
   if (ubi !== null && ubi !== (f.ubicacion_id ?? null)) c.ubicacion_id = ubi

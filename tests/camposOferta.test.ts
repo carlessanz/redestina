@@ -64,11 +64,18 @@ describe('PASOS y CAMPOS describen el mismo cuestionario', () => {
     expect(CAMPOS.map((c) => c.clave)).toEqual([...PASOS])
   })
 
-  it('son 20 pasos, ocho de ellos condicionales', () => {
-    expect(PASOS).toHaveLength(20)
+  it('son 21 pasos, nueve de ellos condicionales', () => {
+    expect(PASOS).toHaveLength(21)
     expect(CAMPOS.filter((c) => c.condicion).map((c) => c.clave)).toEqual([
-      'format_entrega', 'caixes', 'retorn', 'retorn_envasos', 'retorn_quantitat', 'transport', 'preu_minim', 'cost_kg',
+      'hectarees', 'format_entrega', 'caixes', 'retorn', 'retorn_envasos', 'retorn_quantitat', 'transport',
+      'preu_minim', 'cost_kg',
     ])
+  })
+
+  it('ocultos y solo del panel (19-11-2026)', () => {
+    expect(CAMPOS.filter((c) => c.oculto).map((c) => c.clave))
+      .toEqual(['retorn_envasos', 'retorn_quantitat', 'transport'])
+    expect(CAMPOS.filter((c) => c.soloPanel).map((c) => c.clave)).toEqual(['hectarees', 'dies_recollida'])
   })
 
   it('todo campo de tipo «opcions» trae sus opciones', () => {
@@ -427,7 +434,7 @@ describe('secciones: el cuestionario tiene estructura, no 14 campos seguidos', (
   it('el reparto es el que espera el panel', () => {
     const porSeccion = (s: string) => CAMPOS.filter((c) => c.seccion === s).map((c) => c.clave)
     expect(porSeccion('producte')).toEqual([
-      'familia', 'producte', 'varietat', 'producte_al_camp',
+      'familia', 'producte', 'varietat', 'producte_al_camp', 'hectarees',
     ])
     expect(porSeccion('quantitat')).toEqual([
       'kg', 'format_entrega', 'caixes', 'retorn', 'retorn_envasos', 'retorn_quantitat',
@@ -463,7 +470,10 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
     // En venda: el coste por kilo (solo donació) no aplica; el transporte está oculto y los
     // días de recogida son solo del panel.
     const datos = { producte_al_camp: 'no', format_entrega: 'caixes', retorn: 'Sí', modalitat: 'venda' }
-    const passos = PASOS.filter((p) => !['cost_kg', 'transport', 'dies_recollida'].includes(p))
+    // Desde el 19-11-2026 tampoco qué envases y cuántos (ocultos) ni las hectáreas (al camp y panel).
+    const passos = PASOS.filter((p) => ![
+      'cost_kg', 'transport', 'dies_recollida', 'hectarees', 'retorn_envasos', 'retorn_quantitat',
+    ].includes(p))
     for (let i = 0; i < passos.length - 1; i++) {
       expect(siguientePaso(passos[i], datos), `después de ${passos[i]}`).toBe(passos[i + 1])
     }
@@ -482,11 +492,14 @@ describe('siguientePaso: el recorrido del cuestionario', () => {
       .toBe('ubicacio')
   })
 
-  it('amb retorn «Sí» pregunta quins envasos i quants; amb «No», no', () => {
+  it('amb retorn «Sí» ja no pregunta quins envasos ni quants (ocults des del 19-11-2026)', () => {
     const d = { producte_al_camp: 'no', format_entrega: 'caixes' }
-    expect(siguientePaso('retorn', { ...d, retorn: 'Sí' })).toBe('retorn_envasos')
-    expect(siguientePaso('retorn_envasos', { ...d, retorn: 'Sí' })).toBe('retorn_quantitat')
-    expect(siguientePaso('retorn_quantitat', { ...d, retorn: 'Sí' })).toBe('ubicacio')
+    expect(siguientePaso('retorn', { ...d, retorn: 'Sí' })).toBe('ubicacio')
+    expect(siguientePaso('retorn', { ...d, retorn: 'No' })).toBe('ubicacio')
+  })
+
+  it('les hectàrees són només del panell: el bot va de «al camp» als kg', () => {
+    expect(siguientePaso('producte_al_camp', { producte_al_camp: 'si' })).toBe('kg')
   })
 
   it('els dies de recollida són només del panell: el bot va de la data a la franja', () => {
@@ -559,11 +572,17 @@ describe('el formulario también en castellano (28-09-2026)', () => {
 // la condición encadenada y el nombre largo de la maquila en el panel.
 // ---------------------------------------------------------------------------
 describe('fase A del punto 3', () => {
-  it('con retorno «Sí» hacen falta qué envases y cuántos', () => {
+  it('con retorno «Sí» ya no hacen falta qué envases ni cuántos (ocultos desde el 19-11-2026)', () => {
     const d = donacionCompleta()
-    expect(faltantes({ ...d, retorn: 'Sí' })).toEqual(['retorn_envasos', 'retorn_quantitat'])
-    expect(faltantes({ ...d, retorn: 'Sí', retorn_envasos: 'Caixes verdes', retorn_quantitat: 12 })).toEqual([])
+    expect(faltantes({ ...d, retorn: 'Sí' })).toEqual([])
     expect(faltantes({ ...d, retorn: 'No' })).toEqual([])
+  })
+
+  it('las hectáreas: opcionales y solo con el producto en el campo', () => {
+    const d = donacionCompleta()
+    expect(aplica(campo('hectarees'), { ...d, producte_al_camp: 'si' })).toBe(true)
+    expect(aplica(campo('hectarees'), { ...d, producte_al_camp: 'no' })).toBe(false)
+    expect(faltantes({ ...d, producte_al_camp: 'si' })).not.toContain('hectarees')
   })
 
   it('la condición se encadena: un «Sí» que se quedó escrito no pide nada si el retorno ya no aplica', () => {

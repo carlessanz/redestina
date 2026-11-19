@@ -233,3 +233,23 @@ no se borran: las citan ofertas, diagnósticos y documentos).
 - **`CAUSES_ES`** (`camposOferta.ts`) se queda solo por su test de paridad: son las 8 causas viejas, inactivas.
 - 🟡 **Decisión de negocio pendiente** (no es deuda de código): a qué causa nueva corresponden «Final de cultiu» (FC) y
   «Gestió deficient» (GD). Hoy quedan inactivas y se leen con su nombre donde ya estaban.
+
+### Fase 0 de los puntos 4-6: hectáreas, sin detalle de envases (19-11-2026, `20270605100000`)
+
+Flecos del proceso 3 que pidió la Fundació (Excel «Taula mestra — revisió operativa 30.10» y reunión del 18-11-2026):
+
+- **`producte_al_camp`**: las opciones pasan a «Sí» / «No, ja està collit» (antes «Sí, és a la planta»). El valor sigue
+  siendo `si`/`no`, así que nada de lo guardado cambia.
+- **Paso nuevo `hectarees`** justo tras `producte_al_camp`: tipo `numero`, opcional, **`soloPanel`** (el bot no lo
+  pregunta) y con condición `producte_al_camp ∈ [si]`. Acepta decimales (coma o punto); `hectareesDe()` de
+  `_shared/oferta.ts` lo guarda redondeado a 2 decimales y solo si el producto sigue en el campo y es > 0. El formulario
+  lo marca inválido si no es > 0 (`invalidsDe`), `crear-oferta` responde `hectarees_invalid` (`errorFormatOferta`) y
+  `editar_oferta` también. La ficha de la oferta lo enseña («Hectàrees aproximades … ha»).
+- **`retorn_envasos` y `retorn_quantitat`, `oculto: true`**: la Fundació devuelve siempre todos los envases, así que ya no
+  se pregunta cuáles ni cuántos (ni el bot ni el panel). Lo guardado se conserva: `canvisDeDatos` (edición) solo compara
+  esos dos campos si aplican, para no borrarlos al editar. Las columnas quedan sin uso (deuda 188).
+- **21 pasos** en el descriptor (`tests/camposOferta.test.ts`: ocultos = `retorn_envasos`, `retorn_quantitat`,
+  `transport`; `soloPanel` = `hectarees`, `dies_recollida`).
+- **Lugares de recogida ya creados** (`components/LlocsRecollida.tsx`): al editarlos se pueden cambiar también el
+  municipio (precargado desde `municipio_ine`) y el enlace de Maps. Solo se escribe el municipio si cambia; las ofertas
+  ya publicadas conservan el suyo (el trigger `excedentes_ubica` copia municipio y comarca al crear la oferta).

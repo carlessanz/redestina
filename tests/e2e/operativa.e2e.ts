@@ -135,7 +135,12 @@ test('el alta va por bloques, con buscador de producto y el lugar con días y Ma
   await expect(page.locator('#of-familia')).toHaveCount(0)
   await page.locator('#of-producte').fill('poma')
   await page.locator('#of-producte-llista [role="option"]').filter({ hasText: /^Poma/ }).first().click()
+  // «Al camp»: Sí / No; con «Sí» se piden las hectáreas (opcionales), con «No» desaparecen.
+  await expect(page.locator('#of-producte_al_camp [data-valor="si"]')).toHaveText(/^Sí$/)
+  await page.locator('#of-producte_al_camp [data-valor="si"]').click()
+  await expect(page.locator('#of-hectarees')).toBeVisible()
   await page.locator('#of-producte_al_camp [data-valor="no"]').click()
+  await expect(page.locator('#of-hectarees')).toHaveCount(0)
   await expect(page.locator('#of-producte_al_camp [data-valor="no"]')).toHaveAttribute('aria-pressed', 'true')
   await expect(page.getByTestId('bloc-quantitat')).toHaveAttribute('data-obert', 'true')
 
@@ -145,16 +150,14 @@ test('el alta va por bloques, con buscador de producto y el lugar con días y Ma
   await expect(page.locator('#of-kg')).toHaveAttribute('aria-invalid', 'true')
   await page.locator('#of-kg').fill('120')
 
-  // El retorno con «Sí» pide qué envases y cuántos.
+  // El retorno con «Sí» ya no pide qué envases ni cuántos (19-11-2026: se devuelven todos).
   const retorn = page.locator('#of-retorn')
   if (await retorn.count() === 0) {
     await tria(page.locator('#of-format_entrega'), 'caixes')
   }
   await page.locator('#of-retorn [data-valor="Sí"]').click()
-  await expect(page.locator('#of-retorn_envasos')).toBeVisible()
-  await expect(page.locator('#of-retorn_quantitat')).toBeVisible()
-  await page.locator('#of-retorn_envasos').fill('caixes verdes')
-  await page.locator('#of-retorn_quantitat').fill('12')
+  await expect(page.locator('#of-retorn_envasos')).toHaveCount(0)
+  await expect(page.locator('#of-retorn_quantitat')).toHaveCount(0)
 
   // Recogida: el lugar principal con su municipio y, sin enlace propio, el campo para uno;
   // días y franja del lugar; «disponible fins» = hoy + 2.

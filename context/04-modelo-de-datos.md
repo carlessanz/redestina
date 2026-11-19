@@ -1981,3 +1981,11 @@ guardado; si algo es provisional, no se emite.
 `20270521100000`, T4)**: `productos_habituales`, `productes_principals`, `varietats`, `volum_produccio`, `temporada`,
 `envasos_habituals`, `canals_comercials`, `tipologia_clients`, `facturacio_rang` (P2; la cifra, retirada el 16-11-2026),
 `volum_comercialitzat_kg`, `suport_interes` (P6); el trigger `productores_operativa` **poda** lo que no cuelga.
+
+### Hectáreas de la oferta (19-11-2026, `20270605100000`)
+
+`excedentes.hectarees numeric(10,2)`, opcional, `excedentes_hectarees_positives` (null o > 0): superficie aproximada
+cuando el producto sigue en el campo. Sin cambios de GRANT. `editar_oferta()` se recrea (misma firma; solo
+`service_role`) con `hectarees` en la lista `permeses`: número > 0 (si no, `22023 hectarees_invalid`), redondeado a 2
+decimales. Las columnas `retorn_envasos_detall`/`retorn_envasos_quantitat` siguen existiendo pero el intake ya no las
+pide (deuda 188).
