@@ -33,6 +33,8 @@ import {
 import { motiuCanal } from '../../lib/canals'
 import type { LiniaEntrada, PropostaConciliacio } from '../../lib/albarans'
 import { estatEfectiuEnllac } from '../../lib/documentsPanell'
+import { albaraViu, recDe, sortidaDe } from '../../lib/albaransRecollida'
+import type { AlbaraMinim } from '../../lib/albaransRecollida'
 import { diferenciaKg, incidenciesDiferencia, llegeixIncidencia } from '../../lib/incidenciaRecollida'
 import type { IncidenciaDiferencia } from '../../lib/incidenciaRecollida'
 import { estatValidacio } from '../../lib/registreRecollida'
@@ -131,6 +133,31 @@ interface EnllacFila {
    * de evidencia vale menos que un hueco (§4).
    */
   rol_parte: 'entrega' | 'recibe' | null
+}
+
+/** Un albarán de la misma oferta, para enlazar los de la misma recogida. */
+interface GermaFila extends AlbaraMinim {
+  numero_completo: string | null
+}
+
+/**
+ * Los albaranes que van con este (fase 3 de los puntos 4-6): un REC propio, su ENT; un ENT u
+ * OPE, su REC (el propio o el heredado); un REC heredado, todas las salidas vivas de la oferta.
+ */
+function germansDe(a: Pick<Albaran, 'tipo' | 'canalizacion_id' | 'espigolada_id'>, altres: GermaFila[]): GermaFila[] {
+  if (a.espigolada_id) return []
+  if (a.tipo === 'REC' && a.canalizacion_id) {
+    const s = sortidaDe(altres, a.canalizacion_id)
+    return s ? [s] : []
+  }
+  if (a.tipo === 'REC') {
+    return altres.filter((x) => (x.tipo === 'ENT' || x.tipo === 'OPE') && albaraViu(x))
+  }
+  if (a.canalizacion_id) {
+    const r = recDe(altres, a.canalizacion_id)
+    return r ? [r] : []
+  }
+  return []
 }
 
 /** Una incidencia de recogida con la entidad que la declaró (si se sabe). */
@@ -270,6 +297,11 @@ export default function AlbaraDetall() {
   // La confirmación conducida por teléfono, con la persona al otro lado (§9).
   const [dlgAssistit, setDlgAssistit] = useState(false)
   const [dlgRecollida, setDlgRecollida] = useState<string | null>(null)
+  // Fase 3 de los puntos 4-6: los albaranes de la misma recogida, la oferta, y si esta recogida
+  // tiene su propio REC (modelo nuevo: validar emite y concilia los dos en un acto).
+  const [germans, setGermans] = useState<GermaFila[]>([])
+  const [teRecPropi, setTeRecPropi] = useState(false)
+  const [oferta, setOferta] = useState<{ id: string; codi: string | null } | null>(null)
 
   const carrega = useCallback(async () => {
     if (!id) return
@@ -323,7 +355,8 @@ export default function AlbaraDetall() {
     // la del ENT/OPE es la de su canalización; la del REC, la de cualquiera de las
     // canalizaciones de su oferta (con varias entidades, puede haber más de una). Si no se
     // encuentra ahí, la que lleve el propio albarán en `incidencias`.
-    const consultaInc = fila.tipo !== 'REC' && fila.canalizacion_id
+    // Un REC propio (fase 3 de los puntos 4-6) es de UNA recogida: como un ENT, por su canalización.
+    const consultaInc = fila.canalizacion_id
       ? supabase.from('canalizaciones').select('id, entidad_id, incidencia_recollida')
         .eq('id', fila.canalizacion_id)
       : fila.tipo === 'REC' && fila.excedente_id && !fila.espigolada_id
@@ -354,7 +387,7 @@ export default function AlbaraDetall() {
     // espigolada, o REC de una oferta (no de una jornada). La base lo impone igual
     // (`recollida_no_validada`); esto solo lo dice antes de pulsar.
     type CanalValidacio = DatesValidacio & { id: string; estado: string | null; excedentes: { espigolada_id: string | null } | null }
-    const consultaVal = fila.tipo !== 'REC' && fila.canalizacion_id
+    const consultaVal = fila.canalizacion_id
       ? supabase.from('canalizaciones')
         .select('id, estado, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, excedentes(espigolada_id)')
         .eq('id', fila.canalizacion_id)
@@ -381,7 +414,7 @@ export default function AlbaraDetall() {
 
     // D2: el valor de las donaciones (el REC, todas las de su oferta; un ENT, la suya). Las
     // canalizaciones de una oferta comparten el mes del REC, así que casi siempre es uno.
-    const consultaValor = fila.tipo !== 'REC' && fila.canalizacion_id
+    const consultaValor = fila.canalizacion_id
       ? supabase.from('canalizaciones')
         .select('coste_kg, valorizacion, estado, preu_font, preu_mes_albara, preu_mes_font, preu_font_dies, preu_provisional, preu_certificat')
         .eq('id', fila.canalizacion_id)
@@ -400,6 +433,28 @@ export default function AlbaraDetall() {
       setValors([...unics.values()])
     } else {
       setValors([])
+    }
+
+    // Los albaranes de la misma recogida y la oferta de la que sale (fase 3 de los puntos 4-6):
+    // un REC propio lista solo su ENT; un ENT, su REC (el propio o el heredado); un REC
+    // heredado, todas las salidas de la oferta.
+    if (fila.excedente_id) {
+      const [ga, ex] = await Promise.all([
+        supabase.from('albaranes')
+          .select('id, tipo, numero_completo, estado, canalizacion_id, espigolada_id')
+          .eq('excedente_id', fila.excedente_id),
+        supabase.from('excedentes').select('id_excedente').eq('id', fila.excedente_id).maybeSingle(),
+      ])
+      const tots = ((ga.data as GermaFila[] | null) ?? []).filter((x) => x.id !== fila.id)
+      setGermans(germansDe(fila, tots))
+      setTeRecPropi(fila.tipo === 'REC'
+        ? fila.canalizacion_id != null
+        : tots.some((x) => x.tipo === 'REC' && x.canalizacion_id != null && x.canalizacion_id === fila.canalizacion_id))
+      setOferta({ id: fila.excedente_id, codi: (ex.data as { id_excedente: string | null } | null)?.id_excedente ?? null })
+    } else {
+      setGermans([])
+      setTeRecPropi(false)
+      setOferta(null)
     }
 
     if (llistaEnllacos.length) {
@@ -730,7 +785,12 @@ export default function AlbaraDetall() {
   // Los tres tipos se concilian desde el 07-10-2026: `conciliar_albaran()` admite REC, ENT
   // y OPE en `entregado`/`confirmado` (sin confirmar, con plazo vencido y motivo). Antes
   // solo el REC, y un OPE de venta —que no tiene REC— no tenía ninguna puerta a mano.
-  const potConciliar = albara.estado === 'entregado' || albara.estado === 'confirmado'
+  //
+  // Fase 3 de los puntos 4-6: con un REC por recogida, validar la recogida emite y concilia el
+  // ENT y su REC en un acto. «Concilia» queda para las EXCEPCIONES —espigoladas y el circuito
+  // heredado— y en el modelo nuevo ni se ofrece: se dice que es automático.
+  const conciliaAuto = teRecPropi && fluxRecollida
+  const potConciliar = (albara.estado === 'entregado' || albara.estado === 'confirmado') && !conciliaAuto
   // «Envia per correu» (04-11-2026): con el albarán emitido y su PDF vigente. Es un envío
   // manual (§8): con las notificaciones apagadas sigue, y la confirmación lo dice.
   const ambPdf = documents.some((d) => d.vigente && d.estado === 'emitido')
@@ -754,14 +814,18 @@ export default function AlbaraDetall() {
   // la base lo rechaza con `ja_validada` (20270606100100). El botón ni se ofrece.
   const sortidaValidada = assignacioViva !== null
     && (assignacioViva.validada || albara.estado === 'confirmado')
-  const potAnullar = potAprovar
+  // Un REC propio no se anula suelto (`22023 anula_la_canalitzacio`): se anula la asignación
+  // desde la ficha de la oferta, que se lleva el ENT y el REC juntos.
+  const recPropi = albara.tipo === 'REC' && albara.canalizacion_id != null
+  const potAnullar = potAprovar && !recPropi
     && albara.estado !== 'anulado' && albara.estado !== 'conciliado' && !sortidaValidada
   const motiuAnullar = potAnullar
     ? undefined
     : t(!potAprovar ? 'alb.need_approver'
       : albara.estado === 'conciliado' ? 'alb.why_no_cancel'
-        : sortidaValidada ? 'asg.err_ja_validada'
-          : 'alb.why_already_cancelled')
+        : recPropi ? 'asg.err_anula_la_canalitzacio'
+          : sortidaValidada ? 'asg.err_ja_validada'
+            : 'alb.why_already_cancelled')
 
   return (
     <div className="space-y-4">
@@ -836,6 +900,29 @@ export default function AlbaraDetall() {
         <p className="rounded-md bg-error-fondo p-3 text-sm text-error">
           {t('alb.cancel_reason')}: {albara.motivo_anulacion}
         </p>
+      )}
+
+      {/* ── La oferta y los albaranes de la misma recogida (fase 3 de los puntos 4-6) ── */}
+      {(oferta || germans.length > 0) && (
+        <Card data-testid="albara-relacionats">
+          <CardHeader><CardTitle className="text-base">{t('alb.relacionats')}</CardTitle></CardHeader>
+          <CardContent className="flex flex-wrap items-center gap-2 text-sm">
+            {oferta && (
+              <Button asChild variant="outline" size="sm" className="h-11 md:h-8">
+                <Link to={`/equip/ofertes/${oferta.id}`} data-testid="albara-oferta">
+                  {t('alb.oferta', { codi: oferta.codi ?? '—' })}
+                </Link>
+              </Button>
+            )}
+            {germans.map((g) => (
+              <Button key={g.id} asChild variant="outline" size="sm" className="h-11 md:h-8">
+                <Link to={`/equip/albarans/${g.id}`} data-testid="albara-germa">
+                  {g.tipo} · {g.numero_completo ?? t('alb.no_number')} · {t(`alb.st_${g.estado}`)}
+                </Link>
+              </Button>
+            ))}
+          </CardContent>
+        </Card>
       )}
 
       {/* ── Partes ── */}
@@ -1077,15 +1164,17 @@ export default function AlbaraDetall() {
             >
               {t('alb.mark_delivered')}
             </BotoAmbMotiu>
-            <BotoAmbMotiu
-              className="h-11 whitespace-normal md:h-8"
-              variant={potConciliar ? 'default' : 'outline'}
-              disabled={ocupat || !potConciliar}
-              motiu={motiuConciliar}
-              onClick={() => void obreConciliacio()}
-            >
-              {t('alb.reconcile')}
-            </BotoAmbMotiu>
+            {!conciliaAuto && (
+              <BotoAmbMotiu
+                className="h-11 whitespace-normal md:h-8"
+                variant={potConciliar ? 'default' : 'outline'}
+                disabled={ocupat || !potConciliar}
+                motiu={motiuConciliar}
+                onClick={() => void obreConciliacio()}
+              >
+                {t('alb.reconcile')}
+              </BotoAmbMotiu>
+            )}
             <BotoAmbMotiu
               className="h-11 whitespace-normal md:h-8"
               variant="outline"
@@ -1123,6 +1212,12 @@ export default function AlbaraDetall() {
             </div>
           </div>
 
+          {/* Modelo nuevo: no hay nada que conciliar a mano. Se dice, en vez de un botón gris. */}
+          {conciliaAuto && (
+            <p className="text-sm text-muted-foreground" data-testid="concilia-automatica">
+              {t('alb.concilia_auto')}
+            </p>
+          )}
           {/* El porqué del «Emet» gris, visible también en táctil (el tooltip no existe ahí). */}
           {emetPerValidacio && (
             <p className="text-sm text-muted-foreground" data-testid="emet-per-validacio">
@@ -1149,7 +1244,9 @@ export default function AlbaraDetall() {
           valida en la misma llamada; si la entidad ya la registró, lo que se abre es validar.
           Sustituye a «Confirma la recollida», que confirmaba por otro camino. Las espigoladas
           no pasan por aquí: no hay receptora que registre nada. */}
-      {(albara.tipo === 'ENT' || albara.tipo === 'OPE') && albara.canalizacion_id && fluxRecollida
+      {/* Fase 3 de los puntos 4-6: también desde el REC propio de la recogida (el que tiene
+          `canalizacion_id`), que nace en borrador con su ENT y sale con él al validar. */}
+      {(albara.tipo === 'ENT' || albara.tipo === 'OPE' || albara.tipo === 'REC') && albara.canalizacion_id && fluxRecollida
         && ['borrador', 'emitido', 'entregado'].includes(albara.estado) && (
         <Card>
           <CardHeader><CardTitle className="text-base">{t('rrec.as_card_t')}</CardTitle></CardHeader>

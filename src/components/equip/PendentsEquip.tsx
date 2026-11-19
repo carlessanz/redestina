@@ -55,6 +55,8 @@ const FILES: readonly FilaCua[] = [
   { cua: 'respostes', desti: '/equip/aprovacions', nomesAdmin: true },
   // 17-10-2026: la cuarta cola de Aprovacions; el ancla baja directamente a ella.
   { cua: 'recollides_per_validar', desti: '/equip/aprovacions#recollides', nomesAdmin: true },
+  // Fase 3 de los puntos 4-6: ventas y maquilas sin albarán que el equipo tiene que registrar.
+  { cua: 'recollides_equip', desti: '/equip/aprovacions#recollides-equip', nomesAdmin: true },
   // 05-11-2026: firmas subidas por una organización que el super_admin revisa y cierra.
   { cua: 'signatures_per_tancar', desti: '/equip/aprovacions#signatures', nomesSuperAdmin: true },
   { cua: 'missatges', desti: '/equip/missatgeria' },
@@ -78,7 +80,7 @@ const FILES: readonly FilaCua[] = [
 /** Las colas que además de la cifra tienen una frase que explica la consecuencia. */
 const AMB_SUBTITOL: readonly CuaEquip[] = [
   'registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
-  'ofertes_vencudes', 'costos', 'preus', 'espigolades_per_convertir', 'recollides_per_validar', 'signatures_per_tancar',
+  'ofertes_vencudes', 'costos', 'preus', 'espigolades_per_convertir', 'recollides_per_validar', 'recollides_equip', 'signatures_per_tancar',
   // Fase 8: «què ha passat → què falta → acció» en todas las filas.
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error',
 ]

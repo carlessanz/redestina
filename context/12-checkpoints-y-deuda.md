@@ -146,6 +146,8 @@ apuntarían a la nada. Un número retirado no se reutiliza jamás.
 ⚠️ **19-11-2026 (fase 1 de los puntos 4-6): se abre la 189** (E2E de precios provisionales): **85 vivas** y la siguiente es la 190.
 
 ⚠️ **19-11-2026 (`20270607100000`, fase 2 de los puntos 4-6): se cierra la 180 y se abre la 190** (anular una canalización de espigolada no reabre la jornada): **85 vivas** y la siguiente es la 191.
+
+⚠️ **19-11-2026 (`20270608100000`…`100400`, fase 3 de los puntos 4-6): se abren la 191 y la 192** (fixture de externos de canalización; el modelo heredado convive): **87 vivas** y la siguiente es la 193. La condición de la 154 («una venta sin albarán») ya se da: el CT retirado sigue marcando como retroactiva una venta sin OPE, parte del código muerto.
 ⚠️ **17-11-2026 (`20270528100000`, fase A del punto 3): se abre la 180** (el interés en maquila y `preu_minim`): **77 vivas** y la siguiente entrada nueva es la 181.
 ⚠️ **16-11-2026 (`20270527100000`): se abre la 179** (la facturación, solo por rango): **76 vivas** y la siguiente entrada nueva es la 180.
 ⚠️ **11-11-2026 (sin código): se cierran la 115 y la 116**, que hablaban del cuestionario y del plan básico retirados en `20270524100000`: **75 vivas** y la siguiente entrada nueva sigue siendo la 179.
@@ -952,3 +954,11 @@ Las 131-135 y la 137 son **decisiones de producto o de política**, no defectos 
      `anula_canalitzacio()` recalcula la oferta, pero `recalcula_estat_espigolada()` suma también las anuladas y su
      trigger no salta al cambiar el `estado`. Hoy la pantalla no ofrece anular las de espigolada. Arreglo: excluir
      `anulada` en esa suma y disparar el recálculo desde `anula_canalitzacio()`. Precio: una migración y el arnés.
+191. **Externos de una canalización sin fixture en el arnés** (19-11-2026, `20270608100400`). Los cinco checks de
+     lectura de `documentos_externos` con `objeto_tipo='canalizacion'` salen «sin datos» porque
+     `crear-datos-documentales-prueba.ts` no sube ninguno. Arreglo: un externo de prueba sobre una canalización del
+     fixture (vía `subir-documento-externo`). Precio: un rato.
+192. **El modelo heredado convive con el nuevo hasta el vaciado** (19-11-2026, fase 3 de los puntos 4-6). Las ofertas
+     con REC por oferta (sin `canalizacion_id`) y los OPE ya emitidos siguen el camino viejo: REC que espera a todas las
+     recogidas, «Concilia» manual y el defecto de que el REC heredado suma kilos de venta en una oferta mixta. Se
+     resuelve solo con el vaciado de la fase 6; después, retirar las ramas heredadas. Precio: una migración de limpieza.

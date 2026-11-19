@@ -172,6 +172,8 @@ describe('las claves compuestas cubren todo el vocabulario de la base', () => {
     // Precios de referencia por mes (punto 3, D1, 20270531100000; `lib/preus.ts` y `components/preus/`).
     { que: 'preus_referencia.font', prefijo: 'preu.font_', valores: ['gencat', 'mercabarna', 'manual'] },
     { que: 'preus_referencia.font (corta)', prefijo: 'preu.font_', valores: ['gencat_curt', 'mercabarna_curt', 'manual_curt', 'gencat_long', 'mercabarna_long', 'gencat_desc', 'mercabarna_desc'] },
+    // Los albaranes de una recogida (fase 3 de los puntos 4-6): `AlbaransRecollida` y `OfferDetail`.
+    { que: 'albaranes.tipo de una recogida', prefijo: 'arec.tipus_', valores: ['ENT', 'REC', 'OPE'] },
     { que: 'mes (1-12)', prefijo: 'preu.mes_', valores: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] },
     { que: 'mes corto (1-12)', prefijo: 'preu.mes_curt_', valores: ['1', '2', '3', '4', '5', '6', '7', '8', '9', '10', '11', '12'] },
     { que: 'preus_carregues.estat', prefijo: 'preu.estat_', valores: ['pendent', 'validada', 'descartada'] },

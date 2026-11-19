@@ -4,7 +4,7 @@
 //
 //   POST /subir-documento-externo   multipart/form-data   (JWT de la sesión)
 //     fitxer       (File)   pdf, jpg o png, hasta 10 MB
-//     objeto_tipo  'albaran' | 'cierre_donante' | 'convenio' | 'productor' | 'entidad' | 'expedient'
+//     objeto_tipo  'albaran' | 'canalizacion' | 'cierre_donante' | 'convenio' | 'productor' | 'entidad' | 'expedient'
 //     objeto_id    uuid
 //     tipo         'albaran_productor' | 'factura' | 'foto_incidencia'
 //                  | 'conveni_signat' | 'certificat_previ' | 'pla_previ' | 'altre'
@@ -66,7 +66,9 @@ const BUCKET = "documentos";
 // aquí para poder responder un 400 con el campo señalado, no un 23514 crudo de Postgres;
 // la autoridad sigue siendo la base.
 // `expedient` desde la fase 11: las evidencias del Pla de Prevenció (solo las sube el equipo).
-const OBJETOS = ["albaran", "cierre_donante", "convenio", "productor", "entidad", "expedient"];
+// `canalizacion` desde la fase 3 de los puntos 4-6 (19-11-2026): una venta o una maquila no tienen
+// albarán de Redestina, y sus documentos propios (albarán del productor, factura) cuelgan de la recogida.
+const OBJETOS = ["albaran", "canalizacion", "cierre_donante", "convenio", "productor", "entidad", "expedient"];
 const TIPOS = [
   "albaran_productor",
   "factura",
@@ -273,6 +275,21 @@ Deno.serve(async (req) => {
     }
     if (!alb) return responder({ error: "Aquest albarà no existeix", code: "no_existeix" }, 404);
     if (alb.ejercicio) ejercicio = alb.ejercicio as number;
+  }
+  if (objetoTipo === "canalizacion") {
+    // Sin albarán, el acto documentado es la recogida: su año, o el de la asignación si aún no se ha hecho.
+    const { data: can, error: errCan } = await supabase
+      .from("canalizaciones")
+      .select("id, data_hora_recollida, created_at")
+      .eq("id", objetoId)
+      .maybeSingle();
+    if (errCan) {
+      console.error("subir-documento-externo: canalizaciones:", errCan.message);
+      return responder({ error: "Error consultant la canalització", code: "error_bd" }, 500);
+    }
+    if (!can) return responder({ error: "Aquesta canalització no existeix", code: "no_existeix" }, 404);
+    const quan = (can.data_hora_recollida ?? can.created_at) as string | null;
+    if (quan) ejercicio = new Date(quan).getFullYear();
   }
   if (objetoTipo === "convenio") {
     // Un convenio solo tiene `ejercicio` desde que se firma (lo pide el número, §4), así

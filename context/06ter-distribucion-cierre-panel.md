@@ -2649,3 +2649,25 @@ Dos flujos sobre las mismas RPC (`context/04bis`, «Asignación en un acto»):
   recogida validada; en un ENT/OPE vivo, el diálogo avisa de que anula también la asignación.
 - E2E: `tests/e2e/assignacio-directa.e2e.ts` (donación: asignar, modificar, anular; venta bloqueada sin precio o
   aceptación) y `gestio-autonoma.e2e.ts` (el interés lo registra el técnico y lo aprueba el super_admin).
+
+### Recogida en un acto, albaranes por recogida y venta sin albarán (19-11-2026, fase 3 de los puntos 4-6)
+
+- **Ficha de la oferta** (`OfferDetail`): por canalización, su salida y su REC (`lib/albaransRecollida.ts`: `sortidaDe`
+  por tipo ENT/OPE, `recDe` = REC propio o el heredado, `recDeLOferta` = el de la recogida más atrasada); botón
+  **«Registrar la recollida»** (`DialegRegistraRecollida`), que tras validar enseña los albaranes de esa recogida
+  (`components/equip/AlbaransRecollida.tsx`: Veure · Descarrega · Comparteix, `lib/compartirDocument.ts` con Web Share en
+  móvil y descarga en escritorio; consulta cada 2 s hasta que hay PDF). Una venta o maquila enseña kg, cajas y precio y
+  sus **documentos propios** (`components/DocumentsCanalitzacio.tsx`, `objeto_tipo='canalizacion'`).
+- **Ciclo guiado** (`lib/passosCanalitzacio.ts`): `rec()` con varios REC (el menos avanzado), la venta conciliada sin
+  salida no se atasca, `certificatsDelLot` por `valorizacion`; «albarans» y «conciliar» se dan por hechos solos
+  (`canal.bl_automatic`).
+- **Albarans**: orden por fecha descendente y enlace a la oferta; `AlbaraDetall` con bloque «Relacionats» (un REC propio
+  solo lista su ENT), sin «Concilia» ni «Anul·la» en un REC propio (se concilia solo; se anula la asignación).
+- **Aprovacions**: sexta cola **«Recollides per registrar»** (`CuaRecollidesEquip`, `#recollides-equip`, cola
+  `recollides_equip` de `pendents_equip()`, que suma al badge de Aprovacions; `esRecollidaDelEquip()` copia el criterio SQL).
+- **Productor**: varios REC por oferta (`recDeLOferta`). **Receptor**: una canalización `conciliada` sin albarán cuenta
+  como recibida; `FitxaOperacio` enseña los documentos propios de la venta.
+- Textos corregidos: ya no se prometen envíos ni que el REC espera a las demás recogidas (`vrec.*`, `rrec.*`, `canal.*`,
+  `alb.next_*`, `proc.e_assignada_coberta_*`). Los del modelo heredado (`vrec.fet_esperant`) siguen para esas ofertas.
+- E2E: `tests/e2e/recollida-un-acte.e2e.ts` (donación desde la ficha: ENT y REC conciliados y PDF; dos recogidas, dos
+  REC; venta conciliada sin albarán; 360 px sin desbordes).

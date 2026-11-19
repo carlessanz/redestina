@@ -17,6 +17,8 @@ import CarregantSeccio from './CarregantSeccio'
 import RegistraRecollida from './RegistraRecollida'
 import MissatgesDelPunt from './MissatgesDelPunt'
 import ValorCanalitzacio from './ValorCanalitzacio'
+import DocumentsCanalitzacio from './DocumentsCanalitzacio'
+import { esVendaOMaquila } from '../lib/albaransRecollida'
 import { useMissatgesOferta } from '../hooks/useMissatgesOferta'
 
 /** Las clases del estado de la recogida, sin colores fuera de los tokens (§2bis). */
@@ -84,6 +86,10 @@ export default function FitxaOperacio(
   const difDeclarada = declarats != null && assignats != null
     ? Math.round((Number(declarats) - assignats) * 100) / 100 : null
   const motiuReceptor = op.incidencia_recollida?.descripcion ?? null
+  // Fase 3 de los puntos 4-6: una venta o maquila ya no tiene albarán de Redestina. Lo que la
+  // acredite (albarán del productor, factura, foto) cuelga de la recogida, y lo pueden aportar
+  // las dos partes y el equipo una vez registrada.
+  const docsPropis = esVendaOMaquila(op.modalitat) && !op.albara_numero && op.recollida_registrada_at != null
 
   const fila = (etiqueta: string, valor: React.ReactNode) => (valor == null || valor === '' ? null : (
     <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-[10rem_1fr]">
@@ -226,6 +232,13 @@ export default function FitxaOperacio(
         {/* El de recepción (ofertant → Espigoladors) es del ofertante y del equipo. */}
         {op.rol !== 'entidad' && fila(t('op.albara_rec'), op.rec_numero)}
       </dl>
+
+      {docsPropis && (
+        <div className="space-y-2 rounded-lg border p-3">
+          <h3 className="text-sm font-semibold">{t('dcan.title')}</h3>
+          <DocumentsCanalitzacio canalitzacio={canalizacionId} idPrefix={`op-docs-${canalizacionId}`} />
+        </div>
+      )}
 
       {op.rol === 'entidad' && (
         <MissatgesDelPunt missatges={missatges} destinatari="entidad" nomesLectura nomesAvisos />

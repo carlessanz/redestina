@@ -685,6 +685,20 @@ tablas: **nivel 1**, el equipo asigna en un acto; **nivel 2**, la entidad muestr
 - Arnés: bloques `ASSIGNACIO_*` (internas denegadas a todos; técnico deniega las cuatro RPC y `aprovar_resposta`;
   super_admin con `errorExigit: "22023"`; lectura de las columnas nuevas por productor y receptor).
 
+## Recogida en un acto y venta sin albarán (19-11-2026, fase 3 de los puntos 4-6)
+
+- `validar_recollida(p_canalizacion, p_kg, p_motiu) returns jsonb` (admin): **donación con REC propio** → emite,
+  entrega, confirma y concilia ENT y REC de esa recogida sin esperar a las demás (`esperant_altres` siempre false);
+  **venta/maquila sin OPE** → canalización `conciliada`, valoración y aviso `recollida_confirmada` al productor; devuelve
+  `sense_albara: true` y `albara_id/albara/tipus/estat/rec` null; **lo heredado**, como antes (una canalización ya
+  conciliada no hace esperar al REC heredado). Nuevo `22023 cal_preu_acceptat` en cualquier venta sin precio aceptado.
+- `registrar_recollida_escriu` (receptor) y `registrar_recollida_assistida` (equipo): sin albarán en venta/maquila
+  (`ja_registrada` si ya está conciliada); la foto puede ser un externo de la canalización (si no, `foto_aliena`).
+- `operacio_detall`: REC propio o heredado; `pot_registrar` también en venta/maquila sin albarán.
+- `pendents_equip()`: **19 colas** (nueva `recollides_equip`: ventas y maquilas sin albarán pendientes).
+- `anular_albaran` sobre un REC propio → `22023 anula_la_canalitzacio` (se anula la asignación).
+- `canalitzacions_de_les_meves_orgs(p_user)` (puente de la política de externos; otra persona → `42501`).
+
 ## Familias de RPC que el canónico ya no enumera (movidas de `AGENTS.md` el 02-11-2026, 1E)
 
 ### Lista de familias movida de `AGENTS.md` (10-11-2026, A1, para hacer sitio)

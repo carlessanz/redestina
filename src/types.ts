@@ -833,6 +833,8 @@ export interface CosteProducto {
 /** El vocabulario lo fija el CHECK de la tabla (20270329100000), no este tipo. */
 export type DocumentExternObjecte =
   | 'albaran' | 'cierre_donante' | 'convenio'
+  /** Documentos propios de una venta o maquila, sin albarán de Redestina (fase 3, 20270608100400) */
+  | 'canalizacion'
   /** Archivo de la organización: cuelga de la FICHA, no de una operación */
   | 'productor' | 'entidad'
   /** Evidencias del expediente de prevención (fase 11) */

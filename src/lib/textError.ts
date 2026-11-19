@@ -72,6 +72,8 @@ const CODIS: Record<string, string> = {
   ja_validada: 'asg.err_ja_validada',
   no_es_venda: 'asg.err_no_es_venda',
   hora_passada: 'rrec.err_hora_passada',
+  // Fase 3 (20270608100100): el REC propio de una recogida se anula anulando la asignación.
+  anula_la_canalitzacio: 'asg.err_anula_la_canalitzacio',
   kg_maxim: 'asg.err_kg_maxim',
   // `confirmar_recollida()`, fase 3 de la revisión del 08-10-2026.
   canalitzacio_inexistent: 'recol.err_inexistent',

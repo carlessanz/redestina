@@ -4,6 +4,12 @@
 // la RLS, evalúa las políticas de quien consulta. Aquí siempre consulta el equipo, pero eso
 // importa porque la misma vista la usa la bandeja de documentos.
 //
+// Desde la fase 3 de los puntos 4-6 (20270608100100) una donación tiene un REC por recogida, y
+// validar la recogida emite y concilia su ENT y su REC en un acto: lo normal es que un albarán
+// pase de borrador a conciliado sin pararse en las pestañas de en medio. Lo que queda en ellas
+// son las excepciones (espigoladas y el circuito heredado). La lista va por fecha, la más
+// reciente primero, y cada fila enlaza a su oferta.
+//
 // Las pestañas siguen el circuito, no el alfabeto: un albarán nace en BORRADOR (lo crea el
 // trigger al canalizar), se EMITE con número, se marca ENTREGAT cuando la recogida se ha
 // hecho —y ahí sale el enlace de confirmación—, la otra parte lo CONFIRMA y el equipo lo
@@ -56,10 +62,12 @@ export default function Albarans() {
     const { data, error: err } = await supabase
       .from('v_albaranes_bandeja')
       .select('id, tipo, numero_completo, estado, ejercicio, excedente_id, espigolada_id, canalizacion_id, id_excedente, producto, productor_id, entidad_id, codigo_lote, emitido_at, entregado_at, confirmado_at, conciliado_at, rechazo, kg_previstos, kg_neto, kg_confirmados, kg_validados, dias_esperando')
-      // La vista no expone `created_at`: se ordena por lo emitido, y los borradores —que
-      // todavía no tienen fecha ni número— quedan arriba, que es donde hay trabajo.
-      .order('emitido_at', { ascending: false, nullsFirst: true })
-      .order('numero_completo', { ascending: false, nullsFirst: true })
+      // Por fecha, el más reciente primero (fase 3 de los puntos 4-6). La vista no expone
+      // `created_at`: manda lo emitido. Los borradores van al final: desde que la validación de
+      // la recogida emite y concilia en un acto, un borrador es una recogida que aún no se ha
+      // hecho, no trabajo de esta pantalla (lo cuenta «Esborranys» y su cola del tablero).
+      .order('emitido_at', { ascending: false, nullsFirst: false })
+      .order('numero_completo', { ascending: false, nullsFirst: false })
 
     if (err) return { llista: [] as AlbaranBandeja[], err }
     return { llista: (data as AlbaranBandeja[] | null) ?? [], err: null }
@@ -118,6 +126,8 @@ export default function Albarans() {
   /** ¿Este albarán espera la revisión de una diferencia declarada por la receptora? */
   const teIncidencia = (f: AlbaranBandeja): boolean => {
     if (f.estado === 'conciliado' || f.estado === 'anulado' || f.estado === 'rectificado') return false
+    // Un REC propio (fase 3) es de UNA recogida: la incidencia es la de su canalización.
+    if (f.tipo === 'REC' && f.canalizacion_id) return incidencies.canals.has(f.canalizacion_id)
     if (f.tipo === 'REC') return !f.espigolada_id && !!f.excedente_id && incidencies.ofertes.has(f.excedente_id)
     return !!f.canalizacion_id && incidencies.canals.has(f.canalizacion_id)
   }
@@ -175,10 +185,25 @@ export default function Albarans() {
                   <span className="block text-xs text-muted-foreground xl:hidden">
                     {f.producto ?? '—'}<span className="sm:hidden"> · {kilos} kg</span>
                   </span>
+                  {/* La oferta de la que sale (fase 3 de los puntos 4-6): ida y vuelta. */}
+                  {f.excedente_id && f.id_excedente && (
+                    <Link to={`/equip/ofertes/${f.excedente_id}`} data-testid="alb-oferta"
+                      className="block text-xs text-primary tabular-nums hover:underline xl:hidden">
+                      {f.id_excedente}
+                    </Link>
+                  )}
                 </TableCell>
                 <TableCell className="hidden text-center xl:table-cell"><Badge variant="outline">{f.tipo}</Badge></TableCell>
                 <TableCell className="hidden lg:table-cell">{contraparte(f)}</TableCell>
-                <TableCell className="hidden text-muted-foreground xl:table-cell">{f.producto ?? '—'}</TableCell>
+                <TableCell className="hidden text-muted-foreground xl:table-cell">
+                  {f.producto ?? '—'}
+                  {f.excedente_id && f.id_excedente && (
+                    <Link to={`/equip/ofertes/${f.excedente_id}`}
+                      className="block text-xs text-primary tabular-nums hover:underline">
+                      {f.id_excedente}
+                    </Link>
+                  )}
+                </TableCell>
                 <TableCell className="hidden text-center tabular-nums whitespace-nowrap sm:table-cell">{kilos}</TableCell>
                 <TableCell className="text-center">
                   <div className="flex flex-col items-center gap-1">

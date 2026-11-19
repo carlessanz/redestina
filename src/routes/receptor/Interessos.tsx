@@ -25,7 +25,7 @@ import { cn } from '../../lib/utils'
 import { useT } from '../../lib/i18n'
 import { useOrganitzacio } from '../../hooks/useAppContext'
 import { estatSimpleInteres, llegendaSimpleInteres, puntInteres } from '../../lib/procesOferta'
-import type { PuntProces } from '../../lib/procesOferta'
+import type { FetsInteres, PuntProces } from '../../lib/procesOferta'
 import { dataCurta, diaMes, kg, preu } from '../../lib/format'
 import type { AlbaranBandeja } from '../../lib/albarans'
 import type { EstadoAlbaran, OfertaRespuesta } from '../../types'
@@ -75,6 +75,9 @@ interface CanalAmbOferta {
   incidencia_recollida: Record<string, unknown> | null
   data_hora_recollida: string | null
   created_at: string
+  /** `conciliada` sin albarán = venta o maquila validada (fase 3 de los puntos 4-6). */
+  estado: string | null
+  recollida_validada_at: string | null
   // La oferta, con las columnas de `OfertaReceptor`: la fila abre su detalle (28-09-2026).
   excedentes: OfertaReceptor | null
 }
@@ -113,6 +116,9 @@ export function Interessos() {
   const [albarans, setAlbarans] = useState<Record<string, AlbaraEnt>>({})
   // Las canalizaciones con una diferencia de kilos en revisión del equipo (17-10-2026).
   const [ambIncidencia, setAmbIncidencia] = useState<Set<string>>(new Set())
+  /** Recogidas ya conciliadas. Una venta o maquila no tiene albarán desde la fase 3 de los
+   *  puntos 4-6: sin esto se quedaba en «Assignada» para siempre. */
+  const [conciliades, setConciliades] = useState<Set<string>>(new Set())
   // El registro de cada recogida frente a la validación del equipo (17-10-2026): por
   // canalización, si espera al equipo o si el equipo lo ha devuelto (y por qué).
   const [validacions, setValidacions] = useState<Record<string, {
@@ -147,7 +153,7 @@ export function Interessos() {
       // está aplicada, esta lectura falla sola y la pantalla sigue como antes.
       supabase
         .from('canalizaciones')
-        .select('id, incidencia_recollida, kg_declarats, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, motiu_retorn')
+        .select('id, estado, incidencia_recollida, kg_declarats, recollida_registrada_at, recollida_validada_at, recollida_retornada_at, motiu_retorn')
         .eq('entidad_id', entidadId),
     ])
     // Un fallo de carga no es «todavía no has pedido nada»: se dice.
@@ -159,10 +165,11 @@ export function Interessos() {
     setAlbarans(albaraPerCanalitzacio((alb.data as AlbaraEnt[] | null) ?? []))
     // Si esta lectura falla, sin marca: la frase vuelve a la de siempre, que no miente.
     type CanalVal = DatesValidacio & {
-      id: string; incidencia_recollida: unknown; kg_declarats: number | null; motiu_retorn: string | null
+      id: string; estado: string | null; incidencia_recollida: unknown; kg_declarats: number | null; motiu_retorn: string | null
     }
     const canals = inc.error ? [] : ((inc.data as unknown as CanalVal[] | null) ?? [])
     setAmbIncidencia(new Set(canals.filter((c) => c.incidencia_recollida != null).map((c) => c.id)))
+    setConciliades(new Set(canals.filter((c) => c.estado === 'conciliada').map((c) => c.id)))
     const vals: typeof validacions = {}
     for (const c of canals) {
       const e = estatValidacio(c)
@@ -241,6 +248,17 @@ export function Interessos() {
       ? t(punt.claus.passa, punt.vars).replace(/\s+/g, ' ').trim()
       : null)
 
+  /**
+   * El albarán de entrega que cuenta para la etapa. Una venta o maquila conciliada no tiene
+   * albarán desde la fase 3 de los puntos 4-6: cuenta como una entrega cerrada.
+   */
+  const entregaDe = (canalizacionId: string | null): FetsInteres['albaraEnt'] => {
+    if (!canalizacionId) return null
+    const alb = albarans[canalizacionId]
+    if (alb) return { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo }
+    return conciliades.has(canalizacionId) ? { estado: 'conciliado', numero: null } : null
+  }
+
   /** Lo que `puntInteres()` necesita saber de la validación de la recogida de esta fila. */
   const fetsValidacio = (canalizacionId: string | null) => {
     const v = canalizacionId ? validacions[canalizacionId] : undefined
@@ -276,14 +294,13 @@ export function Interessos() {
           <p className="text-sm text-muted-foreground">{t(pestanya === 'per_a_tu' ? 'int.per_a_tu_empty' : 'int.empty')}</p>
         )}
         {!errorCarrega && visibles.map((f) => {
-          const alb = f.canalizacion_id ? albarans[f.canalizacion_id] : undefined
           const assignat = kgAssignat(f)
           const punt = puntInteres({
             estado: f.estado,
             aprovacio: f.aprovacio,
             kg: assignat ?? f.kg_solicitados,
             ofertaEstado: f.excedentes?.estado ?? 'publicada',
-            albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
+            albaraEnt: entregaDe(f.canalizacion_id),
             motiu: f.motiu_aprovacio,
             incidencia: f.canalizacion_id ? ambIncidencia.has(f.canalizacion_id) : false,
             ...fetsValidacio(f.canalizacion_id),
@@ -356,13 +373,12 @@ export function Interessos() {
 
       <Dialog open={obert != null} onOpenChange={(v) => !v && setObert(null)}>
         {obert?.excedentes && (() => {
-          const alb = obert.canalizacion_id ? albarans[obert.canalizacion_id] : undefined
           const punt = puntInteres({
             estado: obert.estado,
             aprovacio: obert.aprovacio,
             kg: kgAssignat(obert) ?? obert.kg_solicitados,
             ofertaEstado: obert.excedentes.estado ?? 'publicada',
-            albaraEnt: alb ? { estado: alb.estado as EstadoAlbaran, numero: alb.numero_completo } : null,
+            albaraEnt: entregaDe(obert.canalizacion_id),
             motiu: obert.motiu_aprovacio,
             incidencia: obert.canalizacion_id ? ambIncidencia.has(obert.canalizacion_id) : false,
             ...fetsValidacio(obert.canalizacion_id),
@@ -461,7 +477,7 @@ export function Historic() {
     void Promise.all([
       supabase
         .from('canalizaciones')
-        .select('id, kg_confirmados, kg_reales, incidencia_recollida, data_hora_recollida, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
+        .select('id, estado, kg_confirmados, kg_reales, incidencia_recollida, data_hora_recollida, recollida_validada_at, created_at, excedentes(id, estado, familia, producto, variedad, kg_total, num_caixes, tipo_caixa, retorn_envasos, modalitat, modalitats, causa, disponible_hasta, horari_recollida, hora_recollida_inici, hora_recollida_fi, observacions, preu_minim, producte_al_camp, comarca, format_entrega, transport_propi, fotos, foto_producte)')
         .eq('entidad_id', entidadId)
         // Una asignación anulada no es una recepción: fuera del histórico (puntos 4-6, fase 2).
         .neq('estado', 'anulada')
@@ -490,6 +506,8 @@ export function Historic() {
   const estatEntrega = (f: CanalAmbOferta): 'conciliada' | 'confirmada' | 'pendent' => {
     const alb = albarans[f.id]
     if (alb?.estado === 'conciliado') return 'conciliada'
+    // Venta o maquila: desde la fase 3 no hay albarán y la recogida validada queda conciliada.
+    if (!alb && f.estado === 'conciliada') return 'conciliada'
     if (alb?.estado === 'confirmado') return 'confirmada'
     return 'pendent'
   }
@@ -507,7 +525,7 @@ export function Historic() {
   // pendiente de recibir vive en «Els meus interessos», con su ficha. Ordenado por la fecha
   // de recepción, la más reciente primero (§2.5).
   const quanRebut = (f: CanalAmbOferta) =>
-    albarans[f.id]?.confirmado_at ?? f.data_hora_recollida ?? f.created_at
+    albarans[f.id]?.confirmado_at ?? f.recollida_validada_at ?? f.data_hora_recollida ?? f.created_at
   const totes = files
     .filter((f) => estatEntrega(f) !== 'pendent')
     .sort((a, b) => quanRebut(b).localeCompare(quanRebut(a)))

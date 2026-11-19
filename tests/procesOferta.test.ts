@@ -666,3 +666,21 @@ describe('motiuVisible', () => {
     expect(motiuVisible(null)).toBe('')
   })
 })
+
+// Fase 3 de los puntos 4-6: una venta o maquila se concilia sin albarán y cierra la oferta.
+describe('cerrada con todas las recogidas conciliadas (sin REC)', () => {
+  it('es «tancada» de Redestina, no un destino registrado a mano', () => {
+    const p = puntOferta({ ...base, estado: 'cerrada', kgCanalitzats: 80, recollidesConciliades: true }, 'equip')
+    expect([p.etapa, p.variant, p.index]).toEqual(['tancada', null, 4])
+    expect(p.vars).toEqual({ kg: 80 })
+  })
+  it('sin el dato, como antes: «tancada amb destí»', () => {
+    const p = puntOferta({ ...base, estado: 'cerrada' }, 'productor')
+    expect([p.etapa, p.variant]).toEqual(['tancada', 'desti'])
+  })
+  it('coberta: al equipo le lleva a la oferta, donde se registra la recogida', () => {
+    const p = puntOferta({ ...base, estado: 'bloqueada', id: 'x1' }, 'equip')
+    expect(p.variant).toBe('coberta')
+    expect(p.enllac).toBe('/equip/ofertes/x1')
+  })
+})

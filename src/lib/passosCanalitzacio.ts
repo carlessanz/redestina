@@ -44,6 +44,15 @@
 //    Quedan: la hora (informativa: NO bloquea registrar), el registro, los albaranes (que
 //    salen solos) y la conciliación (que normalmente también).
 //
+// ⚠️ **UN REC POR RECOGIDA Y VENTAS SIN ALBARÁN** (fase 3 de los puntos 4-6, 20270608100100).
+//    Una donación tiene su ENT y SU REC por canalización, y validar la recogida los emite y los
+//    concilia a la vez; una venta o maquila no tiene albarán y validar la deja conciliada. Por
+//    eso: el REC del lote es el MENOS avanzado (`rec`, `avancEntrades`), una venta conciliada
+//    sin OPE cuenta como salida hecha (`avancSortides`), la modalidad real sale de la
+//    canalización cuando se sabe (`certificatsDelLot`), y «albarans» y «conciliar» son pasos
+//    AUTOMÁTICOS (`canal.bl_automatic`): se dan por hechos al validar. Una oferta con el REC
+//    heredado (uno por oferta) sigue el modelo de antes.
+//
 // ⚠️ **`pendent_validacio` ES UN PASO** (`oferta_validar`), no «publicada». La oferta está
 //    dada de alta pero no sale al Mercat hasta que el equipo la valida, así que distribuirla
 //    queda bloqueado con su motivo hasta entonces.
@@ -56,6 +65,7 @@
 import type { ConvenioEstado, EstadoAlbaran, EstadoExcedente } from '../types'
 import type { PuntProces } from './procesOferta'
 import { FASES_EQUIP } from './procesOferta'
+import { recDe, teRecPerRecollida } from './albaransRecollida'
 
 // --- Los pasos -------------------------------------------------------------------------
 
@@ -247,9 +257,36 @@ function avanc(a: AlbaraCanal | undefined | null): number {
   return AVANC[a.estado] ?? 0
 }
 
-/** El REC del lote: la entrada del generador. Como mucho hay uno vivo. */
+/**
+ * El REC del lote que cuenta: el vivo (emitido o más) MENOS avanzado. Hasta la fase 3 de los
+ * puntos 4-6 había uno por oferta; desde 20270608100100 una donación tiene uno por recogida
+ * (`canalizacion_id`), y el lote va al ritmo del más atrasado.
+ */
 function rec(f: FetsCanal): AlbaraCanal | null {
-  return f.albarans.find((a) => a.tipo === 'REC' && VIU.includes(a.estado)) ?? null
+  const vius = f.albarans.filter((a) => a.tipo === 'REC' && VIU.includes(a.estado))
+  return vius.sort((a, b) => avanc(a) - avanc(b))[0] ?? null
+}
+
+/** Venta o maquila sin ningún albarán de salida: el modelo de la fase 3 (sin OPE). */
+function vendaSenseAlbara(f: FetsCanal, c: CanalitzacioCanal): boolean {
+  return VENDA.includes(c.valorizacion ?? '') && sortidaDe(f, c.id) == null
+}
+
+/** Una recogida conciliada (por su albarán o, sin albarán, por la validación). */
+function canalConciliada(c: CanalitzacioCanal): boolean {
+  return c.kg_conciliados != null || c.estado === 'conciliada'
+}
+
+/**
+ * El avance de las ENTRADAS (REC). Con un REC por recogida, el de cada donación viva —el suyo, o
+ * el heredado si no lo tiene— y al ritmo del más atrasado; un borrador cuenta como 0, porque es
+ * el REC que la validación va a emitir. Sin ningún REC por recogida, el del lote como siempre.
+ */
+function avancEntrades(f: FetsCanal): number {
+  if (!teRecPerRecollida(f.albarans)) return avanc(rec(f))
+  const donacions = canalitzacionsVives(f).filter((c) => !VENDA.includes(c.valorizacion ?? ''))
+  if (donacions.length === 0) return avanc(rec(f))
+  return Math.min(...donacions.map((c) => avanc(recDe(f.albarans, c.id))))
 }
 
 /** Las canalizaciones que cuentan: una anulada ya no es una entrega. */
@@ -276,7 +313,11 @@ function sortidaDe(f: FetsCanal, canalitzacio: string): AlbaraCanal | null {
  */
 function avancSortides(f: FetsCanal): number {
   const vives = canalitzacionsVives(f)
-  const perCanal = vives.map((c) => avanc(sortidaDe(f, c.id)))
+  // Una venta o maquila SIN albarán (fase 3 de los puntos 4-6) no tiene salida que avanzar: la
+  // validación la deja conciliada, y eso es lo mismo que un OPE conciliado.
+  const perCanal = vives.map((c) => (sortidaDe(f, c.id) == null && canalConciliada(c)
+    ? AVANC.conciliado
+    : avanc(sortidaDe(f, c.id))))
   const solts = f.albarans
     .filter((a) => (a.tipo === 'ENT' || a.tipo === 'OPE') && VIU.includes(a.estado)
       && !vives.some((c) => c.id === a.canalizacion_id))
@@ -319,6 +360,19 @@ export function certificatsDelLot(f: FetsCanal): { donacio: boolean; transaccio:
   const ambEnt = sortidesTotes.some((a) => a.tipo === 'ENT')
   const ambOpe = sortidesTotes.some((a) => a.tipo === 'OPE')
   const modalitatVenda = VENDA.includes(f.oferta.modalitat ?? '')
+  // Fase 3 de los puntos 4-6: una venta o maquila ya no tiene OPE, así que los albaranes no
+  // bastan para saber la modalidad real. Cuando las canalizaciones la traen (la ficha; el
+  // índice no), manda la suya.
+  const vives = canalitzacionsVives(f)
+  const ambModalitat = vives.some((c) => c.valorizacion != null)
+  if (ambModalitat) {
+    const donacio = f.oferta.origen === 'espigolament'
+      || rec(f) != null
+      || ambEnt
+      || vives.some((c) => c.valorizacion != null && !VENDA.includes(c.valorizacion))
+    const transaccio = ambOpe || vives.some((c) => VENDA.includes(c.valorizacion ?? ''))
+    return { donacio, transaccio }
+  }
   const donacio = f.oferta.origen === 'espigolament'
     || rec(f) != null
     || ambEnt
@@ -350,10 +404,13 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
   )
 
   const r = rec(f)
-  const aRec = avanc(r)
+  const aRec = avancEntrades(f)
   const aSort = avancSortides(f)
   const vives = canalitzacionsVives(f)
-  const totConciliat = vives.length > 0 && vives.every((c) => c.kg_conciliados != null)
+  const totConciliat = vives.length > 0 && vives.every(canalConciliada)
+  // El modelo de la fase 3 de los puntos 4-6: REC por recogida o venta sin albarán. Ahí los
+  // albaranes y la conciliación salen SOLOS al validar la recogida: son pasos automáticos.
+  const automatic = teRecPerRecollida(f.albarans) || vives.some((c) => vendaSenseAlbara(f, c))
   // La hora solo falta con un `null` EXPLÍCITO: en el índice el campo no viene (ver
   // `CanalitzacioCanal`), y decir «fixa l'hora» de un lote que quizá ya la tiene es inventar.
   const ambHora = vives.every((c) => c.data_hora_recollida !== null || recollidaRegistrada(f, c))
@@ -453,20 +510,26 @@ export function escalaCanal(f: FetsCanal): PasEscala[] {
         const clau = espigolada ? 'albarans_espigolada'
           : recollidesPerValidar ? 'albarans_validar'
             : senseRec ? 'albarans_venda' : undefined
+        const fet = vives.length > 0 && aSort >= 3 && (senseRec || aRec >= 3)
         return {
-          fet: vives.length > 0 && aSort >= 3 && (senseRec || aRec >= 3),
+          fet,
+          motiu: fet && automatic ? 'canal.bl_automatic' : undefined,
           bloqueig: vives.length === 0 ? 'canal.bl_sense_canalitzacions' : undefined,
           clau,
         }
       }
-      case 'conciliar':
-        // Normalmente llega sola: validar concilia (`validar_recollida`). Lo que queda aquí
-        // es un REC fuera de tolerancia, que hay que conciliar con motivo, o una salida
-        // confirmada por el circuito anterior que la conciliación automática no recogió.
+      case 'conciliar': {
+        // Llega sola: validar concilia (`validar_recollida`), y desde la fase 3 de los puntos
+        // 4-6 el ENT y su REC (o la venta sin albarán) en el mismo acto. Lo que queda aquí es lo
+        // heredado: un REC de oferta fuera de tolerancia, que hay que conciliar con motivo, o una
+        // salida confirmada por el circuito anterior que la conciliación automática no recogió.
+        const fet = totConciliat && (senseRec || aRec >= 4)
         return {
-          fet: totConciliat && (senseRec || aRec >= 4),
+          fet,
+          motiu: fet && automatic ? 'canal.bl_automatic' : undefined,
           bloqueig: foraTolerancia ? 'canal.bl_fora_tolerancia' : undefined,
         }
+      }
 
       // ── 6 · tancament ──
       case 'cost':

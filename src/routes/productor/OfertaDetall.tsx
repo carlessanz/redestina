@@ -38,6 +38,7 @@ import { textError } from '../../lib/textError'
 import { dataCurta } from '../../lib/format'
 import { cancelaOferta, carregaDestins } from '../../lib/ofertes'
 import { carregaRecollidesPerValidar } from '../../lib/operacio'
+import { recDeLOferta } from '../../lib/albaransRecollida'
 import DestiFinal from '../../components/DestiFinal'
 import { carregaPendents } from '../../lib/pendents'
 import { carregaProgresOfertes } from '../../lib/progresOfertes'
@@ -61,7 +62,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
  * toca saber a qué entidad va su producto (§4bis, «cuántas, sin nombres»).
  */
 type CanalitzacioMeva = Pick<Canalizacion, 'id' | 'kg_confirmados' | 'kg_reales' | 'estado'>
-interface RecMeu { id: string; estado: string; numero_completo: string | null; dias_esperando: number | null }
+interface RecMeu {
+  id: string; estado: string; numero_completo: string | null; dias_esperando: number | null
+  /** Fase 3 de los puntos 4-6: el REC de UNA recogida (null en el heredado y en la espigolada). */
+  canalizacion_id: string | null
+}
 
 /** Lo que `NovaOferta` deja al navegar aquí. Nada de esto sobrevive a una recarga. */
 interface EstatArribada { publicada?: boolean; correuEnviat?: boolean }
@@ -105,15 +110,17 @@ export default function ProductorOfertaDetall() {
     // l'equip» (28-09-2026). Por eso va después de leer la oferta.
     const espId = (e.data as Excedente | null)?.espigolada_id ?? null
     const a = await supabase.from('v_albaranes_bandeja')
-      .select('id, estado, numero_completo, dias_esperando, emitido_at')
+      .select('id, estado, numero_completo, dias_esperando, emitido_at, canalizacion_id')
       .eq('tipo', 'REC')
       .or(`excedente_id.eq.${id}${espId ? `,espigolada_id.eq.${espId}` : ''}`)
       .order('emitido_at', { ascending: false, nullsFirst: true })
     setErrorCarrega(Boolean(e.error))
     setOferta((e.data as Excedente) ?? null)
     setCanalitzacions((c.data ?? []) as CanalitzacioMeva[])
-    const albarans = (a.data as RecMeu[] | null) ?? []
-    const recVigent = albarans[0] ?? null
+    // Con un REC por recogida (fase 3 de los puntos 4-6) hay varios: cuenta el menos avanzado,
+    // y con alguna recogida sin conciliar ninguno puede decir «tancada» (`recDeLOferta`).
+    const albarans = ((a.data as RecMeu[] | null) ?? []).map((r) => ({ ...r, tipo: 'REC' }))
+    const recVigent = recDeLOferta(albarans, (c.data ?? []) as CanalitzacioMeva[])
     setRec(recVigent)
 
     // Lo pendiente y el embudo son dos RPC que pueden no estar aplicadas todavía (se
@@ -223,6 +230,8 @@ export default function ProductorOfertaDetall() {
     id: oferta.id,
     kgSenseDesti,
     destiReclamat: Boolean(oferta.desti_reclamat_at),
+    // Fase 3 de los puntos 4-6: una venta o maquila se concilia sin albarán y cierra la oferta.
+    recollidesConciliades: vives.length > 0 && vives.every((c) => c.estado === 'conciliada'),
   }, 'productor')
 
   return (

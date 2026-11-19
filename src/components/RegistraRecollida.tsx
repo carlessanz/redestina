@@ -18,6 +18,10 @@
 //    valida en la misma transacción: aquí SÍ salen los albaranes al pulsar, con número legal,
 //    y el texto lo dice antes. Lo monta `DialegRegistraRecollida`. Dos diferencias más: la
 //    foto opcional —se sube después, sobre el albarán ya emitido— y que se abre directamente.
+//
+// 🔁 **Venta y maquila sin albarán** (fase 3 de los puntos 4-6, 20270608100200): se registran
+//    igual, pero validar no emite nada: la recogida queda conciliada. La foto (aquí también la de
+//    la receptora) cuelga de la canalización (`documentos_externos.objeto_tipo = 'canalizacion'`).
 
 import { useState } from 'react'
 import { Loader2, PackageCheck } from 'lucide-react'
@@ -79,6 +83,18 @@ export default function RegistraRecollida({
   const [intentat, setIntentat] = useState(false)
 
   const venda = op.modalitat === 'venda' || op.modalitat === 'maquila'
+  // Fase 3 de los puntos 4-6: una venta o maquila no tiene albarán de Redestina (un OPE heredado
+  // sí). Entonces la foto —también la de la receptora— cuelga de la propia recogida.
+  const senseAlbara = venda && !op.albara_numero
+  const ambFoto = assistit || senseAlbara
+
+  /** Sube la foto: al albarán emitido si lo hay; si no, a la canalización. Avisa si falla. */
+  const pujaFoto = async (f: File, albaraId: string | null) => {
+    const p = await pujarDocumentExtern(albaraId
+      ? { fitxer: f, objecteTipus: 'albaran', objecteId: albaraId, tipus: 'foto_incidencia' }
+      : { fitxer: f, objecteTipus: 'canalizacion', objecteId: op.canalizacion_id, tipus: 'foto_incidencia' })
+    if (!p.ok) toast.warning(`${t('recol.foto_no')} ${t(p.motiuKey)}`)
+  }
 
   const obre = () => {
     setResultat('coincideix')
@@ -118,12 +134,15 @@ export default function RegistraRecollida({
       data: dataIso,
       observacions: obs.trim() || null,
     })
-    setOcupat(false)
     if (!r.ok) {
+      setOcupat(false)
       const clau = clauErrorBase(r.missatge, r.codi)
       setError(clau ? t(clau) : textError(t, r))
       return
     }
+    // Una venta o maquila sin albarán: la foto, sobre la recogida (ya existe; no espera a nada).
+    if (foto && senseAlbara) await pujaFoto(foto, null)
+    setOcupat(false)
     // Lo que ha quedado registrado, y que ahora le toca al equipo. Sin números de albarán:
     // todavía no existen.
     const kgDecl = r.data?.kg_declarats ?? kgFinal
@@ -149,17 +168,16 @@ export default function RegistraRecollida({
       return
     }
     // La foto, sobre el albarán de salida YA emitido: un borrador no tiene ejercicio, y la
-    // carpeta de un documento externo sale del ejercicio de su objeto.
-    if (foto && r.data.albara_id) {
-      const p = await pujarDocumentExtern({
-        fitxer: foto, objecteTipus: 'albaran', objecteId: r.data.albara_id, tipus: 'foto_incidencia',
-      })
-      if (!p.ok) toast.warning(`${t('recol.foto_no')} ${t(p.motiuKey)}`)
+    // carpeta de un documento externo sale del ejercicio de su objeto. Una venta o maquila no
+    // tiene albarán (fase 3 de los puntos 4-6): la foto cuelga de la propia recogida.
+    if (foto && (r.data.albara_id || r.data.sense_albara)) {
+      await pujaFoto(foto, r.data.albara_id ?? null)
     }
     setOcupat(false)
     // Los números que han salido, que es lo que hay que poder decirle a la entidad.
     const nums = [r.data.albara, r.data.rec?.numero].filter(Boolean).join(' · ')
-    toast.success(t(r.data.conciliat ? 'rrec.as_ok_conciliat' : 'rrec.as_ok', { num: nums || '—' }))
+    if (r.data.sense_albara) toast.success(t('rrec.as_ok_sense_albara', { kg: fmtKg(r.data.kg_reals ?? kgFinal) }))
+    else toast.success(t(r.data.conciliat ? 'rrec.as_ok_conciliat' : 'rrec.as_ok', { num: nums || '—' }))
     if (r.data.esperant_altres && !r.data.rec?.numero) toast.info(t('vrec.fet_esperant'))
     void refrescaComptadors()
     onFet()
@@ -254,10 +272,10 @@ export default function RegistraRecollida({
             placeholder={t(assistit ? 'recol.obs_ph' : (ambDiferencia ? 'rrec.motiu_ph' : 'rrec.obs_ph'))} />
           {ambDiferencia && !assistit && <p className="text-xs text-muted-foreground">{t('rrec.incidencia_nota')}</p>}
         </div>
-        {assistit && (
+        {ambFoto && (
           <div className="space-y-1.5 sm:col-span-2">
-            <Label htmlFor="rrec-foto-assistit">{t('recol.foto')}</Label>
-            <Input id="rrec-foto-assistit" type="file" accept="image/jpeg,image/png,application/pdf"
+            <Label htmlFor={`rrec-foto-${mode}`}>{t('recol.foto')}</Label>
+            <Input id={`rrec-foto-${mode}`} type="file" accept="image/jpeg,image/png,application/pdf"
               onChange={(e) => setFoto(e.target.files?.[0] ?? null)} />
           </div>
         )}

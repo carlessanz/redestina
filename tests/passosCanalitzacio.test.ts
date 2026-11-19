@@ -631,3 +631,80 @@ describe('una oferta pendiente de validación', () => {
     expect(escalaCanal(v).find((x) => x.pas === 'oferta_validar')!.estat).toBe('fet')
   })
 })
+
+// Fase 3 de los puntos 4-6 (20270608100100): una donación tiene un REC POR RECOGIDA, que sale
+// emitido y conciliado con su ENT al validar; una venta o maquila no tiene albarán. Albaranes y
+// conciliación pasan a ser pasos automáticos (`canal.bl_automatic`).
+describe('el modelo de un REC por recogida y la venta sin albarán', () => {
+  /** `dues()` en el modelo nuevo: cada recogida con su ENT y su REC propios, en borrador. */
+  function duesNoves(): FetsCanal {
+    const f = dues()
+    f.albarans = [
+      { id: 'e1', tipo: 'ENT', estado: 'borrador', numero: null, canalizacion_id: 'ca1' },
+      { id: 'r1', tipo: 'REC', estado: 'borrador', numero: null, canalizacion_id: 'ca1' },
+      { id: 'e2', tipo: 'ENT', estado: 'borrador', numero: null, canalizacion_id: 'ca2' },
+      { id: 'r2', tipo: 'REC', estado: 'borrador', numero: null, canalizacion_id: 'ca2' },
+    ]
+    return f
+  }
+
+  it('con una recogida validada y la otra no, los albaranes NO están hechos', () => {
+    const f = duesNoves()
+    f.canalitzacions = [
+      { ...f.canalitzacions[0], recollida_registrada_at: AHIR, recollida_validada_at: AHIR, kg_conciliados: 50, estado: 'conciliada' },
+      { ...f.canalitzacions[1], data_hora_recollida: AHIR },
+    ]
+    f.albarans = f.albarans.map((a) => (a.canalizacion_id === 'ca1' ? { ...a, estado: 'conciliado' as const, numero: `${a.tipo}-1` } : a))
+    const escala = escalaCanal(f)
+    expect(escala.find((p) => p.pas === 'albarans')!.estat).not.toBe('fet')
+    expect(puntCanal(f).pas).toBe('recollida_registrar')
+  })
+
+  it('validadas las dos: albaranes y conciliación hechos SOLOS, y lo dice', () => {
+    const f = duesNoves()
+    f.canalitzacions = f.canalitzacions.map((c) => ({
+      ...c, recollida_registrada_at: AHIR, recollida_validada_at: AHIR, kg_conciliados: 50, estado: 'conciliada',
+    }))
+    f.albarans = f.albarans.map((a) => ({ ...a, estado: 'conciliado' as const, numero: `${a.tipo}-1` }))
+    const escala = escalaCanal(f)
+    for (const pas of ['albarans', 'conciliar'] as const) {
+      const p = escala.find((x) => x.pas === pas)!
+      expect(p.estat, pas).toBe('fet')
+      expect(p.motiuKey, pas).toBe('canal.bl_automatic')
+    }
+    expect(puntCanal(f).fase).toBe(5)
+  })
+
+  it('una venta validada sin albarán: conciliada, albaranes y conciliación hechos', () => {
+    const f: FetsCanal = {
+      ...venda(),
+      canalitzacions: [{
+        id: 'ca1', kg_conciliados: 100, coste_kg: null, estado: 'conciliada', valorizacion: 'venda',
+        recollida_registrada_at: AHIR, recollida_validada_at: AHIR, data_hora_recollida: AHIR,
+      }],
+      albarans: [],
+    }
+    const escala = escalaCanal(f)
+    for (const pas of ['recollida_registrar', 'albarans', 'conciliar'] as const) {
+      expect(escala.find((p) => p.pas === pas)!.estat, pas).toBe('fet')
+    }
+    expect(escala.find((p) => p.pas === 'albarans')!.motiuKey).toBe('canal.bl_automatic')
+  })
+
+  it('una venta sin albarán y sin registrar: toca registrar, no conciliar', () => {
+    const f: FetsCanal = {
+      ...venda(),
+      canalitzacions: [{
+        id: 'ca1', kg_conciliados: null, coste_kg: null, estado: 'pendiente', valorizacion: 'venda',
+        recollida_registrada_at: null, recollida_validada_at: null, data_hora_recollida: AHIR,
+      }],
+      albarans: [],
+    }
+    expect(puntCanal(f).pas).toBe('recollida_registrar')
+    expect(clauPas(escalaCanal(f).find((p) => p.pas === 'albarans')!)).toBe('albarans_venda')
+  })
+
+  it('el motivo automático existe en los dos idiomas', () => {
+    for (const idioma of IDIOMES) expect(DICTS[idioma]['canal.bl_automatic']).toBeTruthy()
+  })
+})

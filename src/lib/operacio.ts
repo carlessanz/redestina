@@ -117,10 +117,20 @@ export interface ResultatRegistreRecollida {
   resultat: ResultatRecollida | null
 }
 
-/** Lo que devuelve `validar_recollida()`. Se lee con tolerancia: cualquier clave puede faltar. */
+/**
+ * Lo que devuelve `validar_recollida()`. Se lee con tolerancia: cualquier clave puede faltar.
+ *
+ * Desde la fase 3 de los puntos 4-6 (20270608100200) hay tres caminos:
+ *   · donación con su propio REC: `albara` (el ENT) y `rec` salen emitidos y conciliados en el
+ *     mismo acto; `esperant_altres` siempre false;
+ *   · venta o maquila sin albarán (`sense_albara: true`): `albara_id`, `albara`, `tipus`,
+ *     `estat` y `rec` vienen a null y `conciliat: true`; la canalización queda conciliada;
+ *   · lo heredado (REC por oferta, OPE ya emitido): como antes, y el REC puede esperar a las
+ *     demás recogidas (`esperant_altres`).
+ */
 export interface ResultatValidaRecollida {
   albara_id?: string | null
-  /** El número del albarán de salida (ENT u OPE). */
+  /** El número del albarán de salida (ENT u OPE); null en una venta o maquila sin albarán. */
   albara?: string | null
   tipus?: 'ENT' | 'OPE' | string | null
   estat?: string | null
@@ -128,10 +138,12 @@ export interface ResultatValidaRecollida {
   kg_reals?: number | null
   kg_assignats?: number | null
   kg_declarats?: number | null
-  /** Todo cuadra y se ha cerrado: los albaranes ya son definitivos. */
+  /** Todo cuadra y se ha cerrado: los albaranes (o la canalización sin albarán) son definitivos. */
   conciliat?: boolean | null
-  /** La oferta se repartió entre varias entidades y el REC espera a las demás. */
+  /** Solo en lo heredado: la oferta se repartió entre varias entidades y su REC espera a las demás. */
   esperant_altres?: boolean | null
+  /** Venta o maquila sin albarán de Redestina: la recogida queda conciliada sin documento. */
+  sense_albara?: boolean | null
 }
 
 export type ResultatCrida<T> = { ok: true; data: T } | { ok: false; missatge: string; codi: string | null }
@@ -198,9 +210,10 @@ export async function validaRecollida(camps: {
  * motivo de la receptora) y a `p_motiu` (el de la validación). Sin diferencia, las
  * observaciones van solas y la validación no pide motivo.
  *
- * ⚠️ No pasa `p_foto`: la base exige que la foto ya esté subida a un albarán de ESA entrega, y
- *    antes de validar el albarán es un borrador sin ejercicio, sin carpeta donde subirla. Se
- *    sube después, sobre el albarán emitido (el mismo criterio de siempre). Nunca lanza.
+ * ⚠️ No pasa `p_foto`: la base exige que la foto ya esté subida a un albarán de ESA entrega (o,
+ *    desde 20270608100200, a la propia canalización), y antes de validar el albarán es un
+ *    borrador sin ejercicio. Se sube después: sobre el albarán emitido o, en una venta o maquila
+ *    sin albarán, sobre la canalización (`objeto_tipo = 'canalizacion'`). Nunca lanza.
  */
 export async function registraRecollidaAssistida(camps: {
   canalitzacio: string

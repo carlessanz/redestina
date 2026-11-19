@@ -20,19 +20,21 @@ const CUES = [...bloque.matchAll(/'([a-z_]+)'/g)].map((m) => m[1])
 const AMB_SUB = ['registres', 'convenis_contrasignar', 'ofertes_per_validar', 'respostes', 'ofertes_modificades',
   'ofertes_vencudes', 'costos', 'preus', 'albarans_conciliar', 'espigolades_per_convertir',
   'missatges', 'ofertes_sense_enviar', 'albarans_esborrany', 'documents_error', 'recollides_per_validar',
-  'signatures_per_tancar']
+  'recollides_equip', 'signatures_per_tancar']
 // `albarans_esperant` es informativa: no tiene fila propia (espera a la otra parte, no al
 // equipo) y se enseña como segunda línea de `albarans_conciliar`. Sin clave propia, a propósito.
 const SENSE_FILA = ['albarans_esperant']
 
 describe('pendents_equip · claves compuestas de «Pendent de l’equip»', () => {
-  it('lee las dieciocho colas del union CuaEquip', () => {
+  it('lee las diecinueve colas del union CuaEquip', () => {
     // 14 desde el 05-10-2026 (`ofertes_per_validar`), 15 desde el 11-10-2026
     // (`ofertes_modificades`, fase 2 de la revisión del 08-10-2026) y 16 desde el 17-10-2026
     // (`recollides_per_validar`: el admin valida la recogida antes de generar los albaranes).
     // 17 desde el 05-11-2026 (`signatures_per_tancar`: firmas subidas que revisa el super_admin).
     // 18 desde el 17-11-2026 (`preus`: precios de referencia por revisar, punto 3 D1).
-    expect(CUES).toHaveLength(18)
+    // 19 desde el 19-11-2026 (`recollides_equip`: ventas y maquilas sin albarán por registrar).
+    expect(CUES).toHaveLength(19)
+    expect(CUES).toContain('recollides_equip')
     expect(CUES).toContain('preus')
     expect(CUES).toContain('signatures_per_tancar')
     expect(CUES).toContain('recollides_per_validar')

@@ -260,7 +260,9 @@ export function DialegConciliarAlbara({
       } | null
       if (!viu) return
       if (error || !fila) { toast.error(textError(t, error?.message ?? null)); onTancar(); return }
-      const consultaInc = fila.tipo !== 'REC' && fila.canalizacion_id
+      // Un REC propio (fase 3 de los puntos 4-6) es de UNA recogida: su incidencia es la de su
+      // canalización, como la de un ENT. El heredado mira todas las de la oferta.
+      const consultaInc = fila.canalizacion_id
         ? supabase.from('canalizaciones').select('incidencia_recollida').eq('id', fila.canalizacion_id)
         : fila.tipo === 'REC' && fila.excedente_id && !fila.espigolada_id
           ? supabase.from('canalizaciones').select('incidencia_recollida')

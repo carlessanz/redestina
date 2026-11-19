@@ -2001,3 +2001,28 @@ Fase 2 de los puntos 4-6 (RPC y códigos en `context/04bis`, «Asignación en un
 - `avisos_tipus_check` admite `assignacio_anulada`.
 - 🔴 **Una canalización `anulada` no cuenta para nada**: ni kg cubiertos, ni estado de la oferta
   (`recalcula_estat_excedent`), ni `canalitzacions_actives`, ni las sumas de las pantallas.
+
+### Un REC por recogida; venta y maquila sin albarán (19-11-2026, fase 3 de los puntos 4-6, `20270608100000`…`100400`)
+
+- **Esquema (C1)**: un REC es de una oferta o de una espigolada y puede llevar `canalizacion_id` (solo si es de oferta).
+  Índices únicos de REC vivo: `albaranes_rec_canalizacion_uidx` (por canalización), `albaranes_rec_excedente_uidx`
+  (solo el **heredado**, sin `canalizacion_id`) y el de espigolada; los tres excluyen `anulado`, `rectificado` y los
+  rectificativos (rectificar un REC ya no choca con `23505`).
+- **Nacimiento (C2)**: `trg_canalizaciones_crea_albaranes` — donación → ENT + **REC propio en borrador** (línea con
+  `kg_confirmados` y `caixes_entregades`); si la oferta ya tiene un REC heredado vivo, solo el ENT (**una oferta nunca
+  mezcla los dos modelos**); espigolada → solo ENT; **venta y maquila → nada**. Los OPE en `borrador` (sin número) se
+  anularon en la migración; los emitidos siguen el camino heredado.
+- Adaptadas: `mes_albara_canalitzacio` (solo el REC heredado; si no, el mes de la asignación), `valor_linia_rec` (un REC
+  propio vale lo de su canalización), `albarans_germans_rec` (el hermano de un REC propio es su ENT),
+  `propuesta_conciliacion`, `conciliar_albaran` (solo ENT/OPE escriben en la canalización), `conciliacions_automatiques`,
+  `v_albaranes_bandeja` (`entidad_id`/`codigo_lote` null en los REC), `operacio_detall`, `pendents_equip`,
+  `programar_albarans_recollida`, `canalitzacio_assistida`; `modificar_assignacio` y `anula_canalitzacio` tocan
+  también el REC propio en borrador.
+- **Validar en un acto (C3)**: ver `context/04bis`. Una venta o maquila validada queda `conciliada` con
+  `kg_reales = kg_conciliados` y la oferta se cierra sola (`canalizaciones_tanca_excedent`).
+- **Certificados (C4)**: `cierre_base_periodo` casa cada REC propio con su canalización (**reparto 1:1**,
+  `excedent_partit` false; el heredado, en proporción); `cierre_base_recepcio` y `calcular_certificat_recepcio` solo
+  exigen albarán en donación. El texto del CR (`_shared/pdf/render/cr.ts`) cubre ya las compras y maquilas sin albarán.
+- **Documentos propios de una venta o maquila (D4)**: `documentos_externos.objeto_tipo = 'canalizacion'`, visibles al
+  equipo y a las dos partes (`canalitzacions_de_les_meves_orgs()`), carpeta del productor; `subir-documento-externo`
+  acepta `canalizacion`; `borrar_una_fitxa` se los lleva a `fitxers_orfes`.

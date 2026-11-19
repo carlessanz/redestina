@@ -29,6 +29,7 @@ import { filtraLlistat, opcionsDisponibles, ordenaPerDisponibilitat, type Dimens
 import { carregaPendents } from '../../lib/pendents'
 import { carregaDestins } from '../../lib/ofertes'
 import { carregaRecollidesPerValidar } from '../../lib/operacio'
+import { recDeLOferta } from '../../lib/albaransRecollida'
 import type { ProgresOferta } from '../../lib/progresOfertes'
 import {
   estatSimpleOferta, llegendaSimpleOferta, ofertaEnCurs, puntOferta,
@@ -68,6 +69,8 @@ function useMevesOfertes(productorId: string | null) {
   const [recsPendents, setRecsPendents] = useState<Set<string>>(new Set())
   /** Recogidas registradas por el receptor que esperan la validación del equipo (17-10-2026). */
   const [perValidar, setPerValidar] = useState<Record<string, number>>({})
+  /** Ofertas con todas sus recogidas vivas conciliadas (venta o maquila sin albarán, fase 3). */
+  const [conciliades, setConciliades] = useState<Set<string>>(new Set())
   const [carregant, setCarregant] = useState(true)
   /** Un fallo de carga NO es «no tienes ofertas»: antes se pintaba el estado vacío. */
   const [errorCarrega, setErrorCarrega] = useState(false)
@@ -106,13 +109,13 @@ function useMevesOfertes(productorId: string | null) {
       ? [null, null, null, null, null, {}]
       : await Promise.all([
         // Sin las anuladas: es la misma cuenta que `desti_excedent()` en la base.
-        supabase.from('canalizaciones').select('excedente_id, kg_confirmados')
+        supabase.from('canalizaciones').select('id, excedente_id, kg_confirmados, estado')
           .in('excedente_id', ids).neq('estado', 'anulada'),
         // El REC de una ESPIGOLADA no cuelga de la oferta sino de la jornada
         // (`espigolada_id`): sin buscarlo también por ahí, una oferta convertida y ya
         // conciliada se quedaba en «Espera el contacte de l'equip» (28-09-2026).
         supabase.from('v_albaranes_bandeja')
-          .select('id, excedente_id, espigolada_id, estado, numero_completo, dias_esperando, emitido_at')
+          .select('id, excedente_id, espigolada_id, canalizacion_id, estado, numero_completo, dias_esperando, emitido_at')
           .eq('tipo', 'REC')
           .or(`excedente_id.in.(${ids.join(',')})${espIds.length ? `,espigolada_id.in.(${espIds.join(',')})` : ''}`)
           .order('emitido_at', { ascending: false, nullsFirst: true }),
@@ -140,24 +143,35 @@ function useMevesOfertes(productorId: string | null) {
 
     const kgs: Record<string, number> = {}
     const ns: Record<string, number> = {}
-    for (const f of ((c?.data ?? []) as { excedente_id: string | null; kg_confirmados: number | null }[])) {
+    const canalsPer: Record<string, { id: string; estado: string | null }[]> = {}
+    for (const f of ((c?.data ?? []) as {
+      id: string; excedente_id: string | null; kg_confirmados: number | null; estado: string | null
+    }[])) {
       if (!f.excedente_id) continue
       kgs[f.excedente_id] = (kgs[f.excedente_id] ?? 0) + Number(f.kg_confirmados ?? 0)
       ns[f.excedente_id] = (ns[f.excedente_id] ?? 0) + 1
+      ;(canalsPer[f.excedente_id] ??= []).push({ id: f.id, estado: f.estado })
     }
-    // El REC vigente de cada oferta es el primero de la lista, igual que en el detalle
+    // El REC que cuenta de cada oferta lo elige `recDeLOferta`, igual que en el detalle
     // (`OfertaDetall`): así el badge de la lista y la etapa del detalle no pueden discrepar.
-    const rs: Record<string, RecResum> = {}
-    for (const r of ((a?.data ?? []) as {
-      id: string; excedente_id: string | null; espigolada_id: string | null; estado: string
-      numero_completo: string | null; dias_esperando: number | null
-    }[])) {
+    // Desde la fase 3 de los puntos 4-6 una oferta puede tener un REC por recogida: va al ritmo
+    // de la más atrasada, y con alguna recogida sin conciliar no puede salir «tancada».
+    type RecFila = {
+      id: string; tipo: string; excedente_id: string | null; espigolada_id: string | null
+      canalizacion_id: string | null; estado: string; numero_completo: string | null; dias_esperando: number | null
+    }
+    const recsPer: Record<string, RecFila[]> = {}
+    for (const r of ((a?.data ?? []) as Omit<RecFila, 'tipo'>[])) {
       // De una espigolada, el REC vale para todas las ofertas de esa jornada.
       const destins = r.excedente_id
         ? [r.excedente_id]
         : files.filter((o) => r.espigolada_id && o.espigolada_id === r.espigolada_id).map((o) => o.id)
-      for (const eid of destins) {
-        if (rs[eid]) continue
+      for (const eid of destins) (recsPer[eid] ??= []).push({ ...r, tipo: 'REC' })
+    }
+    const rs: Record<string, RecResum> = {}
+    for (const [eid, llista] of Object.entries(recsPer)) {
+      const r = recDeLOferta(llista, canalsPer[eid])
+      if (r) {
         rs[eid] = {
           id: r.id, estado: r.estado as EstadoAlbaran, numero: r.numero_completo, diesEsperant: r.dias_esperando,
         }
@@ -171,6 +185,12 @@ function useMevesOfertes(productorId: string | null) {
     setKg(kgs)
     setDestins(ns)
     setRecs(rs)
+    setConciliades(new Set(Object.entries(canalsPer)
+      .filter(([, cs]) => {
+        const vives = cs.filter((x) => x.estado !== 'anulada')
+        return vives.length > 0 && vives.every((x) => x.estado === 'conciliada')
+      })
+      .map(([eid]) => eid)))
     setPerValidar(pv ?? {})
     // La RPC «nunca lanza»: sin ella se pierde el matiz «en gestió», no la pantalla.
     setProgres(p && p.ok ? perOferta(p.data) : {})
@@ -228,8 +248,9 @@ function useMevesOfertes(productorId: string | null) {
       kgSenseDesti: Math.max(0, Number(o.kg_total ?? 0) - (kg[o.id] ?? 0) - (externs[o.id] ?? 0)),
       destiReclamat: Boolean(o.desti_reclamat_at),
       nRecollidesPerValidar: perValidar[o.id] ?? 0,
+      recollidesConciliades: conciliades.has(o.id),
     }, 'productor')
-  }, [kg, externs, progres, recs, recsPendents, perValidar])
+  }, [kg, externs, progres, recs, recsPendents, perValidar, conciliades])
 
   return { ofertes, esborranys, kg, destins, sortides, puntDe, carregant, errorCarrega }
 }

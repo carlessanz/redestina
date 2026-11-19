@@ -97,7 +97,7 @@ const CUERPO_PROVISIONAL: Record<"ca" | "es", Bloque[]> = {
     {
       tipo: "p",
       text:
-        "Que aquests quilos provenen d'operacions conciliades: la quantitat certificada és la que consta als albarans de lliurament validats per les dues parts, i no una previsió ni una estimació.",
+        "Que aquests quilos provenen d'operacions conciliades: la quantitat certificada és la que consta als albarans de lliurament validats per les dues parts o, en les operacions de compra o de maquila, la registrada a la recollida i validada per la Fundació; no és una previsió ni una estimació.",
     },
     {
       tipo: "p",
@@ -129,7 +129,7 @@ const CUERPO_PROVISIONAL: Record<"ca" | "es", Bloque[]> = {
     {
       tipo: "p",
       text:
-        "Que estos kilos provienen de operaciones conciliadas: la cantidad certificada es la que consta en los albaranes de entrega validados por ambas partes, y no una previsión ni una estimación.",
+        "Que estos kilos provienen de operaciones conciliadas: la cantidad certificada es la que consta en los albaranes de entrega validados por ambas partes o, en las operaciones de compra o de maquila, la registrada en la recogida y validada por la Fundació; no es una previsión ni una estimación.",
     },
     {
       tipo: "p",

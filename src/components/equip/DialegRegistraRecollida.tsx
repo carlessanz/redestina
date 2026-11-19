@@ -10,7 +10,13 @@
 //   las mismas filas y los mismos albaranes que si lo hubiera hecho ella (R1);
 // - **registrada por la entidad y sin validar** → lo que falta es validar: el formulario de
 //   «Recollides per validar» de Aprovacions, con la misma RPC (`validar_recollida()`);
-// - **validada** → se dice, y no se ofrece nada.
+// - **validada** → se dice, y se enseña lo que ha salido (fase 3 de los puntos 4-6): en una
+//   donación, su ENT y su REC ya conciliados con «Veure», «Descarrega» y «Comparteix»
+//   (`AlbaransRecollida`); en una venta o maquila, que no tiene albarán, sus documentos propios
+//   (`DocumentsCanalitzacio`).
+//
+// Lo abren la ficha de la oferta («Registrar la recollida», por canalización), el ciclo guiado y
+// la ficha del albarán.
 //
 // ⚠️ No se cierra al pinchar fuera, como los otros diálogos asistidos: con los kilos tecleados
 //    y a media llamada, un clic despistado sería caro.
@@ -27,9 +33,12 @@ import type { Operacio, ResultatValidaRecollida } from '../../lib/operacio'
 import {
   clauErrorValidacio, estatValidacio, llegeixKg, validacioCalMotiu,
 } from '../../lib/registreRecollida'
+import { esVendaOMaquila } from '../../lib/albaransRecollida'
 import FitxaOperacio from '../FitxaOperacio'
 import RegistraRecollida from '../RegistraRecollida'
 import CarregantSeccio from '../CarregantSeccio'
+import DocumentsCanalitzacio from '../DocumentsCanalitzacio'
+import AlbaransRecollida from './AlbaransRecollida'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -83,7 +92,7 @@ export default function DialegRegistraRecollida({
             <div className="min-w-0">
               {op === undefined ? <CarregantSeccio files={2} ambCapcalera={false} />
                 : op === null ? <p className="text-sm text-error">{t('op.err')}</p>
-                  : <AccioRecollida op={op} onTancar={onTancar} onFet={fet} />}
+                  : <AccioRecollida op={op} versio={versio} onTancar={onTancar} onFet={fet} />}
             </div>
           </div>
         )}
@@ -92,16 +101,41 @@ export default function DialegRegistraRecollida({
   )
 }
 
-/** Qué se puede hacer con esta recogida, según en qué punto está. */
-function AccioRecollida({ op, onTancar, onFet }: { op: Operacio; onTancar: () => void; onFet: () => void }) {
+/**
+ * Qué se puede hacer con esta recogida, según en qué punto está. Validada, lo que queda es lo
+ * que ha salido (fase 3 de los puntos 4-6): en una donación, su ENT y su REC con «Veure»,
+ * «Descarrega» y «Comparteix»; en una venta o maquila sin albarán, los documentos propios.
+ */
+function AccioRecollida({ op, versio, onTancar, onFet }: {
+  op: Operacio; versio: number; onTancar: () => void; onFet: () => void
+}) {
   const { t } = useT()
   const estat = estatValidacio(op)
+  // Sin albarán de salida: una venta o maquila del modelo nuevo (un OPE heredado sí lo tiene).
+  const senseAlbara = esVendaOMaquila(op.modalitat) && !op.albara_numero
 
   if (estat === 'validada' || op.estat_recollida === 'confirmada' || op.estat_recollida === 'conciliada') {
     return (
-      <div className="flex items-start gap-2 rounded-lg bg-exito-fondo p-3 text-sm text-exito">
-        <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
-        <p className="min-w-0">{t('rrec.as_ja_validada')}</p>
+      <div className="space-y-3" data-testid="recollida-validada">
+        <div className="flex items-start gap-2 rounded-lg bg-exito-fondo p-3 text-sm text-exito">
+          <CheckCircle2 className="mt-0.5 size-4 shrink-0" aria-hidden />
+          <p className="min-w-0">
+            {senseAlbara
+              ? t('rrec.as_ja_validada_venda', { kg: kgFmt(op.kg_rebuts) })
+              : t('rrec.as_ja_validada')}
+          </p>
+        </div>
+        {senseAlbara ? (
+          <div className="space-y-2 rounded-lg border p-3">
+            <p className="text-sm font-medium">{t('dcan.title')}</p>
+            <DocumentsCanalitzacio canalitzacio={op.canalizacion_id} idPrefix={`drr-doc-${op.canalizacion_id}`} />
+          </div>
+        ) : (
+          <div className="space-y-2">
+            <p className="text-sm font-medium">{t('arec.title')}</p>
+            <AlbaransRecollida canalitzacio={op.canalizacion_id} excedentId={op.excedente_id} versio={versio} />
+          </div>
+        )}
       </div>
     )
   }
@@ -132,7 +166,9 @@ function FormulariValidacio({ op, onFet }: { op: Operacio; onFet: () => void }) 
   const errKg = intentat && (kgFinal == null || kgFinal <= 0)
   const errMotiu = intentat && calMotiu && motiu.trim() === ''
   const dif = kgFinal != null && assignats != null ? Math.round((kgFinal - assignats) * 100) / 100 : null
-  const venda = op.modalitat === 'venda' || op.modalitat === 'maquila'
+  // Venta o maquila: sin albarán desde la fase 3; con un OPE heredado, el camino de antes.
+  const venda = esVendaOMaquila(op.modalitat)
+  const senseAlbara = venda && !op.albara_numero
   const motiuReceptor = op.incidencia_recollida?.descripcion ?? null
 
   async function valida() {
@@ -162,7 +198,9 @@ function FormulariValidacio({ op, onFet }: { op: Operacio; onFet: () => void }) 
   if (fet) {
     return (
       <div className="space-y-2 rounded-lg bg-exito-fondo p-3 text-sm text-exito" data-testid="validacio-feta">
-        <p className="font-medium">{t(fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}</p>
+        <p className="font-medium">
+          {t(fet.sense_albara ? 'vrec.fet_sense_albara' : fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}
+        </p>
         {fet.albara && <p>{t('vrec.fet_sortida', { num: fet.albara })}</p>}
         {fet.rec?.numero && <p>{t('vrec.fet_rec', { num: fet.rec.numero })}</p>}
         {fet.esperant_altres && !fet.rec?.numero && <p>{t('vrec.fet_esperant')}</p>}
@@ -203,14 +241,15 @@ function FormulariValidacio({ op, onFet }: { op: Operacio; onFet: () => void }) 
           {errMotiu && <p role="alert" className="text-sm text-error">{t('vrec.err_cal_motiu')}</p>}
         </div>
       </div>
-      {/* Lo que va a pasar, antes de pulsar: documentos con número legal que se envían. */}
+      {/* Lo que va a pasar, antes de pulsar: documentos con número legal (o, en una venta o
+          maquila sin albarán, la recogida conciliada sin documento de Redestina). */}
       <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
-        {t(venda ? 'vrec.avis_venda' : 'vrec.avis', { kg: kgFinal != null ? kgFmt(kgFinal) : '—' })}
+        {t(senseAlbara ? 'vrec.avis_venda' : venda ? 'vrec.avis_ope' : 'vrec.avis', { kg: kgFinal != null ? kgFmt(kgFinal) : '—' })}
       </p>
       {error && <p role="alert" className="text-sm text-error">{error}</p>}
       <div className="flex justify-end">
         <Button className="h-11 w-full whitespace-normal sm:w-auto md:h-8" disabled={ocupat} onClick={() => void valida()}>
-          {ocupat && <Loader2 className="size-4 animate-spin" />}{t('vrec.dlg_go')}
+          {ocupat && <Loader2 className="size-4 animate-spin" />}{t(senseAlbara ? 'vrec.dlg_go_venda' : 'vrec.dlg_go')}
         </Button>
       </div>
     </div>

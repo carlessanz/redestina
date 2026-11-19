@@ -66,6 +66,7 @@ import BotoAmbMotiu from '../../components/proces/BotoAmbMotiu'
 import { useConfirma } from '../../components/DialegConfirma'
 import EnllacOrganitzacio from '../../components/EnllacOrganitzacio'
 import CuaSignatures from '../../components/equip/CuaSignatures'
+import CuaRecollidesEquip from '../../components/equip/CuaRecollidesEquip'
 import { Badge } from '@/components/ui/badge'
 import FormulariAprovacio from '../../components/equip/FormulariAprovacio'
 import type { Modalitat } from '../../types'
@@ -1022,7 +1023,7 @@ export default function Aprovacions() {
                     <BotoAmbMotiu size="sm" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                       disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
                       onClick={() => obreValidacio(r)}>
-                      {t('vrec.go')}
+                      {t(r.valorizacion === 'venda' || r.valorizacion === 'maquila' ? 'vrec.dlg_go_venda' : 'vrec.go')}
                     </BotoAmbMotiu>
                     <BotoAmbMotiu size="sm" variant="outline" className="h-11 w-full whitespace-normal sm:w-auto md:h-8"
                       disabled={bloquejat} motiu={potAprovar ? undefined : t('vrec.need_admin')}
@@ -1036,6 +1037,10 @@ export default function Aprovacions() {
           })}
         </CardContent>
       </Card>
+
+      {/* ── 4bis. Recollides per registrar (fase 3 de los puntos 4-6): ventas y maquilas sin
+             albarán cuya recogida ya es del equipo. Componente propio, anclado en `#recollides-equip`. */}
+      <CuaRecollidesEquip q={q} />
 
       {/* ── 5. Signatures per tancar (05-11-2026): lo que una organización firmó fuera y subió.
              Componente propio: lee su vista, decide el super_admin y se ancla en `#signatures`. */}
@@ -1151,7 +1156,9 @@ function DialegValidacio({
 
         {fet ? (
           <div className="space-y-2 rounded-lg bg-exito-fondo p-3 text-sm text-exito" data-testid="validacio-feta">
-            <p className="font-medium">{t(fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}</p>
+            <p className="font-medium">
+              {t(fet.sense_albara ? 'vrec.fet_sense_albara' : fet.conciliat ? 'vrec.fet_conciliat' : 'vrec.fet')}
+            </p>
             {fet.albara && <p>{t('vrec.fet_sortida', { num: fet.albara })}</p>}
             {fet.rec?.numero && <p>{t('vrec.fet_rec', { num: fet.rec.numero })}</p>}
             {/* «Es generarà» solo si el REC aún no tiene número: en una oferta del flujo
@@ -1189,7 +1196,9 @@ function DialegValidacio({
                 {errMotiu && <p role="alert" className="text-sm text-error">{t('vrec.err_cal_motiu')}</p>}
               </div>
             </div>
-            {/* Lo que va a pasar, antes de pulsar: documentos con número legal que se envían. */}
+            {/* Lo que va a pasar, antes de pulsar. Fase 3 de los puntos 4-6: una venta o maquila no
+                tiene albarán (la recogida queda conciliada; si arrastra un OPE ya emitido, la base
+                lo concilia igual, y el texto de venta lo dice). */}
             <p className="rounded-md bg-aviso-fondo p-3 text-sm text-aviso">
               {t(venda ? 'vrec.avis_venda' : 'vrec.avis', { kg: kgFinal != null ? kgFmt(kgFinal) : '—' })}
             </p>
@@ -1203,7 +1212,7 @@ function DialegValidacio({
           </Button>
           {!fet && (
             <Button className="h-11 whitespace-normal md:h-8" disabled={ocupat} onClick={onConfirma}>
-              {ocupat && <Loader2 className="size-4 animate-spin" />}{t('vrec.dlg_go')}
+              {ocupat && <Loader2 className="size-4 animate-spin" />}{t(venda ? 'vrec.dlg_go_venda' : 'vrec.dlg_go')}
             </Button>
           )}
         </DialogFooter>

@@ -4,8 +4,12 @@
 // 2. «Registra la recollida (en nom de X)» por entrega (`DialegRegistraRecollida`): el mismo
 //    formulario que ve la receptora, que registra y valida en una llamada; si la receptora ya
 //    la registró, lo que se abre es validarla;
-// 3. los ALBARANES que han salido, con su número y su PDF: los emite la validación, no aquí;
-// 4. CONCILIAR lo que no se haya conciliado solo —un REC fuera de tolerancia, una salida
+// 3. los ALBARANES que han salido, con su número y su PDF: los emite la validación, no aquí.
+//    Desde la fase 3 de los puntos 4-6 una donación tiene, por recogida, su ENT y SU REC, que
+//    salen emitidos y conciliados en el mismo acto; una venta o maquila no tiene albarán, y lo
+//    que la acredite (albarán del productor, factura, foto) se cuelga de la entrega
+//    (`DocumentsCanalitzacio`);
+// 4. CONCILIAR solo las excepciones —un REC heredado fuera de tolerancia, una salida
 //    confirmada por el circuito anterior—, en la misma pantalla (`DialegConciliarAlbara`).
 //
 // ⚠️ Una espigolada no tiene receptora que registre: sus albaranes de salida los emite el
@@ -31,6 +35,8 @@ import BotoAmbMotiu from '../../proces/BotoAmbMotiu'
 import DialegAssistit from '../DialegAssistit'
 import { DialegConciliarAlbara } from '../DialegConciliar'
 import DialegRegistraRecollida from '../DialegRegistraRecollida'
+import DocumentsCanalitzacio from '../../DocumentsCanalitzacio'
+import { esVendaOMaquila, sortidaDe } from '../../../lib/albaransRecollida'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -197,6 +203,9 @@ function Entrega({ c, ca, onRegistra }: { c: ContextFase; ca: CanalitzacioCanal;
 
   const kgAssignats = ca.kg_confirmados != null ? fmtKg(ca.kg_confirmados) : '—'
   const kgReals = ca.kg_declarats ?? null
+  // Venta o maquila validada sin albarán (fase 3): sus documentos cuelgan de la entrega.
+  const docsPropis = estat === 'validada' && esVendaOMaquila(ca.valorizacion)
+    && sortidaDe(c.fets.albarans, ca.id) == null
 
   return (
     <div className="space-y-3 rounded-md border p-3" data-testid="entrega-canalitzacio">
@@ -244,6 +253,12 @@ function Entrega({ c, ca, onRegistra }: { c: ContextFase; ca: CanalitzacioCanal;
         >
           {estat === 'per_validar' ? t('rrec.as_btn_validar') : t('cfase.registra_en_nom', { entitat: nom })}
         </BotoAmbMotiu>
+      )}
+      {docsPropis && (
+        <div className="space-y-2 border-t pt-3">
+          <p className="text-xs font-medium text-muted-foreground">{t('dcan.title')}</p>
+          <DocumentsCanalitzacio canalitzacio={ca.id} idPrefix={`cd-docs-${ca.id}`} />
+        </div>
       )}
     </div>
   )

@@ -10,7 +10,7 @@ import type { EntidadPuntuada } from '../lib/redestina'
 import { activitatsPresents, comarquesPresents, filtraRanking, FRANGES_KG, FRANGES_RECEPCIO, hiHaCapacitat, hiHaInteresProducte, hiHaQuantitatHabitual, modalitatsPresents, PAS_RANKING, tipusPresents } from '../lib/rankingEntitats'
 import { carregaTipusActivitat } from '../lib/organitzacio'
 import type { FranjaKg, FranjaRecepcio } from '../lib/rankingEntitats'
-import { dataCurta } from '../lib/format'
+import { dataCurta, kg as fmtKg, preu as fmtPreu } from '../lib/format'
 import BotoCopiar from './BotoCopiar'
 import Desplegable from './Desplegable'
 import { useT } from '../lib/i18n'
@@ -49,8 +49,14 @@ import { Casella, FilaCasella } from './Casella'
 import { SelectorFotos } from './FotosOferta'
 import { fixaFotos } from '../lib/fotos'
 import ValorCanalitzacio from './ValorCanalitzacio'
+import DialegRegistraRecollida from './equip/DialegRegistraRecollida'
+import DocumentsCanalitzacio from './DocumentsCanalitzacio'
+import { esVendaOMaquila, recDe, recDeLOferta, recHeretat, sortidaDe } from '../lib/albaransRecollida'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import {
+  Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle,
+} from '@/components/ui/dialog'
 
 interface Props {
   excedente: Excedente
@@ -208,13 +214,22 @@ export default function OfferDetail({ excedente, onBack }: Props) {
 
   useEffect(() => { void recargar() }, [recargar])
 
-  /** El albarán de salida (ENT u OPE) de una canalización concreta. */
-  const albaraDe = useCallback(
-    (canalitzacioId: string) => albarans.find((a) => a.canalizacion_id === canalitzacioId) ?? null,
-    [albarans],
-  )
-  /** El de recepción del registro: es el que se concilia. */
-  const albaraRec = useMemo(() => albarans.find((a) => a.tipo === 'REC') ?? null, [albarans])
+  /**
+   * El albarán de salida (ENT u OPE) de una canalización concreta. ⚠️ Con el tipo: desde la
+   * fase 3 de los puntos 4-6 el REC propio de la recogida comparte `canalizacion_id`, y un
+   * `find` a secas podía devolverlo a él.
+   */
+  const albaraDe = useCallback((canalitzacioId: string) => sortidaDe(albarans, canalitzacioId), [albarans])
+  /** El REC de una recogida: el suyo o, en una oferta del modelo viejo, el heredado. */
+  const recDeCanal = useCallback((canalitzacioId: string) => recDe(albarans, canalitzacioId), [albarans])
+  /** El REC que cuenta la etapa de la oferta: el menos avanzado (va al ritmo de la más atrasada). */
+  const albaraRec = useMemo(() => recDeLOferta(albarans, canalizaciones), [albarans, canalizaciones])
+  /** El REC heredado (uno por oferta), si lo hay: es el único que tiene sentido en la cabecera. */
+  const albaraRecHeretat = useMemo(() => recHeretat(albarans), [albarans])
+  // «Registrar la recollida» (fase 3 de los puntos 4-6): el diálogo, por canalización.
+  const [registrant, setRegistrant] = useState<{ id: string; entitat: string } | null>(null)
+  // Los documentos propios de una venta o maquila (sin albarán), en su diálogo.
+  const [docsDe, setDocsDe] = useState<{ id: string; entitat: string } | null>(null)
 
   const recargarRespuestas = useCallback(async () => {
     const { data, error } = await supabase
@@ -639,6 +654,9 @@ export default function OfferDetail({ excedente, onBack }: Props) {
     // `canalizaciones` se lee con `*`, así que las fechas nuevas ya llegan en la fila.
     nRecollidesPerValidar: vives.filter((c) =>
       estatValidacio(c as unknown as DatesValidacio) === 'pendent_validacio').length,
+    // Fase 3 de los puntos 4-6: una venta o maquila se concilia sin albarán y cierra la oferta.
+    recollidesConciliades: vives.length > 0
+      && vives.every((c) => c.kg_conciliados != null || c.estado === 'conciliada'),
   }, 'equip')
   const foraDelCami = punt.index < 0
   const estat = etiquetaEstatOferta(exc.estado)
@@ -1080,6 +1098,17 @@ export default function OfferDetail({ excedente, onBack }: Props) {
             const anulada = c.estado === 'anulada'
             // `canalizaciones` se lee con `*`: las fechas de la recogida ya vienen en la fila.
             const fila = c as Canalizacion & DatesValidacio
+            // Cada recogida enseña SU salida y SU REC (fase 3 de los puntos 4-6; el REC
+            // heredado de la oferta si es del modelo viejo).
+            const sortida = albaraDe(c.id)
+            const rec = esVendaOMaquila(c.valorizacion) ? null : recDeCanal(c.id)
+            // Venta o maquila sin albarán: la recogida validada es el cierre, sin documento.
+            const senseAlbara = esVendaOMaquila(c.valorizacion) && !sortida
+            const validada = Boolean(fila.recollida_validada_at) || c.estado === 'conciliada'
+            const perValidar = !validada && estatValidacio(fila) === 'pendent_validacio'
+            // «Registrar la recollida»: viva, sin validar y fuera de una espigolada (allí no hay
+            // receptora que registre; las salidas se emiten desde la ficha del albarán).
+            const potRegistrar = !anulada && !validada && !exc.espigolada_id
             return (
               <div key={c.id} data-testid="od-canalitzacio"
                 className="flex flex-wrap items-center gap-x-3 gap-y-1 border-b pb-2 text-sm">
@@ -1108,21 +1137,65 @@ export default function OfferDetail({ excedente, onBack }: Props) {
                 {c.valorizacion === 'donacio' && <ValorCanalitzacio c={c} />}
                 {/* El albarán ya no es un texto que compone el panel con marcadores y sin
                     número: es una fila numerada de `albaranes` con su PDF. Aquí solo se
-                    enlaza (checkpoint §12.4 y deuda 40, cerradas). */}
-                {albaraDe(c.id)
-                  ? (
-                    <Button asChild variant="outline" size="sm">
-                      <Link to={`/equip/albarans/${albaraDe(c.id)?.id}`}>
-                        {albaraDe(c.id)?.numero_completo ?? t('od.albara')}
-                      </Link>
-                    </Button>
-                  )
-                  : !anulada && <span className="text-xs text-muted-foreground">{t('od.albara_pending')}</span>}
+                    enlaza (checkpoint §12.4 y deuda 40, cerradas). La salida y su REC. */}
+                {sortida && (
+                  <Button asChild variant="outline" size="sm" className="h-11 md:h-8">
+                    <Link to={`/equip/albarans/${sortida.id}`} data-testid="od-albara-sortida">
+                      {sortida.numero_completo ?? t(`arec.tipus_${sortida.tipo}`)}
+                    </Link>
+                  </Button>
+                )}
+                {rec && (
+                  <Button asChild variant="outline" size="sm" className="h-11 md:h-8">
+                    <Link to={`/equip/albarans/${rec.id}`} data-testid="od-albara-rec">
+                      {rec.numero_completo ?? t('od.albara_rec')}
+                    </Link>
+                  </Button>
+                )}
+                {!sortida && !anulada && !senseAlbara && (
+                  <span className="text-xs text-muted-foreground">{t('od.albara_pending')}</span>
+                )}
+                {/* Venta o maquila (fase 3): no hay albarán de Redestina. Lo que se enseña es el
+                    registro —kilos, cajas y precio— y los documentos propios que se adjunten. */}
+                {senseAlbara && !anulada && (
+                  <span className="text-xs text-muted-foreground" data-testid="od-registre-venda">
+                    {validada
+                      ? t('od.venda_tancada', {
+                        kg: fmtKg(c.kg_conciliados ?? c.kg_reales ?? c.kg_confirmados),
+                        caixes: c.caixes_entregades != null ? String(c.caixes_entregades) : '—',
+                        preu: c.preu_acordat_kg != null ? fmtPreu(c.preu_acordat_kg) : '—',
+                      })
+                      : t('od.venda_sense_albara')}
+                  </span>
+                )}
                 {!anulada && (
-                  <div className="ml-auto flex items-center gap-1">
+                  <div className="ml-auto flex flex-wrap items-center gap-1">
+                    {potRegistrar && (
+                      <BotoAmbMotiu size="sm" className="h-11 whitespace-normal md:h-8"
+                        variant={perValidar ? 'default' : 'outline'}
+                        disabled={!potAprovar}
+                        motiu={potAprovar ? undefined : t('recol.need_admin')}
+                        onClick={() => setRegistrant({ id: c.id, entitat: nombrePorId(c.entidad_id) })}>
+                        {t(perValidar ? 'rrec.as_btn_validar' : 'od.b_registrar_recollida')}
+                      </BotoAmbMotiu>
+                    )}
+                    {validada && !senseAlbara && (
+                      <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                        onClick={() => setRegistrant({ id: c.id, entitat: nombrePorId(c.entidad_id) })}>
+                        {t('od.b_albarans_recollida')}
+                      </Button>
+                    )}
+                    {senseAlbara && (
+                      <Button size="sm" variant="outline" className="h-11 whitespace-normal md:h-8"
+                        onClick={() => setDocsDe({ id: c.id, entitat: nombrePorId(c.entidad_id) })}>
+                        {t('dcan.b_obre')}
+                      </Button>
+                    )}
                     <AccionsAssignacio
                       c={fila}
-                      estatsAlbarans={albarans.filter((a) => a.canalizacion_id === c.id).map((a) => a.estado)}
+                      estatsAlbarans={albarans
+                        .filter((a) => a.canalizacion_id === c.id && (a.tipo === 'ENT' || a.tipo === 'OPE'))
+                        .map((a) => a.estado)}
                       kgMaxim={exc.kg_total}
                       potAprovar={potAprovar}
                       idPrefix={`od-asg-${c.id}`}
@@ -1146,12 +1219,12 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         <Card>
           <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-2">
             <CardTitle className="text-base">{t('od.recollida')}</CardTitle>
-            {/* El albarán de recepción del registro: es el que se emite, se confirma y se
-                concilia. Desde aquí se llega a su ficha sin pasar por el listado. */}
-            {albaraRec && (
+            {/* El albarán de recepción HEREDADO (uno por oferta, modelo anterior a la fase 3 de
+                los puntos 4-6). Con un REC por recogida, cada uno va en su fila de arriba. */}
+            {albaraRecHeretat && (
               <Button asChild variant="outline" size="sm">
-                <Link to={`/equip/albarans/${albaraRec.id}`}>
-                  {albaraRec.numero_completo ?? t('od.albara_rec')}
+                <Link to={`/equip/albarans/${albaraRecHeretat.id}`}>
+                  {albaraRecHeretat.numero_completo ?? t('od.albara_rec')}
                 </Link>
               </Button>
             )}
@@ -1189,6 +1262,26 @@ export default function OfferDetail({ excedente, onBack }: Props) {
         onTancar={() => setConvertint(false)}
         onCreada={() => { setConvertint(false); void recargar(); void refrescaComptadors() }}
       />
+
+      {/* «Registrar la recollida» desde la fila (fase 3 de los puntos 4-6): el mismo diálogo que
+          el ciclo guiado y la ficha del albarán. Al validar salen el ENT y su REC conciliados
+          (o, en venta y maquila, la recogida conciliada sin albarán), y el diálogo los enseña. */}
+      <DialegRegistraRecollida
+        canalitzacio={registrant?.id ?? null}
+        entitat={registrant?.entitat ?? null}
+        onTancar={() => setRegistrant(null)}
+        onFet={() => { void recargar(); void refrescaComptadors() }}
+      />
+
+      <Dialog open={docsDe !== null} onOpenChange={(o) => { if (!o) setDocsDe(null) }}>
+        <DialogContent className="max-h-[88dvh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>{t('dcan.title')}</DialogTitle>
+            <DialogDescription>{t('dcan.desc', { entitat: docsDe?.entitat ?? '' })}</DialogDescription>
+          </DialogHeader>
+          {docsDe && <DocumentsCanalitzacio canalitzacio={docsDe.id} idPrefix={`od-doc-${docsDe.id}`} />}
+        </DialogContent>
+      </Dialog>
 
       <DialegMotiu
         obert={noColocada}

@@ -130,6 +130,12 @@ export interface FetsOferta {
    * admin la valide (17-10-2026): todavía sin albaranes. Ausente = 0.
    */
   nRecollidesPerValidar?: number
+  /**
+   * Hay recogidas de Redestina y TODAS están conciliadas (fase 3 de los puntos 4-6). Hace falta
+   * porque una venta o maquila ya no tiene albarán: cerrada sin REC no quiere decir «tancada amb
+   * destí registrat a mà». Ausente = como antes.
+   */
+  recollidesConciliades?: boolean
 }
 
 export interface FetsInteres {
@@ -302,6 +308,9 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
   // mano (venta externa, compostaje…). Variante propia porque decir «recollida» o enviar a
   // los albaranes sería falso.
   if (fets.estado === 'cerrada') {
+    // Fase 3 de los puntos 4-6: una venta o maquila validada se concilia sin albarán y cierra
+    // la oferta. Es una recogida de Redestina, no un destino registrado a mano.
+    if (fets.recollidesConciliades) return fes('tancada', null, 4, { kg: fets.kgCanalitzats }, false)
     return fes('tancada', 'desti', 4, {}, false)
   }
   if (rec?.estado === 'confirmado') {
@@ -341,7 +350,9 @@ export function puntOferta(fets: FetsOferta, rol: RolMira): PuntProces {
     if (variant === 'coberta') {
       return rol === 'productor'
         ? fes('assignada', 'coberta', 1, {}, false)
-        : fes('assignada', 'coberta', 1, {}, true, '/equip/albarans')
+        // Fase 3 de los puntos 4-6: los albaranes ya no se emiten a mano; lo que toca es
+        // registrar la recogida desde la propia oferta (y validarla emite y concilia).
+        : fes('assignada', 'coberta', 1, {}, true, fets.id ? `/equip/ofertes/${fets.id}` : '/equip/albarans')
     }
     return rol === 'productor'
       ? fes('assignada', 'parcial', 1, { n: fets.kgCanalitzats, m: falten }, false)

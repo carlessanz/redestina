@@ -850,6 +850,28 @@ const ASSIGNACIO_LECTURA_RECEPTOR: Check[] = [
   { tabla: "oferta_respuestas", op: "leer", esperado: "permitir", columnas: "id, aprovat_per, assignacio_directa", descripcion: "veu qui va aprovar i si va ser assignacio directa (A1)", requiereFixture: "alguna resposta de la seva entitat" },
 ];
 
+// RECOGIDA, ALBARANES Y VENTAS (fase 3 de los puntos 4-6; 20270608100000–100400). Lo que el
+// arnés afirma (el resto —un REC por recogida, validar en un acto, venta y maquila sin albarán,
+// certificados 1:1— no es de permisos y se probó con transacciones en el clon):
+//
+//   · `canalitzacions_de_les_meves_orgs(p_user)`, el puente nuevo de la RLS de los documentos
+//     externos de una canalización: preguntar por OTRA persona da 42501 a CUALQUIER sesión
+//     (equipo incluido: no es una consulta del equipo, es la de la política), igual que
+//     `albarans_de_les_meves_orgs`;
+//   · las dos partes (productor y receptor) listan SUS canalizaciones por el puente, pueden
+//     preguntar si adjuntan un documento a una canalización (uuid inventado: `false`, sin error)
+//     y leen los externos de `objeto_tipo = 'canalizacion'` de lo suyo (`requiereFixture`: hasta
+//     que alguien suba uno con `subir-documento-externo`, 0 filas no prueba nada);
+//   · `pendents_equip()` pasa a 19 colas (`recollides_equip`): en los dos checks que ya existían.
+const CANALITZACIO_PONT_ALIE: Check[] = [
+  { tabla: "canalitzacions_de_les_meves_orgs", op: "rpc", esperado: "denegar", args: { p_user: "00000000-0000-0000-0000-0000000000ff" }, descripcion: "NO pregunta les canalitzacions d'una altra persona (fase 3)" },
+];
+const CANALITZACIO_EXTERNS_PART: Check[] = [
+  { tabla: "canalitzacions_de_les_meves_orgs", op: "rpc", esperado: "permitir", descripcion: "llista les canalitzacions de les SEVES organitzacions (fase 3)", requiereFixture: "alguna canalitzacio d'una oferta seva o de la seva entitat" },
+  { tabla: "puc_pujar_document_extern", op: "rpc", esperado: "permitir", args: { p_objeto_tipo: "canalizacion", p_objeto_id: "00000000-0000-0000-0000-000000000000" }, descripcion: "pot preguntar si adjunta un document a una canalitzacio (respon false, sense error) (fase 3)" },
+  { tabla: "documentos_externos", op: "leer", esperado: "permitir", filtros: [["objeto_tipo", "eq", "canalizacion"]], descripcion: "veu els documents propis de les SEVES vendes i maquiles (fase 3)", requiereFixture: "algun document extern d'una canalitzacio seva (subir-documento-externo amb objeto_tipo 'canalizacion')" },
+];
+
 // El bloque documental de CUALQUIER cuenta que no sea del equipo, sea cual sea su tipo.
 // Se escribe una vez y se reparte a los cinco perfiles externos: es literalmente la misma
 // afirmación en todos («nada del sistema documental es suyo salvo el nomenclátor»), y
@@ -1467,6 +1489,8 @@ const DOCUMENTAL_EXTERN: Check[] = [
   ...PREUS_EXTERN,
   // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): ver `ASSIGNACIO_SENSE_APROVAR`.
   ...ASSIGNACIO_SENSE_APROVAR,
+  // Recogida, albaranes y ventas (fase 3 de los puntos 4-6): ver `CANALITZACIO_PONT_ALIE`.
+  ...CANALITZACIO_PONT_ALIE,
 ];
 
 // Lo que CADA rol debe poder hacer. Es la especificación ejecutable de AGENTS.md §4:
@@ -1746,6 +1770,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...PREUS_TECNIC,
     // Asignación directa, modificar y anular (fase 2 de los puntos 4-6): el técnico no tiene `pot_aprovar()`.
     ...ASSIGNACIO_TECNIC,
+    // Recogida, albaranes y ventas (fase 3 de los puntos 4-6): ver `CANALITZACIO_PONT_ALIE`.
+    ...CANALITZACIO_PONT_ALIE,
     {
       tabla: "costes_producto",
       op: "leer",
@@ -2136,7 +2162,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     // volviera vacía, es que la función ha dejado de cumplir su contrato y eso sí es un
     // fallo. `security invoker`, o sea que lo que cuenta es lo que este técnico ya podía
     // leer; lo que se comprueba es que la guarda le deja pasar.
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: +preus, D1)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 19, descripcion: "consulta la cua de treball de l'equip (19 cues: +recollides_equip, fase 3)" },
     // Borrado de una ficha (20270328100100, deuda §12.108). El técnico SÍ puede preguntar
     // qué bloquea un borrado —es una pregunta del día a día, y sin ella el panel no podría
     // explicar por qué el botón no va a funcionar— y NO puede borrar: eso sigue siendo del
@@ -2420,6 +2446,8 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
     ...PREUS_SUPER,
     // Asignación directa, modificar y anular (fase 2 de los puntos 4-6).
     ...ASSIGNACIO_SUPER,
+    // Recogida, albaranes y ventas (fase 3 de los puntos 4-6): ver `CANALITZACIO_PONT_ALIE`.
+    ...CANALITZACIO_PONT_ALIE,
     // --- La via assistida (20270328100200 / 20270328100300 / 20270328100400) ---
     // ⚠️ Los tres «permitir» se llaman con un uuid INEXISTENTE a propósito, igual que los
     //    del ciclo de cierre: lo que se afirma es que la guarda de ROL deja pasar, no que
@@ -2726,7 +2754,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
       args: { p_id: "00000000-0000-0000-0000-000000000000" },
       descripcion: "pot validar una oferta (autoritza; l'oferta no existeix, 22023)",
     },
-    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 18, descripcion: "consulta la cua de treball de l'equip (18 cues: +preus, D1)" },
+    { tabla: "pendents_equip", op: "rpc", esperado: "permitir", filasExactas: 19, descripcion: "consulta la cua de treball de l'equip (19 cues: +recollides_equip, fase 3)" },
     {
       tabla: "convenios",
       op: "leer",
@@ -2843,6 +2871,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   ],
   productor: [
     ...ASSIGNACIO_LECTURA_PRODUCTOR,
+    ...CANALITZACIO_EXTERNS_PART,
     { tabla: "impacte_productor", op: "rpc", esperado: "permitir", args: { p_desde: "2026-01-01", p_hasta: "2026-12-31" }, descripcion: "veu el seu impacte (fase 10)" },
     { tabla: "productores", op: "leer", esperado: "permitir", descripcion: "ve SU ficha (solo la suya)" },
     // El archivo que el equipo guarda de SU organización (20270329100000): convenios
@@ -3162,6 +3191,7 @@ const MATRIZ: Record<Cuenta["rol"], Check[]> = {
   // tenga ofertas compatibles (hoy, la social).
   receptor: [
     ...ASSIGNACIO_LECTURA_RECEPTOR,
+    ...CANALITZACIO_EXTERNS_PART,
     // Un esborrany no circula (fase C del punto 3, 20270530100000): ni en el Mercat ni por
     // ninguna otra rama de la política de `excedentes`. Con el fixture de TEST-PROD-1 puesto,
     // ver uno sería un escape de verdad.
